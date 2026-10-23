@@ -326,6 +326,54 @@ describe('original transaction capability projections', () => {
     fixture.controller.close()
   })
 
+  it('records terminal admission and post-cleanup failures before a caught query can escape', async () => {
+    for (const selected of [false, true]) {
+      for (const terminal of [
+        (query: IQueryResult<IRow, undefined>) => query.chunk(0, () => undefined),
+        (query: IQueryResult<IRow, undefined>) => query.requirePushdown().count(),
+        (query: IQueryResult<IRow, undefined>) => query.firstOrThrow()
+      ]) {
+        const fixture = setup()
+        fixture.rows.clear()
+        const query = fixture.scope.use(records).query()
+        const result = terminal(selected ? query.select((row) => row) : query)
+        const failure = await result.catch((error: unknown) => error)
+        expect(failure).toBeInstanceOf(Error)
+        expect(fixture.onFailure).toHaveBeenCalledWith(failure)
+        fixture.controller.stopAdmission()
+        await expect(fixture.controller.runFinalizers()).rejects.toBe(failure)
+        fixture.controller.close()
+      }
+    }
+  })
+
+  it('admits every escaped read terminal before its own argument or empty-result validation', async () => {
+    const fixture = setup()
+    const query = fixture.scope.use(records).query()
+    const selected = query.select((row) => row)
+    fixture.controller.stopAdmission()
+    await fixture.controller.runFinalizers()
+    fixture.controller.close()
+    for (const escaped of [query, selected]) {
+      for (const terminal of [
+        () => escaped.all(),
+        () => escaped.first(),
+        () => escaped.maybe(),
+        () => escaped.firstOrThrow(),
+        () => escaped.pluck('value'),
+        () => escaped.exists(),
+        () => escaped.count(),
+        () => escaped.each(() => undefined),
+        () => escaped.chunk(0, () => undefined),
+        () => escaped.min('value'),
+        () => escaped.max('value'),
+        () => escaped.sum('value'),
+        () => escaped.avg('value')
+      ])
+        await expect(terminal()).rejects.toMatchObject({ code: 'TRANSACTION_FAILED' })
+    }
+  })
+
   it('refuses forged, missing, custom and expired scope authority without binding native data', () => {
     const fixture = setup()
     const missing = defineStorageCapability<{ read(): void }>()('missing')

@@ -9,7 +9,7 @@ import { readCapabilityTokenFacts } from './capability-token.js'
 import type { kv } from './capabilities/kv.js'
 import type { records } from './capabilities/records.js'
 import type { ICodecValue } from '@migaia/serialize/codec'
-import type { IRecordQuery, IQueryResult } from './query-chain.js'
+import { RecordQueryMethod, type IRecordQuery, type IQueryResult } from './query-chain.js'
 import {
   ConcurrencyPolicy,
   assertConcurrencyPolicy,
@@ -876,6 +876,33 @@ function runTransactionCapabilityMethod(
     return Reflect.apply(execute, api, args)
   })
 }
+/** Complete read terminals enter the original operation before validation, execution and cleanup. */
+function transactionRecordQueryReads<R>(scope: object, query: IQueryResult<R, undefined>) {
+  /** Only business arguments cross this zero-context projection; stream retains its iterator owner. */
+  const methods = [
+    [RecordQueryMethod.all, 0],
+    [RecordQueryMethod.first, 0],
+    [RecordQueryMethod.maybe, 0],
+    [RecordQueryMethod.firstOrThrow, 0],
+    [RecordQueryMethod.pluck, 1],
+    [RecordQueryMethod.exists, 0],
+    [RecordQueryMethod.count, 0],
+    [RecordQueryMethod.each, 1],
+    [RecordQueryMethod.chunk, 2],
+    [RecordQueryMethod.min, 1],
+    [RecordQueryMethod.max, 1],
+    [RecordQueryMethod.sum, 1],
+    [RecordQueryMethod.avg, 1]
+  ] as const
+  /** These wrappers borrow the immutable query rather than copying its nodes or owning execution. */
+  const reads: Record<string, unknown> = {}
+  for (const [method, argumentCount] of methods)
+    reads[method] = (...args: readonly unknown[]) =>
+      runTransactionOperation(scope, () =>
+        Reflect.apply(query[method], query, args.slice(0, argumentCount))
+      )
+  return reads as Pick<IQueryResult<R, undefined>, (typeof methods)[number][0]>
+}
 /** Adds original-owner admission to the actual selected chain without copying its nodes or plan. */
 function transactionRecordQueryResult<R>(
   scope: object,
@@ -883,7 +910,7 @@ function transactionRecordQueryResult<R>(
 ): IQueryResult<R, undefined> {
   return Object.freeze({
     ...query,
-    all: () => runTransactionOperation(scope, () => query.all()),
+    ...transactionRecordQueryReads(scope, query),
     explain: () => query.explain(),
     requirePushdown: () => transactionRecordQueryResult(scope, query.requirePushdown())
   })
@@ -907,6 +934,7 @@ function transactionRecordQuery<R>(
   >['select']
   return Object.freeze({
     ...query,
+    ...transactionRecordQueryReads(scope, query),
     where,
     select,
     limit: (count: number) => transactionRecordQuery(scope, query.limit(count)),
@@ -919,7 +947,6 @@ function transactionRecordQuery<R>(
           transactionRecordQuery(scope, pending.limit(count) as IRecordQuery<R, undefined>)
       }
     },
-    all: () => runTransactionOperation(scope, () => query.all()),
     explain: () => query.explain(),
     requirePushdown: () => transactionRecordQuery(scope, query.requirePushdown())
   }) as IRecordQuery<R, undefined>

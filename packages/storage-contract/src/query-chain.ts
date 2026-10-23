@@ -1104,7 +1104,10 @@ async function consumeRecordQuery<R, TResult>(
   node: IQueryNode | undefined,
   strict: boolean,
   ctx: IOperationContext | undefined,
-  consume: (read: () => Promise<IteratorResult<R>>) => Promise<TResult>
+  consume: (
+    read: () => Promise<IteratorResult<R>>,
+    ctx: IOperationContext | undefined
+  ) => Promise<TResult>
 ): Promise<TResult> {
   /** Opening synchronously admits the complete terminal to the original transaction owner. */
   const { iterator, read, ctx: captured } = openRecordQuery(source, node, strict, ctx)
@@ -1112,8 +1115,7 @@ async function consumeRecordQuery<R, TResult>(
     /** The terminal's scalar, bounded chunk or explicit all result stays inside the same operation. */
     let result: TResult
     try {
-      result = await consume(async () => (await read(advance)) as IteratorResult<R>)
-      assertQueryActive(captured)
+      result = await consume(async () => (await read(advance)) as IteratorResult<R>, captured)
     } catch (cause) {
       return failedRecordQuery(iterator, fail, cause)
     }
@@ -1275,7 +1277,7 @@ function recordQueryReads<R, TContext extends IOperationContext | undefined>(
       if (typeof fn !== 'function')
         throw invalidQueryCondition(undefined, StorageContractErrorText.queryArgument)
       assertClientTerminal()
-      return consumeRecordQuery<R, number>(source, node, strict, ctx, async (read) => {
+      return consumeRecordQuery<R, number>(source, node, strict, ctx, async (read, captured) => {
         /** The next original row is requested only after this callback completes. */
         let count = 0
         while (true) {
@@ -1283,6 +1285,7 @@ function recordQueryReads<R, TContext extends IOperationContext | undefined>(
           const next = await read()
           if (next.done) return count
           await fn(next.value, count++)
+          assertQueryActive(captured)
         }
       })
     },
@@ -1292,7 +1295,7 @@ function recordQueryReads<R, TContext extends IOperationContext | undefined>(
       if (typeof fn !== 'function')
         throw invalidQueryCondition(undefined, StorageContractErrorText.queryArgument)
       assertClientTerminal()
-      return consumeRecordQuery<R, number>(source, node, strict, ctx, async (read) => {
+      return consumeRecordQuery<R, number>(source, node, strict, ctx, async (read, captured) => {
         /** One caller-declared bounded batch is live at a time. */
         let rows: R[] = []
         /** The terminal counts accepted rows, including a final partial batch. */
@@ -1301,13 +1304,17 @@ function recordQueryReads<R, TContext extends IOperationContext | undefined>(
           /** Native exhaustion is observed through the same registered reader. */
           const next = await read()
           if (next.done) {
-            if (rows.length > 0) await fn(rows)
+            if (rows.length > 0) {
+              await fn(rows)
+              assertQueryActive(captured)
+            }
             return count
           }
           rows.push(next.value)
           count++
           if (rows.length === size) {
             await fn(rows)
+            assertQueryActive(captured)
             rows = []
           }
         }
