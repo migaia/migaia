@@ -112,6 +112,46 @@ describe('backend error and cancellation boundaries', () => {
     expect(report).toHaveBeenCalledExactlyOnceWith(diagnostic)
   })
 
+  it('classifies user pipeline failures while retaining the caller-admitted backend family', async () => {
+    /** A pipeline callback is an extension failure rather than evidence of native network failure. */
+    const failure = new RangeError('application pipeline failed')
+    const report = vi.fn()
+    await expect(
+      invokeExtension(
+        () => {
+          throw failure
+        },
+        'native',
+        'search',
+        'pipeline',
+        undefined,
+        { reporter: report }
+      )
+    ).rejects.toMatchObject({
+      source: '@migaia/storage-host',
+      code: 'EXTENSION_FAILED',
+      operation: 'search',
+      extensionStage: 'pipeline',
+      cause: failure
+    })
+    /** The existing optional normalizer retains the exact real backend-coded object. */
+    const original = backendError()
+    await expect(
+      invokeExtension(
+        () => {
+          throw original
+        },
+        'native',
+        'search',
+        'pipeline',
+        undefined,
+        { reporter: report },
+        (error) => (isStorageErrorFamily(error, IdentifyError.is) ? error : backendError(error))
+      )
+    ).rejects.toBe(original)
+    expect(report).not.toHaveBeenCalled()
+  })
+
   it('reports native listener-cleanup failure once without changing the operation result', () => {
     /** Use the actual supported signal boundary rather than a second cancellation implementation. */
     const controller = new AbortController()
