@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   compareStorageKeys,
   encodeOrderedStorageKey,
+  snapshotStorageBatchKeys,
   snapshotStorageKeyPrefix,
   snapshotStorageKey,
   type IStorageKey
@@ -50,6 +51,74 @@ const keys: readonly IStorageKey[] = [
 ]
 
 describe('ordered storage key encoding', () => {
+  it('captures each batch position once and retains typed equality without changing native order', () => {
+    /** Both container and nested key getters expose accidental recapture or encoding of raw input. */
+    let reads = 0
+    const key = Object.defineProperty([new Date(3)], 0, {
+      get() {
+        reads++
+        return new Date(3)
+      }
+    })
+    snapshotStorageKey(key, undefined)
+    const expectedReads = reads
+    reads = 0
+    let positions = 0
+    const input = Object.defineProperty([key, [new Date(3)], 0, -0, '0'], 0, {
+      get() {
+        positions++
+        return key
+      }
+    })
+    const batch = snapshotStorageBatchKeys(input, 'memory')
+    expect(reads).toBe(expectedReads)
+    expect(positions).toBe(1)
+    expect(batch.map((entry) => entry.firstIndex)).toEqual([0, 0, 2, 2, 4])
+    expect(batch.map((entry) => entry.identity)).toEqual(
+      batch.map((entry) =>
+        Array.from(encodeOrderedStorageKey(entry.key, 'memory'), (byte) =>
+          byte.toString(16).padStart(2, '0')
+        ).join('')
+      )
+    )
+    expect(Object.isFrozen(batch)).toBe(true)
+    expect(batch.every((entry) => Object.isFrozen(entry))).toBe(true)
+    /** Independent binary snapshots survive both caller mutation and an equivalent duplicate. */
+    const bytes = new Uint8Array([1, 2])
+    const binary = snapshotStorageBatchKeys([bytes.buffer, bytes.slice().buffer], undefined)
+    bytes.fill(9)
+    expect(binary[0]!.key).toEqual(new Uint8Array([1, 2]).buffer)
+    expect(binary[1]!.firstIndex).toBe(0)
+  })
+
+  it('rejects canonical write duplicates and invalid batch input before exposing any native work', () => {
+    for (const keys of [
+      [0, -0],
+      [new Date(3), new Date(3)],
+      [['x'], ['x']]
+    ])
+      expect(() =>
+        snapshotStorageBatchKeys(keys, 'catalog', { rejectDuplicates: true })
+      ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT', backend: 'catalog' }))
+    expect(snapshotStorageBatchKeys([], undefined, { rejectDuplicates: true })).toEqual([])
+    expect(() => snapshotStorageBatchKeys([NaN], 'catalog')).toThrowError(
+      expect.objectContaining({ code: 'INVALID_KEY', backend: 'catalog' })
+    )
+    expect(() => snapshotStorageBatchKeys(null as never, 'catalog')).toThrowError(
+      expect.objectContaining({ code: 'INVALID_ARGUMENT', backend: 'catalog' })
+    )
+    /** A caller getter failure remains the exact cause at the owning batch argument boundary. */
+    const original = new Error('batch key read failed')
+    const input = Object.defineProperty(['x'], 0, {
+      get() {
+        throw original
+      }
+    })
+    expect(() => snapshotStorageBatchKeys(input, 'catalog')).toThrowError(
+      expect.objectContaining({ code: 'INVALID_ARGUMENT', cause: original })
+    )
+  })
+
   it('preserves comparator signs and equality across the complete supported key table', () => {
     /** Encodings are computed once per input; each comparison inspects only its own bytes. */
     const encoded = keys.map((key) => encodeOrderedStorageKey(key, 'memory'))
