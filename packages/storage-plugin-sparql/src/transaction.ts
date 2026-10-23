@@ -18,7 +18,7 @@ import {
 import type { IStorageBackendOrgContext } from '@migaia/storage-host'
 import { throwIfAborted } from '@migaia/storage-host/authoring/backend'
 import { captureQuads, quadIdentity } from './rdf.js'
-import { invalidArgument, normalizeSparqlError } from './errors.js'
+import { invalidArgument, normalizeTransactionFailure } from './errors.js'
 import { SparqlText } from './text.js'
 import type { ISparqlTransactionScope, ISparqlTxRdf, ISparqlTxUpdateApi } from './types.js'
 /** Each canonical quad retains only its final native draft operation. */
@@ -220,7 +220,7 @@ export async function runSparqlAttempt<R>(
     void stage.afterCommit?.(draft.size)
     return { status: 'committed', value }
   } catch (error) {
-    const failure = normalizeSparqlError(error)
+    const failure = normalizeTransactionFailure(error)
     void stage.afterRollback?.('code' in failure ? String(failure.code) : undefined)
     throw failure
   } finally {

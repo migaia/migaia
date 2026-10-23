@@ -48,3 +48,5 @@ Standard RDF accepts ground named subjects/predicates, named or literal objects,
 `ERROR_SOURCE` is `storage.backend.sparql`. `SPARQL_REQUEST_FAILED` retains explicit native HTTP refusal status/body/cause. `SPARQL_UNAVAILABLE` reports read transport/5xx failures. `SPARQL_RESPONSE_INVALID` reports invalid results/documents. `SPARQL_COMMIT_UNKNOWN` means a sent write lacks confirmation: it is not replayed, and later writes on this installed backend reject. Inspect the native dataset, then create a new backend. Local invalid input and unsupported capabilities use the original shared error family. Native error types and original causes/stacks remain reachable; authentication headers/configuration are not copied into hooks or error data.
 
 See [USEGUIDE.en.md](./USEGUIDE.en.md) for HTTP deployment requirements, transactions, query writes, Graph Store, ontology, costs and marker cleanup.
+
+Transaction callback, draft or finalizer business failures use `TRANSACTION_FAILED`, preserving the original native type and primary cause; they do not report endpoint unavailability. Existing contract and native protocol errors retain their identities.

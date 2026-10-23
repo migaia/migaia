@@ -48,7 +48,13 @@ import {
   readAbortReason
 } from '@migaia/storage-host/authoring/backend'
 import type { IStoragePluginCore } from '@migaia/storage-host'
-import { capture, invalidArgument, normalizeSparqlError, sparqlError } from './errors.js'
+import {
+  capture,
+  invalidArgument,
+  normalizeSparqlError,
+  normalizeTransactionFailure,
+  sparqlError
+} from './errors.js'
 import { ERROR_SOURCE, SparqlErrorCode } from './error-code.js'
 import { SparqlText } from './text.js'
 import { parseSparqlResults } from './results.js'
@@ -222,7 +228,9 @@ export function createSparqlBackend(endpoint: ISparqlEndpoint, core: IStoragePlu
         protect
           ? reading(ctx, (signal) => endpoint.query(text, accept, signal))
           : endpoint.query(text, accept, ctx.signal)
-      )
+      ).catch((error: unknown) => {
+        throw normalizeSparqlError(error)
+      })
     /** Canonical ground SELECT returns logical graph terms; blank/native marker rows never leak. */
     const readQuads = async (
       pattern: Partial<IQuad>,
@@ -621,7 +629,7 @@ export function createSparqlBackend(endpoint: ISparqlEndpoint, core: IStoragePlu
     const createOwner = () =>
       createTransactionOwner<unknown, ISparqlTransactionScope>(
         base,
-        (error) => normalizeSparqlError(error) as Error & { source: string; code: string },
+        (error) => normalizeTransactionFailure(error) as Error & { source: string; code: string },
         {
           defaultPolicy: ConcurrencyPolicy.optimistic(),
           concurrencyStages: ports.stageBindings.concurrencyStages(store)

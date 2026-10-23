@@ -1,5 +1,6 @@
 import { describe, it, expect, onTestFinished } from 'vitest'
 import { Store } from 'oxigraph'
+import { walkErrorCauses } from '@migaia/utils/error'
 import { createStorageHost, createOrgId, definePlugin, defineFeature } from '@migaia/storage-host'
 import {
   rdf,
@@ -104,17 +105,44 @@ describe('native RDF storage and atomic transactions', () => {
   })
   it('rolls back callback/captured/unawaited failures before any native write and reads its own draft', async () => {
     const { store, updates } = await installed(),
-      original = quad('original')
+      original = quad('original'),
+      business = new RangeError('caller callback failed'),
+      originalStack = business.stack
     await store.use(rdf).add([original])
     updates.length = 0
-    await expect(
-      store.transaction(async (scope) => {
+    const failure = await store
+      .transaction(async (scope) => {
         await scope.use(rdf).add([quad('a'), quad('b'), quad('c')])
         await scope.use(rdf).delete([original])
         expect(await scope.use(rdf).match({}).count()).toBe(3)
-        throw new Error('caller callback failed')
+        throw business
       })
-    ).rejects.toBeInstanceOf(Error)
+      .catch((error: unknown) => error)
+    expect(failure).toBe(business)
+    expect(failure).toMatchObject({ source: 'storage.backend.sparql', code: 'TRANSACTION_FAILED' })
+    expect(business.stack).toBe(originalStack)
+    for (const cause of [
+      new Error('ordinary callback failed'),
+      Object.freeze(new RangeError('frozen callback failed'))
+    ]) {
+      const failed = await store
+        .transaction(() => {
+          throw cause
+        })
+        .catch((error: unknown) => error)
+      expect(failed).toMatchObject({ source: 'storage.backend.sparql', code: 'TRANSACTION_FAILED' })
+      expect([...walkErrorCauses(failed)]).toContain(cause)
+      expect(cause.stack).not.toBe('')
+      if (cause instanceof RangeError) expect(failed).toBeInstanceOf(RangeError)
+    }
+    const transport = new TypeError('native read connection failed'),
+      network = await installed({
+        query: (body, next) => (body.startsWith('SELECT') ? Promise.reject(transport) : next())
+      })
+    await expect(
+      network.store.transaction((scope) => scope.use(rdf).match({}).all())
+    ).rejects.toMatchObject({ source: 'storage.backend.sparql', code: 'SPARQL_UNAVAILABLE' })
+    expect(network.updates).toHaveLength(0)
     expect(updates).toHaveLength(0)
     expect(await store.use(rdf).match({}).all()).toEqual([original])
     await expect(

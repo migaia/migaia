@@ -89,3 +89,5 @@ ontology 缺省 merge，replace 沿真实 per-graph replace。返回解析条数
 store 操作及 Feature 终点均经原 async pipeline。存储 hooks、beforeSparqlUpdate、onPreconditionFailed、onHttpRequest 只观察，抛错/拒绝只 report，不能中止或改写；干预写 pipeline stage。更新事件只有操作/前提数量，HTTP 只有脱敏 route、method、可选 status 与耗时，无认证或正文。
 
 错误域与四类原生错误见 README。读写成本按实际 RDF 字节；草稿预期 O(q)，条件文本 O(q+p) 加实际 quad 字节，native match 读取实际结果后沿共享客户端预算执行，文档 O(字节+quad) 并完整传输。不含数据库计划、网络与推理成本，不增加第二套时钟、重试器或执行平台。
+
+原事务 callback、已接受 draft 任务或 finalizer 的业务失败使用 `TRANSACTION_FAILED`，原失败仍为 primary，原生类型与 stack 保留。原生读取在读取边界归族，因此事务内 transport 失败仍为 `SPARQL_UNAVAILABLE`；已有 contract/协议错误不改身份。

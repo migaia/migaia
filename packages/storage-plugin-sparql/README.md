@@ -48,3 +48,5 @@ endpoint 与 Oxigraph Store 均由调用方创建并拥有，后端不关闭它�
 `ERROR_SOURCE` 为 `storage.backend.sparql`。`SPARQL_REQUEST_FAILED` 保留原生 HTTP 明确拒绝的 status/body/cause；`SPARQL_UNAVAILABLE` 表示读取 transport/5xx 失败；`SPARQL_RESPONSE_INVALID` 表示结果或文档非法；`SPARQL_COMMIT_UNKNOWN` 表示已发送写缺少确认，不自动重放，当前后端后续写入拒绝。先核实原生 dataset，再创建新后端。本地非法输入与能力不支持沿原共享错误族。原生错误类型、原 cause/stack 可达，认证头与配置不进入错误数据或 hooks。
 
 HTTP 部署要求、事务、查询写入、Graph Store、ontology、成本与 marker 清理见 [USEGUIDE.md](./USEGUIDE.md)。
+
+事务 callback、draft 或 finalizer 的业务失败使用 `TRANSACTION_FAILED`，保留原生类型与原 primary，不冒充端点不可用；已有 contract 与原生协议错误保持原身份。

@@ -78,8 +78,8 @@ export const storagePluginSparqlReference: ILibraryReference = {
     SparqlErrorCode: {
       role: 'constant',
       purpose: t(
-        'Classify native refusal, read availability, invalid response and uncertain commits with original causes.',
-        '分类原生拒绝、读取不可用、响应非法与提交未知，保留原始原因。'
+        'Classify native protocol failures and transaction business failures while retaining original causes.',
+        '分类原生协议失败与事务业务失败，保留原始原因。'
       )
     },
     httpEndpoint: {
@@ -367,10 +367,14 @@ export const storagePluginSparqlReference: ILibraryReference = {
   enums: {
     SparqlErrorCode: {
       summary: t(
-        'Native SPARQL error categories preserve cause and native runtime types.',
-        '原生 SPARQL 错误族保留 cause 与原生类型。'
+        'SPARQL boundary errors preserve causes and native runtime types.',
+        'SPARQL 边界错误保留 cause 与原生类型。'
       ),
       values: {
+        transactionFailed: t(
+          'A callback, draft or finalizer business task failed; the original failure stays primary, without claiming a network failure.',
+          'Callback、draft 或 finalizer 业务任务失败，原失败保持 primary，不声称网络失败。'
+        ),
         unavailable: t('Read transport/5xx failed.', '读取 transport/5xx 失败。'),
         responseInvalid: t('Native results or documents are invalid.', '原生结果或文档非法。'),
         requestFailed: t(
