@@ -117,6 +117,41 @@ describe('memory native contract integration', () => {
       ])
     ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' })
     expect(transactions).toBe(0)
+    /** Key capture retains the original duplicate-before-TTL/value access order. */
+    const fields: string[] = []
+    await expect(
+      text.setMany([
+        {
+          get key() {
+            fields.push('first.key')
+            return 'same'
+          },
+          get ttlMs() {
+            fields.push('first.ttl')
+            return undefined
+          },
+          get value() {
+            fields.push('first.value')
+            return 'one'
+          }
+        },
+        {
+          get key() {
+            fields.push('second.key')
+            return 'same'
+          },
+          get ttlMs() {
+            fields.push('second.ttl')
+            return undefined
+          },
+          get value() {
+            fields.push('second.value')
+            return 'two'
+          }
+        }
+      ])
+    ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' })
+    expect(fields).toEqual(['first.key', 'first.ttl', 'first.value', 'second.key'])
     /** A reachable borrowed key getter must retain the original failure before native admission. */
     const original = new Error('batch key getter')
     await expect(
@@ -141,6 +176,7 @@ describe('memory native contract integration', () => {
     expect(await text.getMany(['earlier', 'blocked'])).toEqual([undefined, undefined])
     expect(await store.getRecord('blocked')).toEqual({ occupied: true })
     expect(errors.map(({ count, code }) => ({ count, code }))).toEqual([
+      { count: 2, code: 'INVALID_ARGUMENT' },
       { count: 2, code: 'INVALID_ARGUMENT' },
       { count: 1, code: 'INVALID_ARGUMENT' },
       { count: 2, code: 'DUPLICATE_KEY' }
@@ -191,6 +227,40 @@ describe('memory native contract integration', () => {
       expect(pipelines).toBe(0)
       expect(observations).toBe(0)
     })
+    /** Array proxy accessors fail on the original contract chain before root pipeline entry. */
+    const original = new Error('batch length getter')
+    let lengths = 0
+    const unreadable = new Proxy(['key'], {
+      get(target, key, receiver) {
+        if (key === 'length') {
+          lengths++
+          throw original
+        }
+        return Reflect.get(target, key, receiver)
+      }
+    })
+    pipelines = 0
+    await expect(store.getMany(unreadable)).rejects.toMatchObject({
+      code: 'INVALID_ARGUMENT',
+      cause: original
+    })
+    expect(pipelines).toBe(0)
+    let expired!: ITransactionScope
+    const failure = await store
+      .transaction(async (scope) => {
+        expired = scope
+        await expect(scope.getMany(unreadable)).rejects.toMatchObject({
+          code: 'INVALID_ARGUMENT',
+          cause: original
+        })
+        await scope.set('uncommitted', 'value').catch(() => undefined)
+      })
+      .catch((cause) => cause)
+    expect(failure).toMatchObject({ code: 'INVALID_ARGUMENT', cause: original })
+    expect(await store.get('uncommitted')).toBeNull()
+    const before = lengths
+    await expect(expired.getMany(unreadable)).rejects.toMatchObject({ code: 'TRANSACTION_FAILED' })
+    expect(lengths).toBe(before)
   })
 
   it('uses original implicit batch locks against an already held single-key transaction', async () => {
