@@ -13,7 +13,7 @@ export type IStorageJournalBackendAccess = {
   readonly orgId: string
   readonly backendInstanceId: string
   readonly binding: Omit<IStorageJournalBackendBinding, 'forOrg'>
-  retain(resource: IStorageResource): void
+  retain(resource: IStorageResource): () => void
 }
 /** Capture the exact original callbacks once before the descriptor's installation window closes. */
 export function snapshotStorageJournalBinding(

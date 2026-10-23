@@ -8,6 +8,11 @@ const baseline = JSON.parse(
   )
 ) as { packages: Record<string, Record<string, string[]>> }
 describe('storage host package exports', () => {
+  it('exposes only the private log factory through its dedicated journal entry', async () => {
+    const runtime = await import('@migaia/storage-host/journal')
+    expect(Object.keys(runtime)).toEqual(baseline.packages['@migaia/storage-host']!['./journal'])
+    expect(await import('@migaia/storage-host')).not.toHaveProperty('storageLogStore')
+  })
   it('loads only finite backend functions from the dedicated authoring entry', async () => {
     /** Real package resolution proves controller authority remains on the original core. */
     const runtime = await import('@migaia/storage-host/authoring/backend')

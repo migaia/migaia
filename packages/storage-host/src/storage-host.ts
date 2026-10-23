@@ -1163,7 +1163,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
       retain: (resource: import('@migaia/storage-contract').IStorageResource) => {
         this.#assertOpen()
         context.assertExecution()
-        context.storeCell.retainJournalResource(resource)
+        return context.storeCell.retainJournalResource(resource)
       }
     })
   }

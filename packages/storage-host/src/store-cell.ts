@@ -23,7 +23,7 @@ export type IStorageStoreCell = {
   setOrgBinding(binding: IStorageOrgBinding): void
   setJournalBinding(binding: IStorageJournalBackendBinding): void
   journalForOrg(orgId: string): Omit<IStorageJournalBackendBinding, 'forOrg'>
-  retainJournalResource(resource: IStorageResource): void
+  retainJournalResource(resource: IStorageResource): () => void
   releaseJournalResources(): Promise<void>
   forOrg(orgId: string, defaultOrgId: string): IStorageBase
   dropOrg(orgId: string): Promise<void>
@@ -71,7 +71,7 @@ export function createStorageStoreCell(): IStorageStoreCell {
   const orgReleases: Array<() => void> = []
   return {
     retainJournalResource: (resource) => {
-      if (journalResources.has(resource)) return
+      if (journalResources.has(resource)) return () => undefined
       let dispose: IStorageResource['dispose']
       try {
         dispose = resource?.dispose
@@ -80,7 +80,11 @@ export function createStorageStoreCell(): IStorageStoreCell {
       }
       if (typeof dispose !== 'function')
         throw new StorageContractError(StorageContractErrorCode.invalidArgument)
-      journalResources.set(resource, () => Reflect.apply(dispose, resource, []))
+      const release = () => Reflect.apply(dispose, resource, [])
+      journalResources.set(resource, release)
+      return () => {
+        if (journalResources.get(resource) === release) journalResources.delete(resource)
+      }
     },
     releaseJournalResources: async () => {
       const releases = [...journalResources.values()]
