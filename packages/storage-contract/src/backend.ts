@@ -14,7 +14,7 @@ import type { ITransactionStageObserver } from './transaction.js'
 import type { IConcurrencyStageObserver } from './concurrency.js'
 import type { ISqlStageObserver } from './sql.js'
 import type { IQueryStageObserver } from './query.js'
-import type { ITransactionBuilder } from './concurrency.js'
+import type { ITransactionBuilder, IOptimisticTransactionBuilder } from './concurrency.js'
 
 /** Canonical provider label syntax shared by base and KV admission. */
 export const BACKEND_KIND_PATTERN = /^[a-z][a-z0-9-]{0,63}$/
@@ -50,8 +50,8 @@ type IChainPart<
 
 /** Preserves both the canonical builder's second generic and specialized no-lock builders. */
 type IWithTransactionBuilderMethods<TBuilder, TMethods extends IChainMethods> =
-  TBuilder extends ITransactionBuilder<infer TScope, infer TAugmentMethods>
-    ? ITransactionBuilder<
+  TBuilder extends IOptimisticTransactionBuilder<infer TScope, infer TAugmentMethods>
+    ? IOptimisticTransactionBuilder<
         IWithTransactionQueryMethods<
           TScope,
           IChainPart<TMethods, 'query'>,
@@ -59,25 +59,34 @@ type IWithTransactionBuilderMethods<TBuilder, TMethods extends IChainMethods> =
         >,
         TAugmentMethods & IChainPart<TMethods, 'tx'>
       >
-    : TBuilder extends { run(run: (scope: infer TScope) => unknown): unknown }
-      ? {
-          [K in Exclude<keyof TBuilder, 'run'>]: TBuilder[K] extends (
-            ...args: infer TArguments
-          ) => TBuilder
-            ? (...args: TArguments) => IWithTransactionBuilderMethods<TBuilder, TMethods>
-            : TBuilder[K]
-        } & {
-          run<TResult>(
-            run: (
-              scope: IWithTransactionQueryMethods<
-                TScope,
-                IChainPart<TMethods, 'query'>,
-                IChainPart<TMethods, 'rdf'>
-              >
-            ) => TResult
-          ): Promise<Awaited<TResult>>
-        } & IChainPart<TMethods, 'tx'>
-      : TBuilder
+    : TBuilder extends ITransactionBuilder<infer TScope, infer TAugmentMethods>
+      ? ITransactionBuilder<
+          IWithTransactionQueryMethods<
+            TScope,
+            IChainPart<TMethods, 'query'>,
+            IChainPart<TMethods, 'rdf'>
+          >,
+          TAugmentMethods & IChainPart<TMethods, 'tx'>
+        >
+      : TBuilder extends { run(run: (scope: infer TScope) => unknown): unknown }
+        ? {
+            [K in Exclude<keyof TBuilder, 'run'>]: TBuilder[K] extends (
+              ...args: infer TArguments
+            ) => TBuilder
+              ? (...args: TArguments) => IWithTransactionBuilderMethods<TBuilder, TMethods>
+              : TBuilder[K]
+          } & {
+            run<TResult>(
+              run: (
+                scope: IWithTransactionQueryMethods<
+                  TScope,
+                  IChainPart<TMethods, 'query'>,
+                  IChainPart<TMethods, 'rdf'>
+                >
+              ) => TResult
+            ): Promise<Awaited<TResult>>
+          } & IChainPart<TMethods, 'tx'>
+        : TBuilder
 
 /** Rebuilds only an existing transaction builder, retaining every backend-specific member. */
 type IWithTransactionMethods<TStore, TMethods extends IChainMethods> = TStore extends {

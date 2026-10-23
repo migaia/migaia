@@ -6,7 +6,7 @@ import {
   type IStorageBaseAdmission,
   type IKeyValueStore
 } from './store.js'
-import type { ITransactionBuilder } from './concurrency.js'
+import type { ITransactionBuilder, IOptimisticTransactionBuilder } from './concurrency.js'
 import type { IWriteConcurrencyOptions } from './concurrency.js'
 import type { ICodecValue } from '@migaia/serialize/codec'
 import type { IOperationContext, IStorageKey } from './context.js'
@@ -158,6 +158,33 @@ type IScopeRecordValue<TScope> = TScope extends {
 }
   ? TValue
   : ICodecValue
+/** The native RDF/raw pair keeps both exact overload domains instead of using its last return. */
+type INativeTransactionRdfApi<TUse> = TUse extends {
+  (capability: infer TFirst): infer TFirstApi
+  (capability: infer TSecond): infer TSecondApi
+}
+  ?
+      | (TFirst extends typeof rdf ? TFirstApi : never)
+      | (TSecond extends typeof rdf ? TSecondApi : never)
+  : never
+/** Only an existing native RDF match gains RDF Feature methods; raw and native refinements survive. */
+type IWithNativeTransactionRdfMethods<
+  TScope extends { use: (...args: never[]) => unknown },
+  TRdfAugmentMethods extends object
+> = keyof TRdfAugmentMethods extends never
+  ? TScope
+  : INativeTransactionRdfApi<TScope['use']> extends infer TApi
+    ? [TApi] extends [never]
+      ? TScope
+      : TApi extends ITransactionRdfApi
+        ? Omit<TScope, 'use'> & {
+            use: ((
+              capability: typeof rdf
+            ) => Omit<TApi, 'match'> & ITransactionRdfApi<TRdfAugmentMethods>) &
+              TScope['use']
+          }
+        : TScope
+    : TScope
 /**
  * Adds selected query methods only to an existing standard transaction capability lookup. Native
  * scope members remain untouched, token availability follows the original use parameter, and the
@@ -170,27 +197,36 @@ export type IWithTransactionQueryMethods<
 > = keyof (TAugmentMethods & TRdfAugmentMethods) extends never
   ? TScope
   : TScope extends { use: (...args: never[]) => unknown }
-    ? Omit<TScope, 'use'> & {
-        use<
-          TCap extends ITransactionalCapability<
-            Extract<Parameters<TScope['use']>[0], IAnyStorageCapability>
-          >
-        >(
-          capability: TCap
-        ): TCap extends typeof records
-          ? ITransactionRecordsApi<IScopeRecordValue<TScope>, TAugmentMethods>
-          : TCap extends typeof rdf
-            ? ITransactionRdfApi<TRdfAugmentMethods>
-            : ITransactionCapabilityApi<TCap>
-      }
+    ? Exclude<
+        Parameters<TScope['use']>[0],
+        ITransactionalCapability<Extract<Parameters<TScope['use']>[0], IAnyStorageCapability>>
+      > extends never
+      ? Omit<TScope, 'use'> & {
+          use<
+            TCap extends ITransactionalCapability<
+              Extract<Parameters<TScope['use']>[0], IAnyStorageCapability>
+            >
+          >(
+            capability: TCap
+          ): TCap extends typeof records
+            ? ITransactionRecordsApi<IScopeRecordValue<TScope>, TAugmentMethods>
+            : TCap extends typeof rdf
+              ? ITransactionRdfApi<TRdfAugmentMethods>
+              : ITransactionCapabilityApi<TCap>
+        }
+      : IWithNativeTransactionRdfMethods<TScope, TRdfAugmentMethods>
     : TScope
 
 /** Replaces only capability-facing members while preserving every native scope extension. */
-type IAddScopedCapabilities<TScope, TCaps extends IAnyStorageCapability> = Omit<
+type IAddScopedCapabilities<
   TScope,
-  'use' | typeof storeCapabilities
-> &
-  ITransactionCapabilityView<TCaps, IScopeRecordValue<TScope>>
+  TCaps extends IAnyStorageCapability
+> = TScope extends ITransactionKeyValueApi
+  ? Omit<TScope, 'use' | typeof storeCapabilities> &
+      ITransactionCapabilityView<TCaps, IScopeRecordValue<TScope>>
+  : TScope extends { use: (...args: never[]) => unknown }
+    ? TScope
+    : TScope & ITransactionCapabilityView<TCaps, IScopeRecordValue<TScope>>
 /** Frozen implementation descriptor; the API object keeps its backend-owned lifetime. */
 export type ICapabilityImpl<
   TCap extends IAnyStorageCapability = IAnyStorageCapability,
@@ -233,11 +269,22 @@ type ITransactionMembers<TBase, TCaps extends IAnyStorageCapability> = TBase ext
         run: (scope: IAddScopedCapabilities<TScope, TCaps>) => TResult,
         options?: TOptions
       ): Promise<Awaited<TResult>>
-    } & (TBase extends { tx(): ITransactionBuilder<infer TBuilderScope, infer TAugmentMethods> }
-      ? { tx(): ITransactionBuilder<IAddScopedCapabilities<TBuilderScope, TCaps>, TAugmentMethods> }
-      : TBase extends { tx(): infer TBuilder }
-        ? { tx(): TBuilder }
-        : Record<never, never>)
+    } & (TBase extends {
+      tx(): IOptimisticTransactionBuilder<infer TBuilderScope, infer TAugmentMethods>
+    }
+      ? {
+          tx(): IOptimisticTransactionBuilder<
+            IAddScopedCapabilities<TBuilderScope, TCaps>,
+            TAugmentMethods
+          >
+        }
+      : TBase extends { tx(): ITransactionBuilder<infer TBuilderScope, infer TAugmentMethods> }
+        ? {
+            tx(): ITransactionBuilder<IAddScopedCapabilities<TBuilderScope, TCaps>, TAugmentMethods>
+          }
+        : TBase extends { tx(): infer TBuilder }
+          ? { tx(): TBuilder }
+          : Record<never, never>)
   : Record<never, never>
 
 /** Refines the original base object without spreading away class or nonenumerable public members. */
