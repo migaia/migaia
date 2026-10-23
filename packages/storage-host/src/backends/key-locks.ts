@@ -15,8 +15,9 @@ import {
 } from '@migaia/storage-contract'
 import { inspectThenable, observeThenableRejection } from '@migaia/utils/function'
 import { walkErrorCauses } from '@migaia/utils/error'
+import type { IAbortSignal } from '@migaia/utils/promise'
 import { createConcurrencyLimiter, deferred, raceWithAbort } from '@migaia/utils/promise'
-import { readAbortReason, throwIfAborted } from '../core/operation.js'
+import { readAbortReason, subscribeToAbort, throwIfAborted } from '../core/operation.js'
 import { createStorageOperationReporter, reportCleanupError } from '../core/operation-reporter.js'
 
 /** The physical backend owns this port; creating it grants no transaction or retry authority. */
@@ -25,7 +26,8 @@ export type IBackendKeyLockPort = IStorageResource & {
     ctx: IConcurrencyAttemptContext,
     holder: IConcurrencyHolder,
     native: IConcurrencyPort<R>,
-    stages?: IConcurrencyStageObserver
+    stages?: IConcurrencyStageObserver,
+    admissionSignal?: IAbortSignal
   ): Promise<IConcurrencyAttempt<R>>
   inspectLocks(): readonly ILockHolding[]
 }
@@ -137,34 +139,52 @@ export function createBackendKeyLockPort(): IBackendKeyLockPort {
     ctx: IConcurrencyAttemptContext,
     identities: readonly string[],
     holder: IConcurrencyHolder,
-    stages: IConcurrencyStageObserver | undefined
+    stages: IConcurrencyStageObserver | undefined,
+    admissionSignal: IAbortSignal | undefined
   ): Promise<IKeyLease> => {
     /** This bridge cancels only queued admission when the original ctx.wait budget ends. */
     const admission = createAbortController()
-    /** One actual queued acquisition remains observed until cancellation cleanup has ended. */
-    const pending = limiter.run(
-      async () => {
-        try {
-          while (true) {
-            throwIfAborted(admission.signal)
-            assertOpen()
-            /** Each wake-up rechecks the same canonical table before any native operation starts. */
-            const held = conflict(identities)
-            if (held === undefined) return acquire(ctx, identities, holder, stages)
-            await raceWithAbort(() => held.lease.released, {
-              signal: admission.signal,
-              cleanupPolicy: 'report',
-              report
-            })
-          }
-        } catch (error) {
-          /** A late cancellation acknowledges the exact reason owned by the original wait. */
-          if (admission.signal.aborted) throw readAbortReason(admission.signal)
-          throw error
-        }
-      },
-      { signal: admission.signal }
+    /** Member closure cancels only this not-yet-native admission on the existing bridge. */
+    const unsubscribe = subscribeToAbort(
+      admissionSignal,
+      () =>
+        admission.abort(
+          new StorageContractError(StorageContractErrorCode.aborted, {
+            cause: readAbortReason(admissionSignal)
+          })
+        ),
+      report
     )
+    /** One actual queued acquisition remains observed until cancellation cleanup has ended. */
+    const pending = limiter
+      .run(
+        async () => {
+          try {
+            while (true) {
+              throwIfAborted(admission.signal)
+              assertOpen()
+              /** Each wake-up rechecks the same canonical table before any native operation starts. */
+              const held = conflict(identities)
+              if (held === undefined) return acquire(ctx, identities, holder, stages)
+              await raceWithAbort(() => held.lease.released, {
+                signal: admission.signal,
+                cleanupPolicy: 'report',
+                report
+              })
+            }
+          } catch (error) {
+            /** A late cancellation acknowledges the exact reason owned by the original wait. */
+            if (admission.signal.aborted) throw readAbortReason(admission.signal)
+            throw error
+          }
+        },
+        { signal: admission.signal }
+      )
+      .catch((error: unknown) => {
+        /** An external budget cancellation retains the exact acknowledgement expected by utils. */
+        if (admission.signal.aborted && ctx.signal?.aborted) throw readAbortReason(ctx.signal)
+        throw error
+      })
     try {
       return await ctx.wait(pending)
     } catch (primary) {
@@ -189,6 +209,8 @@ export function createBackendKeyLockPort(): IBackendKeyLockPort {
           reportCleanupError(report, secondary)
       }
       throw primary
+    } finally {
+      unsubscribe()
     }
   }
 
@@ -197,7 +219,8 @@ export function createBackendKeyLockPort(): IBackendKeyLockPort {
     ctx: IConcurrencyAttemptContext,
     holder: IConcurrencyHolder,
     native: IConcurrencyPort<R>,
-    stages?: IConcurrencyStageObserver
+    stages?: IConcurrencyStageObserver,
+    admissionSignal?: IAbortSignal
   ): Promise<IConcurrencyAttempt<R>> => {
     assertOpen()
     /** Only an authentic active original context can supply canonical identities. */
@@ -208,6 +231,7 @@ export function createBackendKeyLockPort(): IBackendKeyLockPort {
     let lease: IKeyLease | undefined
     try {
       throwIfAborted(ctx.signal)
+      throwIfAborted(admissionSignal)
       if (ctx.locking === 'pessimistic' && identities.length !== 0) {
         /** Empty tables admit immediately without scheduling through the limiter. */
         const held = conflict(identities)
@@ -219,8 +243,10 @@ export function createBackendKeyLockPort(): IBackendKeyLockPort {
             keys: ctx.lock ?? [],
             holder: held.holder
           }
-        else lease = await waitForKeys(ctx, identities, holder, stages)
+        else lease = await waitForKeys(ctx, identities, holder, stages, admissionSignal)
       }
+      /** A member may close after acquisition but before the native terminal is entered. */
+      throwIfAborted(admissionSignal)
       return await native.attempt(ctx)
     } finally {
       await lease?.dispose()

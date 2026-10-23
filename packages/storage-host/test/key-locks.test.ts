@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { deferred } from '@migaia/utils/promise'
+import { deferred, type IAbortSignal } from '@migaia/utils/promise'
 import {
   createTransactionOwner,
   ConcurrencyPolicy,
@@ -20,7 +20,7 @@ import {
   StorageErrorCode,
   type IStoragePluginCore
 } from '../src/index.js'
-import type { IBackendKeyLockPort } from '../src/authoring/backend.js'
+import type { IBackendKeyLockPort, IBackendChangeController } from '../src/authoring/backend.js'
 import { catalog } from './helpers/catalog.js'
 
 /** The actual native catalog and original transaction metadata supply one real installation. */
@@ -31,6 +31,8 @@ async function fixture(shared?: IBackendKeyLockPort) {
   let state!: ReturnType<typeof catalog>
   /** Retain one original core only to test late construction rejection. */
   let installedCore!: IStoragePluginCore
+  /** The actual controller owns direct closure and the original native map cleanup. */
+  let controller!: IBackendChangeController
   /** Kind identity is independent of the native client's diagnostic name. */
   const kind = defineStorageBackendKind<ReturnType<typeof catalog>['store']>()('catalog')
   /** Named descriptor retains actual store inference without granting a standalone constructor. */
@@ -40,18 +42,23 @@ async function fixture(shared?: IBackendKeyLockPort) {
     install: () => {
       installedCore = core
       state = catalog(core)
+      /** Preserve the original map disposer while the actual controller acquires its lifetime. */
+      const nativeDispose = state.store.dispose
+      controller = core.createChangeController({ backend: 'catalog', finalize: nativeDispose })
+      state.store.dispose = () => controller.dispose()
       createTransactionOwner(
         state.store,
         (cause) => new StorageError(StorageErrorCode.extensionFailed, { cause })
       )
       port = shared ?? core.createKeyLockPort()
       core.registerStore(state.store)
+      core.registerChangeController(state.store, controller)
       return {}
     }
   })
   /** The physical owner is explicit in each test; core creation does not auto-close a shared port. */
   const host = await createStorageHost({ plugins: [definePlugin('locks', descriptor)] })
-  return { host, port, state, core: installedCore }
+  return { host, port, state, core: installedCore, controller }
 }
 
 /** Holder metadata is native-backend input, never a provider-global attempt counter. */
@@ -69,11 +76,15 @@ function run<R>(
   owner: string,
   options: ITransactionOptions,
   native: (ctx: IConcurrencyAttemptContext) => Promise<IConcurrencyAttempt<R>>,
-  stages?: IConcurrencyStageObserver
+  stages?: IConcurrencyStageObserver,
+  admissionSignal?: IAbortSignal
 ) {
   return runWithConcurrency(
     { store: current.state.store, options },
-    { attempt: (ctx) => current.port.attempt(ctx, holder(owner), { attempt: native }, stages) }
+    {
+      attempt: (ctx) =>
+        current.port.attempt(ctx, holder(owner), { attempt: native }, stages, admissionSignal)
+    }
   )
 }
 
@@ -226,6 +237,69 @@ describe('the shared local key-lock provider', () => {
     expect(port.inspectLocks()).toEqual([])
   })
 
+  it('removes only a closing member queued admission while another member retains its lock', async () => {
+    /** Two original backend registrations share the same physical provider. */
+    const current = await fixture()
+    await using _firstHost = current.host
+    await using port = current.port
+    /** This second member owns its own controller but has no authority to close the shared port. */
+    const member = await fixture(port)
+    await using _secondHost = member.host
+    /** The unrelated first member keeps its native interval active. */
+    const entered = deferred<void>()
+    /** Only the actual native terminal releases its key. */
+    const finish = deferred<void>()
+    const first = run(current, 'holder', { lock: [lockKey.text('shared')] }, async () => {
+      entered.resolve()
+      await finish.promise
+      return { status: 'committed', value: 'first' }
+    })
+    await entered.promise
+    /** Observe the real wait admission after it has reached the original FIFO. */
+    const queued = deferred<void>()
+    /** Closing this member must prevent the native callback entirely. */
+    const native = vi.fn(async () => ({ status: 'committed' as const, value: 'wrong' }))
+    /** The member controller retains this original accepted operation until actual cleanup. */
+    const release = member.controller.beginMutation()
+    const pending = runWithConcurrency(
+      {
+        store: member.state.store,
+        options: {
+          lock: [lockKey.text('shared')],
+          concurrency: ConcurrencyPolicy.wait()
+        }
+      },
+      {
+        attempt: (ctx) => {
+          /** Only the optional member signal bridges to this actual queued admission. */
+          const result = port.attempt(
+            ctx,
+            holder('member'),
+            { attempt: native },
+            undefined,
+            member.controller.closingSignal
+          )
+          if (ctx.admission === 'wait') queued.resolve()
+          return result
+        }
+      }
+    ).finally(release)
+    /** Rejection is observed before closure notifies the queued task. */
+    const rejected = expect(pending).rejects.toMatchObject({
+      code: 'ABORTED',
+      cause: expect.objectContaining({ code: 'STORE_DISPOSED' })
+    })
+    await queued.promise
+    /** Direct backend disposal stops this member without ending another member's ownership. */
+    const closed = member.state.store.dispose()
+    await Promise.all([rejected, closed])
+    expect(native).not.toHaveBeenCalled()
+    expect(port.inspectLocks()).toHaveLength(1)
+    expect(port.inspectLocks()[0]!.holder).toMatchObject({ owner: 'holder' })
+    finish.resolve()
+    await expect(first).resolves.toBe('first')
+  })
+
   it('keeps optimistic work unlocked and reports failed resource observers without affecting results', async () => {
     const current = await fixture()
     await using _host = current.host
@@ -283,12 +357,24 @@ describe('the shared local key-lock provider', () => {
     const entered = deferred<void>()
     /** Cancellation cannot be mistaken for the native terminal or release. */
     const finish = deferred<void>()
-    const pending = run(active, 'native', { lock: [lockKey.text('key')] }, async () => {
-      entered.resolve()
-      await finish.promise
-      return { status: 'committed', value: 42 }
-    })
+    /** This member retains the same accepted native work through direct disposal. */
+    const release = active.controller.beginMutation()
+    const pending = run(
+      active,
+      'native',
+      { lock: [lockKey.text('key')] },
+      async () => {
+        entered.resolve()
+        await finish.promise
+        return { status: 'committed', value: 42 }
+      },
+      undefined,
+      active.controller.closingSignal
+    ).finally(release)
     await entered.promise
+    /** Member closure does not release an already-entered native attempt. */
+    const closing = active.controller.dispose()
+    expect(current.port.inspectLocks()).toHaveLength(1)
     /** The two resource entries retain independent cached Promise identities. */
     const disposal = current.port.dispose()
     expect(current.port.dispose()).toBe(disposal)
@@ -310,7 +396,7 @@ describe('the shared local key-lock provider', () => {
     expect(settled).toBe(false)
     finish.resolve()
     await expect(pending).resolves.toBe(42)
-    await Promise.all([disposal, symbolic])
+    await Promise.all([disposal, symbolic, closing])
     expect(settled).toBe(true)
   })
 })
