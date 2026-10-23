@@ -7,7 +7,7 @@ function invalid(): never {
   throw createLoggerTypeError(LoggerErrorCode.logPayloadInvalid, DurableText.payloadInvalid)
 }
 /** Copies one JSON tree iteratively, tracking the current path rather than shared object identities. */
-export function snapshotPayload(input: unknown): ILogPayload {
+function copyPayload(input: unknown): ILogPayload {
   /** Mutable root slot allows the same iterative visitor to handle primitives and containers. */
   const root: { value?: ILogPayload } = {}
   /** Current ancestors identify cycles while allowing repeated references on different branches. */
@@ -90,7 +90,7 @@ export function requireText(value: unknown): asserts value is string {
     throw createLoggerTypeError(LoggerErrorCode.invalidOption, DurableText.invalidOption)
 }
 /** Captures a complete batch before any task enters a queue or invokes a transaction port. */
-export function snapshotRecords(
+function copyRecords(
   records: readonly ILogRecordInput[]
 ): readonly { readonly kind: string; readonly payload: ILogPayload }[] {
   if (!Array.isArray(records))
@@ -104,4 +104,38 @@ export function snapshotRecords(
     requireText(kind.value)
     return { kind: kind.value, payload: snapshotPayload(payload.value) }
   })
+}
+
+/** Contains reflection failures at the sole payload admission boundary while preserving their cause. */
+export function snapshotPayload(input: unknown): ILogPayload {
+  try {
+    return copyPayload(input)
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      Object.getOwnPropertyDescriptor(error, 'source')?.value === '@migaia/logger'
+    )
+      throw error
+    throw createLoggerTypeError(LoggerErrorCode.logPayloadInvalid, DurableText.payloadInvalid, {
+      cause: error
+    })
+  }
+}
+
+/** Captures record descriptors at the same admission boundary as payload reflection. */
+export function snapshotRecords(
+  records: readonly ILogRecordInput[]
+): readonly { readonly kind: string; readonly payload: ILogPayload }[] {
+  try {
+    return copyRecords(records)
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      Object.getOwnPropertyDescriptor(error, 'source')?.value === '@migaia/logger'
+    )
+      throw error
+    throw createLoggerTypeError(LoggerErrorCode.logPayloadInvalid, DurableText.payloadInvalid, {
+      cause: error
+    })
+  }
 }

@@ -159,3 +159,23 @@ describe('SQLite durable resource', () => {
     await expect(store.lastSeq()).rejects.toMatchObject({ code: 'RUNTIME_SHUTTING_DOWN' })
   })
 })
+
+it('codes reflection failures without admitting a record and retains the original cause', async () => {
+  const store = memoryLogStore()
+  const original = new Error('payload reflection failed')
+  const payload = new Proxy(
+    { value: 1 },
+    {
+      ownKeys() {
+        throw original
+      }
+    }
+  )
+  await expect(store.append([{ kind: 'bad', payload }])).rejects.toMatchObject({
+    source: '@migaia/logger',
+    code: 'LOG_PAYLOAD_INVALID',
+    cause: original
+  })
+  expect(await store.lastSeq()).toBe(0)
+  await store.dispose()
+})
