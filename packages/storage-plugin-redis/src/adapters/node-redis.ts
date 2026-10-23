@@ -1,7 +1,5 @@
 import {
   RESP_TYPES,
-  WatchError,
-  MultiErrorReply,
   type RedisClientPoolType,
   type RedisClientType,
   type RedisModules,
@@ -96,9 +94,6 @@ export function nodeRedisDriver<
               const reply: unknown = await send([RedisCommand.exec])
               return reply === null ? null : execEntries(requireExecArray(reply))
             } catch (error) {
-              if (error instanceof WatchError) return null
-              if (error instanceof MultiErrorReply)
-                return execEntries(requireExecArray(error.replies), error)
               throw normalizeRedisError(error)
             } finally {
               if (started && !sent && sameConnection()) {

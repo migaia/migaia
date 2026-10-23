@@ -3,6 +3,37 @@ import type { ICaseDoc, IText } from './contract.js'
 const t = (en: string, zh: string): IText => ({ en, zh })
 /** Only delivered native driver entries appear in this package's current examples. */
 export const storagePluginRedisCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
+  redisBackendPlugin: [
+    {
+      title: t('Use the original native transaction', '使用原生事务'),
+      problem: t(
+        'A cache and its native expiry must commit together.',
+        '缓存与原生期限必须一同提交。'
+      ),
+      example: `import { createClientPool } from 'redis'
+import { createStorageHost } from '@migaia/storage-host'
+import { ttl } from '@migaia/storage-contract'
+import { redisBackendPlugin } from '@migaia/storage-plugin-redis'
+import { nodeRedisDriver } from '@migaia/storage-plugin-redis/node-redis'
+const pool = createClientPool({ url: process.env.MIGAIA_REDIS_URL! }, { maximum: 8 })
+await pool.connect()
+const host = await createStorageHost({ plugins: [redisBackendPlugin({
+  driver: nodeRedisDriver(pool), prefix: crypto.randomUUID()
+})] as const })
+const store = host.backend('redis')
+try {
+  await store.tx().lock({ channel: 'text', key: 'cache' }).run(async tx => {
+    await tx.set('cache', 'ready')
+    await tx.use(ttl).expire({ channel: 'text', key: 'cache' }, 60000)
+  })
+  console.log(await store.get('cache'))
+} finally { await store.clearAll(); await host.dispose(); await pool.close() }`,
+      result: t(
+        'Prints ready; the caller retains client ownership.',
+        '输出 ready；调用方仍拥有客户端。'
+      )
+    }
+  ],
   ioredisDriver: [
     {
       title: t('Borrow an ioredis client', '借用 ioredis client'),
