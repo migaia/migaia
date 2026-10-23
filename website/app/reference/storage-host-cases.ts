@@ -3,6 +3,29 @@ import type { ICaseDoc, IText } from './contract.js'
 const t = (en: string, zh: string): IText => ({ en, zh })
 /** Application extensions retain their exact inputs while the host owns installation and cleanup. */
 export const storageHostCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
+  memoryNativeVector: [
+    {
+      title: t('Rank points in the installed memory namespace', '在已安装 memory namespace 排名点'),
+      problem: t(
+        'Use native vector search while sharing original TTL and organization ownership.',
+        '使用原生向量检索并共享原 TTL 与组织拥有者。'
+      ),
+      example: `import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { vector, ttl, lockKey } from '@migaia/storage-contract'
+await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+const store = host.backend('memory')
+const collection = store.use(vector).collection<{ group: string }>('docs', { dimensions: 2, metric: 'dot' })
+await collection.upsert([{ id: 'a', vector: [1, 0], payload: { group: 'docs' } }])
+console.log((await collection.near([1, 0]).where({ group: 'docs' }).topK(1).all())[0]?.id)
+await store.transaction(async (scope) => { await scope.use(ttl).expire(lockKey.vector('docs', 'a'), 0) })
+console.log(await collection.search([1, 0], { k: 1 }))
+// a, []`,
+      result: t(
+        'Returns a, then no hits after the original transaction expires the vector.',
+        '返回 a，原事务设置向量立即到期后无命中。'
+      )
+    }
+  ],
   recommendStorageVector: [
     {
       title: t('Synthesize a native recommendation direction', '合成原生推荐方向'),

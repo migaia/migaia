@@ -20,9 +20,7 @@ describe('memory TTL and counter capabilities', () => {
     const deadlines = store.use(ttl)
     expect(store.has(ttl)).toBe(true)
     expect(store.has(counter)).toBe(true)
-    await expect(deadlines.expire(lockKey.vector('collection', 'point'), 10)).rejects.toMatchObject(
-      { code: 'UNSUPPORTED_CAPABILITY' }
-    )
+    expect(await deadlines.expire(lockKey.vector('collection', 'point'), 10)).toBe(false)
     await store.set('text', 'first')
     await store.setBytes('bytes', new Uint8Array([1]))
     await store.putRecord(undefined, ['record', 1])
