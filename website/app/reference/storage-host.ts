@@ -7,8 +7,8 @@ export const storageHostReference: ILibraryReference = {
   modules: {
     'authoring/backend': {
       summary: t(
-        'Share channel, unique-index, error and cancellation rules through finite backend functions. Controller creation, registration and lookup remain guarded by the original core and Feature ports.',
-        '通过有限后端函数共享通道、唯一索引、错误和取消规则。controller构造、登记和读取仍由原core与Feature接点约束。'
+        'Share channel, unique-index, error and cancellation rules through finite backend functions. Controller and local key-lock construction stay on the original core; only their types are public through this entry. Features retain only controller lookup.',
+        '通过有限后端函数共享通道、唯一索引、错误和取消规则。controller和本地键锁构造归原core，本入口只公开其类型；Feature只保留controller读取。'
       ),
       example: `import { createStorageOperationReporter, reportCleanupError } from '@migaia/storage-host/authoring/backend'
 

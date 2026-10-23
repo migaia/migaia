@@ -40,3 +40,5 @@ export type {
   IStorageOperationReporter,
   IStorageOperationRuntime
 } from '../core/operation-reporter.js'
+
+export type { IBackendKeyLockPort } from '../backends/key-locks.js'

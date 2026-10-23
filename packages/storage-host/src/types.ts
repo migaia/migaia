@@ -1,3 +1,4 @@
+import type { IBackendKeyLockPort } from './backends/key-locks.js'
 import type { IStorageHooks, IStorageHookMap } from './hook-types.js'
 import type { IStorageHookEmitter } from './hooks.js'
 import type {
@@ -303,6 +304,7 @@ export type IStoragePluginCore<F extends IStorageFeatureRecord = {}> = Pick<
     readonly execution: IStorageExecutionPort
     readonly hooks: IStorageHooks
     readonly stageBindings: IBackendStageBindings
+    createKeyLockPort(): IBackendKeyLockPort
     createChangeController(options: IBackendChangeControllerOptions): IBackendChangeController
     registerChangeController(store: IStorageBase, controller: IBackendChangeController): void
     registerDetect(check: (signal: INativeAbortSignal) => Promise<void>): void

@@ -14,6 +14,7 @@ import {
 } from './core/change-controller.js'
 import { StorageHookName as Hook } from './hook-names.js'
 import { borrowStorageBackend } from './borrow.js'
+import { createBackendKeyLockPort } from './backends/key-locks.js'
 import { STORAGE_DEFAULT_ORG } from './state-constants.js'
 import type { IBackendStageBindings } from '@migaia/storage-contract'
 import {
@@ -144,6 +145,11 @@ export function createStoragePluginHost(options: IPluginHostOptions): IStoragePl
         getBackendId: () => context.id,
         getScheduler: () => context.scheduler,
         getStageBindings: context.getStageBindings,
+        createKeyLockPort: (() => {
+          /** Only original window admission is acquired; the physical backend owns final release. */
+          registrationCore!.onDispose(() => undefined)
+          return createBackendKeyLockPort()
+        }) satisfies IStoragePluginCore['createKeyLockPort'],
         createChangeController: ((options) => {
           /** Original resource admission owns partial-construction cleanup and the install window. */
           let controller: IBackendChangeController | undefined

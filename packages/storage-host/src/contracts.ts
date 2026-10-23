@@ -217,6 +217,7 @@ type IStorageNativeCore = IPluginHostCore<IStoragePipelineInput> & {
   getStageBindings(): IBackendStageBindings
   getStorageHooks(): IStorageHooks
   readonly emit: IStorageHookEmitter
+  readonly createKeyLockPort: IStoragePluginCore['createKeyLockPort']
   readonly createChangeController: IStoragePluginCore['createChangeController']
   readonly registerChangeController: IStoragePluginCore['registerChangeController']
   readonly getChangeController: IStorageFeatureExpose<IStorageBackendKind>['getChangeController']
@@ -264,6 +265,7 @@ export const definePlugin: IStorageDefinePlugin = ((
           return nativeCore.getStageBindings()
         },
         emit: nativeCore.emit,
+        createKeyLockPort: nativeCore.createKeyLockPort,
         createChangeController: nativeCore.createChangeController,
         registerChangeController: nativeCore.registerChangeController,
         getPublishedBackend: nativeCore.getPublishedBackend,
