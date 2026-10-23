@@ -66,6 +66,9 @@ export const StorageContractErrorCode = Object.freeze({
    */
   queryNotPushable: 'QUERY_NOT_PUSHABLE',
 
+  /** FirstOrThrow exhausted the query; use first or maybe when absence is expected. */
+  queryEmptyResult: 'QUERY_EMPTY_RESULT',
+
   /** A genuine policy threw or returned an invalid/inapplicable decision; correct the policy. */
   concurrencyPolicyFailed: 'CONCURRENCY_POLICY_FAILED',
   /** A logical admission or physical operation deadline expired; resources have finished cleanup. */

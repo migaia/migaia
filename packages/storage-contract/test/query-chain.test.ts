@@ -22,6 +22,8 @@ import {
   type IWhere,
   type IQueryShape,
   type IQueryResultOf,
+  type IRecordQuery,
+  type IQueryResult,
   type IQueryCondition
 } from '../src/index.js'
 
@@ -341,6 +343,11 @@ describe('standard record capability', () => {
     expectTypeOf(query.all).returns.toEqualTypeOf<Promise<Pick<IOrder, 'total'>[]>>()
     await expect(query.all()).resolves.toEqual([{ total: 12 }])
     expect(opened).toBe(1)
+    /** New terminals remain available through the original standard capability consumer. */
+    await expect(store.use(records).query().where({ status: 'paid' }).firstOrThrow()).resolves.toBe(
+      rows[0]
+    )
+    await expect(store.use(records).query().where({ status: 'paid' }).count()).resolves.toBe(1)
     const key = ['archive', new Date(1)] as const
     const ctx = { timeoutMs: 100 }
     expect(store.use(records).removeByPrefix(key, ctx)).toBe(deletion)
@@ -776,6 +783,226 @@ describe('record query Feature methods', () => {
       expect.objectContaining({ code: 'INVALID_ARGUMENT' })
     )
     expect(execute).not.toHaveBeenCalled()
+  })
+})
+
+describe('record query terminals', () => {
+  it('retains terminal declarations for root, transaction and selected record shapes', () => {
+    /** The three existing fluent contexts expose each new terminal without widening tx context. */
+    function declarations(
+      root: IRecordQuery<IOrder>,
+      tx: IRecordQuery<IOrder, undefined>,
+      selected: IQueryResult<Pick<IOrder, 'total'>>
+    ): void {
+      void [root.first(), tx.first(), selected.first()]
+      void [root.maybe(), tx.maybe(), selected.maybe()]
+      void [root.firstOrThrow(), tx.firstOrThrow(), selected.firstOrThrow()]
+      void [root.pluck('total'), tx.pluck('total'), selected.pluck('total')]
+      void [root.exists(), tx.exists(), selected.exists()]
+      void [root.count(), tx.count(), selected.count()]
+      void [root.each(() => undefined), tx.each(() => undefined), selected.each(() => undefined)]
+      void [
+        root.chunk(2, () => undefined),
+        tx.chunk(2, () => undefined),
+        selected.chunk(2, () => undefined)
+      ]
+      void [root.min('total'), tx.min('total'), selected.min('total')]
+      void [root.max('total'), tx.max('total'), selected.max('total')]
+      void [root.sum('total'), tx.sum('total'), selected.sum('total')]
+      void [root.avg('total'), tx.avg('total'), selected.avg('total')]
+      // @ts-expect-error A transaction query cannot introduce another operation context.
+      void tx.first({})
+      // @ts-expect-error A projected result cannot refer to a field it no longer contains.
+      void selected.pluck('status')
+    }
+    void declarations
+  })
+
+  it('short-circuits presence reads, distinguishes undefined and closes every original cursor', async () => {
+    /** Native advances and closes expose early termination through the existing author entry. */
+    const next = vi.fn()
+    /** Each invocation borrows a fresh original cursor, never a materialized query result. */
+    const close = vi.fn(async () => undefined)
+    /** Present undefined must remain distinguishable from an exhausted source. */
+    const query = createRecordQuery<undefined>({
+      pushdown: noPushdown,
+      execute: () => ownedRows([undefined, undefined], close, undefined, { onNext: next })
+    })
+    await expect(query.first()).resolves.toBeUndefined()
+    await expect(query.maybe()).resolves.toEqual({ some: true, value: undefined })
+    await expect(query.firstOrThrow()).resolves.toBeUndefined()
+    await expect(query.exists()).resolves.toBe(true)
+    expect(next).toHaveBeenCalledTimes(4)
+    expect(close).toHaveBeenCalledTimes(4)
+    /** Empty results share normal cursor cleanup before exposing their distinct public terminal. */
+    const empty = createRecordQuery<undefined>({
+      pushdown: noPushdown,
+      execute: () => ownedRows([], close)
+    })
+    await expect(empty.maybe()).resolves.toEqual({ some: false })
+    await expect(empty.exists()).resolves.toBe(false)
+    await expect(empty.firstOrThrow()).rejects.toMatchObject({
+      source: '@migaia/storage-contract',
+      code: 'QUERY_EMPTY_RESULT'
+    })
+    expect(close).toHaveBeenCalledTimes(7)
+    /** A comparator first is the explicitly documented one-row bounded query. */
+    const ordered = createRecordQuery<number>({
+      pushdown: noPushdown,
+      execute: () => ownedRows([3, 1, 2])
+    })
+    await expect(ordered.orderByComparator((a, b) => a - b).first()).resolves.toBe(1)
+  })
+
+  it('shares conditions and projection across count, pluck, sequential each and bounded chunk', async () => {
+    /** The same input validates unselected and selected result terminal types. */
+    const query = createRecordQuery<IOrder>({
+      pushdown: noPushdown,
+      execute: () => ownedRows([{ total: 1 }, { total: 2 }, { total: 3 }, { total: 4 }])
+    }).where('total', 'gt', 1)
+    await expect(query.count()).resolves.toBe(3)
+    await expect(query.pluck('total')).resolves.toEqual([2, 3, 4])
+    /** A callback completes before the next row can enter it. */
+    const seen: number[] = []
+    await expect(
+      query
+        .select((row) => row.total)
+        .each(async (row, index) => {
+          await Promise.resolve()
+          expect(index).toBe(seen.length)
+          seen.push(row)
+        })
+    ).resolves.toBe(3)
+    expect(seen).toEqual([2, 3, 4])
+    /** Only one explicit chunk is retained between callbacks, including the final partial chunk. */
+    const chunks: number[][] = []
+    await expect(
+      query
+        .select((row) => row.total)
+        .chunk(2, async (rows) => {
+          await Promise.resolve()
+          chunks.push([...rows])
+        })
+    ).resolves.toBe(3)
+    expect(chunks).toEqual([[2, 3], [4]])
+    expectTypeOf(query.pluck('total')).toEqualTypeOf<Promise<number[]>>()
+    expectTypeOf(query.maybe()).toEqualTypeOf<
+      Promise<{ readonly some: true; readonly value: IOrder } | { readonly some: false }>
+    >()
+  })
+
+  it('accumulates numeric statistics in one pass and preserves empty and optional-field semantics', async () => {
+    /** The source counter detects repeated scans inside any single aggregate. */
+    const next = vi.fn()
+    /** Optional numeric fields skip absence; zero and negative values remain actual samples. */
+    const query = createRecordQuery<{ value?: number | null; label: string }>({
+      pushdown: noPushdown,
+      execute: () =>
+        ownedRows(
+          [{ value: -2 }, { value: 0 }, {}, { value: null }, { value: 5 }],
+          async () => undefined,
+          undefined,
+          { onNext: next }
+        )
+    })
+    await expect(query.min('value')).resolves.toEqual({ some: true, value: -2 })
+    expect(next).toHaveBeenCalledTimes(6)
+    await expect(query.max('value')).resolves.toEqual({ some: true, value: 5 })
+    await expect(query.sum('value')).resolves.toBe(3)
+    await expect(query.avg('value')).resolves.toEqual({ some: true, value: 1 })
+    /** Selecting a numeric field retains the same typed streaming statistics. */
+    await expect(query.select('value').sum('value')).resolves.toBe(3)
+    /** No row and an absent optional number both provide no statistical sample. */
+    const empty = query.limit(0)
+    await expect(empty.min('value')).resolves.toEqual({ some: false })
+    await expect(empty.max('value')).resolves.toEqual({ some: false })
+    await expect(empty.avg('value')).resolves.toEqual({ some: false })
+    await expect(empty.sum('value')).resolves.toBe(0)
+    /** Invalid declarations are checked without executing unsupported calls. */
+    function invalidTypes(): void {
+      // @ts-expect-error Statistics accept only numeric fields.
+      void query.sum('label')
+      // @ts-expect-error Maybe requires discriminant narrowing before reading its payload.
+      void query.maybe().then((result) => result.value)
+    }
+    void invalidTypes
+  })
+
+  it('rejects invalid terminal input before I/O and preserves callback failure ahead of cleanup', async () => {
+    /** Admission failures cannot acquire any original native cursor. */
+    const execute = vi.fn(() => ownedRows([{ total: 1 }]))
+    /** Each terminal is reached through the public shared query entry. */
+    const query = createRecordQuery<IOrder>({ pushdown: noPushdown, execute })
+    for (const size of [0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1])
+      await expect(query.chunk(size, () => undefined)).rejects.toMatchObject({
+        code: 'INVALID_ARGUMENT'
+      })
+    await expect(query.each(null as never)).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' })
+    await expect(query.pluck(null as never)).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' })
+    /** Client-only reductions cannot silently bypass requirePushdown on an otherwise empty chain. */
+    for (const terminal of [
+      query.requirePushdown().count(),
+      query.requirePushdown().sum('total'),
+      query.requirePushdown().pluck('total'),
+      query.requirePushdown().each(() => undefined),
+      query.requirePushdown().chunk(1, () => undefined)
+    ])
+      await expect(terminal).rejects.toMatchObject({ code: 'QUERY_NOT_PUSHABLE' })
+    expect(execute).not.toHaveBeenCalled()
+    /** Native cleanup must not replace the original asynchronous callback rejection. */
+    const primary = new Error('each failed')
+    /** This independent close failure follows the first business callback error. */
+    const cleanup = new Error('each cleanup failed')
+    /** Original close reports once even while the registered terminal unwinds. */
+    const close = vi.fn(async () => {
+      throw cleanup
+    })
+    /** A single accepted terminal owns both callback completion and cleanup. */
+    const failing = createRecordQuery<IOrder>({
+      pushdown: noPushdown,
+      execute: () => ownedRows([{ total: 1 }], close)
+    })
+    await expect(
+      failing.each(async () => {
+        throw primary
+      })
+    ).rejects.toBe(primary)
+    expect(primary).toMatchObject({ errors: [expect.objectContaining({ cause: cleanup })] })
+    expect(close).toHaveBeenCalledTimes(1)
+    /** Numeric APIs still reject real invalid runtime data instead of returning NaN silently. */
+    const invalid = createRecordQuery<{ total: number }>({
+      pushdown: noPushdown,
+      execute: () => ownedRows([{ total: Number.NaN }])
+    })
+    await expect(invalid.sum('total')).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' })
+  })
+
+  it('keeps the asynchronous each callback accepted until the original cursor can finish closing', async () => {
+    /** The callback announces admission before disposal is requested on its actual resource. */
+    const started = Promise.withResolvers<void>()
+    /** Business completion remains inside the original accepted transaction operation. */
+    const callback = Promise.withResolvers<void>()
+    /** Physical cleanup must wait for the callback without introducing another cursor owner. */
+    const close = vi.fn(async () => undefined)
+    /** The public source exposes the same registered native resource that disposal later targets. */
+    const iterator = ownedRows([1], close)
+    /** All terminal behavior still enters through the original query author API. */
+    const query = createRecordQuery<number>({ pushdown: noPushdown, execute: () => iterator })
+    /** The callback owns no scheduler or cancellation adapter of its own. */
+    const pending = query.each(async () => {
+      started.resolve()
+      await callback.promise
+    })
+    await started.promise
+    /** The original resource's cached close remains pending during business work. */
+    const disposed = iterator.dispose()
+    expect(iterator.dispose()).toBe(disposed)
+    await Promise.resolve()
+    expect(close).not.toHaveBeenCalled()
+    callback.resolve()
+    await expect(pending).resolves.toBe(1)
+    await disposed
+    expect(close).toHaveBeenCalledTimes(1)
   })
 })
 
