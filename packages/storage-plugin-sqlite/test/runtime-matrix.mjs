@@ -5,7 +5,7 @@ import { defineEntity } from '@migaia/storage-host/entity'
 import { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'
 import { createStore } from '@migaia/store-light'
 import { persist } from '@migaia/store-persist/light'
-import { kv, lockKey, records, sql } from '@migaia/storage-contract'
+import { kv, lockKey, records, sql, ttl, counter } from '@migaia/storage-contract'
 
 /** Each invocation performs exactly one real process phase against its runtime-owned test file. */
 const [mode, path] = process.argv.slice(2)
@@ -77,6 +77,14 @@ async function assertQueryResource(stream) {
 try {
   await handle.ready
   if (mode === 'write') {
+    /** Native deadlines and canonical counter text survive each builtin driver's real reopen. */
+    await storage.set('runtime-ttl', 'retained')
+    assert.equal(await storage.use(ttl).expire(lockKey.text('runtime-ttl'), 60_000), true)
+    assert.equal(await storage.use(counter).increment('runtime-increment'), 1)
+    await storage.transaction(async (tx) => {
+      assert.equal(await tx.use(counter).increment('runtime-increment', 4), 5)
+      assert.equal(await tx.use(ttl).expire(lockKey.text('runtime-increment'), 60_000), true)
+    })
     /** Actual builtin drivers execute the same root batch and canonical duplicate reads. */
     await storage.use(kv).setMany([
       { key: ['runtime-batch', 1], value: 'persisted' },
@@ -154,6 +162,10 @@ try {
   } else {
     assert.equal(mode, 'read')
     assert.equal(state.count, 1)
+    assert.equal(await storage.get('runtime-ttl'), 'retained')
+    assert.ok((await storage.use(ttl).remaining(lockKey.text('runtime-ttl'))) > 0)
+    assert.equal(await storage.get('runtime-increment'), '5')
+    assert.ok((await storage.use(ttl).remaining(lockKey.text('runtime-increment'))) > 0)
     assert.equal(
       (await storage.sql`SELECT value FROM exact_integer WHERE id=${1}`.get()).value,
       9007199254740993n

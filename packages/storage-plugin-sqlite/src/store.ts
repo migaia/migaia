@@ -6,6 +6,8 @@ import {
   snapshotStorageBatchKeys,
   createStorageBatchKeyCapture,
   assertStorageTtlDuration,
+  snapshotStorageTtlTarget,
+  snapshotStorageCounterIncrement,
   encodeOrderedStorageKey,
   snapshotStorageKeyPrefix,
   snapshotOperationContext,
@@ -28,10 +30,17 @@ import {
   kv,
   records,
   sql,
+  ttl,
+  counter,
   createRecordQuery,
   type IStorageKey,
   type IStorageBatchKey,
   type IKeyValueApi,
+  type ITtlApi,
+  type ITtlTarget,
+  type ITransactionTtlApi,
+  type ICounterApi,
+  type ITransactionCounterApi,
   type IOperationContext,
   type IKeyRange,
   type IStorageIterator,
@@ -161,6 +170,17 @@ type ITextBatchEntry = IStorageBatchKey & {
 }
 /** Presence distinguishes a native batch from the unchanged single-operation observation path. */
 type IBatchObservation = { readonly count: number | undefined }
+/** Scope-local native APIs are borrowed only through the original capability transaction binder. */
+const ttlOperations = Symbol('sqlite-ttl-operations')
+/** Counter access shares the same complete native scope without a separate owner registry. */
+const counterOperations = Symbol('sqlite-counter-operations')
+/** This backend owns only the three expiring native tables. */
+type ISqliteTtlTarget = Extract<ITtlTarget, { readonly channel: 'text' | 'bytes' | 'record' }>
+/** Private symbol methods are created by the same original complete scope factory. */
+type ISqliteInternalScope<TValue> = ISqliteTransactionScope<TValue> & {
+  readonly [ttlOperations]: ITransactionTtlApi
+  readonly [counterOperations]: ITransactionCounterApi
+}
 /** Backend authoring state is supplied only by the original installation window. */
 export type ISqliteRuntime = { readonly core: IStoragePluginCore; readonly orgId: string }
 /** Construction returns only exact provider/controller handles needed for original host admission. */
@@ -502,6 +522,18 @@ export function createSqliteStore<TValue>(
     for (const channel of ['text', 'bytes', 'record'] as const)
       for (const id of state.changed.get(channel)?.keys() ?? []) group!.revisions.write(channel, id)
   }
+  /** One successful native COMMIT owns all ordinary and expiry change publication. */
+  const publishChanges = (state: INativeState): void => {
+    for (const channel of ['text', 'bytes', 'record'] as const) {
+      const keys = state.changed.get(channel)
+      if (!keys?.size) continue
+      controller.publish({
+        channel: channel === 'text' ? 'value' : channel,
+        kind: 'batch',
+        keys: [...keys.values()]
+      })
+    }
+  }
   /** Actual codec calls share one failure policy for roots, scopes and iterator advances. */
   const convert = (
     channel: IChannel,
@@ -553,10 +585,16 @@ export function createSqliteStore<TValue>(
       state
     )
     if (
-      !row ||
-      (channel !== 'metadata' && row.expires_at !== null && Number(row.expires_at) <= Date.now())
-    )
+      row &&
+      channel !== 'metadata' &&
+      row.expires_at !== null &&
+      Number(row.expires_at) <= Date.now()
+    ) {
+      if (state) prune(channel, key, state)
+      else syncMutation((current) => prune(channel, key, current), [], undefined, orgId)
       return channel === 'text' || channel === 'bytes' ? null : undefined
+    }
+    if (!row) return channel === 'text' || channel === 'bytes' ? null : undefined
     return channel === 'bytes'
       ? (row.value as Uint8Array).slice()
       : convert(channel, 'decode', row.value, scope)
@@ -571,6 +609,88 @@ export function createSqliteStore<TValue>(
       state
     )
     if (result.changes !== 0 && result.changes !== 0n) changed(state, channel, key)
+  }
+  /** Enumeration uses the existing expiry index and reclaims only expired rows in its own range. */
+  const cleanupExpiredRows = (
+    channel: 'text' | 'record',
+    orgId: string,
+    range?: IKeyRange,
+    state?: INativeState
+  ): void => {
+    /** One local wall-clock cutoff keeps every candidate in this cleanup operation consistent. */
+    const clauses = ['org_id=?', 'expires_at IS NOT NULL', 'expires_at<=?']
+    const values: ISqliteValue[] = [orgId, Date.now()]
+    if (range?.lower !== undefined) {
+      clauses.push(`key${range.lowerOpen ? '>' : '>='}?`)
+      values.push(encoded(channel, range.lower))
+    }
+    if (range?.upper !== undefined) {
+      clauses.push(`key${range.upperOpen ? '<' : '<='}?`)
+      values.push(encoded(channel, range.upper))
+    }
+    /** The native index returns actual expiry candidates without scanning unrelated organizations. */
+    const rows = statement<readonly ISqliteRow[]>(
+      `SELECT key FROM ${tables[channel]} WHERE ${clauses.join(' AND ')}`,
+      values,
+      'all',
+      state
+    )
+    if (rows.length === 0) return
+    /** The original writer rechecks each deadline so a fresh replacement cannot be removed. */
+    const reclaim = (current: INativeState): void => {
+      for (const row of rows)
+        prune(
+          channel,
+          channel === 'record' ? decodeKey(row.key as Uint8Array) : decodeHexKey(row.key as string),
+          current
+        )
+    }
+    if (state) reclaim(state)
+    else syncMutation(reclaim, [], undefined, orgId)
+  }
+  /** Canonical target capture rejects unsupported vector storage before any native access. */
+  const captureTtlTarget = (input: ITtlTarget): ISqliteTtlTarget => {
+    const target = snapshotStorageTtlTarget(input, SqliteNames.backend)
+    if (target.channel === 'text' || target.channel === 'bytes' || target.channel === 'record')
+      return target
+    throw new StorageContractError(StorageContractErrorCode.unsupported, {
+      backend: SqliteNames.backend
+    })
+  }
+  /** Deadline lookup does not decode a value and still observes missing or expired native rows. */
+  const expiration = (
+    target: ISqliteTtlTarget,
+    orgId: string,
+    state?: INativeState
+  ): ISqliteRow | undefined => {
+    if (state) revision(state, target.channel, target.key)
+    const row = statement<ISqliteRow | undefined>(
+      `SELECT expires_at FROM ${tables[target.channel]} WHERE org_id=? AND key=?`,
+      [orgId, encoded(target.channel, target.key)],
+      'get',
+      state
+    )
+    if (row && row.expires_at !== null && Number(row.expires_at) <= Date.now()) {
+      if (state) prune(target.channel, target.key, state)
+      else
+        syncMutation((current) => prune(target.channel, target.key, current), [], undefined, orgId)
+      return undefined
+    }
+    return row
+  }
+  /** TTL updates share the original native mutation, revision and commit notification owners. */
+  const changeDeadline = (target: ISqliteTtlTarget, state: INativeState, ms?: number): boolean => {
+    const row = expiration(target, state.orgId, state)
+    if (!row || (ms === undefined && row.expires_at === null)) return false
+    if (ms === 0) return remove(target.channel, target.key, state)
+    statement(
+      `UPDATE ${tables[target.channel]} SET expires_at=? WHERE org_id=? AND key=?`,
+      [ms === undefined ? null : Date.now() + ms, state.orgId, encoded(target.channel, target.key)],
+      'run',
+      state
+    )
+    changed(state, target.channel, target.key)
+    return true
   }
   /** One native write preserves atomic replace across all public channels. */
   const write = (
@@ -622,7 +742,7 @@ export function createSqliteStore<TValue>(
       }
     }
     statement(
-      `INSERT INTO ${tables[channel]}(org_id,key,value${channel === 'metadata' ? '' : ',expires_at'}) VALUES(?,?,?${channel === 'metadata' ? '' : ',?'}) ON CONFLICT(org_id,key) DO UPDATE SET value=excluded.value${channel === 'metadata' ? '' : ',expires_at=excluded.expires_at'}`,
+      `INSERT INTO ${tables[channel]}(org_id,key,value${channel === 'metadata' ? '' : ',expires_at'}) VALUES(?,?,?${channel === 'metadata' ? '' : ',?'}) ON CONFLICT(org_id,key) DO UPDATE SET value=excluded.value${channel === 'metadata' ? '' : `,expires_at=${ttlMs === undefined ? `${tables[channel]}.expires_at` : 'excluded.expires_at'}`}`,
       [
         state.orgId,
         encoded(channel, key),
@@ -655,6 +775,7 @@ export function createSqliteStore<TValue>(
   ): readonly ISqliteRow[] => {
     /** Range admission owns copies before native binding. */
     const captured = snapshotKeyRange(range, SqliteNames.backend)
+    cleanupExpiredRows('record', orgId, captured, state)
     const clauses = ['org_id=?', '(expires_at IS NULL OR expires_at>?)']
     const values: ISqliteValue[] = [orgId, Date.now()]
     if (captured?.lower !== undefined) {
@@ -1029,42 +1150,60 @@ export function createSqliteStore<TValue>(
       return result
     })
   /** A root read's synchronous native segment holds one real read snapshot across every IN chunk. */
-  const readSnapshot = <R>(run: () => R): R => {
+  const readSnapshot = <R>(orgId: string, run: (state: INativeState) => R): R => {
     assertRoot()
+    /** Expiry cleanup, when needed, belongs to this same original native snapshot and commit. */
+    const state: INativeState = {
+      orgId,
+      context: undefined,
+      baseline: new Map(),
+      changed: new Map(),
+      mode: 'deferred',
+      failure: undefined,
+      expiresAt: undefined
+    }
     statement(SqliteControl.deferred, [], 'run')
     active = SQLITE_CONTROL_ACTIVE
     try {
-      const result = run()
+      const result = run(state)
       statement(SqliteControl.commit, [], 'run')
       active = undefined
+      advanceRevisions(state)
+      publishChanges(state)
       return result
     } catch (error) {
-      return rollback(error)
+      return rollback(
+        error instanceof SqlitePhysicalBusy ? normalizeSqliteFailure(error.cause) : error
+      )
     }
   }
   /** Batch get uses bounded IN lists inside one real native transaction snapshot. */
   const getMany = (
     keys: readonly IStorageBatchKey[],
-    orgId: string,
-    state?: INativeState,
+    state: INativeState,
     scope?: object
   ): readonly (string | undefined)[] => {
     const result = new Map<string, string>()
     const captured = keys.filter(({ firstIndex }, index) => firstIndex === index)
+    /** Native expired rows map back to original snapshots in linear total work. */
+    const keysByIdentity = new Map(captured.map(({ identity, key }) => [identity, key]))
     /** Every chunk uses the same operation-local expiry cutoff inside the same native snapshot. */
     const now = Date.now()
     for (let index = 0; index < captured.length; index += SqliteLimits.batch) {
       const part = captured.slice(index, index + SqliteLimits.batch).map(({ identity }) => identity)
       const rows = statement<readonly ISqliteRow[]>(
-        `SELECT key,value FROM ${tables.text} WHERE org_id=? AND (expires_at IS NULL OR expires_at>?) AND key IN (${part.map(() => '?').join(',')})`,
-        [orgId, now, ...part],
+        `SELECT key,value,expires_at FROM ${tables.text} WHERE org_id=? AND key IN (${part.map(() => '?').join(',')})`,
+        [state.orgId, ...part],
         'all',
         state
       )
-      for (const row of rows)
-        result.set(row.key as string, convert('text', 'decode', row.value, scope) as string)
+      for (const row of rows) {
+        if (row.expires_at !== null && Number(row.expires_at) <= now)
+          prune('text', keysByIdentity.get(row.key as string)!, state)
+        else result.set(row.key as string, convert('text', 'decode', row.value, scope) as string)
+      }
     }
-    if (state) for (const { key } of captured) revision(state, 'text', key)
+    for (const { key } of captured) revision(state, 'text', key)
     return keys.map(({ identity }) => result.get(identity))
   }
   /** Distinct physical deletions use bounded IN lists and one existing native transaction. */
@@ -1139,7 +1278,66 @@ export function createSqliteStore<TValue>(
   /** Create the full scope afresh for callback, accepted operation and final validation views. */
   const createScope = (): ISqliteTransactionScope<TValue> => {
     /** Method arrows capture this exact scope identity, never an older callback view. */
-    const scope: ISqliteTransactionScope<TValue> = {
+    const scope: ISqliteInternalScope<TValue> = {
+      [ttlOperations]: {
+        expire: (target, ms) =>
+          scoped(
+            scope,
+            SqliteOperation.ttlExpire,
+            () => {
+              const captured = captureTtlTarget(target)
+              assertStorageTtlDuration(ms, SqliteNames.backend)
+              return { target: captured, ms }
+            },
+            (state, _current, input) => {
+              const current = input as { target: ITtlTarget; ms: number }
+              const target = captureTtlTarget(current.target)
+              assertStorageTtlDuration(current.ms, SqliteNames.backend)
+              return changeDeadline(target, state, current.ms)
+            }
+          ),
+        remaining: (target) =>
+          scoped(
+            scope,
+            SqliteOperation.ttlRemaining,
+            () => captureTtlTarget(target),
+            (state, _current, input) => {
+              const row = expiration(captureTtlTarget(input as ITtlTarget), state.orgId, state)
+              return row?.expires_at == null
+                ? undefined
+                : Math.max(0, Number(row.expires_at) - Date.now())
+            }
+          ),
+        persist: (target) =>
+          scoped(
+            scope,
+            SqliteOperation.ttlPersist,
+            () => captureTtlTarget(target),
+            (state, _current, input) => changeDeadline(captureTtlTarget(input as ITtlTarget), state)
+          )
+      },
+      [counterOperations]: {
+        increment: (key, by) =>
+          scoped(
+            scope,
+            SqliteOperation.counterIncrement,
+            () => {
+              textInput(key)
+              snapshotStorageCounterIncrement(by, SqliteNames.backend)
+              return { key, by }
+            },
+            (state, current, input) => {
+              const captured = input as { key: string; by?: number }
+              textInput(captured.key)
+              const increment = snapshotStorageCounterIncrement(captured.by, SqliteNames.backend)
+              const result = increment(
+                read('text', captured.key, state.orgId, state, current) as string | null
+              )
+              write('text', captured.key, String(result), state, 'conflict', current)
+              return result
+            }
+          )
+      },
       use: (capability) => useTransactionCapability(scope, capability),
       get: (key) =>
         scoped(scope, SqliteOperation.get, { key }, (state, current) => {
@@ -1265,7 +1463,7 @@ export function createSqliteStore<TValue>(
               (prepared as typeof input).keys,
               SqliteNames.backend
             )
-            return getMany(actual, state.orgId, state, current)
+            return getMany(actual, state, current)
           },
           {
             get count() {
@@ -1775,15 +1973,7 @@ export function createSqliteStore<TValue>(
         for (const keys of state.changed.values()) changedKeys += keys.size
         observe(terminal, 'afterCommit', changedKeys)
         /** Publication occurs only after actual native COMMIT; rollback publishes nothing. */
-        for (const channel of ['text', 'bytes', 'record'] as const) {
-          const keys = state.changed.get(channel)
-          if (!keys?.size) continue
-          controller.publish({
-            channel: channel === 'text' ? 'value' : channel,
-            kind: 'batch',
-            keys: [...keys.values()]
-          })
-        }
+        publishChanges(state)
         return { status: 'committed', value: value as Awaited<R> }
       } catch (error) {
         /** Recognize only the private recovery marker produced by a trusted statement call. */
@@ -1979,6 +2169,7 @@ export function createSqliteStore<TValue>(
   }
   /** String-only legacy keys omit typed batch keys while retaining canonical identity. */
   const textKeys = (orgId: string): string[] => {
+    cleanupExpiredRows('text', orgId)
     const rows = statement<readonly ISqliteRow[]>(
       `SELECT key FROM ${tables.text} WHERE org_id=? AND (expires_at IS NULL OR expires_at>?) ORDER BY key`,
       [orgId, Date.now()],
@@ -2076,15 +2267,7 @@ export function createSqliteStore<TValue>(
       } catch (error) {
         throw normalizeSqliteFailure(error)
       }
-      for (const channel of ['text', 'bytes', 'record'] as const) {
-        const keys = state.changed.get(channel)
-        if (!keys?.size) continue
-        controller.publish({
-          channel: channel === 'text' ? 'value' : channel,
-          kind: 'batch',
-          keys: [...keys.values()]
-        })
-      }
+      publishChanges(state)
       return value
     } catch (error) {
       return rollback(
@@ -2450,7 +2633,7 @@ export function createSqliteStore<TValue>(
             (prepared as typeof input).keys,
             SqliteNames.backend
           )
-          return readSnapshot(() => getMany(actual, orgId))
+          return readSnapshot(orgId, (state) => getMany(actual, state))
         },
         { count }
       )
@@ -2614,10 +2797,75 @@ export function createSqliteStore<TValue>(
       forTransaction: (scope) => ({ sql: (scope as ISqliteTransactionScope<TValue>).sql })
     }
   )
+  /** Standard TTL uses the original native tables and the backend's local wall clock. */
+  const timeToLive: ITtlApi = {
+    expire: async (target, ms, ctx) => {
+      controller.assertLive()
+      const captured = captureTtlTarget(target)
+      assertStorageTtlDuration(ms, SqliteNames.backend)
+      return rootWrite(SqliteOperation.ttlExpire, { target: captured, ms }, ctx, (input) => {
+        const target = captureTtlTarget(input.target)
+        assertStorageTtlDuration(input.ms, SqliteNames.backend)
+        return { keys: [target], run: (state) => changeDeadline(target, state, input.ms) }
+      })
+    },
+    remaining: async (target, ctx) => {
+      controller.assertLive()
+      const captured = captureTtlTarget(target)
+      return rootRead(SqliteOperation.ttlRemaining, captured, ctx, (orgId, input) => {
+        const row = expiration(captureTtlTarget(input as ITtlTarget), orgId)
+        return row?.expires_at == null
+          ? undefined
+          : Math.max(0, Number(row.expires_at) - Date.now())
+      })
+    },
+    persist: async (target, ctx) => {
+      controller.assertLive()
+      const captured = captureTtlTarget(target)
+      return rootWrite(SqliteOperation.ttlPersist, captured, ctx, (input) => {
+        const target = captureTtlTarget(input)
+        return { keys: [target], run: (state) => changeDeadline(target, state) }
+      })
+    }
+  }
+  /** Canonical decimal calculation and text writes share one original atomic native operation. */
+  const counters: ICounterApi = {
+    increment: async (key, by, ctx) => {
+      controller.assertLive()
+      textInput(key)
+      snapshotStorageCounterIncrement(by, SqliteNames.backend)
+      return rootWrite(SqliteOperation.counterIncrement, { key, by }, ctx, (input) => {
+        textInput(input.key)
+        const increment = snapshotStorageCounterIncrement(input.by, SqliteNames.backend)
+        return {
+          keys: [lockKey.text(input.key), lockKey.bytes(input.key), lockKey.record(input.key)],
+          run: (state) => {
+            const result = increment(read('text', input.key, state.orgId, state) as string | null)
+            write('text', input.key, String(result), state, 'conflict')
+            return result
+          }
+        }
+      })
+    }
+  }
+  /** Capability implementations borrow only the private methods on the original complete view. */
+  const ttlImplementation = implement(ttl, timeToLive, {
+    forTransaction: (scope) => (scope as ISqliteInternalScope<TValue>)[ttlOperations]
+  })
+  /** No independent counter state, queue, or transaction projection is registered here. */
+  const counterImplementation = implement(counter, counters, {
+    forTransaction: (scope) => (scope as ISqliteInternalScope<TValue>)[counterOperations]
+  })
   try {
     store = provideCapabilities(
       base,
-      [kvImplementation, recordImplementation, sqlImplementation] as const,
+      [
+        kvImplementation,
+        recordImplementation,
+        sqlImplementation,
+        ttlImplementation,
+        counterImplementation
+      ] as const,
       {
         onInstaller: (value) => {
           installer = value
