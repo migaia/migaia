@@ -52,6 +52,8 @@ opaque token 保留原格式和条件 fallback；原生 entropy 获取失败以 
 
 `probe(identities, ranges?, current?)` 从同一原锁表直接探测规范身份，返回首个脱离的 `ILockHolding` 或 undefined；单键最多进行固定三个通道的 Map.get，范围只扫描所选通道的活锁。范围项为 `{channel,lower,upper}`，边界来自 contract 的 `snapshotConcurrencyLockRange`。`attemptWrite(ctx,holder,write,stages?,admissionSignal?,ranges?,admit?)` 复用同一尝试与 FIFO，write 必须是同步原生修改；最终锁检查与 write 在同一同步执行段。optimistic 根写不创建持锁行，仍尊重已有悲观锁。等待或观察回调之后必须重新检查，排除本尝试已持有的 lease；不创建范围锁。可选 current 必须是原活跃 attempt context，只跳过其实际持有的同一 lease，继续查找其它 holder；声明键或相同 owner 文本不授予豁免。可选 admit(commit) 接后端已有物理准入：先逻辑键、再物理门，commit 至多一次且最终重查操作与成员 signal；原 lease 等物理清理真实结算后释放。
 
+`core.registerValueCommit(store, commit)` 只在原安装窗口接纳已交接的同一 store。`/authoring/backend` 的 `IBackendValueCommit` 接收固定 `{prefix,expected,key,value}` 与可选写上下文；expected 是原始字符串键值快照。实体在异步 schema/codec/投影准备完成后借用该终点，原生后端在原物理准入内同步复核与写入，期间没有 await。它与 controller、envelope 观察共享同一内部 row，卸载由原 scope 清理；登记权与关闭权不向实体开放。 同一个 frozen/raw store 被多个宿主接纳时，envelope 边界向其仍登记的原宿主观察者扇出；释放只移除所属绑定，单宿主保持原观察接点。
+
 controller 的只读 `closingSignal` 代表原关闭阶段。将其作为可选 admission signal 传入，可在直接释放成员时移除该成员的排队请求；不关闭共享 provider，也不提前释放已运行的 native attempt。
 
 后端原安装 core 的 `defaultOrgId` 只读返回宿主已捕获的缺省组织身份。`createRevisionPort()` 在同一安装窗口创建本地修订事实；一个物理数据宇宙共享该对象，`read/write/epoch/clear` 使用既有 text/bytes/record 通道和后端已捕获的键身份。仅原生提交成功后推进修订；clear 清墓碑并推进通道 epoch，防止旧快照通过 ABA 检查。此口不拥有资源或其它成员的关闭权。

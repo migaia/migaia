@@ -84,7 +84,7 @@ console.log(host.extensions.label('draft'))`
     memoryBackendPlugin: {
       role: 'factory',
       purpose: t(
-        'Define an isolated memory backend without acquiring data before installation. Native transactions and root writes share the original owner, policy budget and local lock/revision facts. Replace protects displaced channels; synchronous busy keys reject immediately, while clear/prefix mutation rechecks only affected channels before its uninterrupted native turn.',
+        'Define an isolated memory backend without acquiring data before installation. Native transactions and root writes share the original owner, policy budget and local lock/revision facts. Native value backends register a prepared compare/write endpoint with core.registerValueCommit only inside installation. Replace protects displaced channels; synchronous busy keys reject immediately, while clear/prefix mutation rechecks only affected channels before its uninterrupted native turn.',
         '定义独立内存后端，安装前不获取数据；原生事务共用原owner与本地锁/修订事实。'
       ),
       returns: t(
