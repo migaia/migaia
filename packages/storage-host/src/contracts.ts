@@ -225,6 +225,7 @@ type IStorageNativeCore = IPluginHostCore<IStoragePipelineInput> & {
   readonly createRevisionPort: IStoragePluginCore['createRevisionPort']
   readonly createChangeController: IStoragePluginCore['createChangeController']
   readonly registerChangeController: IStoragePluginCore['registerChangeController']
+  readonly registerValueCommit: IStoragePluginCore['registerValueCommit']
   readonly getChangeController: IStorageFeatureExpose<IStorageBackendKind>['getChangeController']
   readonly getPublishedBackend: IStoragePluginCore['getPublishedBackend']
   readonly registerDetect: IStoragePluginCore['registerDetect']
@@ -279,6 +280,7 @@ export const definePlugin: IStorageDefinePlugin = ((
         createRevisionPort: nativeCore.createRevisionPort,
         createChangeController: nativeCore.createChangeController,
         registerChangeController: nativeCore.registerChangeController,
+        registerValueCommit: nativeCore.registerValueCommit,
         getPublishedBackend: nativeCore.getPublishedBackend,
         registerDetect: nativeCore.registerDetect,
         registerStore: (store: IStorageBase) => {

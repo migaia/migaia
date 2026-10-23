@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { deferred, type IAbortSignal } from '@migaia/utils/promise'
 import {
   createTransactionOwner,
+  defineConcurrencyPolicy,
   ConcurrencyPolicy,
   lockKey,
   runWithConcurrency,
@@ -163,6 +164,78 @@ describe('the shared local key-lock provider', () => {
     await expect(pending).resolves.toBe('first')
     expect(order).toEqual(['acquired', 'native', 'cleanup', 'released'])
     expect(report).not.toHaveBeenCalled()
+  })
+
+  it('waits for async root ranges without replaying native attempts or blocking other channels', async () => {
+    /** The original owner supplies authentic contexts and a shared physical lock table. */
+    const current = await fixture()
+    await using _host = current.host
+    await using port = current.port
+    /** The first actual native attempt retains its record lease until real cleanup ends. */
+    const entered = deferred<void>()
+    /** Release is deliberately later than the root range's original wait decision. */
+    const release = deferred<void>()
+    /** Observing the policy proves the root saw the original held record. */
+    const decided = deferred<void>()
+    /** An optimistic root respects existing locks without creating its own held row. */
+    const decide = vi.fn(() => {
+      decided.resolve()
+      return { action: 'wait' } as const
+    })
+    /** Root native work must not begin until the original holder releases. */
+    const native = vi.fn(async () => ({ status: 'committed', value: 'root' }) as const)
+    /** The protected record falls inside a canonical typed prefix range. */
+    const holding = run(
+      current,
+      'record-owner',
+      { lock: [lockKey.record(['tenant', 1])] },
+      async () => {
+        entered.resolve()
+        await release.promise
+        return { status: 'committed', value: 'held' }
+      }
+    )
+    await entered.promise
+    /** Range bounds come from the original contract encoder, with no backend encoding. */
+    const ranges = [
+      {
+        channel: 'record' as const,
+        ...snapshotConcurrencyLockRange({ channel: 'record', prefix: ['tenant'] }, 'catalog')
+      }
+    ]
+    /** The same original loop retries admission once, then waits inside the existing FIFO. */
+    const pending = runWithConcurrency(
+      {
+        store: current.state.store,
+        options: {
+          concurrency: defineConcurrencyPolicy({
+            name: 'root-range-wait',
+            locking: 'optimistic',
+            decide
+          })
+        }
+      },
+      {
+        attempt: (ctx) =>
+          port.attempt(ctx, holder('root'), { attempt: native }, undefined, undefined, ranges)
+      }
+    )
+    await decided.promise
+    expect(native).not.toHaveBeenCalled()
+    await expect(
+      run(current, 'text-owner', { lock: [lockKey.text('tenant')] }, async () => ({
+        status: 'committed',
+        value: 'text'
+      }))
+    ).resolves.toBe('text')
+    expect(decide).toHaveBeenCalledTimes(1)
+    expect(native).not.toHaveBeenCalled()
+    release.resolve()
+    await expect(holding).resolves.toBe('held')
+    await expect(pending).resolves.toBe('root')
+    expect(native).toHaveBeenCalledTimes(1)
+    expect(decide).toHaveBeenCalledTimes(1)
+    expect(port.inspectLocks()).toEqual([])
   })
 
   it('uses only the original FIFO for wait decisions and prevents cancelled queued native work', async () => {

@@ -16,7 +16,8 @@ import type { IScheduler } from '@migaia/utils/scheduler'
 import type { INativeAbortSignal } from '@migaia/utils/promise'
 import type {
   IBackendChangeController,
-  IBackendChangeControllerOptions
+  IBackendChangeControllerOptions,
+  IBackendValueCommit
 } from './core/change-controller.js'
 import type {
   IOperationContext,
@@ -318,6 +319,7 @@ export type IStoragePluginCore<F extends IStorageFeatureRecord = {}> = Pick<
     createRevisionPort(): IBackendRevisionPort
     createChangeController(options: IBackendChangeControllerOptions): IBackendChangeController
     registerChangeController(store: IStorageBase, controller: IBackendChangeController): void
+    registerValueCommit(store: IStorageBase, commit: IBackendValueCommit): void
     registerDetect(check: (signal: INativeAbortSignal) => Promise<void>): void
     registerStore<S extends IStorageBase>(store: S): void
     getStore(): IStorageBase

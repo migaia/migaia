@@ -2,6 +2,7 @@ import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import {
   assertTransactionOwner,
   createTransactionOwner,
+  readTransactionOperationContext,
   nextTransactionIterator,
   registerTransactionFinalizer,
   runTransactionOperation,
@@ -9,6 +10,8 @@ import {
   type IStorageBase,
   type IStorageIterator,
   type IRecordStore,
+  type IRecordIndexHandle,
+  type IOperationContext,
   type ITransactionInfo,
   type ITransactionScope
 } from '../src/index.js'
@@ -31,7 +34,10 @@ function normalizeFailure(error: unknown): IFailure {
 }
 
 /** Each fixture owns one actual resource base and one original transaction method factory. */
-function setup(options?: { beforeCommit?: (scope: IScope) => void | PromiseLike<void> }) {
+function setup(options?: {
+  beforeCommit?: (scope: IScope) => void | PromiseLike<void>
+  context?: IOperationContext
+}) {
   /** No KV methods are fabricated for this specialized backend. */
   const base: IStorageBase = {
     backend: 'fixture-backend',
@@ -72,12 +78,90 @@ function setup(options?: { beforeCommit?: (scope: IScope) => void | PromiseLike<
   const controller = owner.register(root, {
     createScope,
     onFailure,
-    beforeCommit: options?.beforeCommit
+    beforeCommit: options?.beforeCommit,
+    context: options?.context
   })
   return { base, normalize, onFailure, createScope, owner, root, controller }
 }
 
 describe('canonical transaction ownership', () => {
+  it('shares one captured operation context across live operation and finalizer views', async () => {
+    /** The backend supplies its existing attempt signal, without another cancellation owner. */
+    const abort = new AbortController()
+    /** Accessor counts detect any layered re-read of backend operation options. */
+    const reads = { signal: 0, timeoutMs: 0, pageSize: 0, orgId: 0 }
+    /** Context access remains live only through the original transaction registration. */
+    const context: IOperationContext = {
+      get signal() {
+        reads.signal += 1
+        return abort.signal
+      },
+      get timeoutMs() {
+        reads.timeoutMs += 1
+        return 70
+      },
+      get pageSize() {
+        reads.pageSize += 1
+        return 3
+      },
+      get orgId() {
+        reads.orgId += 1
+        return '00000000-0000-0000-0000-000000000001'
+      }
+    }
+    /** A finalizer receives the same captured fields on its own authentic check view. */
+    const finalizer = vi.fn((scope: IScope) => {
+      expect(readTransactionOperationContext(scope)).toBe(snapshot)
+    })
+    /** Registration snapshots once before publishing any transaction view. */
+    const fixture = setup({ context, beforeCommit: finalizer })
+    /** Repeated reads return the same immutable record, retaining the original signal identity. */
+    const snapshot = readTransactionOperationContext(fixture.root)
+    expect(snapshot).toMatchObject({ signal: abort.signal, timeoutMs: 70, pageSize: 3 })
+    expect(Object.isFrozen(snapshot)).toBe(true)
+    expect(readTransactionOperationContext(fixture.root)).toBe(snapshot)
+    /** Accepted operation work remains valid after the original user callback stops admission. */
+    const gate = Promise.withResolvers<void>()
+    /** Saved views must expire when their actual operation settles. */
+    let operation: IScope | undefined
+    /** Composed extensions receive the same original attempt context on their derived view. */
+    const result = runTransactionOperation(fixture.root, async (scope) => {
+      operation = scope
+      expect(readTransactionOperationContext(scope)).toBe(snapshot)
+      await gate.promise
+      expect(readTransactionOperationContext(scope)?.signal).toBe(abort.signal)
+      expect(readTransactionOperationContext(scope)?.signal?.aborted).toBe(true)
+    })
+    fixture.controller.stopAdmission()
+    expect(() => readTransactionOperationContext(fixture.root)).toThrowError(
+      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+    )
+    /** Cancellation changes the original signal rather than replacing the frozen context. */
+    abort.abort()
+    gate.resolve()
+    await result
+    expect(() => readTransactionOperationContext(operation!)).toThrowError(
+      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+    )
+    await fixture.controller.runFinalizers()
+    expect(finalizer).toHaveBeenCalledTimes(1)
+    expect(reads).toEqual({ signal: 1, timeoutMs: 1, pageSize: 1, orgId: 1 })
+    fixture.controller.close()
+  })
+
+  it('keeps omitted contexts absent and rejects forged or closed views', () => {
+    /** Existing registrations without context retain their original admission behavior. */
+    const fixture = setup()
+    expect(readTransactionOperationContext(fixture.root)).toBeUndefined()
+    expect(() => readTransactionOperationContext({})).toThrowError(
+      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+    )
+    fixture.controller.close()
+    expect(() => readTransactionOperationContext(fixture.root)).toThrowError(
+      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+    )
+  })
+
   it('rejects forged, duplicate and expired identities without invoking data factories', async () => {
     /** A real owner is initialized exactly once for the original store identity. */
     const fixture = setup()
@@ -490,6 +574,9 @@ describe('transaction public type contracts', () => {
       >()
       expectTypeOf(store.transaction(() => 3 as const)).toEqualTypeOf<Promise<3>>()
       expectTypeOf<ITransactionScope['get']>().returns.toEqualTypeOf<Promise<string | null>>()
+      expectTypeOf<ITransactionScope['isRecordIndexReady']>().toEqualTypeOf<
+        ((handle: IRecordIndexHandle) => Promise<boolean>) | undefined
+      >()
       // @ts-expect-error Plain iterators cannot promise explicit owned cleanup.
       const owned: IStorageIterator<number> = raw
       void owned
