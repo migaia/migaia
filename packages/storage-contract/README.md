@@ -632,3 +632,7 @@ const excluded = prefix.matches(['cache', 'users-extra'])
 `ttl` 与 `counter` 是标准能力身份。后端发布完整原生 API；支持事务的 provider 同时提供 `forTransaction`。`store.use(ttl)` 对物理文本、字节或记录目标提供 `expire/remaining/persist`。期限为有限非负毫秒，含小数与零；缺失/已过期目标的写返回 false，缺失/无限期目标的 remaining 返回 undefined；对已无限期目标 persist 返回 false。事务投影使用原 draft 与预算。
 
 `store.use(counter).increment(key, by?)` 原子修改规范十进制安全整数文本；缺失文本从零起算，省略 `by` 为一。空白、指数、前导零、负零、不安全增量和结果溢出均报 `INVALID_ARGUMENT`，不执行写入。后端作者在 I/O 前调用 `snapshotStorageCounterIncrement(by, backend)`，再在既有原子操作内部对当前文本应用其纯计算。`snapshotStorageTtlTarget` 复用原物理键 validator，`assertStorageTtlDuration` 接纳有限非负期限；这些 helper 不创建 store、期限状态或操作预算。
+
+`term.iri/literal/blank/defaultGraph` 拥有纯 RDF 项。IRI 保留精确的绝对 RFC 3987 拼写，不通过 URL 解析、大小写转换或规范化改变身份。普通 literal 含 `xsd:string`；语言 literal 含 `rdf:langString` 与小写且格式正确的 BCP47 标签。raw/parser blank label 只在局部有效，不能进入标准 ground `IQuad` 位置；`IRawQuad` 为 raw 响应保留完整 RDF 1.1 blank 域。
+
+`snapshotStorageRdfTerm`、`snapshotStorageRdfPattern` 与 `snapshotStorageRdfQuad` 单次捕获并复制结构字段；非法项或位置报 `INVALID_ARGUMENT`，保留 getter 原因。pattern 省略的字段不加约束，graph 也如此；完整 quad 必须提供四个位置。`encodeStorageRdfQuad` 通过规范 term 字段与既有自定界有序键 writer 生成独立身份字节。这些纯 helper 不打开原生 store、query 或资源。

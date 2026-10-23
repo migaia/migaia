@@ -775,6 +775,95 @@ export const storageContractReference: ILibraryReference = {
     }
   },
   symbols: {
+    term: {
+      role: 'constant',
+      purpose: t(
+        'Pure RDF factories: iri preserves exact absolute IRI spelling, literal supplies mandatory datatype and lowercase well-formed language, blank is raw/parser-local, and defaultGraph is one frozen value.',
+        '纯 RDF 工厂：iri 保留精确绝对 IRI，literal 补齐必需 datatype 与小写且格式正确的 language，blank 属 raw/parser 局部，defaultGraph 是一个冻结值。'
+      ),
+      example: storageContractCases.term![0]!.example,
+      cases: storageContractCases.term
+    },
+    snapshotStorageRdfTerm: {
+      role: 'operation',
+      purpose: t(
+        'Validate and detach a structural raw RDF term through the canonical term owner.',
+        '通过规范 term owner 校验并复制结构化 raw RDF 项。'
+      ),
+      params: {
+        value: t(
+          'Direct IRdfTerm, including response-local blank terms.',
+          '直接 IRdfTerm，含响应局部 blank 项。'
+        ),
+        backend: t('Actual backend diagnostic or undefined.', '真实后端诊断，或 undefined。')
+      },
+      returns: t(
+        'Frozen normalized IRdfTerm; malformed fields throw INVALID_ARGUMENT with the exact getter cause.',
+        '冻结规范 IRdfTerm；非法字段抛 INVALID_ARGUMENT，保留精确 getter 原因。'
+      ),
+      example: storageContractCases.snapshotStorageRdfTerm![0]!.example,
+      cases: storageContractCases.snapshotStorageRdfTerm
+    },
+    snapshotStorageRdfPattern: {
+      role: 'operation',
+      purpose: t(
+        'Capture only supplied ground positions without inserting a default graph.',
+        '只捕获给定 ground 位置，不补入默认图。'
+      ),
+      params: {
+        pattern: t(
+          'Partial ground IQuad; an omitted field is unconstrained.',
+          '部分 ground IQuad；省略字段不加约束。'
+        ),
+        backend: t('Actual backend diagnostic or undefined.', '真实后端诊断，或 undefined。')
+      },
+      returns: t(
+        'Frozen detached partial IQuad; blank or invalid positional terms reject INVALID_ARGUMENT.',
+        '冻结独立的部分 IQuad；blank 或非法位置项报 INVALID_ARGUMENT。'
+      ),
+      example: storageContractCases.snapshotStorageRdfPattern![0]!.example,
+      cases: storageContractCases.snapshotStorageRdfPattern
+    },
+    snapshotStorageRdfQuad: {
+      role: 'operation',
+      purpose: t(
+        'Capture every required ground position before native identity or writes.',
+        '在原生身份处理或写入前捕获每个必需 ground 位置。'
+      ),
+      params: {
+        quad: t(
+          'Complete ground IQuad with all four positions.',
+          '具四个完整位置的 ground IQuad。'
+        ),
+        backend: t('Actual backend diagnostic or undefined.', '真实后端诊断，或 undefined。')
+      },
+      returns: t(
+        'Frozen detached IQuad; missing or illegal positions throw INVALID_ARGUMENT before I/O.',
+        '冻结独立 IQuad；缺失或非法位置在 I/O 前抛 INVALID_ARGUMENT。'
+      ),
+      example: storageContractCases.snapshotStorageRdfQuad![0]!.example,
+      cases: storageContractCases.snapshotStorageRdfQuad
+    },
+    encodeStorageRdfQuad: {
+      role: 'operation',
+      purpose: t(
+        'Snapshot ground RDF identity and encode term boundaries with the original ordered-key writer.',
+        '快照 ground RDF 身份，并用原有序键 writer 编码项边界。'
+      ),
+      params: {
+        quad: t(
+          'Complete ground IQuad; caller object identity is irrelevant.',
+          '完整 ground IQuad；不使用调用方对象身份。'
+        ),
+        backend: t('Actual backend diagnostic or undefined.', '真实后端诊断，或 undefined。')
+      },
+      returns: t(
+        'Independent Uint8Array identity bytes using term type, exact IRI/value and normalized datatype/language.',
+        '独立 Uint8Array 身份字节，使用项类型、精确 IRI/value 和规范 datatype/language。'
+      ),
+      example: storageContractCases.encodeStorageRdfQuad![0]!.example,
+      cases: storageContractCases.encodeStorageRdfQuad
+    },
     createStorageBatchKeyCapture: {
       role: 'operation',
       purpose: t(
@@ -2331,6 +2420,112 @@ console.log(candidate.name, candidate.output)`
     }
   },
   types: {
+    IRdfNamedNode: {
+      summary: t(
+        'An exact absolute RDF IRI, without URL normalization.',
+        '精确绝对 RDF IRI，不做 URL 规范化。'
+      ),
+      members: {
+        termType: { summary: t('NamedNode discriminator.', 'NamedNode 标记。') },
+        value: { summary: t('Original absolute IRI spelling.', '原绝对 IRI 拼写。') }
+      }
+    },
+    IRdfBlankNode: {
+      summary: t(
+        'A raw/parser-local blank term; labels are not portable repeated-identity keys.',
+        'raw/parser 局部 blank 项；label 不是便携重复身份键。'
+      ),
+      members: {
+        termType: { summary: t('BlankNode discriminator.', 'BlankNode 标记。') },
+        value: {
+          summary: t('Nonempty response/runtime-local label.', '非空的响应或运行时局部 label。')
+        }
+      }
+    },
+    IRdfLiteral: {
+      summary: t(
+        'An immutable lexical literal with mandatory datatype and consistent optional language.',
+        '包含必需 datatype 与一致可选 language 的不可变词法 literal。'
+      ),
+      members: {
+        termType: { summary: t('Literal discriminator.', 'Literal 标记。') },
+        value: {
+          summary: t(
+            'Exact Unicode scalar string, including escaped control values.',
+            '精确 Unicode 标量字符串，含可转义控制值。'
+          )
+        },
+        datatype: {
+          summary: t(
+            'Absolute datatype IRI; plain strings use xsd:string and language tags require rdf:langString.',
+            '绝对 datatype IRI；普通字符串用 xsd:string，language 标签要求 rdf:langString。'
+          )
+        },
+        language: {
+          summary: t(
+            'Lowercase well-formed BCP47 tag, present exactly for rdf:langString.',
+            '小写且格式正确的 BCP47 标签，恰在 rdf:langString 时存在。'
+          )
+        }
+      }
+    },
+    IRdfDefaultGraph: {
+      summary: t(
+        'The default graph has no fabricated IRI or binding value.',
+        '默认图不含伪造 IRI 或绑定值。'
+      ),
+      members: { termType: { summary: t('DefaultGraph discriminator.', 'DefaultGraph 标记。') } }
+    },
+    IRdfBindingTerm: {
+      summary: t(
+        'Raw binding union of NamedNode, BlankNode and Literal; DefaultGraph is excluded.',
+        'NamedNode、BlankNode 与 Literal 的 raw 绑定联合；不含 DefaultGraph。'
+      ),
+      members: {}
+    },
+    IRdfTerm: {
+      summary: t(
+        'Full raw RDF term union including the default graph.',
+        '含默认图的完整 raw RDF 项联合。'
+      ),
+      members: {}
+    },
+    IQuad: {
+      summary: t(
+        'Portable ground quad identity; standard repeated writes reject blank positions.',
+        '便携 ground quad 身份；标准重复写入拒绝 blank 位置。'
+      ),
+      members: {
+        subject: { summary: t('NamedNode subject.', 'NamedNode 主项。') },
+        predicate: { summary: t('NamedNode relation IRI.', 'NamedNode 关系 IRI。') },
+        object: {
+          summary: t('NamedNode or normalized Literal value.', 'NamedNode 或规范 Literal 值。')
+        },
+        graph: {
+          summary: t(
+            'NamedNode or DefaultGraph, required even for the default graph.',
+            'NamedNode 或 DefaultGraph；默认图也须明确提供。'
+          )
+        }
+      }
+    },
+    IRawQuad: {
+      summary: t(
+        'Complete RDF 1.1 raw/parser quad, retaining request-local blank positions.',
+        '完整 RDF 1.1 raw/parser quad，保留请求局部 blank 位置。'
+      ),
+      members: {
+        subject: { summary: t('NamedNode or BlankNode.', 'NamedNode 或 BlankNode。') },
+        predicate: { summary: t('NamedNode relation IRI.', 'NamedNode 关系 IRI。') },
+        object: { summary: t('Any raw binding term.', '任意 raw 绑定项。') },
+        graph: {
+          summary: t(
+            'NamedNode, BlankNode or DefaultGraph.',
+            'NamedNode、BlankNode 或 DefaultGraph。'
+          )
+        }
+      }
+    },
     IStorageBatchKeyCapture: {
       summary: t(
         'Pure per-batch function from one logical key to IStorageBatchKey; it owns only a temporary equality map and input position, without resource authority.',
