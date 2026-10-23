@@ -187,7 +187,21 @@ function setup() {
     query: () =>
       createRecordQuery({
         pushdown: { operations: [], operators: [], source: 'records' },
-        execute: () => scope.iterateRecords()
+        execute: () => scope.iterateRecords(),
+        mutate: (request, run) =>
+          runTransactionOperation(scope, (current) =>
+            run({
+              execute: () => current.iterateRecords(),
+              accept: async (key) => {
+                /** The same native draft and scope own both existence and actual write calls. */
+                const original = rows.get(key)
+                if (original === undefined) return false
+                if (request.operation === 'delete') await current.deleteRecord(key)
+                else await current.putRecord({ ...original, ...request.patch }, key)
+                return true
+              }
+            })
+          )
       }),
     removeByPrefix: (prefix) =>
       runTransactionOperation(scope, () => {
@@ -275,6 +289,37 @@ function setup() {
 }
 
 describe('original transaction capability projections', () => {
+  it('keeps query writes accepted through the original draft and rejects expired writes before patch getters', async () => {
+    const fixture = setup()
+    const query = fixture.scope.use(records).query<IRow>().where({ state: 'paid' }).limit(1)
+    const pending = query.update({ value: 8 })
+    fixture.controller.stopAdmission()
+    expect(await pending).toBe(1)
+    expect(fixture.rows.get('a')).toEqual({ state: 'paid', value: 8 })
+    let patchReads = 0
+    await expect(
+      query.update({
+        get value() {
+          patchReads++
+          return 9
+        }
+      })
+    ).rejects.toMatchObject({
+      source: 'tx-native',
+      code: 'TRANSACTION_FAILED',
+      cause: expect.any(Error)
+    })
+    expect(patchReads).toBe(0)
+    await fixture.controller.runFinalizers()
+    fixture.controller.close()
+    expectTypeOf(query.select('value')).not.toHaveProperty('update')
+    function noContext(): void {
+      // @ts-expect-error Transaction query writes cannot create a separate operation context.
+      query.delete({ timeoutMs: 1 })
+    }
+    void noContext
+  })
+
   it('borrows the original accepted view for RDF matches after callback expiry and across stream advances', async () => {
     const knows = term.iri('urn:knows')
     const quad = (subject: string, object: string): IQuad => ({

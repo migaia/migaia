@@ -25,9 +25,20 @@ import { createStorageIteratorLifetime, type IStorageIterator } from './resource
 import { snapshotOperationContext } from './operation-context.js'
 import { runTransactionIteratorOperation, deriveTransactionIterator } from './transaction.js'
 import { compareStorageKeys, snapshotStorageKey } from './key.js'
-import { encodeOrderedStorageKey, orderStorageKeysByBytes } from './key-order.js'
+import {
+  encodeOrderedStorageKey,
+  orderStorageKeysByBytes,
+  storageKeyBytesIdentity
+} from './key-order.js'
+import {
+  assertConcurrencyPolicy,
+  type IConcurrencyPolicy,
+  type IWriteConcurrencyOptions
+} from './concurrency.js'
 import {
   snapshotStorageRdfPattern,
+  snapshotStorageRdfQuad,
+  encodeRdfQuadSnapshot,
   RdfTermType,
   type IQuad,
   type IRdfNamedNode
@@ -468,6 +479,10 @@ export type IQueryRead<R, TContext extends IOperationContext | undefined = IOper
   stream(ctx?: TContext): IStorageIterator<R>
   explain(): IQueryPlan
 }
+/** Transaction queries borrow original write intent and accept no per-call operation context. */
+export type IQueryWriteContext<TContext> = TContext extends undefined
+  ? undefined
+  : IOperationContext & IWriteConcurrencyOptions
 /** Optional numeric fields remain valid selectors; absence contributes no aggregate sample. */
 export type INumericKeys<R> = Extract<
   { [K in keyof R]-?: [NonNullable<R[K]>] extends [number] ? K : never }[keyof R],
@@ -540,6 +555,8 @@ export interface IRecordQueryBaseCore<
   limit(count: number): this
   skip(count: number): this
   after(cursor: IQueryCursor): this
+  delete(ctx?: IQueryWriteContext<TContext>): Promise<number>
+  update(patch: Partial<T>, ctx?: IQueryWriteContext<TContext>): Promise<number>
 }
 /** The comparator transition requires an explicit finite limit before any read terminal exists. */
 export interface IRecordQueryCore<
@@ -631,6 +648,7 @@ export interface IVectorQueryBase<
   topK(count: number): this
   minScore(score: number): this
   withVector(): IVectorQuery<TPayload, TGroupable, true, TAugmentMethods>
+  delete(ctx?: IOperationContext & IWriteConcurrencyOptions): Promise<number>
 }
 /** Backend augmentation remains available during the pre-topK type state. */
 export type IVectorQueryBuilder<
@@ -678,6 +696,8 @@ export interface IRdfQueryCore<
   orderBy(selector: (quad: IQuad) => IStorageKey, direction?: 'asc' | 'desc'): this
   follow(predicate: IRdfNamedNode, target?: IRdfNamedNode): this
   inverse(predicate: IRdfNamedNode): this
+  delete(ctx?: IQueryWriteContext<TContext>): Promise<number>
+  replace(oldQuad: IQuad, newQuad: IQuad, ctx?: IQueryWriteContext<TContext>): Promise<number>
 }
 /** RDF Feature extensions preserve their original function identity across every branch. */
 export type IRdfQuery<
@@ -710,7 +730,9 @@ export const RecordQueryMethod = Object.freeze({
   distinct: 'distinct',
   skip: 'skip',
   after: 'after',
-  page: 'page'
+  page: 'page',
+  delete: 'delete',
+  update: 'update'
 } as const)
 /** Vector Feature admission reserves the same shared terminals plus its family refinements. */
 export const VectorQueryMethod = Object.freeze({
@@ -724,7 +746,8 @@ export const VectorQueryMethod = Object.freeze({
 export const RdfQueryMethod = Object.freeze({
   ...RecordQueryMethod,
   follow: 'follow',
-  inverse: 'inverse'
+  inverse: 'inverse',
+  replace: 'replace'
 } as const)
 /** Captures only pure Feature methods and rejects collisions before source or cursor admission. */
 function snapshotRecordQueryMethods<T extends object>(
@@ -764,6 +787,8 @@ export type IRecordQuerySource = {
   readonly cursorSource?: object
   /** A real native scalar cursor uses the original resource lifetime and declared terminal support. */
   readonly reduce?: IQueryReducer<IRecordQueryInput>
+  /** The original write pipeline/transaction provides a scoped source and accepts actual rows. */
+  readonly mutate?: IQueryMutator<IRecordQueryInput, unknown, IRecordQueryMutation>
   readonly execute: (input: IRecordQueryInput) => IStorageIterator<readonly [IStorageKey, unknown]>
 }
 /** The existing record execute shape is also used verbatim by its native reduction port. */
@@ -773,6 +798,45 @@ export type IRecordQueryInput = {
   readonly ctx: IOperationContext | undefined
   readonly steps?: readonly IQueryNativeStep[]
 }
+/** Common deletion request; concurrency remains with the original backend operation owner. */
+export type IQueryDelete = {
+  readonly operation: 'delete'
+  readonly ctx: IOperationContext | undefined
+  readonly concurrency?: IConcurrencyPolicy
+}
+/** Records keep one detached patch for the actual selected records, never projected output rows. */
+export type IRecordQueryMutation =
+  | IQueryDelete
+  | {
+      readonly operation: 'update'
+      readonly patch: Readonly<Partial<Record<string, ICodecValue>>>
+      readonly ctx: IOperationContext | undefined
+      readonly concurrency?: IConcurrencyPolicy
+    }
+/** Ground replacement applies only when the original query actually selects oldQuad. */
+export type IRdfQueryMutation =
+  | IQueryDelete
+  | {
+      readonly operation: 'replace'
+      readonly oldQuad: IQuad
+      readonly newQuad: IQuad
+      readonly ctx: IOperationContext | undefined
+      readonly concurrency?: IConcurrencyPolicy
+    }
+/** A mutation borrows only the native transaction's existing reader and draft write callback. */
+export type IQueryMutationPort<TInput, TValue> = {
+  readonly execute: (input: TInput) => IStorageIterator<readonly [IStorageKey, unknown]>
+  readonly accept: (key: IStorageKey, value: TValue) => boolean | PromiseLike<boolean>
+}
+/** Root owners settle only after actual commit; transaction owners return accepted draft counts. */
+export type IQueryMutator<
+  TInput,
+  TValue,
+  TMutation extends IQueryDelete | IRecordQueryMutation | IRdfQueryMutation
+> = (
+  request: TMutation,
+  run: (port: IQueryMutationPort<TInput, TValue>) => Promise<number>
+) => Promise<number>
 /** Native scalar requests contain no JavaScript callbacks or secondary execution state. */
 export type IQueryReduction =
   | { readonly operation: typeof QueryOperation.count }
@@ -828,6 +892,7 @@ export type IVectorQuerySource<TPayload, TGroupable extends boolean = false> = {
   readonly groupBy?: TGroupable
   /** Native scalar terminals keep the same native query and original cursor owner. */
   readonly reduce?: IQueryReducer<IVectorQueryInput>
+  readonly mutate?: IQueryMutator<IVectorQueryInput, IVectorHit<TPayload, boolean>, IQueryDelete>
   readonly execute: (
     input: IVectorQueryInput
   ) => IStorageIterator<readonly [IStorageKey, IVectorHit<TPayload, boolean>]>
@@ -859,6 +924,7 @@ export type IRdfQuerySource<TOperationScope extends object = object> = {
   readonly cursorSource?: object
   /** Native scalar terminals keep the same native query and original cursor owner. */
   readonly reduce?: IQueryReducer<IRdfQueryInput<TOperationScope>>
+  readonly mutate?: IQueryMutator<IRdfQueryInput<TOperationScope>, IQuad, IRdfQueryMutation>
   readonly execute: (
     input: IRdfQueryInput<TOperationScope>
   ) => IStorageIterator<readonly [IStorageKey, unknown]>
@@ -911,7 +977,8 @@ type IQuerySourceSnapshot = {
   readonly tieBreakByKey: IRecordQuerySource['tieBreakByKey']
   readonly execute: IRecordQuerySource['execute']
   readonly reduce: IRecordQuerySource['reduce']
-  readonly receiver: IRecordQuerySource
+  readonly mutate: IRecordQuerySource['mutate']
+  readonly receiver: object
   readonly nativeSteps: boolean
   readonly cursorSource: object
   readonly vector?: {
@@ -1051,10 +1118,15 @@ function snapshotQuerySource(source: IRecordQuerySource): IQuerySourceSnapshot {
     const reduce = source.reduce
     if (reduce !== undefined && typeof reduce !== 'function')
       throw new TypeError(StorageContractErrorText.queryArgument)
+    /** One captured author callback retains original pipeline and native transaction authority. */
+    const mutate = source.mutate
+    if (mutate !== undefined && typeof mutate !== 'function')
+      throw new TypeError(StorageContractErrorText.queryArgument)
     return {
       receiver: source,
       execute,
       reduce,
+      mutate,
       pushdown: capturedPushdown,
       tieBreakByKey,
       nativeSteps: nativeSteps === true,
@@ -2094,6 +2166,43 @@ function compileRecordQueryReader(
     }
   }
 }
+/** Admission remains pure and runs once before either a read cursor or a write owner can open. */
+function prepareQueryExecution(
+  source: IQuerySourceSnapshot,
+  plan: IRecordExecutionPlan,
+  strict: boolean,
+  ctx: IOperationContext | undefined
+): IOperationContext | undefined {
+  /** Cursor mismatch rejects before native I/O without changing existing no-cursor getter order. */
+  const after = [...plan.pushed, ...plan.client].filter(
+    (step) => step.operation === QueryOperation.after
+  )
+  /** Only cursor scope validation needs the captured organization before strictness admission. */
+  let captured = after.length === 0 ? undefined : snapshotOperationContext(ctx)
+  for (const step of after)
+    if (!step.cursor.matches(source, plan.signature, captured?.orgId))
+      throw invalidQueryCondition(undefined, StorageContractErrorText.queryArgument)
+  /** Ranking and traversal cannot be emulated by the ordinary row reader. */
+  const requiredNative = plan.client.filter(
+    (step) => step.operation === QueryOperation.topK || step.operation === QueryOperation.minScore
+  )
+  if ((strict && plan.client.length > 0) || requiredNative.length > 0)
+    throw new StorageContractError(
+      StorageContractErrorCode.queryNotPushable,
+      {},
+      StorageContractErrorText.queryNotPushable(plan.explanation.client.map((step) => step.reason!))
+    )
+  /** Captured intent is shared by the source and every client node. */
+  if (after.length === 0) captured = snapshotOperationContext(ctx)
+  assertQueryActive(captured)
+  return captured
+}
+/** A write reuses this plan and captured context inside the original transaction callback. */
+type IPreparedQueryExecution = {
+  readonly plan: IRecordExecutionPlan
+  readonly ctx: IOperationContext | undefined
+}
+
 /** Plans once and opens only the original native prefix; terminal adapters share this execution. */
 function nativeQuerySteps(
   source: IQuerySourceSnapshot,
@@ -2127,7 +2236,9 @@ function openRecordQuery(
   ctx: IOperationContext | undefined,
   countOnly: boolean | typeof QueryOperation.aggregate = false,
   pageSize?: number,
-  reduction?: INativeQueryReduction
+  reduction?: INativeQueryReduction,
+  prepared?: IPreparedQueryExecution,
+  retainKeys = false
 ): {
   readonly iterator: IStorageIterator<readonly [IStorageKey, unknown]>
   readonly read: IQueryReader
@@ -2138,29 +2249,11 @@ function openRecordQuery(
   readonly mapper: ((row: unknown) => unknown) | undefined
 } {
   /** Strictness and missing comparator bounds reject before a source can open. */
-  const plan = reduction?.plan ?? planRecordQuery(source, node, countOnly, pageSize)
-  /** Cursor mismatch rejects before native I/O without changing existing no-cursor getter order. */
-  const after = [...plan.pushed, ...plan.client].filter(
-    (step) => step.operation === QueryOperation.after
-  )
-  /** Only cursor scope validation needs the captured organization before strictness admission. */
-  let captured = after.length === 0 ? undefined : snapshotOperationContext(ctx)
-  for (const step of after)
-    if (!step.cursor.matches(source, plan.signature, captured?.orgId))
-      throw invalidQueryCondition(undefined, StorageContractErrorText.queryArgument)
-  /** Ranking and traversal cannot be emulated by the ordinary row reader. */
-  const requiredNative = plan.client.filter(
-    (step) => step.operation === QueryOperation.topK || step.operation === QueryOperation.minScore
-  )
-  if ((strict && plan.client.length > 0) || requiredNative.length > 0)
-    throw new StorageContractError(
-      StorageContractErrorCode.queryNotPushable,
-      {},
-      StorageContractErrorText.queryNotPushable(plan.explanation.client.map((step) => step.reason!))
-    )
-  /** Captured intent is shared by the source and every client node. */
-  if (after.length === 0) captured = snapshotOperationContext(ctx)
-  assertQueryActive(captured)
+  const plan =
+    prepared?.plan ?? reduction?.plan ?? planRecordQuery(source, node, countOnly, pageSize)
+  /** An original write owner can reuse pre-I/O admission without re-reading context getters. */
+  const captured =
+    prepared === undefined ? prepareQueryExecution(source, plan, strict, ctx) : prepared.ctx
   /** Native execution receives exactly the safe prefix represented by explain. */
   const conditions = Object.freeze(
     plan.pushed.flatMap((step) => (step.operation === QueryOperation.where ? [step.condition] : []))
@@ -2186,7 +2279,7 @@ function openRecordQuery(
     captured,
     reduction === undefined ? source.tieBreakByKey : undefined,
     source.vector !== undefined,
-    pageSize !== undefined,
+    pageSize !== undefined || retainKeys,
     comparator,
     source
   )
@@ -2263,7 +2356,9 @@ async function consumeRecordQuery<R, TResult>(
   strict: boolean,
   ctx: IOperationContext | undefined,
   consume: (
-    read: () => Promise<IteratorResult<R>>,
+    read: () => Promise<
+      IteratorResult<R> & { readonly key?: IStorageKey; readonly keyBytes?: Uint8Array }
+    >,
     ctx: IOperationContext | undefined,
     page:
       | {
@@ -2274,7 +2369,9 @@ async function consumeRecordQuery<R, TResult>(
   ) => Promise<TResult>,
   countOnly: boolean | typeof QueryOperation.aggregate = false,
   pageSize?: number,
-  reduction?: INativeQueryReduction
+  reduction?: INativeQueryReduction,
+  prepared?: IPreparedQueryExecution,
+  retainKeys = false
 ): Promise<TResult> {
   /** Opening synchronously admits the complete terminal to the original transaction owner. */
   const {
@@ -2284,13 +2381,27 @@ async function consumeRecordQuery<R, TResult>(
     ctx: captured,
     signature,
     mapper
-  } = openRecordQuery(source, node, strict, ctx, countOnly, pageSize, reduction)
+  } = openRecordQuery(
+    source,
+    node,
+    strict,
+    ctx,
+    countOnly,
+    pageSize,
+    reduction,
+    prepared,
+    retainKeys
+  )
   return runTransactionIteratorOperation(iterator, async (advance, fail, currentScope) => {
     /** The terminal's scalar, bounded chunk or explicit all result stays inside the same operation. */
     let result: TResult
     try {
       result = await consume(
-        async () => (await read(advance, currentScope)) as IteratorResult<R>,
+        async () =>
+          (await read(advance, currentScope)) as IteratorResult<R> & {
+            readonly key?: IStorageKey
+            readonly keyBytes?: Uint8Array
+          },
         captured,
         pageSize === undefined ? undefined : { signature, mapper }
       )
@@ -2304,6 +2415,118 @@ async function consumeRecordQuery<R, TResult>(
     }
     return result
   })
+}
+
+/** Captures write-only policy once while the existing context owner retains all other admission. */
+function queryWriteContext(
+  ctx: (IOperationContext & IWriteConcurrencyOptions) | undefined
+): Pick<IQueryDelete, 'ctx' | 'concurrency'> {
+  /** Context getters are read only by the original snapshot owner. */
+  const captured = snapshotOperationContext(ctx)
+  if (ctx === undefined) return { ctx: captured }
+  try {
+    /** Concurrency is not an operation-context field and is therefore borrowed exactly once here. */
+    const concurrency = ctx.concurrency
+    if (concurrency !== undefined) assertConcurrencyPolicy(concurrency)
+    return Object.freeze({ ctx: captured, ...(concurrency === undefined ? {} : { concurrency }) })
+  } catch (cause) {
+    throw queryExecutionFailure(cause)
+  }
+}
+/** A patch is detached at the terminal before its original backend transaction can start. */
+function snapshotQueryPatch(patch: unknown): Readonly<Partial<Record<string, ICodecValue>>> {
+  try {
+    if (typeof patch !== 'object' || patch === null || Array.isArray(patch))
+      throw new TypeError(StorageContractErrorText.queryArgument)
+    /** The existing value and snapshot owners reject unsupported payloads without a new codec. */
+    const captured = asCodecValue(immutableSnapshot(patch))
+    return Object.freeze(captured as Record<string, ICodecValue>)
+  } catch (cause) {
+    throw invalidQueryCondition(cause, StorageContractErrorText.queryArgument)
+  }
+}
+/**
+ * Selects and accepts actual rows inside the original backend write callback. This terminal reuses
+ * the one planner, reader, resource cleanup and transaction operation; it owns no retry or lock.
+ */
+async function mutateRecordQuery(
+  source: IQuerySourceSnapshot,
+  node: IQueryNode | undefined,
+  strict: boolean,
+  request: IRecordQueryMutation | IRdfQueryMutation
+): Promise<number> {
+  /** Missing write authority rejects before source execution or any native transaction starts. */
+  if (source.mutate === undefined)
+    throw new StorageContractError(StorageContractErrorCode.unsupported)
+  /** One execution plan is admitted before the original write pipeline can perform I/O. */
+  const plan = planRecordQuery(source, node)
+  /** This original snapshot is retained for every scoped cursor, including nested RDF traversal. */
+  const ctx = prepareQueryExecution(source, plan, strict, request.ctx)
+  /** Replacement identity uses the original admitted RDF encoder, never source-key spellings. */
+  const replaced =
+    request.operation === RdfQueryMethod.replace
+      ? storageKeyBytesIdentity(encodeRdfQuadSnapshot(request.oldQuad))
+      : undefined
+  try {
+    return await Reflect.apply(source.mutate, source.receiver, [
+      request,
+      async (port: IQueryMutationPort<IRecordQueryInput, unknown>) => {
+        /** A native owner supplies exactly these two functions once per actual write attempt. */
+        const { execute, accept } = port
+        if (typeof execute !== 'function' || typeof accept !== 'function')
+          throw invalidQueryCondition(undefined, StorageContractErrorText.queryArgument)
+        /** The captured source facts stay fixed while I/O borrows the actual transaction receiver. */
+        const scoped = { ...source, execute, receiver: port }
+        /** One hash set retains only selected identities; rows are streamed and never materialized. */
+        const seen = new Set<string>()
+        return consumeRecordQuery<unknown, number>(
+          scoped,
+          node,
+          strict,
+          ctx,
+          async (read, captured) => {
+            /** Count increments only after the original draft explicitly accepts that unique row. */
+            let count = 0
+            while (true) {
+              /**
+               * Selection and callback failures retain the original cursor cleanup and primary
+               * error.
+               */
+              const next = await read()
+              if (next.done) return count
+              /** RDF portable identity is the ground quad; vector identity is its original hit id. */
+              const value =
+                source.rdf === undefined
+                  ? next.value
+                  : snapshotStorageRdfQuad(next.value as IQuad, undefined)
+              /** Key bytes have already been snapshotted and encoded by the same reader. */
+              const identity =
+                source.rdf !== undefined
+                  ? storageKeyBytesIdentity(encodeRdfQuadSnapshot(value as IQuad))
+                  : source.vector !== undefined
+                    ? (value as IVectorHit<unknown>).id
+                    : storageKeyBytesIdentity(next.keyBytes!)
+              if ((replaced !== undefined && identity !== replaced) || seen.has(identity)) continue
+              seen.add(identity)
+              /** The actual backend draft decides accepted no-ops and concurrent disappearance. */
+              const accepted = await Reflect.apply(accept, port, [next.key!, value])
+              if (typeof accepted !== 'boolean')
+                throw invalidQueryCondition(undefined, StorageContractErrorText.queryArgument)
+              if (accepted) count++
+              assertQueryActive(captured)
+            }
+          },
+          false,
+          undefined,
+          undefined,
+          { plan, ctx },
+          true
+        )
+      }
+    ])
+  } catch (cause) {
+    throw queryExecutionFailure(cause)
+  }
 }
 
 /** Terminal field names are captured before a source is opened, without inspecting row shapes. */
@@ -2878,6 +3101,18 @@ function recordQuery<
         }),
     where,
     select,
+    /** Actual record writes remain inside the backend's original pipeline and transaction. */
+    delete: (ctx?: IQueryWriteContext<TContext>) =>
+      mutateRecordQuery(source, node, strict, {
+        operation: RecordQueryMethod.delete,
+        ...queryWriteContext(ctx)
+      }),
+    update: (patch: Partial<T>, ctx?: IQueryWriteContext<TContext>) =>
+      mutateRecordQuery(source, node, strict, {
+        operation: RecordQueryMethod.update,
+        patch: snapshotQueryPatch(patch),
+        ...queryWriteContext(ctx)
+      }),
     ...recordQueryReads<T, TContext>(source, node, strict),
     requirePushdown: () =>
       recordQuery<T, TContext, TAugmentMethods>(source, node, true, methods, ordering)
@@ -2967,6 +3202,11 @@ function familyQuery(
       ...(bounded
         ? {
             ...familyQueryReads(source, node, strict),
+            delete: (ctx?: IOperationContext & IWriteConcurrencyOptions) =>
+              mutateRecordQuery(source, node, strict, {
+                operation: RecordQueryMethod.delete,
+                ...queryWriteContext(ctx)
+              }),
             select,
             distinct(field: string) {
               assertQueryField(field)
@@ -3004,6 +3244,19 @@ function familyQuery(
   return Object.freeze({
     ...shared,
     ...familyQueryReads(source, node, strict),
+    delete: (ctx?: IOperationContext & IWriteConcurrencyOptions) =>
+      mutateRecordQuery(source, node, strict, {
+        operation: RecordQueryMethod.delete,
+        ...queryWriteContext(ctx)
+      }),
+    replace(oldQuad: IQuad, newQuad: IQuad, ctx?: IOperationContext & IWriteConcurrencyOptions) {
+      return mutateRecordQuery(source, node, strict, {
+        operation: RdfQueryMethod.replace,
+        oldQuad: snapshotStorageRdfQuad(oldQuad, undefined),
+        newQuad: snapshotStorageRdfQuad(newQuad, undefined),
+        ...queryWriteContext(ctx)
+      })
+    },
     select,
     distinct(field: string) {
       assertQueryField(field)
