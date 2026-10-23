@@ -163,3 +163,45 @@ it('keeps asynchronous pipeline preparation inside the original root deadline', 
   expect(native).not.toHaveBeenCalled()
   expect(await store.get('late')).toBeNull()
 })
+
+/** Existing middleware surrounds the actual committed result and the exact native error. */
+it('keeps after-next reads and native error catches around the real terminal', async () => {
+  const connection = nodeSqliteDriver(':memory:')
+  let readCommitted!: () => Promise<string | null>
+  let afterNext: string | null | undefined
+  let caught: unknown
+  const around = definePlugin('around', (core) => ({
+    install() {
+      core.useAsyncPipeline(async (request, next) => {
+        if (request.operation !== 'set') {
+          await next(request)
+          return
+        }
+        try {
+          await next(request)
+          if ((request.input as { key?: unknown }).key === 'wrapped')
+            afterNext = await readCommitted()
+        } catch (error) {
+          caught = error
+          throw error
+        }
+      })
+      return {}
+    }
+  }))
+  const host = await createStorageHost({
+    plugins: [sqliteBackendPlugin({ driver: connection }), around] as const
+  })
+  onTestFinished(async () => {
+    await host.dispose()
+    await connection.dispose()
+  })
+  const store = host.backend('sqlite')
+  readCommitted = () => store.get('wrapped')
+  await store.set('wrapped', 'committed')
+  // This isolated memory database forces an actual driver failure through the public SQL endpoint.
+  await store.sql`DROP TABLE migaia_text`.run()
+  const failure = await store.set('failed', 'native').catch((error) => error)
+  expect(failure).toMatchObject({ code: 'SQLITE_FAILED', cause: expect.any(Error) })
+  expect([afterNext, caught === failure]).toEqual(['committed', true])
+})

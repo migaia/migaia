@@ -783,22 +783,15 @@ export function createSqliteStore<TValue>(
     let capturedInput!: I
     /** Fixed preparation retains only this operation's payload and exact affected keys. */
     let mutation!: IRootMutation<R>
-    /** A timestamp exists only after the pipeline has reached the actual operation endpoint. */
-    let started: number | undefined
     return runWithConcurrency<Awaited<R>>(
       {
         store,
         options: ctx ?? {},
-        prepare: (context) =>
-          core.execution.run<I, void>(
-            { operation: name, input, ctx: context },
-            async (captured) => {
-              throwIfAborted(context.signal)
-              capturedInput = captured
-              started = Date.now()
-              observe(operationStages, 'beforeStorageOperation', name)
-            }
-          ),
+        execute: (context, proceed) =>
+          operation(name, input, context, undefined, (captured) => {
+            capturedInput = captured
+            return proceed()
+          }),
         lock: () => {
           mutation = prepare(capturedInput)
           return mutation.keys
@@ -870,25 +863,7 @@ export function createSqliteStore<TValue>(
           }
         }
       }
-    )
-      .then(
-        (value) => {
-          if (started !== undefined)
-            observe(operationStages, 'afterStorageOperation', name, Date.now() - started, 1)
-          return value
-        },
-        (error) => {
-          if (started !== undefined)
-            observe(
-              operationStages,
-              'onStorageOperationError',
-              name,
-              (error as { code?: unknown })?.code
-            )
-          throw error
-        }
-      )
-      .finally(finish)
+    ).finally(finish)
   }
   /** Standard channel preparation owns payload conversion before the shared lock provider runs. */
   const prepareWrite = (
