@@ -1,4 +1,4 @@
-import { describe, expect, expectTypeOf, it } from 'vitest'
+import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import {
   compileStorageWhere,
   createRecordQuery,
@@ -17,6 +17,8 @@ import {
   type IQueryPushdown,
   type IRecordsApi,
   type IWhere,
+  type IQueryShape,
+  type IQueryResultOf,
   type IQueryCondition
 } from '../src/index.js'
 
@@ -702,5 +704,53 @@ describe('shared record query execution', () => {
       cause: original
     })
     expect(closed).toBe(2)
+  })
+})
+
+describe('record query Feature methods', () => {
+  it('retains method references, receiver and result inference across every existing transition', async () => {
+    /** The original Feature method observes each actual query receiver without a wrapper. */
+    const methods = {
+      feature<T>(this: T): T {
+        return this
+      }
+    }
+    /** Input rows remain on the original source cursor. */
+    const query = createRecordQuery<IOrder, undefined, typeof methods>(
+      {
+        pushdown: noPushdown,
+        execute: () => ownedRows([{ status: 'paid', total: 4 }])
+      },
+      methods
+    )
+    /** Every existing branch must retain the method itself and use its real fluent receiver. */
+    const branches = [
+      query,
+      query.where({ status: 'paid' }),
+      query.select('total'),
+      query.select((row) => row.total),
+      query.requirePushdown()
+    ]
+    for (const branch of branches) {
+      expect(branch.feature).toBe(methods.feature)
+      expect(branch.feature()).toBe(branch)
+    }
+    /** Complete terminal extraction supports projected shapes and zero transaction context. */
+    const selected = query.select('total')
+    expectTypeOf<typeof selected>().toExtend<IQueryShape>()
+    expectTypeOf<IQueryResultOf<typeof selected>>().toEqualTypeOf<Pick<IOrder, 'total'>[]>()
+    expect(await selected.all()).toEqual([{ total: 4 }])
+    expect(
+      'feature' in createRecordQuery({ pushdown: noPushdown, execute: () => ownedRows([]) })
+    ).toBe(false)
+  })
+
+  it('rejects built-in collisions before opening the original cursor', () => {
+    /** No feature may replace an original terminal or state transition. */
+    const execute = vi.fn(() => ownedRows([]))
+    expect(() => createRecordQuery({ pushdown: noPushdown, execute }, { all() {} })).toThrowError(
+      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+    )
+    expect(execute).not.toHaveBeenCalled()
   })
 })

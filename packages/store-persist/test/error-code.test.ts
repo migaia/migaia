@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { memoryStorageHost } from '@migaia/storage-web/memory'
+import { createMemoryTestStore } from './helpers/memory.js'
 import { createStore } from '@migaia/store-light'
 import { persist } from '../src/light-index'
 import {
@@ -36,7 +36,7 @@ describe('store-persist error-code contract', () => {
 
 describe('store-persist hydration failure boundary', () => {
   it('HYDRATE failure remains the original cause and blocks a subsequent write', async () => {
-    const storage = memoryStorageHost()
+    const storage = await createMemoryTestStore()
     // Version mismatch makes hydration fail (no migrations provided).
     await storage.set('both-fail', JSON.stringify({ version: 5, state: { count: 1 } }))
     const store = createStore({ count: 0 })

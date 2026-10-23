@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { memoryStorageHost } from '@migaia/storage-web/memory'
+import { createMemoryTestStore } from './helpers/memory.js'
 import { binaryCodec } from '@migaia/storage-host/entity'
 import { createStore } from '@migaia/store-light'
 import { StorageContractError, type ICodec } from '@migaia/storage-contract'
@@ -18,7 +18,7 @@ const binaryArchiveCodec: ICodec = {
 describe('public archive boundaries', () => {
   it('clears only the binary archive while preserving the live state and sibling bytes', async () => {
     /** The canonical backend owns both actual archive and sibling byte entries. */
-    const storage = memoryStorageHost()
+    const storage = await createMemoryTestStore()
     /** Clearing persistence must leave this current business state intact. */
     const store = createStore({ count: 7 })
     /** A separate byte key must survive per-archive removal. */
@@ -49,7 +49,7 @@ describe('public archive boundaries', () => {
 
   it('selects byte deletion explicitly while preserving the existing text helper call', async () => {
     /** Actual channel isolation must survive both forms of the public helper. */
-    const storage = memoryStorageHost()
+    const storage = await createMemoryTestStore()
     /** Text archives keep the existing three-argument removal contract. */
     const textArchive = { version: 0, state: { count: 1 } }
     /** The selected byte archive is independent of its neighboring text key. */
@@ -71,7 +71,7 @@ describe('public archive boundaries', () => {
 
   it('rejects binary clear on an adapter without per-key byte removal', async () => {
     /** Older projected adapters can still read and write bytes, but cannot claim deletion success. */
-    const backend = memoryStorageHost()
+    const backend = await createMemoryTestStore()
     /** The public adapter deliberately exposes the pre-existing read/write-only byte projection. */
     const storage = { ...backend, removeBytes: undefined }
     /** The store remains usable and its written archive must survive the rejected clear. */
@@ -108,7 +108,7 @@ describe('public archive boundaries', () => {
 
   it('round-trips byte archives through the actual binary backend', async () => {
     /** The real backend supplies both byte operations and their declared capability. */
-    const storage = memoryStorageHost()
+    const storage = await createMemoryTestStore()
     /** The binary codec preserves the application payload instead of coercing it to text. */
     const payload = new Uint8Array([0, 1, 127, 255])
     try {
@@ -123,7 +123,7 @@ describe('public archive boundaries', () => {
 
   it('rejects a corrupt archive version without restoring state or allowing a write to replace it', async () => {
     /** A malformed stored archive is external data, not a modified persistence implementation. */
-    const storage = memoryStorageHost()
+    const storage = await createMemoryTestStore()
     /** The live business value must survive rejected hydration unchanged. */
     const store = createStore({ count: 1 })
     /** Encoding succeeds because envelope schema validation belongs to persistence hydration. */

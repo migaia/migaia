@@ -39,10 +39,7 @@
         "planTeardown",
         "resolveInstallSet"
       ],
-      "./graph/dynamic": [
-        "GraphBindingReleaseReason",
-        "createDynamicCapabilityGraph"
-      ]
+      "./graph/dynamic": ["GraphBindingReleaseReason", "createDynamicCapabilityGraph"]
     },
     "@migaia/event-subscriber": {
       ".": [
@@ -65,11 +62,7 @@
         "invokeTaskSettled",
         "withSnapshotEntries"
       ],
-      "./subscriber": [
-        "subscribeOnce",
-        "subscribeSubscriber",
-        "subscribeUntil"
-      ]
+      "./subscriber": ["subscribeOnce", "subscribeSubscriber", "subscribeUntil"]
     },
     "@migaia/lifecycle": {
       ".": [
@@ -100,38 +93,23 @@
         "mergeCleanupResults",
         "snapshotScheduler"
       ],
-      "./abort": [
-        "createAbortController",
-        "observeAbortSubscription"
-      ],
-      "./scheduler": [
-        "resolveScheduler",
-        "resolveSchedulerOption",
-        "snapshotScheduler"
-      ],
+      "./abort": ["createAbortController", "observeAbortSubscription"],
+      "./scheduler": ["resolveScheduler", "resolveSchedulerOption", "snapshotScheduler"],
       "./quiescence": [
         "createObjectLeaseRegistry",
         "createPendingTracker",
         "createQuiescenceTracker",
         "createStringLeaseRegistry"
       ],
-      "./scope": [
-        "createLifecycleScope"
-      ],
-      "./generation": [
-        "createGenerationController"
-      ],
+      "./scope": ["createLifecycleScope"],
+      "./generation": ["createGenerationController"],
       "./disposal": [
         "createDisposeTransaction",
         "createSyncStartedDisposalLedger",
         "executeReleaseDescriptor",
         "mergeCleanupResults"
       ],
-      "./errors": [
-        "LIFECYCLE_SOURCE",
-        "containAsyncRejection",
-        "createErrorCollector"
-      ]
+      "./errors": ["LIFECYCLE_SOURCE", "containAsyncRejection", "createErrorCollector"]
     },
     "@migaia/logger": {
       ".": [
@@ -161,10 +139,7 @@
         "reasoning",
         "uuid"
       ],
-      "./plugins/file": [
-        "FILE_PLUGIN_NAME",
-        "file"
-      ],
+      "./plugins/file": ["FILE_PLUGIN_NAME", "file"],
       "./plugins/durable": [
         "LogRecordState",
         "LogStage",
@@ -173,9 +148,7 @@
         "undoLog",
         "wal"
       ],
-      "./plugins/durable/file": [
-        "fileLogStore"
-      ]
+      "./plugins/durable/file": ["fileLogStore"]
     },
     "@migaia/micro-hub": {
       ".": [
@@ -194,24 +167,11 @@
         "request",
         "resource"
       ],
-      "./events": [
-        "events"
-      ],
-      "./state": [
-        "state",
-        "stateDriverOf"
-      ],
-      "./persist": [
-        "persist"
-      ],
-      "./resource": [
-        "resources"
-      ],
-      "./web-component": [
-        "MICRO_APP_CONTEXT",
-        "consumeMicroApp",
-        "provideMicroApp"
-      ]
+      "./events": ["events"],
+      "./state": ["state", "stateDriverOf"],
+      "./persist": ["persist"],
+      "./resource": ["resources"],
+      "./web-component": ["MICRO_APP_CONTEXT", "consumeMicroApp", "provideMicroApp"]
     },
     "@migaia/middleware-pipeline": {
       ".": [
@@ -245,12 +205,7 @@
         "readPluginDependencies",
         "readPluginHostDisposalProvenance"
       ],
-      "./composition": [
-        "createView",
-        "inspectFeatures",
-        "isManagedHost",
-        "openComposition"
-      ]
+      "./composition": ["createView", "inspectFeatures", "isManagedHost", "openComposition"]
     },
     "@migaia/reactive": {
       ".": [
@@ -296,29 +251,13 @@
       ]
     },
     "@migaia/rpc-browser": {
-      ".": [
-        "RPC_BROWSER_ERROR_SOURCE",
-        "RpcBrowserErrorCode",
-        "createBrowserPeer"
-      ],
-      "./adapters/window": [
-        "createWindowMessageTransport"
-      ],
-      "./adapters/shared-worker": [
-        "createSharedWorkerTransport"
-      ],
-      "./adapters/service-worker": [
-        "createServiceWorkerTransport"
-      ],
-      "./adapters/broadcast-channel": [
-        "createBroadcastChannelTransport"
-      ],
-      "./adapters/web-transport": [
-        "createWebTransportDatagramTransport"
-      ],
-      "./adapters/rtc-data-channel": [
-        "createRtcDataChannelTransport"
-      ]
+      ".": ["RPC_BROWSER_ERROR_SOURCE", "RpcBrowserErrorCode", "createBrowserPeer"],
+      "./adapters/window": ["createWindowMessageTransport"],
+      "./adapters/shared-worker": ["createSharedWorkerTransport"],
+      "./adapters/service-worker": ["createServiceWorkerTransport"],
+      "./adapters/broadcast-channel": ["createBroadcastChannelTransport"],
+      "./adapters/web-transport": ["createWebTransportDatagramTransport"],
+      "./adapters/rtc-data-channel": ["createRtcDataChannelTransport"]
     },
     "@migaia/rpc-contract": {
       ".": [
@@ -371,11 +310,7 @@
         "serializeRpcError",
         "toJsonRpcError"
       ],
-      "./v1": [
-        "normalizeRpcEnvelope",
-        "normalizeStreamPayload",
-        "rpcProtocol"
-      ],
+      "./v1": ["normalizeRpcEnvelope", "normalizeStreamPayload", "rpcProtocol"],
       "./framing": [
         "assertRpcPhysicalFrameSize",
         "bindRpcFrameIngress",
@@ -466,10 +401,7 @@
         "RpcWireLimit",
         "measurePortableStreamValue"
       ],
-      "./portable": [
-        "RPC_PORTABLE_MAX_DEPTH",
-        "normalizePortable"
-      ],
+      "./portable": ["RPC_PORTABLE_MAX_DEPTH", "normalizePortable"],
       "./errors": [
         "RPC_CONTRACT_SOURCE",
         "RpcContractErrorCode",
@@ -570,10 +502,7 @@
         "restoreRpcBinary",
         "restoreRpcBinaryDecoded"
       ],
-      "./binary/capture": [
-        "RpcBinaryStorage",
-        "captureRpcBinaryData"
-      ],
+      "./binary/capture": ["RpcBinaryStorage", "captureRpcBinaryData"],
       "./stream": [
         "RpcStreamEvent",
         "RpcStreamLimit",
@@ -661,19 +590,10 @@
         "timeout",
         "uuid"
       ],
-      "./composed": [
-        "createComposedEndpoint"
-      ],
-      "./client": [
-        "createClientEndpoint"
-      ],
-      "./provider": [
-        "createProviderEndpoint"
-      ],
-      "./full": [
-        "createFullEndpoint",
-        "createFullOneWayEndpoint"
-      ],
+      "./composed": ["createComposedEndpoint"],
+      "./client": ["createClientEndpoint"],
+      "./provider": ["createProviderEndpoint"],
+      "./full": ["createFullEndpoint", "createFullOneWayEndpoint"],
       "./transport-constants": [
         "RpcCandidateStatus",
         "RpcEndpointStatus",
@@ -719,54 +639,23 @@
         "snapshotProbeEvent",
         "subscribeProbeStages"
       ],
-      "./features/outbound": [
-        "createOutboundFeature"
-      ],
-      "./features/one-way": [
-        "createOneWayFeature"
-      ],
-      "./features/provider": [
-        "createProviderAdmissionScope",
-        "createProviderFeature"
-      ],
-      "./features/discovery": [
-        "createDiscoveryFeature"
-      ],
-      "./features/control": [
-        "createControlFeature"
-      ],
-      "./stream": [
-        "createCanonicalChunkFeature",
-        "createStreamFeature"
-      ],
-      "./plugins/flow-control": [
-        "IpcLogEventName",
-        "IpcSendClass"
-      ],
-      "./plugins/send-queue": [
-        "createIpcSendQueueFeature",
-        "createIpcSendQueueTransport"
-      ],
-      "./plugins/log": [
-        "createIpcLogFeature"
-      ],
-      "./adapters/memory": [
-        "createMemoryTransportPair"
-      ],
+      "./features/outbound": ["createOutboundFeature"],
+      "./features/one-way": ["createOneWayFeature"],
+      "./features/provider": ["createProviderAdmissionScope", "createProviderFeature"],
+      "./features/discovery": ["createDiscoveryFeature"],
+      "./features/control": ["createControlFeature"],
+      "./stream": ["createCanonicalChunkFeature", "createStreamFeature"],
+      "./plugins/flow-control": ["IpcLogEventName", "IpcSendClass"],
+      "./plugins/send-queue": ["createIpcSendQueueFeature", "createIpcSendQueueTransport"],
+      "./plugins/log": ["createIpcLogFeature"],
+      "./adapters/memory": ["createMemoryTransportPair"],
       "./adapters/message-port": [
         "createBrowserMessagePortTransport",
         "createNodeMessagePortTransport"
       ],
-      "./testing": [
-        "createPeerPair"
-      ],
-      "./adapters/web-worker": [
-        "createWebWorkerTransport"
-      ],
-      "./adapter": [
-        "defineByteAdapter",
-        "defineMessageAdapter"
-      ],
+      "./testing": ["createPeerPair"],
+      "./adapters/web-worker": ["createWebWorkerTransport"],
+      "./adapter": ["defineByteAdapter", "defineMessageAdapter"],
       "./adapter/internal-advanced": [
         "IpcReporterContext",
         "JSONRPC_ALLOWED_CAPABILITIES",
@@ -804,11 +693,7 @@
       ]
     },
     "@migaia/rpc-devtools": {
-      ".": [
-        "RPC_DEVTOOLS_SOURCE",
-        "RpcDevtoolsErrorCode",
-        "createRpcDevtools"
-      ],
+      ".": ["RPC_DEVTOOLS_SOURCE", "RpcDevtoolsErrorCode", "createRpcDevtools"],
       "./contract": [
         "RPC_DEVTOOLS_SOURCE",
         "RpcDevtoolsErrorCode",
@@ -816,13 +701,8 @@
         "decodeRpcDevtoolsRecord",
         "encodeRpcDevtoolsRecord"
       ],
-      "./hub": [
-        "RpcDevtoolsTargetStatus",
-        "createRpcDevtoolsHub"
-      ],
-      "./log": [
-        "createRpcLogProbe"
-      ]
+      "./hub": ["RpcDevtoolsTargetStatus", "createRpcDevtoolsHub"],
+      "./log": ["createRpcLogProbe"]
     },
     "@migaia/rpc-pool": {
       ".": [
@@ -873,28 +753,12 @@
         "dialProcessByteChannel",
         "listenProcessByteChannel"
       ],
-      "./adapters/bun-spawn": [
-        "createBunProcessLauncher",
-        "openProcessStdioChannel"
-      ],
-      "./adapters/bun-socket": [
-        "dialProcessByteChannel",
-        "listenProcessByteChannel"
-      ],
-      "./adapters/deno-command": [
-        "createDenoProcessLauncher",
-        "openProcessStdioChannel"
-      ],
-      "./adapters/deno-socket": [
-        "dialProcessByteChannel",
-        "listenProcessByteChannel"
-      ],
-      "./adapters/electron-utility-process": [
-        "createElectronUtilityProcessLauncher"
-      ],
-      "./adapters/windows-job": [
-        "createWindowsJobProcessLauncher"
-      ]
+      "./adapters/bun-spawn": ["createBunProcessLauncher", "openProcessStdioChannel"],
+      "./adapters/bun-socket": ["dialProcessByteChannel", "listenProcessByteChannel"],
+      "./adapters/deno-command": ["createDenoProcessLauncher", "openProcessStdioChannel"],
+      "./adapters/deno-socket": ["dialProcessByteChannel", "listenProcessByteChannel"],
+      "./adapters/electron-utility-process": ["createElectronUtilityProcessLauncher"],
+      "./adapters/windows-job": ["createWindowsJobProcessLauncher"]
     },
     "@migaia/rpc-threads": {
       ".": [
@@ -913,10 +777,7 @@
         "readThreadBootstrap",
         "receiveThreadData"
       ],
-      "./adapters/node": [
-        "createNodeThreadChannelFactory",
-        "createNodeThreadLauncher"
-      ],
+      "./adapters/node": ["createNodeThreadChannelFactory", "createNodeThreadLauncher"],
       "./adapters/electron-main": [
         "createElectronMainThreadChannelFactory",
         "createElectronMainThreadLauncher"
@@ -975,15 +836,8 @@
         "streamBase64Chunks",
         "tagSerializeError"
       ],
-      "./plugins": [
-        "jsonParser",
-        "jsonPlugin"
-      ],
-      "./registry": [
-        "chunkToBytes",
-        "chunkToText",
-        "createSerializeRegistry"
-      ],
+      "./plugins": ["jsonParser", "jsonPlugin"],
+      "./registry": ["chunkToBytes", "chunkToText", "createSerializeRegistry"],
       "./codec": [
         "CodecErrorText",
         "asCodecValue",
@@ -992,27 +846,13 @@
         "normalizeCodecFailure",
         "toPortableValue"
       ],
-      "./codecs/identity/v1": [
-        "identityCodec"
-      ],
-      "./tagged": [
-        "createTaggedCodec"
-      ],
-      "./codecs/collections-json": [
-        "defineCollectionsJsonCodec"
-      ],
-      "./codecs/json": [
-        "defineJsonCodec"
-      ],
-      "./codecs/message-pack": [
-        "defineMessagePackCodec"
-      ],
-      "./codecs/cbor": [
-        "defineCBORCodec"
-      ],
-      "./codecs/protobuf": [
-        "defineProtobufCodec"
-      ]
+      "./codecs/identity/v1": ["identityCodec"],
+      "./tagged": ["createTaggedCodec"],
+      "./codecs/collections-json": ["defineCollectionsJsonCodec"],
+      "./codecs/json": ["defineJsonCodec"],
+      "./codecs/message-pack": ["defineMessagePackCodec"],
+      "./codecs/cbor": ["defineCBORCodec"],
+      "./codecs/protobuf": ["defineProtobufCodec"]
     },
     "@migaia/storage-contract": {
       ".": [
@@ -1023,12 +863,14 @@
         "KEY_DOMAIN_LIMITS",
         "QueryOperation",
         "QueryOperator",
+        "RecordQueryMethod",
         "STORAGE_CONTRACT_SOURCE",
         "StorageContractError",
         "StorageContractErrorCode",
         "StorageStageKind",
         "TransactionActivityMode",
         "TransactionBeforeStage",
+        "TransactionBuilderMethod",
         "TransactionObservedStage",
         "asChangeFeedStore",
         "asRecordStore",
@@ -1103,21 +945,11 @@
         "StorageErrorText",
         "lengthPrefixedNamespaceCodec"
       ],
-      "./memory": [
-        "memoryStorageHost"
-      ],
-      "./local-storage": [
-        "localStorageHost"
-      ],
-      "./session-storage": [
-        "sessionStorageHost"
-      ],
-      "./cookies": [
-        "cookiesHost"
-      ],
-      "./indexed-db": [
-        "indexedDbHost"
-      ],
+      "./memory": ["memoryStorageHost"],
+      "./local-storage": ["localStorageHost"],
+      "./session-storage": ["sessionStorageHost"],
+      "./cookies": ["cookiesHost"],
+      "./indexed-db": ["indexedDbHost"],
       "./host": [
         "StorageHostFacade",
         "assertStorageBackendId",
@@ -1125,28 +957,13 @@
         "defineFeature",
         "definePlugin"
       ],
-      "./plugins/memory": [
-        "memoryBackendPlugin"
-      ],
-      "./plugins/local-storage": [
-        "localStorageBackendPlugin"
-      ],
-      "./plugins/session-storage": [
-        "sessionStorageBackendPlugin"
-      ],
-      "./plugins/cookies": [
-        "cookieBackendPlugin"
-      ],
-      "./plugins/indexed-db": [
-        "indexedDbBackendPlugin",
-        "prepareIndexedDbStore"
-      ],
-      "./entity": [
-        "defineEntity"
-      ],
-      "./reactive-adapter": [
-        "defineReactiveAdapterFeature"
-      ],
+      "./plugins/memory": ["memoryBackendPlugin"],
+      "./plugins/local-storage": ["localStorageBackendPlugin"],
+      "./plugins/session-storage": ["sessionStorageBackendPlugin"],
+      "./plugins/cookies": ["cookieBackendPlugin"],
+      "./plugins/indexed-db": ["indexedDbBackendPlugin", "prepareIndexedDbStore"],
+      "./entity": ["defineEntity"],
+      "./reactive-adapter": ["defineReactiveAdapterFeature"],
       "./plugins/reactive": [
         "cookiesReactive",
         "indexedDbReactive",
@@ -1154,21 +971,11 @@
         "memoryReactive",
         "sessionStorageReactive"
       ],
-      "./plugins/reactive/memory": [
-        "memoryReactive"
-      ],
-      "./plugins/reactive/local-storage": [
-        "localStorageReactive"
-      ],
-      "./plugins/reactive/session-storage": [
-        "sessionStorageReactive"
-      ],
-      "./plugins/reactive/cookies": [
-        "cookiesReactive"
-      ],
-      "./plugins/reactive/indexed-db": [
-        "indexedDbReactive"
-      ]
+      "./plugins/reactive/memory": ["memoryReactive"],
+      "./plugins/reactive/local-storage": ["localStorageReactive"],
+      "./plugins/reactive/session-storage": ["sessionStorageReactive"],
+      "./plugins/reactive/cookies": ["cookiesReactive"],
+      "./plugins/reactive/indexed-db": ["indexedDbReactive"]
     },
     "@migaia/store-devtools": {
       ".": [
@@ -1220,10 +1027,7 @@
         "splitDef",
         "writableDef"
       ],
-      "./atom/store": [
-        "createAtomStore",
-        "defaultAtomStore"
-      ],
+      "./atom/store": ["createAtomStore", "defaultAtomStore"],
       "./atom/definition": [
         "assertNotThenable",
         "atomDef",
@@ -1233,10 +1037,7 @@
         "previewSafeAtomDefFactory",
         "writableDef"
       ],
-      "./reactive/atom": [
-        "atomGetter",
-        "atomSetter"
-      ],
+      "./reactive/atom": ["atomGetter", "atomSetter"],
       "./optics": [
         "KeyedSplitCache",
         "computeUniqueKeys",
@@ -1311,16 +1112,9 @@
         "removeEnvelope",
         "writeEnvelope"
       ],
-      "./light": [
-        "persist"
-      ],
-      "./indexed": [
-        "persistCollection"
-      ],
-      "./keyed": [
-        "clearFamily",
-        "persistKeyed"
-      ]
+      "./light": ["persist"],
+      "./indexed": ["persistCollection"],
+      "./keyed": ["clearFamily", "persistKeyed"]
     },
     "@migaia/store-react": {
       ".": [
@@ -1420,11 +1214,7 @@
         "createWorkerHandler",
         "workerComputed"
       ],
-      "./serialize/worker": [
-        "createSerializeWorkerHandler",
-        "workerParser",
-        "workerPlugin"
-      ]
+      "./serialize/worker": ["createSerializeWorkerHandler", "workerParser", "workerPlugin"]
     },
     "@migaia/supervision": {
       ".": [
@@ -1448,11 +1238,7 @@
         "createSupervisor",
         "createUnitBudget"
       ],
-      "./coroutine": [
-        "CoroutineOutcome",
-        "coroutineCapabilities",
-        "createCoroutineSupervisor"
-      ],
+      "./coroutine": ["CoroutineOutcome", "coroutineCapabilities", "createCoroutineSupervisor"],
       "./process": [
         "BootstrapVia",
         "DrainedStream",
@@ -1468,12 +1254,7 @@
         "createProcessSupervisor",
         "reclaimOrphanProcesses"
       ],
-      "./threads": [
-        "ThreadCapability",
-        "ThreadLimit",
-        "ThreadUnitKind",
-        "createThreadSupervisor"
-      ]
+      "./threads": ["ThreadCapability", "ThreadLimit", "ThreadUnitKind", "createThreadSupervisor"]
     },
     "@migaia/tray": {
       ".": [
@@ -1490,20 +1271,10 @@
         "roundRobin",
         "serveTrayHost"
       ],
-      "./host": [
-        "TrayHostState",
-        "createHost"
-      ],
-      "./loader": [
-        "defineLoader",
-        "loadIntoHost"
-      ],
-      "./adapter": [
-        "defineAdapter"
-      ],
-      "./runtime": [
-        "createRuntime"
-      ]
+      "./host": ["TrayHostState", "createHost"],
+      "./loader": ["defineLoader", "loadIntoHost"],
+      "./adapter": ["defineAdapter"],
+      "./runtime": ["createRuntime"]
     },
     "@migaia/utils": {
       ".": [
@@ -1736,10 +1507,7 @@
         "isPrimitive",
         "isSafeIntegerValue"
       ],
-      "./string": [
-        "format",
-        "tryString"
-      ],
+      "./string": ["format", "tryString"],
       "./number": [
         "createNumberFormatter",
         "formatCompactNumber",
@@ -1749,9 +1517,7 @@
         "formatPercent",
         "jitter"
       ],
-      "./testing": [
-        "createManualScheduler"
-      ]
+      "./testing": ["createManualScheduler"]
     },
     "@migaia/storage-host": {
       ".": [
@@ -1805,6 +1571,12 @@
         "selectCodec",
         "structuredCodec"
       ]
+    },
+    "@migaia/storage-plugin-sqlite": {
+      ".": ["SqliteErrorCode", "sqliteBackendKind", "sqliteBackendPlugin"],
+      "./node": ["nodeSqliteDriver"],
+      "./bun": ["bunSqliteDriver"],
+      "./features/maintenance": ["sqliteMaintenanceFeature"]
     }
   }
 }

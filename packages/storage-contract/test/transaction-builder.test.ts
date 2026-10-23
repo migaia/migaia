@@ -197,3 +197,45 @@ describe('immutable transaction builder', () => {
     expect(attempt).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('transaction builder Feature methods', () => {
+  it('retains references and receivers across every configuration branch and the original run Promise', async () => {
+    const { store, calls } = fixture()
+    /** The original method sees the real builder without gaining another transaction owner. */
+    const methods = {
+      feature<T>(this: T): T {
+        return this
+      }
+    }
+    const root = createTransactionBuilder(store, undefined, methods)
+    const controller = new AbortController()
+    const locked = root.lock(lockKey.text('feature'))
+    const branches = [
+      root,
+      root.concurrency(ConcurrencyPolicy.fail()),
+      root.signal(controller.signal),
+      root.timeout(10),
+      locked,
+      locked.lock(lockKey.text('second')),
+      locked.concurrency(ConcurrencyPolicy.fail()),
+      locked.signal(controller.signal),
+      locked.timeout(10)
+    ]
+    for (const branch of branches) {
+      expect(branch.feature).toBe(methods.feature)
+      expect(branch.feature()).toBe(branch)
+    }
+    const pending = locked.feature().run((scope) => scope.read())
+    expectTypeOf(pending).toEqualTypeOf<Promise<number>>()
+    expect(pending).toBe(calls[0]!.promise)
+    expect(await pending).toBe(1)
+  })
+
+  it('rejects built-in collisions before transaction execution', () => {
+    const { store, calls } = fixture()
+    expect(() => createTransactionBuilder(store, undefined, { run() {} })).toThrowError(
+      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+    )
+    expect(calls).toEqual([])
+  })
+})

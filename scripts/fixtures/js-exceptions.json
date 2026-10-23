@@ -32,6 +32,10 @@
     {
       "path": "packages/tray/test/hosts/fixtures/restart-failure-entry.mjs",
       "reason": "Node child process entry proving a real background relaunch failure before bootstrap."
+    },
+    {
+      "path": "packages/storage-plugin-sqlite/test/runtime-matrix.mjs",
+      "reason": "Direct Node, Bun and Deno consumer of the built SQLite package entries, proving native persistent reopen without a TypeScript loader."
     }
   ]
 }
