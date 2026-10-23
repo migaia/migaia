@@ -49,7 +49,7 @@ describe('audited RPC contract framing', () => {
       } catch (error) {
         expect(error).toBeInstanceOf(TypeError)
         expect(error).toMatchObject({
-          source: '@migaia/rpc/contract',
+          source: 'rpc.contract',
           code: 'INVALID_ENVELOPE',
           cause: original
         })
@@ -81,7 +81,7 @@ describe('audited RPC contract framing', () => {
             }).note('one', 'request', '', 'extra')
           else framer.accept(framer.frame('ab', context)[0], context)
         }).toThrow(original)
-        expect(original).toMatchObject({ source: '@migaia/rpc/contract', code: 'CALLBACK_FAILED' })
+        expect(original).toMatchObject({ source: 'rpc.contract', code: 'CALLBACK_FAILED' })
         expect(original.stack).toBe(stack)
       } finally {
         framer.close()
@@ -155,7 +155,7 @@ describe('audited RPC contract framing', () => {
       expect(framer.accept(kind === 'string' ? '12345' : new Uint8Array(5), context)).toMatchObject(
         {
           status: 'rejected',
-          error: { source: '@migaia/rpc/contract', code: 'FRAME_LIMIT_EXCEEDED' }
+          error: { source: 'rpc.contract', code: 'FRAME_LIMIT_EXCEEDED' }
         }
       )
       expect(framer.accept(kind === 'string' ? '1234' : new Uint8Array(4), context).status).toBe(

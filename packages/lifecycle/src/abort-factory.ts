@@ -1,7 +1,7 @@
 import type { IAbortController } from './abort.js'
 import { LifecycleErrorCode } from './error-code.js'
 import { LifecycleErrorText } from './error-text.js'
-import { createLifecycleError } from './errors.js'
+import { LIFECYCLE_SOURCE, createLifecycleError } from './errors.js'
 
 type IHostAbortControllerConstructor = new () => IAbortController
 
@@ -79,7 +79,7 @@ const instantiate = (constructor: IHostAbortControllerConstructor): IAbortContro
   } catch (error) {
     if (
       error instanceof Error &&
-      (error as { readonly source?: unknown }).source === '@migaia/lifecycle' &&
+      (error as { readonly source?: unknown }).source === LIFECYCLE_SOURCE &&
       typeof (error as { readonly code?: unknown }).code === 'string'
     )
       throw error

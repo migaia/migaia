@@ -110,7 +110,7 @@ describe('serialize portable convergence oracle', () => {
       const error = captureFailure(() => rpcPortableWalker(forbiddenValue(id)))
       expect(error, id).toBeInstanceOf(TypeError)
       expect(error, id).toMatchObject({
-        source: '@migaia/rpc/contract',
+        source: 'rpc.contract',
         code: 'INVALID_ENVELOPE',
         message: 'rpc envelope is invalid'
       })
@@ -127,11 +127,11 @@ describe('serialize portable convergence oracle', () => {
     expect(Object.is(toPortableValue(-0), -0)).toBe(true)
     for (const value of [undefined, Number.NaN, Infinity, -Infinity, 1n, Symbol(), () => {}]) {
       expect(() => rpcPortableWalker(value)).toThrowError(
-        expect.objectContaining({ source: '@migaia/rpc/contract', code: 'INVALID_ENVELOPE' })
+        expect.objectContaining({ source: 'rpc.contract', code: 'INVALID_ENVELOPE' })
       )
       expect(() => codecValue(value)).toThrowError(
         expect.objectContaining({
-          source: '@migaia/serialize',
+          source: 'serialization',
           code: SerializeErrorCode.invalidOption
         })
       )
@@ -565,7 +565,7 @@ describe('serialize portable convergence oracle', () => {
     expect(reads).toBe(1)
     expect(error).toBeInstanceOf(TypeError)
     expect(error).toMatchObject({
-      source: '@migaia/rpc/contract',
+      source: 'rpc.contract',
       code: 'INVALID_ENVELOPE',
       cause: original
     })
@@ -676,7 +676,7 @@ describe('serialize portable convergence oracle', () => {
     expect(rpcPortableWalker(bytes).value).toEqual({ $rpc: 'bytes', base64url: 'AP8' })
     expect(() => base64ToBytes('AP8')).toThrowError(
       expect.objectContaining({
-        source: '@migaia/serialize',
+        source: 'serialization',
         code: SerializeErrorCode.invalidOption
       })
     )
@@ -690,7 +690,7 @@ describe('serialize portable convergence oracle', () => {
       const error = captureFailure(() => base64ToBytes(input))
       expect(error).toBeInstanceOf(TypeError)
       expect(error).toMatchObject({
-        source: '@migaia/serialize',
+        source: 'serialization',
         code: SerializeErrorCode.invalidOption,
         message: 'invalid base64 input'
       })
@@ -738,7 +738,7 @@ describe('serialize portable convergence oracle', () => {
     /** Existing encode boundary classifies the projection trap instead of the later NaN check. */
     const error = captureFailure(() => jsonCodec.encode(input as never))
     expect(error).toMatchObject({
-      source: '@migaia/serialize',
+      source: 'serialization',
       code: SerializeErrorCode.encodeFailed,
       cause: original
     })
@@ -797,7 +797,7 @@ it('RPC scalar rejection precedes nested getters while classified errors keep id
   expect(reads).toBe(0)
   /** Existing domain errors crossing an accessor retain the original reference and stack. */
   const original = new TypeError('already classified')
-  Object.defineProperty(original, 'source', { value: '@migaia/rpc/contract' })
+  Object.defineProperty(original, 'source', { value: 'rpc.contract' })
   Object.defineProperty(original, 'code', { value: 'INVALID_ENVELOPE' })
   expect(
     captureFailure(() =>
@@ -838,7 +838,7 @@ it('RPC root byte-copy errors stay raw while enclosing containers retain cause',
   expect(root.code).toBeUndefined()
   for (const value of [{ child: bytes }, [bytes]]) {
     const nested = captureFailure(() => rpcPortableWalker(value))
-    expect(nested).toMatchObject({ source: '@migaia/rpc/contract', code: 'INVALID_ENVELOPE' })
+    expect(nested).toMatchObject({ source: 'rpc.contract', code: 'INVALID_ENVELOPE' })
     expect(nested.cause).toBeInstanceOf(TypeError)
     expect((nested.cause as IPortableFailure).source).toBeUndefined()
     expect((nested.cause as Error).message).toBe(root.message)

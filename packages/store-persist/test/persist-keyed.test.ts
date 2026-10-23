@@ -114,7 +114,7 @@ describe('clearFamily', () => {
     const { proxy, revoke } = Proxy.revocable({}, {})
     revoke()
     await expect(clearFamily(proxy as never, 'users')).rejects.toMatchObject({
-      source: '@migaia/store-persist',
+      source: 'store.persist',
       code: 'INVALID_OPTION',
       cause: expect.any(Error)
     })

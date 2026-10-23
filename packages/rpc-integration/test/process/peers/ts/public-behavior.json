@@ -7,12 +7,12 @@
   },
   "generator": { "input": ["a", "b", "c"], "expected": ["a", "b", "c"] },
   "error": {
-    "source": "@migaia/rpc/core",
+    "source": "rpc.endpoint",
     "code": "INTERNAL",
     "cause": {
-      "source": "@migaia/rpc/core",
+      "source": "rpc.endpoint",
       "code": "INTERNAL",
-      "cause": { "source": "@migaia/rpc/core", "code": "INTERNAL", "message": "peer cause" }
+      "cause": { "source": "rpc.endpoint", "code": "INTERNAL", "message": "peer cause" }
     }
   },
   "cancel": {

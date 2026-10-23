@@ -199,7 +199,7 @@ Window, SharedWorker, ServiceWorker, BroadcastChannel, and RTC borrow their nati
 
 The table uses `source` to identify browser errors. Import this package’s public APIs from `@migaia/rpc-browser`.
 
-| Package code, source=`@migaia/rpc/browser` | Trigger and response                                                                        |
+| Package code, source=`rpc.transport.browser` | Trigger and response                                                                        |
 | ------------------------------------------ | ------------------------------------------------------------------------------------------- |
 | WINDOW_ORIGIN_REQUIRED                     | A Window Peer has no nonempty origin; provide the explicit destination origin               |
 | RTC_CHANNEL_UNRELIABLE                     | A Peer channel is not ordered and reliable; use supported settings                          |

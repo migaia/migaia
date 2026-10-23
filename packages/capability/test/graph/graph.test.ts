@@ -439,7 +439,7 @@ describe('capability graph core', () => {
     expect(() => graph.register(node)).toThrow(admissionError)
     expect(reads).toBe(1)
     expect(admissionError).toMatchObject({
-      source: '@migaia/capability/graph',
+      source: 'capability.graph',
       code: CapabilityGraphErrorCode.invalidNode
     })
   })
@@ -633,7 +633,7 @@ describe('capability graph core', () => {
       }
     })
     await expect(graph.ready()).rejects.toMatchObject({
-      source: '@migaia/capability/graph',
+      source: 'capability.graph',
       code: CapabilityGraphErrorCode.startFailed,
       cause: thrown
     })
@@ -705,7 +705,7 @@ describe('capability graph core', () => {
     await expect(graph.ready()).rejects.toMatchObject({
       code: CapabilityGraphErrorCode.startFailed
     })
-    expect(thenError).toMatchObject({ source: '@migaia/capability/graph' })
+    expect(thenError).toMatchObject({ source: 'capability.graph' })
   })
 
   it('snapshots onError once before lifecycle construction', () => {
@@ -1079,7 +1079,7 @@ describe('capability graph core', () => {
     })
     await reentrant.ready()
     await expect(reentrant.dispose()).rejects.toMatchObject({
-      source: '@migaia/capability/graph',
+      source: 'capability.graph',
       code: CapabilityGraphErrorCode.reentrantOperation
     })
   })
@@ -1246,7 +1246,7 @@ describe('capability graph core', () => {
     const seenCodes = new Set<string>()
     const assertCode = (error: unknown, code: string): void => {
       expect(error).toBeInstanceOf(Error)
-      expect(error).toMatchObject({ source: '@migaia/capability/graph', code })
+      expect(error).toMatchObject({ source: 'capability.graph', code })
       expect((error as Error).stack).toEqual(expect.any(String))
       expect((error as Error).stack!.length).toBeGreaterThan(0)
       expect((error as Error).message.length).toBeGreaterThan(0)

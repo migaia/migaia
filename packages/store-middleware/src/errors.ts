@@ -1,10 +1,14 @@
-import { StoreMiddlewareErrorCode, type IStoreMiddlewareErrorCode } from './error-code.js'
+import {
+  ERROR_SOURCE,
+  StoreMiddlewareErrorCode,
+  type IStoreMiddlewareErrorCode
+} from './error-code.js'
 import { attachErrorIdentity } from '@migaia/utils/error'
 
 export { StoreMiddlewareErrorCode, type IStoreMiddlewareErrorCode }
 
 /** `source` assigned by this package’s factories; upstream errors keep their actual owner. */
-export const STORE_MIDDLEWARE_SOURCE = '@migaia/store-middleware'
+export const STORE_MIDDLEWARE_SOURCE = ERROR_SOURCE
 
 function tagStoreMiddlewareError<E extends Error>(error: E, code: IStoreMiddlewareErrorCode): E {
   return attachErrorIdentity(error, { source: STORE_MIDDLEWARE_SOURCE, code })

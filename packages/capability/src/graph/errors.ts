@@ -1,9 +1,13 @@
 import { attachErrorIdentity } from '@migaia/utils/error'
-import { CapabilityGraphErrorCode, type ICapabilityGraphErrorCode } from './error-code.js'
+import {
+  ERROR_SOURCE,
+  CapabilityGraphErrorCode,
+  type ICapabilityGraphErrorCode
+} from './error-code.js'
 import { CapabilityGraphErrorText } from './error-text.js'
 
 /** Stable source identity for all Graph-owned errors. */
-export const CAPABILITY_GRAPH_SOURCE = '@migaia/capability/graph'
+export const CAPABILITY_GRAPH_SOURCE = ERROR_SOURCE
 
 /** Graph error shape exposed at the public boundary. */
 export type ICapabilityGraphError = Error & {

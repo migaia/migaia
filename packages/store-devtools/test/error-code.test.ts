@@ -10,7 +10,7 @@ describe('store-devtools error-code contract', () => {
     const codes = Object.values(StoreDevtoolsErrorCode)
     expect(codes).toHaveLength(5)
     expect(new Set(codes).size).toBe(5)
-    expect(STORE_DEVTOOLS_SOURCE).toBe('@migaia/store-devtools')
+    expect(STORE_DEVTOOLS_SOURCE).toBe('store.devtools')
   })
 
   it('preserves native RangeError identity through the shared attachment helper', () => {

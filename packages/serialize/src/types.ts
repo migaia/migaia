@@ -227,8 +227,8 @@ export class SerializeCodecError<TCode extends string = ISerializeErrorCode> ext
       /** Optional caller diagnostic label; omitted by default. */
       context?: string
       /**
-       * Overrides the default `@migaia/serialize` source when a higher-level package reuses this
-       * error class.
+       * Overrides the default `serialization` source when a higher-level package reuses this error
+       * class.
        */
       source?: string
       /** Original failure retained by reference through Error.cause when provided. */

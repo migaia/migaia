@@ -26,10 +26,10 @@ describe('workerParser lifecycle', () => {
   it('rejects non-string type and clientId before endpoint creation', () => {
     const worker = {} as never
     expect(() => workerParser({ worker, type: Symbol('type') as never })).toThrow(
-      expect.objectContaining({ source: '@migaia/store-worker', code: 'INVALID_OPTION' })
+      expect.objectContaining({ source: 'store.worker', code: 'INVALID_OPTION' })
     )
     expect(() => workerParser({ worker, clientId: Symbol('client') as never })).toThrow(
-      expect.objectContaining({ source: '@migaia/store-worker', code: 'INVALID_OPTION' })
+      expect.objectContaining({ source: 'store.worker', code: 'INVALID_OPTION' })
     )
   })
 
@@ -214,7 +214,7 @@ describe('workerParser lifecycle', () => {
 
     expect(thrown).toMatchObject({
       name: 'SerializeCodecError',
-      source: '@migaia/store-worker',
+      source: 'store.worker',
       code: StoreWorkerErrorCode.requestAborted,
       cause: expect.objectContaining({ name: 'AbortError' })
     })

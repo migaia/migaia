@@ -82,7 +82,7 @@ describe('audited middleware contracts', () => {
       })
     ).toThrow(
       expect.objectContaining({
-        source: '@migaia/middleware-pipeline',
+        source: 'middleware.pipeline',
         code: 'INVALID_OPTION',
         cause: original
       })
@@ -111,7 +111,7 @@ describe('audited middleware contracts', () => {
       }
       expect(failure).toBe(original)
       expect(failure).toMatchObject({
-        source: '@migaia/middleware-pipeline',
+        source: 'middleware.pipeline',
         code: 'EXECUTION_FAILED'
       })
     }
@@ -198,7 +198,7 @@ describe('audited middleware contracts', () => {
     )
     expect(() => late(2)).toThrow(original)
     expect(original).toMatchObject({
-      source: '@migaia/middleware-pipeline',
+      source: 'middleware.pipeline',
       code: 'EXECUTION_FAILED'
     })
   })

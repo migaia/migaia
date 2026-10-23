@@ -147,7 +147,7 @@ it('correlated group terminals reject contradictory outcomes and cannot resume a
   ]
   for (const result of invalidResults)
     assert.throws(() => normalize({ ...terminal, completion: { ok: true, result } }), {
-      source: '@migaia/rpc/contract',
+      source: 'rpc.contract',
       code: 'INVALID_ENVELOPE'
     })
   for (const completion of [

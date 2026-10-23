@@ -255,7 +255,7 @@ describeShared('SharedInt32Array：逐下标失效', () => {
       throw new Error('expected options to fail')
     } catch (error) {
       expect(error).toMatchObject({
-        source: '@migaia/store-shared',
+        source: 'store.shared',
         code: 'INVALID_OPTION',
         cause: expect.any(Error)
       })

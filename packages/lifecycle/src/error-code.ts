@@ -1,6 +1,9 @@
+/** Stable error domain owned by this code table; package moves preserve this identity. */
+export const ERROR_SOURCE = 'lifecycle'
+
 /**
- * Owns the error-code declarations for `@migaia/lifecycle`. Under `docs/contracts/error-codes.md`,
- * `(source, code)` uniquely identifies an error. The `source` is always `'@migaia/lifecycle'`.
+ * Owns the error-code declarations for `lifecycle`. Under `docs/contracts/error-codes.md`,
+ * `(source, code)` uniquely identifies an error. The `source` is always `'lifecycle'`.
  * Throw sites reference these constants instead of inline literals. Code values are public API.
  * Renaming a code is a breaking change.
  */

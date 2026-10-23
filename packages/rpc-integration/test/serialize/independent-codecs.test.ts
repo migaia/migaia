@@ -117,10 +117,10 @@ describe('independent codec interoperability', () => {
     const encoded = Uint8Array.from(encodeCbor(value))
     expect(codec.decode(encoded)).toEqual(value)
     expect(() => codec.decode(Uint8Array.from(encodeCbor(9007199254740992n)))).toThrowError(
-      expect.objectContaining({ code: 'INVALID_OPTION', source: '@migaia/serialize' })
+      expect.objectContaining({ code: 'INVALID_OPTION', source: 'serialization' })
     )
     expect(() => codec.decode(Uint8Array.from(encodeCbor(-9007199254740992n)))).toThrowError(
-      expect.objectContaining({ code: 'INVALID_OPTION', source: '@migaia/serialize' })
+      expect.objectContaining({ code: 'INVALID_OPTION', source: 'serialization' })
     )
   })
 
@@ -302,7 +302,7 @@ describe('independent codec interoperability', () => {
         thrown = error
       }
       expect(thrown).toMatchObject({
-        source: '@migaia/rpc/contract',
+        source: 'rpc.contract',
         code: 'INVALID_ENVELOPE'
       })
       expect((thrown as Error).cause).toBeDefined()

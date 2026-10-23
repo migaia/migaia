@@ -208,7 +208,7 @@ it('classifies its owned native cleanup AggregateError while retaining the appli
     expect(reports).toHaveLength(1)
     expect(reports[0]).toBeInstanceOf(AggregateError)
     expect(reports[0]).toMatchObject({
-      source: '@migaia/rpc/devtools',
+      source: 'rpc.devtools',
       code: 'TARGET_RELEASE_FAILED',
       cause: original,
       errors: [original]

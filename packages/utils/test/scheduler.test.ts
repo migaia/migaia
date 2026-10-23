@@ -103,7 +103,7 @@ describe('systemScheduler monotonic clock and host capability failures', () => {
       const scheduler = await reloadedSystemScheduler()
       const error = captureThrow(() => scheduler.now())
       expect(error).toBeInstanceOf(errorType)
-      expect(error).toMatchObject({ source: '@migaia/utils', code: 'ENV_UNSUPPORTED' })
+      expect(error).toMatchObject({ source: 'foundation.utils', code: 'ENV_UNSUPPORTED' })
       expect(set).not.toHaveBeenCalled()
       expect(clear).not.toHaveBeenCalled()
     }
@@ -132,7 +132,7 @@ describe('systemScheduler monotonic clock and host capability failures', () => {
     const scheduler = await reloadedSystemScheduler()
     expect(captureThrow(() => scheduler.now())).toMatchObject({
       name: 'Error',
-      source: '@migaia/utils',
+      source: 'foundation.utils',
       code: 'ENV_UNSUPPORTED'
     })
     /** Cancellation stub that must stay untouched when registration is missing. */
@@ -141,7 +141,7 @@ describe('systemScheduler monotonic clock and host capability failures', () => {
     vi.stubGlobal('clearTimeout', clear)
     expect(captureThrow(() => scheduler.schedule(() => undefined, 1))).toMatchObject({
       name: 'Error',
-      source: '@migaia/utils',
+      source: 'foundation.utils',
       code: 'ENV_UNSUPPORTED'
     })
     expect(clear).not.toHaveBeenCalled()
@@ -244,7 +244,7 @@ describe('systemScheduler timers, segments, unref and cancellation', () => {
     const { set } = stubRecordingTimers()
     const error = captureThrow(() => systemScheduler.schedule(() => undefined, delay as number))
     expect(error).toBeInstanceOf(type)
-    expect(error).toMatchObject({ source: '@migaia/utils', code: 'INVALID_ARGUMENT' })
+    expect(error).toMatchObject({ source: 'foundation.utils', code: 'INVALID_ARGUMENT' })
     expect((error as Error).cause).toBeUndefined()
     expect(set).not.toHaveBeenCalled()
   })
@@ -349,7 +349,7 @@ describe('manual scheduler ordering, overflow, reentrancy and runaway', () => {
     scheduler.advance(Number.MAX_VALUE)
     const error = captureThrow(() => scheduler.schedule(callback, Number.MAX_VALUE))
     expect(error).toBeInstanceOf(RangeError)
-    expect(error).toMatchObject({ source: '@migaia/utils', code: 'INVALID_ARGUMENT' })
+    expect(error).toMatchObject({ source: 'foundation.utils', code: 'INVALID_ARGUMENT' })
     expect(scheduler.now()).toBe(Number.MAX_VALUE)
     expect(scheduler.pendingCount).toBe(0)
   })
@@ -361,7 +361,7 @@ describe('manual scheduler ordering, overflow, reentrancy and runaway', () => {
     scheduler.schedule(callback, Number.MAX_VALUE / 4)
     const error = captureThrow(() => scheduler.advance(Number.MAX_VALUE))
     expect(error).toBeInstanceOf(RangeError)
-    expect(error).toMatchObject({ source: '@migaia/utils', code: 'INVALID_ARGUMENT' })
+    expect(error).toMatchObject({ source: 'foundation.utils', code: 'INVALID_ARGUMENT' })
     expect(callback).not.toHaveBeenCalled()
     expect(scheduler.now()).toBe(Number.MAX_VALUE / 2)
     expect(scheduler.pendingCount).toBe(1)
@@ -381,7 +381,7 @@ describe('manual scheduler ordering, overflow, reentrancy and runaway', () => {
       ]) {
         const error = captureThrow(run)
         expect(error).toBeInstanceOf(type)
-        expect(error).toMatchObject({ source: '@migaia/utils', code: 'INVALID_ARGUMENT' })
+        expect(error).toMatchObject({ source: 'foundation.utils', code: 'INVALID_ARGUMENT' })
       }
       expect(scheduler.now()).toBe(0)
       expect(scheduler.pendingCount).toBe(0)
@@ -402,7 +402,7 @@ describe('manual scheduler ordering, overflow, reentrancy and runaway', () => {
     scheduler.advance(10)
     readings.push(scheduler.now())
     expect(nested).toBeInstanceOf(TypeError)
-    expect(nested).toMatchObject({ source: '@migaia/utils', code: 'REENTRANT_CALL' })
+    expect(nested).toMatchObject({ source: 'foundation.utils', code: 'REENTRANT_CALL' })
     expect(readings).toEqual([0, 10, 10, 10])
     scheduler.advance(0)
     expect(scheduler.now()).toBe(10)
@@ -417,7 +417,7 @@ describe('manual scheduler ordering, overflow, reentrancy and runaway', () => {
     scheduler.schedule(loop, 0)
     const error = captureThrow(() => scheduler.advance(0))
     expect(error).toBeInstanceOf(RangeError)
-    expect(error).toMatchObject({ source: '@migaia/utils', code: 'SCHEDULER_RUNAWAY' })
+    expect(error).toMatchObject({ source: 'foundation.utils', code: 'SCHEDULER_RUNAWAY' })
     expect(scheduler.now()).toBe(0)
   })
 

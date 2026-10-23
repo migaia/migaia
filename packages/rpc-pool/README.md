@@ -122,7 +122,7 @@ pnpm add @migaia/rpc-pool @migaia/rpc-core @migaia/rpc-process @migaia/rpc-threa
 
 本包把公开 `createThreadPeer` / `createProcessPeer` 创建的连接组合成池，分配客户端操作槽并管理有限等待队列。通信、方法目录、握手、认证、请求关联、取消、期限、原生启动、监督与重启继续由对应 Peer 负责；池不另建原生线程调度器或 RPC 协议，也没有工作窃取、跨机器池或 Proxy 调用面。
 
-唯一入口是 `@migaia/rpc-pool`。运行时公开 createThreadPool、createProcessPool、RpcPoolState、RpcPoolErrorCode、RPC_POOL_ERROR_SOURCE；类型包括 IThreadPool、IProcessPool、各自 options、IRpcPoolControls、IRpcPoolStats 与 IRpcPoolErrorCode。内部 createPool、校验和错误注记工具不作为业务出口。池的运行时依赖是 lifecycle / utils，三个 RPC 包 core / process / threads 是必需 peer 依赖；直接使用这些包的 API 时也应直接安装。
+唯一入口是 `rpc.pool`。运行时公开 createThreadPool、createProcessPool、RpcPoolState、RpcPoolErrorCode、RPC_POOL_ERROR_SOURCE；类型包括 IThreadPool、IProcessPool、各自 options、IRpcPoolControls、IRpcPoolStats 与 IRpcPoolErrorCode。内部 createPool、校验和错误注记工具不作为业务出口。池的运行时依赖是 lifecycle / utils，三个 RPC 包 core / process / threads 是必需 peer 依赖；直接使用这些包的 API 时也应直接安装。
 
 池拥有自己创建的 Peer、本地 FIFO 和闲置计时任务；没有让应用接管内部 Native 句柄、握手、admission 或 trust 的入口。关闭成员只调用原 Peer.close，由原 owner 执行端口、Worker / 进程和监督资源的清理。
 
@@ -213,7 +213,7 @@ probe 原值转交成员，真实 handshake、ready、restart 仍由原 Peer 发
 | callAborted / CALL_ABORTED       | 仍在 FIFO 中的操作被 signal 取消，原生 AbortError，cause 为原 reason。 |
 | closeFailed / CLOSE_FAILED       | 全部成员清理已尝试后的 AggregateError。                                |
 
-RPC_POOL_ERROR_SOURCE 为 `@migaia/rpc-pool`，IRpcPoolErrorCode 是以上公开值联合。Peer 向池交出的原错误保留自己的 source / code、实例与原因链，池不替它们重新分类；启动失败与清理聚合仍可沿 cause / errors 到达原失败。状态值不是错误码。
+RPC_POOL_ERROR_SOURCE 为 `rpc.pool`，IRpcPoolErrorCode 是以上公开值联合。Peer 向池交出的原错误保留自己的 source / code、实例与原因链，池不替它们重新分类；启动失败与清理聚合仍可沿 cause / errors 到达原失败。状态值不是错误码。
 
 短进程 source 可能经原 reporter 报告 supervision 的 CAPABILITY_UNSUPPORTED 提示，指出 process termination 不受支持并按 best-effort 降级；这不阻止已成功建立的业务调用，也不承诺整棵进程树的强制终止。池保留该原 owner 的诊断，不隐藏提示或增加另一套终止策略。
 

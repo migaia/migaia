@@ -180,7 +180,7 @@ it.each(['rate', 'payload', 'fail-stop', 'queued-cancel', 'rollover'] as const)(
             const cause = Reflect.get(error as object, 'cause') as object
             return (
               Reflect.get(error as object, 'code') === RpcCoreErrorCode.internal &&
-              Reflect.get(cause, 'source') === '@migaia/rpc/process' &&
+              Reflect.get(cause, 'source') === 'rpc.transport.process' &&
               Reflect.get(cause, 'code') === RpcProcessErrorCode.connectionLimit
             )
           })
@@ -220,7 +220,7 @@ it.each(['rate', 'payload', 'fail-stop', 'queued-cancel', 'rollover'] as const)(
         Reflect.get(outcome.error as object, 'code'),
         RpcProcessErrorCode.connectionLimit
       )
-      assert.equal(Reflect.get(outcome.error as object, 'source'), '@migaia/rpc/process')
+      assert.equal(Reflect.get(outcome.error as object, 'source'), 'rpc.transport.process')
       await vi.waitFor(() => assert.equal(admission.size, 0))
       assert.equal(await client.request('baseline'), 42, 'rejected group consumes zero quota')
     } finally {

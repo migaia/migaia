@@ -83,7 +83,7 @@ describe('short Process sources', () => {
 
   it('rejects self-spawn from a test-runner main entry before launching', async () => {
     await expect(createProcessPeer({ spawn: true })).rejects.toMatchObject({
-      source: '@migaia/rpc/core',
+      source: 'rpc.endpoint',
       code: 'INVALID_CONFIG'
     })
   })
@@ -116,7 +116,7 @@ describe('short Process sources', () => {
         expect((await lstat(dirname(address))).mode & 0o777).toBe(0o700)
         expect((await lstat(address)).mode & 0o777).toBe(0o600)
         await expect(createProcessPeer({ listen: name })).rejects.toMatchObject({
-          source: '@migaia/rpc/process',
+          source: 'rpc.transport.process',
           code: 'PROCESS_CHANNEL_LISTEN_FAILED'
         })
       } finally {
@@ -128,12 +128,12 @@ describe('short Process sources', () => {
 
   it('never treats a TCP address as an unauthenticated named endpoint', async () => {
     await expect(createProcessPeer({ connect: 'tcp://127.0.0.1:1' })).rejects.toMatchObject({
-      source: '@migaia/rpc/process',
+      source: 'rpc.transport.process',
       code: 'PROCESS_PLUGIN_INVALID_OPTION',
       detail: { field: 'token' }
     })
     await expect(createProcessPeer({ listen: 'tcp://127.0.0.1:0' })).rejects.toMatchObject({
-      source: '@migaia/rpc/process',
+      source: 'rpc.transport.process',
       code: 'PROCESS_PLUGIN_INVALID_OPTION',
       detail: { field: 'token' }
     })
@@ -158,7 +158,7 @@ describe('short Process sources', () => {
         ).rejects.toBeInstanceOf(Error)
         expect(notices).toContainEqual(
           expect.objectContaining({
-            source: '@migaia/rpc/process',
+            source: 'rpc.transport.process',
             code: 'PROCESS_CHANNEL_AUTH_REJECTED'
           })
         )
@@ -206,7 +206,7 @@ it('gives an explicit default reporter and its wrapper identical per-launch noti
     const termination = notices.filter((error) => {
       const notice = error as { source?: string; code?: string; detail?: { capability?: string } }
       return (
-        notice.source === '@migaia/supervision' &&
+        notice.source === 'supervision' &&
         notice.code === 'CAPABILITY_UNSUPPORTED' &&
         notice.detail?.capability === 'termination'
       )

@@ -1,4 +1,4 @@
-import { UtilsErrorCode } from './error-code.js'
+import { ERROR_SOURCE, UtilsErrorCode } from './error-code.js'
 import { UtilsErrorText } from './error-text.js'
 import { attachErrorIdentity } from './error.js'
 import { readObjectPathSegments } from './internal/object-path.js'
@@ -112,7 +112,7 @@ type ICollectStage<T> =
 /** Creates a package-coded TypeError for invalid collector arguments. */
 function invalidType(field: string, expectation: string): TypeError {
   return attachErrorIdentity(new TypeError(UtilsErrorText.invalidArgument(field, expectation)), {
-    source: '@migaia/utils',
+    source: ERROR_SOURCE,
     code: UtilsErrorCode.invalidArgument
   })
 }
@@ -120,7 +120,7 @@ function invalidType(field: string, expectation: string): TypeError {
 /** Creates a package-coded RangeError while preserving its native runtime type. */
 function invalidRange(field: string, expectation: string): RangeError {
   return attachErrorIdentity(new RangeError(UtilsErrorText.invalidArgument(field, expectation)), {
-    source: '@migaia/utils',
+    source: ERROR_SOURCE,
     code: UtilsErrorCode.invalidArgument
   })
 }
@@ -128,7 +128,7 @@ function invalidRange(field: string, expectation: string): RangeError {
 /** Creates the stable error used when evaluation attempts to mutate or re-read its collector. */
 function reentrantCollector(): TypeError {
   return attachErrorIdentity(new TypeError(UtilsErrorText.reentrantCall), {
-    source: '@migaia/utils',
+    source: ERROR_SOURCE,
     code: UtilsErrorCode.reentrantCall
   })
 }

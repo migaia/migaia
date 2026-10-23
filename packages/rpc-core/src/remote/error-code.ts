@@ -1,5 +1,5 @@
 /** Stable error identity for the unit-neutral remote layer. */
-export const ERROR_SOURCE = '@migaia/rpc/remote'
+export const ERROR_SOURCE = 'rpc.remote'
 
 /** Public remote failures; each code has one owner and one caller action. */
 export const RpcRemoteLayerErrorCode = {

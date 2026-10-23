@@ -23,7 +23,7 @@ describe('SSR error identity boundary', () => {
     const error = createStoreSsrRangeError(StoreSsrErrorCode.invalidOption, 'invalid option')
     expect(error).toBeInstanceOf(RangeError)
     expect(error).toMatchObject({
-      source: '@migaia/store-ssr',
+      source: 'store.ssr',
       code: 'INVALID_OPTION'
     })
     expect(error.stack).toContain('invalid option')
@@ -36,7 +36,7 @@ describe('SSR request scope runtime input boundary', () => {
     scopeOptions.revoke()
     expect(() => new SSRRequestScope(scopeOptions.proxy as never)).toThrow(
       expect.objectContaining({
-        source: '@migaia/store-ssr',
+        source: 'store.ssr',
         code: 'INVALID_OPTION',
         cause: expect.any(Error)
       })
@@ -48,7 +48,7 @@ describe('SSR request scope runtime input boundary', () => {
       scope.register('app', fakeStore(scope.runtime), registrationOptions.proxy as never)
     ).toThrow(
       expect.objectContaining({
-        source: '@migaia/store-ssr',
+        source: 'store.ssr',
         code: 'INVALID_OPTION',
         cause: expect.any(Error)
       })
@@ -76,7 +76,7 @@ describe('SSR request scope runtime input boundary', () => {
     const scope = createSSRRequestScope()
     expect(() =>
       scope.register('app', fakeStore(scope.runtime), { owned: 'yes' as never })
-    ).toThrow(expect.objectContaining({ source: '@migaia/store-ssr', code: 'INVALID_OPTION' }))
+    ).toThrow(expect.objectContaining({ source: 'store.ssr', code: 'INVALID_OPTION' }))
     scope.dispose()
   })
 
@@ -367,7 +367,7 @@ describe('register()', () => {
     }
     expect(() => scope.hydrate(state as never)).toThrow(
       expect.objectContaining({
-        source: '@migaia/store-ssr',
+        source: 'store.ssr',
         code: 'INVALID_SNAPSHOT',
         cause: expect.any(Error)
       })
@@ -1290,7 +1290,7 @@ describe('createSSRStateScriptWith() / readSSRStateFromDocumentWith()', () => {
     )
     revoke()
     await expect(createSSRStateScriptWith(state, proxy as never)).rejects.toMatchObject({
-      source: '@migaia/store-ssr',
+      source: 'store.ssr',
       code: 'INVALID_OPTION',
       cause: expect.any(Error)
     })
@@ -1458,7 +1458,7 @@ describe('assertSSRState()', () => {
       throw new Error('expected assertion to fail')
     } catch (error) {
       expect(error).toMatchObject({
-        source: '@migaia/store-ssr',
+        source: 'store.ssr',
         code: 'INVALID_SNAPSHOT',
         message: '[store] stores could not be read safely'
       })

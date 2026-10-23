@@ -184,7 +184,7 @@ describe('audited reactive boundary contracts', () => {
               ? runtime.runTracedAction('audit', fail)
               : runtime.computed(fail).value
       expect(run).toThrow(failure)
-      expect(failure).toMatchObject({ source: '@migaia/reactive', code: 'CALLBACK_FAILED' })
+      expect(failure).toMatchObject({ source: 'reactive', code: 'CALLBACK_FAILED' })
     }
   )
 

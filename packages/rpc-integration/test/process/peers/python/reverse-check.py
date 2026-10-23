@@ -48,7 +48,7 @@ def check():
         first, second, full = session.receive(), session.receive(), session.receive()
         assert first["kind"] == second["kind"] == "request"
         assert full["id"] == "pending-2" and full["code"] == "OVERLOADED"
-        cause = {"source": "@migaia/rpc/core", "code": "INTERNAL", "name": "Error", "message": "cause", "stack": "Error: cause"}
+        cause = {"source": "rpc.endpoint", "code": "INTERNAL", "name": "Error", "message": "cause", "stack": "Error: cause"}
         failure = {**cause, "message": "reverse failure", "stack": "Error: reverse failure", "cause": cause}
         session.send(reply(second, error=failure))
         failed = session.receive()

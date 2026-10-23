@@ -193,7 +193,7 @@ describe('process Host facade admission and ownership', () => {
       await Promise.resolve()
       expect(finished).toBe(false)
       expect(() => outlet.request('child', RemoteMethodName.hostInspect, [])).toThrow(
-        expect.objectContaining({ source: '@migaia/plugin-host', code: 'HOST_DISPOSING' })
+        expect.objectContaining({ source: 'plugin.host', code: 'HOST_DISPOSING' })
       )
       const observed = (await outcome)[0]!
       expect(observed).toMatchObject({ status: 'fulfilled' })
@@ -270,7 +270,7 @@ describe('process Host facade admission and ownership', () => {
         () => outlet.replace('child')
       ])
         expect(operation).toThrow(
-          expect.objectContaining({ source: '@migaia/plugin-host', code: 'HOST_DISPOSING' })
+          expect.objectContaining({ source: 'plugin.host', code: 'HOST_DISPOSING' })
         )
       await release
       expect(fixture.terminate).toHaveBeenCalledTimes(1)

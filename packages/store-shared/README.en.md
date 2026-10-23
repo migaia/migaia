@@ -219,7 +219,7 @@ High-level initialization and writes accept only integers in `[-2147483648, 2147
 
 ### Error identity and handling
 
-`STORE_SHARED_SOURCE` is the string constant `'@migaia/store-shared'`. `StoreSharedErrorCode` contains the following entries; `IStoreSharedErrorCode` is the union of their values.
+`STORE_SHARED_SOURCE` is the string constant `'store.shared'`. `StoreSharedErrorCode` contains the following entries; `IStoreSharedErrorCode` is the union of their values.
 
 | Property / code                          | Trigger and response                                                                                                              |
 | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |

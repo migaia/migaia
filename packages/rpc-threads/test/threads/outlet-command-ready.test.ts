@@ -55,7 +55,7 @@ describe('thread outlet command readiness', () => {
         expect(await host.thread!.request('worker', 'identity')).not.toBe(previous)
         expect(() =>
           host.thread!.request({ name: 'worker', instanceId: previous as string }, 'identity')
-        ).toThrow(expect.objectContaining({ source: '@migaia/rpc/core', code: 'TARGET_UNKNOWN' }))
+        ).toThrow(expect.objectContaining({ source: 'rpc.endpoint', code: 'TARGET_UNKNOWN' }))
         /**
          * Native retirement closes generation 1 before its supervisor leaves ready. The existing
          * observer reports that rejected stale preparation with the original transport cause.
@@ -64,14 +64,14 @@ describe('thread outlet command readiness', () => {
           expect.objectContaining({
             name: 'Error',
             message: 'Remote generation is closed',
-            source: '@migaia/rpc/remote',
+            source: 'rpc.remote',
             code: 'REMOTE_CLOSED',
             detail: { generation: 1 },
             stack: expect.stringMatching(/\S/),
             cause: expect.objectContaining({
               name: 'Error',
               message: '[rpc] message port closed',
-              source: '@migaia/rpc/core',
+              source: 'rpc.endpoint',
               code: 'TRANSPORT',
               stack: expect.stringMatching(/\S/)
             })

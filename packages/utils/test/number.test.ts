@@ -48,7 +48,7 @@ describe('number formatting', () => {
       expect.fail('expected invalid currency failure')
     } catch (error) {
       expect(error).toBeInstanceOf(RangeError)
-      expect(error).toMatchObject({ code: 'NUMBER_FORMAT_INVALID', source: '@migaia/utils' })
+      expect(error).toMatchObject({ code: 'NUMBER_FORMAT_INVALID', source: 'foundation.utils' })
     }
   })
 

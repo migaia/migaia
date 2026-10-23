@@ -167,7 +167,7 @@ describe('Core physical carrier observation', () => {
     expect(receive).toHaveBeenCalledTimes(3)
     expect(errors).toHaveBeenCalledTimes(2)
     for (const [error] of errors.mock.calls)
-      expect(error).toMatchObject({ source: '@migaia/rpc/core', code: 'TRANSPORT', cause })
+      expect(error).toMatchObject({ source: 'rpc.endpoint', code: 'TRANSPORT', cause })
     removeLeft()
     removeRight()
     left.close()
@@ -300,7 +300,7 @@ describe('Core physical carrier observation', () => {
       expect(receive).toHaveBeenCalledTimes(4)
       expect(errors).toHaveBeenCalledTimes(4)
       for (const [error] of errors.mock.calls)
-        expect(error).toMatchObject({ source: '@migaia/rpc/core', code: 'TRANSPORT', cause })
+        expect(error).toMatchObject({ source: 'rpc.endpoint', code: 'TRANSPORT', cause })
       /** A fresh recorder detects any observation that escapes adapter retirement. */
       const final = recorder()
       transport.observe!(final.probe)
@@ -519,7 +519,7 @@ describe('Core physical carrier observation', () => {
       expect(provide).toHaveBeenCalledTimes(1)
       expect(reports.mock.calls.length).toBeGreaterThanOrEqual(4)
       for (const [error] of reports.mock.calls)
-        expect(error).toMatchObject({ source: '@migaia/rpc/core', code: 'TRANSPORT', cause })
+        expect(error).toMatchObject({ source: 'rpc.endpoint', code: 'TRANSPORT', cause })
     } finally {
       await client.dispose()
       await server.dispose()

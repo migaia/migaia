@@ -18,7 +18,7 @@ describe('Resource policy and settlement contracts', () => {
       { retry: () => Promise.reject(rejection) as never }
     )
     await expect(resource.promise).rejects.toMatchObject({
-      source: '@migaia/resource',
+      source: 'resource',
       code: ResourceErrorCode.invalidOption
     })
     await flush()
@@ -41,7 +41,7 @@ describe('Resource policy and settlement contracts', () => {
       }
     )
     await expect(resource.promise).rejects.toMatchObject({
-      source: '@migaia/resource',
+      source: 'resource',
       code: ResourceErrorCode.invalidOption
     })
     await flush()

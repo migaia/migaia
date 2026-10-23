@@ -304,7 +304,7 @@ describe('runtime exposed methods serve after commit', () => {
       expect(gateResult).toHaveProperty('error')
       if (gateResult && 'error' in gateResult) {
         expect(gateResult.error).toMatchObject({
-          source: '@migaia/rpc/core',
+          source: 'rpc.endpoint',
           code: RpcCoreErrorCode.targetUnknown
         })
         /** Rollback's lifecycle reason is a real PluginHostError, independent of the install cause. */

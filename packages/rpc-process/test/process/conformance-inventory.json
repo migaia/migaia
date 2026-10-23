@@ -758,7 +758,7 @@
       "id": "integration.3",
       "evidenceOwner": "root integration owner",
       "status": "implemented",
-      "assertion": "real child core error source @migaia/rpc/core, Rpc name and complete cause chain",
+      "assertion": "real child core error source rpc.endpoint, Rpc name and complete cause chain",
       "evidence": "H actual core error Rpc* name, source/code/full original wire-stack cause graph; root final integration execution pending"
     },
     {

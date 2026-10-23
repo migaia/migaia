@@ -3,7 +3,7 @@ import { assimilateCapturedThen, probeThenable, ThenableProbeKind } from '@migai
 import { createAbortController } from '@migaia/lifecycle'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { TrayErrorCode } from '../error-code.js'
-import { attachTrayError, createTrayError } from '../errors.js'
+import { TRAY_SOURCE, attachTrayError, createTrayError } from '../errors.js'
 import { readRuntimeBridge } from '../host/internal-capability.js'
 import type {
   ITrayHost,
@@ -218,7 +218,7 @@ export function createRuntime<
             if (
               error &&
               typeof error === 'object' &&
-              (error as { readonly source?: unknown }).source === '@migaia/tray' &&
+              (error as { readonly source?: unknown }).source === TRAY_SOURCE &&
               typeof (error as { readonly code?: unknown }).code === 'string'
             )
               throw error

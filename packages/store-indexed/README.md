@@ -247,7 +247,7 @@ guard 是同步写入许可检查，签名 `assertMutationAllowed(operation?:str
 | invalidIndex               | INVALID_INDEX       | Array.at/set 非整数                                                          |
 | crossRuntime               | CROSS_RUNTIME       | 本包检测到跨 Runtime 追踪读取                                                |
 
-本包错误的 source 为 `STORE_INDEXED_SOURCE='@migaia/store-indexed'`。已有外包 source/code 保持实际 owner。未编码 guard/updater 原生错误可附码时保留原对象、类型、message、stack；不可附码或非 Error 值经 cause/errors 保留。不要依赖 message 分支，下面列出稳定诊断供定位：
+本包错误的 source 为 `STORE_INDEXED_SOURCE='store.indexed'`。已有外包 source/code 保持实际 owner。未编码 guard/updater 原生错误可附码时保留原对象、类型、message、stack；不可附码或非 Error 值经 cause/errors 保留。不要依赖 message 分支，下面列出稳定诊断供定位：
 
 | message                                                                                       | 场景                                        |
 | --------------------------------------------------------------------------------------------- | ------------------------------------------- |

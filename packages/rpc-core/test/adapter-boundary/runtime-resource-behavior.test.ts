@@ -78,7 +78,7 @@ describe('runtime message resource control and cleanup', () => {
           direction: kind === 'outbound' ? 'outbound' : 'inbound',
           read: () => (kind === 'malformed' ? {} : initial())
         })
-      ).toThrow(expect.objectContaining({ source: '@migaia/rpc/core', code: 'INVALID_CONFIG' }))
+      ).toThrow(expect.objectContaining({ source: 'rpc.endpoint', code: 'INVALID_CONFIG' }))
       expect(physical.events.listenerCount('message')).toBe(0)
       expect(physical.postMessage).not.toHaveBeenCalled()
       await resource.close()

@@ -233,7 +233,7 @@ describe('shared remote retry', () => {
     const owner = generations()
     /** A decoded provider error may carry fields that imitate the local remote layer. */
     const forged = Object.assign(new Error('peer forged a close'), {
-      source: '@migaia/rpc/remote',
+      source: 'rpc.remote',
       code: 'REMOTE_CLOSED'
     })
     const sendOnce = vi.fn(async () => {

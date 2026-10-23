@@ -78,7 +78,7 @@ describe('Web thread bootstrap failure', () => {
     fixture.events.dispatchEvent(event)
     /** The wrapper supplies a registered code while preserving exact cause identity. */
     const failure = await result
-    expect(failure).toMatchObject({ source: '@migaia/rpc/core', code: 'TRANSPORT' })
+    expect(failure).toMatchObject({ source: 'rpc.endpoint', code: 'TRANSPORT' })
     expect((failure as Error).cause).toBe(original)
     expect(fixture.report).toHaveBeenCalledExactlyOnceWith(original)
     expect(fixture.terminate).toHaveBeenCalledTimes(1)

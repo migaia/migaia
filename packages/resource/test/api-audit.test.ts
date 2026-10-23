@@ -115,7 +115,7 @@ describe('audited resource request ownership', () => {
       const failure = await resource.promise.catch((error: unknown) => error)
       expect(failure).toBe(policyFailure)
       expect([...walkErrorCauses(failure)]).toContain(fetchFailure)
-      expect(failure).toMatchObject({ source: '@migaia/resource', code: 'INVALID_OPTION' })
+      expect(failure).toMatchObject({ source: 'resource', code: 'INVALID_OPTION' })
       resource.dispose()
     }
   )
@@ -139,7 +139,7 @@ describe('audited resource request ownership', () => {
        */
       const failure = await pending.catch((error: unknown) => error)
       expect(failure).toBeInstanceOf(DOMException)
-      expect(failure).toMatchObject({ source: '@migaia/resource', code: 'REQUEST_ABORTED' })
+      expect(failure).toMatchObject({ source: 'resource', code: 'REQUEST_ABORTED' })
       expect([...walkErrorCauses(failure)]).toContain(context.signal.reason)
       resource.dispose()
     }
@@ -151,7 +151,7 @@ describe('audited resource request ownership', () => {
     const resource = new Resource(() => Promise.reject(original), createRuntime())
     const failure = await resource.promise.catch((error: unknown) => error)
     expect(failure).toBe(original)
-    expect(failure).toMatchObject({ source: '@migaia/resource', code: 'FETCH_FAILED' })
+    expect(failure).toMatchObject({ source: 'resource', code: 'FETCH_FAILED' })
     expect(() => resource.read()).toThrow(original)
     resource.dispose()
   })
@@ -161,11 +161,11 @@ describe('audited resource request ownership', () => {
     const frozen = Object.freeze(new Error('immutable fetch failed'))
     const immutable = new Resource(() => Promise.reject(frozen), createRuntime())
     const failure = await immutable.promise.catch((error: unknown) => error)
-    expect(failure).toMatchObject({ source: '@migaia/resource', code: 'FETCH_FAILED' })
+    expect(failure).toMatchObject({ source: 'resource', code: 'FETCH_FAILED' })
     expect([...walkErrorCauses(failure)]).toContain(frozen)
     /** Already classified failures remain owned by their originating package. */
     const foreign = Object.assign(new Error('foreign failure'), {
-      source: '@migaia/serialize',
+      source: 'serialization',
       code: 'ENCODE_FAILED'
     })
     const owned = new Resource(() => Promise.reject(foreign), createRuntime())

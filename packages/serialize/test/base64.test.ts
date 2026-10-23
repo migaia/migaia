@@ -13,7 +13,7 @@ describe('bytesToBase64 / base64ToBytes', () => {
       expect(() => base64ToBytes(input), input).toThrow(
         expect.objectContaining({
           code: 'INVALID_OPTION',
-          source: '@migaia/serialize'
+          source: 'serialization'
         })
       )
     }

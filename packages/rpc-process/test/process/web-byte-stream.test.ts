@@ -67,7 +67,7 @@ describe('Web byte stream adapter', () => {
     const closing = port.channel.close()
     await expect(closing).rejects.toBeInstanceOf(AggregateError)
     await expect(closing).rejects.toMatchObject({
-      source: '@migaia/rpc/process',
+      source: 'rpc.transport.process',
       code: 'PROCESS_CHANNEL_CLOSED',
       cause: failure,
       errors: [failure]

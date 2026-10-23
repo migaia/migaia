@@ -52,7 +52,7 @@ describe('store-worker byte boundaries', () => {
         await expect(
           parser.encode(value, { signal: controller.signal, context: 'byte-brand' })
         ).rejects.toMatchObject({
-          source: '@migaia/store-worker',
+          source: 'store.worker',
           code: 'REQUEST_ABORTED',
           bytesConsumed
         })

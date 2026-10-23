@@ -1,8 +1,11 @@
+/** Stable error domain owned by this code table; package moves preserve this identity. */
+export const ERROR_SOURCE = 'serialization'
+
 /**
- * The single declaration site for `@migaia/serialize` error codes.
+ * The single declaration site for `serialization` error codes.
  *
  * The pair (source, code) uniquely identifies a failure at the package boundary. `source` is always
- * `'@migaia/serialize'`. Throw sites use these constants instead of inline values.
+ * `'serialization'`. Throw sites use these constants instead of inline values.
  *
  * Code values are public API. Renaming a code is a breaking change.
  */

@@ -1,4 +1,4 @@
-import { UtilsErrorCode } from './error-code.js'
+import { ERROR_SOURCE, UtilsErrorCode } from './error-code.js'
 import { UtilsErrorText } from './error-text.js'
 import { attachErrorIdentity } from './error.js'
 
@@ -88,7 +88,7 @@ export function immutableSnapshot<T>(value: T): T {
   if (typeof globalThis.structuredClone !== 'function') {
     const unavailable = new TypeError(UtilsErrorText.envUnsupported('structuredClone'))
     attachErrorIdentity(unavailable, {
-      source: '@migaia/utils',
+      source: ERROR_SOURCE,
       code: UtilsErrorCode.envUnsupported
     })
     throw unavailable
@@ -97,7 +97,7 @@ export function immutableSnapshot<T>(value: T): T {
     return structuredClone(value)
   } catch (error) {
     const tagged = new TypeError(UtilsErrorText.cloneUnsupported, { cause: error })
-    attachErrorIdentity(tagged, { source: '@migaia/utils', code: UtilsErrorCode.cloneUnsupported })
+    attachErrorIdentity(tagged, { source: ERROR_SOURCE, code: UtilsErrorCode.cloneUnsupported })
     throw tagged
   }
 }

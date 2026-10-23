@@ -2,7 +2,7 @@
  * Browser Peer admission and RTC decoding are owned by this package; wire errors retain Core
  * identity.
  */
-export const ERROR_SOURCE = '@migaia/rpc/browser'
+export const ERROR_SOURCE = 'rpc.transport.browser'
 
 /**
  * Browser Peer configuration failures have stable semantic identities independent from Core

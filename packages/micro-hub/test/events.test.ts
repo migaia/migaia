@@ -122,7 +122,7 @@ describe('events and requests', () => {
     /** Caller is allowed to use the contract before its owner mounts. */
     const view = hub.connect('caller').use(contract)
     await expect(view.requests.value(undefined)).rejects.toMatchObject({
-      source: '@migaia/micro-hub',
+      source: 'micro-frontend.hub',
       code: 'OWNER_ABSENT'
     })
     /** Owner validates names at the handler registration boundary. */
@@ -217,7 +217,7 @@ describe('events and requests', () => {
     owned.handle('value', () => 1)
     owned.release()
     await expect(pending).rejects.toMatchObject({
-      source: '@migaia/micro-hub',
+      source: 'micro-frontend.hub',
       code: 'OWNER_ABSENT'
     })
   })

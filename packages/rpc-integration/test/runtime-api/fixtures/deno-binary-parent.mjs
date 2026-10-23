@@ -33,7 +33,7 @@ assert.deepEqual(receipt.failures, [])
  */
 for (const event of receipt.closing) {
   assert.equal(event.phase, 'closing')
-  assert.equal(event.source, '@migaia/rpc/core')
+  assert.equal(event.source, 'rpc.endpoint')
   assert.equal(event.code, 'CANCELLED')
   assert.equal(event.name, 'AbortError')
 }

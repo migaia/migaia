@@ -19,7 +19,7 @@ describe('PluginHost public error-code documentation', () => {
 
   it('每个 PluginHostError 都携带 (source, code) 二元组', () => {
     const error = new PluginHostError('HOST_DISPOSED', 'host is disposed')
-    expect(error.source).toBe('@migaia/plugin-host')
+    expect(error.source).toBe('plugin.host')
     expect(error.code).toBe('HOST_DISPOSED')
     expect(error.stack).toBeTruthy()
   })
@@ -49,7 +49,7 @@ describe('PluginHost public error-code documentation', () => {
   it('入参校验 TypeError 保持类型不变并携带 (source, INVALID_OPTION)（裸抛扫描门禁）', () => {
     const error = createPluginHostTypeError('plugin name must be a non-empty string')
     expect(error).toBeInstanceOf(TypeError)
-    expect(error.source).toBe('@migaia/plugin-host')
+    expect(error.source).toBe('plugin.host')
     expect(error.code).toBe(PluginHostErrorCode.invalidOption)
     expect(error.stack).toBeTruthy()
   })

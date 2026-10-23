@@ -40,7 +40,7 @@ describe('canonical request with version ownership', () => {
     const replacement = pending(resource)
     expect(replacement).not.toBe(original)
     await expect(original).rejects.toMatchObject({
-      source: '@migaia/resource',
+      source: 'resource',
       code: 'REQUEST_ABORTED',
       name: 'AbortError'
     })
@@ -123,7 +123,7 @@ it('releases a loaded value if canonical clock settlement fails', async () => {
   const release = resource.retainResource()
   const operation = pending(resource)
   await expect(operation).rejects.toMatchObject({
-    source: '@migaia/resource',
+    source: 'resource',
     code: 'INVALID_OPTION',
     cause: failure
   })

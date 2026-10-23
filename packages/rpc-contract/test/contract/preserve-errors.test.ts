@@ -27,7 +27,7 @@ it('native error vectors retain complete identity and ordered causes independent
   assert.ok(top instanceof TypeError)
   assert.equal(top.name, 'TypeError')
   assert.equal(top.message, 'rpc envelope is invalid')
-  assert.equal(Reflect.get(top, 'source'), '@migaia/rpc/contract')
+  assert.equal(Reflect.get(top, 'source'), 'rpc.contract')
   assert.equal(Reflect.get(top, 'code'), 'INVALID_ENVELOPE')
   assert.ok(top.stack && top.stack.length > 0)
   assert.equal(top.cause, original)

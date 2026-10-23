@@ -405,7 +405,7 @@ describe('promise primitives', () => {
     )
     const reason = new Error('cancelled')
     controller.abort(reason)
-    await expect(pending).rejects.toMatchObject({ source: '@migaia/utils', code: 'ABORTED' })
+    await expect(pending).rejects.toMatchObject({ source: 'foundation.utils', code: 'ABORTED' })
     expect(operationSignal.aborted).toBe(true)
     expect(operationSignal.reason).toBe(reason)
   })
@@ -1009,7 +1009,7 @@ describe('promise primitives', () => {
     await expect(
       limiter.run(() => 'never', { signal: { aborted: true, reason: undefined } as never })
     ).rejects.toMatchObject({
-      source: '@migaia/utils',
+      source: 'foundation.utils',
       code: 'ABORTED'
     })
     let release!: () => void
@@ -1017,7 +1017,7 @@ describe('promise primitives', () => {
     const pending = limiter.run(() => 'never')
     limiter.close()
     await expect(pending).rejects.toMatchObject({
-      source: '@migaia/utils',
+      source: 'foundation.utils',
       code: 'LIMITER_CLOSED'
     })
     release()

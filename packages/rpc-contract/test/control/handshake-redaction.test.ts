@@ -335,7 +335,7 @@ describe('handshake redaction', () => {
     /** Keeps even the redacted diagnostic local to the controlled Contract factory. */
     const wire = serializeRpcError(error, { report })
     expect(wire).toMatchObject({
-      source: '@migaia/rpc/contract',
+      source: 'rpc.contract',
       code: 'HANDSHAKE_INVALID',
       message: error.message,
       stack: error.stack

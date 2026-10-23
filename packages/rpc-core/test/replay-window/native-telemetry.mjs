@@ -14,7 +14,7 @@ import { RpcDebugProperty } from '../../dist/core/internal/test-observer.js'
  */
 export function classifyFailure(error, reason = null) {
   return {
-    source: error?.source ?? '@migaia/rpc/core',
+    source: error?.source ?? 'rpc.endpoint',
     code: error?.code ?? 'UNCLASSIFIED',
     name: error?.name ?? (error === undefined ? 'RejectionEvent' : typeof error),
     reason: reason ?? error?.reason ?? null,
@@ -38,7 +38,7 @@ export function classifyProviderRejection(rejection) {
     bindingExpired: RpcCoreErrorText.verifiedPeerBindingExpired
   }
   return {
-    source: '@migaia/rpc/core',
+    source: 'rpc.endpoint',
     code: RpcCoreErrorCode.overloaded,
     name: 'Error',
     reason: rejection.reason,

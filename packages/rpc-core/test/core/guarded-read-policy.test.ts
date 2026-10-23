@@ -35,7 +35,7 @@ describe('safeRead guarded property policy', () => {
       thrown = error
     }
     expect(thrown).toMatchObject({
-      source: '@migaia/rpc/core',
+      source: 'rpc.endpoint',
       code: 'PROPERTY_READ_FAILED',
       cause: failure
     })
@@ -64,7 +64,7 @@ describe('safeRead guarded property policy', () => {
     } catch (error) {
       thrown = error
     }
-    expect(thrown).toMatchObject({ source: '@migaia/rpc/core', code: 'PROPERTY_READ_FAILED' })
+    expect(thrown).toMatchObject({ source: 'rpc.endpoint', code: 'PROPERTY_READ_FAILED' })
     expect(thrown).toBeInstanceOf(TypeError)
     expect((thrown as Error).cause).toBeInstanceOf(AggregateError)
     expect(((thrown as Error).cause as AggregateError).errors).toEqual([readFailure, reportFailure])

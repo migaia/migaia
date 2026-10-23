@@ -97,7 +97,7 @@ describe('composed endpoint root disposal boundary', () => {
     /** Lifecycle wraps non-native structural throws, retaining their original value as cause. */
     const structuralFailure = (hostResult.cleanupErrors[3] as Error).cause as Error
     expect(structuralFailure).toMatchObject({
-      source: '@migaia/lifecycle',
+      source: 'lifecycle',
       code: 'SCOPE_DISPOSAL_FAILED',
       cause: structuralRaw
     })
@@ -171,7 +171,7 @@ describe('composed endpoint root disposal boundary', () => {
     const failure = await first.catch((error: unknown) => error)
     expect(failure).toBeInstanceOf(RpcLifecycleError)
     expect(failure).toMatchObject({
-      source: '@migaia/rpc/core',
+      source: 'rpc.endpoint',
       code: 'ENDPOINT_DISPOSED',
       message: 'Endpoint disposal completed with cleanup errors',
       cause: endpointPrimary,
@@ -224,7 +224,7 @@ describe('composed endpoint root disposal boundary', () => {
     const failure = await first.catch((error: unknown) => error)
     expect(failure).toBeInstanceOf(RpcLifecycleError)
     expect(failure).toMatchObject({
-      source: '@migaia/rpc/core',
+      source: 'rpc.endpoint',
       code: 'ENDPOINT_DISPOSED',
       cause: secondCleanup,
       cleanupErrors: [

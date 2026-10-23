@@ -267,7 +267,7 @@ it('a disabled exposed Feature refuses the complete group before any business or
       )
     assert.deepEqual(calls, [], 'an unavailable second Feature cannot execute the first')
     assert.ok('error' in outcome, 'permission refusal rejects the whole group')
-    assert.equal(Reflect.get(outcome.error as object, 'source'), '@migaia/plugin-host')
+    assert.equal(Reflect.get(outcome.error as object, 'source'), 'plugin.host')
     assert.equal(Reflect.get(outcome.error as object, 'code'), PluginHostErrorCode.pluginDisabled)
     await vi.waitFor(() => assert.equal(admission.size, 0))
     assert.equal(replay.size, before, 'permission refusal allocates no replay tombstones')

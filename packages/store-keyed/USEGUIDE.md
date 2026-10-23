@@ -628,7 +628,7 @@ function derivedFamilyDef<K extends IFamilyKey, T>(
 
 ## 7. 错误工具完整参考
 
-源文件：`src/errors.ts`、`src/error-code.ts`、`src/error-text.ts`。本包创建的错误带 `source: '@migaia/store-keyed'` 与稳定 `code`；Reactive 或其它已有编码错误保留实际 owner。纯 optic 属性访问失败使用 `OPTIC_ACCESS_FAILED`：可扩展原生错误在原对象附码，保留类型、message、stack；frozen/非 Error 主值经 coded fallback 的 cause 可达。任意值品牌守卫读取失败返回 false。按 source/code 处理（而非 message）。
+源文件：`src/errors.ts`、`src/error-code.ts`、`src/error-text.ts`。本包创建的错误带 `source: 'store.keyed'` 与稳定 `code`；Reactive 或其它已有编码错误保留实际 owner。纯 optic 属性访问失败使用 `OPTIC_ACCESS_FAILED`：可扩展原生错误在原对象附码，保留类型、message、stack；frozen/非 Error 主值经 coded fallback 的 cause 可达。任意值品牌守卫读取失败返回 false。按 source/code 处理（而非 message）。
 
 ### 7.1 构造器
 
@@ -658,10 +658,10 @@ function createStoreKeyedAggregateError(
 ): AggregateError
 ```
 
-前三者只在返回的运行时类型上不同（`Error`/`RangeError`/`TypeError`），参数形状完全一致：`code`（必填）、`message`（必填）、`options?.cause`（可选，透传进原生 `Error` 构造器的 `{ cause }`）。返回值都经 `attachErrorIdentity`（来自 `@migaia/utils/error`）打上 `source: '@migaia/store-keyed'` 与 `code`，不改动 `stack`/`name`。`createStoreKeyedAggregateError` 额外要求 `errors: unknown[]`（必填，成为 `AggregateError.errors`），不接受 `cause` 选项。
+前三者只在返回的运行时类型上不同（`Error`/`RangeError`/`TypeError`），参数形状完全一致：`code`（必填）、`message`（必填）、`options?.cause`（可选，透传进原生 `Error` 构造器的 `{ cause }`）。返回值都经 `attachErrorIdentity`（来自 `@migaia/utils/error`）打上 `source: 'store.keyed'` 与 `code`，不改动 `stack`/`name`。`createStoreKeyedAggregateError` 额外要求 `errors: unknown[]`（必填，成为 `AggregateError.errors`），不接受 `cause` 选项。
 
 ```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
-const STORE_KEYED_SOURCE = '@migaia/store-keyed'
+const STORE_KEYED_SOURCE = 'store.keyed'
 ```
 
 字符串常量，无参数；用于本包创建的错误身份；透传的其它包错误保留原 source。

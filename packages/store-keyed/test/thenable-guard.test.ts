@@ -31,7 +31,7 @@ describe('thenable guard', () => {
       })
       expect(() => atomDef(hostile)).toThrow(
         expect.objectContaining({
-          source: '@migaia/store-keyed',
+          source: 'store.keyed',
           code: 'INVALID_OPTION',
           cause: failure
         })
@@ -44,7 +44,7 @@ describe('thenable guard', () => {
         then: () => undefined
       })
       expect(() => atomDef(callable)).toThrow(
-        expect.objectContaining({ source: '@migaia/store-keyed', code: 'INVALID_OPTION' })
+        expect.objectContaining({ source: 'store.keyed', code: 'INVALID_OPTION' })
       )
     })
   })

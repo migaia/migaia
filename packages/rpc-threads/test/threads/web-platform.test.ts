@@ -55,11 +55,11 @@ describe('Deno owned Worker exit-observation boundary', () => {
       const receipt = JSON.parse(output.trim().split('\n').at(-1)!)
       expect(receipt.value).toBe('actual-deno-owned-worker')
       expect(receipt.admissionDiagnostics).toEqual([
-        expect.objectContaining({ source: '@migaia/supervision', code: 'CAPABILITY_UNSUPPORTED' })
+        expect.objectContaining({ source: 'supervision', code: 'CAPABILITY_UNSUPPORTED' })
       ])
       expect(receipt.closeDiagnostics, JSON.stringify(receipt)).toEqual([
         expect.objectContaining({
-          source: '@migaia/supervision',
+          source: 'supervision',
           code: 'EXIT_UNOBSERVABLE',
           name: 'Error',
           detail: { kind: 'thread', generation: 1, phase: 'exit', capability: 'exit-observation' },

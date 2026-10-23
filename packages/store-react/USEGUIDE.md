@@ -485,7 +485,7 @@ remove、replace 和 register 返回的注销函数触发的是单项清理：�
 | invalidConfig            | INVALID_CONFIG           | token/Provider/owned/ready/feature 配置无效  |
 | readyRejected            | READY_REJECTED           | 非 Error ready 拒绝原因的包装                |
 
-STORE_REACT_SOURCE 为 `'@migaia/store-react'`，本包创建的错误带 source/code；已有外包身份保持实际 owner，底层 reactive 所有权错误也由其 owner 提供。`createStoreReactError(code:IStoreReactErrorCode,message:string,options?)` 返回原生 Error，options 默认 undefined，cause 非 undefined 时转发；`createStoreReactAggregateError(code,errors:readonly unknown[],message)` 返回原生 AggregateError。必填参数如签名所示，两工厂只构造、不自动抛出，附不可写 source/code，保留 stack 与 errors/cause 链。
+STORE_REACT_SOURCE 为 `'store.react'`，本包创建的错误带 source/code；已有外包身份保持实际 owner，底层 reactive 所有权错误也由其 owner 提供。`createStoreReactError(code:IStoreReactErrorCode,message:string,options?)` 返回原生 Error，options 默认 undefined，cause 非 undefined 时转发；`createStoreReactAggregateError(code,errors:readonly unknown[],message)` 返回原生 AggregateError。必填参数如签名所示，两工厂只构造、不自动抛出，附不可写 source/code，保留 stack 与 errors/cause 链。
 
 | 稳定诊断                                                                          | 对应处理                               |
 | --------------------------------------------------------------------------------- | -------------------------------------- |

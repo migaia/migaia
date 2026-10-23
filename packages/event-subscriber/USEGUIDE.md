@@ -407,7 +407,7 @@ canonical（固定的原名）方法始终存在；别名与原名指向同一�
 
 `report` 不存在或失败时，先尝试 `terminalReport`，再依次尝试宿主 `reportError`、`console.error`、排入微任务抛出；宿主不能排入微任务时同步抛出。报告函数本身的失败也保留在诊断错误链上，不静默丢弃。
 
-包级错误的 `source` 为 `EVENT_SUBSCRIBER_SOURCE`，值是 `'@migaia/event-subscriber'`。输入校验保留原生 `TypeError`，发布聚合保留 `AggregateError`。原始失败通过 `errors` 与 `cause` 可达；存在监听器失败时，`cause` 是第一个失败。只有预算耗尽时，`errors` 可以为空。业务代码比较 `EventSubscriberErrorCode` 的成员，不散写码值。`EventSubscriberErrorText` 是内部文案表，不是公开导出，业务代码不能导入；锁定文案时断言实际错误的 `message`。
+包级错误的 `source` 为 `EVENT_SUBSCRIBER_SOURCE`，值是 `'event.subscriber'`。输入校验保留原生 `TypeError`，发布聚合保留 `AggregateError`。原始失败通过 `errors` 与 `cause` 可达；存在监听器失败时，`cause` 是第一个失败。只有预算耗尽时，`errors` 可以为空。业务代码比较 `EventSubscriberErrorCode` 的成员，不散写码值。`EventSubscriberErrorText` 是内部文案表，不是公开导出，业务代码不能导入；锁定文案时断言实际错误的 `message`。
 
 | 错误码成员                           | 码值                                    | 触发条件                                                      |
 | ------------------------------------ | --------------------------------------- | ------------------------------------------------------------- |

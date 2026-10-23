@@ -1,7 +1,10 @@
+/** Stable error domain owned by this code table; package moves preserve this identity. */
+export const ERROR_SOURCE = 'store.middleware'
+
 /**
- * Declares the public error codes for `@migaia/store-middleware` in one place.
+ * Declares the public error codes for `store.middleware` in one place.
  *
- * Pair these codes with source `@migaia/store-middleware`; identified upstream failures retain
+ * Pair these codes with source `store.middleware`; identified upstream failures retain
  * their actual package owner. Throw sites use these constants instead of inline literals.
  *
  * Code values are public API. Renaming a code is a breaking change.

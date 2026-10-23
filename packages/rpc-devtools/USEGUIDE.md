@@ -499,7 +499,7 @@ Logger 方法必须不阻塞，只入已有队列；本包不另建缓冲、批�
 
 ### 错误身份与开发命令
 
-错误 source 是 RPC_DEVTOOLS_SOURCE（@migaia/rpc/devtools），code 从 RpcDevtoolsErrorCode 读取，按 source/code 分类，不匹配 message。
+错误 source 是 RPC_DEVTOOLS_SOURCE（rpc.devtools），code 从 RpcDevtoolsErrorCode 读取，按 source/code 分类，不匹配 message。
 
 | code                              | 场景                                                      |
 | --------------------------------- | --------------------------------------------------------- |

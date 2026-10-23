@@ -304,7 +304,7 @@ createDataOrderSlot 调用即保留顺序；禁用、恢复和 replace 沿用 sl
 
 ### 错误、诊断与状态
 
-PluginHostError 继承 Error，携带只读 source、code、可选 detail；source 为 `@migaia/plugin-host`，原始失败通过 cause/errors 可达。可写 native 回调错误原位附身份，不可写或非 Error 值保留在 cause，完整外包身份保留原 owner。INVALID_OPTION 形状错误保留 TypeError；配置值与循环错误是 PluginHostError。不要仅按类名处理所有错误，也不要解析诊断文案。
+PluginHostError 继承 Error，携带只读 source、code、可选 detail；source 为 `plugin.host`，原始失败通过 cause/errors 可达。可写 native 回调错误原位附身份，不可写或非 Error 值保留在 cause，完整外包身份保留原 owner。INVALID_OPTION 形状错误保留 TypeError；配置值与循环错误是 PluginHostError。不要仅按类名处理所有错误，也不要解析诊断文案。
 
 安装主错不被回滚失败覆盖。PLUGIN_INSTALL_FAILED.detail 包含 failedName、按回滚顺序的 rollbackErrors；异步 use 的 detail 已完成且冻结，同步 useSync 先公布冻结快照，通过 detail.completion 返回最终冻结详情。需要完整次错身份的转换应先 await completion。回滚失败另报 PLUGIN_INSTALL_ROLLBACK_FAILED。
 

@@ -246,7 +246,7 @@ describe('JSON-RPC bridge readiness', () => {
       expect(outcome!.status).toBe('rejected')
       if (outcome!.status !== 'rejected') throw new Error('fixture unexpectedly ready')
       expect(cleanup, 'cleanup contract').toMatchObject({
-        source: '@migaia/rpc/core',
+        source: 'rpc.endpoint',
         code: 'INTERNAL'
       })
       if (hello) expect(outcome!.reason).toBe(cleanup)
@@ -256,7 +256,7 @@ describe('JSON-RPC bridge readiness', () => {
         expect(outcome!.reason.errors).toContain(cleanup)
         expect(fixture.reports).toEqual([
           expect.objectContaining({
-            source: '@migaia/rpc/process',
+            source: 'rpc.transport.process',
             code: 'PROCESS_CHANNEL_CLOSED',
             cause: primary
           }),

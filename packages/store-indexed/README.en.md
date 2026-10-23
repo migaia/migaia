@@ -247,7 +247,7 @@ A guard is a synchronous permission check with `assertMutationAllowed(operation?
 | invalidIndex                   | INVALID_INDEX       | Noninteger Array.at/set                                                              |
 | crossRuntime                   | CROSS_RUNTIME       | A cross-Runtime tracked read detected here                                           |
 
-Errors owned here use `STORE_INDEXED_SOURCE='@migaia/store-indexed'`. Existing foreign source/code pairs retain their actual owner. An uncoded guard/updater native error keeps its object, type, message, and stack when identity can be attached; otherwise cause/errors retain the original value. Branch on code rather than message. Stable diagnostics remain available for locating a failure:
+Errors owned here use `STORE_INDEXED_SOURCE='store.indexed'`. Existing foreign source/code pairs retain their actual owner. An uncoded guard/updater native error keeps its object, type, message, and stack when identity can be attached; otherwise cause/errors retain the original value. Branch on code rather than message. Stable diagnostics remain available for locating a failure:
 
 | message                                                                                       | Situation                                                     |
 | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |

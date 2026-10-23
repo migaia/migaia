@@ -94,7 +94,7 @@ describe('composeSerializeSignal registration races', () => {
     }
 
     expect(error).toMatchObject({
-      source: '@migaia/serialize',
+      source: 'serialization',
       code: 'INVALID_OPTION',
       cause: registrationFailure
     })
@@ -139,7 +139,7 @@ describe('composeSerializeSignal registration races', () => {
     }
 
     expect(error).toMatchObject({
-      source: '@migaia/serialize',
+      source: 'serialization',
       code: 'INVALID_OPTION',
       cause: registrationFailure
     })
@@ -324,7 +324,7 @@ describe('composeSerializeSignal registration races', () => {
 
     expect(() => callerListener?.()).not.toThrow()
     expect(composed.signal.reason).toMatchObject({
-      source: '@migaia/serialize',
+      source: 'serialization',
       code: 'INVALID_OPTION',
       cause
     })

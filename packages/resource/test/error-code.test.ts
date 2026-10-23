@@ -184,7 +184,7 @@ describe('the table is exhaustive and tagging is non-destructive', () => {
     expect(declared).toHaveLength(11) // FETCH_FAILED + 表格行数 + SUSPENSE_PROBE_FAILED/CANCELLATION_CLEANUP_FAILED + RESOURCE_SETUP_INVALID/RESOURCE_SETUP_CLOSED
   })
 
-  it('a tagged error carries source === "@migaia/resource" and a non-empty stack', () => {
+  it('a tagged error carries source === "resource" and a non-empty stack', () => {
     const runtime = createRuntime()
     const resource = new Resource(() => 1, runtime, { autoStart: false })
     resource.dispose()

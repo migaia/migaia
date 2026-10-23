@@ -95,7 +95,7 @@ describe('process outlet command readiness', () => {
         expect(await host.process!.request('service', 'identity')).not.toBe(previous)
         expect(() =>
           host.process!.request({ name: 'service', instanceId: previous as string }, 'identity')
-        ).toThrow(expect.objectContaining({ source: '@migaia/rpc/core', code: 'TARGET_UNKNOWN' }))
+        ).toThrow(expect.objectContaining({ source: 'rpc.endpoint', code: 'TARGET_UNKNOWN' }))
         /**
          * Best-effort admission warns once; physical retirement also rejects the observer's stale
          * generation-1 preparation while preserving both original process-channel causes.
@@ -104,7 +104,7 @@ describe('process outlet command readiness', () => {
           expect.objectContaining({
             name: 'Error',
             message: 'supervision capability is unsupported',
-            source: '@migaia/supervision',
+            source: 'supervision',
             code: 'CAPABILITY_UNSUPPORTED',
             detail: { capability: 'termination', level: 'unsupported', kind: 'process' },
             stack: expect.stringMatching(/\S/)
@@ -112,20 +112,20 @@ describe('process outlet command readiness', () => {
           expect.objectContaining({
             name: 'Error',
             message: 'Remote generation is closed',
-            source: '@migaia/rpc/remote',
+            source: 'rpc.remote',
             code: 'REMOTE_CLOSED',
             detail: { generation: 1 },
             stack: expect.stringMatching(/\S/),
             cause: expect.objectContaining({
               name: 'Error',
               message: 'process channel is closed',
-              source: '@migaia/rpc/process',
+              source: 'rpc.transport.process',
               code: 'PROCESS_CHANNEL_CLOSED',
               stack: expect.stringMatching(/\S/),
               cause: expect.objectContaining({
                 name: 'Error',
                 message: 'process channel is closed',
-                source: '@migaia/rpc/process',
+                source: 'rpc.transport.process',
                 code: 'PROCESS_CHANNEL_CLOSED',
                 stack: expect.stringMatching(/\S/)
               })

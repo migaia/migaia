@@ -1,10 +1,10 @@
-import { StoreSsrErrorCode, type IStoreSsrErrorCode } from './error-code.js'
+import { ERROR_SOURCE, StoreSsrErrorCode, type IStoreSsrErrorCode } from './error-code.js'
 import { attachErrorIdentity } from '@migaia/utils/error'
 
 export { StoreSsrErrorCode, type IStoreSsrErrorCode }
 
 /** Identity for package-owned failures; complete foreign identities retain their existing source. */
-export const STORE_SSR_SOURCE = '@migaia/store-ssr'
+export const STORE_SSR_SOURCE = ERROR_SOURCE
 
 /** Attaches `(source, code)` onto an existing error object without touching its type or stack. */
 const tagStoreSsrError = <E extends Error>(error: E, code: IStoreSsrErrorCode): E =>

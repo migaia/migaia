@@ -94,14 +94,18 @@ func (b *businessState) invoke(method string, payload any, trace any) (any, reco
 		return runtimeDescription(true, b.host, b.stream), nil
 	case "migaia.remote.host.use":
 		if !b.host || len(args) < 1 || len(args) > 2 || args[0] != "p" {
-			return nil, wireError("REMOTE_CONTRACT_INVALID", "invalid Host use")
+			failure := wireError("REMOTE_CONTRACT_INVALID", "invalid Host use")
+			failure["source"] = "rpc.remote"
+			return nil, failure
 		}
 		b.installed = true
 		b.revision++
 		return b.item(), nil
 	case "migaia.remote.host.unUse":
 		if !b.host || len(args) < 1 || len(args) > 2 || args[0] != "p" {
-			return nil, wireError("REMOTE_CONTRACT_INVALID", "invalid Host unUse")
+			failure := wireError("REMOTE_CONTRACT_INVALID", "invalid Host unUse")
+			failure["source"] = "rpc.remote"
+			return nil, failure
 		}
 		b.installed = false
 		b.revision++
@@ -123,12 +127,12 @@ func (b *businessState) invoke(method string, payload any, trace any) (any, reco
 	case "peer.trace":
 		return trace, nil
 	case "peer.error":
-		cause := record{"source": "@migaia/rpc/core", "code": "INTERNAL", "name": "Error", "message": "peer cause", "stack": "Error: peer cause"}
-		return nil, record{"source": "@migaia/rpc/core", "code": "INTERNAL", "name": "RpcError", "message": "peer error", "stack": "RpcError: peer error", "cause": cause}
+		cause := record{"source": "rpc.endpoint", "code": "INTERNAL", "name": "Error", "message": "peer cause", "stack": "Error: peer cause"}
+		return nil, record{"source": "rpc.endpoint", "code": "INTERNAL", "name": "RpcError", "message": "peer error", "stack": "RpcError: peer error", "cause": cause}
 	}
 	if strings.HasPrefix(method, "p.f.") && !b.installed {
 		failure := wireError("REMOTE_CLOSED", "remote is closed")
-		failure["source"] = "@migaia/rpc/remote"
+		failure["source"] = "rpc.remote"
 		return nil, failure
 	}
 	if method == "p.f.request" {

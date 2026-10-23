@@ -291,8 +291,8 @@ The `source` values below identify errors; they are not import paths. Import Cor
 
 | source               | Constant / code table                             |
 | -------------------- | ------------------------------------------------- |
-| `@migaia/rpc/core`   | RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode          |
-| `@migaia/rpc/remote` | RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode |
+| `rpc.endpoint`   | RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode          |
+| `rpc.remote` | RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode |
 
 isRpcErrorInstance/isRpcRemoteError/isRpcTimeoutError use stable fields across realms/copies rather than instanceof. isRpcError only checks a string code and is not a substitute for those family guards. RpcError/RpcRemoteError/RpcTimeoutError and similar names are type-only exports. RpcLifecycleError is the only constructible public class, for consumers that own their own release state.
 

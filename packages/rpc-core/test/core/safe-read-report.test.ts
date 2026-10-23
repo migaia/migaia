@@ -49,7 +49,7 @@ describe('public safeRead failure channel', () => {
     }
     expect(received).toBeInstanceOf(TypeError)
     expect(received).toMatchObject({
-      source: '@migaia/rpc/core',
+      source: 'rpc.endpoint',
       code: 'PROPERTY_READ_FAILED',
       message: 'rpc property read failed',
       cause: failure

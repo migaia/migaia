@@ -11,7 +11,7 @@ const expectPluginListFailure = (plugins: unknown, cause: unknown): void => {
   }
   expect(caught).toBeInstanceOf(TypeError)
   expect(caught).toMatchObject({
-    source: '@migaia/serialize',
+    source: 'serialization',
     code: 'INVALID_OPTION',
     cause
   })

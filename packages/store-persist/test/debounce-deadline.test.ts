@@ -239,7 +239,7 @@ describe('bounded persistence debounce', () => {
           persist(store, { key: 'invalid-window', storage, debounceMs: 100, maxWaitMs, scheduler })
         ).toThrow(
           expect.objectContaining({
-            source: '@migaia/store-persist',
+            source: 'store.persist',
             code: StorePersistErrorCode.invalidOption,
             name: 'TypeError'
           })

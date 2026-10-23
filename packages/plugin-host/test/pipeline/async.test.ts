@@ -36,7 +36,7 @@ describe('async host pipeline', () => {
       next(value + 2)
     })
     await expect(host.run(1)).rejects.toMatchObject({
-      source: '@migaia/plugin-host',
+      source: 'plugin.host',
       code: 'PIPELINE_NEXT_DUPLICATE'
     })
   })
@@ -74,7 +74,7 @@ class AsyncHostWithDiagnostic extends PluginHost<Record<string, never>, number> 
 /**
  * Host-owned failure and closing semantics of an async host. These restore the earlier baselines
  * that exercised the retired `runAsyncPipeline` wrapper directly; they now run through a real host
- * so the host's combiner (`PIPELINE_FAILED`, source `@migaia/plugin-host`) and active checks are
+ * so the host's combiner (`PIPELINE_FAILED`, source `plugin.host`) and active checks are
  * what is asserted, not middleware-pipeline's defaults.
  */
 describe('async host pipeline failure and closing baselines', () => {
@@ -101,7 +101,7 @@ describe('async host pipeline failure and closing baselines', () => {
     })
     const caught = await settle(host)
     expect(caught).toBeInstanceOf(AggregateError)
-    expect(caught).toMatchObject({ code: 'PIPELINE_FAILED', source: '@migaia/plugin-host' })
+    expect(caught).toMatchObject({ code: 'PIPELINE_FAILED', source: 'plugin.host' })
     expect((caught as AggregateError).errors).toEqual([stageError, downstreamError])
   })
 
@@ -126,7 +126,7 @@ describe('async host pipeline failure and closing baselines', () => {
       throw undefined
     })
     await expect(thrown.run(1)).rejects.toMatchObject({
-      source: '@migaia/middleware-pipeline',
+      source: 'middleware.pipeline',
       code: 'EXECUTION_FAILED',
       cause: undefined
     })
@@ -137,7 +137,7 @@ describe('async host pipeline failure and closing baselines', () => {
     })
     rejected.useAsyncPipeline(async () => Promise.reject(undefined))
     await expect(rejected.run(1)).rejects.toMatchObject({
-      source: '@migaia/middleware-pipeline',
+      source: 'middleware.pipeline',
       code: 'EXECUTION_FAILED',
       cause: undefined
     })
@@ -199,7 +199,7 @@ describe('async host pipeline failure and closing baselines', () => {
     })
     const caught = await settle(host)
     expect(caught).toBeInstanceOf(AggregateError)
-    expect(caught).toMatchObject({ source: '@migaia/plugin-host', code: 'PIPELINE_FAILED' })
+    expect(caught).toMatchObject({ source: 'plugin.host', code: 'PIPELINE_FAILED' })
     expect((caught as AggregateError).errors).toEqual([stageError, downstreamError])
   })
 
@@ -209,7 +209,7 @@ describe('async host pipeline failure and closing baselines', () => {
       void host.dispose()
     })
     await expect(host.run(1)).rejects.toMatchObject({
-      source: '@migaia/plugin-host',
+      source: 'plugin.host',
       code: 'HOST_DISPOSING'
     })
   })
@@ -221,7 +221,7 @@ describe('async host pipeline failure and closing baselines', () => {
       void host.dispose()
     })
     await expect(host.run(1)).rejects.toMatchObject({
-      source: '@migaia/plugin-host',
+      source: 'plugin.host',
       code: 'HOST_DISPOSING'
     })
   })

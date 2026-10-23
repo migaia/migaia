@@ -294,7 +294,7 @@ describe('third adversarial pass', () => {
       const aggregate = (failure as Error & { cause?: unknown }).cause
       expect(aggregate).toBeInstanceOf(AggregateError)
       expect(aggregate).toMatchObject({
-        source: '@migaia/logger',
+        source: 'logging',
         code: 'PROCESS_INSTALL_ROLLBACK_FAILED'
       })
       expect((aggregate as AggregateError).errors[0]).toMatchObject({
@@ -1413,7 +1413,7 @@ describe('Logger-owned scheduler option admission', () => {
       message: LoggerErrorText.schedulerGetterFailed
     })
     expect((failure as { cause?: unknown }).cause).toBe(getterError)
-    expect((failure as { source?: string }).source).not.toBe('@migaia/plugin-host')
+    expect((failure as { source?: string }).source).not.toBe('plugin.host')
   })
 
   it('rejects an invalid scheduler shape with logger TypeError and no foreign error owner', () => {
@@ -1434,7 +1434,7 @@ describe('Logger-owned scheduler option admission', () => {
       message: LoggerErrorText.invalidScheduler
     })
     expect((failure as { cause?: unknown }).cause).toBeUndefined()
-    expect((failure as { source?: string }).source).not.toBe('@migaia/plugin-host')
+    expect((failure as { source?: string }).source).not.toBe('plugin.host')
   })
 
   it('preserves a scheduler capability getter failure directly as the logger TypeError cause', () => {

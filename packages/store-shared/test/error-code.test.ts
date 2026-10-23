@@ -10,7 +10,7 @@ describe('store-shared error-code contract', () => {
     const codes = Object.values(StoreSharedErrorCode)
     expect(codes).toHaveLength(8)
     expect(new Set(codes).size).toBe(8)
-    expect(STORE_SHARED_SOURCE).toBe('@migaia/store-shared')
+    expect(STORE_SHARED_SOURCE).toBe('store.shared')
   })
 
   it('preserves native RangeError identity through shared attachment', () => {

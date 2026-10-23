@@ -15,7 +15,7 @@ function expectTransportIdentity(value: unknown, message: string): void {
   expect(error.stack?.length).toBeGreaterThan(0)
   expect(Object.hasOwn(error, 'source')).toBe(true)
   expect(Object.hasOwn(error, 'code')).toBe(true)
-  expect(error.source).toBe('@migaia/rpc/core')
+  expect(error.source).toBe('rpc.endpoint')
   expect(error.code).toBe('TRANSPORT')
 }
 

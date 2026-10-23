@@ -71,12 +71,12 @@ describe('store-indexed audit regressions', () => {
   it('rejects the same invalid JavaScript Map entry at construction and replacement', () => {
     /** Native Map entry admission must run before collection ownership is established. */
     expect(() => Reflect.construct(ObservableMap, [['ab']])).toThrow(
-      expect.objectContaining({ source: '@migaia/store-indexed', code: 'INVALID_OPTION' })
+      expect.objectContaining({ source: 'store.indexed', code: 'INVALID_OPTION' })
     )
     /** Replacement must reject without disturbing the prior valid data. */
     const map = new ObservableMap([['old', 1]])
     expect(() => Reflect.apply(map.replace, map, [['ab']])).toThrow(
-      expect.objectContaining({ source: '@migaia/store-indexed', code: 'INVALID_OPTION' })
+      expect.objectContaining({ source: 'store.indexed', code: 'INVALID_OPTION' })
     )
     expect(map.entries()).toEqual([['old', 1]])
     map.dispose()
@@ -108,7 +108,7 @@ describe('store-indexed audit regressions', () => {
               throw primary
             })
       ).toThrow(primary)
-      expect(primary).toMatchObject({ source: '@migaia/store-indexed', code: 'CALLBACK_FAILED' })
+      expect(primary).toMatchObject({ source: 'store.indexed', code: 'CALLBACK_FAILED' })
       expect(primary).toBeInstanceOf(TypeError)
       expect(object.peek('count')).toBe(1)
       object.dispose()
@@ -148,7 +148,7 @@ describe('store-indexed audit regressions', () => {
       }
     })
     expect(() => object.set('count', 2)).toThrow(primary)
-    expect(primary).toMatchObject({ source: '@migaia/utils', code: 'ABORTED' })
+    expect(primary).toMatchObject({ source: 'foundation.utils', code: 'ABORTED' })
     expect(object.peek('count')).toBe(1)
     object.dispose()
   })
@@ -164,7 +164,7 @@ describe('store-indexed audit regressions', () => {
       })
     ).toThrow(
       expect.objectContaining({
-        source: '@migaia/store-indexed',
+        source: 'store.indexed',
         code: 'CALLBACK_FAILED',
         cause: primary
       })

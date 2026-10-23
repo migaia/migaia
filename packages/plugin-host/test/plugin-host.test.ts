@@ -1761,7 +1761,7 @@ describe('PluginHost', () => {
         caught = error
       }
       expect(caught).toBeInstanceOf(PluginHostError)
-      expect((caught as PluginHostError).source).toBe('@migaia/plugin-host')
+      expect((caught as PluginHostError).source).toBe('plugin.host')
       expect((caught as PluginHostError).code).toBe('HOST_DISPOSING')
       expect(caught).not.toBeInstanceOf(AggregateError)
       expect(caught).not.toHaveProperty('errors')

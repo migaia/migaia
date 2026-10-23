@@ -10,7 +10,7 @@ describe('store-indexed error-code contract', () => {
     const codes = Object.values(StoreIndexedErrorCode)
     expect(codes).toHaveLength(6)
     expect(new Set(codes).size).toBe(6)
-    expect(STORE_INDEXED_SOURCE).toBe('@migaia/store-indexed')
+    expect(STORE_INDEXED_SOURCE).toBe('store.indexed')
   })
 
   it('preserves native RangeError identity through the shared attachment helper', () => {

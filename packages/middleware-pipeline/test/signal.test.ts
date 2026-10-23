@@ -33,7 +33,7 @@ describe('signal contract', () => {
     expect(module).not.toHaveProperty('adaptSyncStageToGenerator')
     expect(module).not.toHaveProperty('adaptGeneratorStageToAsyncGenerator')
     expect(module).not.toHaveProperty('adaptSyncStageToAsyncGenerator')
-    expect(module.MIDDLEWARE_PIPELINE_SOURCE).toBe('@migaia/middleware-pipeline')
+    expect(module.MIDDLEWARE_PIPELINE_SOURCE).toBe('middleware.pipeline')
   })
 
   it('rejects sync candidate after cooperative abort', () => {

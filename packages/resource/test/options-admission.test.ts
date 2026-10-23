@@ -83,7 +83,7 @@ describe('Resource option admission', () => {
 
     expect(() => new Resource(fetcher, runtime, options)).toThrowError(
       expect.objectContaining({
-        source: '@migaia/resource',
+        source: 'resource',
         code: ResourceErrorCode.invalidOption,
         cause
       })
@@ -112,7 +112,7 @@ describe('Resource option admission', () => {
 
     expect(() => new Resource(fetcher, runtime, options)).toThrowError(
       expect.objectContaining({
-        source: '@migaia/resource',
+        source: 'resource',
         code: ResourceErrorCode.invalidOption,
         cause
       })
@@ -132,7 +132,7 @@ describe('Resource option admission', () => {
         })
     ).toThrowError(
       expect.objectContaining({
-        source: '@migaia/resource',
+        source: 'resource',
         code: ResourceErrorCode.invalidOption
       })
     )

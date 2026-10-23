@@ -81,7 +81,7 @@ it('rebuilds installed probe stages even when an earlier cold listener throws', 
   try {
     await client.send('probe-server', 'echo', 'before')
     expect(() => probe.setStages([])).toThrow(original)
-    expect(original).toMatchObject({ source: '@migaia/rpc/core', code: 'CALLBACK_FAILED' })
+    expect(original).toMatchObject({ source: 'rpc.endpoint', code: 'CALLBACK_FAILED' })
     expect(readProbeStages(probe)).toBe(0)
     /** This scalar snapshot excludes events generated before pause. */
     const before = events
@@ -118,7 +118,7 @@ it.each([
       expect(failure).toBeInstanceOf(DOMException)
       expect(failure).toMatchObject({
         name: 'DataCloneError',
-        source: '@migaia/rpc/core',
+        source: 'rpc.endpoint',
         code: 'TRANSPORT'
       })
       expect((failure as Error).stack).toBeTruthy()
@@ -149,7 +149,7 @@ it('classifies the original middleware installation failure at the endpoint boun
         middlewares: [connect({ transport: left }), middleware]
       })
     ).rejects.toBe(original)
-    expect(original).toMatchObject({ source: '@migaia/rpc/core', code: 'CALLBACK_FAILED' })
+    expect(original).toMatchObject({ source: 'rpc.endpoint', code: 'CALLBACK_FAILED' })
   } finally {
     left.close()
     right.close()
@@ -186,7 +186,7 @@ it('retains the original native error event cause in the worker transport diagno
     events.dispatchEvent(event)
     expect(observed).toHaveLength(1)
     expect(observed[0]).toMatchObject({
-      source: '@migaia/rpc/core',
+      source: 'rpc.endpoint',
       code: 'TRANSPORT',
       cause: original
     })
@@ -225,7 +225,7 @@ it.each([true, false])(
       expect(failure).toBeInstanceOf(DOMException)
       expect(failure).toMatchObject({
         name: 'AbortError',
-        source: '@migaia/rpc/core',
+        source: 'rpc.endpoint',
         code: 'CANCELLED',
         cause: reason
       })

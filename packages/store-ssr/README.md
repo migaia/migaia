@@ -230,7 +230,7 @@ SsrWireType 是 { json: 'json', text: 'text', bytes: 'bytes' }，ISsrWireType �
 
 ### 错误身份与工厂
 
-本包构造错误的 source 为 STORE_SSR_SOURCE，即 @migaia/store-ssr；完整外包 source/code 保留原 owner。StoreSsrErrorCode 的 12 项如下：
+本包构造错误的 source 为 STORE_SSR_SOURCE，即 store.ssr；完整外包 source/code 保留原 owner。StoreSsrErrorCode 的 12 项如下：
 
 | 属性 / code                                  | 场景                                            |
 | -------------------------------------------- | ----------------------------------------------- |

@@ -832,7 +832,7 @@ Whether a failure is rethrown, wrapped, reported or used as the abort reason dep
 
 ```ts doc-test=skip reason="Fragment that relies on illustrative outside functions or values"
 abstract class UtilsError extends Error {
-  readonly source = '@migaia/utils';
+  readonly source = 'foundation.utils';
   readonly code: IUtilsErrorCode;
 }
 class UtilsAbortError extends UtilsError {
@@ -847,7 +847,7 @@ class UtilsTimeoutError extends UtilsError {
 }
 ```
 
-`UtilsError` is the abstract base class: every semantic error this package throws carries `source: '@migaia/utils'` and a stable `code`. `UtilsAbortError` keeps the original abort reason on `cause`; `UtilsTimeoutError` also carries `scope` (whether the single operation, one attempt or the total deadline ran out) and `timeoutMs`.
+`UtilsError` is the abstract base class: every semantic error this package throws carries `source: 'foundation.utils'` and a stable `code`. `UtilsAbortError` keeps the original abort reason on `cause`; `UtilsTimeoutError` also carries `scope` (whether the single operation, one attempt or the total deadline ran out) and `timeoutMs`.
 
 ```ts doc-test=skip reason="Signature summary, not a runnable module"
 function attachErrorIdentity<T extends object>(
@@ -910,7 +910,7 @@ function isUtilsAbortError(value: unknown): value is UtilsAbortError;
 function isUtilsTimeoutError(value: unknown): value is UtilsTimeoutError;
 ```
 
-Diagnostic shape guards: they check an error-like `name` / `message` / `stack`, `source` equal to `@migaia/utils`, and a `code` that belongs to `UtilsErrorCode`; the abort and timeout guards also check the matching code. They need no `instanceof` against local constructors and are not meant to authenticate where an error came from.
+Diagnostic shape guards: they check an error-like `name` / `message` / `stack`, `source` equal to `foundation.utils`, and a `code` that belongs to `UtilsErrorCode`; the abort and timeout guards also check the matching code. They need no `instanceof` against local constructors and are not meant to authenticate where an error came from.
 
 ### `UtilsErrorCode`
 
@@ -940,7 +940,7 @@ const UtilsErrorCode = {
 } as const;
 ```
 
-The stable semantic codes used across the whole package; `IUtilsErrorCode` is the union of their values. Besides the `UtilsError` subclasses, native `TypeError` / `RangeError` thrown by modules such as `base64ToBytes`, object paths and config also get the matching `code` (and `source: '@migaia/utils'`) through `Object.defineProperty`, so the same checks recognize them.
+The stable semantic codes used across the whole package; `IUtilsErrorCode` is the union of their values. Besides the `UtilsError` subclasses, native `TypeError` / `RangeError` thrown by modules such as `base64ToBytes`, object paths and config also get the matching `code` (and `source: 'foundation.utils'`) through `Object.defineProperty`, so the same checks recognize them.
 
 What each code means:
 
@@ -1963,7 +1963,7 @@ The table lists every public name. See the module sections above for parameters,
 | `MAX_NATIVE_RECURSION_DEPTH` | `@migaia/utils/function` | Maximum synchronous reentrancy before callers move work off the native stack. |
 | `ThenableProbeKind` | `@migaia/utils/function` | Stable outcomes of one `.then` read. |
 | `UtilsAbortError` | `@migaia/utils/promise` | Error for cooperative cancellation, code `ABORTED`, with the original reason on `cause`. |
-| `UtilsError` | `@migaia/utils/error` | Base class of this package's semantic errors, with `source: '@migaia/utils'` and a stable `code`. |
+| `UtilsError` | `@migaia/utils/error` | Base class of this package's semantic errors, with `source: 'foundation.utils'` and a stable `code`. |
 | `UtilsErrorCode` | `@migaia/utils/error` | Stable error codes this package emits. |
 | `UtilsTimeoutError` | `@migaia/utils/error` | Error for an operation, attempt or total deadline, code `DEADLINE_EXCEEDED`. |
 | `admitAbortSignal` | `@migaia/utils/promise` | Admits an abort-signal shape with one `aborted` read, without reading `reason` or subscribing. |

@@ -743,7 +743,7 @@ async function main() {
     '@migaia/rpc/threads': ['packages/rpc-threads/src/error-code.ts', 'RpcThreadErrorCode']
   }
   if (rootMode)
-    codeTables['@migaia/rpc/devtools'] = [
+    codeTables['rpc.devtools'] = [
       'packages/rpc-devtools/src/error-code.ts',
       'RpcDevtoolsErrorCode'
     ]
@@ -768,7 +768,7 @@ async function main() {
     observableCodes,
     installedPath:
       'Existing public process/thread Peer options receive the genuine probe through their canonical forwarding owners',
-    source: '@migaia/rpc/core',
+    source: 'rpc.endpoint',
     sharedCode: 'OVERLOADED',
     reasons: Object.values(RpcProviderRejectionReason),
     reasonChannel:

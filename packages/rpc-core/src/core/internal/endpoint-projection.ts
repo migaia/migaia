@@ -1,3 +1,4 @@
+import { PLUGIN_HOST_SOURCE } from '@migaia/plugin-host'
 import {
   createRpcError,
   createRpcLifecycleError,
@@ -286,7 +287,7 @@ function asEndpointDisposed(error: unknown): unknown {
     typeof error === 'object' &&
     ((error as { code?: unknown }).code === 'REGISTRATION_REVOKED' ||
       (error as { code?: unknown }).code === 'HOST_DISPOSED') &&
-    (error as { source?: unknown }).source === '@migaia/plugin-host'
+    (error as { source?: unknown }).source === PLUGIN_HOST_SOURCE
   )
     return createRpcLifecycleError(RpcCoreErrorText.endpointDisposed, error)
   return error

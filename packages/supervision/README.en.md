@@ -164,7 +164,7 @@ The default startup timeout is 10 seconds. A startup timeout follows the same re
 
 The core depends only on `@migaia/lifecycle` and `@migaia/utils`. A profile may use `hooks.acquireUnit` for a preacquired unit, `hooks.afterLaunch` to own attachments, `hooks.onReady` to own monitors or fail the unit, and `hooks.inspectUnit` for a read-only snapshot. Attachments registered in `unit.scope` release after `exited`; monitors registered in `unit.monitors` release before termination. Unit-specific entry points belong beside, never inside, the root implementation.
 
-Supervisor-created failures carry `source: '@migaia/supervision'` and one semantic `SupervisionErrorCode`; wrapped original failures remain on `cause`, and cleanup failures remain reachable through `errors`. Passive observer and late-check failures sent to `report` retain their original objects. States and budget outcomes are values, not thrown codes.
+Supervisor-created failures carry `source: 'supervision'` and one semantic `SupervisionErrorCode`; wrapped original failures remain on `cause`, and cleanup failures remain reachable through `errors`. Passive observer and late-check failures sent to `report` retain their original objects. States and budget outcomes are values, not thrown codes.
 
 When a launcher explicitly declares `exit-observation: 'unsupported'`, forced termination immediately reports `EXIT_UNOBSERVABLE` and marks the generation abandoned without waiting for `reapTimeoutMs`. Details include kind, generation and capability. Its lease remains held until actual exit: an unavailable observation is not an exit receipt. Observable exit that misses its deadline still reports `REAP_TIMEOUT`; launch-phase recovery timeouts also retain their existing behavior.
 

@@ -199,7 +199,7 @@ Window、SharedWorker、ServiceWorker、BroadcastChannel、RTC 都借用原生�
 
 表中的 `source` 标识浏览器错误的归属；本包公开 API 的导入路径是 `@migaia/rpc-browser`。
 
-| 本包 code（source=`@migaia/rpc/browser`） | 触发与处理                                                      |
+| 本包 code（source=`rpc.transport.browser`） | 触发与处理                                                      |
 | ----------------------------------------- | --------------------------------------------------------------- |
 | WINDOW_ORIGIN_REQUIRED                    | Window Peer 缺少非空 origin；填写明确对端源                     |
 | RTC_CHANNEL_UNRELIABLE                    | Peer 的频道不是可靠有序；改用受支持配置                         |

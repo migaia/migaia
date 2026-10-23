@@ -219,7 +219,7 @@ watch 开始时就可能同步发布已有变化。每轮先捕获等待版本�
 
 ### 错误身份与处置
 
-`STORE_SHARED_SOURCE` 是字符串常量 `'@migaia/store-shared'`。`StoreSharedErrorCode` 是下表常量对象，`IStoreSharedErrorCode` 为其值的联合类型。
+`STORE_SHARED_SOURCE` 是字符串常量 `'store.shared'`。`StoreSharedErrorCode` 是下表常量对象，`IStoreSharedErrorCode` 为其值的联合类型。
 
 | 属性 / code                              | 场景与处置                                                                         |
 | ---------------------------------------- | ---------------------------------------------------------------------------------- |

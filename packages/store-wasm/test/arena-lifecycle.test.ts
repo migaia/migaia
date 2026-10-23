@@ -52,7 +52,7 @@ describe('public WASM initialization and allocation lifetime', () => {
     const { context } = makeFieldContext()
     expect(() => owner.number().create(context)).toThrow(
       expect.objectContaining({
-        source: '@migaia/store-wasm',
+        source: 'store.wasm',
         code: 'NOT_INITIALIZED'
       })
     )
@@ -72,7 +72,7 @@ describe('public WASM initialization and allocation lifetime', () => {
     expect(owner.native.dealloc_bytes).toHaveBeenCalledOnce()
     expect(() => field.value).toThrow(
       expect.objectContaining({
-        source: '@migaia/store-wasm',
+        source: 'store.wasm',
         code: 'FIELD_DISPOSED'
       })
     )
@@ -80,7 +80,7 @@ describe('public WASM initialization and allocation lifetime', () => {
       field.value = 8
     }).toThrow(
       expect.objectContaining({
-        source: '@migaia/store-wasm',
+        source: 'store.wasm',
         code: 'FIELD_DISPOSED'
       })
     )
@@ -119,7 +119,7 @@ describe('public WASM initialization and allocation lifetime', () => {
       field.value = false
     }).toThrow(
       expect.objectContaining({
-        source: '@migaia/store-wasm',
+        source: 'store.wasm',
         code: 'FIELD_DISPOSED'
       })
     )
@@ -135,7 +135,7 @@ describe('public WASM initialization and allocation lifetime', () => {
     /** No graph resource may be acquired for a missing native allocation. */
     const createSource = vi.fn(context.createSource)
     expect(() => owner.number().create({ ...context, createSource })).toThrow(
-      expect.objectContaining({ source: '@migaia/store-wasm', code: 'ALLOCATION_FAILED' })
+      expect.objectContaining({ source: 'store.wasm', code: 'ALLOCATION_FAILED' })
     )
     expect(createSource).not.toHaveBeenCalled()
     expect(owner.native.dealloc_bytes).not.toHaveBeenCalled()
@@ -178,7 +178,7 @@ describe('public WASM initialization and allocation lifetime', () => {
     } catch (error) {
       poisoned = error
     }
-    expect(poisoned).toMatchObject({ source: '@migaia/store-wasm', code: 'INSTANCE_POISONED' })
+    expect(poisoned).toMatchObject({ source: 'store.wasm', code: 'INSTANCE_POISONED' })
     expect((poisoned as Error).cause).toBe(trap)
     expect(owner.native.alloc_bytes).toHaveBeenCalledTimes(2)
     live.dispose()

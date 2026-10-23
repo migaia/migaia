@@ -629,7 +629,7 @@ The strong cache is a `Map` reordered by access (`maxSize` entries). Beyond the 
 
 ## 7. Error tools reference
 
-Source: `src/errors.ts`, `src/error-code.ts`, `src/error-text.ts`. Errors created by this package carry `source: '@migaia/store-keyed'` and a stable `code`; errors from Reactive or other packages that already have a code keep their real owner. Failures of pure optic property access use `OPTIC_ACCESS_FAILED`: extensible native errors receive the code on the original object, keeping type, message and stack; frozen or non-Error primary values stay reachable through the cause of a coded fallback. Brand guards on arbitrary values return false when reading fails. Branch on source/code, not on the message.
+Source: `src/errors.ts`, `src/error-code.ts`, `src/error-text.ts`. Errors created by this package carry `source: 'store.keyed'` and a stable `code`; errors from Reactive or other packages that already have a code keep their real owner. Failures of pure optic property access use `OPTIC_ACCESS_FAILED`: extensible native errors receive the code on the original object, keeping type, message and stack; frozen or non-Error primary values stay reachable through the cause of a coded fallback. Brand guards on arbitrary values return false when reading fails. Branch on source/code, not on the message.
 
 ### 7.1 Constructors
 
@@ -662,7 +662,7 @@ function createStoreKeyedAggregateError(
 The first three differ only in the runtime type they return (`Error`/`RangeError`/`TypeError`) and take the same arguments: `code` (required), `message` (required), `options?.cause` (optional, passed to the native `Error` constructor's `{ cause }`). Each result gets `source: '@migaia/store-keyed'` and `code` through `attachErrorIdentity` (from `@migaia/utils/error`), without touching `stack`/`name`. `createStoreKeyedAggregateError` also requires `errors: unknown[]` (which become `AggregateError.errors`) and takes no `cause` option.
 
 ```ts doc-test=skip reason="Signature summary, not a runnable module"
-const STORE_KEYED_SOURCE = '@migaia/store-keyed'
+const STORE_KEYED_SOURCE = 'store.keyed'
 ```
 
 A string constant with no parameters, used for the identity of errors created by this package; errors passed through from other packages keep their own source.

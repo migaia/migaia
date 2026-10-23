@@ -356,7 +356,7 @@ describe('@migaia/tray/loader', () => {
     })
     expect(removed.cleanupErrors[0]).toBe(cleanupFailure)
     expect(removed.cleanupErrors[0]).toMatchObject({
-      source: '@migaia/lifecycle',
+      source: 'lifecycle',
       code: 'SCOPE_DISPOSAL_FAILED'
     })
 

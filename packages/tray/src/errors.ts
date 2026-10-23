@@ -1,9 +1,9 @@
-import { TrayErrorCode, type ITrayErrorCode } from './error-code.js'
+import { ERROR_SOURCE, TrayErrorCode, type ITrayErrorCode } from './error-code.js'
 import { TrayErrorText } from './error-text.js'
 import { attachErrorIdentity, attachSecondaryErrors, isNativeErrorValue } from '@migaia/utils/error'
 
 /** Stable package source attached to every Tray-owned boundary error. */
-export const TRAY_SOURCE = '@migaia/tray'
+export const TRAY_SOURCE = ERROR_SOURCE
 
 /**
  * Classifies native errors without replacing their type or stack. Complete foreign identities stay

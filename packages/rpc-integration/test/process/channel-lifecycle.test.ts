@@ -101,13 +101,13 @@ describe('process channel boundary', () => {
     expect(remoteProcessJsonCodec.encode(value)).toBe(original.encode(asCodecValue(value)))
     expect(remoteProcessJsonCodec.decode(original.encode(asCodecValue(value)))).toEqual(value)
     expect(() => remoteProcessJsonCodec.encode(undefined)).toThrowError(
-      expect.objectContaining({ source: '@migaia/serialize', code: 'INVALID_OPTION' })
+      expect.objectContaining({ source: 'serialization', code: 'INVALID_OPTION' })
     )
     expect(() => remoteProcessJsonCodec.encode(new Map())).toThrowError(
-      expect.objectContaining({ source: '@migaia/serialize', code: 'INVALID_OPTION' })
+      expect.objectContaining({ source: 'serialization', code: 'INVALID_OPTION' })
     )
     expect(() => remoteProcessJsonCodec.decode(42)).toThrowError(
-      expect.objectContaining({ source: '@migaia/rpc/core', code: 'PAYLOAD_INVALID' })
+      expect.objectContaining({ source: 'rpc.endpoint', code: 'PAYLOAD_INVALID' })
     )
     /** The framer adapter rejects non-strings before the exact source framer is called. */
     const context = { source: 'peer', messageId: 'm1' }
@@ -120,7 +120,7 @@ describe('process channel boundary', () => {
       expect.objectContaining({
         name: 'TypeError',
         message: 'process channel requires a string encoded value',
-        source: '@migaia/rpc/contract',
+        source: 'rpc.contract',
         code: 'INVALID_FRAME'
       })
     )

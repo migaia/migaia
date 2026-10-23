@@ -678,7 +678,7 @@ describe('real process session and principal isolation', () => {
         expect(outcomes.every((error) => error instanceof Error)).toBe(true)
         for (const error of outcomes) {
           expect(error).toMatchObject({
-            source: '@migaia/rpc/process',
+            source: 'rpc.transport.process',
             code: RpcProcessErrorCode.channelClosed
           })
         }

@@ -1,5 +1,5 @@
 import { attachErrorIdentity, tryReadProperty } from './error.js'
-import { UtilsErrorCode } from './error-code.js'
+import { ERROR_SOURCE, UtilsErrorCode } from './error-code.js'
 import { UtilsErrorText } from './error-text.js'
 import {
   ErrorChainFallback,
@@ -957,7 +957,7 @@ function createViolation(
   if (strategy.createViolation) return strategy.createViolation(cause, pointer, violation)
   /** A native TypeError identifies malformed cross-realm input without replacing the original cause. */
   const error = new TypeError(UtilsErrorText.errorChainInvalid(pointer, violation), { cause })
-  attachErrorIdentity(error, { source: '@migaia/utils', code: UtilsErrorCode.errorChainInvalid })
+  attachErrorIdentity(error, { source: ERROR_SOURCE, code: UtilsErrorCode.errorChainInvalid })
   Object.defineProperty(error, 'pointer', { value: pointer })
   Object.defineProperty(error, 'violation', { value: violation })
   return error

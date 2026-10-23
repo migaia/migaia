@@ -1,4 +1,6 @@
 import { workerData as bootstrap } from 'node:worker_threads'
+import { createSyncLifecycleScope } from '@migaia/lifecycle'
+import { UtilsAbortError } from '@migaia/utils/error'
 import { defineFeature, definePlugin, PluginHost } from '@migaia/plugin-host'
 import { createThreadPlugin, readThreadBootstrap } from '@migaia/rpc-threads'
 import { createComposedEndpoint } from '@migaia/rpc-core/composed'
@@ -18,8 +20,25 @@ import { ping } from '@migaia/rpc-core'
 /** The private launcher wrapper provides endpoint addressing and preserves the original data. */
 const { peerId, data: workerData } = readThreadBootstrap(bootstrap)
 
-/** The first generation can deliberately die after its request has been received. */
+/**
+ * Returns normal fixture data, crashes the selected generation, or rejects with two real package
+ * errors.
+ *
+ * @param {unknown} value Portable business value received through the public request path.
+ * @returns {unknown} The original value, or a pending Promise until the deliberate crash.
+ * @throws {UtilsAbortError} Source-domain mode wraps the lifecycle admission failure as its cause.
+ */
 function request(value) {
+  if (workerData.sourceDomainFailure) {
+    /** A real closed lifecycle owner creates the inner registered package error. */
+    const scope = createSyncLifecycleScope()
+    scope.dispose()
+    try {
+      scope.own('already-disposed', { syncSafe: true, force: () => undefined })
+    } catch (cause) {
+      throw new UtilsAbortError(cause)
+    }
+  }
   if (workerData.crash && workerData.generation === 1) {
     setTimeout(() => process.exit(1), workerData.crashDelay ?? 1)
     return new Promise(() => undefined)

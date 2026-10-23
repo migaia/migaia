@@ -75,7 +75,7 @@ describe('historical Host and descriptor sentinel replay', () => {
       }
       expect(caught).toBeInstanceOf(TypeError)
       expect(caught).toMatchObject({
-        source: '@migaia/rpc/remote',
+        source: 'rpc.remote',
         code: 'REMOTE_CONTRACT_INVALID'
       })
       /** The controlled wrapper intentionally preserves local error identity. */

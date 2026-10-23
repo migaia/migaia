@@ -781,7 +781,7 @@ describe('runAsyncMiddleware', () => {
         else return downstream
       }
       const pipelineFailed = {
-        source: '@migaia/plugin-host',
+        source: 'plugin.host',
         code: 'PIPELINE_FAILED'
       }
       await expect(

@@ -90,7 +90,7 @@ func baselineAgreement(chosen agreement) bool {
 // runtimeFailure uses registered core codes rather than introducing language-fixture provider codes.
 func runtimeFailure(code, message string) record {
 	failure := wireError(code, message)
-	failure["source"] = "@migaia/rpc/core"
+	failure["source"] = "rpc.endpoint"
 	return failure
 }
 

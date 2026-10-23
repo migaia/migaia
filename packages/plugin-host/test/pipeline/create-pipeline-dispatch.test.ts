@@ -79,7 +79,7 @@ describe('createPipeline host dispatch', () => {
       cause: expect.objectContaining({
         name: 'TypeError',
         code: 'INVALID_OPTION',
-        source: '@migaia/middleware-pipeline'
+        source: 'middleware.pipeline'
       })
     })
     expect((failure as Error).cause).toBeInstanceOf(TypeError)
@@ -105,7 +105,7 @@ describe('createPipeline host dispatch', () => {
       cause: expect.objectContaining({
         name: 'TypeError',
         code: 'INVALID_OPTION',
-        source: '@migaia/middleware-pipeline'
+        source: 'middleware.pipeline'
       })
     })
     expect((failure as Error).cause).toBeInstanceOf(TypeError)

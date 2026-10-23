@@ -1,4 +1,4 @@
-import { UtilsErrorCode } from './error-code.js'
+import { ERROR_SOURCE, UtilsErrorCode } from './error-code.js'
 import { UtilsErrorText } from './error-text.js'
 import { attachErrorIdentity } from './error.js'
 
@@ -95,7 +95,7 @@ export function base64ToBytes(value: string, target?: Uint8Array): Uint8Array {
       new TypeError(
         UtilsErrorText.invalidArgument('target', 'a Uint8Array matching the decoded byte length')
       ),
-      { source: '@migaia/utils', code: UtilsErrorCode.invalidArgument }
+      { source: ERROR_SOURCE, code: UtilsErrorCode.invalidArgument }
     )
   /** Default callers retain their existing one allocation; supplied targets allocate no backing. */
   const output = target ?? new Uint8Array(length)
@@ -121,7 +121,7 @@ export function* streamBase64Chunks(value: Uint8Array, maxChunkBytes = 32763): I
   if (!Number.isSafeInteger(maxChunkBytes) || maxChunkBytes < 3)
     throw attachErrorIdentity(
       new RangeError(UtilsErrorText.invalidArgument('maxChunkBytes', 'a safe integer >= 3')),
-      { source: '@migaia/utils', code: UtilsErrorCode.invalidArgument }
+      { source: ERROR_SOURCE, code: UtilsErrorCode.invalidArgument }
     )
   const width = maxChunkBytes - (maxChunkBytes % 3)
   for (let offset = 0; offset < value.length; offset += width)
@@ -218,7 +218,7 @@ export function splitUtf8(value: string, maxBytes: number): readonly string[] {
   if (!Number.isSafeInteger(maxBytes) || maxBytes < 4)
     throw attachErrorIdentity(
       new RangeError(UtilsErrorText.invalidArgument('maxBytes', 'a safe integer >= 4')),
-      { source: '@migaia/utils', code: UtilsErrorCode.invalidArgument }
+      { source: ERROR_SOURCE, code: UtilsErrorCode.invalidArgument }
     )
   if (value.length === 0) return ['']
   /** Completed chunks preserve input order and the existing empty-input special case. */
@@ -258,7 +258,7 @@ function encodingError(offset: number, encoding: 'Base64' | 'UTF-8' = 'Base64'):
   const error = new TypeError(UtilsErrorText.invalidEncoding(encoding, offset), {
     cause: undefined
   })
-  Object.defineProperty(error, 'source', { value: '@migaia/utils', enumerable: true })
+  Object.defineProperty(error, 'source', { value: ERROR_SOURCE, enumerable: true })
   Object.defineProperty(error, 'code', { value: UtilsErrorCode.invalidEncoding, enumerable: true })
   return error
 }

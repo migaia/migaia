@@ -1565,7 +1565,7 @@ for (const mode of ['tell', 'values'] as const) {
       if (mode === 'tell') await vi.waitFor(() => assert.ok(failures.length > 0))
       const failure = mode === 'tell' ? failures[0] : await pending
       assert.equal(failure.code, 'PROVIDER_GENERATION_RETIRED')
-      assert.equal(failure.source, '@migaia/rpc/core')
+      assert.equal(failure.source, 'rpc.endpoint')
       assert.ok(failure.cause instanceof Error, 'native departure remains reachable')
       await vi.waitFor(
         () =>
@@ -1830,7 +1830,7 @@ it('C business identity, stack and cause cross both hops with forward metadata',
   const cause = new TypeError('forward-fixture-cause')
   /** The source/code already belong to the public utils registry. */
   const original = attachErrorIdentity(new RangeError('forward-fixture-business', { cause }), {
-    source: '@migaia/utils',
+    source: 'foundation.utils',
     code: 'INVALID_ARGUMENT'
   })
   try {
@@ -2091,7 +2091,7 @@ it('a forwarded iterator failure keeps C source, stack, cause and admitted route
   const cause = new TypeError('forward-stream-cause')
   /** Existing utils identity distinguishes business failure from B's stream controls. */
   const original = attachErrorIdentity(new RangeError('forward-stream-business', { cause }), {
-    source: '@migaia/utils',
+    source: 'foundation.utils',
     code: 'INVALID_ARGUMENT'
   })
   try {
@@ -2273,7 +2273,7 @@ it('a forwarded native call retires once and a fresh call uses C replacement', a
     await handles[0]!.exited
     const failure = await pending
     assert.equal(failure.code, 'PROVIDER_GENERATION_RETIRED')
-    assert.equal(failure.source, '@migaia/rpc/core')
+    assert.equal(failure.source, 'rpc.endpoint')
     assert.equal(retryCalls, 0, 'an idempotent forward never enters custom retry')
     /** The next logical call may target the genuine replacement; the old call cannot replay. */
     await vi.waitFor(
@@ -2326,7 +2326,7 @@ it('unUse withdraws the forward slot and a same-name connection restores new cal
     assert.equal(await owners[0].thread!.request('b', 'c.echo'), 'old')
     await owners[1].unUse('c')
     await assert.rejects(owners[0].thread!.request('b', 'c.echo'), (error) => {
-      assert.equal((error as any).source, '@migaia/rpc/core')
+      assert.equal((error as any).source, 'rpc.endpoint')
       assert.equal((error as any).code, 'TARGET_UNKNOWN')
       assert.equal((error as any).cause.code, 'PLUGIN_NOT_INSTALLED')
       return true
@@ -2422,7 +2422,7 @@ it('closing B cancels its actual downstream provider before scope release comple
     await owners[1].dispose()
     await cancelled
     const failure = await pending
-    assert.equal(failure.source, '@migaia/rpc/core')
+    assert.equal(failure.source, 'rpc.endpoint')
     assert.equal(failure.code, 'TRANSPORT')
   } finally {
     for (const host of owners) await host.dispose()

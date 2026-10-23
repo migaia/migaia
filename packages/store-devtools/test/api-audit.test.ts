@@ -25,7 +25,7 @@ describe('store-devtools audit regressions', () => {
     try {
       fail = true
       expect(() => session.jumpTo(session.history[0]!.id)).toThrow(original)
-      expect(original).toMatchObject({ source: '@migaia/store-devtools', code: 'CALLBACK_FAILED' })
+      expect(original).toMatchObject({ source: 'store.devtools', code: 'CALLBACK_FAILED' })
       expect(original.stack).toBeTruthy()
       expect(store.count).toBe(0)
       expect(session.history).toHaveLength(1)
@@ -59,7 +59,7 @@ describe('store-devtools audit regressions', () => {
       const before = session.history
       close = true
       expect(() => session.record('retired-in-clone')).toThrow(
-        expect.objectContaining({ source: '@migaia/store-devtools', code: 'SESSION_DISPOSED' })
+        expect.objectContaining({ source: 'store.devtools', code: 'SESSION_DISPOSED' })
       )
       expect(session.history).toEqual(before)
       expect(session.history).toHaveLength(1)
@@ -86,7 +86,7 @@ describe('store-devtools audit regressions', () => {
     try {
       close = true
       expect(() => session.recordAction({ name: 'terminal' })).toThrow(
-        expect.objectContaining({ source: '@migaia/store-devtools', code: 'SESSION_DISPOSED' })
+        expect.objectContaining({ source: 'store.devtools', code: 'SESSION_DISPOSED' })
       )
       expect(session.actions).toHaveLength(0)
     } finally {
@@ -113,7 +113,7 @@ describe('store-devtools audit regressions', () => {
     try {
       fail = true
       expect(() => session.record()).toThrow(original)
-      expect(original).toMatchObject({ source: '@migaia/store-devtools', code: 'CALLBACK_FAILED' })
+      expect(original).toMatchObject({ source: 'store.devtools', code: 'CALLBACK_FAILED' })
       expect(session.history.map((entry) => entry.id)).toEqual([1])
       fail = false
       expect(session.record().id).toBe(2)
@@ -146,7 +146,7 @@ describe('store-devtools audit regressions', () => {
         } catch (error) {
           failure = error
         }
-        expect(failure).toMatchObject({ source: '@migaia/store-devtools', code: 'CALLBACK_FAILED' })
+        expect(failure).toMatchObject({ source: 'store.devtools', code: 'CALLBACK_FAILED' })
         if (kind === 'native') expect(failure).toBe(original)
         else expect((failure as Error).cause).toBe(original)
         expect(session.actions).toHaveLength(0)

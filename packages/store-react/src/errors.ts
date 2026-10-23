@@ -1,11 +1,11 @@
-import { StoreReactErrorCode, type IStoreReactErrorCode } from './error-code.js'
+import { ERROR_SOURCE, StoreReactErrorCode, type IStoreReactErrorCode } from './error-code.js'
 import { attachErrorIdentity, isNativeErrorValue } from '@migaia/utils/error'
 import { StoreReactErrorText } from './error-text.js'
 
 export { StoreReactErrorCode, type IStoreReactErrorCode }
 
 /** Identity of package-owned errors; complete foreign package identities remain with their owner. */
-export const STORE_REACT_SOURCE = '@migaia/store-react'
+export const STORE_REACT_SOURCE = ERROR_SOURCE
 
 function tagStoreReactError<E extends Error>(error: E, code: IStoreReactErrorCode): E {
   return attachErrorIdentity(error, { source: STORE_REACT_SOURCE, code })

@@ -768,6 +768,6 @@ probe 失败经 onListenerError 报 Core TRANSPORT，原异常保留在 cause，
 
 Node launcher 的原生 Worker 构造参数被拒绝时，使用 Core INVALID_CONFIG 标识；若已有原生 code，则以包装错误保留原 Error、name、message、stack 和原生 code 于 cause，不覆盖它们。此分类只描述 Node 构造边界，不泛化为所有 Web 构造器异常。
 
-本包本地错误码对象 RpcThreadErrorCode 只有 usageSampleFailed，值为 THREAD_USAGE_SAMPLE_FAILED，RPC_THREAD_ERROR_SOURCE 为 @migaia/rpc/threads。调用、监督和 Host 边界各使用自己的 source，不把所有失败改成本包采样码。按 source / code 分支，不匹配 message 文本；业务异常跨 Worker 后保留原生类型、message、stack、source/code 与 cause / errors 链，不能承诺接收端对象与发送端同一 identity。
+本包本地错误码对象 RpcThreadErrorCode 只有 usageSampleFailed，值为 THREAD_USAGE_SAMPLE_FAILED，RPC_THREAD_ERROR_SOURCE 为 rpc.transport.thread。调用、监督和 Host 边界各使用自己的 source，不把所有失败改成本包采样码。按 source / code 分支，不匹配 message 文本；业务异常跨 Worker 后保留原生类型、message、stack、source/code 与 cause / errors 链，不能承诺接收端对象与发送端同一 identity。
 
 Worker 单独运行配置失败通常是没有库 launcher bootstrap；默认 buffer 未失效是复制语义；Worker 是否重启取决于 restart 策略。需人工恢复时用 Host 的 restart / replace，并查看 list / get 的当前代次与退出信息。

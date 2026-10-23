@@ -56,14 +56,14 @@ describe('$hydrate input boundary', () => {
     revoke()
     expect(() => store.$set(proxy as never)).toThrow(
       expect.objectContaining({
-        source: '@migaia/store-light',
+        source: 'store.light',
         code: 'INVALID_OPTION',
         cause: expect.any(Error)
       })
     )
     expect(() => store.$hydrate(proxy as never)).toThrow(
       expect.objectContaining({
-        source: '@migaia/store-light',
+        source: 'store.light',
         code: 'INVALID_OPTION',
         cause: expect.any(Error)
       })
@@ -73,7 +73,7 @@ describe('$hydrate input boundary', () => {
     optionsProxy.revoke()
     expect(() => store.$hydrate({ count: 2 }, optionsProxy.proxy as never)).toThrow(
       expect.objectContaining({
-        source: '@migaia/store-light',
+        source: 'store.light',
         code: 'INVALID_OPTION',
         cause: expect.any(Error)
       })
@@ -154,7 +154,7 @@ describe('createStore: field classification', () => {
       throw new Error('expected store construction to fail')
     } catch (error) {
       expect(error).toMatchObject({
-        source: '@migaia/store-light',
+        source: 'store.light',
         code: 'INVALID_OPTION',
         cause: expect.any(Error)
       })
@@ -169,7 +169,7 @@ describe('createStore: field classification', () => {
       throw new Error('expected store options to fail')
     } catch (error) {
       expect(error).toMatchObject({
-        source: '@migaia/store-light',
+        source: 'store.light',
         code: 'INVALID_OPTION',
         cause: expect.any(Error)
       })
@@ -1001,7 +1001,7 @@ describe('hydration option capture', () => {
         )
       ).toThrow(
         expect.objectContaining({
-          source: '@migaia/store-light',
+          source: 'store.light',
           code: StoreLightErrorCode.invalidOption,
           cause
         })
@@ -1046,7 +1046,7 @@ describe('async action diagnostics', () => {
     await pending
     expect(values).toEqual([2, 4])
     expect(() => runtime.batch(() => Promise.resolve())).toThrow(
-      expect.objectContaining({ source: '@migaia/reactive', code: 'INVALID_OPTION' })
+      expect.objectContaining({ source: 'reactive', code: 'INVALID_OPTION' })
     )
     stop()
     await store.$dispose()
@@ -1068,7 +1068,7 @@ describe('async action diagnostics', () => {
     await store.save()
     expect(onError).toHaveBeenCalledTimes(1)
     expect(onError.mock.calls[0][0]).toMatchObject({
-      source: '@migaia/store-light',
+      source: 'store.light',
       code: StoreLightErrorCode.actionBatchBoundary
     })
     await store.$dispose()

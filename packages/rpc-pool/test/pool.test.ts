@@ -325,7 +325,7 @@ describe('public pool scheduling', () => {
     )
     const failure = await failing.close().catch((error: unknown) => error)
     expect(failure).toBeInstanceOf(AggregateError)
-    expect(failure).toMatchObject({ source: '@migaia/rpc-pool', code: 'CLOSE_FAILED' })
+    expect(failure).toMatchObject({ source: 'rpc.pool', code: 'CLOSE_FAILED' })
     expect((failure as AggregateError).errors).toEqual(failures)
   })
 
@@ -335,7 +335,7 @@ describe('public pool scheduling', () => {
     const active = pool.request('hold', 1)
     const queued = pool.request('echo', 2)
     await expect(pool.request('echo', 3)).rejects.toMatchObject({
-      source: '@migaia/rpc-pool',
+      source: 'rpc.pool',
       code: 'QUEUE_FULL'
     })
     expect(fixture.dispatches).toEqual([{ id: 0, value: 1 }])
@@ -431,7 +431,7 @@ describe('public pool scheduling', () => {
     expect(rejected).toBeInstanceOf(DOMException)
     expect(rejected).toMatchObject({
       name: 'AbortError',
-      source: '@migaia/rpc-pool',
+      source: 'rpc.pool',
       code: 'CALL_ABORTED'
     })
     expect((rejected as Error).cause).toBe(queuedReason)
@@ -557,7 +557,7 @@ describe('pool scheduler ownership', () => {
         }
       })
     ).rejects.toMatchObject({
-      source: '@migaia/lifecycle',
+      source: 'lifecycle',
       code: 'INVALID_OPTION',
       cause
     })

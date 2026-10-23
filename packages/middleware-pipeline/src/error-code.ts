@@ -1,8 +1,11 @@
+/** Stable error domain owned by this code table; package moves preserve this identity. */
+export const ERROR_SOURCE = 'middleware.pipeline'
+
 /**
  * Stable source attached to package-owned input, execution, and cancellation failures. A failure
  * already carrying another complete semantic source/code keeps that original identity.
  */
-export const MIDDLEWARE_PIPELINE_SOURCE = '@migaia/middleware-pipeline'
+export const MIDDLEWARE_PIPELINE_SOURCE = ERROR_SOURCE
 
 /**
  * Stable codes for failures owned by this package. Branch on source/code rather than message text;

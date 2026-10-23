@@ -16,7 +16,7 @@ describe('serialize error-code contract', () => {
     expect(codes).toEqual(
       expect.arrayContaining(['ENV_UNSUPPORTED', 'TAG_MISSING', 'TAG_INVALID', 'TAG_UNKNOWN'])
     )
-    expect(SERIALIZE_SOURCE).toBe('@migaia/serialize')
+    expect(SERIALIZE_SOURCE).toBe('serialization')
   })
 })
 

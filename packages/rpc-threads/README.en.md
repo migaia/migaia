@@ -262,7 +262,7 @@ The table distinguishes thread sampling, supervision, Core and Remote errors. Im
 | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | `@migaia/rpc/threads` / THREAD_USAGE_SAMPLE_FAILED | Thread CPU / memory sampling failed, with cause retained; display unavailable without changing Worker lifecycle.    |
 | @migaia/supervision / EXIT_UNOBSERVABLE            | Exit observation is explicitly unsupported; immediate abandonment retains the lease without a reap wait.            |
-| `@migaia/rpc/core` / INVALID_CONFIG                | Invalid entry, source, bootstrap, capability ACK, portable data, or configuration; inspect field details and cause. |
+| `rpc.endpoint` / INVALID_CONFIG                | Invalid entry, source, bootstrap, capability ACK, portable data, or configuration; inspect field details and cause. |
 | `@migaia/rpc/core` / TRANSPORT                     | Native message I/O or startup resource failure, preserving native error type and cause.                             |
 | `@migaia/rpc/core` / DEADLINE_EXCEEDED             | TimeoutError; the Worker may already have executed, so reconcile first.                                             |
 | `@migaia/rpc/core` / CANCELLED                     | AbortError; cooperative cancellation does not prove non-execution.                                                  |
@@ -273,6 +273,6 @@ The table distinguishes thread sampling, supervision, Core and Remote errors. Im
 
 When native Node Worker construction rejects its arguments, the Node launcher classifies the failure as Core INVALID_CONFIG. If a native code already exists, a wrapper keeps the original Error, name, message, stack, and native code on cause rather than overwriting them. This describes the Node constructor boundary, not every Web constructor exception.
 
-The local RpcThreadErrorCode object contains only usageSampleFailed, whose value is THREAD_USAGE_SAMPLE_FAILED; RPC_THREAD_ERROR_SOURCE is `@migaia/rpc/threads`. Calls, supervision, and Host boundaries retain their own sources rather than becoming sampling failures. Branch on source / code rather than message text. Business errors crossing Workers preserve native type, message, stack, source/code, and cause / errors chains; the received object cannot retain sender-side identity.
+The local RpcThreadErrorCode object contains only usageSampleFailed, whose value is THREAD_USAGE_SAMPLE_FAILED; RPC_THREAD_ERROR_SOURCE is `rpc.transport.thread`. Calls, supervision, and Host boundaries retain their own sources rather than becoming sampling failures. Branch on source / code rather than message text. Business errors crossing Workers preserve native type, message, stack, source/code, and cause / errors chains; the received object cannot retain sender-side identity.
 
 A standalone Worker configuration failure usually means no library bootstrap exists. A caller buffer that remains attached is the default copy behavior. Restart depends on policy; use Host restart / replace for explicit recovery and list / get for generation and exit information.

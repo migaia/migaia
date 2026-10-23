@@ -51,7 +51,7 @@ describe('IStoreMiddlewareHost construction', () => {
     revoke()
     expect(() => createStoreMiddlewareHost(proxy as never)).toThrow(
       expect.objectContaining({
-        source: '@migaia/store-middleware',
+        source: 'store.middleware',
         code: 'INVALID_OPTION',
         cause: expect.any(Error)
       })
@@ -496,7 +496,7 @@ describe('IStoreMiddlewareHost.connectDevTools', () => {
     const { proxy, revoke } = Proxy.revocable({}, {})
     revoke()
     await expect(host.connectDevTools(proxy as never)).rejects.toMatchObject({
-      source: '@migaia/store-middleware',
+      source: 'store.middleware',
       code: 'INVALID_OPTION',
       cause: expect.any(Error)
     })

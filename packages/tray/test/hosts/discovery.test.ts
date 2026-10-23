@@ -30,7 +30,7 @@ describe('Tray discovery', () => {
       })
       expect(detail.generation).toBe(detail.unit.generation)
       await expect(tray.get('missing')).rejects.toMatchObject({
-        source: '@migaia/tray',
+        source: 'tray',
         code: 'TRAY_INSTANCE_UNKNOWN'
       })
     } finally {

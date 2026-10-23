@@ -33,7 +33,7 @@ describe('StoreRegistry register/replace/get/require/has/remove', () => {
     revoke()
     expect(() => registry.register(token, 1, proxy as never)).toThrow(
       expect.objectContaining({
-        source: '@migaia/store-react',
+        source: 'store.react',
         code: 'INVALID_CONFIG',
         cause: expect.any(Error)
       })
@@ -44,7 +44,7 @@ describe('StoreRegistry register/replace/get/require/has/remove', () => {
     const registry = new StoreRegistry()
     const token = createStoreToken<number>('invalid-owned')
     expect(() => registry.register(token, 1, { owned: 'yes' as never })).toThrow(
-      expect.objectContaining({ source: '@migaia/store-react', code: 'INVALID_CONFIG' })
+      expect.objectContaining({ source: 'store.react', code: 'INVALID_CONFIG' })
     )
     registry.dispose()
   })

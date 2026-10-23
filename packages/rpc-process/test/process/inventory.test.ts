@@ -12,7 +12,7 @@ describe('process channel upstream inventory', () => {
     const portable = asCodecValue({ request: ['ready', 1, null] })
     expect(codec.encode(portable)).toBe('{"request":["ready",1,null]}')
     expect(() => asCodecValue(undefined)).toThrowError(
-      expect.objectContaining({ code: 'INVALID_OPTION', source: '@migaia/serialize' })
+      expect.objectContaining({ code: 'INVALID_OPTION', source: 'serialization' })
     )
   })
 

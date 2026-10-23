@@ -1,7 +1,10 @@
+/** Stable error domain owned by this code table; package moves preserve this identity. */
+export const ERROR_SOURCE = 'store.ssr'
+
 /**
- * Declares the public error codes for `@migaia/store-ssr` in one place.
+ * Declares the public error codes for `store.ssr` in one place.
  *
- * Package-owned failures use `(source, code)` with source `'@migaia/store-ssr'`. Throw sites use
+ * Package-owned failures use `(source, code)` with source `'store.ssr'`. Throw sites use
  * these constants instead of inline literals; complete upstream identities retain their owner.
  *
  * Code values are public API. Renaming a code is a breaking change.

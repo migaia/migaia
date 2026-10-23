@@ -306,7 +306,7 @@ tray.publish(topic, payload?) 同步向当前订阅者分发；子端 deps.tray.
 
 ### 错误与迁移
 
-所有 Tray 自有边界码的 source 为 TRAY_SOURCE，即 `@migaia/tray`；按 source / code 分支，不匹配 message。可注记的原生错误保持类型、stack 与 identity；冻结或不可安全注记的值经带码 wrapper.cause 保留，完整外包身份不改写。Graph 启动 / 节点 / 释放错误继续属于 capability。
+所有 Tray 自有边界码的 source 为 TRAY_SOURCE，即 `tray`；按 source / code 分支，不匹配 message。可注记的原生错误保持类型、stack 与 identity；冻结或不可安全注记的值经带码 wrapper.cause 保留，完整外包身份不改写。Graph 启动 / 节点 / 释放错误继续属于 capability。
 
 | TrayErrorCode 属性 / 值                           | 触发                                                                  |
 | ------------------------------------------------- | --------------------------------------------------------------------- |

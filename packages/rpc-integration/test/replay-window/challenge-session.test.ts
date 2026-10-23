@@ -281,7 +281,7 @@ it('a signed unknown challenge is rejected before the business codec runs', asyn
     await vi.waitFor(() => assert.equal(server.failures.at(-1)?.reason, 'SESSION_UNKNOWN'))
     assert.equal(decodes, before)
     assert.equal(calls, 1)
-    assert.equal(server.failures.at(-1).source, '@migaia/rpc/core')
+    assert.equal(server.failures.at(-1).source, 'rpc.endpoint')
     assert.equal(server.failures.at(-1).name, 'RpcAuthenticationError')
   } finally {
     await close(client)
@@ -810,7 +810,7 @@ it('notify reports an unknown session without retransmission and the next dispat
       ).length,
       3
     )
-    assert.equal(server.failures[0]?.source, '@migaia/rpc/core')
+    assert.equal(server.failures[0]?.source, 'rpc.endpoint')
     assert.equal(server.failures[0]?.code, 'AUTHENTICATION_FAILED')
   } finally {
     await close(client)

@@ -102,7 +102,7 @@ describe('store-wasm audit regressions', () => {
       try {
         store.values.setRange(0, 2, [1, 2])
         expect(() => store.values.setRange(0, 1, values)).toThrow(original)
-        expect(original).toMatchObject({ source: '@migaia/store-wasm', code: 'INVALID_OPTION' })
+        expect(original).toMatchObject({ source: 'store.wasm', code: 'INVALID_OPTION' })
         expect(original.stack).toBeTruthy()
         expect([...store.values.view()]).toEqual([1, 2])
       } finally {
@@ -136,7 +136,7 @@ describe('store-wasm audit regressions', () => {
         }
       })
     ).toThrow(reason)
-    expect(reason).toMatchObject({ source: '@migaia/store-wasm', code: 'INIT_ABORTED' })
+    expect(reason).toMatchObject({ source: 'store.wasm', code: 'INIT_ABORTED' })
     expect(reason).toBeInstanceOf(DOMException)
     expect(reason.name).toBe('AbortError')
     expect(reason.stack).toBeTruthy()

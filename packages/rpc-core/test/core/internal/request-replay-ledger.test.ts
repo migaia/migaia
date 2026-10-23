@@ -92,7 +92,7 @@ describe('RequestReplayLedger', () => {
   it('rejects non-positive limits with a coded TypeError (bare-throw gate)', () => {
     expect(() => new RequestReplayLedger(0, 2, 100)).toThrow(
       expect.objectContaining({
-        source: '@migaia/rpc/core',
+        source: 'rpc.endpoint',
         code: 'INVALID_CONFIG',
         message: 'request replay limits must be positive safe integers'
       })

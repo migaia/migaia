@@ -75,7 +75,7 @@ describe('store-keyed audit regressions', () => {
         store.get(focused)
         throw new Error('expected getter failure')
       } catch (error) {
-        expect(error).toMatchObject({ source: '@migaia/store-keyed', code: 'OPTIC_ACCESS_FAILED' })
+        expect(error).toMatchObject({ source: 'store.keyed', code: 'OPTIC_ACCESS_FAILED' })
         if (frozen) expect((error as Error).cause).toBe(primary)
         else {
           expect(error).toBe(primary)
@@ -109,7 +109,7 @@ describe('store-keyed audit regressions', () => {
           ? readOpticPath(source, ['item'], 'audit')
           : writeOpticPath(source, ['item'], 1, 'audit')
       ).toThrow(primary)
-      expect(primary).toMatchObject({ source: '@migaia/store-keyed', code: 'OPTIC_ACCESS_FAILED' })
+      expect(primary).toMatchObject({ source: 'store.keyed', code: 'OPTIC_ACCESS_FAILED' })
     }
   )
 })

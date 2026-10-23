@@ -14,7 +14,7 @@ export function peerOptions(classification) {
         classification.rejections.push({
           ...event,
           verifiedPeerKey: '[REDACTED]',
-          source: '@migaia/rpc/core',
+          source: 'rpc.endpoint',
           code: 'OVERLOADED',
           name: null,
           message: BrowserBenchText.rejected,

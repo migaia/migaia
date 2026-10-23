@@ -438,7 +438,7 @@ function assertPackedCanonicalFeatureRoutePerturbation(packedPackage, consumerDi
         '  await endpoint.dispose()',
         "  if (process.argv[2] === 'mutated') throw new Error('Injected canonical feature route was not rejected')",
         '} catch (error) {',
-        "  if (process.argv[2] === 'mutated' && error?.source === '@migaia/rpc/core' && error?.code === 'INVALID_CONFIG' && error?.message === 'endpoint module token is invalid') {",
+        "  if (process.argv[2] === 'mutated' && error?.source === 'rpc.endpoint' && error?.code === 'INVALID_CONFIG' && error?.message === 'endpoint module token is invalid') {",
         `    process.stderr.write(${JSON.stringify(`${expectedFailure}\n`)})`,
         '    process.exit(1)',
         '  }',

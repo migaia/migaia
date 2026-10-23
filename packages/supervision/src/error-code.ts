@@ -1,5 +1,8 @@
+/** Stable error domain owned by this code table; package moves preserve this identity. */
+export const ERROR_SOURCE = 'supervision'
+
 /** Errors produced by the unit-neutral supervisor keep one package identity. */
-export const SUPERVISION_SOURCE = '@migaia/supervision'
+export const SUPERVISION_SOURCE = ERROR_SOURCE
 
 /** Stable semantic codes shared by all unit profiles. */
 export const SupervisionErrorCode = {

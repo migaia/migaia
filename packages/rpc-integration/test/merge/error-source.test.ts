@@ -18,7 +18,7 @@ describe('source continuity through merged layers', () => {
     }
     expect(caught).toBeInstanceOf(TypeError)
     expect(caught).toMatchObject({ source: contractSource, code: 'INVALID_DESCRIPTOR' })
-    expect(contractSource).toBe('@migaia/rpc/contract')
+    expect(contractSource).toBe('rpc.contract')
   })
 
   it('tags core invalid configuration and preserves serialized source', async () => {
@@ -31,7 +31,7 @@ describe('source continuity through merged layers', () => {
     expect(caught).toBeInstanceOf(Error)
     expect(isRpcErrorInstance(caught)).toBe(true)
     expect(caught).toMatchObject({ source: coreSource, code: 'INVALID_CONFIG' })
-    expect(coreSource).toBe('@migaia/rpc/core')
+    expect(coreSource).toBe('rpc.endpoint')
     expect(serializeRpcError(caught as Error, { report: () => {} }).source).toBe(coreSource)
   })
 

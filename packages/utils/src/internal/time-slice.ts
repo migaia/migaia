@@ -3,7 +3,7 @@
  * the host between them, so rendering, input, timers and I/O keep running. The slice budget is
  * measured on a monotonic clock; yields go through `asyncTask` strategies.
  */
-import { UtilsErrorCode } from '../error-code.js'
+import { ERROR_SOURCE, UtilsErrorCode } from '../error-code.js'
 import { UtilsErrorText } from '../error-text.js'
 import {
   attachErrorIdentity,
@@ -49,7 +49,7 @@ function argumentError(
   expectation: string
 ): Error {
   return attachErrorIdentity(new Constructor(UtilsErrorText.invalidArgument(field, expectation)), {
-    source: '@migaia/utils',
+    source: ERROR_SOURCE,
     code: UtilsErrorCode.invalidArgument
   })
 }

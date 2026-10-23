@@ -156,7 +156,7 @@ it('one original outlet publisher snapshots listeners and closes bounded watch i
     for (let index = 0; index < 101; index += 1)
       publisher.publish({ ...event, timestamp: index }, (error) => reports.push(error))
     await assert.rejects(slow.next(), {
-      source: '@migaia/rpc/remote',
+      source: 'rpc.remote',
       code: 'RUNTIME_EVENT_OVERFLOW'
     })
     assert.equal(

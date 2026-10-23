@@ -73,7 +73,7 @@ describe('advanced native parent-port startup', () => {
           peerId: 'native-child'
         })
       ).toThrowError(
-        expect.objectContaining({ source: '@migaia/rpc/core', code: 'INVALID_CONFIG' })
+        expect.objectContaining({ source: 'rpc.endpoint', code: 'INVALID_CONFIG' })
       )
       expect(provide).not.toHaveBeenCalled()
       expect(ports.port2.listenerCount('message')).toBe(0)

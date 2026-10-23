@@ -3,7 +3,7 @@
  * and the non-overlapping `repeat` loop. Timer-driven invocations have no caller to throw to, so
  * their failures go to the host's uncaught-error queue instead of being dropped.
  */
-import { UtilsErrorCode } from '../error-code.js'
+import { ERROR_SOURCE, UtilsErrorCode } from '../error-code.js'
 import { UtilsErrorText } from '../error-text.js'
 import { attachErrorIdentity, tryReadProperty, UtilsAbortError } from '../error.js'
 import { reportUnhandledError } from '../host-report.js'
@@ -102,7 +102,7 @@ function argumentError(
   expectation: string
 ): Error {
   return attachErrorIdentity(new Constructor(UtilsErrorText.invalidArgument(field, expectation)), {
-    source: '@migaia/utils',
+    source: ERROR_SOURCE,
     code: UtilsErrorCode.invalidArgument
   })
 }

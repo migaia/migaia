@@ -1,4 +1,4 @@
-import { StoreWasmErrorCode, type IStoreWasmErrorCode } from './error-code.js'
+import { ERROR_SOURCE, StoreWasmErrorCode, type IStoreWasmErrorCode } from './error-code.js'
 import { attachErrorIdentity, isNativeErrorValue, tryReadProperty } from '@migaia/utils/error'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { StoreWasmErrorText } from './error-text.js'
@@ -6,7 +6,7 @@ import { StoreWasmErrorText } from './error-text.js'
 export { StoreWasmErrorCode, type IStoreWasmErrorCode }
 
 /** Identity of package-owned failures; complete foreign identities retain their original owner. */
-export const STORE_WASM_SOURCE = '@migaia/store-wasm'
+export const STORE_WASM_SOURCE = ERROR_SOURCE
 
 /** Attaches `(source, code)` onto an existing error object without touching its type or stack. */
 function tagStoreWasmError<E extends Error>(error: E, code: IStoreWasmErrorCode): E {

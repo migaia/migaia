@@ -259,7 +259,7 @@ WorkerByteOwnership 是公开词表 copy / transfer，IByteOwnership 是其值�
 | invalidResponseChunk / INVALID_RESPONSE_CHUNK | 返回 chunk 或帧序列不合法。                              |
 | cleanupFailed / CLEANUP_FAILED                | parser 端点与可选 terminate 同时清理失败。               |
 
-STORE_WORKER_SOURCE 为 @migaia/store-worker。createStoreWorkerError(code, message, options?) 接收必填码和消息，可选 options.cause，返回带身份的 Error；createStoreWorkerAggregateError(code, errors, message) 返回 AggregateError，保留 errors 顺序和原值。code 类型为 IStoreWorkerErrorCode，工厂不覆盖 stack。外包完整身份继续由原 owner 负责。
+STORE_WORKER_SOURCE 为 store.worker。createStoreWorkerError(code, message, options?) 接收必填码和消息，可选 options.cause，返回带身份的 Error；createStoreWorkerAggregateError(code, errors, message) 返回 AggregateError，保留 errors 顺序和原值。code 类型为 IStoreWorkerErrorCode，工厂不覆盖 stack。外包完整身份继续由原 owner 负责。
 
 ### 排查与维护
 

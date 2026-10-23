@@ -422,7 +422,7 @@ fn reject() -> Value {
         (
             "error",
             wire_error(
-                "@migaia/rpc/contract",
+                "rpc.contract",
                 "HANDSHAKE_INCOMPATIBLE",
                 "Handshake rejected",
             ),
@@ -646,7 +646,7 @@ fn serve(
                                         &message,
                                         Value::Null,
                                         Some((
-                                            "@migaia/rpc/core",
+                                            "rpc.endpoint",
                                             "INTERNAL",
                                             "Peer requested failure",
                                         )),
@@ -686,7 +686,7 @@ fn serve(
                                         &message,
                                         Value::Null,
                                         Some((
-                                            "@migaia/rpc/core",
+                                            "rpc.endpoint",
                                             "PROVIDER_NOT_FOUND",
                                             METHOD_UNAVAILABLE,
                                         )),

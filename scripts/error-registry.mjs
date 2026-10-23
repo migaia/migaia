@@ -12,6 +12,10 @@ export const REGISTRY_END = '<!-- error-registry:end -->'
 
 /** Stable failures exposed by the registry generator and its CLI. */
 export const ErrorRegistryErrorCode = {
+  /** A code table has no explicit error domain; add its canonical declaration. */
+  sourceMissing: 'REGISTRY_SOURCE_MISSING',
+  /** A declared error domain is empty, branded or malformed; correct the domain spelling. */
+  sourceInvalid: 'REGISTRY_SOURCE_INVALID',
   /** A declaration has no scenario JSDoc; add the entry's description. */
   jsdocMissing: 'REGISTRY_JSDOC_MISSING',
   /** Two declarations own one semantic pair; remove one declaration. */
@@ -28,6 +32,16 @@ export const ErrorRegistryErrorCode = {
 
 /** Stable diagnostic text shared by errors and the generated contract. */
 const RegistryText = {
+  /**
+   * @param {string} path Declaration path requiring an explicit domain. @returns {string}
+   *   Missing-domain diagnostic.
+   */
+  sourceMissing: (path) => `${path}: error code table is missing ERROR_SOURCE`,
+  /**
+   * @param {string} path Declaration path. @param {string} value Invalid declared domain. @returns
+   *   {string} Invalid-domain diagnostic retaining the original value.
+   */
+  sourceInvalid: (path, value) => `${path}: invalid ERROR_SOURCE ${JSON.stringify(value)}`,
   /**
    * Existing missing-description text is consumed by registry tests. @param {string} path
    * Declaration path. @param {string} code Error code.
@@ -112,22 +126,47 @@ const firstSentence = (body) => {
   return (boundary < 0 ? text : text.slice(0, boundary + 1)).replaceAll('|', '\\|').trim()
 }
 
+/** Lowercase semantic domains allow dotted segments and hyphens within each segment. */
+const SOURCE_PATTERN = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*(?:\.[a-z][a-z0-9]*(?:-[a-z0-9]+)*)*$/
 /**
- * Reads a layer source declaration, falling back to its package identity.
+ * Temporary package-directory exemption. Remove only when the storage follow-up migrates all
+ * storage declarations and readers, and lands together with the domain migration. Merging the
+ * storage program with its old source values does not remove this exemption.
+ */
+const DEFERRED_STORAGE_PREFIX = 'storage-'
+
+/**
+ * Reads an explicit domain from an already loaded declaration. Only deferred storage packages
+ * preserve the old package-name fallback.
  *
  * @param {string} file Absolute declaration path.
+ * @param {string} text Already loaded declaration text.
+ * @param {string} root Repository root that owns the package directory.
  * @returns {string} Registry source.
+ * @throws {Error} Missing or malformed non-exempt domain with its stable diagnostic code.
  */
-const sourceFor = (file) => {
-  /** Optional layer-specific source exported by this error code declaration. */
-  const declaredSource = readFileSync(file, 'utf8').match(
-    /^export const ERROR_SOURCE = '([^']+)'/m
-  )?.[1]
-  if (declaredSource) return declaredSource
-  /** Package directory containing this error code declaration. */
-  const packageDirectory = file.slice(0, file.indexOf('/src/') + 0)
-  const manifest = JSON.parse(readFileSync(join(packageDirectory, 'package.json'), 'utf8'))
-  return manifest.name
+const sourceFor = (file, text, root) => {
+  /** Empty is a declared invalid value, distinct from a missing declaration. */
+  const declaredSource = text.match(/^export const ERROR_SOURCE = '([^']*)'/m)?.[1]
+  /** Only the direct package directory selects the temporary storage exemption. */
+  const path = relative(root, file)
+  const parts = path.split('/')
+  if (parts[0] === 'packages' && parts[1]?.startsWith(DEFERRED_STORAGE_PREFIX)) {
+    if (declaredSource) return declaredSource
+    /** The exempt owner's manifest preserves its current wire contract until the follow-up. */
+    const manifest = JSON.parse(
+      readFileSync(join(root, 'packages', parts[1], 'package.json'), 'utf8')
+    )
+    return manifest.name
+  }
+  if (declaredSource === undefined)
+    throw withCode(ErrorRegistryErrorCode.sourceMissing, RegistryText.sourceMissing(path))
+  if (!SOURCE_PATTERN.test(declaredSource) || declaredSource.includes('migaia'))
+    throw withCode(
+      ErrorRegistryErrorCode.sourceInvalid,
+      RegistryText.sourceInvalid(path, declaredSource)
+    )
+  return declaredSource
 }
 
 /**
@@ -151,9 +190,12 @@ export const collectErrorRegistry = (root = repositoryRoot) => {
   const entryPattern =
     /(?:\/\*\*((?:(?!\*\/)[\s\S])*?)\*\/\s*)?([A-Za-z][A-Za-z0-9]*)\s*:\s*'([A-Z][A-Z0-9_]*)'/g
   for (const file of files) {
-    const source = sourceFor(file)
     const text = readFileSync(file, 'utf8')
-    for (const match of text.matchAll(entryPattern)) {
+    /** Re-exports and empty tables own no codes and therefore need no source declaration. */
+    const entries = [...text.matchAll(entryPattern)]
+    if (entries.length === 0) continue
+    const source = sourceFor(file, text, root)
+    for (const match of entries) {
       const scenario = firstSentence(match[1] ?? '')
       if (scenario.length === 0) {
         const path = relative(root, file)

@@ -42,7 +42,7 @@ describe('streaming error graph', () => {
         failure = error
       }
       expect(failure).toMatchObject({
-        source: '@migaia/rpc/core',
+        source: 'rpc.endpoint',
         code: 'INTERNAL',
         name: 'RpcError',
         message: 'producer failed',
@@ -96,7 +96,7 @@ describe('streaming error graph', () => {
       }
       expect(received).toBeInstanceOf(AggregateError)
       expect((received as AggregateError).errors[0]).toMatchObject({
-        source: '@migaia/rpc/core',
+        source: 'rpc.endpoint',
         code: 'INTERNAL',
         message: primary.message,
         stack: primary.stack
@@ -131,7 +131,7 @@ describe('streaming error graph', () => {
       streamRoots()
     )
     const original = {
-      source: '@migaia/rpc/core',
+      source: 'rpc.endpoint',
       code: RpcCoreErrorCode.internal,
       name: 'RpcError',
       message: 'large trace',

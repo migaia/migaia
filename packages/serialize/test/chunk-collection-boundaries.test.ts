@@ -38,7 +38,7 @@ describe('serialize boundaries', () => {
       ).catch((caught: unknown) => caught)
 
       expect(error).toMatchObject({
-        source: '@migaia/serialize',
+        source: 'serialization',
         code: 'INVALID_CHUNK',
         phase: 'encode',
         type: 'stream',
@@ -58,7 +58,7 @@ describe('serialize boundaries', () => {
     ).catch((caught: unknown) => caught)
 
     expect(error).toMatchObject({
-      source: '@migaia/serialize',
+      source: 'serialization',
       code: 'INVALID_CHUNK',
       chunkIndex: 1,
       bytesConsumed: 0
@@ -188,7 +188,7 @@ describe('serialize boundaries', () => {
       .catch((caught: unknown) => caught)
 
     expect(error).toMatchObject({
-      source: '@migaia/serialize',
+      source: 'serialization',
       code: 'INVALID_OPTION',
       cause: expect.objectContaining({ message: 'decode type getter failed' })
     })
@@ -213,7 +213,7 @@ describe('serialize boundaries', () => {
       .next()
       .catch((caught: unknown) => caught)
 
-    expect(error).toMatchObject({ source: '@migaia/serialize', code: 'INVALID_OPTION', cause })
+    expect(error).toMatchObject({ source: 'serialization', code: 'INVALID_OPTION', cause })
     expect(encodeCalls).toBe(0)
   })
 

@@ -39,7 +39,12 @@ const declareCodes = (root, directory, name, declaration, subdirectory = '') => 
   writeFileSync(join(packageRoot, 'package.json'), JSON.stringify({ name }))
   /** Path reported when duplicate declarations are rejected. */
   const file = join(sourceRoot, 'error-code.ts')
-  writeFileSync(file, declaration)
+  writeFileSync(
+    file,
+    declaration.includes('export const ERROR_SOURCE') || directory.startsWith('storage-')
+      ? declaration
+      : `export const ERROR_SOURCE = 'fixture.${directory}'\n${declaration}`
+  )
   return relative(root, file)
 }
 
@@ -63,11 +68,11 @@ test('registry rows use code-unit order and render identically across locales', 
       root,
       'a-slash',
       '@fixture/a-slash',
-      "export const ERROR_SOURCE = '@fixture/a/b'\nexport const Code = {\n  /** Slash source scenario. */\n  slash: 'SLASH'\n} as const\n"
+      "export const ERROR_SOURCE = 'fixture.a.layer'\nexport const Code = {\n  /** Slash source scenario. */\n  slash: 'SLASH'\n} as const\n"
     )
     assert.deepEqual(
       registry.collectErrorRegistry(root).map(({ source, code }) => `${source}:${code}`),
-      ['@fixture/a:AB', '@fixture/a:A_B', '@fixture/a-b:DASH', '@fixture/a/b:SLASH']
+      ['fixture.a:AB', 'fixture.a:A_B', 'fixture.a-b:DASH', 'fixture.a.layer:SLASH']
     )
     /**
      * A child process isolates each locale from the other assertion. @param {string} locale Locale
@@ -162,8 +167,8 @@ test('source-only validation reports counts without reading or writing docs', ()
     /** Byte and mtime baseline before the read-only check. */
     const before = [readFileSync(document), statSync(document).mtimeMs]
     assert.deepEqual(registry.checkErrorRegistrySources(root), [
-      { source: '@fixture/a', count: 2 },
-      { source: '@fixture/b', count: 1 }
+      { source: 'fixture.a', count: 2 },
+      { source: 'fixture.b', count: 1 }
     ])
     assert.deepEqual([readFileSync(document), statSync(document).mtimeMs], before)
     assert.throws(
@@ -431,3 +436,193 @@ test('merged source changes generate identical and idempotent registration bytes
     for (const root of roots) rmSync(root, { recursive: true, force: true })
   }
 })
+
+/** Frozen public domain inventory distinguishes valid spelling from the agreed migration. */
+const domainInventory = Object.freeze([
+  {
+    file: 'packages/utils/src/error-code.ts',
+    source: 'foundation.utils'
+  },
+  {
+    file: 'packages/capability/src/error-code.ts',
+    source: 'capability'
+  },
+  {
+    file: 'packages/capability/src/graph/error-code.ts',
+    source: 'capability.graph'
+  },
+  {
+    file: 'packages/event-subscriber/src/error-code.ts',
+    source: 'event.subscriber'
+  },
+  {
+    file: 'packages/lifecycle/src/error-code.ts',
+    source: 'lifecycle'
+  },
+  {
+    file: 'packages/resource/src/error-code.ts',
+    source: 'resource'
+  },
+  {
+    file: 'packages/supervision/src/error-code.ts',
+    source: 'supervision'
+  },
+  {
+    file: 'packages/reactive/src/error-code.ts',
+    source: 'reactive'
+  },
+  {
+    file: 'packages/serialize/src/error-code.ts',
+    source: 'serialization'
+  },
+  {
+    file: 'packages/logger/src/error-code.ts',
+    source: 'logging'
+  },
+  {
+    file: 'packages/middleware-pipeline/src/error-code.ts',
+    source: 'middleware.pipeline'
+  },
+  {
+    file: 'packages/plugin-host/src/error-code.ts',
+    source: 'plugin.host'
+  },
+  {
+    file: 'packages/micro-hub/src/error-code.ts',
+    source: 'micro-frontend.hub'
+  },
+  {
+    file: 'packages/tray/src/error-code.ts',
+    source: 'tray'
+  },
+  {
+    file: 'packages/rpc-contract/src/contract/error-code.ts',
+    source: 'rpc.contract'
+  },
+  {
+    file: 'packages/rpc-contract/src/contract/framing/jsonrpc/error-code.ts',
+    source: 'rpc.contract.jsonrpc'
+  },
+  {
+    file: 'packages/rpc-core/src/core/error-code.ts',
+    source: 'rpc.endpoint'
+  },
+  {
+    file: 'packages/rpc-core/src/remote/error-code.ts',
+    source: 'rpc.remote'
+  },
+  {
+    file: 'packages/rpc-process/src/error-code.ts',
+    source: 'rpc.transport.process'
+  },
+  {
+    file: 'packages/rpc-threads/src/error-code.ts',
+    source: 'rpc.transport.thread'
+  },
+  {
+    file: 'packages/rpc-browser/src/error-code.ts',
+    source: 'rpc.transport.browser'
+  },
+  {
+    file: 'packages/rpc-pool/src/error-code.ts',
+    source: 'rpc.pool'
+  },
+  {
+    file: 'packages/rpc-devtools/src/error-code.ts',
+    source: 'rpc.devtools'
+  },
+  {
+    file: 'packages/store-light/src/error-code.ts',
+    source: 'store.light'
+  },
+  {
+    file: 'packages/store-keyed/src/error-code.ts',
+    source: 'store.keyed'
+  },
+  {
+    file: 'packages/store-indexed/src/error-code.ts',
+    source: 'store.indexed'
+  },
+  {
+    file: 'packages/store-shared/src/error-code.ts',
+    source: 'store.shared'
+  },
+  {
+    file: 'packages/store-persist/src/error-code.ts',
+    source: 'store.persist'
+  },
+  {
+    file: 'packages/store-middleware/src/error-code.ts',
+    source: 'store.middleware'
+  },
+  {
+    file: 'packages/store-react/src/error-code.ts',
+    source: 'store.react'
+  },
+  {
+    file: 'packages/store-ssr/src/error-code.ts',
+    source: 'store.ssr'
+  },
+  {
+    file: 'packages/store-devtools/src/error-code.ts',
+    source: 'store.devtools'
+  },
+  {
+    file: 'packages/store-wasm/src/error-code.ts',
+    source: 'store.wasm'
+  },
+  {
+    file: 'packages/store-worker/src/error-code.ts',
+    source: 'store.worker'
+  }
+])
+
+test('source domains agreed runtime domain inventory', () => {
+  /** These are main's only exempt declarations; derive their sources through the real parser. */
+  const deferredFiles = [
+    'packages/storage-contract/src/error-code.ts',
+    'packages/storage-web/src/error-code.ts'
+  ]
+  /** A separate parser root preserves path-based exemption without guessing source spellings. */
+  const root = fixture()
+  try {
+    for (const file of deferredFiles) {
+      /** Package ownership comes from the frozen main path, not from the source value. */
+      const directory = file.split('/')[1]
+      /** Preserve the existing package fallback only for the deferred declarations. */
+      const manifest = JSON.parse(
+        readFileSync(join(repositoryRoot, 'packages', directory, 'package.json'), 'utf8')
+      )
+      declareCodes(root, directory, manifest.name, readFileSync(join(repositoryRoot, file), 'utf8'))
+    }
+    /** The exemption is scoped by declaration paths; source spellings remain parser-owned. */
+    const deferredSources = new Set(
+      registry.checkErrorRegistrySources(root).map(({ source }) => source)
+    )
+    /** The full public collector must emit all and only the agreed non-exempt domains. */
+    const actual = registry
+      .checkErrorRegistrySources()
+      .map(({ source }) => source)
+      .filter((source) => !deferredSources.has(source))
+      .sort()
+    assert.equal(actual.length, 34, 'SOURCE_DOMAIN_DOMAIN_COUNT')
+    assert.deepEqual(
+      actual,
+      domainInventory.map(({ source }) => source).sort(),
+      'SOURCE_DOMAIN_DOMAIN_SET'
+    )
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+/** Per-owner cases cannot be hidden by the first failing collection-level assertion. */
+for (const { file, source } of domainInventory)
+  test(`source domains agreed owner ${file} declares its fixed domain`, () => {
+    /** A swapped pair of valid domains is still a migration error. */
+    const declaration = readFileSync(join(repositoryRoot, file), 'utf8')
+    assert.ok(
+      declaration.includes(`export const ERROR_SOURCE = '${source}'`),
+      `SOURCE_DOMAIN_OWNER: ${file}`
+    )
+  })

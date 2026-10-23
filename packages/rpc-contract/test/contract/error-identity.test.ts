@@ -80,7 +80,7 @@ describe('rpc-contract error identity', () => {
       const [type, text] = expected[code]
       expect(error).toBeInstanceOf(type)
       expect(error.message).toBe(text)
-      expect(error).toMatchObject({ source: '@migaia/rpc/contract', code })
+      expect(error).toMatchObject({ source: 'rpc.contract', code })
       expect(Object.hasOwn(error, 'cause')).toBe(false)
     }
   })

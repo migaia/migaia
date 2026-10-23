@@ -56,7 +56,7 @@ describe('object path primitives', () => {
     expect(Object.isFrozen(parsed)).toBe(true)
     for (const invalid of ['', 'user..name', 'user[0]', 'user.__proto__.name', 'user.[-1]']) {
       expect(() => parseObjectPath(invalid)).toThrowError(
-        expect.objectContaining({ code: 'OBJECT_PATH_INVALID', source: '@migaia/utils' })
+        expect.objectContaining({ code: 'OBJECT_PATH_INVALID', source: 'foundation.utils' })
       )
     }
   })

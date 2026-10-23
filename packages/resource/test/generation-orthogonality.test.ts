@@ -152,7 +152,7 @@ describe('canonical adapter capabilities', () => {
     const pending = resource.promise
     expect(resource.promise).toBe(pending)
     const cancelled = expect(pending).rejects.toMatchObject({
-      source: '@migaia/resource',
+      source: 'resource',
       code: 'REQUEST_ABORTED',
       name: 'AbortError'
     })

@@ -195,7 +195,7 @@ describe('collector public contract', () => {
     })
 
     expect(() => reading.result).toThrowError(
-      expect.objectContaining({ code: 'REENTRANT_CALL', source: '@migaia/utils' })
+      expect.objectContaining({ code: 'REENTRANT_CALL', source: 'foundation.utils' })
     )
 
     let mutating!: ICollector<number>
@@ -204,17 +204,17 @@ describe('collector public contract', () => {
       return true
     })
     expect(() => mutating.result).toThrowError(
-      expect.objectContaining({ code: 'REENTRANT_CALL', source: '@migaia/utils' })
+      expect.objectContaining({ code: 'REENTRANT_CALL', source: 'foundation.utils' })
     )
   })
 
   it('rejects invalid source and window sizes with native coded errors', () => {
     expect(() => collect(null as never)).toThrowError(
-      expect.objectContaining({ code: 'INVALID_ARGUMENT', source: '@migaia/utils' })
+      expect.objectContaining({ code: 'INVALID_ARGUMENT', source: 'foundation.utils' })
     )
     for (const count of [-1, 1.5, Number.POSITIVE_INFINITY]) {
       expect(() => collect(users).skip(count)).toThrowError(
-        expect.objectContaining({ code: 'INVALID_ARGUMENT', source: '@migaia/utils' })
+        expect.objectContaining({ code: 'INVALID_ARGUMENT', source: 'foundation.utils' })
       )
       expect(() => collect(users).take(count)).toThrow(RangeError)
     }
@@ -238,7 +238,7 @@ describe('collector public contract', () => {
       () => unsafe.distinctBy(null)
     ])
       expect(run).toThrowError(
-        expect.objectContaining({ code: 'INVALID_ARGUMENT', source: '@migaia/utils' })
+        expect.objectContaining({ code: 'INVALID_ARGUMENT', source: 'foundation.utils' })
       )
   })
 })

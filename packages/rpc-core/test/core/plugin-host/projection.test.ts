@@ -245,7 +245,7 @@ describe('canonical endpoint projection', () => {
       expect(endpoint.dispose()).toBe(first)
       await expect(first).rejects.toMatchObject({
         name: 'RpcLifecycleError',
-        source: '@migaia/rpc/core',
+        source: 'rpc.endpoint',
         code: RpcCoreErrorCode.endpointDisposed,
         cause: cleanup,
         cleanupErrors: [{ resource: 'resource disposer', error: cleanup }]

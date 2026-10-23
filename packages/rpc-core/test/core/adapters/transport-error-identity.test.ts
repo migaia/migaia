@@ -15,7 +15,7 @@ describe('memory transport terminal identity', () => {
       expect(error).toMatchObject({
         name: 'Error',
         message: '[rpc] memory transport is closed',
-        source: '@migaia/rpc/core',
+        source: 'rpc.endpoint',
         code: 'TRANSPORT'
       })
     }

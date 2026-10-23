@@ -160,9 +160,9 @@ describe('store-shared audit regressions', () => {
         }
         expect(failure).toMatchObject(
           kind === 'foreign'
-            ? { source: '@migaia/utils', code: 'ABORTED' }
+            ? { source: 'foundation.utils', code: 'ABORTED' }
             : {
-                source: '@migaia/store-shared',
+                source: 'store.shared',
                 code: 'UPDATE_FAILED',
                 ...(kind === 'frozen' ? { cause: original } : {})
               }

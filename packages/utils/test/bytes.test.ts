@@ -91,7 +91,7 @@ describe('byte primitives', () => {
     const target = new Uint8Array([9])
     expect(() => base64ToBytes('AQI=', target)).toThrow(
       expect.objectContaining({
-        source: '@migaia/utils',
+        source: 'foundation.utils',
         code: 'INVALID_ARGUMENT'
       })
     )

@@ -1,11 +1,11 @@
 /** Stable error source for core and browser adapters that throw core error classes. */
-export const ERROR_SOURCE = '@migaia/rpc/core'
+export const ERROR_SOURCE = 'rpc.endpoint'
 
 /**
- * Defines the error codes owned by `@migaia/rpc/core` in one place.
+ * Defines the error codes owned by `rpc.endpoint` in one place.
  *
  * The `(source, code)` pair uniquely identifies a public semantic failure. `source` is always
- * `@migaia/rpc/core`. Throw sites reference these constants rather than inline literals.
+ * `rpc.endpoint`. Throw sites reference these constants rather than inline literals.
  *
  * Code values are public API, so renaming one is a breaking change. Only codes with actual throw
  * sites remain here. Records historical reserved codes removed during migration.

@@ -272,7 +272,7 @@ for (const control of ['abort', 'deadline', 'late-failure'] as const) {
           (error) => (error as { cause?: unknown }).cause === lateFailure
         ) as { source?: string; code?: string; name?: string } | undefined
         assert.ok(reported, 'late transform failure is reported with its original cause')
-        assert.equal(reported.source, '@migaia/rpc/core')
+        assert.equal(reported.source, 'rpc.endpoint')
         assert.equal(reported.code, 'AUTHENTICATION_FAILED')
       }
       /** Cancellation uses the native code and exact local cause. */

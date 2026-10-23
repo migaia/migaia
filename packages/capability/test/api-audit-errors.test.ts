@@ -92,7 +92,7 @@ describe('audited capability boundary contracts', () => {
         error: undefined
       })
     ).toThrow(original)
-    expect(original).toMatchObject({ source: '@migaia/capability', code: 'INVALID_OPTION' })
+    expect(original).toMatchObject({ source: 'capability', code: 'INVALID_OPTION' })
   })
 
   it.each(['host', 'static', 'dynamic'] as const)(

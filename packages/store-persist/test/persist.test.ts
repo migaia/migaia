@@ -76,7 +76,7 @@ describe('persist（store-light）', () => {
       throw new Error('expected hostile codec to fail')
     } catch (error) {
       expect(error).toMatchObject({
-        source: '@migaia/store-persist',
+        source: 'store.persist',
         code: 'INVALID_OPTION',
         cause: expect.any(Error)
       })
@@ -99,7 +99,7 @@ describe('persist（store-light）', () => {
       throw new Error('expected hostile options to fail')
     } catch (error) {
       expect(error).toMatchObject({
-        source: '@migaia/store-persist',
+        source: 'store.persist',
         code: 'INVALID_OPTION',
         cause: expect.any(Error)
       })
@@ -267,7 +267,7 @@ describe('persist（store-light）', () => {
     expect(thrown).toBeInstanceOf(DOMException)
     expect(thrown).toMatchObject({
       name: 'AbortError',
-      source: '@migaia/store-persist',
+      source: 'store.persist',
       code: 'ABORTED_BY_DISPOSE',
       cause: failure
     })
@@ -357,7 +357,7 @@ describe('persist（store-light）', () => {
       (error: unknown) =>
         error instanceof DOMException &&
         error.name === 'AbortError' &&
-        (error as { source?: string }).source === '@migaia/store-persist' &&
+        (error as { source?: string }).source === 'store.persist' &&
         (error as unknown as { code?: string }).code === 'ABORTED_BY_DISPOSE'
     )
     await expect(handle.clear()).rejects.toSatisfy(

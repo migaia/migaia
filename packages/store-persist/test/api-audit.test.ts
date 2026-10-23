@@ -213,7 +213,7 @@ describe('store-persist audit regressions', () => {
     /** The ready result describes this attempt, not a mutable status sampled later. */
     const ready = expect(handle.ready).rejects.toMatchObject({
       name: 'AbortError',
-      source: '@migaia/store-persist',
+      source: 'store.persist',
       code: 'ABORTED_BY_DISPOSE'
     })
     try {

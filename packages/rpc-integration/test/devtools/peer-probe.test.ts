@@ -124,7 +124,7 @@ it('process spawn:true forwards probe through ordinary entry discovery and emits
           source: (report as { source?: unknown }).source,
           code: (report as { code?: unknown }).code
         },
-        { source: '@migaia/supervision', code: 'CAPABILITY_UNSUPPORTED' },
+        { source: 'supervision', code: 'CAPABILITY_UNSUPPORTED' },
         'only the existing best-effort termination notice reaches the Peer reporter'
       )
   } finally {

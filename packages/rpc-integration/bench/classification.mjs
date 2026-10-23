@@ -28,7 +28,7 @@ export function rejected(event) {
   classification.rejections.push({
     ...event,
     verifiedPeerKey: '[REDACTED]',
-    source: '@migaia/rpc/core',
+    source: 'rpc.endpoint',
     code: 'OVERLOADED',
     name: null,
     message: 'provider rejection event',

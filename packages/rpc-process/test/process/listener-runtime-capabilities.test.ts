@@ -152,7 +152,7 @@ describe('Process listener runtime capabilities', () => {
       ).rejects.toMatchObject({ code: 'REMOTE_START_FAILED' })
       expect(reports).toContainEqual(
         expect.objectContaining({
-          source: '@migaia/rpc/contract',
+          source: 'rpc.contract',
           code: 'HANDSHAKE_INCOMPATIBLE',
           reason: 'protocol'
         })

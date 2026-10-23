@@ -611,7 +611,7 @@ export type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMod
 - `StoreFieldMode`：`FieldBuilder.mode` 的合法取值（`'sync'` / `'async'`），自定义 Builder 实现时用它标注 `mode` 字段，见 [第 6 节](#6-fieldbuilder自定义字段扩展协议)。
 
 ```ts doc-test=skip reason="签名摘要，不是可运行模块"
-export const STORE_LIGHT_SOURCE = '@migaia/store-light'
+export const STORE_LIGHT_SOURCE = 'store.light'
 
 function createStoreLightError(
   code: IStoreLightErrorCode,
@@ -631,7 +631,7 @@ function createStoreLightAggregateError(
 ): AggregateError
 ```
 
-- `STORE_LIGHT_SOURCE`：本包所有错误 `error.source` 的固定值 `'@migaia/store-light'`，用于按来源过滤/断言错误。
+- `STORE_LIGHT_SOURCE`：本包所有错误 `error.source` 的固定值 `'store.light'`，用于按来源过滤/断言错误。
 - `createStoreLightError(code, message, options?)`：构造一个携带 `(source, code)` 身份（经 `@migaia/utils/error` 的 `attachErrorIdentity`）的普通 `Error`；`options.cause` 可选，设置了才会传给 `Error` 构造器的 `cause`。
 - `createStoreLightRangeError(code, message)`：同上，但构造 `RangeError`；无 `cause` 选项。
 - `createStoreLightTypeError(code, message, options?)`：同上，但构造 `TypeError`；`options.cause` 可选。
@@ -643,7 +643,7 @@ function createStoreLightAggregateError(
 
 ## 10. 错误信息全表
 
-本包创建的错误使用 `source: '@migaia/store-light'` 与稳定 `code`。Reactive 所有权错误、Resource 请求失败与取消保留其原 owner。FieldBuilder 初始化失败与晚到字段清理失败若已具有完整身份则保留；其余原生可扩展 Error 在原对象上标记 `INITIALIZATION_FAILED` / `FIELD_DISPOSE_FAILED`，保留类型、message 和 stack；不能附加身份的值通过 coded fallback 的 `cause` 保持可达。初始化与 cleanup 同时失败时，能写 cause 的主 Error 仍为原对象，已有 cause 与 cleanup 合并；不能写入时使用 `INIT_AND_CLEANUP_FAILED` AggregateError。
+本包创建的错误使用 `source: 'store.light'` 与稳定 `code`。Reactive 所有权错误、Resource 请求失败与取消保留其原 owner。FieldBuilder 初始化失败与晚到字段清理失败若已具有完整身份则保留；其余原生可扩展 Error 在原对象上标记 `INITIALIZATION_FAILED` / `FIELD_DISPOSE_FAILED`，保留类型、message 和 stack；不能附加身份的值通过 coded fallback 的 `cause` 保持可达。初始化与 cleanup 同时失败时，能写 cause 的主 Error 仍为原对象，已有 cause 与 cleanup 合并；不能写入时使用 `INIT_AND_CLEANUP_FAILED` AggregateError。
 
 | `StoreLightErrorCode`  | 码值                      | 触发条件 / 处理                                                      |
 | ---------------------- | ------------------------- | -------------------------------------------------------------------- |
@@ -776,7 +776,7 @@ StoreResource 用创建时捕获的 Runtime 做空闲清理和诊断，用准入
 
 StoreLight 现在只适配一个 `@migaia/resource` 实例。它保留实际值的身份、渲染 capture、资源与版本租约以及值的释放，删除了自己重复的请求/数据控制器和请求协调器。`StoreResourceDataKind` 及其类型已删除；需要原生 Resource 状态时用 `ResourceStatus` / `ResourceFetchStatus`。`StoreResourceKind` 仍是门面内部的词汇；`readSnapshot()` 仍返回 `value`/`version`/`token`，没有公开的 kind 属性。
 
-加载中的重复读取抛出的是同一个 Promise，它以原始值完成。`retry()` 或强制取消会让被取代的 Promise 立即以原生 `AbortError` 失败，`source` 为 `@migaia/resource`，`code` 为 `REQUEST_ABORTED`；以前，忽略中止信号的加载函数会让这个 Promise 一直挂起，直到它自己完成。手动驱动重试时要处理旧 Promise 的拒绝。迟到的返回值只释放一次。刷新失败时恢复旧数据；旧版本的租约会把它的释放推迟到租约释放之后。等待时钟结算的已加载值仍归资源所有，结算失败时也会被释放。临时 capture 的定时器准入失败时，已建立的部分 capture 和定时器会被释放，并作为释放过程的附带问题上报；已经加载成功的值仍可读，并会通知订阅者。不引入任何异步上下文机制。
+加载中的重复读取抛出的是同一个 Promise，它以原始值完成。`retry()` 或强制取消会让被取代的 Promise 立即以原生 `AbortError` 失败，`source` 为 `resource`，`code` 为 `REQUEST_ABORTED`；以前，忽略中止信号的加载函数会让这个 Promise 一直挂起，直到它自己完成。手动驱动重试时要处理旧 Promise 的拒绝。迟到的返回值只释放一次。刷新失败时恢复旧数据；旧版本的租约会把它的释放推迟到租约释放之后。等待时钟结算的已加载值仍归资源所有，结算失败时也会被释放。临时 capture 的定时器准入失败时，已建立的部分 capture 和定时器会被释放，并作为释放过程的附带问题上报；已经加载成功的值仍可读，并会通知订阅者。不引入任何异步上下文机制。
 
 ### 迁移说明：公开 API 收敛
 

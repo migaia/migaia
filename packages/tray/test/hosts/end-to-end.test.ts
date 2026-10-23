@@ -45,7 +45,7 @@ describe('Tray Hosts root integration', () => {
       ).toBe(true)
       await tray.remove('wiki-main')
       await expect(tray.get('wiki-main')).rejects.toMatchObject({
-        source: '@migaia/tray',
+        source: 'tray',
         code: 'TRAY_INSTANCE_UNKNOWN'
       })
       await until(

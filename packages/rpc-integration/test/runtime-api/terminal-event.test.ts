@@ -134,7 +134,7 @@ for (const family of ['thread', 'coroutine'] as const) {
       assert.equal(terminal.length, 1, `missing terminal after exit: ${JSON.stringify(events)}`)
       assert.equal(terminal[0]!.name, 'terminal-unit')
       assert.deepEqual(terminal[0]!.error, {
-        source: '@migaia/supervision',
+        source: 'supervision',
         code: 'SUPERVISION_EXHAUSTED'
       })
       assert.equal(

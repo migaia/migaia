@@ -94,7 +94,7 @@ describe('scheduler/task admission snapshot', () => {
     })
 
     expect(() => snapshot?.schedule(() => {}, 0)).toThrowError(
-      expect.objectContaining({ source: '@migaia/lifecycle', code: 'INVALID_OPTION' })
+      expect.objectContaining({ source: 'lifecycle', code: 'INVALID_OPTION' })
     )
   })
 
@@ -117,7 +117,7 @@ describe('scheduler/task admission snapshot', () => {
     }
     expect(snapshotError).toEqual(
       expect.objectContaining({
-        source: '@migaia/lifecycle',
+        source: 'lifecycle',
         code: LifecycleErrorCode.invalidOption,
         cause: getterError
       })
@@ -132,7 +132,7 @@ describe('scheduler/task admission snapshot', () => {
     }
     expect(resolvedError).toEqual(
       expect.objectContaining({
-        source: '@migaia/lifecycle',
+        source: 'lifecycle',
         code: LifecycleErrorCode.invalidOption,
         cause: getterError
       })
@@ -192,7 +192,7 @@ describe('injected task unref forwarding, rollback and lifecycle defaults', () =
     const { cancelReceivers, task, scheduler } = injectedTask(() => 1)
     const error = captureThrow(() => snapshotScheduler(scheduler)!.schedule(() => undefined, 1))
     expect(error).toMatchObject({
-      source: '@migaia/lifecycle',
+      source: 'lifecycle',
       code: LifecycleErrorCode.invalidOption
     })
     expect(cancelReceivers).toEqual([task])
@@ -206,7 +206,7 @@ describe('injected task unref forwarding, rollback and lifecycle defaults', () =
     const error = captureThrow(() => snapshotScheduler(scheduler)!.schedule(() => undefined, 1))
     expect(error).toBeInstanceOf(TypeError)
     expect(error).toMatchObject({
-      source: '@migaia/lifecycle',
+      source: 'lifecycle',
       code: LifecycleErrorCode.invalidOption
     })
     expect((error as Error).cause).toBe(getterError)
@@ -284,14 +284,14 @@ describe('default scheduler identity versus lifecycle admission identity', () =>
   ] as const)('utils systemScheduler rejects delay %s with utils INVALID_ARGUMENT', (_l, delay) => {
     const error = captureThrow(() => systemScheduler.schedule(() => undefined, delay))
     expect(error).toBeInstanceOf(RangeError)
-    expect(error).toMatchObject({ source: '@migaia/utils', code: 'INVALID_ARGUMENT' })
+    expect(error).toMatchObject({ source: 'foundation.utils', code: 'INVALID_ARGUMENT' })
     expect((error as { detail?: unknown }).detail).toBeUndefined()
   })
 
   it('utils systemScheduler rejects a string delay with a utils TypeError', () => {
     const error = captureThrow(() => systemScheduler.schedule(() => undefined, '1' as never))
     expect(error).toBeInstanceOf(TypeError)
-    expect(error).toMatchObject({ source: '@migaia/utils', code: 'INVALID_ARGUMENT' })
+    expect(error).toMatchObject({ source: 'foundation.utils', code: 'INVALID_ARGUMENT' })
   })
 
   it('lifecycle admission rejects before reaching the utils implementation', () => {
@@ -301,7 +301,7 @@ describe('default scheduler identity versus lifecycle admission identity', () =>
     )
     expect(error).toBeInstanceOf(RangeError)
     expect(error).toMatchObject({
-      source: '@migaia/lifecycle',
+      source: 'lifecycle',
       code: LifecycleErrorCode.invalidOption,
       detail: { field: 'delayMs' }
     })
@@ -321,7 +321,7 @@ describe('default scheduler identity versus lifecycle admission identity', () =>
     const second = queue.enqueue(() => 't2')
     await expect(second).rejects.toBeInstanceOf(RangeError)
     await expect(second).rejects.toMatchObject({
-      source: '@migaia/lifecycle',
+      source: 'lifecycle',
       code: LifecycleErrorCode.invalidOption,
       detail: { field: 'delayMs' }
     })
@@ -337,7 +337,7 @@ describe('admission boundaries that replace the removed lifecycle implementation
       captureThrow(() => addSchedulerTime(Number.MAX_VALUE, Number.MAX_VALUE, 'deadline'))
     ).toMatchObject({
       name: 'RangeError',
-      source: '@migaia/lifecycle',
+      source: 'lifecycle',
       code: LifecycleErrorCode.invalidOption,
       detail: { field: 'deadline' }
     })
@@ -346,12 +346,12 @@ describe('admission boundaries that replace the removed lifecycle implementation
     expect(
       captureThrow(() => resolveScheduler({ schedule: () => ({ cancel() {} }) }))
     ).toMatchObject({
-      source: '@migaia/lifecycle',
+      source: 'lifecycle',
       code: LifecycleErrorCode.invalidOption
     })
     const primitiveTask = snapshotScheduler({ now: () => 0, schedule: () => 1 })!
     expect(captureThrow(() => primitiveTask.schedule(() => undefined, 1))).toMatchObject({
-      source: '@migaia/lifecycle',
+      source: 'lifecycle',
       code: LifecycleErrorCode.invalidOption
     })
   })

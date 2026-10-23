@@ -135,9 +135,9 @@ for (const unavailable of [
       calls = 0
       /** Local outlet denial and inbound Feature denial must retain their exact registered owner. */
       const expected = unavailable.startsWith('connection-')
-        ? { source: '@migaia/rpc/core', code: 'TARGET_UNKNOWN' }
+        ? { source: 'rpc.endpoint', code: 'TARGET_UNKNOWN' }
         : {
-            source: '@migaia/plugin-host',
+            source: 'plugin.host',
             code:
               unavailable === 'exposed-unloaded'
                 ? 'PLUGIN_NOT_INSTALLED'

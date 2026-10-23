@@ -1,5 +1,6 @@
+import { ERROR_SOURCE } from './error-code.js'
 /** `source` value stamped onto every error this package throws. */
-export const CAPABILITY_SOURCE = '@migaia/capability'
+export const CAPABILITY_SOURCE = ERROR_SOURCE
 
 import { attachErrorIdentity } from '@migaia/utils/error'
 

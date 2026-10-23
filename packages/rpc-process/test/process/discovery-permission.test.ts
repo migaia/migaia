@@ -42,7 +42,7 @@ it('does not read denied Deno environment keys and rejects a granted invalid boo
   granted = true
   expect(isProcessChild()).toBe(false)
   await expect(createProcessPeer({ connect, report: () => undefined })).rejects.toMatchObject({
-    source: '@migaia/rpc/core',
+    source: 'rpc.endpoint',
     code: 'INVALID_CONFIG',
     message: 'process runtime API bootstrap is invalid'
   })

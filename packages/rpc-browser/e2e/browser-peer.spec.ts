@@ -35,7 +35,7 @@ test('iframe unload settles pending request with the original Core deadline code
 }) => {
   await page.goto('/browser-peer/index.html')
   expect(await page.evaluate(() => globalThis.runBrowserPeerWindow(true))).toMatchObject({
-    source: '@migaia/rpc/core',
+    source: 'rpc.endpoint',
     code: 'DEADLINE_EXCEEDED',
     name: 'TimeoutError'
   })
@@ -70,7 +70,7 @@ test('one SharedWorker serves two page Peers and keeps the surviving page callab
     { echo: 'survivor', values: [20, 21] }
   )
   expect(await pages[1]!.evaluate(() => globalThis.closeBrowserPeerShared(true))).toMatchObject({
-    source: '@migaia/rpc/core',
+    source: 'rpc.endpoint',
     code: 'DEADLINE_EXCEEDED',
     name: 'TimeoutError'
   })

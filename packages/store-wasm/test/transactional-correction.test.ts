@@ -123,7 +123,7 @@ describe('transactional correction', () => {
     failNextPointer = true
     expect(() => allocateSync(8)).toThrowError(
       expect.objectContaining({
-        source: '@migaia/store-wasm',
+        source: 'store.wasm',
         code: StoreWasmErrorCode.allocationFailed
       })
     )

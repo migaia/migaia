@@ -91,7 +91,7 @@ describe('store-light audit regressions', () => {
         ).rejects.toBe(primary)
       }
       expect(primary).toMatchObject({
-        source: '@migaia/store-light',
+        source: 'store.light',
         code: 'INITIALIZATION_FAILED'
       })
     }
@@ -111,7 +111,7 @@ describe('store-light audit regressions', () => {
         }
       })
     ).rejects.toMatchObject({
-      source: '@migaia/store-light',
+      source: 'store.light',
       code: 'INITIALIZATION_FAILED',
       cause: primary
     })
@@ -145,7 +145,7 @@ describe('store-light audit regressions', () => {
             ? resource.retainVersion(snapshot.token)
             : resource.commitCapture(resource.captureVersion(snapshot.version))
         ).toThrow(
-          expect.objectContaining({ source: '@migaia/store-light', code: 'UNKNOWN_VERSION' })
+          expect.objectContaining({ source: 'store.light', code: 'UNKNOWN_VERSION' })
         )
       } finally {
         resource.forceDispose()
@@ -195,7 +195,7 @@ describe('store-light audit regressions', () => {
         },
         $snapshot: 1
       })
-    ).toThrow(expect.objectContaining({ source: '@migaia/store-light', code: 'INVALID_OPTION' }))
+    ).toThrow(expect.objectContaining({ source: 'store.light', code: 'INVALID_OPTION' }))
     await vi.waitFor(() => expect(dispose).toHaveBeenCalledTimes(1), { timeout: 200, interval: 5 })
   })
   it('rejects a pre-discriminant builder before starting its creation', async () => {
@@ -203,7 +203,7 @@ describe('store-light audit regressions', () => {
     const create = vi.fn(async () => ({ disposed: false, dispose() {} }))
     await expect(
       createAsyncStore({ field: { [FIELD_BUILDER]: true, create } as never })
-    ).rejects.toMatchObject({ source: '@migaia/store-light', code: 'INVALID_OPTION' })
+    ).rejects.toMatchObject({ source: 'store.light', code: 'INVALID_OPTION' })
     expect(create).not.toHaveBeenCalled()
   })
 })

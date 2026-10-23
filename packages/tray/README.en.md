@@ -306,7 +306,7 @@ Each current subscription receives at most one delivery. Non-ready subscribers m
 
 ### Errors and migration
 
-Tray-owned boundary codes use TRAY_SOURCE, `@migaia/tray`. Branch on source/code rather than message. Annotatable native errors preserve type, stack and identity. Frozen or unsafe-to-annotate values remain reachable through a coded wrapper's cause, and complete foreign identities remain with their owner. Graph startup, node and release failures continue to belong to capability.
+Tray-owned boundary codes use TRAY_SOURCE, `tray`. Branch on source/code rather than message. Annotatable native errors preserve type, stack and identity. Frozen or unsafe-to-annotate values remain reachable through a coded wrapper's cause, and complete foreign identities remain with their owner. Graph startup, node and release failures continue to belong to capability.
 
 | TrayErrorCode property / value                    | Trigger                                                                                                                        |
 | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |

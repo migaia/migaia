@@ -1,4 +1,4 @@
-import { StorePersistErrorCode, type IStorePersistErrorCode } from './error-code.js'
+import { ERROR_SOURCE, StorePersistErrorCode, type IStorePersistErrorCode } from './error-code.js'
 import { attachErrorIdentity } from '@migaia/utils/error'
 
 export { StorePersistErrorCode, type IStorePersistErrorCode }
@@ -7,7 +7,7 @@ export { StorePersistErrorCode, type IStorePersistErrorCode }
  * Source stamped on locally constructed errors; forwarded unit/codec/adapter failures keep their
  * owner.
  */
-export const STORE_PERSIST_SOURCE = '@migaia/store-persist'
+export const STORE_PERSIST_SOURCE = ERROR_SOURCE
 
 function tagStorePersistError<E extends Error>(error: E, code: IStorePersistErrorCode): E {
   return attachErrorIdentity(error, { source: STORE_PERSIST_SOURCE, code })

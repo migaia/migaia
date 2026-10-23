@@ -186,7 +186,7 @@ describe('local contract error privacy', () => {
     const business = new Error('business wrapper fixture', { cause: original })
     /** Source/code properties alone cannot authorize the local disclosure policy. */
     const forged = Object.assign(business, {
-      source: '@migaia/rpc/remote',
+      source: 'rpc.remote',
       code: 'REMOTE_CONTRACT_INVALID'
     })
     expect(serializeRpcError(forged, { report: vi.fn() })).toMatchObject({

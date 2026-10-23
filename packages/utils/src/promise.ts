@@ -1,4 +1,4 @@
-import { UtilsErrorCode } from './error-code.js'
+import { ERROR_SOURCE, UtilsErrorCode } from './error-code.js'
 import { UtilsErrorText } from './error-text.js'
 import {
   attachErrorIdentity,
@@ -262,7 +262,7 @@ export function createAbortTimeoutSignal(
   if (!Number.isFinite(timeoutMs) || timeoutMs < 0)
     throw attachErrorIdentity(
       new RangeError(UtilsErrorText.invalidArgument('timeoutMs', 'a finite non-negative number')),
-      { source: '@migaia/utils', code: UtilsErrorCode.invalidArgument }
+      { source: ERROR_SOURCE, code: UtilsErrorCode.invalidArgument }
     )
   const controller = new AbortController()
   const scheduler = options.scheduler ?? systemScheduler
@@ -384,7 +384,7 @@ export function sleep(delayMs: number, options?: IAsyncControls): Promise<void> 
     return Promise.reject(
       attachErrorIdentity(
         new RangeError(UtilsErrorText.invalidArgument('delayMs', 'a finite non-negative number')),
-        { source: '@migaia/utils', code: UtilsErrorCode.invalidArgument }
+        { source: ERROR_SOURCE, code: UtilsErrorCode.invalidArgument }
       )
     )
   if (signal && signalsOption)
@@ -393,7 +393,7 @@ export function sleep(delayMs: number, options?: IAsyncControls): Promise<void> 
         new TypeError(
           UtilsErrorText.invalidArgument('signal', 'signal and signals are mutually exclusive')
         ),
-        { source: '@migaia/utils', code: UtilsErrorCode.invalidArgument }
+        { source: ERROR_SOURCE, code: UtilsErrorCode.invalidArgument }
       )
     )
   const signals = snapshotSignals(signalsOption, signal)
@@ -512,7 +512,7 @@ export function withTimeout<T>(
     return Promise.reject(
       attachErrorIdentity(
         new RangeError(UtilsErrorText.invalidArgument('timeoutMs', 'a finite non-negative number')),
-        { source: '@migaia/utils', code: UtilsErrorCode.invalidArgument }
+        { source: ERROR_SOURCE, code: UtilsErrorCode.invalidArgument }
       )
     )
   if (signal && signalsOption)
@@ -521,7 +521,7 @@ export function withTimeout<T>(
         new TypeError(
           UtilsErrorText.invalidArgument('signal', 'signal and signals are mutually exclusive')
         ),
-        { source: '@migaia/utils', code: UtilsErrorCode.invalidArgument }
+        { source: ERROR_SOURCE, code: UtilsErrorCode.invalidArgument }
       )
     )
   const signals = snapshotSignals(signalsOption, signal)
@@ -658,7 +658,7 @@ export function raceWithAbort<T>(
         new TypeError(
           UtilsErrorText.invalidArgument('signal', 'signal and signals are mutually exclusive')
         ),
-        { source: '@migaia/utils', code: UtilsErrorCode.invalidArgument }
+        { source: ERROR_SOURCE, code: UtilsErrorCode.invalidArgument }
       )
     )
   const signals = snapshotSignals(signalsOption, signal)
@@ -718,7 +718,7 @@ export function raceWithAbort<T>(
         new TypeError(UtilsErrorText.invalidArgument('signal', 'abort listener admission failed'), {
           cause: error
         }),
-        { source: '@migaia/utils', code: UtilsErrorCode.invalidArgument }
+        { source: ERROR_SOURCE, code: UtilsErrorCode.invalidArgument }
       )
       finish(() => reject(admissionError), admissionError)
       return
@@ -772,14 +772,14 @@ async function retryCore<T>(
   if (!Number.isSafeInteger(options.maxAttempts) || options.maxAttempts < 1)
     throw attachErrorIdentity(
       new RangeError(UtilsErrorText.invalidArgument('maxAttempts', 'a positive safe integer')),
-      { source: '@migaia/utils', code: UtilsErrorCode.invalidArgument }
+      { source: ERROR_SOURCE, code: UtilsErrorCode.invalidArgument }
     )
   if (options.signal && options.signals)
     throw attachErrorIdentity(
       new TypeError(
         UtilsErrorText.invalidArgument('signal', 'signal and signals are mutually exclusive')
       ),
-      { source: '@migaia/utils', code: UtilsErrorCode.invalidArgument }
+      { source: ERROR_SOURCE, code: UtilsErrorCode.invalidArgument }
     )
   for (const [name, value] of [
     ['totalTimeoutMs', options.totalTimeoutMs],
@@ -788,7 +788,7 @@ async function retryCore<T>(
     if (value !== undefined && (!Number.isFinite(value) || value < 0))
       throw attachErrorIdentity(
         new RangeError(UtilsErrorText.invalidArgument(name, 'a finite non-negative number')),
-        { source: '@migaia/utils', code: UtilsErrorCode.invalidArgument }
+        { source: ERROR_SOURCE, code: UtilsErrorCode.invalidArgument }
       )
   const externalSignals = options.signals ?? (options.signal ? [options.signal] : [])
   const preAbort = observeAbort(externalSignals)
@@ -869,7 +869,7 @@ async function retryCore<T>(
       if (!Number.isFinite(delay) || delay < 0)
         throw attachErrorIdentity(
           new RangeError(UtilsErrorText.invalidArgument('delay', 'a finite non-negative number')),
-          { source: '@migaia/utils', code: UtilsErrorCode.invalidArgument }
+          { source: ERROR_SOURCE, code: UtilsErrorCode.invalidArgument }
         )
       if (options.totalTimeoutMs !== undefined) {
         const elapsed = (options.scheduler?.now() ?? systemScheduler.now()) - startedAt
@@ -905,7 +905,7 @@ export function retry<T>(
         new TypeError(
           UtilsErrorText.invalidArgument('signal', 'signal and signals are mutually exclusive')
         ),
-        { source: '@migaia/utils', code: UtilsErrorCode.invalidArgument }
+        { source: ERROR_SOURCE, code: UtilsErrorCode.invalidArgument }
       )
     )
   if (snapshot.totalTimeoutMs === undefined) return retryCore(operation, snapshot)
@@ -1024,7 +1024,7 @@ export function createConcurrencyLimiter(options: {
   if (!Number.isSafeInteger(concurrency) || concurrency < 1)
     throw attachErrorIdentity(
       new RangeError(UtilsErrorText.invalidArgument('concurrency', 'a positive safe integer')),
-      { source: '@migaia/utils', code: UtilsErrorCode.invalidArgument }
+      { source: ERROR_SOURCE, code: UtilsErrorCode.invalidArgument }
     )
   type IEntry = {
     readonly task: (context: { readonly signal?: IAbortSignal }) => unknown
@@ -1219,7 +1219,7 @@ function reportDiagnostic(
 
 function limiterClosedError(): Error {
   return attachErrorIdentity(new Error(UtilsErrorText.limiterClosed), {
-    source: '@migaia/utils',
+    source: ERROR_SOURCE,
     code: UtilsErrorCode.limiterClosed
   })
 }

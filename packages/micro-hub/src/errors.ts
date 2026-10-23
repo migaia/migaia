@@ -1,10 +1,10 @@
 import { attachErrorIdentity } from '@migaia/utils/error'
-import { MicroHubErrorCode, type IMicroHubErrorCode } from './error-code.js'
+import { ERROR_SOURCE, MicroHubErrorCode, type IMicroHubErrorCode } from './error-code.js'
 
 export { MicroHubErrorCode, type IMicroHubErrorCode }
 
 /** `source` attached to every error this package creates; registry rows use the same value. */
-export const MICRO_HUB_SOURCE = '@migaia/micro-hub'
+export const MICRO_HUB_SOURCE = ERROR_SOURCE
 
 /** Options shared by the error factories; `cause` keeps the original error reachable. */
 type IErrorOptions = { readonly cause?: unknown }

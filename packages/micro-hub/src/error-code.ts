@@ -1,8 +1,11 @@
+/** Stable error domain owned by this code table; package moves preserve this identity. */
+export const ERROR_SOURCE = 'micro-frontend.hub'
+
 /**
- * Declares the public error codes for `@migaia/micro-hub` in one place.
+ * Declares the public error codes for `micro-frontend.hub` in one place.
  *
  * The registry in `docs/contracts/error-codes.md` identifies errors by `(source, code)`. The
- * `source` is always `'@migaia/micro-hub'`. Throw sites use these constants instead of inline
+ * `source` is always `'micro-frontend.hub'`. Throw sites use these constants instead of inline
  * literals. Code values are public API; renaming one is a breaking change.
  */
 export const MicroHubErrorCode = {
@@ -119,5 +122,5 @@ export const MicroHubErrorCode = {
   invalidOption: 'INVALID_OPTION'
 } as const
 
-/** Union of every `@migaia/micro-hub` error code value. */
+/** Union of every `micro-frontend.hub` error code value. */
 export type IMicroHubErrorCode = (typeof MicroHubErrorCode)[keyof typeof MicroHubErrorCode]

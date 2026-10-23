@@ -64,7 +64,7 @@ describe('JSON-RPC profile boundary', () => {
     expect(sending).toBeInstanceOf(Promise)
     await expect(sending).rejects.toMatchObject({
       name: 'TypeError',
-      source: '@migaia/rpc/bridge/jsonrpc',
+      source: 'rpc.contract.jsonrpc',
       code: 'JSONRPC_PROFILE_INVALID'
     })
     expect(fixture.messages).toHaveLength(1)

@@ -1,6 +1,9 @@
+/** Stable error domain owned by this code table; package moves preserve this identity. */
+export const ERROR_SOURCE = 'store.indexed'
+
 /**
  * Public failure classifications for collection admission, use and synchronous callbacks. Pair each
- * code with source `@migaia/store-indexed`; callback errors already owned by another package retain
+ * code with source `store.indexed`; callback errors already owned by another package retain
  * that package's identity. Code values are public API.
  */
 export const StoreIndexedErrorCode = {

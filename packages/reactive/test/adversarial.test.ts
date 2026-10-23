@@ -262,7 +262,7 @@ describe('Sol scheduler strategy admission', () => {
       }
       expect(caught).toBeInstanceOf(TypeError)
       expect(caught).toMatchObject({
-        source: '@migaia/reactive',
+        source: 'reactive',
         code: ReactiveErrorCode.invalidOption
       })
     }
@@ -311,7 +311,7 @@ describe('scheduler strategy runtime contract', () => {
       await flush()
       expect(reported).toHaveLength(1)
       expect(reported[0]).toMatchObject({
-        source: '@migaia/reactive',
+        source: 'reactive',
         code: ReactiveErrorCode.invalidOption,
         cause: rejection
       })
@@ -353,7 +353,7 @@ describe('scheduler strategy runtime contract', () => {
       signal.value = 1
       expect(reported).toHaveLength(1)
       expect(reported[0]).toMatchObject({
-        source: '@migaia/reactive',
+        source: 'reactive',
         code: ReactiveErrorCode.invalidOption,
         cause: getterError
       })
@@ -440,7 +440,7 @@ describe('scheduler strategy runtime contract', () => {
 
       expect(reported).toHaveLength(1)
       expect(reported[0]).toMatchObject({
-        source: '@migaia/reactive',
+        source: 'reactive',
         code: ReactiveErrorCode.invalidOption,
         cause: rejection
       })
@@ -489,7 +489,7 @@ describe('maxFlushPasses admission', () => {
     expect(reads).toBe(1)
     expect(caught).toEqual(
       expect.objectContaining({
-        source: '@migaia/reactive',
+        source: 'reactive',
         code: ReactiveErrorCode.invalidOption,
         cause: getterError
       })

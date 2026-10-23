@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { CapabilityErrorCode, createCapabilityHost } from '../src/index.js'
 
-const source = '@migaia/capability'
+const source = 'capability'
 
 const invalidOptionValues = [
   ['null', null],

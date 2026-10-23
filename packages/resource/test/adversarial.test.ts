@@ -75,7 +75,7 @@ describe('resource TTL finite-domain admission', () => {
 
     await expect(resource.promise).rejects.toMatchObject({
       name: 'RangeError',
-      source: '@migaia/resource',
+      source: 'resource',
       code: ResourceErrorCode.invalidOption,
       message: 'resource ttl expiration must remain finite'
     })
@@ -224,7 +224,7 @@ describe('resource scheduler entry validation', () => {
       } as any)
     ).toThrowError(
       expect.objectContaining({
-        source: '@migaia/resource',
+        source: 'resource',
         code: 'INVALID_SNAPSHOT',
         cause
       })
@@ -336,7 +336,7 @@ describe('resource initialSnapshot construction admission', () => {
         )
     ).toThrowError(
       expect.objectContaining({
-        source: '@migaia/resource',
+        source: 'resource',
         code: ResourceErrorCode.invalidOption,
         cause
       })
@@ -415,7 +415,7 @@ describe('retry timer cleanup failure', () => {
     expect(settled).toBe(true)
     expect(resource.fetchStatus).toBe('idle')
     expect(rejection).toEqual(
-      expect.objectContaining({ source: '@migaia/resource', code: 'INVALID_OPTION' })
+      expect.objectContaining({ source: 'resource', code: 'INVALID_OPTION' })
     )
     resource.dispose()
   })
@@ -466,7 +466,7 @@ describe('retry timer cleanup failure', () => {
     expect(thrown).toBeUndefined()
     expect(reported).toEqual([
       expect.objectContaining({
-        source: '@migaia/resource',
+        source: 'resource',
         code: ResourceErrorCode.cancellationCleanupFailed,
         cause: cleanupError
       })
@@ -634,7 +634,7 @@ describe('retry admission abort race', () => {
     expect(taskCancels).toBe(1)
     expect(reported).toEqual([
       expect.objectContaining({
-        source: '@migaia/resource',
+        source: 'resource',
         code: ResourceErrorCode.cancellationCleanupFailed,
         cause: cleanupError
       })
@@ -735,7 +735,7 @@ describe('withAbort signal registration race', () => {
     )
 
     await expect(resource.refetch()).rejects.toMatchObject({
-      source: '@migaia/resource',
+      source: 'resource',
       code: ResourceErrorCode.invalidOption,
       cause: registrationError
     })
@@ -762,7 +762,7 @@ describe('withAbort signal registration race', () => {
     await expect(resource.refetch()).resolves.toBe('ok')
     expect(reported).toEqual([
       expect.objectContaining({
-        source: '@migaia/resource',
+        source: 'resource',
         code: ResourceErrorCode.cancellationCleanupFailed,
         cause: cleanupError
       })
@@ -789,7 +789,7 @@ describe('withAbort signal registration race', () => {
     await expect(resource.refetch()).rejects.toBe(sourceError)
     expect(reported).toEqual([
       expect.objectContaining({
-        source: '@migaia/resource',
+        source: 'resource',
         code: ResourceErrorCode.cancellationCleanupFailed,
         cause: cleanupError
       })
@@ -820,7 +820,7 @@ describe('withAbort signal registration race', () => {
     })
     expect(reported).toEqual([
       expect.objectContaining({
-        source: '@migaia/resource',
+        source: 'resource',
         code: ResourceErrorCode.cancellationCleanupFailed,
         cause: cleanupError
       })
@@ -885,7 +885,7 @@ describe('Resource scheduler.now boundary', () => {
     const rejection = await resource.promise.catch((error: unknown) => error)
 
     expect(rejection).toMatchObject({
-      source: '@migaia/resource',
+      source: 'resource',
       code: ResourceErrorCode.invalidOption,
       message: 'resource scheduler task operation failed',
       cause: clockError
@@ -909,12 +909,12 @@ describe('Resource scheduler.now boundary', () => {
       const cause = (rejection as { cause?: unknown }).cause
 
       expect(rejection).toMatchObject({
-        source: '@migaia/resource',
+        source: 'resource',
         code: ResourceErrorCode.invalidOption,
         message: 'resource scheduler task operation failed'
       })
       expect(cause).toMatchObject({
-        source: '@migaia/lifecycle',
+        source: 'lifecycle',
         code: LifecycleErrorCode.invalidOption
       })
       expect(cause).toBeInstanceOf(RangeError)
@@ -953,7 +953,7 @@ describe('Resource scheduler.now boundary', () => {
     expect(state.status).toBe('error')
     const failure = (state as { status: 'error'; error: unknown }).error
     expect(failure).toMatchObject({
-      source: '@migaia/resource',
+      source: 'resource',
       code: ResourceErrorCode.invalidOption,
       cause: clockError
     })
@@ -1003,7 +1003,7 @@ describe('Resource scheduler.now boundary', () => {
 
     expect(attempts).toBe(2)
     expect(rejection).toMatchObject({
-      source: '@migaia/resource',
+      source: 'resource',
       code: ResourceErrorCode.invalidOption,
       cause: clockError
     })
@@ -1040,7 +1040,7 @@ describe('Resource scheduler.now boundary', () => {
     const rejection = await refresh.catch((error: unknown) => error)
 
     expect(rejection).toMatchObject({
-      source: '@migaia/resource',
+      source: 'resource',
       code: ResourceErrorCode.invalidOption,
       cause: clockError
     })

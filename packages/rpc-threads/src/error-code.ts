@@ -1,5 +1,5 @@
 /** Native isolate resource failures belong to the thread adapter, independently of core RPC. */
-export const ERROR_SOURCE = '@migaia/rpc/threads'
+export const ERROR_SOURCE = 'rpc.transport.thread'
 
 /** Cold resource queries report failures without changing execution lifecycle. */
 export const RpcThreadErrorCode = {

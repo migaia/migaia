@@ -1736,7 +1736,7 @@ describe('discovery attachment boundary semantics', () => {
           expect(firstReason).toBeInstanceOf(RpcLifecycleError)
           expect(firstReason).toMatchObject({
             name: 'RpcLifecycleError',
-            source: '@migaia/rpc/core',
+            source: 'rpc.endpoint',
             code: 'ENDPOINT_DISPOSED',
             message: 'Endpoint disposed'
           })

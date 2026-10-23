@@ -45,7 +45,7 @@ describe('@migaia/tray/runtime', () => {
     vi.useFakeTimers()
     try {
       await expect(runtime.run('missing', { timeoutMs: 60_000 }, execute)).rejects.toMatchObject({
-        source: '@migaia/capability/graph',
+        source: 'capability.graph',
         code: 'GRAPH_PROVIDER_UNAVAILABLE'
       })
       expect(execute).not.toHaveBeenCalled()
@@ -371,7 +371,7 @@ describe('@migaia/tray/runtime', () => {
       runtime.run('runtime-plugin', { timeoutMs: false }, async ({ self }: any) => {
         const ticket = self.unUse()
         await expect(ticket.completion).rejects.toMatchObject({
-          source: '@migaia/tray',
+          source: 'tray',
           code: 'RUNTIME_CONTRACT_INVALID'
         })
         return ticket

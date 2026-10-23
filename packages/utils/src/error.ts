@@ -1,5 +1,8 @@
-import { UtilsErrorCode, type IUtilsErrorCode } from './error-code.js'
+import { ERROR_SOURCE, UtilsErrorCode, type IUtilsErrorCode } from './error-code.js'
 import { UtilsErrorText } from './error-text.js'
+
+/** Public utils error domain; callers compare this stable identity across package moves. */
+export const UTILS_SOURCE = ERROR_SOURCE
 
 /** Result of one property read; failures retain the exact value thrown by the getter. */
 export type IPropertyRead<T> =
@@ -56,7 +59,7 @@ export function isNativeErrorValue(value: unknown): value is Error {
 
 /** Base error retaining the utils source and stable semantic code. */
 export abstract class UtilsError extends Error {
-  readonly source = '@migaia/utils' as const
+  readonly source = ERROR_SOURCE
   readonly code: IUtilsErrorCode
 
   protected constructor(
@@ -140,7 +143,7 @@ export function attachErrorIdentity<T extends object>(
       }
       throw attachErrorIdentity(
         new TypeError(UtilsErrorText.errorIdentityConflict(key), { cause: target }),
-        { source: '@migaia/utils', code: UtilsErrorCode.errorIdentityConflict }
+        { source: ERROR_SOURCE, code: UtilsErrorCode.errorIdentityConflict }
       )
     }
     if (existing) continue
@@ -311,7 +314,7 @@ export function isUtilsError(value: unknown): value is UtilsError {
     /** Code admission must prove the union promised by this type guard. */
     const code = (value as { code?: unknown }).code
     return (
-      (value as { source?: unknown }).source === '@migaia/utils' &&
+      (value as { source?: unknown }).source === ERROR_SOURCE &&
       Object.values(UtilsErrorCode).some((registered) => registered === code)
     )
   } catch {

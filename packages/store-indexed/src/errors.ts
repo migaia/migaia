@@ -1,10 +1,10 @@
-import { StoreIndexedErrorCode, type IStoreIndexedErrorCode } from './error-code.js'
+import { ERROR_SOURCE, StoreIndexedErrorCode, type IStoreIndexedErrorCode } from './error-code.js'
 import { attachErrorIdentity } from '@migaia/utils/error'
 
 export { StoreIndexedErrorCode, type IStoreIndexedErrorCode }
 
 /** Source attached to package-owned failures; already identified callback failures keep their owner. */
-export const STORE_INDEXED_SOURCE = '@migaia/store-indexed'
+export const STORE_INDEXED_SOURCE = ERROR_SOURCE
 
 function tagStoreIndexedError<E extends Error>(error: E, code: IStoreIndexedErrorCode): E {
   return attachErrorIdentity(error, { source: STORE_INDEXED_SOURCE, code })

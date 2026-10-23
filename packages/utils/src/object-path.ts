@@ -1,4 +1,4 @@
-import { UtilsErrorCode } from './error-code.js'
+import { ERROR_SOURCE, UtilsErrorCode } from './error-code.js'
 import { UtilsErrorText } from './error-text.js'
 import { attachErrorIdentity } from './error.js'
 
@@ -199,7 +199,7 @@ const maxSegments = 256
 /** Creates a package-coded invalid-path error without changing its native type. */
 function invalidPath(path: string, reason: string): TypeError {
   const error = new TypeError(UtilsErrorText.objectPathInvalid(path, reason))
-  attachErrorIdentity(error, { source: '@migaia/utils', code: UtilsErrorCode.objectPathInvalid })
+  attachErrorIdentity(error, { source: ERROR_SOURCE, code: UtilsErrorCode.objectPathInvalid })
   return error
 }
 

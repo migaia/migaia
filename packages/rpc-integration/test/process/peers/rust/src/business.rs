@@ -171,7 +171,7 @@ impl Business {
                     return (
                         Value::Null,
                         Some(wire_error(
-                            "@migaia/rpc/remote",
+                            "rpc.remote",
                             "REMOTE_CONTRACT_INVALID",
                             "invalid Host control",
                         )),
@@ -227,8 +227,8 @@ impl Business {
             }
             "peer.trace" => return (trace.clone(), None),
             "peer.error" => {
-                let cause = wire_error("@migaia/rpc/core", "INTERNAL", "peer cause");
-                let mut error = wire_error("@migaia/rpc/core", "INTERNAL", "peer error");
+                let cause = wire_error("rpc.endpoint", "INTERNAL", "peer cause");
+                let mut error = wire_error("rpc.endpoint", "INTERNAL", "peer error");
                 set(&mut error, "name", string("RpcError"));
                 set(&mut error, "stack", string("RpcError: peer error"));
                 set(&mut error, "cause", cause);
@@ -240,7 +240,7 @@ impl Business {
             return (
                 Value::Null,
                 Some(wire_error(
-                    "@migaia/rpc/remote",
+                    "rpc.remote",
                     "REMOTE_CLOSED",
                     "remote is closed",
                 )),
@@ -257,7 +257,7 @@ impl Business {
         (
             Value::Null,
             Some(wire_error(
-                "@migaia/rpc/core",
+                "rpc.endpoint",
                 "PROVIDER_NOT_FOUND",
                 METHOD_UNAVAILABLE,
             )),
@@ -411,7 +411,7 @@ pub fn serve(
                 (
                     "error",
                     wire_error(
-                        "@migaia/rpc/process",
+                        "rpc.transport.process",
                         "AUTH_REJECTED",
                         "authentication rejected",
                     ),
@@ -840,7 +840,7 @@ pub(super) fn serve_bridge(
                             (
                                 "error",
                                 wire_error(
-                                    "@migaia/rpc/process",
+                                    "rpc.transport.process",
                                     if baseline {
                                         "AUTH_REJECTED"
                                     } else {
@@ -937,7 +937,7 @@ pub(super) fn serve_bridge(
                         (
                             Value::Null,
                             Some(wire_error(
-                                "@migaia/rpc/core",
+                                "rpc.endpoint",
                                 "PAYLOAD_INVALID",
                                 "Runtime method payload is invalid",
                             )),
@@ -954,7 +954,7 @@ pub(super) fn serve_bridge(
                 _ => (
                     Value::Null,
                     Some(wire_error(
-                        "@migaia/rpc/core",
+                        "rpc.endpoint",
                         "METHOD_NOT_FOUND",
                         "bridge peer method unavailable",
                     )),

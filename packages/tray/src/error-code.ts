@@ -1,3 +1,6 @@
+/** Stable error domain owned by this code table; package moves preserve this identity. */
+export const ERROR_SOURCE = 'tray'
+
 /** Stable error codes exposed by the Tray admission and lookup boundary. */
 export const TrayErrorCode = {
   /** The mesh has no ready host candidate; await a ready instance before calling again. */

@@ -1,4 +1,4 @@
-import { StoreKeyedErrorCode, type IStoreKeyedErrorCode } from './error-code.js'
+import { ERROR_SOURCE, StoreKeyedErrorCode, type IStoreKeyedErrorCode } from './error-code.js'
 import { attachErrorIdentity } from '@migaia/utils/error'
 
 export { StoreKeyedErrorCode, type IStoreKeyedErrorCode }
@@ -7,7 +7,7 @@ export { StoreKeyedErrorCode, type IStoreKeyedErrorCode }
  * `source` assigned by this package’s factories; errors owned by another package retain their
  * owner.
  */
-export const STORE_KEYED_SOURCE = '@migaia/store-keyed'
+export const STORE_KEYED_SOURCE = ERROR_SOURCE
 
 /** Attaches `(source, code)` onto an existing error object without touching its type or stack. */
 function tagStoreKeyedError<E extends Error>(error: E, code: IStoreKeyedErrorCode): E {

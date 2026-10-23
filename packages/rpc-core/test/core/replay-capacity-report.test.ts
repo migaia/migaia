@@ -193,7 +193,7 @@ describe('local replay capacity reports', () => {
         .send('capacity-server', 'echo', 'secret-capacity-payload')
         .catch((error: unknown) => error)
       expect(refusal).toMatchObject({
-        source: '@migaia/rpc/core',
+        source: 'rpc.endpoint',
         code: 'OVERLOADED',
         message: 'Replay window is full'
       })
@@ -307,7 +307,7 @@ describe('local replay capacity reports', () => {
         const capacity = events.filter((event) => event.detail !== undefined)
         expect(capacity).toHaveLength(1)
         expect(capacity[0]!.error).toMatchObject({
-          source: '@migaia/rpc/core',
+          source: 'rpc.endpoint',
           code: 'OVERLOADED',
           message: 'Request replay ledger is full'
         })

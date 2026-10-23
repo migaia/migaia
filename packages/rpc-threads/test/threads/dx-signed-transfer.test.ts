@@ -70,7 +70,7 @@ describe('ordinary signed native-binary thread profile', () => {
       await expect(
         peer.request('bytes.inspect', buffer, { transfer: [buffer] })
       ).rejects.toMatchObject({
-        source: '@migaia/rpc/core',
+        source: 'rpc.endpoint',
         code: 'CAPABILITY_UNSUPPORTED'
       })
       expect(buffer.byteLength).toBe(3)
@@ -111,7 +111,7 @@ describe('ordinary signed native-binary thread profile', () => {
       forge = true
       await expect(
         peer.request('bytes.inspect', buffer, { transfer: [buffer], timeoutMs: 100 })
-      ).rejects.toMatchObject({ source: '@migaia/rpc/core', code: 'DEADLINE_EXCEEDED' })
+      ).rejects.toMatchObject({ source: 'rpc.endpoint', code: 'DEADLINE_EXCEEDED' })
       expect(buffer.byteLength).toBe(0)
       forge = false
       expect(await peer.request('bytes.calls')).toBe(0)

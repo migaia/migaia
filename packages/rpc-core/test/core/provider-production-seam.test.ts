@@ -876,7 +876,7 @@ describe('provider production-seam matrix', () => {
     }
     expect(failure).toMatchObject({
       name: 'RpcError',
-      source: '@migaia/rpc/core',
+      source: 'rpc.endpoint',
       code: RpcCoreErrorCode.invalidConfig
     })
 
@@ -895,12 +895,12 @@ describe('provider production-seam matrix', () => {
         hostFailure = error
       }
       expect(hostFailure).toMatchObject({
-        source: '@migaia/plugin-host',
+        source: 'plugin.host',
         code: 'PLUGIN_INSTALL_FAILED',
         detail: { failedName: 'endpoint-capabilities' },
         cause: expect.objectContaining({
           name: 'RpcError',
-          source: '@migaia/rpc/core',
+          source: 'rpc.endpoint',
           code: RpcCoreErrorCode.invalidConfig
         })
       })
@@ -1201,7 +1201,7 @@ describe('provider production-seam matrix', () => {
       }
       expect(dispatchFailure).toMatchObject({
         name: 'RpcError',
-        source: '@migaia/rpc/core',
+        source: 'rpc.endpoint',
         code: RpcCoreErrorCode.invalidConfig
       })
       commandKinds.push('validate')
@@ -1214,7 +1214,7 @@ describe('provider production-seam matrix', () => {
       expect(validateFailure).toBeInstanceOf(RpcSchemaValidationError)
       expect(validateFailure).toMatchObject({
         name: 'RpcSchemaValidationError',
-        source: '@migaia/rpc/core',
+        source: 'rpc.endpoint',
         code: RpcCoreErrorCode.schemaInvalid,
         cause: validateCause
       })
@@ -1249,7 +1249,7 @@ describe('provider production-seam matrix', () => {
       expect(responseResult).toBeInstanceOf(Promise)
       await expect(responseResult).rejects.toMatchObject({
         name: 'RpcTransportError',
-        source: '@migaia/rpc/core',
+        source: 'rpc.endpoint',
         code: RpcCoreErrorCode.transport,
         cause: responsePrimary
       })
@@ -1277,7 +1277,7 @@ describe('provider production-seam matrix', () => {
       expect(frameResult).toBeInstanceOf(Promise)
       await expect(frameResult).rejects.toMatchObject({
         name: 'RpcTransportError',
-        source: '@migaia/rpc/core',
+        source: 'rpc.endpoint',
         code: RpcCoreErrorCode.transport,
         cause: framePrimary
       })
@@ -1641,12 +1641,12 @@ describe('provider production-seam matrix', () => {
         terminal
       }).toEqual({
         name: 'PluginHostError',
-        source: '@migaia/plugin-host',
+        source: 'plugin.host',
         code: 'PLUGIN_INSTALL_FAILED',
         failedName: 'endpoint-capabilities',
         cause: expect.objectContaining({
           name: 'RpcError',
-          source: '@migaia/rpc/core',
+          source: 'rpc.endpoint',
           code: RpcCoreErrorCode.invalidConfig
         }),
         terminal: {
@@ -1972,7 +1972,7 @@ describe('provider production-seam matrix', () => {
     }
     expect(failure).toMatchObject({
       name: 'RpcLifecycleError',
-      source: '@migaia/rpc/core',
+      source: 'rpc.endpoint',
       code: RpcCoreErrorCode.endpointDisposed,
       cause: secondCleanup
     })
@@ -3838,7 +3838,7 @@ describe('provider production-seam matrix', () => {
       })
     ).rejects.toMatchObject({
       name: 'RpcConfigurationError',
-      source: '@migaia/rpc/core',
+      source: 'rpc.endpoint',
       code: RpcCoreErrorCode.invalidConfig,
       cause: failedCause
     })
@@ -3875,12 +3875,12 @@ describe('provider production-seam matrix', () => {
         failure = error
       }
       expect(failure).toMatchObject({
-        source: '@migaia/plugin-host',
+        source: 'plugin.host',
         code: 'PLUGIN_INSTALL_FAILED',
         detail: { failedName: 'endpoint-capabilities' },
         cause: expect.objectContaining({
           name: 'RpcConfigurationError',
-          source: '@migaia/rpc/core',
+          source: 'rpc.endpoint',
           code: RpcCoreErrorCode.invalidConfig,
           cause
         })
@@ -3945,12 +3945,12 @@ describe('provider production-seam matrix', () => {
         failure = error
       }
       expect(failure).toMatchObject({
-        source: '@migaia/plugin-host',
+        source: 'plugin.host',
         code: 'PLUGIN_INSTALL_FAILED',
         detail: { failedName: 'endpoint-capabilities' },
         cause: expect.objectContaining({
           name: 'RpcConfigurationError',
-          source: '@migaia/rpc/core',
+          source: 'rpc.endpoint',
           code: RpcCoreErrorCode.invalidConfig,
           cause
         })
@@ -4022,12 +4022,12 @@ describe('provider production-seam matrix', () => {
         failure = error
       }
       expect(failure).toMatchObject({
-        source: '@migaia/plugin-host',
+        source: 'plugin.host',
         code: 'PLUGIN_INSTALL_FAILED',
         detail: { failedName: 'endpoint-capabilities' },
         cause: expect.objectContaining({
           name: 'RpcConfigurationError',
-          source: '@migaia/rpc/core',
+          source: 'rpc.endpoint',
           code: RpcCoreErrorCode.invalidConfig,
           cause
         })
@@ -4567,7 +4567,7 @@ describe('provider production-seam matrix', () => {
       expect(response).toMatchObject({ code: RpcCoreErrorCode.schemaInvalid })
       expect(response?.error).toMatchObject({
         name: 'RpcSchemaValidationError',
-        source: '@migaia/rpc/core',
+        source: 'rpc.endpoint',
         code: RpcCoreErrorCode.schemaInvalid,
         stack: expect.any(String)
       })
@@ -4909,7 +4909,7 @@ describe('provider production-seam matrix', () => {
       expect(response).toMatchObject({
         error: {
           name: 'RpcSchemaValidationError',
-          source: '@migaia/rpc/core',
+          source: 'rpc.endpoint',
           code: RpcCoreErrorCode.schemaInvalid,
           stack: expect.any(String)
         }
@@ -4969,7 +4969,7 @@ describe('provider production-seam matrix', () => {
         response: {
           error: {
             name: 'RpcError',
-            source: '@migaia/rpc/core',
+            source: 'rpc.endpoint',
             code: RpcCoreErrorCode.internal,
             message: primary.message,
             stack: primary.stack,
@@ -5034,7 +5034,7 @@ describe('provider production-seam matrix', () => {
         response: {
           error: {
             name: 'RpcError',
-            source: '@migaia/rpc/core',
+            source: 'rpc.endpoint',
             code: RpcCoreErrorCode.internal,
             message: primary.message,
             stack: primary.stack,
@@ -5161,7 +5161,7 @@ describe('provider production-seam matrix', () => {
           code: RpcCoreErrorCode.internal,
           error: {
             name: 'RpcContractError',
-            source: '@migaia/rpc/core',
+            source: 'rpc.endpoint',
             code: RpcCoreErrorCode.contractInvalid,
             message: expect.any(String),
             stack: expect.any(String)
@@ -5226,7 +5226,7 @@ describe('provider production-seam matrix', () => {
       ) as { readonly error?: { readonly cause?: Record<string, unknown> } } | undefined
       expect(response?.error).toMatchObject({
         name: 'RpcSchemaValidationError',
-        source: '@migaia/rpc/core',
+        source: 'rpc.endpoint',
         code: RpcCoreErrorCode.schemaInvalid,
         stack: expect.any(String)
       })
@@ -5288,7 +5288,7 @@ describe('provider production-seam matrix', () => {
           code: RpcCoreErrorCode.internal,
           error: {
             name: 'RpcContractError',
-            source: '@migaia/rpc/core',
+            source: 'rpc.endpoint',
             code: RpcCoreErrorCode.contractInvalid,
             message: expect.any(String),
             stack: expect.any(String)

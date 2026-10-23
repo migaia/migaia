@@ -106,7 +106,7 @@ describe('provider concurrency observer', () => {
           for (const report of reports)
             expect(report).toMatchObject({
               code: 'INTERNAL',
-              error: { code: 'INTERNAL', source: '@migaia/rpc/core', cause: original }
+              error: { code: 'INTERNAL', source: 'rpc.endpoint', cause: original }
             })
         } else expect(reports).toEqual([])
         finish()

@@ -49,7 +49,7 @@ describe('serialize boundaries', () => {
 
     expect(error).toBeInstanceOf(SerializeCodecError)
     expect(error).toMatchObject({
-      source: '@migaia/serialize',
+      source: 'serialization',
       code: 'ABORTED',
       cause: reason
     })
@@ -78,7 +78,7 @@ describe('serialize boundaries', () => {
       .catch((caught: unknown) => caught)
 
     expect(hostileError).toMatchObject({
-      source: '@migaia/serialize',
+      source: 'serialization',
       code: 'INVALID_OPTION',
       cause: getterCause
     })
@@ -132,7 +132,7 @@ describe('serialize boundaries', () => {
 
     expect(error).toBeInstanceOf(SerializeCodecError)
     expect(error).toMatchObject({
-      source: '@migaia/serialize',
+      source: 'serialization',
       code: 'ENCODE_FAILED',
       type: 'fixture-type',
       chunkIndex: 1,
@@ -153,7 +153,7 @@ describe('serialize boundaries', () => {
 
     expect(error).toBeInstanceOf(SerializeCodecError)
     expect(error).toMatchObject({
-      source: '@migaia/serialize',
+      source: 'serialization',
       code: 'INVALID_CHUNK',
       chunkIndex: 1,
       bytesConsumed: 2,
@@ -175,7 +175,7 @@ describe('serialize boundaries', () => {
       })
     ).toThrowError(
       expect.objectContaining({
-        source: '@migaia/serialize',
+        source: 'serialization',
         code: 'INVALID_OPTION',
         cause
       })
@@ -234,7 +234,7 @@ describe('serialize boundaries', () => {
       if (scenario.name === 'getter') {
         expect(error, scenario.name).toBeInstanceOf(TypeError)
         expect(error, scenario.name).toMatchObject({
-          source: '@migaia/serialize',
+          source: 'serialization',
           code: 'INVALID_OPTION',
           cause: scenario.cause
         })
@@ -242,7 +242,7 @@ describe('serialize boundaries', () => {
       }
       expect(error, scenario.name).toBeInstanceOf(SerializeCodecError)
       expect(error, scenario.name).toMatchObject({
-        source: '@migaia/serialize',
+        source: 'serialization',
         code: scenario.code,
         type: 'stream',
         phase: 'encode',

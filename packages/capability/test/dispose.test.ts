@@ -91,7 +91,7 @@ describe('dispose generation cleanup isolation', () => {
     expect(host.disposed).toBe(true)
     await expect(host.dispose()).rejects.toEqual(
       expect.objectContaining({
-        source: '@migaia/capability',
+        source: 'capability',
         code: CapabilityErrorCode.hostTransitioning
       })
     )

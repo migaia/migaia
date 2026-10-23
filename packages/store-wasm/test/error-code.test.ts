@@ -6,7 +6,7 @@ describe('store-wasm error-code contract', () => {
     const codes = Object.values(StoreWasmErrorCode)
     expect(codes).toHaveLength(8)
     expect(new Set(codes).size).toBe(8)
-    expect(STORE_WASM_SOURCE).toBe('@migaia/store-wasm')
+    expect(STORE_WASM_SOURCE).toBe('store.wasm')
   })
 })
 

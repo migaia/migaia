@@ -1,5 +1,8 @@
+/** Stable error domain owned by this code table; package moves preserve this identity. */
+export const ERROR_SOURCE = 'event.subscriber'
+
 /** Stable source attached to every event-subscriber package-boundary error. */
-export const EVENT_SUBSCRIBER_SOURCE = '@migaia/event-subscriber'
+export const EVENT_SUBSCRIBER_SOURCE = ERROR_SOURCE
 
 /**
  * Stable semantic error codes attached together with EVENT_SUBSCRIBER_SOURCE. Compare these values

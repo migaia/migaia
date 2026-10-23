@@ -263,12 +263,14 @@ func acceptRecord(chosen agreement, local offer) record {
 
 // wireError uses the required source/code/name/message/stack wire fields with fixed safe text.
 func wireError(code, message string) record {
-	return record{"source": "@migaia/rpc/peer-go", "code": code, "name": "Error", "message": message, "stack": "Error: " + message}
+	return record{"source": "rpc.endpoint", "code": code, "name": "Error", "message": message, "stack": "Error: " + message}
 }
 
 // rejectRecord never includes a received hello or a credential.
 func rejectRecord(code, message string) record {
-	return record{"kind": "handshake", "step": "reject", "protocol": "migaia.rpc", "error": wireError(code, message)}
+	failure := wireError(code, message)
+	failure["source"] = "rpc.transport.process"
+	return record{"kind": "handshake", "step": "reject", "protocol": "migaia.rpc", "error": failure}
 }
 
 // parseAccept verifies that responder choices are a subset of the initiator offer.

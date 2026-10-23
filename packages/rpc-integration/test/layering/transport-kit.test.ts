@@ -126,7 +126,7 @@ describe('public transport kit', () => {
       expect(error).toBeInstanceOf(Error)
       expect(isRpcErrorInstance(error)).toBe(true)
       expect((error as Error).name).toBe('RpcTransportError')
-      expect(error).toMatchObject({ source: '@migaia/rpc/core', code: 'TRANSPORT' })
+      expect(error).toMatchObject({ source: 'rpc.endpoint', code: 'TRANSPORT' })
       expect((error as Error & { cause: unknown }).cause).toBe(original)
       expect(original).toBeInstanceOf(TypeError)
       expect(original).toMatchObject({ source: '@example/carrier', code: 'SEND_FAILED' })

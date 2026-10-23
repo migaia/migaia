@@ -2,7 +2,7 @@ import { createPortableWalker, type IPortableWalkerStrategy } from '../../src/co
 
 /** Copied RPC contract identity is fixture policy; serialize production code owns no RPC rule. */
 const RpcPortableOracle = {
-  source: '@migaia/rpc/contract',
+  source: 'rpc.contract',
   code: 'INVALID_ENVELOPE',
   message: 'rpc envelope is invalid',
   invalid: 'rpc portable input is invalid',

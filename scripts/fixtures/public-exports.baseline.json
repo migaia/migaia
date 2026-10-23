@@ -234,6 +234,7 @@
     "@migaia/plugin-host": {
       ".": [
         "ERROR_TEXT",
+        "PLUGIN_HOST_SOURCE",
         "PluginHost",
         "PluginHostDisposalNodeKind",
         "PluginHostError",
@@ -1920,6 +1921,7 @@
         "IdentifyError",
         "MAX_NATIVE_RECURSION_DEPTH",
         "ThenableProbeKind",
+        "UTILS_SOURCE",
         "UtilsAbortError",
         "UtilsError",
         "UtilsErrorCode",
@@ -2056,6 +2058,7 @@
       ],
       "./error": [
         "IdentifyError",
+        "UTILS_SOURCE",
         "UtilsAbortError",
         "UtilsError",
         "UtilsErrorCode",

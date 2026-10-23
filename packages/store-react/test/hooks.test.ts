@@ -94,7 +94,7 @@ describe('public React subscriptions', () => {
       return createElement('span', null, useNodeValue(node, createRuntime()))
     }
     expect(() => renderToString(createElement(Consumer))).toThrow(
-      expect.objectContaining({ source: '@migaia/reactive', code: 'CROSS_RUNTIME' })
+      expect.objectContaining({ source: 'reactive', code: 'CROSS_RUNTIME' })
     )
     node.dispose()
   })

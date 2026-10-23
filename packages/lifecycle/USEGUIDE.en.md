@@ -1044,7 +1044,7 @@ import { probeThenable, assimilateCapturedThen, type IThenableProbe } from '@mig
 ### `LIFECYCLE_SOURCE`
 
 ```ts doc-test=skip reason="Fragment that relies on illustrative outside functions or values"
-const LIFECYCLE_SOURCE: '@migaia/lifecycle'
+const LIFECYCLE_SOURCE: 'lifecycle'
 ```
 
 The fixed `source` value of every error from this package. A string constant.
@@ -1160,7 +1160,7 @@ Plain constant objects (`as const`) to compare against or `switch` on instead of
 import { LifecycleErrorCode, type ILifecycleErrorCode } from '@migaia/lifecycle'
 ```
 
-The stable error code table: **22 codes**, all declared in `src/error-code.ts`; `source` is always `'@migaia/lifecycle'`:
+The stable error code table: **22 codes**, all declared in `src/error-code.ts`; `source` is always `'lifecycle'`:
 
 ```ts doc-test=skip reason="Fragment that relies on illustrative outside functions or values"
 if (error.code === LifecycleErrorCode.scopeClosed) {
@@ -1378,7 +1378,7 @@ Leaf entries offer smaller import boundaries. Only five names are missing from t
 - **`GenerationController.begin()` throws `GENERATION_DISPOSED`**: the controller was disposed and cannot be reused; create a new one.
 - **`commitTo()` throws `PROVISIONAL_PARENT_CLOSED`**: the target parent is `closing`/`terminal`. What was handed over stays with the parent and the rest was already released; no manual `rollback()` is needed.
 - **`enqueue()` throws `QUEUE_SELF_DEPENDENCY`**: an owner submitted and awaited a new task while its own task was running, which would deadlock a FIFO queue; split it into two independent top-level calls.
-- **`systemScheduler` throws `ENV_UNSUPPORTED`** (`source: '@migaia/utils'`): the host lacks `performance.now`, `setTimeout` or `clearTimeout`. Inject your own `IScheduler`, or run in a runtime that has them.
+- **`systemScheduler` throws `ENV_UNSUPPORTED`** (`source: 'foundation.utils'`): the host lacks `performance.now`, `setTimeout` or `clearTimeout`. Inject your own `IScheduler`, or run in a runtime that has them.
 - **You need an event bus, current-value subscriptions or a dependency graph**: `@migaia/lifecycle` deliberately does not provide them; see `@migaia/event-subscriber`, `@migaia/reactive` and `@migaia/capability/graph`.
 
 ```bash

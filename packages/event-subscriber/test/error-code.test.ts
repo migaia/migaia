@@ -4,7 +4,7 @@ import { EVENT_SUBSCRIBER_SOURCE, EventSubscriberErrorCode } from '../src/index.
 describe('error code contract', () => {
   it('exposes one source and nineteen unique public codes', () => {
     const codes = Object.values(EventSubscriberErrorCode)
-    expect(EVENT_SUBSCRIBER_SOURCE).toBe('@migaia/event-subscriber')
+    expect(EVENT_SUBSCRIBER_SOURCE).toBe('event.subscriber')
     expect(codes).toHaveLength(19)
     expect(new Set(codes).size).toBe(codes.length)
   })

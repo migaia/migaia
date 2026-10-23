@@ -439,7 +439,7 @@ FinalizationRegistry 存在时登记已创建字段，显式释放会 unregister
 | cleanupFailed           | CLEANUP_FAILED      | 多项清理失败或不能直接附 secondary errors 的构造回滚失败 |
 | instancePoisoned        | INSTANCE_POISONED   | arena 已 trap 后再申请分配，cause 为原 trap              |
 
-STORE_WASM_SOURCE 为 `'@migaia/store-wasm'`，只标识本包创建的错误；已有外包身份保持原 owner。可附码 native 输入读取失败原位附 INVALID_OPTION，不可附码时用 cause/errors；不要把声明的原生 WASM pass-through 错误强制重包为普通 Error。
+STORE_WASM_SOURCE 为 `'store.wasm'`，只标识本包创建的错误；已有外包身份保持原 owner。可附码 native 输入读取失败原位附 INVALID_OPTION，不可附码时用 cause/errors；不要把声明的原生 WASM pass-through 错误强制重包为普通 Error。
 
 四个公开错误工厂 code:IStoreWasmErrorCode 与 message:string 必填。`createStoreWasmError(code,message,options?)` 返回 Error，`createStoreWasmTypeError(...)` 返回 TypeError，options 默认 undefined，仅 cause，值非 undefined 时转发；`createStoreWasmRangeError(code,message)` 无第三参；`createStoreWasmAggregateError(code,errors:readonly unknown[],message)` 保留每个原错。它们构造不自动 throw，附不可写 source/code，不改 stack。
 

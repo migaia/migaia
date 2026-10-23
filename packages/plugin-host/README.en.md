@@ -302,7 +302,7 @@ inspectFeatures(roots) from composition reads trusted Feature topology without e
 
 ### Errors, diagnostics, and states
 
-PluginHostError extends Error with readonly source, code, and optional detail. Its source is @migaia/plugin-host; cause/errors retain original failures. Mutable native callback errors receive identity in place; immutable or non-Error values remain on cause. Complete foreign identities retain their owner. INVALID_OPTION keeps TypeError; configuration-domain and cycle failures are PluginHostError. Do not classify all failures by one class or parse diagnostic text.
+PluginHostError extends Error with readonly source, code, and optional detail. Its source is plugin.host; cause/errors retain original failures. Mutable native callback errors receive identity in place; immutable or non-Error values remain on cause. Complete foreign identities retain their owner. INVALID_OPTION keeps TypeError; configuration-domain and cycle failures are PluginHostError. Do not classify all failures by one class or parse diagnostic text.
 
 Rollback failures do not replace installation failures. PLUGIN_INSTALL_FAILED.detail includes failedName and rollbackErrors in release order. Async use publishes a completed frozen detail; sync useSync publishes a frozen snapshot with detail.completion for final frozen identities. Await completion before translating errors that need all secondary failures. PLUGIN_INSTALL_ROLLBACK_FAILED is an additional diagnostic.
 

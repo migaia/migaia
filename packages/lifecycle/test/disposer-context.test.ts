@@ -37,7 +37,7 @@ describe('disposer context owner-join contract', () => {
     expect(failures).toHaveLength(2)
     for (const failure of failures) {
       expect(failure).toMatchObject({
-        source: '@migaia/lifecycle',
+        source: 'lifecycle',
         code: LifecycleErrorCode.scopeReentrantDispose
       })
       expect((failure as Error).stack).toBeTruthy()
@@ -306,7 +306,7 @@ describe('disposer context owner-join contract', () => {
     expect(bErrors).toHaveLength(1)
     expect(bErrors[0]?.error).toBe(aError)
     expect(aError).toMatchObject({
-      source: '@migaia/lifecycle',
+      source: 'lifecycle',
       code: LifecycleErrorCode.scopeReentrantDispose
     })
     expect(scopeB.lifecycle).toBe('terminal')

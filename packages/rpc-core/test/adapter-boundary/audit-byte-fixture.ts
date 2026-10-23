@@ -2,14 +2,14 @@ import * as contract from '@migaia/rpc-contract'
 import type { IRuntimeByteDiagnostics } from '../../dist/adapter/internal-advanced.js'
 /** Core owns these generic byte-adapter failure identities. */
 export const diagnostics: IRuntimeByteDiagnostics = {
-  closed: { source: '@migaia/rpc/core', code: 'TRANSPORT', message: 'audit byte closed' },
+  closed: { source: 'rpc.endpoint', code: 'TRANSPORT', message: 'audit byte closed' },
   timeout: {
-    source: '@migaia/rpc/core',
+    source: 'rpc.endpoint',
     code: 'DEADLINE_EXCEEDED',
     message: 'audit handshake timeout'
   },
   authenticationRejected: {
-    source: '@migaia/rpc/core',
+    source: 'rpc.endpoint',
     code: 'AUTHENTICATION_FAILED',
     message: 'audit authentication rejected'
   },

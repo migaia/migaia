@@ -40,7 +40,7 @@ describe('instance definitions', () => {
     expect(() =>
       defineTrayHost({ name: 'bad', plugins, exposes: [], ...override } as never)
     ).toThrowError(
-      expect.objectContaining({ source: '@migaia/tray', code: TrayErrorCode.hostInvalid })
+      expect.objectContaining({ source: 'tray', code: TrayErrorCode.hostInvalid })
     )
   })
 

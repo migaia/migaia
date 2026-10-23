@@ -1,5 +1,5 @@
 /** Registry identity shared by all devtools errors; consumers classify the source/code pair. */
-export const ERROR_SOURCE = '@migaia/rpc/devtools'
+export const ERROR_SOURCE = 'rpc.devtools'
 
 /** Public code owner for the record contract and the collector/hub lifecycle. */
 export const RpcDevtoolsErrorCode = {

@@ -18,11 +18,11 @@ test('owned DedicatedWorker reports its unobservable exit without waiting for re
   expect(receipt.value).toBe(42)
   expect(receipt.exitObservation).toBe('unsupported')
   expect(receipt.admission).toEqual([
-    expect.objectContaining({ source: '@migaia/supervision', code: 'CAPABILITY_UNSUPPORTED' })
+    expect.objectContaining({ source: 'supervision', code: 'CAPABILITY_UNSUPPORTED' })
   ])
   expect(receipt.closing).toEqual([
     expect.objectContaining({
-      source: '@migaia/supervision',
+      source: 'supervision',
       code: 'EXIT_UNOBSERVABLE',
       name: 'Error',
       detail: expect.objectContaining({

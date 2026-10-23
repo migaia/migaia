@@ -56,7 +56,7 @@ it('rolls back the actual acquired Worker when its first physical write fails', 
         }
       )
     ).rejects.toBe(original)
-    expect(original).toMatchObject({ source: '@migaia/rpc/core', code: 'TRANSPORT' })
+    expect(original).toMatchObject({ source: 'rpc.endpoint', code: 'TRANSPORT' })
     expect(workers[0]!.terminated).toBe(1)
     await workers[0]!.closed
     expect([...workers[0]!.listeners.values()].every((group) => group.size === 0)).toBe(true)

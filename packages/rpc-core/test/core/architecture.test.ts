@@ -111,7 +111,7 @@ describe('web-rpc 边界：不得依赖 src/store', () => {
 
     const pipelineImports = Object.entries(SOURCES)
       .filter(([path]) => !path.endsWith('.test.ts') && !path.endsWith('.test.tsx'))
-      .filter(([, source]) => source.includes('@migaia/middleware-pipeline'))
+      .filter(([, source]) => source.includes('middleware.pipeline'))
       .map(([path]) => path)
     expect(pipelineImports).toEqual([])
   })

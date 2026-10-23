@@ -1,5 +1,6 @@
 import { runInNewContext } from 'node:vm'
 import { describe, expect, it } from 'vitest'
+import * as publicUtilsError from '@migaia/utils/error'
 import {
   attachErrorIdentity,
   attachSecondaryErrors,
@@ -11,6 +12,16 @@ import {
 } from '../src/error.js'
 
 describe('error primitives', () => {
+  it('source domains keeps public utils errors and source exports aligned', () => {
+    /** The public package boundary creates a registered error from a non-Error value. */
+    const error = publicUtilsError.toError({ bad: true })
+    expect(error, 'SOURCE_DOMAIN_UTILS_SOURCE').toMatchObject({
+      source: 'foundation.utils',
+      code: publicUtilsError.UtilsErrorCode.nonErrorValue
+    })
+    expect(Reflect.get(error, 'source')).toBe(Reflect.get(publicUtilsError, 'UTILS_SOURCE'))
+  })
+
   it('recognizes native error families across realms without invoking hostile methods', () => {
     /** Cross-realm native failures must retain their original constructor and stack. */
     const foreign = runInNewContext('new TypeError("foreign")') as unknown

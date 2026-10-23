@@ -225,7 +225,7 @@ describe('process session provider admission', () => {
         expect(close).toHaveBeenCalledTimes(index === 2 ? 1 : 0)
         expect(providers[index]!.signal.aborted).toBe(true)
         expect(providers[index]!.signal.reason).toMatchObject({
-          source: '@migaia/rpc/core',
+          source: 'rpc.endpoint',
           code: 'DEADLINE_EXCEEDED',
           name: 'TimeoutError'
         })

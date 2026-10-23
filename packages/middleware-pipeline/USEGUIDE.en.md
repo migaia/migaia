@@ -342,7 +342,7 @@ Each returning outer async stage rechecks cancellation and host activity even wh
 
 ## Failures, original errors and codes
 
-`MIDDLEWARE_PIPELINE_SOURCE` is `'@migaia/middleware-pipeline'`. `MiddlewarePipelineErrorCode` is the public error table.
+`MIDDLEWARE_PIPELINE_SOURCE` is `'middleware.pipeline'`. `MiddlewarePipelineErrorCode` is the public error table.
 
 | Member               | Code                   | What causes it                                                                                                                                                    |
 | -------------------- | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |

@@ -277,7 +277,7 @@ describe('framing matrix', () => {
     throwingReads = 0
     expect(framer.accept(throwing as never, context)).toMatchObject({
       status: 'rejected',
-      error: { code: 'INVALID_FRAME', source: '@migaia/rpc/contract', cause: original }
+      error: { code: 'INVALID_FRAME', source: 'rpc.contract', cause: original }
     })
     expect(throwingReads).toBe(1)
   })

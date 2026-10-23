@@ -112,7 +112,7 @@ describe('createResource', () => {
         { runtime: createRuntime() }
       )
     ).toThrowError(
-      expect.objectContaining({ code: 'RESOURCE_SETUP_INVALID', source: '@migaia/resource' })
+      expect.objectContaining({ code: 'RESOURCE_SETUP_INVALID', source: 'resource' })
     )
     expect(cleanup).toHaveBeenCalledOnce()
   })

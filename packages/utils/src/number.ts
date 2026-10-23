@@ -1,4 +1,4 @@
-import { UtilsErrorCode } from './error-code.js'
+import { ERROR_SOURCE, UtilsErrorCode } from './error-code.js'
 import { UtilsErrorText } from './error-text.js'
 import { attachErrorIdentity } from './error.js'
 
@@ -69,7 +69,7 @@ function codeNumberFormatError(error: unknown): Error {
       ? error
       : new TypeError(UtilsErrorText.numberFormatInvalid, { cause: error })
   return attachErrorIdentity(nativeError, {
-    source: '@migaia/utils',
+    source: ERROR_SOURCE,
     code: UtilsErrorCode.numberFormatInvalid
   })
 }

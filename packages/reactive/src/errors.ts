@@ -1,5 +1,5 @@
 /** `source` value stamped onto every error this package throws. */
-export const REACTIVE_SOURCE = '@migaia/reactive'
+export const REACTIVE_SOURCE = ERROR_SOURCE
 
 /**
  * Shared error contract from `docs/contracts/error-codes.md`. `source` and `code` are attached as
@@ -38,7 +38,7 @@ import {
   isNativeErrorValue,
   tryReadProperty
 } from '@migaia/utils/error'
-import { ReactiveErrorCode } from './error-code.js'
+import { ERROR_SOURCE, ReactiveErrorCode } from './error-code.js'
 import { ReactiveErrorText } from './error-text.js'
 
 /**

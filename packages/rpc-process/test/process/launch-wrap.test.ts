@@ -31,7 +31,7 @@ const entry = fileURLToPath(new URL('./fixtures/launch-wrap-child.ts', import.me
 /** The external macOS tool is optional; the skip reason is part of the sandbox case evidence. */
 const sandboxAvailable = process.platform === 'darwin' && existsSync('/usr/bin/sandbox-exec')
 /** The public Host install wrapper stays visible instead of asserting only a nested code. */
-const hostFailure = { source: '@migaia/plugin-host', code: 'PLUGIN_INSTALL_FAILED' }
+const hostFailure = { source: 'plugin.host', code: 'PLUGIN_INSTALL_FAILED' }
 
 /** Error inspection keeps native values and cause identity intact while checking owner layers. */
 type IObservedError = Error & {
@@ -302,7 +302,7 @@ describe('launch-wrap revision 5', () => {
     const invalid = (error as Error).cause as IObservedError
     expect(invalid).toBeInstanceOf(TypeError)
     expect(invalid).toMatchObject({
-      source: '@migaia/rpc/process',
+      source: 'rpc.transport.process',
       code: 'PROCESS_PLUGIN_INVALID_OPTION',
       detail: { field: 'wrap' },
       stack: expect.stringMatching(/\S/)
@@ -323,10 +323,10 @@ describe('launch-wrap revision 5', () => {
         }
       })
       /** Own-data validation fails at the named field without executing a launch. */
-      const invalid = layer(error, '@migaia/supervision', 'LAUNCH_FAILED').cause as IObservedError
+      const invalid = layer(error, 'supervision', 'LAUNCH_FAILED').cause as IObservedError
       expect(invalid).toBeInstanceOf(TypeError)
       expect(invalid).toMatchObject({
-        source: '@migaia/rpc/process',
+        source: 'rpc.transport.process',
         code: 'PROCESS_PLUGIN_INVALID_OPTION',
         detail: { field: `wrap.${field}` }
       })
@@ -351,10 +351,10 @@ describe('launch-wrap revision 5', () => {
           })
       })
       /** Returning an accessor is invalid output and has no invented thrown cause. */
-      const invalid = layer(error, '@migaia/supervision', 'LAUNCH_FAILED').cause as IObservedError
+      const invalid = layer(error, 'supervision', 'LAUNCH_FAILED').cause as IObservedError
       expect(invalid).toBeInstanceOf(TypeError)
       expect(invalid).toMatchObject({
-        source: '@migaia/rpc/process',
+        source: 'rpc.transport.process',
         code: 'PROCESS_PLUGIN_INVALID_OPTION',
         detail: { field: `wrap.${field}` }
       })
@@ -379,14 +379,14 @@ describe('launch-wrap revision 5', () => {
     async (field, wrap) => {
       /** Invalid callback results intentionally bypass the static return type. */
       const error = await installFailure({ wrap: wrap as unknown as IProcessShortSpawn['wrap'] })
-      layer(error, '@migaia/rpc/remote', 'REMOTE_START_FAILED')
+      layer(error, 'rpc.remote', 'REMOTE_START_FAILED')
       /** Launcher failure retains the validation instance as its direct native cause. */
-      const failed = layer(error, '@migaia/supervision', 'LAUNCH_FAILED')
+      const failed = layer(error, 'supervision', 'LAUNCH_FAILED')
       /** The invalid result was returned, so its TypeError has no invented cause. */
       const invalid = failed.cause as IObservedError
       expect(invalid).toBeInstanceOf(TypeError)
       expect(invalid).toMatchObject({
-        source: '@migaia/rpc/process',
+        source: 'rpc.transport.process',
         code: 'PROCESS_PLUGIN_INVALID_OPTION',
         detail: { field: `wrap.${field}` },
         stack: expect.stringMatching(/\S/)
@@ -412,12 +412,12 @@ describe('launch-wrap revision 5', () => {
         }
       }
     })
-    layer(error, '@migaia/rpc/remote', 'REMOTE_START_FAILED')
+    layer(error, 'rpc.remote', 'REMOTE_START_FAILED')
     /** Only the native tagged TypeError adds a layer before the identical original thrown object. */
-    const invalid = layer(error, '@migaia/supervision', 'LAUNCH_FAILED').cause as IObservedError
+    const invalid = layer(error, 'supervision', 'LAUNCH_FAILED').cause as IObservedError
     expect(invalid).toBeInstanceOf(TypeError)
     expect(invalid).toMatchObject({
-      source: '@migaia/rpc/process',
+      source: 'rpc.transport.process',
       code: 'PROCESS_PLUGIN_INVALID_OPTION',
       detail: { field: 'wrap' },
       stack: expect.stringMatching(/\S/)
@@ -426,10 +426,10 @@ describe('launch-wrap revision 5', () => {
     /** Exhaustion reports carry the same launch failure chain. */
     const exhausted = reports.find((report) => causes(report)[0]?.code === 'SUPERVISION_EXHAUSTED')
     expect(exhausted).toMatchObject({
-      source: '@migaia/supervision',
+      source: 'supervision',
       code: 'SUPERVISION_EXHAUSTED'
     })
-    expect(layer(exhausted, '@migaia/supervision', 'LAUNCH_FAILED').cause).toBe(invalid)
+    expect(layer(exhausted, 'supervision', 'LAUNCH_FAILED').cause).toBe(invalid)
   })
 
   it('preserves missing-command ENOENT below channel and launch failure layers', async () => {
@@ -438,9 +438,9 @@ describe('launch-wrap revision 5', () => {
       wrap: (command) => ({ ...command, command: '/migaia-launch-wrap-command-does-not-exist' })
     })
     /** Native spawn failure has exactly the documented owner sequence beneath managed admission. */
-    const failed = layer(error, '@migaia/supervision', 'LAUNCH_FAILED')
+    const failed = layer(error, 'supervision', 'LAUNCH_FAILED')
     expect(failed.cause).toMatchObject({
-      source: '@migaia/rpc/process',
+      source: 'rpc.transport.process',
       code: 'PROCESS_CHANNEL_CONNECT_FAILED',
       cause: { code: 'ENOENT' }
     })
@@ -470,7 +470,7 @@ describe('launch-wrap revision 5', () => {
             expect.objectContaining({
               reason: 'crashed',
               code: 3,
-              error: { source: '@migaia/supervision', code: 'EXIT_UNEXPECTED' }
+              error: { source: 'supervision', code: 'EXIT_UNEXPECTED' }
             })
           ),
         { timeout: 2000 }
@@ -527,7 +527,7 @@ describe('launch-wrap revision 5', () => {
         const event = exits[0]
         expect(event).toMatchObject({
           reason: 'crashed',
-          error: { source: '@migaia/supervision', code: 'EXIT_UNEXPECTED' }
+          error: { source: 'supervision', code: 'EXIT_UNEXPECTED' }
         })
         console.info(
           '[immediate wrapper]',
@@ -537,11 +537,11 @@ describe('launch-wrap revision 5', () => {
         expect(outcome.error).toMatchObject(hostFailure)
         /** Bootstrap write failure and pre-commit channel closure retain distinct owner chains. */
         const failed = causes(outcome.error).find(
-          (error) => error.source === '@migaia/supervision' && error.code === 'LAUNCH_FAILED'
+          (error) => error.source === 'supervision' && error.code === 'LAUNCH_FAILED'
         )
         if (failed) {
           expect(failed.cause).toMatchObject({
-            source: '@migaia/rpc/process',
+            source: 'rpc.transport.process',
             code: 'PROCESS_CHANNEL_CONNECT_FAILED',
             cause: expect.any(Error)
           })
@@ -555,12 +555,12 @@ describe('launch-wrap revision 5', () => {
           )
         } else {
           /** A returned handle can lose its channel before Host installation commits. */
-          const start = layer(outcome.error, '@migaia/rpc/remote', 'REMOTE_START_FAILED')
+          const start = layer(outcome.error, 'rpc.remote', 'REMOTE_START_FAILED')
           expect(start.cause).toMatchObject({
-            source: '@migaia/rpc/process',
+            source: 'rpc.transport.process',
             code: 'PROCESS_CHANNEL_CLOSED',
             cause: {
-              source: '@migaia/rpc/process',
+              source: 'rpc.transport.process',
               code: 'PROCESS_CHANNEL_CLOSED'
             }
           })
@@ -617,7 +617,7 @@ describe('launch-wrap revision 5', () => {
       if (detail.found) {
         expect(detail.value.lastExit).toMatchObject({
           reason: 'launch-failed',
-          error: { source: '@migaia/supervision', code: 'LAUNCH_FAILED' }
+          error: { source: 'supervision', code: 'LAUNCH_FAILED' }
         })
       } else {
         expect(detail.error).toBeInstanceOf(Error)

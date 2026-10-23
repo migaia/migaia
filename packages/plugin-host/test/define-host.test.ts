@@ -41,7 +41,7 @@ describe('defineHost', () => {
 
   it('rejects an empty identity label and admits only identities issued for an exact Host', async () => {
     expect(() => defineHost({ host: { ...hostOptions, identity: { name: '' } } })).toThrow(
-      expect.objectContaining({ source: '@migaia/plugin-host', code: 'INVALID_OPTION' })
+      expect.objectContaining({ source: 'plugin.host', code: 'INVALID_OPTION' })
     )
     const host = defineHost({ host: hostOptions })
     try {

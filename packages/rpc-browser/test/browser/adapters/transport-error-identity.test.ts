@@ -44,7 +44,7 @@ describe('browser native transport error identity', () => {
     transport.onTransportError?.((error) => observed.push(error))
     expect(observed).toHaveLength(1)
     expect(observed[0]).toMatchObject({
-      source: '@migaia/rpc/core',
+      source: 'rpc.endpoint',
       code: 'TRANSPORT',
       message: 'RTCDataChannel closed'
     })
@@ -68,7 +68,7 @@ describe('browser native transport error identity', () => {
     await new Promise<void>((resolve) => queueMicrotask(resolve))
     expect(observed).toHaveLength(1)
     expect(observed[0]).toMatchObject({
-      source: '@migaia/rpc/core',
+      source: 'rpc.endpoint',
       code: 'TRANSPORT',
       message: 'WebTransport datagram stream ended'
     })
@@ -83,7 +83,7 @@ describe('browser native transport error identity', () => {
     fixture.emit({ type: 'close' })
     const aggregate = observed[0] as AggregateError
     expect(aggregate.errors[0]).toMatchObject({
-      source: '@migaia/rpc/core',
+      source: 'rpc.endpoint',
       code: 'TRANSPORT',
       message: 'RTCDataChannel closed'
     })
@@ -112,7 +112,7 @@ describe('browser native transport error identity', () => {
     } as unknown as Event)
     expect(observed).toHaveLength(1)
     expect(observed[0]).toMatchObject({
-      source: '@migaia/rpc/core',
+      source: 'rpc.endpoint',
       code: 'TRANSPORT',
       cause: original
     })
@@ -135,7 +135,7 @@ describe('browser native transport error identity', () => {
     shared.subscribe(() => undefined)
     listeners.get('messageerror')?.(new Event('messageerror'))
     expect(sharedErrors).toHaveLength(1)
-    expect(sharedErrors[0]).toMatchObject({ source: '@migaia/rpc/core', code: 'TRANSPORT' })
+    expect(sharedErrors[0]).toMatchObject({ source: 'rpc.endpoint', code: 'TRANSPORT' })
 
     listeners.clear()
     const worker = createWebWorkerTransport(port)
@@ -145,7 +145,7 @@ describe('browser native transport error identity', () => {
     listeners.get('messageerror')?.(new Event('messageerror'))
     expect(workerErrors).toHaveLength(2)
     for (const error of workerErrors) {
-      expect(error).toMatchObject({ source: '@migaia/rpc/core', code: 'TRANSPORT' })
+      expect(error).toMatchObject({ source: 'rpc.endpoint', code: 'TRANSPORT' })
       expect((error as Error).constructor).toBe(Error)
     }
   })
@@ -164,7 +164,7 @@ describe('browser native transport error identity', () => {
     expect(aggregate.errors[0]).toBe(original)
     expect(aggregate.errors[1]).toBe(fixture.cleanup)
     expect(received[1]).toBe(original)
-    expect(original).toMatchObject({ source: '@migaia/rpc/core', code: 'TRANSPORT' })
+    expect(original).toMatchObject({ source: 'rpc.endpoint', code: 'TRANSPORT' })
     expect(original.message).toBe('terminal failure')
     expect(original.stack).toBe(stack)
   })
@@ -185,7 +185,7 @@ describe('browser native transport error identity', () => {
     const wrapper = aggregate.errors[0]
     expect(wrapper).not.toBe(original)
     expect(wrapper).toMatchObject({
-      source: '@migaia/rpc/core',
+      source: 'rpc.endpoint',
       code: 'TRANSPORT',
       cause: original
     })

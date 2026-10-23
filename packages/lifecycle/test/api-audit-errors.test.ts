@@ -12,7 +12,7 @@ describe('lifecycle audited error observation', () => {
   it('requires a reporter at the public collector entry', () => {
     for (const policy of ['report', 'firstError'] as const)
       expect(() => createErrorCollector(policy, undefined)).toThrowError(
-        expect.objectContaining({ source: '@migaia/lifecycle', code: 'INVALID_OPTION' })
+        expect.objectContaining({ source: 'lifecycle', code: 'INVALID_OPTION' })
       )
   })
 
@@ -37,7 +37,7 @@ describe('lifecycle audited error observation', () => {
       () => scheduler.defer?.(() => undefined)
     ])
       expect(run).toThrow(failure)
-    expect(failure).toMatchObject({ source: '@migaia/lifecycle', code: 'INVALID_OPTION' })
+    expect(failure).toMatchObject({ source: 'lifecycle', code: 'INVALID_OPTION' })
   })
 
   it('rejects provisional detach failure after releasing every resource', async () => {
@@ -108,7 +108,7 @@ describe('lifecycle audited error observation', () => {
     }
     /** Coded fallback keeps both failures reachable. */
     const wrapped = createLifecycleFailure('INVALID_OPTION', 'fallback', original)
-    expect(wrapped.source).toBe('@migaia/lifecycle')
+    expect(wrapped.source).toBe('lifecycle')
     expect(wrapped.code).toBe('INVALID_OPTION')
     expect(wrapped.cause).toBe(original)
     expect(walkErrorCauses(wrapped).includes(original)).toBe(true)
@@ -143,16 +143,16 @@ describe('lifecycle audited error observation', () => {
     const collector = createErrorCollector('throw', undefined)
     collector.add('item', original)
     expect(() => collector.finalize('release failed')).toThrow(original)
-    expect(original).toMatchObject({ source: '@migaia/lifecycle', code: 'SCOPE_DISPOSAL_FAILED' })
+    expect(original).toMatchObject({ source: 'lifecycle', code: 'SCOPE_DISPOSAL_FAILED' })
     /** Valid foreign semantic identity must never be rewritten by lifecycle policy. */
     const foreign = Object.assign(new Error('foreign'), {
-      source: '@migaia/utils',
+      source: 'foundation.utils',
       code: 'INVALID_ARGUMENT'
     })
     /** Collection keeps the exact foreign value. */
     const collecting = createErrorCollector('collect', undefined)
     collecting.add('item', foreign)
     expect(collecting.finalize('collect')[0]?.error).toBe(foreign)
-    expect(foreign.source).toBe('@migaia/utils')
+    expect(foreign.source).toBe('foundation.utils')
   })
 })

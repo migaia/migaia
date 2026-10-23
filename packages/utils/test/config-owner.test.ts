@@ -39,7 +39,7 @@ describe('ConfigOwner', () => {
     expect(owner.getOr('present', 'fallback')).toBeUndefined()
     expect(owner.getOr('missing', 'fallback')).toBe('fallback')
     expect(() => owner.require('missing.deep')).toThrowError(
-      expect.objectContaining({ code: 'CONFIG_VALUE_MISSING', source: '@migaia/utils' })
+      expect.objectContaining({ code: 'CONFIG_VALUE_MISSING', source: 'foundation.utils' })
     )
   })
 

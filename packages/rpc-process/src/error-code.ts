@@ -1,5 +1,5 @@
 /** Stable source for errors owned by native process channels and launch adapters. */
-export const ERROR_SOURCE = '@migaia/rpc/process'
+export const ERROR_SOURCE = 'rpc.transport.process'
 
 /** Process boundary failures; callers close or recreate the affected connection. */
 export const RpcProcessErrorCode = {

@@ -91,7 +91,7 @@ describe('process resilience public session policy', () => {
       ).toThrowError(
         expect.objectContaining({
           constructor: TypeError,
-          source: '@migaia/rpc/process',
+          source: 'rpc.transport.process',
           code: 'PROCESS_RESILIENCE_INVALID_OPTION',
           message: 'process resilience options are invalid',
           detail: { field: 'identity.principalId' },
@@ -113,7 +113,7 @@ describe('process resilience public session policy', () => {
     expect(() => createProcessResilience({ scheduler, report, reportAtMs: [5, 10] })).toThrowError(
       expect.objectContaining({
         constructor: RangeError,
-        source: '@migaia/rpc/process',
+        source: 'rpc.transport.process',
         code: 'PROCESS_RESILIENCE_INVALID_OPTION',
         message: 'process resilience options are invalid',
         detail: { field: 'reportAtMs' },

@@ -452,7 +452,7 @@ LoggerLevel、LoggerColorMode、LoggerReasoningPhase、LoggerStatus 与 LOGGER_S
 
 ### 错误身份与排查
 
-Logger 自有错误 source 为 @migaia/logger；来自 Plugin Host、middleware 或其它 owner 的完整身份保持原属。LoggerErrorCode 有 17 项：
+Logger 自有错误 source 为 logging；来自 Plugin Host、middleware 或其它 owner 的完整身份保持原属。LoggerErrorCode 有 17 项：
 
 | code                            | 场景                                                    |
 | ------------------------------- | ------------------------------------------------------- |

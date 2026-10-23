@@ -102,7 +102,7 @@ describe('能力闸门', () => {
     await expect(host.enable('hostile')).resolves.toEqual({
       status: 'failed',
       error: expect.objectContaining({
-        source: '@migaia/capability',
+        source: 'capability',
         code: CapabilityErrorCode.invalidHandle,
         cause: getterError
       })
@@ -149,7 +149,7 @@ describe('能力闸门', () => {
     expect(host.disposed).toBe(true)
     expect(selfError).toEqual(
       expect.objectContaining({
-        source: '@migaia/capability',
+        source: 'capability',
         code: CapabilityErrorCode.hostTransitioning,
         message: 'capability host cannot mutate during a lifecycle transition'
       })
@@ -159,7 +159,7 @@ describe('能力闸门', () => {
     await first
     expect(reported).toEqual([
       expect.objectContaining({
-        source: '@migaia/capability',
+        source: 'capability',
         code: CapabilityErrorCode.hostTransitioning
       })
     ])
@@ -181,7 +181,7 @@ describe('能力闸门', () => {
     expect(concurrent).not.toBe(first)
     await expect(concurrent).rejects.toEqual(
       expect.objectContaining({
-        source: '@migaia/capability',
+        source: 'capability',
         code: CapabilityErrorCode.hostTransitioning
       })
     )
@@ -208,7 +208,7 @@ describe('能力闸门', () => {
     const second = host.dispose()
     await expect(second).rejects.toEqual(
       expect.objectContaining({
-        source: '@migaia/capability',
+        source: 'capability',
         code: CapabilityErrorCode.hostTransitioning
       })
     )
@@ -263,7 +263,7 @@ describe('能力闸门', () => {
     expect(host.disposed).toBe(true)
     await expect(host.dispose()).rejects.toEqual(
       expect.objectContaining({
-        source: '@migaia/capability',
+        source: 'capability',
         code: CapabilityErrorCode.hostTransitioning
       })
     )
@@ -342,7 +342,7 @@ describe('能力闸门', () => {
     expect(host.disposed).toBe(true)
     await expect(host.dispose()).rejects.toEqual(
       expect.objectContaining({
-        source: '@migaia/capability',
+        source: 'capability',
         code: CapabilityErrorCode.hostTransitioning
       })
     )

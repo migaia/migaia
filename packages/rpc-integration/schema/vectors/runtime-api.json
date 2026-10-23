@@ -401,7 +401,7 @@
           "name": "Error",
           "message": "lookup fixture refusal",
           "stack": "Error: lookup fixture refusal\n    at runtime-profile-fixture",
-          "source": "@migaia/rpc/core",
+          "source": "rpc.endpoint",
           "code": "CAPABILITY_UNSUPPORTED"
         }
       }

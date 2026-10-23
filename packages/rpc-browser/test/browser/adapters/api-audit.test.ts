@@ -32,7 +32,7 @@ it.each(['shared-worker', 'service-worker'] as const)(
       expect(failure).toBeInstanceOf(DOMException)
       expect(failure).toMatchObject({
         name: 'DataCloneError',
-        source: '@migaia/rpc/core',
+        source: 'rpc.endpoint',
         code: 'TRANSPORT'
       })
       expect((failure as Error).stack).toBeTruthy()
@@ -59,7 +59,7 @@ it('classifies the native BroadcastChannel clone failure without replacing it', 
     expect(() => transport.send(() => undefined)).toThrowError(
       expect.objectContaining({
         name: 'DataCloneError',
-        source: '@migaia/rpc/core',
+        source: 'rpc.endpoint',
         code: 'TRANSPORT'
       })
     )
@@ -82,7 +82,7 @@ it('classifies a native stream write rejection and preserves the original Error'
   })
   try {
     await expect(transport.send(new Uint8Array([1]))).rejects.toBe(original)
-    expect(original).toMatchObject({ source: '@migaia/rpc/core', code: 'TRANSPORT' })
+    expect(original).toMatchObject({ source: 'rpc.endpoint', code: 'TRANSPORT' })
   } finally {
     await expect(transport.close?.()).rejects.toBeDefined()
   }
@@ -109,7 +109,7 @@ it('classifies a native stream read rejection and preserves the original Error',
   try {
     controller.error(original)
     expect(await failure).toBe(original)
-    expect(original).toMatchObject({ source: '@migaia/rpc/core', code: 'TRANSPORT' })
+    expect(original).toMatchObject({ source: 'rpc.endpoint', code: 'TRANSPORT' })
   } finally {
     off()
     await transport.close?.()
@@ -144,7 +144,7 @@ it('retains the original RTC event error through the standard error chain', () =
   try {
     owner.dispatchEvent(event)
     expect(transport.closed).toBe(true)
-    expect(failure).toMatchObject({ source: '@migaia/rpc/core', code: 'TRANSPORT' })
+    expect(failure).toMatchObject({ source: 'rpc.endpoint', code: 'TRANSPORT' })
     expect(walkErrorCauses(failure)).toContain(original)
   } finally {
     off()

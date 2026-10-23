@@ -164,7 +164,7 @@ describe('probe non-interference', () => {
           .request('hold', undefined, { timeoutMs: 10 })
           .catch((failure: unknown) => failure)
         expect(timeout).toBeInstanceOf(RpcTimeoutError)
-        expect(timeout).toMatchObject({ source: '@migaia/rpc/core', code: 'DEADLINE_EXCEEDED' })
+        expect(timeout).toMatchObject({ source: 'rpc.endpoint', code: 'DEADLINE_EXCEEDED' })
         /** Caller cancellation keeps the exact native reason rather than any probe failure. */
         const controller = new AbortController(),
           reason = new RangeError('probe isolation abort reason')
@@ -174,7 +174,7 @@ describe('probe non-interference', () => {
         controller.abort(reason)
         const abortError = await aborted
         expect(abortError).toBeInstanceOf(RpcAbortError)
-        expect(abortError).toMatchObject({ source: '@migaia/rpc/core', code: 'CANCELLED' })
+        expect(abortError).toMatchObject({ source: 'rpc.endpoint', code: 'CANCELLED' })
         expect(Reflect.get(abortError as object, 'cause')).toBe(reason)
         release()
         expect(await client.notify('echo', -2)).toBeUndefined()
@@ -399,7 +399,7 @@ describe('probe non-interference', () => {
           .send('encrypted-server', 'echo', 'denied')
           .catch((error: unknown) => error)
         expect(rejected).toBeInstanceOf(RpcRemoteError)
-        expect(rejected).toMatchObject({ source: '@migaia/rpc/core', code: 'OVERLOADED' })
+        expect(rejected).toMatchObject({ source: 'rpc.endpoint', code: 'OVERLOADED' })
         expect(rejections).toEqual(['concurrency'])
         expect(await client.ping('encrypted-server', undefined, { timeoutMs: 1000 })).toBe(true)
         release()
@@ -566,7 +566,7 @@ describe('probe non-interference', () => {
             expect(executions).toBe(1)
           } else {
             expect(result).toMatchObject({
-              source: '@migaia/rpc/core',
+              source: 'rpc.endpoint',
               code: 'CAPABILITY_UNSUPPORTED'
             })
             expect(backing.byteLength).toBe(3)

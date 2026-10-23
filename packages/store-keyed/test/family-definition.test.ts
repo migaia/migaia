@@ -8,7 +8,7 @@ describe('familyDef', () => {
     revoke()
     expect(() => familyDef((id: string) => id, proxy as never)).toThrow(
       expect.objectContaining({
-        source: '@migaia/store-keyed',
+        source: 'store.keyed',
         code: 'INVALID_OPTION',
         cause: expect.any(Error)
       })
@@ -16,7 +16,7 @@ describe('familyDef', () => {
   })
   it('rejects non-string debug labels before creating a definition', () => {
     expect(() => familyDef((id: string) => id, { debugLabel: Symbol('label') as never })).toThrow(
-      expect.objectContaining({ source: '@migaia/store-keyed', code: 'INVALID_OPTION' })
+      expect.objectContaining({ source: 'store.keyed', code: 'INVALID_OPTION' })
     )
   })
   it('rejects runtime null options with a tagged configuration error', () => {

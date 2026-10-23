@@ -11,7 +11,7 @@ describe('logger error-code contract', () => {
     const codes = Object.values(LoggerErrorCode)
     expect(codes).toHaveLength(27)
     expect(new Set(codes).size).toBe(27)
-    expect(LOGGER_SOURCE).toBe('@migaia/logger')
+    expect(LOGGER_SOURCE).toBe('logging')
   })
 
   it('PIPELINE_ENTRY_INVALID reports a replacement while preserving original delivery', async () => {

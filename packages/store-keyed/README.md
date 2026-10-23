@@ -157,7 +157,7 @@ pnpm add @migaia/store-keyed @migaia/reactive
 7. **缓存清理和节点释放是两回事。** `splitDef(...).prune(store)`、`familyDef(...).forget()` / `clear()` 只清理定义的缓存，不释放 store 里已建的节点；节点用 `store.release()` 或 `store.dispose()` 释放。`forget` 之后同一个 key 会得到新定义，旧定义的状态与新定义互不相通。
 8. **family 需要 `WeakRef` 和 `FinalizationRegistry`。** 宿主缺少它们时，调用 `familyDef` / `derivedFamilyDef` 就抛 `ENV_UNSUPPORTED`，不会悄悄退化。
 9. **key 比较用 SameValueZero**，和 `Map` / `Set` 一致：`-0` 与 `+0` 是同一个 key，`NaN` 等于自身。
-10. **错误身份。** 本包产生的错误带 `source === STORE_KEYED_SOURCE`（`@migaia/store-keyed`）和 `StoreKeyedErrorCode` 里的 `code`；其他包已有身份的错误保持原样。按 `source` / `code` 判断，不要比较 message。
+10. **错误身份。** 本包产生的错误带 `source === STORE_KEYED_SOURCE`（`store.keyed`）和 `StoreKeyedErrorCode` 里的 `code`；其他包已有身份的错误保持原样。按 `source` / `code` 判断，不要比较 message。
 
 **破坏性迁移**：十个高级 optics 原语只从 `@migaia/store-keyed/optics` 导出，`assertNotThenable` 只从 `@migaia/store-keyed/atom/definition` 导出，根入口不保留兼容别名。
 

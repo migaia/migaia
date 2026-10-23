@@ -181,7 +181,7 @@ describe('registration listener ownership', () => {
       expect(second.pendingClose).toHaveBeenCalledOnce()
       expect(onCandidate).toHaveBeenCalledOnce()
       expect(fixture.reports).toEqual([
-        expect.objectContaining({ source: '@migaia/rpc/process', code: 'PROCESS_CONNECTION_LIMIT' })
+        expect.objectContaining({ source: 'rpc.transport.process', code: 'PROCESS_CONNECTION_LIMIT' })
       ])
       await adopted.close()
     } finally {
@@ -228,14 +228,14 @@ describe('registration listener ownership', () => {
         await expect(
           fixture.resilience.listenRegistrations(input as IProcessRegistrationListenOptions)
         ).rejects.toMatchObject({
-          source: '@migaia/rpc/process',
+          source: 'rpc.transport.process',
           code: 'PROCESS_RESILIENCE_INVALID_OPTION'
         })
       }
       expect(listen).not.toHaveBeenCalled()
       await fixture.resilience.close()
       await expect(fixture.resilience.listenRegistrations(fixture.options)).rejects.toMatchObject({
-        source: '@migaia/rpc/process',
+        source: 'rpc.transport.process',
         code: 'PROCESS_CHANNEL_CLOSED'
       })
       expect(() => fixture.resilience.onTerminal(() => undefined)).toThrow(
@@ -264,7 +264,7 @@ describe('registration listener ownership', () => {
     })
     /** The original governor owns all listeners it successfully publishes. */
     const rejected = expect(opening).rejects.toMatchObject({
-      source: '@migaia/rpc/process',
+      source: 'rpc.transport.process',
       code: 'PROCESS_CHANNEL_CLOSED'
     })
     await fixture.resilience.close()
@@ -297,7 +297,7 @@ describe('registration listener ownership', () => {
     await expect(closing).rejects.toSatisfy((error: AggregateError) => {
       expect(error).toMatchObject({
         constructor: AggregateError,
-        source: '@migaia/rpc/process',
+        source: 'rpc.transport.process',
         code: 'PROCESS_CHANNEL_CLOSED'
       })
       expect(error.errors).toHaveLength(2)

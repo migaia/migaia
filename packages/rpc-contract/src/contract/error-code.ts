@@ -1,5 +1,5 @@
 /** Stable error source owned by the runtime-neutral RPC contract layer. */
-export const ERROR_SOURCE = '@migaia/rpc/contract'
+export const ERROR_SOURCE = 'rpc.contract'
 
 /** Public error codes owned by the runtime-neutral RPC contract layer. */
 export const RpcContractErrorCode = {

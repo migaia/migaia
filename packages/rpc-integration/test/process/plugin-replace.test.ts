@@ -152,7 +152,7 @@ describe('process plugin whole-process replacement', () => {
           })
         ).toThrowError(
           expect.objectContaining({
-            source: '@migaia/rpc/process',
+            source: 'rpc.transport.process',
             code: 'PROCESS_PLUGIN_INVALID_OPTION',
             detail: { field: 'supervision.spec.bootstrap' }
           })

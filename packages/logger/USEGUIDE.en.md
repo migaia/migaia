@@ -452,7 +452,7 @@ LoggerLevel, LoggerColorMode, LoggerReasoningPhase, LoggerStatus, and LOGGER_SOU
 
 ### Error identity and troubleshooting
 
-Logger-owned errors use source @migaia/logger. Complete identities from Plugin Host, middleware, or another owner remain with that owner. LoggerErrorCode has 17 values.
+Logger-owned errors use source logging. Complete identities from Plugin Host, middleware, or another owner remain with that owner. LoggerErrorCode has 17 values.
 
 | code                            | Trigger                                                                             |
 | ------------------------------- | ----------------------------------------------------------------------------------- |

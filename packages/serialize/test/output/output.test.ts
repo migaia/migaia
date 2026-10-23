@@ -66,7 +66,7 @@ it('TOML rejects a root array and null at every depth with the existing native c
   for (const value of [[], null, { absent: null }, { nested: [{ absent: null }] }]) {
     assert.throws(
       () => emit(value, 'toml'),
-      { name: 'TypeError', source: '@migaia/serialize', code: 'INVALID_OPTION' },
+      { name: 'TypeError', source: 'serialization', code: 'INVALID_OPTION' },
       'TOML must reject rather than omit an unrepresentable value'
     )
   }
@@ -106,7 +106,7 @@ it('cycles, accessors and nonportable values reject without reading getters or r
           /** Diagnostics keep the native TypeError and canonical semantic identity. */
           const failure = error as TypeError & { source?: string; code?: string }
           assert.ok(failure instanceof TypeError)
-          assert.equal(failure.source, '@migaia/serialize')
+          assert.equal(failure.source, 'serialization')
           assert.equal(failure.code, 'INVALID_OPTION')
           assert.equal(failure.message.includes(secret), false)
           return true

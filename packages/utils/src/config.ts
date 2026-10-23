@@ -1,4 +1,4 @@
-import { UtilsErrorCode } from './error-code.js'
+import { ERROR_SOURCE, UtilsErrorCode } from './error-code.js'
 import { UtilsErrorText } from './error-text.js'
 import { parseObjectPath, probeObjectPath, type IObjectPathTupleFor } from './object-path.js'
 
@@ -1135,7 +1135,7 @@ function configError(code: string, path: string, reason: string, cause?: unknown
     code === UtilsErrorCode.configLimitExceeded
       ? new RangeError(message, options)
       : new TypeError(message, options)
-  Object.defineProperty(error, 'source', { value: '@migaia/utils', enumerable: true })
+  Object.defineProperty(error, 'source', { value: ERROR_SOURCE, enumerable: true })
   Object.defineProperty(error, 'code', { value: code, enumerable: true })
   return error
 }

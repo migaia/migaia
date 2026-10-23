@@ -122,7 +122,7 @@ describe('scheduler input validation', () => {
         thrown = error
       }
       expect(thrown).toBeInstanceOf(RangeError)
-      expect(thrown).toMatchObject({ source: '@migaia/utils', code: 'INVALID_ARGUMENT' })
+      expect(thrown).toMatchObject({ source: 'foundation.utils', code: 'INVALID_ARGUMENT' })
     }
   })
 

@@ -39,7 +39,7 @@ describe('构造 fail-fast + close/dispose', () => {
       throw new Error('should have thrown')
     } catch (error) {
       expect(error).toBeInstanceOf(TypeError)
-      expect(error).toMatchObject({ code: 'INVALID_OPTION', source: '@migaia/serialize' })
+      expect(error).toMatchObject({ code: 'INVALID_OPTION', source: 'serialization' })
     }
   })
 
@@ -49,7 +49,7 @@ describe('构造 fail-fast + close/dispose', () => {
       createSerializeRegistry([plugin('a')])
       throw new Error('should have thrown')
     } catch (error) {
-      expect(error).toMatchObject({ code: 'ENV_UNSUPPORTED', source: '@migaia/serialize' })
+      expect(error).toMatchObject({ code: 'ENV_UNSUPPORTED', source: 'serialization' })
     }
   })
 
@@ -289,7 +289,7 @@ describe('构造 fail-fast + close/dispose', () => {
     }
     expect(() => createSerializeRegistry([plugin('a')], schedulerOptions as never)).toThrowError(
       expect.objectContaining({
-        source: '@migaia/serialize',
+        source: 'serialization',
         code: 'INVALID_OPTION',
         cause: schedulerCause
       })
@@ -318,7 +318,7 @@ describe('构造 fail-fast + close/dispose', () => {
       )
     ).toThrowError(
       expect.objectContaining({
-        source: '@migaia/serialize',
+        source: 'serialization',
         code: 'INVALID_OPTION',
         cause: timeoutCause
       })
@@ -333,7 +333,7 @@ describe('构造 fail-fast + close/dispose', () => {
     ]) {
       expect(() => createSerializeRegistry([plugin('a')], invalid as never)).toThrowError(
         expect.objectContaining({
-          source: '@migaia/serialize',
+          source: 'serialization',
           code: 'INVALID_OPTION'
         })
       )
@@ -909,7 +909,7 @@ describe('iterable admission failure containment', () => {
     ])
 
     await expect(registry.encode('x')).rejects.toMatchObject({
-      source: '@migaia/serialize',
+      source: 'serialization',
       code: 'ENCODE_FAILED',
       cause
     })
@@ -942,7 +942,7 @@ describe('iterable admission failure containment', () => {
       await expect(registry.encode('x')).rejects.toSatisfy((error: unknown) => {
         expect(error).toBeInstanceOf(SerializeCodecError)
         expect(error).toMatchObject({
-          source: '@migaia/serialize',
+          source: 'serialization',
           code: 'ENCODE_FAILED',
           cause
         })
@@ -965,7 +965,7 @@ describe('dispose：释放语义', () => {
       const registry = createSerializeRegistry([plugin('a')])
       await expect(registry.dispose({ deadlineAt: bad })).rejects.toMatchObject({
         code: 'INVALID_OPTION',
-        source: '@migaia/serialize'
+        source: 'serialization'
       })
     }
   })
@@ -985,7 +985,7 @@ describe('dispose：释放语义', () => {
 
     await expect(registry.dispose({ deadlineAt: Number.NaN })).rejects.toMatchObject({
       code: 'INVALID_OPTION',
-      source: '@migaia/serialize'
+      source: 'serialization'
     })
     await expect(registry.dispose()).resolves.toBeUndefined()
     await expect(registry.dispose()).resolves.toBeUndefined()
@@ -1075,7 +1075,7 @@ describe('deadline failure never skips parser cleanup', () => {
       )
       throw new Error('expected scheduler admission failure')
     } catch (error) {
-      expect(error).toMatchObject({ code: 'INVALID_OPTION', source: '@migaia/serialize' })
+      expect(error).toMatchObject({ code: 'INVALID_OPTION', source: 'serialization' })
       expect((error as Error & { cause?: Error }).cause).toMatchObject({ cause: getterFailure })
     }
     expect(parserDisposeCalls).toBe(0)

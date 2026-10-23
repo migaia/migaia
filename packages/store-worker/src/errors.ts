@@ -1,9 +1,9 @@
-import { StoreWorkerErrorCode, type IStoreWorkerErrorCode } from './error-code.js'
+import { ERROR_SOURCE, StoreWorkerErrorCode, type IStoreWorkerErrorCode } from './error-code.js'
 
 export { StoreWorkerErrorCode, type IStoreWorkerErrorCode }
 
 /** `source` identity of package-owned errors; foreign RPC/application identities retain their owner. */
-export const STORE_WORKER_SOURCE = '@migaia/store-worker'
+export const STORE_WORKER_SOURCE = ERROR_SOURCE
 
 /** Attaches `(source, code)` onto an existing error object without touching its type or stack. */
 function tagStoreWorkerError<E extends Error>(error: E, code: IStoreWorkerErrorCode): E {

@@ -19,7 +19,7 @@ describe('StoreProvider ready rejection normalization', () => {
       readonly code: string
       readonly cause: unknown
     }
-    expect(normalized.source).toBe('@migaia/store-react')
+    expect(normalized.source).toBe('store.react')
     expect(normalized.code).toBe(StoreReactErrorCode.readyRejected)
     expect(normalized.cause).toBe(reason)
   })

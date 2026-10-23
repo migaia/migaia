@@ -55,7 +55,7 @@ describe('serialize admission and streaming boundaries', () => {
     })
 
     await expect(collectStream(source as never)).rejects.toMatchObject({
-      source: '@migaia/serialize',
+      source: 'serialization',
       code: 'INVALID_CHUNK'
     })
     expect(factoryReads).toBe(1)
@@ -82,7 +82,7 @@ describe('serialize admission and streaming boundaries', () => {
     })
 
     await expect(collectStream(source as never, encoder as never)).rejects.toMatchObject({
-      source: '@migaia/serialize',
+      source: 'serialization',
       code: 'INVALID_OPTION',
       cause
     })

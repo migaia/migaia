@@ -10,7 +10,7 @@ describe('store-light error-code contract', () => {
     const codes = Object.values(StoreLightErrorCode)
     expect(codes).toHaveLength(14)
     expect(new Set(codes).size).toBe(14)
-    expect(STORE_LIGHT_SOURCE).toBe('@migaia/store-light')
+    expect(STORE_LIGHT_SOURCE).toBe('store.light')
   })
 
   it('preserves native RangeError identity through shared attachment', () => {
@@ -129,7 +129,7 @@ describe('store-light foreign field adoption rollback', () => {
     }
 
     expect(thrown).toMatchObject({
-      source: '@migaia/reactive',
+      source: 'reactive',
       code: 'OWNERSHIP_CONFLICT'
     })
     // Cleanup failures are appended to the primary's non-enumerable `errors`, never its `cause`.

@@ -387,7 +387,7 @@ The pool owns admission and cleanup errors, not this Peer error. This example pr
 
 This package combines connections created by the public createThreadPeer / createProcessPeer factories. It assigns client-operation slots and owns a bounded waiting FIFO. Communication, method directories, handshakes, authentication, request matching, cancellation, deadlines, native startup, supervision and restart stay with the corresponding Peer. The pool adds no native thread scheduler, RPC protocol, work stealing, cross-machine pool or Proxy call surface.
 
-The only entry is `@migaia/rpc-pool`. Runtime exports are createThreadPool, createProcessPool, RpcPoolState, RpcPoolErrorCode and RPC_POOL_ERROR_SOURCE. Public types include IThreadPool, IProcessPool, their options, IRpcPoolControls, IRpcPoolStats and IRpcPoolErrorCode. Internal createPool, validation and error-tagging helpers are not application exports. Lifecycle and utils are runtime dependencies; core, process and threads are required RPC peer dependencies. Install a package directly when directly importing its API.
+The only entry is `rpc.pool`. Runtime exports are createThreadPool, createProcessPool, RpcPoolState, RpcPoolErrorCode and RPC_POOL_ERROR_SOURCE. Public types include IThreadPool, IProcessPool, their options, IRpcPoolControls, IRpcPoolStats and IRpcPoolErrorCode. Internal createPool, validation and error-tagging helpers are not application exports. Lifecycle and utils are runtime dependencies; core, process and threads are required RPC peer dependencies. Install a package directly when directly importing its API.
 
 The pool owns its created Peers, local FIFO and idle tasks. It exposes no internal native handles, handshake, admission or trust controls. Member retirement calls the original Peer.close; its owner performs the port, Worker/process and supervision cleanup.
 
@@ -478,7 +478,7 @@ The original probe is forwarded to members. Real handshake, ready and restart ob
 | callAborted / CALL_ABORTED        | Signal cancellation while still queued, retaining native AbortError and original reason as cause. |
 | closeFailed / CLOSE_FAILED        | AggregateError after every member cleanup has been attempted.                                     |
 
-RPC_POOL_ERROR_SOURCE is `@migaia/rpc-pool`, and IRpcPoolErrorCode is the union of those public values. Failures already returned by the Peer retain their own source/code, instance and cause chain without pool reclassification. Startup and cleanup failures remain reachable through cause/errors. State values are not error codes.
+RPC_POOL_ERROR_SOURCE is `rpc.pool`, and IRpcPoolErrorCode is the union of those public values. Failures already returned by the Peer retain their own source/code, instance and cause chain without pool reclassification. Startup and cleanup failures remain reachable through cause/errors. State values are not error codes.
 
 A short Process source can report supervision's CAPABILITY_UNSUPPORTED notice for unsupported process termination under its best-effort capability policy. This does not prevent established business calls from succeeding or establish forced termination of an entire process tree. The pool preserves the original owner's diagnostic without suppressing it or adding another termination strategy.
 

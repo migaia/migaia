@@ -371,11 +371,11 @@ async function business(
   if (bridge)
     expect(
       active.reports.filter(
-        (error) => (error as { source?: string }).source === '@migaia/rpc/bridge/jsonrpc'
+        (error) => (error as { source?: string }).source === 'rpc.contract.jsonrpc'
       )
     ).toEqual([
       expect.objectContaining({
-        source: '@migaia/rpc/bridge/jsonrpc',
+        source: 'rpc.contract.jsonrpc',
         code: 'JSONRPC_PROFILE_INVALID'
       })
     ])

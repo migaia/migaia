@@ -130,7 +130,7 @@ describe('process resilience committed liquidation', () => {
         failure = error
       }
       expect(failure).toMatchObject({
-        source: '@migaia/rpc/process',
+        source: 'rpc.transport.process',
         code,
         detail: { registrationId: name }
       })

@@ -11,7 +11,7 @@ describe('store-middleware error-code contract', () => {
     const codes = Object.values(StoreMiddlewareErrorCode)
     expect(codes).toHaveLength(9)
     expect(new Set(codes).size).toBe(9)
-    expect(STORE_MIDDLEWARE_SOURCE).toBe('@migaia/store-middleware')
+    expect(STORE_MIDDLEWARE_SOURCE).toBe('store.middleware')
   })
 
   it('shared attachment preserves native Error/AggregateError identity and stack', () => {

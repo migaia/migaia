@@ -67,7 +67,7 @@ describe('IdentifyError', () => {
         expect.objectContaining({
           name: 'TypeError',
           code: 'INVALID_ARGUMENT',
-          source: '@migaia/utils'
+          source: 'foundation.utils'
         })
       )
   })

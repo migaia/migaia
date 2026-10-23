@@ -1,7 +1,10 @@
+/** Stable error domain owned by this code table; package moves preserve this identity. */
+export const ERROR_SOURCE = 'store.persist'
+
 /**
- * Declares the public error codes for `@migaia/store-persist` in one place.
+ * Declares the public error codes for `store.persist` in one place.
  *
- * Locally constructed errors use source `'@migaia/store-persist'`. Codec, unit and adapter failures
+ * Locally constructed errors use source `'store.persist'`. Codec, unit and adapter failures
  * may instead retain their owning boundary's identity. Throw sites use these constants instead of
  * inline literals.
  *

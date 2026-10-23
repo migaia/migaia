@@ -213,7 +213,7 @@ A shared node reached through two distinct diamond branches is not circular and 
 
 ### Errors, factories, and maintenance commands
 
-STORE_DEVTOOLS_SOURCE is @migaia/store-devtools. Branch on source / code rather than matching message text.
+STORE_DEVTOOLS_SOURCE is store.devtools. Branch on source / code rather than matching message text.
 
 | StoreDevtoolsErrorCode property / value     | Trigger and response                                                                                                                 |
 | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |

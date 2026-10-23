@@ -6,7 +6,7 @@ describe('store-keyed error-code contract', () => {
     const codes = Object.values(StoreKeyedErrorCode)
     expect(codes).toHaveLength(10)
     expect(new Set(codes).size).toBe(10)
-    expect(STORE_KEYED_SOURCE).toBe('@migaia/store-keyed')
+    expect(STORE_KEYED_SOURCE).toBe('store.keyed')
   })
 
   it('preserves native RangeError, cause, and stack through shared attachment', () => {

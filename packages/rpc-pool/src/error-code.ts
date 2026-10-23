@@ -1,5 +1,8 @@
+/** Stable error domain owned by this code table; package moves preserve this identity. */
+export const ERROR_SOURCE = 'rpc.pool'
+
 /** The stable package source identifies pool-owned admission and cleanup failures. */
-export const RPC_POOL_ERROR_SOURCE = '@migaia/rpc-pool'
+export const RPC_POOL_ERROR_SOURCE = ERROR_SOURCE
 
 /** Only pool-owned failures receive these registered codes; Peer errors pass through unchanged. */
 export const RpcPoolErrorCode = {

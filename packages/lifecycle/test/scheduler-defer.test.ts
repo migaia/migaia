@@ -64,7 +64,7 @@ it('rejects an invalid optional method and retains a getter failure cause before
   const base = { now: () => 0, schedule: () => ({ cancel: () => undefined }) }
   expect(() => resolveScheduler({ ...base, defer: 1 })).toThrow(
     expect.objectContaining({
-      source: '@migaia/lifecycle',
+      source: 'lifecycle',
       code: 'INVALID_OPTION'
     })
   )
@@ -79,7 +79,7 @@ it('rejects an invalid optional method and retains a getter failure cause before
     })
   ).toThrow(
     expect.objectContaining({
-      source: '@migaia/lifecycle',
+      source: 'lifecycle',
       code: 'INVALID_OPTION',
       cause
     })

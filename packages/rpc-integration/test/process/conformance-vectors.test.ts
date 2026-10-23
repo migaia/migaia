@@ -112,7 +112,7 @@ describe('published vectors evaluated by independent language owners', () => {
         const before = writes
         await expect(
           runtime.stream!.open(peer.id, 'p.f.generator', ['no-stream']).next()
-        ).rejects.toMatchObject({ source: '@migaia/rpc/core', code: 'CAPABILITY_CONFLICT' })
+        ).rejects.toMatchObject({ source: 'rpc.endpoint', code: 'CAPABILITY_CONFLICT' })
         expect(writes).toBe(before)
       } finally {
         await runtime.endpoint.dispose()

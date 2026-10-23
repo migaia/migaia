@@ -12,7 +12,7 @@ describe('audited event delivery contracts', () => {
       })
       throw new Error('expected visitor failure')
     } catch (error) {
-      expect(error).toMatchObject({ source: '@migaia/event-subscriber', code: 'VISITOR_FAILED' })
+      expect(error).toMatchObject({ source: 'event.subscriber', code: 'VISITOR_FAILED' })
       expect(Object.hasOwn(error as object, 'cause')).toBe(true)
       expect((error as Error).cause).toBeUndefined()
     }
@@ -31,7 +31,7 @@ describe('audited event delivery contracts', () => {
         calls.push(2)
       })
       expect(() => channel.publish(0)).toThrowError(
-        expect.objectContaining({ source: '@migaia/event-subscriber', code: 'PUBLISH_FAILED' })
+        expect.objectContaining({ source: 'event.subscriber', code: 'PUBLISH_FAILED' })
       )
       expect(calls).toEqual([1])
     }
@@ -85,7 +85,7 @@ describe('audited event delivery contracts', () => {
               throw failure
             })
       ).toThrow(failure)
-      expect(failure).toMatchObject({ source: '@migaia/event-subscriber', code: 'VISITOR_FAILED' })
+      expect(failure).toMatchObject({ source: 'event.subscriber', code: 'VISITOR_FAILED' })
     }
   )
 
@@ -103,7 +103,7 @@ describe('audited event delivery contracts', () => {
         throw failure
       })
     ).rejects.toBe(failure)
-    expect(failure).toMatchObject({ source: '@migaia/event-subscriber', code: 'VISITOR_FAILED' })
+    expect(failure).toMatchObject({ source: 'event.subscriber', code: 'VISITOR_FAILED' })
     expect(invoke).toThrowError(expect.objectContaining({ code: 'INVOCATION_CLOSED' }))
   })
 })

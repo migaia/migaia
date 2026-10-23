@@ -117,7 +117,7 @@ describe('serialize boundaries', () => {
     ).catch((caught: unknown) => caught)
     expect(error).toBeInstanceOf(SerializeCodecError)
     expect(error).toMatchObject({
-      source: '@migaia/serialize',
+      source: 'serialization',
       code: 'INVALID_CHUNK',
       chunkIndex: 1,
       bytesConsumed: 2,
@@ -165,7 +165,7 @@ describe('serialize boundaries', () => {
 
     expect(error).toBeInstanceOf(SerializeCodecError)
     expect(error).toMatchObject({
-      source: '@migaia/serialize',
+      source: 'serialization',
       code: 'ENCODE_FAILED',
       chunkIndex: 1,
       cause: syncFailure

@@ -63,7 +63,7 @@ describe('thread runtime resource ACK startup', () => {
           timeoutMs: 0
         })
       ).rejects.toMatchObject({
-        source: '@migaia/rpc/core',
+        source: 'rpc.endpoint',
         code: 'INVALID_CONFIG',
         message: 'Thread data bootstrap was not acknowledged'
       })
@@ -125,7 +125,7 @@ describe('thread runtime resource ACK startup', () => {
     try {
       await expect(opening).rejects.toBeInstanceOf(TypeError)
       await expect(opening).rejects.toMatchObject({
-        source: '@migaia/rpc/core',
+        source: 'rpc.endpoint',
         code: 'INVALID_CONFIG'
       })
     } finally {

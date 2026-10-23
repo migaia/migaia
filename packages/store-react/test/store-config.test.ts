@@ -36,7 +36,7 @@ describe('normalizeStoreConfig', () => {
       throw new Error('expected config normalization to fail')
     } catch (error) {
       expect(error).toMatchObject({
-        source: '@migaia/store-react',
+        source: 'store.react',
         code: 'INVALID_CONFIG',
         cause: expect.any(TypeError)
       })

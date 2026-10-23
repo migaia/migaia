@@ -84,11 +84,11 @@ describe('store-middleware audit regressions', () => {
           failure = error
         }
         expect(failure).toMatchObject({
-          source: '@migaia/store-middleware',
+          source: 'store.middleware',
           code: mode === 'unsupported' ? 'CLONE_UNSUPPORTED' : 'ENV_UNSUPPORTED'
         })
         expect((failure as Error).cause).toMatchObject({
-          source: '@migaia/utils',
+          source: 'foundation.utils',
           code: mode === 'unsupported' ? 'CLONE_UNSUPPORTED' : 'ENV_UNSUPPORTED'
         })
         expect(((failure as Error).cause as Error).stack).toBeTruthy()
@@ -123,7 +123,7 @@ describe('store-middleware audit regressions', () => {
               })
         ).toThrow(primary)
         expect(primary).toMatchObject({
-          source: mode === 'policy' ? '@migaia/store-middleware' : '@migaia/reactive',
+          source: mode === 'policy' ? 'store.middleware' : 'reactive',
           code: 'CALLBACK_FAILED'
         })
         expect(policy.insideAction).toBe(false)
@@ -172,7 +172,7 @@ describe('store-middleware audit regressions', () => {
       expect(reports).toHaveLength(1)
       expect(reports[0]).toBeInstanceOf(SyntaxError)
       expect(reports[0]).toMatchObject({
-        source: '@migaia/store-middleware',
+        source: 'store.middleware',
         code: 'DEVTOOLS_MESSAGE_INVALID'
       })
       receive({ type: 'DISPATCH', payload: { type: 'JUMP_TO_STATE' }, state: '{"count":3}' })
@@ -222,7 +222,7 @@ describe('store-middleware audit regressions', () => {
               ? new Map([[state, 1]])
               : new Set([state])
       expect(() => immutableSnapshotClone(value)).toThrow(
-        expect.objectContaining({ source: '@migaia/store-middleware', code: 'CLONE_UNSUPPORTED' })
+        expect.objectContaining({ source: 'store.middleware', code: 'CLONE_UNSUPPORTED' })
       )
     }
   )
@@ -238,7 +238,7 @@ describe('store-middleware audit regressions', () => {
         }
       })
     ).toThrow(
-      expect.objectContaining({ source: '@migaia/store-middleware', code: 'CLONE_UNSUPPORTED' })
+      expect.objectContaining({ source: 'store.middleware', code: 'CLONE_UNSUPPORTED' })
     )
     expect(reads).toBe(0)
   })

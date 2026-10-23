@@ -4,6 +4,7 @@ import {
   mkdirSync,
   readdirSync,
   readFileSync,
+  renameSync,
   rmSync,
   symlinkSync,
   writeFileSync
@@ -13,6 +14,7 @@ import { join } from 'node:path'
 import test from 'node:test'
 import {
   checkErrorRegistry,
+  checkErrorRegistrySources,
   collectErrorRegistry,
   REGISTRY_END,
   REGISTRY_START,
@@ -20,13 +22,24 @@ import {
   writeErrorRegistry
 } from '../error-registry.mjs'
 
-/** Creates the smallest repository shape understood by the registry collector. */
-const createFixture = (source) => {
+/**
+ * Creates the smallest repository shape understood by the registry collector.
+ *
+ * @param {string} source Full declaration text parsed by the real collector.
+ * @param {string} [directory] Package directory beneath the temporary packages root.
+ * @returns {string} Temporary repository root owned by the caller.
+ */
+const createFixture = (source, directory = 'example', preserveDeclaration = false) => {
   const root = mkdtempSync(join(tmpdir(), 'migai-error-registry-'))
-  const packageRoot = join(root, 'packages/example')
+  const packageRoot = join(root, 'packages', directory)
   mkdirSync(join(packageRoot, 'src'), { recursive: true })
   writeFileSync(join(packageRoot, 'package.json'), JSON.stringify({ name: '@migaia/example' }))
-  writeFileSync(join(packageRoot, 'src/error-code.ts'), source)
+  writeFileSync(
+    join(packageRoot, 'src/error-code.ts'),
+    preserveDeclaration || source.includes('export const ERROR_SOURCE')
+      ? source
+      : `export const ERROR_SOURCE = 'fixture.example'\n${source}`
+  )
   return root
 }
 
@@ -71,7 +84,7 @@ test('accepts an absent ignored registry after validating declaration JSDoc', ()
   }
 })
 
-test('uses a layer ERROR_SOURCE and falls back to the package name', () => {
+test('uses explicit layer domains independently of package names', () => {
   const root = createFixture(
     "export const ExampleErrorCode = {\n  /** Raised when the root input is invalid. */\n  rootInvalid: 'ROOT_INVALID'\n} as const\n"
   )
@@ -81,13 +94,13 @@ test('uses a layer ERROR_SOURCE and falls back to the package name', () => {
     mkdirSync(join(packageRoot, 'src/x'), { recursive: true })
     writeFileSync(
       join(packageRoot, 'src/x/error-code.ts'),
-      "export const ERROR_SOURCE = '@fixture/a/custom'\nexport const LayerErrorCode = {\n  /** Raised when the layer input is invalid. */\n  layerInvalid: 'LAYER_INVALID'\n} as const\n"
+      "export const ERROR_SOURCE = 'fixture.a.custom'\nexport const LayerErrorCode = {\n  /** Raised when the layer input is invalid. */\n  layerInvalid: 'LAYER_INVALID'\n} as const\n"
     )
     assert.deepEqual(
       collectErrorRegistry(root).map(({ source, code }) => ({ source, code })),
       [
-        { source: '@fixture/a', code: 'ROOT_INVALID' },
-        { source: '@fixture/a/custom', code: 'LAYER_INVALID' }
+        { source: 'fixture.a.custom', code: 'LAYER_INVALID' },
+        { source: 'fixture.example', code: 'ROOT_INVALID' }
       ]
     )
   } finally {
@@ -150,11 +163,11 @@ test('maps merged RPC codes and preserves capability graph ownership', () => {
   const rows = collectErrorRegistry()
   const codes = (source) => rows.filter((row) => row.source === source).map((row) => row.code)
   assert.deepEqual(
-    codes('@migaia/rpc/contract'),
+    codes('rpc.contract'),
     [...frozen.contract, ...added.contract, ...controlAdded.contract, ...laterAdded.contract].sort()
   )
   assert.deepEqual(
-    codes('@migaia/rpc/core'),
+    codes('rpc.endpoint'),
     [
       ...frozen.core.filter((code) => !retired.has(code)),
       ...added.core,
@@ -169,7 +182,7 @@ test('maps merged RPC codes and preserves capability graph ownership', () => {
       'utf8'
     ).matchAll(/^\s*[A-Za-z][A-Za-z0-9]*\s*:\s*'([A-Z][A-Z0-9_]*)'/gm)
   ].map((match) => match[1])
-  assert.deepEqual(codes('@migaia/capability/graph').sort(), graphCodes.sort())
+  assert.deepEqual(codes('capability.graph').sort(), graphCodes.sort())
   assert.deepEqual(codes('@migaia/rpc-contract'), [])
   assert.deepEqual(codes('@migaia/web-rpc'), [])
   assert.doesNotMatch(
@@ -240,7 +253,7 @@ test('lists every utils code with its own scenario and regenerates a checkable r
     )
   ].map((match) => match[1])
   /** Registry rows owned by the utils package. */
-  const utilsRows = rows.filter((row) => row.source === '@migaia/utils')
+  const utilsRows = rows.filter((row) => row.source === 'foundation.utils')
   /** One registry row per declared code: no duplicates and none missing. */
   assert.equal(utilsRows.length, utilsCodes.length)
   assert.deepEqual(new Set(utilsRows.map((row) => row.code)), new Set(utilsCodes))
@@ -269,4 +282,236 @@ test('lists every utils code with its own scenario and regenerates a checkable r
   } finally {
     rmSync(root, { recursive: true, force: true })
   }
+})
+
+/** All public registry modes must share the same source validation path. */
+const sourceValidationModes = [checkErrorRegistrySources, checkErrorRegistry, writeErrorRegistry]
+
+/**
+ * Creates a real parser fixture with a usable local registry for the write mode.
+ *
+ * @param {string | undefined} source Optional declaration value; undefined omits the declaration.
+ * @param {string} [directory] Package path used to distinguish the storage prefix exemption.
+ * @returns {string} Temporary repository root owned by the caller.
+ */
+const sourceDomainFixture = (source, directory = 'example') => {
+  /** Undefined exercises actual missing-source rejection or the storage fallback exemption. */
+  const declaration = source === undefined ? '' : `export const ERROR_SOURCE = '${source}'\n`
+  /** The package manifest deliberately differs from a valid semantic domain. */
+  const root = createFixture(
+    `${declaration}export const Code = {\n/** A source validation fixture scenario. */\ninvalid: 'INVALID_INPUT'\n} as const\n`,
+    directory,
+    true
+  )
+  mkdirSync(join(root, 'docs/contracts'), { recursive: true })
+  writeFileSync(
+    join(root, 'docs/contracts/error-codes.md'),
+    `# Registry\n${REGISTRY_START}\n${REGISTRY_END}\n`
+  )
+  return root
+}
+
+/** Separate native cases ensure every declared mode executes even when the first is RED. */
+for (const [modeIndex, mode] of sourceValidationModes.entries())
+  test(`source domains missing declared source rejects in public mode ${modeIndex}`, () => {
+    /** Each write-mode attempt owns a separate real document fixture. */
+    const root = sourceDomainFixture(undefined)
+    try {
+      assert.throws(
+        () => mode(root),
+        (error) =>
+          error.code === 'REGISTRY_SOURCE_MISSING' &&
+          error.message.includes('packages/example/src/error-code.ts'),
+        'SOURCE_DOMAIN_MISSING_SOURCE'
+      )
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+/** Every disallowed shape or brand position is a distinct input in every public registry mode. */
+const invalidDomains = [
+  '',
+  '@migaia/utils',
+  'rpc/core',
+  'rpcCore',
+  'migaia.rpc',
+  'migaia-core',
+  'rpc.migaia.core',
+  'premigaia',
+  'Rpc.core',
+  'rpc..core',
+  'rpc.-x',
+  'rpc_core',
+  'rpc.x-',
+  'rpc.x--y',
+  '1rpc',
+  'rpc.2'
+]
+/** Existing valid grammar remains accepted, including digits and more than three segments. */
+const validDomains = [
+  'rpc.transport.process',
+  'micro-frontend.hub',
+  'lifecycle',
+  'rpc.v2',
+  'rpc.transport.process.worker'
+]
+for (const value of invalidDomains)
+  for (const [modeIndex, mode] of sourceValidationModes.entries())
+    test(`source domains rejects ${JSON.stringify(value)} in public mode ${modeIndex}`, () => {
+      /** Invalid input must stop in parsing before a registry write. */
+      const root = sourceDomainFixture(value)
+      try {
+        assert.throws(
+          () => mode(root),
+          (error) =>
+            error.code === 'REGISTRY_SOURCE_INVALID' &&
+            error.message.includes('packages/example/src/error-code.ts') &&
+            error.message.includes(JSON.stringify(value)),
+          `SOURCE_DOMAIN_INVALID_SOURCE: ${JSON.stringify(value)}`
+        )
+      } finally {
+        rmSync(root, { recursive: true, force: true })
+      }
+    })
+for (const value of validDomains)
+  for (const [modeIndex, mode] of sourceValidationModes.entries())
+    test(`source domains accepts ${value} in public mode ${modeIndex}`, () => {
+      /** A matching generated region isolates source syntax from unrelated document staleness. */
+      const root = sourceDomainFixture(value)
+      try {
+        writeErrorRegistry(root)
+        assert.doesNotThrow(() => mode(root), `SOURCE_DOMAIN_VALID_SOURCE: ${value}`)
+      } finally {
+        rmSync(root, { recursive: true, force: true })
+      }
+    })
+
+/** The identical invalid value is exempt only below the exact packages/storage- prefix. */
+for (const [modeIndex, mode] of sourceValidationModes.entries())
+  test(`source domains accepts deferred storage prefix in public mode ${modeIndex}`, () => {
+    /** This real parser input keeps the same invalid value used by the non-exempt cases. */
+    const root = sourceDomainFixture('@migaia/utils', 'storage-x')
+    try {
+      writeErrorRegistry(root)
+      assert.doesNotThrow(() => mode(root), 'SOURCE_DOMAIN_STORAGE_PREFIX_EXEMPT')
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+for (const [modeIndex, mode] of sourceValidationModes.entries())
+  test(`source domains rejects near storage prefix in public mode ${modeIndex}`, () => {
+    /** Storagex is outside packages/storage- even though its name begins with storage. */
+    const root = sourceDomainFixture('@migaia/utils', 'storagex')
+    try {
+      assert.throws(
+        () => mode(root),
+        (error) =>
+          error.code === 'REGISTRY_SOURCE_INVALID' &&
+          error.message.includes('packages/storagex/src/error-code.ts') &&
+          error.message.includes(JSON.stringify('@migaia/utils')),
+        'SOURCE_DOMAIN_STORAGE_PREFIX_ONLY'
+      )
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+/** A package manifest cannot activate the exemption outside the storage directory prefix. */
+for (const [modeIndex, mode] of sourceValidationModes.entries())
+  test(`source domains rejects a storage manifest in a non-storage directory in public mode ${modeIndex}`, () => {
+    /** Keep the illegal declaration under packages/example while changing only manifest identity. */
+    const root = sourceDomainFixture('@migaia/utils')
+    try {
+      writeFileSync(
+        join(root, 'packages/example/package.json'),
+        JSON.stringify({ name: '@migaia/storage-x' })
+      )
+      assert.throws(
+        () => mode(root),
+        (error) =>
+          error.code === 'REGISTRY_SOURCE_INVALID' &&
+          error.message.includes('packages/example/src/error-code.ts') &&
+          error.message.includes(JSON.stringify('@migaia/utils')),
+        'SOURCE_DOMAIN_MANIFEST_NOT_EXEMPT'
+      )
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+/** A nested source directory cannot activate the package-directory exemption. */
+for (const [modeIndex, mode] of sourceValidationModes.entries())
+  test(`source domains rejects a nested storage substring in public mode ${modeIndex}`, () => {
+    /** The collector recursively scans this supported layer declaration in a non-storage package. */
+    const root = sourceDomainFixture('@migaia/utils')
+    try {
+      /** Move the same declaration without changing its source value or owning manifest. */
+      const nestedDirectory = join(root, 'packages/example/src/storage-x')
+      mkdirSync(nestedDirectory)
+      renameSync(
+        join(root, 'packages/example/src/error-code.ts'),
+        join(nestedDirectory, 'error-code.ts')
+      )
+      assert.throws(
+        () => mode(root),
+        (error) =>
+          error.code === 'REGISTRY_SOURCE_INVALID' &&
+          error.message.includes('packages/example/src/storage-x/error-code.ts') &&
+          error.message.includes(JSON.stringify('@migaia/utils')),
+        'SOURCE_DOMAIN_NESTED_STORAGE_NOT_EXEMPT'
+      )
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+/** The temporary storage exemption preserves the old manifest fallback for missing declarations. */
+for (const [modeIndex, mode] of sourceValidationModes.entries())
+  test(`source domains accepts missing declared source under deferred storage prefix in public mode ${modeIndex}`, () => {
+    /** The directory activates the exemption even when the manifest identity is non-storage. */
+    const root = sourceDomainFixture(undefined, 'storage-x')
+    try {
+      writeErrorRegistry(root)
+      assert.doesNotThrow(() => mode(root), 'SOURCE_DOMAIN_STORAGE_MISSING_EXEMPT')
+      assert.deepEqual(
+        checkErrorRegistrySources(root).map(({ source }) => source),
+        ['@migaia/example'],
+        'SOURCE_DOMAIN_STORAGE_FALLBACK_SOURCE'
+      )
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+test('source domains known source readers contain no legacy error identities', () => {
+  /**
+   * These non-storage comparisons are independent witnesses; the deferred storage-web reader stays
+   * with its owner.
+   */
+  const readers = [
+    ['packages/tray/src/runtime/create-runtime.ts', ".source === '@migaia/tray'"],
+    ['packages/lifecycle/src/abort-factory.ts', ".source === '@migaia/lifecycle'"],
+    [
+      'packages/rpc-core/src/core/internal/endpoint-projection.ts',
+      ".source === '@migaia/plugin-host'"
+    ]
+  ]
+  /** All known runtime comparisons must disappear, while package module specifiers stay valid. */
+  const remaining = readers.filter(([file, literal]) =>
+    readFileSync(join(repositoryRoot, file), 'utf8').includes(literal)
+  )
+  assert.deepEqual(remaining, [], 'SOURCE_DOMAIN_RUNTIME_READERS')
+})
+
+test('source domains cross-package readers reference owner constants instead of inlining migrated domains', () => {
+  /** The included cross-package reader must import the owning package constant after migration. */
+  const readers = [['packages/rpc-core/src/core/internal/endpoint-projection.ts', 'plugin.host']]
+  /** A quoted new domain in this reader duplicates the owner's source contract. */
+  const duplicated = readers.filter(([file, domain]) => {
+    /** Public module specifiers retain package names and are not semantic domain literals. */
+    const contents = readFileSync(join(repositoryRoot, file), 'utf8')
+    return contents.includes(`'${domain}'`) || contents.includes(`"${domain}"`)
+  })
+  assert.deepEqual(duplicated, [], 'SOURCE_DOMAIN_INLINE_READER_DOMAINS')
 })

@@ -291,7 +291,7 @@ Business failures use JSON-RPC error.code/message/data.migaiaWireError, with sou
 
 The table retains the error identity defined by `@migaia/rpc-contract` for Process JSON-RPC byte connections. Its `source` is not a package import path.
 
-| Bridge code, source=`@migaia/rpc/bridge/jsonrpc` | Trigger                                                              |
+| Bridge code, source=`rpc.contract.jsonrpc` | Trigger                                                              |
 | ------------------------------------------------ | -------------------------------------------------------------------- |
 | JSONRPC_FRAME_INVALID                            | Invalid header/encoding/JSON or partial closure; terminal connection |
 | JSONRPC_EXTENSION_MISSING                        | Hello omits required capabilities or extension methods               |
@@ -303,7 +303,7 @@ Remote wire source/code is diagnostic data, not local cancellation/retry/authent
 
 ### Errors and troubleshooting
 
-RPC_PROCESS_ERROR_SOURCE is `@migaia/rpc/process`. Native synchronous spawn and Unix listener preparation/bind errors receive semantic identity on the original object, retaining native type, stack, and other OS fields while replacing errno code with the semantic code. Wrappers retain originals through cause. Do not control behavior by matching messages.
+RPC_PROCESS_ERROR_SOURCE is `rpc.transport.process`. Native synchronous spawn and Unix listener preparation/bind errors receive semantic identity on the original object, retaining native type, stack, and other OS fields while replacing errno code with the semantic code. Wrappers retain originals through cause. Do not control behavior by matching messages.
 
 | Process code                                                   | Scenario                                                                             |
 | -------------------------------------------------------------- | ------------------------------------------------------------------------------------ |

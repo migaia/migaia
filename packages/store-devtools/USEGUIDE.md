@@ -463,7 +463,7 @@ maxDepth 缺省 20，必须是非负安全整数；0 连根的直接边也不展
 
 ### 错误码、错误工厂与维护命令
 
-STORE_DEVTOOLS_SOURCE 为 @migaia/store-devtools；按 source / code 分支，别匹配 message。
+STORE_DEVTOOLS_SOURCE 为 store.devtools；按 source / code 分支，别匹配 message。
 
 | StoreDevtoolsErrorCode 属性 / 值            | 触发与处理                                                                                    |
 | ------------------------------------------- | --------------------------------------------------------------------------------------------- |

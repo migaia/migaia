@@ -37,7 +37,7 @@ describe('serialize byte boundaries', () => {
         validateSerializeChunk(['bytes', value], details)
         throw new Error('expected invalid byte chunk')
       } catch (error) {
-        expect(error).toMatchObject({ source: '@migaia/serialize', code: 'INVALID_CHUNK' })
+        expect(error).toMatchObject({ source: 'serialization', code: 'INVALID_CHUNK' })
         expect(error).toHaveProperty('message', 'bytes chunk data must be a Uint8Array')
         expect(error).toHaveProperty('stack')
       }

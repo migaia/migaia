@@ -5,7 +5,7 @@
       "id": "abort",
       "variation": "abort",
       "payload": {
-        "source": "@migaia/rpc/core",
+        "source": "rpc.endpoint",
         "code": "CANCELLED",
         "name": "RangeError",
         "message": "stop",

@@ -1,8 +1,11 @@
+/** Stable error domain owned by this code table; package moves preserve this identity. */
+export const ERROR_SOURCE = 'reactive'
+
 /**
- * The single declaration site for `@migaia/reactive` error codes.
+ * The single declaration site for `reactive` error codes.
  *
  * See `docs/contracts/error-codes.md`. The pair `(source, code)` uniquely identifies an error.
- * `source` is always `'@migaia/reactive'`. Throw sites use these constants instead of inline
+ * `source` is always `'reactive'`. Throw sites use these constants instead of inline
  * values.
  *
  * The migration assigns codes to previously untagged errors. `SCOPE_CLOSED`,

@@ -62,7 +62,7 @@ it('releases both native streams when one close observer throws', async () => {
   /** One rejected completion exposes both semantic identity and the original callback failure. */
   const closing = channel.close()
   await expect(closing).rejects.toMatchObject({
-    source: '@migaia/rpc/process',
+    source: 'rpc.transport.process',
     code: 'PROCESS_CHANNEL_CLOSED'
   })
   await expect(closing).rejects.toSatisfy((error) => walkErrorCauses(error).includes(original))
@@ -96,7 +96,7 @@ it('classifies a synchronous native spawn failure while retaining TypeError', as
   )
   await expect(operation).rejects.toBeInstanceOf(TypeError)
   await expect(operation).rejects.toMatchObject({
-    source: '@migaia/rpc/process',
+    source: 'rpc.transport.process',
     code: 'PROCESS_CHANNEL_CONNECT_FAILED'
   })
 })
@@ -112,7 +112,7 @@ it('classifies the managed Unix parent read failure before binding', async () =>
       onConnection: () => undefined,
       report: () => undefined
     })
-  ).rejects.toMatchObject({ source: '@migaia/rpc/process', code: 'PROCESS_CHANNEL_LISTEN_FAILED' })
+  ).rejects.toMatchObject({ source: 'rpc.transport.process', code: 'PROCESS_CHANNEL_LISTEN_FAILED' })
 })
 
 it('classifies actual bind reports and shares the native listener close Promise', async () => {
@@ -134,7 +134,7 @@ it('classifies actual bind reports and shares the native listener close Promise'
     ).rejects.toMatchObject({ code: 'PROCESS_CHANNEL_LISTEN_FAILED' })
     expect(errors).toHaveLength(1)
     expect(errors[0]).toMatchObject({
-      source: '@migaia/rpc/process',
+      source: 'rpc.transport.process',
       code: 'PROCESS_CHANNEL_LISTEN_FAILED'
     })
     /** The underlying listener release executes once while every caller joins the same result. */

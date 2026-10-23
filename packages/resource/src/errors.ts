@@ -1,8 +1,9 @@
+import { ERROR_SOURCE } from './error-code.js'
 /**
  * Source stamped onto Resource-owned failures; classified foreign errors retain their original
  * owner.
  */
-export const RESOURCE_SOURCE = '@migaia/resource'
+export const RESOURCE_SOURCE = ERROR_SOURCE
 
 /**
  * Defines the workspace structural error contract. `source` and `code` attach as properties without

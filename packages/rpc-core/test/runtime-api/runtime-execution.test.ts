@@ -179,7 +179,7 @@ it('a serialized original deadline retains DEADLINE_EXCEEDED when it wins the fi
       'DEADLINE_EXCEEDED',
       'crossing the wire cannot change deadline into caller cancellation'
     )
-    assert.equal(terminal.completion.error.source, '@migaia/rpc/core')
+    assert.equal(terminal.completion.error.source, 'rpc.endpoint')
     assert.equal(terminal.completion.error.stack, restored.stack)
     assert.equal(effects, 0)
   } finally {
@@ -438,7 +438,7 @@ it('a send adapter forged FRAME_LIMIT code cannot rewrite the original completed
   harness.registry.register('value', (context) => context.success(42))
   /** Public diagnostics imitate a Contract failure without its private owner reference. */
   const reason = attachErrorIdentity(new Error('adapter frame fixture'), {
-    source: '@migaia/rpc/contract',
+    source: 'rpc.contract',
     code: RpcContractErrorCode.frameLimitExceeded
   })
   /** Refusal before preparation must not substitute a forged payload-invalid result in the store. */

@@ -59,7 +59,7 @@ describe('Tray public boundary and lifecycle events', () => {
       expect(codes).toContain(code)
       /** Message generation uses the same code registry as production throw sites. */
       const error = errors.createTrayError(code)
-      expect(error).toMatchObject({ source: '@migaia/tray', code })
+      expect(error).toMatchObject({ source: 'tray', code })
       expect(error.message.length).toBeGreaterThan(0)
       expect(error.message).not.toBe(code)
     }

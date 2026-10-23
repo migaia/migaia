@@ -177,7 +177,7 @@ describe('Thread channels inherit canonical physical observation', () => {
       expect(receive).toHaveBeenCalledTimes(3)
       expect(errors).toHaveBeenCalledTimes(2)
       for (const [error] of errors.mock.calls)
-        expect(error).toMatchObject({ source: '@migaia/rpc/core', code: 'TRANSPORT', cause })
+        expect(error).toMatchObject({ source: 'rpc.endpoint', code: 'TRANSPORT', cause })
       transport.observe!(probe)
       remove()
       removeError()
@@ -188,7 +188,7 @@ describe('Thread channels inherit canonical physical observation', () => {
         transport.send(7)
       } catch (error) {
         /** Owned adapter retirement retains its existing TRANSPORT send rejection path. */
-        expect(error).toMatchObject({ source: '@migaia/rpc/core', code: 'TRANSPORT' })
+        expect(error).toMatchObject({ source: 'rpc.endpoint', code: 'TRANSPORT' })
       }
       await Promise.resolve()
       expect(events).toHaveLength(2)

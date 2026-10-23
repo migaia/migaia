@@ -29,7 +29,7 @@ describe('Tray child topology', () => {
         const control = (installed[0] as any).getFeature('control')
         await expect(
           control.init({ id: 'foreign', host: 'another-host', generation: 1, config: {} })
-        ).rejects.toMatchObject({ source: '@migaia/tray', code: 'TRAY_CHILD_STATE_INVALID' })
+        ).rejects.toMatchObject({ source: 'tray', code: 'TRAY_CHILD_STATE_INVALID' })
       } finally {
         await local.dispose()
       }
@@ -84,7 +84,7 @@ describe('Tray child topology', () => {
           })
         ).rejects.toMatchObject({ code: 'TRAY_CHILD_STATE_INVALID' })
         await expect(remote.request('node.hidden.secret')).rejects.toMatchObject({
-          source: '@migaia/tray',
+          source: 'tray',
           code: 'TRAY_PATH_NOT_EXPOSED'
         })
         await tray.remove('child')

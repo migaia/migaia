@@ -52,7 +52,7 @@ describe('serialize audited ownership and failure contracts', () => {
         })()
       : values()
     await expect(collectStream(source)).rejects.toMatchObject({
-      source: '@migaia/serialize',
+      source: 'serialization',
       code: 'ENCODE_FAILED',
       phase: 'encode',
       chunkIndex: asynchronous ? 1 : 0
@@ -67,7 +67,7 @@ describe('serialize audited ownership and failure contracts', () => {
     controller.abort(reason)
     await expect(
       collectStream([['text', 'x']], undefined, { signal: controller.signal })
-    ).rejects.toMatchObject({ source: '@migaia/serialize', code: 'ABORTED', cause: reason })
+    ).rejects.toMatchObject({ source: 'serialization', code: 'ABORTED', cause: reason })
   })
 
   it('delegates identity conflicts to the canonical utils owner with the original cause', () => {
@@ -75,7 +75,7 @@ describe('serialize audited ownership and failure contracts', () => {
     const original = tagSerializeError(new Error('original'), SerializeErrorCode.encodeFailed)
     expect(() => tagSerializeError(original, SerializeErrorCode.decodeFailed)).toThrowError(
       expect.objectContaining({
-        source: '@migaia/utils',
+        source: 'foundation.utils',
         code: 'ERROR_IDENTITY_CONFLICT',
         cause: original
       })
@@ -87,9 +87,9 @@ describe('serialize audited ownership and failure contracts', () => {
       base64ToBytes('!')
     } catch (error) {
       expect(error).toMatchObject({
-        source: '@migaia/serialize',
+        source: 'serialization',
         code: 'INVALID_OPTION',
-        cause: expect.objectContaining({ source: '@migaia/utils', code: 'INVALID_ENCODING' })
+        cause: expect.objectContaining({ source: 'foundation.utils', code: 'INVALID_ENCODING' })
       })
       return
     }
@@ -104,14 +104,14 @@ describe('serialize audited ownership and failure contracts', () => {
     expect(() => parser.decode(['text', '{'], context)).toThrowError(
       expect.objectContaining({
         name: 'SyntaxError',
-        source: '@migaia/serialize',
+        source: 'serialization',
         code: 'DECODE_FAILED'
       })
     )
     expect(() => parser.encode(1n, context)).toThrowError(
       expect.objectContaining({
         name: 'TypeError',
-        source: '@migaia/serialize',
+        source: 'serialization',
         code: 'ENCODE_FAILED'
       })
     )
@@ -124,7 +124,7 @@ describe('serialize audited ownership and failure contracts', () => {
       }
     })
     expect(() => rejecting.encode({}, context)).toThrow(failure)
-    expect(failure).toMatchObject({ source: '@migaia/serialize', code: 'ENCODE_FAILED' })
+    expect(failure).toMatchObject({ source: 'serialization', code: 'ENCODE_FAILED' })
   })
 
   it('preserves a decoder native code on the original cause and tags the conversion boundary', () => {
@@ -138,7 +138,7 @@ describe('serialize audited ownership and failure contracts', () => {
       })
     } catch (error) {
       expect(error).toBeInstanceOf(TypeError)
-      expect(error).toMatchObject({ source: '@migaia/serialize', code: 'DECODE_FAILED' })
+      expect(error).toMatchObject({ source: 'serialization', code: 'DECODE_FAILED' })
       expect(walkErrorCauses(error)).toContain(original)
       return
     }

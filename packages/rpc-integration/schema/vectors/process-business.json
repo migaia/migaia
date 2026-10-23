@@ -112,7 +112,7 @@
       "cancel": "notification",
       "lateResponse": "late-after-cancel",
       "expectedReport": {
-        "source": "@migaia/rpc/bridge/jsonrpc",
+        "source": "rpc.contract.jsonrpc",
         "code": "JSONRPC_PROFILE_INVALID"
       },
       "subsequentRequest": "after-cancel"
@@ -197,7 +197,7 @@
       "negotiatedStream": false,
       "consumer": "public-composed-stream-owner",
       "expected": {
-        "source": "@migaia/rpc/core",
+        "source": "rpc.endpoint",
         "code": "CAPABILITY_CONFLICT"
       },
       "physicalStreamWrites": 0

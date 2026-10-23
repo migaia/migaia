@@ -119,7 +119,7 @@ describe('public-surface convergence', () => {
     expect('currentVersion' in runtime).toBe(false)
     expect(() => publicApi.createRuntime({ schedulerStrategy: 1 as never })).toThrow(TypeError)
     expect(() => publicApi.createRuntime({ schedulerStrategy: 1 as never })).toThrow(
-      expect.objectContaining({ code: 'INVALID_OPTION', source: '@migaia/reactive' })
+      expect.objectContaining({ code: 'INVALID_OPTION', source: 'reactive' })
     )
     /** Read-only clock query rejects objects without registered runtime ownership. */
     const { currentRuntimeVersion } = await import('../src/entry/extension.js')
@@ -128,7 +128,7 @@ describe('public-surface convergence', () => {
     signal.value = 3
     expect(currentRuntimeVersion(runtime)).toBeGreaterThan(previousVersion)
     expect(() => currentRuntimeVersion({} as IRuntime)).toThrow(
-      expect.objectContaining({ code: 'NOT_RUNTIME_OWNED', source: '@migaia/reactive' })
+      expect.objectContaining({ code: 'NOT_RUNTIME_OWNED', source: 'reactive' })
     )
     effect.dispose()
   })

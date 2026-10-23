@@ -698,7 +698,7 @@ A snapshot carries only durations, never the sender's absolute time. `remainingT
 import { RESOURCE_SOURCE, ResourceErrorCode, type IResourceErrorCode } from '@migaia/resource'
 ```
 
-The stable error-code table has **9 codes**, declared only in `src/error-code.ts`. The package's own errors use the `source` `'@migaia/resource'`; errors that already carry a full foreign identity keep their original package identity. `RESOURCE_SOURCE` exports this stable source: when classifying errors across packages, compare against it and `ResourceErrorCode` instead of copying string literals.
+The stable error-code table has **9 codes**, declared only in `src/error-code.ts`. The package's own errors use the `source` `'resource'`; errors that already carry a full foreign identity keep their original package identity. `RESOURCE_SOURCE` exports this stable source: when classifying errors across packages, compare against it and `ResourceErrorCode` instead of copying string literals.
 
 | `ResourceErrorCode` key | Code | When |
 | --- | --- | --- |
@@ -797,7 +797,7 @@ State type migration: `ResourceStatus.fetching` became `ResourceFetchStatus.fetc
 
 ### Adapters: read-only inspection and reset
 
-`peekState()` returns the current `IResourceState<T>` without tracking, loading or TTL revalidation. Unlike `peek()`, it returns the state union rather than taking the value out or throwing. `reset()` cancels any pending generation, clears dependency edges and cached data, and leaves this same instance idle and reusable. The old pending Promise rejects immediately with a native `AbortError`, source `@migaia/resource`, code `REQUEST_ABORTED`; reset never reuses a prior generation or token.
+`peekState()` returns the current `IResourceState<T>` without tracking, loading or TTL revalidation. Unlike `peek()`, it returns the state union rather than taking the value out or throwing. `reset()` cancels any pending generation, clears dependency edges and cached data, and leaves this same instance idle and reusable. The old pending Promise rejects immediately with a native `AbortError`, source `resource`, code `REQUEST_ABORTED`; reset never reuses a prior generation or token.
 
 `IResourceFetchContext` is the readonly request identity (`signal`, a monotonic `generation`, an opaque `token`). Retries keep that identity; replacement requests receive a new one. Keep request identity separate from the counters used for observation and suspension. Ownership of loaded values and render-version leases belongs to adapters, not to the Resource dependency graph. StoreLight uses these capabilities with one Resource instance, preserving the original `T` and the shared request Promise.
 

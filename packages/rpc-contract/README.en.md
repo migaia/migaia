@@ -238,7 +238,7 @@ schema/wire-error is a structural starting point, not the complete bounded norma
 
 ### Error identity and maintenance
 
-Contract errors retain the semantic source `@migaia/rpc/contract`, exported as `RPC_CONTRACT_SOURCE`, and use RpcContractErrorCode for the code.
+Contract errors retain the semantic source `rpc.contract`, exported as `RPC_CONTRACT_SOURCE`, and use RpcContractErrorCode for the code.
 
 | Code                   | Native type and trigger                                                           |
 | ---------------------- | --------------------------------------------------------------------------------- |
@@ -256,9 +256,9 @@ Contract errors retain the semantic source `@migaia/rpc/contract`, exported as `
 
 Shape errors retain native classes. Mutable callback errors are tagged in place without stack rewriting; immutable/non-Error values stay on cause. Complete upstream source/code identities retain their owner. Fatal UTF-8 decoder errors remain on HANDSHAKE_INVALID/INVALID_FRAME causes.
 
-The bridge source is `@migaia/rpc/bridge/jsonrpc`, exported as JSONRPC_BRIDGE_ERROR_SOURCE. JsonRpcBridgeErrorCode contains JSONRPC_FRAME_INVALID, JSONRPC_EXTENSION_MISSING, JSONRPC_PROFILE_INVALID, JSONRPC_UNSUPPORTED_MODE, and JSONRPC_HANDSHAKE_TIMEOUT for framing, extensions, profile, mode, and handshake timing. Do not classify bridge errors as the contract source.
+The bridge source is `rpc.contract.jsonrpc`, exported as JSONRPC_BRIDGE_ERROR_SOURCE. JsonRpcBridgeErrorCode contains JSONRPC_FRAME_INVALID, JSONRPC_EXTENSION_MISSING, JSONRPC_PROFILE_INVALID, JSONRPC_UNSUPPORTED_MODE, and JSONRPC_HANDSHAKE_TIMEOUT for framing, extensions, profile, mode, and handshake timing. Do not classify bridge errors as the contract source.
 
-Other layers use `@migaia/rpc/core` (RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode), `@migaia/rpc/remote` (RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode), `@migaia/rpc/process` (RPC_PROCESS_ERROR_SOURCE / RpcProcessErrorCode), and `@migaia/rpc/threads` (RPC_THREAD_ERROR_SOURCE / RpcThreadErrorCode). Branch on source/code; message is presentation text rather than retry policy.
+Other layers use `rpc.endpoint` (RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode), `rpc.remote` (RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode), `rpc.transport.process` (RPC_PROCESS_ERROR_SOURCE / RpcProcessErrorCode), and `rpc.transport.thread` (RPC_THREAD_ERROR_SOURCE / RpcThreadErrorCode). Branch on source/code; message is presentation text rather than retry policy.
 
 ```bash
 pnpm --filter @migaia/rpc-contract run fmt

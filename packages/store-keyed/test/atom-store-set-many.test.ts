@@ -146,7 +146,7 @@ describe('AtomStore.setMany', () => {
     } catch (error) {
       caught = error
     }
-    expect(caught).toMatchObject({ source: '@migaia/reactive', code: 'CALLBACK_FAILED', cause: 7 })
+    expect(caught).toMatchObject({ source: 'reactive', code: 'CALLBACK_FAILED', cause: 7 })
     store.dispose()
   })
 })

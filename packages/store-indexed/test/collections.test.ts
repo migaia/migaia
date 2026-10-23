@@ -8,14 +8,14 @@ describe('store-indexed', () => {
     revoke()
     expect(() => new ObservableObject({ a: 1 }, defaultRuntime, proxy as never)).toThrow(
       expect.objectContaining({
-        source: '@migaia/store-indexed',
+        source: 'store.indexed',
         code: 'INVALID_OPTION',
         cause: expect.any(Error)
       })
     )
     expect(
       () => new ObservableObject({ a: 1 }, defaultRuntime, { debugName: Symbol('name') as never })
-    ).toThrow(expect.objectContaining({ source: '@migaia/store-indexed', code: 'INVALID_OPTION' }))
+    ).toThrow(expect.objectContaining({ source: 'store.indexed', code: 'INVALID_OPTION' }))
   })
   it('rejects non-iterable function inputs before collection materialization', () => {
     expect(() => new ObservableArray((() => undefined) as never)).toThrow(
@@ -69,7 +69,7 @@ describe('store-indexed', () => {
     expect(array.snapshot()).toEqual(['a', 'b'])
     expect(set.snapshot()).toEqual(new Set(['a', 'b']))
     expect(() => new ObservableMap('ab' as never)).toThrow(
-      expect.objectContaining({ source: '@migaia/store-indexed', code: 'INVALID_OPTION' })
+      expect.objectContaining({ source: 'store.indexed', code: 'INVALID_OPTION' })
     )
     array.dispose()
     set.dispose()
@@ -89,7 +89,7 @@ describe('store-indexed', () => {
         )
     ).toThrow(
       expect.objectContaining({
-        source: '@migaia/store-indexed',
+        source: 'store.indexed',
         code: 'INVALID_OPTION',
         cause: getterFailure
       })
@@ -103,7 +103,7 @@ describe('store-indexed', () => {
       })
     ).toThrow(
       expect.objectContaining({
-        source: '@migaia/store-indexed',
+        source: 'store.indexed',
         code: 'INVALID_OPTION',
         cause: callFailure
       })
@@ -115,7 +115,7 @@ describe('store-indexed', () => {
   it('tags malformed Map entries before replacing existing state', () => {
     const map = new ObservableMap<string, number>([['old', 1]])
     expect(() => map.replace([1] as never)).toThrow(
-      expect.objectContaining({ source: '@migaia/store-indexed', code: 'INVALID_OPTION' })
+      expect.objectContaining({ source: 'store.indexed', code: 'INVALID_OPTION' })
     )
     expect(map.snapshot()).toEqual(new Map([['old', 1]]))
     map.dispose()
@@ -326,7 +326,7 @@ describe('store-indexed', () => {
     } as unknown as { a: number; b: number }
     expect(() => object.replace(next)).toThrow(
       expect.objectContaining({
-        source: '@migaia/store-indexed',
+        source: 'store.indexed',
         code: 'INVALID_OPTION',
         cause: expect.any(Error)
       })
@@ -341,7 +341,7 @@ describe('store-indexed', () => {
     revoke()
     expect(() => object.replace(proxy as never)).toThrow(
       expect.objectContaining({
-        source: '@migaia/store-indexed',
+        source: 'store.indexed',
         code: 'INVALID_OPTION',
         cause: expect.any(Error)
       })
@@ -364,7 +364,7 @@ describe('store-indexed', () => {
     }
     expect(() => map.replace(hostile)).toThrow(
       expect.objectContaining({
-        source: '@migaia/store-indexed',
+        source: 'store.indexed',
         code: 'INVALID_OPTION',
         cause: failure
       })
@@ -389,7 +389,7 @@ describe('store-indexed', () => {
     }
     expect(() => set.replace(hostile)).toThrow(
       expect.objectContaining({
-        source: '@migaia/store-indexed',
+        source: 'store.indexed',
         code: 'INVALID_OPTION',
         cause: failure
       })
@@ -413,7 +413,7 @@ it('contains hostile object constructor proxies before ownership admission', () 
     throw new Error('expected constructor to fail')
   } catch (error) {
     expect(error).toMatchObject({
-      source: '@migaia/store-indexed',
+      source: 'store.indexed',
       code: 'INVALID_OPTION',
       cause: expect.any(Error)
     })
@@ -437,7 +437,7 @@ it('contains hostile iterable constructor failures before ownership admission', 
       throw new Error('expected constructor to fail')
     } catch (error) {
       expect(error).toMatchObject({
-        source: '@migaia/store-indexed',
+        source: 'store.indexed',
         code: 'INVALID_OPTION',
         cause: expect.any(Error)
       })

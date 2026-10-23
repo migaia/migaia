@@ -1,4 +1,4 @@
-import { UtilsErrorCode, type IUtilsErrorCode } from './error-code.js'
+import { ERROR_SOURCE, UtilsErrorCode, type IUtilsErrorCode } from './error-code.js'
 import { UtilsErrorText } from './error-text.js'
 import { attachErrorIdentity, safeErrorReason } from './error.js'
 import { isPlainObject } from './object.js'
@@ -140,7 +140,7 @@ function ownerError(
 ): Error {
   return attachErrorIdentity(
     new Constructor(message, cause === undefined ? undefined : { cause }),
-    { source: '@migaia/utils', code }
+    { source: ERROR_SOURCE, code }
   )
 }
 

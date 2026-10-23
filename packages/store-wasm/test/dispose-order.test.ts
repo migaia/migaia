@@ -58,7 +58,7 @@ describe('WASM cleanup error contract', () => {
       throw new Error('expected record() to fail')
     } catch (error) {
       expect(error).toMatchObject({
-        source: '@migaia/store-wasm',
+        source: 'store.wasm',
         code: StoreWasmErrorCode.invalidOption,
         cause: expect.any(TypeError)
       })
@@ -75,7 +75,7 @@ describe('WASM cleanup error contract', () => {
       thrown = error
     }
     expect(thrown).toMatchObject({
-      source: '@migaia/store-wasm',
+      source: 'store.wasm',
       code: StoreWasmErrorCode.cleanupFailed,
       errors: [primary, cleanup]
     })
@@ -112,7 +112,7 @@ describe('WASM cleanup error contract', () => {
 
     expect(thrown).toBeInstanceOf(AggregateError)
     expect(thrown).toMatchObject({
-      source: '@migaia/store-wasm',
+      source: 'store.wasm',
       code: StoreWasmErrorCode.cleanupFailed,
       errors: [first, second]
     })
@@ -339,7 +339,7 @@ describe('record construction rollback matrix', () => {
       thrown = error
     }
     expect(thrown).toMatchObject({
-      source: '@migaia/store-wasm',
+      source: 'store.wasm',
       code: StoreWasmErrorCode.cleanupFailed,
       errors: [first, second]
     })

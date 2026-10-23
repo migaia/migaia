@@ -287,7 +287,7 @@ describe('process plugin spawn binding', () => {
       )
     ).toThrowError(
       expect.objectContaining({
-        source: '@migaia/rpc/process',
+        source: 'rpc.transport.process',
         code: RpcProcessErrorCode.pluginInvalidOption,
         detail: { field: 'supervision.spec.bootstrap' }
       })

@@ -206,7 +206,7 @@ describe('store-worker audit regressions', () => {
       }
     }
     expect(() => createSerializeWorkerHandler(implementation, () => {})).toThrow(original)
-    expect(original).toMatchObject({ source: '@migaia/store-worker', code: 'INVALID_OPTION' })
+    expect(original).toMatchObject({ source: 'store.worker', code: 'INVALID_OPTION' })
     expect(original.stack).toBeTruthy()
   })
 
@@ -233,7 +233,7 @@ describe('store-worker audit regressions', () => {
       expect(input.byteLength).toBe(3)
       expect([...input]).toEqual([1, 2, 3])
       expect(failure).toMatchObject({
-        source: '@migaia/store-worker',
+        source: 'store.worker',
         code: 'REQUEST_ABORTED',
         cause: reason
       })

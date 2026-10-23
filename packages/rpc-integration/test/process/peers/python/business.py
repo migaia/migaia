@@ -24,7 +24,7 @@ METHODS = {
     "p.f.generator": ["stream"], "p.f.asyncGenerator": ["stream"]
 }
 HOST_METHODS = ["migaia.remote.host.use", "migaia.remote.host.unUse", "migaia.remote.host.inspect"]
-ERROR_SOURCE = "@migaia/rpc/core"
+ERROR_SOURCE = "rpc.endpoint"
 # CLI fixes the actual provider declaration once, before this process accepts any session.
 REQUEST_IDEMPOTENT = True
 
@@ -140,7 +140,7 @@ class Business:
             self.pending_fault = method
             return "ACK", None
         if method.startswith("p.f.") and not self.installed:
-            return None, {**peer.wire_error("REMOTE_CLOSED", "remote is closed"), "source": "@migaia/rpc/remote"}
+            return None, {**peer.wire_error("REMOTE_CLOSED", "remote is closed"), "source": "rpc.remote"}
         if method == "p.f.request":
             return payload[0], None
         if method == "p.f.oneWay":

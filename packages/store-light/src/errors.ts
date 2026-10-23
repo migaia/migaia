@@ -1,10 +1,10 @@
-import { StoreLightErrorCode, type IStoreLightErrorCode } from './error-code.js'
+import { ERROR_SOURCE, StoreLightErrorCode, type IStoreLightErrorCode } from './error-code.js'
 import { attachErrorIdentity } from '@migaia/utils/error'
 
 export { StoreLightErrorCode, type IStoreLightErrorCode }
 
 /** `source` value stamped onto every error this package throws. */
-export const STORE_LIGHT_SOURCE = '@migaia/store-light'
+export const STORE_LIGHT_SOURCE = ERROR_SOURCE
 
 /** Attaches `(source, code)` onto an existing error object without touching its type or stack. */
 function tagStoreLightError<E extends Error>(error: E, code: IStoreLightErrorCode): E {

@@ -216,7 +216,7 @@ export const onRejected = (event: Record<string, unknown>): void => {
   state.rejections.push({
     ...event,
     verifiedPeerKey: '[REDACTED]',
-    source: '@migaia/rpc/core',
+    source: 'rpc.endpoint',
     code: 'OVERLOADED',
     name: null,
     message: 'provider rejection event',

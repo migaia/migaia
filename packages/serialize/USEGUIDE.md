@@ -433,7 +433,7 @@ TOML 只接受对象根，任意深度 null 和未配对 surrogate 都拒绝；�
 
 ### 错误身份、定位与排查
 
-SerializeCodecError(message, details) 的 details 必含 code、type、phase、chunkIndex、bytesConsumed，可选 context、source、cause；source 默认 @migaia/serialize，TCode 默认 ISerializeErrorCode，上层可用自己的 code 联合与 source 复用它。phase 为 encode/decode，cause 保留原对象。registry 编解码失败和原生构造/生命周期失败载体不同，统一按 (source, code) 判断，不能只靠 instanceof。
+SerializeCodecError(message, details) 的 details 必含 code、type、phase、chunkIndex、bytesConsumed，可选 context、source、cause；source 默认 serialization，TCode 默认 ISerializeErrorCode，上层可用自己的 code 联合与 source 复用它。phase 为 encode/decode，cause 保留原对象。registry 编解码失败和原生构造/生命周期失败载体不同，统一按 (source, code) 判断，不能只靠 instanceof。
 
 | SerializeErrorCode 成员 | 码值与边界                                                                       |
 | ----------------------- | -------------------------------------------------------------------------------- |
@@ -449,7 +449,7 @@ SerializeCodecError(message, details) 的 details 必含 code、type、phase、c
 | tagInvalid              | TAG_INVALID：保留头部损坏，不回退。                                              |
 | tagUnknown              | TAG_UNKNOWN：合法标签没有对应的登记版本。                                        |
 
-tagSerializeError(error, code, context?) 返回原错误并附只读 source/code，context 未提供保持未设；同身份重复附加幂等，context 仅补一次。冲突委托 utils，抛 (@migaia/utils, ERROR_IDENTITY_CONFLICT)，原错误在 cause，不能静默改写身份。
+tagSerializeError(error, code, context?) 返回原错误并附只读 source/code，context 未提供保持未设；同身份重复附加幂等，context 仅补一次。冲突委托 utils，抛 (foundation.utils, ERROR_IDENTITY_CONFLICT)，原错误在 cause，不能静默改写身份。
 
 ISerializeTaggedError 为原生错误附 source/code/context 的类型；ISerializeTypeError、ISerializeRangeError 保持各自原生类型，ISerializeLifecycleError 另允许 errors。createSerializeError、createSerializeTypeError、createSerializeRangeError 分别构造带码 Error/TypeError/RangeError；code/message 必填，options 默认未提供，均允许 cause/context，普通 Error 另允许 errors 的冻结快照。错误码是公开 API，错误 factory 不改写 stack。空输出进度为 0；decode 坏 chunk 进度为 0；decode parser 原错携带该段字节数；外层 stream 重新包装保留自己的片序，不丢掉内层原因。
 

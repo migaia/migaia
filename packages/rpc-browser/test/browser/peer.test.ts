@@ -290,7 +290,7 @@ describe('browser Runtime Peer', () => {
       createBrowserPeer({
         connect: { window: fixture.target, origin: '*', receiver: fixture.target }
       })
-    ).rejects.toMatchObject({ source: '@migaia/rpc/core', code: 'INVALID_CONFIG' })
+    ).rejects.toMatchObject({ source: 'rpc.endpoint', code: 'INVALID_CONFIG' })
     expect(fixture.listeners.get('message')?.size ?? 0).toBe(0)
   })
 

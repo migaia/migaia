@@ -1,7 +1,7 @@
 /** Stable source for capability graph errors and their registry rows. */
-export const ERROR_SOURCE = '@migaia/capability/graph'
+export const ERROR_SOURCE = 'capability.graph'
 
-/** Stable error codes owned by `@migaia/capability/graph`. */
+/** Stable error codes owned by `capability.graph`. */
 export const CapabilityGraphErrorCode = {
   /** Graph mutation/query reaches terminal state; create a new graph. */
   graphDisposed: 'GRAPH_DISPOSED',

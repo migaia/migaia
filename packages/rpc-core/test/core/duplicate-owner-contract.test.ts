@@ -217,7 +217,7 @@ describe('candidate-specific duplicate-owner contracts', () => {
     // 宿主壳层已从「继承 PluginHost」改为「defineHost 产出句柄」；这条断言要观测的是
     // 「通用 pipeline 所有权留在 plugin-host 里」，用宿主入口而不是继承关系来表达。
     expect(source('../../src/core/internal/web-rpc-plugin-host.ts')).toContain('defineHost')
-    expect(Object.values(SOURCES).join('\n')).not.toContain('@migaia/middleware-pipeline')
+    expect(Object.values(SOURCES).join('\n')).not.toContain('middleware.pipeline')
     expect('usePipeline' in endpoint).toBe(false)
     await endpoint.dispose()
   })
@@ -650,7 +650,7 @@ describe('projection and public lifecycle surface', () => {
     const failure = await hostDispose.catch((error: unknown) => error)
     expect(failure).toBeInstanceOf(RpcLifecycleError)
     expect(failure).toMatchObject({
-      source: '@migaia/rpc/core',
+      source: 'rpc.endpoint',
       code: RpcCoreErrorCode.endpointDisposed,
       cause: cleanup,
       cleanupErrors: [{ resource: 'resource disposer', error: cleanup }]

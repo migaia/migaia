@@ -24,7 +24,7 @@ describe('ResourceOwnershipRegistry', () => {
     factory.revoke()
     expect(() => createStoreResource(factory.proxy as never)).toThrow(
       expect.objectContaining({
-        source: '@migaia/store-light',
+        source: 'store.light',
         code: 'INVALID_OPTION',
         cause: expect.any(Error)
       })
@@ -33,7 +33,7 @@ describe('ResourceOwnershipRegistry', () => {
     options.revoke()
     expect(() => createStoreResource(() => 1, options.proxy as never)).toThrow(
       expect.objectContaining({
-        source: '@migaia/store-light',
+        source: 'store.light',
         code: 'INVALID_OPTION',
         cause: expect.any(Error)
       })
@@ -49,7 +49,7 @@ describe('ResourceOwnershipRegistry', () => {
       } as never)
     ).toThrow(
       expect.objectContaining({
-        source: '@migaia/store-light',
+        source: 'store.light',
         code: 'INVALID_OPTION',
         cause: expect.any(Error)
       })
@@ -62,7 +62,7 @@ describe('ResourceOwnershipRegistry', () => {
       } as never)
     ).toThrow(
       expect.objectContaining({
-        source: '@migaia/store-light',
+        source: 'store.light',
         code: 'INVALID_OPTION',
         cause: expect.any(Error)
       })
@@ -146,7 +146,7 @@ describe('ResourceOwnershipRegistry', () => {
     (key) => {
       expect(() => createStoreResource(() => 1, { [key]: 1 } as never)).toThrow(
         expect.objectContaining({
-          source: '@migaia/store-light',
+          source: 'store.light',
           code: 'INVALID_OPTION'
         })
       )

@@ -39,7 +39,7 @@ describe('bindStoreMiddleware', () => {
           failure = error
         }
         expect(failure).toMatchObject({
-          source: '@migaia/store-middleware',
+          source: 'store.middleware',
           code: 'CALLBACK_FAILED'
         })
         if (frozen) expect((failure as Error).cause).toBe(original)

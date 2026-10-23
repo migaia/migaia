@@ -159,7 +159,7 @@ it('closes an acquired source when native entropy fails before endpoint construc
           close
         })
       })
-    ).rejects.toMatchObject({ source: '@migaia/rpc/core', code: 'INVALID_CONFIG', cause: original })
+    ).rejects.toMatchObject({ source: 'rpc.endpoint', code: 'INVALID_CONFIG', cause: original })
     expect(close).toHaveBeenCalledTimes(1)
     expect(left.closed).toBe(true)
   } finally {

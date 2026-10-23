@@ -572,7 +572,7 @@ Serialization decode / request and pre-cancelled encode use SerializeCodecError 
 | invalidResponseChunk / INVALID_RESPONSE_CHUNK | Invalid response chunk or frame sequence.                                                 |
 | cleanupFailed / CLEANUP_FAILED                | Both parser Endpoint cleanup and optional termination failed.                             |
 
-STORE_WORKER_SOURCE is @migaia/store-worker. createStoreWorkerError(code, message, options?) requires code / message and accepts options.cause, returning an identified Error. createStoreWorkerAggregateError(code, errors, message) returns AggregateError retaining all values and ordering. code has type IStoreWorkerErrorCode, and factories do not overwrite stack. Complete foreign identities retain their owner.
+STORE_WORKER_SOURCE is store.worker. createStoreWorkerError(code, message, options?) requires code / message and accepts options.cause, returning an identified Error. createStoreWorkerAggregateError(code, errors, message) returns AggregateError retaining all values and ordering. code has type IStoreWorkerErrorCode, and factories do not overwrite stack. Complete foreign identities retain their owner.
 
 ### Troubleshooting and maintenance
 

@@ -59,7 +59,7 @@ describe('safeString failure reporting', () => {
     } catch (error) {
       expect(error).toBeInstanceOf(TypeError)
       expect(error).toMatchObject({
-        source: '@migaia/rpc/core',
+        source: 'rpc.endpoint',
         code: 'STRING_CONVERSION_FAILED',
         message: 'rpc string conversion failed',
         cause: original

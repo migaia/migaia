@@ -51,7 +51,7 @@ it('rejects invalid callback/capability arguments with native coded TypeError', 
   for (const run of invalid) {
     expect(run).toThrow(TypeError)
     expect(run).toThrow(
-      expect.objectContaining({ source: '@migaia/utils', code: 'INVALID_ARGUMENT' })
+      expect.objectContaining({ source: 'foundation.utils', code: 'INVALID_ARGUMENT' })
     )
   }
 })
@@ -69,7 +69,7 @@ it('preserves the exact failed scheduler getter on cause', () => {
   }
   expect(() => deferTask(scheduler, () => undefined)).toThrow(
     expect.objectContaining({
-      source: '@migaia/utils',
+      source: 'foundation.utils',
       code: 'INVALID_ARGUMENT',
       cause
     })
@@ -80,7 +80,7 @@ it('reports absent default host capability without affecting custom schedulers',
   vi.stubGlobal('queueMicrotask', undefined)
   expect(() => deferTask(systemScheduler, () => undefined)).toThrow(
     expect.objectContaining({
-      source: '@migaia/utils',
+      source: 'foundation.utils',
       code: 'ENV_UNSUPPORTED'
     })
   )

@@ -1,11 +1,11 @@
-import { LoggerErrorCode, type ILoggerErrorCode } from './error-code.js'
+import { ERROR_SOURCE, LoggerErrorCode, type ILoggerErrorCode } from './error-code.js'
 import { LoggerErrorText } from './error-text.js'
 import { attachErrorIdentity } from '@migaia/utils/error'
 
 export { LoggerErrorCode, type ILoggerErrorCode }
 
 /** Source identity for package-owned failures; upstream/plugin errors retain their own boundary. */
-export const LOGGER_SOURCE = '@migaia/logger'
+export const LOGGER_SOURCE = ERROR_SOURCE
 
 /** Attaches logger metadata, or returns an attachable wrapper that keeps the original as `cause`. */
 export function tagLoggerError<E extends Error>(error: E, code: ILoggerErrorCode): E {

@@ -151,7 +151,7 @@ pnpm add @migaia/store-light
 5. **构造失败会回滚。** 构造过程中任一步出错，已经创建的节点按注册的逆序释放，原始错误继续向外抛；清理本身失败时附加到原错误上，不会替换它。
 6. **导入时不创建默认 Runtime。** 第一次不传 `options.runtime` 创建 store 时才取得 reactive 的共享默认 Runtime，它和 `@migaia/reactive` 根入口导出的 `defaultRuntime` 是同一个对象。
 7. **StoreResource 的值由它持有。** 配了 `dispose` 时值必须是对象或函数；没配而值自带 `$dispose` 时会调用它。没有持有者之后的回收倒计时是 `keepAliveMs`（默认 1000，`0` 表示同步回收）；React 渲染期间由 capture/commit 租约保护正在显示的版本。
-8. **错误身份。** 本包产生的错误带 `source === STORE_LIGHT_SOURCE`（`@migaia/store-light`）和 `StoreLightErrorCode` 里的 `code`；来自 reactive 的所有权错误、来自 resource 的请求失败和取消保留原来的身份。
+8. **错误身份。** 本包产生的错误带 `source === STORE_LIGHT_SOURCE`（`store.light`）和 `StoreLightErrorCode` 里的 `code`；来自 reactive 的所有权错误、来自 resource 的请求失败和取消保留原来的身份。
 
 请求、数据、取消和共享 Promise 由 `@migaia/resource` 的一个实例负责，StoreResource 只在其上加值的所有权、渲染 capture、版本租约和恰好一次的释放。迁移说明（`StoreResourceDataKind`、`StoreResourceKind`、`retain()` 的移除）见 USEGUIDE 末尾。
 

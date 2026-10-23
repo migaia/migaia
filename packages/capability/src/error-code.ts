@@ -1,8 +1,11 @@
+/** Stable error domain owned by this code table; package moves preserve this identity. */
+export const ERROR_SOURCE = 'capability'
+
 /**
- * The single declaration site for `@migaia/capability` error codes.
+ * The single declaration site for `capability` error codes.
  *
  * The pair (source, code) uniquely identifies an error at the public boundary. `source` is always
- * `'@migaia/capability'`. Throw sites use these constants instead of inline values.
+ * `'capability'`. Throw sites use these constants instead of inline values.
  *
  * The migration assigns codes to previously untagged errors. `INVALID_NAME`, `INVALID_ACTIVATE`,
  * and `INVALID_HANDLE` retain their native `TypeError` identity. Codes are attached as properties

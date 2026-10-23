@@ -50,7 +50,7 @@ describe('review 1c abortableDelay', () => {
       } else await expect(pending).rejects.toBe(failure)
       expect(cancel).toHaveBeenCalledTimes(1)
       expect(failure).toMatchObject({
-        source: '@migaia/lifecycle',
+        source: 'lifecycle',
         code: LifecycleErrorCode.delayFailed
       })
     }
@@ -68,7 +68,7 @@ describe('review 1c abortableDelay', () => {
     }
     await expect(abortableDelay(scheduler, 1, undefined)).rejects.toBe(failure)
     expect(failure).toMatchObject({
-      source: '@migaia/lifecycle',
+      source: 'lifecycle',
       code: LifecycleErrorCode.delayFailed
     })
   })

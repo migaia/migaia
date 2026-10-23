@@ -13,7 +13,7 @@ LIMIT = 2
 
 def error(code: str, message: str) -> dict[str, Any]:
     """Reuse registered core codes; never expose arbitrary peer fields in diagnostics."""
-    return {**peer.wire_error(code, message), "source": "@migaia/rpc/core"}
+    return {**peer.wire_error(code, message), "source": "rpc.endpoint"}
 
 
 class ReverseCalls:

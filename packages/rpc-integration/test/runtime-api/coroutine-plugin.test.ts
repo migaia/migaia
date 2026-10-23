@@ -6,11 +6,11 @@ import { coroutineFailure, coroutineService, coroutineTestHost } from './fixture
 describe('coroutine runtime plugin modes', () => {
   it('constructs only one mode before any Host call', () => {
     expect(() => createCoroutinePlugin({ name: 'neither' } as never)).toThrow(
-      expect.objectContaining({ source: '@migaia/rpc/core', code: 'INVALID_CONFIG' })
+      expect.objectContaining({ source: 'rpc.endpoint', code: 'INVALID_CONFIG' })
     )
     expect(() =>
       createCoroutinePlugin({ name: 'both', task: async () => undefined, connect: {} } as never)
-    ).toThrow(expect.objectContaining({ source: '@migaia/rpc/core', code: 'INVALID_CONFIG' }))
+    ).toThrow(expect.objectContaining({ source: 'rpc.endpoint', code: 'INVALID_CONFIG' }))
   })
 
   it('publishes managed controls and symmetric calls with one announced and described self', async () => {
@@ -93,11 +93,11 @@ describe('coroutine runtime plugin modes', () => {
       const captured = parentConnection.peer
       await host.coroutine!.stop('c', { graceMs: 50 })
       await expect(async () => host.coroutine!.request('c', 'service.read')).rejects.toMatchObject({
-        source: '@migaia/rpc/core',
+        source: 'rpc.endpoint',
         code: 'TARGET_UNKNOWN'
       })
       await expect(async () => captured.request('service.read')).rejects.toMatchObject({
-        source: '@migaia/rpc/remote',
+        source: 'rpc.remote',
         code: 'REMOTE_CLOSED'
       })
       /** The ready callback starts its call synchronously before the restart caller can resume. */
@@ -164,7 +164,7 @@ describe('coroutine runtime plugin modes', () => {
         })
       )
       expect(rejected).toMatchObject({
-        source: '@migaia/plugin-host',
+        source: 'plugin.host',
         code: 'PLUGIN_INSTALL_FAILED'
       })
       /** The chain follows only existing Host, managed start and supervision owner layers. */
@@ -176,7 +176,7 @@ describe('coroutine runtime plugin modes', () => {
       )
         chain.push(current)
       expect(chain).toContain(failure)
-      expect(chain[1]).toMatchObject({ source: '@migaia/rpc/remote' })
+      expect(chain[1]).toMatchObject({ source: 'rpc.remote' })
       expect(host.coroutine).toBeUndefined()
       console.info(
         '[coroutine preconnect]',
@@ -396,7 +396,7 @@ it.each(['thread', 'process'] as const)(
       forwardController.abort()
       /** The ordinary call error keeps the registered cancellation source and code. */
       const forwardError = await forwardRejection
-      expect(forwardError).toMatchObject({ source: '@migaia/rpc/core', code: 'CANCELLED' })
+      expect(forwardError).toMatchObject({ source: 'rpc.endpoint', code: 'CANCELLED' })
       await vi.waitFor(async () => {
         /** Native abort receipt proves cancellation crossed both real channel boundaries. */
         const stats = (await child.coroutine!.request(
@@ -428,11 +428,11 @@ it.each(['thread', 'process'] as const)(
       reverseController.abort()
       /** The native caller's cancellation has the same canonical public failure identity. */
       const reverseError = await reverseRejection
-      expect(reverseError).toMatchObject({ source: '@migaia/rpc/core', code: 'CANCELLED' })
+      expect(reverseError).toMatchObject({ source: 'rpc.endpoint', code: 'CANCELLED' })
       await vi.waitFor(() => expect(service.cancellation).toEqual({ waiting: 1, cancelled: 1 }))
       expect(reverseCalls).toEqual({ request: 1, notify: 1, stream: 1, cancel: 1 })
       expect(reverseReasons).toHaveLength(1)
-      expect(reverseReasons[0]).toMatchObject({ source: '@migaia/rpc/core', code: 'CANCELLED' })
+      expect(reverseReasons[0]).toMatchObject({ source: 'rpc.endpoint', code: 'CANCELLED' })
       /** Full cancellation evidence is distinct from expected background cleanup diagnostics. */
       console.info(
         '[coroutine native cancellation]',

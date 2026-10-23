@@ -1,12 +1,12 @@
 import { inspectThenable, observeThenableRejection } from '@migaia/utils/function'
 import type { ICollectedError, IErrorPolicy } from './types.js'
 import { attachErrorIdentity, attachSecondaryErrors, tryReadProperty } from '@migaia/utils/error'
-import { LifecycleErrorCode } from './error-code.js'
+import { ERROR_SOURCE, LifecycleErrorCode } from './error-code.js'
 import { LifecycleErrorText } from './error-text.js'
 import { assertErrorPolicyReporter } from './error-boundary.js'
 
 /** `source` value stamped onto every error this package throws. */
-export const LIFECYCLE_SOURCE = '@migaia/lifecycle'
+export const LIFECYCLE_SOURCE = ERROR_SOURCE
 
 /**
  * The structural error contract every package in the workspace follows. Attached as properties on a

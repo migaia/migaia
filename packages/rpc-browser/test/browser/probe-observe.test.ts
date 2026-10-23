@@ -242,7 +242,7 @@ describe('carriers: browser observe', () => {
       /** Each reported wrapper must retain the same original probe exception as its cause. */
       for (const error of failures)
         expect(error).toMatchObject({
-          source: '@migaia/rpc/core',
+          source: 'rpc.endpoint',
           code: 'TRANSPORT',
           cause: failure
         })

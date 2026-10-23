@@ -147,3 +147,6 @@ export type {
 } from './feature-types.js'
 export { asyncDisposeKey } from './symbols.js'
 export { isPluginHandleCurrent } from './plugin-handle.js'
+
+/** Public domain identity for errors emitted by plugin host lifecycle operations. */
+export { PLUGIN_HOST_SOURCE } from './error-code.js'

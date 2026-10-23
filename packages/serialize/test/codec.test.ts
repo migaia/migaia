@@ -217,7 +217,7 @@ describe('versioned codecs', () => {
         throw new Error(`expected ${testCase.name} to reject`)
       } catch (error) {
         expect(error).toMatchObject({
-          source: '@migaia/serialize',
+          source: 'serialization',
           code: 'INVALID_OPTION',
           cause: original
         })
@@ -233,7 +233,7 @@ describe('versioned codecs', () => {
     expect(() => codec.encode(cycle as ICodecValue)).toThrow()
     expect(() => codec.encode(Number.NaN)).toThrow()
     expect(() => codec.encode(1n as never)).toThrowError(
-      expect.objectContaining({ code: 'INVALID_OPTION', source: '@migaia/serialize' })
+      expect.objectContaining({ code: 'INVALID_OPTION', source: 'serialization' })
     )
   })
 
@@ -269,7 +269,7 @@ describe('versioned codecs', () => {
   it('normalizes malformed and foreign codec failures with a reachable cause', () => {
     const json = defineJsonCodec({ version: 1 })
     expect(() => json.decode('{')).toThrowError(
-      expect.objectContaining({ code: 'DECODE_FAILED', source: '@migaia/serialize' })
+      expect.objectContaining({ code: 'DECODE_FAILED', source: 'serialization' })
     )
 
     const protobuf = defineProtobufCodec({

@@ -132,7 +132,7 @@ void loadProfile('1')
 pnpm add @migaia/resource @migaia/reactive
 ```
 
-包只有根入口 `@migaia/resource`：`Resource`、`ResourceStatus`、`ResourceFetchStatus`、`ResourceErrorCode`、`RESOURCE_SOURCE` 和全部公开类型都从这里导入，没有稳定的深层子路径。`runtime` 参数来自 `@migaia/reactive` 的 `createRuntime()`，两个包要用配套的版本。
+包只有根入口 `resource`：`Resource`、`ResourceStatus`、`ResourceFetchStatus`、`ResourceErrorCode`、`RESOURCE_SOURCE` 和全部公开类型都从这里导入，没有稳定的深层子路径。`runtime` 参数来自 `reactive` 的 `createRuntime()`，两个包要用配套的版本。
 
 ## 常用 API
 
@@ -162,7 +162,7 @@ pnpm add @migaia/resource @migaia/reactive
 
 ### 错误身份
 
-`Resource` 自己产生的错误带 `source === RESOURCE_SOURCE`（`@migaia/resource`）和 `ResourceErrorCode` 里的 `code`。已经有完整 `source`/`code` 的外部错误保持原样；没有分类的加载失败在重试结束后附加 `FETCH_FAILED`，原生错误保持原类型，不可修改的错误保留在 `cause` 链上。重试策略本身出错时附加 `INVALID_OPTION`，触发它的加载错误仍可从错误链找到。取消和释放产生的错误是原生 `DOMException`（`name === 'AbortError'`），按 `error.name` 判断即可。
+`Resource` 自己产生的错误带 `source === RESOURCE_SOURCE`（`resource`）和 `ResourceErrorCode` 里的 `code`。已经有完整 `source`/`code` 的外部错误保持原样；没有分类的加载失败在重试结束后附加 `FETCH_FAILED`，原生错误保持原类型，不可修改的错误保留在 `cause` 链上。重试策略本身出错时附加 `INVALID_OPTION`，触发它的加载错误仍可从错误链找到。取消和释放产生的错误是原生 `DOMException`（`name === 'AbortError'`），按 `error.name` 判断即可。
 
 ### Suspense
 

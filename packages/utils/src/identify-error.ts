@@ -1,4 +1,4 @@
-import { UtilsErrorCode } from './error-code.js'
+import { ERROR_SOURCE, UtilsErrorCode } from './error-code.js'
 import { UtilsErrorText } from './error-text.js'
 import {
   attachErrorIdentity,
@@ -96,7 +96,7 @@ const reservedFactoryKeys = new Set<string>(['source', 'codes', 'is', 'find'])
 /** Creates the coded native `TypeError` used for every rejected identity or argument. */
 function identityError(field: string): TypeError {
   return attachErrorIdentity(new TypeError(UtilsErrorText.identityInvalid(field)), {
-    source: '@migaia/utils',
+    source: ERROR_SOURCE,
     code: UtilsErrorCode.invalidArgument
   })
 }
@@ -180,7 +180,7 @@ function sameDetail(
  *   try {
  *     await load()
  *   } catch (cause) {
- *     throw IdentifyError.from(cause, { source: '@app/orders', code: 'LOAD_FAILED' })
+ *     throw IdentifyError.from(cause, { source: 'app.orders', code: 'LOAD_FAILED' })
  *   }
  *   ```
  */
@@ -273,7 +273,7 @@ class IdentifyErrorConstructor<S extends string = string, C extends string = str
    *
    * @example
    *   ;```ts
-   *   const OrderError = IdentifyError.define('@app/orders', { notFound: 'NOT_FOUND' })
+   *   const OrderError = IdentifyError.define('app.orders', { notFound: 'NOT_FOUND' })
    *   throw OrderError.notFound({ detail: { id } })
    *   if (OrderError.is(error, 'notFound')) retry()
    *   ```
@@ -390,7 +390,7 @@ class IdentifyErrorConstructor<S extends string = string, C extends string = str
    * @example
    *   ;```ts
    *   const timeout = IdentifyError.find(error, {
-   *     source: '@migaia/utils',
+   *     source: ERROR_SOURCE,
    *     code: 'DEADLINE_EXCEEDED'
    *   })
    *   ```

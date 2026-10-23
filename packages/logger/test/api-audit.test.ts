@@ -80,7 +80,7 @@ describe('audited logger contracts', () => {
       // Match the audit repro: the clock recovers before the host's own cleanup deadlines run.
       failClock = false
       const failure = await pending.catch((error: unknown) => error)
-      expect(failure).toMatchObject({ source: '@migaia/logger', code: 'INVALID_OPTION' })
+      expect(failure).toMatchObject({ source: 'logging', code: 'INVALID_OPTION' })
       expect([...walkErrorCauses(failure)]).toContain(clockFailure)
       if (cleanupFails) expect([...walkErrorCauses(failure)]).toContain(cleanupFailure)
       expect(disposed).toBe(1)

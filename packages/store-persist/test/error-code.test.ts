@@ -13,7 +13,7 @@ describe('store-persist error-code contract', () => {
     const codes = Object.values(StorePersistErrorCode)
     expect(codes).toHaveLength(8)
     expect(new Set(codes).size).toBe(8)
-    expect(STORE_PERSIST_SOURCE).toBe('@migaia/store-persist')
+    expect(STORE_PERSIST_SOURCE).toBe('store.persist')
   })
 
   it('preserves DOMException AbortError type and cause through shared attachment', () => {

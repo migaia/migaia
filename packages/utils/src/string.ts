@@ -1,4 +1,4 @@
-import { UtilsErrorCode } from './error-code.js'
+import { ERROR_SOURCE, UtilsErrorCode } from './error-code.js'
 import { UtilsErrorText } from './error-text.js'
 import { attachErrorIdentity } from './error.js'
 
@@ -58,7 +58,7 @@ function createFormatError(
   cause?: unknown
 ): TypeError {
   const error = new TypeError(message, cause === undefined ? undefined : { cause })
-  return attachErrorIdentity(error, { source: '@migaia/utils', code })
+  return attachErrorIdentity(error, { source: ERROR_SOURCE, code })
 }
 
 /** Snapshots formatting options once before scanning user-controlled text. */

@@ -1,4 +1,4 @@
-import { UtilsErrorCode } from './error-code.js'
+import { ERROR_SOURCE, UtilsErrorCode } from './error-code.js'
 import { UtilsErrorText } from './error-text.js'
 import { tryReadProperty } from './error.js'
 import { reportUnhandledError } from './host-report.js'
@@ -129,7 +129,7 @@ export function once<T extends (...args: never[]) => unknown>(functionValue: T):
   return ((...args: never[]) => {
     if (state === 'running') {
       const error = new TypeError(UtilsErrorText.reentrantCall)
-      Object.defineProperty(error, 'source', { value: '@migaia/utils', enumerable: true })
+      Object.defineProperty(error, 'source', { value: ERROR_SOURCE, enumerable: true })
       Object.defineProperty(error, 'code', {
         value: UtilsErrorCode.reentrantCall,
         enumerable: true
@@ -169,7 +169,7 @@ export function onceAsync<T>(functionValue: () => PromiseLike<T>): () => Promise
           const error = new TypeError(
             UtilsErrorText.invalidArgument('onceAsync result', 'a Promise or PromiseLike')
           )
-          Object.defineProperty(error, 'source', { value: '@migaia/utils', enumerable: true })
+          Object.defineProperty(error, 'source', { value: ERROR_SOURCE, enumerable: true })
           Object.defineProperty(error, 'code', {
             value: UtilsErrorCode.invalidArgument,
             enumerable: true
@@ -184,7 +184,7 @@ export function onceAsync<T>(functionValue: () => PromiseLike<T>): () => Promise
           const error = new TypeError(
             UtilsErrorText.invalidArgument('onceAsync result', 'a Promise or PromiseLike')
           )
-          Object.defineProperty(error, 'source', { value: '@migaia/utils', enumerable: true })
+          Object.defineProperty(error, 'source', { value: ERROR_SOURCE, enumerable: true })
           Object.defineProperty(error, 'code', {
             value: UtilsErrorCode.invalidArgument,
             enumerable: true

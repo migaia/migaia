@@ -90,7 +90,7 @@ describe('public archive boundaries', () => {
       }
       expect(failure).toBeInstanceOf(TypeError)
       expect(failure).toMatchObject({
-        source: '@migaia/store-persist',
+        source: 'store.persist',
         code: 'BACKEND_CAPABILITY',
         message: '[store] binary archive removal requires a storage backend with removeBytes'
       })

@@ -1,12 +1,60 @@
-import { nativeWorkerFor, nativeErrorListenerCount } from './fixture.js'
+import { nativeFixture, nativeWorkerFor, nativeErrorListenerCount } from './fixture.js'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it, vi } from 'vitest'
+import { LifecycleErrorCode, LifecycleErrorText } from '@migaia/lifecycle'
+import {
+  serializeErrorChain,
+  UtilsAbortError,
+  UtilsErrorCode,
+  walkErrorCauses
+} from '@migaia/utils/error'
 import { createNodeThreadLauncher } from '../../src/threads/adapters/node.js'
 
 /** Native exit fixture has no RPC protocol or Vitest runtime in the Worker. */
 const entry = fileURLToPath(new URL('./fixtures/lifecycle-worker.mjs', import.meta.url))
 
 describe('Node thread launcher', () => {
+  it('source domains preserves a real worker provider error chain', async () => {
+    /** The existing runtime fixture owns the real Worker, RPC provider and Host lifetime. */
+    const fixture = nativeFixture({}, { sourceDomainFailure: true })
+    try {
+      /** Public request rejects only after the Worker-side provider throws its package error. */
+      const feature = await fixture.install()
+      /** Observe the received rejection while permitting the assertion to distinguish success. */
+      const received = await feature.read(['source-domain']).then(
+        () => undefined,
+        (error: unknown) => error
+      )
+      expect(received).toBeInstanceOf(Error)
+      /** Locate the original error by native family and code, outside any local RPC wrapper. */
+      const remoteFailure = walkErrorCauses(received).find(
+        (error) =>
+          error !== null &&
+          typeof error === 'object' &&
+          Reflect.get(error, 'name') === 'AbortError' &&
+          Reflect.get(error, 'code') === UtilsErrorCode.aborted
+      )
+      expect.soft(remoteFailure, 'SOURCE_DOMAIN_REMOTE_SOURCE_CHAIN').toMatchObject({
+        source: 'foundation.utils',
+        code: UtilsErrorCode.aborted,
+        name: 'AbortError',
+        message: new UtilsAbortError().message,
+        cause: {
+          source: 'lifecycle',
+          code: LifecycleErrorCode.scopeTerminal,
+          message: LifecycleErrorText.scopeTerminal
+        }
+      })
+      /** Serialize the complete received graph, including wrappers and every preserved cause. */
+      const serialized = serializeErrorChain(received)
+      expect
+        .soft(JSON.stringify(serialized), 'SOURCE_DOMAIN_SERIALIZED_CHAIN')
+        .not.toContain('@migaia/')
+    } finally {
+      await fixture.close()
+      await Promise.all(fixture.handles.map((handle) => handle.exited))
+    }
+  })
   it('classifies native Worker option rejection and retains the native diagnostic on cause', async () => {
     /** A rejected native runtime flag fails construction before any Worker can be acquired. */
     const launching = createNodeThreadLauncher({ execArgv: ['--eval'] }).launch(
@@ -15,7 +63,7 @@ describe('Node thread launcher', () => {
     )
     await expect(launching).rejects.toBeInstanceOf(Error)
     await expect(launching).rejects.toMatchObject({
-      source: '@migaia/rpc/core',
+      source: 'rpc.endpoint',
       code: 'INVALID_CONFIG',
       cause: {
         code: 'ERR_WORKER_INVALID_EXEC_ARGV',

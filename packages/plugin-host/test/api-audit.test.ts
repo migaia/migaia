@@ -187,7 +187,7 @@ describe('audited plugin host contracts', () => {
             })
       const failure = await pending.catch((error: unknown) => error)
       expect(failure).toBe(original)
-      expect(failure).toMatchObject({ source: '@migaia/plugin-host', code: 'CALLBACK_FAILED' })
+      expect(failure).toMatchObject({ source: 'plugin.host', code: 'CALLBACK_FAILED' })
       if (kind !== 'dispose') {
         expect(host.config.get('config')).toEqual({ value: 1 })
         await host.dispose()
@@ -210,7 +210,7 @@ describe('audited plugin host contracts', () => {
           throw original
         })
         .catch((error: unknown) => error)
-      expect(failure).toMatchObject({ source: '@migaia/plugin-host', code: 'CALLBACK_FAILED' })
+      expect(failure).toMatchObject({ source: 'plugin.host', code: 'CALLBACK_FAILED' })
       expect(Object.hasOwn(failure as object, 'cause')).toBe(true)
       expect((failure as Error).cause).toBe(original)
       await host.dispose()

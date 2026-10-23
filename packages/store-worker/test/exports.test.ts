@@ -119,7 +119,7 @@ describe('store-worker exports', () => {
       expect(received).toMatchObject({
         name: 'RpcRemoteError',
         message: 'Provider failed',
-        source: '@migaia/rpc/core',
+        source: 'rpc.endpoint',
         code: 'INTERNAL',
         cause: expect.any(Error)
       })
@@ -154,7 +154,7 @@ describe('store-worker exports', () => {
       expect(received).toMatchObject({
         name: 'RpcRemoteError',
         message: 'Provider failed',
-        source: '@migaia/rpc/core',
+        source: 'rpc.endpoint',
         code: 'INTERNAL',
         cause: expect.any(TypeError)
       })
@@ -401,7 +401,7 @@ describe('store-worker exports', () => {
       throw new Error('expected worker options to fail')
     } catch (error) {
       expect(error).toMatchObject({
-        source: '@migaia/store-worker',
+        source: 'store.worker',
         code: 'INVALID_OPTION',
         cause: expect.any(Error)
       })
@@ -427,7 +427,7 @@ describe('store-worker exports', () => {
     revoke()
     expect(() => workerParser(proxy as never)).toThrow(
       expect.objectContaining({
-        source: '@migaia/store-worker',
+        source: 'store.worker',
         code: 'INVALID_OPTION',
         cause: expect.any(Error)
       })
@@ -465,14 +465,14 @@ describe('store-worker exports', () => {
   it('rejects invalid worker handler callbacks before endpoint construction', () => {
     expect(() => createWorkerHandler(null as never, () => undefined)).toThrow(
       expect.objectContaining({
-        source: '@migaia/store-worker',
+        source: 'store.worker',
         code: 'INVALID_OPTION',
         message: '[store] createWorkerHandler compute must be a function'
       })
     )
     expect(() => createWorkerHandler(() => 1, null as never)).toThrow(
       expect.objectContaining({
-        source: '@migaia/store-worker',
+        source: 'store.worker',
         code: 'INVALID_OPTION',
         message: '[store] createWorkerHandler postMessage must be a function'
       })
@@ -612,12 +612,12 @@ describe('store-worker exports', () => {
     revoke()
 
     await expect(adapter.request({}, proxy as never)).rejects.toMatchObject({
-      source: '@migaia/store-worker',
+      source: 'store.worker',
       code: 'INVALID_OPTION',
       cause: expect.any(Error)
     })
     await expect(adapter.request({}, null as never)).rejects.toMatchObject({
-      source: '@migaia/store-worker',
+      source: 'store.worker',
       code: 'INVALID_OPTION'
     })
     adapter.close()
@@ -627,14 +627,14 @@ describe('store-worker exports', () => {
     const adapter = new WorkerAdapter(fakePort())
     expect(() => workerComputed(adapter, null as never)).toThrow(
       expect.objectContaining({
-        source: '@migaia/store-worker',
+        source: 'store.worker',
         code: 'INVALID_OPTION',
         message: '[store] workerComputed selectInput must be a function'
       })
     )
     expect(() => workerComputed(adapter, () => 1, { transfer: 1 as never })).toThrow(
       expect.objectContaining({
-        source: '@migaia/store-worker',
+        source: 'store.worker',
         code: 'INVALID_OPTION',
         message: '[store] workerComputed transfer must be a function'
       })
@@ -697,7 +697,7 @@ describe('store-worker exports', () => {
 
     expect(() => workerComputed(adapter, () => 1, options)).toThrow(
       expect.objectContaining({
-        source: '@migaia/store-worker',
+        source: 'store.worker',
         code: 'INVALID_OPTION',
         message: '[store] worker options must be an object',
         cause: failure

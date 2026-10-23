@@ -92,7 +92,7 @@ describe('public peer remote vectors', () => {
     if (entry.semanticValid) expect(normalizeRemoteContract(entry.value)).toEqual(entry.value)
     else
       expect(() => normalizeRemoteContract(entry.value)).toThrow(
-        expect.objectContaining({ source: '@migaia/rpc/remote', code: 'REMOTE_CONTRACT_INVALID' })
+        expect.objectContaining({ source: 'rpc.remote', code: 'REMOTE_CONTRACT_INVALID' })
       )
   })
   /** Host oracle includes the schema-valid but semantically invalid catalog and unsorted inspect. */

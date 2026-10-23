@@ -34,10 +34,15 @@ import {
   encodeRpcStreamFrame,
   RPC_STREAM_MAX_FRAME_BYTES
 } from '@migaia/rpc-contract/framing/stream'
+import { encodeJsonRpcFrame } from '@migaia/rpc-contract/framing/jsonrpc'
 import { endpointFor, bridgeEndpointFor } from './peers/ts/runtime.js'
 import { RemoteMethodName } from '@migaia/rpc-core/remote'
 import {
   peers,
+  expected,
+  assertWireGraph,
+  offer,
+  bridgeFrames,
   evidence,
   contract,
   bridgeContract,
@@ -287,6 +292,253 @@ function receipt(active: Awaited<ReturnType<typeof faultClient>>, label: string)
   })
   writeFileSync(join(evidence, `hf-${label}.sent.bin`), Buffer.concat(active.sent), { mode: 0o600 })
 }
+
+describe('source domains error source domains', () => {
+  it('uses the endpoint domain in the public TS behavior vector', () => {
+    expect(expected.error, 'SOURCE_DOMAIN_PUBLIC_VECTOR_DOMAIN_SOURCE').toMatchObject({
+      source: 'rpc.endpoint',
+      code: 'INTERNAL',
+      cause: {
+        source: 'rpc.endpoint',
+        code: 'INTERNAL',
+        cause: { source: 'rpc.endpoint', code: 'INTERNAL', message: 'peer cause' }
+      }
+    })
+  })
+
+  for (const peer of peers)
+    it(`${peer.language} preserves real wire diagnostics with endpoint domain sources`, async () => {
+      /** The existing deployment starts the actual independent language executable. */
+      const active = await faultClient(peer)
+      /** Retain the caller's real rejection for comparison with the physical response. */
+      let receivedError: unknown
+      try {
+        await expect(
+          active.runtimes[0]!.endpoint.send(peer.id, 'peer.error', []).catch((error) => {
+            receivedError = error
+            throw error
+          })
+        ).rejects.toMatchObject({
+          code: 'INTERNAL',
+          cause: {
+            code: 'INTERNAL',
+            message: 'peer error',
+            cause: { code: 'INTERNAL', message: 'peer cause' }
+          }
+        })
+        /** Observe the actual provider bytes through the canonical stream decoder. */
+        const failedWire = wireFrames(active.stdout).find(
+          (frame) =>
+            frame.kind === 'response' &&
+            frame.ok === false &&
+            frame.data.route.method === 'peer.error'
+        )?.error
+        expect(failedWire).toBeDefined()
+        /** Existing graph assertions prove exact code/name/message/stack and cause preservation. */
+        assertWireGraph((receivedError as { cause: unknown }).cause, failedWire)
+        expect.soft(failedWire, 'SOURCE_DOMAIN_WIRE_DOMAIN_SOURCE').toMatchObject({
+          source: 'rpc.endpoint',
+          code: 'INTERNAL',
+          message: 'peer error',
+          cause: { source: 'rpc.endpoint', code: 'INTERNAL', message: 'peer cause' }
+        })
+        expect.soft(receivedError, 'SOURCE_DOMAIN_RECEIVED_DOMAIN_SOURCE').toMatchObject({
+          source: 'rpc.endpoint',
+          code: 'INTERNAL',
+          cause: {
+            source: 'rpc.endpoint',
+            code: 'INTERNAL',
+            message: 'peer error',
+            cause: { source: 'rpc.endpoint', code: 'INTERNAL', message: 'peer cause' }
+          }
+        })
+      } finally {
+        await active.close()
+        await Promise.all(active.handles.map((handle) => handle.exited))
+        receipt(active, `${peer.language}-source-domain-error-source`)
+      }
+      expect(active.budget.inUse).toBe(0)
+      expect(active.budget.pending).toBe(0)
+    })
+
+  it('uses the process domain for a real Go authentication rejection', async () => {
+    /** The admitted Go executable receives bootstrap and hello through its existing native entry. */
+    const peer = peers.find((candidate) => candidate.language === 'go')!
+    /** This test owns the raw child because a rejected hello cannot produce a ready facade. */
+    const child = spawn(peer.command, [...peer.args, '--stdio', '--bootstrap', 'stdin'], {
+      stdio: ['pipe', 'pipe', 'pipe']
+    })
+    /** Register close observation before sending input so early launch failures remain visible. */
+    const exited = once(child, 'close')
+    /** Only peer-produced bytes are decoded as evidence of the rejected handshake. */
+    const stdout: Uint8Array[] = []
+    /** Retain native diagnostics without logging the local authentication fixture. */
+    const stderr: Uint8Array[] = []
+    child.stdout!.on('data', (chunk: Buffer) => stdout.push(chunk.slice()))
+    child.stderr!.on('data', (chunk: Buffer) => stderr.push(chunk.slice()))
+    try {
+      child.stdin!.end(
+        Buffer.concat([
+          encodeRpcStreamFrame(Buffer.from('source-domain-bootstrap-token')),
+          encodeRpcStreamFrame(
+            Buffer.from(
+              JSON.stringify({
+                kind: 'handshake',
+                step: 'hello',
+                protocol: 'migaia.rpc',
+                ...offer,
+                auth: 'source-domain-different-token'
+              })
+            )
+          )
+        ])
+      )
+      expect((await exited)[0]).toBe(0)
+      /** The real Go rejectRecord calls its generic wireError before returning this frame. */
+      const rejected = wireFrames(stdout).find(
+        (frame) => frame.kind === 'handshake' && frame.step === 'reject'
+      )
+      expect(rejected?.error).toMatchObject({
+        code: 'AUTH_REJECTED',
+        name: 'Error',
+        message: 'authentication rejected',
+        stack: 'Error: authentication rejected'
+      })
+      expect(rejected.error, 'SOURCE_DOMAIN_GENERIC_HANDSHAKE_SOURCE').toMatchObject({
+        source: 'rpc.transport.process'
+      })
+    } finally {
+      if (child.exitCode === null && child.signalCode === null) child.kill()
+      await exited
+      writeFileSync(
+        join(evidence, 'hf-go-source-domain-generic-handshake.stdout.bin'),
+        Buffer.concat(stdout)
+      )
+      writeFileSync(
+        join(evidence, 'hf-go-source-domain-generic-handshake.stderr.log'),
+        Buffer.concat(stderr)
+      )
+    }
+  })
+
+  it('uses the remote domain for a real Go empty Host use rejection', async () => {
+    /** Host profile exposes the same control entry as the public TypeScript Host service. */
+    const peer = peers.find((candidate) => candidate.language === 'go')!
+    /** Reuse the existing authenticated deployment, raw byte observer and process release owner. */
+    const active = await faultClient(peer, { host: true })
+    /** The caller's actual error must retain the complete generic provider diagnostic. */
+    let receivedError: unknown
+    try {
+      await expect(
+        active.runtimes[0]!.endpoint.send(peer.id, RemoteMethodName.hostUse, []).catch((error) => {
+          receivedError = error
+          throw error
+        })
+      ).rejects.toBeInstanceOf(Error)
+      /** Empty parameters reach businessState.invoke's existing generic wireError branch. */
+      const failure = wireFrames(active.stdout).find(
+        (frame) =>
+          frame.kind === 'response' &&
+          frame.ok === false &&
+          frame.data.route.method === RemoteMethodName.hostUse
+      )?.error
+      expect(failure).toMatchObject({
+        code: 'REMOTE_CONTRACT_INVALID',
+        name: 'Error',
+        message: 'invalid Host use',
+        stack: 'Error: invalid Host use'
+      })
+      assertWireGraph((receivedError as { cause: unknown }).cause, failure)
+      expect(failure, 'SOURCE_DOMAIN_GENERIC_HOST_SOURCE').toMatchObject({ source: 'rpc.remote' })
+    } finally {
+      await active.close()
+      await Promise.all(active.handles.map((handle) => handle.exited))
+      receipt(active, 'go-source-domain-generic-host')
+    }
+  })
+
+  it('uses the remote domain for a real Go empty Host unUse rejection', async () => {
+    /** Host profile exposes the same control entry as the public TypeScript Host service. */
+    const peer = peers.find((candidate) => candidate.language === 'go')!
+    /** Reuse the existing authenticated deployment, raw byte observer and process release owner. */
+    const active = await faultClient(peer, { host: true })
+    /** The caller's actual error must retain the complete generic provider diagnostic. */
+    let receivedError: unknown
+    try {
+      await expect(
+        active.runtimes[0]!.endpoint.send(peer.id, RemoteMethodName.hostUnUse, []).catch(
+          (error) => {
+            receivedError = error
+            throw error
+          }
+        )
+      ).rejects.toBeInstanceOf(Error)
+      /** Empty parameters reach businessState.invoke's existing generic wireError branch. */
+      const failure = wireFrames(active.stdout).find(
+        (frame) =>
+          frame.kind === 'response' &&
+          frame.ok === false &&
+          frame.data.route.method === RemoteMethodName.hostUnUse
+      )?.error
+      expect(failure).toMatchObject({
+        code: 'REMOTE_CONTRACT_INVALID',
+        name: 'Error',
+        message: 'invalid Host unUse',
+        stack: 'Error: invalid Host unUse'
+      })
+      assertWireGraph((receivedError as { cause: unknown }).cause, failure)
+      expect(failure, 'SOURCE_DOMAIN_GENERIC_HOST_UNUSE_SOURCE').toMatchObject({
+        source: 'rpc.remote'
+      })
+    } finally {
+      await active.close()
+      await Promise.all(active.handles.map((handle) => handle.exited))
+      receipt(active, 'go-source-domain-generic-host-unuse')
+    }
+  })
+
+  it('uses the endpoint domain for a real Go unknown bridge method rejection', async () => {
+    /** The existing bridge deployment supplies authentication, fd bootstrap and byte observation. */
+    const peer = peers.find((candidate) => candidate.language === 'go')!
+    /** The production bridge owns the session while this one request exercises its foreign peer. */
+    const active = await faultClient(peer, { bridge: true })
+    try {
+      await active.physical[0]!.write(
+        encodeJsonRpcFrame({
+          jsonrpc: '2.0',
+          id: 'source-domain-generic-bridge',
+          method: 'source-domain.missing',
+          params: {}
+        })
+      )
+      await vi.waitFor(() =>
+        expect(
+          bridgeFrames(active.stdout).some((frame) => frame.id === 'source-domain-generic-bridge')
+        ).toBe(true)
+      )
+      /** The authenticated Go bridge default branch returns its generic wireError directly. */
+      const reply = bridgeFrames(active.stdout).find(
+        (frame) => frame.id === 'source-domain-generic-bridge'
+      )
+      expect(reply.error).toMatchObject({ code: -32000, message: 'bridge peer method unavailable' })
+      expect(reply.error.data.migaiaWireError).toMatchObject({
+        code: 'METHOD_NOT_FOUND',
+        name: 'Error',
+        message: 'bridge peer method unavailable',
+        stack: 'Error: bridge peer method unavailable'
+      })
+      expect(reply.error.data.migaiaWireError, 'SOURCE_DOMAIN_GENERIC_BRIDGE_SOURCE').toMatchObject(
+        {
+          source: 'rpc.endpoint'
+        }
+      )
+    } finally {
+      await active.close()
+      await Promise.all(active.handles.map((handle) => handle.exited))
+      receipt(active, 'go-source-domain-generic-bridge')
+    }
+  })
+})
 
 describe('canonical raw physical frame boundaries', () => {
   it('accepts exactly 16 MiB and rejects oversized length before payload allocation', () => {
@@ -572,19 +824,19 @@ describe('real owned terminal guards', () => {
           const writes = active.sent.length
           for (const method of ['request', 'oneWay'] as const)
             await expect(active.feature[method]([])).rejects.toMatchObject({
-              source: '@migaia/rpc/process',
+              source: 'rpc.transport.process',
               code: 'PROCESS_TERMINAL_CALL'
             })
           await expect(
             active.feature.generator([])[Symbol.asyncIterator]().next()
-          ).rejects.toMatchObject({ source: '@migaia/rpc/process', code: 'PROCESS_TERMINAL_CALL' })
+          ).rejects.toMatchObject({ source: 'rpc.transport.process', code: 'PROCESS_TERMINAL_CALL' })
           if (active.facade) {
             await expect(active.facade.use('p')).rejects.toMatchObject({
-              source: '@migaia/rpc/process',
+              source: 'rpc.transport.process',
               code: 'PROCESS_TERMINAL_CALL'
             })
             await expect(active.facade.inspect()).rejects.toMatchObject({
-              source: '@migaia/rpc/process',
+              source: 'rpc.transport.process',
               code: 'PROCESS_TERMINAL_CALL'
             })
           }
@@ -698,7 +950,7 @@ describe('physical departure before sendOnce admission', () => {
         )
         admit()
         expect(await call).toMatchObject({
-          error: { source: '@migaia/rpc/remote', code: 'REMOTE_CLOSED' }
+          error: { source: 'rpc.remote', code: 'REMOTE_CLOSED' }
         })
         expect(
           wireFrames(active.sent).filter(
@@ -814,7 +1066,7 @@ describe('capacity one real stopped reader', () => {
           active.runtimes[0]!.endpoint.send(peer.id, 'p.f.request', ['overloaded'], {
             trace: 'h-rejected-trace'
           })
-        ).rejects.toMatchObject({ source: '@migaia/rpc/core', code: 'OVERLOADED' })
+        ).rejects.toMatchObject({ source: 'rpc.endpoint', code: 'OVERLOADED' })
         expect(active.sent).toHaveLength(writes)
         expect(active.backlog).toContainEqual(
           expect.objectContaining({
@@ -916,7 +1168,7 @@ describe('real owned crash retry eligibility', () => {
             expect(result).toMatchObject({ error: { name: 'TimeoutError' } })
           } else {
             expect(result).toMatchObject({
-              error: { source: '@migaia/rpc/remote', code: 'REMOTE_RESULT_UNKNOWN' }
+              error: { source: 'rpc.remote', code: 'REMOTE_RESULT_UNKNOWN' }
             })
           }
         } finally {
@@ -1094,7 +1346,7 @@ describe('real non-idempotent request crash', () => {
           expect(active!.resilience.inspect('p')).toMatchObject({ state: 'ready' })
         )
         expect(await call).toMatchObject({
-          error: { source: '@migaia/rpc/remote', code: 'REMOTE_RESULT_UNKNOWN' }
+          error: { source: 'rpc.remote', code: 'REMOTE_RESULT_UNKNOWN' }
         })
         const requests = wireFrames(active.sent).filter(
           (frame) => frame.kind === 'request' && frame.method === 'p.f.request'

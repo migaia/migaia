@@ -21,7 +21,7 @@ it('rejects a registered callable at another runtime boundary', () => {
   const value = () => 42
   claimOwnership(value, owner)
   expect(() => assertOwnedBy(value, other, 'callable')).toThrow(
-    expect.objectContaining({ source: '@migaia/reactive', code: 'CROSS_RUNTIME' })
+    expect.objectContaining({ source: 'reactive', code: 'CROSS_RUNTIME' })
   )
 })
 
@@ -35,6 +35,6 @@ it('rejects foreign-copy callable ownership through the public extension entry',
   /** Reloading the public entry models a second module copy with its own ownership WeakMap. */
   const foreign = await import('../src/entry/extension.js')
   expect(() => foreign.ownerOf(value)).toThrow(
-    expect.objectContaining({ source: '@migaia/reactive', code: 'COPY_CONFLICT' })
+    expect.objectContaining({ source: 'reactive', code: 'COPY_CONFLICT' })
   )
 })

@@ -81,7 +81,7 @@ it('preserves the existing unknown-node error contract for direct value reads', 
   const graph = createCapabilityGraph()
   expect(() => graph.readValue('missing' as IGraphNodeId)).toThrow(
     expect.objectContaining({
-      source: '@migaia/capability/graph',
+      source: 'capability.graph',
       code: CapabilityGraphErrorCode.unknownNode
     })
   )

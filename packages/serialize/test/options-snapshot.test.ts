@@ -76,7 +76,7 @@ describe('serialize operation option admission', () => {
       ])
 
       await expect(registry.encode('value', options as never)).rejects.toMatchObject({
-        source: '@migaia/serialize',
+        source: 'serialization',
         code: 'INVALID_OPTION',
         cause
       })
@@ -105,7 +105,7 @@ describe('serialize operation option admission', () => {
       }
     ]) {
       await expect(registry.encode('value', options as never)).rejects.toMatchObject({
-        source: '@migaia/serialize',
+        source: 'serialization',
         code: 'INVALID_OPTION'
       })
     }
@@ -136,7 +136,7 @@ describe('serialize operation option admission', () => {
     await expect(
       registry.encode('value', { signal: signal as unknown as IAbortSignal })
     ).rejects.toMatchObject({
-      source: '@migaia/serialize',
+      source: 'serialization',
       code: 'INVALID_OPTION',
       cause
     })
@@ -167,7 +167,7 @@ describe('serialize operation option admission', () => {
     await expect(
       registry.encode('value', { signal: signal as unknown as IAbortSignal })
     ).rejects.toMatchObject({
-      source: '@migaia/serialize',
+      source: 'serialization',
       code: 'INVALID_OPTION',
       cause
     })
@@ -196,7 +196,7 @@ describe('serialize operation option admission', () => {
     listener?.()
 
     await expect(pending).rejects.toMatchObject({
-      source: '@migaia/serialize',
+      source: 'serialization',
       code: 'INVALID_OPTION',
       cause
     })

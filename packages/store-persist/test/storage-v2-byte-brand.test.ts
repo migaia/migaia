@@ -49,6 +49,6 @@ describe('store-persist byte boundary', () => {
 
     await expect(
       writeEnvelope(storage as never, 'key', codec as never, undefined, {})
-    ).rejects.toMatchObject({ source: '@migaia/store-persist', code: 'CODEC_OUTPUT_MISMATCH' })
+    ).rejects.toMatchObject({ source: 'store.persist', code: 'CODEC_OUTPUT_MISMATCH' })
   })
 })

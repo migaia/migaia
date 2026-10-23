@@ -14,7 +14,7 @@ import {
  * Installation and cleanup producers retain original failures through cause or error collections.
  */
 export class PluginHostError<TDetail = IPluginHostErrorDetail> extends Error {
-  /** The `source` component of `(source, code)`, always `'@migaia/plugin-host'`. */
+  /** The `source` component of `(source, code)`, always `'plugin.host'`. */
   readonly source: string
   /** Stable scenario code from PluginHostErrorCode, independent of the human-readable message. */
   readonly code: IPluginHostErrorCode

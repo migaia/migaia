@@ -287,8 +287,8 @@ governor 沿原 rate/payload/连续超时/idle 策略，disposer 归实际连接
 
 | source               | 常量 / 表                                         |
 | -------------------- | ------------------------------------------------- |
-| `@migaia/rpc/core`   | RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode          |
-| `@migaia/rpc/remote` | RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode |
+| `rpc.endpoint`   | RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode          |
+| `rpc.remote` | RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode |
 
 isRpcErrorInstance / isRpcRemoteError / isRpcTimeoutError 按稳定字段跨 realm/副本判断，不能依赖 instanceof；isRpcError 只检查字符串 code，不能替代错误族守卫。RpcError、RpcRemoteError、RpcTimeoutError 等仅类型导出，唯一公开可构造类为 RpcLifecycleError，供持有自身释放状态的消费方使用。
 

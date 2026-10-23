@@ -729,7 +729,7 @@ type IResourceCacheSnapshot<T> = {
 import { RESOURCE_SOURCE, ResourceErrorCode, type IResourceErrorCode } from '@migaia/resource'
 ```
 
-稳定错误码表，**9 个码**，唯一声明处 `src/error-code.ts`，包自身错误的 `source` 为 `'@migaia/resource'`；已有完整外部身份的错误保留原包身份。
+稳定错误码表，**9 个码**，唯一声明处 `src/error-code.ts`，包自身错误的 `source` 为 `'resource'`；已有完整外部身份的错误保留原包身份。
 `RESOURCE_SOURCE` 导出这个稳定 source，跨包分类错误时应比较它与 `ResourceErrorCode`，不要复制字符串字面量。
 
 | `ResourceErrorCode` 键      | 码值                          | 触发条件                                                                                                                                        |
@@ -829,7 +829,7 @@ pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test &
 
 ### 适配层：只读检查与重置
 
-`peekState()` 返回当前的 `IResourceState<T>`，不登记依赖、不发起加载，也不检查有效期。和 `peek()` 不同，它返回状态联合本身，而不是取出值或抛出。`reset()` 取消进行中的请求，清除依赖和缓存数据，让同一个实例回到可复用的 `idle`。之前那个 pending Promise 立即以原生 `AbortError` 失败，`source` 为 `@migaia/resource`，`code` 为 `REQUEST_ABORTED`；重置后的请求不会沿用旧的 generation 或 token。
+`peekState()` 返回当前的 `IResourceState<T>`，不登记依赖、不发起加载，也不检查有效期。和 `peek()` 不同，它返回状态联合本身，而不是取出值或抛出。`reset()` 取消进行中的请求，清除依赖和缓存数据，让同一个实例回到可复用的 `idle`。之前那个 pending Promise 立即以原生 `AbortError` 失败，`source` 为 `resource`，`code` 为 `REQUEST_ABORTED`；重置后的请求不会沿用旧的 generation 或 token。
 
 `IResourceFetchContext` 是只读的请求身份（`signal`、单调递增的 `generation`、不透明的 `token`）。同一次请求的多次重试保留这组身份，替换后的请求拿到新的一组。请求身份要和观察、休眠用到的计数分开看待。加载值的所有权和渲染版本租约属于适配层，不属于 Resource 的依赖图。StoreLight 用一个 Resource 实例使用这些能力，保留原始的 `T` 和共享的请求 Promise。
 

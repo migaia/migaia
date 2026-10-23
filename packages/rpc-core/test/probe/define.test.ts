@@ -144,7 +144,7 @@ describe('probe contract', () => {
       Object.defineProperty(host, field, { value: 'owned', writable: true, configurable: true })
       expect(() => defineProbe({ stages: ['peer'], emit: vi.fn() }, host)).toThrow(
         expect.objectContaining({
-          source: '@migaia/rpc/core',
+          source: 'rpc.endpoint',
           code: 'INVALID_CONFIG',
           name: 'TypeError'
         })
@@ -175,7 +175,7 @@ describe('probe contract', () => {
     for (const host of [frozen, sealed, registered]) {
       expect(() => defineProbe({ stages: ['message'], emit: vi.fn() }, host)).toThrow(
         expect.objectContaining({
-          source: '@migaia/rpc/core',
+          source: 'rpc.endpoint',
           code: 'INVALID_CONFIG',
           name: 'TypeError'
         })
@@ -197,7 +197,7 @@ describe('probe contract', () => {
         defineProbe({ stages: ['peer'], emit: vi.fn() }, host as unknown as object)
       ).toThrow(
         expect.objectContaining({
-          source: '@migaia/rpc/core',
+          source: 'rpc.endpoint',
           code: 'INVALID_CONFIG',
           name: 'TypeError'
         })
@@ -284,7 +284,7 @@ describe('probe contract', () => {
       expect(() => defineProbe(definition)).toThrow(TypeError)
       expect(() => defineProbe(definition)).toThrow(
         expect.objectContaining({
-          source: '@migaia/rpc/core',
+          source: 'rpc.endpoint',
           code: 'INVALID_CONFIG',
           name: 'TypeError'
         })
@@ -391,7 +391,7 @@ describe('probe contract', () => {
     /** Matching every public field cannot forge the private probe identity used by installation. */
     expect(() => probePlugin({ ...probe })).toThrow(
       expect.objectContaining({
-        source: '@migaia/rpc/core',
+        source: 'rpc.endpoint',
         code: 'INVALID_CONFIG',
         name: 'TypeError'
       })

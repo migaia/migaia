@@ -90,7 +90,7 @@ def write_json(stream: BinaryIO, value: Any) -> None:
 def wire_error(code: str, message: str) -> dict[str, str]:
     """Create a complete fixed-text wire error without peer-provided secrets."""
     return {
-        "source": "@migaia/rpc/process",
+        "source": "rpc.transport.process",
         "code": code,
         "name": "Error",
         "message": message,

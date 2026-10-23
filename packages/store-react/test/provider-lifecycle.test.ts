@@ -309,7 +309,7 @@ describe('StoreProvider readiness and configuration', () => {
       if (kind === 'error') expect(caught[0]).toBe(reason)
       else
         expect(caught[0]).toMatchObject({
-          source: '@migaia/store-react',
+          source: 'store.react',
           code: 'READY_REJECTED',
           cause: reason
         })
@@ -329,7 +329,7 @@ describe('StoreProvider readiness and configuration', () => {
     )
     expect(container.textContent).toBe('failed')
     expect(caught).toEqual([
-      expect.objectContaining({ source: '@migaia/store-react', code: 'INVALID_CONFIG' })
+      expect.objectContaining({ source: 'store.react', code: 'INVALID_CONFIG' })
     ])
     expect(registry.lifecycle).toBe('open')
   })
@@ -347,7 +347,7 @@ describe('StoreProvider readiness and configuration', () => {
     expect(container.textContent).toBe('failed')
     expect(caught).toEqual([
       expect.objectContaining({
-        source: '@migaia/store-react',
+        source: 'store.react',
         code: 'INVALID_CONFIG',
         cause: failure
       })

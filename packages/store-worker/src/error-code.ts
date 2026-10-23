@@ -1,7 +1,10 @@
+/** Stable error domain owned by this code table; package moves preserve this identity. */
+export const ERROR_SOURCE = 'store.worker'
+
 /**
- * Declares the public error codes for `@migaia/store-worker` in one place.
+ * Declares the public error codes for `store.worker` in one place.
  *
- * Locally constructed errors use source '@migaia/store-worker'. RPC and application failures retain
+ * Locally constructed errors use source 'store.worker'. RPC and application failures retain
  * their owning identities and original chains. Throw sites use these constants instead of inline
  * literals.
  *

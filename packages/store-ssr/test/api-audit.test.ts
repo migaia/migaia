@@ -48,7 +48,7 @@ describe('store-ssr audit regressions', () => {
     const store = memoryStore(scope.runtime, () => scope.dispose())
     try {
       expect(() => scope.register('app', store)).toThrow(
-        expect.objectContaining({ source: '@migaia/store-ssr', code: 'SCOPE_DISPOSED' })
+        expect.objectContaining({ source: 'store.ssr', code: 'SCOPE_DISPOSED' })
       )
       expect(scope.disposed).toBe(true)
       expect(store.$plain()).toEqual({ count: 1 })
@@ -84,7 +84,7 @@ describe('store-ssr audit regressions', () => {
     const resource = new ClosingResource(async () => 0, scope.runtime)
     try {
       expect(() => scope.registerResource('item', resource)).toThrow(
-        expect.objectContaining({ source: '@migaia/store-ssr', code: 'SCOPE_DISPOSED' })
+        expect.objectContaining({ source: 'store.ssr', code: 'SCOPE_DISPOSED' })
       )
       expect(resource.disposed).toBe(false)
       expect(resource.state.status).toBe('success')
@@ -160,7 +160,7 @@ describe('store-ssr audit regressions', () => {
       })
       expect(failures.map((failure) => failure.key)).toEqual(['pending'])
       expect(failures[0]?.error).toMatchObject({
-        source: '@migaia/store-ssr',
+        source: 'store.ssr',
         code: 'RESOURCE_TIMEOUT'
       })
       expect(state.resources?.ready.data).toBe(7)
@@ -195,7 +195,7 @@ describe('store-ssr audit regressions', () => {
         }
       })
       expect(() => assertSSRState(state)).toThrow(original)
-      expect(original).toMatchObject({ source: '@migaia/store-ssr', code: 'INVALID_SNAPSHOT' })
+      expect(original).toMatchObject({ source: 'store.ssr', code: 'INVALID_SNAPSHOT' })
       expect(original.stack).toBeTruthy()
     }
   )
@@ -203,7 +203,7 @@ describe('store-ssr audit regressions', () => {
   it('keeps native JSON SyntaxError while adding the invalid-state-script identity', () => {
     expect(() => deserializeSSRState('{')).toThrow(SyntaxError)
     expect(() => deserializeSSRState('{')).toThrow(
-      expect.objectContaining({ source: '@migaia/store-ssr', code: 'INVALID_STATE_SCRIPT' })
+      expect.objectContaining({ source: 'store.ssr', code: 'INVALID_STATE_SCRIPT' })
     )
   })
 })

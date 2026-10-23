@@ -1,5 +1,8 @@
+/** Stable error domain owned by this code table; package moves preserve this identity. */
+export const ERROR_SOURCE = 'store.wasm'
+
 /**
- * Package-owned failures paired with source `@migaia/store-wasm`. Native WASM loading/trap errors
+ * Package-owned failures paired with source `store.wasm`. Native WASM loading/trap errors
  * and complete foreign identities retain their original behavior. Code values are public API.
  */
 export const StoreWasmErrorCode = {

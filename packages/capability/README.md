@@ -297,7 +297,7 @@ snapshotGraphReadiness(source) 是桥接外部 readiness source 的低层工具�
 
 ### 错误身份与处理
 
-Host 自有错误的 source 为 CAPABILITY_SOURCE，即 @migaia/capability；Graph 自有错误为 CAPABILITY_GRAPH_SOURCE，即 @migaia/capability/graph。用 (source, code) 区分归属。身份字段通过属性附加，不改写 stack；可附加的原生错误保留类型与实例，需包装时经 cause/errors 保留原对象。私有错误工厂不是公开入口。
+Host 自有错误的 source 为 CAPABILITY_SOURCE，即 capability；Graph 自有错误为 CAPABILITY_GRAPH_SOURCE，即 capability.graph。用 (source, code) 区分归属。身份字段通过属性附加，不改写 stack；可附加的原生错误保留类型与实例，需包装时经 cause/errors 保留原对象。私有错误工厂不是公开入口。
 
 | Host code          | 触发点                                                            |
 | ------------------ | ----------------------------------------------------------------- |

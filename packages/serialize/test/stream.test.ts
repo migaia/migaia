@@ -72,7 +72,7 @@ describe('sliceByFrameBudget：按实测耗时定片大小', () => {
         .catch((caught: unknown) => caught)
       expect(error).toBeInstanceOf(TypeError)
       expect(error).toMatchObject({
-        source: '@migaia/serialize',
+        source: 'serialization',
         code: 'INVALID_OPTION',
         cause: schedulerOption === getterScheduler ? getterFailure : callFailure,
         message:
@@ -92,7 +92,7 @@ describe('sliceByFrameBudget：按实测耗时定片大小', () => {
         .catch((caught: unknown) => caught)
       expect(error).toBeInstanceOf(RangeError)
       expect(error).toMatchObject({
-        source: '@migaia/serialize',
+        source: 'serialization',
         code: 'INVALID_OPTION',
         message: 'serialize scheduler now() must return a finite number'
       })
@@ -128,7 +128,7 @@ describe('sliceByFrameBudget：按实测耗时定片大小', () => {
       const error = await iterator.next().catch((caught: unknown) => caught)
       expect(error).toBeInstanceOf(TypeError)
       expect(error).toMatchObject({
-        source: '@migaia/serialize',
+        source: 'serialization',
         code: 'INVALID_OPTION',
         cause: schedulerOption === scheduleThrowing ? scheduleFailure : cancelGetterFailure,
         message:
@@ -214,12 +214,12 @@ describe('sliceByFrameBudget：按实测耗时定片大小', () => {
     controller.abort('stream disposed')
     const error = await next.catch((caught: unknown) => caught)
     expect(error).toMatchObject({
-      source: '@migaia/serialize',
+      source: 'serialization',
       code: 'ABORTED',
       cause: 'stream disposed',
       errors: [
         expect.objectContaining({
-          source: '@migaia/serialize',
+          source: 'serialization',
           code: 'INVALID_OPTION',
           cause: cancelFailure
         })
@@ -254,7 +254,7 @@ describe('sliceByFrameBudget：按实测耗时定片大小', () => {
     await Promise.resolve()
     runCallback?.()
     await expect(next).rejects.toMatchObject({
-      source: '@migaia/serialize',
+      source: 'serialization',
       code: 'INVALID_OPTION',
       cause: cancelFailure,
       message: 'serialize scheduler task cancel() failed'
@@ -303,7 +303,7 @@ describe('sliceByFrameBudget：按实测耗时定片大小', () => {
       await iterator.next()
       const error = await observeYieldResult(iterator.next())
       expect(error).toMatchObject({
-        source: '@migaia/serialize',
+        source: 'serialization',
         code: 'ABORTED',
         cause: reason
       })
@@ -349,13 +349,13 @@ describe('sliceByFrameBudget：按实测耗时定片大小', () => {
     await iterator.next()
     const error = await observeYieldResult(iterator.next())
     expect(error).toMatchObject({
-      source: '@migaia/serialize',
+      source: 'serialization',
       code: 'INVALID_OPTION',
       message: 'serialize abort signal listener registration failed',
       cause: registrationFailure,
       errors: [
         expect.objectContaining({
-          source: '@migaia/serialize',
+          source: 'serialization',
           code: 'INVALID_OPTION',
           cause: removeFailure
         })
@@ -406,14 +406,14 @@ describe('sliceByFrameBudget：按实测耗时定片大小', () => {
       const error = await observeYieldResult(iterator.next())
       if (throwsAfterCallback) {
         expect(error).toMatchObject({
-          source: '@migaia/serialize',
+          source: 'serialization',
           code: 'INVALID_OPTION',
           message: 'serialize abort signal listener registration failed',
           cause: registrationFailure
         })
       } else {
         expect(error).toMatchObject({
-          source: '@migaia/serialize',
+          source: 'serialization',
           code: 'ABORTED',
           cause: reason
         })
@@ -460,12 +460,12 @@ describe('sliceByFrameBudget：按实测耗时定片大小', () => {
     await iterator.next()
     const error = await observeYieldResult(iterator.next())
     expect(error).toMatchObject({
-      source: '@migaia/serialize',
+      source: 'serialization',
       code: 'ABORTED',
       cause: reason,
       errors: [
         expect.objectContaining({
-          source: '@migaia/serialize',
+          source: 'serialization',
           code: 'INVALID_OPTION',
           cause: removeFailure
         })
@@ -856,7 +856,7 @@ describe('encodeStream：不拼装地吐流', () => {
     const secondError = await stream.next().catch((error: unknown) => error)
     expect(secondError).toBeInstanceOf(SerializeCodecError)
     expect(secondError).toMatchObject({
-      source: '@migaia/serialize',
+      source: 'serialization',
       code: 'ENCODE_FAILED',
       cause: secondFailure
     })
@@ -1055,7 +1055,7 @@ describe('decodeStream 与 collectStream', () => {
         scenario.cause
       )
       expect(decodeError, scenario.name).toMatchObject({
-        source: '@migaia/serialize',
+        source: 'serialization',
         code: 'DECODE_FAILED',
         phase: 'decode',
         type: 'json',
@@ -1070,7 +1070,7 @@ describe('decodeStream 与 collectStream', () => {
       )
       expect(collectError, scenario.name).toBeInstanceOf(SerializeCodecError)
       expect(collectError, scenario.name).toMatchObject({
-        source: '@migaia/serialize',
+        source: 'serialization',
         code: 'ENCODE_FAILED',
         phase: 'encode',
         type: 'stream',

@@ -1,8 +1,11 @@
+/** Stable error domain owned by this code table; package moves preserve this identity. */
+export const ERROR_SOURCE = 'plugin.host'
+
 /**
- * The single declaration site for `@migaia/plugin-host` error codes.
+ * The single declaration site for `plugin.host` error codes.
  *
  * The pair `(source, code)` uniquely identifies a package-owned failure. `source` is always
- * `'@migaia/plugin-host'`. Throw sites use these constants instead of inline values. Localized
+ * `'plugin.host'`. Throw sites use these constants instead of inline values. Localized
  * messages live in `error-text.ts` and correspond to code names.
  *
  * Code values are public API. Renaming a code is a breaking change.
@@ -352,4 +355,4 @@ export type IPluginHostErrorCode = (typeof PluginHostErrorCode)[keyof typeof Plu
  * Every error leaving the plugin-host boundary uses this value. Throw sites and `error-text.ts`
  * must not repeat its string literal.
  */
-export const PLUGIN_HOST_SOURCE = '@migaia/plugin-host' as const
+export const PLUGIN_HOST_SOURCE = ERROR_SOURCE

@@ -1,10 +1,10 @@
-import { SerializeErrorCode, type ISerializeErrorCode } from './error-code.js'
+import { ERROR_SOURCE, SerializeErrorCode, type ISerializeErrorCode } from './error-code.js'
 import { attachErrorIdentity, isNativeErrorValue } from '@migaia/utils/error'
 
 export { SerializeErrorCode, type ISerializeErrorCode }
 
-/** The single literal source for error `source`. Throw sites do not repeat `'@migaia/serialize'`. */
-export const SERIALIZE_SOURCE = '@migaia/serialize' as const
+/** The single literal source for error `source`. Throw sites do not repeat `'serialization'`. */
+export const SERIALIZE_SOURCE = ERROR_SOURCE
 
 /** Stable registry-option diagnostics used by construction-time validation. */
 export const SerializeErrorText = {

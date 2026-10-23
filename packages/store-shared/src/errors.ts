@@ -1,10 +1,10 @@
-import { StoreSharedErrorCode, type IStoreSharedErrorCode } from './error-code.js'
+import { ERROR_SOURCE, StoreSharedErrorCode, type IStoreSharedErrorCode } from './error-code.js'
 import { attachErrorIdentity } from '@migaia/utils/error'
 
 export { StoreSharedErrorCode, type IStoreSharedErrorCode }
 
 /** Identity for package-owned errors; complete foreign callback identities keep their own source. */
-export const STORE_SHARED_SOURCE = '@migaia/store-shared'
+export const STORE_SHARED_SOURCE = ERROR_SOURCE
 
 function tagStoreSharedError<E extends Error>(error: E, code: IStoreSharedErrorCode): E {
   return attachErrorIdentity(error, { source: STORE_SHARED_SOURCE, code })

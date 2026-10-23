@@ -9,7 +9,7 @@ import { runtimeSources } from '../../../rpc-core/test/runtime-api/fixture.js'
 import { RpcCoreErrorCode } from '../../../rpc-core/dist/core/errors.js'
 
 /** Rejection checks retain the canonical wrapper while requiring the original permission code. */
-function permission(error: unknown, code: string, source = '@migaia/plugin-host'): boolean {
+function permission(error: unknown, code: string, source = 'plugin.host'): boolean {
   /** Core may retain the original package error on its bounded serialized cause chain. */
   let current = error
   for (let depth = 0; depth < 5 && current && typeof current === 'object'; depth += 1) {
@@ -241,7 +241,7 @@ it('a different same-name plugin follows the frozen whitelist without reviving c
     for (const method of ['service.removed', 'service.added'])
       await assert.rejects(
         Promise.resolve().then(() => owners[1].thread!.request('connection', method)),
-        (error) => permission(error, RpcCoreErrorCode.providerNotFound, '@migaia/rpc/core')
+        (error) => permission(error, RpcCoreErrorCode.providerNotFound, 'rpc.endpoint')
       )
     assert.equal(successorCalls, 1, 'neither a removed key nor an unadvertised key executes')
     /**
@@ -256,7 +256,7 @@ it('a different same-name plugin follows the frozen whitelist without reviving c
     }
     await owners[1].unUse('connection')
     assert.throws(() => capturedOutlet.request(capturedConnection, 'service.read'), {
-      source: '@migaia/rpc/core',
+      source: 'rpc.endpoint',
       code: RpcCoreErrorCode.targetUnknown
     })
   } finally {

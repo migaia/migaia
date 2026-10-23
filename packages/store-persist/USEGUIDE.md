@@ -488,7 +488,7 @@ IPersistStorage 是内部最小类型投影，不作为包入口具名导出：c
 
 ### 错误与排查
 
-STORE_PERSIST_SOURCE 为 @migaia/store-persist；稳定码由 StorePersistErrorCode 维护：
+STORE_PERSIST_SOURCE 为 store.persist；稳定码由 StorePersistErrorCode 维护：
 
 | 属性 / 码                                        | 含义                                                          |
 | ------------------------------------------------ | ------------------------------------------------------------- |

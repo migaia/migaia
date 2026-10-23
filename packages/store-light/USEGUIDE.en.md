@@ -610,7 +610,7 @@ export type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMod
 - `StoreFieldMode`: the valid values of `FieldBuilder.mode` (`'sync'` / `'async'`), used to label `mode` in a custom builder; see [section 6](#6-fieldbuilder-the-custom-field-protocol).
 
 ```ts doc-test=skip reason="Signature summary, not a runnable module"
-export const STORE_LIGHT_SOURCE = '@migaia/store-light'
+export const STORE_LIGHT_SOURCE = 'store.light'
 
 function createStoreLightError(
   code: IStoreLightErrorCode,
@@ -630,7 +630,7 @@ function createStoreLightAggregateError(
 ): AggregateError
 ```
 
-- `STORE_LIGHT_SOURCE`: the fixed `error.source` value `'@migaia/store-light'` of every error from this package, for filtering or asserting errors by origin.
+- `STORE_LIGHT_SOURCE`: the fixed `error.source` value `'store.light'` of every error from this package, for filtering or asserting errors by origin.
 - `createStoreLightError(code, message, options?)`: builds a plain `Error` carrying the `(source, code)` identity (through `attachErrorIdentity` from `@migaia/utils/error`); `options.cause` is optional and passed to the `Error` constructor only when set.
 - `createStoreLightRangeError(code, message)`: the same, building a `RangeError`; no `cause` option.
 - `createStoreLightTypeError(code, message, options?)`: the same, building a `TypeError`; `options.cause` is optional.
@@ -642,7 +642,7 @@ These four factories are the tools this package uses to build all of its own err
 
 ## 10. Error reference
 
-Errors created by this package use `source: '@migaia/store-light'` and a stable `code`. Reactive ownership errors and Resource request failures and cancellations keep their original owner. FieldBuilder initialization failures and late field cleanup failures keep a complete existing identity; other native extensible Errors are marked `INITIALIZATION_FAILED` / `FIELD_DISPOSE_FAILED` on the original object, keeping type, message and stack; values that cannot carry an identity stay reachable through the `cause` of a coded fallback. When initialization and cleanup both fail, the primary Error stays the original object when its cause can be written, and an existing cause is merged with the cleanup failure; otherwise an `INIT_AND_CLEANUP_FAILED` AggregateError is used.
+Errors created by this package use `source: 'store.light'` and a stable `code`. Reactive ownership errors and Resource request failures and cancellations keep their original owner. FieldBuilder initialization failures and late field cleanup failures keep a complete existing identity; other native extensible Errors are marked `INITIALIZATION_FAILED` / `FIELD_DISPOSE_FAILED` on the original object, keeping type, message and stack; values that cannot carry an identity stay reachable through the `cause` of a coded fallback. When initialization and cleanup both fail, the primary Error stays the original object when its cause can be written, and an existing cause is merged with the cleanup failure; otherwise an `INIT_AND_CLEANUP_FAILED` AggregateError is used.
 
 | `StoreLightErrorCode` | Code | When / what to do |
 | --- | --- | --- |
@@ -775,7 +775,7 @@ StoreResource uses the Runtime captured at creation for idle cleanup and diagnos
 
 StoreLight now adapts one `@migaia/resource` instance. It keeps the identity of actual values, render captures, resource and version leases and value release, and deletes its own duplicate request/data controller and request coordinator. `StoreResourceDataKind` and its type are removed; use `ResourceStatus` / `ResourceFetchStatus` for native Resource state. `StoreResourceKind` remains internal facade vocabulary; `readSnapshot()` still returns `value`/`version`/`token` and has no public kind property.
 
-Repeated reads while loading throw the same Promise, which resolves with the original value. `retry()` or a forced cancellation rejects the superseded Promise at once with a native `AbortError`, source `@migaia/resource`, code `REQUEST_ABORTED`; previously a loader that ignored the abort could keep that Promise pending until it finished on its own. Handle the old Promise's rejection when driving retries by hand. Late returned values are released once. A failed refresh restores the old data; an old version lease delays its release until the lease is released. Loaded values still waiting for clock settlement remain owned and are released if settlement fails. When admitting the provisional-capture timer fails, the partial captures and timers are released and reported as release housekeeping; a value that loaded successfully stays readable and notifies subscribers. No async-context mechanism is introduced.
+Repeated reads while loading throw the same Promise, which resolves with the original value. `retry()` or a forced cancellation rejects the superseded Promise at once with a native `AbortError`, source `resource`, code `REQUEST_ABORTED`; previously a loader that ignored the abort could keep that Promise pending until it finished on its own. Handle the old Promise's rejection when driving retries by hand. Late returned values are released once. A failed refresh restores the old data; an old version lease delays its release until the lease is released. Loaded values still waiting for clock settlement remain owned and are released if settlement fails. When admitting the provisional-capture timer fails, the partial captures and timers are released and reported as release housekeeping; a value that loaded successfully stays readable and notifies subscribers. No async-context mechanism is introduced.
 
 ### Migration note: public API convergence
 

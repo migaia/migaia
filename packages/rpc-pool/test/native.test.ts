@@ -71,7 +71,7 @@ it('preserves failed work once while the same real Peer restarts and serves futu
     /** This failed business call remains failed; the pool does not replay it in the new unit. */
     const failure = await pool.request('crash', { journal }).catch((error: unknown) => error)
     expect(failure).toBeInstanceOf(Error)
-    expect(failure).not.toMatchObject({ source: '@migaia/rpc-pool' })
+    expect(failure).not.toMatchObject({ source: 'rpc.pool' })
     await ready.promise
     expect(exits).toContainEqual(expect.objectContaining({ reason: 'crashed', code: 1 }))
     expect(await pool.request('echo', 42)).toBe(42)

@@ -361,7 +361,7 @@ describe('native process handshake', () => {
     expect(JSON.stringify(reports)).not.toContain(token)
     expect(reports).toEqual([
       expect.objectContaining({
-        source: '@migaia/rpc/process',
+        source: 'rpc.transport.process',
         code: 'PROCESS_CHANNEL_AUTH_REJECTED'
       })
     ])
@@ -548,7 +548,7 @@ describe('native process handshake', () => {
     })
     await expect(pending).rejects.toBeInstanceOf(TypeError)
     await expect(pending).rejects.toMatchObject({
-      source: '@migaia/rpc/core',
+      source: 'rpc.endpoint',
       code: 'INVALID_CONFIG'
     })
   })

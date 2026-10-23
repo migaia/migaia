@@ -291,7 +291,7 @@ payload 必须数组，非数组 JSONRPC_PROFILE_INVALID；超过安全整数范
 
 下表的 `source` 是保留的错误身份，由 `@migaia/rpc-contract` 定义，供 Process 的 JSON-RPC 字节连接报告失败；它不是包的导入路径。
 
-| JSON-RPC code（source=`@migaia/rpc/bridge/jsonrpc`） | 场景                                      |
+| JSON-RPC code（source=`rpc.contract.jsonrpc`） | 场景                                      |
 | ---------------------------------------------------- | ----------------------------------------- |
 | JSONRPC_FRAME_INVALID                                | 非法头部、编码、JSON 或半帧关闭，连接终止 |
 | JSONRPC_EXTENSION_MISSING                            | hello 缺必需能力或四个扩展方法            |
@@ -303,7 +303,7 @@ payload 必须数组，非数组 JSONRPC_PROFILE_INVALID；超过安全整数范
 
 ### 错误与排查
 
-本包 source 为 RPC_PROCESS_ERROR_SOURCE（`@migaia/rpc/process`）。同步 spawn、Unix listener 准备/bind 在原错误上附语义码，保留原生类型、stack 和其它 OS 字段，原 errno code 归入语义 code；包装失败仍经 cause 可达。不要按错误 message 做控制。
+本包 source 为 RPC_PROCESS_ERROR_SOURCE（`rpc.transport.process`）。同步 spawn、Unix listener 准备/bind 在原错误上附语义码，保留原生类型、stack 和其它 OS 字段，原 errno code 归入语义 code；包装失败仍经 cause 可达。不要按错误 message 做控制。
 
 | Process code                                                   | 场景                                                        |
 | -------------------------------------------------------------- | ----------------------------------------------------------- |

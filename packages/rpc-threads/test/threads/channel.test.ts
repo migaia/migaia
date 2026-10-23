@@ -157,7 +157,7 @@ describe('thread channel ownership and portable boundary', () => {
         failureKind === 'prepare'
           ? expect(receiving).rejects.toBe(failure)
           : expect(receiving).rejects.toMatchObject({
-              source: '@migaia/rpc/core',
+              source: 'rpc.endpoint',
               code: 'INVALID_CONFIG',
               name: 'TypeError'
             })
@@ -183,20 +183,20 @@ describe('thread channel ownership and portable boundary', () => {
         expect(() => feature.read([value])).toThrow(
           expect.objectContaining({
             code: 'INVALID_ENVELOPE',
-            source: '@migaia/rpc/contract'
+            source: 'rpc.contract'
           })
         )
       expect(fixture.frames).toHaveLength(before)
       /** A controlled Contract failure crosses the boundary as code/text without local causes. */
       const remoteError = await feature.bad([]).catch((error: unknown) => error)
       expect(remoteError).toMatchObject({
-        source: '@migaia/rpc/core',
+        source: 'rpc.endpoint',
         code: 'PAYLOAD_INVALID',
         message: 'Runtime request result must be portable',
         stack: expect.any(String)
       })
       expect((remoteError as Error).cause).toMatchObject({
-        source: '@migaia/rpc/contract',
+        source: 'rpc.contract',
         code: 'INVALID_ENVELOPE'
       })
       expect(fixture.frames.every(({ transfer }) => transfer === undefined)).toBe(true)
@@ -250,7 +250,7 @@ describe('thread channel ownership and portable boundary', () => {
           expect(native).toMatchObject({
             code: 'INVALID_CONFIG',
             detail: { field: 'spec.data' },
-            cause: { source: '@migaia/rpc/contract' }
+            cause: { source: 'rpc.contract' }
           })
         }
         expect(launch).not.toHaveBeenCalled()

@@ -380,7 +380,7 @@ it('contains revoked and throwing options getters as tagged configuration errors
   revoked.revoke()
   expect(() => createStoreDevTools(store, revoked.proxy as never)).toThrow(
     expect.objectContaining({
-      source: '@migaia/store-devtools',
+      source: 'store.devtools',
       code: 'INVALID_OPTION',
       cause: expect.any(Error)
     })
@@ -393,7 +393,7 @@ it('contains revoked and throwing options getters as tagged configuration errors
     } as never)
   ).toThrow(
     expect.objectContaining({
-      source: '@migaia/store-devtools',
+      source: 'store.devtools',
       code: 'INVALID_OPTION',
       cause: expect.any(Error)
     })

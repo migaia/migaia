@@ -124,7 +124,7 @@ describe('capability 码表穷尽 + 单点声明', () => {
     expect(offenders).toEqual([])
   })
 
-  it('tagged errors carry source === "@migaia/capability" and non-empty stack', async () => {
+  it('tagged errors carry source === "capability" and non-empty stack', async () => {
     const host = createCapabilityHost<unknown>({})
     await host.dispose()
     let caught: unknown

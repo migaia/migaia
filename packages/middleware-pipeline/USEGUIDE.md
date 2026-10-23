@@ -342,7 +342,7 @@ stage（处理步骤）接收当前值，决定继续、短路或失败；done �
 
 ## 失败、原始错误与错误码
 
-`MIDDLEWARE_PIPELINE_SOURCE` 的值是 `'@migaia/middleware-pipeline'`。`MiddlewarePipelineErrorCode` 是唯一的公开错误码表：
+`MIDDLEWARE_PIPELINE_SOURCE` 的值是 `'middleware.pipeline'`。`MiddlewarePipelineErrorCode` 是唯一的公开错误码表：
 
 | 成员                 | 码值                   | 发生时看到什么                                                                                                      |
 | -------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------- |

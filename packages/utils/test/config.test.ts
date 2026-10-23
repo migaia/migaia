@@ -16,14 +16,14 @@ describe('config primitives', () => {
     /** Direct readonly view retains native Date reads while denying writes. */
     const view = readonlyConfig(owned)
     expect(() => view.when.setMilliseconds(123)).toThrowError(
-      expect.objectContaining({ source: '@migaia/utils', code: 'CONFIG_READONLY' })
+      expect.objectContaining({ source: 'foundation.utils', code: 'CONFIG_READONLY' })
     )
     /** Path reads return a discriminated result whose value carries the same protection. */
     const read = readConfigPath(owned, 'when')
     expect(read.kind).toBe('value')
     if (read.kind === 'value')
       expect(() => (read.value as Date).setMilliseconds(123)).toThrowError(
-        expect.objectContaining({ source: '@migaia/utils', code: 'CONFIG_READONLY' })
+        expect.objectContaining({ source: 'foundation.utils', code: 'CONFIG_READONLY' })
       )
     expect(owned.when.getTime()).toBe(0)
   })
@@ -43,7 +43,7 @@ describe('config primitives', () => {
     expect('nested' in view).toBe(true)
     expect(Object.getOwnPropertyDescriptor(owned, 'nested')?.configurable).toBe(false)
     expect(() => Reflect.set(view.nested, 'value', 2)).toThrowError(
-      expect.objectContaining({ source: '@migaia/utils', code: 'CONFIG_READONLY' })
+      expect.objectContaining({ source: 'foundation.utils', code: 'CONFIG_READONLY' })
     )
     expect(owned.nested.value).toBe(1)
   })

@@ -57,7 +57,7 @@ describe('string format', () => {
     expect(format('{toString}', {})).toBe('{toString}')
     expect(format('{__proto__.polluted}', {})).toBe('{__proto__.polluted}')
     expect(() => format('{missing}', {}, { missing: 'throw' })).toThrow(
-      expect.objectContaining({ code: 'FORMAT_VALUE_MISSING', source: '@migaia/utils' })
+      expect.objectContaining({ code: 'FORMAT_VALUE_MISSING', source: 'foundation.utils' })
     )
   })
 
@@ -92,14 +92,14 @@ describe('string format', () => {
   it('rejects ambiguous or hostile option access with package-coded native errors', () => {
     expect(() =>
       format('{value}', { value: 1 }, { placeholder: { open: '{', close: '{' } })
-    ).toThrow(expect.objectContaining({ code: 'FORMAT_INVALID', source: '@migaia/utils' }))
+    ).toThrow(expect.objectContaining({ code: 'FORMAT_INVALID', source: 'foundation.utils' }))
     const options = Object.defineProperty({}, 'placeholder', {
       get: () => {
         throw new Error('option read failed')
       }
     })
     expect(() => format('{value}', { value: 1 }, options)).toThrow(
-      expect.objectContaining({ code: 'FORMAT_INVALID', source: '@migaia/utils' })
+      expect.objectContaining({ code: 'FORMAT_INVALID', source: 'foundation.utils' })
     )
   })
 })

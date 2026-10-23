@@ -191,7 +191,7 @@ it('Tray-D03 keeps a frozen factory error reachable beside creation detail', asy
     failure = error
   }
   expect(failure).toMatchObject({
-    source: '@migaia/tray',
+    source: 'tray',
     code: 'TRAY_INVALID_ENTRY',
     cause: original,
     detail: { phase: 'factory', cleanupComplete: true, cleanupErrors: [] }

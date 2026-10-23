@@ -314,7 +314,7 @@ export function validateAccept(offer: IRecord, accept: unknown): boolean {
 function wireError(code: 'INTERNAL' | 'PROVIDER_NOT_FOUND'): IRecord {
   const message = code === 'PROVIDER_NOT_FOUND' ? PROVIDER_NOT_FOUND_MESSAGE : 'peer request failed'
   const name = 'Error'
-  return { source: '@migaia/rpc/core', code, name, message, stack: `${name}: ${message}` }
+  return { source: 'rpc.endpoint', code, name, message, stack: `${name}: ${message}` }
 }
 
 /** Replies address the caller's receiver; discovery advertises this peer's separate receiver. */
@@ -378,7 +378,7 @@ async function respond(source: Readable, destination: Writable): Promise<void> {
       step: 'reject',
       protocol: 'migaia.rpc',
       error: {
-        source: '@migaia/rpc/contract',
+        source: 'rpc.contract',
         code: 'HANDSHAKE_INCOMPATIBLE',
         name: 'Error',
         message: 'rpc handshake incompatible',

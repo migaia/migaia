@@ -236,7 +236,7 @@ schema/wire-error 只提供结构校验起点，不等于有界 normalizer。独
 
 ### 错误身份与维护
 
-本包错误的语义来源 `source` 为 `@migaia/rpc/contract`，由常量 `RPC_CONTRACT_SOURCE` 表示，code 来自 RpcContractErrorCode：
+本包错误的语义来源 `source` 为 `rpc.contract`，由常量 `RPC_CONTRACT_SOURCE` 表示，code 来自 RpcContractErrorCode：
 
 | code                   | 原生类型与含义                                                                             |
 | ---------------------- | ------------------------------------------------------------------------------------------ |
@@ -254,9 +254,9 @@ schema/wire-error 只提供结构校验起点，不等于有界 normalizer。独
 
 形状失败保留对应原生类；可写回调错误原位附码且不改 stack，不可写或非 Error 值经 cause，完整外包 source/code 保留原 owner。fatal UTF-8 decoder 失败在 HANDSHAKE_INVALID/INVALID_FRAME 的 cause 中保留。
 
-JSON-RPC 桥身份为 `@migaia/rpc/bridge/jsonrpc`（JSONRPC_BRIDGE_ERROR_SOURCE），其 JsonRpcBridgeErrorCode 包括 JSONRPC_FRAME_INVALID、JSONRPC_EXTENSION_MISSING、JSONRPC_PROFILE_INVALID、JSONRPC_UNSUPPORTED_MODE、JSONRPC_HANDSHAKE_TIMEOUT，分别用于分帧、缺扩展、profile、模式和握手期限。不要把桥错误当作 contract source。
+JSON-RPC 桥身份为 `rpc.contract.jsonrpc`（JSONRPC_BRIDGE_ERROR_SOURCE），其 JsonRpcBridgeErrorCode 包括 JSONRPC_FRAME_INVALID、JSONRPC_EXTENSION_MISSING、JSONRPC_PROFILE_INVALID、JSONRPC_UNSUPPORTED_MODE、JSONRPC_HANDSHAKE_TIMEOUT，分别用于分帧、缺扩展、profile、模式和握手期限。不要把桥错误当作 contract source。
 
-其他层的 source 分别是 rpc-core 的 `@migaia/rpc/core`（RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode）、rpc-core/remote 的 `@migaia/rpc/remote`（RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode）、rpc-process 的 `@migaia/rpc/process`（RPC_PROCESS_ERROR_SOURCE / RpcProcessErrorCode）与 rpc-threads 的 `@migaia/rpc/threads`（RPC_THREAD_ERROR_SOURCE / RpcThreadErrorCode）。按 source/code 分支；message 用于展示，不用于决定重试。
+其他层的 source 分别是 rpc-core 的 `rpc.endpoint`（RPC_CORE_ERROR_SOURCE / RpcCoreErrorCode）、rpc-core/remote 的 `rpc.remote`（RPC_REMOTE_ERROR_SOURCE / RpcRemoteLayerErrorCode）、rpc-process 的 `rpc.transport.process`（RPC_PROCESS_ERROR_SOURCE / RpcProcessErrorCode）与 rpc-threads 的 `rpc.transport.thread`（RPC_THREAD_ERROR_SOURCE / RpcThreadErrorCode）。按 source/code 分支；message 用于展示，不用于决定重试。
 
 ```bash
 pnpm --filter @migaia/rpc-contract run fmt

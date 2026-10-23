@@ -267,7 +267,7 @@ describe('independent native business peers through public process facades', () 
         )
         expect(active.reports).toMatchObject([
           {
-            source: '@migaia/supervision',
+            source: 'supervision',
             code: 'CAPABILITY_UNSUPPORTED',
             detail: { capability: 'termination', level: 'unsupported', kind: 'process' }
           }

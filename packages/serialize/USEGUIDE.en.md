@@ -433,7 +433,7 @@ TOML requires a record root and rejects null at every depth as well as unpaired 
 
 ### Error identity, positions and troubleshooting
 
-SerializeCodecError(message, details) requires code, type, phase, chunkIndex and bytesConsumed, with optional context, source and cause. Source defaults to @migaia/serialize and TCode to ISerializeErrorCode; consumers can reuse the class with their own code union/source. Phase is encode/decode and cause retains the original object. Codec failures and native construction/lifecycle failures use different carriers, so branch on (source, code) rather than instanceof alone.
+SerializeCodecError(message, details) requires code, type, phase, chunkIndex and bytesConsumed, with optional context, source and cause. Source defaults to serialization and TCode to ISerializeErrorCode; consumers can reuse the class with their own code union/source. Phase is encode/decode and cause retains the original object. Codec failures and native construction/lifecycle failures use different carriers, so branch on (source, code) rather than instanceof alone.
 
 | SerializeErrorCode member | Code and boundary                                                                                              |
 | ------------------------- | -------------------------------------------------------------------------------------------------------------- |
@@ -449,7 +449,7 @@ SerializeCodecError(message, details) requires code, type, phase, chunkIndex and
 | tagInvalid                | TAG_INVALID: reserved header is malformed; no fallback.                                                        |
 | tagUnknown                | TAG_UNKNOWN: valid tag has no registered codec revision.                                                       |
 
-tagSerializeError(error, code, context?) returns the original error with read-only source/code. Omitted context stays absent. Repeating the same identity is idempotent, with context filled only once. Identity conflicts delegate to utils and throw (@migaia/utils, ERROR_IDENTITY_CONFLICT), retaining the original error on cause instead of silently overwriting ownership.
+tagSerializeError(error, code, context?) returns the original error with read-only source/code. Omitted context stays absent. Repeating the same identity is idempotent, with context filled only once. Identity conflicts delegate to utils and throw (foundation.utils, ERROR_IDENTITY_CONFLICT), retaining the original error on cause instead of silently overwriting ownership.
 
 ISerializeTaggedError adds source/code/context to a native error type. ISerializeTypeError and ISerializeRangeError retain their native types; ISerializeLifecycleError also permits errors. createSerializeError, createSerializeTypeError and createSerializeRangeError create coded native Error/TypeError/RangeError. Code/message are required. Options default to omission and permit cause/context; the ordinary Error also permits a frozen errors snapshot. Codes are public API, and error factories never rewrite stack. Empty output reports zero progress. Malformed decode chunks report zero progress, while parser decode failures report that chunk’s byte count. Stream wrappers use outer frame positions without losing inner causes.
 

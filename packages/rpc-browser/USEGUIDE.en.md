@@ -413,7 +413,7 @@ An adapter returns IRpcTransport for createEndpoint({id,transport,middlewares:[c
 
 Window, SharedWorker, ServiceWorker, BroadcastChannel, and RTC borrow their native carriers. Endpoint.dispose and Peer.close release subscriptions while the creator retains physical close ownership. WebTransport releases only its acquired reader/writer. Normal unsubscribe is idempotent. Native remover failure may throw while retaining the registration, allowing the original disposer to retry; cleanup is not guaranteed to be infallible.
 
-| Package code, source=@migaia/rpc/browser | Trigger and response                                                                        |
+| Package code, source=rpc.transport.browser | Trigger and response                                                                        |
 | ---------------------------------------- | ------------------------------------------------------------------------------------------- |
 | WINDOW_ORIGIN_REQUIRED                   | A Window Peer has no nonempty origin; provide the explicit destination origin               |
 | RTC_CHANNEL_UNRELIABLE                   | A Peer channel is not ordered and reliable; use supported settings                          |

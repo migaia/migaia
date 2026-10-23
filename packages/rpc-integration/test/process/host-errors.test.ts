@@ -13,7 +13,7 @@ describe('process Host error identity', () => {
     const error = createProcessError(code, primary, { field: 'strategy' })
     expect(error).toBeInstanceOf(type)
     expect(error).toMatchObject({
-      source: '@migaia/rpc/process',
+      source: 'rpc.transport.process',
       code,
       message: text,
       cause: primary,

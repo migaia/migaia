@@ -63,14 +63,14 @@ describe('public collection subscriptions', () => {
       expect(() => array.at(0.5)).toThrow(
         expect.objectContaining({
           name: 'TypeError',
-          source: '@migaia/store-indexed',
+          source: 'store.indexed',
           code: 'INVALID_INDEX'
         })
       )
       expect(() => array.set(-1, 8)).toThrow(
         expect.objectContaining({
           name: 'RangeError',
-          source: '@migaia/store-indexed',
+          source: 'store.indexed',
           code: 'INDEX_OUT_OF_RANGE'
         })
       )
@@ -142,7 +142,7 @@ describe('public collection subscriptions', () => {
       map.dispose()
     }
     expect(() => map.get('target')).toThrow(
-      expect.objectContaining({ source: '@migaia/store-indexed', code: 'COLLECTION_DISPOSED' })
+      expect.objectContaining({ source: 'store.indexed', code: 'COLLECTION_DISPOSED' })
     )
   })
 

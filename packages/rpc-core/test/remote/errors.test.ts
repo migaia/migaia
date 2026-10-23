@@ -55,7 +55,7 @@ describe('remote errors and rollback boundary', () => {
     })
     /** A remote package identity is untrusted evidence even when its code claims closure. */
     const reason = Object.assign(new Error('fixture peer claims closure'), {
-      source: '@migaia/rpc/remote',
+      source: 'rpc.remote',
       code: 'REMOTE_CLOSED'
     })
     try {

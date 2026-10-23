@@ -212,7 +212,7 @@ Native WebAssembly.CompileError/LinkError/RuntimeError pass unchanged through su
 | cleanupFailed               | CLEANUP_FAILED      | Multiple cleanup errors, or rollback failure that cannot be attached to its primary |
 | instancePoisoned            | INSTANCE_POISONED   | Allocation after an arena trap, with the original trap on cause                     |
 
-STORE_WASM_SOURCE is `'@migaia/store-wasm'`, identifying errors created here rather than rewriting foreign owners. A native input-read failure that can accept identity receives INVALID_OPTION in place; otherwise cause/errors retain it. Do not forcibly replace declared native WASM pass-through errors with ordinary Error wrappers.
+STORE_WASM_SOURCE is `'store.wasm'`, identifying errors created here rather than rewriting foreign owners. A native input-read failure that can accept identity receives INVALID_OPTION in place; otherwise cause/errors retain it. Do not forcibly replace declared native WASM pass-through errors with ordinary Error wrappers.
 
 All four public factories require code:IStoreWasmErrorCode and message:string. `createStoreWasmError(code,message,options?)` returns Error and `createStoreWasmTypeError(...)` returns TypeError. options defaults to undefined, contains only optional cause, and forwards it when not undefined. `createStoreWasmRangeError(code,message)` has no third argument. `createStoreWasmAggregateError(code,errors:readonly unknown[],message)` retains each original error. They construct without automatically throwing, attach nonwritable source/code, and leave stack intact.
 

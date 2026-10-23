@@ -488,7 +488,7 @@ Binary output is checked by genuine Uint8Array brand, accepting foreign intrinsi
 
 ### Errors and troubleshooting
 
-STORE_PERSIST_SOURCE is @migaia/store-persist. StorePersistErrorCode owns the stable vocabulary:
+STORE_PERSIST_SOURCE is store.persist. StorePersistErrorCode owns the stable vocabulary:
 
 | Property / code                                  | Meaning                                                                           |
 | ------------------------------------------------ | --------------------------------------------------------------------------------- |

@@ -364,7 +364,7 @@ describe('reverse direction: the table is exhaustive and does not overreach', ()
     expect(declared).toHaveLength(18) // Includes public callback failure classification.
   })
 
-  it('every tagged error carries source === "@migaia/reactive"', () => {
+  it('every tagged error carries source === "reactive"', () => {
     const runtime = createRuntime()
     const signal = runtime.signal(1)
     signal.dispose()
@@ -375,7 +375,7 @@ describe('reverse direction: the table is exhaustive and does not overreach', ()
       caught = error
     }
     expect((caught as { source?: string }).source).toBe(REACTIVE_SOURCE)
-    expect(REACTIVE_SOURCE).toBe('@migaia/reactive')
+    expect(REACTIVE_SOURCE).toBe('reactive')
   })
 })
 

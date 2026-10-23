@@ -1,7 +1,10 @@
+/** Stable error domain owned by this code table; package moves preserve this identity. */
+export const ERROR_SOURCE = 'store.react'
+
 /**
- * Declares the public error codes for `@migaia/store-react` in one place.
+ * Declares the public error codes for `store.react` in one place.
  *
- * Pair these codes with source `@migaia/store-react`; complete upstream error identities retain
+ * Pair these codes with source `store.react`; complete upstream error identities retain
  * their actual package owner. Throw sites use these constants instead of inline literals.
  *
  * Code values are public API. Renaming a code is a breaking change.

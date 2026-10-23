@@ -87,7 +87,7 @@ describe('canonical control registration texts', () => {
         expect(() => endpoint.connect.onQuery!(() => undefined)).toThrowError(
           expect.objectContaining({
             constructor: RpcError,
-            source: '@migaia/rpc/core',
+            source: 'rpc.endpoint',
             code: 'CAPABILITY_CONFLICT',
             message: 'only one manual query listener may be registered'
           })

@@ -378,7 +378,7 @@ SsrWireType is { json: 'json', text: 'text', bytes: 'bytes' }, and ISsrWireType 
 
 ### Error identity and factories
 
-Package-created errors use STORE_SSR_SOURCE, @migaia/store-ssr. Complete foreign source/code identities retain their original owner. StoreSsrErrorCode contains these 12 values.
+Package-created errors use STORE_SSR_SOURCE, store.ssr. Complete foreign source/code identities retain their original owner. StoreSsrErrorCode contains these 12 values.
 
 | Property / code                              | Trigger                                                                             |
 | -------------------------------------------- | ----------------------------------------------------------------------------------- |

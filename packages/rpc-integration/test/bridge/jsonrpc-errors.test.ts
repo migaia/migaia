@@ -43,7 +43,7 @@ describe('JSON-RPC error graph', () => {
     [{ code: -32602, message: 'bad params' }, 'jsonrpc-2.0', '-32602', 0],
     [
       { code: -32000, message: 'business lacks extension' },
-      '@migaia/rpc/bridge/jsonrpc',
+      'rpc.contract.jsonrpc',
       'JSONRPC_EXTENSION_MISSING',
       1
     ],
@@ -55,7 +55,7 @@ describe('JSON-RPC error graph', () => {
           migaiaWireError: { source: 'peer', code: 'FAIL', name: 'Error', message: 'missing stack' }
         }
       },
-      '@migaia/rpc/bridge/jsonrpc',
+      'rpc.contract.jsonrpc',
       'JSONRPC_PROFILE_INVALID',
       1
     ]
@@ -88,7 +88,7 @@ describe('JSON-RPC error graph', () => {
     expect(Object.values(JsonRpcBridgeErrorCode)).toHaveLength(5)
     for (const code of Object.values(JsonRpcBridgeErrorCode)) {
       const error = createJsonRpcBridgeError(code)
-      expect(error).toMatchObject({ source: '@migaia/rpc/bridge/jsonrpc', code })
+      expect(error).toMatchObject({ source: 'rpc.contract.jsonrpc', code })
       expect(error.stack).toBeTruthy()
     }
     expect(createJsonRpcBridgeError(JsonRpcBridgeErrorCode.unsupportedMode)).toBeInstanceOf(

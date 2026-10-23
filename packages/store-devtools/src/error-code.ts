@@ -1,6 +1,9 @@
+/** Stable error domain owned by this code table; package moves preserve this identity. */
+export const ERROR_SOURCE = 'store.devtools'
+
 /**
  * Public semantic codes owned by Store Devtools. Package-created errors use the source
- * '@migaia/store-devtools'; complete foreign callback identities retain their original owner. Code
+ * 'store.devtools'; complete foreign callback identities retain their original owner. Code
  * values are public API and distinguish configuration, session state and cleanup failures.
  */
 export const StoreDevtoolsErrorCode = {

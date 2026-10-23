@@ -358,10 +358,10 @@ describe('actual language process resource ownership', () => {
           () =>
             expect(reports).toContainEqual(
               expect.objectContaining({
-                source: '@migaia/supervision',
+                source: 'supervision',
                 code: 'SUPERVISION_EXHAUSTED',
                 cause: expect.objectContaining({
-                  source: '@migaia/supervision',
+                  source: 'supervision',
                   code: 'RESOURCE_LIMIT_EXCEEDED',
                   detail: expect.objectContaining({ maximum: 1, observed: measured })
                 })

@@ -54,7 +54,7 @@ describe.skipIf(process.platform === 'win32')('Node Unix listener close limitati
         await expect(lstat(address)).rejects.toMatchObject({ code: 'ENOENT' })
         expect(report).toHaveBeenCalledTimes(1)
         expect(report.mock.calls[0]![0]).toMatchObject({
-          source: '@migaia/rpc/process',
+          source: 'rpc.transport.process',
           code: 'PROCESS_CHANNEL_LISTEN_FAILED',
           cause: { code: 'ENOENT' }
         })

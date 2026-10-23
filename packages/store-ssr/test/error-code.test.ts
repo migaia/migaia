@@ -6,6 +6,6 @@ describe('store-ssr error-code contract', () => {
     const codes = Object.values(StoreSsrErrorCode)
     expect(codes).toHaveLength(12)
     expect(new Set(codes).size).toBe(12)
-    expect(STORE_SSR_SOURCE).toBe('@migaia/store-ssr')
+    expect(STORE_SSR_SOURCE).toBe('store.ssr')
   })
 })

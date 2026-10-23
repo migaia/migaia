@@ -877,7 +877,7 @@ else handleAbort(read.value);
 
 ```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 abstract class UtilsError extends Error {
-  readonly source = '@migaia/utils';
+  readonly source = 'foundation.utils';
   readonly code: IUtilsErrorCode;
 }
 class UtilsAbortError extends UtilsError {
@@ -892,7 +892,7 @@ class UtilsTimeoutError extends UtilsError {
 }
 ```
 
-`UtilsError` 是抽象基类，所有本包抛出的语义化错误都携带 `source: '@migaia/utils'` 与稳定的 `code`。`UtilsAbortError` 通过 `cause` 保留原始中止原因；`UtilsTimeoutError` 额外携带 `scope`（超时发生在单次操作 / 单次尝试 / 总截止时间的哪一层）与 `timeoutMs`。
+`UtilsError` 是抽象基类，所有本包抛出的语义化错误都携带 `source: 'foundation.utils'` 与稳定的 `code`。`UtilsAbortError` 通过 `cause` 保留原始中止原因；`UtilsTimeoutError` 额外携带 `scope`（超时发生在单次操作 / 单次尝试 / 总截止时间的哪一层）与 `timeoutMs`。
 
 ```ts doc-test=skip reason="签名摘要，不是可运行模块"
 function attachErrorIdentity<T extends object>(
@@ -955,7 +955,7 @@ function isUtilsAbortError(value: unknown): value is UtilsAbortError;
 function isUtilsTimeoutError(value: unknown): value is UtilsTimeoutError;
 ```
 
-诊断形状守卫：检查 error-like 的 name/message/stack、source 为 @migaia/utils，且 code 属于 UtilsErrorCode；abort/timeout 再核对对应 code。无需 instanceof 本地构造器，不用作来源认证。
+诊断形状守卫：检查 error-like 的 name/message/stack、source 为 foundation.utils，且 code 属于 UtilsErrorCode；abort/timeout 再核对对应 code。无需 instanceof 本地构造器，不用作来源认证。
 
 ### `UtilsErrorCode`
 
@@ -985,7 +985,7 @@ const UtilsErrorCode = {
 } as const;
 ```
 
-全包统一使用的稳定语义码，`IUtilsErrorCode` 是其取值的联合类型。除 `UtilsError` 子类外，`base64ToBytes`/`object-path`/`config` 等模块抛出的原生 `TypeError`/`RangeError` 也会通过 `Object.defineProperty` 挂上对应的 `code`（与 `source: '@migaia/utils'`），可用同一套判断逻辑识别。
+全包统一使用的稳定语义码，`IUtilsErrorCode` 是其取值的联合类型。除 `UtilsError` 子类外，`base64ToBytes`/`object-path`/`config` 等模块抛出的原生 `TypeError`/`RangeError` 也会通过 `Object.defineProperty` 挂上对应的 `code`（与 `source: 'foundation.utils'`），可用同一套判断逻辑识别。
 
 按用途理解全部错误码：
 
@@ -1027,7 +1027,7 @@ throw OrderError.notFound({ cause, detail: { id } })      // IdentifyError<'@app
 
 if (OrderError.is(error, 'notFound')) showEmpty()
 const status = IdentifyError.match(error, { NOT_FOUND: () => 404, CONFLICT: () => 409, _: () => 500 })
-const timeout = IdentifyError.find(error, { source: '@migaia/utils', code: 'DEADLINE_EXCEEDED' })
+const timeout = IdentifyError.find(error, { source: 'foundation.utils', code: 'DEADLINE_EXCEEDED' })
 ```
 
 - 静态方法：`from(error, identity)`（同身份的实例原样返回）、`define`、`assert`、`wrap`（同步异常与异步拒绝都转换）、`is`、`find`、`match`、`identityOf`（从不抛出），以及委托给现有函数的 `combine` / `walk` / `reason` / `serialize` / `deserialize`。
@@ -2050,7 +2050,7 @@ UTF-8 的 fatal 解码失败使用 INVALID_ENCODING，并在 message 中标明 U
 | `MAX_NATIVE_RECURSION_DEPTH` | `@migaia/utils/function` | 同步重入的最大深度；超过后调用方应把工作移出原生调用栈。 |
 | `ThenableProbeKind` | `@migaia/utils/function` | 一次 `.then` 读取的稳定结果种类。 |
 | `UtilsAbortError` | `@migaia/utils/promise` | 表示协作式取消的错误，代码 `ABORTED`，原始取消原因在 `cause` 上。 |
-| `UtilsError` | `@migaia/utils/error` | 本包语义错误的基类，带 `source: '@migaia/utils'` 和稳定的 `code`。 |
+| `UtilsError` | `@migaia/utils/error` | 本包语义错误的基类，带 `source: 'foundation.utils'` 和稳定的 `code`。 |
 | `UtilsErrorCode` | `@migaia/utils/error` | 本包对外抛出的稳定错误码。 |
 | `UtilsTimeoutError` | `@migaia/utils/error` | 表示操作、单次尝试或总时限超时的错误，代码 `DEADLINE_EXCEEDED`。 |
 | `admitAbortSignal` | `@migaia/utils/promise` | 只读取一次 `aborted` 来接纳 signal 形状，不读取 `reason`，也不订阅。 |

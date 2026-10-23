@@ -158,7 +158,7 @@ When a contract uses a plugin that is not installed, `use()` / `own()` throws `P
 
 ## Errors
 
-Every error carries `source: '@migaia/micro-hub'` and a `code` (`MicroHubErrorCode`): `HUB_ALREADY_CREATED`, `HUB_NOT_CREATED`, `APP_ALREADY_CONNECTED`, `APP_DISCONNECTED`, `PLUGIN_MISSING`, `CONTRACT_VERSION_MISMATCH`, `CONTRACT_OWNED`, `WRITE_DENIED`, `EMIT_DENIED`, `COMMAND_ASYNC`, `HANDLER_DUPLICATED`, `OWNER_ABSENT`, `OWNER_TIMEOUT`, `OWNER_GONE`, `INVALID_OPTION`. See the [USEGUIDE](./USEGUIDE.en.md#error-codes) for when each code is thrown and what to do.
+Every error carries `source: 'micro-frontend.hub'` and a `code` (`MicroHubErrorCode`): `HUB_ALREADY_CREATED`, `HUB_NOT_CREATED`, `APP_ALREADY_CONNECTED`, `APP_DISCONNECTED`, `PLUGIN_MISSING`, `CONTRACT_VERSION_MISMATCH`, `CONTRACT_OWNED`, `WRITE_DENIED`, `EMIT_DENIED`, `COMMAND_ASYNC`, `HANDLER_DUPLICATED`, `OWNER_ABSENT`, `OWNER_TIMEOUT`, `OWNER_GONE`, `INVALID_OPTION`. See the [USEGUIDE](./USEGUIDE.en.md#error-codes) for when each code is thrown and what to do.
 
 To branch on an error, compare `error.source === MICRO_HUB_SOURCE` and `error.code`; do not match the message text. `MicroHubErrorText` exports every message; refer to it when a test or a log needs to check the exact wording.
 

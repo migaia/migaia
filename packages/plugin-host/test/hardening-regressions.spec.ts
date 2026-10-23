@@ -510,7 +510,7 @@ describe('plugin admission snapshot and disposer boundary', () => {
       caught = error
     }
     expect(caught).toMatchObject({
-      source: '@migaia/plugin-host',
+      source: 'plugin.host',
       code: 'INVALID_OPTION',
       cause
     })
@@ -536,10 +536,10 @@ describe('plugin admission snapshot and disposer boundary', () => {
         }
       } as any)
     ).rejects.toMatchObject({
-      source: '@migaia/plugin-host',
+      source: 'plugin.host',
       code: 'PLUGIN_INSTALL_FAILED',
       cause: {
-        source: '@migaia/plugin-host',
+        source: 'plugin.host',
         code: 'INVALID_OPTION',
         cause
       }

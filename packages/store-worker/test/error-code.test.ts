@@ -11,7 +11,7 @@ describe('store-worker error-code contract', () => {
     const codes = Object.values(StoreWorkerErrorCode)
     expect(codes).toHaveLength(6)
     expect(new Set(codes).size).toBe(6)
-    expect(STORE_WORKER_SOURCE).toBe('@migaia/store-worker')
+    expect(STORE_WORKER_SOURCE).toBe('store.worker')
   })
 
   it('shared attachment preserves native Error/AggregateError identity, cause, and stack', () => {

@@ -10,7 +10,7 @@
  * implementation reads them structurally from `globalThis` on every call instead of importing DOM
  * or Node types. Reading per call keeps `vi.stubGlobal`-style host substitution observable.
  */
-import { UtilsErrorCode, type IUtilsErrorCode } from '../error-code.js'
+import { ERROR_SOURCE, UtilsErrorCode, type IUtilsErrorCode } from '../error-code.js'
 import { UtilsErrorText } from '../error-text.js'
 import { attachErrorIdentity } from '../error.js'
 
@@ -99,7 +99,7 @@ function schedulerError(
   message: string,
   options?: ErrorOptions
 ): Error {
-  return attachErrorIdentity(new Constructor(message, options), { source: '@migaia/utils', code })
+  return attachErrorIdentity(new Constructor(message, options), { source: ERROR_SOURCE, code })
 }
 
 /**

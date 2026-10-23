@@ -1,3 +1,6 @@
+/** Stable error domain owned by this code table; package moves preserve this identity. */
+export const ERROR_SOURCE = 'foundation.utils'
+
 /** Stable semantic codes emitted by the utils package boundary. */
 export const UtilsErrorCode = {
   /**

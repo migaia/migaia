@@ -30,7 +30,7 @@ describe('store-react audit regressions', () => {
           expect(registry.lifecycle).toBe('closing')
           expect(registry.disposed).toBe(true)
           expect(() => registry.register(late, {}, { owned: true })).toThrow(
-            expect.objectContaining({ source: '@migaia/store-react', code: 'REGISTRY_DISPOSED' })
+            expect.objectContaining({ source: 'store.react', code: 'REGISTRY_DISPOSED' })
           )
           registry.dispose()
           reentrant = registry.disposeAsync()
@@ -68,7 +68,7 @@ describe('store-react audit regressions', () => {
       })
     ).toThrow(
       expect.objectContaining({
-        source: '@migaia/store-react',
+        source: 'store.react',
         code: 'INVALID_CONFIG',
         cause: original
       })
@@ -145,10 +145,10 @@ describe('store-react audit regressions', () => {
       /** Native and foreign errors retain identity; non-extensible errors keep a direct cause. */
       const expected =
         kind === 'frozen'
-          ? { source: '@migaia/store-react', code: 'REGISTRY_DISPOSAL_FAILED', cause: original }
+          ? { source: 'store.react', code: 'REGISTRY_DISPOSAL_FAILED', cause: original }
           : kind === 'foreign'
-            ? { source: '@migaia/utils', code: 'ABORTED' }
-            : { source: '@migaia/store-react', code: 'REGISTRY_DISPOSAL_FAILED' }
+            ? { source: 'foundation.utils', code: 'ABORTED' }
+            : { source: 'store.react', code: 'REGISTRY_DISPOSAL_FAILED' }
       expect(synchronous).toMatchObject(expected)
       if (kind !== 'frozen') expect(synchronous).toBe(original)
       /** The stable completion preserves this plan and its original failure chain. */

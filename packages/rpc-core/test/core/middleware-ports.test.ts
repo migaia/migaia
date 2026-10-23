@@ -4827,7 +4827,7 @@ describe('atomic middleware and claim contracts', () => {
       expect(roleInstallCalls).toBe(1)
       expect(errorChainContains(failure, primary)).toBe(true)
       expect(failure).toMatchObject({
-        source: '@migaia/plugin-host',
+        source: 'plugin.host',
         code: 'PLUGIN_INSTALL_FAILED',
         detail: { failedName: `middleware:${role}` }
       })
@@ -6509,7 +6509,7 @@ describe('outbound feature production-seam matrix', () => {
       .catch((error: unknown) => error)
     expect(failure).toMatchObject({
       name: 'PluginHostError',
-      source: '@migaia/plugin-host',
+      source: 'plugin.host',
       code: 'PLUGIN_INSTALL_FAILED',
       detail: { failedName: 'native-observation-install-failure', rollbackErrors: [] },
       cause: primary
@@ -6640,7 +6640,7 @@ describe('outbound feature production-seam matrix', () => {
       .catch((error: unknown) => error)
     expect(failure).toMatchObject({
       name: 'PluginHostError',
-      source: '@migaia/plugin-host',
+      source: 'plugin.host',
       code: 'PLUGIN_INSTALL_FAILED',
       detail: { failedName: 'native-observation-later-failure' },
       cause: rollback
@@ -6704,7 +6704,7 @@ describe('discovery Host transactions', () => {
     expect(published).toBeDefined()
     expect(failure).toMatchObject({
       name: 'PluginHostError',
-      source: '@migaia/plugin-host',
+      source: 'plugin.host',
       code: 'PLUGIN_INSTALL_FAILED',
       cause: primary,
       detail: { failedName: lateName }
@@ -6789,7 +6789,7 @@ describe('discovery Host transactions', () => {
     const firstDispose = endpoint.dispose()
     expect(endpoint.dispose()).toBe(firstDispose)
     await expect(firstDispose).rejects.toMatchObject({
-      source: '@migaia/rpc/core',
+      source: 'rpc.endpoint',
       code: RpcCoreErrorCode.endpointDisposed,
       cause: cleanup
     })
@@ -6860,7 +6860,7 @@ describe('discovery Host transactions', () => {
         failure = error
       }
       expect(failure).toMatchObject({
-        source: '@migaia/rpc/core',
+        source: 'rpc.endpoint',
         code: RpcCoreErrorCode.endpointDisposed
       })
       const cleanupErrors = (

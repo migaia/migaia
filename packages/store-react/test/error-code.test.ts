@@ -10,7 +10,7 @@ describe('store-react error-code contract', () => {
     const codes = Object.values(StoreReactErrorCode)
     expect(codes).toHaveLength(9)
     expect(new Set(codes).size).toBe(9)
-    expect(STORE_REACT_SOURCE).toBe('@migaia/store-react')
+    expect(STORE_REACT_SOURCE).toBe('store.react')
   })
 
   it('preserves AggregateError errors and shared identity metadata', () => {

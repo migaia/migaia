@@ -589,7 +589,7 @@ Annotatable native getter Errors retain identity, type and stack while receiving
 
 ### Error identity and handling
 
-Host-owned errors use CAPABILITY_SOURCE, @migaia/capability. Graph-owned errors use CAPABILITY_GRAPH_SOURCE, @migaia/capability/graph. Branch on (source, code). Identity fields are attached without rewriting stack. Annotatable native errors preserve their type and object identity; wrappers retain originals through cause/errors. Private error factories are not public entry points.
+Host-owned errors use CAPABILITY_SOURCE, capability. Graph-owned errors use CAPABILITY_GRAPH_SOURCE, capability.graph. Branch on (source, code). Identity fields are attached without rewriting stack. Annotatable native errors preserve their type and object identity; wrappers retain originals through cause/errors. Private error factories are not public entry points.
 
 | Host code          | Trigger                                                                                    |
 | ------------------ | ------------------------------------------------------------------------------------------ |

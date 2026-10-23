@@ -91,7 +91,7 @@ describe('Tray instance admission and discovery', () => {
     try {
       for (const config of values) {
         await expect(tray.spawn('node-co', { id: 'invalid', config })).rejects.toMatchObject({
-          source: '@migaia/tray',
+          source: 'tray',
           code: 'TRAY_VALUE_NOT_PORTABLE',
           cause: expect.anything()
         })
@@ -117,7 +117,7 @@ describe('Tray instance admission and discovery', () => {
     })
     try {
       await expect(tray.spawn('faulty', { id: 'factory' })).rejects.toMatchObject({
-        source: '@migaia/tray',
+        source: 'tray',
         code: 'TRAY_INSTANCE_START_FAILED',
         cause: expect.anything()
       })

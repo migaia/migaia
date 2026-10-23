@@ -517,7 +517,7 @@ describe('merged public exports', () => {
     /** The retired package contributes no current entry; Contract retains the original codes. */
     expect(existsSync(join(packageRoot, 'rpc-bridge-jsonrpc/package.json'))).toBe(false)
     const framing = await import('@migaia/rpc-contract/framing/jsonrpc')
-    expect(framing.JSONRPC_BRIDGE_ERROR_SOURCE).toBe('@migaia/rpc/bridge/jsonrpc')
+    expect(framing.JSONRPC_BRIDGE_ERROR_SOURCE).toBe('rpc.contract.jsonrpc')
     expect(Object.keys(framing.JsonRpcBridgeErrorCode)).toHaveLength(5)
     /** Former Core Process operations retain one exact namespace at their owning package root. */
     const processEntry = manifests['rpc-process']!.exports['.']!
@@ -620,7 +620,7 @@ describe('merged public exports', () => {
     expect(Object.keys(nodeThreads).sort()).toEqual(
       ['createNodeThreadChannelFactory', 'createNodeThreadLauncher'].sort()
     )
-    expect(threads.RPC_THREAD_ERROR_SOURCE).toBe('@migaia/rpc/threads')
+    expect(threads.RPC_THREAD_ERROR_SOURCE).toBe('rpc.transport.thread')
     expect(threads.RpcThreadErrorCode.usageSampleFailed).toBe('THREAD_USAGE_SAMPLE_FAILED')
   })
 

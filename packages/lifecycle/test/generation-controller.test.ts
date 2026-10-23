@@ -151,7 +151,7 @@ describe('GenerationController: new generation, late arrival, disposed', () => {
     for (const timeoutMs of invalidTimeouts) {
       expect(() => controller.begin({ timeoutMs: timeoutMs as never })).toThrowError(
         expect.objectContaining({
-          source: '@migaia/lifecycle',
+          source: 'lifecycle',
           code: LifecycleErrorCode.invalidOption
         })
       )
@@ -417,7 +417,7 @@ describe('GenerationController cancellation cleanup boundary', () => {
 
     expect(caught).toBe(cleanupError)
     expect(cleanupError).toMatchObject({
-      source: '@migaia/lifecycle',
+      source: 'lifecycle',
       code: LifecycleErrorCode.generationCancellationFailed
     })
   })
@@ -454,7 +454,7 @@ describe('GenerationController cancellation cleanup boundary', () => {
 
     expect(caught).toEqual(
       expect.objectContaining({
-        source: '@migaia/lifecycle',
+        source: 'lifecycle',
         code: LifecycleErrorCode.generationCancellationFailed
       })
     )
@@ -483,7 +483,7 @@ describe('GenerationController cancellation cleanup boundary', () => {
 
     expect(caught).toEqual(
       expect.objectContaining({
-        source: '@migaia/lifecycle',
+        source: 'lifecycle',
         code: LifecycleErrorCode.generationCancellationFailed,
         cause: 'primitive cleanup failure'
       })
@@ -543,7 +543,7 @@ describe('GenerationController parent admission races', () => {
 
     expect(caught).toBe(primaryError)
     expect(caught).toMatchObject({
-      source: '@migaia/lifecycle',
+      source: 'lifecycle',
       code: LifecycleErrorCode.generationCancellationFailed,
       errors: [cleanupError]
     })
@@ -626,7 +626,7 @@ describe('GenerationController parent admission races', () => {
 
     expect(caught).toBe(reasonError)
     expect(caught).toMatchObject({
-      source: '@migaia/lifecycle',
+      source: 'lifecycle',
       code: LifecycleErrorCode.generationCancellationFailed
     })
     expect(listeners.size).toBe(0)
@@ -671,7 +671,7 @@ describe('synchronous scheduler callback cleanup boundary', () => {
 
     expect(caught).toBe(primaryError)
     expect(primaryError).toMatchObject({
-      source: '@migaia/lifecycle',
+      source: 'lifecycle',
       code: LifecycleErrorCode.generationCancellationFailed
     })
     expect(cancelCalls).toBe(1)

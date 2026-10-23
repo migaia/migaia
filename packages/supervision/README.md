@@ -164,7 +164,7 @@ pnpm add @migaia/supervision
 
 核心只依赖 `@migaia/lifecycle` 和 `@migaia/utils`。profile 可以用 `hooks.acquireUnit` 接收预先启动好的单元，用 `hooks.afterLaunch` 挂接附属资源，用 `hooks.onReady` 挂接监控或让单元失败，用 `hooks.inspectUnit` 提供只读快照。登记在 `unit.scope` 里的附属资源在 `exited` 之后释放；登记在 `unit.monitors` 里的监控在结束单元之前释放。
 
-监督器产生的错误带有 `source: '@migaia/supervision'` 和一个 `SupervisionErrorCode`；被包装的原始错误保留在 `cause` 上，清理失败可以通过 `errors` 找到。交给 `report` 的被动观察失败和迟到的检查失败保持原对象。状态和预算结果是返回值，不会作为错误抛出。
+监督器产生的错误带有 `source: 'supervision'` 和一个 `SupervisionErrorCode`；被包装的原始错误保留在 `cause` 上，清理失败可以通过 `errors` 找到。交给 `report` 的被动观察失败和迟到的检查失败保持原对象。状态和预算结果是返回值，不会作为错误抛出。
 
 启动器明确声明 `exit-observation: 'unsupported'` 时，强制终止后立即报告 `EXIT_UNOBSERVABLE` 并将该代记为 abandoned，不等待 `reapTimeoutMs`。诊断详情包含 kind、generation 和 capability。名额仍保留到真实退出，不能把无法观察当作已经退出；可观察退出但超时的路径仍报告 `REAP_TIMEOUT`，启动阶段的回收超时也保持原行为。
 

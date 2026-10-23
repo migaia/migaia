@@ -86,7 +86,7 @@ describe('package exports', () => {
     expect(typeof encodeStream).toBe('function')
     expect(typeof decodeStream).toBe('function')
     expect(typeof collectStream).toBe('function')
-    expect(SERIALIZE_SOURCE).toBe('@migaia/serialize')
+    expect(SERIALIZE_SOURCE).toBe('serialization')
     expect(defineCollectionsJsonCodec({ version: 1 }).id).toBe('collections-json')
     expect(createTaggedCodec({ codecs: [defineCollectionsJsonCodec({ version: 1 })] }).id).toBe(
       'tagged'

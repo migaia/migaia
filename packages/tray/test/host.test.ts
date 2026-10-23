@@ -244,14 +244,14 @@ describe('@migaia/tray/host', () => {
       }
       if (entry === 'createHost') {
         await expect(createHost(options([stale]))).rejects.toMatchObject({
-          source: '@migaia/tray',
+          source: 'tray',
           code: TrayErrorCode.invalidEntry
         })
       } else {
         /** Captures the pre-mutation facade for both mutation entry points. */
         const managed = await createHost(options([original]))
         await expect(managed[entry](stale as never)).rejects.toMatchObject({
-          source: '@migaia/tray',
+          source: 'tray',
           code: TrayErrorCode.invalidEntry
         })
         expect(managed.plugins).toEqual(['target'])
@@ -322,9 +322,9 @@ describe('@migaia/tray/host', () => {
         await managed.dispose()
       }
       expect(boundary).toMatchObject({
-        source: '@migaia/tray',
+        source: 'tray',
         code: TrayErrorCode.invalidEntry,
-        cause: { source: '@migaia/plugin-host', code: PluginHostErrorCode.invalidOption }
+        cause: { source: 'plugin.host', code: PluginHostErrorCode.invalidOption }
       })
       expect((boundary as Error).cause).toBe(original)
       expect(original).toBeInstanceOf(TypeError)

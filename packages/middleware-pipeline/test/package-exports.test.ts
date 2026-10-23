@@ -28,7 +28,7 @@ describe('package exports', () => {
     expect(packageRoot).not.toHaveProperty('adaptSyncStageToGenerator')
     expect(packageRoot).not.toHaveProperty('adaptGeneratorStageToAsyncGenerator')
     expect(packageRoot).not.toHaveProperty('adaptSyncStageToAsyncGenerator')
-    expect(packageRoot.MIDDLEWARE_PIPELINE_SOURCE).toBe('@migaia/middleware-pipeline')
+    expect(packageRoot.MIDDLEWARE_PIPELINE_SOURCE).toBe('middleware.pipeline')
   })
 
   it('resolves and executes runtime and declaration exports through package boundary', async () => {
@@ -75,7 +75,7 @@ describe('package exports', () => {
     expect(MiddlewarePipelineMode.sync).toBe('sync')
     expect(MiddlewarePipelineMode.asyncGenerator).toBe('async-generator')
     expect(MiddlewarePipelineViolation.late).toBe('late')
-    expect(MIDDLEWARE_PIPELINE_SOURCE).toBe('@migaia/middleware-pipeline')
+    expect(MIDDLEWARE_PIPELINE_SOURCE).toBe('middleware.pipeline')
     expect(MiddlewarePipelineErrorCode.executionFailed).toBe('EXECUTION_FAILED')
     expect(values).toEqual([2, 2, 2, 2])
     expect(adaptedGenerator(1).next()).toEqual({ value: 2, done: false })

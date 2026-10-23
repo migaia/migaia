@@ -30,7 +30,7 @@ describe('utils audited public contracts', () => {
     const original = attachErrorIdentity(new Error('original'), { source: 'first', code: 'FIRST' })
     expect(() => attachErrorIdentity(original, { source: 'second', code: 'SECOND' })).toThrowError(
       expect.objectContaining({
-        source: '@migaia/utils',
+        source: 'foundation.utils',
         code: 'ERROR_IDENTITY_CONFLICT',
         cause: original
       })
@@ -54,7 +54,7 @@ describe('utils audited public contracts', () => {
         (error: unknown) =>
           (error instanceof RangeError || error instanceof TypeError) &&
           Object.hasOwn(error, 'stack') &&
-          (error as { source?: string }).source === '@migaia/utils' &&
+          (error as { source?: string }).source === 'foundation.utils' &&
           (error as { code?: string }).code === UtilsErrorCode.invalidArgument
       )
     }
@@ -109,7 +109,7 @@ describe('utils audited public contracts', () => {
           signals: []
         })
       )
-    ).rejects.toMatchObject({ source: '@migaia/utils', code: 'INVALID_ARGUMENT' })
+    ).rejects.toMatchObject({ source: 'foundation.utils', code: 'INVALID_ARGUMENT' })
     expect(operation).not.toHaveBeenCalled()
   })
 
@@ -172,18 +172,18 @@ describe('utils audited public contracts', () => {
   })
 
   it('only narrows errors with a registered utils code', () => {
-    expect(isUtilsError(Object.assign(new Error('missing'), { source: '@migaia/utils' }))).toBe(
+    expect(isUtilsError(Object.assign(new Error('missing'), { source: 'foundation.utils' }))).toBe(
       false
     )
     expect(
       isUtilsError(
-        Object.assign(new Error('unknown'), { source: '@migaia/utils', code: 'UNKNOWN' })
+        Object.assign(new Error('unknown'), { source: 'foundation.utils', code: 'UNKNOWN' })
       )
     ).toBe(false)
     expect(
       isUtilsError(
         attachErrorIdentity(new TypeError('argument'), {
-          source: '@migaia/utils',
+          source: 'foundation.utils',
           code: UtilsErrorCode.invalidArgument
         })
       )

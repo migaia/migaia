@@ -267,7 +267,7 @@ Host 的 use/unUse/dispose、插件失败回滚、配置与资源逆序清理归
 | envUnsupported                | ENV_UNSUPPORTED          | immutable 环境缺 structuredClone                                       |
 | cleanupFailed                 | CLEANUP_FAILED           | 绑定设置失败且同步回滚也失败                                           |
 
-`IStoreMiddlewareErrorCode` 是码值联合，`STORE_MIDDLEWARE_SOURCE='@migaia/store-middleware'` 只标识本包创建的错误；Reactive、pipeline 及其它已有 source/code 保持实际 owner。能附码的原生错误保留原实例、类型、message、stack，不可附码或非 Error 值经 cause/errors 保留。不要把记录状态、业务失败与诊断失败混成一个控制流。
+`IStoreMiddlewareErrorCode` 是码值联合，`STORE_MIDDLEWARE_SOURCE='store.middleware'` 只标识本包创建的错误；Reactive、pipeline 及其它已有 source/code 保持实际 owner。能附码的原生错误保留原实例、类型、message、stack，不可附码或非 Error 值经 cause/errors 保留。不要把记录状态、业务失败与诊断失败混成一个控制流。
 
 `createStoreMiddlewareError(code,message,options?)` 返回原生 Error；code:IStoreMiddlewareErrorCode、message:string 均必填，options 默认 undefined，唯一字段可选 cause；显式自有 cause（包括 undefined）转发原生 Error。`createStoreMiddlewareAggregateError(code,errors:readonly unknown[],message)` 返回原生 AggregateError，三参必填，errors 保留原对象。两者只构造、不自动 throw，附不可写 source/code、不改 stack。
 
