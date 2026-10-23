@@ -166,13 +166,17 @@ export function createEntityQuery<
   const result = <R>(
     query: IQueryResult<R, TContext, true, TMethods>,
     plan: IEntityQueryPlan,
-    invalid: IInvalidRecordAction | IInvalidRecordHandler<T> | undefined
+    invalid: IInvalidRecordAction | IInvalidRecordHandler<T> | undefined,
+    prepareResult: (first?: true) => IQueryResult<R, TContext, true, TMethods> = () => query
   ): IQueryResult<R, TContext, true, TMethods> =>
     Object.freeze({
       ...query,
-      ...reads(() => query, plan, invalid),
+      ...reads(prepareResult, plan, invalid, () => query),
+      explain: () => prepareResult().explain(),
       requirePushdown: (): IQueryResult<R, TContext, true, TMethods> =>
-        result(query.requirePushdown(), plan, invalid)
+        result(query.requirePushdown(), plan, invalid, (first) =>
+          prepareResult(first).requirePushdown()
+        )
     }) as IQueryResult<R, TContext, true, TMethods>
   /** A default comparator is an entity option; the original query heap performs its actual work. */
   const prepare = (
@@ -210,19 +214,24 @@ export function createEntityQuery<
         { ...plan, hasWhere: true },
         invalid
       )) as IEntityQueryNarrowed<T, TIndexes, TContext, TMethods>['where']
-    const select = ((...args: readonly unknown[]) =>
-      (() => {
-        const prepared = prepare(query, limit, explicit)
-        return result(
-          Reflect.apply(
-            prepared.select,
-            prepared,
-            typeof args[0] === 'function' ? [input.mapper(args[0] as (value: T) => unknown)] : args
-          ),
-          plan,
-          invalid
-        )
-      })()) as IEntityQueryNarrowed<T, TIndexes, TContext, TMethods>['select']
+    const select = ((...args: readonly unknown[]) => {
+      /** Public projection arguments are validated now; its wrapped mapper is captured once. */
+      const captured =
+        typeof args[0] === 'function' ? [input.mapper(args[0] as (value: T) => unknown)] : args
+      /** Count keeps the current page without introducing the unused default comparator. */
+      const unprepared =
+        input.defaultComparator !== undefined && !explicit && limit !== undefined
+          ? query.limit(limit)
+          : query
+      /** This immutable canonical branch retains the validated fields and original augmentation. */
+      const selected = Reflect.apply(unprepared.select, unprepared, captured)
+      return result(selected, plan, invalid, (first) => {
+        if (input.defaultComparator === undefined || explicit) return selected
+        /** Other reads retain the original pre-projection bounded ordering and limit error. */
+        const prepared = prepare(query, limit, explicit, first)
+        return Reflect.apply(prepared.select, prepared, captured)
+      })
+    }) as IEntityQueryNarrowed<T, TIndexes, TContext, TMethods>['select']
     return Object.freeze({
       ...query,
       ...reads(
