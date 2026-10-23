@@ -1,6 +1,7 @@
 import {
   StorageContractError,
   StorageContractErrorCode,
+  type ILockKey,
   type IStorageKey
 } from '@migaia/storage-contract'
 import { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'
@@ -30,6 +31,7 @@ export type IMemoryCapacityEntry = {
   readonly encoded: string
   readonly key: IStorageKey
   readonly bytes: number
+  readonly lock?: ILockKey
 }
 /** A native deletion has no byte count; all other fields remain exact physical identity facts. */
 export type IMemoryCapacityChange = Omit<IMemoryCapacityEntry, 'bytes'> & {
@@ -270,7 +272,8 @@ export function createMemoryCapacityIndex(options: IMemoryCapacity) {
             channel: victim.channel,
             encoded: victim.encoded,
             key: victim.key,
-            bytes: victim.bytes
+            bytes: victim.bytes,
+            lock: victim.lock
           })
           remove(victim.id)
         }

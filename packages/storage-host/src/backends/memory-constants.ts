@@ -31,6 +31,9 @@ export const MemoryOperation = {
   ttlRemaining: 'ttl.remaining',
   ttlPersist: 'ttl.persist',
   counterIncrement: 'counter.increment',
+  rdfAdd: 'rdf.add',
+  rdfDelete: 'rdf.delete',
+  rdfMatch: 'rdf.match',
   vectorSearch: 'vector.search',
   vectorUpsert: 'vector.upsert',
   vectorDelete: 'vector.delete',
@@ -42,7 +45,7 @@ export const MemoryState = {
   defaultNamespace: 'default',
   querySource: 'memory',
   channels: ['value', 'bytes', 'record'] as const,
-  identity: (channel: IStorageChannel | 'vector', encoded: string): string =>
+  identity: (channel: IStorageChannel | 'vector' | 'rdf', encoded: string): string =>
     `${channel}:${encoded}`,
   ownerLabel: (runtime: string | undefined, pid: number | undefined): string =>
     runtime === undefined ? 'browser' : `${runtime}:${pid}`

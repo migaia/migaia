@@ -36,6 +36,16 @@ import {
   ttl,
   counter,
   vector,
+  rdf,
+  createRdfQuery,
+  snapshotStorageRdfQuad,
+  snapshotStorageRdfPattern,
+  prefixStorageOrgGraph,
+  unprefixStorageOrgGraph,
+  encodeStorageRdfQuad,
+  type IQuad,
+  type IRdfApi,
+  type ITransactionRdfApi,
   createVectorQuery,
   compileStorageWhere,
   compileStorageQueryCondition,
@@ -85,6 +95,7 @@ import {
 } from '@migaia/storage-contract'
 import { parseObjectPath } from '@migaia/utils/object-path'
 import { rankMemoryVectors, recommendStorageVector } from './vector-core.js'
+import { createMemoryRdfIndex, memoryRdfKeys, type IMemoryRdfKeys } from './rdf-core.js'
 import { detectServerRuntime } from '@migaia/utils'
 import { isUint8Array, utf8ByteLength } from '@migaia/utils/bytes'
 import { StorageError, StorageErrorCode, type IStorageChannel } from '../errors.js'
@@ -132,14 +143,20 @@ const recordPrefix = Symbol()
 const ttlOperations = Symbol()
 /** The counter binder borrows the same accepted operation and text draft from its fresh view. */
 const counterOperations = Symbol()
+/** The RDF binder borrows the same original draft and accepted operation view. */
+const rdfOperations = Symbol()
 /**
  * This private member runs through the same original operation owner as every other native scope
  * method.
  */
-type IMemoryScope<T> = ITransactionScope<T, typeof records | typeof ttl | typeof counter> & {
+type IMemoryScope<T> = ITransactionScope<
+  T,
+  typeof records | typeof ttl | typeof counter | typeof rdf
+> & {
   [recordPrefix](prefix: IStorageKey): Promise<number>
   readonly [ttlOperations]: ITransactionTtlApi
   readonly [counterOperations]: ITransactionCounterApi
+  readonly [rdfOperations]: ITransactionRdfApi
 }
 /** The original store retains the concrete complete native transaction view. */
 type IMemoryBase<T> = Omit<ISyncCapableStore<IRecordStore<T>>, 'transaction'> &
@@ -157,9 +174,11 @@ type IMemoryEntry = {
   readonly value: unknown
   readonly ordered: Uint8Array
   readonly bytes?: number
+  readonly rdfKeys?: IMemoryRdfKeys
+  readonly rdfLock?: ILockKey
 }
-/** Vector metadata shares the native maps and draft without becoming a legacy logical channel. */
-type IMemoryChannel = IStorageChannel | 'vector'
+/** Native vector and RDF rows share the maps and draft without legacy channel replacement. */
+type IMemoryChannel = IStorageChannel | 'vector' | 'rdf'
 /** A transaction retains its first deadline beside the existing detached value snapshot. */
 type IMemorySnapshot = IMemoryEntry & { readonly deadline?: number }
 /** This native unit supports only its actual three physical value channels. */
@@ -169,6 +188,12 @@ type IMemoryDraft = IMemorySnapshot & {
   readonly channel: IMemoryChannel
   readonly remove: boolean
   readonly encoded: string
+}
+/** A prepared RDF row keeps physical graph identity and the user's namespace-local logical lock. */
+type IMemoryRdfEntry = IMemoryEntry & {
+  readonly encoded: string
+  readonly rdfKeys: IMemoryRdfKeys
+  readonly rdfLock: ILockKey
 }
 
 /** Prepared root work owns detached inputs while borrowing the original admission and budget. */
@@ -285,12 +310,13 @@ function createMemoryNamespace<T>(
     value: new Map<string, IMemoryEntry>(),
     bytes: new Map<string, IMemoryEntry>(),
     record: new Map<string, IMemoryEntry>(),
-    vector: new Map<string, IMemoryEntry>()
+    vector: new Map<string, IMemoryEntry>(),
+    rdf: new Map<string, IMemoryEntry>()
   }
   /** Collection metadata is private to this namespace and consumes no second physical entry. */
   const vectorCollections = new Map<string, IStorageVectorConfiguration>()
-  /** Full physical clears include vector entries; legacy key replacement remains three-channel. */
-  const physicalChannels = [...MemoryState.channels, 'vector'] as const
+  /** Full clears include native families; legacy key replacement remains three-channel. */
+  const physicalChannels = [...MemoryState.channels, 'vector', 'rdf'] as const
   /** Only live expiring identities retain deadline metadata. */
   const deadlines = new Map<string, number>()
   /** Optional policy metadata belongs only to this namespace's original physical rows. */
@@ -308,8 +334,11 @@ function createMemoryNamespace<T>(
     value: createOrderedRecordIndex<IMemoryEntry>(),
     bytes: createOrderedRecordIndex<IMemoryEntry>(),
     record: createOrderedRecordIndex<IMemoryEntry>(),
-    vector: createOrderedRecordIndex<IMemoryEntry>()
+    vector: createOrderedRecordIndex<IMemoryEntry>(),
+    rdf: createOrderedRecordIndex<IMemoryEntry>()
   }
+  /** RDF permutations index the same physical entries under this namespace and lifecycle. */
+  const rdfIndex = createMemoryRdfIndex(ordered.rdf)
   /** These original internal algorithms own only physical facts, without installation authority. */
   const revisions = createBackendRevisionPort()
   /** Each namespace has independent canonical locks under the one parent lifecycle. */
@@ -336,6 +365,7 @@ function createMemoryNamespace<T>(
     expiring?.clear()
     capacityIndex?.clear()
     vectorCollections.clear()
+    rdfIndex.clear()
   }
   /** Unknown backend callback failures gain their original memory transaction boundary. */
   const normalize = (cause: unknown, expiredScope?: true) =>
@@ -412,22 +442,26 @@ function createMemoryNamespace<T>(
         (point.payload === undefined ? 0 : memoryCapacityValueBytes(point.payload))
       )
     }
+    if (channel === 'rdf')
+      return encodeStorageRdfQuad(value as IQuad, STORAGE_MEMORY_BACKEND).byteLength
     return memoryCapacityValueBytes(value)
   }
   /** One already owned physical identity is shared by the native entry and its policy metadata. */
   const capacityFact = (
     channel: IMemoryChannel,
     key: IStorageKey,
-    bytes?: number
+    bytes?: number,
+    rdfLock?: ILockKey
   ): IMemoryCapacityChange => {
-    /** Encoding follows the original flat-key owner, not a capacity-specific key format. */
-    const encoded = encodeFlatStorageKey(key)
-    return { id: identity(channel, encoded), channel, encoded, key, bytes }
+    /** RDF already owns its original canonical identity; other channels retain the flat-key owner. */
+    const encoded = channel === 'rdf' ? (key as string) : encodeFlatStorageKey(key)
+    return { id: identity(channel, encoded), channel, encoded, key, bytes, lock: rdfLock }
   }
   /** Capacity uses only native physical channels already known to this namespace. */
   const capacityLock = (entry: IMemoryCapacityChange): ILockKey => {
     if (entry.channel === 'value') return lockKey.text(entry.key)
     if (entry.channel === 'bytes') return lockKey.bytes(entry.key as string)
+    if (entry.channel === 'rdf') return entry.lock!
     if (entry.channel === 'vector') {
       /** Vector rows already own the canonical collection/id tuple used by their lock owner. */
       const key = entry.key as readonly [string, string]
@@ -462,7 +496,8 @@ function createMemoryNamespace<T>(
     const entry = data[channel].get(encoded)
     if (entry === undefined) return undefined
     data[channel].delete(encoded)
-    ordered[channel].delete(entry.ordered)
+    if (channel === 'rdf') rdfIndex.delete(entry.rdfKeys!)
+    else ordered[channel].delete(entry.ordered)
     setDeadline(channel, encoded, undefined)
     capacityIndex?.remove(identity(channel, encoded))
     bump(channel, encoded)
@@ -482,7 +517,7 @@ function createMemoryNamespace<T>(
   }
   /** Memory values use one original clone rule for reads, writes and drafts. */
   const copyValue = (channel: IMemoryChannel, value: unknown, key: IStorageKey): unknown =>
-    channel === 'value'
+    channel === 'value' || channel === 'rdf'
       ? value
       : channel === 'bytes'
         ? cloneBytes(value as Uint8Array, key)
@@ -537,10 +572,11 @@ function createMemoryNamespace<T>(
       return
     }
     controller.publish({
-      channel: channel === 'vector' ? 'all' : channel,
+      channel: channel === 'vector' || channel === 'rdf' ? 'all' : channel,
       kind,
       orgId,
-      ...(keys === undefined ? {} : { keys })
+      // RDF has no public storage-key projection; broad invalidation never exposes physical graphs.
+      ...(keys === undefined || channel === 'rdf' ? {} : { keys })
     })
   }
   /** Capacity mutations and their events share the original final synchronous native turn. */
@@ -813,6 +849,7 @@ function createMemoryNamespace<T>(
     deadlines.clear()
     expiring?.clear()
     capacityIndex?.clear()
+    rdfIndex.clear()
     if (changed) controller.publish({ channel: 'all', kind: 'clear', orgId })
   }
   /** Channel selection is captured before the shared provider's final synchronous range check. */
@@ -1167,6 +1204,105 @@ function createMemoryNamespace<T>(
     }
   }
 
+  /** RDF graph projection reuses the one contract owner while keeping this namespace immutable. */
+  function physicalRdfPattern(pattern: Readonly<Partial<IQuad>>): Readonly<Partial<IQuad>> {
+    return pattern.graph === undefined
+      ? pattern
+      : { ...pattern, graph: prefixStorageOrgGraph(orgId, pattern.graph) }
+  }
+  /** Physical graph envelopes never escape a native organization view. */
+  function logicalRdfQuad(entry: IMemoryEntry): IQuad {
+    /** Native RDF entries own frozen ground terms and an organization-prefixed named graph. */
+    const quad = entry.value as IQuad
+    return Object.freeze({
+      ...quad,
+      graph: unprefixStorageOrgGraph(
+        orgId,
+        quad.graph as Parameters<typeof unprefixStorageOrgGraph>[1]
+      )
+    })
+  }
+  /** Full-batch canonical capture finishes before any logical lock or physical mutation. */
+  function captureRdfEntries(input: readonly IQuad[]): readonly IMemoryRdfEntry[] {
+    return captureBatch(() => {
+      if (!Array.isArray(input))
+        throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
+          backend: STORAGE_MEMORY_BACKEND
+        })
+      /** Borrowed array bounds are captured once before validating any member or changing data. */
+      const length = input.length
+      if (!Number.isSafeInteger(length) || length < 0)
+        throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
+          backend: STORAGE_MEMORY_BACKEND
+        })
+      /** Duplicate quads share one eventual physical change after every input has been admitted. */
+      const entries = new Map<string, IMemoryRdfEntry>()
+      for (let index = 0; index < length; index++) {
+        /** The contract alone owns ground position rules and detached term identity. */
+        const logical = snapshotStorageRdfQuad(input[index]!, STORAGE_MEMORY_BACKEND)
+        /** Each namespace stores real organization graphs even though its maps are also isolated. */
+        const value = Object.freeze({
+          ...logical,
+          graph: prefixStorageOrgGraph(orgId, logical.graph)
+        })
+        /** Explicit user locks and additional capacity victims must meet on this logical quad. */
+        const rdfLock = lockKey.rdf(logical)
+        /** A string row key avoids reclassifying large canonical RDF bytes as public binary keys. */
+        const encoded = snapshotConcurrencyLockKeys([lockKey.rdf(value)], STORAGE_MEMORY_BACKEND)
+          .identities[0]!
+        /** Six physical permutations retain only the canonical term writer's independent bytes. */
+        const rdfKeys = memoryRdfKeys(value)
+        entries.set(encoded, {
+          key: encoded,
+          encoded,
+          value,
+          ordered: rdfKeys[0]!,
+          rdfKeys,
+          rdfLock,
+          bytes: entryBytes('rdf', value)
+        })
+      }
+      return [...entries.values()]
+    })
+  }
+  /** Root pattern reads stream only the selected native prefix and retain safe leaf advancement. */
+  function* rdfRows(pattern: Readonly<Partial<IQuad>>): IterableIterator<IMemoryEntry> {
+    for (const row of rdfIndex.match(physicalRdfPattern(pattern))) {
+      capacityIndex?.touch(identity('rdf', row.key as string))
+      yield row
+    }
+  }
+  /**
+   * Root RDF queries expose truthful pattern access; traversal, sorting and cursors keep their
+   * owner.
+   */
+  function rootRdfQuery(pattern: Partial<IQuad>): ReturnType<IRdfApi['match']> {
+    controller.assertLive()
+    /** Caller getters detach at construction; native execution later receives this trusted shape. */
+    const captured = snapshotStorageRdfPattern(pattern, STORAGE_MEMORY_BACKEND)
+    return createRdfQuery(
+      {
+        asyncDisposeKey,
+        cursorSource: store,
+        pushdown: {
+          source: MemoryState.querySource,
+          index: rdfIndex.select(physicalRdfPattern(captured)).name,
+          operations: [],
+          operators: []
+        },
+        execute: (input) =>
+          nativeIterator(
+            MemoryOperation.rdfMatch,
+            input.ctx,
+            () => rdfRows(input.pattern),
+            (row): readonly [IStorageKey, IQuad] => [row.key, logicalRdfQuad(row)]
+          )
+      },
+      captured,
+      core.getChainMethods('rdf')
+    )
+  }
+
   /** Root scans retain one actual native generator and one cached cleanup path. */
   function rootIterator(
     range: IKeyRange | undefined,
@@ -1194,7 +1330,7 @@ function createMemoryNamespace<T>(
   function nativeIterator<V, R>(
     operation: string,
     ctx: IOperationContext | undefined,
-    select: () => readonly V[],
+    select: () => Iterable<V>,
     project: (row: V) => R,
     beforeNext?: () => void
   ): IStorageIterator<R> {
@@ -1280,8 +1416,11 @@ function createMemoryNamespace<T>(
       value: createOrderedRecordIndex<IMemoryDraft>(),
       bytes: createOrderedRecordIndex<IMemoryDraft>(),
       record: createOrderedRecordIndex<IMemoryDraft>(),
-      vector: createOrderedRecordIndex<IMemoryDraft>()
+      vector: createOrderedRecordIndex<IMemoryDraft>(),
+      rdf: createOrderedRecordIndex<IMemoryDraft>()
     }
+    /** Proposed RDF entries and tombstones use the same six native permutations. */
+    const draftRdfIndex = createMemoryRdfIndex(draftOrdered.rdf)
     /** First reads are repeatable until a write in this attempt replaces their snapshot. */
     const snapshots = new Map<string, IMemorySnapshot | undefined>()
     /** Per-key tombstone revisions detect delete/reinsert and other ABA writes. */
@@ -1324,6 +1463,8 @@ function createMemoryNamespace<T>(
                 value: copyValue(channel, current.value, key),
                 ordered: current.ordered,
                 bytes: current.bytes,
+                rdfKeys: current.rdfKeys,
+                rdfLock: current.rdfLock,
                 deadline: deadlines.get(id)
               }
         )
@@ -1366,7 +1507,8 @@ function createMemoryNamespace<T>(
         ordered: draftOrdered[entry.channel].get(entry.ordered)?.key ?? entry.ordered
       }
       draft.set(track(proposed.channel, proposed.encoded, proposed.key), proposed)
-      draftOrdered[proposed.channel].set(proposed.ordered, proposed)
+      if (proposed.channel === 'rdf') draftRdfIndex.set(proposed.rdfKeys!, proposed)
+      else draftOrdered[proposed.channel].set(proposed.ordered, proposed)
     }
     /** Prepare first, then stage eviction and put atomically within this native draft. */
     const txWrite = (
@@ -1470,6 +1612,90 @@ function createMemoryNamespace<T>(
       }
       return rows
     }
+    /** RDF writes retain the same original draft, first-read revisions and logical lock facts. */
+    const txRdfWrite = (input: readonly IQuad[], remove: boolean): void => {
+      /** Admission of the entire batch precedes even the first draft tombstone. */
+      const entries = captureRdfEntries(input)
+      for (const entry of entries) {
+        /** Draft and first-read membership share the original channel identity. */
+        const id = identity('rdf', entry.encoded)
+        /** Own writes mask physical membership without introducing another transaction owner. */
+        const proposed = draft.get(id)
+        /** The original first-read owner records even absence for ABA conflict checks. */
+        const current = proposed
+          ? proposed.remove
+            ? undefined
+            : proposed
+          : txSnapshot('rdf', entry.encoded, entry.key)
+        if (remove ? current === undefined : current !== undefined) continue
+        stageDraft({ ...entry, channel: 'rdf', remove })
+      }
+    }
+    /** Physical and proposed prefix scans merge by identity without materializing complete results. */
+    function* txRdfRows(pattern: Readonly<Partial<IQuad>>): IterableIterator<IMemoryEntry> {
+      if (!snapshotEpochs.has('rdf')) snapshotEpochs.set('rdf', revisions.epoch('rdf'))
+      /** Both trees receive one identical bound graph envelope and access-path choice. */
+      const physical = physicalRdfPattern(pattern)
+      for (const row of rdfIndex.match(physical)) {
+        /** The original physical key remains a string even for a large literal. */
+        const encoded = row.key as string
+        if (draft.has(identity('rdf', encoded))) continue
+        /** Repeat reads retain the first physical snapshot and original revision. */
+        const current = txSnapshot('rdf', encoded, row.key)
+        if (current !== undefined) {
+          capacityIndex?.touch(identity('rdf', encoded))
+          yield current
+        }
+      }
+      for (const row of draftRdfIndex.match(physical)) if (!row.remove) yield row
+    }
+    /** The original transaction owner admits each native advance and closes the actual generator. */
+    function rdfQuery(
+      pattern: Partial<IQuad>,
+      scope: ITransactionScope<T>
+    ): ReturnType<ITransactionRdfApi['match']> {
+      /** The shared planner owns subsequent query snapshots and operation-scope rebinding. */
+      const captured = snapshotStorageRdfPattern(pattern, STORAGE_MEMORY_BACKEND)
+      return createRdfQuery<undefined, Record<never, never>, ITransactionScope<T>>(
+        {
+          asyncDisposeKey,
+          cursorSource: scope,
+          pushdown: {
+            source: MemoryState.querySource,
+            index: rdfIndex.select(physicalRdfPattern(captured)).name,
+            operations: [],
+            operators: []
+          },
+          execute: (input) => {
+            /** This actual generator, including client traversal children, has one native owner. */
+            const iterator = (async function* () {
+              for (const row of txRdfRows(input.pattern)) {
+                controller.assertLive()
+                throwIfAborted(ctx.signal)
+                yield [row.key, logicalRdfQuad(row)] as const
+              }
+            })()
+            return owner.registerIterator(input.operationScope ?? scope, {
+              next: (current) =>
+                core.execution.run(
+                  {
+                    operation: MemoryOperation.rdfMatch,
+                    input: input.pattern,
+                    scope: current,
+                    ctx
+                  },
+                  () => iterator.next()
+                ),
+              close: async () => {
+                await iterator.return(undefined)
+              }
+            })
+          }
+        },
+        captured,
+        core.getChainMethods('rdf')
+      )
+    }
     /** Native text batches stage only into this attempt's existing draft and revision baseline. */
     const textDraft: IMemoryTextDraft = {
       setMany: (entries) => {
@@ -1570,6 +1796,23 @@ function createMemoryNamespace<T>(
               },
               scope
             )
+        },
+        [rdfOperations]: {
+          add: (quads) =>
+            acceptedOperation(
+              MemoryOperation.rdfAdd,
+              quads,
+              (input) => txRdfWrite(input, false),
+              scope
+            ),
+          delete: (quads) =>
+            acceptedOperation(
+              MemoryOperation.rdfDelete,
+              quads,
+              (input) => txRdfWrite(input, true),
+              scope
+            ),
+          match: (pattern) => rdfQuery(pattern, scope)
         },
         [recordPrefix]: (prefix) =>
           operation(MemoryOperation.recordRemoveByPrefix, prefix, (current) => {
@@ -1837,7 +2080,10 @@ function createMemoryNamespace<T>(
                       (entry.key as readonly [string, string])[0],
                       (entry.key as readonly [string, string])[1]
                     )
-                  : lockKey.record(entry.key)
+                  : entry.channel === 'rdf'
+                    ? (draft.get(identity('rdf', entry.encoded)) ??
+                        snapshots.get(identity('rdf', entry.encoded)))!.rdfLock!
+                    : lockKey.record(entry.key)
           ),
           holder: undefined,
           cause: new Error(
@@ -1863,7 +2109,8 @@ function createMemoryNamespace<T>(
                   proposed.remove ||
                     (proposed.deadline !== undefined && proposed.deadline <= scheduler.now())
                     ? undefined
-                    : (proposed.bytes ?? 0)
+                    : (proposed.bytes ?? 0),
+                  proposed.rdfLock
                 )
               )
             )
@@ -1886,7 +2133,8 @@ function createMemoryNamespace<T>(
         value: [] as IStorageKey[],
         bytes: [] as IStorageKey[],
         record: [] as IStorageKey[],
-        vector: [] as IStorageKey[]
+        vector: [] as IStorageKey[],
+        rdf: [] as IStorageKey[]
       }
       commitCapacity(capacityPlan, () => {
         for (const proposed of draft.values()) {
@@ -1900,7 +2148,8 @@ function createMemoryNamespace<T>(
             setDeadline(proposed.channel, encoded, undefined)
             capacityIndex?.remove(identity(proposed.channel, encoded))
             if (!data[proposed.channel].delete(encoded)) continue
-            ordered[proposed.channel].delete(proposed.ordered)
+            if (proposed.channel === 'rdf') rdfIndex.delete(proposed.rdfKeys!)
+            else ordered[proposed.channel].delete(proposed.ordered)
           } else {
             /**
              * An overwrite retains its original live ordered encoding instead of keeping duplicate
@@ -1912,13 +2161,16 @@ function createMemoryNamespace<T>(
               key: proposed.key,
               value: proposed.value,
               ordered: keyBytes,
-              bytes: proposed.bytes
+              bytes: proposed.bytes,
+              rdfKeys: proposed.rdfKeys,
+              rdfLock: proposed.rdfLock
             }
             data[proposed.channel].set(encoded, entry)
-            ordered[proposed.channel].set(keyBytes, entry)
+            if (proposed.channel === 'rdf') rdfIndex.set(proposed.rdfKeys!, entry)
+            else ordered[proposed.channel].set(keyBytes, entry)
             setDeadline(proposed.channel, encoded, proposed.deadline)
             capacityIndex?.put({
-              ...capacityFact(proposed.channel, proposed.key),
+              ...capacityFact(proposed.channel, proposed.key, undefined, proposed.rdfLock),
               bytes: proposed.bytes ?? 0
             })
           }
@@ -1951,6 +2203,7 @@ function createMemoryNamespace<T>(
       expected.clear()
       snapshotEpochs.clear()
       for (const channel of physicalChannels) draftOrdered[channel].clear()
+      draftRdfIndex.clear()
       void stage.onTransactionClose?.()
     }
   }
@@ -2539,6 +2792,60 @@ function createMemoryNamespace<T>(
     }
   }
 
+  /** Native RDF writes use the original mutation runner, canonical locks and final synchronous turn. */
+  const rdfApi: IRdfApi = {
+    add: (quads, ctx) =>
+      mutationEntry(MemoryOperation.rdfAdd, quads, ctx, (input) => {
+        /** Full canonical admission precedes root lock acquisition and the final physical turn. */
+        const entries = captureRdfEntries(input)
+        return {
+          keys: entries.map((entry) => entry.rdfLock),
+          capacityChanges:
+            capacity === undefined
+              ? undefined
+              : () =>
+                  entries.map((entry) =>
+                    capacityFact('rdf', entry.key, entry.bytes, entry.rdfLock)
+                  ),
+          run: () => {
+            /** Idempotent additions publish only when physical membership really changes. */
+            let changed = false
+            for (const entry of entries) {
+              if (data.rdf.has(entry.encoded)) {
+                capacityIndex?.touch(identity('rdf', entry.encoded))
+                continue
+              }
+              data.rdf.set(entry.encoded, entry)
+              rdfIndex.set(entry.rdfKeys, entry)
+              capacityIndex?.put({
+                ...capacityFact('rdf', entry.key, undefined, entry.rdfLock),
+                bytes: entry.bytes ?? 0
+              })
+              bump('rdf', entry.encoded)
+              changed = true
+            }
+            if (changed) publish('rdf', 'batch')
+          }
+        }
+      }),
+    delete: (quads, ctx) =>
+      mutationEntry(MemoryOperation.rdfDelete, quads, ctx, (input) => {
+        /** All supplied quads validate before an existing point can be removed. */
+        const entries = captureRdfEntries(input)
+        return {
+          keys: entries.map((entry) => entry.rdfLock),
+          run: () => {
+            /** Repeated or absent deletions do not manufacture revisions or events. */
+            let changed = false
+            for (const entry of entries)
+              if (deletePhysical('rdf', entry.encoded) !== undefined) changed = true
+            if (changed) publish('rdf', 'batch')
+          }
+        }
+      }),
+    match: rootRdfQuery
+  }
+
   /** Publish the real built-in APIs on the original resource, never a copied base. */
   const store = provideCapabilities(
     base,
@@ -2548,6 +2855,9 @@ function createMemoryNamespace<T>(
         forTransaction: (scope) => (scope as IMemoryScope<T>)[ttlOperations]
       }),
       implement(vector, vectors),
+      implement(rdf, rdfApi, {
+        forTransaction: (scope) => (scope as IMemoryScope<T>)[rdfOperations]
+      }),
       implement(counter, counters, {
         forTransaction: (scope) => (scope as IMemoryScope<T>)[counterOperations]
       }),
