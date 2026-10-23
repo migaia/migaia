@@ -1822,6 +1822,83 @@ export const storageContractReference: ILibraryReference = {
       ),
       example: storageContractCases.runWithConcurrency![0]!.example
     },
+    getStorageOrgGraphPrefix: {
+      role: 'operation',
+      purpose: t(
+        'Return the canonical native graph prefix for exact organization filtering and deletion.',
+        '返回精确组织筛选、删除使用的规范原生图前缀。'
+      ),
+      params: {
+        orgId: t('Canonical lowercase UUID, including zero.', '规范小写 UUID，包括全零值。')
+      },
+      returns: t(
+        'urn:migaia:org:<orgId>: without store creation or I/O. Invalid UUID throws INVALID_ARGUMENT.',
+        'urn:migaia:org:<orgId>:，不创建 store 或执行 I/O。无效 UUID 抛 INVALID_ARGUMENT。'
+      ),
+      example: storageContractCases.getStorageOrgGraphPrefix![0]!.example,
+      cases: storageContractCases.getStorageOrgGraphPrefix
+    },
+    prefixStorageOrgGraph: {
+      role: 'operation',
+      purpose: t(
+        'Map logical default and named graphs to disjoint native named graph identities.',
+        '把逻辑默认图、命名图映射到互不冲突的原生命名图身份。'
+      ),
+      params: {
+        orgId: t('Canonical lowercase organization UUID.', '规范小写组织 UUID。'),
+        graph: t(
+          'Ground named or default graph captured once.',
+          '单次捕获的 ground 命名图或默认图。'
+        )
+      },
+      returns: t(
+        'Frozen IRdfNamedNode: prefix plus d for default, or n: and canonical percent-encoded exact IRI. Invalid input throws INVALID_ARGUMENT.',
+        '冻结 IRdfNamedNode：默认图为前缀加 d，命名图为前缀加 n: 与规范百分号编码的原样 IRI。无效输入抛 INVALID_ARGUMENT。'
+      ),
+      example: storageContractCases.prefixStorageOrgGraph![0]!.example,
+      cases: storageContractCases.prefixStorageOrgGraph
+    },
+    unprefixStorageOrgGraph: {
+      role: 'operation',
+      purpose: t(
+        'Restore a shared frozen RDF graph only from the exact canonical organization envelope.',
+        '仅从精确规范组织封装还原共享冻结 RDF 图。'
+      ),
+      params: {
+        orgId: t(
+          'Exact canonical lowercase UUID expected in the native graph.',
+          '原生图内应匹配的精确规范小写 UUID。'
+        ),
+        graph: t(
+          'Physical IRdfNamedNode returned by the shared writer.',
+          '共享写入函数返回的物理 IRdfNamedNode。'
+        )
+      },
+      returns: t(
+        'IRdfNamedNode or IRdfDefaultGraph with exact original IRI spelling. Foreign or noncanonical graphs throw INVALID_ARGUMENT; getter and decoding failures retain their original cause.',
+        '原样 IRI 的 IRdfNamedNode 或 IRdfDefaultGraph。其它组织或非规范图抛 INVALID_ARGUMENT；getter、解码失败保留原 cause。'
+      ),
+      example: storageContractCases.unprefixStorageOrgGraph![0]!.example,
+      cases: storageContractCases.unprefixStorageOrgGraph
+    },
+    RdfTermType: {
+      role: 'constant',
+      purpose: t(
+        'Canonical RDF structural discriminants reused by native parsers and adapters.',
+        '原生解析器和适配器复用的规范 RDF 结构标签。'
+      ),
+      example: storageContractCases.RdfTermType![0]!.example,
+      cases: storageContractCases.RdfTermType
+    },
+    RdfDatatype: {
+      role: 'constant',
+      purpose: t(
+        'Canonical RDF 1.1 string and language-string datatype IRIs.',
+        '规范 RDF 1.1 字符串、语言字符串 datatype IRI。'
+      ),
+      example: storageContractCases.RdfDatatype![0]!.example,
+      cases: storageContractCases.RdfDatatype
+    },
     prefixStorageOrgKey: {
       role: 'operation',
       purpose: t(

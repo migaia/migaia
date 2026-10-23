@@ -6,6 +6,12 @@ import {
   encodeStorageOrgStringPrefix,
   encodeOrderedStorageKey,
   unprefixStorageOrgKey,
+  getStorageOrgGraphPrefix,
+  prefixStorageOrgGraph,
+  unprefixStorageOrgGraph,
+  term,
+  RdfTermType,
+  RdfDatatype,
   type IOperationContext,
   type IStorageKey
 } from '../src/index.js'
@@ -16,6 +22,93 @@ const zeroOrg = '00000000-0000-0000-0000-000000000000'
 const firstOrg = '12345678-1234-1234-1234-123456789abc'
 /** This differs only in its final identity digit so prefix matching cannot substitute for equality. */
 const secondOrg = '12345678-1234-1234-1234-123456789abd'
+
+describe('organization RDF graph mapping', () => {
+  it('maps default and exact named graphs to disjoint native identities for every organization', () => {
+    for (const orgId of [zeroOrg, firstOrg, secondOrg]) {
+      const prefix = getStorageOrgGraphPrefix(orgId)
+      const physicalDefault = prefixStorageOrgGraph(orgId, term.defaultGraph)
+      expect(prefix).toBe(`urn:migaia:org:${orgId}:`)
+      expect(physicalDefault).toEqual(term.iri(prefix + 'd'))
+      expect(unprefixStorageOrgGraph(orgId, physicalDefault)).toBe(term.defaultGraph)
+      for (const iri of [
+        'urn:graph',
+        prefix + 'd',
+        'https://[2001:db8::1]/a?b=%aB#c',
+        'https://例子.测试/图?值=😀#片段',
+        "urn:graph:!$&'()*+,;=:@/?x=%2F#y"
+      ]) {
+        const logical = term.iri(iri)
+        const physical = prefixStorageOrgGraph(orgId, logical)
+        expect(physical.value).toBe(prefix + 'n:' + encodeURIComponent(iri))
+        expect(physical).not.toEqual(physicalDefault)
+        expect(Object.isFrozen(physical)).toBe(true)
+        expect(unprefixStorageOrgGraph(orgId, physical)).toEqual(logical)
+        expect(Object.isFrozen(unprefixStorageOrgGraph(orgId, physical))).toBe(true)
+      }
+    }
+    expect(RdfTermType.namedNode).toBe('NamedNode')
+    expect(RdfDatatype.string).toBe('http://www.w3.org/2001/XMLSchema#string')
+    expect(() =>
+      unprefixStorageOrgGraph(secondOrg, prefixStorageOrgGraph(firstOrg, term.defaultGraph))
+    ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT' }))
+  })
+
+  it('captures graph getters once and keeps the original reflected error as cause', () => {
+    let kindReads = 0
+    let valueReads = 0
+    const graph = {
+      get termType() {
+        kindReads += 1
+        return RdfTermType.namedNode
+      },
+      get value() {
+        valueReads += 1
+        return 'urn:original'
+      }
+    }
+    expect(unprefixStorageOrgGraph(firstOrg, prefixStorageOrgGraph(firstOrg, graph))).toEqual(
+      term.iri('urn:original')
+    )
+    expect([kindReads, valueReads]).toEqual([1, 1])
+    const original = new Error('graph getter failed')
+    const broken = {
+      get termType(): never {
+        throw original
+      }
+    }
+    for (const convert of [prefixStorageOrgGraph, unprefixStorageOrgGraph]) {
+      expect(() => convert(firstOrg, broken as never)).toThrowError(
+        expect.objectContaining({ code: 'INVALID_ARGUMENT', cause: original })
+      )
+      expect(() => convert('bad', broken as never)).toThrowError(
+        expect.objectContaining({ code: 'INVALID_ARGUMENT', cause: expect.any(TypeError) })
+      )
+    }
+  })
+
+  it('rejects foreign or noncanonical envelopes and invalid ground graph terms', () => {
+    const prefix = getStorageOrgGraphPrefix(firstOrg)
+    for (const suffix of ['', 'd:extra', 'n:', 'n:relative', 'n:urn%3agraph', 'n:%C0%AF'])
+      expect(() => unprefixStorageOrgGraph(firstOrg, term.iri(prefix + suffix))).toThrowError(
+        expect.objectContaining({ source: '@migaia/storage-contract', code: 'INVALID_ARGUMENT' })
+      )
+    for (const graph of [term.blank('raw'), term.literal('literal'), undefined]) {
+      expect(() => prefixStorageOrgGraph(firstOrg, graph as never)).toThrowError(
+        expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+      )
+      expect(() => unprefixStorageOrgGraph(firstOrg, graph as never)).toThrowError(
+        expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+      )
+    }
+    expect(() => unprefixStorageOrgGraph(firstOrg, term.defaultGraph as never)).toThrowError(
+      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+    )
+    expect(() => getStorageOrgGraphPrefix(firstOrg.toUpperCase())).toThrowError(
+      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+    )
+  })
+})
 
 describe('canonical organization identity', () => {
   it('admits the zero and lowercase UUID forms through the original context boundary', () => {
