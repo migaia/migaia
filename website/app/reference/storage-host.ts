@@ -388,8 +388,8 @@ console.log(host.extensions.label('draft'))`,
     },
     IStorageJournalAttempt: {
       summary: t(
-        'Original authenticated txId and pre-commit record(scope) only; no new transaction or terminal authority.',
-        '仅含原认证 txId 与提交前 record(scope)，不授予新事务或终态权。'
+        'Original authenticated txId, pre-commit record(scope), and optional settle() for terminal-started external append. No new transaction or terminal authority.',
+        '原认证 txId、提交前 record(scope)，以及仅排空原 terminal 外置追加的可选 settle()；不授予新事务或终态权。'
       ),
       members: {}
     },
@@ -405,8 +405,8 @@ console.log(host.extensions.label('draft'))`,
       members: {
         journal: {
           summary: t(
-            'Optional global journal configuration; omitted configurations leave the original execution path unchanged. Automatic undo execution, external WAL, redo, clear/blob capture and other-backend routing are not completed by the current memory unit.',
-            '可选全局 journal；省略时保持原路径。当前 memory 单元不代表自动 undo、外置 WAL、redo、clear/blob 捕获或其它后端路由已完成。'
+            'Optional global journal configuration; omitted configurations leave the original execution path unchanged. Automatic undo execution, external WAL, redo, blob capture and other-backend routing are not completed by the current memory unit.',
+            '可选全局 journal；省略时保持原路径。当前 memory 单元不代表自动 undo、外置 WAL、redo、blob 捕获或其它后端路由已完成。'
           )
         }
       }

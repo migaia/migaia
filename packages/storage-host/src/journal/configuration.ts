@@ -66,7 +66,8 @@ export function snapshotStorageJournalConfiguration(
 export function prepareStorageJournalConfiguration(
   options: IStorageJournalConfigurationSnapshot,
   access: IStorageJournalBackendAccess,
-  backend: import('@migaia/storage-contract').IBackendKind
+  backend: import('@migaia/storage-contract').IBackendKind,
+  onBinlogAppendError?: (txId: string, error: unknown) => void
 ) {
   if (options.telemetry || options.logger.wal !== undefined)
     return Promise.reject(new StorageContractError(StorageContractErrorCode.unsupported))
@@ -79,6 +80,7 @@ export function prepareStorageJournalConfiguration(
     logger: options.logger,
     atomicBinlog: options.atomicBinlog?.[access.backendInstanceId],
     atomicUndo: options.atomicUndo?.[access.backendInstanceId],
-    binlogValues: options.binlogValues
+    binlogValues: options.binlogValues,
+    onBinlogAppendError
   })
 }

@@ -1398,7 +1398,19 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
       entry.value = await prepareStorageJournalConfiguration(
         configured,
         this.#journalContextAccess(context, orgId),
-        context.storeCell.get().backend
+        context.storeCell.get().backend,
+        (txId, error) => {
+          this.#report(error)
+          this.#events.emit(Hook.onBinlogAppendError, () => ({
+            backendId: context.id,
+            backend: context.storeCell.get().backend,
+            orgId,
+            namespace: configured.namespace,
+            backendInstanceId: context.id,
+            txId,
+            code: readStorageHookFailureCode(error, this.#report)
+          }))
+        }
       )
       entry.complete = true
     })
