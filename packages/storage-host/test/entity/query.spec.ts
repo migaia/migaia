@@ -300,7 +300,22 @@ it('applies the default bounded comparator before limit and projection', async (
   compare.mockClear()
   expect(await repo.query().count()).toBe(3)
   expect(await repo.query().limit(1).count()).toBe(1)
+  const mapper = vi.fn((row: IRow) => row.id)
+  expect(await repo.query().select(mapper).count()).toBe(3)
+  expect(await repo.query().limit(2).select(mapper).count()).toBe(2)
+  expect(await repo.query().orderByComparator(compare).limit(1).select(mapper).count()).toBe(1)
   expect(compare).not.toHaveBeenCalled()
+  expect(mapper).not.toHaveBeenCalled()
+  expect(() => repo.query().select(mapper).all()).toThrowError(
+    expect.objectContaining({ code: 'INVALID_CONFIG' })
+  )
+  expect(await repo.query().select('id').first()).toEqual({ id: 'c' })
+  await expect(repo.query().limit(1).select('id').requirePushdown().count()).rejects.toMatchObject({
+    code: 'QUERY_NOT_PUSHABLE'
+  })
+  expect(() => repo.query().select(4 as never)).toThrowError(
+    expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+  )
 })
 
 it('observes a rejected comparator thenable before rejecting its synchronous contract', async () => {
