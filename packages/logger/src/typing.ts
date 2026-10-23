@@ -355,7 +355,10 @@ export type ILoggerDomainCore<
   | 'useAsyncGeneratorPipeline'
   | 'use'
   | 'unUse'
->
+> & {
+  /** Reports through the same logger failure policy without adding an instance API. */
+  reportFailure(failure: ILogFailure): void
+}
 
 // ---------------------------------------------------------------------------
 // Plugin contracts and type-level extension composition.
@@ -381,6 +384,8 @@ export type ILoggerPluginCore<
 > = Omit<ILoggerCore<TMode, TShared>, 'use' | 'unUse' | 'onDispose'> & {
   /** Register an install-owned resource; Host removal/disposal releases it in reverse order. */
   onDispose(resource: import('@migaia/plugin-host').IPluginResource): void
+  /** Reports durable observer and resource failures through the original logger policy. */
+  reportFailure(failure: ILogFailure): void
 }
 
 export type IResolvedPluginShared<_TPlugins extends readonly unknown[]> = Record<string, never>

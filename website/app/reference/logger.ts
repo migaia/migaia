@@ -1238,8 +1238,229 @@ await log.shutdown('manual')`,
 }
 
 /** Reference of `@migaia/logger`. */
+
+/** Durable resource and plugin methods share the maintained public examples below. */
+const durableStoreMembers: Readonly<Record<string, IMemberDoc>> = {
+  append: {
+    summary: t(
+      'Atomically commit a batch and create pending states; empty batches allocate no sequences. Inputs are captured immediately.',
+      '原子提交一批并创建 pending 状态；空批不分配序号，输入立即快照。'
+    )
+  },
+  read: {
+    summary: t(
+      'Read ascending retained snapshots from an inclusive sequence and an explicit nonnegative limit.',
+      '从包含边界的序号读取保留记录的升序快照，limit 为非负安全整数。'
+    )
+  },
+  lastSeq: {
+    summary: t(
+      'Read the committed high watermark, preserved after complete truncation.',
+      '读取已提交高水位，全部截断后仍保留。'
+    )
+  },
+  onAppend: {
+    summary: t(
+      'Observe one frozen {lastSeq,count} notice per nonempty real commit; return an idempotent cancellation function.',
+      '每次非空真实提交只观察一次冻结的 {lastSeq,count}；返回幂等取消函数。'
+    )
+  },
+  truncate: {
+    summary: t(
+      'Delete only seq < beforeSeq without reusing committed sequences.',
+      '只删除 seq < beforeSeq 的前缀，不复用已提交序号。'
+    )
+  },
+  setState: {
+    summary: t(
+      'Only pending may advance to done or aborted; terminal and missing records reject WAL_RECORD_INVALID.',
+      '只允许 pending 进入 done 或 aborted；已结束或不存在的记录拒绝 WAL_RECORD_INVALID。'
+    )
+  },
+  states: {
+    summary: t(
+      'Return pending sequence numbers in creation order, excluding terminal history.',
+      '按创建顺序返回 pending 序号，不扫描已结束历史。'
+    )
+  },
+  dispose: {
+    summary: t(
+      'Close admission, drain accepted work, and return one cached explicit cleanup Promise; failure rejects.',
+      '停止准入、排空已接纳工作，返回缓存的显式清理 Promise；失败拒绝。'
+    )
+  },
+  '[Symbol.asyncDispose]': {
+    summary: t(
+      'Share the same cleanup using a separate cached Promise that reports failure and resolves.',
+      '共享同一次清理，以另一个缓存 Promise 报告失败后成功。'
+    )
+  }
+}
+const durableBinlogMembers: Readonly<Record<string, IMemberDoc & { call: string }>> = {
+  ready: {
+    call: '()',
+    summary: t(
+      'Await this installation initialization; call it before opening a native transaction.',
+      '等待本次安装初始化；必须在打开原生事务前调用。'
+    )
+  },
+  whenIdle: {
+    call: '()',
+    summary: t(
+      'Wait for accepted FIFO work, including actual port append completion; external listeners and transaction terminal state are not awaited.',
+      '等待已接纳 FIFO 工作和端口实际追加完成；不等待外部 listener 或事务终态。'
+    )
+  },
+  append: {
+    call: '(kind, payload, options?)',
+    summary: t(
+      'Append one kind/payload and return its sequence; transaction options return a provisional sequence immediately.',
+      '追加一条 kind/payload 并返回序号；携带事务选项时立即发起并返回暂定序号。'
+    )
+  },
+  appendBatch: {
+    call: '(records, options?)',
+    summary: t(
+      'Commit all records or none and return their sequences; transaction ports retain their original owner.',
+      '整批全有或全无并返回序号；事务端口保留原拥有者。'
+    )
+  },
+  read: {
+    call: '(fromSeq, options?)',
+    summary: t(
+      'Read from an inclusive sequence with options.limit defaulting to 100.',
+      '从包含边界的序号读取；options.limit 默认 100。'
+    )
+  },
+  subscribe: {
+    call: '(fromSeq, listener)',
+    summary: t(
+      'Follow history and live commits through one cursor. Slow callbacks do not block append or other subscribers.',
+      '以一个游标追历史与后续提交；慢回调不阻塞追加和其它订阅。'
+    )
+  },
+  lastSeq: {
+    call: '()',
+    summary: t(
+      'Read the committed high watermark, preserved after complete truncation.',
+      '读取已提交高水位，全部截断后仍保留。'
+    )
+  },
+  truncate: {
+    call: '(beforeSeq)',
+    summary: t(
+      'Delete only seq < beforeSeq without reusing committed sequences.',
+      '只删除 seq < beforeSeq 的前缀，不复用已提交序号。'
+    )
+  }
+}
+const durableWalMembers: Readonly<Record<string, IMemberDoc & { call: string }>> = {
+  ready: {
+    call: '()',
+    summary: t(
+      'Await this installation initialization; call it before opening a native transaction.',
+      '等待本次安装初始化；必须在打开原生事务前调用。'
+    )
+  },
+  whenIdle: {
+    call: '()',
+    summary: t(
+      'Wait for accepted FIFO work, including actual port append completion; external listeners and transaction terminal state are not awaited.',
+      '等待已接纳 FIFO 工作和端口实际追加完成；不等待外部 listener 或事务终态。'
+    )
+  },
+  begin: {
+    call: '(kind, payload)',
+    summary: t(
+      'Commit pending intent before returning its sequence.',
+      '提交 pending 意图后才返回序号。'
+    )
+  },
+  complete: {
+    call: '(seq)',
+    summary: t(
+      'Persist pending to done in the same serial operation.',
+      '在同一串行操作内将 pending 持久改为 done。'
+    )
+  },
+  abort: {
+    call: '(seq)',
+    summary: t(
+      'Persist pending to aborted; terminal records cannot reopen.',
+      '将 pending 持久改为 aborted；终态不能重开。'
+    )
+  },
+  pending: {
+    call: '()',
+    summary: t(
+      'Read all pending committed records in sequence order.',
+      '按序号读取全部已提交 pending 记录。'
+    )
+  }
+}
+const durableUndoMembers: Readonly<Record<string, IMemberDoc & { call: string }>> = {
+  ready: {
+    call: '()',
+    summary: t(
+      'Await this installation initialization; call it before opening a native transaction.',
+      '等待本次安装初始化；必须在打开原生事务前调用。'
+    )
+  },
+  whenIdle: {
+    call: '()',
+    summary: t(
+      'Wait for accepted FIFO work, including actual port append completion; external listeners and transaction terminal state are not awaited.',
+      '等待已接纳 FIFO 工作和端口实际追加完成；不等待外部 listener 或事务终态。'
+    )
+  },
+  record: {
+    call: '(txId, images, options?)',
+    summary: t(
+      'Store target/before/after images for one active txId; optional transaction ports start in the current stack.',
+      '为唯一活跃 txId 保存 target/before/after 镜像；可选事务端口在当前栈启动。'
+    )
+  },
+  get: {
+    call: '(txId)',
+    summary: t(
+      'Read independent active images or undefined; uncommitted images remain invisible.',
+      '读取活跃镜像的独立快照或 undefined；未提交镜像不可见。'
+    )
+  },
+  list: {
+    call: '(options?)',
+    summary: t(
+      'List newest time first, seq descending for ties; default limit 100 and inclusive sinceTime.',
+      '按时间降序、相同时间按序号降序；limit 默认 100，sinceTime 包含边界。'
+    )
+  },
+  forget: {
+    call: '(txId)',
+    summary: t(
+      'Persist done before removing active images; missing ids succeed and forgotten ids can be reused.',
+      '先持久写 done 再移除镜像；不存在时幂等成功，遗忘后可复用 id。'
+    )
+  }
+}
+
 export const loggerReference: ILibraryReference = {
   modules: {
+    'plugins/durable': {
+      summary: t(
+        'Ordered binlog, write-ahead intent, and undo image plugins with caller-owned stores.',
+        '有序 binlog、写前意图与 undo 镜像插件；store 由调用方创建并释放。'
+      ),
+      example:
+        "import { Logger } from '@migaia/logger'\nimport { binlog, wal, undoLog, memoryLogStore } from '@migaia/logger/plugins/durable'\n\nawait using events = memoryLogStore()\nawait using intents = memoryLogStore()\nawait using images = memoryLogStore()\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [binlog({ store: events }), wal({ store: intents }), undoLog({ store: images })]\n})\ntry {\n  await Promise.all([log.binlog.ready(), log.wal.ready(), log.undo.ready()])\n  const seq = await log.binlog.append('order.created', { id: 'o1' })\n  const off = log.binlog.subscribe(seq, record => console.log(record.seq))\n  const intent = await log.wal.begin('save-order', { id: 'o1' })\n  await log.undo.record('tx1', [{ target: 'o1', before: null, after: { total: 120 } }])\n  await log.wal.complete(intent)\n  console.log(await log.undo.get('tx1'))\n  await log.undo.forget('tx1')\n  off()\n} finally {\n  try { await log.shutdown('manual') }\n  finally { await Promise.all([log.binlog.whenIdle(), log.wal.whenIdle(), log.undo.whenIdle()]) }\n}"
+    },
+    'plugins/durable/file': {
+      summary: t(
+        'Local SQLite log resources using node:sqlite in Node/Deno or bun:sqlite in Bun. Keep the separate entry out of browser code.',
+        '本地 SQLite 日志资源：Node/Deno 使用 node:sqlite，Bun 使用 bun:sqlite。浏览器代码使用独立的中立入口。'
+      ),
+      example:
+        "import { fileLogStore } from '@migaia/logger/plugins/durable/file'\n\nawait using store = await fileLogStore('./orders.sqlite')\nawait store.append([{ kind: 'order.created', payload: { id: 'o1' } }])\nconsole.log(await store.lastSeq())"
+    },
     index: {
       summary: t(
         'Core entry point. Start from `new Logger({ execution, plugins })`: the core only builds entries, runs the pipeline, calls sinks and drains on `flush()` / `shutdown()`. Levels, console output, batching and uploads come from plugins in `@migaia/logger/plugins`.',
@@ -1273,6 +1494,76 @@ ${create}
     }
   },
   symbols: {
+    memoryLogStore: {
+      role: 'factory',
+      purpose: t(
+        'Create a process-local atomic log; the creator owns disposal.',
+        '创建进程内原子日志；创建者拥有释放权。'
+      ),
+      returns: t(
+        'Caller-owned resource or synchronous logger plugin; await ready before a native transaction.',
+        '调用方资源或同步 logger 插件；原生事务前等待 ready。'
+      ),
+      example:
+        "import { memoryLogStore } from '@migaia/logger/plugins/durable'\nimport type { ILogStore } from '@migaia/logger/plugins/durable'\n\nconst delegate = memoryLogStore()\n// A custom implementation must preserve this single owner's atomic commit and notices.\nconst custom: ILogStore = {\n  append: records => delegate.append(records),\n  read: (fromSeq, limit) => delegate.read(fromSeq, limit),\n  lastSeq: () => delegate.lastSeq(),\n  onAppend: listener => delegate.onAppend(listener),\n  truncate: beforeSeq => delegate.truncate(beforeSeq),\n  setState: (seq, state) => delegate.setState(seq, state),\n  states: filter => delegate.states(filter),\n  dispose: () => delegate.dispose(),\n  [Symbol.asyncDispose]: () => delegate[Symbol.asyncDispose]()\n}\nawait custom.append([{ kind: 'custom', payload: null }])\nawait custom.dispose()",
+      cases: loggerCases.memoryLogStore
+    },
+    fileLogStore: {
+      role: 'factory',
+      purpose: t(
+        'Open builtin SQLite with a retained exclusive lock and native durable commits.',
+        '打开内置 SQLite，以连接排他锁和原生事务持久提交。'
+      ),
+      returns: t(
+        'Caller-owned resource or synchronous logger plugin; await ready before a native transaction.',
+        '调用方资源或同步 logger 插件；原生事务前等待 ready。'
+      ),
+      example:
+        "import { fileLogStore } from '@migaia/logger/plugins/durable/file'\n\nawait using store = await fileLogStore('./orders.sqlite')\nawait store.append([{ kind: 'order.created', payload: { id: 'o1' } }])\nconsole.log(await store.lastSeq())",
+      cases: loggerCases.fileLogStore
+    },
+    binlog: {
+      role: 'factory',
+      purpose: t(
+        'Install ordered append/read/subscribe methods; initialize once and borrow the original store.',
+        '安装有序追加、读取与订阅方法；共享一次准备并借用原 store。'
+      ),
+      returns: t(
+        'Caller-owned resource or synchronous logger plugin; await ready before a native transaction.',
+        '调用方资源或同步 logger 插件；原生事务前等待 ready。'
+      ),
+      example:
+        "import { Logger } from '@migaia/logger'\nimport { binlog, wal, undoLog, memoryLogStore } from '@migaia/logger/plugins/durable'\n\nawait using events = memoryLogStore()\nawait using intents = memoryLogStore()\nawait using images = memoryLogStore()\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [binlog({ store: events }), wal({ store: intents }), undoLog({ store: images })]\n})\ntry {\n  await Promise.all([log.binlog.ready(), log.wal.ready(), log.undo.ready()])\n  const seq = await log.binlog.append('order.created', { id: 'o1' })\n  const off = log.binlog.subscribe(seq, record => console.log(record.seq))\n  const intent = await log.wal.begin('save-order', { id: 'o1' })\n  await log.undo.record('tx1', [{ target: 'o1', before: null, after: { total: 120 } }])\n  await log.wal.complete(intent)\n  console.log(await log.undo.get('tx1'))\n  await log.undo.forget('tx1')\n  off()\n} finally {\n  try { await log.shutdown('manual') }\n  finally { await Promise.all([log.binlog.whenIdle(), log.wal.whenIdle(), log.undo.whenIdle()]) }\n}",
+      cases: loggerCases.binlog
+    },
+    wal: {
+      role: 'factory',
+      purpose: t(
+        'Install durable pending intent and forward-only complete/abort methods.',
+        '安装持久 pending 意图及只前进的 complete/abort 方法。'
+      ),
+      returns: t(
+        'Caller-owned resource or synchronous logger plugin; await ready before a native transaction.',
+        '调用方资源或同步 logger 插件；原生事务前等待 ready。'
+      ),
+      example:
+        "import { Logger } from '@migaia/logger'\nimport { binlog, wal, undoLog, memoryLogStore } from '@migaia/logger/plugins/durable'\n\nawait using events = memoryLogStore()\nawait using intents = memoryLogStore()\nawait using images = memoryLogStore()\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [binlog({ store: events }), wal({ store: intents }), undoLog({ store: images })]\n})\ntry {\n  await Promise.all([log.binlog.ready(), log.wal.ready(), log.undo.ready()])\n  const seq = await log.binlog.append('order.created', { id: 'o1' })\n  const off = log.binlog.subscribe(seq, record => console.log(record.seq))\n  const intent = await log.wal.begin('save-order', { id: 'o1' })\n  await log.undo.record('tx1', [{ target: 'o1', before: null, after: { total: 120 } }])\n  await log.wal.complete(intent)\n  console.log(await log.undo.get('tx1'))\n  await log.undo.forget('tx1')\n  off()\n} finally {\n  try { await log.shutdown('manual') }\n  finally { await Promise.all([log.binlog.whenIdle(), log.wal.whenIdle(), log.undo.whenIdle()]) }\n}",
+      cases: loggerCases.wal
+    },
+    undoLog: {
+      role: 'factory',
+      purpose: t(
+        'Install undo image storage; business undo and conflict checks remain the consumer responsibility.',
+        '安装 undo 镜像存储；业务撤销和冲突检查仍由消费方负责。'
+      ),
+      returns: t(
+        'Caller-owned resource or synchronous logger plugin; await ready before a native transaction.',
+        '调用方资源或同步 logger 插件；原生事务前等待 ready。'
+      ),
+      example:
+        "import { Logger } from '@migaia/logger'\nimport { binlog, wal, undoLog, memoryLogStore } from '@migaia/logger/plugins/durable'\n\nawait using events = memoryLogStore()\nawait using intents = memoryLogStore()\nawait using images = memoryLogStore()\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [binlog({ store: events }), wal({ store: intents }), undoLog({ store: images })]\n})\ntry {\n  await Promise.all([log.binlog.ready(), log.wal.ready(), log.undo.ready()])\n  const seq = await log.binlog.append('order.created', { id: 'o1' })\n  const off = log.binlog.subscribe(seq, record => console.log(record.seq))\n  const intent = await log.wal.begin('save-order', { id: 'o1' })\n  await log.undo.record('tx1', [{ target: 'o1', before: null, after: { total: 120 } }])\n  await log.wal.complete(intent)\n  console.log(await log.undo.get('tx1'))\n  await log.undo.forget('tx1')\n  off()\n} finally {\n  try { await log.shutdown('manual') }\n  finally { await Promise.all([log.binlog.whenIdle(), log.wal.whenIdle(), log.undo.whenIdle()]) }\n}",
+      cases: loggerCases.undoLog
+    },
     Logger: {
       role: 'factory',
       purpose: t(
@@ -1632,6 +1923,196 @@ ${create}
     }
   },
   types: {
+    ILogPayload: alias(
+      'Plain JSON output data with independent snapshots.',
+      '独立快照的普通 JSON 输出数据。'
+    ),
+    ILogPayloadInput: alias(
+      'Structural input admission retaining named shapes and readonly tuples.',
+      '保留命名对象和 readonly 元组的结构输入准入。'
+    ),
+    ILogRecordInput: alias(
+      'A caller kind and payload before sequence/time assignment.',
+      '分配序号与时间前的调用方 kind/payload。'
+    ),
+    ILogBatchInput: alias(
+      'Per-record static JSON admission without losing tuple positions.',
+      '逐条静态 JSON 准入，不丢失元组位置。'
+    ),
+    ILogRecord: alias(
+      'Committed sequence, nondecreasing time, kind, and payload snapshot.',
+      '已提交序号、非递减时间、kind 与载荷快照。'
+    ),
+    ILogObservation: alias(
+      'Fixed identity statistics without payload or native resources.',
+      '固定身份统计，不包含载荷或原生资源。'
+    ),
+    ILogObserver: alias(
+      'Synchronous observation; asynchronous rejection is only reported.',
+      '同步观察；异步拒绝只报告而不等待。'
+    ),
+    ILogAppendNotice: alias(
+      'Frozen lastSeq/count of one actual nonempty append commit.',
+      '一次真实非空追加提交的冻结 lastSeq/count。'
+    ),
+    IUndoImage: alias(
+      'JSON target and before/after images; null is legitimate.',
+      'JSON target 与 before/after 镜像；null 是合法值。'
+    ),
+    ILogStore: {
+      summary: t(
+        'Durable logger contract with explicit ownership and initialization.',
+        '具有明确资源归属与准备顺序的持久日志契约。'
+      ),
+      members: durableStoreMembers
+    },
+    IBinlogExt: {
+      summary: t(
+        'Durable logger contract with explicit ownership and initialization.',
+        '具有明确资源归属与准备顺序的持久日志契约。'
+      ),
+      members: {
+        binlog: {
+          summary: t(
+            'Installed ordered log API; unavailable without the binlog plugin.',
+            '安装后的有序日志 API；未安装 binlog 时不存在。'
+          )
+        }
+      }
+    },
+    IWalExt: {
+      summary: t(
+        'Durable logger contract with explicit ownership and initialization.',
+        '具有明确资源归属与准备顺序的持久日志契约。'
+      ),
+      members: { wal: { summary: t('Installed persistent intent API.', '安装后的持久意图 API。') } }
+    },
+    IUndoLogExt: {
+      summary: t(
+        'Durable logger contract with explicit ownership and initialization.',
+        '具有明确资源归属与准备顺序的持久日志契约。'
+      ),
+      members: {
+        undo: {
+          summary: t(
+            'Installed active image API; no business rollback authority.',
+            '安装后的活跃镜像 API；不拥有业务回滚权。'
+          )
+        }
+      }
+    },
+    IDurablePluginOptions: {
+      summary: t(
+        'Durable logger contract with explicit ownership and initialization.',
+        '具有明确资源归属与准备顺序的持久日志契约。'
+      ),
+      members: {
+        store: {
+          summary: t(
+            'The original caller-owned ILogStore; one installed plugin per object. It never enters plugin config.',
+            '调用方拥有的原 ILogStore；同一对象只能安装一个插件，不进入插件 config。'
+          )
+        },
+        observe: {
+          summary: t(
+            'Optional synchronous statistics observer; thrown, getter, and async failures only report.',
+            '可选同步统计观察者；同步抛错、then 读取失败和异步拒绝只报告。'
+          )
+        }
+      }
+    },
+    IBinlogOptions: {
+      summary: t(
+        'Durable logger contract with explicit ownership and initialization.',
+        '具有明确资源归属与准备顺序的持久日志契约。'
+      ),
+      members: {
+        store: {
+          summary: t(
+            'The original caller-owned ILogStore; one installed plugin per object. It never enters plugin config.',
+            '调用方拥有的原 ILogStore；同一对象只能安装一个插件，不进入插件 config。'
+          )
+        },
+        observe: {
+          summary: t(
+            'Optional synchronous statistics observer; thrown, getter, and async failures only report.',
+            '可选同步统计观察者；同步抛错、then 读取失败和异步拒绝只报告。'
+          )
+        },
+        echo: {
+          summary: t(
+            'Default false; true emits kind plus seq/time metadata without payload.',
+            '默认 false；true 输出 kind 与 seq/time 元数据，不输出 payload。'
+          )
+        }
+      }
+    },
+    ILogStoreOptions: {
+      summary: t(
+        'Durable logger contract with explicit ownership and initialization.',
+        '具有明确资源归属与准备顺序的持久日志契约。'
+      ),
+      members: {
+        observe: {
+          summary: t(
+            'Optional synchronous statistics observer; thrown, getter, and async failures only report.',
+            '可选同步统计观察者；同步抛错、then 读取失败和异步拒绝只报告。'
+          )
+        },
+        report: {
+          summary: t(
+            'Optional standalone store failure reporter; reporter failures use the original logger terminal channel.',
+            '可选独立 store 失败报告器；报告器失败走原 logger 终端通道。'
+          )
+        }
+      }
+    },
+    ILogAppendOptions: {
+      summary: t(
+        'Durable logger contract with explicit ownership and initialization.',
+        '具有明确资源归属与准备顺序的持久日志契约。'
+      ),
+      members: {
+        transaction: {
+          summary: t(
+            'Existing owner-created append port; prepare logger plugins before opening its native transaction.',
+            '由原拥有者创建的追加端口；先准备 logger 插件再打开原生事务。'
+          )
+        }
+      }
+    },
+    ILogAppendPort: {
+      summary: t(
+        'Durable logger contract with explicit ownership and initialization.',
+        '具有明确资源归属与准备顺序的持久日志契约。'
+      ),
+      members: {
+        store: {
+          summary: t(
+            'Exact resource identity bound by the original owner, not write authority itself.',
+            '原拥有者绑定的精确资源身份；此字段本身不授予写权限。'
+          )
+        },
+        append: {
+          summary: t(
+            'Immediately append within the current native transaction; return provisional sequences.',
+            '立即在当前原生事务追加，返回暂定序号。'
+          )
+        },
+        onCommit: {
+          summary: t(
+            'Register one actual commit effect and return its cancellation function.',
+            '登记真实提交观察并返回取消函数。'
+          )
+        },
+        onRollback: {
+          summary: t(
+            'Register one actual rollback effect and return its cancellation function.',
+            '登记真实回滚观察并返回取消函数。'
+          )
+        }
+      }
+    },
     Logger: {
       surface: 'ILoggerCore',
       summary: t(
@@ -2701,6 +3182,60 @@ log.endResponse()`,
     }
   },
   enums: {
+    LogRecordState: {
+      summary: t('Pending advances only to a terminal state.', 'pending 只前进至终态。'),
+      values: {
+        pending: t('Committed intent remains active.', '已提交意图仍活跃。'),
+        done: t('Completed; cannot reopen.', '已完成，不能重开。'),
+        aborted: t('Aborted; cannot reopen.', '已中止，不能重开。')
+      }
+    },
+    LogStage: {
+      summary: t('Fixed observer-only durable statistics.', '固定名称的持久日志统计，仅供观察。'),
+      values: {
+        beforeLogOpen: t(
+          'beforeLogOpen statistics; failures only report.',
+          'beforeLogOpen 统计；失败只报告。'
+        ),
+        afterLogOpen: t(
+          'afterLogOpen statistics; failures only report.',
+          'afterLogOpen 统计；失败只报告。'
+        ),
+        onLogOpenError: t(
+          'onLogOpenError statistics; failures only report.',
+          'onLogOpenError 统计；失败只报告。'
+        ),
+        beforeLogOperation: t(
+          'beforeLogOperation statistics; failures only report.',
+          'beforeLogOperation 统计；失败只报告。'
+        ),
+        afterLogOperation: t(
+          'afterLogOperation statistics; failures only report.',
+          'afterLogOperation 统计；失败只报告。'
+        ),
+        onLogOperationError: t(
+          'onLogOperationError statistics; failures only report.',
+          'onLogOperationError 统计；失败只报告。'
+        ),
+        beforeLogClose: t(
+          'beforeLogClose statistics; failures only report.',
+          'beforeLogClose 统计；失败只报告。'
+        ),
+        afterLogClose: t(
+          'afterLogClose statistics; failures only report.',
+          'afterLogClose 统计；失败只报告。'
+        ),
+        onLogCloseError: t(
+          'onLogCloseError statistics; failures only report.',
+          'onLogCloseError 统计；失败只报告。'
+        ),
+        onAppend: t('onAppend statistics; failures only report.', 'onAppend 统计；失败只报告。'),
+        onWalPending: t(
+          'onWalPending statistics; failures only report.',
+          'onWalPending 统计；失败只报告。'
+        )
+      }
+    },
     LoggerLevel: {
       summary: t(
         'Level names of `level()`, lowest first.',
@@ -2842,6 +3377,46 @@ log.endResponse()`,
           '`BATCH_OVERFLOW`: the pending batch limit was reached and the oldest queued batch was dropped.',
           '`BATCH_OVERFLOW`：达到排队批次上限，最早排队的批次被丢弃。'
         ),
+        logPayloadInvalid: t(
+          'LOG_PAYLOAD_INVALID: payload is outside plain JSON data',
+          'LOG_PAYLOAD_INVALID：持久日志边界错误；修正输入或检查原始 cause。'
+        ),
+        logStoreLocked: t(
+          'LOG_STORE_LOCKED: another SQLite connection owns the file lock',
+          'LOG_STORE_LOCKED：持久日志边界错误；修正输入或检查原始 cause。'
+        ),
+        logStoreInUse: t(
+          'LOG_STORE_IN_USE: another installed plugin borrows the object',
+          'LOG_STORE_IN_USE：持久日志边界错误；修正输入或检查原始 cause。'
+        ),
+        logStoreUnavailable: t(
+          'LOG_STORE_UNAVAILABLE: the runtime builtin SQLite is missing',
+          'LOG_STORE_UNAVAILABLE：持久日志边界错误；修正输入或检查原始 cause。'
+        ),
+        logStoreIoFailed: t(
+          'LOG_STORE_IO_FAILED: storage or cleanup failed; original cause remains reachable',
+          'LOG_STORE_IO_FAILED：持久日志边界错误；修正输入或检查原始 cause。'
+        ),
+        logStoreCorrupt: t(
+          'LOG_STORE_CORRUPT: committed metadata or owned undo data is inconsistent',
+          'LOG_STORE_CORRUPT：持久日志边界错误；修正输入或检查原始 cause。'
+        ),
+        logSequenceExhausted: t(
+          'LOG_SEQUENCE_EXHAUSTED: a sequence cannot be represented safely',
+          'LOG_SEQUENCE_EXHAUSTED：持久日志边界错误；修正输入或检查原始 cause。'
+        ),
+        logSubscriptionTruncated: t(
+          'LOG_SUBSCRIPTION_TRUNCATED: prefix truncation passed the subscription cursor',
+          'LOG_SUBSCRIPTION_TRUNCATED：持久日志边界错误；修正输入或检查原始 cause。'
+        ),
+        walRecordInvalid: t(
+          'WAL_RECORD_INVALID: a state target is missing or terminal',
+          'WAL_RECORD_INVALID：持久日志边界错误；修正输入或检查原始 cause。'
+        ),
+        undoRecordExists: t(
+          'UNDO_RECORD_EXISTS: an active undo transaction id already exists',
+          'UNDO_RECORD_EXISTS：持久日志边界错误；修正输入或检查原始 cause。'
+        ),
         fileSinkUnavailable: t(
           '`FILE_SINK_UNAVAILABLE`: `file()` has no injected `fs` and no Node default.',
           '`FILE_SINK_UNAVAILABLE`：`file()` 既没有注入的 `fs`，也没有 Node 默认能力。'
@@ -2850,6 +3425,63 @@ log.endResponse()`,
     }
   },
   enhancers: {
+    binlog: {
+      kind: 'plugin',
+      target: 'Logger',
+      summary: t(
+        'Ordered history/live log; it borrows a store and never disposes it.',
+        '有序历史与后续日志；只借用 store，不负责关闭。'
+      ),
+      install:
+        "import { Logger } from '@migaia/logger'\nimport { binlog, wal, undoLog, memoryLogStore } from '@migaia/logger/plugins/durable'\n\nawait using events = memoryLogStore()\nawait using intents = memoryLogStore()\nawait using images = memoryLogStore()\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [binlog({ store: events }), wal({ store: intents }), undoLog({ store: images })]\n})\ntry {\n  await Promise.all([log.binlog.ready(), log.wal.ready(), log.undo.ready()])\n  const seq = await log.binlog.append('order.created', { id: 'o1' })\n  const off = log.binlog.subscribe(seq, record => console.log(record.seq))\n  const intent = await log.wal.begin('save-order', { id: 'o1' })\n  await log.undo.record('tx1', [{ target: 'o1', before: null, after: { total: 120 } }])\n  await log.wal.complete(intent)\n  console.log(await log.undo.get('tx1'))\n  await log.undo.forget('tx1')\n  off()\n} finally {\n  try { await log.shutdown('manual') }\n  finally { await Promise.all([log.binlog.whenIdle(), log.wal.whenIdle(), log.undo.whenIdle()]) }\n}",
+      grants: grantsOf('log.binlog', durableBinlogMembers),
+      scenarios: [
+        t(
+          'Keep durable records with caller-owned resources.',
+          '\u4fdd\u7559\u6301\u4e45\u8bb0\u5f55\uff0c\u8d44\u6e90\u5f52\u8c03\u7528\u65b9\u6240\u6709\u3002'
+        )
+      ],
+      example:
+        "import { Logger } from '@migaia/logger'\nimport { binlog, wal, undoLog, memoryLogStore } from '@migaia/logger/plugins/durable'\n\nawait using events = memoryLogStore()\nawait using intents = memoryLogStore()\nawait using images = memoryLogStore()\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [binlog({ store: events }), wal({ store: intents }), undoLog({ store: images })]\n})\ntry {\n  await Promise.all([log.binlog.ready(), log.wal.ready(), log.undo.ready()])\n  const seq = await log.binlog.append('order.created', { id: 'o1' })\n  const off = log.binlog.subscribe(seq, record => console.log(record.seq))\n  const intent = await log.wal.begin('save-order', { id: 'o1' })\n  await log.undo.record('tx1', [{ target: 'o1', before: null, after: { total: 120 } }])\n  await log.wal.complete(intent)\n  console.log(await log.undo.get('tx1'))\n  await log.undo.forget('tx1')\n  off()\n} finally {\n  try { await log.shutdown('manual') }\n  finally { await Promise.all([log.binlog.whenIdle(), log.wal.whenIdle(), log.undo.whenIdle()]) }\n}"
+    },
+    wal: {
+      kind: 'plugin',
+      target: 'Logger',
+      summary: t(
+        'Durable pending intent with forward-only terminal states.',
+        '持久 pending 意图与只前进的终态。'
+      ),
+      install:
+        "import { Logger } from '@migaia/logger'\nimport { binlog, wal, undoLog, memoryLogStore } from '@migaia/logger/plugins/durable'\n\nawait using events = memoryLogStore()\nawait using intents = memoryLogStore()\nawait using images = memoryLogStore()\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [binlog({ store: events }), wal({ store: intents }), undoLog({ store: images })]\n})\ntry {\n  await Promise.all([log.binlog.ready(), log.wal.ready(), log.undo.ready()])\n  const seq = await log.binlog.append('order.created', { id: 'o1' })\n  const off = log.binlog.subscribe(seq, record => console.log(record.seq))\n  const intent = await log.wal.begin('save-order', { id: 'o1' })\n  await log.undo.record('tx1', [{ target: 'o1', before: null, after: { total: 120 } }])\n  await log.wal.complete(intent)\n  console.log(await log.undo.get('tx1'))\n  await log.undo.forget('tx1')\n  off()\n} finally {\n  try { await log.shutdown('manual') }\n  finally { await Promise.all([log.binlog.whenIdle(), log.wal.whenIdle(), log.undo.whenIdle()]) }\n}",
+      grants: grantsOf('log.wal', durableWalMembers),
+      scenarios: [
+        t(
+          'Keep durable records with caller-owned resources.',
+          '\u4fdd\u7559\u6301\u4e45\u8bb0\u5f55\uff0c\u8d44\u6e90\u5f52\u8c03\u7528\u65b9\u6240\u6709\u3002'
+        )
+      ],
+      example:
+        "import { Logger } from '@migaia/logger'\nimport { binlog, wal, undoLog, memoryLogStore } from '@migaia/logger/plugins/durable'\n\nawait using events = memoryLogStore()\nawait using intents = memoryLogStore()\nawait using images = memoryLogStore()\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [binlog({ store: events }), wal({ store: intents }), undoLog({ store: images })]\n})\ntry {\n  await Promise.all([log.binlog.ready(), log.wal.ready(), log.undo.ready()])\n  const seq = await log.binlog.append('order.created', { id: 'o1' })\n  const off = log.binlog.subscribe(seq, record => console.log(record.seq))\n  const intent = await log.wal.begin('save-order', { id: 'o1' })\n  await log.undo.record('tx1', [{ target: 'o1', before: null, after: { total: 120 } }])\n  await log.wal.complete(intent)\n  console.log(await log.undo.get('tx1'))\n  await log.undo.forget('tx1')\n  off()\n} finally {\n  try { await log.shutdown('manual') }\n  finally { await Promise.all([log.binlog.whenIdle(), log.wal.whenIdle(), log.undo.whenIdle()]) }\n}"
+    },
+    undoLog: {
+      kind: 'plugin',
+      target: 'Logger',
+      summary: t(
+        'Active undo image records; the caller owns business rollback.',
+        '活跃 undo 镜像记录；业务回滚归调用方。'
+      ),
+      install:
+        "import { Logger } from '@migaia/logger'\nimport { binlog, wal, undoLog, memoryLogStore } from '@migaia/logger/plugins/durable'\n\nawait using events = memoryLogStore()\nawait using intents = memoryLogStore()\nawait using images = memoryLogStore()\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [binlog({ store: events }), wal({ store: intents }), undoLog({ store: images })]\n})\ntry {\n  await Promise.all([log.binlog.ready(), log.wal.ready(), log.undo.ready()])\n  const seq = await log.binlog.append('order.created', { id: 'o1' })\n  const off = log.binlog.subscribe(seq, record => console.log(record.seq))\n  const intent = await log.wal.begin('save-order', { id: 'o1' })\n  await log.undo.record('tx1', [{ target: 'o1', before: null, after: { total: 120 } }])\n  await log.wal.complete(intent)\n  console.log(await log.undo.get('tx1'))\n  await log.undo.forget('tx1')\n  off()\n} finally {\n  try { await log.shutdown('manual') }\n  finally { await Promise.all([log.binlog.whenIdle(), log.wal.whenIdle(), log.undo.whenIdle()]) }\n}",
+      grants: grantsOf('log.undo', durableUndoMembers),
+      scenarios: [
+        t(
+          'Keep durable records with caller-owned resources.',
+          '\u4fdd\u7559\u6301\u4e45\u8bb0\u5f55\uff0c\u8d44\u6e90\u5f52\u8c03\u7528\u65b9\u6240\u6709\u3002'
+        )
+      ],
+      example:
+        "import { Logger } from '@migaia/logger'\nimport { binlog, wal, undoLog, memoryLogStore } from '@migaia/logger/plugins/durable'\n\nawait using events = memoryLogStore()\nawait using intents = memoryLogStore()\nawait using images = memoryLogStore()\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [binlog({ store: events }), wal({ store: intents }), undoLog({ store: images })]\n})\ntry {\n  await Promise.all([log.binlog.ready(), log.wal.ready(), log.undo.ready()])\n  const seq = await log.binlog.append('order.created', { id: 'o1' })\n  const off = log.binlog.subscribe(seq, record => console.log(record.seq))\n  const intent = await log.wal.begin('save-order', { id: 'o1' })\n  await log.undo.record('tx1', [{ target: 'o1', before: null, after: { total: 120 } }])\n  await log.wal.complete(intent)\n  console.log(await log.undo.get('tx1'))\n  await log.undo.forget('tx1')\n  off()\n} finally {\n  try { await log.shutdown('manual') }\n  finally { await Promise.all([log.binlog.whenIdle(), log.wal.whenIdle(), log.undo.whenIdle()]) }\n}"
+    },
     level: {
       kind: 'plugin',
       target: 'Logger',

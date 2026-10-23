@@ -309,19 +309,83 @@ pnpm --filter @migaia/logger run test
 
 test 会先构建本包；typecheck:browser 与 test:e2e 是另外的现有入口。这里只列命令，不声称它们已经执行。
 
-## Durable log storage
+## 持久日志插件
 
-`memoryLogStore` from `@migaia/logger/plugins/durable` is an atomic, process-local log resource. `fileLogStore` from `@migaia/logger/plugins/durable/file` uses builtin SQLite: `node:sqlite` in Node and Deno, `bun:sqlite` in Bun. The file implementation supports local files on macOS, Linux, and Windows; network filesystems do not receive a locking or durability guarantee. A retained SQLite connection owns the exclusive writer lock until disposal. No storage package or third-party native driver is required.
+入口 @migaia/logger/plugins/durable 导出 binlog、wal、undoLog 工厂、ILogStore 契约、memoryLogStore、LogRecordState 和 LogStage。每个插件借用独立的调用方资源；保留原对象、类方法与 symbol，不把资源放入插件配置。同一 store 对象不能同时被另一个插件借用。插件不关闭注入资源。
+
+binlog 提供有序追加、读取与订阅。wal.begin 返回前已提交 pending 意图；complete 与 abort 只允许 pending 前进至终态。undoLog 提供 undo.record/get/list/forget，只保存镜像，不执行业务回滚。活跃 txId 必须唯一；forget 先持久写 done 再删除索引，之后允许复用 txId。list 默认返回 100 项，按 time 降序、相同时间按 seq 降序；sinceTime 包含边界。所有读取返回独立快照。
 
 ```ts
-import { memoryLogStore, LogRecordState } from '@migaia/logger/plugins/durable'
+import { Logger } from '@migaia/logger'
+import { binlog, wal, undoLog, memoryLogStore } from '@migaia/logger/plugins/durable'
 
-await using store = memoryLogStore()
-const [seq] = await store.append([{ kind: 'order.created', payload: { id: 'o1' } }])
-await store.setState(seq, LogRecordState.done)
-console.log(await store.read(1, 100))
+await using events = memoryLogStore()
+await using intents = memoryLogStore()
+await using images = memoryLogStore()
+const log = new Logger({
+  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+  plugins: [binlog({ store: events }), wal({ store: intents }), undoLog({ store: images })]
+})
+try {
+  await Promise.all([log.binlog.ready(), log.wal.ready(), log.undo.ready()])
+  const seq = await log.binlog.append('order.created', { id: 'o1' })
+  const off = log.binlog.subscribe(seq, (record) => console.log(record.seq))
+  const intent = await log.wal.begin('save-order', { id: 'o1' })
+  await log.undo.record('tx1', [{ target: 'o1', before: null, after: { total: 120 } }])
+  await log.wal.complete(intent)
+  console.log(await log.undo.get('tx1'))
+  await log.undo.forget('tx1')
+  off()
+} finally {
+  try {
+    await log.shutdown('manual')
+  } finally {
+    await Promise.all([log.binlog.whenIdle(), log.wal.whenIdle(), log.undo.whenIdle()])
+  }
+}
 ```
 
-Records accept plain JSON data, capture inputs immediately, and return independent snapshots. A batch creates all records and their pending states atomically. Sequence numbers start at one and remain monotonic after prefix truncation. `onAppend` reports one frozen `{ lastSeq, count }` notice after each nonempty append commit. It never publishes state changes or truncation.
+打开原生事务前先等待 ready()；普通方法自动等待初始化。whenIdle() 在卸载后仍可等待已接纳工作及真实端口追加的完成；它不等待外部订阅回调，也不能证明业务事务已提交。logger 的 flush/shutdown 保留原有有限预算。即使 shutdown 拒绝，创建者也必须在 finally 中等待每个插件的 whenIdle，再关闭 store。旧嵌套对象与提取的方法在重装后仍被撤销。
 
-Explicit `dispose()` returns a cached Promise that rejects on cleanup failure. The async disposal symbol returns a separate cached Promise that reports failure and resolves. Both share one physical cleanup. The creator owns disposal; installed plugins only borrow the original resource.
+binlog.append(kind,payload,options?) 返回一个序号；appendBatch(records,options?) 返回整批序号。read(fromSeq,{limit?}) 包含起点，limit 默认 100。truncate(beforeSeq) 只删除严格前缀，lastSeq() 永久保留已提交高水位。每个订阅只有一个游标与一个在途回调；慢 listener 不阻塞追加或其它订阅，取消幂等。回调失败停止该订阅，以 source=hook 报告原错。截断越过游标时停止并报告 LOG_SUBSCRIPTION_TRUNCATED。echo 默认 false；true 时普通日志 tag 为 binlog、message 为 kind，meta 只有 seq/time，不输出 payload。
+
+原生事务拥有者可向 binlog 追加与 undo.record 传 ILogAppendOptions.transaction。该拥有者创建绑定精确 store 与活跃事务的 ILogAppendPort。logger 在当前调用栈发起已捕获的 append，返回暂定序号，不提交或回滚；同一个 FIFO 只登记该实际 Promise 的完成等待。真实提交后由 store 唯一发布 onAppend，旧插件卸载后的晚提交也由新安装接收。rollback 不通知、不占用 undo id。memory/file 不提供跨业务资源的事务端口；同名后端本身不证明原子性。
+
+### 原生日志资源
+
+memoryLogStore(options?) 只保证进程内原子性。独立入口 @migaia/logger/plugins/durable/file 的 fileLogStore(path,options?) 使用内置 SQLite：Node/Deno 延迟加载 node:sqlite，Bun 延迟加载 bun:sqlite。支持矩阵为 macOS、Linux、Windows 本地文件系统；实际验证仍须分别给出运行时与操作系统证据。网络文件系统不承诺锁与持久保证。文件资源使用 synchronous=FULL、逐次原生事务和连接级排他锁；先逆序 finalize 语句，再关闭连接。不依赖任何存储包或第三方 native 驱动。COMMIT 失败的结果可能未知，因此本实例停止准入，重开读取真实已提交状态，不自动重放。
+
+```ts
+import { fileLogStore } from '@migaia/logger/plugins/durable/file'
+
+await using store = await fileLogStore('./orders.sqlite')
+await store.append([{ kind: 'order.created', payload: { id: 'o1' } }])
+console.log(await store.lastSeq())
+```
+
+ILogStore.append 原子创建记录及 pending 状态，序号从 1 开始；空批不分配序号。read(fromSeq,limit) 按序读取保留快照，limit 为非负安全整数。setState(seq,state) 只允许 pending 到 done/aborted，或 pending 的幂等请求；已结束或不存在时报 WAL_RECORD_INVALID。states(LogRecordState.pending) 返回活跃序号。截断保留永久序号与非递减时间高水位，不复用已提交序号。onAppend 返回幂等取消函数，每个非空真实提交同步发送一次冻结的 lastSeq/count 统计；空批、状态变化、截断与 rollback 不通知，监听失败只报告。
+
+载荷只接受普通 JSON 数据：拒绝 undefined、非有限数、bigint、函数、类实例、循环、数组空洞和访问器。调用进入 FIFO 前已完成快照，不调用 getter/toJSON；共享子对象按 JSON 值复制。store 和插件只通过固定 LogStage 发送身份统计，不包含记录、txId、原生句柄或认证配置；观察失败只报告。原始 I/O 错误始终可从 cause 到达，载荷、范围、关闭与锁错误保持各自语义码。
+
+显式 dispose() 缓存主 Promise，清理失败时拒绝；异步释放 symbol 缓存另一 Promise，报告失败后成功。两个 Promise 共用一次实际清理。创建者在未借出时可使用 raw API，借出期间业务读写只经唯一插件，最后释放权不变。自定义 ILogStore 必须保持同样的原子提交、快照、序号、状态、通知与资源契约。下面的转发例保留一个已有拥有者，不建立第二提交机制：
+
+```ts
+import { memoryLogStore } from '@migaia/logger/plugins/durable'
+import type { ILogStore } from '@migaia/logger/plugins/durable'
+
+const delegate = memoryLogStore()
+// A custom implementation must preserve this single owner's atomic commit and notices.
+const custom: ILogStore = {
+  append: (records) => delegate.append(records),
+  read: (fromSeq, limit) => delegate.read(fromSeq, limit),
+  lastSeq: () => delegate.lastSeq(),
+  onAppend: (listener) => delegate.onAppend(listener),
+  truncate: (beforeSeq) => delegate.truncate(beforeSeq),
+  setState: (seq, state) => delegate.setState(seq, state),
+  states: (filter) => delegate.states(filter),
+  dispose: () => delegate.dispose(),
+  [Symbol.asyncDispose]: () => delegate[Symbol.asyncDispose]()
+}
+await custom.append([{ kind: 'custom', payload: null }])
+await custom.dispose()
+```

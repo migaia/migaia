@@ -168,7 +168,10 @@
       "./plugins/durable": [
         "LogRecordState",
         "LogStage",
-        "memoryLogStore"
+        "binlog",
+        "memoryLogStore",
+        "undoLog",
+        "wal"
       ],
       "./plugins/durable/file": [
         "fileLogStore"

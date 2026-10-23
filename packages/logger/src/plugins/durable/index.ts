@@ -20,3 +20,6 @@ export type {
   IUndoImage,
   IUndoLogExt
 } from './types.js'
+export { binlog } from './binlog.js'
+export { wal } from './wal.js'
+export { undoLog } from './undo.js'
