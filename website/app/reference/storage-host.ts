@@ -54,6 +54,15 @@ console.log(host.extensions.label('draft'))`
     }
   },
   symbols: {
+    asyncDisposeKey: {
+      role: 'constant',
+      purpose: t(
+        'The original plugin-host disposal symbol, re-exported through the backend authoring entry. It preserves the same identity on runtimes with or without native Symbol.asyncDispose.',
+        '通过后端作者入口重导出的原plugin-host释放symbol；无论运行时是否提供原生Symbol.asyncDispose，都保留同一身份。'
+      ),
+      example: storageHostCases.asyncDisposeKey![0]!.example,
+      cases: storageHostCases.asyncDisposeKey
+    },
     storageLogStore: {
       role: 'factory',
       purpose: t(
@@ -735,6 +744,27 @@ console.log(host.extensions.label('draft'))`,
           returns: t(
             'Completion of that native target deletion; failures retain the original error.',
             '返回该原生目标删除的完成结果，失败保留原错误。'
+          )
+        }
+      }
+    },
+    IStorageFeatureClientResolver: {
+      summary: t(
+        'Explicit backend-owned native client selection registered through core.registerFeatureClientResolver only during the original exact-store installation. No selection preserves original getters; async preparation retains admission, and transaction selection is synchronous on the authentic scope.',
+        '后端仅在精确store原安装窗口通过core.registerFeatureClientResolver登记原生客户端选择；未登记保持原getter，异步准备后仍检查原准入，事务选择同步使用认证scope。'
+      ),
+      example: storageHostCases.IStorageFeatureClientResolver![0]!.example,
+      members: {
+        getClient: {
+          summary: t(
+            'Prepare and return the original native client for this immutable organization.',
+            '为本不可变组织准备并返回原生客户端。'
+          )
+        },
+        getTransactionClient: {
+          summary: t(
+            'Return the already-active original native transaction synchronously; never open or await another transaction.',
+            '同步返回已活跃的原生事务，不另开或等待事务。'
           )
         }
       }

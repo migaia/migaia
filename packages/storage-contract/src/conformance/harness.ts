@@ -17,6 +17,11 @@ import { sparql } from '../capabilities/sparql.js'
 import { blob } from '../capabilities/blob.js'
 import { durableChangeFeed } from '../capabilities/durable-change-feed.js'
 
+/** Observe the same original failure whether native entry validation throws or rejects. */
+export async function invocation(run: () => unknown): Promise<unknown> {
+  return run()
+}
+
 /** Consumer-owned assertion vocabulary; this entry imports no test runner. */
 export type IConformanceMatchers = {
   toBe(expected: unknown): void

@@ -785,8 +785,8 @@ export const storageContractReference: ILibraryReference = {
     runConformance: {
       role: 'operation',
       purpose: t(
-        'Register all declared standard-token and Boolean behavior groups without acquiring a runner, host or driver dependency. Every case validates the complete manifest and finally disposes its original fixture; primary and cleanup failures remain reachable.',
-        '登记声明的标准 token 与布尔行为组，不依赖 runner、host 或 driver。每例核对完整清单并 finally 释放原 fixture，主体与清理错误均可追踪。'
+        'Register all declared standard-token and Boolean behavior groups without acquiring a runner, host or driver dependency. Every case validates the complete manifest and finally disposes its original fixture; primary and cleanup failures remain reachable. Invalid-input assertions observe both synchronous native throws and Promise rejection without changing the required original semantic code.',
+        '登记声明的标准 token 与布尔行为组，不依赖 runner、host 或 driver。每例核对完整清单并 finally 释放原 fixture，主体与清理错误均可追踪。输入错误断言同时观察原生同步抛错与Promise拒绝，仍要求原语义码。'
       ),
       params: {
         harness: t(

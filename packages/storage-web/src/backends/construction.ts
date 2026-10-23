@@ -8,7 +8,7 @@ import {
   type IStorageBase,
   type IKeyValueStore
 } from '@migaia/storage-contract'
-import type { IStoragePluginCore } from '@migaia/storage-host'
+import type { IStoragePluginCore, IStorageOrgBinding } from '@migaia/storage-host'
 import type {
   IBackendChangeController,
   IBackendValueCommit
@@ -25,6 +25,8 @@ export type IBackendRuntime = Pick<
   | 'execution'
   | 'stageBindings'
   | 'featureExpose'
+  | 'getOrgContext'
+  | 'createOrgAuthoringPort'
 >
 
 /** Native KV methods and their exact synchronous channel remain on the same provided object. */
@@ -65,6 +67,10 @@ export type IBackendConstruction<S extends IStorageBase, C> = {
   readonly prepare?: () => Promise<void>
   /** The original value backend supplies its own atomic native terminal to entity orchestration. */
   readonly commitValueWrite?: IBackendValueCommit
+  /** Physical organization lookup remains private to this installed backend construction. */
+  readonly orgBinding?: IStorageOrgBinding
+  /** Physical deletion stays with the original native opener and keeps the borrowed store usable. */
+  readonly dropData?: () => Promise<void>
 }
 
 /** Publish the actual native descriptors without cloning their store or cleanup methods. */

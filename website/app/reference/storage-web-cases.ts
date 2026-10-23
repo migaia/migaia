@@ -29,6 +29,19 @@ try {
         'Reads dark from the selected namespace. Host disposal releases resources and leaves persistent browser data intact.',
         '从选定命名空间读到深色主题；宿主释放资源后，浏览器持久化数据仍保留。'
       )
+    },
+    {
+      title: t('Keep organization preferences separate', '隔离组织偏好'),
+      problem: t(
+        'One configured browser namespace serves a default organization and explicit UUID organizations without sharing their keys.',
+        '同一配置命名空间分别服务缺省组织与显式UUID组织，不共享键值。'
+      ),
+      example:
+        "import { createStorageHost, createOrgId } from '@migaia/storage-host'\nimport { localStorageBackendPlugin } from '@migaia/storage-web/local-storage'\nconst host = await createStorageHost({ plugins: [localStorageBackendPlugin({ namespace: 'preferences' })] })\ntry {\n  const org = createOrgId()\n  const settings = host.org(org).backend('local')\n  await host.backend('local').set('theme', 'light')\n  await settings.set('theme', 'dark')\n  console.log(await host.backend('local').get('theme'), await settings.get('theme'))\n  await host.dropOrg(org)\n  console.log(await settings.get('theme'))\n} finally { await host.dispose() }",
+      result: t(
+        'Prints light dark, then null. The original organization view remains reusable after its target is cleared.',
+        '依次输出light dark及null；目标清理后原组织视图仍可复用。'
+      )
     }
   ],
   indexedDbBackendPlugin: [
@@ -84,6 +97,19 @@ try {
       result: t(
         'Prints null. A zero duration removes the target in the same native transaction; text, bytes and records share the TTL capability.',
         '输出 null。零期限在同一原生事务删除目标，文本、字节和记录均支持 TTL 能力。'
+      )
+    },
+    {
+      title: t('Delete one organization database', '删除单个组织数据库'),
+      problem: t(
+        'Organization deletion must remove its physical IndexedDB target while preserving other organizations and reusable views.',
+        '删除组织时需移除其物理 IndexedDB 目标，保留其它组织及可复用视图。'
+      ),
+      example:
+        "import { createStorageHost, createOrgId } from '@migaia/storage-host'\nimport { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'\nconst host = await createStorageHost({ plugins: [indexedDbBackendPlugin({ dbName: 'preferences' })] })\ntry {\n  const org = createOrgId()\n  const settings = host.org(org).backend('indexed-db')\n  await host.backend('indexed-db').set('theme', 'light')\n  await settings.set('theme', 'dark')\n  await host.dropOrg(org)\n  console.log(await settings.get('theme'), await host.backend('indexed-db').get('theme'))\n} finally { await host.dispose() }",
+      result: t(
+        'Prints null light. The deleted organization reopens through the original native layout; the configured default remains intact.',
+        '输出 null light；删除的组织通过原生布局重新打开，配置的缺省目标保持不变。'
       )
     }
   ],
