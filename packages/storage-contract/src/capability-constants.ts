@@ -16,6 +16,16 @@ export const STORAGE_KEY_VALUE_METHODS = [
   'clearAll'
 ] as const
 
+/** The existing synchronous channel has six methods and deliberately does not expose clearAll. */
+export const SYNC_KEY_VALUE_METHODS = [
+  'get',
+  'set',
+  'remove',
+  StorageCapabilityMethod.has,
+  'keys',
+  'clearValues'
+] as const
+
 /** Non-method key-value members retain their original descriptor and precise static type. */
 export const STORAGE_KEY_VALUE_PROPERTIES = ['sync'] as const
 
