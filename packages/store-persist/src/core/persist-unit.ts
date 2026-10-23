@@ -284,7 +284,18 @@ export function persistUnit<TState>(
   }
   /** One frozen plan is shared by every hydration attempt and never rebuilt during reads. */
   const migrationPlan = createPersistMigrationPlan(key, version, migrations)
-  if (codecStages !== undefined && codecStages.kind !== StorageStageKind.codec) {
+  /** Stage-family metadata is captured at the same option boundary as other accessor-backed input. */
+  let codecStageKind: unknown
+  try {
+    codecStageKind = codecStages?.kind
+  } catch (cause) {
+    throw createStorePersistTypeError(
+      StorePersistErrorCode.invalidOption,
+      StorePersistErrorText.codecStagesInvalid,
+      { cause }
+    )
+  }
+  if (codecStages !== undefined && codecStageKind !== StorageStageKind.codec) {
     throw createStorePersistTypeError(
       StorePersistErrorCode.invalidOption,
       StorePersistErrorText.codecStagesInvalid

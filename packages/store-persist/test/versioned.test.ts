@@ -182,6 +182,61 @@ describe('versioned persistence', () => {
     await storage.dispose()
   })
 
+  it('contains observer metadata and callback getter failures at their owning boundary', async () => {
+    /** Both conversion directions use the actual persistence facade and archive backend. */
+    const storage = memoryStorageHost()
+    await storage.set('getter', '{"version":0,"state":{"count":2}}')
+    /** Equal initial state avoids application writes during this observer-specific case. */
+    const store = createStore({ count: 2 })
+    /** Failed metadata access must be normalized before attachment starts. */
+    const metadataFailure = new Error('kind getter failed')
+    /** Native getter identity must survive on the existing configuration error. */
+    const badObserver: ICodecStageObserver = {
+      get kind(): typeof StorageStageKind.codec {
+        throw metadataFailure
+      },
+      forTransaction: () => badObserver,
+      report: () => undefined
+    }
+    expect(() => persist(store, { key: 'getter', storage, codecStages: badObserver })).toThrowError(
+      expect.objectContaining({
+        source: '@migaia/store-persist',
+        code: 'INVALID_OPTION',
+        cause: metadataFailure
+      })
+    )
+    /** Callback lookup failures are observations and cannot prevent actual encoding/decoding. */
+    const beforeFailure = new Error('before getter failed')
+    /** The successful decoder still reaches its after observation lookup. */
+    const afterFailure = new Error('after getter failed')
+    /** The original failures reach one existing report channel in actual operation order. */
+    const reports: unknown[] = []
+    /** Accessor-backed ports are a supported readonly structural observer shape. */
+    const observer: ICodecStageObserver = {
+      kind: StorageStageKind.codec,
+      forTransaction: () => observer,
+      get beforeEncode(): ICodecStageObserver['beforeEncode'] {
+        throw beforeFailure
+      },
+      get afterDecode(): ICodecStageObserver['afterDecode'] {
+        throw afterFailure
+      },
+      report: (error) => {
+        reports.push(error)
+        return undefined
+      }
+    }
+    /** Both readiness and flush must retain their normal successful results. */
+    const handle = persist(store, { key: 'getter', storage, codecStages: observer })
+    await handle.ready
+    await handle.flush()
+    expect(reports).toEqual([afterFailure, beforeFailure])
+    expect(await storage.get('getter')).toBe('{"version":0,"state":{"count":2}}')
+    await handle.disposeAsync()
+    store.$dispose()
+    await storage.dispose()
+  })
+
   it('caches separate asynchronous disposal promises over one cleanup', async () => {
     /** A minimal existing unit boundary isolates attachment ownership from any state package. */
     const runtime = createRuntime()

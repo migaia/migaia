@@ -15,22 +15,33 @@ const collectionsCodec = fromValueCodec(defineCollectionsJsonCodec({ version: 1 
 /** Calls observation without waiting; the existing utility contains then and reporter failures. */
 function observeCodec(
   observer: ICodecStageObserver | undefined,
-  callback: ICodecStageObserver['onEncodeError'],
+  stage: keyof Pick<
+    ICodecStageObserver,
+    | 'beforeEncode'
+    | 'afterEncode'
+    | 'onEncodeError'
+    | 'beforeDecode'
+    | 'afterDecode'
+    | 'onDecodeError'
+  >,
   operation: string,
   codec: string,
   code?: string
 ): void {
-  if (observer === undefined || callback === undefined) return
+  if (observer === undefined) return
   try {
+    /** Dynamic ports may use accessors; reading the callback is part of observation. */
+    const callback = observer[stage]
+    if (callback === undefined) return
     /** Only primitives enter an observer; conversion values never leave the codec boundary. */
     const result = Reflect.apply(
       callback,
       observer,
       code === undefined ? [operation, codec] : [operation, codec, code]
     )
-    observeThenableRejection(result, inspectThenable(result), observer.report)
+    observeThenableRejection(result, inspectThenable(result), (error) => observer.report(error))
   } catch (error) {
-    observeThenableRejection(undefined, { error }, observer.report)
+    observeThenableRejection(undefined, { error }, (failure) => observer.report(failure))
   }
 }
 
@@ -122,7 +133,7 @@ export async function writeEnvelopeWithStages(
       StorePersistErrorText.structuredOutput(codec.name)
     )
   }
-  observeCodec(observer, observer?.beforeEncode, PersistCodecOperation.encode, codec.name)
+  observeCodec(observer, 'beforeEncode', PersistCodecOperation.encode, codec.name)
   /** The codec result is observed once, before the selected backend receives it. */
   let encoded: unknown
   try {
@@ -130,14 +141,14 @@ export async function writeEnvelopeWithStages(
   } catch (error) {
     observeCodec(
       observer,
-      observer?.onEncodeError,
+      'onEncodeError',
       PersistCodecOperation.encode,
       codec.name,
       codec === defaultJsonCodec ? StorePersistErrorCode.encodeFailed : undefined
     )
     throw error
   }
-  observeCodec(observer, observer?.afterEncode, PersistCodecOperation.encode, codec.name)
+  observeCodec(observer, 'afterEncode', PersistCodecOperation.encode, codec.name)
   if (codec.output === PersistCodecOutput.binary && storage.capabilities.binary) {
     assertBinaryCapable(storage)
     if (!isUint8Array(encoded)) {
@@ -201,16 +212,16 @@ export async function readEnvelopeWithStages(
 
   /** Both storage routes share one conversion boundary and preserve the original failure. */
   async function decodeObserved(raw: unknown): Promise<unknown> {
-    observeCodec(observer, observer?.beforeDecode, PersistCodecOperation.decode, codec.name)
+    observeCodec(observer, 'beforeDecode', PersistCodecOperation.decode, codec.name)
     try {
       /** After observation runs only when the actual codec succeeds. */
       const value = await codec.decode(raw, ctx)
-      observeCodec(observer, observer?.afterDecode, PersistCodecOperation.decode, codec.name)
+      observeCodec(observer, 'afterDecode', PersistCodecOperation.decode, codec.name)
       return value
     } catch (error) {
       observeCodec(
         observer,
-        observer?.onDecodeError,
+        'onDecodeError',
         PersistCodecOperation.decode,
         codec.name,
         codec === defaultJsonCodec ? StorePersistErrorCode.envelopeInvalid : undefined
