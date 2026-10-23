@@ -1021,8 +1021,8 @@ export const storageContractReference: ILibraryReference = {
       ),
       params: {
         request: t(
-          'Authentic registered store and original options or exact outer attempt; optional policy overrides the owner default. Optional prepare(captured) settles once under the original deadline and signal before lock derivation; it is never a native attempt. Optional lock(captured) runs once after fixed-field capture and merges implicit locks with all explicit locks, reusing inherited encodings and budget.',
-          '真实登记 store 与原 options 或精确外层 attempt；policy 省略用原默认。可选 prepare(captured) 在原期限与信号下完成一次，再派生锁；它不算原生尝试。可选 lock(captured) 在固定字段捕获后调用一次，隐式锁与全部显式锁合并，复用继承编码与预算。'
+          'Authentic registered store and original options or exact outer attempt; optional policy overrides the owner default. Optional execute(captured, invokeOriginalLoop) wraps the real native loop once so before-next, after-next and catch remain in the original pipeline and call budget. Optional prepare(captured) settles once under the original deadline and signal before lock derivation; it is never a native attempt. Optional lock(captured) runs once after fixed-field capture and merges implicit locks with all explicit locks, reusing inherited encodings and budget.',
+          '真实登记 store 与原 options 或精确外层 attempt；policy 省略用原默认。可选 execute(captured, invokeOriginalLoop) 在原调用预算下包围一次真实循环，保留原 pipeline 的 before-next、after-next 与 catch。可选 prepare(captured) 在原期限与信号下完成一次，再派生锁；它不算原生尝试。可选 lock(captured) 在固定字段捕获后调用一次，隐式锁与全部显式锁合并，复用继承编码与预算。'
         ),
         port: t(
           'Real backend attempt port. Return committed or conflict only after native completion and cleanup; use context.wait for logical admission and waitPhysical for physical scheduling.',
