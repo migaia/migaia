@@ -1,5 +1,12 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
-import { lockKey, compareStorageKeys, type ILockKey, type IStorageKey } from '../src/index.js'
+import {
+  lockKey,
+  compareStorageKeys,
+  snapshotConcurrencyLockHoldings,
+  type ILockHolding,
+  type ILockKey,
+  type IStorageKey
+} from '../src/index.js'
 import { normalizeLockKeys, snapshotLockKey } from '../src/concurrency.js'
 
 /** Oracle compares established key meanings and fixed channel order, independent of new encoding. */
@@ -154,6 +161,65 @@ describe('canonical lock identities', () => {
     expect(() => normalizeLockKeys([{ channel: 'record', key: {} }], 'catalog')).toThrowError(
       expect.objectContaining({ code: 'INVALID_KEY', backend: 'catalog' })
     )
+  })
+
+  it('snapshots current holdings in canonical order without merging lease or holder rows', () => {
+    /** Borrowed native inspection state must remain independent from the returned snapshot. */
+    const holder = {
+      status: 'held' as const,
+      owner: 'native-owner',
+      label: 'writer',
+      since: 1,
+      scope: 'local' as const
+    }
+    const date = new Date(2)
+    const bytes = new Uint8Array([3])
+    const rows: ILockHolding[] = [
+      {
+        key: { channel: 'record', key: [date, bytes.buffer] },
+        holder,
+        expired: true,
+        expiresAt: 5
+      },
+      {
+        key: lockKey.bytes('a'),
+        holder: { status: 'handing-off', scope: 'remote' },
+        expired: false
+      },
+      { key: lockKey.text('z'), holder, expired: false, expiresAt: 9 },
+      {
+        key: lockKey.text('z'),
+        holder: { ...holder, owner: 'other-owner' },
+        expired: true,
+        expiresAt: 8
+      },
+      { key: lockKey.text(1), holder, expired: false }
+    ]
+    const expected = rows.slice().sort((left, right) => compareLockKeys(left.key, right.key))
+    const snapshot = snapshotConcurrencyLockHoldings(rows)
+    expect(snapshot).toEqual(expected)
+    expect(snapshot).toHaveLength(5)
+    expect(Object.isFrozen(snapshot)).toBe(true)
+    expect(snapshot.every((row) => Object.isFrozen(row) && Object.isFrozen(row.holder))).toBe(true)
+    date.setTime(99)
+    bytes.fill(99)
+    holder.label = 'changed'
+    rows.length = 0
+    expect(snapshot[4]!.key.key).toEqual([new Date(2), new Uint8Array([3]).buffer])
+    expect(snapshot[4]!.holder).toMatchObject({ label: 'writer' })
+    expect(snapshot[1]!.holder).toMatchObject({ owner: 'native-owner' })
+    expect(snapshot[2]!.holder).toMatchObject({ owner: 'other-owner' })
+    expect(snapshotConcurrencyLockHoldings([])).toEqual([])
+    const original = new Error('inspection getter failed')
+    expect(() =>
+      snapshotConcurrencyLockHoldings([
+        {
+          get key(): never {
+            throw original
+          }
+        } as unknown as ILockHolding
+      ])
+    ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT', cause: original }))
   })
 
   it('handles a long key with many short keys using an explicit suffix stack and no comparison sort', () => {

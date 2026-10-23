@@ -178,7 +178,11 @@ export { lockKey } from './concurrency.js'
 
 export { prefixStorageOrgKey, unprefixStorageOrgKey } from './org.js'
 
-export { runWithConcurrency, readConcurrencyLockIdentities } from './concurrency.js'
+export {
+  runWithConcurrency,
+  readConcurrencyLockIdentities,
+  snapshotConcurrencyLockHoldings
+} from './concurrency.js'
 export type {
   IConcurrencyAttempt,
   IConcurrencyAttemptContext,
