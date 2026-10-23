@@ -19,7 +19,7 @@ import { DurableText } from './text.js'
 import {
   createOwnedLogStoreIndex,
   prepareLogAppend,
-  requireInteger,
+  assertLogInteger,
   type ILogStoreSnapshot
 } from './committed-index.js'
 import type { ILogAppendNotice, ILogRecord, ILogStore, ILogStoreOptions } from './types.js'
@@ -134,8 +134,8 @@ export function createLogStore(
     },
     read: (fromSeq, limit) => {
       try {
-        requireInteger(fromSeq)
-        requireInteger(limit, 0)
+        assertLogInteger(fromSeq)
+        assertLogInteger(limit, 0)
       } catch (error) {
         return Promise.reject(error)
       }
@@ -150,7 +150,7 @@ export function createLogStore(
     },
     truncate: (beforeSeq) => {
       try {
-        requireInteger(beforeSeq)
+        assertLogInteger(beforeSeq)
       } catch (error) {
         return Promise.reject(error)
       }
@@ -162,7 +162,7 @@ export function createLogStore(
     },
     setState: (seq, state) => {
       try {
-        requireInteger(seq)
+        assertLogInteger(seq)
         if (!Object.values(LogRecordState).includes(state))
           throw createLoggerTypeError(LoggerErrorCode.invalidOption, DurableText.invalidOption)
       } catch (error) {

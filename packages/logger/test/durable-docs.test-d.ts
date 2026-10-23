@@ -4,6 +4,7 @@ import {
   wal,
   undoLog,
   memoryLogStore,
+  assertLogInteger,
   snapshotLogRecords,
   prepareLogAppend,
   snapshotLogStoreState,
@@ -109,4 +110,10 @@ export async function compilePayloadDomain(): Promise<void> {
     await log.binlog.whenIdle()
     await store.dispose()
   }
+}
+
+/** Native adapters narrow unknown numeric inputs with the original logger admission. */
+export function compileLogInteger(value: unknown): number {
+  assertLogInteger(value, 0)
+  return value
 }

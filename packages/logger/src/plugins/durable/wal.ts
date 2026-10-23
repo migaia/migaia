@@ -1,5 +1,5 @@
 import { captureDurableOptions, createDurableRuntime } from './plugin-runtime.js'
-import { requireInteger } from './committed-index.js'
+import { assertLogInteger } from './committed-index.js'
 import { snapshotLogRecords } from './snapshot.js'
 import { DurableKind, LogOperation, LogRecordState, LogStage } from './state-constants.js'
 import type { IDurablePlugin, IDurablePluginOptions, ILogRecord, IWalExt } from './types.js'
@@ -37,7 +37,7 @@ export function wal(options: IDurablePluginOptions): IDurablePlugin<IWalExt> {
           },
           complete: (seq) => {
             try {
-              requireInteger(seq)
+              assertLogInteger(seq)
             } catch (error) {
               return Promise.reject(error)
             }
@@ -47,7 +47,7 @@ export function wal(options: IDurablePluginOptions): IDurablePlugin<IWalExt> {
           },
           abort: (seq) => {
             try {
-              requireInteger(seq)
+              assertLogInteger(seq)
             } catch (error) {
               return Promise.reject(error)
             }
