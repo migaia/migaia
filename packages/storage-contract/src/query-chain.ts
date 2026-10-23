@@ -1215,36 +1215,47 @@ function planRecordQuery(
   pageSize?: number
 ): IRecordExecutionPlan {
   /** One reverse traversal avoids repeated prefix allocation during fluent construction. */
-  const steps: IQueryNode['step'][] = []
+  let steps: IQueryNode['step'][] = []
   for (let current = node; current !== undefined; current = current.previous)
     steps.push(current.step)
   steps.reverse()
   /** Fingerprints exclude execution-only bounds and never allocate a persistent cursor registry. */
   const signature = Object.freeze([...steps])
   /** New keyset executions keep row selection before per-page bounds in this same plan. */
-  const after = steps.filter((step) => step.operation === QueryOperation.after)
+  const after: IQueryNode['step'][] = []
+  /** One linear partition never shifts an already retained tail for each removed node. */
+  const body: IQueryNode['step'][] = []
+  for (const step of steps) (step.operation === QueryOperation.after ? after : body).push(step)
   if (pageSize !== undefined || after.length > 0) {
-    for (let index = steps.length - 1; index >= 0; index--)
-      if (steps[index]!.operation === QueryOperation.after) steps.splice(index, 1)
     /** Opaque comparison can seek before its original bounded heap without unbounded radix sorting. */
-    const comparator = steps.findIndex((step) => step.operation === QueryOperation.comparator)
-    if (comparator >= 0) steps.splice(comparator, 0, ...after)
-    else {
-      /** Keyset limit and skip apply to each page after the full condition/order/distinct result. */
-      const bounds = steps.filter(
-        (step) => step.operation === QueryOperation.limit || step.operation === QueryOperation.skip
-      )
-      for (let index = steps.length - 1; index >= 0; index--)
-        if (
-          steps[index]!.operation === QueryOperation.limit ||
-          steps[index]!.operation === QueryOperation.skip
-        )
-          steps.splice(index, 1)
-      /** Output mapping stays after keyset admission and the same original finite bounds. */
-      const projection = steps.findIndex((step) => step.operation === QueryOperation.mapper)
-      steps.splice(projection < 0 ? steps.length : projection, 0, ...after, ...bounds)
+    if (body.some((step) => step.operation === QueryOperation.comparator)) {
+      steps = []
+      /** The supported comparator state has one ordering stage and its adjacent explicit bound. */
+      let inserted = false
+      for (const step of body) {
+        if (!inserted && step.operation === QueryOperation.comparator) {
+          for (const anchor of after) steps.push(anchor)
+          inserted = true
+        }
+        steps.push(step)
+      }
+    } else {
+      /** Each original node is copied once into selection, page-bound or output partitions. */
+      const rows: IQueryNode['step'][] = []
+      /** Keyset limit and skip apply after the complete condition/order/distinct result. */
+      const bounds: IQueryNode['step'][] = []
+      /** Output callbacks observe only accepted keyset rows. */
+      const output: IQueryNode['step'][] = []
+      for (const step of body)
+        (step.operation === QueryOperation.limit || step.operation === QueryOperation.skip
+          ? bounds
+          : step.operation === QueryOperation.mapper
+            ? output
+            : rows
+        ).push(step)
+      steps = [...rows, ...after, ...bounds, ...output]
       /** Default primary-key order is needed only without either explicit ordering family. */
-      if (!steps.some((step) => step.operation === QueryOperation.order))
+      if (!rows.some((step) => step.operation === QueryOperation.order))
         steps.unshift({
           operation: QueryOperation.order,
           by: QueryOrderField.key,
