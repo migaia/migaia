@@ -67,6 +67,8 @@ cosine/dot/euclid use `<=>`/`<#>`/`<->` with scores 1-distance/-distance/-distan
 
 ## COPY and notifications
 
+Global collection configuration uses a stable private namespace identity in the original configuration table, independently of every host's default organization. Equal schema/prefix/name identities share one native table across hosts. dropOrg removes only that organization's point rows and retains global configuration, other organizations and native table structure. Expiry indexes also lead with org_id.
+
 ```ts
 import { pgCopyFeature } from '@migaia/storage-plugin-postgres/features/copy'
 import { pgListenFeature } from '@migaia/storage-plugin-postgres/features/listen'

@@ -73,3 +73,74 @@ it('routes the same text, record and selected vector identities to their immutab
     tenant: 'org'
   })
 })
+
+/** Global native collection identity is independent from each host's configured default org. */
+it('shares one native collection across hosts with different defaults and preserves it across org drop', async () => {
+  const connectionString = process.env.MIGAIA_PG_URL
+  if (!connectionString)
+    throw new Error('Run through scripts/storage-services.mts run -- to provide PostgreSQL')
+  const pool = new Pool({ connectionString })
+  const prefix = 'pg_shared_' + randomUUID().slice(0, 8)
+  const makeHost = () =>
+    createStorageHost({
+      org: randomUUID(),
+      plugins: [
+        postgresBackendPlugin({ driver: pgDriver(pool), prefix }, { vector: pgvectorFeature() })
+      ] as const
+    })
+  const first = await makeHost()
+  const second = await makeHost()
+  onTestFinished(async () => {
+    await first.dispose()
+    await second.dispose()
+    await pool.end()
+  })
+  const orgId = randomUUID()
+  const otherOrg = randomUUID()
+  const left = first.org(orgId).backend('postgres')
+  const right = second.org(orgId).backend('postgres')
+  await left
+    .use(vector)
+    .collection('shared', { dimensions: 1, metric: 'dot' })
+    .upsert([{ id: 'same', vector: [2] }])
+  await first
+    .org(otherOrg)
+    .backend('postgres')
+    .use(vector)
+    .collection('shared')
+    .upsert([{ id: 'other', vector: [3] }])
+  expect(
+    (
+      await right
+        .use(vector)
+        .collection('shared', { dimensions: 1, metric: 'dot' })
+        .near([1], { exact: true })
+        .topK(1)
+        .all()
+    )[0]?.id
+  ).toBe('same')
+  expect(
+    (await pool.query('SELECT count(*)::int4 AS count FROM ' + prefix + '_vector_config')).rows[0]
+      ?.count
+  ).toBe(1)
+  await first.dropOrg(orgId)
+  expect(
+    await right.use(vector).collection('shared').near([1], { exact: true }).topK(1).all()
+  ).toEqual([])
+  expect(
+    (
+      await first
+        .org(otherOrg)
+        .backend('postgres')
+        .use(vector)
+        .collection('shared')
+        .near([1], { exact: true })
+        .topK(1)
+        .all()
+    )[0]?.id
+  ).toBe('other')
+  expect(
+    (await pool.query('SELECT count(*)::int4 AS count FROM ' + prefix + '_vector_config')).rows[0]
+      ?.count
+  ).toBe(1)
+})

@@ -69,6 +69,8 @@ cosine、dot、euclid 使用原生 `<=>`、`<#>`、`<->`；score 分别为 1-dis
 
 ## COPY 与通知
 
+全局集合配置使用原配置表中的稳定私有 namespace 身份，与各 host 的缺省组织无关；相同 schema/prefix/name 在不同 host 复用同一原生表。dropOrg 只删除目标组织的点行，保留全局配置、其它组织与原生表结构。期限索引同样以 org_id 领先。
+
 ```ts
 import { pgCopyFeature } from '@migaia/storage-plugin-postgres/features/copy'
 import { pgListenFeature } from '@migaia/storage-plugin-postgres/features/listen'

@@ -126,6 +126,7 @@ export type IPostgresConstruction<T> = {
   readonly runNative: IPgNativeOperation
   createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>
   createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi
+  dropVectorOrg(client: IPgConnection, orgId: string): Promise<void>
   reportReplication(maxSlotWalKeepSize: string): void
   releaseOrgCapabilities(): void
   getTransactionClient(scope: IPostgresTransactionScope): IPgConnection
@@ -1166,7 +1167,6 @@ export async function createPostgresStore<T>(
         vectors ??= createPgVectors({
           configuration,
           tables,
-          defaultOrgId: core.defaultOrgId,
           orgId: runtime.orgId,
           assertLive: () => controller.assertLive(),
           run: (operation, ctx, work) =>
@@ -1277,6 +1277,10 @@ export async function createPostgresStore<T>(
         installer: installer!,
         controller,
         createVectorApi,
+        dropVectorOrg: async (client, orgId) => {
+          createVectorApi()
+          await vectors!.dropOrg(client, orgId)
+        },
         createDurableApi,
         reportReplication: (maxSlotWalKeepSize) =>
           core.emit('onCapabilityProbe', () => ({
@@ -1367,6 +1371,15 @@ export async function createPostgresStore<T>(
           await client.query('BEGIN', [])
           for (const table of Object.values(tables))
             await client.query('DELETE FROM ' + table + ' WHERE org_id=$1', [orgId])
+          if (vectorSelected()) {
+            let current = organizations.get(orgId)
+            if (current === undefined) {
+              current = bind(core.getOrgContext(orgId), true)
+              organizations.set(orgId, current)
+            }
+            // The child carries the original native vector owner, not a root API forwarding closure.
+            await current.dropVectorOrg(client, orgId)
+          }
           await client.query('COMMIT', [])
         } catch (cause) {
           try {
