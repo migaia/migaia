@@ -321,7 +321,9 @@ export function createBackendKeyLockPort(): IBackendKeyLockPort {
         const held = conflict(identities, ranges, lease)
         if (held !== undefined)
           return { status: 'conflict', phase: 'acquire', keys: [held.key], holder: held.holder }
-        /** No await separates the final active-table check from native data/revision mutation. */
+        /** An acquisition observer may have cancelled the original operation synchronously. */
+        throwIfAborted(ctx.signal)
+        /** No await separates final cancellation/active-table checks from native mutation. */
         return { status: 'committed', value: write() }
       }
       return await native!.attempt(ctx)

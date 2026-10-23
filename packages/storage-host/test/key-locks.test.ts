@@ -371,6 +371,36 @@ describe('the shared local key-lock provider', () => {
     }
   })
 
+  it('does not start a root mutation when its acquired observer aborts the original operation', async () => {
+    const current = await fixture()
+    await using _host = current.host
+    await using port = current.port
+    /** The real acquired observation can synchronously cancel the original operation budget. */
+    const abort = new AbortController()
+    const reason = new Error('cancel before root native mutation')
+    const native = vi.fn(() => 1)
+    await expect(
+      runWithConcurrency(
+        {
+          store: current.state.store,
+          options: { lock: [lockKey.text('root')], signal: abort.signal }
+        },
+        {
+          attempt: (ctx) =>
+            port.attemptWrite(ctx, holder('root'), native, {
+              kind: StorageStageKind.concurrency,
+              report: () => undefined,
+              onLockAcquired: () => abort.abort(reason)
+            })
+        }
+      )
+    ).rejects.toMatchObject({ code: 'ABORTED', cause: reason })
+    expect(native).not.toHaveBeenCalled()
+    expect(
+      port.probe(snapshotConcurrencyLockKeys([lockKey.text('root')], 'catalog').identities)
+    ).toBeUndefined()
+  })
+
   it('keeps optimistic work unlocked and reports failed resource observers without affecting results', async () => {
     const current = await fixture()
     await using _host = current.host
