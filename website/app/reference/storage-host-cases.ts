@@ -100,6 +100,30 @@ console.log(await repo.query().where({ name: 'Ada' }).orderByComparator((left, r
   ],
   memoryBackendPlugin: [
     {
+      title: t('Commit native RDF with the original draft', '用原 draft 提交原生 RDF'),
+      problem: t(
+        'Ground graph data must share namespace and transaction ownership with KV.',
+        'Ground 图数据需要与 KV 共用 namespace 和事务 owner。'
+      ),
+      example: `import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { rdf, term } from '@migaia/storage-contract'
+
+await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+const memory = host.backend('memory')
+await memory.transaction(async tx => {
+  await tx.set('status', 'ready')
+  await tx.use(rdf).add([{
+    subject: term.iri('urn:alice'), predicate: term.iri('urn:knows'),
+    object: term.iri('urn:bob'), graph: term.defaultGraph
+  }])
+})
+console.log(await memory.use(rdf).match({ subject: term.iri('urn:alice') }).count())`,
+      result: t(
+        'Prints 1 after KV and the logical default graph commit together.',
+        'KV 与逻辑 default graph 同提交后输出 1。'
+      )
+    },
+    {
       title: t('Bound one memory namespace with native LRU', '用原生 LRU 限制一个内存 namespace'),
       problem: t(
         'Evict committed physical entries without a second cache or transaction owner.',

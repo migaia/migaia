@@ -160,8 +160,8 @@ console.log(host.extensions.label('draft'))`
         '定义独立内存后端，安装前不获取数据。可选 namespace 容量单次捕获正 maxEntries/maxBytes 与 lru（缺省）或 lfu。策略双链节点和原 deadline radix 选择提交后的驱逐项，原生事务、根写共用原 owner、预算与目标锁。onEvict 只在提交后报告逐通道数量。显式 maxBytes 必须有真实 canonical 编码，不能编码的 record 修改前拒绝；省略容量及 maxEntries 保留原 structuredClone 值域。'
       ),
       returns: t(
-        'A literal-id memory plugin retaining selected Features from the separate final argument memoryBackendPlugin(options, features). The default id is memory; where/select/all run through the shared records query core.',
-        '通过独立最后参数memoryBackendPlugin(options, features)保留所选Feature的字面量id内存插件；缺省id为memory，where/select/all复用records查询核心。'
+        'A literal-id memory plugin retaining selected Features from the separate final argument memoryBackendPlugin(options, features). Native RDF uses six fixed canonical-term radix indexes, fixed-org graphs and the original transaction draft. Pattern matching is native; traversal and paging retain the shared query reader. Records use the shared records query core.',
+        '通过独立最后参数memoryBackendPlugin(options, features)保留所选Feature的字面量id内存插件。原生RDF以六个固定term radix索引、固定org图与原事务draft执行；pattern原生匹配，traversal和分页沿共享query reader；records复用原查询核心。'
       ),
       cases: [
         ...(storageHostCases.memoryBackendPlugin ?? []),

@@ -154,3 +154,7 @@ memory 原生提供 `vector`：`store.use(vector).collection('docs', { dimension
 这是 canonical 编码预算，不是 JavaScript 堆占用估算。原 codec 的 own-field 投影同样适用：raw record 中的 ArrayBuffer 按 `{}` 编码计费，原生读取仍保留其真实 structured-clone 值。
 
 所选 Feature API 与查询族保留原生 optimistic 事务 builder 的实际 scope 和原有 builder 方法。run 仍可直接调用，key lock 仍不存在，concurrency 只接纳 optimistic 策略。宿主发布原生 tx 方法，不创建替代 builder。
+
+memory 原生提供 `rdf`：`store.use(rdf).add(quads)`、`delete(quads)` 与 `match(pattern)` 使用共享 ground term 校验与 canonical 身份，完整批次先快照，重复 quad 幂等；blank node 仍只用于 raw/parser 域。六个固定压缩 radix 索引覆盖全局及 graph 内的 SPO/POS/OSP 访问，匹配按实际 bound prefix 定位，流式推进，不另存完整候选数组。逻辑 default/named graph 都映射为当前 org 的真实 named graph，返回时沿共享 helper 还原；namespace、提取方法、查询与原事务 scope 固定 org。`tx.use(rdf)` 与 KV 共用原 draft、revision、提交、回滚和迭代器生命周期，RDF 锁与容量驱逐都使用同 namespace 的逻辑 quad 身份。RDF 新变更沿 `all` 通道宽失效；`maxBytes` 计共享 canonical quad 编码，六个索引不重复计条目。
+
+RDF pattern 是原生访问路径；`where`、`follow`、`inverse`、排序与 page/after 保留共享 query reader 的客户端执行，`requirePushdown()` 如实拒绝所需客户端步骤。没有原生 traversal、native watch 或跨每次 next 的全库快照承诺；事务仍保留原 first-read/draft 语义。合法大 literal 不会被再次当作 public binary key 而收窄到 1 MiB。
