@@ -12,8 +12,8 @@ export const storageContractCases: Readonly<Record<string, readonly ICaseDoc[]>>
         '把真实后端接到原策略 owner'
       ),
       problem: t(
-        'Backend and persist composition must not add a second retry loop or restart operation deadlines.',
-        '后端与 persist 组合不能另建重试循环或重开操作期限。'
+        'Backend and persist composition must retain native option fields without adding a second retry loop or restarting operation deadlines.',
+        '后端与 persist 组合须保留原生选项字段，不能另建重试循环或重开操作期限。'
       ),
       example: t(
         `import { resolveConcurrencyPolicy, runWithConcurrency, type IStorageBase, type ITransactionOptions, type IConcurrencyPort } from '@migaia/storage-contract'

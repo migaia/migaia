@@ -453,3 +453,5 @@ lockKey.text 与 lockKey.record 接收原有 typed storage-key 域，lockKey.byt
 内层 store 接收同一个 attempt context 时复用外层预算与组合 signal，仅最外层释放 signal。循环观察失败只报告，不改变结果。后端在真实生命周期边界发 acquired/released/lost；循环发准入入口、冲突、决策、等待和重试观察。包内测试通过不代表原生后端整体验收通过。
 
 LOCK_REJECTED 与 LOCK_TIMEOUT 携只读 keys、holder。已确认身份时消息含逻辑/规范键身份与真实 label；交接窗口明确写 handing-off，不借用前任身份。物理调度无法提供身份时，物理超时仍携声明键，holder 为 undefined。
+
+循环也把已捕获的原生扩展选项与 symbol 字段传给每次 attempt 及接收同一 context 的内层调用；覆盖规范上下文字段时不丢后端扩展，也不再读取固定字段 getter。

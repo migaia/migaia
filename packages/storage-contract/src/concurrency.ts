@@ -462,6 +462,31 @@ export function normalizeLockKeys(
   return Object.freeze(unique)
 }
 
+/** Fixed fields have already been captured by the original option/context admission path. */
+const capturedConcurrencyFields = Object.freeze({
+  lock: true,
+  concurrency: true,
+  signal: true,
+  timeoutMs: true,
+  pageSize: true,
+  conflictPolicy: true,
+  orgId: true
+})
+/** Captures backend extension fields once without re-reading any admitted fixed-field getter. */
+function snapshotConcurrencyExtensions(options: ITransactionOptions): object {
+  /** Plain owned properties preserve native option values and symbol fields on every attempt. */
+  const extensions = {}
+  try {
+    for (const key of Reflect.ownKeys(options)) {
+      if (Object.hasOwn(capturedConcurrencyFields, key)) continue
+      Object.defineProperty(extensions, key, { value: Reflect.get(options, key), enumerable: true })
+    }
+  } catch (cause) {
+    throw invalidConcurrencyArgument(cause)
+  }
+  return extensions
+}
+
 /** A conflict can escape a backend only after its native work, rollback and resources have ended. */
 export type IConcurrencyAttempt<TResult> =
   | { readonly status: 'committed'; readonly value: TResult }
@@ -767,6 +792,8 @@ export async function runWithConcurrency<TResult>(
       : normalizeLockKeys(capturedLocks, backend)
   /** Context snapshots preserve original signal identity, field causes, org identity and omission. */
   const context = snapshotOperationContext(request.options)
+  /** Native options remain available to a backend while fixed fields keep their single capture. */
+  const extensions = snapshotConcurrencyExtensions(request.options)
   /** Only the original operation creates a diagnostic deadline reason and utils signal owner. */
   const deadlineFailure =
     inherited?.budget.deadlineFailure ??
@@ -806,13 +833,14 @@ export async function runWithConcurrency<TResult>(
       /** Cancellation before resource admission starts no native attempt. */
       const aborted = concurrencyAbort(budget, false)
       if (aborted) throw aborted
-      /** Only canonical fixed context fields are forwarded; the original deadline is already owned. */
+      /** Captured native fields are forwarded while the original deadline remains owned here. */
       const { timeoutMs: _originalTimeout, ...fields } = context ?? {}
       /**
        * Every real attempt gets detached keys so a previous borrowed view cannot mutate future
        * identity.
        */
       const attemptContext: IConcurrencyAttemptContext = {
+        ...extensions,
         ...fields,
         signal: budget.cancellation.signal,
         lock: locks?.map((entry) => snapshotLockKey(entry.key, backend)),

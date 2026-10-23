@@ -703,8 +703,8 @@ export const storageContractReference: ILibraryReference = {
         )
       },
       returns: t(
-        'Promise of the awaited committed value. Conflict errors preserve backend cause; cancellation awaits real attempt termination. Exact nested attempt contexts reuse the original budget.',
-        '完成提交值的 Promise；冲突保留后端 cause，取消仍等待真实尝试结束；相同嵌套 attempt context 复用原预算。'
+        'Promise of the awaited committed value. Conflict errors preserve backend cause; cancellation awaits real attempt termination. Exact nested attempt contexts reuse the original budget and retain captured backend extension fields.',
+        '完成提交值的 Promise；冲突保留后端 cause，取消仍等待真实尝试结束；相同嵌套 attempt context 复用原预算，并保留已捕获后端扩展字段。'
       ),
       example: storageContractCases.runWithConcurrency![0]!.example,
       cases: storageContractCases.runWithConcurrency

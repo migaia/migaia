@@ -580,3 +580,5 @@ Backend and persist authors use `resolveConcurrencyPolicy(store, capturedOptions
 An inner store call receiving the exact attempt context reuses the outer budget and combined signal; only the outermost call disposes that signal. Loop observations report failures without changing results. Backends emit acquired/released/lost stages at their real lifecycle boundaries; the loop emits acquisition entry, conflict, decision, waiting and retry observations. These contracts do not claim native backend integration merely because package tests pass.
 
 LOCK_REJECTED and LOCK_TIMEOUT include read-only keys and holder properties. Known holder messages include logical/canonical key identity and the confirmed label; handing-off is reported explicitly without borrowing the previous owner. Physical timeout carries declared keys and an unknown holder when physical scheduling supplies no identity.
+
+The loop also forwards captured native option fields and symbol properties to every attempt and exact-context nested call. It never drops backend extensions when applying canonical context fields, and it does not read fixed-field getters again.

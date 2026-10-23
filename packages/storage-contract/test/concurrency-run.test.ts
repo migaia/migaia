@@ -495,4 +495,47 @@ describe('canonical concurrency attempts', () => {
     await vi.advanceTimersByTimeAsync(5)
     await rejected
   })
+  it('forwards native fields and symbol extensions through the exact nested attempt context once', async () => {
+    const { store } = base()
+    const nativeSymbol = Symbol('native option')
+    const nativeValue = { tag: 'unchanged' }
+    let reads = 0
+    const options = {
+      get nativeTag() {
+        reads++
+        return nativeValue
+      },
+      [nativeSymbol]: nativeValue,
+      timeoutMs: 100,
+      pageSize: 3,
+      orgId: '00000000-0000-0000-0000-000000000000'
+    }
+    expect(
+      await run(
+        store,
+        async (outer) => {
+          expect(Reflect.get(outer, 'nativeTag')).toBe(nativeValue)
+          expect(Reflect.get(outer, nativeSymbol)).toBe(nativeValue)
+          expect(Object.hasOwn(outer, 'timeoutMs')).toBe(false)
+          return {
+            status: 'committed',
+            value: await run(
+              store,
+              async (inner) => {
+                expect(inner.signal).toBe(outer.signal)
+                expect(Reflect.get(inner, 'nativeTag')).toBe(nativeValue)
+                expect(Reflect.get(inner, nativeSymbol)).toBe(nativeValue)
+                expect(inner.pageSize).toBe(3)
+                expect(inner.orgId).toBe(options.orgId)
+                return { status: 'committed', value: true }
+              },
+              outer
+            )
+          }
+        },
+        options
+      )
+    ).toBe(true)
+    expect(reads).toBe(1)
+  })
 })
