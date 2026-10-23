@@ -4,20 +4,24 @@ import { resolveStorageNamespace } from '@migaia/storage-host/authoring/backend'
 import type { IBackendConstruction, IBackendRuntime } from './construction.js'
 
 /** Retain only physical constructions; registration cleanup and all native behavior stay original. */
-export function createBrowserOrgBinding<S extends IKeyValueStore, C>(
+export function createBrowserOrgBinding<
+  S extends IKeyValueStore,
+  C,
+  P extends IBackendConstruction<S, C> = IBackendConstruction<S, C>
+>(
   runtime: IBackendRuntime,
   configuredTarget: string,
-  initial: IBackendConstruction<S, C>,
-  create: (target: string, runtime: IBackendRuntime) => IBackendConstruction<S, C>,
-  drop: (physical: IBackendConstruction<S, C>) => Promise<void> = (physical) =>
+  initial: P,
+  create: (target: string, runtime: IBackendRuntime) => P,
+  drop: (physical: P) => Promise<void> = (physical) =>
     physical.dropData?.() ?? physical.store.clearAll()
-): IStorageOrgBinding {
+): IStorageOrgBinding & { readonly resolve: (orgId: string) => P } {
   /** Only the original installation may capture this bounded author authority. */
   const author = runtime.createOrgAuthoringPort()
   /** The configured default and explicit default organization share this exact initial object. */
-  const physical = new Map<string, IBackendConstruction<S, C>>([[configuredTarget, initial]])
+  const physical = new Map<string, P>([[configuredTarget, initial]])
   /** Resolve the same canonical target for lookup and deletion, without a second key codec. */
-  const forOrg = (orgId: string): IBackendConstruction<S, C> => {
+  const forOrg = (orgId: string): P => {
     initial.controller.assertLive()
     /** The host namespace owner alone defines both the default and UUID-suffixed physical target. */
     const target = resolveStorageNamespace(configuredTarget, orgId, runtime.defaultOrgId)
@@ -35,6 +39,7 @@ export function createBrowserOrgBinding<S extends IKeyValueStore, C>(
     return child
   }
   return Object.freeze({
+    resolve: forOrg,
     backend: (orgId: string) => forOrg(orgId).store,
     drop: (orgId: string) => drop(forOrg(orgId))
   })
