@@ -23,6 +23,18 @@ export const storagePluginRedisReference: ILibraryReference = {
     }
   },
   symbols: {
+    redisBackendKind: {
+      role: 'constant',
+      purpose: t('Exact native Redis backend kind.', '精确 Redis 原生后端 kind。')
+    },
+    redisBackendPlugin: {
+      role: 'factory',
+      purpose: t(
+        'Install native KV, bytes, records, TTL, counters and WATCH transactions.',
+        '安装原生 KV、字节、记录、TTL、counter 与 WATCH 事务。'
+      ),
+      cases: storagePluginRedisCases.redisBackendPlugin
+    },
     ERROR_SOURCE: {
       role: 'constant',
       purpose: t('Registered domain storage.backend.redis.', '登记错误域 storage.backend.redis。')
@@ -60,6 +72,48 @@ export const storagePluginRedisReference: ILibraryReference = {
     }
   },
   types: {
+    IRedisOptions: {
+      summary: t(
+        'Borrowed driver and namespace, original concurrency policy and native lock lease.',
+        '借用 driver、namespace、原并发策略与原生锁租期。'
+      ),
+      members: {}
+    },
+    IRedisCapabilities: {
+      summary: t(
+        'The original KV, records, TTL and counter tokens.',
+        '原 KV、records、TTL 与 counter token。'
+      ),
+      members: {}
+    },
+    IRedisStore: {
+      summary: t(
+        'Full asynchronous record store with original capabilities, native transactions and change hints.',
+        '带原能力、原生事务与变更提示的完整异步记录存储。'
+      ),
+      members: {}
+    },
+    IRedisTransactionScope: {
+      summary: t(
+        'Authentic original transaction view; native Feature APIs are absent.',
+        '真实原事务视图；不含专有原生 Feature API。'
+      ),
+      members: {}
+    },
+    IRedisCommandHookPayload: {
+      summary: t(
+        'Command name and elapsed time without arguments or payloads.',
+        '仅命令名与耗时，不含参数或载荷。'
+      ),
+      members: {}
+    },
+    IRedisWatchConflictHookPayload: {
+      summary: t(
+        'Logical native WATCH key count without business key copies.',
+        '原生 WATCH 逻辑键数量，不复制业务键。'
+      ),
+      members: {}
+    },
     IRedisReply: {
       summary: t(
         'Unknown native replies are validated by each fixed command consumer.',

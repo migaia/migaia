@@ -1828,7 +1828,7 @@
       "./features/management": ["qdrantManagementFeature"]
     },
     "@migaia/storage-plugin-redis": {
-      ".": ["ERROR_SOURCE", "RedisErrorCode"],
+      ".": ["ERROR_SOURCE", "RedisErrorCode", "redisBackendKind", "redisBackendPlugin"],
       "./ioredis": ["ioredisDriver"],
       "./node-redis": ["nodeRedisDriver"],
       "./bun": ["bunRedisDriver"]

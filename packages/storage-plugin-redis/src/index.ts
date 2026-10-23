@@ -6,3 +6,12 @@ export type {
   IRedisConnection,
   IRedisDriver
 } from './driver.js'
+
+export { redisBackendKind, redisBackendPlugin } from './plugin.js'
+export type {
+  IRedisOptions,
+  IRedisCapabilities,
+  IRedisStore,
+  IRedisTransactionScope
+} from './types.js'
+export type { IRedisCommandHookPayload, IRedisWatchConflictHookPayload } from './hooks.js'
