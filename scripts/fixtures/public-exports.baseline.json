@@ -1794,10 +1794,13 @@
       ],
       "./entity": [
         "REPOSITORY_KEY_PREFIX",
+        "RecordIndexBackfillPhase",
         "binaryCodec",
         "fromStandardSchema",
         "jsonCodec",
+        "markRecordIndexBackfillContentionFailure",
         "passthrough",
+        "registerRecordIndexBackfillStore",
         "repositoryMigrationKey",
         "selectCodec",
         "structuredCodec"

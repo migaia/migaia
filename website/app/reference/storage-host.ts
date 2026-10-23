@@ -40,6 +40,47 @@ console.log(host.extensions.label('draft'))`
     }
   },
   symbols: {
+    registerRecordIndexBackfillStore: {
+      role: 'operation',
+      purpose: t(
+        'Register the existing native backfill provider in its moved neutral owner.',
+        '在迁入的中立拥有者登记已有原生补录 provider。'
+      ),
+      params: {
+        backend: t('Original constructed backend object.', '原构造后端对象。'),
+        provider: t(
+          'Captured native backfill protocol; no methods are called during registration.',
+          '捕获的原生补录协议；登记不调用其方法。'
+        )
+      },
+      returns: t(
+        'void; no transaction or close authority is granted.',
+        'void；不授予事务或关闭权限。'
+      )
+    },
+    markRecordIndexBackfillContentionFailure: {
+      role: 'operation',
+      purpose: t(
+        'Mark an original coded native contention error without replacing it.',
+        '标记原 coded 原生争用错误，不替换原对象。'
+      ),
+      params: { error: t('Original coded native error object.', '原 coded 原生错误对象。') },
+      returns: t(
+        'void; entity orchestration recognizes this same identity for its existing fallback.',
+        'void；实体编排按同一身份识别已有回退。'
+      )
+    },
+    RecordIndexBackfillPhase: {
+      role: 'constant',
+      purpose: t(
+        'Retain canonical and legacy persisted scan phase values.',
+        '保留 canonical 与 legacy 持久化扫描阶段值。'
+      ),
+      returns: t(
+        'The existing phase vocabulary with no new backend state.',
+        '已有阶段词汇，不新增后端状态。'
+      )
+    },
     memoryBackendPlugin: {
       role: 'factory',
       purpose: t(
@@ -182,6 +223,69 @@ console.log(host.extensions.label('draft'))`,
     }
   },
   types: {
+    IRecordIndexBackfillPhase: {
+      summary: t(
+        'Existing canonical or legacy persisted scan phase.',
+        '已有 canonical 或 legacy 持久化扫描阶段。'
+      ),
+      members: {}
+    },
+    IRecordIndexBackfillCandidate: {
+      summary: t(
+        'Native candidate retaining key, raw value, revision and optional phase.',
+        '保留 key、原值、revision 与可选阶段的原生候选。'
+      ),
+      members: {}
+    },
+    IRecordIndexBackfillPreparation: {
+      summary: t(
+        'Entity preparation result retaining decoded byte budget and projection outcome.',
+        '保留解码字节预算与投影结果的实体准备记录。'
+      ),
+      members: {}
+    },
+    IRecordIndexBackfillReadOptions: {
+      summary: t(
+        'Optional asynchronous preparation outside the original native transaction.',
+        '在原生事务外执行的可选异步准备。'
+      ),
+      members: {}
+    },
+    IRecordIndexBackfillProjection: {
+      summary: t(
+        'Prepared projection with expected native revision for the same commit.',
+        '具备同次提交所需预期原生 revision 的已准备投影。'
+      ),
+      members: {}
+    },
+    IRecordIndexBackfillBatch: {
+      summary: t(
+        'Existing generation, owner token, checkpoints and native batch projections.',
+        '已有 generation、owner token、checkpoint 与原生批投影。'
+      ),
+      members: {}
+    },
+    IRecordIndexBackfillRetryReceipt: {
+      summary: t(
+        'Durable receipt permitting the original exact batch retry.',
+        '允许原精确批次重试的持久化回执。'
+      ),
+      members: {}
+    },
+    IRecordIndexBackfillSession: {
+      summary: t(
+        'Original native backfill renew/read/commit/fail/release protocol.',
+        '原生补录原有 renew/read/commit/fail/release 协议。'
+      ),
+      members: {}
+    },
+    IRecordIndexBackfillStore: {
+      summary: t(
+        'Captured native provider owning preparation, index readiness and backfill sessions.',
+        '拥有准备、索引就绪与补录会话的捕获原生 provider。'
+      ),
+      members: {}
+    },
     IStorageHooks: {
       summary: t(
         'One synchronous registry shared by constructor hooks, host listeners and original plugin installation scopes.',
