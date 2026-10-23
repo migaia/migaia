@@ -5,7 +5,8 @@
     "moduleResolution": "Bundler",
     "lib": [
       "ES2024",
-      "ESNext.Disposable"
+      "ESNext.Disposable",
+      "DOM"
     ],
     "rootDir": "src",
     "outDir": "dist",

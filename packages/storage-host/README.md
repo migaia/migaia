@@ -161,3 +161,16 @@ RDF pattern 是原生访问路径；`where`、`follow`、`inverse`、排序与 p
 memory 的真实文本 `watch(key, ctx?)` 与原 `subscribeChanges` 共用 controller。root watch 固定缺省 org，org view 固定自身 org；root 的既有 subscribeChanges 仍观察全部 org。watch 是提交后失效提示：一个未消费槽合并多次匹配为最新 sequence 的 `all` 提示，省略 keys/scope，不提供逐事件历史或 replay。原 native generator 串行推进，原 iterator owner 保留主/符号双缓存 Promise，dispose/abort/根关闭先唤醒已接受 next 再排空、取消订阅；原取消 reason 保留。真实 change-feed guard 通过后，records、原生 RDF pattern 与完成 topK 的 vector query 可 watch；需要客户端谓词或 traversal 的查询在订阅前拒绝。
 
 后端作者可复用 `createBackendChangeIterator(controller, { orgId, channel, key?, ctx?, execute? })`；它只借用原 controller 的订阅和关闭 signal，固定组织/通道/可选文本键，在一个槽合并失效提示，复用原资源、context 与诊断 owner。可选 execute 接收原 advance 与单次捕获的 context，以保留该后端逐 next 的原 pipeline；没有新的 controller、事件队列、registry 或重试平台。
+
+memory 原生提供 `blob`，与同名 KV/record 条目独立。`put` 先用共享规则快照字节和 metadata；条件不匹配时不接管上传 reader，流完整消费且清理成功后，在原同步提交窗口再次复核 etag/不存在条件并提交容量变化。取消、关闭或流失败不写入半个对象。`get` 返回读取时的 metadata/内容快照，range 的 end 包含在内；stream 与 bytes 共用一次消费权，释放沿原共享资源 owner。`list` 在原压缩 radix 上按 UTF-16 键顺序分页，cursor 绑定 org 与 prefix；`removeByPrefix` 只删除当前 org 的匹配对象。blob 不提供事务投影或文本锁。容量按每个对象一条、正文 byteLength 计入，metadata 与索引不重复计入；通知沿 all 宽失效且不外露内部 org key。
+
+```ts
+import { blob } from '@migaia/storage-contract'
+import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+
+await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+const objects = host.backend('memory').use(blob)
+await objects.put('images/sample', new Uint8Array([1, 2, 3]), { ifNoneMatch: true })
+await using object = (await objects.get('images/sample', { range: { start: 1, end: 1 } }))!
+console.log((await object.bytes())[0]) // 2
+```
