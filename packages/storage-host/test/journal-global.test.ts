@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { Logger } from '@migaia/logger'
 import { deferred } from '@migaia/utils/promise'
 import { binlog, undoLog, LogRecordState, type ILogStore } from '@migaia/logger/plugins/durable'
-import { blob, counter, kv, lockKey, ttl } from '@migaia/storage-contract'
+import { blob, counter, kv, lockKey, rdf, term, ttl, vector } from '@migaia/storage-contract'
 import { createOrgId, createStorageHost, memoryBackendPlugin } from '../src/index.js'
 
 /** Real durable scheduling keeps failures observable without writing test diagnostics to stdout. */
@@ -70,7 +70,6 @@ describe('global native storage journal', () => {
       ).rejects.toMatchObject({ cause: original })
       expect(await store.get('text')).toBe('three')
       expect(await logs.get(initialized[0]!)!.lastSeq()).toBe(6)
-      await expect(store.clearAll()).rejects.toMatchObject({ code: 'UNSUPPORTED_CAPABILITY' })
       expect(await store.get('text')).toBe('three')
       let pulls = 0
       const body = new ReadableStream<Uint8Array>(
@@ -208,5 +207,71 @@ describe('global native storage journal', () => {
       })
     ).rejects.toMatchObject({ code: 'BACKEND_INSTALL_FAILED', cause: { cause: original } })
     await expect(acquired!.lastSeq()).rejects.toMatchObject({ code: 'STORE_DISPOSED' })
+  })
+
+  it('captures each native clear image while retaining original channel epochs and one clear event', async () => {
+    let logger: ReturnType<typeof createJournalLogger> | undefined
+    await using host = await createStorageHost({
+      plugins: [memoryBackendPlugin()],
+      journal: async ({ storageLogStore }) => {
+        const records = await storageLogStore('memory', { prefix: 'clear-binlog' })
+        const images = await storageLogStore('memory', { prefix: 'clear-undo' })
+        logger = createJournalLogger(records, images)
+        return {
+          logger,
+          namespace: 'clear',
+          atomicBinlog: { memory: records },
+          atomicUndo: { memory: images }
+        }
+      }
+    })
+    try {
+      const store = host.backend('memory')
+      await store.set('text', 'value')
+      await store.setBytes('bytes', new Uint8Array([4]))
+      await store.putRecord(null, 'record')
+      const collection = store.use(vector).collection('vectors', { dimensions: 1, metric: 'dot' })
+      await collection.upsert([{ id: 'one', vector: [1] }])
+      await store.use(rdf).add([
+        {
+          subject: term.iri('urn:a'),
+          predicate: term.iri('urn:p'),
+          object: term.iri('urn:b'),
+          graph: term.defaultGraph
+        }
+      ])
+      const changes: string[] = []
+      const unsubscribe = store.subscribeChanges((change) => {
+        changes.push(change.kind)
+      })
+      await store.clearValues()
+      expect(changes).toEqual(['clear'])
+      expect(await store.getBytes('bytes')).toEqual(new Uint8Array([4]))
+      const clearedText = (await logger!.binlog.read(6))[0]!.payload as { txId: string }
+      const textImages = await logger!.undo.get(clearedText.txId)
+      expect(textImages).toHaveLength(1)
+      expect(textImages![0]!.target).toMatchObject({ afterRevision: { epoch: 1, revision: 0 } })
+      changes.length = 0
+      await store.clearAll()
+      expect(changes).toEqual(['clear'])
+      const clearedAll = (await logger!.binlog.read(7))[0]!.payload as {
+        txId: string
+        changes: unknown[]
+      }
+      expect(clearedAll.changes).toHaveLength(4)
+      const images = await logger!.undo.get(clearedAll.txId)
+      expect(images).toHaveLength(4)
+      for (const image of images!) {
+        expect(image.target).toMatchObject({ afterRevision: { epoch: 1, revision: 0 } })
+        expect(image.after).toEqual({ present: false })
+      }
+      expect(await collection.search([1], { k: 1 })).toEqual([])
+      expect(await store.use(rdf).match({}).count()).toBe(0)
+      await store.clearAll()
+      expect(await logger!.binlog.read(1)).toHaveLength(7)
+      unsubscribe()
+    } finally {
+      await logger?.shutdown('manual')
+    }
   })
 })

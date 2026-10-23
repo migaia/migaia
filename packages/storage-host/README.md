@@ -229,7 +229,7 @@ console.log(await log.lastSeq(), await log.states(LogRecordState.pending)) // 1 
 
 全局 `journal` 接受借用 logger 配置或 `async ({orgId,storageLogStore}) => 配置`。缺省组织由原安装批次最后的 bootstrap 准备；后续组织在首次受支持异步终点准备一次，共享同一 Promise，准备时间计入原操作预算并由原 controller 排空。配置在后续 use 中固定，准备失败也不重新执行 initializer；宿主不会 shutdown 借用 logger。`atomicBinlog[id]`、`atomicUndo[id]` 必须选择同一真实 registration 的载体，head 锁加入原第一次规范取锁。
 
-当前自动 memory 单元覆盖根 text/bytes/record 写入、批量、前缀删除、counter/TTL、vector/RDF、查询写及显式 native 事务；原 draft 在修改前捕获 portable 镜像。capacity victim 同属该 draft 的镜像，异步追加后重查原修订和实际容量计划；victim 改变沿原 commit conflict 回滚暂存日志。真实数据和 victim 完成后才发布已提交日志索引，原淘汰通知顺序保持。空写不生成 storage.commit，选中异步 journal 时同步入口沿原 guard 拒绝。clear 与 blob 写暂在修改前报 UNSUPPORTED_CAPABILITY，blob 不接管上传 reader，不伪造 blob 锁或镜像格式。WAL、telemetry、其它后端全局路由、undo 执行与 redo 仍待完成；缺失的已选保证明确拒绝，不静默漏记。
+当前自动 memory 单元覆盖根 text/bytes/record 写入、批量、前缀删除、counter/TTL、vector/RDF、clear、查询写及显式 native 事务；原 draft 在修改前捕获 portable 镜像。capacity victim 同属该 draft 的镜像，异步追加后重查原修订和实际容量计划；victim 改变沿原 commit conflict 回滚暂存日志。真实数据和 victim 完成后才发布已提交日志索引，原淘汰通知顺序保持。空写不生成 storage.commit，选中异步 journal 时同步入口沿原 guard 拒绝。clear 按实际删除项捕获镜像，保留原通道 epoch 重置与一次粗粒度 clear 通知；空 clear 不生成 storage.commit。blob 写暂在修改前报 UNSUPPORTED_CAPABILITY，不接管上传 reader，不伪造 blob 锁或镜像格式。WAL、telemetry、其它后端全局路由、undo 执行与 redo 仍待完成；缺失的已选保证明确拒绝，不静默漏记。
 
 PENDING-USER-REVIEW：dropOrg 遇到存活的全局 journal 时，原私有 namespace generation 失效；storageLogStore 缓存读取与旧 native port 均报 STORE_DISPOSED，后续选中 journal 的写入在修改前拒绝，普通未选 journal 的 org 视图仍可复用。同一借用 logger 在 drop 后继续，需要原 logger 的正式 reset 契约；宿主不重跑一次性 initializer、不替换或关闭 logger。比较隐式复用缓存、重跑 initializer 与安全隔离后选择安全隔离，保数据/日志一致；回退只能撤回新增全局组合，或由原 owner 显式 reset 协议替换隔离。
 

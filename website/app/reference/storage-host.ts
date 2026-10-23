@@ -405,8 +405,8 @@ console.log(host.extensions.label('draft'))`,
       members: {
         journal: {
           summary: t(
-            'Optional global journal configuration; omitted configurations leave the original execution path unchanged. Automatic undo execution, external WAL, redo, clear/blob capture and other-backend routing are not completed by the current memory unit.',
-            '可选全局 journal；省略时保持原路径。当前 memory 单元不代表自动 undo、外置 WAL、redo、clear/blob 捕获或其它后端路由已完成。'
+            'Optional global journal configuration; omitted configurations leave the original execution path unchanged. Automatic undo execution, external WAL, redo, blob capture and other-backend routing are not completed by the current memory unit.',
+            '可选全局 journal；省略时保持原路径。当前 memory 单元不代表自动 undo、外置 WAL、redo、blob 捕获或其它后端路由已完成。'
           )
         }
       }

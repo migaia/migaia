@@ -291,6 +291,7 @@ type IMemoryTextEntry = {
 type IMemoryTextDraft = {
   write(channel: IStorageChannel, key: IStorageKey, value: unknown, policy: IConflictPolicy): void
   remove(channel: IStorageChannel | 'vector', key: IStorageKey): boolean
+  clear(channel?: IStorageChannel): void
   ttl(target: IMemoryTtlTarget, ms: number | undefined, persist: boolean): boolean
   increment(key: string, increment: ReturnType<typeof snapshotStorageCounterIncrement>): number
   upsertVector(
@@ -857,7 +858,7 @@ function createMemoryNamespace<T>(
     publish(channel, 'remove', [captured])
   }
   /** Clear invalidates the actual channel snapshot even when membership was already empty. */
-  const clear = (channel: IStorageChannel): void => {
+  const clear = (channel: IStorageChannel, notify = true): void => {
     controller.assertLive()
     /** Preserve the original rule that an empty clear emits no notification. */
     const changed = data[channel].size !== 0
@@ -868,7 +869,7 @@ function createMemoryNamespace<T>(
     data[channel].clear()
     ordered[channel].clear()
     revisions.clear(channel === 'value' ? 'text' : channel)
-    if (changed) publish(channel, 'clear')
+    if (changed && notify) publish(channel, 'clear')
   }
   /** All flat reads retain string-only validation and old null/undefined missing results. */
   const read = (channel: IStorageChannel, key: IStorageKey): unknown => {
@@ -1049,7 +1050,7 @@ function createMemoryNamespace<T>(
     return preparing === undefined ? pending : pending.finally(preparing)
   }
   /** All-channel clearing retains its original one coarse event after one synchronous merge. */
-  const clearAll = (): void => {
+  const clearAll = (notify = true): void => {
     controller.assertLive()
     /** Empty physical channels still advance epochs without manufacturing change notifications. */
     const changed = blobs.size !== 0 || physicalChannels.some((channel) => data[channel].size !== 0)
@@ -1063,7 +1064,7 @@ function createMemoryNamespace<T>(
     capacityIndex?.clear()
     rdfIndex.clear()
     blobs.clear()
-    if (changed) controller.publish({ channel: 'all', kind: 'clear', orgId })
+    if (changed && notify) controller.publish({ channel: 'all', kind: 'clear', orgId })
   }
   /** Channel selection is captured before the shared provider's final synchronous range check. */
   const clearEntry = (
@@ -1074,6 +1075,7 @@ function createMemoryNamespace<T>(
     mutationEntry(operation, channel, ctx, (captured) => ({
       keys: [],
       ranges: mutationRanges(captured === undefined ? physicalChannels : [captured]),
+      invoke: (draft) => draft.clear(captured),
       run: () => (captured === undefined ? clearAll() : clear(captured))
     }))
 
@@ -1721,6 +1723,12 @@ function createMemoryNamespace<T>(
     let journalVictims: Set<string> | undefined
     /** The original capacity plan must still select these same rows after asynchronous append. */
     let journalCapacity: ReturnType<typeof planCapacity>
+    /** Root clear keeps the original coarse epoch transition, without exposing a new scope method. */
+    let clearedChannels: readonly IMemoryChannel[] | undefined
+    /** The original all-channel clear publishes one broad event instead of per-channel batches. */
+    let clearAllRequested = false
+    /** Preserve whether the original physical clear has an event, even if capture prunes expiry. */
+    let clearChanged = false
     /** Each channel draft reuses the same compressed radix implementation, including tombstones. */
     const draftOrdered = {
       value: createOrderedRecordIndex<IMemoryDraft>(),
@@ -2058,6 +2066,24 @@ function createMemoryNamespace<T>(
     const textDraft: IMemoryTextDraft = {
       write: txWrite,
       remove: txRemove,
+      clear: (channel) => {
+        /** Blob has no shared image target, so an all-channel clear must not silently delete it. */
+        if (channel === undefined && blobs.size !== 0)
+          throw new StorageContractError(StorageContractErrorCode.unsupported)
+        clearedChannels = channel === undefined ? physicalChannels : [channel]
+        clearAllRequested = channel === undefined
+        clearChanged = clearedChannels.some((current) => data[current].size !== 0)
+        for (const current of clearedChannels) {
+          if (!snapshotEpochs.has(current))
+            snapshotEpochs.set(current, revisions.epoch(current === 'value' ? 'text' : current))
+          /** Native Map iteration advances safely when the original TTL owner prunes an entry. */
+          for (const [encoded, entry] of data[current]) {
+            const snapshot = txSnapshot(current, encoded, entry.key)
+            if (snapshot !== undefined)
+              stageDraft({ ...snapshot, channel: current, encoded, remove: true })
+          }
+        }
+      },
       ttl: (target, ms, persist) => txTtl(target, ms, persist),
       increment: (key, increment) => {
         const result = increment(txRead('value', key) as string | undefined)
@@ -2252,6 +2278,8 @@ function createMemoryNamespace<T>(
         proposed?.remove === true ||
         (proposed?.deadline !== undefined && proposed.deadline <= scheduler.now())
       const changed = proposed !== undefined && (!removes || snapshots.get(id) !== undefined)
+      if (clearedChannels?.includes(row.channel))
+        return Object.freeze({ epoch: snapshotEpochs.get(row.channel)! + 1, revision: 0 })
       return Object.freeze({
         epoch: snapshotEpochs.get(row.channel)!,
         revision: expected.get(id)!.revision + (changed ? 1 : 0)
@@ -2936,7 +2964,16 @@ function createMemoryNamespace<T>(
       commitCapacity(
         capacityPlan,
         () => {
+          /** Clear's physical maps, revisions and accounting remain owned by their original turn. */
+          if (clearedChannels !== undefined) {
+            if (clearAllRequested) clearAll(false)
+            else clear(clearedChannels[0] as IStorageChannel, false)
+          }
           for (const proposed of draft.values()) {
+            if (clearedChannels?.includes(proposed.channel)) {
+              changed[proposed.channel].push(proposed.key)
+              continue
+            }
             /** Policy eviction remains owned by commitCapacity, including revision and onEvict. */
             if (journalVictims?.has(identity(proposed.channel, proposed.encoded))) continue
             /** Existing draft identities retain their already captured logical key. */
@@ -2981,15 +3018,21 @@ function createMemoryNamespace<T>(
           /** The original capacity buffer preserves batch-before-victim notification order. */
           if (capacityPlan !== undefined)
             for (const channel of physicalChannels)
-              if (changed[channel].length !== 0) publish(channel, 'batch', changed[channel])
+              if (!clearedChannels?.includes(channel) && changed[channel].length !== 0)
+                publish(channel, 'batch', changed[channel])
         },
         () => {
           /** Actual data and capacity victims are final before private indexes become visible. */
           journalDraft?.commit()
           journalDraft?.complete(true)
+          if (clearChanged) {
+            if (clearAllRequested) controller.publish({ channel: 'all', kind: 'clear', orgId })
+            else publish(clearedChannels![0]!, 'clear')
+          }
           if (capacityPlan === undefined)
             for (const channel of physicalChannels)
-              if (changed[channel].length !== 0) publish(channel, 'batch', changed[channel])
+              if (!clearedChannels?.includes(channel) && changed[channel].length !== 0)
+                publish(channel, 'batch', changed[channel])
         }
       )
       void stage.afterCommit?.(
