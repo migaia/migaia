@@ -353,8 +353,8 @@ export function verifyKvBackend(
   runConformance(harness, { name: 'my-backend', create, capabilities: [kv], features })
 }`,
       result: t(
-        'The consumer runner executes the registered cases. Each creates a fresh fixture, verifies the complete manifest, and finally disposes that store; extra declared tokens belong in capabilities.',
-        '消费者 runner 执行登记的用例。每例新建 fixture、核对完整清单并 finally 释放 store；其它已声明 token 也必须列入 capabilities。'
+        'The consumer runner executes the registered cases. Each creates a fresh fixture, verifies the complete manifest, and finally disposes that store; extra declared tokens belong in capabilities. Optional native index preparation still requires complete readiness and real index behavior.',
+        '消费者 runner 执行登记的用例。每例新建 fixture、核对完整清单并 finally 释放 store；其它已声明 token 也必须列入 capabilities；可选原生索引准备仍须 complete 就绪与真实索引行为。'
       )
     }
   ],

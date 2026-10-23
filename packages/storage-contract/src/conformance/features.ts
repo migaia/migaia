@@ -1,6 +1,7 @@
-import type { IConformanceCase, IConformanceHarness } from './harness.js'
+import type { IConformanceCase, IConformanceHarness, IConformanceSubject } from './harness.js'
 import { conformanceRows, conformanceCleanup } from './harness.js'
 import { isKeyValueStore, type IKeyValueStore, type IRecordStore } from '../store.js'
+import type { IStorageStore } from '../capability.js'
 import { asSecondaryIndexRecordStore } from '../secondary-index.js'
 import { asChangeFeedStore } from '../change-feed.js'
 
@@ -72,13 +73,18 @@ export function syncConformance(check: IConformanceCase, harness: IConformanceHa
 }
 
 /** Existing public index operations own readiness, projections, uniqueness and transaction state. */
-export function indexConformance(check: IConformanceCase, harness: IConformanceHarness): void {
+export function indexConformance(
+  check: IConformanceCase,
+  harness: IConformanceHarness,
+  prepare?: IConformanceSubject<IStorageStore<never>>['prepareSecondaryIndexes']
+): void {
   const expect = harness.expect
   check('secondaryIndexes · ranges, order, limit and projection maintenance', async (store) => {
     const api = asSecondaryIndexRecordStore(store as unknown as IRecordStore)
     const handle = await api.ensureRecordIndexes('conformance', [
       { name: 'value', unique: false, multiEntry: false, revision: 1 }
     ])
+    await prepare?.(store, handle)
     await expect(api.getRecordIndexReadiness(handle)).resolves.toMatchObject({ status: 'complete' })
     await api.putIndexedRecord({ value: 1 }, 'a', handle, { value: { kind: 'single', key: 1 } })
     await api.putIndexedRecord({ value: 2 }, 'b', handle, { value: { kind: 'single', key: 2 } })
@@ -129,6 +135,8 @@ export function indexConformance(check: IConformanceCase, harness: IConformanceH
       { name: 'unique', unique: true, multiEntry: false, revision: 1 },
       { name: 'tags', unique: false, multiEntry: true, revision: 1 }
     ])
+    await prepare?.(store, handle)
+    await expect(api.getRecordIndexReadiness(handle)).resolves.toMatchObject({ status: 'complete' })
     await api.transactionIndexed(handle, (tx) =>
       tx.putIndexedRecord({ id: 'a' }, 'a', handle, {
         unique: { kind: 'single', key: 'one' },
