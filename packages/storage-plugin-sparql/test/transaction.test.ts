@@ -172,10 +172,16 @@ describe('native RDF storage and atomic transactions', () => {
     expect(() => saved.use(rdf)).toThrow()
   })
   it('sends one conditional Modify, one ASK and one marker cleanup with independent absent conditions', async () => {
-    const { store, updates, queries, native } = await installed()
+    const { store, updates, queries, native } = await installed(),
+      previous = quad('previous'),
+      committed = [quad('committed'), quad('a'), quad('b')]
+    await store.use(rdf).add([previous])
+    updates.length = 0
+    queries.length = 0
     await store.transaction(async (scope) => {
       scope.use(rdf).expectAbsent([quad('absent-a'), quad('absent-b')])
-      await scope.use(rdf).add([quad('committed')])
+      await scope.use(rdf).add(committed)
+      await scope.use(rdf).delete([previous])
     })
     expect(updates).toHaveLength(2)
     expect(queries).toHaveLength(1)
@@ -192,7 +198,40 @@ describe('native RDF storage and atomic transactions', () => {
         { concurrency: ConcurrencyPolicy.optimistic({ retries: 0 }) }
       )
     ).rejects.toMatchObject({ code: 'WRITE_CONFLICT' })
-    expect(await store.use(rdf).match({}).all()).toEqual([quad('committed')])
+    expect(
+      (await store.use(rdf).match({}).all()).map((value) => value.object.value).sort()
+    ).toEqual(committed.map((value) => value.object.value).sort())
+  })
+  it('keeps concurrent unconditional updates within native RDF quad identity', async () => {
+    const { store } = await installed(),
+      previous = quad('previous'),
+      firstRead = Promise.withResolvers<void>(),
+      release = Promise.withResolvers<void>()
+    await store.use(rdf).add([previous])
+    const delayed = store.transaction(async (scope) => {
+      const values = await scope.use(rdf).match({}).all()
+      firstRead.resolve()
+      await release.promise
+      await scope.use(rdf).delete(values)
+      await scope.use(rdf).add([quad('last')])
+    })
+    await firstRead.promise
+    await store.transaction(async (scope) => {
+      await scope.use(rdf).delete([previous])
+      await scope.use(rdf).add([quad('earlier')])
+    })
+    release.resolve()
+    await delayed
+    expect(
+      (await store.use(rdf).match({}).all()).map((value) => value.object.value).sort()
+    ).toEqual(['earlier', 'last'])
+    const membership = quad('membership')
+    await store.use(rdf).add([membership])
+    await store.use(rdf).delete([membership])
+    expect(await store.use(rdf).match(membership).count()).toBe(0)
+    await store.use(rdf).delete([membership])
+    await store.use(rdf).add([membership])
+    expect(await store.use(rdf).match(membership).count()).toBe(1)
   })
   it('retries only a confirmed precondition conflict through the original optimistic owner', async () => {
     const { store } = await installed(),

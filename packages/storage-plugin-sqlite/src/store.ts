@@ -683,12 +683,11 @@ export function createSqliteStore<TValue>(
       backend: SqliteNames.backend
     })
   }
-  /** Deadline lookup does not decode a value and still observes missing or expired native rows. */
+  /** Deadline reads and writes share the original attempt's first live native observation. */
   const expiration = (
     target: ISqliteTtlTarget,
     orgId: string,
-    state?: INativeState,
-    reading = false
+    state?: INativeState
   ): ISqliteRow | undefined => {
     if (state) revision(state, target.channel, target.key)
     const row = statement<ISqliteRow | undefined>(
@@ -697,12 +696,7 @@ export function createSqliteStore<TValue>(
       'get',
       state
     )
-    if (
-      row &&
-      (reading
-        ? !liveExpiration(target.channel, target.key, row.expires_at, state)
-        : row.expires_at !== null && Number(row.expires_at) <= Date.now())
-    ) {
+    if (row && !liveExpiration(target.channel, target.key, row.expires_at, state)) {
       if (state) prune(target.channel, target.key, state)
       else
         syncMutation((current) => prune(target.channel, target.key, current), [], undefined, orgId)
@@ -1343,12 +1337,7 @@ export function createSqliteStore<TValue>(
             SqliteOperation.ttlRemaining,
             () => captureTtlTarget(target),
             (state, _current, input) => {
-              const row = expiration(
-                captureTtlTarget(input as ITtlTarget),
-                state.orgId,
-                state,
-                true
-              )
+              const row = expiration(captureTtlTarget(input as ITtlTarget), state.orgId, state)
               return row?.expires_at == null
                 ? undefined
                 : Math.max(0, Number(row.expires_at) - Date.now())
@@ -2891,7 +2880,7 @@ export function createSqliteStore<TValue>(
       controller.assertLive()
       const captured = captureTtlTarget(target)
       return rootRead(SqliteOperation.ttlRemaining, captured, ctx, (orgId, input) => {
-        const row = expiration(captureTtlTarget(input as ITtlTarget), orgId, undefined, true)
+        const row = expiration(captureTtlTarget(input as ITtlTarget), orgId)
         return row?.expires_at == null
           ? undefined
           : Math.max(0, Number(row.expires_at) - Date.now())

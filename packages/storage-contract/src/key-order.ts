@@ -180,6 +180,86 @@ export function decodeOrderedStorageKey(
   if (offset !== encoded.byteLength) invalid()
   return snapshotStorageKey(key, backend)
 }
+
+/** Encode the original organization envelope without charging it to the logical key's budget. */
+export function encodeStorageOrgKey(
+  orgId: string,
+  key: IStorageKey,
+  backend: IBackendKind | undefined
+): Uint8Array {
+  return encodeKeySnapshot(prefixStorageOrgKey(orgId, key, backend), false)
+}
+
+/** The same writer supplies the original fixed marker and UUID header for native ranges. */
+function storageOrgKeyHeader(orgId: string, backend: IBackendKind | undefined): Uint8Array {
+  /** Known empty logical content identifies only the original envelope boundary. */
+  const emptyEnvelope = encodeStorageOrgKey(orgId, '', backend)
+  return emptyEnvelope.subarray(0, emptyEnvelope.byteLength - measureKey('') - 1)
+}
+
+/** A shortest strict successor bounds a canonical byte prefix without another ordering format. */
+function strictByteSuccessor(encoded: Uint8Array): Uint8Array {
+  /** Every caller supplies a nonempty canonical type-tagged prefix, so a successor exists. */
+  let end = encoded.length
+  while (end > 0 && encoded[end - 1] === 255) end--
+  /** Discard saturated suffix bytes before incrementing the last representable component. */
+  const upper = encoded.slice(0, end)
+  upper[end - 1]++
+  return upper
+}
+
+/** Project one organization's native half-open byte range using the original logical prefix owner. */
+export function snapshotStorageOrgKeyPrefix(
+  orgId: string,
+  prefix: IStorageKey | undefined,
+  backend: IBackendKind | undefined
+): Pick<IStorageKeyPrefix, 'lower' | 'upper'> {
+  /** The original fixed organization envelope is outside logical key limits. */
+  const header = storageOrgKeyHeader(orgId, backend)
+  if (prefix === undefined)
+    return Object.freeze({ lower: header.slice(), upper: strictByteSuccessor(header) })
+  /** Typed bounds and their complete-child prefix semantics belong to the original key owner. */
+  const logical = snapshotStorageKeyPrefix(prefix, backend)
+  /** Copy each detached bound after the fixed header without inspecting logical tags. */
+  const join = (bytes: Uint8Array): Uint8Array => {
+    /** One allocation retains exactly this bound and its organization. */
+    const result = new Uint8Array(header.byteLength + bytes.byteLength)
+    result.set(header)
+    result.set(bytes, header.byteLength)
+    return result
+  }
+  return Object.freeze({ lower: join(logical.lower), upper: join(logical.upper) })
+}
+
+/**
+ * Check the original envelope's canonical bytes, then give only its logical component to the
+ * original bounded reader. No second key format or parser is introduced.
+ */
+export function decodeStorageOrgKey(
+  orgId: string,
+  encoded: Uint8Array,
+  backend: IBackendKind | undefined
+): IStorageKey {
+  /** The original writer supplies the exact marker and UUID header without duplicating its tags. */
+  const header = storageOrgKeyHeader(orgId, backend)
+  /** Invalid/foreign envelope boundaries keep the original organization error family. */
+  const invalid = (): never => {
+    throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
+      backend,
+      cause: new TypeError(StorageContractErrorText.orgKeyEnvelope)
+    })
+  }
+  if (
+    !isUint8Array(encoded) ||
+    encoded.byteLength <= header.byteLength + 1 ||
+    encoded[encoded.byteLength - 1] !== 0
+  )
+    invalid()
+  for (let index = 0; index < header.byteLength; index++)
+    if (encoded[index] !== header[index]) invalid()
+  return decodeOrderedStorageKey(encoded.subarray(header.byteLength, -1), backend)
+}
+
 /** Converts already canonical bytes without another logical-key traversal or representation. */
 export function storageKeyBytesIdentity(encoded: Uint8Array): string {
   return Array.from(encoded, (byte) => byte.toString(16).padStart(2, '0')).join('')
@@ -292,11 +372,7 @@ export function snapshotStorageKeyPrefix(
   /** The original writer deliberately omits only the root variable terminator, never a child end. */
   const encoded = encodeKeySnapshot(key, true)
   /** A shortest strict byte successor bounds every encoding that begins with this typed prefix. */
-  let end = encoded.length
-  while (end > 0 && encoded[end - 1] === 255) end--
-  /** The canonical non-255 type tag guarantees a finite strict successor for every valid key. */
-  const upper = encoded.slice(0, end)
-  upper[end - 1]++
+  const upper = strictByteSuccessor(encoded)
   return Object.freeze({
     key,
     lower: encoded.slice(),

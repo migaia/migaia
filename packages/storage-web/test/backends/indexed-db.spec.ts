@@ -14,7 +14,6 @@ import {
   RecordIndexBackfillPhase,
   type IRecordIndexBackfillStore
 } from '@migaia/storage-host/entity'
-import * as entityOwner from '@migaia/storage-host/entity'
 import type { IKeyValueStore } from '@migaia/storage-contract'
 import { createStorageHost, STORAGE_HOST_SOURCE } from '@migaia/storage-host'
 import { indexedDbBackendPlugin } from '../../src/indexed-db.js'
@@ -22,7 +21,10 @@ import { STORAGE_WEB_SOURCE } from '../../src/index.js'
 import { walkErrorCauses } from '@migaia/utils/error'
 import { encodeFlatStorageKey } from '@migaia/storage-host/authoring/backend'
 import { captureOperationCleanup } from '../helpers/operation-reporter.js'
-import { createIndexedDbTestStore } from '../helpers/installed-backends.js'
+import {
+  createIndexedDbTestStore,
+  createIndexedDbBackfillTestStore
+} from '../helpers/installed-backends.js'
 
 /** Public installation keeps the original native failure reachable below its host/plugin wrappers. */
 const expectNativeInstallationFailure = async (
@@ -50,29 +52,13 @@ const freshDb = () =>
     dbName: `test-${Math.random().toString(36).slice(2)}`
   })
 /** Capture the actual provider during the same real plugin installation, without a lookup registry. */
-const createBackfillDb = async (
+const createBackfillDb = (
   options: Parameters<typeof createIndexedDbTestStore>[0] = {
     factory: freshFactory(),
     keyRange: IDBKeyRange,
-    dbName: `test-${Math.random().toString(36).slice(2)}`
+    dbName: `test-1o8ee6u6sqp`
   }
-) => {
-  const register = entityOwner.registerRecordIndexBackfillStore
-  let capability: IRecordIndexBackfillStore<unknown> | undefined
-  const capture = vi
-    .spyOn(entityOwner, 'registerRecordIndexBackfillStore')
-    .mockImplementation((store, provider) => {
-      register(store, provider)
-      capability = provider
-    })
-  try {
-    const store = await createIndexedDbTestStore(options)
-    if (capability === undefined) throw new Error('native backfill provider was not registered')
-    return { store, capability }
-  } finally {
-    capture.mockRestore()
-  }
-}
+) => createIndexedDbBackfillTestStore(options)
 
 /** Native key fixtures derive canonical identity through the same actual public repository. */
 const entityRecordKey = (store: IKeyValueStore, scope: string, id: IStorageKey): IStorageKey =>

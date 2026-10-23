@@ -138,8 +138,10 @@ const createMixedLegacyStore = async (dbName: string, keys: readonly IDBValidKey
     handles.map((handle) => preflightStore.getRecordIndexReadiness(handle))
   )
   await preflightStore.dispose()
+  /** Add legacy data after whatever fixed native layout the installation actually prepared. */
+  const version = (await factory.databases()).find((database) => database.name === dbName)!.version!
   await new Promise<void>((resolve, reject) => {
-    const request = factory.open(dbName, 2)
+    const request = factory.open(dbName, version + 1)
     request.onupgradeneeded = () => {
       const legacy = request.result.createObjectStore('documents')
       keys.forEach((key, index) => legacy.put({ __v: 1, data: { id: index } }, key))

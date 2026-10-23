@@ -9,12 +9,14 @@ import {
   ttl,
   counter,
   records,
+  sql,
   sqlFragment,
   lockKey,
   ConcurrencyPolicy,
   compareStorageKeys,
   type IStorageKey
 } from '@migaia/storage-contract'
+import { runConformance } from '@migaia/storage-contract/conformance'
 import { sqliteBackendPlugin, type ISqliteValue } from '../src/index.js'
 import { nodeSqliteDriver } from '../src/node.js'
 
@@ -59,6 +61,27 @@ async function installed(options: { wal?: boolean; memory?: boolean; native?: st
   })
   return { store: host.backend('sqlite'), host, connection, path }
 }
+
+/** Each selected standard group receives a fresh actual native database and original owner. */
+runConformance(
+  { describe, it, expect },
+  {
+    name: 'native SQLite standard capabilities',
+    capabilities: [kv, records, sql, ttl, counter],
+    features: {
+      syncRead: true,
+      binary: true,
+      records: true,
+      transactions: true,
+      iteration: true,
+      secondaryIndexes: false,
+      changeFeed: false,
+      maxValueBytes: undefined,
+      opaqueEntries: false
+    },
+    create: async () => (await installed({ memory: true })).store
+  }
+)
 
 describe('native SQLite installation', () => {
   it('keeps native TTL with values, reclaims expiry, and rolls back the same three channels', async () => {
@@ -227,6 +250,49 @@ describe('native SQLite installation', () => {
     ).rejects.toMatchObject({ code: 'WRITE_CONFLICT' })
     expect(await store.getBytes('observed-bytes')).toBeNull()
     expect(await store.getRecord('observed-record')).toBeUndefined()
+  })
+
+  it('keeps observed deadlines through native TTL writes until the original commit conflict', async () => {
+    /** Every supported target shares the same real native snapshot and deterministic local clock. */
+    let now = Date.now()
+    const clock = vi.spyOn(Date, 'now').mockImplementation(() => now)
+    onTestFinished(() => clock.mockRestore())
+    const { store } = await installed({ memory: true })
+    for (const channel of ['text', 'bytes', 'record'] as const) {
+      for (const action of ['persist', 'extend'] as const) {
+        const key = `${channel}-${action}`
+        const target =
+          channel === 'text'
+            ? lockKey.text(key)
+            : channel === 'bytes'
+              ? lockKey.bytes(key)
+              : lockKey.record(key)
+        if (channel === 'text') await store.set(key, 'old')
+        else if (channel === 'bytes') await store.setBytes(key, new Uint8Array([7]))
+        else await store.putRecord({ value: 'old' }, key)
+        await store.use(ttl).expire(target, 5)
+        await expect(
+          store.transaction(
+            async (scope) => {
+              if (channel === 'text') expect(await scope.get(key)).toBe('old')
+              else if (channel === 'bytes')
+                expect(await scope.getBytes(key)).toEqual(new Uint8Array([7]))
+              else expect(await scope.getRecord(key)).toEqual({ value: 'old' })
+              now += 5
+              expect(
+                action === 'persist'
+                  ? await scope.use(ttl).persist(target)
+                  : await scope.use(ttl).expire(target, 50)
+              ).toBe(true)
+              await scope.set('rollback-ttl-write', 'never')
+            },
+            { concurrency: ConcurrencyPolicy.optimistic({ retries: 0 }) }
+          )
+        ).rejects.toMatchObject({ code: 'WRITE_CONFLICT' })
+        expect(await store.get('rollback-ttl-write')).toBeNull()
+        expect(await store.use(ttl).remaining(target)).toBeUndefined()
+      }
+    }
   })
 
   it('skips unobserved expired iterator positions and counts only returned native rows', async () => {

@@ -50,3 +50,5 @@ Standard RDF accepts ground named subjects/predicates, named or literal objects,
 See [USEGUIDE.en.md](./USEGUIDE.en.md) for HTTP deployment requirements, transactions, query writes, Graph Store, ontology, costs and marker cleanup.
 
 Transaction callback, draft or finalizer business failures use `TRANSACTION_FAILED`, preserving the original native type and primary cause; they do not report endpoint unavailability. Existing contract and native protocol errors retain their identities.
+
+Without `expect`, writes retain canonical quad set semantics. Concurrent read-modify-write transactions inserting different objects can retain both new quads; predicate values do not have a last-writer guarantee. Use `expect` to validate the quads read before changing them.

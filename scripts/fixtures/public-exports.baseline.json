@@ -1072,12 +1072,14 @@
         "createTransactionOwner",
         "createVectorQuery",
         "decodeOrderedStorageKey",
+        "decodeStorageOrgKey",
         "defineConcurrencyPolicy",
         "defineStorageCapability",
         "deriveStorageSqlQuery",
         "deriveTransactionIterator",
         "durableChangeFeed",
         "encodeOrderedStorageKey",
+        "encodeStorageOrgKey",
         "encodeStorageOrgStringPrefix",
         "encodeStorageRdfQuad",
         "encodeStorageRdfTerm",
@@ -1128,6 +1130,7 @@
         "snapshotStorageCounterIncrement",
         "snapshotStorageKey",
         "snapshotStorageKeyPrefix",
+        "snapshotStorageOrgKeyPrefix",
         "snapshotStorageRdfPattern",
         "snapshotStorageRdfQuad",
         "snapshotStorageRdfTerm",
@@ -1822,6 +1825,12 @@
       "./features/recommend": ["qdrantRecommendFeature"],
       "./features/group-by": ["qdrantGroupByFeature"],
       "./features/management": ["qdrantManagementFeature"]
+    },
+    "@migaia/storage-plugin-redis": {
+      ".": ["ERROR_SOURCE", "RedisErrorCode"],
+      "./ioredis": ["ioredisDriver"],
+      "./node-redis": ["nodeRedisDriver"],
+      "./bun": ["bunRedisDriver"]
     },
     "@migaia/storage-plugin-sparql": {
       ".": ["ERROR_SOURCE", "SparqlErrorCode", "sparqlBackendKind", "sparqlBackendPlugin"],

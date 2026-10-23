@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import {
   createStorageHost,
   createOrgId,
@@ -14,6 +14,7 @@ import { qdrantHybridFeature } from '../src/features/hybrid.js'
 import { qdrantRecommendFeature } from '../src/features/recommend.js'
 import { qdrantGroupByFeature } from '../src/features/group-by.js'
 import { nativeHttp } from '../src/native.js'
+import { QdrantManagedVectorName } from '../src/constants.js'
 import type { IQdrantHttp } from '../src/types.js'
 /** Real service addresses come exclusively from the shared fixture launcher. */
 const url = process.env.MIGAIA_QDRANT_URL
@@ -21,10 +22,12 @@ const url = process.env.MIGAIA_QDRANT_URL
 function native() {
   const original = fetchHttp(url!),
     created: string[] = [],
-    calls: string[] = []
+    calls: string[] = [],
+    requests: { operation: string; args: readonly unknown[] }[] = []
   const http = nativeHttp(
     async (operation, args, ctx): Promise<Awaited<ReturnType<IQdrantHttp[typeof operation]>>> => {
       calls.push(operation)
+      requests.push({ operation, args })
       const result = await Reflect.apply(original[operation], original, [...args, ctx])
       if (operation === 'createCollection') created.push(args[0] as string)
       return result as Awaited<ReturnType<IQdrantHttp[typeof operation]>>
@@ -38,12 +41,240 @@ function native() {
     http,
     created,
     calls,
+    requests,
     close: async () => {
       for (const name of created) await original.deleteCollection(name)
     }
   }
 }
 describe('real native vector backend', () => {
+  it.skipIf(!url)(
+    'detects required standard methods and rejects missing optional native methods only on use',
+    async () => {
+      const fixture = native(),
+        http = { ...fixture.http }
+      Reflect.deleteProperty(http, 'createSnapshot')
+      const host = await createStorageHost({
+          plugins: [
+            qdrantBackendPlugin(
+              { url: url!, collectionPrefix: crypto.randomUUID(), http },
+              { management: qdrantManagementFeature() }
+            )
+          ] as const
+        }),
+        store = host.backend('qdrant')
+      try {
+        const collection = store.use(vector).collection('valid', { dimensions: 1, metric: 'dot' })
+        await collection.upsert([{ id: 'one', vector: [1] }])
+        const before = fixture.calls.length
+        await expect(async () =>
+          store.api.qdrantManagement!.createSnapshot(fixture.created[0]!, { wait: true })
+        ).rejects.toMatchObject({ code: 'UNSUPPORTED_CAPABILITY' })
+        expect(fixture.calls).toHaveLength(before)
+      } finally {
+        await host.dispose()
+        await fixture.close()
+      }
+    },
+    30_000
+  )
+  it.skipIf(!url)(
+    'retains native precount divergence and the actual multi-page scroll collection boundary',
+    async () => {
+      const fixture = native()
+      let afterCount: (() => Promise<void>) | undefined,
+        afterFirstPage: (() => Promise<void>) | undefined,
+        beforeDelete: (() => Promise<void>) | undefined
+      const http: IQdrantHttp = {
+          ...fixture.http,
+          async count(...args) {
+            const result = await fixture.http.count(...args),
+              work = afterCount
+            afterCount = undefined
+            await work?.()
+            return result
+          },
+          async scroll(...args) {
+            const result = await fixture.http.scroll(...args),
+              work = afterFirstPage
+            afterFirstPage = undefined
+            await work?.()
+            return result
+          },
+          async delete(...args) {
+            const work = beforeDelete
+            beforeDelete = undefined
+            await work?.()
+            return fixture.http.delete(...args)
+          }
+        },
+        host = await createStorageHost({
+          plugins: [
+            qdrantBackendPlugin({ url: url!, collectionPrefix: crypto.randomUUID(), http })
+          ] as const
+        }),
+        store = host.backend('qdrant'),
+        collection = store
+          .use(vector)
+          .collection<{ tag: string }>('boundary', { dimensions: 1, metric: 'dot' })
+      try {
+        await collection.upsert([{ id: 'pre-1', vector: [1], payload: { tag: 'pre' } }])
+        afterCount = () =>
+          collection.upsert([{ id: 'pre-2', vector: [1], payload: { tag: 'pre' } }])
+        expect(await collection.deleteWhere({ tag: 'pre' })).toBe(1)
+        expect(await collection.near([1]).where({ tag: 'pre' }).topK(10).all()).toEqual([])
+        const initial = Array.from({ length: 300 }, (_, index) => ({
+          id: `page-${index}`,
+          vector: [1],
+          payload: { tag: 'match' }
+        }))
+        await collection.upsert(initial)
+        const nativeRequest = fixture.requests
+            .filter((request) => request.operation === 'upsert')
+            .at(-1)!.args[1] as Parameters<IQdrantHttp['upsert']>[1],
+          points = 'points' in nativeRequest ? nativeRequest.points : [],
+          ordered = points
+            .map((point, index) => ({ physical: String(point.id), logical: initial[index]!.id }))
+            .sort((a, b) => (a.physical < b.physical ? -1 : 1)),
+          low = ordered[0]!.logical,
+          high = ordered.at(-1)!.logical,
+          changed = ordered[1]!.logical
+        await collection.delete([low, high])
+        await store.use(ttl).expire(lockKey.vector('boundary', ordered[2]!.logical), 0)
+        afterFirstPage = () =>
+          collection.upsert([
+            { id: low, vector: [1], payload: { tag: 'match' } },
+            { id: high, vector: [1], payload: { tag: 'match' } },
+            { id: changed, vector: [1], payload: { tag: 'other' } }
+          ])
+        beforeDelete = () =>
+          collection.upsert([{ id: 'after-collection', vector: [1], payload: { tag: 'match' } }])
+        const before = fixture.requests.length
+        expect(
+          await collection.deleteWhere(
+            { tag: { startsWith: 'mat' } },
+            { count: DeleteCountMode.scroll }
+          )
+        ).toBe(299)
+        const pages = fixture.requests
+          .slice(before)
+          .filter((request) => request.operation === 'scroll')
+        expect(pages).toHaveLength(2)
+        expect(JSON.stringify(pages.map((request) => request.args))).not.toContain('$expiresAt')
+        expect(
+          (await collection.near([1], { exact: true }).topK(10).all()).map((hit) => hit.id).sort()
+        ).toEqual([low, 'after-collection'].sort())
+        expect(await collection.near([1]).where({ tag: 'other' }).topK(10).all()).toEqual([])
+      } finally {
+        await host.dispose()
+        await fixture.close()
+      }
+    },
+    30_000
+  )
+  it.skipIf(!url)(
+    'uses one client clock for expiry retention and tenant-only native purge records',
+    async () => {
+      const fixture = native(),
+        org = createOrgId(),
+        other = createOrgId(),
+        host = await createStorageHost({
+          org,
+          plugins: [
+            qdrantBackendPlugin(
+              { url: url!, collectionPrefix: crypto.randomUUID(), http: fixture.http },
+              { management: qdrantManagementFeature() }
+            )
+          ] as const
+        }),
+        store = host.backend('qdrant'),
+        collection = store.use(vector).collection('clock', { dimensions: 1, metric: 'dot' }),
+        peer = host.org(other).backend('qdrant'),
+        otherCollection = peer.use(vector).collection('clock'),
+        now = Date.now(),
+        clock = vi.spyOn(Date, 'now').mockReturnValue(now)
+      try {
+        await collection.upsert([{ id: 'future', vector: [1] }], { ttlMs: 3_000 })
+        await collection.upsert([{ id: 'past', vector: [2] }], { ttlMs: 0 })
+        await otherCollection.upsert([{ id: 'past', vector: [3] }], { ttlMs: 0 })
+        clock.mockReturnValue(now + 500)
+        await collection.upsert([
+          { id: 'future', vector: [4] },
+          { id: 'unlimited', vector: [5] }
+        ])
+        expect(await store.use(ttl).remaining(lockKey.vector('clock', 'future'))).toBe(2_500)
+        expect(await store.use(ttl).remaining(lockKey.vector('clock', 'unlimited'))).toBeUndefined()
+        const written = fixture.requests.filter((request) => request.operation === 'upsert'),
+          request = written[3]!.args[1] as Parameters<IQdrantHttp['upsert']>[1],
+          points = 'points' in request ? request.points : []
+        expect(points).toHaveLength(2)
+        expect(points[0]!.payload?.$expiresAt).toBe(new Date(now + 3_000).toISOString())
+        expect(points[1]!.payload).not.toHaveProperty('$expiresAt')
+        const before = fixture.requests.length
+        expect(await store.api.qdrantManagement!.purgeExpired('clock')).toMatchObject({
+          status: 'completed',
+          operationId: expect.any(Number)
+        })
+        expect(fixture.requests.slice(before).map((request) => request.operation)).toEqual([
+          'delete'
+        ])
+        const removal = fixture.requests[before]!.args[1] as Parameters<IQdrantHttp['delete']>[1]
+        expect(removal).toEqual({
+          filter: {
+            must: [
+              { key: '"$org"', match: { value: org } },
+              {
+                must: [{ key: '"$expiresAt"', range: { lt: new Date(now + 500).toISOString() } }]
+              }
+            ]
+          },
+          wait: true
+        })
+        expect(await collection.search([1], { k: 10, exact: true })).toHaveLength(2)
+        expect(
+          await peer.api.qdrantManagement!.purgeExpired('clock', { wait: false })
+        ).toMatchObject({
+          status: 'acknowledged'
+        })
+        expect(await store.api.qdrantManagement!.purgeExpired('clock')).toMatchObject({
+          status: 'completed'
+        })
+        clock.mockReturnValue(now - 1_000)
+        expect(await store.use(ttl).remaining(lockKey.vector('clock', 'future'))).toBe(4_000)
+        clock.mockReturnValue(now + 4_000)
+        expect(await collection.search([1], { k: 10, exact: true })).toMatchObject([
+          { id: 'unlimited' }
+        ])
+        await expect(async () =>
+          store.use(ttl).expire({ channel: 'text', key: 'unlimited' }, 0)
+        ).rejects.toMatchObject({ code: 'UNSUPPORTED_CAPABILITY' })
+        await expect(async () =>
+          collection.upsert([{ id: 'invalid', vector: [1], payload: { $expiresAt: 'bad' } }])
+        ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' })
+        const saved = store.api.qdrantManagement!.purgeExpired,
+          primary = store.dispose(),
+          symbolic = store[Symbol.asyncDispose]()
+        expect(store.dispose()).toBe(primary)
+        expect(store[Symbol.asyncDispose]()).toBe(symbolic)
+        expect(symbolic).not.toBe(primary)
+        await primary
+        await symbolic
+        await expect(async () => saved('clock')).rejects.toMatchObject({ code: 'STORE_DISPOSED' })
+        await host.dispose()
+        const disposedCalls = fixture.calls.length
+        await expect(async () => saved('clock')).rejects.toMatchObject({
+          source: '@migaia/plugin-host',
+          code: 'PLUGIN_NOT_INSTALLED'
+        })
+        expect(fixture.calls).toHaveLength(disposedCalls)
+      } finally {
+        clock.mockRestore()
+        await host.dispose()
+        await fixture.close()
+      }
+    },
+    30_000
+  )
   it.skipIf(!url)(
     'keeps native metrics, unnormalized samples, portable payloads, filters and immutable standard chains',
     async () => {
@@ -113,6 +344,32 @@ describe('real native vector backend', () => {
             collection.upsert([{ id: 'bad', vector: [1, Number.NaN], payload }])
           ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' })
         }
+        const recommendation = store
+          .use(vector)
+          .collection('amplitude', { dimensions: 2, metric: 'cosine' })
+        await recommendation.upsert([
+          { id: 'p1', vector: [100, 0] },
+          { id: 'p2', vector: [0, 1] },
+          { id: 'c1', vector: [1, 0] },
+          { id: 'c2', vector: [1, 1] }
+        ])
+        const beforeSamples = fixture.requests.length
+        expect(
+          (
+            await recommendation
+              .recommend({ positive: ['p1', 'p2'] })
+              .topK(1)
+              .withVector()
+              .all()
+          )[0]!.id
+        ).toBe('c1')
+        const requests = fixture.requests.slice(beforeSamples)
+        for (const request of requests.filter((item) => item.operation === 'retrieve'))
+          expect(request.args[1]).toMatchObject({ with_vector: [QdrantManagedVectorName.source] })
+        expect(requests.find((request) => request.operation === 'query')!.args[1]).toMatchObject({
+          using: QdrantManagedVectorName.search,
+          with_vector: [QdrantManagedVectorName.source]
+        })
         const saved = store.use(vector).collection('cosine').near([1, 0]).topK(1)
         await host.dispose()
         await expect(saved.all()).rejects.toMatchObject({ code: 'STORE_DISPOSED' })
@@ -228,9 +485,26 @@ describe('real native vector backend', () => {
         expect(
           await store.api.qdrantManagement!.createCollection(name, {
             vectors: { dense: { size: 2, distance: 'Cosine' } },
-            sparse_vectors: { sparse: {} }
+            sparse_vectors: { sparse: {} },
+            quantization_config: { scalar: { type: 'int8', always_ram: true } }
           })
         ).toBe(true)
+        expect((await fixture.http.getCollection(name)).config.quantization_config).toMatchObject({
+          scalar: { type: 'int8', always_ram: true }
+        })
+        const alias = name + '_current'
+        expect(
+          await store.api.qdrantManagement!.updateCollectionAliases({
+            actions: [{ create_alias: { collection_name: name, alias_name: alias } }]
+          })
+        ).toBe(true)
+        expect((await fixture.http.getCollection(alias)).config.params.vectors).toMatchObject({
+          dense: { size: 2, distance: 'Cosine' }
+        })
+        await store.api.qdrantManagement!.updateCollectionAliases({
+          actions: [{ delete_alias: { alias_name: alias } }]
+        })
+        expect(await store.api.qdrantManagement!.createSnapshot(name, { wait: false })).toBeNull()
         await fixture.http.upsert(name, {
           points: [
             {

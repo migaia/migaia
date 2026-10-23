@@ -9,7 +9,11 @@ import {
   type CompleteMultipartUploadCommandOutput,
   type PutObjectCommandOutput
 } from '@aws-sdk/client-s3'
-import { StorageContractError, type IBlobApi } from '@migaia/storage-contract'
+import {
+  StorageContractError,
+  createStorageBlobBodyReader,
+  type IBlobApi
+} from '@migaia/storage-contract'
 import {
   subscribeToAbort,
   readAbortReason,
@@ -37,18 +41,13 @@ export async function uploadMultipart(
 ): Promise<string> {
   if (isUint8Array(body) && Math.ceil(body.byteLength / partBytes) > ObjectNames.maximumParts)
     throw invalidArgument()
-  const source = isUint8Array(body)
-    ? new ReadableStream<Uint8Array>({
-        start(controller) {
-          controller.enqueue(body)
-          controller.close()
-        }
-      })
-    : body
-  const reader = source.getReader()
+  const reader = createStorageBlobBodyReader(body, {
+    backend: ObjectNames.backend,
+    report,
+    normalizeFailure: normalizeObjectError
+  })
   let chunk: Uint8Array = new Uint8Array(0)
   let offset = 0
-  let ended = false
   let uploadId: string | undefined
   let completed = false
   let failure: unknown
@@ -58,9 +57,8 @@ export async function uploadMultipart(
   const stop = subscribeToAbort(
     options.ctx?.signal,
     () => {
-      void reader
-        .cancel(readAbortReason(options.ctx?.signal))
-        .catch((error) => report(normalizeObjectError(error)))
+      // Symbolic disposal below reports the original cached cleanup failure exactly once.
+      void reader.return?.(readAbortReason(options.ctx?.signal))
     },
     report
   )
@@ -71,20 +69,11 @@ export async function uploadMultipart(
     while (size < partBytes) {
       throwIfAborted(options.ctx?.signal)
       if (offset === chunk.byteLength) {
-        let next: ReadableStreamReadResult<Uint8Array>
-        try {
-          next = await reader.read()
-        } catch (error) {
-          /** Rejected reads are already terminal and must not be cancelled/reported a second time. */
-          ended = true
-          throw error
-        }
+        const next = await reader.next()
         throwIfAborted(options.ctx?.signal)
         if (next.done) {
-          ended = true
           break
         }
-        if (!isUint8Array(next.value)) throw invalidArgument(new TypeError(ObjectErrorText.chunk))
         chunk = next.value
         offset = 0
       }
@@ -151,7 +140,7 @@ export async function uploadMultipart(
           if (!failed) {
             failure = error
             failed = true
-            void reader.cancel(error).catch((cleanup) => report(normalizeObjectError(cleanup)))
+            void reader.return?.(error)
           }
         })
         .finally(() => {
@@ -183,12 +172,8 @@ export async function uploadMultipart(
     return result.ETag as string
   } catch (error) {
     let primary = normalizeObjectError(error)
-    if (!ended)
-      try {
-        await reader.cancel(primary)
-      } catch (cleanup) {
-        report(normalizeObjectError(cleanup))
-      }
+    void reader.return?.(primary)
+    await reader[Symbol.asyncDispose]()
     await Promise.all(jobs)
     if (uploadId && !completed)
       try {
@@ -217,6 +202,6 @@ export async function uploadMultipart(
     throw primary
   } finally {
     stop()
-    reader.releaseLock()
+    await reader[Symbol.asyncDispose]()
   }
 }

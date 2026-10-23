@@ -10,8 +10,6 @@ export const ObjectErrorText = {
   argument: 'object driver options are invalid',
   /** One real directory permits only one active object writer in this process. */
   rootOccupied: 'object filesystem root already has an active writer',
-  /** The caller must keep every input chunk inside the shared byte domain. */
-  chunk: 'object upload stream must contain Uint8Array chunks',
   /** Only active store resources admit new operations. */
   disposed: 'object store is disposed',
   /** An opaque page belongs to one backend, organization and prefix. */

@@ -234,10 +234,10 @@ const orgByteOrderCase: ICaseDoc = {
     'Backends need ordered object pages without a second organization codec or sorting rule.',
     '后端需要有序对象页，不能复制组织 codec 或排序规则。'
   ),
-  example: `import { prefixStorageOrgKey, encodeStorageOrgStringPrefix, encodeOrderedStorageKey, orderStorageKeysByBytes } from '@migaia/storage-contract'
+  example: `import { encodeStorageOrgKey, encodeStorageOrgStringPrefix, orderStorageKeysByBytes } from '@migaia/storage-contract'
 const org = '12345678-1234-1234-1234-123456789abc'
 const prefix = encodeStorageOrgStringPrefix(org, 'user/', 'memory')
-const ordered = orderStorageKeysByBytes(['user/z', 'user/a'], key => encodeOrderedStorageKey(prefixStorageOrgKey(org, key), 'memory'))`,
+const ordered = orderStorageKeysByBytes(['user/z', 'user/a'], key => encodeStorageOrgKey(org, key, 'memory'))`,
   result: t(
     'ordered is user/a then user/z. The byte prefix matches only string keys under user/ in the exact organization.',
     'ordered 为 user/a 后 user/z；字节前缀只匹配精确组织内 user/ 下的 string key。'
@@ -353,8 +353,8 @@ export function verifyKvBackend(
   runConformance(harness, { name: 'my-backend', create, capabilities: [kv], features })
 }`,
       result: t(
-        'The consumer runner executes the registered cases. Each creates a fresh fixture, verifies the complete manifest, and finally disposes that store; extra declared tokens belong in capabilities.',
-        '消费者 runner 执行登记的用例。每例新建 fixture、核对完整清单并 finally 释放 store；其它已声明 token 也必须列入 capabilities。'
+        'The consumer runner executes the registered cases. Each creates a fresh fixture, verifies the complete manifest, and finally disposes that store; extra declared tokens belong in capabilities. Optional native index preparation still requires complete readiness and real index behavior; an original native key projection keeps fixture ids in their canonical record domain.',
+        '消费者 runner 执行登记的用例。每例新建 fixture、核对完整清单并 finally 释放 store；其它已声明 token 也必须列入 capabilities；可选原生索引准备仍须 complete 就绪与真实索引行为，原生键投影让fixture id保留规范record域。'
       )
     }
   ],
@@ -1282,6 +1282,59 @@ console.log(migrateEnvelopeSync(plan, { version: 0, state: 'old' })) // { previo
       result: t(
         'The complete example prints MIGRATION_GAP, VERSION_UNSUPPORTED and MIGRATION_FAILED true. No storage writes occur; current-version state identity is preserved.',
         '完整示例依次输出 MIGRATION_GAP、VERSION_UNSUPPORTED 与 MIGRATION_FAILED true。不会写存储；同版状态保留原引用。'
+      )
+    }
+  ],
+  snapshotStorageOrgKeyPrefix: [
+    {
+      title: t('Bound a native organization range', '限定原生组织范围'),
+      problem: t(
+        'Reuse complete typed-key limits without a second tenant codec.',
+        '保完整typed键限制，不加第二组织codec。'
+      ),
+      example: `import { snapshotStorageOrgKeyPrefix, encodeStorageOrgKey, orderStorageKeysByBytes } from '@migaia/storage-contract'
+const org = '11111111-1111-1111-1111-111111111111'
+const bounds = snapshotStorageOrgKeyPrefix(org, 'order/', 'redis')
+const key = encodeStorageOrgKey(org, 'order/1', 'redis')
+const sorted = orderStorageKeysByBytes([bounds.lower, key, bounds.upper], value => value)
+console.log(sorted[1] === key)`,
+      result: t(
+        'Prints true. Undefined prefix selects all logical key types in this organization.',
+        '输出true；undefined前缀选择该组织内全部逻辑键类型。'
+      )
+    }
+  ],
+  encodeStorageOrgKey: [
+    {
+      title: t('Preserve the complete logical key budget', '保留完整逻辑键预算'),
+      problem: t(
+        'Native organization envelopes must not shrink supported key depth or nodes.',
+        '原生组织封装不能缩小支持的逻辑键深度或节点数。'
+      ),
+      example: t(
+        "import { encodeStorageOrgKey, decodeStorageOrgKey, compareStorageKeys } from '@migaia/storage-contract'\nconst orgId = '11111111-1111-1111-1111-111111111111'\nconst logical = ['orders', new Date(0)] as const\nconst encoded = encodeStorageOrgKey(orgId, logical, 'redis')\nconsole.log(compareStorageKeys(decodeStorageOrgKey(orgId, encoded, 'redis'), logical))",
+        "import { encodeStorageOrgKey, decodeStorageOrgKey, compareStorageKeys } from '@migaia/storage-contract'\nconst orgId = '11111111-1111-1111-1111-111111111111'\nconst logical = ['orders', new Date(0)] as const\nconst encoded = encodeStorageOrgKey(orgId, logical, 'redis')\nconsole.log(compareStorageKeys(decodeStorageOrgKey(orgId, encoded, 'redis'), logical))"
+      ),
+      result: t(
+        'Prints 0; physical bytes use the original ordered format.',
+        '输出0，物理字节沿原保序格式。'
+      )
+    }
+  ],
+  decodeStorageOrgKey: [
+    {
+      title: t('Decode only the requested organization', '只解码请求的组织'),
+      problem: t(
+        'Return a detached logical key without admitting a foreign organization.',
+        '返回独立逻辑键，不准入其它组织。'
+      ),
+      example: t(
+        "import { encodeStorageOrgKey, decodeStorageOrgKey, compareStorageKeys } from '@migaia/storage-contract'\nconst orgId = '11111111-1111-1111-1111-111111111111'\nconst logical = ['orders', new Date(0)] as const\nconst encoded = encodeStorageOrgKey(orgId, logical, 'redis')\nconsole.log(compareStorageKeys(decodeStorageOrgKey(orgId, encoded, 'redis'), logical))",
+        "import { encodeStorageOrgKey, decodeStorageOrgKey, compareStorageKeys } from '@migaia/storage-contract'\nconst orgId = '11111111-1111-1111-1111-111111111111'\nconst logical = ['orders', new Date(0)] as const\nconst encoded = encodeStorageOrgKey(orgId, logical, 'redis')\nconsole.log(compareStorageKeys(decodeStorageOrgKey(orgId, encoded, 'redis'), logical))"
+      ),
+      result: t(
+        'Prints 0; foreign boundaries reject with INVALID_ARGUMENT.',
+        '输出0，其它组织的封装边界以INVALID_ARGUMENT拒绝。'
       )
     }
   ],

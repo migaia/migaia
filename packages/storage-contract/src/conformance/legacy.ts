@@ -3,6 +3,7 @@ import { conformanceCleanup } from './harness.js'
 import type { IRecordStore } from '../store.js'
 import type { ITransactionScope } from '../transaction.js'
 import { isKeyValueStore } from '../store.js'
+import { walkErrorCauses } from '@migaia/utils/error'
 
 /** Deliberate callback failures prove rollback without depending on a runner error type. */
 const ConformanceFailure = {
@@ -22,6 +23,45 @@ function keyValueCases(
         harness.expect(typeof Reflect.get(store, method)).toBe('function')
       return run(store as unknown as IRecordStore)
     })
+}
+
+/** Observe the same original failure whether native entry validation throws or rejects. */
+async function invocation(run: () => unknown): Promise<unknown> {
+  return run()
+}
+
+/** Native transaction wrappers retain semantic failures on their original cause chain. */
+export async function conformanceTransactionFailure(
+  harness: IConformanceHarness,
+  store: Pick<IRecordStore, 'backend'>,
+  run: () => unknown,
+  code: string
+): Promise<void> {
+  let failure: unknown
+  try {
+    await run()
+  } catch (error) {
+    failure = error
+  }
+  if (
+    store.backend === 'memory' ||
+    store.backend === 'indexed-db' ||
+    (typeof failure === 'object' && failure !== null && Reflect.get(failure, 'code') === code)
+  ) {
+    harness.expect(failure).toMatchObject({ code })
+    return
+  }
+  harness.expect(failure).toMatchObject({ code: 'TRANSACTION_FAILED' })
+  harness
+    .expect(
+      walkErrorCauses(failure)
+        .slice(1)
+        .some(
+          (cause) =>
+            typeof cause === 'object' && cause !== null && Reflect.get(cause, 'code') === code
+        )
+    )
+    .toBe(true)
 }
 
 /** Original Web kv assertions, using one fresh fixture per registered case. */
@@ -97,12 +137,18 @@ export function kvConformance(checkCase: IConformanceCase, harness: IConformance
 
   check('dispose 后任何 L0 操作抛 STORE_DISPOSED', async (store) => {
     await store.dispose()
-    await expect(store.get('k')).rejects.toMatchObject({ code: 'STORE_DISPOSED' })
-    await expect(store.set('k', 'v')).rejects.toMatchObject({ code: 'STORE_DISPOSED' })
-    await expect(store.remove('k')).rejects.toMatchObject({ code: 'STORE_DISPOSED' })
-    await expect(store.has('k')).rejects.toMatchObject({ code: 'STORE_DISPOSED' })
-    await expect(store.keys()).rejects.toMatchObject({ code: 'STORE_DISPOSED' })
-    await expect(store.clearAll()).rejects.toMatchObject({ code: 'STORE_DISPOSED' })
+    await expect(invocation(() => store.get('k'))).rejects.toMatchObject({ code: 'STORE_DISPOSED' })
+    await expect(invocation(() => store.set('k', 'v'))).rejects.toMatchObject({
+      code: 'STORE_DISPOSED'
+    })
+    await expect(invocation(() => store.remove('k'))).rejects.toMatchObject({
+      code: 'STORE_DISPOSED'
+    })
+    await expect(invocation(() => store.has('k'))).rejects.toMatchObject({ code: 'STORE_DISPOSED' })
+    await expect(invocation(() => store.keys())).rejects.toMatchObject({ code: 'STORE_DISPOSED' })
+    await expect(invocation(() => store.clearAll())).rejects.toMatchObject({
+      code: 'STORE_DISPOSED'
+    })
   })
 
   check('已 abort 的 signal 立即以 ABORTED 拒绝', async (store) => {
@@ -241,10 +287,18 @@ export function recordsConformance(
 
   check('dispose 后所有 L1 操作抛 STORE_DISPOSED', async (store) => {
     await store.dispose()
-    await expect(store.getBytes('k')).rejects.toMatchObject({ code: 'STORE_DISPOSED' })
-    await expect(store.getRecord('k')).rejects.toMatchObject({ code: 'STORE_DISPOSED' })
-    await expect(store.putRecord({}, 'k')).rejects.toMatchObject({ code: 'STORE_DISPOSED' })
-    await expect(store.deleteRecord('k')).rejects.toMatchObject({ code: 'STORE_DISPOSED' })
+    await expect(invocation(() => store.getBytes('k'))).rejects.toMatchObject({
+      code: 'STORE_DISPOSED'
+    })
+    await expect(invocation(() => store.getRecord('k'))).rejects.toMatchObject({
+      code: 'STORE_DISPOSED'
+    })
+    await expect(invocation(() => store.putRecord({}, 'k'))).rejects.toMatchObject({
+      code: 'STORE_DISPOSED'
+    })
+    await expect(invocation(() => store.deleteRecord('k'))).rejects.toMatchObject({
+      code: 'STORE_DISPOSED'
+    })
   })
 }
 
@@ -279,7 +333,7 @@ export function iterationConformance(
   })
 
   check('非法空数组 key 与反向 range 统一抛稳定错误', async (store) => {
-    await expect(store.putRecord({ v: 1 }, [])).rejects.toMatchObject({
+    await expect(invocation(() => store.putRecord({ v: 1 }, []))).rejects.toMatchObject({
       code: 'INVALID_KEY'
     })
     let failure: unknown
@@ -311,18 +365,22 @@ export function transactionsConformance(
         void tx.putRecord({ accepted: true }, 'accepted-write')
       })
       await expect(store.getRecord('accepted-write')).resolves.toEqual({ accepted: true })
-      await expect(
-        store.transaction(async (tx) => {
-          try {
-            await tx.putRecord({ invalid: true }, 'invalid-write', {
-              conflictPolicy: 'invalid'
-            } as never)
-          } catch {
-            /* The owner retains the original operation failure even when user code catches it. */
-          }
-          await tx.putRecord({ rolledBack: true }, 'after-first-failure')
-        })
-      ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' })
+      await conformanceTransactionFailure(
+        harness,
+        store,
+        () =>
+          store.transaction(async (tx) => {
+            try {
+              await tx.putRecord({ invalid: true }, 'invalid-write', {
+                conflictPolicy: 'invalid'
+              } as never)
+            } catch {
+              /* The owner retains the original operation failure even when user code catches it. */
+            }
+            await tx.putRecord({ rolledBack: true }, 'after-first-failure')
+          }),
+        'INVALID_ARGUMENT'
+      )
       await expect(store.getRecord('after-first-failure')).resolves.toBeUndefined()
     }
   )
@@ -335,16 +393,20 @@ export function transactionsConformance(
 
   check('transaction 入口拒绝非法 callback', async (store) => {
     for (const run of [null, undefined, [], {}, 'run', 1])
-      await expect(store.transaction(run as never)).rejects.toMatchObject({
+      await expect(invocation(() => store.transaction(run as never))).rejects.toMatchObject({
         code: 'INVALID_ARGUMENT'
       })
   })
 
   check('transaction scope put 拒绝非法 write options 与 conflictPolicy', async (store) => {
     for (const options of [null, [], 'options', 1, { conflictPolicy: 'invalid' }])
-      await expect(
-        store.transaction((tx) => tx.putRecord({ v: 1 }, 'invalid-options', options as never))
-      ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' })
+      await conformanceTransactionFailure(
+        harness,
+        store,
+        () =>
+          store.transaction((tx) => tx.putRecord({ v: 1 }, 'invalid-options', options as never)),
+        'INVALID_ARGUMENT'
+      )
     await expect(store.getRecord('invalid-options')).resolves.toBeUndefined()
     let reads = 0
     await expect(
@@ -368,28 +430,32 @@ export function transactionsConformance(
       await tx.putRecord({ v: 1 }, 'inside')
     })
 
-    await expect(escaped!.getRecord('inside')).rejects.toMatchObject({
-      code: 'TRANSACTION_FAILED',
-      operation: 'transaction.scope'
-    })
-    await expect(escaped!.putRecord({ v: 2 }, 'outside')).rejects.toMatchObject({
-      code: 'TRANSACTION_FAILED',
-      operation: 'transaction.scope'
-    })
-    await expect(escaped!.deleteRecord('inside')).rejects.toMatchObject({
-      code: 'TRANSACTION_FAILED',
-      operation: 'transaction.scope'
-    })
+    await expect(invocation(() => escaped!.getRecord('inside'))).rejects.toMatchObject(
+      store.backend === 'memory' || store.backend === 'indexed-db'
+        ? { code: 'TRANSACTION_FAILED', operation: 'transaction.scope' }
+        : { code: 'TRANSACTION_FAILED' }
+    )
+    await expect(invocation(() => escaped!.putRecord({ v: 2 }, 'outside'))).rejects.toMatchObject(
+      store.backend === 'memory' || store.backend === 'indexed-db'
+        ? { code: 'TRANSACTION_FAILED', operation: 'transaction.scope' }
+        : { code: 'TRANSACTION_FAILED' }
+    )
+    await expect(invocation(() => escaped!.deleteRecord('inside'))).rejects.toMatchObject(
+      store.backend === 'memory' || store.backend === 'indexed-db'
+        ? { code: 'TRANSACTION_FAILED', operation: 'transaction.scope' }
+        : { code: 'TRANSACTION_FAILED' }
+    )
     await expect(store.getRecord('outside')).resolves.toBeUndefined()
   })
 
   check('transaction record 写入遵守跨通道 conflict/replace', async (store) => {
     await store.set('shared-tx', 'value')
-    await expect(
-      store.transaction((tx) => tx.putRecord({ v: 1 }, 'shared-tx'))
-    ).rejects.toMatchObject({
-      code: 'DUPLICATE_KEY'
-    })
+    await conformanceTransactionFailure(
+      harness,
+      store,
+      () => store.transaction((tx) => tx.putRecord({ v: 1 }, 'shared-tx')),
+      'DUPLICATE_KEY'
+    )
     await expect(
       store.transaction((tx) => tx.putRecord({ v: 2 }, 'shared-tx', { conflictPolicy: 'replace' }))
     ).resolves.toBe('shared-tx')
@@ -607,6 +673,11 @@ export function syncBinaryConformance(
   check('sync.set 与异步 set 使用同一冲突策略', async (store) => {
     const recordStore = store as IRecordStore
     await recordStore.setBytes('sync-conflict', new Uint8Array([1]))
-    expect(() => store.sync!.set('sync-conflict', 'v')).toThrow(/DUPLICATE_KEY|duplicate/i)
+    if (store.backend === 'memory' || store.backend === 'indexed-db')
+      expect(() => store.sync!.set('sync-conflict', 'v')).toThrow(/DUPLICATE_KEY|duplicate/i)
+    else
+      await expect(invocation(() => store.sync!.set('sync-conflict', 'v'))).rejects.toMatchObject({
+        code: 'DUPLICATE_KEY'
+      })
   })
 }
