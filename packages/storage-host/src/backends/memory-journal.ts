@@ -9,10 +9,22 @@ import {
   type ITransactionScope
 } from '@migaia/storage-contract'
 import type { IStorageJournalNamespace, IStorageJournalNamespaceView } from '../journal/types.js'
+import { StorageError, StorageErrorCode } from '../errors.js'
+import { StorageErrorText } from '../error-text.js'
+
+/** Commit evidence stays in the same private physical data universe as original log namespaces. */
+const markerNamespace = Symbol()
+/** Ordinary marker I/O reuses one fixed canonical metadata head lock, without dynamic tx locks. */
+const markerLockNamespace = 'storage.commit.markers'
+/** A marker contains only commit evidence; tx identity is its original native owner-issued key. */
+const markerValue = '1'
 
 /** A private native scope carries the same draft and terminal effects as its business writes. */
 export type IMemoryJournalTransaction = {
-  run<R>(prefix: string, work: (view: IStorageJournalNamespaceView) => Promise<R>): Promise<R>
+  run<R>(
+    prefix: string | symbol,
+    work: (view: IStorageJournalNamespaceView) => Promise<R>
+  ): Promise<R>
   onCommit(effect: () => void): () => void
   onRollback(effect: () => void): () => void
 }
@@ -44,14 +56,14 @@ export function createMemoryJournalData(options: {
   }
 }) {
   /** Business clear and capacity never enumerate these original backend-private metadata rows. */
-  let namespaces = new Map<string, Map<string, string>>()
+  let namespaces = new Map<string | symbol, Map<string, string>>()
 
   /** Prepare sparse private writes beside the same native attempt's existing business draft. */
   function draft() {
     /** Replacing the private physical map invalidates even an initially empty pre-drop attempt. */
     const generation = namespaces
     /** Each touched private namespace retains its original committed map identity. */
-    const touched = new Map<string, IMemoryJournalDraft>()
+    const touched = new Map<string | symbol, IMemoryJournalDraft>()
     /** Original event delivery observes synchronous and late terminal-listener failures. */
     const committed = createEventChannel<void>({ report: ({ error }) => options.report(error) })
     /** Rollback effects use the same terminal channel owner and report policy. */
@@ -59,7 +71,7 @@ export function createMemoryJournalData(options: {
     /** A native attempt publishes exactly one actual terminal result. */
     let settled = false
     /** Capture a namespace on first access; untouched rows stay in the original physical Map. */
-    const state = (prefix: string): IMemoryJournalDraft => {
+    const state = (prefix: string | symbol): IMemoryJournalDraft => {
       let entry = touched.get(prefix)
       if (entry === undefined) {
         entry = {
@@ -81,7 +93,7 @@ export function createMemoryJournalData(options: {
     /** The original scope supplies authorization on every extracted private method invocation. */
     const port = {
       run: async <R>(
-        prefix: string,
+        prefix: string | symbol,
         work: (view: IStorageJournalNamespaceView) => Promise<R>,
         execute: <V>(run: () => V) => Promise<Awaited<V>>
       ): Promise<R> => {
@@ -142,7 +154,7 @@ export function createMemoryJournalData(options: {
     }
     return {
       port,
-      conflict: (): string | undefined => {
+      conflict: (): string | symbol | undefined => {
         if (generation !== namespaces) return touched.keys().next().value
         for (const [prefix, entry] of touched) {
           const current = namespaces.get(prefix)
@@ -307,6 +319,36 @@ export function createMemoryJournalData(options: {
   return {
     draft,
     open,
+    /** Marker and business data share this exact native attempt and its original rollback path. */
+    writeMarker: (scope: Omit<ITransactionScope, 'use'>, txId: string): Promise<void> => {
+      const current = options.scope(scope)
+      if (txId !== current.info.id)
+        throw new StorageContractError(StorageContractErrorCode.invalidArgument)
+      return current.port.run(markerNamespace, (view) => view.set(txId, markerValue))
+    },
+    /** Recovery reads original private metadata without opening a second log resource owner. */
+    hasMarker: (txId: string): Promise<boolean> => {
+      assertText(txId)
+      return options.transaction(markerLockNamespace, (port) =>
+        port.run(markerNamespace, async (view) => {
+          const value = await view.get(txId)
+          if (value === null) return false
+          if (value === markerValue) return true
+          throw new StorageError(
+            StorageErrorCode.journalRecordInvalid,
+            {},
+            StorageErrorText.journalRecordInvalid
+          )
+        })
+      )
+    },
+    /** Terminal intent cleanup removes only its fixed-org evidence through the original owner. */
+    removeMarker: (txId: string): Promise<void> => {
+      assertText(txId)
+      return options.transaction(markerLockNamespace, (port) =>
+        port.run(markerNamespace, (view) => view.remove(txId))
+      )
+    },
     clear: () => {
       namespaces = new Map()
     }
