@@ -1,5 +1,15 @@
 /** Stable validation causes used by codec and synchronous-option admission boundaries. */
 export const StorageContractErrorText = {
+  /** A backend owner, genuine fresh view and callable registration callbacks are required. */
+  transactionArgument: 'transaction owner, scope or callback is invalid',
+  /** Expired data views reject through the backend normalizer after releasing resource references. */
+  transactionInactive: 'transaction scope is no longer active',
+  /** Cleanup aggregation preserves the primary failure before all resource-release failures. */
+  transactionCleanup: 'transaction resource cleanup failed',
+  /** Callback admission rejects before allocating backend transaction resources. */
+  transactionCallback: 'transaction callback must be a function',
+  /** Transaction writes use the shared conflict/replace domain without root operation contexts. */
+  transactionWriteOptions: 'transaction write options contain an invalid conflictPolicy',
   /** Value-codec adaptation captures valid metadata and both conversion functions before use. */
   valueCodecDescriptor:
     'value codec must declare id, positive safe version, encodedType, encode, and decode',

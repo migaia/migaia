@@ -241,6 +241,7 @@ describe('V2 capability contracts', () => {
       clearValues: async () => undefined,
       clearAll: async () => undefined,
       dispose: async () => undefined,
+      [Symbol.asyncDispose]: async () => undefined,
       getBytes: async () => null,
       setBytes: async () => undefined,
       removeBytes: async () => undefined,
@@ -290,6 +291,7 @@ describe('V2 capability contracts', () => {
       clearValues: async () => undefined,
       clearAll: async () => undefined,
       dispose: async () => undefined,
+      [Symbol.asyncDispose]: async () => undefined,
       getBytes: async () => null,
       setBytes: async () => undefined,
       removeBytes: async () => undefined,
@@ -338,7 +340,8 @@ describe('V2 capability contracts', () => {
       keys: async () => [],
       clearValues: async () => undefined,
       clearAll: async () => undefined,
-      dispose: async () => undefined
+      dispose: async () => undefined,
+      [Symbol.asyncDispose]: async () => undefined
     }
     const capabilityFailure = new Error('capability getter failed')
     const throwingCapabilities = Object.create(null) as Record<string, unknown>
@@ -400,7 +403,8 @@ describe('V2 capability contracts', () => {
       keys: async () => [],
       clearValues: async () => undefined,
       clearAll: async () => undefined,
-      dispose: async () => undefined
+      dispose: async () => undefined,
+      [Symbol.asyncDispose]: async () => undefined
     }
     Object.defineProperty(store, 'subscribeChanges', {
       get: () => {

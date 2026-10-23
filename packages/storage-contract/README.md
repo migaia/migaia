@@ -150,7 +150,7 @@ L0 指所有后端提供的字符串键值通道；L1 指额外提供字节、�
 | `clearAll(ctx?)`                                | 同时清 values、bytes、records 三个业务通道。                                                                                                                |
 | `metadata?`                                     | 后端自有的可选维护通道；get(key, ctx?) 返回 unknown 或 undefined，set(key, value, ctx?) 与 delete(key, ctx?) 返回 `Promise<void>`。set 使用 IWriteOptions。 |
 | `iterateRecords(range?, ctx?)`                  | 返回异步迭代器，每项为 [IStorageKey, TValue]。                                                                                                              |
-| `transaction(run, ctx?)`                        | run 接收 `ITransactionScope<TValue>` 并返回 `Promise<T>`；事务方法返回相同类型的 `Promise<T>`。                                                             |
+| `transaction(run, ctx?)`                        | run 接收完整 scope 并返回 TResult；事务方法返回 `Promise<Awaited<TResult>>`。                                                                               |
 
 metadata 供可恢复维护迁移使用，与 values、bytes、records 独立，不属于 clearAll/clearRecords 的清理范围。range 省略时没有显式范围参数；查询行为由实现解释。
 
@@ -235,9 +235,13 @@ metadata 供可恢复维护迁移使用，与 values、bytes、records 独立，
 
 ### 事务作用域与冲突策略
 
-`ITransactionScope<TValue>` 只有 get(key): `Promise<TValue | undefined>`、put(value, key?, options?): `Promise<IStorageKey>`、delete(key): `Promise<void>`。key 为 IStorageKey；put 省略 key 时由实现生成。`ITransactionWriteOptions` 只有可选 conflictPolicy。
+`ITransactionScope<TValue>` 覆盖文本 `get/set/remove/has`、字节 `getBytes/setBytes/removeBytes` 与记录 `getRecord/putRecord/deleteRecord/iterateRecords`。文本和字节缺失返回 null，记录缺失返回 undefined；记录键为 IStorageKey，putRecord 省略 key 请求后端生成。旧记录 put/delete 名称已移除，get 改为读文本。方法继承事务上下文，只有写入接收精简冲突选项。可选 putIndexedRecord/iterateRecordIndex 由 ISecondaryIndexTransactionScope 引用同一签名，不重复声明。
 
-隔离级别、提交时机、失败重试由实现定义。本包不执行事务。run 回调 resolve 之后不要继续保存并使用 scope，连接或快照可能已经释放。`assertTransactionCallback(run, backend)` 在实现方分配资源前检查 run 是函数；否则抛 INVALID_ARGUMENT，附 backend。
+`createTransactionOwner` 登记原 store 与真实视图身份。后端私持 register/createScope/onFailure 和生命周期控制；功能模块通过 assertTransactionOwner、runTransactionOperation、registerTransactionFinalizer 与 nextTransactionIterator 接入。操作入口同步开始，并获得完整新视图。stopAdmission 只封闭用户视图，已接纳操作继续在自己的视图排空。每个检查和最后库内 beforeCommit 都使用新视图，只运行一次，排空子请求并释放迭代器后再运行下一检查。已 catch 或未 await 的操作失败仍锁定后端归一的首错并通知回滚。本包不创建数据库、runner 或隐式当前视图。
+
+普通与索引记录迭代统一返回 IStorageIterator，IKeyValueStore 继承唯一 IStorageResource 声明。拥有者只登记真实迭代器，以当前有效视图推进每次 next，等已接纳推进结束，再按创建的相反顺序关闭剩余资源。dispose 返回缓存的拒绝主 Promise，固定符号方法返回独立缓存、报告后成功的 Promise；return 与自然结束使用同一次真实清理。缺少原生符号时由外层传入规范 asyncDisposeKey，契约不创建后备键。伪造、错 store 或过期 scope 的绑定同步抛 INVALID_ARGUMENT；过期数据方法拒绝预存的后端 TRANSACTION_FAILED，不再调用工厂或数据回调。
+
+本包拥有中立事务协调，真实提交、隔离、取消与重试仍归后端。IndexedDB 严守原生活跃窗口：外部数据应先取再开事务，await 定时器后可能不能继续请求；memory 与 SQLite 自行管理活跃期。assertTransactionCallback 在分配后端资源前校验可调用性。声明与包内假后端验证不能替代真实后端原子持久化验收。
 
 `readTransactionConflictPolicy(options, backend)` 接受 undefined 或对象；省略 options 或 conflictPolicy 返回 conflict，replace 返回 replace。直接传策略字符串、非法对象或非法字段都会抛 INVALID_ARGUMENT，getter 失败保留精确 cause。它只读取策略，不执行写入。
 
@@ -285,7 +289,7 @@ query 必填 handle、index，可选 range、direction（next/prev）、limit；
 
 1. 用 snapshotOperationContext(ctx) 校验并保留本次上下文。
 2. 用 `asRecordStore<IProfile>`(store) 收窄；不足时直接使用既有的 UNSUPPORTED_CAPABILITY，不另造裸 Error。
-3. 在 records.transaction 的回调里使用 tx.get/put/delete，将上下文快照传给 transaction。
+3. 在 records.transaction 的回调里使用 tx.getRecord/putRecord/deleteRecord，将上下文快照传给 transaction。
 4. 返回回调结果；连接、原子提交与失败重试由实际后端负责。
 
 只支持文本的后端需要调用方明确选文本 codec 或转换方式；不能仅看到 binary 标志就跳过完整记录能力准入。自定义 gzip、加密或 Worker codec 先用 assertCodec/snapshotCodec 校验，再交给实现层使用。

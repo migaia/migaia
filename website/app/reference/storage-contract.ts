@@ -417,81 +417,121 @@ await records.metadata?.delete('migration')`
       ctx: contextParam
     },
     returns: t(
-      'An `AsyncIterableIterator` of `[IStorageKey, TValue]`; stop consumption normally so backend cleanup can run.',
+      'An `IStorageIterator` of `[IStorageKey, TValue]`; stop consumption normally so backend cleanup can run.',
       '产出 `[IStorageKey, TValue]` 的异步迭代器；应正常结束消费，以便后端运行清理。'
     ),
     example: `for await (const [key, value] of records.iterateRecords({ lower: 'a', upper: 'z' })) console.log(key, value)`
   },
   transaction: {
     summary: t(
-      'Runs a caller-authored async callback with an `ITransactionScope` supplied by the backend. The backend owns commit and rollback; callback rejection aborts that transaction path.',
-      '用后端提供的 `ITransactionScope` 执行调用方异步回调。后端负责提交与回滚；回调拒绝会中止该事务路径。'
+      'Runs a caller-authored callback with an `ITransactionScope` supplied by the backend. The backend owns commit and rollback; callback rejection aborts that transaction path.',
+      '用后端提供的 `ITransactionScope` 执行调用方回调。后端负责提交与回滚；回调拒绝会中止该事务路径。'
     ),
     params: {
       run: t(
-        'Async `(tx) => result` callback; tx comes from this transaction and must not escape its callback lifetime.',
-        '异步 `(tx) => result` 回调；事务上下文由本次事务传入，不得逃逸回调生命周期。'
+        'Synchronous, asynchronous or PromiseLike `(tx) => result` callback; tx comes from this transaction and must not escape its callback lifetime.',
+        '同步、异步或 PromiseLike `(tx) => result` 回调；事务上下文由本次事务传入，不得逃逸回调生命周期。'
       ),
       ctx: contextParam
     },
     returns: t(
-      'A `Promise<T>` for the callback result after the backend’s transaction outcome is known; failure rejects.',
-      '后端事务结局已知后的回调结果 `Promise<T>`；失败会拒绝。'
+      'A `Promise<Awaited<TResult>>` for the callback result after the backend’s transaction outcome is known; failure rejects.',
+      '后端事务结局已知后的回调结果 `Promise<Awaited<TResult>>`；失败会拒绝。'
     ),
     example: `await records.transaction(async (tx) => {
-  const value = await tx.get('profile')
-  if (value) await tx.put(value, 'profile', { conflictPolicy: 'replace' })
+  const value = await tx.getRecord('profile')
+  if (value) await tx.putRecord(value, 'profile', { conflictPolicy: 'replace' })
 })`
   }
 }
 
-/** Scoped record operations remain valid only while their backend-owned transaction callback runs. */
+/** Transaction members reuse original text/byte/record meanings without root timing contexts. */
 const transactionMembers: Readonly<Record<string, IMemberDoc>> = {
   get: {
     summary: t(
-      'Reads one record within the current transaction’s backend-owned view.',
-      '在当前事务后端持有的视图中读取一条记录，不创建独立事务。'
+      'Read text in this transaction; absent values are null.',
+      '在本事务读取文本；缺失为 null。'
+    ),
+    params: { key: stringKeyParam },
+    example: `await tx.get('theme')`
+  },
+  set: {
+    summary: t(
+      'Write text using optional reduced conflictPolicy; no separate ctx.',
+      '写入文本，只接收可选精简 conflictPolicy，不另收 ctx。'
+    ),
+    example: `await tx.set('theme', 'dark', { conflictPolicy: 'replace' })`
+  },
+  remove: {
+    summary: t('Remove transaction text by string key.', '按字符串键移除事务文本。'),
+    params: { key: stringKeyParam },
+    example: `await tx.remove('theme')`
+  },
+  has: {
+    summary: t('Check a transaction text key.', '检查事务文本键。'),
+    params: { key: stringKeyParam },
+    example: `await tx.has('theme')`
+  },
+  getBytes: {
+    summary: t('Read transaction bytes, or null when absent.', '读取事务字节，缺失为 null。'),
+    params: { key: stringKeyParam },
+    example: `await tx.getBytes('image')`
+  },
+  setBytes: {
+    summary: t(
+      'Write bytes using optional reduced conflictPolicy.',
+      '写入字节，接收可选精简 conflictPolicy。'
+    ),
+    example: `await tx.setBytes('image', new Uint8Array([1]), { conflictPolicy: 'replace' })`
+  },
+  removeBytes: {
+    summary: t('Remove only this transaction byte entry.', '只移除本事务的字节条目。'),
+    params: { key: stringKeyParam },
+    example: `await tx.removeBytes('image')`
+  },
+  getRecord: {
+    summary: t(
+      'Read a transaction record, or undefined when absent.',
+      '读取事务记录，缺失为 undefined。'
     ),
     params: { key: recordKeyParam },
-    returns: t(
-      'A promise of the transactional record or undefined when absent.',
-      '事务记录的异步结果，不存在时为空值。'
-    ),
-    example: `await records.transaction(async (tx) => { console.log(await tx.get('profile')) })`
+    example: `await tx.getRecord('profile')`
   },
-  put: {
+  putRecord: {
     summary: t(
-      'Writes a record within the current transaction; it shares that transaction’s final commit or rollback.',
-      '在当前事务内写入记录，共享该事务最终的提交或回滚。'
+      'Write a transaction record; an omitted key requests backend key generation.',
+      '写入事务记录，省略键请求后端生成。'
     ),
-    params: {
-      value: t('Application record to stage in this transaction.', '应用要在当前事务暂存的记录。'),
-      key: t(
-        'Optional application key; omission delegates key selection to the backend.',
-        '可选应用键；省略时把键选择交给后端。'
-      ),
-      options: t(
-        'Optional `ITransactionWriteOptions`; conflict policy defaults to conflict.',
-        '可选 `ITransactionWriteOptions`；冲突策略默认为冲突拒绝。'
-      )
-    },
-    returns: t(
-      'The written `IStorageKey` as a promise; final durability still belongs to the enclosing transaction.',
-      '写入键 `IStorageKey` 的异步结果；最终持久性仍由外层事务决定。'
-    ),
-    example: `await records.transaction(async (tx) => { await tx.put({ name: 'Ada' }, 'profile', { conflictPolicy: 'replace' }) })`
+    example: `await tx.putRecord({ name: 'Ada' }, 'profile', { conflictPolicy: 'replace' })`
   },
-  delete: {
+  deleteRecord: {
     summary: t(
-      'Stages removal of one record in the current transaction; the backend applies the final transaction outcome.',
-      '在当前事务暂存一条记录的移除，由后端应用最终事务结局。'
+      'Delete one transaction record without committing early.',
+      '删除一条事务记录，不提前提交。'
     ),
     params: { key: recordKeyParam },
-    returns: t(
-      'A `Promise<void>` for transactional deletion, without committing the surrounding transaction early.',
-      '事务删除的 `Promise<void>`，不会提前提交外层事务。'
+    example: `await tx.deleteRecord('profile')`
+  },
+  iterateRecords: {
+    summary: t(
+      'Return a resource iterator from this same transaction and optional key range.',
+      '由同一事务及可选键范围返回资源迭代器。'
     ),
-    example: `await records.transaction(async (tx) => { await tx.delete('profile') })`
+    example: `await using cursor = tx.iterateRecords(); console.log(await cursor.next())`
+  },
+  putIndexedRecord: {
+    summary: t(
+      'Optional original indexed write; pass the handle and complete projection explicitly.',
+      '可选原索引写入，显式传入句柄与完整投影。'
+    ),
+    example: `await tx.putIndexedRecord?.({ name: 'Ada' }, 'profile', handle, { byName: { kind: 'single', key: 'Ada' } })`
+  },
+  iterateRecordIndex: {
+    summary: t(
+      'Optional resource iterator for the original transaction index.',
+      '原事务索引的可选资源迭代器。'
+    ),
+    example: `await using cursor = tx.iterateRecordIndex!({ handle, index: 'byName' }); console.log(await cursor.next())`
   }
 }
 
@@ -618,209 +658,134 @@ export const storageContractReference: ILibraryReference = {
     }
   },
   symbols: {
-    ITransactionKeyValueApi: {
+    TransactionActivityMode: {
+      role: 'constant',
       purpose: t(
-        'Standard transaction text API bound to one original owner, without root operation contexts.',
-        '绑定原拥有者的标准事务文本 API，不接受根操作上下文。'
+        'Actual managed or native activity mode captured by the real backend owner.',
+        '真实后端拥有者捕获的 managed 或 native 活跃模式。'
       )
     },
-    ITransactionalCapability: {
+    TransactionBeforeStage: {
+      role: 'constant',
       purpose: t(
-        'Select only standard tokens with declared transaction projections.',
-        '仅选择声明了事务投影的标准令牌。'
+        'Canonical transaction before-observation names; observations cannot delay or veto work.',
+        '规范事务工作前观察名；观察不能延迟或否决工作。'
       )
     },
-    ITransactionCapabilityApi: {
+    TransactionObservedStage: {
+      role: 'constant',
       purpose: t(
-        'Project a standard token to its transaction-owned API.',
-        '将标准令牌投影为事务拥有者 API。'
+        'Canonical operation and terminal transaction observation names.',
+        '规范操作与事务终态观察名。'
       )
     },
-    IStorageResource: {
+    createTransactionOwner: {
+      role: 'operation',
       purpose: t(
-        'One owned resource with explicit rejecting cleanup and separately cached report-only symbolic cleanup.',
-        '自有资源的显式拒绝清理与独立缓存的只报告符号清理。'
-      )
+        'Initialize one neutral owner for an original resource base. Backends retain registration and lifecycle authority; no database is opened.',
+        '为原资源基础对象初始化唯一中立拥有者。后端保留登记与生命周期权限，不打开数据库。'
+      ),
+      params: {
+        store: t(
+          'Original IStorageBase, including specialized non-KV backends.',
+          '原 IStorageBase，支持非 KV 专用后端。'
+        ),
+        normalizeFailure: t(
+          'Backend-owned idempotent normalization retaining source, code, stack and cause.',
+          '后端拥有的幂等归一，保留 source、code、stack 与 cause。'
+        ),
+        options: t(
+          'Optional actual activityMode and outer fixed asyncDisposeKey; no fallback is created.',
+          '可选真实 activityMode 与外层固定 asyncDisposeKey，不创建后备键。'
+        )
+      },
+      returns: t(
+        'Backend-held register and registerIterator ports. Registration returns stopAdmission, runFinalizers, closeIterators and terminal close.',
+        '后端私持的 register 与 registerIterator；登记返回 stopAdmission、runFinalizers、closeIterators 与终态 close。'
+      ),
+      example: `const owner = createTransactionOwner(store, normalizeFailure)
+const control = owner.register(scope, { createScope, onFailure })`
     },
-    IStorageIterator: {
+    assertTransactionOwner: {
+      role: 'operation',
       purpose: t(
-        'Asynchronous iterator and owned cleanup resource.',
-        '异步迭代器及其自有清理资源。'
-      )
+        'Check authentic live view identity for the exact original store.',
+        '检查精确原 store 的真实有效视图身份。'
+      ),
+      params: {
+        store: t('Original registered resource base.', '已登记原资源基础对象。'),
+        scope: t('Actual current transaction or derived view.', '当前真实事务或派生视图。')
+      },
+      returns: t(
+        'The same immutable ITransactionInfo for every live view; invalid identity throws INVALID_ARGUMENT.',
+        '每个有效视图共用的不可变 ITransactionInfo；无效身份抛 INVALID_ARGUMENT。'
+      ),
+      example: `const info = assertTransactionOwner(store, scope)`
     },
-    IStorageBaseAdmission: {
+    runTransactionOperation: {
+      role: 'operation',
       purpose: t(
-        'Non-owning single-read base admission retains the original object, disposer receiver and exact reflection failure.',
-        '不取得所有权的单读基础准入，保留原对象、释放接收者和精确反射失败。'
-      )
+        'Synchronously admit and invoke one composed operation on a fresh complete view; drain its actual settlement.',
+        '在新完整视图上同步接纳并调用组合操作，等待真实结算。'
+      ),
+      params: {
+        scope: t(
+          'Authentic live view; expired real views reject the backend expiry error.',
+          '真实有效视图；真实过期视图拒绝后端失效错误。'
+        ),
+        run: t(
+          'Callback receiving this operation’s independent complete view.',
+          '接收本操作独立完整视图的回调。'
+        )
+      },
+      returns: t(
+        'Promise<Awaited<TResult>> with backend-normalized failure locked even when caught or unawaited.',
+        'Promise<Awaited<TResult>>；即使 catch 或未 await，后端归一失败仍锁定。'
+      ),
+      example: storageContractCases.runTransactionOperation![0]!.example,
+      cases: storageContractCases.runTransactionOperation
     },
-    IBackendStageBindings: {
+    registerTransactionFinalizer: {
+      role: 'operation',
       purpose: t(
-        'One host binding surface for the seven distinct canonical observer families, without another registry or executor.',
-        '七个独立规范观察家族的单一宿主绑定面，不创建另一套 registry 或执行器。'
-      )
+        'Register an ordered once-only check before finalization freezes the accepted list.',
+        '在最终检查冻结接纳列表前登记按序、只运行一次的检查。'
+      ),
+      params: {
+        scope: t('A real active view of the owning transaction.', '所属事务的真实有效视图。'),
+        check: t(
+          'Receives a fresh complete check view and drains its own child operations before the next check.',
+          '接收新完整检查视图，在下一检查前排空自己的子操作。'
+        )
+      },
+      returns: t(
+        'void; late registration throws INVALID_ARGUMENT.',
+        'void；过晚登记抛 INVALID_ARGUMENT。'
+      ),
+      example: `registerTransactionFinalizer(scope, checkScope => checkScope.getRecord('profile').then(() => undefined))`
     },
-    IBackendStageObserver: {
-      purpose: t('Observe backend installation and disposal.', '观察后端安装与释放。')
-    },
-    IStorageOperationStageObserver: {
+    nextTransactionIterator: {
+      role: 'operation',
       purpose: t(
-        'Observe store operations bound to original transaction views.',
-        '观察绑定原事务视图的存储操作。'
-      )
-    },
-    ITransactionStageObserver: {
-      purpose: t(
-        'Observe original transaction operations, commit and cleanup.',
-        '观察原事务操作、提交与清理。'
-      )
-    },
-    IConcurrencyStageObserver: {
-      purpose: t('Observe canonical lock and concurrency decisions.', '观察规范锁与并发决策。')
-    },
-    ISqlStageObserver: {
-      purpose: t(
-        'Observe SQL execution counts without receiving statement payloads.',
-        '观察 SQL 执行计数，不接收语句载荷。'
-      )
-    },
-    IQueryStageObserver: {
-      purpose: t(
-        'Observe query plans and terminal counts without executing a query.',
-        '观察查询计划与结束计数，不执行查询。'
-      )
+        'Borrow the current authentic view to advance an actual iterator from the same transaction without reviving its creation view.',
+        '借当前真实视图推进同事务真实迭代器，不复活创建视图。'
+      ),
+      params: {
+        scope: t('Current live operation or check view.', '当前有效操作或检查视图。'),
+        iterator: t(
+          'Actual iterator registered by this transaction’s backend owner.',
+          '本事务后端拥有者登记的真实迭代器。'
+        )
+      },
+      returns: t(
+        'One Promise<IteratorResult<T>>; forged or cross-transaction identity throws before port.next.',
+        '一次 Promise<IteratorResult<T>>；伪造或跨事务身份在 port.next 前抛错。'
+      ),
+      example: `const result = await nextTransactionIterator(scope, iterator)`
     },
     ConcurrencyHolderState: {
+      role: 'constant',
       purpose: t('Canonical held and remote handoff state names.', '规范的持有与远端交接状态名。')
-    },
-    IConcurrencyHolder: {
-      purpose: t(
-        'Real holder identity or a remote handoff interval with no fabricated owner.',
-        '真实持有者身份，或不伪造 owner 的远端交接区间。'
-      )
-    },
-    IConcurrencyDecision: {
-      purpose: t(
-        'Exclusive wait, reject or retry decision fields.',
-        '互斥的 wait、reject 或 retry 决策字段。'
-      )
-    },
-    IStorageBase: {
-      purpose: t(
-        'Runtime-neutral resource, backend name and support facts without a KV requirement.',
-        '不强制 KV 的中立资源、后端名与能力事实。'
-      )
-    },
-    IStorageStore: {
-      purpose: t(
-        'Resource base with an exact contravariant capability set and token use/has.',
-        '保留精确反变能力集合及令牌 use/has 的资源基础对象。'
-      )
-    },
-    IStorageCapability: {
-      purpose: t(
-        'Opaque API token; its name does not grant runtime authority.',
-        '不透明 API 令牌；名称不授予运行权限。'
-      )
-    },
-    IAnyStorageCapability: {
-      purpose: t(
-        'Shared upper bound for capability identity tokens.',
-        '能力身份令牌的共同类型上界。'
-      )
-    },
-    ICapabilityApi: {
-      purpose: t(
-        'Type projection of the API associated with one token.',
-        '一个令牌所关联 API 的类型投影。'
-      )
-    },
-    IKeyValueApi: {
-      purpose: t(
-        'Public KV methods projected from the canonical store contract.',
-        '由唯一 store 契约投影的公开 KV 方法。'
-      )
-    },
-    ICapabilityImpl: {
-      purpose: t(
-        'Authentic frozen pairing of one token and its precise backend API.',
-        '一个令牌与精确后端 API 的真实冻结配对。'
-      )
-    },
-    ICapabilityStore: {
-      purpose: t(
-        'Original base refined with exact APIs, full transaction scope and builder augmentation.',
-        '保留具体 API、完整事务视图与构建器增强的基础对象投影。'
-      )
-    },
-    IStorageCapabilitySet: {
-      purpose: t(
-        'Type-only capability union from an already provided store.',
-        '已装配 store 的纯类型能力联合投影。'
-      )
-    },
-    IStorageImplementationsOf: {
-      purpose: t('Exact original provider implementation tuple.', '提供方原始实现元组的精确投影。')
-    },
-    ICapabilityPublication: {
-      purpose: t(
-        'Idempotent publish and release of one prepared capability batch.',
-        '一批已准备能力的幂等发布与释放。'
-      )
-    },
-    ICapabilityInstallPort: {
-      purpose: t(
-        'One store’s opaque prepare/publish/release installation authority.',
-        '一个 store 的不透明 prepare/publish/release 安装权限。'
-      )
-    },
-    IChainMethods: {
-      purpose: t(
-        'Finite query, transaction, vector and RDF chain method groups.',
-        '有限的 query、事务、vector 与 RDF 链方法分组。'
-      )
-    },
-    IChainMethodsOf: {
-      purpose: t('Pure projection of existing chain method groups.', '已有链方法分组的纯投影。')
-    },
-    IWithChainMethods: {
-      purpose: t(
-        'Preserves original builder scope and augmentation while projecting host method groups.',
-        '投影宿主方法分组时保留原构建器视图与增强。'
-      )
-    },
-    ILockKey: {
-      purpose: t(
-        'Physical text, bytes or record channel and key identity.',
-        'text、bytes 或 record 物理通道及键身份。'
-      )
-    },
-    IConcurrencyPolicy: {
-      purpose: t(
-        'Public policy name and locking mode; runtime authority remains private.',
-        '公开策略名与加锁模式；运行权限仍由私有拥有者掌握。'
-      )
-    },
-    ITransactionOptions: {
-      purpose: t(
-        'Operation timing, declared locks and a selected concurrency policy.',
-        '操作时间选项、声明锁及选定并发策略。'
-      )
-    },
-    IWriteConcurrencyOptions: {
-      purpose: t('Per-write concurrency policy override.', '单次写入的并发策略覆盖。')
-    },
-    ITransactionBuilder: {
-      purpose: t(
-        'Immutable unlocked chain type retaining its original second augmentation generic.',
-        '保留原第二增强泛型的不可变未加锁链类型。'
-      )
-    },
-    ILockedTransactionBuilder: {
-      purpose: t(
-        'Locked chain type exposes run and retains full scope and method augmentation.',
-        '加锁链类型公开 run，并保留完整视图与方法增强。'
-      )
     },
     defineStorageCapability: {
       role: 'operation',
@@ -919,54 +884,6 @@ console.log(api === store.use(kv)) // true`
         '全部契约准入检查共用的规范后端名模式。'
       ),
       example: `console.log(BACKEND_KIND_PATTERN.test('example-catalog')) // true`
-    },
-    IVersionedEnvelope: {
-      purpose: t(
-        'Own safe version and caller-owned non-null state container.',
-        '自有安全版本与调用方拥有的非空状态容器。'
-      )
-    },
-    IMigrationStepContext: {
-      purpose: t(
-        'One source/target version transition with an optional borrowed cancellation signal.',
-        '一次来源/目标版本转换及可选借用取消信号。'
-      )
-    },
-    IMigrationStep: {
-      purpose: t(
-        'Unknown historical state conversion; return type inference decides synchronous admission.',
-        '转换未知历史状态；返回类型推断决定同步准入。'
-      )
-    },
-    IMigrationReset: {
-      purpose: t(
-        'Zero-argument fresh-state factory for resetting older archives once.',
-        '对旧存档仅调用一次的零参数新状态工厂。'
-      )
-    },
-    ISyncMigrationSteps: {
-      purpose: t(
-        'Retains callback inference while excluding known Promise and callable-then return types.',
-        '保留回调推断，排除已知 Promise 与可调用 then 返回类型。'
-      )
-    },
-    IMigrationPlan: {
-      purpose: t(
-        'Frozen current/base versions and captured step functions, with optional reset.',
-        '冻结的当前/最低版本及步骤快照，可选 reset。'
-      )
-    },
-    IMigrationStepObserver: {
-      purpose: t(
-        'Nonblocking before/after observers with a synchronous failure reporter.',
-        '不阻塞的步骤前后观察器及同步失败报告。'
-      )
-    },
-    IMigrationRunOptions: {
-      purpose: t(
-        'Borrowed cancellation, utility reporter and step observation configuration.',
-        '借用的取消、工具报告器与步骤观察配置。'
-      )
     },
     assertVersionedEnvelope: {
       role: 'operation',
@@ -1493,7 +1410,7 @@ keys.sort(compareStorageKeys)`
         'No result for a function; otherwise `INVALID_ARGUMENT` with backend and native TypeError cause.',
         '函数输入没有结果；否则抛包含后端和原生类型错误原因的 `INVALID_ARGUMENT`。'
       ),
-      example: `const run = async (tx: ITransactionScope) => tx.get('profile')
+      example: `const run = async (tx: ITransactionScope) => tx.getRecord('profile')
 assertTransactionCallback(run, 'memory')`
     },
     readTransactionConflictPolicy: {
@@ -1581,12 +1498,6 @@ console.log(candidate.name, candidate.output)`
         '七种中立观察接点的唯一判别常量，不授予 store 或事务权限。'
       ),
       example: `console.log(StorageStageKind.codec) // codec`
-    },
-    ICodecStageObserver: {
-      purpose: t(
-        'Observation-only encode/decode stages bound to the original real store and transaction owner.',
-        '绑定原真实 store 与事务拥有者的只观察编解码阶段。'
-      )
     },
     ConflictPolicy: {
       role: 'constant',
@@ -1677,6 +1588,402 @@ console.log(candidate.name, candidate.output)`
     }
   },
   types: {
+    ITransactionInfo: {
+      summary: t(
+        'Immutable shared transaction identity returned from authentic live views.',
+        '真实有效视图返回的共享不可变事务身份。'
+      ),
+      members: {
+        id: {
+          summary: t(
+            'One immutable identity shared by all real views of this transaction.',
+            '本事务全部真实视图共用的不可变身份。'
+          )
+        },
+        activityMode: {
+          summary: t(
+            'Actual mode captured from the backend owner.',
+            '由真实后端拥有者捕获的模式。'
+          ),
+          values: { enum: 'TransactionActivityMode' }
+        }
+      }
+    },
+    ITransactionKeyValueApi: {
+      summary: t(
+        'Standard transaction text API bound to one original owner, without root operation contexts.',
+        '绑定原拥有者的标准事务文本 API，不接受根操作上下文。'
+      ),
+      members: {}
+    },
+    ITransactionalCapability: {
+      summary: t(
+        'Select only standard tokens with declared transaction projections.',
+        '仅选择声明了事务投影的标准令牌。'
+      ),
+      members: {}
+    },
+    ITransactionCapabilityApi: {
+      summary: t(
+        'Project a standard token to its transaction-owned API.',
+        '将标准令牌投影为事务拥有者 API。'
+      ),
+      members: {}
+    },
+    IStorageResource: {
+      summary: t(
+        'One owned resource with explicit rejecting cleanup and separately cached report-only symbolic cleanup.',
+        '自有资源的显式拒绝清理与独立缓存的只报告符号清理。'
+      ),
+      members: {
+        dispose: {
+          summary: t(
+            'Return the cached main Promise of one actual cleanup; failures reject with the original error reachable.',
+            '返回同一次真实清理的缓存主 Promise，失败拒绝并保留可达原错。'
+          ),
+          example: `await resource.dispose()`
+        },
+        '[Symbol.asyncDispose]': {
+          summary: t(
+            'Return a separately cached report-only Promise; failed cleanup is reported once and this entry resolves.',
+            '返回独立缓存的只报告 Promise；清理失败报告一次，本入口完成。'
+          ),
+          example: `await resource[Symbol.asyncDispose]()`
+        }
+      }
+    },
+    IStorageIterator: {
+      summary: t(
+        'Asynchronous iterator and owned cleanup resource.',
+        '异步迭代器及其自有清理资源。'
+      ),
+      members: {}
+    },
+    IStorageBaseAdmission: {
+      summary: t(
+        'Non-owning single-read base admission retains the original object, disposer receiver and exact reflection failure.',
+        '不取得所有权的单读基础准入，保留原对象、释放接收者和精确反射失败。'
+      ),
+      members: {}
+    },
+    IBackendStageBindings: {
+      summary: t(
+        'One host binding surface for the seven distinct canonical observer families, without another registry or executor.',
+        '七个独立规范观察家族的单一宿主绑定面，不创建另一套 registry 或执行器。'
+      ),
+      members: {
+        backendStages: {
+          summary: t(
+            'Direct observer used before a store exists.',
+            'store 存在前使用的直接观察者。'
+          )
+        },
+        operationStages: {
+          summary: t('Bind ordinary operations to the original store.', '把普通操作绑定原 store。'),
+          example: `const operations = bindings.operationStages(store)`
+        },
+        codecStages: {
+          summary: t(
+            'Bind codec observations to the original store.',
+            '把 codec 观察绑定原 store。'
+          ),
+          example: `const codecs = bindings.codecStages(store)`
+        },
+        transactionStages: {
+          summary: t(
+            'Bind transaction observations to the original store owner.',
+            '把事务观察绑定原 store 拥有者。'
+          ),
+          example: `const transactions = bindings.transactionStages(store)`
+        },
+        concurrencyStages: {
+          summary: t(
+            'Bind lock observations without granting lock authority.',
+            '绑定锁观察，不授予锁权限。'
+          ),
+          example: `const locks = bindings.concurrencyStages(store)`
+        },
+        sqlStages: {
+          summary: t(
+            'Bind SQL count observations to the original store.',
+            '把 SQL 计数观察绑定原 store。'
+          ),
+          example: `const sql = bindings.sqlStages(store)`
+        },
+        queryStages: {
+          summary: t(
+            'Bind query plans and count observations to the original store.',
+            '把查询计划与计数观察绑定原 store。'
+          ),
+          example: `const query = bindings.queryStages(store)`
+        }
+      }
+    },
+    IBackendStageObserver: {
+      summary: t('Observe backend installation and disposal.', '观察后端安装与释放。'),
+      members: {}
+    },
+    IStorageOperationStageObserver: {
+      summary: t(
+        'Observe store operations bound to original transaction views.',
+        '观察绑定原事务视图的存储操作。'
+      ),
+      members: {}
+    },
+    ITransactionStageObserver: {
+      summary: t(
+        'Observe original transaction operations, commit and cleanup.',
+        '观察原事务操作、提交与清理。'
+      ),
+      members: {}
+    },
+    IConcurrencyStageObserver: {
+      summary: t('Observe canonical lock and concurrency decisions.', '观察规范锁与并发决策。'),
+      members: {}
+    },
+    ISqlStageObserver: {
+      summary: t(
+        'Observe SQL execution counts without receiving statement payloads.',
+        '观察 SQL 执行计数，不接收语句载荷。'
+      ),
+      members: {}
+    },
+    IQueryStageObserver: {
+      summary: t(
+        'Observe query plans and terminal counts without executing a query.',
+        '观察查询计划与结束计数，不执行查询。'
+      ),
+      members: {}
+    },
+    IConcurrencyHolder: {
+      summary: t(
+        'Real holder identity or a remote handoff interval with no fabricated owner.',
+        '真实持有者身份，或不伪造 owner 的远端交接区间。'
+      ),
+      members: {}
+    },
+    IConcurrencyDecision: {
+      summary: t(
+        'Exclusive wait, reject or retry decision fields.',
+        '互斥的 wait、reject 或 retry 决策字段。'
+      ),
+      members: {}
+    },
+    IStorageBase: {
+      summary: t(
+        'Runtime-neutral resource, backend name and support facts without a KV requirement.',
+        '不强制 KV 的中立资源、后端名与能力事实。'
+      ),
+      members: {
+        backend: storeMembers.backend!,
+        capabilities: storeMembers.capabilities!,
+        dispose: {
+          summary: t('Explicit cleanup owned by the original backend.', '原后端拥有的显式清理。'),
+          example: `await base.dispose()`
+        },
+        '[Symbol.asyncDispose]': {
+          summary: t(
+            'Report-only cleanup at the canonical resource key.',
+            '规范资源键上的只报告清理。'
+          ),
+          example: `await base[Symbol.asyncDispose]()`
+        }
+      }
+    },
+    IStorageStore: {
+      summary: t(
+        'Resource base with an exact contravariant capability set and token use/has.',
+        '保留精确反变能力集合及令牌 use/has 的资源基础对象。'
+      ),
+      members: {}
+    },
+    IStorageCapability: {
+      summary: t(
+        'Opaque API token; its name does not grant runtime authority.',
+        '不透明 API 令牌；名称不授予运行权限。'
+      ),
+      members: {}
+    },
+    IAnyStorageCapability: {
+      summary: t(
+        'Shared upper bound for capability identity tokens.',
+        '能力身份令牌的共同类型上界。'
+      ),
+      members: {}
+    },
+    ICapabilityApi: {
+      summary: t(
+        'Type projection of the API associated with one token.',
+        '一个令牌所关联 API 的类型投影。'
+      ),
+      members: {}
+    },
+    IKeyValueApi: {
+      summary: t(
+        'Public KV methods projected from the canonical store contract.',
+        '由唯一 store 契约投影的公开 KV 方法。'
+      ),
+      members: {}
+    },
+    ICapabilityImpl: {
+      summary: t(
+        'Authentic frozen pairing of one token and its precise backend API.',
+        '一个令牌与精确后端 API 的真实冻结配对。'
+      ),
+      members: {}
+    },
+    ICapabilityStore: {
+      summary: t(
+        'Original base refined with exact APIs, full transaction scope and builder augmentation.',
+        '保留具体 API、完整事务视图与构建器增强的基础对象投影。'
+      ),
+      members: {}
+    },
+    IStorageCapabilitySet: {
+      summary: t(
+        'Type-only capability union from an already provided store.',
+        '已装配 store 的纯类型能力联合投影。'
+      ),
+      members: {}
+    },
+    IStorageImplementationsOf: {
+      summary: t('Exact original provider implementation tuple.', '提供方原始实现元组的精确投影。'),
+      members: {}
+    },
+    ICapabilityPublication: {
+      summary: t(
+        'Idempotent publish and release of one prepared capability batch.',
+        '一批已准备能力的幂等发布与释放。'
+      ),
+      members: {}
+    },
+    ICapabilityInstallPort: {
+      summary: t(
+        'One store’s opaque prepare/publish/release installation authority.',
+        '一个 store 的不透明 prepare/publish/release 安装权限。'
+      ),
+      members: {}
+    },
+    IChainMethods: {
+      summary: t(
+        'Finite query, transaction, vector and RDF chain method groups.',
+        '有限的 query、事务、vector 与 RDF 链方法分组。'
+      ),
+      members: {}
+    },
+    IChainMethodsOf: {
+      summary: t('Pure projection of existing chain method groups.', '已有链方法分组的纯投影。'),
+      members: {}
+    },
+    IWithChainMethods: {
+      summary: t(
+        'Preserves original builder scope and augmentation while projecting host method groups.',
+        '投影宿主方法分组时保留原构建器视图与增强。'
+      ),
+      members: {}
+    },
+    ILockKey: {
+      summary: t(
+        'Physical text, bytes or record channel and key identity.',
+        'text、bytes 或 record 物理通道及键身份。'
+      ),
+      members: {}
+    },
+    IConcurrencyPolicy: {
+      summary: t(
+        'Public policy name and locking mode; runtime authority remains private.',
+        '公开策略名与加锁模式；运行权限仍由私有拥有者掌握。'
+      ),
+      members: {}
+    },
+    ITransactionOptions: {
+      summary: t(
+        'Operation timing, declared locks and a selected concurrency policy.',
+        '操作时间选项、声明锁及选定并发策略。'
+      ),
+      members: {}
+    },
+    IWriteConcurrencyOptions: {
+      summary: t('Per-write concurrency policy override.', '单次写入的并发策略覆盖。'),
+      members: {}
+    },
+    ITransactionBuilder: {
+      summary: t(
+        'Immutable unlocked chain type retaining its original second augmentation generic.',
+        '保留原第二增强泛型的不可变未加锁链类型。'
+      ),
+      members: {}
+    },
+    ILockedTransactionBuilder: {
+      summary: t(
+        'Locked chain type exposes run and retains full scope and method augmentation.',
+        '加锁链类型公开 run，并保留完整视图与方法增强。'
+      ),
+      members: {}
+    },
+    IVersionedEnvelope: {
+      summary: t(
+        'Own safe version and caller-owned non-null state container.',
+        '自有安全版本与调用方拥有的非空状态容器。'
+      ),
+      members: {}
+    },
+    IMigrationStepContext: {
+      summary: t(
+        'One source/target version transition with an optional borrowed cancellation signal.',
+        '一次来源/目标版本转换及可选借用取消信号。'
+      ),
+      members: {}
+    },
+    IMigrationStep: {
+      summary: t(
+        'Unknown historical state conversion; return type inference decides synchronous admission.',
+        '转换未知历史状态；返回类型推断决定同步准入。'
+      ),
+      members: {}
+    },
+    IMigrationReset: {
+      summary: t(
+        'Zero-argument fresh-state factory for resetting older archives once.',
+        '对旧存档仅调用一次的零参数新状态工厂。'
+      ),
+      members: {}
+    },
+    ISyncMigrationSteps: {
+      summary: t(
+        'Retains callback inference while excluding known Promise and callable-then return types.',
+        '保留回调推断，排除已知 Promise 与可调用 then 返回类型。'
+      ),
+      members: {}
+    },
+    IMigrationPlan: {
+      summary: t(
+        'Frozen current/base versions and captured step functions, with optional reset.',
+        '冻结的当前/最低版本及步骤快照，可选 reset。'
+      ),
+      members: {}
+    },
+    IMigrationStepObserver: {
+      summary: t(
+        'Nonblocking before/after observers with a synchronous failure reporter.',
+        '不阻塞的步骤前后观察器及同步失败报告。'
+      ),
+      members: {}
+    },
+    IMigrationRunOptions: {
+      summary: t(
+        'Borrowed cancellation, utility reporter and step observation configuration.',
+        '借用的取消、工具报告器与步骤观察配置。'
+      ),
+      members: {}
+    },
+    ICodecStageObserver: {
+      summary: t(
+        'Observation-only encode/decode stages bound to the original real store and transaction owner.',
+        '绑定原真实 store 与事务拥有者的只观察编解码阶段。'
+      ),
+      members: {}
+    },
     IKeyValueStore: {
       summary: t(
         'Base asynchronous string-channel contract implemented by a concrete backend and admitted by the store shape helpers.',
@@ -2060,8 +2367,8 @@ if (admission.valid) await Reflect.apply(admission.dispose, admission.receiver, 
     },
     ITransactionScope: {
       summary: t(
-        'Backend-issued minimal record transaction view; retain it only inside the asynchronous transaction callback that supplied it.',
-        '后端提供的最小记录事务视图；只能在提供它的异步事务回调内保留使用。'
+        'Complete text, byte and record transaction view; retain it only during its original callback or owned operation interval.',
+        '完整文本、字节与记录事务视图；只在原回调或所属操作区间使用。'
       ),
       scenarios: [
         t(
@@ -2070,8 +2377,8 @@ if (admission.valid) await Reflect.apply(admission.dispose, admission.receiver, 
         )
       ],
       example: `await records.transaction(async (tx) => {
-  const value = await tx.get('profile')
-  if (value) await tx.put(value, 'profile', { conflictPolicy: 'replace' })
+  const value = await tx.getRecord('profile')
+  if (value) await tx.putRecord(value, 'profile', { conflictPolicy: 'replace' })
 })`,
       members: transactionMembers
     },
@@ -2087,36 +2394,9 @@ if (admission.valid) await Reflect.apply(admission.dispose, admission.receiver, 
         )
       ],
       example: `await indexed.transactionIndexed(handle, async (tx) => {
-  await tx.put({ name: 'Ada' }, 'user-1', { byName: { kind: 'single', key: 'Ada' } })
+  await tx.putIndexedRecord({ name: 'Ada' }, 'user-1', handle, { byName: { kind: 'single', key: 'Ada' } })
 })`,
-      members: {
-        get: transactionMembers.get!,
-        delete: transactionMembers.delete!,
-        put: {
-          summary: t(
-            'Writes a record and its explicit per-index projection within the current index transaction.',
-            '在当前索引事务内写入记录及其显式的逐索引投影。'
-          ),
-          params: {
-            value: t(
-              'Application-created record staged in this transaction.',
-              '应用创建、暂存于此事务的记录。'
-            ),
-            key: recordKeyParam,
-            projection: t(
-              'Caller-produced `IRecordIndexProjection` for the definitions selected by the transaction handle.',
-              '调用方为事务句柄选定定义产生的 `IRecordIndexProjection`。'
-            )
-          },
-          returns: t(
-            'A promise of the stored record key; enclosing transaction completion still determines commit.',
-            '存储记录键的异步结果；仍由外层事务完成决定提交。'
-          ),
-          example: `await indexed.transactionIndexed(handle, async (tx) => {
-  await tx.put({ name: 'Ada' }, 'user-1', { byName: { kind: 'single', key: 'Ada' } })
-})`
-        }
-      }
+      members: transactionMembers
     },
     ISecondaryIndexRecordStore: {
       summary: t(
@@ -2228,8 +2508,8 @@ if (admission.valid) await Reflect.apply(admission.dispose, admission.receiver, 
               '同一后端索引接纳操作返回的句柄。'
             ),
             run: t(
-              'Async `(tx) => result` callback receiving `ISecondaryIndexTransactionScope`; do not retain tx after the callback settles. Throw or rejection requests transaction failure.',
-              '接收 `ISecondaryIndexTransactionScope` 的异步 `(tx) => result` 回调；回调结算后不可保留使用事务。抛错或拒绝请求事务失败。'
+              'Synchronous, asynchronous or PromiseLike `(tx) => result` callback receiving `ISecondaryIndexTransactionScope`; do not retain tx after the callback settles. Throw or rejection requests transaction failure.',
+              '接收 `ISecondaryIndexTransactionScope` 的同步、异步或 PromiseLike `(tx) => result` 回调；回调结算后不可保留使用事务。抛错或拒绝请求事务失败。'
             ),
             ctx: contextParam
           },
@@ -2238,7 +2518,7 @@ if (admission.valid) await Reflect.apply(admission.dispose, admission.receiver, 
             '后端事务结局已知后返回回调输出的异步结果。'
           ),
           example: `await indexed.transactionIndexed(handle, async (tx) => {
-  const value = await tx.get('user-1')
+  const value = await tx.getRecord('user-1')
   if (value) console.log(value)
 })`
         }
@@ -2656,6 +2936,88 @@ console.log(compareStorageKeys(key, ['users', 2]))`,
     }
   },
   enums: {
+    TransactionActivityMode: {
+      summary: t(
+        'Actual activity constraint chosen by the backend owner.',
+        '后端拥有者选择的真实活跃约束。'
+      ),
+      values: {
+        managed: t(
+          'The backend manages activity until its own transaction lifetime ends.',
+          '后端在自身事务生命周期结束前管理活跃期。'
+        ),
+        native: t(
+          'Native transaction activity windows govern every request.',
+          '每次请求受原生事务活跃窗口约束。'
+        )
+      }
+    },
+    TransactionBeforeStage: {
+      summary: t(
+        'Observation boundaries before transaction work; all are report-only.',
+        '事务工作前的观察边界，全部只报告。'
+      ),
+      values: {
+        beforeTransaction: t('Before creating a real transaction.', '创建真实事务之前。'),
+        beforeTxOperation: t('Before an admitted transaction operation.', '已接纳事务操作之前。'),
+        beforeCommit: t(
+          'Before the original transaction commits, on the final check view.',
+          '原事务提交前，使用最后检查视图。'
+        ),
+        beforePersistFlush: t(
+          'Before the current transactional persistence flush.',
+          '本次事务持久化 flush 之前。'
+        )
+      }
+    },
+    TransactionObservedStage: {
+      summary: t(
+        'Canonical transaction observations retain the captured original identity.',
+        '规范事务观察保留捕获的原身份。'
+      ),
+      values: {
+        onTransactionStart: t('After a real transaction is registered.', '真实事务登记之后。'),
+        afterTxOperation: t('After one actual transaction operation.', '一次实际事务操作之后。'),
+        afterCommit: t('After native commit is known to have completed.', '确认原生提交完成之后。'),
+        afterRollback: t('After native rollback completes.', '原生回滚完成之后。'),
+        onTransactionClose: t(
+          'After original transaction lifetime closes.',
+          '原事务生命周期关闭之后。'
+        ),
+        afterPersistFlush: t(
+          'After encoding and request completion; this does not claim commit.',
+          '编码与请求完成之后，不声明已提交。'
+        )
+      }
+    },
+    ConcurrencyHolderState: {
+      summary: t(
+        'Real holder status and the remote handoff interval.',
+        '真实持有状态与远端交接区间。'
+      ),
+      values: {
+        held: t('A real local or remote owner holds the lock.', '真实本地或远端拥有者持锁。'),
+        'handing-off': t(
+          'Remote transfer is in progress; owner identity is intentionally absent.',
+          '远端交接进行中，不提供 owner 身份。'
+        )
+      }
+    },
+    StorageStageKind: {
+      summary: t(
+        'Distinct canonical observer families; kinds grant no data authority.',
+        '独立规范观察家族，kind 不授予数据权限。'
+      ),
+      values: {
+        codec: t('Value codec observations.', '值编解码观察。'),
+        backend: t('Backend construction and disposal.', '后端构造与释放。'),
+        operation: t('Ordinary storage operations.', '普通存储操作。'),
+        transaction: t('Original transaction lifecycle and operations.', '原事务生命周期与操作。'),
+        concurrency: t('Lock and policy decisions.', '锁与策略决策。'),
+        sql: t('SQL execution counts.', 'SQL 执行计数。'),
+        query: t('Query plans and result counts.', '查询计划与结果计数。')
+      }
+    },
     ConflictPolicy: {
       summary: t(
         'Existing-key outcomes used by asynchronous, synchronous and transaction write options.',

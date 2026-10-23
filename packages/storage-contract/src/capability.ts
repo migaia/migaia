@@ -49,7 +49,10 @@ export type IStorageStore<TCaps extends IAnyStorageCapability = never> = IStorag
 }
 
 /** The existing KV contract remains the single declaration of its callable API and sync channel. */
-export type IKeyValueApi = Omit<IKeyValueStore, 'backend' | 'capabilities' | 'dispose'>
+export type IKeyValueApi = Omit<
+  IKeyValueStore,
+  'backend' | 'capabilities' | 'dispose' | typeof Symbol.asyncDispose
+>
 
 /** Only standard capabilities with a declared transaction projection belong to transaction use. */
 export type ITransactionalCapability<TCaps extends IAnyStorageCapability> = Extract<
