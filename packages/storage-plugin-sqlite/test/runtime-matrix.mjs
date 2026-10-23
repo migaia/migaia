@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict'
 import { createStorageHost } from '@migaia/storage-host'
+import { asyncDisposeKey } from '@migaia/plugin-host'
 import { defineEntity } from '@migaia/storage-host/entity'
 import { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'
 import { createStore } from '@migaia/store-light'
 import { persist } from '@migaia/store-persist/light'
-import { lockKey } from '@migaia/storage-contract'
+import { lockKey, records } from '@migaia/storage-contract'
 
 /** Each invocation performs exactly one real process phase against its runtime-owned test file. */
 const [mode, path] = process.argv.slice(2)
@@ -15,8 +16,11 @@ const driver = process.versions.bun
 /** The caller owns this connection and releases the host before its native file handle. */
 const connection =
   'bunSqliteDriver' in driver ? driver.bunSqliteDriver(path) : driver.nodeSqliteDriver(path)
+/** The original public observation counts real native resource cleanup, including early return. */
+let iterationCloses = 0
 /** The actual public plugin installs its own native store. */
 const host = await createStorageHost({
+  hooks: { onStorageIterationClose: () => iterationCloses++ },
   plugins: [
     sqliteBackendPlugin({ driver: connection, maxLockMs: mode === 'hold' ? 1000 : undefined })
   ]
@@ -48,6 +52,28 @@ const entities = defineEntity({
 const legacy = { version: 1, state: { id: 'legacy', active: true, score: 1 } }
 /** Canonical record order makes ordinary and transaction projections directly comparable. */
 const projected = [{ id: 'committed' }, { id: 'legacy' }, { id: 'root' }]
+/**
+ * Checks the same public resource paths on actual root and transaction queries.
+ *
+ * @param {import('@migaia/storage-contract').IStorageIterator<string>} stream Original query
+ *   resource.
+ * @returns {Promise<void>} Settles after its one native cleanup completes.
+ */
+async function assertQueryResource(stream) {
+  /** Only this opened resource contributes to the next native close observation. */
+  const before = iterationCloses
+  assert.equal(typeof stream[asyncDisposeKey], 'function')
+  assert.deepEqual(await stream.next(), { done: false, value: 'committed' })
+  /** Explicit and language-level cleanup each retain their original cached Promise. */
+  const main = stream.dispose()
+  const symbolic = stream[asyncDisposeKey]()
+  assert.equal(stream.dispose(), main)
+  assert.equal(stream[asyncDisposeKey](), symbolic)
+  assert.notEqual(main, symbolic)
+  await Promise.all([main, symbolic])
+  assert.equal((await stream.next()).done, true)
+  assert.equal(iterationCloses, before + 1)
+}
 try {
   await handle.ready
   if (mode === 'write') {
@@ -113,6 +139,22 @@ try {
   }
   assert.deepEqual(await entities.get('legacy'), { id: 'legacy', active: true, score: 2 })
   assert.deepEqual(await storage.getRecord(entities.lockKey('legacy').key), legacy)
+  await assertQueryResource(
+    storage
+      .use(records)
+      .query()
+      .select((value) => value.state.id)
+      .stream()
+  )
+  await storage.transaction((tx) =>
+    assertQueryResource(
+      tx
+        .use(records)
+        .query()
+        .select((value) => value.state.id)
+        .stream()
+    )
+  )
   assert.deepEqual(await entities.query().where({ active: true }).select('id').all(), projected)
   assert.deepEqual(
     await storage.transaction((tx) =>
