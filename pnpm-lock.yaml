@@ -768,6 +768,24 @@ importers:
         specifier: 4.1.10
         version: 4.1.10(@types/node@24.13.2)(@vitest/coverage-v8@4.1.10)(jsdom@29.1.1)(vite@8.1.1(@types/node@24.13.2)(esbuild@0.28.2)(jiti@1.21.7)(yaml@2.9.0))
 
+  packages/storage-host:
+    dependencies:
+      '@migaia/event-subscriber':
+        specifier: workspace:^
+        version: link:../event-subscriber
+      '@migaia/lifecycle':
+        specifier: workspace:^
+        version: link:../lifecycle
+      '@migaia/plugin-host':
+        specifier: workspace:^
+        version: link:../plugin-host
+      '@migaia/storage-contract':
+        specifier: workspace:^
+        version: link:../storage-contract
+      '@migaia/utils':
+        specifier: workspace:^
+        version: link:../utils
+
   packages/storage-web:
     dependencies:
       '@migaia/capability':

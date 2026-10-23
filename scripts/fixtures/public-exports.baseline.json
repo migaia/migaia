@@ -1727,6 +1727,20 @@
       "./testing": [
         "createManualScheduler"
       ]
+    },
+    "@migaia/storage-host": {
+      ".": [
+        "STORAGE_HOST_SOURCE",
+        "StorageError",
+        "StorageErrorCode",
+        "StorageErrorText",
+        "StorageHostFacade",
+        "assertStorageBackendId",
+        "createStorageHost",
+        "defineFeature",
+        "definePlugin",
+        "defineStorageBackendKind"
+      ]
     }
   }
 }
