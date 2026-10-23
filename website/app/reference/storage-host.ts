@@ -5,6 +5,13 @@ const t = (en: string, zh: string): IText => ({ en, zh })
 /** Neutral host and authoring entry, with no browser or native driver import. */
 export const storageHostReference: ILibraryReference = {
   modules: {
+    'authoring/vector': {
+      summary: t(
+        'Expose only standard query vector synthesis; memory scoring and ranking remain private.',
+        '只公开标准查询向量合成；memory 评分与排名仍私有。'
+      ),
+      example: storageHostCases.recommendStorageVector![0]!.example
+    },
     'authoring/backend': {
       summary: t(
         'Share channel, unique-index, error and cancellation rules through finite backend functions. Controller and local key-lock construction stay on the original core; only their types are public through this entry. Features retain only controller lookup. The controller closing signal cancels its own pending lock admission without closing the shared provider. Its key-lock port excludes only the exact original live attempt lease when requested and probes canonical point identities directly, scans only selected channel buckets for ranges, and runs synchronous root writes after a final conflict recheck in the original attempt/FIFO.',
@@ -40,6 +47,29 @@ console.log(host.extensions.label('draft'))`
     }
   },
   symbols: {
+    recommendStorageVector: {
+      role: 'operation',
+      purpose: t(
+        'Compute positive mean minus negative mean for native retrieval.',
+        '为原生检索计算正均值减负均值。'
+      ),
+      params: {
+        positive: t(
+          'Nonempty readonly sample vectors with common finite dimensions.',
+          '具有相同有限维度的非空只读样本向量。'
+        ),
+        negative: t(
+          'Optional readonly samples; omission or empty input contributes zero.',
+          '可选只读样本；省略或空输入贡献零。'
+        )
+      },
+      returns: t(
+        'Independent readonly vector; invalid samples reject with INVALID_ARGUMENT and retain original causes. The collection validates cosine zero direction.',
+        '独立只读向量；非法样本报 INVALID_ARGUMENT 并保留原 cause；cosine 零方向由 collection 校验。'
+      ),
+      example: storageHostCases.recommendStorageVector![0]!.example,
+      cases: storageHostCases.recommendStorageVector
+    },
     observeStorageBatch: {
       role: 'operation',
       purpose: t(

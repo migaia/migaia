@@ -139,3 +139,5 @@ await memory.transaction(async (tx) => {
 memory 原生发布 `ttl` 与 `counter`。`expire`、`remaining`、`persist` 指向既有 text、bytes 或 record 通道，结构文本键与批量键共享规范身份。期限为有限非负毫秒，0 立即过期；sync/async 读取、枚举与跨通道冲突检查使用同一惰性到期路径。覆盖活记录保留期限，删除、clear 与跨通道 replace 清除旧期限；`setMany` 的 `ttlMs` 与值在同一原子草稿提交。事务首次读保留值与期限，提交经原修订检查发现观察后的到期。
 
 `store.use(counter).increment('visits', 1)` 在原单键原子写路径修改规范十进制文本。缺失从 0 开始；非规范文本、非安全整数增量与溢出在修改前拒绝 `INVALID_ARGUMENT`。`tx.use(ttl)` 与 `tx.use(counter)` 使用当前原生草稿和原事务预算。
+
+`@migaia/storage-host/authoring/vector` 只导出 `recommendStorageVector(positive, negative?)`，按输入次序计算正样本均值减负样本均值，返回独立只读向量。正样本非空，负样本可空，维度须一致且分量有限；非法输入沿共享 contract 报 `INVALID_ARGUMENT`，getter 原错保留在 cause。函数不创建 collection、查询或连接；原 collection 查询校验 cosine 零范数，再由原生引擎检索。memory 的评分、过滤执行和排名不从作者入口导出。
