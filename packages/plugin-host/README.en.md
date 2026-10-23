@@ -372,3 +372,9 @@ pnpm --filter @migaia/plugin-host run test
 ```
 
 For a stalled installation, distinguish queue admission, hook execution, and self-awaiting activation. A failed config update preserves the committed snapshot; inspect code/cause. Use handles returned from use for typed extension access. For unfinished cleanup, inspect its result and continuations rather than assuming logical closure implies physical release.
+
+## Two execution entries
+
+On sync/async hosts, owners can call `runPipelineSync(value, terminal)` or `runPipelineAsync(value, terminal)` on the `defineHost` handle; subclasses use the same protected entries. Both consume the same registrations, order and lifecycle leases. Sync stages run in both. A visible async stage makes the sync entry throw `ASYNC_STAGE_IN_SYNC_ENTRY` before any stage or terminal runs; removing or disabling it restores sync execution.
+
+The sync entry returns `TResult | undefined`; the async entry accepts a terminal returning `Promise<TResult>` and returns `Promise<TResult | undefined>`. A stage that omits next halts with undefined. Empty lanes invoke the terminal directly, preserving its exact value or Promise identity. Nonempty async execution waits for the actual terminal operation before cleanup. Generator hosts retain `runPipeline`; explicit sync/async entries reject them with `PIPELINE_MODE_MISMATCH`.

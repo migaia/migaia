@@ -1,10 +1,23 @@
 import { createQuiescenceTracker, type IQuiescenceTracker } from '@migaia/lifecycle'
-import type { IMiddlewarePipelineMode, IMiddlewarePipelineStage } from '@migaia/middleware-pipeline'
+import type {
+  IAsyncMiddlewareStage,
+  ISyncMiddlewareStage,
+  IMiddlewarePipelineMode,
+  IMiddlewarePipelineStage
+} from '@migaia/middleware-pipeline'
 import type { IDataOrderSlotState } from './composition.js'
 import type { IRegistration } from './registry.js'
 
+/** Runner forms derived once from one canonical stage registration. */
+export type IStageForms<TValue> = Readonly<{
+  /** Original synchronous stage; absence prevents synchronous entry. */
+  syncStage?: ISyncMiddlewareStage<TValue>
+  /** Ordinary async form; generator modes keep their existing runner path. */
+  asyncStage?: IAsyncMiddlewareStage<TValue>
+}>
+
 /** One exact stage registration; identical function objects still have independent lifetimes. */
-export type IStageEntry<TValue> = {
+export type IStageEntry<TValue> = IStageForms<TValue> & {
   readonly stage: IMiddlewarePipelineStage<IMiddlewarePipelineMode, TValue>
   alive: boolean
 }
@@ -13,6 +26,10 @@ export type IStageEntry<TValue> = {
 export type IStageOwnerSegment = {
   readonly kind: 'owner'
   readonly ordinal: bigint
+  /** Contribution currently included in the global visible count. */
+  visibleCount: number
+  /** Contribution currently preventing synchronous entry. */
+  visibleAsyncCount: number
   owner?: object
   retired: boolean
   /** Counted as a tombstone exactly once: set when the segment is retired and ownerless. */
@@ -30,6 +47,10 @@ type IHostSegment<TValue> = {
 export type IStageSnapshot<TValue> = Readonly<{
   readonly stages: readonly IMiddlewarePipelineStage<IMiddlewarePipelineMode, TValue>[]
   readonly ownerKeys: readonly object[]
+  /** Original synchronous stage forms in this version's canonical order. */
+  readonly syncStages: readonly ISyncMiddlewareStage<TValue>[]
+  /** Async stage forms derived from those same registrations. */
+  readonly asyncStages: readonly IAsyncMiddlewareStage<TValue>[]
 }>
 
 /** Append-only allocation-order lane with one cached immutable execution snapshot per version. */
@@ -40,10 +61,52 @@ export class StageLanes<TValue> {
   #segments: Array<IHostSegment<TValue> | IStageOwnerSegment> = []
   /** Retired empty slots left as tombstones until amortized compaction. */
   #dead = 0
+  /** Visible stage count maintained at mutation boundaries for the empty fast path. */
+  #size = 0
+  /** Visible asynchronous count maintained without scanning stages on execution. */
+  #asyncStageCount = 0
   /** Cached version, invalidated only when visible execution can change. */
   #snapshot: IStageSnapshot<TValue> | undefined
   /** Retires the cached version's owner pins after its last execution releases. */
   #retireSnapshot: (() => void) | undefined
+
+  /** Visible stages, excluding disabled, suspended, unpublished and retired owners. */
+  get size(): number {
+    return this.#size
+  }
+
+  /** Stages that require the asynchronous entry in an ordinary sync/async host. */
+  get asyncStageCount(): number {
+    return this.#asyncStageCount
+  }
+
+  /** Applies a segment delta to the cached totals; no execution scans registrations. */
+  #setContribution(segment: IStageOwnerSegment, count: number, asynchronous: number): void {
+    this.#size += count - segment.visibleCount
+    this.#asyncStageCount += asynchronous - segment.visibleAsyncCount
+    segment.visibleCount = count
+    segment.visibleAsyncCount = asynchronous
+  }
+
+  /** Refreshes only the changed owner's visible contribution and invalidates derived views. */
+  refreshOwner<TDomainCore extends object>(registration: IRegistration<TDomainCore, TValue>): void {
+    /** Candidates and old generations cannot alter a committed segment's counts. */
+    const segment = registration.segment
+    if (segment?.owner !== registration) return
+    /** Live entries contributed by this exact generation. */
+    let count = 0
+    /** Synchronous execution requires an original sync form on every visible entry. */
+    let asynchronous = 0
+    if (registration.enabled && !registration.suspended) {
+      for (const entry of registration.stageEntries) {
+        if (!entry.alive) continue
+        count += 1
+        if (!entry.syncStage) asynchronous += 1
+      }
+    }
+    this.#setContribution(segment, count, asynchronous)
+    this.invalidate()
+  }
 
   /** Invalidates the cached execution version after a visible mutation. */
   invalidate(): void {
@@ -59,6 +122,8 @@ export class StageLanes<TValue> {
     const segment: IStageOwnerSegment = {
       kind: 'owner',
       ordinal: slot.ordinal,
+      visibleCount: 0,
+      visibleAsyncCount: 0,
       retired: false
     }
     slot.segment = segment
@@ -69,9 +134,12 @@ export class StageLanes<TValue> {
   /** Appends a host-owned stage at its allocation position. */
   appendHost(
     stage: IMiddlewarePipelineStage<IMiddlewarePipelineMode, TValue>,
-    ordinal: bigint
+    ordinal: bigint,
+    forms: IStageForms<TValue> = {}
   ): void {
-    this.#segments.push({ kind: 'host', ordinal, entry: { stage, alive: true } })
+    this.#segments.push({ kind: 'host', ordinal, entry: { stage, ...forms, alive: true } })
+    this.#size += 1
+    if (!forms.syncStage) this.#asyncStageCount += 1
     this.invalidate()
   }
 
@@ -79,16 +147,17 @@ export class StageLanes<TValue> {
   registerOwner<TDomainCore extends object>(
     registration: IRegistration<TDomainCore, TValue>,
     slot: IDataOrderSlotState,
-    stage: IMiddlewarePipelineStage<IMiddlewarePipelineMode, TValue>
+    stage: IMiddlewarePipelineStage<IMiddlewarePipelineMode, TValue>,
+    forms: IStageForms<TValue> = {}
   ): void {
     registration.segment = this.ensureSlot(slot)
     /** Disposer toggles only its own occurrence, even when another owner uses the same function. */
-    const entry: IStageEntry<TValue> = { stage, alive: true }
+    const entry: IStageEntry<TValue> = { stage, ...forms, alive: true }
     registration.stageEntries.push(entry)
     registration.pipelineDisposers.push(() => {
       if (!entry.alive) return
       entry.alive = false
-      if (registration.segment?.owner === registration) this.invalidate()
+      if (registration.segment?.owner === registration) this.refreshOwner(registration)
     })
   }
 
@@ -96,7 +165,7 @@ export class StageLanes<TValue> {
   bindOwner<TDomainCore extends object>(registration: IRegistration<TDomainCore, TValue>): void {
     if (!registration.segment) return
     registration.segment.owner = registration
-    this.invalidate()
+    this.refreshOwner(registration)
   }
 
   /** Detaches visibility before sealing the old generation's lease key. */
@@ -107,6 +176,7 @@ export class StageLanes<TValue> {
     const segment = registration.segment
     if (segment?.owner === registration) {
       segment.owner = undefined
+      this.#setContribution(segment, 0, 0)
       this.invalidate()
       this.#markDeadIfOwnerless(segment)
     }
@@ -141,11 +211,21 @@ export class StageLanes<TValue> {
     if (this.#snapshot) return this.#snapshot
     /** Visible stages in the same allocation order as their segments. */
     const stages: IMiddlewarePipelineStage<IMiddlewarePipelineMode, TValue>[] = []
+    /** Derived sync forms preserve the same registrations and generation snapshot. */
+    const syncStages: ISyncMiddlewareStage<TValue>[] = []
+    /** Derived async forms reuse canonical middleware lifting rather than a second registry. */
+    const asyncStages: IAsyncMiddlewareStage<TValue>[] = []
+    /** Appends one visible entry to each supported runner projection. */
+    const append = (entry: IStageEntry<TValue>): void => {
+      stages.push(entry.stage)
+      if (entry.syncStage) syncStages.push(entry.syncStage)
+      if (entry.asyncStage) asyncStages.push(entry.asyncStage)
+    }
     /** Lease keys belonging to registrations that contribute visible stages. */
     const ownerKeys: object[] = []
     for (const segment of this.#segments) {
       if (segment.kind === 'host') {
-        if (segment.entry.alive) stages.push(segment.entry.stage)
+        if (segment.entry.alive) append(segment.entry)
         continue
       }
       const owner = segment.owner as IRegistration<object, TValue> | undefined
@@ -153,7 +233,7 @@ export class StageLanes<TValue> {
       let contributed = false
       for (const entry of owner.stageEntries) {
         if (!entry.alive) continue
-        stages.push(entry.stage)
+        append(entry)
         contributed = true
       }
       if (contributed) ownerKeys.push(owner.pipelineOwnerKey)
@@ -161,6 +241,8 @@ export class StageLanes<TValue> {
     /** Immutable version doubles as the lifecycle execution lease key. */
     const snapshot = Object.freeze({
       stages: Object.freeze(stages),
+      syncStages: Object.freeze(syncStages),
+      asyncStages: Object.freeze(asyncStages),
       ownerKeys: Object.freeze(ownerKeys)
     })
     /** Owner pins belong to the immutable version, rather than every execution. */
@@ -195,6 +277,8 @@ export class StageLanes<TValue> {
   clear(): void {
     this.#segments.length = 0
     this.#dead = 0
+    this.#size = 0
+    this.#asyncStageCount = 0
     this.invalidate()
   }
 }

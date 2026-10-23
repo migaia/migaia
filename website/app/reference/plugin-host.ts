@@ -257,6 +257,36 @@ search.extensions.query('migaia')`
     ),
     example: `await handle.runPipeline('  hello  ', (value) => console.log(value)) // hello`
   },
+  runPipelineSync: {
+    summary: t(
+      'Runs original synchronous stages from the same canonical lane. Any visible async stage throws ASYNC_STAGE_IN_SYNC_ENTRY before effects. Available on sync/async owner handles or as a protected subclass entry; generator hosts keep runPipeline.',
+      '从同一规范列表执行原始同步阶段。可见异步阶段使调用在副作用前抛 ASYNC_STAGE_IN_SYNC_ENTRY。同步/异步拥有者句柄及子类受保护入口可用；生成器宿主沿用 runPipeline。'
+    ),
+    params: {
+      value: t('Input value.', '输入值。'),
+      done: t('Terminal returning TResult.', '返回 TResult 的终点。')
+    },
+    returns: t(
+      'TResult | undefined; halted stages return undefined. Empty lanes preserve the exact terminal value.',
+      'TResult | undefined；阶段停止时返回 undefined，零阶段保留终点原值。'
+    ),
+    example: `const result = host.runPipelineSync(input, (value) => readNative(value))`
+  },
+  runPipelineAsync: {
+    summary: t(
+      'Runs async forms of the same stage registrations, including lifted sync stages. Waits for the real terminal Promise and onion cleanup; uses the existing host cancellation and leases.',
+      '运行同一登记列表的异步形态，包含提升后的同步阶段。等待真实终点 Promise 及外层清理，复用宿主原有取消与租约。'
+    ),
+    params: {
+      value: t('Input value.', '输入值。'),
+      done: t('Terminal returning Promise<TResult>.', '返回 Promise<TResult> 的终点。')
+    },
+    returns: t(
+      'Promise<TResult | undefined>. A halted stage resolves undefined; an empty lane returns the original terminal Promise by identity.',
+      'Promise<TResult | undefined>；阶段停止时解析为 undefined，零阶段返回身份相同的终点原 Promise。'
+    ),
+    example: `const result = await host.runPipelineAsync(input, (value) => readRemote(value))`
+  },
   dispose: {
     summary: t(
       'Closes permanently: stops new changes, drains pipelines and releases plugins with dependents first. The completion Promise is published before callbacks or abort listeners run; concurrent or reentrant disposal shares it, so cleanup middleware runs once. The lifecycle abort reason and later admission failure can be distinct instances with the same source/code.',
@@ -874,7 +904,7 @@ if (isManagedHost(host)) console.log(openComposition(host).revision)`
       exampleIntro: pluginHostCases.defineHost![0]!.problem,
       example: pluginHostCases.defineHost![0]!.example,
       exampleResult: pluginHostCases.defineHost![0]!.result,
-      cases: pluginHostCases.defineHost
+      cases: [...pluginHostCases.defineHost!, ...pluginHostCases.dualEntry!]
     },
     definePlugin: {
       role: 'enhancer',
@@ -1085,8 +1115,8 @@ console.log(ERROR_TEXT.HOST_DISPOSED)`
     PluginHostErrorCode: {
       role: 'error',
       purpose: t(
-        'The 44 Host error and diagnostic codes. Host protocol and configuration-domain failures use PluginHostError; input/definition validation preserves native TypeError. CALLBACK_FAILED classifies otherwise unowned callback or surface-descriptor failures while preserving writable native identity, immutable/non-Error cause and existing foreign ownership. Diagnostic-only codes reach diagnostic instead of being thrown.',
-        '宿主共四十四个错误及诊断码；协议与配置域使用宿主错误，输入及定义校验保留原生类型。`CALLBACK_FAILED` 分类未归属回调或表面描述符失败，可写原生对象保持身份，不可修改或非错误值保留在原因上，外包身份不改写；仅诊断的码经回调报告。'
+        'The 45 Host error and diagnostic codes. Host protocol and configuration-domain failures use PluginHostError; input/definition validation preserves native TypeError. CALLBACK_FAILED classifies otherwise unowned callback or surface-descriptor failures while preserving writable native identity, immutable/non-Error cause and existing foreign ownership. Diagnostic-only codes reach diagnostic instead of being thrown.',
+        '宿主共四十五个错误及诊断码；协议与配置域使用宿主错误，输入及定义校验保留原生类型。`CALLBACK_FAILED` 分类未归属回调或表面描述符失败，可写原生对象保持身份，不可修改或非错误值保留在原因上，外包身份不改写；仅诊断的码经回调报告。'
       ),
       example: `if ((error as { code?: string }).code === PluginHostErrorCode.prerequisiteMissing) await host.use(provider)`
     },
@@ -3013,6 +3043,10 @@ await view.extensions.query('migaia')`,
         pipelineModeMismatch: t(
           '`PIPELINE_MODE_MISMATCH`: a stage cannot be lifted to the host mode.',
           '`PIPELINE_MODE_MISMATCH`：某个步骤无法提升到宿主的模式。'
+        ),
+        asyncStageInSyncEntry: t(
+          '`ASYNC_STAGE_IN_SYNC_ENTRY`: a visible async stage prevents synchronous execution before effects.',
+          '`ASYNC_STAGE_IN_SYNC_ENTRY`：可见异步阶段使同步入口在副作用前拒绝。'
         ),
         pipelineNextDuplicate: t(
           '`PIPELINE_NEXT_DUPLICATE`: `next()` was called twice in one stage.',

@@ -258,6 +258,13 @@ const ERROR_TEXT = {
   /** 标明不受 runner 支持的阶段提升组合，供调用方选择兼容模式。 */
   PIPELINE_MODE_MISMATCH: (hostMode: string, stageMode: string) =>
     prefixed(`host is in ${hostMode} mode and cannot register a ${stageMode} stage`),
+  /** Synchronous execution cannot silently bypass an installed asynchronous intervention. */
+  ASYNC_STAGE_IN_SYNC_ENTRY: prefixed(
+    'synchronous pipeline entry cannot execute asynchronous stages'
+  ),
+  /** Explicit sync/async entries do not consume generator stages or alter their legacy protocol. */
+  PIPELINE_ENTRY_MODE_MISMATCH: (hostMode: string, entryMode: string) =>
+    prefixed(`host is in ${hostMode} mode and cannot use the ${entryMode} pipeline entry`),
   /** Pipeline stage 对同一次 step 重复调用了 next()。 */
   PIPELINE_NEXT_ALREADY_CALLED: prefixed(
     'pipeline stage called next() more than once for the same invocation'

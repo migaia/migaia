@@ -237,6 +237,14 @@ export class PluginHost<
   #pipelineMode: IMiddlewarePipelineMode
   /** Canonical stateless runner that owns mode dispatch, lifting, and violation semantics. */
   #pipeline: IMiddlewarePipeline<IMiddlewarePipelineMode, TValue>
+  /** Canonical sync runner consumes original sync forms from the same registration lane. */
+  #syncPipeline: IMiddlewarePipeline<IMiddlewarePipelineMode, TValue>
+  /** Canonical async runner consumes derived async forms from that same lane. */
+  #asyncPipeline: IMiddlewarePipeline<IMiddlewarePipelineMode, TValue>
+  /** Fixed sync execution policy shares original leases, depth and pending ownership. */
+  readonly #syncPipelineExecution: IPluginHostPipelineExecutionPort<TValue>
+  /** Fixed async execution policy shares original leases, depth and pending ownership. */
+  readonly #asyncPipelineExecution: IPluginHostPipelineExecutionPort<TValue>
   /** Stable execution policy avoids rebuilding four Host closures for every log/stage run. */
   readonly #pipelineExecution: IPluginHostPipelineExecutionPort<TValue>
   #diagnostic: IPluginHostDiagnostic
@@ -321,14 +329,14 @@ export class PluginHost<
         ),
         this
       )
-    this.#pipeline = createPipeline<TValue, IMiddlewarePipelineMode>({
-      mode: this.#pipelineMode,
+    /** All runners share cancellation, violation reporting and error combination policy. */
+    const pipelineOptions = {
       onViolation: this.#onPipelineViolation,
       assertActive: () => this.#assertActive(),
       // Every mode observes the lifecycle abort signal, so in-flight stages of any mode can
       // stop through `context.signal` when the host closes.
       signal: this.#liveSignal,
-      combineStageAndDownstreamError: (stageError, downstreamError) =>
+      combineStageAndDownstreamError: (stageError: unknown, downstreamError: unknown) =>
         tagPluginHostError(
           new AggregateError(
             [stageError, downstreamError],
@@ -336,7 +344,25 @@ export class PluginHost<
           ),
           PluginHostErrorCode.pipelineFailed
         )
+    }
+    this.#pipeline = createPipeline<TValue, IMiddlewarePipelineMode>({
+      ...pipelineOptions,
+      mode: this.#pipelineMode
     })
+    this.#syncPipeline =
+      this.#pipelineMode === MiddlewarePipelineMode.sync
+        ? this.#pipeline
+        : createPipeline<TValue, IMiddlewarePipelineMode>({
+            ...pipelineOptions,
+            mode: MiddlewarePipelineMode.sync
+          })
+    this.#asyncPipeline =
+      this.#pipelineMode === MiddlewarePipelineMode.async
+        ? this.#pipeline
+        : createPipeline<TValue, IMiddlewarePipelineMode>({
+            ...pipelineOptions,
+            mode: MiddlewarePipelineMode.async
+          })
     this.#pipelineExecution = {
       mode: this.#pipelineMode,
       runner: this.#pipeline,
@@ -349,6 +375,16 @@ export class PluginHost<
         this.#pipelineDepth -= 1
       },
       pending: this.#pending
+    }
+    this.#syncPipelineExecution = {
+      ...this.#pipelineExecution,
+      mode: MiddlewarePipelineMode.sync,
+      runner: this.#syncPipeline
+    }
+    this.#asyncPipelineExecution = {
+      ...this.#pipelineExecution,
+      mode: MiddlewarePipelineMode.async,
+      runner: this.#asyncPipeline
     }
     // 时间策略统一走 lifecycle scheduler / 可配置阈值。负数/NaN/Infinity 立即 INVALID_OPTION。
     for (const [label, value] of [
@@ -808,10 +844,27 @@ export class PluginHost<
     kind: IMiddlewarePipelineMode
   ): void {
     try {
+      /** Preserve the existing host-mode lift, reusing it for the async view when modes match. */
+      const lifted = this.#pipeline.lift(stage as never, kind as never)
       registerPluginHostStage({
         host: this,
         depth: this.#pipelineDepth,
-        stage: this.#pipeline.lift(stage as never, kind as never),
+        stage: lifted,
+        forms: {
+          syncStage:
+            kind === MiddlewarePipelineMode.sync
+              ? (stage as ISyncMiddlewareStage<TValue>)
+              : undefined,
+          asyncStage:
+            kind === MiddlewarePipelineMode.sync || kind === MiddlewarePipelineMode.async
+              ? ((this.#pipelineMode === MiddlewarePipelineMode.async
+                  ? lifted
+                  : this.#asyncPipeline.lift(
+                      stage as never,
+                      kind as never
+                    )) as IAsyncMiddlewareStage<TValue>)
+              : undefined
+        },
         owner,
         lanes: this.#state.lanes,
         stageSlots: this.#state.stageSlots,
@@ -851,6 +904,92 @@ export class PluginHost<
       )
     } catch (error) {
       this.#rethrowWithIdentity(error)
+    }
+  }
+
+  /** Rejects explicit ordinary entries on generator hosts without altering their old protocol. */
+  #assertOrdinaryEntry(mode: IMiddlewarePipelineMode): void {
+    if (
+      this.#pipelineMode === MiddlewarePipelineMode.generator ||
+      this.#pipelineMode === MiddlewarePipelineMode.asyncGenerator
+    )
+      throw attachPluginHostIdentity(
+        new PluginHostError(
+          PluginHostErrorCode.pipelineModeMismatch,
+          ERROR_TEXT.PIPELINE_ENTRY_MODE_MISMATCH(this.#pipelineMode, mode)
+        ),
+        this
+      )
+  }
+
+  /**
+   * Runs original sync forms from the canonical lane. Async intervention rejects before any stage
+   * or terminal runs. Empty lanes call the terminal directly; a halted stage returns undefined.
+   */
+  protected runPipelineSync<TResult>(
+    value: TValue,
+    done: (value: TValue) => TResult
+  ): TResult | undefined {
+    this.#assertActive()
+    this.#assertOrdinaryEntry(MiddlewarePipelineMode.sync)
+    if (this.#state.lanes.asyncStageCount > 0)
+      throw attachPluginHostIdentity(
+        new PluginHostError(
+          PluginHostErrorCode.asyncStageInSyncEntry,
+          ERROR_TEXT.ASYNC_STAGE_IN_SYNC_ENTRY
+        ),
+        this
+      )
+    if (this.#state.lanes.size === 0) return done(value)
+    /** One immutable generation snapshot supplies both runner views and the existing lease key. */
+    const snapshot = this.#state.lanes.snapshot()
+    /** A stage may deliberately stop before the terminal, retaining the existing halt protocol. */
+    let result: TResult | undefined
+    try {
+      executePluginHostPipeline(
+        this.#syncPipelineExecution,
+        snapshot,
+        value,
+        (next) => {
+          result = done(next)
+        },
+        snapshot.syncStages
+      )
+      return result
+    } catch (error) {
+      this.#rethrowWithIdentity(error)
+    }
+  }
+
+  /**
+   * Runs the async forms and waits for the actual terminal Promise. With no stages, returns that
+   * exact Promise without a context or dispatch; halted stages resolve undefined.
+   */
+  protected runPipelineAsync<TResult>(
+    value: TValue,
+    done: (value: TValue) => Promise<TResult>
+  ): Promise<TResult | undefined> {
+    try {
+      this.#assertActive()
+      this.#assertOrdinaryEntry(MiddlewarePipelineMode.async)
+      if (this.#state.lanes.size === 0) return done(value)
+      /** Runner views and generation leases share one canonical immutable snapshot. */
+      const snapshot = this.#state.lanes.snapshot()
+      /** Only a fulfilled terminal publishes a result; downstream failure remains runner-owned. */
+      let result: TResult | undefined
+      /** Existing pending tracking waits for terminal I/O and upstream onion cleanup. */
+      const completion = executePluginHostPipeline(
+        this.#asyncPipelineExecution,
+        snapshot,
+        value,
+        async (next) => {
+          result = await done(next)
+        },
+        snapshot.asyncStages
+      ) as Promise<void>
+      return completion.then(() => result)
+    } catch (error) {
+      return Promise.reject(error)
     }
   }
 

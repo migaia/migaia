@@ -18,7 +18,7 @@ import ERROR_TEXT, {
 import { PluginHostErrorCode } from './error-code.js'
 import type { IDataOrderSlotState } from './composition.js'
 import type { IRegistration } from './registry.js'
-import type { IStageSnapshot, StageLanes } from './stage-lanes.js'
+import type { IStageSnapshot, IStageForms, StageLanes } from './stage-lanes.js'
 import { PluginHostRegistrationLifecycle } from './state-constants.js'
 import type { IPluginHostErrorCode } from './typing.js'
 
@@ -60,6 +60,7 @@ type IPluginHostStageRegistrationOptions<TDomainCore extends object, TValue> = R
   readonly host: object
   readonly depth: number
   readonly stage: IMiddlewarePipelineStage<IMiddlewarePipelineMode, TValue>
+  readonly forms?: IStageForms<TValue>
   readonly owner: IRegistration<TDomainCore, TValue> | undefined
   readonly lanes: StageLanes<TValue>
   readonly stageSlots: Map<string, IDataOrderSlotState>
@@ -81,7 +82,7 @@ export const registerPluginHostStage = <TDomainCore extends object, TValue>(
   if (options.depth > 0 && !owner)
     throw new PluginHostError(PluginHostErrorCode.pipelineExecuting, ERROR_TEXT.PIPELINE_EXECUTING)
   if (!owner) {
-    options.lanes.appendHost(stage, options.allocateSlot())
+    options.lanes.appendHost(stage, options.allocateSlot(), options.forms)
     return
   }
   let slotState = options.stageSlots.get(owner.name)
@@ -94,7 +95,7 @@ export const registerPluginHostStage = <TDomainCore extends object, TValue>(
     }
     options.stageSlots.set(owner.name, slotState)
   }
-  options.lanes.registerOwner(owner, slotState, stage)
+  options.lanes.registerOwner(owner, slotState, stage, options.forms)
 }
 
 /** Executes the single host-mode lane and owns lease/depth/pending cleanup. */
@@ -102,9 +103,9 @@ export const executePluginHostPipeline = <TValue>(
   options: IPluginHostPipelineExecutionPort<TValue>,
   snapshot: IStageSnapshot<TValue>,
   value: TValue,
-  done: (value: TValue) => void
+  done: (value: TValue) => void,
+  stages = snapshot.stages
 ): void | Promise<void> => {
-  const stages = snapshot.stages
   const asynchronous =
     options.mode === MiddlewarePipelineMode.async ||
     options.mode === MiddlewarePipelineMode.asyncGenerator
