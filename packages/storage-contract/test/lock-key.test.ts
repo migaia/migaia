@@ -7,18 +7,115 @@ import {
   snapshotConcurrencyLockRange,
   type ILockHolding,
   type ILockKey,
-  type IStorageKey
+  type IStorageKey,
+  term,
+  encodeStorageRdfQuad
 } from '../src/index.js'
 import { normalizeLockKeys, snapshotLockKey } from '../src/concurrency.js'
 
 /** Oracle compares established key meanings and fixed channel order, independent of new encoding. */
 function compareLockKeys(left: ILockKey, right: ILockKey): number {
   /** This small table is independent test data, not a production lock identity owner. */
-  const channel = { text: 0, bytes: 1, record: 2 }
+  const channel = { text: 0, bytes: 1, record: 2, vector: 3, rdf: 4 }
+  if (
+    left.channel === 'vector' ||
+    left.channel === 'rdf' ||
+    right.channel === 'vector' ||
+    right.channel === 'rdf'
+  )
+    return channel[left.channel] - channel[right.channel]
   return channel[left.channel] - channel[right.channel] || compareStorageKeys(left.key, right.key)
 }
 
 describe('canonical lock identities', () => {
+  it('adds disjoint vector and canonical ground RDF identities to the original lock order', () => {
+    const quad = {
+      subject: term.iri('urn:s'),
+      predicate: term.iri('urn:p'),
+      object: term.literal('text', { language: 'EN' }),
+      graph: term.defaultGraph
+    }
+    const vector = lockKey.vector('catalog', 'one')
+    const rdf = lockKey.rdf(quad)
+    expectTypeOf(vector.collection).toEqualTypeOf<string>()
+    expectTypeOf(rdf.quad).toEqualTypeOf<import('../src/index.js').IQuad>()
+    const captured = snapshotConcurrencyLockKeys(
+      [
+        rdf,
+        vector,
+        lockKey.record(['catalog', 'one']),
+        lockKey.bytes('one'),
+        lockKey.text('one'),
+        lockKey.rdf({ ...quad, object: term.literal('text', { language: 'en' }) }),
+        lockKey.vector('catalog', 'one')
+      ],
+      'memory'
+    )
+    expect(captured.keys.map((key) => key.channel)).toEqual([
+      'text',
+      'bytes',
+      'record',
+      'vector',
+      'rdf'
+    ])
+    expect(new Set(captured.identities).size).toBe(5)
+    expect(normalizeLockKeys([rdf], 'memory')[0]!.encoded.slice(1)).toEqual(
+      encodeStorageRdfQuad(quad, 'memory')
+    )
+    for (const channel of ['vector', 'rdf'] as const) {
+      const range = snapshotConcurrencyLockRange({ channel }, 'memory')
+      const own = captured.identities[channel === 'vector' ? 3 : 4]!
+      expect(range.lower <= own && own < range.upper).toBe(true)
+      expect(() => snapshotConcurrencyLockRange({ channel, prefix: 'x' }, 'memory')).toThrowError(
+        expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+      )
+    }
+    expect(Object.isFrozen(rdf.quad)).toBe(true)
+    expect(rdf.quad).not.toBe(quad)
+    expect(() => lockKey.rdf({ ...quad, subject: term.blank('local') } as never)).toThrowError(
+      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+    )
+    expect(() => lockKey.vector('catalog', 1 as never)).toThrowError(
+      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+    )
+    const reads: string[] = []
+    expect(
+      snapshotLockKey(
+        {
+          get channel() {
+            reads.push('channel')
+            return 'vector'
+          },
+          get collection() {
+            reads.push('collection')
+            return 'catalog'
+          },
+          get id() {
+            reads.push('id')
+            return 'one'
+          },
+          get key(): never {
+            throw new Error('irrelevant')
+          }
+        },
+        'memory'
+      )
+    ).toEqual(vector)
+    expect(reads).toEqual(['channel', 'collection', 'id'])
+    const original = new Error('vector getter failed')
+    expect(() =>
+      snapshotLockKey(
+        {
+          channel: 'vector',
+          get collection(): never {
+            throw original
+          }
+        },
+        'memory'
+      )
+    ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT', cause: original }))
+  })
+
   it('snapshots factory inputs and preserves exact channel types without a fabricated backend', () => {
     /** Caller-owned mutable key components must detach immediately at factory invocation. */
     const date = new Date(1)
@@ -71,9 +168,9 @@ describe('canonical lock identities', () => {
     expect(Object.isFrozen(normalized)).toBe(true)
     expect(normalizeLockKeys([], 'memory')).toEqual([])
     /** Actual strings and typed batch keys keep different canonical identities. */
-    const text = normalized.filter((item) => item.key.channel === 'text')
-    expect(text.map((item) => item.key.key)).toContain(1)
-    expect(text.map((item) => item.key.key)).toContain('1')
+    const text = normalized.map((item) => item.key).filter((key) => key.channel === 'text')
+    expect(text.map((key) => key.key)).toContain(1)
+    expect(text.map((key) => key.key)).toContain('1')
   })
 
   it('keeps encoded internal identity independent of all caller-owned key components', () => {
@@ -86,7 +183,10 @@ describe('canonical lock identities', () => {
     sourceKey[0].setTime(50)
     new Uint8Array(sourceKey[1]).fill(99)
     expect(normalized[0]!.encoded).toEqual(before)
-    expect(normalized[0]!.key.key).toEqual([new Date(1), new Uint8Array([1]).buffer])
+    expect((normalized[0]!.key as Extract<ILockKey, { channel: 'record' }>).key).toEqual([
+      new Date(1),
+      new Uint8Array([1]).buffer
+    ])
     normalized[0]!.encoded.fill(0)
     expect(sourceKey[0].getTime()).toBe(50)
     expect(new Uint8Array(sourceKey[1])[0]).toBe(99)
@@ -207,7 +307,10 @@ describe('canonical lock identities', () => {
     bytes.fill(99)
     holder.label = 'changed'
     rows.length = 0
-    expect(snapshot[4]!.key.key).toEqual([new Date(2), new Uint8Array([3]).buffer])
+    expect((snapshot[4]!.key as Extract<ILockKey, { channel: 'record' }>).key).toEqual([
+      new Date(2),
+      new Uint8Array([3]).buffer
+    ])
     expect(snapshot[4]!.holder).toMatchObject({ label: 'writer' })
     expect(snapshot[1]!.holder).toMatchObject({ owner: 'native-owner' })
     expect(snapshot[2]!.holder).toMatchObject({ owner: 'other-owner' })
@@ -299,10 +402,10 @@ describe('canonical lock identities', () => {
     ].reverse()
     const normalized = normalizeLockKeys(keys, 'memory')
     expect(normalized).toHaveLength(513)
-    expect(normalized.slice(0, 512).map((item) => item.key.key)).toEqual(
-      Array.from({ length: 512 }, (_, index) => index)
-    )
-    expect(normalized[512]!.key.key).toBe(long)
+    expect(
+      normalized.slice(0, 512).map((item) => ('key' in item.key ? item.key.key : undefined))
+    ).toEqual(Array.from({ length: 512 }, (_, index) => index))
+    expect((normalized[512]!.key as Extract<ILockKey, { channel: 'record' }>).key).toBe(long)
     /** Known simple keys reveal only the channel prefix followed by the original canonical bytes. */
     expect(normalizeLockKeys([lockKey.text('a')], 'memory')[0]!.encoded).toEqual(
       new Uint8Array([1, 3, 1, 0, 97, 0])

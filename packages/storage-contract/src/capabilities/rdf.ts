@@ -89,7 +89,7 @@ function createIriPattern(): RegExp {
 }
 /** Static lexical admission has no external state and can be eliminated when RDF is unused. */
 const RDF_IRI = /* @__PURE__ */ createIriPattern()
-/** RFC 5646 well-formed language tags, before duplicate variant/extension checks. */
+/** RFC 5646 ABNF accepts well-formed tags without imposing IANA validity rules. */
 const RDF_LANGUAGE =
   /^(?:(?:[a-z]{2,3}(?:-[a-z]{3}){0,3}|[a-z]{4}|[a-z]{5,8})(?:-[a-z]{4})?(?:-(?:[a-z]{2}|[0-9]{3}))?(?:-(?:[a-z0-9]{5,8}|[0-9][a-z0-9]{3}))*(?:-[a-wy-z0-9](?:-[a-z0-9]{2,8})+)*(?:-x(?:-[a-z0-9]{1,8})+)?|x(?:-[a-z0-9]{1,8})+)$/
 /** The finite grandfathered set is part of RFC 5646 grammar, not a language registry lookup. */
@@ -155,24 +155,6 @@ function rdfLanguage(value: unknown, backend: IBackendKind | undefined): string 
   const language = value.toLowerCase()
   if (RDF_GRANDFATHERED.has(language)) return language
   if (!RDF_LANGUAGE.test(language)) throw invalidRdf(backend)
-  if (language.startsWith('x-')) return language
-  /** Repeated variants and extension singletons are not well-formed under RFC 5646 section 2.2.9. */
-  const variants = new Set<string>()
-  /** Extension keys are independent from ordinary variant subtags. */
-  const extensions = new Set<string>()
-  /** Private-use tails permit repeated subtags and no longer participate in these uniqueness rules. */
-  let extension = false
-  for (const part of language.split('-').slice(1)) {
-    if (part === 'x') break
-    if (part.length === 1) {
-      if (extensions.has(part)) throw invalidRdf(backend)
-      extensions.add(part)
-      extension = true
-    } else if (!extension && (part.length >= 5 || /^[0-9][a-z0-9]{3}$/.test(part))) {
-      if (variants.has(part)) throw invalidRdf(backend)
-      variants.add(part)
-    }
-  }
   return language
 }
 /** Creates an admitted literal with its mandatory datatype and consistent optional language. */
