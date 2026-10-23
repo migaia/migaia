@@ -2757,6 +2757,19 @@ if (snapshot) console.log(await snapshot.store.getRecord('profile'))`
       ),
       example: `assertStringStorageKey('theme', 'local')`
     },
+    snapshotStorageOrgKeyPrefix: {
+      role: 'operation',
+      purpose: t(
+        'Project half-open native byte bounds from the original organization and logical prefix owners.',
+        '从原组织与逻辑前缀拥有者投影原生半开字节界。'
+      ),
+      returns: t(
+        'Detached lower/upper bytes; undefined prefix selects all logical keys in only that organization.',
+        '独立lower/upper字节；undefined前缀仅选择该组织全部逻辑键。'
+      ),
+      example: storageContractCases.snapshotStorageOrgKeyPrefix![0]!.example,
+      cases: storageContractCases.snapshotStorageOrgKeyPrefix
+    },
     encodeStorageOrgKey: {
       role: 'operation',
       purpose: t(

@@ -1130,6 +1130,7 @@
         "snapshotStorageCounterIncrement",
         "snapshotStorageKey",
         "snapshotStorageKeyPrefix",
+        "snapshotStorageOrgKeyPrefix",
         "snapshotStorageRdfPattern",
         "snapshotStorageRdfQuad",
         "snapshotStorageRdfTerm",

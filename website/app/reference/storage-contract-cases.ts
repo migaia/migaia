@@ -1285,6 +1285,25 @@ console.log(migrateEnvelopeSync(plan, { version: 0, state: 'old' })) // { previo
       )
     }
   ],
+  snapshotStorageOrgKeyPrefix: [
+    {
+      title: t('Bound a native organization range', '限定原生组织范围'),
+      problem: t(
+        'Reuse complete typed-key limits without a second tenant codec.',
+        '保完整typed键限制，不加第二组织codec。'
+      ),
+      example: `import { snapshotStorageOrgKeyPrefix, encodeStorageOrgKey, orderStorageKeysByBytes } from '@migaia/storage-contract'
+const org = '11111111-1111-1111-1111-111111111111'
+const bounds = snapshotStorageOrgKeyPrefix(org, 'order/', 'redis')
+const key = encodeStorageOrgKey(org, 'order/1', 'redis')
+const sorted = orderStorageKeysByBytes([bounds.lower, key, bounds.upper], value => value)
+console.log(sorted[1] === key)`,
+      result: t(
+        'Prints true. Undefined prefix selects all logical key types in this organization.',
+        '输出true；undefined前缀选择该组织内全部逻辑键类型。'
+      )
+    }
+  ],
   encodeStorageOrgKey: [
     {
       title: t('Preserve the complete logical key budget', '保留完整逻辑键预算'),

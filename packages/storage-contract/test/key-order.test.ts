@@ -4,12 +4,13 @@ import {
   encodeOrderedStorageKey,
   encodeStorageOrgKey,
   decodeStorageOrgKey,
+  snapshotStorageOrgKeyPrefix,
+  snapshotStorageKeyPrefix,
   prefixStorageOrgKey,
   encodeStorageOrgStringPrefix,
   orderStorageKeysByBytes,
   snapshotStorageBatchKeys,
   createStorageBatchKeyCapture,
-  snapshotStorageKeyPrefix,
   snapshotStorageKey,
   type IStorageKey
 } from '../src/index.js'
@@ -84,6 +85,40 @@ describe('organization ordered wire keys', () => {
         'redis'
       )
     ).toThrowError(expect.objectContaining({ code: 'INVALID_KEY' }))
+  })
+
+  it('projects original typed prefixes and full tenant ranges without shrinking logical limits', () => {
+    const inRange = (bytes: Uint8Array, range: { lower: Uint8Array; upper: Uint8Array }) =>
+      Buffer.compare(bytes, range.lower) >= 0 && Buffer.compare(bytes, range.upper) < 0
+    const all = snapshotStorageOrgKeyPrefix(orgId, undefined, 'redis')
+    let deep: IStorageKey = 'leaf'
+    for (let depth = 0; depth < 32; depth++) deep = [deep]
+    const wide: IStorageKey = Array.from({ length: 4095 }, () => '')
+    for (const key of [...keys, deep, wide]) {
+      expect(inRange(encodeStorageOrgKey(orgId, key, 'redis'), all)).toBe(true)
+      expect(inRange(encodeStorageOrgKey(otherOrgId, key, 'redis'), all)).toBe(false)
+    }
+    for (const prefix of [
+      'str',
+      '\ud800',
+      1,
+      new Date(0),
+      new Uint8Array([1]).buffer,
+      ['a'],
+      deep,
+      wide
+    ]) {
+      const range = snapshotStorageOrgKeyPrefix(orgId, prefix, 'redis')
+      const logical = snapshotStorageKeyPrefix(prefix, 'redis')
+      for (const key of [...keys, prefix, deep, wide])
+        expect(inRange(encodeStorageOrgKey(orgId, key, 'redis'), range)).toBe(logical.matches(key))
+    }
+    expect(() => snapshotStorageOrgKeyPrefix(orgId, [], 'redis')).toThrowError(
+      expect.objectContaining({ code: 'INVALID_KEY' })
+    )
+    expect(() => snapshotStorageOrgKeyPrefix('invalid', undefined, 'redis')).toThrowError(
+      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+    )
   })
 
   it('checks tenant and wire boundaries while retaining the original logical decoder limits', () => {
