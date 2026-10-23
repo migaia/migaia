@@ -582,3 +582,19 @@ lockKey.text 与 lockKey.record 接收原有 typed storage-key 域，lockKey.byt
 LOCK_REJECTED 与 LOCK_TIMEOUT 携只读 keys、holder。已确认身份时消息含逻辑/规范键身份与真实 label；交接窗口明确写 handing-off，不借用前任身份。物理调度无法提供身份时，物理超时仍携声明键，holder 为 undefined。
 
 循环也把已捕获的原生扩展选项与 symbol 字段传给每次 attempt 及接收同一 context 的内层调用；覆盖规范上下文字段时不丢后端扩展，也不再读取固定字段 getter。
+
+### 不可变事务 builder
+
+`createTransactionBuilder(store, options?)` 接收具备真实 transaction 签名的原登记 store。根对象只有 lock/concurrency/signal/timeout，没有 run；声明至少一个锁后才启用 run。每次派生返回独立不可变分支，每次 lock 只快照新增键。run 用显式栈展开共享历史，经原 owner 只规范化一次，再直接调用原 transaction 一次；保留原 Promise 身份、完整原生 scope 与 options 类型。配置不创建期限、队列或 I/O。
+
+`IRecordStore.transaction` 与索引事务选项包含原 `ITransactionOptions` 的 lock/concurrency 字段。具体 tx()/inspectLocks 方法仍由真实实现接入。对已安装且登记的记录 store：
+
+```ts
+import { createTransactionBuilder, lockKey, type IRecordStore } from '@migaia/storage-contract'
+function readLocked(store: IRecordStore<{ count: number }>) {
+  return createTransactionBuilder(store, { pageSize: 50 })
+    .lock(lockKey.record('counter'))
+    .timeout(2_000)
+    .run((tx) => tx.getRecord('counter'))
+}
+```

@@ -1041,6 +1041,7 @@
         "assertVersionedEnvelope",
         "compareStorageKeys",
         "createMigrationPlan",
+        "createTransactionBuilder",
         "createTransactionOwner",
         "defineConcurrencyPolicy",
         "defineStorageCapability",

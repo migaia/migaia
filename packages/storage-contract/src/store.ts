@@ -1,3 +1,4 @@
+import type { ITransactionOptions } from './concurrency.js'
 import { StorageContractError, StorageContractErrorCode } from './errors.js'
 import {
   snapshotStorageCapabilitiesDetailed,
@@ -198,7 +199,7 @@ export type IRecordStore<TValue = unknown> = IKeyValueStore & {
    */
   transaction<TResult>(
     run: (tx: ITransactionScope<TValue>) => TResult,
-    ctx?: IOperationContext
+    ctx?: ITransactionOptions
   ): Promise<Awaited<TResult>>
 }
 

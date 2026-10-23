@@ -5,6 +5,33 @@ const t = (en: string, zh: string): IText => ({ en, zh })
 
 /** Exercises public contract tools without supplying a fictional storage implementation. */
 export const storageContractCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
+  createTransactionBuilder: [
+    {
+      title: t('Declare locks without starting a transaction', '声明锁而不提前启动事务'),
+      problem: t(
+        'Independent builder branches must not copy old lock prefixes or start operation deadlines during configuration.',
+        '独立 builder 分支不能反复复制旧锁前缀，也不能在配置期间启动操作期限。'
+      ),
+      example: t(
+        `import { createTransactionBuilder, lockKey, type IRecordStore } from '@migaia/storage-contract'
+function readLocked(store: IRecordStore<{ count: number }>) {
+  return createTransactionBuilder(store, { pageSize: 50 })
+    .lock(lockKey.record('counter')).timeout(2_000)
+    .run(tx => tx.getRecord('counter'))
+}`,
+        `import { createTransactionBuilder, lockKey, type IRecordStore } from '@migaia/storage-contract'
+function readLocked(store: IRecordStore<{ count: number }>) {
+  return createTransactionBuilder(store, { pageSize: 50 })
+    .lock(lockKey.record('counter')).timeout(2_000)
+    .run(tx => tx.getRecord('counter'))
+}`
+      ),
+      result: t(
+        'The supplied registered store starts one transaction at run, returning its original Promise. The scope remains that store’s complete native scope.',
+        '所提供登记 store 在 run 时启动一次事务，返回原 Promise；scope 保留该 store 的完整原生结构。'
+      )
+    }
+  ],
   runWithConcurrency: [
     {
       title: t(

@@ -455,3 +455,19 @@ An inner store call receiving the exact attempt context reuses the outer budget 
 LOCK_REJECTED and LOCK_TIMEOUT include read-only keys and holder properties. Known holder messages include logical/canonical key identity and the confirmed label; handing-off is reported explicitly without borrowing the previous owner. Physical timeout carries declared keys and an unknown holder when physical scheduling supplies no identity.
 
 The loop also forwards captured native option fields and symbol properties to every attempt and exact-context nested call. It never drops backend extensions when applying canonical context fields, and it does not read fixed-field getters again.
+
+### Immutable transaction builder
+
+`createTransactionBuilder(store, options?)` accepts the original registered store with its actual transaction signature. The root has lock/concurrency/signal/timeout and no run method. Declaring at least one lock enables run; every derivation returns a new immutable branch. Only newly declared keys are snapshotted at each lock step. Run unfolds shared blocks with an explicit stack, normalizes once through the existing owner, and invokes the original transaction exactly once. It preserves the original transaction Promise and full native scope/options types. Configuration creates no deadline, queue or I/O.
+
+`IRecordStore.transaction` and indexed transaction options include the original `ITransactionOptions` lock/concurrency fields. Native tx()/inspectLocks methods still belong to concrete implementations. For an already installed, registered record store:
+
+```ts
+import { createTransactionBuilder, lockKey, type IRecordStore } from '@migaia/storage-contract'
+function readLocked(store: IRecordStore<{ count: number }>) {
+  return createTransactionBuilder(store, { pageSize: 50 })
+    .lock(lockKey.record('counter'))
+    .timeout(2_000)
+    .run((tx) => tx.getRecord('counter'))
+}
+```
