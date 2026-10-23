@@ -88,6 +88,9 @@ export const StorageContractErrorText = {
   /** Invalid capability descriptors and provider resources fail before installation side effects. */
   capabilityArgument: 'capability token, implementation or provider base is invalid',
   /** Missing token diagnostics identify backend and capability without granting authority by name. */
+  /** Root membership alone does not authorize a capability on an original transaction view. */
+  capabilityTransactionMissing: (capability: string, backend: string): string =>
+    `backend ${backend} does not provide transaction capability ${capability}`,
   capabilityMissing: (capability: string, backend: string): string =>
     `backend ${backend} does not provide capability ${capability}`
 } as const

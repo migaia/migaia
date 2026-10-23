@@ -67,6 +67,7 @@ export type {
   ITransactionScope,
   ITransactionWriteOptions,
   ITransactionKeyValueApi,
+  ITransactionRecordsApi,
   ITransactionStageObserver
 } from './transaction.js'
 export { assertTransactionCallback, readTransactionConflictPolicy } from './transaction.js'
@@ -222,3 +223,6 @@ export type {
   IQueryChain,
   IRecordQuerySource
 } from './query-chain.js'
+
+export { useTransactionCapability } from './transaction.js'
+export type { ITransactionCapabilityView } from './capability.js'

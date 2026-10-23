@@ -702,3 +702,19 @@ async function readUser(executor: ISqlExecutor, id: number) {
 `createSqlTag({ dialect, all, get, run })` lets original backend authors bind these nodes to real execution. Each callback receives `prepare: () => ICompiledStorageSql` and the original ctx. It must enter its original operation/transaction owner before calling prepare, then invoke its native driver. The tag returns that callback's exact Promise and preserves its receiver and ctx. It creates no connection, pipeline, lease, cancellation timer or disposal owner. ICompiledStorageSql contains only text and readonly values. The first complete text is checked for one statement, quoting, comments, transaction control and SQLite journal_mode mutation. Rejection happens inside original admission before native invocation and enters the same transaction first failure. One trailing semicolon and comments are allowed; CREATE TRIGGER internal statement lists are rejected.
 
 Shared ISqlValue includes boolean, bigint and Uint8Array. ISqlRunResult promises changes only, with no insertion ID. Backends specialize ISqlTag<TValue, TResult>/ISqlExecutor<TValue, TResult> to retain native output domains and results. Explicit row types are caller declarations, not runtime verification of the SQL output schema. SQLite boolean input conversion and lastInsertRowid belong to its original adapter. PostgreSQL standard strings use supported standard_conforming_strings=on, alongside E strings, dollar quotes and nested block comments. Original backend owners retain connections, driver errors, observations and transaction cleanup.
+
+## Original transaction capability projections
+
+`useTransactionCapability(scope, token)` finds the original store through an authentic scope's transaction owner, then reads its sole provider table. Backend method factories use `use: (token) => useTransactionCapability(scope, token)`. The helper does not modify scopes, so complete frozen scopes with public type annotations need no private symbol or cast. Pure use invokes no forTransaction binder or I/O. Repeated use for the same view/implementation returns one frozen projection, whose cache is cleared when the view expires.
+
+The implemented standard transaction projections cover kv and records. KV supplies all eight get/set/remove/has/getMany/setMany/removeMany/removeByPrefix methods, retaining one real native batch. It has no root keys/clear, ordinary operation ctx or independent policy. Records supplies the real shared query and removeByPrefix; query all accepts no ordinary ctx. Every data method enters the original runTransactionOperation and passes a fresh complete operation view to forTransaction. Saved query all also enters that owner before strict planning, mapping and original iterator cleanup, retaining first failure and draining. Saved data methods and query terminals reject the original backend TRANSACTION_FAILED before I/O after closure.
+
+```ts
+import { kv, records, type ITransactionScope } from '@migaia/storage-contract'
+async function paidValues(tx: ITransactionScope<{ state: string; value: number }, typeof records>) {
+  await tx.use(kv).setMany([{ key: 'status', value: 'paid' }])
+  return tx.use(records).query().where({ state: 'paid' }).select('value').all()
+}
+```
+
+A base/Feature declaring transactions must provide real forTransaction bindings for supplied kv and records. The provider checks before publication or base mutation. Binders use the current native view and must not return root APIs. Query construction remains pure, and the backend source must register its actual iterator with that scope's original owner. The second ITransactionScope generic and ITransactionCapabilityView preserve capability-set contravariance. Provider type projection replaces transaction/tx use while retaining native extensions, options, builder augmentation and Awaited results. Other standard transaction projections and the root KV batch surface remain for later implementations.

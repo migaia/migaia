@@ -1,5 +1,9 @@
 /** Stable capability admission method names also resolve the overlapping KV has operation. */
-export const StorageCapabilityMethod = { use: 'use', has: 'has' } as const
+export const StorageCapabilityMethod = {
+  use: 'use',
+  has: 'has',
+  removeByPrefix: 'removeByPrefix'
+} as const
 
 /** Standard key-value methods validated and published by the canonical capability provider. */
 export const STORAGE_KEY_VALUE_METHODS = [
@@ -19,4 +23,16 @@ export const STORAGE_KEY_VALUE_PROPERTIES = ['sync'] as const
 export const STORAGE_CAPABILITY_METHODS = [
   StorageCapabilityMethod.use,
   StorageCapabilityMethod.has
+] as const
+
+/** Complete original transaction KV projection, including native batch and prefix operations. */
+export const TRANSACTION_KEY_VALUE_METHODS = [
+  'get',
+  'set',
+  'remove',
+  StorageCapabilityMethod.has,
+  'getMany',
+  'setMany',
+  'removeMany',
+  StorageCapabilityMethod.removeByPrefix
 ] as const
