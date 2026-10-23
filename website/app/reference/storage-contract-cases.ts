@@ -135,9 +135,49 @@ function observe(query: ISqlQuery) {
   )
 }
 
+/** Object reads acquire the backend's actual snapshot and dispose it through the original owner. */
+const blobCase: ICaseDoc = {
+  title: t('Read an independent object snapshot', '读取独立对象快照'),
+  problem: t(
+    'Object resources must be consumed once and released after reading.',
+    '对象资源须单次消费，并在读取后释放。'
+  ),
+  example: `import { blob, type IStorageStore } from '@migaia/storage-contract'
+async function readObject(store: IStorageStore<typeof blob>) {
+  const object = await store.use(blob).get('readme')
+  if (!object) return undefined
+  await using owned = object
+  return object.bytes()
+}`,
+  result: t(
+    'The actual backend supplies detached bytes; the original object lifetime closes once.',
+    '实际后端提供独立字节；原对象生命周期只关闭一次。'
+  )
+}
+/** Replay cursors advance only after the consumer has processed the returned native commits. */
+const durableChangeCase: ICaseDoc = {
+  title: t('Replay durable commit summaries', '重放持久提交摘要'),
+  problem: t(
+    'Consumers must retain their cursor only after successful processing.',
+    '消费者须在成功处理后才保存游标。'
+  ),
+  example: `import { durableChangeFeed, type IStorageStore, type IDurableStorageChange } from '@migaia/storage-contract'
+async function replay(store: IStorageStore<typeof durableChangeFeed>, after: string, process: (change: IDurableStorageChange) => Promise<void>) {
+  const batch = await store.use(durableChangeFeed).readChanges({ after })
+  for (const change of batch.changes) await process(change)
+  return batch.cursor
+}`,
+  result: t(
+    'Actual retained commits replay at least once. A retention gap rejects CHANGE_CURSOR_EXPIRED and requires full invalidation.',
+    '实际保留提交至少一次重放；保留期缺口拒绝 CHANGE_CURSOR_EXPIRED，并要求全量失效。'
+  )
+}
+
 /** Exercises public contract tools without supplying a fictional storage implementation. */
 export const storageContractCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
   sql: [sqlCapabilityCase],
+  blob: [blobCase],
+  durableChangeFeed: [durableChangeCase],
   deriveStorageSqlQuery: [deriveSqlCase],
   term: [rdfTermCase],
   snapshotStorageRdfTerm: [rdfTermCase],

@@ -1,7 +1,12 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import {
   ttl,
   counter,
+  blob,
+  durableChangeFeed,
+  type ITransactionalCapability,
+  type IBlobApi,
+  type IDurableChangeFeedApi,
   sql,
   createSqlTag,
   implement,
@@ -36,6 +41,46 @@ function base(): IStorageBase {
 }
 
 describe('standard scalar capability contracts', () => {
+  it('publishes independent blob and durable APIs without flat KV or transaction authority', () => {
+    const native = vi.fn(async (): Promise<never> => {
+      throw new Error('admission must not execute')
+    })
+    const objects: IBlobApi = {
+      put: native,
+      get: native,
+      head: native,
+      remove: native,
+      list: native,
+      removeByPrefix: native
+    }
+    const changes: IDurableChangeFeedApi = { readChanges: native, tailChanges: native }
+    const store = provideCapabilities(base(), [
+      implement(blob, objects),
+      implement(durableChangeFeed, changes)
+    ])
+    expect(store.use(blob)).toBe(objects)
+    expect(store.use(durableChangeFeed)).toBe(changes)
+    expect('get' in store).toBe(false)
+    expect(native).not.toHaveBeenCalled()
+    expectTypeOf<
+      ITransactionalCapability<typeof blob | typeof durableChangeFeed>
+    >().toEqualTypeOf<never>()
+    for (const method of ['put', 'get', 'head', 'remove', 'list', 'removeByPrefix'])
+      expect(() =>
+        provideCapabilities(base(), [implement(blob, { ...objects, [method]: undefined } as never)])
+      ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT' }))
+    for (const method of ['readChanges', 'tailChanges'])
+      expect(() =>
+        provideCapabilities(base(), [
+          implement(durableChangeFeed, { ...changes, [method]: undefined } as never)
+        ])
+      ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT' }))
+    for (const token of [blob, durableChangeFeed])
+      expect(() =>
+        implement(token, {} as never, { forTransaction: (() => ({})) as never })
+      ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT' }))
+  })
+
   it('admits complete scalar shapes by exact token identity and captures no replacement root API', () => {
     const expiration = {
       expire: vi.fn(async () => true),

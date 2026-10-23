@@ -62,3 +62,15 @@ export const TRANSACTION_KEY_VALUE_METHODS = [
   StorageCapabilityMethod.has,
   ...STORAGE_BATCH_METHODS
 ] as const
+
+/** Object capabilities retain their own independent string-key and resource API. */
+export const STORAGE_BLOB_METHODS = [
+  'put',
+  'get',
+  'head',
+  'remove',
+  'list',
+  'removeByPrefix'
+] as const
+/** Durable feeds expose replay and a separately disposable tail without a transaction projection. */
+export const STORAGE_DURABLE_CHANGE_METHODS = ['readChanges', 'tailChanges'] as const
