@@ -1007,6 +1007,7 @@
       ".": [
         "BACKEND_KIND_PATTERN",
         "ConcurrencyHolderState",
+        "ConcurrencyPolicy",
         "ConflictPolicy",
         "KEY_DOMAIN_LIMITS",
         "STORAGE_CONTRACT_SOURCE",
@@ -1030,6 +1031,7 @@
         "compareStorageKeys",
         "createMigrationPlan",
         "createTransactionOwner",
+        "defineConcurrencyPolicy",
         "defineStorageCapability",
         "encodeOrderedStorageKey",
         "fromValueCodec",

@@ -397,3 +397,25 @@ console.log(codec.name, codec.output, await codec.decode(raw))
 ### 保序键字节
 
 `encodeOrderedStorageKey(key, backend)` 先复用 `snapshotStorageKey` 的校验与复制，再返回独立持有的 `Uint8Array`。字典字节序与 `compareStorageKeys` 一致，涵盖正负零、Date、UTF-16 码元、二进制前缀与嵌套数组前缀。写入器只测量一次，再顺序写入一份预分配空间，不排序，也不反复拼接已完成的子编码。此编码供记录索引与锁排序复用，不替换持久化值 codec 或旧平面存储键。
+
+### 真实并发策略
+
+```ts
+import { ConcurrencyPolicy, defineConcurrencyPolicy } from '@migaia/storage-contract'
+
+const wait = ConcurrencyPolicy.wait({ timeoutMs: 2_000 })
+const fail = ConcurrencyPolicy.fail()
+const optimistic = ConcurrencyPolicy.optimistic({ retries: 2, backoffMs: 10 })
+const custom = defineConcurrencyPolicy({
+  name: 'retry-twice',
+  locking: 'pessimistic',
+  decide: (conflict) =>
+    conflict.attempt <= 2 ? { action: 'retry', delayMs: 10 } : { action: 'reject' }
+})
+console.log(wait.name, fail.name, optimistic.locking, custom.name)
+// wait fail optimistic retry-twice
+```
+
+工厂只读取一次定义字段，冻结公开的 name/locking 元数据，私下保存原决策回调。复制或结构伪造的策略会被拒绝。允许零预算；时长与重试次数必须为非负安全整数。定义或选项 getter 失败以 INVALID_ARGUMENT 保留精确 cause。创建策略不执行决策回调、事务或取锁。
+
+原事务 owner 只捕获一次 defaultPolicy 与 concurrencyStages；省略策略时只创建一次 wait 缺省值，真实显式覆盖值优先。缺省解析只使用同一私有 owner 登记，不读公开 store 字段，不建立另一套 store registry。wait 缺省逻辑准入预算为 30,000 ms，optimistic 缺省对三个冲突按 20 ms 退避。决策循环与后端真实锁是另行接入的执行边界；仅有策略元数据不能证明锁或重试行为。

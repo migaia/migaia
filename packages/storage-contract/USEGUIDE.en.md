@@ -524,3 +524,25 @@ The outer host may pass its fixed canonical `asyncDisposeKey`. Otherwise admissi
 ### Ordered key bytes
 
 `encodeOrderedStorageKey(key, backend)` first reuses `snapshotStorageKey` validation and copying, then returns independently owned `Uint8Array` bytes. Lexicographic byte order agrees with `compareStorageKeys`, including signed zero, Date, UTF-16 code units, binary prefixes and nested array prefixes. The writer measures once and appends once into one allocation; it does not sort or concatenate completed child encodings. This encoding serves record indexes and lock ordering, and does not replace persisted value codecs or existing flat storage keys.
+
+### Authentic concurrency policies
+
+```ts
+import { ConcurrencyPolicy, defineConcurrencyPolicy } from '@migaia/storage-contract'
+
+const wait = ConcurrencyPolicy.wait({ timeoutMs: 2_000 })
+const fail = ConcurrencyPolicy.fail()
+const optimistic = ConcurrencyPolicy.optimistic({ retries: 2, backoffMs: 10 })
+const custom = defineConcurrencyPolicy({
+  name: 'retry-twice',
+  locking: 'pessimistic',
+  decide: (conflict) =>
+    conflict.attempt <= 2 ? { action: 'retry', delayMs: 10 } : { action: 'reject' }
+})
+console.log(wait.name, fail.name, optimistic.locking, custom.name)
+// wait fail optimistic retry-twice
+```
+
+Factories validate and capture definition fields once, freeze only public name/locking metadata, and retain the original decision callback privately. A copied or structurally forged policy is rejected. Zero budgets are valid; durations and retry counts must be nonnegative safe integers. Definition or option getter failures retain the exact cause under INVALID_ARGUMENT. Policy creation executes no decision callback, transaction or lock acquisition.
+
+The original transaction owner captures defaultPolicy and concurrencyStages once. Without an override it creates exactly one wait policy; explicit authentic overrides take precedence. Default selection uses that same private owner registration and never a public store field or another store registry. Wait defaults to 30,000 ms of logical admission, optimistic to three conflicts with 20 ms backoff. The decision-loop and actual backend-lock integration are separate execution boundaries; policy metadata alone proves neither locking nor retry behavior.

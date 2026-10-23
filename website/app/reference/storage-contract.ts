@@ -658,6 +658,33 @@ export const storageContractReference: ILibraryReference = {
     }
   },
   symbols: {
+    defineConcurrencyPolicy: {
+      role: 'operation',
+      purpose: t(
+        'Capture authentic frozen policy metadata and a private decision callback without executing work.',
+        '捕获真实冻结策略元数据与私有决策回调，不执行工作。'
+      ),
+      params: {
+        definition: t(
+          'Nonblank name, pessimistic/optimistic locking, and a synchronous or asynchronous decision callback; fields are read once.',
+          '非空白 name、pessimistic/optimistic locking 与同步或异步决策回调；字段只读一次。'
+        )
+      },
+      returns: t(
+        'Immutable IConcurrencyPolicy retaining name/locking literals. Invalid metadata or option getters reject with INVALID_ARGUMENT and exact cause.',
+        '保留 name/locking 字面量的不可变 IConcurrencyPolicy；无效元数据或选项 getter 失败以 INVALID_ARGUMENT 保留精确 cause。'
+      ),
+      example: storageContractCases.defineConcurrencyPolicy![0]!.example,
+      cases: storageContractCases.defineConcurrencyPolicy
+    },
+    ConcurrencyPolicy: {
+      role: 'constant',
+      purpose: t(
+        'Canonical wait, fail and optimistic factories create authentic identities through the original policy registry.',
+        '规范 wait、fail 与 optimistic 工厂经原策略登记创建真实身份。'
+      ),
+      example: `const policy = ConcurrencyPolicy.wait({ timeoutMs: 2_000 })`
+    },
     TransactionActivityMode: {
       role: 'constant',
       purpose: t(
@@ -695,8 +722,8 @@ export const storageContractReference: ILibraryReference = {
           '后端拥有的幂等归一，保留 source、code、stack 与 cause。'
         ),
         options: t(
-          'Optional actual activityMode and outer fixed asyncDisposeKey; no fallback is created.',
-          '可选真实 activityMode 与外层固定 asyncDisposeKey，不创建后备键。'
+          'Optional actual activityMode, outer fixed asyncDisposeKey, authentic defaultPolicy and canonical concurrencyStages; the same original owner captures them once.',
+          '可选真实 activityMode、外层固定 asyncDisposeKey、真实 defaultPolicy 与规范 concurrencyStages；同一原 owner 只捕获一次。'
         )
       },
       returns: t(
@@ -1588,6 +1615,99 @@ console.log(candidate.name, candidate.output)`
     }
   },
   types: {
+    ConcurrencyPolicy: {
+      summary: t(
+        'Preset factories validate numeric configuration before execution.',
+        '预设工厂在执行前校验数值配置。'
+      ),
+      members: {
+        wait: {
+          summary: t(
+            'Logical acquisition wait, default 30,000 ms; zero is valid, and commit conflicts reject.',
+            '逻辑获取等待，缺省 30,000 ms；允许零，提交冲突拒绝。'
+          ),
+          example: `const policy = ConcurrencyPolicy.wait({ timeoutMs: 0 })`
+        },
+        fail: {
+          summary: t(
+            'Pessimistic policy rejects each genuine conflict; it does not set a physical timeout.',
+            '悲观策略拒绝每次真实冲突，不设置物理期限。'
+          ),
+          example: `const policy = ConcurrencyPolicy.fail()`
+        },
+        optimistic: {
+          summary: t(
+            'Retry up to three real conflicts with 20 ms backoff by default; retry counts and delays are nonnegative safe integers.',
+            '缺省对三个真实冲突按 20 ms 重试；次数和延迟为非负安全整数。'
+          ),
+          example: `const policy = ConcurrencyPolicy.optimistic({ retries: 0, backoffMs: 0 })`
+        }
+      }
+    },
+    IConcurrencyConflict: {
+      summary: t(
+        'Per-conflict identity and wait data supplied only when a real attempt reports conflict.',
+        '仅在真实尝试报告冲突时提供的单次冲突身份和等待数据。'
+      ),
+      members: {
+        phase: {
+          summary: t(
+            'Acquire or commit conflict; commit cannot decide wait.',
+            'acquire 或 commit 冲突；commit 不能决定 wait。'
+          )
+        },
+        keys: {
+          summary: t(
+            'Independent lock-key snapshots for this decision, detached from internal identity.',
+            '本次决策的独立锁键快照，与内部身份分离。'
+          )
+        },
+        attempt: {
+          summary: t('One-based real conflict sequence number.', '从一开始的真实冲突序号。')
+        },
+        waitedMs: {
+          summary: t(
+            'Actual accumulated blocking wait, excluding ordinary callback work.',
+            '实际累计阻塞等待，不含普通回调工作。'
+          )
+        },
+        holder: {
+          summary: t(
+            'Known real holder, explicit remote handoff, or undefined when unavailable.',
+            '已知真实 holder、显式远端交接，或无法取得时的 undefined。'
+          )
+        },
+        signal: {
+          summary: t('Optional original composed cancellation signal.', '可选原组合取消信号。'),
+          default: t('Omitted when no signal is provided.', '未提供信号时省略。')
+        }
+      }
+    },
+    ILockHolding: {
+      summary: t(
+        'One inspectable lock identity and lease state; expiry does not prove a process has died.',
+        '一份可检查的锁身份和租约状态；到期不证明进程已死。'
+      ),
+      members: {
+        key: { summary: t('Independent normalized lock identity.', '独立规范锁身份。') },
+        holder: {
+          summary: t(
+            'Last known real holder or permitted remote handoff.',
+            '最后已知真实 holder 或允许的远端交接。'
+          )
+        },
+        expired: {
+          summary: t('Whether its lease has expired before recovery.', '回收前租约是否已到期。')
+        },
+        expiresAt: {
+          summary: t(
+            'Lease deadline only when supported by this backend.',
+            '仅在后端支持时提供租约到期时间。'
+          ),
+          default: t('Omitted for non-lease locks.', '非租约锁省略。')
+        }
+      }
+    },
     ITransactionInfo: {
       summary: t(
         'Immutable shared transaction identity returned from authentic live views.',
@@ -1894,7 +2014,20 @@ console.log(candidate.name, candidate.output)`
         'Public policy name and locking mode; runtime authority remains private.',
         '公开策略名与加锁模式；运行权限仍由私有拥有者掌握。'
       ),
-      members: {}
+      members: {
+        name: {
+          summary: t(
+            'Captured diagnostic name; equal names do not share runtime policy authority.',
+            '捕获的诊断名称；同名不共享策略运行权限。'
+          )
+        },
+        locking: {
+          summary: t(
+            'Captured pessimistic or optimistic mode, independent of existing-key ConflictPolicy.',
+            '捕获的悲观或乐观模式，独立于已有键 ConflictPolicy。'
+          )
+        }
+      }
     },
     ITransactionOptions: {
       summary: t(
