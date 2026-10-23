@@ -418,3 +418,51 @@ pnpm run typecheck
 pnpm run typecheck:test
 pnpm run test
 ```
+
+## 版本 envelope 与链式升级
+
+`assertVersionedEnvelope` 校验普通对象上的自有 `version` 与非空 `state`，只读取每个属性一次，并保留 state 引用。计划在创建时快照并冻结连续的版本步骤。纯转换器不持有连接，不写存储，也不负责释放调用方资源。
+
+```ts
+import {
+  assertVersionedEnvelope,
+  createMigrationPlan,
+  migrateEnvelopeSync,
+  StorageContractError
+} from '@migaia/storage-contract'
+
+try {
+  createMigrationPlan({ version: 3, steps: { 1: (value) => value, 3: (value) => value } })
+} catch (error) {
+  if (!(error instanceof StorageContractError)) throw error
+  console.log(error.code) // MIGRATION_GAP
+}
+
+const plan = createMigrationPlan({ version: 2, steps: { 2: (value) => ({ previous: value }) } })
+try {
+  migrateEnvelopeSync(plan, assertVersionedEnvelope({ version: 3, state: {} }))
+} catch (error) {
+  if (!(error instanceof StorageContractError)) throw error
+  console.log(error.code) // VERSION_UNSUPPORTED
+}
+
+const originalError = new Error('upgrade failed')
+const failing = createMigrationPlan({
+  version: 1,
+  steps: {
+    1: () => {
+      throw originalError
+    }
+  }
+})
+try {
+  migrateEnvelopeSync(failing, { version: 0, state: {} })
+} catch (error) {
+  if (!(error instanceof StorageContractError)) throw error
+  console.log(error.code, error.cause === originalError) // MIGRATION_FAILED true
+}
+```
+
+`migrateEnvelope` 支持异步步骤和取消信号；即使版本相等，也先检查取消。同步入口拒绝已知的异步步骤，运行期遇到 thenable 同样拒绝并消费迟到拒绝。`{ version, reset: () => ({}) }` 计划对旧档只重置一次，同版保留引用，未来版本仍拒绝。步骤对 state 的原地修改及外部副作用不会回滚。
+
+`observe.beforeStep` 与 `observe.afterStep` 只观察，不等待返回值。观察失败交给同步 `observe.report`，不改变迁移结果；省略时使用 utils 的宿主异常报告。资源释放、宿主管线与存储写回由各自拥有者负责。

@@ -78,3 +78,18 @@ export {
 } from './operation-context.js'
 
 export { intrinsicConstructorName } from './bytes.js'
+
+export {
+  assertVersionedEnvelope,
+  createMigrationPlan,
+  migrateEnvelopeSync,
+  migrateEnvelope,
+  type IVersionedEnvelope,
+  type IMigrationStepContext,
+  type IMigrationStep,
+  type IMigrationReset,
+  type ISyncMigrationSteps,
+  type IMigrationPlan,
+  type IMigrationStepObserver,
+  type IMigrationRunOptions
+} from './versioned.js'

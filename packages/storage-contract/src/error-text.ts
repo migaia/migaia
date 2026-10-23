@@ -7,7 +7,21 @@ export const StorageContractErrorText = {
   /** Synchronous writes cannot wait for cancellation or a deadline. */
   syncWriteContext: 'sync writes do not support signal or timeoutMs',
   /** Both context validators admit only the canonical conflict-policy domain. */
-  conflictPolicy: 'conflictPolicy must be conflict or replace'
+  conflictPolicy: 'conflictPolicy must be conflict or replace',
+  /** Envelope admission requires a plain object with own, valid version and state properties. */
+  envelopeInvalid: 'archive must contain a non-negative safe version and a non-null state',
+  /** Migration construction accepts a version plus either steps or a reset callback. */
+  migrationOptions: 'migration options must contain a valid version and either steps or reset',
+  /** Step values must be callable before any archive is read. */
+  migrationStep: 'migration steps must be functions',
+  /** Numeric target versions are canonical and contiguous through the current version. */
+  migrationGap: 'migration step versions must form a continuous canonical integer range',
+  /** A rejected archive must not be processed or written by code outside its supported range. */
+  versionUnsupported: 'archive version is outside the supported migration range',
+  /** Migration failures retain the original error and the exact failed version transition. */
+  migrationFailed: 'migration step failed',
+  /** The synchronous recovery path cannot wait for migration results. */
+  migrationSyncThenable: 'synchronous migration steps must not return thenables'
 } as const
 /** Stable cause text for a collection codec that cannot represent an undefined root. */
 export const COLLECTIONS_CODEC_UNDEFINED_ROOT = 'collection codec cannot encode an undefined root'

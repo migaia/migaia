@@ -5,6 +5,48 @@ const t = (en: string, zh: string): IText => ({ en, zh })
 
 /** Exercises public contract tools without supplying a fictional storage implementation. */
 export const storageContractCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
+  createMigrationPlan: [
+    {
+      title: t(
+        'Reject gaps and future archives while preserving migration errors',
+        '拒绝断档与未来存档并保留迁移原错'
+      ),
+      problem: t(
+        'A persistence reader must reject incomplete plans at creation and avoid applying older code to a newer archive. Conversion failures must retain the original error identity.',
+        '持久化读取器必须在创建时拒绝不完整计划，避免旧代码处理未来存档，并保留转换原错身份。'
+      ),
+      example: t(
+        `import { createMigrationPlan, migrateEnvelopeSync, StorageContractError } from '@migaia/storage-contract'
+try {
+  createMigrationPlan({ version: 3, steps: { 1: value => value, 3: value => value } })
+} catch (error) {
+  if (!(error instanceof StorageContractError)) throw error
+  console.log(error.code) // MIGRATION_GAP
+}
+const plan = createMigrationPlan({ version: 1, reset: () => ({}) })
+try {
+  migrateEnvelopeSync(plan, { version: 2, state: {} })
+} catch (error) {
+  if (!(error instanceof StorageContractError)) throw error
+  console.log(error.code) // VERSION_UNSUPPORTED
+}
+const originalError = new Error('upgrade failed')
+const failing = createMigrationPlan({ version: 1, steps: { 1: () => { throw originalError } } })
+try {
+  migrateEnvelopeSync(failing, { version: 0, state: {} })
+} catch (error) {
+  if (!(error instanceof StorageContractError)) throw error
+  console.log(error.code, error.cause === originalError) // MIGRATION_FAILED true
+}`,
+        `const plan = createMigrationPlan({ version: 1, steps: { 1: value => ({ previous: value }) } })
+console.log(migrateEnvelopeSync(plan, { version: 0, state: 'old' })) // { previous: 'old' }`
+      ),
+      result: t(
+        'The complete example prints MIGRATION_GAP, VERSION_UNSUPPORTED and MIGRATION_FAILED true. No storage writes occur; current-version state identity is preserved.',
+        '完整示例依次输出 MIGRATION_GAP、VERSION_UNSUPPORTED 与 MIGRATION_FAILED true。不会写存储；同版状态保留原引用。'
+      )
+    }
+  ],
   snapshotStorageKey: [
     {
       title: t('Capture a composite key before its owner changes it', '在调用方修改前捕获复合键'),

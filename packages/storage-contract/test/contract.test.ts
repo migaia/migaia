@@ -19,13 +19,17 @@ import {
 } from '../src/index.js'
 
 describe('StorageContractError 家族', () => {
-  it('5 码 + source 恒为 @migaia/storage-contract', () => {
+  it('公开码表 + source 恒为 @migaia/storage-contract', () => {
     expect(Object.keys(StorageContractErrorCode).sort()).toEqual([
       'aborted',
       'disposed',
+      'envelopeInvalid',
       'invalidArgument',
       'invalidKey',
-      'unsupported'
+      'migrationFailed',
+      'migrationGap',
+      'unsupported',
+      'versionUnsupported'
     ])
     const error = new StorageContractError(StorageContractErrorCode.invalidArgument, {
       cause: new TypeError('bad')

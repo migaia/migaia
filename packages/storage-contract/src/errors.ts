@@ -7,10 +7,7 @@ export { StorageContractErrorCode, type IStorageContractErrorCode }
 /** `source` value stamped onto every contract-level error this package throws. */
 export const STORAGE_CONTRACT_SOURCE = '@migaia/storage-contract'
 
-/**
- * Contains neutral contract error details. Web diagnostics such as codec, migration, and extension
- * details belong to `storage-web`.
- */
+/** Contains neutral contract error details. Provider-specific diagnostics stay with their owner. */
 export type IStorageContractErrorDetails = {
   /** Optional provider family for diagnostics. */
   readonly backend?: IBackendKind
@@ -18,6 +15,10 @@ export type IStorageContractErrorDetails = {
   readonly key?: string | IStorageKey
   /** Original failure retained through the standard Error cause property. */
   readonly cause?: unknown
+  /** Archive version immediately before a failed migration step or reset. */
+  readonly fromVersion?: number
+  /** Target version of a failed migration step or reset. */
+  readonly toVersion?: number
 }
 
 /**
@@ -34,6 +35,10 @@ export class StorageContractError extends Error {
   readonly backend?: IBackendKind
   /** Key supplied in details, or undefined. */
   readonly key?: string | IStorageKey
+  /** Failed migration's source version; absent on unrelated failures. */
+  readonly fromVersion?: number
+  /** Failed migration's target version; absent on unrelated failures. */
+  readonly toVersion?: number
 
   /**
    * Creates and freezes a contract failure. code is required; details defaults to an empty object.
@@ -51,6 +56,8 @@ export class StorageContractError extends Error {
     this.code = code
     this.backend = details.backend
     this.key = details.key
+    if (details.fromVersion !== undefined) this.fromVersion = details.fromVersion
+    if (details.toVersion !== undefined) this.toVersion = details.toVersion
     Object.freeze(this)
   }
 }
