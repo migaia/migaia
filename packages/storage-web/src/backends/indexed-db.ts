@@ -145,6 +145,13 @@ import { asyncDisposeKey } from '@migaia/plugin-host'
 import { withStorageIteratorResource } from '../utils/storage-iterator.js'
 import { observeIndexedDbStage, runNativeIndexedDbTransaction } from './indexed-db-transaction.js'
 
+/** Both record APIs declare the same native support; each query captures its own planner facts. */
+const recordQueryPushdown = {
+  source: StorageBackend.indexedDb,
+  operations: [],
+  operators: []
+} as const
+
 const CAPABILITIES: IStorageCapabilities = Object.freeze({
   syncRead: false,
   binary: true,
@@ -4466,7 +4473,7 @@ export const indexedDbHost = <TValue = unknown>(
       createRecordQuery<R>(
         {
           asyncDisposeKey,
-          pushdown: { source: StorageBackend.indexedDb, operations: [], operators: [] },
+          pushdown: recordQueryPushdown,
           execute: ({ ctx }) => store.iterateRecords(undefined, ctx)
         },
         runtime.getChainMethods('query')
@@ -4500,7 +4507,7 @@ export const indexedDbHost = <TValue = unknown>(
     query: <R = TValue>() =>
       createRecordQuery<R, undefined>(
         {
-          pushdown: { source: StorageBackend.indexedDb, operations: [], operators: [] },
+          pushdown: recordQueryPushdown,
           execute: () => scope.iterateRecords()
         },
         runtime.getChainMethods('query')
