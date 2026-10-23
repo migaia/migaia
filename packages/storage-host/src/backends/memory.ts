@@ -5,6 +5,7 @@ import type { IBackendChangeController } from '../core/change-controller.js'
 import {
   StorageContractError,
   StorageContractErrorCode,
+  ConcurrencyPolicy,
   assertStringStorageKey,
   snapshotStorageKey,
   snapshotStorageBatchKeys,
@@ -114,6 +115,7 @@ import { createMemoryRdfIndex, memoryRdfKeys, type IMemoryRdfKeys } from './rdf-
 import { createMemoryBlobData } from './memory-blob.js'
 import { createMemoryJournalData, type IMemoryJournalTransaction } from './memory-journal.js'
 import type { IStorageJournalBackendBinding } from '../journal/types.js'
+import { storageJournalLockKey, StorageJournalLock } from '../journal/keys.js'
 import { detectServerRuntime } from '@migaia/utils'
 import { isUint8Array, utf8ByteLength } from '@migaia/utils/bytes'
 import { StorageError, StorageErrorCode, type IStorageChannel } from '../errors.js'
@@ -422,12 +424,39 @@ function createMemoryNamespace<T>(
   const journal = createMemoryJournalData({
     assertLive: controller.assertLive,
     report: (error) => reportCleanupError(report, error),
-    transaction: (work) =>
+    closingSignal: controller.closingSignal,
+    reserve: (prefix, run) =>
+      runWithConcurrency(
+        {
+          store: base,
+          options: { lock: [storageJournalLockKey(prefix, StorageJournalLock.resource)] },
+          policy: ConcurrencyPolicy.fail()
+        },
+        {
+          attempt: (context) =>
+            locks.attemptMetadata(
+              context,
+              holding(),
+              {
+                attempt: async () => {
+                  await run()
+                  return { status: 'committed', value: undefined }
+                }
+              },
+              core.stageBindings.concurrencyStages(store),
+              controller.closingSignal
+            )
+        }
+      ),
+    transaction: (prefix, work) =>
       atomicEntry(
         MemoryOperation.transaction,
         () => work,
         undefined,
-        (captured) => ({ invoke: (scope) => captured(scope[journalOperations]) })
+        (captured) => ({
+          keys: [storageJournalLockKey(prefix, StorageJournalLock.head)],
+          invoke: (scope) => captured(scope[journalOperations])
+        })
       ),
     scope: (scope) => ({
       info: assertTransactionOwner(store, scope),

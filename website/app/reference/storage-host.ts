@@ -322,6 +322,20 @@ console.log(host.extensions.label('draft'))`,
     }
   },
   types: {
+    IBackendKeyLockPort: {
+      summary: t(
+        'Installation-issued canonical key locks shared by native backends.',
+        '原安装窗口提供的规范键锁，由原生后端共享。'
+      ),
+      members: {
+        attemptMetadata: {
+          summary: t(
+            'Hold only private metadata through the original point-lock owner; business clear ranges exclude this row.',
+            '仅通过原点锁拥有者持有私有元数据；业务 clear 范围排除该行。'
+          )
+        }
+      }
+    },
     IStorageJournalNamespaceView: {
       summary: t(
         'Six original string KV methods plus actual private keys; business bulk and TTL capabilities are absent.',
@@ -334,7 +348,14 @@ console.log(host.extensions.label('draft'))`,
         'Private native run, actual commit/rollback callbacks and accepted-work disposal; it never closes its backend.',
         '私有原生 run、真实 commit/rollback 回调和已接纳工作清理，不关闭其后端。'
       ),
-      members: {}
+      members: {
+        transactionInfo: {
+          summary: t(
+            'Read the original authenticated transaction identity for this exact native namespace.',
+            '读取精确原生 namespace 的原认证事务身份。'
+          )
+        }
+      }
     },
     IStorageJournalBackendBinding: {
       summary: t(

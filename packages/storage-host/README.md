@@ -196,3 +196,5 @@ console.log(
 后端 descriptor 可提供 `journalBinding(store)`。原安装窗口在精确 store 准入后调用一次，并把原生回调捕获到该 registration 的 storeCell。`forOrg(orgId)` 必须返回固定物理组织的原 I/O 闭包，不能用公开 KV 前缀或其它连接替代。`IStorageJournalNamespaceView` 只含原六个字符串方法（`get`、`has`、`set`、`remove`、`clearValues`、`clearAll`）和 `keys`，不继承业务批量或 TTL 能力。namespace 转发原生事务及真实 commit/rollback 回调，保留独立的 main/符号清理 Promise，并排空已接纳工作直到原生终态。事务、资源和登记权仍归原后端。
 
 memory 已提供该私有 namespace 接点。私有字符串行与原业务 draft 一起稀疏暂存、原子提交，提交前与回滚后均不可见。业务 keys、clear、capacity 和 change-feed 不包含这些元数据行；dropOrg 删除目标组织的私有行。显式组织绑定拒绝其它组织的 scope，提取出的私有 view 随原操作失效。该作者接点本身不增加自动 binlog、undo/redo 或公开 storageLogStore 工厂。
+
+memory 日志 namespace 在整个资源期持有原规范 resource-owner 文本 lease；同组织、同 prefix 再次打开报 `LOCK_REJECTED`。普通私有事务在最初的原生锁集合中取得另一个固定 head 键。原后端关闭信号也会关闭部分构造的 namespace 资源。`transactionInfo(scope)` 返回精确 store/org 的原认证事务身份，同事务追加归并不信任调用方 id。后端作者仅对私有元数据 lease 使用 `IBackendKeyLockPort.attemptMetadata`：规范点身份冲突和原 acquire/release/wait 拥有者不变，业务 clear 范围跳过其本就不能触及的私有行；普通业务锁保持原范围行为。

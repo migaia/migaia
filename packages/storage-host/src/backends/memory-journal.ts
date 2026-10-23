@@ -1,5 +1,7 @@
 import { createEventChannel } from '@migaia/event-subscriber'
 import { createQuiescenceTracker } from '@migaia/lifecycle'
+import { deferred, type INativeAbortSignal } from '@migaia/utils/promise'
+import { subscribeToAbort } from '../core/operation.js'
 import {
   StorageContractError,
   StorageContractErrorCode,
@@ -30,7 +32,12 @@ function assertText(value: unknown): asserts value is string {
 export function createMemoryJournalData(options: {
   readonly assertLive: () => void
   readonly report: (error: unknown) => void
-  readonly transaction: <R>(work: (port: IMemoryJournalTransaction) => Promise<R>) => Promise<R>
+  readonly closingSignal: INativeAbortSignal
+  readonly reserve: (prefix: string, run: () => Promise<void>) => Promise<void>
+  readonly transaction: <R>(
+    prefix: string,
+    work: (port: IMemoryJournalTransaction) => Promise<R>
+  ) => Promise<R>
   readonly scope: (scope: Omit<ITransactionScope, 'use'>) => {
     readonly info: ITransactionInfo
     readonly port: IMemoryJournalTransaction
@@ -182,11 +189,23 @@ export function createMemoryJournalData(options: {
     assertText(prefix)
     if (prefix.length === 0)
       throw new StorageContractError(StorageContractErrorCode.invalidArgument)
+    /** The original lock attempt spans this namespace resource's actual lifetime. */
+    const acquired = deferred<void>()
+    /** Disposal settles the existing held attempt instead of inventing another release protocol. */
+    const releaseOwner = deferred<void>()
+    const reservation = options.reserve(prefix, async () => {
+      acquired.resolve()
+      await releaseOwner.promise
+    })
+    void reservation.then(undefined, acquired.reject)
+    await acquired.promise
     const lifetime = createQuiescenceTracker<object>()
     const resource = Object.freeze({})
     const attempts = new Map<string, () => void>()
     let main: Promise<void> | undefined
     let symbolic: Promise<void> | undefined
+    /** The original backend close signal also releases unretained partial-construction handles. */
+    let unsubscribe = () => undefined as void
     /** Closing this handle never closes its original backend or another namespace handle. */
     const assertOpen = (): void => {
       options.assertLive()
@@ -217,11 +236,25 @@ export function createMemoryJournalData(options: {
     const dispose = (): Promise<void> => {
       if (main !== undefined) return main
       lifetime.seal(resource)
-      main = lifetime.whenZero(resource)
+      main = lifetime
+        .whenZero(resource)
+        .then(async () => {
+          releaseOwner.resolve()
+          await reservation
+        })
+        .finally(() => unsubscribe())
       return main
     }
+    unsubscribe = subscribeToAbort(
+      options.closingSignal,
+      () => {
+        void dispose().catch(options.report)
+      },
+      options.report
+    )
     return Object.freeze({
       nativeAtomic: true,
+      transactionInfo: (scope: Omit<ITransactionScope, 'use'>) => options.scope(scope).info,
       run: <R>(
         work: (view: IStorageJournalNamespaceView) => Promise<R>,
         scope?: Omit<ITransactionScope, 'use'>
@@ -232,7 +265,7 @@ export function createMemoryJournalData(options: {
             throw new StorageContractError(StorageContractErrorCode.invalidArgument)
           if (scope !== undefined) return transaction(scope).run(prefix, work)
           const release = lifetime.retain(resource)
-          return options.transaction((port) => port.run(prefix, work)).finally(release)
+          return options.transaction(prefix, (port) => port.run(prefix, work)).finally(release)
         } catch (error) {
           return Promise.reject(error)
         }

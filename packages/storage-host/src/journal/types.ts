@@ -2,6 +2,7 @@ import type {
   IKeyValueApi,
   ILockKey,
   IStorageResource,
+  ITransactionInfo,
   ITransactionScope
 } from '@migaia/storage-contract'
 import type { ILogPayload } from '@migaia/logger/plugins/durable'
@@ -22,6 +23,8 @@ export type IStorageJournalNamespaceView = {
 /** A namespace borrows authentic native scopes and forwards their actual terminal callbacks. */
 export type IStorageJournalNamespace = IStorageResource & {
   readonly nativeAtomic: boolean
+  /** Return the original authenticated transaction identity for this exact store and organization. */
+  transactionInfo(scope: Omit<ITransactionScope, 'use'>): ITransactionInfo
   run<R>(
     work: (view: IStorageJournalNamespaceView) => Promise<R>,
     scope?: Omit<ITransactionScope, 'use'>
