@@ -40,7 +40,7 @@ Schema 与 codec 适配位于 `@migaia/storage-host/entity`：`passthrough`、`f
 
 `host.org(orgId)` 返回不可变的业务视图，保留同一插件、Feature API 与事务推断；提取的方法仍绑定原组织。视图及其后端不暴露安装、drop 或关闭权。原生后端通过原安装窗口的 `core.registerOrgBinding(store, { backend, drop })` 提供实际组织目标；`core.getOrgContext(orgId)` 只返回同一执行器、观察、调用上下文与事务 API 投影。它不提供登记或关闭句柄。普通扩展及 Feature API 的 `this.orgId` 是固定身份，`this.backend(borrowed)` 只投影该插件安装时已经借用的依赖。
 
-需要按需创建物理组织后端的作者，在原安装窗口捕获 core.createOrgAuthoringPort()，只把端口保存在后端闭包。安装后它仍复用原 controller、本地键锁与精确 store 的 controller/value-commit 登记函数；子资源由同一 registration 清理，撤销后拒绝使用。业务视图和 getOrgContext 不暴露该权限。组织借用优先使用其物理后端已登记的原 controller，保留资源生命周期与组织通知过滤。
+需要按需创建物理组织后端的作者，在原安装窗口捕获 core.createOrgAuthoringPort()，只把端口保存在后端闭包。安装后它仍复用原 controller、本地键锁、createRevisionPort 的原独立修订事实工厂与精确 store 的 controller/value-commit 登记函数；子资源由同一 registration 清理，撤销后拒绝使用。业务视图和 getOrgContext 不暴露该权限。组织借用优先使用其物理后端已登记的原 controller，保留资源生命周期与组织通知过滤。
 
 作者入口还从原 plugin-host 拥有者重导出 asyncDisposeKey；支持环境缺少原生 Symbol.asyncDispose 时，后端仍使用同一 symbol，不新建符号或生命周期拥有者。
 

@@ -209,6 +209,10 @@ export function createStoragePluginHost(options: IPluginHostOptions): IStoragePl
               context.assertExecution()
               return createBackendKeyLockPort()
             },
+            createRevisionPort: () => {
+              context.assertExecution()
+              return createBackendRevisionPort()
+            },
             registerChangeController: (store, controller) => {
               context.assertExecution()
               context.storeCell.retainOrgBinding(registerBackendChangeController(store, controller))

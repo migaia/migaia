@@ -123,6 +123,23 @@ describe('installation-captured organization authoring', () => {
     expect(() => fixture.core().createOrgAuthoringPort()).toThrow()
     expect(() => fixture.core().createChangeController({ backend: 'catalog' })).toThrow()
     expect(() => fixture.core().createKeyLockPort()).toThrow()
+    expect(() => fixture.core().createRevisionPort()).toThrow()
+  })
+
+  it('creates independent original revision facts for late physical orgs and rejects after revocation', async () => {
+    const fixture = lazyBackend()
+    const host = await createStorageHost({ plugins: [fixture.plugin] })
+    const first = fixture.port().createRevisionPort()
+    const second = fixture.port().createRevisionPort()
+    first.write('text', 'encoded-key')
+    expect(first.read('text', 'encoded-key')).toBe(1)
+    expect(second.read('text', 'encoded-key')).toBe(0)
+    first.clear('text')
+    expect(first.epoch('text')).toBe(1)
+    expect(first.read('text', 'encoded-key')).toBe(0)
+    expect(second.epoch('text')).toBe(0)
+    await host.dispose()
+    expect(() => fixture.port().createRevisionPort()).toThrow()
   })
 
   it('releases later native children when an earlier original finalizer fails', async () => {

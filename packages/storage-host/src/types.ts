@@ -146,6 +146,7 @@ export type IStorageOrgAuthoringPort = Pick<
   IStoragePluginCore,
   | 'createChangeController'
   | 'createKeyLockPort'
+  | 'createRevisionPort'
   | 'registerChangeController'
   | 'registerValueCommit'
 >
