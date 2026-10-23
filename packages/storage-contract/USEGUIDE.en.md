@@ -871,3 +871,5 @@ Native entry validation may throw synchronously or reject; conformance observes 
 snapshotStorageOrgKeyPrefix(orgId, prefix, backend) returns detached half-open native byte bounds. Undefined prefix selects all logical keys in only that organization. A typed prefix uses the original string/binary/array-prefix or exact number/Date semantics without reducing logical depth or node limits.
 
 Index preparation may return the existing native record-key projection for logical fixture ids a/b. The suite uses those original keys for all index reads, writes and expected rows; absent projection keeps the original string keys. This avoids treating unscoped raw mutations as canonical indexed mutations.
+
+Conformance observes the original invalid-input failure whether native entry validation throws synchronously or returns a rejected Promise. The same semantic code remains required; accepting invalid input or returning a different code still fails. The assertion adapter does not change backend error timing or wrap its error object.
