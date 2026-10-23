@@ -507,3 +507,44 @@ async function readGreeting(store: IStorageBase) {
   return useStorageCapability(store, kv).get('greeting')
 }
 ```
+
+### Shared record execution
+
+`createRecordQuery<T,TContext>(source)` is the backend-author seam for the implemented `where`, `select`, `all`, `explain` and `requirePushdown` slice. `IQueryChain` advertises only these implemented methods. Three where forms combine with AND; a single select accepts typed top-level fields or a mapper with an Awaited result. Selected results remove where/select. Passing `undefined` as TContext makes a transaction-bound query reject operation contexts at compile time.
+
+The source captures `IQueryPushdown` and its original execute callback once. Immutable linked nodes share history; execution or explain unfolds it once. A record query sends the longest safe native prefix as canonical condition AST nodes and optional projection fields. JavaScript predicates/mappers and opaque object identity comparisons stay on the client. A client step prevents subsequent record steps from moving across it. `QueryOperation` is the shared vocabulary, not a promise that every named fluent method is implemented. explain reads no data; fullScan is conservative unless an index and native condition are declared. requirePushdown rejects with QUERY_NOT_PUSHABLE and client reasons before opening a cursor.
+
+`execute({conditions,fields,ctx})` returns the original `IStorageIterator<readonly [IStorageKey,unknown]>`; projected native rows intentionally do not claim the full T domain. all processes candidates in order and always awaits that iterator's real dispose Promise. It does not create another resource owner, timer or transaction. The original source owns operation cancellation/deadlines. For an original transaction iterator, all synchronously registers its complete consumption, mapper and cleanup interval with that same owner. A callback that omits awaiting all cannot commit before it settles; mapper failure enters the original firstFailure before cleanup. Callback failures retain coded identity; mutable uncoded native errors receive INVALID_ARGUMENT, while attachment failure preserves the original through the existing error tools. Cleanup cannot replace the first failure. Opaque identity operands, including objects containing Date/bigint, are never traversed.
+
+```ts
+import { createRecordQuery, type IRecordQuerySource } from '@migaia/storage-contract'
+function totals(execute: IRecordQuerySource['execute']) {
+  return createRecordQuery<{ status: string; total: number }>({
+    pushdown: { source: 'supplied-cursor', operations: [], operators: [] },
+    execute
+  })
+    .where({ status: 'paid' })
+    .where('total', 'gte', 100)
+    .select('total')
+    .all()
+}
+```
+
+The supplied cursor is a real backend resource. With paid totals 120 and 50, totals returns `[{total:120}]` and waits for cleanup. Ordering, paging, writes, statistics, watch and vector/RDF methods are not part of this implemented slice.
+
+### Standard records capability
+
+`records` is the authentic standard token for `IRecordsApi<TValue>`. Its `query<R = TValue>()` returns the implemented shared `IQueryChain<R>` slice: where, one select, all, explain and requirePushdown. Native backends and Features supply their query through `createRecordQuery` and keep the original iterator/transaction owner; there is no second chain executor. Standard admission requires callable query and removeByPrefix methods without invoking either. A legacy capabilities.records boolean grants no token authority and does not replace an actual Feature API.
+
+`removeByPrefix(prefix, ctx?)` belongs to the supplied original write pipeline and returns its actual deletion count. Its context includes the existing IWriteConcurrencyOptions. The provider returns the exact API object and preserves native default row/API refinements; it does not wrap the deletion Promise or copy the prefix/context. Concrete backend deletion, transaction capability projection and the remaining query terminals require their later implementation slices.
+
+```ts
+import { records, useStorageCapability, type IStorageBase } from '@migaia/storage-contract'
+async function paidTotals(store: IStorageBase) {
+  return useStorageCapability(store, records)
+    .query<{ status: string; total: number }>()
+    .where({ status: 'paid' })
+    .select('total')
+    .all()
+}
+```

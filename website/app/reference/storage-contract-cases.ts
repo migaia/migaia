@@ -33,8 +33,60 @@ async function readGreeting(store: IStorageBase) {
 
 /** Exercises public contract tools without supplying a fictional storage implementation. */
 export const storageContractCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
+  records: [
+    {
+      title: t('Use one standard record query entry', '使用唯一标准记录查询入口'),
+      problem: t(
+        'Native record backends and record Features must share the same typed query executor instead of interpreting the legacy support flag as permission.',
+        '原生记录后端与 records Feature 必须共用 typed 查询执行器，不能把旧支持标记解释成权限。'
+      ),
+      example: t(
+        `import { records, useStorageCapability, type IStorageBase } from '@migaia/storage-contract'
+async function paidTotals(store: IStorageBase) {
+  return useStorageCapability(store, records).query<{ status: string; total: number }>()
+    .where({ status: 'paid' }).select('total').all()
+}`,
+        `import { records, useStorageCapability, type IStorageBase } from '@migaia/storage-contract'
+async function paidTotals(store: IStorageBase) {
+  return useStorageCapability(store, records).query<{ status: string; total: number }>()
+    .where({ status: 'paid' }).select('total').all()
+}`
+      ),
+      result: t(
+        'An actual provided records API executes the shared query and returns selected paid totals. Missing tokens throw UNSUPPORTED_CAPABILITY; admission alone performs no query. Other terminals are not advertised by this slice.',
+        '真实已提供 records API 执行共用查询并返回 paid total；缺失 token 抛 UNSUPPORTED_CAPABILITY，准入本身不执行查询，本切片不声明其他终点。'
+      )
+    }
+  ],
   hasStorageCapability: [capabilityReadCase],
   useStorageCapability: [capabilityReadCase],
+  createRecordQuery: [
+    {
+      title: t('Share a record executor over an original cursor', '在原游标上共用记录执行器'),
+      problem: t(
+        'A backend needs declarative conditions and typed projections without another fluent chain or resource owner.',
+        '后端需要声明式条件与 typed 投影，不应另建查询链或资源 owner。'
+      ),
+      example: t(
+        `import { createRecordQuery, type IRecordQuerySource } from '@migaia/storage-contract'
+function totals(execute: IRecordQuerySource['execute']) {
+  return createRecordQuery<{ status: string; total: number }>({
+    pushdown: { source: 'supplied-cursor', operations: [], operators: [] }, execute
+  }).where({ status: 'paid' }).where('total', 'gte', 100).select('total').all()
+}`,
+        `import { createRecordQuery, type IRecordQuerySource } from '@migaia/storage-contract'
+function totals(execute: IRecordQuerySource['execute']) {
+  return createRecordQuery<{ status: string; total: number }>({
+    pushdown: { source: 'supplied-cursor', operations: [], operators: [] }, execute
+  }).where({ status: 'paid' }).where('total', 'gte', 100).select('total').all()
+}`
+      ),
+      result: t(
+        'Given an original cursor over paid totals 120 and 50, totals returns [{total:120}]. all awaits its actual disposal on success or failure. The empty support declaration keeps all steps client-side.',
+        '传入 paid total 为 120、50 的原游标后，totals 返回 [{total:120}]；all 在成功或失败时都等待真实释放，空支持声明使所有步骤在客户端执行。'
+      )
+    }
+  ],
   compileStorageWhere: [
     {
       title: t(

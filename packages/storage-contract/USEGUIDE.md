@@ -634,3 +634,44 @@ async function readGreeting(store: IStorageBase) {
   return useStorageCapability(store, kv).get('greeting')
 }
 ```
+
+### 共用记录执行器
+
+`createRecordQuery<T,TContext>(source)` 是已实现 where、select、all、explain、requirePushdown 切片的后端作者接点；`IQueryChain` 只声明这些真实方法。三种 where 按 AND 组合；一次 select 接受 typed 顶层字段或推断 Awaited 的 mapper。选择后的结果移除 where/select。TContext 传 undefined 时，事务绑定查询在编译期拒绝操作上下文。
+
+数据源只捕获一次 `IQueryPushdown` 与原 execute 回调。不可变链节点共享历史，执行或 explain 只展开一次；记录查询把最长安全原生前缀作为规范条件 AST 与可选投影字段交给数据源。JS 谓词、mapper 与不透明对象身份比较在客户端执行；后续步骤不能越过客户端边界下推。`QueryOperation` 是共用词汇，不表示所有同名链方法都已实现。explain 不读数据；仅声明索引与原生条件时才保守地排除 fullScan。requirePushdown 在开游标前以 QUERY_NOT_PUSHABLE 与客户端原因拒绝。
+
+`execute({conditions,fields,ctx})` 返回原 `IStorageIterator<readonly [IStorageKey,unknown]>`，原生投影行不会谎称完整 T 域。all 按顺序处理候选，并始终等待原迭代器真实 dispose Promise；不创建第二资源 owner、计时器或事务，取消/期限仍由原数据源负责。原事务迭代器上的 all 同步把完整消费、mapper 与清理区间登记到同一 owner；回调未等待 all 也不能在其结束前提交，mapper 首错在清理前进入原 firstFailure。回调失败保留已有 coded 身份；未编码可变原生错误附 INVALID_ARGUMENT，附着失败由原错误工具保留原错。清理失败不能覆盖首错。不透明身份操作数，包括含 Date/bigint 的对象，从不遍历内容。
+
+```ts
+import { createRecordQuery, type IRecordQuerySource } from '@migaia/storage-contract'
+function totals(execute: IRecordQuerySource['execute']) {
+  return createRecordQuery<{ status: string; total: number }>({
+    pushdown: { source: 'supplied-cursor', operations: [], operators: [] },
+    execute
+  })
+    .where({ status: 'paid' })
+    .where('total', 'gte', 100)
+    .select('total')
+    .all()
+}
+```
+
+传入的游标必须是真实后端资源；当 paid total 为 120、50 时，totals 返回 `[{total:120}]` 并等待清理。排序、分页、写入、统计、watch 与 vector/RDF 方法尚不属于本实现切片。
+
+### 标准 records 能力
+
+`records` 是 `IRecordsApi<TValue>` 的真实标准 token；其 `query<R = TValue>()` 返回已实现的共用 `IQueryChain<R>` 切片：where、一次 select、all、explain、requirePushdown。原生后端与 Feature 通过 `createRecordQuery` 提供查询，保持原迭代器/事务 owner，不另建查询执行器。标准准入只检查 query 与 removeByPrefix 可调用，不调用它们。旧 capabilities.records 布尔值不授予 token 权限，也不代替真实 Feature API。
+
+`removeByPrefix(prefix, ctx?)` 属于所提供的原写入 pipeline，返回真实删除数；ctx 包含原 IWriteConcurrencyOptions。provider 返回精确 API 对象，保留原生默认行类型/API 扩展，不包装删除 Promise、不复制 prefix/ctx。具体后端删除、事务能力投影与其他查询终点仍待后续实现切片。
+
+```ts
+import { records, useStorageCapability, type IStorageBase } from '@migaia/storage-contract'
+async function paidTotals(store: IStorageBase) {
+  return useStorageCapability(store, records)
+    .query<{ status: string; total: number }>()
+    .where({ status: 'paid' })
+    .select('total')
+    .all()
+}
+```

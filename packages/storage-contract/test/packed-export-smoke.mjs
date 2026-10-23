@@ -79,9 +79,30 @@ function main() {
     writeFileSync(join(consumerDirectory, 'package.json'), '{"type":"module"}\n', 'utf8')
     writeFileSync(
       join(consumerDirectory, 'identity.mjs'),
-      `import { fromValueCodec } from '@migaia/storage-contract'
+      `import { fromValueCodec, defineStorageCapability, implement, provideCapabilities, hasStorageCapability, useStorageCapability } from '@migaia/storage-contract'
 import { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'
 import { isArrayBuffer as utilsBuffer, isUint8Array as utilsBytes } from '@migaia/utils/bytes'
+/** Independent resource bases exercise package-root capability reads without acquiring external clients. */
+const createBase = () => ({
+  backend: 'packed-fixture',
+  capabilities: { syncRead: false, binary: false, records: false, transactions: false, iteration: false, secondaryIndexes: false, changeFeed: false, maxValueBytes: undefined, opaqueEntries: false },
+  dispose: async () => undefined,
+  [Symbol.asyncDispose]: async () => undefined
+})
+/** Authentic root exports retain the same original API after normal package extraction. */
+const token = defineStorageCapability()('packed-read')
+/** API identity proves both lookup paths share the original provider installation. */
+const api = { read: () => 'packed' }
+/** Provider setup exists only to exercise the actual package entry and identity contract. */
+const store = provideCapabilities(createBase(), [implement(token, api)])
+if (!hasStorageCapability(store, token) || useStorageCapability(store, token) !== store.use(token) || useStorageCapability(store, token) !== api) throw new Error('packed capability root export mismatch')
+/** A frozen unprovided base must remain unmodified and report the same missing capability code. */
+const raw = Object.freeze(createBase())
+if (hasStorageCapability(raw, token) || Object.hasOwn(raw, 'use')) throw new Error('raw capability read mutated the base')
+/** The real package-root error remains the declared unsupported failure rather than a missing export. */
+let missing
+try { useStorageCapability(raw, token) } catch (error) { missing = error }
+if (missing?.source !== '@migaia/storage-contract' || missing.code !== 'UNSUPPORTED_CAPABILITY' || missing.backend !== 'packed-fixture' || Object.hasOwn(raw, 'use')) throw new Error('packed missing capability identity mismatch')
 if (!utilsBuffer(new ArrayBuffer(1)) || !utilsBytes(new Uint8Array(1))) throw new Error('canonical byte owner mismatch')
 const originalClone = globalThis.structuredClone
 let cloneCalls = 0
