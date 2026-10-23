@@ -1,5 +1,21 @@
 /** Canonical host boundary messages. */
 export const StorageErrorText = {
+  /** Flat-wire decoding preserves the original bounded key-domain messages. */
+  storageKeyDecodeLimitExceeded: 'storage key exceeds decode limits',
+  /** Flat-wire tuples retain exactly their registered tag and payload slots. */
+  storageKeyWireInvalid: 'invalid storage key wire',
+  /** A decoded binary key cannot exceed the canonical contract budget. */
+  storageKeyBinaryTooLarge: 'key too large',
+  /** Unknown wire tags remain malformed data and never become logical keys. */
+  storageKeyWireTagInvalid: 'invalid storage key wire tag',
+  /** Ranges must be structural option objects before copying their bounds. */
+  keyRangeObject: 'key range must be an object',
+  /** Both inclusive/exclusive flags retain the existing boolean domain. */
+  keyRangeFlags: 'key range open flags must be boolean',
+  /** Invalid bounds preserve their original field label and validation cause. */
+  keyRangeBound: (label: string) => `invalid ${label}`,
+  /** Empty or reversed bounds reject before backend iteration. */
+  keyRangeInvalid: 'invalid key range',
   /** Preserve the original final backend cleanup diagnostic when its neutral implementation moves. */
   operationCleanupFailed: '[storage-web] operation cleanup failed',
   /** Environment checks must be callable before their original installation resource is acquired. */

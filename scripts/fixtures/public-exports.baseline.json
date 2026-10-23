@@ -1753,9 +1753,17 @@
         "defineStorageBackendKind"
       ],
       "./authoring/backend": [
+        "assertKeyRange",
         "createStorageOperationReporter",
         "createStorageOperationRuntime",
-        "reportCleanupError"
+        "createStorageToken",
+        "decodeFlatStorageKey",
+        "encodeFlatStorageKey",
+        "isStorageKeyInRange",
+        "reportCleanupError",
+        "resolveStorageNamespace",
+        "safeJsonPayloadByteLength",
+        "snapshotKeyRange"
       ],
       "./entity": [
         "REPOSITORY_KEY_PREFIX",

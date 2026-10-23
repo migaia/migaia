@@ -23,3 +23,5 @@ export const STORAGE_PLUGIN_NAME_PREFIX = 'storage-backend:'
 
 /** Ordinary host operations share the existing zero-UUID default organization. */
 export const STORAGE_DEFAULT_ORG = '00000000-0000-0000-0000-000000000000'
+/** Memory remains the original fallback label for shared flat-key diagnostic inputs. */
+export const STORAGE_MEMORY_BACKEND = 'memory'
