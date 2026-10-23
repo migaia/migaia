@@ -1777,7 +1777,25 @@ const initOnce = once(() => {
 
 ---
 
+## Identify the server runtime
+
+```ts doc-test=run
+import { detectServerRuntime } from '@migaia/utils'
+
+console.log(detectServerRuntime()) // 'node' in Node
+```
+
+`detectServerRuntime(): 'deno' | 'bun' | 'node' | undefined` checks `globalThis.Deno`, then `process.versions.bun`, then `process.versions.node`. Node compatibility globals in Deno and Bun do not take precedence. Browsers return `undefined`. The function imports no filesystem or other host APIs; native adapters use its result to load only their runtime module.
+
 ## `/value`, `/string` and `/number` everyday tools
+
+`jitter(value, ratio, random = Math.random)` is exported from `@migaia/utils/number` and the root entry. It returns a value in `[value * (1 - ratio), value]`, only shortening the deadline. `value` must be finite and non-negative; `ratio` and the random result must be in the inclusive interval `[0, 1]`. Invalid inputs throw a `RangeError` carrying `@migaia/utils` / `INVALID_ARGUMENT`. A throwing random callback produces the same coded error with the original failure on `cause`. Each call with valid arguments draws exactly one sample, including when `value` or `ratio` is zero.
+
+```ts doc-test=run
+import { jitter } from '@migaia/utils/number'
+
+console.log(jitter(60_000, 0.2, () => 0.5)) // 54000, never above the original 60000
+```
 
 `isSafeIntegerValue(value)` from `/value` accepts only finite safe-integer numbers and converts no strings, bigints or boxed numbers.
 
@@ -1967,6 +1985,7 @@ The table lists every public name. See the module sections above for parameters,
 | `deferTask` | `@migaia/utils/scheduler` | Schedules one job to run after the current call through a scheduler. |
 | `deferred` | `@migaia/utils/promise` | Creates a native Promise you settle from outside; prefer `Promise.withResolvers()` in new code. |
 | `deserializeErrorChain` | `@migaia/utils/error` | Validates an untrusted error tree in full, then rebuilds the native error graph. |
+| `detectServerRuntime` | `@migaia/utils` | Identifies Deno before Bun before Node; browsers without server globals return `undefined`. |
 | `diagnosticSnapshot` | `@migaia/utils/object` | Copies a value as far as possible and returns explicit diagnostics. |
 | `encodeUtf8` | `@migaia/utils/bytes` | Encodes a string into a new UTF-8 byte array. |
 | `format` | `@migaia/utils/string` | Replaces placeholder paths in a template in one linear scan. |
@@ -1993,6 +2012,7 @@ The table lists every public name. See the module sections above for parameters,
 | `isUtilsAbortError` | `@migaia/utils/error` | Checks this package's error shape and identity, then that the code is `ABORTED`. |
 | `isUtilsError` | `@migaia/utils/error` | Recognizes this package's error shape only when both identity fields are valid. |
 | `isUtilsTimeoutError` | `@migaia/utils/error` | Checks this package's error shape and identity, then that the code is `DEADLINE_EXCEEDED`. |
+| `jitter` | `@migaia/utils/number` | Shortens a finite non-negative value into `[value * (1 - ratio), value]`; invalid inputs use `INVALID_ARGUMENT`. |
 | `noop` | `@migaia/utils/function` | Empty function that always returns `undefined`, used as a default callback. |
 | `normalizeSerializedErrorChain` | `@migaia/utils/error` | Validates and freezes a fresh wire error tree before the receiver uses any field. |
 | `observeThenableRejection` | `@migaia/utils/function` | Observes a captured thenable's rejection while isolating reporter failures at the boundary. |

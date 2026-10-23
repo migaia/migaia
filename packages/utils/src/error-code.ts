@@ -6,7 +6,9 @@ export const UtilsErrorCode = {
    * Uint8Array brand or decoded length, or a scheduler `delayMs`/`advance(ms)` that is not a finite
    * non-negative number or overflows the virtual clock/shared absolute deadline, or a deferred
    * callback/scheduler method that is not callable. The native `TypeError`/`RangeError` type is
-   * kept; the caller must fix the argument, retrying the same value fails again.
+   * kept. Also covers jitter's non-finite/negative value, ratio or random result outside [0, 1],
+   * and a throwing random callback (kept as cause). The caller must fix the argument; retrying the
+   * same value fails again.
    */
   invalidArgument: 'INVALID_ARGUMENT',
   /**

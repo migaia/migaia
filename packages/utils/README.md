@@ -103,6 +103,8 @@ async function fetchWithTimeout(url: string, ms: number) {
 | 接收、保护、更新配置 | `ownConfig`、`readonlyConfig`、`patchConfig` | `@migaia/utils/config` |
 | Base64 与 UTF-8 | `bytesToBase64`、`base64ToBytes`、`encodeUtf8` | `@migaia/utils/bytes` |
 | 模板插值、数字和金额格式化 | `format`、`formatCurrency` | `@migaia/utils/string`、`/number` |
+| 识别启动程序的服务端运行时 | `detectServerRuntime` | `@migaia/utils` |
+| 分散缓存到期时间，且不延长原期限 | `jitter` | `@migaia/utils/number` |
 
 几个贯穿全包的说法：
 

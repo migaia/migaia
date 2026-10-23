@@ -1,9 +1,9 @@
 /**
  * Reference documentation of `@migaia/utils`. Rules: `app/reference/contract.ts`. Verified against
  * `packages/utils/src` (promise.ts, scheduler.ts, error.ts, error-chain*.ts, bytes.ts, object.ts,
- * object-path.ts, config.ts, function.ts, number.ts, string.ts, value.ts, url.ts, collector.ts),
- * README and USEGUIDE on 2026-10-17. Source correction: `withTimeout` with zero timeout and `start`
- * still schedules a zero-delay deadline; it does not disable the deadline.
+ * object-path.ts, config.ts, function.ts, number.ts, runtime.ts, string.ts, value.ts, url.ts,
+ * collector.ts), README and USEGUIDE on 2026-10-17. Source correction: `withTimeout` with zero
+ * timeout and `start` still schedules a zero-delay deadline; it does not disable the deadline.
  */
 import type { ILibraryReference, IMemberDoc, IOptionCaseDoc, IText, ITypeDoc } from './contract.js'
 import { utilsCases } from './utils-cases.js'
@@ -1370,8 +1370,8 @@ const getRegistry = once(() => buildRegistry())`
     },
     number: {
       summary: t(
-        'Use this entry to display numbers in a chosen locale, including money and percentages. Choose `@migaia/utils/number` when formatting is the task, rather than the root collection of general utilities.\n\n`formatCurrency()` formats a value with the currency you specify; `createNumberFormatter()` creates a formatter you can reuse across many values. The functions use `Intl.NumberFormat`, the platform number formatter, and leave currency and precision choices to you; they do not parse numeric text.',
-        '需要按指定地区的习惯显示数字、金额或百分比时，使用此入口。专门处理数字展示时，可从 `@migaia/utils/number` 导入，不必从汇集多类工具的根入口选择。\n\n`formatCurrency()` 按你指定的货币格式化数值；`createNumberFormatter()` 创建可反复处理多个数值的格式器。它们使用平台提供的数字格式器 `Intl.NumberFormat`，货币和精度仍由你决定，也不负责把文本解析成数字。'
+        'Use this entry to display numbers in a chosen locale, including money and percentages, or shorten deadlines with `jitter()`.\n\n`formatCurrency()` formats a value with the currency you specify; `createNumberFormatter()` creates a formatter you can reuse across many values. The formatters use `Intl.NumberFormat` and leave currency and precision choices to you. `jitter()` spreads expiration times without exceeding the original deadline.',
+        '需要按指定地区的习惯显示数字、金额或百分比，或用 `jitter()` 缩短期限时，使用此入口。\n\n`formatCurrency()` 按你指定的货币格式化数值；`createNumberFormatter()` 创建可反复处理多个数值的格式器。格式器使用平台提供的 `Intl.NumberFormat`，货币和精度仍由你决定。`jitter()` 分散到期时间，且不超过原始期限。'
       ),
       example: `import { formatCurrency } from '@migaia/utils/number'
 
@@ -1462,6 +1462,44 @@ isEmptyValue(0) // false`
     }
   },
   symbols: {
+    jitter: {
+      role: 'operation',
+      cases: utilsCases.jitter,
+      purpose: t(
+        'Shortens a finite non-negative deadline by a bounded random fraction without extending it.',
+        '以有界随机比例缩短有限非负期限，绝不延长。'
+      ),
+      params: {
+        value: t('Finite non-negative starting value.', '有限且非负的原始值。'),
+        ratio: t('Maximum reduction fraction in [0, 1].', '最大缩短比例，范围为 [0, 1]。'),
+        random: t(
+          'Optional sampler, default Math.random. Called once after argument validation; must return a finite value in [0, 1].',
+          '可选随机源，默认 Math.random。参数校验后调用一次；必须返回 [0, 1] 内的有限值。'
+        )
+      },
+      returns: t(
+        'A value in [value * (1 - ratio), value]. Invalid inputs or a failing sampler throw RangeError with utils INVALID_ARGUMENT; callback failures remain on cause.',
+        '返回 [value * (1 - ratio), value] 内的值。输入无效或随机源失败时抛出带 `@migaia/utils` / `INVALID_ARGUMENT` 的 `RangeError`；回调原错保留在 `cause`。'
+      ),
+      example: `import { jitter } from '@migaia/utils/number'
+
+const ttlMs = jitter(60_000, 0.2)`
+    },
+    detectServerRuntime: {
+      role: 'operation',
+      cases: utilsCases.detectServerRuntime,
+      purpose: t(
+        'Identifies the server runtime without importing host APIs, checking Deno before Bun before Node.',
+        '不导入宿主 API，按 Deno、Bun、Node 的优先级识别服务端运行时。'
+      ),
+      returns: t(
+        '`deno`, `bun` or `node`; `undefined` in browsers without server globals.',
+        '`deno`、`bun` 或 `node`；没有服务端全局的浏览器返回 `undefined`。'
+      ),
+      example: `import { detectServerRuntime } from '@migaia/utils'
+
+const runtime = detectServerRuntime()`
+    },
     ...utilsFacadeSymbols,
     yieldToHost: {
       ...utilsFacadeSymbols.yieldToHost!,

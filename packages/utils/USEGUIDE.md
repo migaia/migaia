@@ -1866,7 +1866,25 @@ const initOnce = once(() => {
 
 ---
 
+## 识别服务端运行时
+
+```ts doc-test=run
+import { detectServerRuntime } from '@migaia/utils'
+
+console.log(detectServerRuntime()) // Node 中为 'node'
+```
+
+`detectServerRuntime(): 'deno' | 'bun' | 'node' | undefined` 先检查 `globalThis.Deno`，再检查 `process.versions.bun`，最后检查 `process.versions.node`。Deno 和 Bun 提供的 Node 兼容全局不会抢先匹配。浏览器返回 `undefined`。函数不导入文件系统或其它宿主 API；原生适配器根据结果只加载自己的运行时模块。
+
 ## `/value`、`/string`、`/number` 高频工具
+
+`jitter(value, ratio, random = Math.random)` 从 `@migaia/utils/number` 或根入口导出，返回 `[value * (1 - ratio), value]` 内的值，只缩短期限。`value` 必须有限且非负，`ratio` 与随机结果必须在闭区间 `[0, 1]`。无效输入抛出带 `@migaia/utils` / `INVALID_ARGUMENT` 的 `RangeError`；随机回调抛错时同样以该错误拒绝，原错保留在 `cause`。参数有效后每次只调用一次随机源，包括 `value` 或 `ratio` 为零时。
+
+```ts doc-test=run
+import { jitter } from '@migaia/utils/number'
+
+console.log(jitter(60_000, 0.2, () => 0.5)) // 54000，永不超过原来的 60000
+```
 
 `isSafeIntegerValue(value)` 从 `/value` 导出，仅接受有限的安全整数 number，不转换字符串、bigint 或 boxed number。
 
@@ -2054,6 +2072,7 @@ UTF-8 的 fatal 解码失败使用 INVALID_ENCODING，并在 message 中标明 U
 | `deferTask` | `@migaia/utils/scheduler` | 通过调度器安排一个在当前调用结束后执行的任务。 |
 | `deferred` | `@migaia/utils/promise` | 创建可以从外部结算的原生 Promise；新代码优先用 `Promise.withResolvers()`。 |
 | `deserializeErrorChain` | `@migaia/utils/error` | 先完整校验不可信的错误树，再重建原生错误图。 |
+| `detectServerRuntime` | `@migaia/utils` | 依次识别 Deno、Bun、Node；没有服务端全局的浏览器返回 `undefined`。 |
 | `diagnosticSnapshot` | `@migaia/utils/object` | 尽力复制一个值，并给出明确的诊断列表。 |
 | `encodeUtf8` | `@migaia/utils/bytes` | 把字符串编码为新的 UTF-8 字节数组。 |
 | `format` | `@migaia/utils/string` | 一次线性扫描替换模板中的占位符路径。 |
@@ -2080,6 +2099,7 @@ UTF-8 的 fatal 解码失败使用 INVALID_ENCODING，并在 message 中标明 U
 | `isUtilsAbortError` | `@migaia/utils/error` | 先确认是本包的错误形状和身份，再检查代码是否为 `ABORTED`。 |
 | `isUtilsError` | `@migaia/utils/error` | 只有两个身份字段都有效时，才认定为本包的错误形状。 |
 | `isUtilsTimeoutError` | `@migaia/utils/error` | 先确认是本包的错误形状和身份，再检查代码是否为 `DEADLINE_EXCEEDED`。 |
+| `jitter` | `@migaia/utils/number` | 将有限非负值随机缩短至 `[value * (1 - ratio), value]`；非法输入使用 `INVALID_ARGUMENT`。 |
 | `noop` | `@migaia/utils/function` | 恒返回 `undefined` 的空函数，用作默认回调。 |
 | `normalizeSerializedErrorChain` | `@migaia/utils/error` | 接收方使用之前，先校验并冻结一份新的线上错误树。 |
 | `observeThenableRejection` | `@migaia/utils/function` | 观察已捕获 thenable 的拒绝，并在边界上隔离 reporter 自身的失败。 |
