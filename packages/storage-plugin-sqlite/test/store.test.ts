@@ -6,6 +6,8 @@ import { createStorageHost, definePlugin } from '@migaia/storage-host'
 import { deferred } from '@migaia/utils/promise'
 import {
   kv,
+  ttl,
+  counter,
   records,
   sqlFragment,
   lockKey,
@@ -59,6 +61,129 @@ async function installed(options: { wal?: boolean; memory?: boolean; native?: st
 }
 
 describe('native SQLite installation', () => {
+  it('keeps native TTL with values, reclaims expiry, and rolls back the same three channels', async () => {
+    /** This backend uses the local wall clock; no scheduler timer performs cleanup. */
+    let now = Date.now()
+    const clock = vi.spyOn(Date, 'now').mockImplementation(() => now)
+    onTestFinished(() => clock.mockRestore())
+    const { store } = await installed({ memory: true })
+    await store.set('text-expiry', 'old')
+    await store.setBytes('bytes-expiry', new Uint8Array([1]))
+    await store.putRecord({ value: 'old' }, 'record-expiry')
+    for (const target of [
+      lockKey.text('text-expiry'),
+      lockKey.bytes('bytes-expiry'),
+      lockKey.record('record-expiry')
+    ]) {
+      expect(await store.use(ttl).expire(target, 25.5)).toBe(true)
+      expect(await store.use(ttl).remaining(target)).toBe(25.5)
+    }
+    /** Every ordinary same-channel overwrite keeps its existing live deadline. */
+    await store.set('text-expiry', 'updated')
+    await store.setBytes('bytes-expiry', new Uint8Array([2]))
+    await store.putRecord({ value: 'updated' }, 'record-expiry')
+    expect(await store.use(ttl).remaining(lockKey.text('text-expiry'))).toBe(25.5)
+    expect(await store.use(ttl).remaining(lockKey.bytes('bytes-expiry'))).toBe(25.5)
+    expect(await store.use(ttl).remaining(lockKey.record('record-expiry'))).toBe(25.5)
+    now += 26
+    /** No warm read is allowed to hide a stale cross-channel duplicate. */
+    await store.setBytes('text-expiry', new Uint8Array([3]))
+    await store.putRecord({ live: true }, 'bytes-expiry')
+    await store.set('record-expiry', 'live')
+    expect(await store.get('text-expiry')).toBeNull()
+    expect(await store.getBytes('bytes-expiry')).toBeNull()
+    expect(await store.getRecord('record-expiry')).toBeUndefined()
+    expect(await store.use(ttl).remaining(lockKey.bytes('text-expiry'))).toBeUndefined()
+    /** Expiry metadata and same-connection replacement share the original native scope. */
+    await store.transaction(async (tx) => {
+      await tx.set('scoped-expiry', 'old')
+      expect(await tx.use(ttl).expire(lockKey.text('scoped-expiry'), 5)).toBe(true)
+      now += 6
+      await tx.setBytes('scoped-expiry', new Uint8Array([4]))
+      expect(await tx.get('scoped-expiry')).toBeNull()
+      expect(await tx.getBytes('scoped-expiry')).toEqual(new Uint8Array([4]))
+    })
+    const primary = new Error('TTL native rollback')
+    await expect(
+      store.transaction(async (tx) => {
+        await tx.set('ttl-rollback', 'new')
+        await tx.use(ttl).expire(lockKey.text('ttl-rollback'), 100)
+        throw primary
+      })
+    ).rejects.toMatchObject({ code: 'TRANSACTION_FAILED', cause: primary })
+    expect(await store.get('ttl-rollback')).toBeNull()
+    await store.clearAll()
+    /** Reads physically reclaim expired text while preserving the existing revision owner. */
+    await store.set('lazy', 'value')
+    await store.use(ttl).expire(lockKey.text('lazy'), 1)
+    now += 2
+    expect(store.sync.get('lazy')).toBeNull()
+    expect(await store.sql`SELECT count(*) AS count FROM migaia_text`.get()).toMatchObject({
+      count: 0
+    })
+    await store.use(kv).setMany([{ key: ['batch-expiry'], value: 'gone', ttlMs: 1 }])
+    now += 2
+    expect(await store.use(kv).getMany([['batch-expiry'], ['batch-expiry']])).toEqual([
+      undefined,
+      undefined
+    ])
+    expect(await store.sql`SELECT count(*) AS count FROM migaia_text`.get()).toMatchObject({
+      count: 0
+    })
+    await store.putRecord({ gone: true }, ['record-expiry'])
+    await store.use(ttl).expire(lockKey.record(['record-expiry']), 1)
+    now += 2
+    expect(await store.use(records).query().all()).toEqual([])
+    expect(await store.sql`SELECT count(*) AS count FROM migaia_records`.get()).toMatchObject({
+      count: 0
+    })
+    await store.set('persistent', 'value')
+    expect(await store.use(ttl).persist(lockKey.text('persistent'))).toBe(false)
+    expect(await store.use(ttl).expire(lockKey.text('persistent'), 50)).toBe(true)
+    expect(await store.use(ttl).persist(lockKey.text('persistent'))).toBe(true)
+    expect(await store.use(ttl).remaining(lockKey.text('persistent'))).toBeUndefined()
+    expect(await store.use(ttl).expire(lockKey.text('persistent'), 0)).toBe(true)
+    expect(await store.get('persistent')).toBeNull()
+    expect(await store.use(ttl).expire(lockKey.text('persistent'), 50)).toBe(false)
+    await expect(store.use(ttl).expire(lockKey.vector('absent', 'point'), 1)).rejects.toMatchObject(
+      { code: 'UNSUPPORTED_CAPABILITY' }
+    )
+  })
+
+  it('updates native counters atomically and keeps canonical text and TTL semantics', async () => {
+    /** Real native operations and failures share the same root text mutation owner. */
+    const { store } = await installed({ memory: true })
+    expect(await store.use(counter).increment('visits')).toBe(1)
+    await Promise.all(Array.from({ length: 100 }, () => store.use(counter).increment('visits')))
+    expect(await store.get('visits')).toBe('101')
+    await store.use(ttl).expire(lockKey.text('visits'), 60_000)
+    expect(await store.use(counter).increment('visits', -1)).toBe(100)
+    expect(await store.use(ttl).remaining(lockKey.text('visits'))).toBeGreaterThan(59_000)
+    await store.set('invalid-counter', '01')
+    await expect(store.use(counter).increment('invalid-counter')).rejects.toMatchObject({
+      code: 'INVALID_ARGUMENT'
+    })
+    expect(await store.get('invalid-counter')).toBe('01')
+    await expect(store.use(counter).increment('visits', 0.5)).rejects.toMatchObject({
+      code: 'INVALID_ARGUMENT'
+    })
+    await store.set('overflow-counter', String(Number.MAX_SAFE_INTEGER))
+    await expect(store.use(counter).increment('overflow-counter')).rejects.toMatchObject({
+      code: 'INVALID_ARGUMENT'
+    })
+    expect(await store.get('overflow-counter')).toBe(String(Number.MAX_SAFE_INTEGER))
+    const primary = new Error('counter native rollback')
+    await expect(
+      store.transaction(async (tx) => {
+        expect(await tx.use(counter).increment('visits', 5)).toBe(105)
+        await tx.use(ttl).persist(lockKey.text('visits'))
+        throw primary
+      })
+    ).rejects.toMatchObject({ code: 'TRANSACTION_FAILED', cause: primary })
+    expect(await store.get('visits')).toBe('100')
+    expect(await store.use(ttl).remaining(lockKey.text('visits'))).toBeGreaterThan(59_000)
+  })
+
   it('runs native root and scoped batches with canonical keys and one count observation', async () => {
     /** Actual hook payloads prove that one public batch never expands into per-key operations. */
     const observations: Array<{ operation: string; count?: number }> = []

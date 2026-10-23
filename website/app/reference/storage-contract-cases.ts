@@ -299,6 +299,74 @@ export const storageContractCases: Readonly<Record<string, readonly ICaseDoc[]>>
   snapshotStorageRdfQuad: [rdfTermCase],
   encodeStorageRdfQuad: [rdfTermCase],
   ttl: [ttlCase],
+  snapshotStorageBlobPut: [
+    {
+      title: t('snapshotStorageBlobPut', 'snapshotStorageBlobPut'),
+      problem: t(
+        'Backend authors need the original shared blob input and resource semantics.',
+        '后端作者需要原共享 blob 输入与资源语义。'
+      ),
+      example: t(
+        "import { snapshotStorageBlobPut } from '@migaia/storage-contract'\nconst body = new Uint8Array([1, 2])\nconst input = snapshotStorageBlobPut('file', body, { metadata: { owner: 'Ada' } }, 'object')\nbody[0] = 9\nconsole.log(input.body instanceof Uint8Array && input.body[0], input.options.metadata?.owner)",
+        "import { snapshotStorageBlobPut } from '@migaia/storage-contract'\nconst body = new Uint8Array([1, 2])\nconst input = snapshotStorageBlobPut('file', body, { metadata: { owner: 'Ada' } }, 'object')\nbody[0] = 9\nconsole.log(input.body instanceof Uint8Array && input.body[0], input.options.metadata?.owner)"
+      ),
+      result: t(
+        'Prints 1 Ada; input bytes and metadata are detached without I/O.',
+        '输出 1 Ada；输入字节与元数据独立捕获，不进行 I/O。'
+      )
+    }
+  ],
+  snapshotStorageBlobGet: [
+    {
+      title: t('snapshotStorageBlobGet', 'snapshotStorageBlobGet'),
+      problem: t(
+        'Backend authors need the original shared blob input and resource semantics.',
+        '后端作者需要原共享 blob 输入与资源语义。'
+      ),
+      example: t(
+        "import { snapshotStorageBlobGet } from '@migaia/storage-contract'\nconst input = snapshotStorageBlobGet('file', { range: { start: 2, end: 4 } }, 'object')\nconsole.log(input.options.range?.start, input.options.range?.end)",
+        "import { snapshotStorageBlobGet } from '@migaia/storage-contract'\nconst input = snapshotStorageBlobGet('file', { range: { start: 2, end: 4 } }, 'object')\nconsole.log(input.options.range?.start, input.options.range?.end)"
+      ),
+      result: t(
+        'Prints 2 4; end is inclusive and native content remains unopened.',
+        '输出 2 4；end 为闭区间，尚未打开原生内容。'
+      )
+    }
+  ],
+  snapshotStorageBlobList: [
+    {
+      title: t('snapshotStorageBlobList', 'snapshotStorageBlobList'),
+      problem: t(
+        'Backend authors need the original shared blob input and resource semantics.',
+        '后端作者需要原共享 blob 输入与资源语义。'
+      ),
+      example: t(
+        "import { snapshotStorageBlobList } from '@migaia/storage-contract'\nconst input = snapshotStorageBlobList({ prefix: 'files/' }, undefined, 'object')\nconsole.log(input.prefix, input.limit)",
+        "import { snapshotStorageBlobList } from '@migaia/storage-contract'\nconst input = snapshotStorageBlobList({ prefix: 'files/' }, undefined, 'object')\nconsole.log(input.prefix, input.limit)"
+      ),
+      result: t(
+        'Prints files/ 100; the backend still owns actual pagination and cursor binding.',
+        '输出 files/ 100；后端继续拥有实际分页与游标绑定。'
+      )
+    }
+  ],
+  createStorageBlobObject: [
+    {
+      title: t('createStorageBlobObject', 'createStorageBlobObject'),
+      problem: t(
+        'Backend authors need the original shared blob input and resource semantics.',
+        '后端作者需要原共享 blob 输入与资源语义。'
+      ),
+      example: t(
+        "import { createStorageBlobObject } from '@migaia/storage-contract'\nconst object = createStorageBlobObject(\n  { key: 'file', size: 1, etag: 'native', updatedAt: 1, metadata: {} },\n  new ReadableStream<Uint8Array>({ start(controller) { controller.enqueue(new Uint8Array([7])); controller.close() } }),\n  { close: async () => undefined, report: console.error, backend: 'object' }\n)\ntry { console.log((await object.bytes())[0]) } finally { await object.dispose() }",
+        "import { createStorageBlobObject } from '@migaia/storage-contract'\nconst object = createStorageBlobObject(\n  { key: 'file', size: 1, etag: 'native', updatedAt: 1, metadata: {} },\n  new ReadableStream<Uint8Array>({ start(controller) { controller.enqueue(new Uint8Array([7])); controller.close() } }),\n  { close: async () => undefined, report: console.error, backend: 'object' }\n)\ntry { console.log((await object.bytes())[0]) } finally { await object.dispose() }"
+      ),
+      result: t(
+        'Prints 7; bytes consumes the single content right and EOF releases the original resource.',
+        '输出 7；bytes 消费唯一内容权限，EOF 释放原资源。'
+      )
+    }
+  ],
   snapshotStorageTtlTarget: [ttlCase],
   assertStorageTtlDuration: [ttlCase],
   counter: [counterCase],

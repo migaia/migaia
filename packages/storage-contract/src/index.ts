@@ -239,8 +239,11 @@ export type {
   IQueryResult,
   IQueryChain,
   IRecordQuerySource,
+  IQueryNativeStep,
   IRecordQuery,
   IRecordQueryCore,
+  IRecordOrderedQuery,
+  IRecordOrderedQueryCore,
   IRecordQueryBase,
   IRecordQueryBaseCore,
   IRecordQueryNeedsLimit,
@@ -291,7 +294,13 @@ export type {
 
 export { sql } from './capabilities/sql.js'
 
-export { blob } from './capabilities/blob.js'
+export {
+  blob,
+  snapshotStorageBlobPut,
+  snapshotStorageBlobGet,
+  snapshotStorageBlobList,
+  createStorageBlobObject
+} from './capabilities/blob.js'
 export type { IBlobInfo, IBlobObject, IBlobApi } from './capabilities/blob.js'
 export { durableChangeFeed } from './capabilities/durable-change-feed.js'
 export type {

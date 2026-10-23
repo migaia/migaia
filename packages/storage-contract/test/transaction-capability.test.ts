@@ -345,7 +345,12 @@ describe('original transaction capability projections', () => {
     await api.delete([quad])
     expect(writes).toHaveBeenCalledTimes(2)
     expect(writes.mock.calls[0]![0]).not.toBe(writes.mock.calls[1]![0])
-    const query = api.match({}).limit(1)
+    const query = api
+      .match({})
+      .orderBy((row) => row.subject.value)
+      .distinct('subject')
+      .skip(0)
+      .limit(1)
     expect(await query.all()).toEqual([quad])
     expect(await query.select('subject').all()).toEqual([{ subject: quad.subject }])
     expect(await query.first()).toBe(quad)
@@ -618,7 +623,13 @@ describe('original transaction capability projections', () => {
 
   it('admits every escaped read terminal before its own argument or empty-result validation', async () => {
     const fixture = setup()
-    const query = fixture.scope.use(records).query()
+    const query = fixture.scope
+      .use(records)
+      .query()
+      .orderBy((row) => row.value)
+      .distinct('value')
+      .skip(0)
+      .limit(4)
     const selected = query.select((row) => row)
     fixture.controller.stopAdmission()
     await fixture.controller.runFinalizers()

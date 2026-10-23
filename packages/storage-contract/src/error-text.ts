@@ -1,5 +1,9 @@
 /** Stable validation causes used by codec and synchronous-option admission boundaries. */
 export const StorageContractErrorText = {
+  /** Blob inputs are captured before native object I/O or upload-reader ownership. */
+  blobArgument: 'blob key, body or options are invalid',
+  /** A returned object grants one stream-or-bytes right for its original resource lifetime. */
+  blobConsumed: 'blob content has already been consumed or disposed',
   /** SQL templates, identifiers and pure fragment inputs are admitted before native execution. */
   sqlArgument: 'SQL fragment input is invalid',
   /** SPARQL accepts only real templates, validated RDF values and authentic fragments. */
@@ -56,6 +60,8 @@ export const StorageContractErrorText = {
   queryUnsupported: 'backend does not declare this operation or operator',
   /** A record operation following a client step cannot cross the longest safe native prefix. */
   queryPrefix: 'operation follows a client execution boundary',
+  /** Offset pagination advances through every skipped source row rather than seeking a key. */
+  querySkip: 'skip advances through rows with O(n) cost',
   /**
    * Confirmed lock diagnostics expose declared identity and holder without inventing a remote
    * owner.
