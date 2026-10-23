@@ -78,10 +78,18 @@ describe('native endpoint adapters', () => {
       })
       expect(endpoint.atomicUpdate).toBeUndefined()
       expect(await endpoint.query('ASK {}', 'application/sparql-results+json')).toContain('true')
+      let formats = 0
       await endpoint.graphStore!.put(
         { graph: term.iri('https://example/g?x=é&y=1') },
-        { format: 'text/turtle', text: '<https://a> <https://p> "x" .' }
+        {
+          get format() {
+            formats++
+            return 'text/turtle' as const
+          },
+          text: '<https://a> <https://p> "x" .'
+        }
       )
+      expect(formats).toBe(1)
       expect(new URL(seen[1]!.url, origin).searchParams.get('graph')).toBe(
         'https://example/g?x=é&y=1'
       )

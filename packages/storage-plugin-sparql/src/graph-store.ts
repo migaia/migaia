@@ -25,8 +25,9 @@ export function snapshotGraphFormat(format?: IRdfGraphFormat): IRdfGraphFormat {
 /** Document bytes detach from mutable option objects before native work. */
 export function snapshotGraphDocument(document: IRdfGraphDocument): IRdfGraphDocument {
   return capture(() => {
-    if (document.format === undefined) throw invalidArgument()
-    const format = snapshotGraphFormat(document.format),
+    const suppliedFormat = document.format
+    if (suppliedFormat === undefined) throw invalidArgument()
+    const format = snapshotGraphFormat(suppliedFormat),
       text = document.text
     if (typeof text !== 'string') throw invalidArgument()
     return Object.freeze({ format, text })

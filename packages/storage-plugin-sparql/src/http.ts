@@ -27,7 +27,7 @@ function responseError(status: number, body: string, mutation: boolean): Error {
     body: { value: body, enumerable: true }
   })
   return sparqlError(
-    status >= 500
+    status >= 500 || status === 0
       ? mutation
         ? SparqlErrorCode.commitUnknown
         : SparqlErrorCode.unavailable
