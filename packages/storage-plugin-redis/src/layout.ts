@@ -2,6 +2,7 @@ import {
   encodeOrderedStorageKey,
   encodeStorageOrgKey,
   decodeStorageOrgKey,
+  snapshotStorageOrgKeyPrefix,
   type IStorageKey
 } from '@migaia/storage-contract'
 import { bytesToBase64, base64ToBytes } from '@migaia/serialize/core'
@@ -36,6 +37,8 @@ export const RedisSuffix = {
   record: 'r',
   revisions: 'rev',
   changes: 'changes',
+  durableChanges: 'durable-changes',
+  changeField: 'change',
   locks: 'lock',
   sequence: '$sequence'
 } as const
@@ -45,6 +48,9 @@ export function createRedisLayout(prefix: string, orgId: string) {
   const tag = '{' + redisHex(encodeOrderedStorageKey(prefix, RedisText.backend)) + '}',
     encode = (key: IStorageKey): string =>
       redisHex(encodeStorageOrgKey(orgId, key, RedisText.backend)),
+    span = snapshotStorageOrgKeyPrefix(orgId, undefined, RedisText.backend),
+    lower = redisHex(span.lower),
+    upper = redisHex(span.upper),
     decode = (encoded: string): IStorageKey => {
       try {
         return decodeStorageOrgKey(orgId, redisUnhex(encoded), RedisText.backend)
@@ -55,8 +61,15 @@ export function createRedisLayout(prefix: string, orgId: string) {
   return Object.freeze({
     tag,
     orgId,
+    owns: (physical: string): boolean => {
+      if (physical.startsWith(tag + ':' + RedisSuffix.locks + ':' + orgId + ':')) return true
+      if (!physical.startsWith(tag + ':')) return false
+      const encoded = physical.slice(physical.lastIndexOf(':') + 1)
+      return encoded >= lower && encoded < upper
+    },
     revisions: tag + ':' + RedisSuffix.revisions,
     changes: tag + ':' + RedisSuffix.changes,
+    durableChanges: tag + ':' + RedisSuffix.durableChanges,
     encode,
     decode,
     value: (channel: IRedisChannel, key: IStorageKey): string =>

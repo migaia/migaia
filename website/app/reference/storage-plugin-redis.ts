@@ -8,6 +8,33 @@ const t = (en: string, zh: string): IText => ({ en, zh })
  */
 export const storagePluginRedisReference: ILibraryReference = {
   modules: {
+    'features/streams': {
+      summary: t(
+        'Native Streams and consumer groups with dedicated drained leases.',
+        '原生 Streams 与消费组，使用专用并排空的租约。'
+      )
+    },
+    'features/pubsub': {
+      summary: t(
+        'Best-effort native Pub/Sub and namespace-filtered key events.',
+        '原生 best-effort Pub/Sub 与 namespace 过滤键事件。'
+      )
+    },
+    'features/sorted-sets': {
+      summary: t(
+        'Native ascending leaderboards with canonical UTF16 ties.',
+        '原生升序排行榜，同分按规范 UTF16 排序。'
+      )
+    },
+    'features/rate-limit': {
+      summary: t('Atomic Redis-clock fixed windows.', 'Redis 时钟下的原子固定窗口。')
+    },
+    'features/change-stream': {
+      summary: t(
+        'Native replay cursors appended in the same standard EXEC.',
+        '标准 EXEC 同批追加的原生重放游标。'
+      )
+    },
     index: {
       summary: t(
         'Neutral native driver types and registered errors.',
@@ -23,6 +50,46 @@ export const storagePluginRedisReference: ILibraryReference = {
     }
   },
   symbols: {
+    redisStreamsFeature: {
+      role: 'factory',
+      purpose: t(
+        'Add native Streams root APIs; no transaction API.',
+        '增加原生 Streams 根 API，不进入事务。'
+      ),
+      cases: storagePluginRedisCases.nativeFeatures
+    },
+    redisPubSubFeature: {
+      role: 'factory',
+      purpose: t(
+        'Add owned Pub/Sub resources without reconnect replay.',
+        '增加自有 Pub/Sub 资源，不承诺断连重放。'
+      ),
+      cases: storagePluginRedisCases.nativeFeatures
+    },
+    redisSortedSetsFeature: {
+      role: 'factory',
+      purpose: t(
+        'Add ascending finite-score native sorted sets.',
+        '增加有限分数的原生升序有序集合。'
+      ),
+      cases: storagePluginRedisCases.nativeFeatures
+    },
+    redisRateLimitFeature: {
+      role: 'factory',
+      purpose: t(
+        'Reject exhausted requests without incrementing counters.',
+        '耗尽时拒绝且不增加计数。'
+      ),
+      cases: storagePluginRedisCases.nativeFeatures
+    },
+    redisChangeStreamFeature: {
+      role: 'factory',
+      purpose: t(
+        'Install durableChangeFeed using the original native commit owner.',
+        '使用原生提交拥有者安装 durableChangeFeed。'
+      ),
+      cases: storagePluginRedisCases.nativeFeatures
+    },
     redisBackendKind: {
       role: 'constant',
       purpose: t('Exact native Redis backend kind.', '精确 Redis 原生后端 kind。')
@@ -72,6 +139,55 @@ export const storagePluginRedisReference: ILibraryReference = {
     }
   },
   types: {
+    IRedisStreamEntry: {
+      summary: t('Exact native Feature declaration.', '精确原生 Feature 声明。'),
+      members: {}
+    },
+    IRedisStreamsApi: {
+      summary: t('Exact native Feature declaration.', '精确原生 Feature 声明。'),
+      members: {}
+    },
+    IRedisStreamsOutput: {
+      summary: t('Exact native Feature declaration.', '精确原生 Feature 声明。'),
+      members: {}
+    },
+    IRedisPubSubApi: {
+      summary: t('Exact native Feature declaration.', '精确原生 Feature 声明。'),
+      members: {}
+    },
+    IRedisPubSubOutput: {
+      summary: t('Exact native Feature declaration.', '精确原生 Feature 声明。'),
+      members: {}
+    },
+    IRedisSortedSetsApi: {
+      summary: t('Exact native Feature declaration.', '精确原生 Feature 声明。'),
+      members: {}
+    },
+    IRedisSortedSetsOutput: {
+      summary: t('Exact native Feature declaration.', '精确原生 Feature 声明。'),
+      members: {}
+    },
+    IRedisRateLimitOptions: {
+      summary: t('Exact native Feature declaration.', '精确原生 Feature 声明。'),
+      members: {}
+    },
+    IRedisRateLimitResult: {
+      summary: t('Exact native Feature declaration.', '精确原生 Feature 声明。'),
+      members: {}
+    },
+    IRedisRateLimitApi: {
+      summary: t('Exact native Feature declaration.', '精确原生 Feature 声明。'),
+      members: {}
+    },
+    IRedisRateLimitOutput: {
+      summary: t('Exact native Feature declaration.', '精确原生 Feature 声明。'),
+      members: {}
+    },
+    IRedisChangeStreamOutput: {
+      summary: t('Exact native Feature declaration.', '精确原生 Feature 声明。'),
+      members: {}
+    },
+
     IRedisOptions: {
       summary: t(
         'Borrowed driver and namespace, original concurrency policy and native lock lease.',

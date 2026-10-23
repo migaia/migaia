@@ -1,4 +1,4 @@
-import { RedisCommand } from './constants.js'
+import { RedisCommand, RedisReply } from './constants.js'
 import {
   ConcurrencyHolderState,
   readConcurrencyLockIdentities,
@@ -176,7 +176,7 @@ export function createRedisLocks(options: {
                   : holder(decode(current))
               )
             }
-            if (result !== RedisCommand.ok) throw redisError(RedisErrorCode.decodeFailed, result)
+            if (result !== RedisReply.ok) throw redisError(RedisErrorCode.decodeFailed, result)
             owned.set(physical, value)
           }
           for (let index = 0; index < identities.length; index++)
