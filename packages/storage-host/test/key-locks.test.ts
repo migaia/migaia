@@ -461,6 +461,107 @@ describe('the shared local key-lock provider', () => {
     ).toBeUndefined()
   })
 
+  it('retains original logical leases through physical admission and actual physical cleanup', async () => {
+    const current = await fixture()
+    await using _host = current.host
+    await using port = current.port
+    /** Existing backend physical admission owns its own ready and cleanup intervals. */
+    const entered = deferred<void>()
+    const ready = deferred<void>()
+    const wrote = deferred<void>()
+    const cleanup = deferred<void>()
+    const identities = snapshotConcurrencyLockKeys([lockKey.text('physical')], 'catalog').identities
+    let writes = 0
+    const pending = runWithConcurrency(
+      { store: current.state.store, options: { lock: [lockKey.text('physical')] } },
+      {
+        attempt: (ctx) =>
+          port.attemptWrite(
+            ctx,
+            holder('physical'),
+            () => ++writes,
+            undefined,
+            undefined,
+            undefined,
+            async (commit) => {
+              entered.resolve()
+              await ready.promise
+              const result = commit()
+              wrote.resolve()
+              await cleanup.promise
+              return result
+            }
+          )
+      }
+    )
+    await entered.promise
+    try {
+      expect(port.probe(identities)).toMatchObject({ holder: { owner: 'physical' } })
+      expect(writes).toBe(0)
+      ready.resolve()
+      await wrote.promise
+      expect(writes).toBe(1)
+      expect(port.probe(identities)).toBeDefined()
+      cleanup.resolve()
+      await expect(pending).resolves.toBe(1)
+      expect(port.probe(identities)).toBeUndefined()
+    } finally {
+      ready.resolve()
+      cleanup.resolve()
+      await Promise.allSettled([pending])
+    }
+  })
+
+  it.each(['operation', 'member'] as const)(
+    'rechecks %s cancellation after physical admission before native mutation',
+    async (kind) => {
+      const current = await fixture()
+      await using _host = current.host
+      await using port = current.port
+      const abort = new AbortController()
+      const reason = new Error('abort physical root wait')
+      const entered = deferred<void>()
+      const ready = deferred<void>()
+      const native = vi.fn(() => 1)
+      const release = current.controller.beginMutation()
+      const pending = runWithConcurrency(
+        {
+          store: current.state.store,
+          options: { lock: [lockKey.text('physical')], signal: abort.signal }
+        },
+        {
+          attempt: (ctx) =>
+            port.attemptWrite(
+              ctx,
+              holder('physical'),
+              native,
+              undefined,
+              current.controller.closingSignal,
+              undefined,
+              async (commit) => {
+                entered.resolve()
+                await ready.promise
+                return commit()
+              }
+            )
+        }
+      ).finally(release)
+      const rejected = expect(pending).rejects.toMatchObject({
+        code: 'ABORTED',
+        cause: kind === 'operation' ? reason : expect.objectContaining({ code: 'STORE_DISPOSED' })
+      })
+      await entered.promise
+      const closing = kind === 'member' ? current.controller.dispose() : undefined
+      if (kind === 'operation') abort.abort(reason)
+      ready.resolve()
+      await Promise.all([rejected, closing])
+      expect(native).not.toHaveBeenCalled()
+      expect(
+        port.probe(snapshotConcurrencyLockKeys([lockKey.text('physical')], 'catalog').identities)
+      ).toBeUndefined()
+    }
+  )
+
   it('keeps optimistic work unlocked and reports failed resource observers without affecting results', async () => {
     const current = await fixture()
     await using _host = current.host
