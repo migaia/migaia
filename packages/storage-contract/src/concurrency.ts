@@ -77,6 +77,19 @@ export type ILockedTransactionBuilder<
   run<TResult>(run: (scope: TScope) => TResult): Promise<Awaited<TResult>>
 } & TAugmentMethods
 
+/** Native atomic backends can run without declared keys while accepting only optimistic policies. */
+export type IOptimisticTransactionBuilder<
+  TScope,
+  TAugmentMethods extends object = Record<never, never>
+> = {
+  concurrency(
+    policy: IConcurrencyPolicy & { readonly locking: 'optimistic' }
+  ): IOptimisticTransactionBuilder<TScope, TAugmentMethods>
+  signal(signal: IAbortSignal): IOptimisticTransactionBuilder<TScope, TAugmentMethods>
+  timeout(ms: number): IOptimisticTransactionBuilder<TScope, TAugmentMethods>
+  run<TResult>(run: (scope: TScope) => TResult): Promise<Awaited<TResult>>
+} & TAugmentMethods
+
 /** A handoff interval never borrows the previous holder's identity. */
 export const ConcurrencyHolderState = { held: 'held', handingOff: 'handing-off' } as const
 /** Holder state names share the canonical runtime declaration. */
@@ -158,7 +171,7 @@ type IConcurrencyDecide = (
 /** The sole policy registry proves identity and captures its original callback in the same lookup. */
 const concurrencyPolicies = new WeakMap<IConcurrencyPolicy, IConcurrencyDecide>()
 /** Canonical locking values are shared by policy validation and the original decision loop. */
-const ConcurrencyLocking = { pessimistic: 'pessimistic', optimistic: 'optimistic' } as const
+export const ConcurrencyLocking = { pessimistic: 'pessimistic', optimistic: 'optimistic' } as const
 /** Stable decision values stay in the original concurrency owner. */
 const ConcurrencyAction = { wait: 'wait', reject: 'reject', retry: 'retry' } as const
 /** Preset labels describe policy behavior and never authorize a structurally copied policy. */
@@ -179,13 +192,20 @@ function invalidConcurrencyArgument(cause?: unknown): StorageContractError {
   )
 }
 /** Internal identity admission is reused by the original transaction owner and decision loop. */
-export function assertConcurrencyPolicy(policy: unknown): asserts policy is IConcurrencyPolicy {
+export function assertConcurrencyPolicy(
+  policy: unknown,
+  locking?: IConcurrencyPolicy['locking'],
+  backend?: IBackendKind
+): asserts policy is IConcurrencyPolicy {
   if (
     typeof policy !== 'object' ||
     policy === null ||
     !concurrencyPolicies.has(policy as IConcurrencyPolicy)
   )
     throw invalidConcurrencyArgument()
+  /** The original policy registry also owns optional native-backend locking-mode admission. */
+  if (locking !== undefined && (policy as IConcurrencyPolicy).locking !== locking)
+    throw new StorageContractError(StorageContractErrorCode.unsupported, { backend })
 }
 /** Captures three definition fields exactly once and publishes only immutable public metadata. */
 export function defineConcurrencyPolicy<
