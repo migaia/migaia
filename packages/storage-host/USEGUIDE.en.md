@@ -199,3 +199,21 @@ Backend descriptors may provide `journalBinding(store)`. The original install wi
 Memory supplies this private namespace port. Private string rows stage sparsely beside the original business draft, commit atomically, and remain invisible before commit or after rollback. Business keys, clear, capacity, and change-feed notifications exclude these metadata rows; dropOrg removes the target's private rows. Explicit organization bindings reject foreign scopes, and extracted private views expire with their original operation. This author port does not itself add automatic binlog, undo/redo, or a public storageLogStore factory.
 
 A memory journal namespace holds one original canonical resource-owner text lease until disposal; another open of the same prefix and org rejects `LOCK_REJECTED`. Ordinary private transactions take the separate fixed head key in their initial native lock set. Root backend closure also closes partially constructed namespace resources through the original signal. `transactionInfo(scope)` returns the original authenticated transaction identity for this exact store/org, so same-transaction append grouping never trusts a caller id. Backend authors use `IBackendKeyLockPort.attemptMetadata` only for private metadata leases: canonical point conflicts and the original acquire/release/wait owner remain unchanged, while business clear ranges exclude rows they cannot touch. Ordinary business locks retain their existing range behavior.
+
+### Private log resources
+
+`storageLogStore(host, id, { prefix })` is exported only from `@migaia/storage-host/journal`. Pass the real host or fixed organization view and its installed backend ID. Public KV objects, raw stores and forged hosts grant no private access. The backend must supply its original private journal binding and reliable exclusive ownership. Opening completes recovery first. One organization/prefix permits only one live handle; organizations remain isolated. The original host registration owns cleanup, and callers may close handles early. Explicit log close drains admitted FIFO work. Parent close preserves original pipeline admission: work not yet admitted by the backend can reject with the original HOST_DISPOSING cause, while all admitted Promises still settle. Business enumeration, clear and capacity leave private records untouched.
+
+Append captures original logger JSON before the existing FIFO writes records and commits one final head. Only an actual nonempty commit updates the original logger index and publishes one frozen notice. State advances only from pending to done/aborted. Truncation commits its floor before physical reclamation; reopening retains sequence/time watermarks and never reuses committed sequences. An uncertain write seals the handle until close and reopen; recovery ignores uncommitted rows/state candidates and reclaims remnants, preserving original causes. A non-native private namespace can use the same protocol when its backend supplies reliable exclusivity and atomic single-key head replacement. The current built-in binding is memory. Business transaction append ports and global journal configuration are separate integration work; opening a log does not enable them.
+
+```ts
+import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { storageLogStore } from '@migaia/storage-host/journal'
+import { LogRecordState } from '@migaia/logger/plugins/durable'
+
+await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+await using log = await storageLogStore(host, 'memory', { prefix: 'history' })
+await log.append([{ kind: 'order.created', payload: { id: 'o1' } }])
+await log.setState(1, LogRecordState.done)
+console.log(await log.lastSeq(), await log.states(LogRecordState.pending)) // 1 []
+```

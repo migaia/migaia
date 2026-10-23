@@ -5,6 +5,13 @@ const t = (en: string, zh: string): IText => ({ en, zh })
 /** Neutral host and authoring entry, with no browser or native driver import. */
 export const storageHostReference: ILibraryReference = {
   modules: {
+    journal: {
+      summary: t(
+        'Open a fixed-organization private log through its original admitted backend binding.',
+        '沿原已准入后端绑定打开固定组织私有日志。'
+      ),
+      example: storageHostCases.storageLogStore![0]!.example
+    },
     'authoring/vector': {
       summary: t(
         'Expose only standard query vector synthesis; memory scoring and ranking remain private.',
@@ -47,6 +54,33 @@ console.log(host.extensions.label('draft'))`
     }
   },
   symbols: {
+    storageLogStore: {
+      role: 'factory',
+      purpose: t(
+        'Recover a caller-closeable private ILogStore without granting raw backend or host authority.',
+        '恢复可由调用方释放的私有 ILogStore，不授予 raw 后端或宿主权。'
+      ),
+      params: {
+        host: t(
+          'The original host or its immutable organization view.',
+          '原宿主或不可变组织视图。'
+        ),
+        id: t(
+          'An exact installed backend ID with an authentic private journal binding.',
+          '具备真实私有 journal binding 的准确已安装后端 ID。'
+        ),
+        options: t(
+          'A nonempty private prefix, exclusive within this backend and organization.',
+          '在该后端与组织中独占的非空私有 prefix。'
+        )
+      },
+      returns: t(
+        'Promise<ILogStore> after recovery; uncertain writes seal the handle, and reopening reads the durable head.',
+        '恢复后的 Promise<ILogStore>；未确认写入停止句柄准入，重开读取持久 head。'
+      ),
+      example: storageHostCases.storageLogStore![0]!.example,
+      cases: storageHostCases.storageLogStore
+    },
     recommendStorageVector: {
       role: 'operation',
       purpose: t(

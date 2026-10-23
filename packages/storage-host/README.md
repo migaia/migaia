@@ -198,3 +198,21 @@ console.log(
 memory 已提供该私有 namespace 接点。私有字符串行与原业务 draft 一起稀疏暂存、原子提交，提交前与回滚后均不可见。业务 keys、clear、capacity 和 change-feed 不包含这些元数据行；dropOrg 删除目标组织的私有行。显式组织绑定拒绝其它组织的 scope，提取出的私有 view 随原操作失效。该作者接点本身不增加自动 binlog、undo/redo 或公开 storageLogStore 工厂。
 
 memory 日志 namespace 在整个资源期持有原规范 resource-owner 文本 lease；同组织、同 prefix 再次打开报 `LOCK_REJECTED`。普通私有事务在最初的原生锁集合中取得另一个固定 head 键。原后端关闭信号也会关闭部分构造的 namespace 资源。`transactionInfo(scope)` 返回精确 store/org 的原认证事务身份，同事务追加归并不信任调用方 id。后端作者仅对私有元数据 lease 使用 `IBackendKeyLockPort.attemptMetadata`：规范点身份冲突和原 acquire/release/wait 拥有者不变，业务 clear 范围跳过其本就不能触及的私有行；普通业务锁保持原范围行为。
+
+### 私有日志资源
+
+`storageLogStore(host, id, { prefix })` 仅从 `@migaia/storage-host/journal` 导出。传入真实宿主或固定组织视图及其已安装后端 ID；它不接受 public KV、raw store 或伪造宿主。后端必须提供原私有 journal binding 与可靠独占，打开先完成恢复。同组织与 prefix 同时只允许一个日志句柄；不同组织相互隔离。句柄由原宿主登记接管，调用方也可提前释放。显式日志关闭排空已入 FIFO 的工作；宿主关闭保留原 pipeline 准入，尚未进入后端的工作可能以原 HOST_DISPOSING cause 拒绝，全部已接纳 Promise 仍排空；业务枚举、clear 与容量不触及私有日志。
+
+追加先捕获原 logger JSON，再沿既有 FIFO 写入记录并最终提交唯一 head；只有真实非空 commit 才更新原 logger 索引并发布一次冻结通知。状态只从 pending 前进到 done/aborted；截断先提交水位再回收物理行，重开保留最高序号与时间，不复用序号。未确认写入使句柄停止准入，必须关闭并重开；恢复忽略未提交记录及状态候选并清理残留，原错误留在 cause。无原生事务的私有 namespace 仍可沿同协议工作，但必须由后端提供可靠独占与单键原子 head 写入。当前内置绑定为 memory；业务事务追加端口与全局 journal 配置另行接线，不因打开日志自动启用。
+
+```ts
+import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { storageLogStore } from '@migaia/storage-host/journal'
+import { LogRecordState } from '@migaia/logger/plugins/durable'
+
+await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+await using log = await storageLogStore(host, 'memory', { prefix: 'history' })
+await log.append([{ kind: 'order.created', payload: { id: 'o1' } }])
+await log.setState(1, LogRecordState.done)
+console.log(await log.lastSeq(), await log.states(LogRecordState.pending)) // 1 []
+```

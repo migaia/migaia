@@ -1801,6 +1801,7 @@
       "./authoring/vector": [
         "recommendStorageVector"
       ],
+      "./journal": ["storageLogStore"],
       "./entity": [
         "REPOSITORY_KEY_PREFIX",
         "RecordIndexBackfillPhase",
