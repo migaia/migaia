@@ -22,7 +22,7 @@ async function saveProfile(store: IKeyValueStore) {
 }`
 
 /** Shared quick start also appears in the complete Map/Set task case. */
-const codecExample = storageContractCases.collectionsJsonCodec![0]!.example
+const codecExample = storageContractCases.fromValueCodec![0]!.example
 
 /** Index handles always come from the same backend that executes subsequent index operations. */
 const indexExample = `const indexed = asSecondaryIndexRecordStore<{ name: string }>(records)
@@ -1437,7 +1437,7 @@ assertTransactionCallback(run, 'memory')`
         'An `ICodec` shallow snapshot; empty name, invalid output or nonfunction methods throw `INVALID_ARGUMENT`.',
         '一个 `ICodec` 浅快照；名称为空、输出无效或方法不可调用时抛 `INVALID_ARGUMENT`。'
       ),
-      example: `const codec = snapshotCodec(collectionsJsonCodec)
+      example: `const codec = snapshotCodec(fromValueCodec(defineCollectionsJsonCodec({ version: 1 })))
 console.log(await codec.decode(await codec.encode(new Set([1, 2]))))`
     },
     assertCodec: {
@@ -1459,28 +1459,40 @@ console.log(await codec.decode(await codec.encode(new Set([1, 2]))))`
       example: `assertCodec(candidate)
 console.log(candidate.name, candidate.output)`
     },
-    collectionsJsonCodec: {
-      role: 'constant',
+    fromValueCodec: {
+      role: 'operation',
       purpose: t(
-        'Frozen text codec with `name: migaia-collections-json-v1` and `output: text`. Await `encode(value, ctx?)` to turn JSON-compatible data containing real Map/Set values into a string; await `decode(raw, ctx?)` with the matching string to restore them. Both optional `ctx` parameters default to `undefined` and are ignored. It revives only its exact three-slot version marker; similar ordinary arrays remain arrays. Other values follow JSON behavior, including its cycle and value-type limits.',
-        '冻结文本编解码器，`name` 固定为 `migaia-collections-json-v1`，`output` 固定为 `text`。等待 `encode(value, ctx?)`，把含真实 `Map`、`Set` 的 JSON 兼容数据转成字符串；等待 `decode(raw, ctx?)`，用匹配的字符串还原集合。两个可选 `ctx` 默认 `undefined` 且被忽略。只还原精确三位置版本标记，相似普通数组仍为数组。其余值遵循 JSON 的循环引用与值类型边界。'
+        'Snapshot a serialize codec and adapt its independently typed callbacks to asynchronous storage conversion. The adapter owns no value format or resource.',
+        '快照 serialize codec，将独立类型的两条回调适配为异步存储转换；适配器不拥有值格式或资源。'
       ),
+      params: {
+        codec: t(
+          'Concrete value codec with id, positive safe version, encodedType, encode and decode.',
+          '包含 id、正安全版本、encodedType、encode 与 decode 的具体值 codec。'
+        )
+      },
       returns: t(
-        'The shared `ICodec<unknown, string>` instance; encoding unsupported roots, malformed collections, non-string raw input or parse failure rejects with `INVALID_ARGUMENT` and cause.',
-        '共享的 `ICodec<unknown, string>` 实例；根值不受支持、集合格式错误、原始输入非字符串或解析失败时，以带原因的 `INVALID_ARGUMENT` 拒绝。'
+        'Frozen exact-name/route adapter. Callback failures become INVALID_ARGUMENT with original cause; encode and decode preserve their separate inputs and Awaited results.',
+        '返回保留精确名称与路由的冻结适配器；回调失败以保留原 cause 的 INVALID_ARGUMENT 报告，两条回调保留各自输入与 Awaited 结果。'
       ),
-      exampleIntro: storageContractCases.collectionsJsonCodec![0]!.problem,
-      example: storageContractCases.collectionsJsonCodec![0]!.example,
-      exampleResult: storageContractCases.collectionsJsonCodec![0]!.result,
-      cases: storageContractCases.collectionsJsonCodec
+      exampleIntro: storageContractCases.fromValueCodec![0]!.problem,
+      example: storageContractCases.fromValueCodec![0]!.example,
+      exampleResult: storageContractCases.fromValueCodec![0]!.result,
+      cases: storageContractCases.fromValueCodec
     },
-    COLLECTIONS_JSON_CODEC_NAME: {
+    StorageStageKind: {
       role: 'constant',
       purpose: t(
-        'Stable format identity `migaia-collections-json-v1` used by the collection codec name and tuple discriminator. Persist the format consistently so a different generic JSON decoder does not silently discard collection identity.',
-        '集合编解码器名称与元组判别共同使用的稳定格式身份。持久化时应保持格式一致，避免其他通用解码器丢失集合身份。'
+        'Canonical discriminants distinguish seven neutral observer families without granting store or transaction authority.',
+        '七种中立观察接点的唯一判别常量，不授予 store 或事务权限。'
       ),
-      example: `console.log(collectionsJsonCodec.name === COLLECTIONS_JSON_CODEC_NAME)`
+      example: `console.log(StorageStageKind.codec) // codec`
+    },
+    ICodecStageObserver: {
+      purpose: t(
+        'Observation-only encode/decode stages bound to the original real store and transaction owner.',
+        '绑定原真实 store 与事务拥有者的只观察编解码阶段。'
+      )
     },
     ConflictPolicy: {
       role: 'constant',

@@ -22,8 +22,13 @@ export { ConflictPolicy } from './context.js'
 export type { IBackendKind, IStorageCapabilities } from './capabilities.js'
 export { snapshotStorageCapabilities, isStorageCapabilities } from './capabilities.js'
 
-export type { ICodec, ICodecOutput } from './codec.js'
-export { COLLECTIONS_JSON_CODEC_NAME, collectionsJsonCodec } from './collections-codec.js'
+export {
+  fromValueCodec,
+  type ICodec,
+  type ICodecOutput,
+  type ICodecStageObserver
+} from './codec.js'
+export { StorageStageKind } from './stage-kind.js'
 
 export type {
   IKeyValueStoreAdmission,

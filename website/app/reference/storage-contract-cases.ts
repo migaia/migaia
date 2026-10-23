@@ -131,20 +131,20 @@ console.log(migrateEnvelopeSync(plan, { version: 0, state: 'old' })) // { previo
       )
     }
   ],
-  collectionsJsonCodec: [
+  fromValueCodec: [
     {
-      title: t('Restore nested Map and Set values from text', '从文本恢复嵌套的 Map 与 Set'),
+      title: t('Adapt the shared collection codec for storage', '把共享集合 codec 适配到存储'),
       problem: t(
-        'A permissions object contains a Map of users to permission Sets. Ordinary JSON serialization writes these collections as empty objects, so loading the saved text loses the permissions.\n\nJSON does not turn Map entries or Set elements into object fields. A handwritten replacer and reviver must also agree on collection tags and handle nested collections; implementing only one side cannot restore the original types.\n\nUse `collectionsJsonCodec.encode()` and `decode()` as a pair. Both use the same versioned tuple format, preserving Map and Set inside otherwise JSON-compatible data; pass the encoded string to a storage implementation separately.',
-        '权限对象用 `Map` 保存用户，每个用户对应一个权限 `Set`。普通 JSON 序列化把集合写成空对象，重新加载保存的文本后，权限内容就丢失了。\n\nJSON 不会把 Map 条目或 Set 元素转换成对象字段。手写替换器和还原器还需要协调集合标记、处理嵌套集合，只实现一端无法恢复原类型。\n\n配对使用 `collectionsJsonCodec.encode()` 和 `decode()`。两端采用同一版本元组格式，在其余部分兼容 JSON 的数据中保留 Map 与 Set；编码得到的字符串另交给存储实现保存。'
+        'Storage must use one serialize-owned value format. The adapter maps metadata to a storage route while retaining independent encode and decode input domains.',
+        '存储应使用 serialize 唯一拥有的值格式。适配器将元数据映射到存储路由，并独立保留 encode 与 decode 的输入类型。'
       ),
       example: t(
-        "import { collectionsJsonCodec } from '@migaia/storage-contract'\n\nconst settings = { roles: new Map([['Ada', new Set(['read', 'write'])]]) }\nconst raw = await collectionsJsonCodec.encode(settings)\nconst restored = await collectionsJsonCodec.decode(raw) as typeof settings\nconsole.log('output:', collectionsJsonCodec.output)\nconsole.log('Map:', restored.roles instanceof Map)\nconsole.log('Set:', restored.roles.get('Ada') instanceof Set)\nconsole.log('permissions:', [...(restored.roles.get('Ada') ?? [])].join(', '))",
-        "import { collectionsJsonCodec } from '@migaia/storage-contract'\n\nconst settings = { roles: new Map([['Ada', new Set(['read', 'write'])]]) }\nconst raw = await collectionsJsonCodec.encode(settings)\nconst restored = await collectionsJsonCodec.decode(raw) as typeof settings\nconsole.log('输出形式:', collectionsJsonCodec.output)\nconsole.log('Map:', restored.roles instanceof Map)\nconsole.log('Set:', restored.roles.get('Ada') instanceof Set)\nconsole.log('权限:', [...(restored.roles.get('Ada') ?? [])].join(', '))"
+        "import { fromValueCodec } from '@migaia/storage-contract'\nimport { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'\nconst codec = fromValueCodec(defineCollectionsJsonCodec({ version: 1 }))\nconst raw = await codec.encode(new Map([['Ada', new Set(['read', 'write'])]]))\nconst restored = await codec.decode(raw)\nconsole.log(codec.name, codec.output, restored instanceof Map)\n// collections-json@1 text true",
+        "import { fromValueCodec } from '@migaia/storage-contract'\nimport { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'\nconst codec = fromValueCodec(defineCollectionsJsonCodec({ version: 1 }))\nconst raw = await codec.encode(new Map([['Ada', new Set(['read', 'write'])]]))\nconst restored = await codec.decode(raw)\nconsole.log(codec.name, codec.output, restored instanceof Map)\n// collections-json@1 text true"
       ),
       result: t(
-        'Prints `output: text`, `Map: true`, `Set: true`, then `permissions: read, write`.\n\nThe codec restores both nested collection types from a string and does not store that string anywhere. Other values retain JSON limitations; cycles are unsupported. Arrays matching the codec’s exact reserved tuple format are decoded as collections, so avoid using that format as ordinary application data.',
-        '依次输出 `输出形式: text`、`Map: true`、`Set: true`、`权限: read, write`。\n\n编解码器从字符串中恢复两种嵌套集合，不负责保存字符串。其余值仍受 JSON 能力边界限制，不支持循环引用；与保留元组格式完全匹配的数组会被解码为集合，因此普通业务数据应避开该格式。'
+        'Prints collections-json@1 text true. Serialize owns Map/Set revival; adaptation adds no second parser, clone or storage write.',
+        '输出 collections-json@1 text true。Map/Set 还原由 serialize 拥有；适配不增加第二次解析、克隆或存储写入。'
       )
     }
   ],
