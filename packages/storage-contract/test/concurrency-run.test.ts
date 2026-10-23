@@ -6,6 +6,7 @@ import {
   defineConcurrencyPolicy,
   lockKey,
   runWithConcurrency,
+  readConcurrencyLockIdentities,
   resolveConcurrencyPolicy,
   StorageStageKind,
   type IConcurrencyAttempt,
@@ -68,6 +69,95 @@ function run<T>(
 afterEach(() => vi.useRealTimers())
 
 describe('canonical concurrency attempts', () => {
+  it('captures raw policy once inside the owner and preserves exact nested attempt metadata', async () => {
+    const { store } = base()
+    const policy = ConcurrencyPolicy.fail()
+    let reads = 0
+    const original = new Date(1)
+    let outerContext: IConcurrencyAttemptContext | undefined
+    let identities: readonly string[] | undefined
+    const options = {
+      get concurrency() {
+        reads++
+        return policy
+      },
+      lock: [lockKey.record(original), lockKey.text('key'), lockKey.record(new Date(1))],
+      timeoutMs: 100
+    }
+    await expect(
+      runWithConcurrency(
+        { store, options },
+        {
+          attempt: async (outer) => {
+            outerContext = outer
+            expect(outer.concurrency).toBe(policy)
+            expect(outer.locking).toBe('pessimistic')
+            identities = readConcurrencyLockIdentities(outer)
+            expect(Object.isFrozen(identities)).toBe(true)
+            expect(identities).toHaveLength(2)
+            expect(identities).toBe(readConcurrencyLockIdentities(outer))
+            original.setTime(99)
+            const record = outer.lock!.find((key) => key.channel === 'record')!
+            ;(record.key as Date).setTime(33)
+            expect(readConcurrencyLockIdentities(outer)).toBe(identities)
+            await expect(
+              runWithConcurrency(
+                { store, options: outer },
+                {
+                  attempt: async (inner) => {
+                    expect(inner.signal).toBe(outer.signal)
+                    expect(inner.timeoutMs).toBeUndefined()
+                    expect(readConcurrencyLockIdentities(inner)).toBe(identities)
+                    return { status: 'committed', value: 7 }
+                  }
+                }
+              )
+            ).resolves.toBe(7)
+            return conflict()
+          }
+        }
+      )
+    ).rejects.toMatchObject({ code: 'LOCK_REJECTED' })
+    expect(reads).toBe(1)
+    expect(() => readConcurrencyLockIdentities(outerContext!)).toThrowError(
+      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+    )
+    expect(() => readConcurrencyLockIdentities({} as IConcurrencyAttemptContext)).toThrowError(
+      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+    )
+  })
+
+  it('keeps explicit policy authoritative and resolves the original default without another registry', async () => {
+    const { store } = base()
+    const explicit = ConcurrencyPolicy.fail()
+    await expect(
+      runWithConcurrency(
+        {
+          store,
+          options: { concurrency: ConcurrencyPolicy.optimistic({ retries: 1, backoffMs: 0 }) },
+          policy: explicit
+        },
+        {
+          attempt: async (ctx) => {
+            expect(ctx.locking).toBe('pessimistic')
+            return conflict()
+          }
+        }
+      )
+    ).rejects.toMatchObject({ code: 'LOCK_REJECTED' })
+    await expect(
+      runWithConcurrency(
+        { store, options: {} },
+        {
+          attempt: async (ctx) => {
+            expect(ctx.locking).toBe(resolveConcurrencyPolicy(store).locking)
+            expect(readConcurrencyLockIdentities(ctx)).toEqual([])
+            return { status: 'committed', value: 1 }
+          }
+        }
+      )
+    ).resolves.toBe(1)
+  })
   it('tries once without calling policy on success and preserves original options and awaited values', async () => {
     const { store } = base()
     const decide = vi.fn(() => ({ action: 'reject' as const }))

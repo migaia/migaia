@@ -686,6 +686,25 @@ export const storageContractReference: ILibraryReference = {
     }
   },
   symbols: {
+    readConcurrencyLockIdentities: {
+      role: 'operation',
+      purpose: t(
+        'Read immutable lock identities from the original active attempt metadata without re-encoding logical keys.',
+        '从原活跃 attempt 元数据读取不可变锁身份，不重新编码逻辑键。'
+      ),
+      params: {
+        ctx: t(
+          'Authentic active IConcurrencyAttemptContext; forged, settled or builder-only objects reject INVALID_ARGUMENT.',
+          '真实活跃 IConcurrencyAttemptContext；伪造、已结算或只有 builder 元数据的对象抛 INVALID_ARGUMENT。'
+        )
+      },
+      returns: t(
+        'One frozen canonical channel-separated hexadecimal string list, shared across repeated reads and nested attempts. No mutable bytes, registration or control authority.',
+        '一个冻结、带规范通道隔离的十六进制字符串列表，重复读取和嵌套尝试共用；无可变字节、登记或控制权限。'
+      ),
+      example: storageContractCases.readConcurrencyLockIdentities![0]!.example,
+      cases: storageContractCases.readConcurrencyLockIdentities
+    },
     records: {
       role: 'constant',
       purpose: t(
@@ -831,7 +850,7 @@ export const storageContractReference: ILibraryReference = {
       params: {
         request: t(
           'Authentic registered store, plain captured ITransactionOptions, and already resolved genuine policy. Read borrowed getters once before resolving overrides.',
-          '真实登记 store、普通已捕获 ITransactionOptions 与已解析真实策略；resolve 覆盖值前只读一次借用 getter。'
+          '真实登记 store 与原 ITransactionOptions 或精确外层 attempt；循环只捕获一次覆盖值，policy 省略时解析原默认策略，显式 policy 仍唯一生效。'
         ),
         port: t(
           'Real backend attempt port. Return committed or conflict only after native completion and cleanup; use context.wait for logical admission and waitPhysical for physical scheduling.',
