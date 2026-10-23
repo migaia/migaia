@@ -516,3 +516,7 @@ console.log(codec.name, codec.output, await codec.decode(raw))
 外层宿主可传入固定的规范 `asyncDisposeKey`；否则使用原生 `Symbol.asyncDispose`，原生键不存在时只要求显式释放。契约不会创建后备符号，也不会在准入时调用清理函数。提供方专属的可扩展性与安装条件仍由 `provideCapabilities` 校验。
 
 `IBackendStageBindings` 连接 backend、operation、codec、transaction、concurrency、SQL 与 query 七个独立观察家族。规范 `kind` 字面量阻止不同家族误用。这些声明不提供执行器或第二套 registry；宿主将观察者绑定到原 store 与事务视图。`IConcurrencyHolder` 区分真实持有者与远端交接区间，`IConcurrencyDecision` 排除 wait/reject/retry 不相容的字段。
+
+### 保序键字节
+
+`encodeOrderedStorageKey(key, backend)` 先复用 `snapshotStorageKey` 的校验与复制，再返回独立持有的 `Uint8Array`。字典字节序与 `compareStorageKeys` 一致，涵盖正负零、Date、UTF-16 码元、二进制前缀与嵌套数组前缀。写入器只测量一次，再顺序写入一份预分配空间，不排序，也不反复拼接已完成的子编码。此编码供记录索引与锁排序复用，不替换持久化值 codec 或旧平面存储键。
