@@ -1,9 +1,9 @@
 import { it, expect, expectTypeOf, onTestFinished } from 'vitest'
-import { createStorageHost } from '@migaia/storage-host'
+import { createStorageHost, definePlugin, type IStorageBorrowedBackend } from '@migaia/storage-host'
 import { createStore } from '@migaia/store-light'
 import { persist } from '@migaia/store-persist/light'
 import { persistTransaction } from '@migaia/store-persist'
-import type { ISqlExecutor } from '@migaia/storage-contract'
+import { kv, type ISqlExecutor } from '@migaia/storage-contract'
 import { sqliteBackendPlugin, type ISqliteValue, type ISqliteRunResult } from '../src/index.js'
 import { nodeSqliteDriver } from '../src/node.js'
 /** Existing SQL consumers depend only on the shared executor and retain external row interfaces. */
@@ -55,4 +55,48 @@ it('commits persistence and native SQL through one original transaction', async 
   ).rejects.toMatchObject({ code: 'TRANSACTION_FAILED', cause: failure })
   await handle.flush()
   expect(await countRows(storage)).toMatchObject({ count: 1 })
+})
+
+/** A real dependent plugin borrows the original provider without acquiring close authority. */
+it('limits borrowed KV capabilities to original channel methods and precise sync access', async () => {
+  const connection = nodeSqliteDriver(':memory:')
+  let borrowed!: IStorageBorrowedBackend
+  const consumer = definePlugin('consumer', (core) => {
+    borrowed = core.getPublishedBackend('sqlite')
+    return { install: () => ({}) }
+  })
+  const host = await createStorageHost({
+    plugins: [sqliteBackendPlugin({ driver: connection })] as const
+  })
+  onTestFinished(async () => {
+    await host.dispose()
+    await connection.dispose()
+  })
+  await host.use(consumer)
+  const storage = host.backend('sqlite')
+  const api = borrowed.use(kv)
+  expect(api).toBe(storage.use(kv))
+  expect(Reflect.ownKeys(api).sort()).toEqual([
+    'clearAll',
+    'clearValues',
+    'get',
+    'has',
+    'keys',
+    'remove',
+    'set',
+    'sync'
+  ])
+  expect(api.sync).toBe(storage.sync)
+  expect(Reflect.ownKeys(api.sync!).sort()).toEqual([
+    'clearValues',
+    'get',
+    'has',
+    'keys',
+    'remove',
+    'set'
+  ])
+  for (const name of ['dispose', 'metadata', 'sql'] as const) expect(name in api).toBe(false)
+  expect(Symbol.asyncDispose in api).toBe(false)
+  await api.set('shared', 'kept')
+  expect(await storage.get('shared')).toBe('kept')
 })

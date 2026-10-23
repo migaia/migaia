@@ -2079,8 +2079,19 @@ export function createSqliteStore<TValue>(
     [asyncDisposeKey]: () =>
       (symbolic ??= controller.dispose().catch((error) => reportCleanupError(report, error)))
   }
-  /** KV methods and native transaction binders are real methods on the current complete scope. */
-  const kvImplementation = implement(kv, base, { forTransaction: (scope) => scope })
+  /** A borrowed KV capability exposes only original channel methods, never resource authority. */
+  const keyValue = {
+    get: base.get,
+    set: base.set,
+    remove: base.remove,
+    has: base.has,
+    keys: base.keys,
+    clearValues: base.clearValues,
+    clearAll: base.clearAll,
+    sync: base.sync
+  }
+  /** Transaction binders retain the authentic complete scope admitted by the original owner. */
+  const kvImplementation = implement(kv, keyValue, { forTransaction: (scope) => scope })
   /** Query source delegates iteration to the exact root or original transaction owner. */
   const recordApi: IRecordsApi<TValue> = {
     query: <R = TValue>() =>
