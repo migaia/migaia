@@ -686,6 +686,52 @@ export const storageContractReference: ILibraryReference = {
     }
   },
   symbols: {
+    hasStorageCapability: {
+      role: 'operation',
+      purpose: t(
+        'Read authentic published token membership through the original provider table without modifying the base.',
+        '通过原 provider 表读取真实已发布 token 成员关系，不修改 base。'
+      ),
+      params: {
+        store: t(
+          'Original IStorageBase, including raw/frozen resources.',
+          '原 IStorageBase，包括 raw/frozen 资源。'
+        ),
+        capability: t(
+          'Capability token; forged or missing tokens return false, exactly like store.has(token).',
+          '能力 token；伪造或缺失返回 false，与 store.has(token) 相同。'
+        )
+      },
+      returns: t(
+        'Boolean membership only; no installation, ownership or base handle.',
+        '仅 boolean 成员关系，不提供安装、所有权或 base 句柄。'
+      ),
+      example: storageContractCases.hasStorageCapability![0]!.example,
+      cases: storageContractCases.hasStorageCapability
+    },
+    useStorageCapability: {
+      role: 'operation',
+      purpose: t(
+        'Read the same original capability API and native refinements as store.use(token), without provider authority.',
+        '读取与 store.use(token) 相同的原能力 API 与原生扩展，不取得 provider 权限。'
+      ),
+      params: {
+        store: t(
+          'Original IStorageBase; provided diagnostics reuse its captured backend.',
+          '原 IStorageBase；已提供 store 的诊断复用捕获 backend。'
+        ),
+        capability: t(
+          'Authentic published token. Forged tokens throw INVALID_ARGUMENT; authentic missing tokens throw UNSUPPORTED_CAPABILITY.',
+          '真实已发布 token；伪造抛 INVALID_ARGUMENT，真实缺失抛 UNSUPPORTED_CAPABILITY。'
+        )
+      },
+      returns: t(
+        'The exact installed API object with native implementation types; late Feature publication uses the same table.',
+        '精确已安装 API 对象与原生实现类型，晚发布 Feature 复用同一表。'
+      ),
+      example: storageContractCases.useStorageCapability![0]!.example,
+      cases: storageContractCases.useStorageCapability
+    },
     compileStorageWhere: {
       role: 'operation',
       purpose: t(

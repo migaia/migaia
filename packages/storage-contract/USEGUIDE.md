@@ -617,3 +617,20 @@ const rows = [
 ]
 console.log(rows.filter(accepts).length) // 1
 ```
+
+### 只读 capability 访问
+
+`hasStorageCapability(store, token)` 与 `useStorageCapability(store, token)` 读取原 provider 表，不安装方法、不发布能力、不取得所有权，也不返回 provider/base 控制句柄。token 语义与原 store.has(token)/store.use(token) 完全一致：真实已发布 token 返回同一 API 身份；伪造 token 的 has 返回 false、use 抛 INVALID_ARGUMENT；真实缺失 token 抛 UNSUPPORTED_CAPABILITY。未提供能力的 raw 或 frozen 资源保持缺失且不被修改。已提供 store 复用捕获的 backend 诊断，不重新读取 getter；use 保留原生实现的精确扩展类型。晚发布 Feature 的 prepare/publish/release 通过同一表立即可见；原 store.has(stringKey) 的 KV 转发保持不变。
+
+```ts
+import {
+  hasStorageCapability,
+  useStorageCapability,
+  kv,
+  type IStorageBase
+} from '@migaia/storage-contract'
+async function readGreeting(store: IStorageBase) {
+  if (!hasStorageCapability(store, kv)) return undefined
+  return useStorageCapability(store, kv).get('greeting')
+}
+```
