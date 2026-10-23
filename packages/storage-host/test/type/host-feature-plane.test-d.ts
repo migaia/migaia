@@ -43,6 +43,11 @@ const exactDescriptor = (core: IStoragePluginCore) => ({
 const exactPlugin = definePlugin('exact', exactDescriptor)
 const exactHost = await createStorageHost({ plugins: [exactPlugin] as const })
 const exactBackend: IExactStore = exactHost.backend('exact')
+/** A valid raw backend without a Feature API projects the actual absent value. */
+const noApi: undefined = exactHost.api.exact
+void noApi
+// @ts-expect-error an absent API cannot manufacture a callable method.
+exactHost.api.exact.custom()
 const literalEcho: 'literal' = exactHost.extensions.echo('literal')
 type IExactExtensionKeysStayLiteral = string extends keyof typeof exactHost.extensions
   ? false

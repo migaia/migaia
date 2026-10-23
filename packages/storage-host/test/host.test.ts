@@ -61,6 +61,8 @@ describe('neutral storage installation', () => {
     const host = await createStorageHost({ plugins: [left.plugin, right.plugin] })
     expect(host.backend('left')).toBe(left.state().store)
     expect(host.backend('right')).toBe(right.state().store)
+    expect(host.api.left).toBeUndefined()
+    expect(host.api.right).toBeUndefined()
     expect(await host.backend('left').get('name')).toBe('one')
     expect(await host.backend('right').get('name')).toBe('two')
     const snapshot = host.backends()

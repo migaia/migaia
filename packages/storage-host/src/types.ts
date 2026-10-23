@@ -533,7 +533,7 @@ export type IStorageHost<P extends readonly IStorageBackendPluginHandle[]> =
         readonly api: infer A
       }
         ? A
-        : never
+        : undefined
     }
     use<const Next extends readonly IStorageBackendPluginHandle[]>(
       ...plugins: IRejectInstalledOrDuplicateIds<{ [N in IStoragePluginId<P[number]>]: true }, Next>
