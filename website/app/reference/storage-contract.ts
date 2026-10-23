@@ -3793,8 +3793,8 @@ console.log(candidate.name, candidate.output)`
     },
     IRecordQueryMutation: {
       summary: t(
-        'Record delete/update request with one detached portable patch for update.',
-        '记录 delete/update 请求，update 包含一份已分离的可移植 patch。'
+        'Record delete/update request with one detached patch for update; the original backend codec validates its value domain.',
+        '记录 delete/update 请求，update 包含一份已分离的 patch，值域由原后端 codec 验证。'
       ),
       members: {}
     },
