@@ -1,5 +1,5 @@
 import type { IConformanceCase, IConformanceHarness } from './harness.js'
-import { conformanceCleanup } from './harness.js'
+import { conformanceCleanup, invocation } from './harness.js'
 import type { IRecordStore } from '../store.js'
 import type { ITransactionScope } from '../transaction.js'
 import { isKeyValueStore } from '../store.js'
@@ -23,11 +23,6 @@ function keyValueCases(
         harness.expect(typeof Reflect.get(store, method)).toBe('function')
       return run(store as unknown as IRecordStore)
     })
-}
-
-/** Observe the same original failure whether native entry validation throws or rejects. */
-async function invocation(run: () => unknown): Promise<unknown> {
-  return run()
 }
 
 /** Native transaction wrappers retain semantic failures on their original cause chain. */
@@ -154,7 +149,9 @@ export function kvConformance(checkCase: IConformanceCase, harness: IConformance
   check('已 abort 的 signal 立即以 ABORTED 拒绝', async (store) => {
     const controller = new AbortController()
     controller.abort()
-    await expect(store.get('k', { signal: controller.signal })).rejects.toMatchObject({
+    await expect(
+      invocation(() => store.get('k', { signal: controller.signal }))
+    ).rejects.toMatchObject({
       code: 'ABORTED'
     })
   })
@@ -640,7 +637,9 @@ export function crossChannelConformance(
   const expect = harness.expect
   check('通道清理彼此隔离，跨通道冲突可显式 replace', async (store) => {
     await store.setBytes('shared', new Uint8Array([1]))
-    await expect(store.set('shared', 'value')).rejects.toMatchObject({ code: 'DUPLICATE_KEY' })
+    await expect(invocation(() => store.set('shared', 'value'))).rejects.toMatchObject({
+      code: 'DUPLICATE_KEY'
+    })
     await store.set('shared', 'value', { conflictPolicy: 'replace' })
     await expect(store.getBytes('shared')).resolves.toBeNull()
     await expect(store.get('shared')).resolves.toBe('value')

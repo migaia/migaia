@@ -744,3 +744,5 @@ RDF 的客户端 `follow`/`inverse` 现在沿同一 reader 逐前驱调用原 `s
 snapshotStorageOrgKeyPrefix(orgId, prefix, backend) 返回独立的原生半开字节界。prefix 为 undefined 时选择该组织内全部逻辑键；指定前缀沿原 string/binary/array 前缀或 number/Date 精确语义，不缩小逻辑深度和节点预算。
 
 索引准备可返回既有原生 record-key 投影，转换 fixture 的逻辑 id a/b；所有索引读写及期望行沿该原键，省略仍使用原字符串键，避免将未归属范围的 raw 修改当作规范索引修改。
+
+共享套件同时观察原生入口同步抛出的输入错误与异步拒绝，仍要求同一语义码；接受非法输入或返回其它码仍失败。观察适配不改变后端错误时序，也不包装原错误对象。
