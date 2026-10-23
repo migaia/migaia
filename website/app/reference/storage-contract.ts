@@ -926,8 +926,8 @@ export const storageContractReference: ILibraryReference = {
       ),
       params: {
         source: t(
-          'IRecordQuerySource captures pushdown facts and execute once. execute receives only safe-prefix conditions, optional fields and captured operation context; projected native rows are unknown.',
-          'IRecordQuerySource 一次捕获下推事实与 execute；execute 仅接收安全前缀条件、可选字段及捕获的操作上下文，原生投影行保持 unknown。'
+          "IRecordQuerySource captures pushdown facts, execute and optional readonly asyncDisposeKey once. execute receives only safe-prefix conditions, optional fields and captured operation context; projected native rows are unknown. Pass the host's existing resource key when it supplies a fallback for native Symbol.asyncDispose.",
+          'IRecordQuerySource 一次捕获下推事实、execute 与可选只读 asyncDisposeKey；execute 仅接收安全前缀条件、可选字段及捕获的操作上下文，原生投影行保持 unknown。宿主使用原生 Symbol.asyncDispose 的既有后备键时应传入同一个资源键。'
         ),
         methods: t(
           'Optional Feature-owned pure method object; capture once and retain each function reference on every where/select/requirePushdown result.',
@@ -2300,6 +2300,12 @@ console.log(candidate.name, candidate.output)`
       ),
       members: {
         pushdown: { summary: t('Captured native support declaration.', '捕获的原生支持声明。') },
+        asyncDisposeKey: {
+          summary: t(
+            "Optional readonly typeof Symbol.asyncDispose, captured once. An explicit symbol or undefined is accepted; other values reject with INVALID_ARGUMENT. Omission or undefined uses native Symbol.asyncDispose. Pass the host's existing fallback key when needed; mapped symbolic cleanup and source diagnostics share it while retaining separate cached cleanup Promises and the original owner. The contract creates no fallback symbol.",
+            '可选只读 typeof Symbol.asyncDispose，只捕获一次。显式值接受 Symbol 或 undefined，否则以 INVALID_ARGUMENT 拒绝；省略或 undefined 时使用原生 Symbol.asyncDispose。需要时传宿主既有后备键；映射流的符号清理与来源诊断共用此键，保留独立缓存的清理 Promise 和原 owner。契约不创建后备符号。'
+          )
+        },
         execute: {
           summary: t(
             'Return the original cursor over only pushed conditions/fields.',
