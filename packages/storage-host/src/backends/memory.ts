@@ -1955,17 +1955,19 @@ function createMemoryNamespace<T>(
           | IStorageVectorPoint<TPayload>
           | undefined
       /** Search removes expired rows before filtering/scoring; physical deleteWhere retains them. */
-      const points = (physical = false): readonly IStorageVectorPoint<TPayload>[] => {
-        /** Native collection membership comes only from its radix prefix, without a full-store scan. */
-        const rows = [
-          ...ordered.vector.range({ lower: bounds.lower, upper: bounds.upper, upperOpen: true })
-        ]
-        return rows
-          .map((leaf) =>
-            physical ? leaf.value : liveEntry('vector', encodeFlatStorageKey(leaf.value.key))
-          )
-          .filter((entry): entry is IMemoryEntry => entry !== undefined)
-          .map((entry) => entry.value as IStorageVectorPoint<TPayload>)
+      const points = function* (physical = false): IterableIterator<IStorageVectorPoint<TPayload>> {
+        /** The original radix locates this collection without retaining all candidate references. */
+        let leaf = ordered.vector.lowerBound(bounds.lower)
+        while (leaf !== undefined && compareRecordIndexKeys(leaf.key, bounds.upper) < 0) {
+          /** Expiry or a caller delete can unlink this leaf before the generator resumes. */
+          const next = leaf.next
+          /** Physical deletion includes expired matches; ranking reclaims them before scoring. */
+          const entry = physical
+            ? leaf.value
+            : liveEntry('vector', encodeFlatStorageKey(leaf.value.key))
+          if (entry !== undefined) yield entry.value as IStorageVectorPoint<TPayload>
+          leaf = next
+        }
       }
       /** Output payloads/vectors detach only for selected native hits, preserving bounded work. */
       const output = (

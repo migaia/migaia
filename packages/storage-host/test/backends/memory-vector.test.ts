@@ -240,6 +240,11 @@ describe('memory native vectors', () => {
       await collection.deleteWhere({ group: 'same' }, { count: DeleteCountMode.precount })
     ).toBe(0)
     expect(await store.use(ttl).remaining(lockKey.vector('docs', 'expired'))).toBeUndefined()
+    /** A lazy-expired first radix leaf must not detach the live successor from native ranking. */
+    await collection.upsert([{ id: 'expired-first', vector: [3, 0] }], { ttlMs: 1 })
+    await collection.upsert([{ id: 'live-next', vector: [4, 0] }])
+    scheduler.advance(1)
+    expect(await collection.search([1, 0], { k: 1 })).toEqual([{ id: 'live-next', score: 4 }])
   })
 
   it('keeps org, notifications, extracted sources and lock admission on their original owner', async () => {
