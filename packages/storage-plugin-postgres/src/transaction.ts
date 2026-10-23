@@ -23,7 +23,7 @@ import {
 } from '@migaia/storage-host/authoring/backend'
 import { inspectThenable, observeThenableRejection } from '@migaia/utils/function'
 import { sleep } from '@migaia/utils/promise'
-import { walkErrorCauses } from '@migaia/utils/error'
+import { walkErrorCauses, attachSecondaryErrors } from '@migaia/utils/error'
 import type { IPgConfiguration, IPgTables } from './schema.js'
 import type { IPgState } from './native.js'
 import type { IPgJournalCapture } from './journal.js'
@@ -70,6 +70,18 @@ function physicalPgFailure(value: unknown): boolean {
         ('errno' in cause &&
           (cause.errno === PgSqlState.serialization || cause.errno === PgSqlState.deadlock)))
   )
+}
+/** Frozen primary failures keep their public identity on a wrapper and both original causes. */
+function physicalPgCause(failure: unknown, cause: unknown): unknown {
+  const attached = attachSecondaryErrors(failure, [cause])
+  if (attached === failure) return failure
+  return failure instanceof StorageContractError
+    ? new StorageContractError(
+        failure.code,
+        { backend: failure.backend, keys: failure.keys, holder: failure.holder, cause: attached },
+        failure.message
+      )
+    : normalizeTransactionFailure(attached)
 }
 /** Native transaction state is borrowed only after the original contract owner authenticates a view. */
 export function createPgTransactions<TScope extends Omit<ITransactionScope, 'use'>>(input: {
@@ -123,7 +135,19 @@ export function createPgTransactions<TScope extends Omit<ITransactionScope, 'use
   ): Promise<IConcurrencyAttempt<Awaited<R>>> => {
     const normalize = publicTransaction ? normalizeTransactionFailure : normalizePostgresError
     const baseline = new Map<string, bigint>()
+    /** The last real server conflict remains reachable if its physical recovery budget ends. */
+    let lastPhysical: unknown
+    /** Only the existing concurrency owner distinguishes physical deadlines from external abort. */
+    const physicalCancellation = async (cause: unknown): Promise<void> => {
+      if (!context.signal?.aborted) return
+      try {
+        await context.waitPhysical(Promise.resolve())
+      } catch (failure) {
+        throw physicalPgCause(failure, cause)
+      }
+    }
     for (;;) {
+      if (lastPhysical !== undefined) await physicalCancellation(lastPhysical)
       throwIfAborted(context.signal)
       const client = await configuration.driver.connect(context)
       const state: IPgState = {
@@ -304,7 +328,16 @@ export function createPgTransactions<TScope extends Omit<ITransactionScope, 'use
             }
           }
           if (!commitSent && physicalPgFailure(cause) && primary === cause) {
-            if (await recheckPgRevisions(state, tables)) {
+            lastPhysical = cause
+            await physicalCancellation(cause)
+            let unchanged: boolean
+            try {
+              unchanged = await recheckPgRevisions(state, tables)
+            } catch (failure) {
+              await physicalCancellation(cause)
+              throw failure
+            }
+            if (unchanged) {
               observePg(concurrencyStages, 'onRetry', context.attempt, 0, 'physical')
               retry = true
             } else
@@ -318,7 +351,10 @@ export function createPgTransactions<TScope extends Omit<ITransactionScope, 'use
           }
           if (cause instanceof PgLockConflict && primary === cause)
             return { status: 'conflict', phase: 'acquire', keys: cause.keys, holder: cause.holder }
-          if (!retry) throw normalize(primary)
+          if (!retry) {
+            if (lastPhysical !== undefined) await physicalCancellation(lastPhysical)
+            throw normalize(primary)
+          }
         }
       })().then(
         (value) => ({ failed: false as const, value }),
@@ -348,7 +384,15 @@ export function createPgTransactions<TScope extends Omit<ITransactionScope, 'use
       }
       if (settled.failed) throw settled.cause
       if (settled.value !== undefined) return settled.value
-      if (retry) await context.waitPhysical(sleep(10, { signal: context.signal }))
+      if (retry) {
+        try {
+          // The original concurrency budget alone owns cancellation and deadline classification.
+          // A signal-bound timer can throw before waitPhysical gets to classify an expired budget.
+          await context.waitPhysical(sleep(10))
+        } catch (failure) {
+          throw physicalPgCause(failure, primary)
+        }
+      }
     }
   }
   /**

@@ -17,6 +17,7 @@ async function installed(
     committed?(pending: Promise<IPgResult>): Promise<IPgResult>
     beforeWork?(): Promise<void>
     markerRead?(): void
+    retried?(): void
   }
 ) {
   const connectionString = process.env.MIGAIA_PG_URL
@@ -71,7 +72,10 @@ async function installed(
         counts.conflicts += 1
       },
       onRetry: (payload) => {
-        if (payload.reason === 'physical') counts.physical += 1
+        if (payload.reason === 'physical') {
+          counts.physical += 1
+          observation?.retried?.()
+        }
       }
     },
     plugins: [postgresBackendPlugin({ driver, prefix }), inspect] as const
@@ -385,3 +389,52 @@ it('seals its original controller when COMMIT recovery cannot establish the actu
   expect((await pool.query('SELECT * FROM ' + prefix + '_kv')).rows).toHaveLength(1)
   expect((await pool.query('SELECT * FROM ' + prefix + '_commit_markers')).rows).toHaveLength(1)
 })
+
+/** Actual SERIALIZABLE conflicts keep native cause evidence when the original budget ends. */
+for (const end of ['deadline', 'abort'] as const) {
+  it('retains actual 40001 through physical replay ' + end, async () => {
+    const cancelled = new AbortController()
+    const original = new Error('cancel-physical-replay')
+    const { store, pool, prefix, counts } = await installed(true, {
+      retried: () => {
+        if (end === 'abort') cancelled.abort(original)
+      }
+    })
+    const table = prefix + '_physical_budget'
+    await pool.query('CREATE TABLE ' + table + ' (id integer PRIMARY KEY,value integer NOT NULL)')
+    await pool.query('INSERT INTO ' + table + ' VALUES(1,0)')
+    let attempts = 0
+    const failure = await store
+      .transaction(
+        async (scope) => {
+          attempts += 1
+          await scope.get('stable-revision')
+          await scope.sql`SELECT value FROM ${scope.sql.id(table)} WHERE id=1`.get()
+          await pool.query('UPDATE ' + table + ' SET value=value+1 WHERE id=1')
+          await scope.sql`UPDATE ${scope.sql.id(table)} SET value=value+1 WHERE id=1`.run()
+        },
+        {
+          concurrency: ConcurrencyPolicy.fail(),
+          lock: [lockKey.text('stable-revision')],
+          ...(end === 'abort' ? { signal: cancelled.signal } : { timeoutMs: 120 })
+        }
+      )
+      .then(
+        () => undefined,
+        (cause: unknown) => cause
+      )
+    expect(failure).toMatchObject({ code: end === 'abort' ? 'ABORTED' : 'LOCK_TIMEOUT' })
+    expect(
+      walkErrorCauses(failure).some(
+        (error) =>
+          error !== null && typeof error === 'object' && 'code' in error && error.code === '40001'
+      )
+    ).toBe(true)
+    if (end === 'abort') {
+      expect(walkErrorCauses(failure)).toContain(original)
+      expect(attempts).toBe(1)
+    } else expect(attempts).toBeGreaterThan(1)
+    expect(counts.conflicts).toBe(0)
+    expect(counts.physical).toBeGreaterThan(0)
+  })
+}
