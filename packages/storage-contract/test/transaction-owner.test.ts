@@ -2,6 +2,7 @@ import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import {
   assertTransactionOwner,
   createTransactionOwner,
+  deriveTransactionIterator,
   readTransactionOperationContext,
   nextTransactionIterator,
   registerTransactionFinalizer,
@@ -562,6 +563,168 @@ describe('transaction iterator resources', () => {
     } finally {
       enqueue.mockRestore()
     }
+  })
+})
+
+describe('same-owner iterator projection', () => {
+  it('passes the real current view and drains it before closing both actual cursors once', async () => {
+    /** The backend supplies one existing attempt signal for all derived query work. */
+    const abort = new AbortController()
+    /** The same real transaction owns both source cursors and the public derived iterator. */
+    const fixture = setup({ context: { signal: abort.signal } })
+    /** Deferred materialization remains admitted after the original user view closes. */
+    const gate = Promise.withResolvers<void>()
+    /** Later-created additional resources close before the original source. */
+    const order: string[] = []
+    /** Native source cleanup remains the original backend port. */
+    const sourceClose = vi.fn(() => {
+      order.push('source')
+    })
+    /** A second cursor can be created lazily with the currently authorized operation view. */
+    const legacyClose = vi.fn(() => {
+      order.push('legacy')
+    })
+    /** No public wrapper fabricates transaction authority for either actual cursor. */
+    const source = fixture.owner.registerIterator(fixture.root, {
+      next: async () => ({ done: false, value: 1 }),
+      close: sourceClose
+    })
+    /** The second source exists only after the derived reader actually needs it. */
+    let legacy: IStorageIterator<number> | undefined
+    /** A saved operation view must expire when this complete mapped advance settles. */
+    let current: object | undefined
+    /** A complete query reader borrows the original view and native advance function. */
+    const derived = deriveTransactionIterator(
+      source,
+      async (next, _fail, scope) => {
+        current = scope
+        expect(assertTransactionOwner(fixture.base, scope)).toBe(
+          assertTransactionOwner(fixture.base, fixture.root)
+        )
+        expect(readTransactionOperationContext(scope)?.signal).toBe(abort.signal)
+        await gate.promise
+        /** Original source advancement and lazy second-source creation share this live view. */
+        const first = await next()
+        legacy = fixture.owner.registerIterator(scope as IScope, {
+          next: async () => ({ done: false, value: 9 }),
+          close: legacyClose
+        })
+        /** Secondary source reads reuse the same existing owner rather than a captured user view. */
+        const second = await nextTransactionIterator(scope, legacy)
+        return { done: false, value: first.value + second.value }
+      },
+      () => legacy?.dispose()
+    )!
+    /** Accepted materialization must finish before either native resource closes. */
+    const pending = derived.next()
+    fixture.controller.stopAdmission()
+    /** The derived lifetime is the original owner's cached cleanup, including all accepted work. */
+    const cleanup = derived.dispose()
+    expect(derived.dispose()).toBe(cleanup)
+    expect(order).toEqual([])
+    gate.resolve()
+    await expect(pending).resolves.toEqual({ done: false, value: 10 })
+    await cleanup
+    await derived[Symbol.asyncDispose]()
+    expect(order).toEqual(['legacy', 'source'])
+    expect(sourceClose).toHaveBeenCalledTimes(1)
+    expect(legacyClose).toHaveBeenCalledTimes(1)
+    expect(() => readTransactionOperationContext(current!)).toThrowError(
+      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+    )
+    await fixture.controller.closeIterators()
+    fixture.controller.close()
+  })
+
+  it('preserves the primary error while attempting both original and additional cleanup', async () => {
+    /** All failures use the backend's original normalization and first-failure state. */
+    const fixture = setup()
+    /** Query failure must remain the first reachable error when both cleanups fail. */
+    const primary = new Error('query materialization failed')
+    /** Original native cursor cleanup must still run after additional-source cleanup fails. */
+    const sourceFailure = new Error('source cleanup failed')
+    /** Both cleanup causes must remain reachable from the public main cleanup rejection. */
+    const extraFailure = new Error('additional cursor cleanup failed')
+    /** The original source belongs to the same real transaction owner. */
+    const source = fixture.owner.registerIterator(fixture.root, {
+      next: async () => ({ done: false, value: 1 }),
+      close: () => {
+        throw sourceFailure
+      }
+    })
+    /** A real additional-source cleanup is invoked even after the original cleanup rejects. */
+    const extra = vi.fn(() => {
+      throw extraFailure
+    })
+    /** Failure propagation remains the original resource's fail function. */
+    const derived = deriveTransactionIterator(
+      source,
+      async (_next, fail) => {
+        throw fail(primary)
+      },
+      extra
+    )!
+    await expect(derived.next()).rejects.toMatchObject({ cause: primary })
+    /** This exact backend-normalized primary remains first in the cleanup aggregate. */
+    const first = fixture.onFailure.mock.calls[0]![0]
+    /** Main cleanup rejects; the cached resource still attempts every owned close exactly once. */
+    let failure: unknown
+    try {
+      await derived.dispose()
+    } catch (error) {
+      failure = error
+    }
+    expect(failure).toMatchObject({ code: 'TRANSACTION_FAILED' })
+    /** The existing cleanup aggregate preserves the original normalized primary and both causes. */
+    const aggregate = (failure as Error).cause as AggregateError
+    expect(aggregate).toBeInstanceOf(AggregateError)
+    expect(aggregate.errors[0]).toBe(first)
+    expect(aggregate.errors[1].cause).toBe(extraFailure)
+    expect(aggregate.errors[2].cause).toBe(sourceFailure)
+    expect(extra).toHaveBeenCalledTimes(1)
+    await fixture.controller.closeIterators()
+    fixture.controller.close()
+  })
+
+  it('locks the first additional cleanup failure before attempting original source cleanup', async () => {
+    /** Resource errors use the same first-failure path even without a preceding query failure. */
+    const fixture = setup()
+    /** The later-created resource fails first under reverse cleanup order. */
+    const extraFailure = new Error('additional cursor failed first')
+    /** Original cleanup must still run and preserve its distinct native cause. */
+    const sourceFailure = new Error('original cursor failed second')
+    /** Both actual close ports belong to this same transaction's resource lifetime. */
+    const source = fixture.owner.registerIterator(fixture.root, {
+      next: async () => ({ done: false, value: 1 }),
+      close: () => {
+        throw sourceFailure
+      }
+    })
+    /** A two-argument reader remains valid when the current view is not needed. */
+    const derived = deriveTransactionIterator(
+      source,
+      (next) => next(),
+      () => {
+        throw extraFailure
+      }
+    )!
+    /** Main cleanup retains both failures while locking the actual first failure immediately. */
+    let failure: unknown
+    try {
+      await derived.dispose()
+    } catch (error) {
+      failure = error
+    }
+    /** The original state records the first close failure, rather than the later native failure. */
+    const first = fixture.onFailure.mock.calls[0]![0]
+    expect(first.cause).toBe(extraFailure)
+    /** Existing aggregate construction keeps the first normalized error before subsequent causes. */
+    const aggregate = (failure as Error).cause as AggregateError
+    expect(aggregate.errors[0]).toBe(first)
+    expect(aggregate.errors[1].cause).toBe(sourceFailure)
+    expect(fixture.onFailure).toHaveBeenCalledTimes(1)
+    await fixture.controller.closeIterators()
+    fixture.controller.close()
   })
 })
 

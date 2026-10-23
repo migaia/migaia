@@ -85,3 +85,40 @@ console.log(await memory.use(records).query<Order>().where({ state: 'paid' }).se
 后端原 scope factory 在冻结同一个视图前调用 `core.createTransactionApi(scope)`；没有选中事务方法时返回 undefined。已选方法通过原 `runTransactionOperation` 登记、排空和保留首错，再进入同一 execution 与当前 scope 的惰性 client getter；过期方法保留原后端事务错误。`core.getChainMethods(family)` 把已选链方法交给原 query/builder creator，所有派生分支保留同一方法引用和原 this。纯链配置同步执行且不进入干预阶段，实际 I/O 终点才进入原 runner；内置方法和重复名称在能力发布前拒绝。
 
 memory 的根操作在原并发 budget 内包住完整 pipeline：阶段修改一次输入，终点调用唯一原 loop，`await next()` 仍等待实际写入和失败。阶段等待计入同一期限；取消后不派生锁或执行原生写入。事务的 loop 位于 pipeline 外，每个真实 attempt 重新进入同一 pipeline，提交冲突重放 callback 时也重新运行阶段。
+
+`defineEntity` 从 `@migaia/storage-host/entity` 导入。记录仓储通过原 `repo.in(scope)` 组合，`repo.batch` 只开一个原生事务。schema、codec 与迁移借用该事务的原 signal。唯一约束检查最终草稿，交换和删除后重用保持原子性。历史索引句柄只有经当前原生 scope 确认就绪才使用；否则在同一 scope 扫描，不建索引。
+
+实体存档使用 `{version, state}` 与共享冻结迁移计划。畸形读取和非法写入保留宿主 `DESERIALIZE_FAILED`/`SERIALIZE_FAILED`，第一层 cause 为 contract `ENVELOPE_INVALID`；不支持版本和迁移失败保留宿主错误码与原 contract cause。不接纳旧 `{__v,data}`。比较函数必须有有限 limit，复用共享有界堆；流返回实际可释放迭代器。
+
+实体查询复用原不可变核心：`repo.query().index(name, keyOrRange).where(...).select(...).all()` 替代 `findManyBy`，`.stream()` 替代 `streamBy`。根查询与事务查询保留已安装的 query Feature 方法。此源的对象与字段条件在客户端执行；显式索引查询仍使用原生索引准备或权威扫描回退。比较器必须指定有限上限，候选由原有界堆保留。事务查询继承原 signal 和期限，终点不接另一个 context。
+
+```ts
+import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { defineEntity } from '@migaia/storage-host/entity'
+
+await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+const memory = host.backend('memory')
+const orders = defineEntity<{ id: string; state: string; total: number }>()({
+  name: 'orders',
+  key: 'id',
+  indexes: { byState: { path: 'state' } }
+}).connect(memory)
+const paid = await orders
+  .query()
+  .index('byState', 'paid')
+  .where('total', 'gt', 100)
+  .orderByComparator((left, right) => right.total - left.total)
+  .limit(20)
+  .select('id', 'total')
+  .all()
+await using stream = orders.query().limit(20).stream()
+for await (const order of stream) console.log(order)
+await memory.transaction(async (tx) => {
+  await orders.in(tx).put({ id: 'next', state: 'paid', total: 200 })
+  console.log(await orders.in(tx).query().where({ state: 'paid' }).select('id').all())
+})
+```
+
+`connect(store, {codecStages, queryStages})` 接收原宿主相应的观察接点。codec 围绕每次实际转换；query 的每次 `all` 和 stream 的每次 `next` 观察实际操作。stream 统计累计，消费方两次推进之间的停顿不计执行时间。观察不等待、不否决，抛错与迟到拒绝进入原报告渠道。
+
+自定义 value-only 后端的 unique 写入必须具备 record 事务或原子 value commit 接点；仅有 sync 通道不等于具备该原子终点。两者都缺少时，仅这个 unique 写入组合在修改前拒绝 `UNSUPPORTED_CAPABILITY`；普通 KV 写入仍可使用。原后端安装窗口内，先 `core.registerStore(store)`，再 `core.registerValueCommit(store, commit)`。`IBackendValueCommit` 从 `@migaia/storage-host/authoring/backend` 导出：`commit({prefix, expected, key, value}, ctx?)` 返回 `Promise<void>`；`expected` 是该前缀捕获的原始 `[key,value]` 对。异步 schema/codec 准备完成后，后端须原子复核这份前缀快照并写入 `key/value`，复核和修改之间不得有 await 缝隙；快照变化时以 `WRITE_CONFLICT` 拒绝且不修改数据。该接点只借用原 native store，不新增资源或关闭权。

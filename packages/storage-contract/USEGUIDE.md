@@ -370,6 +370,8 @@ metadata 供可恢复维护迁移使用，与 values、bytes、records 独立，
 
 `ITransactionScope.isRecordIndexReady?(handle)` 是可选的同事务只读查询：缺失、待就绪或失效索引返回 false；只有当前原生快照中的完整元数据与句柄 generation、fingerprint 都一致才返回 true。它不建立或刷新索引，也不另开事务；未提供该方法的既有 scope 仍合法。`ISecondaryIndexTransactionScope` 仍只要求原来的索引读写方法。
 
+`deriveTransactionIterator(iterator, read, close?)` 只从原 owner 已登记的实际 iterator 派生资源；未登记源返回 undefined，不调用 read 或 close。read 的参数依次是原推进函数、原首错传播函数和该次真实 next 的 `currentScope`，旧的两参数回调仍有效；当前视图只在本次完整推进结算前有效。可选 close 用于释放读取期间惰性创建的附属真实游标；原资源生命周期先等已准入推进真正结束，再按逆序先关闭附属源、后关闭原 source，两者都尝试。首个失败立即沿原 state 锁定，后续清理失败沿同一 cleanupFailure 聚合并保留 cause；无附属 close 时直接复用原 cleanup。该接点不授予自由构造视图、登记或关闭 store 的权限，不新增登记表或生命周期。
+
 普通与索引记录迭代统一返回 IStorageIterator，IKeyValueStore 继承唯一 IStorageResource 声明。拥有者只登记真实迭代器，以当前有效视图推进每次 next，等已接纳推进结束，再按创建的相反顺序关闭剩余资源。dispose 返回缓存的拒绝主 Promise，固定符号方法返回独立缓存、报告后成功的 Promise；return 与自然结束使用同一次真实清理。缺少原生符号时由外层传入规范 asyncDisposeKey，契约不创建后备键。伪造、错 store 或过期 scope 的绑定同步抛 INVALID_ARGUMENT；过期数据方法拒绝预存的后端 TRANSACTION_FAILED，不再调用工厂或数据回调。
 
 本包拥有中立事务协调，真实提交、隔离、取消与重试仍归后端。IndexedDB 严守原生活跃窗口：外部数据应先取再开事务，await 定时器后可能不能继续请求；memory 与 SQLite 自行管理活跃期。assertTransactionCallback 在分配后端资源前校验可调用性。声明与包内假后端验证不能替代真实后端原子持久化验收。
@@ -688,7 +690,9 @@ async function paidTotals(store: IStorageBase) {
 
 `snapshotConcurrencyLockKeys(keys, backend)` 一次规范化、排序去重并返回配对的冻结 `{keys, identities}`；键为独立快照，identity 是原通道编码的十六进制字符串，不授予取锁权限。`snapshotConcurrencyLockRange({channel,prefix?}, backend)` 返回同一 identity 域的半开 `{lower,upper}`；省略 prefix 选整个通道，有值时复用原 typed 前缀规则，bytes 前缀仅接受字符串（含空串）。
 
-`runWithConcurrency` 的可选 `request.lock(captured)` 在原固定上下文字段完成一次捕获后调用一次；返回的隐式锁与显式 options.lock 合并、排序去重，保留显式锁。嵌套调用只规范化新增键，复用原锁编码与同一预算；重试不重新调用派生函数。派生 getter、raw 回调失败沿 INVALID_ARGUMENT 保留 cause，已有 coded 回调错误保持原身份。`IWriteOptions` 以及根 remove/clear 各数据通道上下文包含 `IWriteConcurrencyOptions`，省略 concurrency 使用原 owner 默认策略。
+`runWithConcurrency` 的可选 `request.lock(captured)` 在原固定上下文字段完成一次捕获后调用一次；返回的隐式锁与显式 options.lock 合并、排序去重，保留显式锁。嵌套调用只规范化新增键，复用原锁编码与同一预算；默认模式重试不重新调用派生函数。派生 getter、raw 回调失败沿 INVALID_ARGUMENT 保留 cause，已有 coded 回调错误保持原身份。`IWriteOptions` 以及根 remove/clear 各数据通道上下文包含 `IWriteConcurrencyOptions`，省略 concurrency 使用原 owner 默认策略。
+
+后端可选用 `request.executeAttempt(captured, proceed)` 代替 `execute`，两者不能同时提供。默认 execute 仍只包围完整逻辑循环一次。executeAttempt 在每次真实原生提交尝试周围运行完整 pipeline；纯获取锁冲突的等待或重试留在当前段内，不重新干预输入。提交冲突必须先完成原生回滚与清理，proceed 再以该冲突的原 coded cause 拒绝；缺失或未编码的 cause 由同一 owner 包为保留 cause 的 WRITE_CONFLICT，形成该段唯一失败身份。只有 stage 完整收尾后仍抛同一失败，原循环才咨询策略并重开下一段；stage 恢复返回值或改抛其他身份时直接结算。stage 不调用 proceed 也可正常提前返回，重复调用则报 INVALID_ARGUMENT。每个新段从最初捕获的显式或继承锁重新派生本段变换输入的隐式锁，不积累上一段的锁。原 options 单读、整体 signal、期限与冲突计数始终共用；不新增循环、队列或超时拥有者。
 
 `IConcurrencyAttemptContext.attempt` 等于原共用冲突计数加一；后端把此只读序号转发给观察，不自行计数，嵌套尝试沿同一预算来源。
 

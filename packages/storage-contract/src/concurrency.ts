@@ -625,6 +625,8 @@ const ConcurrencyAttemptStatus = { committed: 'committed', conflict: 'conflict' 
 const ConcurrencyAdmission = { try: 'try', wait: 'wait' } as const
 /** Acquisition refusal and completed-rollback conflicts have distinct public failure codes. */
 const ConcurrencyPhase = { acquire: 'acquire', commit: 'commit' } as const
+/** A pipeline may return a recovery value or preserve the exact failure it observed. */
+const ConcurrencyExecutionStatus = { returned: 'returned', threw: 'threw' } as const
 /** One logical operation owns timing and conflict counters, including nested persist admission. */
 type IConcurrencyBudget = {
   readonly cancellation: IAbortTimeoutSignal
@@ -909,11 +911,21 @@ export async function runWithConcurrency<TResult>(
       captured: IOperationContext & { readonly conflictPolicy?: IConflictPolicy },
       invokeOriginalLoop: () => Promise<Awaited<TResult>>
     ) => Awaited<TResult> | PromiseLike<Awaited<TResult>>
+    /**
+     * Wraps each actual native commit attempt. Acquisition retries stay within the current stage;
+     * commit conflicts finish its catch/finally before policy and another stage. Mutually exclusive
+     * with execute. A stage may halt or recover by returning without rethrowing the exact
+     * conflict.
+     */
+    readonly executeAttempt?: (
+      captured: IOperationContext & { readonly conflictPolicy?: IConflictPolicy },
+      invokeOriginalAttempt: () => Promise<Awaited<TResult>>
+    ) => Awaited<TResult> | PromiseLike<Awaited<TResult>>
     /** Runs one original pipeline within this call's budget before deriving its fixed-input locks. */
     readonly prepare?: (
       captured: IOperationContext & { readonly conflictPolicy?: IConflictPolicy }
     ) => void | PromiseLike<void>
-    /** Derives additional locks once from the original frozen operation-field snapshot. */
+    /** Derives fixed-input locks once by default, or once per executeAttempt pipeline segment. */
     readonly lock?: (
       captured: IOperationContext & { readonly conflictPolicy?: IConflictPolicy }
     ) => readonly ILockKey[]
@@ -946,12 +958,15 @@ export async function runWithConcurrency<TResult>(
   let prepare: typeof request.prepare
   /** The actual outer pipeline may wrap only this original loop and its existing call budget. */
   let execute: typeof request.execute
+  /** Native commit replay can reopen only this finite wrapper, never another logical loop. */
+  let executeAttempt: typeof request.executeAttempt
   try {
     capturedLocks = request.options.lock
     capturedOverride = request.options.concurrency
     deriveLocks = request.lock
     prepare = request.prepare
     execute = request.execute
+    executeAttempt = request.executeAttempt
   } catch (cause) {
     throw invalidConcurrencyArgument(cause)
   }
@@ -959,7 +974,9 @@ export async function runWithConcurrency<TResult>(
   if (
     (deriveLocks !== undefined && typeof deriveLocks !== 'function') ||
     (prepare !== undefined && typeof prepare !== 'function') ||
-    (execute !== undefined && typeof execute !== 'function')
+    (execute !== undefined && typeof execute !== 'function') ||
+    (executeAttempt !== undefined && typeof executeAttempt !== 'function') ||
+    (execute !== undefined && executeAttempt !== undefined)
   )
     throw invalidConcurrencyArgument()
   /** Default resolution belongs to the same owner, after the original override getter is read once. */
@@ -972,9 +989,11 @@ export async function runWithConcurrency<TResult>(
     : capturedLocks === undefined
       ? undefined
       : normalizeLockKeys(capturedLocks, backend)
+  /** Each actual native replay derives from caller/inherited locks, without prior input transforms. */
+  const originalLocks = locks
   /** Context snapshots preserve original signal identity, field causes, org identity and omission. */
   const context = snapshotOperationContext(request.options)
-  /** Both entry paths use one derivation; preparation only delays it until the input is fixed. */
+  /** Every path derives only after its pipeline has fixed the current segment's input. */
   function derivePreparedLocks(): void {
     if (!deriveLocks) return
     /** Only new keys are captured and encoded; inherited normalized entries remain unchanged. */
@@ -990,7 +1009,7 @@ export async function runWithConcurrency<TResult>(
     if (normalized.length > 0) locks = uniqueNormalizedLockKeys([...(locks ?? []), ...normalized])
   }
   // Preserve admission ordering for existing callers that have no preparation phase.
-  if (!prepare && !execute) derivePreparedLocks()
+  if (!prepare && !execute && !executeAttempt) derivePreparedLocks()
   /** Unchanged inherited sets retain their exact immutable identity list as well as their budget. */
   let identities =
     locks === inherited?.locks && inherited ? inherited.identities : snapshotLockIdentities(locks)
@@ -1030,6 +1049,87 @@ export async function runWithConcurrency<TResult>(
    * mutation.
    */
   let lastConflict: Pick<IConcurrencyConflict, 'keys' | 'holder'> | undefined
+  /** One current pipeline segment waits on the original loop's actual native settlement. */
+  type IAttemptExecution = {
+    readonly ready: Promise<void>
+    readonly completed: Promise<
+      | {
+          readonly status: typeof ConcurrencyExecutionStatus.returned
+          readonly value: Awaited<TResult>
+        }
+      | { readonly status: typeof ConcurrencyExecutionStatus.threw; readonly cause: unknown }
+    >
+    readonly entered: boolean
+    readonly resolve: (value: Awaited<TResult>) => void
+    readonly reject: (cause: unknown) => void
+  }
+  /** The same frozen captured fields and budget signal are reused by every actual segment. */
+  const executionContext = executeAttempt
+    ? Object.freeze({ ...context, signal: budget.cancellation.signal })
+    : undefined
+  /** Only an active segment is retained; a completed conflict releases it before replay. */
+  let execution: IAttemptExecution | undefined
+  /** Creates no native work until the real stage terminal enters the original logical loop. */
+  function startAttemptExecution(): IAttemptExecution {
+    /** The terminal receives the real native outcome, including rollback and cleanup completion. */
+    let resolveNative!: (value: Awaited<TResult>) => void
+    /** Rejecting with the exact failure lets stage catch/recovery keep its original semantics. */
+    let rejectNative!: (cause: unknown) => void
+    /** A logical acquire refusal does not settle this Promise or unwind its stage. */
+    const native = new Promise<Awaited<TResult>>((resolve, reject) => {
+      resolveNative = resolve
+      rejectNative = reject
+    })
+    // A typed stage may return after calling its terminal without awaiting the native Promise.
+    void native.then(undefined, () => undefined)
+    /** Stage halt, failure and terminal admission all wake the original loop without a timer. */
+    let resolveReady!: () => void
+    /** The stage either reaches its terminal or completes without any native work. */
+    const ready = new Promise<void>((resolve) => {
+      resolveReady = resolve
+    })
+    /** Reusing one continuation cannot duplicate native work. */
+    let invoked = false
+    /** Only successful terminal preparation permits the loop to admit a native attempt. */
+    let entered = false
+    /** Capture both outcomes immediately so a late catch/finally never escapes observation. */
+    const completed: IAttemptExecution['completed'] = (async () => {
+      try {
+        return {
+          status: ConcurrencyExecutionStatus.returned,
+          value: await executeAttempt!(executionContext!, () => {
+            if (invoked) return Promise.reject(invalidConcurrencyArgument())
+            invoked = true
+            /** Expired before-next work derives no keys and starts no native admission. */
+            const aborted = concurrencyAbort(budget, false)
+            if (aborted) return Promise.reject(aborted)
+            locks = originalLocks
+            derivePreparedLocks()
+            identities =
+              locks === inherited?.locks && inherited
+                ? inherited.identities
+                : snapshotLockIdentities(locks)
+            entered = true
+            resolveReady()
+            return native
+          })
+        }
+      } catch (cause) {
+        return { status: ConcurrencyExecutionStatus.threw, cause }
+      } finally {
+        resolveReady()
+      }
+    })()
+    return {
+      ready,
+      completed,
+      get entered() {
+        return entered
+      },
+      resolve: resolveNative,
+      reject: rejectNative
+    }
+  }
   try {
     if (prepare) {
       /** An already canceled call starts neither its pipeline nor a native attempt. */
@@ -1044,7 +1144,7 @@ export async function runWithConcurrency<TResult>(
       /** Accepted preparation settles before cancellation can release this call's signal owner. */
       const afterPreparation = concurrencyAbort(budget, false)
       if (afterPreparation) throw afterPreparation
-      if (!execute) derivePreparedLocks()
+      if (!execute && !executeAttempt) derivePreparedLocks()
       identities =
         locks === inherited?.locks && inherited
           ? inherited.identities
@@ -1075,12 +1175,33 @@ export async function runWithConcurrency<TResult>(
       return (await execute(executionContext, invokeOriginalLoop)) as Awaited<TResult>
     }
     return await runOriginalLoop()
+  } catch (cause) {
+    if (!execution) throw cause
+    /** Cancellation, native and policy errors also await the original stage's actual unwind. */
+    execution.reject(cause)
+    const completed = await execution.completed
+    if (completed.status === ConcurrencyExecutionStatus.returned) return completed.value
+    throw completed.cause
   } finally {
     if (!inherited?.budget) budget.cancellation.dispose()
   }
   /** The sole existing logical loop retains all attempt, wait, decision and retry ownership. */
   async function runOriginalLoop(): Promise<Awaited<TResult>> {
     while (true) {
+      if (executeAttempt && !execution) {
+        /** Cancellation before a fresh stage cannot start another pipeline or native attempt. */
+        const beforeExecution = concurrencyAbort(budget, false)
+        if (beforeExecution) throw beforeExecution
+        execution = startAttemptExecution()
+        await execution.ready
+        if (!execution.entered) {
+          /** A legal stage halt/recovery may complete without ever calling its terminal. */
+          const completed = await execution.completed
+          execution = undefined
+          if (completed.status === ConcurrencyExecutionStatus.returned) return completed.value
+          throw completed.cause
+        }
+      }
       /** Cancellation before resource admission starts no native attempt. */
       const aborted = concurrencyAbort(budget, false)
       if (aborted) throw aborted
@@ -1137,7 +1258,32 @@ export async function runWithConcurrency<TResult>(
       } finally {
         concurrencyAttemptBudgets.delete(attemptContext)
       }
-      if (result.status === ConcurrencyAttemptStatus.committed) return await result.value
+      if (result.status === ConcurrencyAttemptStatus.committed) {
+        /** The stage's after-next path observes the actual committed value, then fully settles. */
+        const value = await result.value
+        if (!execution) return value
+        execution.resolve(value)
+        const completed = await execution.completed
+        execution = undefined
+        if (completed.status === ConcurrencyExecutionStatus.returned) return completed.value
+        throw completed.cause
+      }
+      if (execution && result.phase === ConcurrencyPhase.commit) {
+        /** Absent or uncoded causes need one explicit boundary identity before stage intervention. */
+        const failure = IdentifyError.identityOf(result.cause)
+          ? result.cause
+          : new StorageContractError(StorageContractErrorCode.writeConflict, {
+              backend,
+              cause: result.cause
+            })
+        execution.reject(failure)
+        const completed = await execution.completed
+        execution = undefined
+        if (completed.status === ConcurrencyExecutionStatus.returned) return completed.value
+        if (completed.cause !== failure) throw completed.cause
+        /** A policy rejection retains the same coded boundary the stage actually observed. */
+        if (failure !== result.cause) result = { ...result, cause: failure }
+      }
       /** A backend can report conflict only after finishing rollback and resource cleanup. */
       const afterAttemptAbort = concurrencyAbort(budget, false)
       if (afterAttemptAbort) throw afterAttemptAbort

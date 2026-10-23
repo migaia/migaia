@@ -17,8 +17,8 @@ reportCleanupError(report, new Error('cleanup failed'))`
     },
     entity: {
       summary: t(
-        'Use neutral schema adapters and strict portable codecs through one entity entry.',
-        '通过同一个实体入口使用中立schema适配与严格portable codec。'
+        'Compose entity repositories through the original transaction scope, immutable versioned envelopes, bounded queries, neutral schema adapters and strict portable codecs.',
+        '实体仓储复用原事务scope、共享版本存档、有界查询、中立schema与严格portable codec。'
       ),
       example: `import { jsonCodec } from '@migaia/storage-host/entity'
 
@@ -80,6 +80,18 @@ console.log(host.extensions.label('draft'))`
         'The existing phase vocabulary with no new backend state.',
         '已有阶段词汇，不新增后端状态。'
       )
+    },
+    defineEntity: {
+      role: 'factory',
+      purpose: t(
+        'Define one immutable entity schema and migration plan, then connect it to an admitted native backend.',
+        '定义冻结实体schema与迁移计划，再连接合法原生后端。'
+      ),
+      returns: t(
+        'A typed repository with same-owner transaction binding, final-draft unique checks and bounded list/stream queries.',
+        '带同owner事务绑定、最终草稿唯一检查与有界list/stream的类型化仓储。'
+      ),
+      cases: storageHostCases.defineEntity
     },
     memoryBackendPlugin: {
       role: 'factory',
@@ -283,6 +295,39 @@ console.log(host.extensions.label('draft'))`,
       summary: t(
         'Captured native provider owning preparation, index readiness and backfill sessions.',
         '拥有准备、索引就绪与补录会话的捕获原生 provider。'
+      ),
+      members: {}
+    },
+    IEntityQuery: {
+      summary: t(
+        'Immutable entity source selection over the original query core, retaining installed Feature methods.',
+        '原查询核心上的不可变实体源选择，保留已安装的Feature方法。'
+      ),
+      members: {
+        index: {
+          summary: t(
+            'Choose a declared index and optional key or range before filtering.',
+            '在过滤前选择声明索引及可选键或范围。'
+          )
+        },
+        all: {
+          summary: t(
+            'Materialize the shared query result; transaction queries inherit the original operation context.',
+            '收集原查询结果；事务查询继承原操作上下文。'
+          )
+        },
+        stream: {
+          summary: t(
+            'Advance the actual disposable iterator; each scoped next borrows the original transaction owner.',
+            '推进实际可释放迭代器；每次事务next借用原transaction owner。'
+          )
+        }
+      }
+    },
+    IEntityConnectOptions: {
+      summary: t(
+        'Explicit original codec/query observer ports; failures only report.',
+        '显式原codec/query观察接点；失败只报告。'
       ),
       members: {}
     },
