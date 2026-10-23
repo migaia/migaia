@@ -6092,18 +6092,18 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
   ...foundationApiGuides,
   'storage-host:entity:jsonCodec': createStorageWebGuide({
     purposeEn:
-      'The default zero-dependency codec for JSON-compatible values. It writes text on every backend, converts undefined top-level results to null, and reports serialization and parsing failures as StorageError values.',
+      'Strict portable JSON text codec backed by defineJsonCodec. Encoding undefined, non-finite numbers or other unsupported portable values rejects SERIALIZE_FAILED before backend I/O. The cause chain retains the contract adapter and original serialization failure; decoding failures use DESERIALIZE_FAILED.',
     purposeZh:
-      '面向 JSON-compatible value 的默认零依赖 codec。它在所有 backend 写入 text，把 top-level undefined 结果归一为 null，并将 stringify/parse failure 报告为 StorageError。',
+      '基于 defineJsonCodec 的严格可移植 JSON 文本编解码器。编码 undefined、非有限数字或其他不支持的可移植值时，在后端 I/O 前拒绝 SERIALIZE_FAILED。原因链保留契约适配器与原始序列化失败；解码失败使用 DESERIALIZE_FAILED。',
     quickStart: `import { jsonCodec } from '@migaia/storage-host/entity'\n\nconst raw = await jsonCodec.encode({ id: 1, name: 'Ada' })\nconst user = await jsonCodec.decode(raw)\nconsole.log(user)`,
     scenariosEn: [
       'Portable text storage across every backend.',
-      'Plain objects and arrays need the smallest built-in choice.',
+      'Plain JSON objects and arrays need a stable text format.',
       'Persisted payloads must remain inspectable as JSON.'
     ],
     scenariosZh: [
       '需要跨所有 backend 的 portable text storage。',
-      'plain object 与 array 需要最小 built-in choice。',
+      '普通 JSON 对象与数组需要稳定的文本格式。',
       'persisted payload 必须保持可检查的 JSON text。'
     ],
     avoidEn: [
@@ -6176,7 +6176,7 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
       'Binds a codec to one backend capability snapshot. Matching output stays direct, binary-to-text uses a reported Base64 fallback, and structured-to-text fails explicitly because no lossless fallback exists.',
     purposeZh:
       '把 codec 绑定到一次 backend capability snapshot。匹配的 output 直接使用；binary-to-text 使用会被报告的 Base64 fallback；structured-to-text 因不存在无损 fallback 而显式失败。',
-    quickStart: `import { binaryCodec, selectCodec } from '@migaia/storage-host/entity'\n\nexport async function writeAvatar(storage: { capabilities: Parameters<typeof selectCodec>[1]; set(key: string, value: unknown): Promise<void> }, bytes: Uint8Array): Promise<void> {\n  const selected = selectCodec(binaryCodec, storage.capabilities, (message) => console.warn(message))\n  await storage.set('avatar', await selected.encode(bytes))\n}`,
+    quickStart: `import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { binaryCodec, selectCodec } from '@migaia/storage-host/entity'\n\nconst host = await createStorageHost({ plugins: [memoryBackendPlugin()] })\ntry {\n  const storage = host.backend('memory')\n  const selected = selectCodec(binaryCodec, storage.capabilities, (message) => console.warn(message))\n  const encoded = await selected.encode(new Uint8Array([1, 2, 3]))\n  console.log(encoded, await selected.decode(encoded))\n} finally {\n  await host.dispose()\n}`,
     scenariosEn: [
       'An entity codec must be reconciled with its concrete backend.',
       'Binary data may accept an observable Base64 fallback.',
@@ -11650,7 +11650,7 @@ export async function readByEmail(
   'store-persist:index:persistTransaction': {
     en: {
       purpose:
-        'Drain authentic handles on one complete store, then commit their snapshots with entity, text and byte writes in its original transaction. Native storage writes roll back on failure; normal mirroring resumes afterwards.',
+        'Drain authentic handles on one complete backend store, then commit their snapshots with entity, text and byte writes in its original transaction. Client Store state in application memory does not roll back. Native backend writes roll back on failure; normal mirroring resumes after settlement.',
       quickStart:
         "import { createStore } from '@migaia/store-light'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { persistTransaction } from '@migaia/store-persist'\nimport { persist } from '@migaia/store-persist/light'\n\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nconst settings = createStore({ count: 0 })\nconst handle = persist(settings, { key: 'settings', storage })\nawait handle.ready\ntry {\n  await persistTransaction(storage, [handle], async (tx) => {\n    settings.count = 1\n    await handle.flush(tx)\n    await tx.set('settings-source', 'user', { conflictPolicy: 'replace' })\n  })\n} finally {\n  await handle.disposeAsync()\n  await settings.$dispose()\n}",
       scenarios: [
@@ -11665,7 +11665,7 @@ export async function readByEmail(
     },
     zh: {
       purpose:
-        '排空同一完整 store 上的真实句柄，在其原始事务中共同提交快照、实体、文本与字节。原生存储写入在失败时回滚，结算后恢复普通镜像写入。',
+        '排空同一完整后端存储上的真实句柄，在其原始事务中共同提交快照、实体、文本与字节。应用内存中的客户端 Store 状态不回滚；原生后端写入在失败时回滚，结算后恢复普通镜像写入。',
       quickStart:
         "import { createStore } from '@migaia/store-light'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { persistTransaction } from '@migaia/store-persist'\nimport { persist } from '@migaia/store-persist/light'\n\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nconst settings = createStore({ count: 0 })\nconst handle = persist(settings, { key: 'settings', storage })\nawait handle.ready\ntry {\n  await persistTransaction(storage, [handle], async (tx) => {\n    settings.count = 1\n    await handle.flush(tx)\n    await tx.set('settings-source', 'user', { conflictPolicy: 'replace' })\n  })\n} finally {\n  await handle.disposeAsync()\n  await settings.$dispose()\n}",
       scenarios: [
