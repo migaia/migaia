@@ -1704,6 +1704,25 @@ export const storageContractReference: ILibraryReference = {
       ),
       example: 'console.log(QueryOperation.where, QueryOperation.select) // where select'
     },
+    compileStorageQueryCondition: {
+      role: 'operation',
+      purpose: t(
+        'Compile an already canonical source AST using the original condition compiler.',
+        '使用原条件 compiler 编译 source 已收到的规范 AST。'
+      ),
+      params: {
+        condition: t(
+          'Canonical AST from the original native execute callback, without another IWhere snapshot.',
+          '原生 execute 回调的规范 AST，不再捕获 IWhere。'
+        )
+      },
+      returns: t(
+        'The original stateless predicate with unchanged operator and error semantics.',
+        '操作符及错误语义保持的原无状态谓词。'
+      ),
+      example: storageContractCases.compileStorageQueryCondition![0]!.example,
+      cases: storageContractCases.compileStorageQueryCondition
+    },
     compileStorageWhere: {
       role: 'operation',
       purpose: t(

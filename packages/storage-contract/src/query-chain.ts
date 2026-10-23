@@ -372,6 +372,19 @@ export function compileStorageWhere<T>(where: IWhere<T>): (value: T) => boolean 
   return compileQueryCondition<T>(snapshotStorageWhere(where))
 }
 
+/**
+ * Compiles only the canonical AST already admitted and supplied to a native source callback. Reuses
+ * the same compiler without parsing, cloning or re-reading the original IWhere input. Compilation
+ * failures use the existing admission error path; predicate failures stay unchanged.
+ */
+export function compileStorageQueryCondition<T>(condition: IQueryCondition): (value: T) => boolean {
+  try {
+    return compileQueryCondition<T>(condition)
+  } catch (cause) {
+    throw invalidQueryCondition(cause)
+  }
+}
+
 /** Operation names are the shared planner vocabulary; each backend declares its actual subset. */
 export const QueryOperation = Object.freeze({
   where: 'where',

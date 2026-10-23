@@ -759,6 +759,34 @@ async function pages(source: IRecordQuerySource) {
       )
     }
   ],
+  compileStorageQueryCondition: [
+    {
+      title: t(
+        'Filter native candidates with the original canonical AST',
+        '用原规范 AST 过滤原生候选'
+      ),
+      problem: t(
+        'A native source receives canonical conditions and must not duplicate query operators.',
+        '原生数据源收到规范条件，不应复制查询操作符。'
+      ),
+      example: t(
+        `import { compileStorageQueryCondition, type IQueryCondition } from '@migaia/storage-contract'
+function matching(conditions: readonly IQueryCondition[], rows: readonly { total: number }[]) {
+  const tests = conditions.map((condition) => compileStorageQueryCondition<{ total: number }>(condition))
+  return rows.filter((row) => tests.every((test) => test(row)))
+}`,
+        `import { compileStorageQueryCondition, type IQueryCondition } from '@migaia/storage-contract'
+function matching(conditions: readonly IQueryCondition[], rows: readonly { total: number }[]) {
+  const tests = conditions.map((condition) => compileStorageQueryCondition<{ total: number }>(condition))
+  return rows.filter((row) => tests.every((test) => test(row)))
+}`
+      ),
+      result: t(
+        'Uses only the source-supplied canonical conditions and the existing predicate compiler.',
+        '仅使用 source 已提供的规范条件与现有谓词 compiler。'
+      )
+    }
+  ],
   compileStorageWhere: [
     {
       title: t(

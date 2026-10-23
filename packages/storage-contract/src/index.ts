@@ -217,6 +217,7 @@ export {
   QueryOperator,
   QueryOperation,
   compileStorageWhere,
+  compileStorageQueryCondition,
   createRecordQuery,
   createVectorQuery,
   createRdfQuery,

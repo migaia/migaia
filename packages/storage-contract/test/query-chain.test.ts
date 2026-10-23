@@ -1,6 +1,7 @@
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import {
   compileStorageWhere,
+  compileStorageQueryCondition,
   assertStorageKey,
   KEY_DOMAIN_LIMITS,
   createRecordQuery,
@@ -42,6 +43,36 @@ type IOrder = {
 }
 
 describe('canonical declarative conditions', () => {
+  it('compiles source-supplied canonical AST with the original condition compiler', async () => {
+    const candidates: IOrder[] = [
+      { status: 'paid', total: 12, created: new Date(10) },
+      { status: 'paid', total: 9, created: new Date(20) },
+      { status: 'cancelled', total: 12, created: new Date(30) }
+    ]
+    const execute: IRecordQuerySource['execute'] = vi.fn(
+      (input: Parameters<IRecordQuerySource['execute']>[0]) => {
+        const predicates = input.conditions.map((condition) =>
+          compileStorageQueryCondition<IOrder>(condition)
+        )
+        return ownedRows(
+          candidates.filter((row) => predicates.every((predicate) => predicate(row)))
+        )
+      }
+    )
+    const query = createRecordQuery<IOrder>({
+      pushdown: {
+        source: 'canonical-ast-consumer',
+        operators: ['in', 'gte'],
+        operations: ['where']
+      },
+      execute
+    })
+      .where({ status: { in: ['paid'] }, created: { gte: new Date(5) }, total: { gte: 10 } })
+      .requirePushdown()
+    expect(await query.all()).toEqual([candidates[0]])
+    expect(execute).toHaveBeenCalledTimes(1)
+  })
+
   it('combines nested fields, and/or/not and missing fields without reading unrelated properties', () => {
     const predicate = compileStorageWhere<IOrder>({
       and: [{ status: 'paid' }, { total: { gte: 10 } }],

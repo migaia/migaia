@@ -686,3 +686,5 @@ RDF add/delete/match 沿同一规范 ground IQuad owner。支持事务的 provid
 新 keyset 执行中，条件、selector 排序与 distinct 在 after 之前，limit/skip 是其后的页控制；原来没有 page/after 的链保持声明顺序。comparator 的 after 在原 comparator+limit 有界堆之前比较，游标锚点使用 utils 原 structuredClone 快照域，不增加无界排序。`query.after(next).limit(2).all()` 返回锚点之后的两条。
 
 原 `nativeSteps:true` 端口扩展主键 `order` 与 `{operation:'after',key,direction}`；后端仅声明其真实索引 seek 支持。具有相应索引的原 execute 可做 O(log n + 页大小) seek；共享 fallback 明确保留客户端排序/过滤成本，strict 会在 I/O 前拒绝。向量查询没有 page/after。
+
+`compileStorageQueryCondition<T>(condition)` 只编译原生 source 回调已经收到的规范 `IQueryCondition`，直接复用原 compiler，不再捕获 IWhere、不增加 parser 或登记表。Date、对象身份、操作符和返回谓词的错误语义保持；编译失败沿原 INVALID_ARGUMENT。外部声明式输入仍用 `compileStorageWhere`。
