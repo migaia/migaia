@@ -873,3 +873,5 @@ snapshotStorageOrgKeyPrefix(orgId, prefix, backend) 返回独立的原生半开�
 索引准备可返回既有原生 record-key 投影，转换 fixture 的逻辑 id a/b；所有索引读写及期望行沿该原键，省略仍使用原字符串键，避免将未归属范围的 raw 修改当作规范索引修改。
 
 共享套件同时观察原生入口同步抛出的输入错误与异步拒绝，仍要求同一语义码；接受非法输入或返回其它码仍失败。观察适配不改变后端错误时序，也不包装原错误对象。
+
+`snapshotStorageVectorIds(ids, backend?, rejectDuplicates = false)` 捕获并冻结稠密字符串 ID 批次，默认保序保重复；推荐输入可选拒绝重复，不施加存储键大小限制。`snapshotStorageDeleteCountMode(value, backend?)` 将省略值归为 `DeleteCountMode.precount`，只接受 `precount`/`scroll`；非法输入沿原 `INVALID_ARGUMENT` 边界。两者不做原生 I/O，也不改变引擎实际删除计数策略。

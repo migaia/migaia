@@ -79,7 +79,7 @@ function main() {
     writeFileSync(join(consumerDirectory, 'package.json'), '{"type":"module"}\n', 'utf8')
     writeFileSync(
       join(consumerDirectory, 'identity.mjs'),
-      `import { fromValueCodec, defineStorageCapability, implement, provideCapabilities, hasStorageCapability, useStorageCapability, sql, createSqlTag, deriveStorageSqlQuery, blob, snapshotStorageBlobPut, snapshotStorageBlobGet, snapshotStorageBlobList, createStorageBlobObject, durableChangeFeed, orderStorageKeysByBytes, encodeStorageOrgStringPrefix, encodeOrderedStorageKey, decodeOrderedStorageKey, prefixStorageOrgKey, sparql, sparqlFragment, createSparqlTag, term, rdf, vector, DeleteCountMode, createStorageIteratorLifetime, createRecordQuery, snapshotStorageWhere, compileStorageQueryCondition } from '@migaia/storage-contract'
+      `import { fromValueCodec, defineStorageCapability, implement, provideCapabilities, hasStorageCapability, useStorageCapability, sql, createSqlTag, deriveStorageSqlQuery, blob, snapshotStorageBlobPut, snapshotStorageBlobGet, snapshotStorageBlobList, createStorageBlobObject, durableChangeFeed, orderStorageKeysByBytes, encodeStorageOrgStringPrefix, encodeOrderedStorageKey, decodeOrderedStorageKey, prefixStorageOrgKey, sparql, sparqlFragment, createSparqlTag, term, rdf, vector, DeleteCountMode, snapshotStorageVectorIds, snapshotStorageDeleteCountMode, createStorageIteratorLifetime, createRecordQuery, snapshotStorageWhere, compileStorageQueryCondition } from '@migaia/storage-contract'
 import { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'
 import * as conformance from '@migaia/storage-contract/conformance'
 import { isArrayBuffer as utilsBuffer, isUint8Array as utilsBytes } from '@migaia/utils/bytes'
@@ -113,6 +113,9 @@ const vectorApi = { collection: noAdmissionIo }
 const rdfApi = { add: noAdmissionIo, delete: noAdmissionIo, match: noAdmissionIo }
 const semanticStore = provideCapabilities(createBase(), [implement(vector, vectorApi), implement(rdf, rdfApi)])
 if (semanticStore.use(vector) !== vectorApi || semanticStore.use(rdf) !== rdfApi || DeleteCountMode.scroll !== 'scroll') throw new Error('packed semantic capability mismatch')
+/** Packed input helpers retain detached ID data and the original deletion mode without native work. */
+const capturedIds = snapshotStorageVectorIds(['a', 'a'])
+if (!Object.isFrozen(capturedIds) || capturedIds.join(',') !== 'a,a' || snapshotStorageDeleteCountMode(undefined) !== DeleteCountMode.precount || snapshotStorageDeleteCountMode(DeleteCountMode.scroll) !== DeleteCountMode.scroll) throw new Error('packed vector input root export mismatch')
 /** Packed native SPARQL keeps callable capability and pure fragment identities together. */
 const preparedSparql = []
 const sparqlApi = createSparqlTag({ select: async () => [], ask: prepare => { preparedSparql.push(prepare()); return Promise.resolve(true) }, construct: async () => [], update: async () => undefined })
