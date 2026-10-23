@@ -13,7 +13,7 @@ import {
 /** Native borrowed resources reuse the original lifecycle tracker for accepted work and release. */
 export function pgResource(
   close: () => void | Promise<void>
-): IStorageResource & { run<T>(invoke: () => Promise<T>): Promise<T> } {
+): IStorageResource & { assertLive(): void; run<T>(invoke: () => Promise<T>): Promise<T> } {
   const owner = {}
   const tracker = createQuiescenceTracker<object>()
   const report = createStorageOperationReporter()
@@ -24,12 +24,17 @@ export function pgResource(
     tracker.seal(owner)
     return (main = tracker.whenZero(owner).then(close))
   }
+  /** Extracted namespace methods consult the same original resource seal. */
+  const assertLive = (): void => {
+    if (tracker.isSealed(owner))
+      throw new StorageContractError(StorageContractErrorCode.disposed, {
+        backend: PgNames.backend
+      })
+  }
   return {
+    assertLive,
     run: async (invoke) => {
-      if (tracker.isSealed(owner))
-        throw new StorageContractError(StorageContractErrorCode.disposed, {
-          backend: PgNames.backend
-        })
+      assertLive()
       const release = tracker.retain(owner)
       try {
         return await invoke()

@@ -51,7 +51,8 @@ import {
 import type {
   IStoragePluginCore,
   IStorageBackendOrgContext,
-  IStorageOrgBinding
+  IStorageOrgBinding,
+  IStorageJournalBackendBinding
 } from '@migaia/storage-host'
 import {
   asyncDisposeKey,
@@ -71,6 +72,7 @@ import {
 } from './schema.js'
 import { probePostgres } from './probe.js'
 import { createPgTransactions, observePg } from './transaction.js'
+import { createPgJournalImages, createPgJournalBinding } from './journal.js'
 import { createPgChanges } from './changes.js'
 import { createPgVectors } from './vector.js'
 import { createPgDurableApi, type IPgReplicationSelection } from './logical-replication.js'
@@ -123,6 +125,7 @@ export type IPostgresConstruction<T> = {
   readonly configuration: IPgConfiguration
   readonly tables: IPgTables
   readonly orgBinding: IStorageOrgBinding
+  readonly journalBinding: IStorageJournalBackendBinding
   readonly runNative: IPgNativeOperation
   createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>
   createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi
@@ -229,7 +232,10 @@ export async function createPostgresStore<T>(
     const bind = (
       runtime: IStorageBackendOrgContext,
       orgView: boolean
-    ): Omit<IPostgresConstruction<T>, 'configuration' | 'tables' | 'orgBinding'> => {
+    ): Omit<
+      IPostgresConstruction<T>,
+      'configuration' | 'tables' | 'orgBinding' | 'journalBinding'
+    > & { readonly journal: Omit<IStorageJournalBackendBinding, 'forOrg'> } => {
       let store: IPostgresStore<IPgServer, T>
       let installer: ICapabilityInstallPort | undefined
       let engine: ReturnType<typeof createPgTransactions<IPgScope<T>>>
@@ -362,7 +368,7 @@ export async function createPostgresStore<T>(
           ctx: IOperationContext | undefined
         ) => {
           const run = async (state: IPgState, current: IPgScope<T> | undefined) => {
-            if (orgView)
+            if (orgView || runtime.journal?.active())
               throw new StorageContractError(StorageContractErrorCode.unsupported, {
                 backend: PgNames.backend
               })
@@ -1221,6 +1227,11 @@ export async function createPostgresStore<T>(
         })
         return durableApi
       }
+      const journalImages = createPgJournalImages(tables, () => {
+        if (!vectorSelected()) return undefined
+        createVectorApi()
+        return vectors!.journal
+      })
       store = provideCapabilities(
         base,
         [
@@ -1253,6 +1264,7 @@ export async function createPostgresStore<T>(
         controller,
         createScope,
         publish: (state) => changes!.publish(state),
+        journalCapture: (state) => journalImages.capture(state),
         beforeCommit: (state) => changes!.beforeCommit(state),
         onIsolation: (isolationLevel) =>
           core.emit('onCapabilityProbe', () => ({
@@ -1272,7 +1284,28 @@ export async function createPostgresStore<T>(
         durablePublication = installer!.prepare([implement(durableChangeFeed, createDurableApi())])
         durablePublication.publish()
       }
+      /** Root and explicit-default views share only the same authenticated fixed-org native facts. */
+      const journalState = (scope: object) => {
+        const binding = states.get(scope)
+        assertTransactionOwner(binding?.store ?? store, scope)
+        if (binding === undefined || binding.state.orgId !== runtime.orgId) throw invalidArgument()
+        return binding.state
+      }
+      const journal = createPgJournalBinding({
+        orgId: runtime.orgId,
+        tables,
+        configuration,
+        controller,
+        stateFor: journalState,
+        infoFor: (scope) => {
+          journalState(scope)
+          return assertTransactionOwner(states.get(scope)!.store, scope)
+        },
+        images: journalImages,
+        transaction: (work) => engine.run(work, undefined, 'journal', undefined, false, false)
+      })
       return {
+        journal,
         store,
         installer: installer!,
         controller,
@@ -1303,7 +1336,7 @@ export async function createPostgresStore<T>(
                 ctx,
                 () => ({}),
                 (state) => {
-                  if (orgView)
+                  if (orgView || runtime.journal?.active())
                     throw new StorageContractError(StorageContractErrorCode.unsupported, {
                       backend: PgNames.backend
                     })
@@ -1315,7 +1348,7 @@ export async function createPostgresStore<T>(
             : runTransactionOperation(scope as IPgScope<T>, (current) => {
                 const state = engine.stateFor(current)
                 return observed(operation, current, () => {
-                  if (orgView)
+                  if (orgView || runtime.journal?.active())
                     throw new StorageContractError(StorageContractErrorCode.unsupported, {
                       backend: PgNames.backend
                     })
@@ -1397,7 +1430,21 @@ export async function createPostgresStore<T>(
         }
       }
     }
-    return { ...root, configuration, tables, orgBinding }
+    const journalBinding = (orgId: string): IStorageJournalBackendBinding => ({
+      forOrg: journalBinding,
+      ...(() => {
+        if (orgId === core.defaultOrgId) return root.journal
+        orgBinding.backend(orgId)
+        return organizations.get(orgId)!.journal
+      })()
+    })
+    return {
+      ...root,
+      configuration,
+      tables,
+      orgBinding,
+      journalBinding: journalBinding(core.defaultOrgId)
+    }
   } catch (cause) {
     try {
       await controller.dispose()

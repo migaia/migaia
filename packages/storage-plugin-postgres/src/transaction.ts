@@ -11,7 +11,8 @@ import {
   type IConcurrencyAttempt,
   type ITransactionStageObserver,
   type ILockKey,
-  type IOperationContext
+  type IOperationContext,
+  type ITransactionScope
 } from '@migaia/storage-contract'
 import type { IStorageBackendOrgContext } from '@migaia/storage-host'
 import {
@@ -25,6 +26,7 @@ import { sleep } from '@migaia/utils/promise'
 import { walkErrorCauses } from '@migaia/utils/error'
 import type { IPgConfiguration, IPgTables } from './schema.js'
 import type { IPgState } from './native.js'
+import type { IPgJournalCapture } from './journal.js'
 import { commitPgRevisions, recheckPgRevisions } from './native.js'
 import {
   acquirePgLocks,
@@ -70,7 +72,7 @@ function physicalPgFailure(value: unknown): boolean {
   )
 }
 /** Native transaction state is borrowed only after the original contract owner authenticates a view. */
-export function createPgTransactions<TScope extends object>(input: {
+export function createPgTransactions<TScope extends Omit<ITransactionScope, 'use'>>(input: {
   readonly states: WeakMap<object, { readonly store: IStorageStore; readonly state: IPgState }>
   readonly store: IStorageStore
   readonly configuration: IPgConfiguration
@@ -79,6 +81,7 @@ export function createPgTransactions<TScope extends object>(input: {
   readonly controller: IBackendChangeController
   readonly createScope: (state: IPgState) => TScope
   readonly publish: (state: IPgState) => void
+  readonly journalCapture?: (state: IPgState) => IPgJournalCapture
   readonly beforeCommit?: (state: IPgState) => Promise<void>
   readonly onIsolation?: (value: string) => void
 }) {
@@ -106,7 +109,7 @@ export function createPgTransactions<TScope extends object>(input: {
     states.set(scope, { store, state })
     return scope
   }
-  const stateFor = (scope: TScope): IPgState => {
+  const stateFor = (scope: object): IPgState => {
     assertTransactionOwner(store, scope)
     return states.get(scope)!.state
   }
@@ -115,7 +118,8 @@ export function createPgTransactions<TScope extends object>(input: {
     context: IConcurrencyAttemptContext,
     callback: (scope: TScope) => R,
     lease: IPgLockLease | undefined,
-    publicTransaction: boolean
+    publicTransaction: boolean,
+    journaled: boolean
   ): Promise<IConcurrencyAttempt<Awaited<R>>> => {
     const normalize = publicTransaction ? normalizeTransactionFailure : normalizePostgresError
     const baseline = new Map<string, bigint>()
@@ -123,6 +127,7 @@ export function createPgTransactions<TScope extends object>(input: {
       throwIfAborted(context.signal)
       const client = await configuration.driver.connect(context)
       const state: IPgState = {
+        terminal: { committed: new Set(), rolledBack: new Set(), settled: false },
         codecs: pgCodecs,
         client,
         orgId: runtime.orgId,
@@ -137,6 +142,8 @@ export function createPgTransactions<TScope extends object>(input: {
         guardRange: (channel, prefix) =>
           guardPgRange(client, tables, runtime.orgId, controller.origin, lease, channel, prefix)
       }
+      /** The configured original host owner alone decides whether capture is active. */
+      if (journaled && runtime.journal?.active()) state.journal = input.journalCapture?.(state)
       let begun = false
       let commitSent = false
       let registration: ReturnType<typeof owner.register<TScope>> | undefined
@@ -151,14 +158,26 @@ export function createPgTransactions<TScope extends object>(input: {
       /** Recovery returns the same native borrow before consulting the original driver. */
       let borrowReturned = false
       /** Publication follows actual native settlement, including a positively recovered COMMIT. */
-      const committed = (): IConcurrencyAttempt<Awaited<R>> => {
+      let journalAttempt: ReturnType<NonNullable<typeof runtime.journal>['begin']>
+      /** Original native settlement alone delivers terminal effects. Listener failures report only. */
+      const complete = (success: boolean): void => {
+        if (state.terminal.settled) return
+        state.terminal.settled = true
+        for (const effect of success ? state.terminal.committed : state.terminal.rolledBack)
+          observePg({ effect }, 'effect')
+        state.terminal.committed.clear()
+        state.terminal.rolledBack.clear()
+      }
+      const committed = async (): Promise<IConcurrencyAttempt<Awaited<R>>> => {
         begun = false
         observePg(
           terminal!,
           'afterCommit',
           [...state.changed.values()].reduce((count, keys) => count + keys.size, 0)
         )
+        complete(true)
         publish(state)
+        await journalAttempt?.settle?.()
         return { status: 'committed', value: value as Awaited<R> }
       }
       const settled = await (async (): Promise<IConcurrencyAttempt<Awaited<R>> | undefined> => {
@@ -182,9 +201,12 @@ export function createPgTransactions<TScope extends object>(input: {
             },
             beforeCommit: async (checkScope) => {
               observePg(transactionStages.forTransaction(checkScope), 'beforeCommit')
+              await state.journal?.finalize()
+              await journalAttempt?.record(checkScope)
               await beforeCommit?.(state)
             }
           })
+          if (journaled) journalAttempt = runtime.journal?.begin(scope)
           terminal = transactionStages.forTransaction(scope)
           observePg(terminal, 'onTransactionStart')
           marker = assertTransactionOwner(store, scope).id
@@ -208,7 +230,9 @@ export function createPgTransactions<TScope extends object>(input: {
           }
           throwIfAborted(context.signal)
           await client.query(
-            'INSERT INTO ' + tables.markers + ' (org_id,key,value) VALUES($1,$2,$3)',
+            'INSERT INTO ' +
+              tables.markers +
+              ' (org_id,key,value) VALUES($1,$2,$3) ON CONFLICT(org_id,key) DO NOTHING',
             [runtime.orgId, marker, PgNames.markerValue],
             context
           )
@@ -300,6 +324,7 @@ export function createPgTransactions<TScope extends object>(input: {
         (value) => ({ failed: false as const, value }),
         (cause) => ({ failed: true as const, cause })
       )
+      if (!state.terminal.settled) complete(false)
       if (!settled.failed && settled.value?.status === 'committed' && marker !== undefined) {
         try {
           await (borrowReturned ? configuration.driver : client).query(
@@ -340,7 +365,8 @@ export function createPgTransactions<TScope extends object>(input: {
       readonly lock?: () => readonly ILockKey[]
       readonly observe?: <V>(invoke: () => Promise<V>) => Promise<V>
     },
-    pipeline = true
+    pipeline = true,
+    journaled = true
   ): Promise<Awaited<R>> => {
     assertTransactionCallback(callback, PgNames.backend)
     controller.assertLive()
@@ -349,7 +375,13 @@ export function createPgTransactions<TScope extends object>(input: {
       {
         store,
         options,
-        ...(execution?.lock === undefined ? {} : { lock: execution.lock }),
+        ...(journaled && runtime.journal !== undefined
+          ? { prepare: () => runtime.journal!.prepare() }
+          : {}),
+        lock: () => [
+          ...(execution?.lock?.() ?? []),
+          ...(journaled ? (runtime.journal?.headLocks() ?? []) : [])
+        ],
         ...(pipeline
           ? {
               executeAttempt: (
@@ -385,7 +417,13 @@ export function createPgTransactions<TScope extends object>(input: {
           let failed = false
           let result: IConcurrencyAttempt<Awaited<R>> | undefined
           try {
-            result = await attempt(context, callback, lease, operation === PgOperation.transaction)
+            result = await attempt(
+              context,
+              callback,
+              lease,
+              operation === PgOperation.transaction,
+              journaled
+            )
           } catch (cause) {
             primary = cause
             failed = true

@@ -22,6 +22,14 @@ export type IPgChannel = 'text' | 'bytes' | 'record' | 'metadata'
 export type IPgMutationChannel = IPgChannel | 'vector'
 /** An original native attempt retains observations only until its real COMMIT or ROLLBACK. */
 export type IPgState = {
+  /** Complete journal facts belong only to this original native attempt. */
+  journal?: import('./journal.js').IPgJournalCapture
+  /** Native terminal listeners have no independent commit or admission authority. */
+  readonly terminal: {
+    readonly committed: Set<() => void>
+    readonly rolledBack: Set<() => void>
+    settled: boolean
+  }
   readonly codecs: ReturnType<typeof import('./codec.js').createPgCodecs>
   readonly client: IPgConnection
   readonly orgId: string
@@ -76,6 +84,7 @@ export async function observePgRevision(
   channel: IPgMutationChannel,
   key: IStorageKey
 ): Promise<void> {
+  await state.journal?.capture(channel, [key])
   if (channel === 'metadata') return
   const identity = pgIdentity(channel, key)
   if (!state.baseline.has(identity)) {
@@ -219,6 +228,7 @@ export async function writePg(
       }
     }
   }
+  if (channel === 'metadata') await observePgRevision(state, tables, channel, key)
   const expiry = channel === 'metadata' ? '' : ',expires_at'
   const deadline =
     ttlMs === undefined ? 'NULL' : "clock_timestamp()+($4::float8*interval '1 millisecond')"
@@ -311,6 +321,13 @@ export async function scanPgRecords<T>(
     )
   ).rows
   if (expiredCandidates.length !== 0)
+    await observePgBatch(
+      state,
+      tables,
+      'record',
+      expiredCandidates.map((row) => pgRecordKey(row.key))
+    )
+  if (expiredCandidates.length !== 0)
     await state.guardKeys(expiredCandidates.map((row) => pgLockKey('record', pgRecordKey(row.key))))
   const expired = await state.client.query(
     'DELETE FROM ' +
@@ -354,6 +371,21 @@ export async function clearPg(
 ): Promise<void> {
   await observePgRange(state, tables, channel)
   await state.guardRange(channel)
+  if (state.journal !== undefined) {
+    const before = (
+      await state.client.query(
+        'SELECT key FROM ' + tables[channel] + ' WHERE org_id=$1',
+        [state.orgId],
+        state.ctx
+      )
+    ).rows
+    await observePgBatch(
+      state,
+      tables,
+      channel,
+      before.map((row) => (channel === 'record' ? pgRecordKey(row.key) : pgTextKey(row.key)))
+    )
+  }
   const rows = (
     await state.client.query(
       'DELETE FROM ' + tables[channel] + ' WHERE org_id=$1 RETURNING key',
@@ -461,6 +493,7 @@ export async function observePgBatch(
   channel: Exclude<IPgMutationChannel, 'metadata'>,
   keys: readonly IStorageKey[]
 ): Promise<void> {
+  await state.journal?.capture(channel, keys)
   const missing = new Map<string, IStorageKey>()
   for (const key of keys) {
     const id = pgIdentity(channel, key)
@@ -658,6 +691,21 @@ export async function removePrefixPg(
   await state.guardRange(channel, range.key)
   const lower = channel === 'record' ? range.lower : pgKeyHex(range.lower)
   const upper = channel === 'record' ? range.upper : pgKeyHex(range.upper)
+  if (state.journal !== undefined) {
+    const before = (
+      await state.client.query(
+        'SELECT key FROM ' + tables[channel] + ' WHERE org_id=$1 AND key>=$2 AND key<$3',
+        [state.orgId, lower, upper],
+        state.ctx
+      )
+    ).rows
+    await observePgBatch(
+      state,
+      tables,
+      channel,
+      before.map((row) => (channel === 'record' ? pgRecordKey(row.key) : pgTextKey(row.key)))
+    )
+  }
   const rows = (
     await state.client.query(
       'DELETE FROM ' + tables[channel] + ' WHERE org_id=$1 AND key>=$2 AND key<$3 RETURNING key',

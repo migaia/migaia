@@ -832,6 +832,9 @@ importers:
         specifier: workspace:^
         version: link:../utils
     devDependencies:
+      '@migaia/logger':
+        specifier: workspace:^
+        version: link:../logger
       '@types/bun':
         specifier: 1.4.3
         version: 1.4.3

@@ -39,6 +39,7 @@ import { pgVectorCondition, pgVectorFilter, pgVectorProjection } from './vector-
 import { invalidArgument, postgresError } from './errors.js'
 import { PostgresErrorCode } from './error-code.js'
 import { PgNames } from './constants.js'
+import { encodePgJournalImage, decodePgJournalImage, type IPgJournalVectorPort } from './journal.js'
 /** One native table belongs to the store-wide logical collection rather than one organization. */
 type IPgVectorCollectionState = IStorageVectorConfiguration & { readonly table: string }
 /** This private source receives only the backend's original native transaction operation. */
@@ -652,6 +653,74 @@ export function createPgVectors(runtime: IPgVectorRuntime) {
         ])
       }
     },
+    /** Exact native columns participate in the same original scope's journal image. */
+    journal: {
+      read: async (state, name, ids) => {
+        const config = await collection(state, name, undefined)
+        const rows = (
+          await state.client.query(
+            'SELECT key,embedding::text AS vector,payload,projection::text AS projection,expires_at::text AS deadline FROM ' +
+              config.table +
+              ' WHERE org_id=$1 AND key=ANY($2::text[])',
+            [state.orgId, { arrayType: 'text', values: ids.map((id) => pgKey(id).hex) }],
+            state.ctx
+          )
+        ).rows
+        const result = new Map<string, import('@migaia/storage-host').IStorageJournalImage>()
+        for (const id of ids) result.set(id, { present: false })
+        for (const row of rows) {
+          if (
+            typeof row.vector !== 'string' ||
+            !(row.payload === null || typeof row.payload === 'string') ||
+            !(row.projection === null || typeof row.projection === 'string') ||
+            !(row.deadline === null || typeof row.deadline === 'string')
+          )
+            throw postgresError(PostgresErrorCode.decodeFailed)
+          result.set(
+            pointId(row.key),
+            encodePgJournalImage({
+              version: 1,
+              channel: 'vector',
+              value: row.vector,
+              payload: row.payload,
+              projection: row.projection,
+              expiresAt: row.deadline
+            })
+          )
+        }
+        return result
+      },
+      write: async (state, name, id, image) => {
+        const config = await collection(state, name, undefined)
+        const wire = image.present ? decodePgJournalImage(image, 'vector') : undefined
+        if (wire !== undefined) decodeVector(wire.value, config)
+        await observePgRevision(state, tables, 'vector', [name, id])
+        await state.guardKeys([lockKey.vector(name, id)])
+        if (wire === undefined) {
+          const removed = await state.client.query(
+            'DELETE FROM ' + config.table + ' WHERE org_id=$1 AND key=$2',
+            [state.orgId, pgKey(id).hex],
+            state.ctx
+          )
+          if (removed.rowCount === 0) return
+        } else
+          await state.client.query(
+            'INSERT INTO ' +
+              config.table +
+              ' (org_id,key,embedding,payload,projection,expires_at) VALUES($1,$2,$3::vector,$4,$5::jsonb,$6::timestamptz) ON CONFLICT(org_id,key) DO UPDATE SET embedding=excluded.embedding,payload=excluded.payload,projection=excluded.projection,expires_at=excluded.expires_at',
+            [
+              state.orgId,
+              pgKey(id).hex,
+              wire.value,
+              wire.payload ?? null,
+              wire.projection ?? null,
+              wire.expiresAt
+            ],
+            state.ctx
+          )
+        markPgChanged(state, 'vector', [name, id])
+      }
+    } satisfies IPgJournalVectorPort,
     standard,
     collection,
     search,

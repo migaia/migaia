@@ -90,6 +90,7 @@ export function postgresBackendPlugin<
         })
         return {}
       },
+      journalBinding: () => construction.journalBinding,
       capabilityInstaller: (_store: IPostgresStore<TServer, TValue>): ICapabilityInstallPort =>
         construction.installer,
       featureExpose: () => ({
