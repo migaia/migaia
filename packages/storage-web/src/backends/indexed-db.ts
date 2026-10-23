@@ -52,7 +52,7 @@ import { planChannelWrite } from '../core/channel-write.js'
  * is a leaf-level string with no dependency back onto this backend module, so importing it here
  * does not create a cycle with `entity/repository.ts` (which does depend on this file).
  */
-import { REPOSITORY_KEY_PREFIX, repositoryMigrationKey } from '../entity/key.js'
+import { REPOSITORY_KEY_PREFIX, repositoryMigrationKey } from '@migaia/storage-host/entity'
 import { isArrayBuffer, isUint8Array } from '../core/bytes.js'
 import { normalizeError } from '../core/errors.js'
 import { collectUniqueIndexOwners } from '../core/unique-index.js'

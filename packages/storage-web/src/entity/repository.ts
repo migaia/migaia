@@ -1,3 +1,4 @@
+import { repositoryMigrationKey } from '@migaia/storage-host/entity'
 import { StorageError as HostStorageError } from '@migaia/storage-host'
 import {
   StorageContractError,
@@ -28,7 +29,6 @@ import {
   composeStructuredKey,
   decodeRepositoryKey,
   flatKeyPrefix,
-  repositoryMigrationKey,
   repositoryEntityRange,
   repositoryUniqueWriteKey
 } from './key.js'

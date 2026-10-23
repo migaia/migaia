@@ -9,7 +9,7 @@ import {
 import { createEventChannel, EventDispatchPolicy } from '@migaia/event-subscriber'
 import { createStringLeaseRegistry } from '@migaia/lifecycle'
 import { createStorageOperationReporter, reportCleanupError } from '../core/operation-reporter.js'
-import { REPOSITORY_KEY_PREFIX } from '../entity/key.js'
+import { REPOSITORY_KEY_PREFIX } from '@migaia/storage-host/entity'
 
 /** Construction-time references and options retained by the private adapter seam. */
 export type IBackendReactiveSnapshot = {

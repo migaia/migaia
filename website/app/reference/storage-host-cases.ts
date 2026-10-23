@@ -3,6 +3,22 @@ import type { ICaseDoc, IText } from './contract.js'
 const t = (en: string, zh: string): IText => ({ en, zh })
 /** Application extensions retain their exact inputs while the host owns installation and cleanup. */
 export const storageHostCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
+  repositoryMigrationKey: [
+    {
+      title: t('Share one persisted entity layout', '共享同一持久化实体布局'),
+      problem: t(
+        'A backend raw-record firewall must invalidate the same metadata record as its repository.',
+        '后端raw-record firewall必须使repository使用的同一个metadata记录失效。'
+      ),
+      example: `import { repositoryMigrationKey } from '@migaia/storage-host/entity'
+
+console.log(repositoryMigrationKey('users'))`,
+      result: t(
+        'Prints repository:users:migration. The package move changes no persisted key.',
+        '输出repository:users:migration。包迁移不改变持久化key。'
+      )
+    }
+  ],
   jsonCodec: [
     {
       title: t('Encode a portable record', '编码portable记录'),

@@ -30,6 +30,21 @@ console.log(host.extensions.label('draft'))`
     }
   },
   symbols: {
+    repositoryMigrationKey: {
+      role: 'operation',
+      purpose: t(
+        'Read the existing entity metadata layout identity shared by repositories and backend raw-record firewalls.',
+        '读取repository与后端raw-record firewall共用的既有实体metadata布局身份。'
+      ),
+      returns: t(
+        'The unchanged repository:<entityName>:migration metadata key.',
+        '保持原格式的repository:<entityName>:migration metadata key。'
+      ),
+      example: `import { repositoryMigrationKey } from '@migaia/storage-host/entity'
+
+console.log(repositoryMigrationKey('users'))`,
+      cases: storageHostCases.repositoryMigrationKey
+    },
     jsonCodec: {
       role: 'operation',
       purpose: t(
