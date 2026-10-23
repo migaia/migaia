@@ -1038,6 +1038,7 @@
         "defineStorageCapability",
         "encodeOrderedStorageKey",
         "fromValueCodec",
+        "hasStorageCapability",
         "implement",
         "intrinsicConstructorName",
         "isBackendKind",
@@ -1068,7 +1069,8 @@
         "snapshotStorageCapabilities",
         "snapshotStorageKey",
         "snapshotSyncWriteOptions",
-        "unprefixStorageOrgKey"
+        "unprefixStorageOrgKey",
+        "useStorageCapability"
       ]
     },
     "@migaia/storage-web": {

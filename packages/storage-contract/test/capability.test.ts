@@ -3,6 +3,8 @@ import {
   defineStorageCapability,
   implement,
   provideCapabilities,
+  hasStorageCapability,
+  useStorageCapability,
   kv,
   StorageContractErrorCode,
   type ICapabilityInstallPort,
@@ -43,6 +45,97 @@ function createBase() {
 }
 
 describe('capability identity and provider ownership', () => {
+  it('shares read-only token access for provided, raw and frozen resources without modifying them', () => {
+    /** A native refinement must survive the read-only type projection as it does on store.use. */
+    const token = defineStorageCapability<{ read(): string }>()('readonly-catalog')
+    /** Exact implementation identity is retained through both public paths. */
+    const api = { read: () => 'value', native: () => 7 }
+    /** Backend identity must stay captured even when its getter later changes. */
+    let reads = 0
+    const base = {
+      ...createBase(),
+      get backend() {
+        reads++
+        return reads === 1 ? 'original-backend' : 'changed-backend'
+      }
+    }
+    const store = provideCapabilities(base, [implement(token, api)])
+    Object.freeze(store)
+    expect(hasStorageCapability(store, token)).toBe(store.has(token))
+    expect(useStorageCapability(store, token)).toBe(store.use(token))
+    expect(useStorageCapability(store, token)).toBe(api)
+    expectTypeOf(useStorageCapability(store, token)).toEqualTypeOf<typeof api>()
+    expect(useStorageCapability(store, token).native()).toBe(7)
+    const missing = defineStorageCapability<{ read(): string }>()('missing')
+    for (const read of [
+      () => store.use(missing as never),
+      () => useStorageCapability(store, missing)
+    ]) {
+      expect(read).toThrowError(
+        expect.objectContaining({
+          source: '@migaia/storage-contract',
+          code: 'UNSUPPORTED_CAPABILITY',
+          backend: 'original-backend',
+          message: 'backend original-backend does not provide capability missing'
+        })
+      )
+    }
+    expect(reads).toBe(1)
+    const forged = { name: token.name } as typeof token
+    expect(hasStorageCapability(store, forged)).toBe(store.has(forged))
+    for (const read of [() => store.use(forged), () => useStorageCapability(store, forged)])
+      expect(read).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT' }))
+    for (const raw of [createBase(), Object.freeze(createBase())]) {
+      /** Reads leave raw own-property descriptors and cleanup call counts unchanged. */
+      const descriptors = Object.getOwnPropertyDescriptors(raw)
+      expect(hasStorageCapability(raw, token)).toBe(false)
+      expect(() => useStorageCapability(raw, token)).toThrowError(
+        expect.objectContaining({ code: 'UNSUPPORTED_CAPABILITY', backend: 'example-catalog' })
+      )
+      expect(Object.getOwnPropertyDescriptors(raw)).toEqual(descriptors)
+      expect(raw.dispose).not.toHaveBeenCalled()
+    }
+  })
+
+  it('observes late Feature publication through the same read-only lookup while retaining key has', async () => {
+    const token = defineStorageCapability<{ value(): number }>()('late-readonly')
+    const api = { value: () => 3 }
+    let installer!: ICapabilityInstallPort
+    const store = provideCapabilities(createBase(), [], {
+      onInstaller: (port) => {
+        installer = port
+      }
+    })
+    const publication = installer.prepare([implement(token, api)])
+    expect(hasStorageCapability(store, token)).toBe(false)
+    expect(() => useStorageCapability(store, token)).toThrowError(
+      expect.objectContaining({ code: 'UNSUPPORTED_CAPABILITY' })
+    )
+    publication.publish()
+    expect(hasStorageCapability(store, token)).toBe(store.has(token))
+    expect(useStorageCapability(store, token)).toBe(store.use(token as never))
+    expect(useStorageCapability(store, token)).toBe(api)
+    publication.release()
+    expect(hasStorageCapability(store, token)).toBe(store.has(token))
+    expect(() => useStorageCapability(store, token)).toThrowError(
+      expect.objectContaining({ code: 'UNSUPPORTED_CAPABILITY' })
+    )
+    const keyHas = vi.fn(async (key: string) => key === 'present')
+    const kvApi: IKeyValueApi = {
+      get: async () => null,
+      set: async () => undefined,
+      remove: async () => undefined,
+      has: keyHas,
+      keys: async () => [],
+      clearValues: async () => undefined,
+      clearAll: async () => undefined
+    }
+    const kvStore = provideCapabilities(createBase(), [implement(kv, kvApi)])
+    await expect(kvStore.has('present')).resolves.toBe(true)
+    expect(keyHas).toHaveBeenCalledOnce()
+    expect(hasStorageCapability(kvStore, kv)).toBe(true)
+    expect(useStorageCapability(kvStore, kv)).toBe(kvApi)
+  })
   it('freezes tokens and implementation records without trusting matching names', () => {
     /** Equal diagnostic names deliberately do not imply equal capability authority. */
     const first = defineStorageCapability<{ read(): string }>()('catalog')

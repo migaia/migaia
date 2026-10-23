@@ -117,6 +117,8 @@ export {
   defineStorageCapability,
   implement,
   provideCapabilities,
+  hasStorageCapability,
+  useStorageCapability,
   kv,
   type IStorageCapability,
   type IAnyStorageCapability,

@@ -168,7 +168,12 @@ const implementations = new WeakMap<object, IImplementationRecord>()
 /** One entry retains descriptor identity and publication visibility inside its owning store table. */
 type IInstalledCapability = { readonly implementation: ICapabilityImpl; published: boolean }
 /** Each provided base owns exactly one token table, including prepared unpublished entries. */
-const stores = new WeakMap<object, Map<IAnyStorageCapability, IInstalledCapability>>()
+const stores = new WeakMap<object, ICapabilityStoreRecord>()
+/** The one registry retains original diagnostics beside its existing capability table. */
+type ICapabilityStoreRecord = {
+  readonly table: Map<IAnyStorageCapability, IInstalledCapability>
+  readonly backend: IStorageBase['backend']
+}
 
 /** Creates a frozen identity token for one API contract; duplicate names remain distinct tokens. */
 export function defineStorageCapability<TApi>(): <const TName extends string>(
@@ -198,6 +203,62 @@ function invalidCapability(cause?: unknown): StorageContractError {
 /** Tests private token identity without consulting a name, user getter, or public brand. */
 function isToken(value: unknown): value is IAnyStorageCapability {
   return typeof value === 'object' && value !== null && tokens.has(value)
+}
+
+/** Shared token membership path for store methods and read-only root access, with no user reads. */
+function hasCapability(record: ICapabilityStoreRecord | undefined, capability: unknown): boolean {
+  return isToken(capability) && record?.table.get(capability)?.published === true
+}
+
+/** Shared token lookup retains the original captured backend diagnostic and exact API identity. */
+function useCapability(
+  store: IStorageBase,
+  record: ICapabilityStoreRecord | undefined,
+  capability: unknown
+): unknown {
+  if (!isToken(capability)) throw invalidCapability()
+  /** Prepared Feature entries remain absent until their original publication is visible. */
+  const installed = record?.table.get(capability)
+  if (installed?.published) return installed.implementation.api
+  /** Provided stores never re-read backend getters; a raw base has no prior captured identity. */
+  let backend: IStorageBase['backend']
+  try {
+    backend = record === undefined ? store.backend : record.backend
+  } catch (cause) {
+    throw invalidCapability(cause)
+  }
+  throw new StorageContractError(
+    StorageContractErrorCode.unsupported,
+    { backend },
+    StorageContractErrorText.capabilityMissing(capability.name, backend)
+  )
+}
+
+/**
+ * Reads the original provider table without changing the base, granting installation authority or
+ * acquiring cleanup ownership. Authentic published tokens behave exactly like store.has(token);
+ * missing, forged and raw-store tokens return false, including on frozen bases.
+ */
+export function hasStorageCapability(
+  store: IStorageBase,
+  capability: IAnyStorageCapability
+): boolean {
+  return hasCapability(stores.get(store), capability)
+}
+
+/**
+ * Returns the same original API as store.use(token), including exact native implementation types.
+ * Forged tokens throw INVALID_ARGUMENT; authentic missing tokens throw UNSUPPORTED_CAPABILITY using
+ * the original provider backend diagnostic. Raw and frozen bases remain unmodified.
+ */
+export function useStorageCapability<
+  TStore extends IStorageBase,
+  TCap extends IAnyStorageCapability
+>(store: TStore, capability: TCap): IProvidedApi<IStorageImplementationsOf<TStore>, TCap> {
+  return useCapability(store, stores.get(store), capability) as IProvidedApi<
+    IStorageImplementationsOf<TStore>,
+    TCap
+  >
 }
 
 /** Creates a frozen authentic implementation descriptor without taking ownership of its API. */
@@ -337,6 +398,8 @@ export function provideCapabilities<
     const baseAdmission = admitBase(base)
     /** This sole map is shared by base capabilities and later Feature publications. */
     const table = new Map<IAnyStorageCapability, IInstalledCapability>()
+    /** Method closures and root read access share the same table and captured diagnostic. */
+    const record: ICapabilityStoreRecord = { table, backend: baseAdmission.backend }
     /** No caller or base mutation occurs while descriptors and duplicates are checked. */
     const captured = admitImplementations(entries, table)
     /** Capture original KV method receivers before replacing the overlapping has entry. */
@@ -359,25 +422,14 @@ export function provideCapabilities<
     definitions.use = {
       configurable: true,
       enumerable: true,
-      value: (capability: unknown): unknown => {
-        if (!isToken(capability)) throw invalidCapability()
-        /** Both initial and Feature-provided implementations use this same table. */
-        const installed = table.get(capability)
-        if (!installed?.published)
-          throw new StorageContractError(
-            StorageContractErrorCode.unsupported,
-            { backend: baseAdmission.backend },
-            StorageContractErrorText.capabilityMissing(capability.name, baseAdmission.backend)
-          )
-        return installed.implementation.api
-      }
+      value: (capability: unknown): unknown => useCapability(base, record, capability)
     }
     definitions.has = {
       configurable: true,
       enumerable: true,
       value: (capability: unknown, context?: unknown): boolean | Promise<boolean> => {
         if (typeof capability === 'string' && keyHas) return keyHas(capability, context)
-        return isToken(capability) && table.get(capability)?.published === true
+        return hasCapability(record, capability)
       }
     }
     /** The original host receives this private authority once; tokens alone do not grant it. */
@@ -447,7 +499,7 @@ export function provideCapabilities<
       table.set(descriptor.capability, { implementation: descriptor, published: true })
     onInstaller?.(Object.freeze(installer))
     Object.defineProperties(base, definitions)
-    stores.set(base, table)
+    stores.set(base, record)
     return base as unknown as ICapabilityStore<
       TBase,
       TImplementations[number]['capability'],
