@@ -1172,7 +1172,8 @@
       "./plugins/session-storage": ["sessionStorageBackendPlugin"],
       "./plugins/cookies": ["cookieBackendPlugin"],
       "./plugins/indexed-db": ["indexedDbBackendPlugin"],
-      "./features/reactive": ["reactiveFeature"]
+      "./features/reactive": ["reactiveFeature"],
+      "./features/blobs": ["indexedDbBlobFeature"]
     },
     "@migaia/store-devtools": {
       ".": [

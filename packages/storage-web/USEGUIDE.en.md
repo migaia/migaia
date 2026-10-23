@@ -189,3 +189,27 @@ IndexedDB natively provides `ttl`: `store.use(ttl)` exposes `expire`, `remaining
 Text organization views use the configured namespace for the host default and namespace + "/" + orgId for every other organization. The same captured native client, namespace codec and Cookie scope remain in use. A configured namespace ending in "/" plus a canonical UUID rejects before native I/O; a bare UUID remains valid. dropOrg clears only that target, preserves other organizations and plugin prefixes, and leaves existing views reusable. Borrowed entities retain the original native atomic unique writer. IndexedDB maps dbName by the same rule. dropOrg makes the target connection close-pending, drains native transactions, and waits for that target's deleteDatabase request. New opens wait for the same request; existing views reopen afterward. Other instances close through their original versionchange handler. A foreign connection that refuses to close keeps native deletion pending; the host never resumes opening early and lets a late deletion destroy new data.
 
 localStorage declares changeFeed:true only after registering the actual localStorage and storage event source of the same Window. A Storage-like injection alone remains false. Original watch/subscribeChanges combine committed writes from this instance with native cross-document events, filtered by storageArea, namespace codec, and organization; host disposal releases the listener. The receiving controller numbers hints locally, without a native writer history sequence. Reread current data: delivery is neither per-write nor a native notification for other instances in the same page. Organization views retain watch with runtime capability admission and no backend close authority.
+
+## Native Blob and File storage
+
+Select `indexedDbBlobFeature` from the dedicated subpath. It adds `store.api.blobs` and `scope.api.blobs`. Blob/File values use native structured clone; File name, type and lastModified survive reopening. The default store is `__migaia_blobs__`. Declare a different name with `{ storeName }`; declaration collisions fail before opening. Blob requests share the original record transaction, cancellation, quota normalization and rollback. Organization views use their actual database and original transaction owner. The Feature grants no database disposal method.
+
+```ts
+import { createStorageHost } from '@migaia/storage-host'
+import { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'
+import { indexedDbBlobFeature } from '@migaia/storage-web/features/blobs'
+
+const host = await createStorageHost({
+  plugins: [indexedDbBackendPlugin({ dbName: 'attachments' }, { blobs: indexedDbBlobFeature() })]
+})
+try {
+  const store = host.backend('indexed-db')
+  await store.transaction(async (scope) => {
+    await scope.api.blobs.put('avatar', new Blob(['avatar bytes'], { type: 'text/plain' }))
+    await scope.putRecord({ attachment: 'avatar' }, 'profile')
+  })
+  console.log(await (await store.api.blobs.get('avatar'))?.text())
+} finally {
+  await host.dispose()
+}
+```

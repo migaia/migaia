@@ -135,3 +135,27 @@ IndexedDB 原生提供 `ttl`：`store.use(ttl)` 的 `expire`、`remaining`、`pe
 文本组织视图的宿主缺省组织使用配置 namespace，其它组织使用 namespace + "/" + orgId，继续复用捕获的原生客户端、namespace codec 与 Cookie scope。配置目标以 "/" 加规范 UUID 结尾时在原生 I/O 前拒绝，单独 UUID 合法。dropOrg 只清该目标，保留其它组织及插件前缀，既有视图仍可复用；借用实体保留原生原子唯一写入端点。IndexedDB 使用相同规则映射 dbName；dropOrg 先让目标连接进入原生 close-pending 并排空其事务，再等待该目标的 deleteDatabase 完成。删除期间新打开等待同一原生请求；完成后原视图可重新打开。其它实例沿原 versionchange 关闭；拒绝关闭的外部连接会使原生删除继续等待，宿主不会提前恢复打开并让迟到删除损坏新数据。
 
 localStorage 仅在成功捕获同一 Window 的真实 localStorage 与 storage 事件源后声明 changeFeed:true；单独注入 Storage-like 仍为 false。原 watch/subscribeChanges 同时接本实例已提交写与跨文档原生事件，按 storageArea、namespace codec 和组织过滤；宿主关闭释放原监听者。通知由接收方原 controller 编号，不含原生写入方历史序号；应重读当前值，不保证逐写投递或同页面其它独立实例的原生事件。组织视图保留 watch 方法，调用仍检查运行时能力，且不获得后端关闭权。
+
+## 原生 Blob 与 File 存储
+
+从专用子入口选择 `indexedDbBlobFeature`，得到 `store.api.blobs` 与 `scope.api.blobs`。Blob/File 使用原生结构化克隆；File 的名称、类型和最后修改时间在重开后保留。仓库默认 `__migaia_blobs__`，可用 `{ storeName }` 指定；声明碰撞在开库前拒绝。Blob 请求与 records 共用原事务、取消、配额归一和回滚；组织视图使用自己的真实数据库及原事务拥有者。Feature 不授予关闭数据库的方法。
+
+```ts
+import { createStorageHost } from '@migaia/storage-host'
+import { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'
+import { indexedDbBlobFeature } from '@migaia/storage-web/features/blobs'
+
+const host = await createStorageHost({
+  plugins: [indexedDbBackendPlugin({ dbName: 'attachments' }, { blobs: indexedDbBlobFeature() })]
+})
+try {
+  const store = host.backend('indexed-db')
+  await store.transaction(async (scope) => {
+    await scope.api.blobs.put('avatar', new Blob(['avatar bytes'], { type: 'text/plain' }))
+    await scope.putRecord({ attachment: 'avatar' }, 'profile')
+  })
+  console.log(await (await store.api.blobs.get('avatar'))?.text())
+} finally {
+  await host.dispose()
+}
+```

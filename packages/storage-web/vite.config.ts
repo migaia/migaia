@@ -34,7 +34,8 @@ export default defineConfig({
         'plugins/session-storage': 'src/plugins/session-storage.ts',
         'plugins/cookies': 'src/plugins/cookies.ts',
         'plugins/indexed-db': 'src/plugins/indexed-db.ts',
-        'features/reactive': 'src/features/reactive.ts'
+        'features/reactive': 'src/features/reactive.ts',
+        'features/blobs': 'src/features/blobs.ts'
       },
       formats: ['es'],
       fileName: (_format, entryName) => `${entryName}.js`
