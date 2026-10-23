@@ -341,3 +341,5 @@ async function saveExternal(loadSettings: () => Promise<{ count: number }>): Pro
 ```
 
 Optional `transactionStages: host.transactionStages(storage)` passes through all three adapters. Persistence emits only beforePersistFlush / afterPersistFlush; after means request completion. codecStages binds the actual operation view and observes each conversion once. Observer failures only report, never wait or alter business results. Exported `ITransactionScopeOf<typeof storage>` preserves the concrete backend scope type.
+
+`ctx.concurrency` overrides the original store default. Busy handles are tried once: fail rejects immediately, and only a wait decision enters the cancellable FIFO. Custom policy runs only after a real conflict. Handle admission and backend retries share this call's deadline and wait budget; entering the backend does not restart timeoutMs. Cancellation still waits for accepted work to actually finish before releasing resources. Backend option values, including symbol fields, retain identity; cancellation uses the same coordination signal.

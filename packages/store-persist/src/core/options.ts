@@ -119,8 +119,10 @@ export function snapshotPersistOptions<T extends object>(options: T): T {
     )
   }
   try {
-    const snapshot: Record<PropertyKey, unknown> = {}
-    for (const [key, descriptor] of Object.entries(descriptorSnapshot.descriptors)) {
+    const snapshot: Record<PropertyKey, unknown> = Object.create(null)
+    for (const key of Reflect.ownKeys(descriptorSnapshot.descriptors)) {
+      /** Backend context extensions may use symbols as well as ordinary own string fields. */
+      const descriptor = Reflect.get(descriptorSnapshot.descriptors, key) as PropertyDescriptor
       snapshot[key] =
         'get' in descriptor
           ? descriptor.get === undefined

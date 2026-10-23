@@ -4,13 +4,16 @@ import { createManualScheduler } from '@migaia/utils/testing'
 import { binaryCodec } from '@migaia/storage-host/entity'
 import {
   createTransactionOwner,
+  ConcurrencyPolicy,
+  defineConcurrencyPolicy,
   runTransactionOperation,
   TransactionActivityMode,
   type IRecordStore,
   type ICodec,
   type IStorageIterator,
   type IStorageKey,
-  type ITransactionScope
+  type ITransactionScope,
+  type ITransactionOptions
 } from '@migaia/storage-contract'
 import { persistTransaction, persistUnit, type IPersistUnit } from '../src/index.js'
 
@@ -21,6 +24,13 @@ const recordingFailure = {
   source: 'recording-port',
   code: 'TRANSACTION_FAILED',
   message: 'recording port operation failed'
+}
+/** Symbol-backed backend extensions must survive the same capture as ordinary option fields. */
+const recordingOption = Symbol('recording-option')
+/** The local native entry retains concrete backend extensions in its original signature. */
+type IRecordingOptions = ITransactionOptions & {
+  readonly nativeTag?: object
+  readonly [recordingOption]?: object
 }
 
 /** Preserve coded failures exactly, while retaining a raw fixture error as the cause. */
@@ -55,7 +65,12 @@ function recordingPort() {
     }
   })
   /** Unused channels remain inert; only text requests are exercised by these local port cases. */
-  const storage: IRecordStore = {
+  const storage: Omit<IRecordStore, 'transaction'> & {
+    transaction<TResult>(
+      run: (scope: ITransactionScope) => TResult,
+      options?: IRecordingOptions
+    ): Promise<Awaited<TResult>>
+  } = {
     backend: 'recording-port',
     capabilities: {
       syncRead: false,
@@ -91,9 +106,10 @@ function recordingPort() {
     dispose: async () => undefined,
     [Symbol.asyncDispose]: async () => undefined,
     async transaction<TResult>(
-      run: (scope: ITransactionScope) => TResult
+      run: (scope: ITransactionScope) => TResult,
+      options?: IRecordingOptions
     ): Promise<Awaited<TResult>> {
-      entered()
+      entered(options)
       /** The canonical owner, rather than this port, owns views, pending work and the first failure. */
       const root = createScope()
       /** This scope lasts until all admitted combinations and their requests settle. */
@@ -168,6 +184,97 @@ function mutableUnit() {
 }
 
 describe('persistence transaction local ports', () => {
+  it('rejects busy slots through fail and custom policy without entering a second native callback', async () => {
+    /** One active transaction holds the actual per-handle limiter until its callback completes. */
+    const port = recordingPort()
+    /** No automatic notification changes this handle during the admission check. */
+    const value = mutableUnit()
+    /** The canonical owner supplies the default; only the tested calls override it. */
+    const handle = persistUnit(value.unit, {
+      key: 'busy',
+      storage: port.storage,
+      runtime: createRuntime()
+    })
+    await handle.ready
+    /** Callback entry and completion are explicit without another queue implementation. */
+    const started = Promise.withResolvers<void>()
+    /** The first transaction remains real work until conflicting calls settle. */
+    const release = Promise.withResolvers<void>()
+    /** This original callback owns the slot, so subsequent calls see a genuine conflict. */
+    const holding = persistTransaction(port.storage, [handle], async () => {
+      started.resolve()
+      await release.promise
+    })
+    await started.promise
+    /** Conflict ordinals must accumulate in the one canonical policy loop. */
+    const conflicts: number[] = []
+    /** The custom callback retries twice, then refuses the third real conflict. */
+    const custom = defineConcurrencyPolicy({
+      name: 'recording-retry-twice',
+      locking: 'pessimistic',
+      decide: ({ attempt }) => {
+        conflicts.push(attempt)
+        return attempt <= 2 ? { action: 'retry', delayMs: 0 } : { action: 'reject' }
+      }
+    })
+    try {
+      await expect(
+        persistTransaction(port.storage, [handle], () => undefined, {
+          concurrency: ConcurrencyPolicy.fail()
+        })
+      ).rejects.toMatchObject({ code: 'LOCK_REJECTED' })
+      await expect(
+        persistTransaction(port.storage, [handle], () => undefined, { concurrency: custom })
+      ).rejects.toMatchObject({ code: 'LOCK_REJECTED' })
+      expect(conflicts).toEqual([1, 2, 3])
+      expect(port.entered).toHaveBeenCalledTimes(1)
+    } finally {
+      release.resolve()
+      await holding
+      await handle.disposeAsync()
+    }
+  })
+
+  it('retains concrete own and symbol options on the actual context without restarting timeout', async () => {
+    /** The local entry records the actual context delivered by the public coordinator. */
+    const port = recordingPort()
+    /** Snapshot content is irrelevant to this original options-boundary assertion. */
+    const value = mutableUnit()
+    /** The same authentic handle enlists without a structural wrapper. */
+    const handle = persistUnit(value.unit, {
+      key: 'options',
+      storage: port.storage,
+      runtime: createRuntime()
+    })
+    await handle.ready
+    /** Values retain identity rather than being serialized by option capture. */
+    const nativeTag = {}
+    /** Symbol extensions are part of the concrete backend's original public options. */
+    const symbolicTag = {}
+    /** Borrowed accessors run only at the original public boundary. */
+    let reads = 0
+    try {
+      await persistTransaction(port.storage, [handle], () => undefined, {
+        get nativeTag() {
+          reads++
+          return nativeTag
+        },
+        [recordingOption]: symbolicTag,
+        timeoutMs: 1_000
+      })
+      /** The attempt context carries timing ownership rather than another original timeout. */
+      const delivered = port.entered.mock.calls[0]![0]!
+      expect(delivered.nativeTag).toBe(nativeTag)
+      expect(delivered[recordingOption]).toBe(symbolicTag)
+      expect(delivered.timeoutMs).toBeUndefined()
+      expect(delivered.admission).toBe('try')
+      expect(typeof delivered.wait).toBe('function')
+      expect(reads).toBe(1)
+    } finally {
+      await handle.disposeAsync()
+    }
+  })
+
   it('encodes each of two unawaited flush calls before the same snapshot object changes again', async () => {
     /** This test exercises the public coordinator and engine without claiming backend atomicity. */
     const port = recordingPort()
