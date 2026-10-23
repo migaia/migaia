@@ -43,6 +43,9 @@ export const StorageContractErrorText = {
     `storage query cannot be pushed: ${reasons.join('; ')}`,
   /** Client functions have no declarative translation and form a record prefix boundary. */
   queryFunction: 'JavaScript callback requires client execution',
+  /** Vector callbacks inspect only original engine hits and never trigger replacement searches. */
+  queryVectorFunction:
+    'JavaScript payload predicate applies only to engine hits and may return fewer than topK',
   /** Native equality cannot promise JavaScript opaque object identity. */
   queryIdentity: 'object identity comparison requires client execution',
   /** Native admission explicitly lists each supported operation and field operator. */

@@ -765,3 +765,11 @@ const excluded = prefix.matches(['cache', 'users-extra'])
 `snapshotStorageRdfTerm`、`snapshotStorageRdfPattern` 与 `snapshotStorageRdfQuad` 单次捕获并复制结构字段；非法项或位置报 `INVALID_ARGUMENT`，保留 getter 原因。pattern 省略的字段不加约束，graph 也如此；完整 quad 必须提供四个位置。`encodeStorageRdfQuad` 通过规范 term 字段与既有自定界有序键 writer 生成独立身份字节。这些纯 helper 不打开原生 store、query 或资源。
 
 `lockKey.vector(collection, id)` 与 `lockKey.rdf(quad)` 扩展原规范锁拥有者。通道顺序保留 text、bytes、record，再追加 vector、rdf。向量使用精确 collection/point 元组；RDF 与写入共用规范 ground quad 快照与保序字节。工厂分离调用方数据，归一时一次去重。整通道锁范围涵盖两个新通道；typed prefix 仍只支持 text、bytes、record。TTL 接受向量 collection/point 目标，在原生操作前拒绝 RDF。不支持某通道的后端必须明确拒绝。
+
+## 向量与 RDF 查询作者入口
+
+`createVectorQuery<TPayload,TGroupable>(source, methods?)` 返回不可变 builder；声明正安全整数 `topK(k)` 后才有读取终点。原生 execute 接收 `IVectorQueryInput`：全部可译 payload conditions、最终 topK/minScore、withVector 与原 context。声明式条件跨函数谓词下推，org/TTL 仍由后端在排名前处理；函数只过滤原引擎命中，不补搜。withVector 缺省 false，显式开启后结果类型才包含 vector。exact:true 的 explain 标记 fullScan。groupBy:true 才提供标准分组，在原 topK 命中上单遍按 payload 自有标量字段分组，每组保留 perGroup 个原序命中。
+
+`createRdfQuery(source, pattern, methods?)` 捕获规范 ground pattern，保留省略 graph 的全 graph 语义。原生 execute 接收 `IRdfQueryInput`，其有序 steps 保留 where/follow/inverse/select 的原调用顺序；follow/inverse 只接受 ground IRI。当前读取单元提供原生安全前缀遍历与普通 limit；当前不能在客户端执行的遍历在 I/O 前拒绝 QUERY_NOT_PUSHABLE。RDF 客户端遍历、分页与写终点由后续单元补齐。
+
+两个作者入口复用记录查询的同一节点、planner、reader 与原 IStorageIterator，保留 asyncDisposeKey、取消、事务资源与清理首错。可选纯方法保留原函数引用；`VectorQueryMethod` 与 `RdfQueryMethod` 为同名冲突的规范保留表。
