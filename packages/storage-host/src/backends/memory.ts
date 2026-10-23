@@ -1,4 +1,7 @@
 import { asyncDisposeKey } from '@migaia/plugin-host'
+import { createBackendRevisionPort } from './revisions.js'
+import { createBackendKeyLockPort } from './key-locks.js'
+import type { IBackendChangeController } from '../core/change-controller.js'
 import {
   StorageContractError,
   StorageContractErrorCode,
@@ -12,6 +15,7 @@ import {
   snapshotSyncWriteOptions,
   encodeOrderedStorageKey,
   createTransactionOwner,
+  assertTransactionOwner,
   runTransactionOperation,
   useTransactionCapability,
   snapshotStorageKeyPrefix,
@@ -31,6 +35,24 @@ import {
   records,
   ttl,
   counter,
+  vector,
+  createVectorQuery,
+  compileStorageWhere,
+  compileStorageQueryCondition,
+  QueryOperator,
+  QueryOperation,
+  DeleteCountMode,
+  snapshotStorageVectorCollection,
+  snapshotStorageVector,
+  snapshotStorageVectorUpsert,
+  snapshotStorageVectorSearch,
+  type IStorageVectorPoint,
+  type IStorageVectorConfiguration,
+  type IVectorApi,
+  type IVectorCollection,
+  type IVectorHit,
+  type IVectorFilter,
+  type IQueryCondition,
   type ITtlTarget,
   type ITtlApi,
   type ICounterApi,
@@ -61,8 +83,10 @@ import {
   type IConflictPolicy,
   type IKeyRange
 } from '@migaia/storage-contract'
+import { parseObjectPath } from '@migaia/utils/object-path'
+import { rankMemoryVectors, recommendStorageVector } from './vector-core.js'
 import { detectServerRuntime } from '@migaia/utils'
-import { isUint8Array } from '@migaia/utils/bytes'
+import { isUint8Array, utf8ByteLength } from '@migaia/utils/bytes'
 import { StorageError, StorageErrorCode, type IStorageChannel } from '../errors.js'
 import { StorageErrorText } from '../error-text.js'
 import type { IStoragePluginCore } from '../types.js'
@@ -81,10 +105,20 @@ import { resolveStorageNamespace } from '../core/namespace.js'
 import { throwIfAborted, mergeSignals, withAbort } from '../core/operation.js'
 import { createStorageOperationReporter, reportCleanupError } from '../core/operation-reporter.js'
 import { observeStorageBatch } from '../core/batch-observation.js'
+import { StorageHookName } from '../hook-names.js'
+import {
+  snapshotMemoryCapacity,
+  createMemoryCapacityIndex,
+  memoryCapacityValueBytes,
+  type IMemoryCapacity,
+  type IMemoryCapacityOptions,
+  type IMemoryCapacityChange
+} from './memory-capacity.js'
 
 /** Memory options retain one private data universe for this concrete plugin instance. */
 export type IMemoryOptions = {
   readonly namespace?: string
+  readonly capacity?: IMemoryCapacityOptions
   readonly concurrency?: IConcurrencyPolicy
   readonly owner?: { readonly label?: string }
 }
@@ -122,14 +156,17 @@ type IMemoryEntry = {
   readonly key: IStorageKey
   readonly value: unknown
   readonly ordered: Uint8Array
+  readonly bytes?: number
 }
+/** Vector metadata shares the native maps and draft without becoming a legacy logical channel. */
+type IMemoryChannel = IStorageChannel | 'vector'
 /** A transaction retains its first deadline beside the existing detached value snapshot. */
 type IMemorySnapshot = IMemoryEntry & { readonly deadline?: number }
 /** This native unit supports only its actual three physical value channels. */
-type IMemoryTtlTarget = Extract<ITtlTarget, { readonly channel: 'text' | 'bytes' | 'record' }>
+type IMemoryTtlTarget = ITtlTarget
 /** A draft deletion remains distinct from an untouched identity. */
 type IMemoryDraft = IMemorySnapshot & {
-  readonly channel: IStorageChannel
+  readonly channel: IMemoryChannel
   readonly remove: boolean
   readonly encoded: string
 }
@@ -142,6 +179,7 @@ type IMemoryRootMutation<R> = {
     readonly lower: string
     readonly upper: string
   }[]
+  readonly capacityChanges?: () => readonly IMemoryCapacityChange[]
   run(): R
 }
 /** Text batches retain detached canonical keys and prepared values before lock admission. */
@@ -166,7 +204,8 @@ type IMemoryAtomicWork<T, R> = {
 /** Create the real native backend only from its original installed core. */
 export function createMemoryBackend<T = unknown>(
   core: IStoragePluginCore,
-  options: IMemoryOptions
+  options: IMemoryOptions,
+  capacity: IMemoryCapacity | undefined = snapshotMemoryCapacity(options)
 ) {
   /** Validate the configured target before allocating data or acquiring any native resource. */
   const namespace = resolveStorageNamespace(
@@ -174,49 +213,130 @@ export function createMemoryBackend<T = unknown>(
     core.defaultOrgId,
     core.defaultOrgId
   )
-  /** All three physical channels retain their original independent membership. */
-  const data = {
-    value: new Map<string, IMemoryEntry>(),
-    bytes: new Map<string, IMemoryEntry>(),
-    record: new Map<string, IMemoryEntry>()
-  }
-  /** Only expiring physical identities own metadata; no timer or expiry history is retained. */
-  const deadlines = new Map<string, number>()
-  /** Hash point reads and ordered ranges refer to the same physical entries in each channel. */
-  const ordered = {
-    value: createOrderedRecordIndex<IMemoryEntry>(),
-    bytes: createOrderedRecordIndex<IMemoryEntry>(),
-    record: createOrderedRecordIndex<IMemoryEntry>()
-  }
-  /** One revision owner covers writes, deletes and tombstones across the three channels. */
-  const revisions = core.createRevisionPort()
-  /** The physical instance owns this one provider; no other memory instance shares its locks. */
-  const locks = core.createKeyLockPort()
-  /** Original cleanup diagnostics never alter the committed data result. */
-  const report = createStorageOperationReporter()
-  /** Native deadlines and operation durations share the scheduler already captured by this host. */
-  const scheduler = core.featureExpose.getScheduler()
-  /** Symbol cleanup retains its own cached derivative of the controller's primary Promise. */
-  let symbolic: Promise<void> | undefined
-  /** Capabilities are published on the original mutable base, with one captured installer. */
-  let installer!: ICapabilityInstallPort
-  /** The sole original transaction owner is initialized after the complete base exists. */
-  let owner!: ReturnType<typeof createTransactionOwner<T>>
-  /** Original controller supplies lifecycle leases and committed local change notifications. */
+  /** Every namespace belongs to this installed physical backend and its one lifecycle controller. */
+  const namespaces = new Map<string, ReturnType<typeof createMemoryNamespace<T>>>()
+  /** One controller owns admission, event sequence and final cleanup for all native namespaces. */
   const controller = core.createChangeController({
     backend: STORAGE_MEMORY_BACKEND,
     options: { namespace },
     finalize: async () => {
-      await locks.dispose()
-      for (const channel of MemoryState.channels) {
-        data[channel].clear()
-        ordered[channel].clear()
-      }
-      for (const channel of MemoryState.channels)
-        revisions.clear(channel === 'value' ? 'text' : channel)
-      deadlines.clear()
+      for (const physical of namespaces.values()) await physical.finalize()
+      namespaces.clear()
     }
   })
+  /** Native projections allocate data only on demand, without DDL, registry writes or new lifetimes. */
+  const forOrg = (orgId: string) => {
+    controller.assertLive()
+    const target = resolveStorageNamespace(namespace, orgId, core.defaultOrgId)
+    const existing = namespaces.get(target)
+    if (existing !== undefined) return existing
+    const ports = core.getOrgContext(orgId)
+    const physical = createMemoryNamespace<T>(
+      { ...core, ...ports },
+      options,
+      controller,
+      orgId,
+      orgId === core.defaultOrgId,
+      capacity
+    )
+    namespaces.set(target, physical)
+    return physical
+  }
+  /** Default host calls and explicit default-org views resolve the exact same physical namespace. */
+  const physical = forOrg(core.defaultOrgId)
+  return {
+    ...physical,
+    controller,
+    orgBinding: {
+      backend: (orgId: string) => forOrg(orgId).store,
+      drop: async (orgId: string) => {
+        await forOrg(orgId).store.clearAll()
+      }
+    },
+    assertScope: (scope: ITransactionScope) => {
+      for (const physical of namespaces.values()) {
+        try {
+          assertTransactionOwner(physical.store, scope)
+          return
+        } catch (error) {
+          if (
+            !(error instanceof StorageContractError) ||
+            error.code !== StorageContractErrorCode.invalidArgument
+          )
+            throw error
+        }
+      }
+      assertTransactionOwner(physical.store, scope)
+    }
+  }
+}
+
+/** Build native operations over one namespace while borrowing its registration's original lifetime. */
+function createMemoryNamespace<T>(
+  core: IStoragePluginCore,
+  options: IMemoryOptions,
+  controller: IBackendChangeController,
+  orgId: string,
+  root: boolean,
+  capacity: IMemoryCapacity | undefined
+) {
+  /** Physical membership, ordered ranges, deadline facts and lock admission share this namespace. */
+  const data = {
+    value: new Map<string, IMemoryEntry>(),
+    bytes: new Map<string, IMemoryEntry>(),
+    record: new Map<string, IMemoryEntry>(),
+    vector: new Map<string, IMemoryEntry>()
+  }
+  /** Collection metadata is private to this namespace and consumes no second physical entry. */
+  const vectorCollections = new Map<string, IStorageVectorConfiguration>()
+  /** Full physical clears include vector entries; legacy key replacement remains three-channel. */
+  const physicalChannels = [...MemoryState.channels, 'vector'] as const
+  /** Only live expiring identities retain deadline metadata. */
+  const deadlines = new Map<string, number>()
+  /** Optional policy metadata belongs only to this namespace's original physical rows. */
+  const capacityIndex = capacity === undefined ? undefined : createMemoryCapacityIndex(capacity)
+  /** Capacity can reclaim actual elapsed deadlines through the same compressed radix owner. */
+  const expiring =
+    capacity === undefined
+      ? undefined
+      : createOrderedRecordIndex<{
+          readonly channel: IMemoryChannel
+          readonly encoded: string
+        }>()
+  /** Ordered leaves index the same native data entries. */
+  const ordered = {
+    value: createOrderedRecordIndex<IMemoryEntry>(),
+    bytes: createOrderedRecordIndex<IMemoryEntry>(),
+    record: createOrderedRecordIndex<IMemoryEntry>(),
+    vector: createOrderedRecordIndex<IMemoryEntry>()
+  }
+  /** These original internal algorithms own only physical facts, without installation authority. */
+  const revisions = createBackendRevisionPort()
+  /** Each namespace has independent canonical locks under the one parent lifecycle. */
+  const locks = createBackendKeyLockPort()
+  /** Existing cleanup diagnostics retain their original reporter. */
+  const report = createStorageOperationReporter()
+  /** Native deadlines use the original captured scheduler. */
+  const scheduler = core.featureExpose.getScheduler()
+  /** Symbol cleanup retains its cached reporting derivative. */
+  let symbolic: Promise<void> | undefined
+  /** Feature publication borrows this native provider's original installer. */
+  let installer!: ICapabilityInstallPort
+  /** Native transaction views share this namespace's original canonical owner. */
+  let owner!: ReturnType<typeof createTransactionOwner<T>>
+  /** Root lifecycle finalization releases each namespace's physical facts exactly once. */
+  const finalize = async () => {
+    await locks.dispose()
+    for (const channel of physicalChannels) {
+      data[channel].clear()
+      ordered[channel].clear()
+      revisions.clear(channel === 'value' ? 'text' : channel)
+    }
+    deadlines.clear()
+    expiring?.clear()
+    capacityIndex?.clear()
+    vectorCollections.clear()
+  }
   /** Unknown backend callback failures gain their original memory transaction boundary. */
   const normalize = (cause: unknown, expiredScope?: true) =>
     isStorageErrorFamily(cause)
@@ -249,14 +369,104 @@ export function createMemoryBackend<T = unknown>(
     ...(pid === undefined ? {} : { pid })
   })
   /** One physical channel plus the existing flat wire gives an unambiguous revision identity. */
-  const identity = (channel: IStorageChannel, encoded: string): string =>
+  const identity = (channel: IMemoryChannel, encoded: string): string =>
     MemoryState.identity(channel, encoded)
   /** Revision changes remain independent of whether an entry is currently present. */
-  const revision = (channel: IStorageChannel, encoded: string): number =>
+  const revision = (channel: IMemoryChannel, encoded: string): number =>
     revisions.read(channel === 'value' ? 'text' : channel, encoded)
   /** Every successful physical change advances only its own channel's original revision. */
-  const bump = (channel: IStorageChannel, encoded: string): void => {
+  const bump = (channel: IMemoryChannel, encoded: string): void => {
     revisions.write(channel === 'value' ? 'text' : channel, encoded)
+  }
+  /** One deadline mutation keeps the original Map and optional candidate index synchronized. */
+  const setDeadline = (
+    channel: IMemoryChannel,
+    encoded: string,
+    deadline: number | undefined
+  ): void => {
+    /** Existing canonical identity and old clock fact identify the exact expiry leaf to replace. */
+    const id = identity(channel, encoded)
+    /** No secondary expiry structure exists on the original unbounded path. */
+    const previous = deadlines.get(id)
+    if (expiring !== undefined && previous !== undefined)
+      expiring.delete(encodeOrderedStorageKey([previous, channel, encoded], STORAGE_MEMORY_BACKEND))
+    if (deadline === undefined) deadlines.delete(id)
+    else {
+      deadlines.set(id, deadline)
+      expiring?.set(encodeOrderedStorageKey([deadline, channel, encoded], STORAGE_MEMORY_BACKEND), {
+        channel,
+        encoded
+      })
+    }
+  }
+  /** Accounting never inspects record values unless the explicit byte limit needs their encoding. */
+  const entryBytes = (channel: IMemoryChannel, value: unknown): number => {
+    if (capacity?.maxBytes === undefined) return 0
+    if (channel === 'value') return utf8ByteLength(value as string)
+    if (channel === 'bytes') return (value as Uint8Array).byteLength
+    if (channel === 'vector') {
+      /** Native JS number components are binary64; this is accounting, not a portable vector wire. */
+      const point = value as IStorageVectorPoint<unknown>
+      return (
+        point.vector.length * Float64Array.BYTES_PER_ELEMENT +
+        (point.payload === undefined ? 0 : memoryCapacityValueBytes(point.payload))
+      )
+    }
+    return memoryCapacityValueBytes(value)
+  }
+  /** One already owned physical identity is shared by the native entry and its policy metadata. */
+  const capacityFact = (
+    channel: IMemoryChannel,
+    key: IStorageKey,
+    bytes?: number
+  ): IMemoryCapacityChange => {
+    /** Encoding follows the original flat-key owner, not a capacity-specific key format. */
+    const encoded = encodeFlatStorageKey(key)
+    return { id: identity(channel, encoded), channel, encoded, key, bytes }
+  }
+  /** Capacity uses only native physical channels already known to this namespace. */
+  const capacityLock = (entry: IMemoryCapacityChange): ILockKey => {
+    if (entry.channel === 'value') return lockKey.text(entry.key)
+    if (entry.channel === 'bytes') return lockKey.bytes(entry.key as string)
+    if (entry.channel === 'vector') {
+      /** Vector rows already own the canonical collection/id tuple used by their lock owner. */
+      const key = entry.key as readonly [string, string]
+      return lockKey.vector(key[0], key[1])
+    }
+    return lockKey.record(entry.key)
+  }
+  /** Derive only elapsed deadline leaves, followed by actual policy victims of proposed writes. */
+  const planCapacity = (changes: readonly IMemoryCapacityChange[]) => {
+    /** An omitted capacity never allocates accounting or candidate work. */
+    if (capacityIndex === undefined || expiring === undefined) return undefined
+    /** Inclusive now is expressed through the original tuple-prefix upper bound. */
+    const upper = snapshotStorageKeyPrefix([scheduler.now()], STORAGE_MEMORY_BACKEND).upper
+    /** Actual expired rows alone enter the removal plan; no live-key table scan occurs. */
+    const expired: IMemoryCapacityChange[] = []
+    for (const leaf of expiring.range({ upper, upperOpen: true })) {
+      const { channel, encoded } = leaf.value
+      const entry = data[channel].get(encoded)
+      if (entry !== undefined) expired.push(capacityFact(channel, entry.key))
+    }
+    /** Preview restores the exact policy links before any lock wait or user callback can happen. */
+    const victims = capacityIndex.preview([...expired, ...changes])
+    /** Canonical point identities feed only the existing physical lock owner and its original FIFO. */
+    const identities = snapshotConcurrencyLockKeys(
+      [...expired, ...victims].map(capacityLock),
+      STORAGE_MEMORY_BACKEND
+    ).identities
+    return { expired, victims, identities }
+  }
+  /** Native metadata deletion is shared by expiry, explicit removal and committed capacity victims. */
+  const deletePhysical = (channel: IMemoryChannel, encoded: string): IMemoryEntry | undefined => {
+    const entry = data[channel].get(encoded)
+    if (entry === undefined) return undefined
+    data[channel].delete(encoded)
+    ordered[channel].delete(entry.ordered)
+    setDeadline(channel, encoded, undefined)
+    capacityIndex?.remove(identity(channel, encoded))
+    bump(channel, encoded)
+    return entry
   }
   /** Records and bytes detach ownership before an eviction or committed mutation occurs. */
   const clone = <V>(value: V, key?: IStorageKey): V => {
@@ -271,7 +481,7 @@ export function createMemoryBackend<T = unknown>(
     }
   }
   /** Memory values use one original clone rule for reads, writes and drafts. */
-  const copyValue = (channel: IStorageChannel, value: unknown, key: IStorageKey): unknown =>
+  const copyValue = (channel: IMemoryChannel, value: unknown, key: IStorageKey): unknown =>
     channel === 'value'
       ? value
       : channel === 'bytes'
@@ -305,16 +515,72 @@ export function createMemoryBackend<T = unknown>(
       })
     return copyValue(channel, value, key)
   }
+  /**
+   * Explicit capacity holds only this native turn's events until all data and victims are
+   * committed.
+   */
+  let pendingChanges:
+    | {
+        readonly channel: IMemoryChannel
+        readonly kind: IStorageChange['kind']
+        readonly keys?: readonly IStorageKey[]
+      }[]
+    | undefined
   /** Notifications retain original commit-after eviction order. */
   const publish = (
-    channel: IStorageChannel,
+    channel: IMemoryChannel,
     kind: IStorageChange['kind'],
     keys?: readonly IStorageKey[]
   ): void => {
-    controller.publish({ channel, kind, ...(keys === undefined ? {} : { keys }) })
+    if (pendingChanges !== undefined) {
+      pendingChanges.push({ channel, kind, keys })
+      return
+    }
+    controller.publish({
+      channel: channel === 'vector' ? 'all' : channel,
+      kind,
+      orgId,
+      ...(keys === undefined ? {} : { keys })
+    })
+  }
+  /** Capacity mutations and their events share the original final synchronous native turn. */
+  const commitCapacity = <R>(plan: ReturnType<typeof planCapacity>, run: () => R): R => {
+    if (plan === undefined) return run()
+    pendingChanges = []
+    /** Counts retain only actual capacity removals, never ordinary expiry or user values. */
+    const counts = new Map<IMemoryChannel, number>()
+    try {
+      for (const entry of plan.expired) {
+        const removed = deletePhysical(entry.channel as IMemoryChannel, entry.encoded)
+        if (removed !== undefined) publish(entry.channel as IMemoryChannel, 'remove', [removed.key])
+      }
+      /** Input preparation and final lock checks have already completed before this callback. */
+      const result = run()
+      for (const entry of plan.victims) {
+        const channel = entry.channel as IMemoryChannel
+        const removed = deletePhysical(channel, entry.encoded)
+        if (removed === undefined) continue
+        publish(channel, 'remove', [removed.key])
+        counts.set(channel, (counts.get(channel) ?? 0) + 1)
+      }
+      return result
+    } finally {
+      /** Clear the native event buffer before observers can synchronously reenter this store. */
+      const changes = pendingChanges
+      pendingChanges = undefined
+      for (const change of changes) publish(change.channel, change.kind, change.keys)
+      for (const [channel, count] of counts)
+        core.emit(StorageHookName.onEvict, () => ({
+          backendId: core.getBackendId(),
+          backend: STORAGE_MEMORY_BACKEND,
+          orgId,
+          channel,
+          count
+        }))
+    }
   }
   /** Every physical access shares one deadline check and the original removal/revision path. */
-  const liveEntry = (channel: IStorageChannel, encoded: string): IMemoryEntry | undefined => {
+  const liveEntry = (channel: IMemoryChannel, encoded: string): IMemoryEntry | undefined => {
     /** Physical membership and deadline use the same canonical channel/key identity. */
     const entry = data[channel].get(encoded)
     /** Omitted deadlines remain unlimited, including keys first written before TTL is used. */
@@ -322,10 +588,7 @@ export function createMemoryBackend<T = unknown>(
     /** The original monotonic clock is consulted once for this physical access. */
     const deadline = deadlines.get(id)
     if (entry !== undefined && deadline !== undefined && deadline <= scheduler.now()) {
-      data[channel].delete(encoded)
-      ordered[channel].delete(entry.ordered)
-      deadlines.delete(id)
-      bump(channel, encoded)
+      deletePhysical(channel, encoded)
       publish(channel, 'remove', [entry.key])
       return undefined
     }
@@ -336,7 +599,8 @@ export function createMemoryBackend<T = unknown>(
     channel: IStorageChannel,
     key: IStorageKey,
     value: unknown,
-    policy: IConflictPolicy = 'conflict'
+    policy: IConflictPolicy = 'conflict',
+    bytes = entryBytes(channel, value)
   ): void => {
     controller.assertLive()
     /** Snapshot and prepare before touching any conflicting channel. */
@@ -356,15 +620,13 @@ export function createMemoryBackend<T = unknown>(
     /** Shared conflict policy owns one removal order for all backends. */
     const plan = planChannelWrite(captured, channel, existing, policy, STORAGE_MEMORY_BACKEND)
     for (const previous of plan.remove) {
-      data[previous].delete(encoded)
-      ordered[previous].delete(keyBytes)
-      deadlines.delete(identity(previous, encoded))
-      bump(previous, encoded)
+      deletePhysical(previous, encoded)
     }
     /** The hash and radix owners share this exact committed entry reference. */
-    const entry = { key: captured, value: prepared, ordered: keyBytes }
+    const entry = { key: captured, value: prepared, ordered: keyBytes, bytes }
     data[channel].set(encoded, entry)
     ordered[channel].set(keyBytes, entry)
+    capacityIndex?.put({ ...capacityFact(channel, captured), bytes })
     bump(channel, encoded)
     for (const previous of plan.remove) publish(previous, 'remove', [captured])
     publish(channel, 'put', [captured])
@@ -379,10 +641,7 @@ export function createMemoryBackend<T = unknown>(
     /** The actual entry already owns the canonical ordered bytes needed for removal. */
     const entry = liveEntry(channel, encoded)
     if (!entry) return
-    data[channel].delete(encoded)
-    ordered[channel].delete(entry.ordered)
-    deadlines.delete(identity(channel, encoded))
-    bump(channel, encoded)
+    deletePhysical(channel, encoded)
     publish(channel, 'remove', [captured])
   }
   /** Clear invalidates the actual channel snapshot even when membership was already empty. */
@@ -390,7 +649,10 @@ export function createMemoryBackend<T = unknown>(
     controller.assertLive()
     /** Preserve the original rule that an empty clear emits no notification. */
     const changed = data[channel].size !== 0
-    for (const encoded of data[channel].keys()) deadlines.delete(identity(channel, encoded))
+    for (const encoded of data[channel].keys()) {
+      setDeadline(channel, encoded, undefined)
+      capacityIndex?.remove(identity(channel, encoded))
+    }
     data[channel].clear()
     ordered[channel].clear()
     revisions.clear(channel === 'value' ? 'text' : channel)
@@ -403,6 +665,7 @@ export function createMemoryBackend<T = unknown>(
     const captured = snapshotStorageKey(key, STORAGE_MEMORY_BACKEND)
     /** Reading never allocates a revision or changes physical membership. */
     const entry = liveEntry(channel, encodeFlatStorageKey(captured))
+    if (entry !== undefined) capacityIndex?.touch(identity(channel, encodeFlatStorageKey(captured)))
     return entry === undefined ? undefined : copyValue(channel, entry.value, captured)
   }
   /** Replace admits every possible displaced channel in the same fixed canonical order. */
@@ -421,7 +684,7 @@ export function createMemoryBackend<T = unknown>(
             : []
     )
   /** One finite range per affected channel uses the original contract's encoded identity bounds. */
-  const mutationRanges = (channels: readonly IStorageChannel[]) =>
+  const mutationRanges = (channels: readonly IMemoryChannel[]) =>
     channels.map((channel) => {
       /** Physical text identity is shared by scalar and typed transaction text keys. */
       const target: ILockKey['channel'] = channel === 'value' ? 'text' : channel
@@ -457,9 +720,25 @@ export function createMemoryBackend<T = unknown>(
     const captured = snapshotStorageKey(key, STORAGE_MEMORY_BACKEND)
     /** A clone failure cannot remove a displaced row or acquire a logical key. */
     const prepared = prepare(channel, value, captured)
+    /** Byte-domain admission precedes every possible displaced channel or draft mutation. */
+    const bytes = entryBytes(channel, prepared)
     return {
       keys: mutationKeys(channel, captured, policy),
-      run: () => write(channel, captured, prepared, policy)
+      capacityChanges:
+        capacity === undefined
+          ? undefined
+          : () => {
+              /** Only the same logical key's original conflict channels participate in replacement. */
+              const changes: IMemoryCapacityChange[] =
+                policy === 'replace'
+                  ? MemoryState.channels
+                      .filter((current) => current !== channel)
+                      .map((current) => capacityFact(current, captured))
+                  : []
+              changes.push(capacityFact(channel, captured, bytes))
+              return changes
+            },
+      run: () => write(channel, captured, prepared, policy, bytes)
     }
   }
   /** Root writes reuse the original execution list, policy loop, member lease and lock provider. */
@@ -473,6 +752,8 @@ export function createMemoryBackend<T = unknown>(
     let capturedInput = input
     /** The sole derivation captures inputs and affected keys once, before any native attempt. */
     let mutation!: IMemoryRootMutation<R>
+    /** The last readonly preflight is consumed immediately by the same native synchronous terminal. */
+    let capacityPlan: ReturnType<typeof planCapacity>
     return runWithConcurrency(
       {
         store: base,
@@ -501,10 +782,20 @@ export function createMemoryBackend<T = unknown>(
           locks.attemptWrite(
             attempt,
             holding(),
-            mutation.run,
+            () => commitCapacity(capacityPlan, mutation.run),
             core.stageBindings.concurrencyStages(store),
             controller.closingSignal,
-            mutation.ranges
+            mutation.ranges,
+            undefined,
+            capacity === undefined
+              ? undefined
+              : () => {
+                  capacityPlan =
+                    mutation.capacityChanges === undefined
+                      ? undefined
+                      : planCapacity(mutation.capacityChanges())
+                  return capacityPlan?.identities ?? []
+                }
           )
       }
     )
@@ -513,14 +804,16 @@ export function createMemoryBackend<T = unknown>(
   const clearAll = (): void => {
     controller.assertLive()
     /** Empty physical channels still advance epochs without manufacturing change notifications. */
-    const changed = MemoryState.channels.some((channel) => data[channel].size !== 0)
-    for (const channel of MemoryState.channels) {
+    const changed = physicalChannels.some((channel) => data[channel].size !== 0)
+    for (const channel of physicalChannels) {
       data[channel].clear()
       ordered[channel].clear()
       revisions.clear(channel === 'value' ? 'text' : channel)
     }
     deadlines.clear()
-    if (changed) controller.publish({ channel: 'all', kind: 'clear' })
+    expiring?.clear()
+    capacityIndex?.clear()
+    if (changed) controller.publish({ channel: 'all', kind: 'clear', orgId })
   }
   /** Channel selection is captured before the shared provider's final synchronous range check. */
   const clearEntry = (
@@ -530,7 +823,7 @@ export function createMemoryBackend<T = unknown>(
   ): Promise<void> =>
     mutationEntry(operation, channel, ctx, (captured) => ({
       keys: [],
-      ranges: mutationRanges(captured === undefined ? MemoryState.channels : [captured]),
+      ranges: mutationRanges(captured === undefined ? physicalChannels : [captured]),
       run: () => (captured === undefined ? clearAll() : clear(captured))
     }))
 
@@ -628,6 +921,8 @@ export function createMemoryBackend<T = unknown>(
     }
     /** Each pipeline fixes this attempt's original callback or detached native batch. */
     let work: IMemoryAtomicWork<T, R>
+    /** Only actual previous-attempt victim identities feed the original policy's waiting admission. */
+    let capacityIdentities: readonly string[] = []
     return runWithConcurrency<Awaited<R>>(
       {
         store: base,
@@ -646,10 +941,16 @@ export function createMemoryBackend<T = unknown>(
           locks.attempt(
             attempt,
             holding(),
-            { attempt: () => transact(work.invoke, attempt, work.ranges) },
+            {
+              attempt: () =>
+                transact(work.invoke, attempt, work.ranges, (identities) => {
+                  capacityIdentities = identities
+                })
+            },
             core.stageBindings.concurrencyStages(store),
             controller.closingSignal,
-            work.ranges
+            work.ranges,
+            capacity === undefined ? undefined : () => capacityIdentities
           )
       }
     ).finally(() => release?.())
@@ -690,7 +991,22 @@ export function createMemoryBackend<T = unknown>(
               options.conflictPolicy
             )
             assertUnlocked(mutation.keys)
-            mutation.run()
+            /**
+             * Synchronous writes share exact victim planning but reject a busy victim without
+             * waiting.
+             */
+            const plan =
+              mutation.capacityChanges === undefined
+                ? undefined
+                : planCapacity(mutation.capacityChanges())
+            const held = plan === undefined ? undefined : locks.probe(plan.identities)
+            if (held !== undefined)
+              throw new StorageContractError(StorageContractErrorCode.lockRejected, {
+                backend: STORAGE_MEMORY_BACKEND,
+                keys: [held.key],
+                holder: held.holder
+              })
+            commitCapacity(plan, mutation.run)
           }
         ),
       remove: (key) =>
@@ -824,7 +1140,9 @@ export function createMemoryBackend<T = unknown>(
       }),
     subscribeChanges: (listener) => {
       controller.assertLive()
-      return controller.subscribe(listener)
+      return controller.subscribe((change) => {
+        if (root || change.orgId === orgId) listener(change)
+      })
     },
     dispose: () => controller.dispose(),
     [asyncDisposeKey]: () =>
@@ -856,6 +1174,30 @@ export function createMemoryBackend<T = unknown>(
   ): IStorageIterator<[IStorageKey, T]> {
     /** Bounds capture at construction; data membership and values capture on the first actual next. */
     const captured = orderedRange(range)
+    return nativeIterator(
+      MemoryOperation.iterateRecords,
+      ctx,
+      () =>
+        [...ordered.record.range(captured)]
+          .map((leaf) => {
+            const encoded = encodeFlatStorageKey(leaf.value.key)
+            const entry = liveEntry('record', encoded)
+            if (entry !== undefined) capacityIndex?.touch(identity('record', encoded))
+            return entry
+          })
+          .filter((entry): entry is IMemoryEntry => entry !== undefined),
+      (row): [IStorageKey, T] => [clone(row.key), clone(row.value) as T]
+    )
+  }
+
+  /** Native families reuse this original memory generator and its cached cleanup/signal owner. */
+  function nativeIterator<V, R>(
+    operation: string,
+    ctx: IOperationContext | undefined,
+    select: () => readonly V[],
+    project: (row: V) => R,
+    beforeNext?: () => void
+  ): IStorageIterator<R> {
     /** This actual iterator alone owns its timeout and caller abort subscriptions. */
     const merged = mergeSignals(ctx, report)
     /** The primary cleanup Promise seals further native advances synchronously. */
@@ -863,19 +1205,17 @@ export function createMemoryBackend<T = unknown>(
     /** Symbolic disposal reports once through its separately cached derivative. */
     let symbolic: Promise<void> | undefined
     /** Iterator return shares the same cleanup while retaining its own result Promise. */
-    let returned: Promise<IteratorResult<[IStorageKey, T]>> | undefined
+    let returned: Promise<IteratorResult<R>> | undefined
     /** The generator supplies serialization of native next/return without another resource queue. */
     const native = (async function* () {
       controller.assertLive()
       throwIfAborted(merged.signal)
       /** Committed values are immutable to callers and snapshot with native membership. */
-      const rows = [...ordered.record.range(captured)]
-        .map((leaf) => liveEntry('record', encodeFlatStorageKey(leaf.value.key)))
-        .filter((entry): entry is IMemoryEntry => entry !== undefined)
+      const rows = select()
       for (const row of rows) {
         controller.assertLive()
         throwIfAborted(merged.signal)
-        yield [clone(row.key), clone(row.value)] as [IStorageKey, T]
+        yield project(row)
       }
     })()
     /**
@@ -891,10 +1231,10 @@ export function createMemoryBackend<T = unknown>(
         }
       }))
     return {
-      next: () =>
-        core.execution.run(
-          { operation: MemoryOperation.iterateRecords, input: undefined, ctx },
-          async () => {
+      next: () => {
+        try {
+          beforeNext?.()
+          return core.execution.run({ operation, input: undefined, ctx }, async () => {
             if (disposal) {
               await disposal
               return { done: true, value: undefined }
@@ -908,8 +1248,11 @@ export function createMemoryBackend<T = unknown>(
               await dispose()
               throw cause
             }
-          }
-        ),
+          })
+        } catch (cause) {
+          return Promise.reject(cause)
+        }
+      },
       return: (value) => (returned ??= dispose().then(() => ({ done: true, value }))),
       dispose,
       [asyncDisposeKey]: () =>
@@ -924,31 +1267,34 @@ export function createMemoryBackend<T = unknown>(
   async function transact<R>(
     run: (scope: IMemoryScope<T>, draft: IMemoryTextDraft) => R,
     ctx: IConcurrencyAttemptContext,
-    protectedRanges?: IMemoryRootMutation<unknown>['ranges']
+    protectedRanges?: IMemoryRootMutation<unknown>['ranges'],
+    setCapacityIdentities?: (identities: readonly string[]) => void
   ): Promise<IConcurrencyAttempt<Awaited<R>>> {
     controller.assertLive()
     throwIfAborted(ctx.signal)
+    setCapacityIdentities?.([])
     /** Only touched identities retain draft entries; rollback never rewrites committed maps. */
     const draft = new Map<string, IMemoryDraft>()
     /** Each channel draft reuses the same compressed radix implementation, including tombstones. */
     const draftOrdered = {
       value: createOrderedRecordIndex<IMemoryDraft>(),
       bytes: createOrderedRecordIndex<IMemoryDraft>(),
-      record: createOrderedRecordIndex<IMemoryDraft>()
+      record: createOrderedRecordIndex<IMemoryDraft>(),
+      vector: createOrderedRecordIndex<IMemoryDraft>()
     }
     /** First reads are repeatable until a write in this attempt replaces their snapshot. */
     const snapshots = new Map<string, IMemorySnapshot | undefined>()
     /** Per-key tombstone revisions detect delete/reinsert and other ABA writes. */
     const expected = new Map<
       string,
-      { channel: IStorageChannel; encoded: string; key: IStorageKey; revision: number }
+      { channel: IMemoryChannel; encoded: string; key: IStorageKey; revision: number }
     >()
     /** A clear invalidates only channels already observed by this native attempt. */
-    const snapshotEpochs = new Map<IStorageChannel, number>()
+    const snapshotEpochs = new Map<IMemoryChannel, number>()
     /** The original owner retains the first asynchronous operation failure. */
     let failure: (Error & { readonly source: string; readonly code: string }) | undefined
     /** Capture the real revision once, before any draft read or write. */
-    const track = (channel: IStorageChannel, encoded: string, key: IStorageKey): string => {
+    const track = (channel: IMemoryChannel, encoded: string, key: IStorageKey): string => {
       if (!snapshotEpochs.has(channel))
         snapshotEpochs.set(channel, revisions.epoch(channel === 'value' ? 'text' : channel))
       /** Channel plus original flat key identifies one actual native row. */
@@ -959,7 +1305,7 @@ export function createMemoryBackend<T = unknown>(
     }
     /** First access captures value, deadline and revision once; later reads retain that snapshot. */
     const txSnapshot = (
-      channel: IStorageChannel,
+      channel: IMemoryChannel,
       encoded: string,
       key: IStorageKey
     ): IMemorySnapshot | undefined => {
@@ -977,6 +1323,7 @@ export function createMemoryBackend<T = unknown>(
                 key,
                 value: copyValue(channel, current.value, key),
                 ordered: current.ordered,
+                bytes: current.bytes,
                 deadline: deadlines.get(id)
               }
         )
@@ -984,7 +1331,7 @@ export function createMemoryBackend<T = unknown>(
       return snapshots.get(id)
     }
     /** Read own writes first; otherwise retain the first committed value in this attempt. */
-    const txEntry = (channel: IStorageChannel, key: IStorageKey): IMemorySnapshot | undefined => {
+    const txEntry = (channel: IMemoryChannel, key: IStorageKey): IMemorySnapshot | undefined => {
       /** Caller-owned keys detach before contributing to revision or draft identity. */
       const captured = snapshotStorageKey(key, STORAGE_MEMORY_BACKEND)
       /** Every channel uses the same canonical logical-key wire. */
@@ -998,13 +1345,15 @@ export function createMemoryBackend<T = unknown>(
         : txSnapshot(channel, encoded, captured)
     }
     /** Every mutable value returned from a retained native snapshot has independent ownership. */
-    const txRead = (channel: IStorageChannel, key: IStorageKey): unknown => {
+    const txRead = (channel: IMemoryChannel, key: IStorageKey): unknown => {
       /** Membership and an undefined-valued record remain separate facts. */
       const current = txEntry(channel, key)
+      if (current !== undefined)
+        capacityIndex?.touch(identity(channel, encodeFlatStorageKey(current.key)))
       return current === undefined ? undefined : copyValue(channel, current.value, current.key)
     }
     /** Membership shares the same first snapshot, including undefined-valued records. */
-    const txHas = (channel: IStorageChannel, encoded: string, key: IStorageKey): boolean => {
+    const txHas = (channel: IMemoryChannel, encoded: string, key: IStorageKey): boolean => {
       /** A tombstone masks physical membership until the attempt commits. */
       const proposed = draft.get(identity(channel, encoded))
       return proposed ? !proposed.remove : txSnapshot(channel, encoded, key) !== undefined
@@ -1033,6 +1382,8 @@ export function createMemoryBackend<T = unknown>(
       const encoded = encodeFlatStorageKey(captured)
       /** Clone caller-owned payload before mutating the draft. */
       const prepared = prepare(channel, value, captured)
+      /** Explicit byte-domain failure happens before staging any replacement or native victim. */
+      const bytes = entryBytes(channel, prepared)
       /** Channel conflict semantics are owned by the same shared plan as root writes. */
       const existing = new Set(
         MemoryState.channels.filter((current) => txHas(current, encoded, captured))
@@ -1056,6 +1407,7 @@ export function createMemoryBackend<T = unknown>(
         channel,
         key: captured,
         value: prepared,
+        bytes,
         remove: false,
         encoded,
         ordered: keyBytes,
@@ -1148,7 +1500,7 @@ export function createMemoryBackend<T = unknown>(
     const txTtl = (target: IMemoryTtlTarget, ms: number | undefined, persist: boolean): boolean => {
       /** A TTL target has already been captured by the original contract lock owner. */
       const channel = ttlChannel(target)
-      const current = txEntry(channel, target.key)
+      const current = txEntry(channel, ttlKey(target))
       if (current === undefined || (persist && current.deadline === undefined)) return false
       stageDraft({
         ...current,
@@ -1162,7 +1514,7 @@ export function createMemoryBackend<T = unknown>(
     /** Remaining duration observes the same retained transaction value and captured deadline. */
     const txRemaining = (target: IMemoryTtlTarget): number | undefined => {
       /** Missing and unlimited rows share the documented undefined result. */
-      const current = txEntry(ttlChannel(target), target.key)
+      const current = txEntry(ttlChannel(target), ttlKey(target))
       return current?.deadline === undefined
         ? undefined
         : Math.max(0, current.deadline - scheduler.now())
@@ -1480,7 +1832,12 @@ export function createMemoryBackend<T = unknown>(
               ? lockKey.text(entry.key)
               : entry.channel === 'bytes'
                 ? lockKey.bytes(entry.key as string)
-                : lockKey.record(entry.key)
+                : entry.channel === 'vector'
+                  ? lockKey.vector(
+                      (entry.key as readonly [string, string])[0],
+                      (entry.key as readonly [string, string])[1]
+                    )
+                  : lockKey.record(entry.key)
           ),
           holder: undefined,
           cause: new Error(
@@ -1494,42 +1851,87 @@ export function createMemoryBackend<T = unknown>(
           )
         }
       }
+      /** Final capacity admission shares the same original attempt, locks and no-await commit turn. */
+      const capacityPlan =
+        capacity === undefined
+          ? undefined
+          : planCapacity(
+              [...draft.values()].map((proposed) =>
+                capacityFact(
+                  proposed.channel,
+                  proposed.key,
+                  proposed.remove ||
+                    (proposed.deadline !== undefined && proposed.deadline <= scheduler.now())
+                    ? undefined
+                    : (proposed.bytes ?? 0)
+                )
+              )
+            )
+      setCapacityIdentities?.(capacityPlan?.identities ?? [])
+      const capacityHeld =
+        capacityPlan === undefined
+          ? undefined
+          : locks.probe(capacityPlan.identities, undefined, ctx)
+      if (capacityHeld !== undefined) {
+        void stage.afterRollback?.(StorageContractErrorCode.lockRejected)
+        return {
+          status: 'conflict',
+          phase: 'acquire',
+          keys: [capacityHeld.key],
+          holder: capacityHeld.holder
+        }
+      }
       /** Each channel reports one batch after all physical draft rows have committed. */
       const changed = {
         value: [] as IStorageKey[],
         bytes: [] as IStorageKey[],
-        record: [] as IStorageKey[]
+        record: [] as IStorageKey[],
+        vector: [] as IStorageKey[]
       }
-      for (const proposed of draft.values()) {
-        /** Existing draft identities retain their already captured logical key. */
-        const encoded = proposed.encoded
-        /** New deadlines that elapsed within this draft commit as immediate absence. */
-        if (
-          proposed.remove ||
-          (proposed.deadline !== undefined && proposed.deadline <= scheduler.now())
-        ) {
-          deadlines.delete(identity(proposed.channel, encoded))
-          if (!data[proposed.channel].delete(encoded)) continue
-          ordered[proposed.channel].delete(proposed.ordered)
-        } else {
-          /**
-           * An overwrite retains its original live ordered encoding instead of keeping duplicate
-           * key bytes.
-           */
-          const keyBytes = ordered[proposed.channel].get(proposed.ordered)?.key ?? proposed.ordered
-          const entry = { key: proposed.key, value: proposed.value, ordered: keyBytes }
-          data[proposed.channel].set(encoded, entry)
-          ordered[proposed.channel].set(keyBytes, entry)
-          if (proposed.deadline === undefined) deadlines.delete(identity(proposed.channel, encoded))
-          else deadlines.set(identity(proposed.channel, encoded), proposed.deadline)
+      commitCapacity(capacityPlan, () => {
+        for (const proposed of draft.values()) {
+          /** Existing draft identities retain their already captured logical key. */
+          const encoded = proposed.encoded
+          /** New deadlines that elapsed within this draft commit as immediate absence. */
+          if (
+            proposed.remove ||
+            (proposed.deadline !== undefined && proposed.deadline <= scheduler.now())
+          ) {
+            setDeadline(proposed.channel, encoded, undefined)
+            capacityIndex?.remove(identity(proposed.channel, encoded))
+            if (!data[proposed.channel].delete(encoded)) continue
+            ordered[proposed.channel].delete(proposed.ordered)
+          } else {
+            /**
+             * An overwrite retains its original live ordered encoding instead of keeping duplicate
+             * key bytes.
+             */
+            const keyBytes =
+              ordered[proposed.channel].get(proposed.ordered)?.key ?? proposed.ordered
+            const entry = {
+              key: proposed.key,
+              value: proposed.value,
+              ordered: keyBytes,
+              bytes: proposed.bytes
+            }
+            data[proposed.channel].set(encoded, entry)
+            ordered[proposed.channel].set(keyBytes, entry)
+            setDeadline(proposed.channel, encoded, proposed.deadline)
+            capacityIndex?.put({
+              ...capacityFact(proposed.channel, proposed.key),
+              bytes: proposed.bytes ?? 0
+            })
+          }
+          bump(proposed.channel, encoded)
+          changed[proposed.channel].push(proposed.key)
         }
-        bump(proposed.channel, encoded)
-        changed[proposed.channel].push(proposed.key)
-      }
-      for (const channel of MemoryState.channels)
-        if (changed[channel].length !== 0) publish(channel, 'batch', changed[channel])
+        for (const channel of physicalChannels)
+          if (changed[channel].length !== 0) publish(channel, 'batch', changed[channel])
+      })
       void stage.afterCommit?.(
-        MemoryState.channels.reduce((count, channel) => count + changed[channel].length, 0)
+        physicalChannels.reduce((count, channel) => count + changed[channel].length, 0) +
+          (capacityPlan?.expired.length ?? 0) +
+          (capacityPlan?.victims.length ?? 0)
       )
       return { status: 'committed', value }
     } catch (cause) {
@@ -1548,7 +1950,7 @@ export function createMemoryBackend<T = unknown>(
       snapshots.clear()
       expected.clear()
       snapshotEpochs.clear()
-      for (const channel of MemoryState.channels) draftOrdered[channel].clear()
+      for (const channel of physicalChannels) draftOrdered[channel].clear()
       void stage.onTransactionClose?.()
     }
   }
@@ -1660,16 +2062,17 @@ export function createMemoryBackend<T = unknown>(
   function captureTtlTarget(input: ITtlTarget): IMemoryTtlTarget {
     /** The original lock owner validates and detaches the complete channel-specific identity. */
     const target = snapshotStorageTtlTarget(input, STORAGE_MEMORY_BACKEND)
-    if (target.channel === 'text' || target.channel === 'bytes' || target.channel === 'record')
-      return target
-    throw new StorageContractError(StorageContractErrorCode.unsupported, {
-      backend: STORAGE_MEMORY_BACKEND
-    })
+    return target
   }
-  /** Only the canonical text tag differs from the original native value-channel name. */
-  function ttlChannel(target: IMemoryTtlTarget): IStorageChannel {
+  /** Only text differs from the original physical channel spelling. */
+  function ttlChannel(target: IMemoryTtlTarget): IMemoryChannel {
     return target.channel === 'text' ? 'value' : target.channel
   }
+  /** Vector locks and deadlines identify the same independently tagged collection/point key. */
+  function ttlKey(target: IMemoryTtlTarget): IStorageKey {
+    return target.channel === 'vector' ? [target.collection, target.id] : target.key
+  }
+
   /** One metadata mutation keeps the same physical value, revision and local notification owner. */
   const changeDeadline = (
     target: IMemoryTtlTarget,
@@ -1678,12 +2081,11 @@ export function createMemoryBackend<T = unknown>(
   ): boolean => {
     /** Canonical target snapshot has already detached every mutable key segment. */
     const channel = ttlChannel(target)
-    const encoded = encodeFlatStorageKey(target.key)
+    const encoded = encodeFlatStorageKey(ttlKey(target))
     const current = liveEntry(channel, encoded)
     const id = identity(channel, encoded)
     if (current === undefined || (persist && !deadlines.has(id))) return false
-    if (persist) deadlines.delete(id)
-    else deadlines.set(id, scheduler.now() + ms!)
+    setDeadline(channel, encoded, persist ? undefined : scheduler.now() + ms!)
     if (ms === 0) liveEntry(channel, encoded)
     else {
       bump(channel, encoded)
@@ -1705,7 +2107,7 @@ export function createMemoryBackend<T = unknown>(
       asyncEntry(MemoryOperation.ttlRemaining, target, ctx, (input) => {
         const target = captureTtlTarget(input)
         const channel = ttlChannel(target)
-        const encoded = encodeFlatStorageKey(target.key)
+        const encoded = encodeFlatStorageKey(ttlKey(target))
         if (liveEntry(channel, encoded) === undefined) return undefined
         const deadline = deadlines.get(identity(channel, encoded))
         return deadline === undefined ? undefined : Math.max(0, deadline - scheduler.now())
@@ -1725,17 +2127,418 @@ export function createMemoryBackend<T = unknown>(
         assertStringStorageKey(key, STORAGE_MEMORY_BACKEND)
         /** Decimal and overflow validation stays with the original contract helper. */
         const increment = snapshotStorageCounterIncrement(input.by, STORAGE_MEMORY_BACKEND)
+        /**
+         * The capacity preflight retains this attempt's exact native calculation for its final
+         * turn.
+         */
+        let capacityResult: ReturnType<typeof increment> | undefined
         return {
           keys: [lockKey.text(key)],
+          capacityChanges:
+            capacity === undefined
+              ? undefined
+              : () => {
+                  const encoded = encodeFlatStorageKey(key)
+                  const deadline = deadlines.get(identity('value', encoded))
+                  const current =
+                    deadline !== undefined && deadline <= scheduler.now()
+                      ? undefined
+                      : (data.value.get(encoded)?.value as string | undefined)
+                  capacityResult = increment(current)
+                  return [capacityFact('value', key, entryBytes('value', String(capacityResult)))]
+                },
           run: () => {
             /** This calculation and its write share one synchronous admitted native turn. */
-            const result = increment(read('value', key) as string | undefined)
+            const result = capacityResult ?? increment(read('value', key) as string | undefined)
             write('value', key, String(result))
             return result
           }
         }
       })
   }
+  /** New native capability calls check the same controller before the original registration runner. */
+  const vectorOperation = <R>(invoke: () => Promise<R>): Promise<R> => {
+    try {
+      controller.assertLive()
+      return invoke()
+    } catch (cause) {
+      return Promise.reject(cause)
+    }
+  }
+  /** Vector admission errors retain the shared contract identity and the actual native backend. */
+  function invalidVector(): never {
+    throw new StorageContractError(
+      StorageContractErrorCode.invalidArgument,
+      { backend: STORAGE_MEMORY_BACKEND },
+      StorageErrorText.memoryVectorArgument
+    )
+  }
+  /** Canonical payload filter translation reuses the original query compiler and membership Set. */
+  const vectorCondition = (filter: IVectorFilter): IQueryCondition => {
+    if ('all' in filter) return { kind: 'and', conditions: filter.all.map(vectorCondition) }
+    if ('any' in filter) return { kind: 'or', conditions: filter.any.map(vectorCondition) }
+    if ('not' in filter) return { kind: 'not', condition: vectorCondition(filter.not) }
+    /** The canonical path owner retains field segments and rejects inherited access. */
+    const path = parseObjectPath(filter.field).map(String)
+    if ('eq' in filter) return { kind: 'field', path, operator: QueryOperator.eq, value: filter.eq }
+    if ('in' in filter) return { kind: 'field', path, operator: QueryOperator.in, value: filter.in }
+    /** Two range operands remain one conjunction rather than a second evaluator. */
+    const conditions: IQueryCondition[] = []
+    if (filter.gte !== undefined)
+      conditions.push({ kind: 'field', path, operator: QueryOperator.gte, value: filter.gte })
+    if (filter.lte !== undefined)
+      conditions.push({ kind: 'field', path, operator: QueryOperator.lte, value: filter.lte })
+    return { kind: 'and', conditions }
+  }
+  /** One canonical tuple identifies the same vector row, revision, deadline and lock point. */
+  const vectorKey = (collection: string, id: string): readonly [string, string] => [collection, id]
+  /** Native IDs detach through the original key batch capture before any policy may wait. */
+  const vectorIds = (ids: readonly string[]): readonly string[] => {
+    /** The existing batch owner rejects malformed arrays without a second parser. */
+    const facts = snapshotStorageBatchKeys(ids, STORAGE_MEMORY_BACKEND)
+    /** Only first occurrences enter physical admission; repeated public IDs remain harmless. */
+    const result: string[] = []
+    for (const [index, fact] of facts.entries()) {
+      assertStringStorageKey(fact.key, STORAGE_MEMORY_BACKEND)
+      if (fact.firstIndex === index) result.push(fact.key)
+    }
+    return result
+  }
+  /** Physical deletion includes lazy-expired rows and changes the original revision once. */
+  const removeVector = (collection: string, id: string): boolean => {
+    /** Each prepared ID uses the original key encoding without a new point registry. */
+    const encoded = encodeFlatStorageKey(vectorKey(collection, id))
+    /** The actual physical row determines whether this delete contributes to the result. */
+    const current = data.vector.get(encoded)
+    if (current === undefined) return false
+    deletePhysical('vector', encoded)
+    return true
+  }
+  /** Each collection borrows this namespace's original execution, data and resource lifetime. */
+  const vectors: IVectorApi = {
+    collection: <TPayload>(
+      name: string,
+      options?: IStorageVectorConfiguration
+    ): IVectorCollection<TPayload> => {
+      controller.assertLive()
+      /** Optional configuration capture performs no lookup or native operation by itself. */
+      const captured = snapshotStorageVectorCollection(name, options, STORAGE_MEMORY_BACKEND)
+      /** Repeated descriptors resolve the same metadata, while incompatible declarations reject. */
+      const existing = vectorCollections.get(captured.name)
+      /** New collections require real dimensions and never infer them from a later write. */
+      const configuration = existing ?? captured.options
+      if (
+        configuration === undefined ||
+        (existing !== undefined &&
+          captured.options !== undefined &&
+          (existing.dimensions !== captured.options.dimensions ||
+            existing.metric !== captured.options.metric))
+      )
+        invalidVector()
+      vectorCollections.set(captured.name, configuration)
+      /** Prefix bytes localize only this collection in the existing physical vector radix. */
+      const bounds = snapshotStorageKeyPrefix([captured.name], STORAGE_MEMORY_BACKEND)
+      /** Stored point values are canonical snapshots and remain inaccessible to application code. */
+      const point = (id: string): IStorageVectorPoint<TPayload> | undefined => {
+        const encoded = encodeFlatStorageKey(vectorKey(captured.name, id))
+        const entry = liveEntry('vector', encoded)
+        if (entry !== undefined) capacityIndex?.touch(identity('vector', encoded))
+        return entry?.value as IStorageVectorPoint<TPayload> | undefined
+      }
+      /** Search removes expired rows before filtering/scoring; physical deleteWhere retains them. */
+      const points = function* (physical = false): IterableIterator<IStorageVectorPoint<TPayload>> {
+        /** The original radix locates this collection without retaining all candidate references. */
+        let leaf = ordered.vector.lowerBound(bounds.lower)
+        while (leaf !== undefined && compareRecordIndexKeys(leaf.key, bounds.upper) < 0) {
+          /** Expiry or a caller delete can unlink this leaf before the generator resumes. */
+          const next = leaf.next
+          /** Physical deletion includes expired matches; ranking reclaims them before scoring. */
+          const entry = physical
+            ? leaf.value
+            : liveEntry('vector', encodeFlatStorageKey(leaf.value.key))
+          if (entry !== undefined) {
+            if (!physical) capacityIndex?.touch(identity('vector', encodeFlatStorageKey(entry.key)))
+            yield entry.value as IStorageVectorPoint<TPayload>
+          }
+          leaf = next
+        }
+      }
+      /** Output payloads/vectors detach only for selected native hits, preserving bounded work. */
+      const output = (
+        hit: ReturnType<typeof rankMemoryVectors<TPayload>>[number],
+        withVector: boolean,
+        withPayload: boolean
+      ): IVectorHit<TPayload, boolean> => ({
+        id: hit.point.id,
+        score: hit.score,
+        ...(withPayload && hit.point.payload !== undefined
+          ? { payload: clone(hit.point.payload) }
+          : {}),
+        ...(withVector ? { vector: [...hit.point.vector] } : {})
+      })
+      /** A source keeps one immutable resolver; canonical query nodes still own every refinement. */
+      const query = (
+        resolve: () => { query: readonly number[]; exclude: ReadonlySet<string> },
+        metric: IStorageVectorConfiguration['metric']
+      ) =>
+        createVectorQuery<TPayload>(
+          {
+            asyncDisposeKey,
+            exact: true,
+            pushdown: {
+              source: MemoryState.querySource,
+              operations: [QueryOperation.where, QueryOperation.topK, QueryOperation.minScore],
+              operators: Object.values(QueryOperator)
+            },
+            execute: (input) => {
+              controller.assertLive()
+              return nativeIterator(
+                MemoryOperation.vectorSearch,
+                input.ctx,
+                () => {
+                  /**
+                   * Samples resolve once within this native execution and never during
+                   * construction.
+                   */
+                  const selected = resolve()
+                  if (input.topK === 0) return []
+                  /**
+                   * Native canonical conditions use the sole original compiler, including one in
+                   * Set.
+                   */
+                  const predicates = input.conditions.map((condition) =>
+                    compileStorageQueryCondition<TPayload | undefined>(condition)
+                  )
+                  return rankMemoryVectors(
+                    points(),
+                    selected.query,
+                    metric,
+                    input.topK,
+                    input.minScore,
+                    (point) =>
+                      !selected.exclude.has(point.id) &&
+                      predicates.every((predicate) => predicate(point.payload))
+                  ).map((hit): readonly [IStorageKey, IVectorHit<TPayload, boolean>] => [
+                    hit.point.id,
+                    output(hit, input.withVector, true)
+                  ])
+                },
+                (row) => row,
+                () => controller.assertLive()
+              )
+            }
+          },
+          core.getChainMethods('vector')
+        )
+      return {
+        near: (input, options) => {
+          controller.assertLive()
+          return captureBatch(() => {
+            if (
+              options !== undefined &&
+              (typeof options !== 'object' || options === null || Array.isArray(options))
+            )
+              invalidVector()
+            /** Optional request fields are read once before the immutable source captures them. */
+            const inputMetric = options?.metric
+            const metric = inputMetric === undefined ? configuration.metric : inputMetric
+            /** Memory is exact for either request; malformed explicit options still reject. */
+            const exact = options?.exact
+            if (exact !== undefined && typeof exact !== 'boolean') invalidVector()
+            /** The original component owner snapshots the query and the requested metric. */
+            const components = snapshotStorageVector(
+              input,
+              { dimensions: configuration.dimensions, metric },
+              STORAGE_MEMORY_BACKEND
+            )
+            return query(() => ({ query: components, exclude: new Set<string>() }), metric)
+          })
+        },
+        similarTo: (id) => {
+          controller.assertLive()
+          assertStringStorageKey(id, STORAGE_MEMORY_BACKEND)
+          return query(() => {
+            /** A missing/expired sample is rejected before native candidates are ranked. */
+            const sample = point(id)
+            if (sample === undefined) invalidVector()
+            return {
+              query: snapshotStorageVector(sample.vector, configuration, STORAGE_MEMORY_BACKEND),
+              exclude: new Set([id])
+            }
+          }, configuration.metric)
+        },
+        recommend: (input) => {
+          controller.assertLive()
+          /** The original key batch owner detaches ID arrays before their asynchronous use. */
+          const samples = captureBatch(() => {
+            if (typeof input !== 'object' || input === null || Array.isArray(input)) invalidVector()
+            const { positive, negative } = input
+            const positiveIds = vectorIds(positive)
+            const negativeIds = vectorIds(negative === undefined ? [] : negative)
+            if (positiveIds.length === 0) invalidVector()
+            const exclude = new Set([...positiveIds, ...negativeIds])
+            if (exclude.size !== positiveIds.length + negativeIds.length) invalidVector()
+            return { positiveIds, negativeIds, exclude }
+          })
+          return query(() => {
+            /** Every requested sample resolves against this collection and immutable organization. */
+            const load = (id: string): readonly number[] => {
+              const sample = point(id)
+              if (sample === undefined) invalidVector()
+              return sample.vector
+            }
+            const positive = samples.positiveIds.map(load)
+            const negative = samples.negativeIds.map(load)
+            const combined = recommendStorageVector(
+              positive as [readonly number[], ...(readonly number[])[]],
+              negative
+            )
+            return {
+              query: snapshotStorageVector(combined, configuration, STORAGE_MEMORY_BACKEND),
+              exclude: samples.exclude
+            }
+          }, configuration.metric)
+        },
+        upsert: (points, ctx) =>
+          vectorOperation(() =>
+            mutationEntry(MemoryOperation.vectorUpsert, points, ctx, (input, context) => {
+              /** Full-batch capture occurs before any original lock wait or physical mutation. */
+              const prepared = snapshotStorageVectorUpsert(
+                input,
+                configuration,
+                STORAGE_MEMORY_BACKEND
+              )
+              /** Complete canonical payload encoding also finishes before the first native put. */
+              const sizes = prepared.map((point) => entryBytes('vector', point))
+              /**
+               * Extension fields came from the original concurrency snapshot, never a second raw
+               * read.
+               */
+              const ttlMs = Reflect.get(context, 'ttlMs') as number | undefined
+              if (ttlMs !== undefined) assertStorageTtlDuration(ttlMs, STORAGE_MEMORY_BACKEND)
+              return {
+                keys: prepared.map((point) => lockKey.vector(captured.name, point.id)),
+                capacityChanges:
+                  capacity === undefined
+                    ? undefined
+                    : () =>
+                        prepared.map((point, index) => {
+                          const key = vectorKey(captured.name, point.id)
+                          const deadline =
+                            ttlMs === undefined
+                              ? deadlines.get(identity('vector', encodeFlatStorageKey(key)))
+                              : scheduler.now() + ttlMs
+                          return capacityFact(
+                            'vector',
+                            key,
+                            ttlMs !== undefined &&
+                              deadline !== undefined &&
+                              deadline <= scheduler.now()
+                              ? undefined
+                              : sizes[index]
+                          )
+                        }),
+                run: () => {
+                  /** One monotonic clock observation applies to this synchronous admitted batch. */
+                  const now = scheduler.now()
+                  for (const [index, point] of prepared.entries()) {
+                    const key = vectorKey(captured.name, point.id)
+                    const encoded = encodeFlatStorageKey(key)
+                    const current = liveEntry('vector', encoded)
+                    const orderedKey =
+                      current?.ordered ?? encodeOrderedStorageKey(key, STORAGE_MEMORY_BACKEND)
+                    const deadline =
+                      ttlMs === undefined ? deadlines.get(identity('vector', encoded)) : now + ttlMs
+                    if (deadline !== undefined && deadline <= now) {
+                      removeVector(captured.name, point.id)
+                      continue
+                    }
+                    const entry = { key, ordered: orderedKey, value: point, bytes: sizes[index] }
+                    data.vector.set(encoded, entry)
+                    ordered.vector.set(orderedKey, entry)
+                    setDeadline('vector', encoded, deadline)
+                    capacityIndex?.put({ ...capacityFact('vector', key), bytes: sizes[index]! })
+                    bump('vector', encoded)
+                  }
+                  if (prepared.length > 0) publish('vector', 'batch')
+                }
+              }
+            })
+          ),
+        delete: (ids, ctx) =>
+          vectorOperation(() =>
+            mutationEntry(MemoryOperation.vectorDelete, ids, ctx, (input) => {
+              const capturedIds = vectorIds(input)
+              return {
+                keys: capturedIds.map((id) => lockKey.vector(captured.name, id)),
+                run: () => {
+                  let count = 0
+                  for (const id of capturedIds) if (removeVector(captured.name, id)) count++
+                  if (count > 0) publish('vector', 'batch')
+                }
+              }
+            })
+          ),
+        deleteWhere: (where, ctx) =>
+          vectorOperation(() =>
+            mutationEntry(MemoryOperation.vectorDeleteWhere, where, ctx, (input, context) => {
+              const count = Reflect.get(context, 'count')
+              if (
+                count !== undefined &&
+                count !== DeleteCountMode.precount &&
+                count !== DeleteCountMode.scroll
+              )
+                invalidVector()
+              const predicate = compileStorageWhere<TPayload | undefined>(input)
+              return {
+                keys: [],
+                ranges: [
+                  {
+                    channel: 'vector',
+                    ...snapshotConcurrencyLockRange({ channel: 'vector' }, STORAGE_MEMORY_BACKEND)
+                  }
+                ],
+                run: () => {
+                  let count = 0
+                  for (const point of points(true))
+                    if (predicate(point.payload) && removeVector(captured.name, point.id)) count++
+                  if (count > 0) publish('vector', 'batch')
+                  return count
+                }
+              }
+            })
+          ),
+        search: (query, options, ctx) =>
+          vectorOperation(() =>
+            asyncEntry(MemoryOperation.vectorSearch, { query, options }, ctx, (input) => {
+              controller.assertLive()
+              const request = snapshotStorageVectorSearch(
+                input.query,
+                input.options,
+                configuration,
+                STORAGE_MEMORY_BACKEND
+              )
+              if (request.options.k === 0) return []
+              const filter =
+                request.options.filter === undefined
+                  ? undefined
+                  : compileStorageQueryCondition<TPayload | undefined>(
+                      vectorCondition(request.options.filter)
+                    )
+              return rankMemoryVectors(
+                points(),
+                request.query,
+                configuration.metric,
+                request.options.k,
+                undefined,
+                (point) => filter === undefined || filter(point.payload)
+              ).map((hit) => output(hit, false, request.options.withPayload))
+            })
+          )
+      }
+    }
+  }
+
   /** Publish the real built-in APIs on the original resource, never a copied base. */
   const store = provideCapabilities(
     base,
@@ -1744,6 +2547,7 @@ export function createMemoryBackend<T = unknown>(
       implement(ttl, timeToLive, {
         forTransaction: (scope) => (scope as IMemoryScope<T>)[ttlOperations]
       }),
+      implement(vector, vectors),
       implement(counter, counters, {
         forTransaction: (scope) => (scope as IMemoryScope<T>)[counterOperations]
       }),
@@ -1789,10 +2593,7 @@ export function createMemoryBackend<T = unknown>(
                   for (const row of rows) {
                     /** Every selected live row shares the original hash/radix/revision identity. */
                     const encoded = encodeFlatStorageKey(row.key)
-                    data.record.delete(encoded)
-                    deadlines.delete(identity('record', encoded))
-                    ordered.record.delete(row.ordered)
-                    bump('record', encoded)
+                    deletePhysical('record', encoded)
                   }
                   if (rows.length > 0)
                     publish(
@@ -1819,7 +2620,7 @@ export function createMemoryBackend<T = unknown>(
     defaultPolicy: options.concurrency,
     concurrencyStages: core.stageBindings.concurrencyStages(store)
   })
-  return { store, controller, installer }
+  return { store, controller, installer, finalize }
 }
 
 /** Precise native store shape is retained by the first-party plugin factory. */

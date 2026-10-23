@@ -844,6 +844,29 @@ export const storageContractReference: ILibraryReference = {
       example: storageContractCases.snapshotStorageRdfQuad![0]!.example,
       cases: storageContractCases.snapshotStorageRdfQuad
     },
+    encodeStorageRdfTerm: {
+      role: 'operation',
+      purpose: t(
+        'Encode a canonical raw RDF term for native ordered index components using the original key writer.',
+        '沿原 key writer 编码规范 raw RDF term，作为原生有序索引分量。'
+      ),
+      params: {
+        value: t(
+          'Structural raw term admitted by snapshotStorageRdfTerm; blank labels remain request-local.',
+          'snapshotStorageRdfTerm 接纳的结构 raw term，blank 标签仍局限请求。'
+        ),
+        backend: t(
+          'Optional diagnostic backend supplied explicitly as a name or undefined.',
+          '显式传入后端名或 undefined，供可选诊断使用。'
+        )
+      },
+      returns: t(
+        'Independent self-delimiting Uint8Array. Native indexes concatenate components directly without the public binary-key limit; malformed terms throw INVALID_ARGUMENT with original getter cause.',
+        '独立、自定界 Uint8Array。原生索引直接拼接分量，不施加公开 binary-key 限制；无效 term 抛 INVALID_ARGUMENT 并保留原 getter cause。'
+      ),
+      example: storageContractCases.encodeStorageRdfTerm![0]!.example,
+      cases: storageContractCases.encodeStorageRdfTerm
+    },
     encodeStorageRdfQuad: {
       role: 'operation',
       purpose: t(
@@ -863,6 +886,131 @@ export const storageContractReference: ILibraryReference = {
       ),
       example: storageContractCases.encodeStorageRdfQuad![0]!.example,
       cases: storageContractCases.encodeStorageRdfQuad
+    },
+    decodeOrderedStorageKey: {
+      role: 'operation',
+      purpose: t('Read the original ordered physical key wire format.', '读取原保序物理键格式。'),
+      params: {
+        encoded: t(
+          'Complete canonical key bytes from encodeOrderedStorageKey.',
+          'encodeOrderedStorageKey 返回的完整规范键字节。'
+        ),
+        backend: t('Actual backend diagnostic or undefined.', '真实后端标签或 undefined。')
+      },
+      returns: t(
+        'Detached IStorageKey; incomplete, noncanonical or out-of-domain bytes throw INVALID_KEY.',
+        '独立 IStorageKey；不完整、非规范或超域字节抛 INVALID_KEY。'
+      ),
+      example: storageContractCases.decodeOrderedStorageKey![0]!.example,
+      cases: storageContractCases.decodeOrderedStorageKey
+    },
+    snapshotStorageVectorCollection: {
+      role: 'operation',
+      purpose: t(
+        'Capture a collection name and optional declared configuration.',
+        '捕获 collection 名和可选声明配置。'
+      ),
+      params: {
+        name: t('Logical collection name.', '逻辑 collection 名。'),
+        options: t(
+          'Optional positive dimensions and cosine/dot/euclid metric; omission stays absent.',
+          '可选正维度与 cosine/dot/euclid metric；省略仍缺省。'
+        ),
+        backend: t('Optional native diagnostic label.', '可选原生诊断标签。')
+      },
+      returns: t(
+        'Detached input; INVALID_ARGUMENT preserves the original cause.',
+        '独立输入；INVALID_ARGUMENT 保留原始 cause。'
+      ),
+      example: storageContractCases.snapshotStorageVectorCollection![0]!.example,
+      cases: storageContractCases.snapshotStorageVectorCollection
+    },
+    snapshotStorageVector: {
+      role: 'operation',
+      purpose: t(
+        'Detach finite dense components under optional dimension and metric facts.',
+        '按可选维度与 metric 事实独立捕获有限稠密分量。'
+      ),
+      params: {
+        input: t('Readonly numeric component array.', '只读数字分量数组。'),
+        options: t(
+          'Optional dimensions/metric; cosine rejects zero vectors.',
+          '可选 dimensions/metric；cosine 拒绝零向量。'
+        ),
+        backend: t('Optional native diagnostic label.', '可选原生诊断标签。')
+      },
+      returns: t(
+        'Detached input; INVALID_ARGUMENT preserves the original cause.',
+        '独立输入；INVALID_ARGUMENT 保留原始 cause。'
+      ),
+      example: storageContractCases.snapshotStorageVector![0]!.example,
+      cases: storageContractCases.snapshotStorageVector
+    },
+    snapshotStorageVectorUpsert: {
+      role: 'operation',
+      purpose: t(
+        'Prevalidate a complete point batch using the serialize payload owner.',
+        '沿 serialize payload owner 预校验完整点批次。'
+      ),
+      params: {
+        points: t(
+          'Readonly points; every input is checked and duplicate IDs keep the last value.',
+          '只读点；全部输入逐项校验，重复 ID 保留末值。'
+        ),
+        configuration: t('Existing declared dimensions and metric.', '已有声明维度与 metric。'),
+        backend: t('Optional native diagnostic label.', '可选原生诊断标签。')
+      },
+      returns: t(
+        'Detached input; INVALID_ARGUMENT preserves the original cause.',
+        '独立输入；INVALID_ARGUMENT 保留原始 cause。'
+      ),
+      example: storageContractCases.snapshotStorageVectorUpsert![0]!.example,
+      cases: storageContractCases.snapshotStorageVectorUpsert
+    },
+    snapshotStorageVectorFilter: {
+      role: 'operation',
+      purpose: t(
+        'Snapshot a closed native vector filter AST without executing it.',
+        '快照封闭原生向量过滤 AST，不执行过滤。'
+      ),
+      params: {
+        filter: t(
+          'Own-path all/any/not, scalar equality, membership or finite numeric bounds.',
+          '自有路径 all/any/not、标量相等、成员或有限数值边界。'
+        ),
+        backend: t('Optional native diagnostic label.', '可选原生诊断标签。')
+      },
+      returns: t(
+        'Detached input; INVALID_ARGUMENT preserves the original cause.',
+        '独立输入；INVALID_ARGUMENT 保留原始 cause。'
+      ),
+      example: storageContractCases.snapshotStorageVectorFilter![0]!.example,
+      cases: storageContractCases.snapshotStorageVectorFilter
+    },
+    snapshotStorageVectorSearch: {
+      role: 'operation',
+      purpose: t(
+        'Capture direct-search arguments even for k=0 before native retrieval.',
+        '在原生检索前捕获直接搜索参数，包含 k=0。'
+      ),
+      params: {
+        query: t(
+          'Finite numeric query direction matching the collection.',
+          '匹配 collection 的有限数字查询方向。'
+        ),
+        options: t(
+          'Nonnegative safe k, optional filter/withPayload/exact; booleans default false.',
+          '非负安全 k、可选 filter/withPayload/exact；布尔缺省 false。'
+        ),
+        configuration: t('Existing declared dimensions and metric.', '已有声明维度与 metric。'),
+        backend: t('Optional native diagnostic label.', '可选原生诊断标签。')
+      },
+      returns: t(
+        'Detached input; INVALID_ARGUMENT preserves the original cause.',
+        '独立输入；INVALID_ARGUMENT 保留原始 cause。'
+      ),
+      example: storageContractCases.snapshotStorageVectorSearch![0]!.example,
+      cases: storageContractCases.snapshotStorageVectorSearch
     },
     snapshotStorageBlobPut: {
       role: 'operation',
@@ -944,8 +1092,8 @@ export const storageContractReference: ILibraryReference = {
         ),
         source: t('The already-open native WHATWG byte stream.', '已打开的原生 WHATWG 字节流。'),
         options: t(
-          'Native close, report, optional backend and onSettled callbacks.',
-          '原生 close、report 及可选 backend、onSettled 回调。'
+          'Native close, report, optional backend/onSettled, and optional normalizeFailure for backend-owned native error classification.',
+          '原生 close、report、可选 backend/onSettled，以及供后端分类原生错误的 normalizeFailure。'
         )
       },
       returns: t(
@@ -1700,6 +1848,83 @@ export const storageContractReference: ILibraryReference = {
         '所选 IConcurrencyPolicy 的精确身份；伪造策略或 store 抛 INVALID_ARGUMENT。'
       ),
       example: storageContractCases.runWithConcurrency![0]!.example
+    },
+    getStorageOrgGraphPrefix: {
+      role: 'operation',
+      purpose: t(
+        'Return the canonical native graph prefix for exact organization filtering and deletion.',
+        '返回精确组织筛选、删除使用的规范原生图前缀。'
+      ),
+      params: {
+        orgId: t('Canonical lowercase UUID, including zero.', '规范小写 UUID，包括全零值。')
+      },
+      returns: t(
+        'urn:migaia:org:<orgId>: without store creation or I/O. Invalid UUID throws INVALID_ARGUMENT.',
+        'urn:migaia:org:<orgId>:，不创建 store 或执行 I/O。无效 UUID 抛 INVALID_ARGUMENT。'
+      ),
+      example: storageContractCases.getStorageOrgGraphPrefix![0]!.example,
+      cases: storageContractCases.getStorageOrgGraphPrefix
+    },
+    prefixStorageOrgGraph: {
+      role: 'operation',
+      purpose: t(
+        'Map logical default and named graphs to disjoint native named graph identities.',
+        '把逻辑默认图、命名图映射到互不冲突的原生命名图身份。'
+      ),
+      params: {
+        orgId: t('Canonical lowercase organization UUID.', '规范小写组织 UUID。'),
+        graph: t(
+          'Ground named or default graph captured once.',
+          '单次捕获的 ground 命名图或默认图。'
+        )
+      },
+      returns: t(
+        'Frozen IRdfNamedNode: prefix plus d for default, or n: and canonical percent-encoded exact IRI. Invalid input throws INVALID_ARGUMENT.',
+        '冻结 IRdfNamedNode：默认图为前缀加 d，命名图为前缀加 n: 与规范百分号编码的原样 IRI。无效输入抛 INVALID_ARGUMENT。'
+      ),
+      example: storageContractCases.prefixStorageOrgGraph![0]!.example,
+      cases: storageContractCases.prefixStorageOrgGraph
+    },
+    unprefixStorageOrgGraph: {
+      role: 'operation',
+      purpose: t(
+        'Restore a shared frozen RDF graph only from the exact canonical organization envelope.',
+        '仅从精确规范组织封装还原共享冻结 RDF 图。'
+      ),
+      params: {
+        orgId: t(
+          'Exact canonical lowercase UUID expected in the native graph.',
+          '原生图内应匹配的精确规范小写 UUID。'
+        ),
+        graph: t(
+          'Physical IRdfNamedNode returned by the shared writer.',
+          '共享写入函数返回的物理 IRdfNamedNode。'
+        )
+      },
+      returns: t(
+        'IRdfNamedNode or IRdfDefaultGraph with exact original IRI spelling. Foreign or noncanonical graphs throw INVALID_ARGUMENT; getter and decoding failures retain their original cause.',
+        '原样 IRI 的 IRdfNamedNode 或 IRdfDefaultGraph。其它组织或非规范图抛 INVALID_ARGUMENT；getter、解码失败保留原 cause。'
+      ),
+      example: storageContractCases.unprefixStorageOrgGraph![0]!.example,
+      cases: storageContractCases.unprefixStorageOrgGraph
+    },
+    RdfTermType: {
+      role: 'constant',
+      purpose: t(
+        'Canonical RDF structural discriminants reused by native parsers and adapters.',
+        '原生解析器和适配器复用的规范 RDF 结构标签。'
+      ),
+      example: storageContractCases.RdfTermType![0]!.example,
+      cases: storageContractCases.RdfTermType
+    },
+    RdfDatatype: {
+      role: 'constant',
+      purpose: t(
+        'Canonical RDF 1.1 string and language-string datatype IRIs.',
+        '规范 RDF 1.1 字符串、语言字符串 datatype IRI。'
+      ),
+      example: storageContractCases.RdfDatatype![0]!.example,
+      cases: storageContractCases.RdfDatatype
     },
     prefixStorageOrgKey: {
       role: 'operation',
@@ -4572,6 +4797,41 @@ console.log(candidate.name, candidate.output)`
         delete: { summary: t('Delete named point IDs.', '按点 ID 删除。') },
         search: {
           summary: t('Execute the native direct search surface.', '执行原生直接搜索入口。')
+        }
+      }
+    },
+    IStorageVectorConfiguration: {
+      summary: t(
+        'Native collection dimensions and metric, without connection ownership.',
+        '原生 collection 维度与 metric，不持有连接。'
+      ),
+      members: {
+        dimensions: { summary: t('Positive safe integer.', '正安全整数。') },
+        metric: { summary: t('cosine, dot or euclid.', 'cosine、dot 或 euclid。') }
+      }
+    },
+    IStorageVectorValidation: {
+      summary: t(
+        'Optional validation facts for detached vector input.',
+        '独立向量输入的可选校验事实。'
+      ),
+      members: {
+        dimensions: { summary: t('Optional matching positive dimension.', '可选匹配正维度。') },
+        metric: {
+          summary: t('Optional metric; cosine rejects zero.', '可选 metric；cosine 拒绝零向量。')
+        }
+      }
+    },
+    IStorageVectorPoint: {
+      summary: t(
+        'Declared point input with detached portable payload output.',
+        '声明点输入，返回独立便携 payload。'
+      ),
+      members: {
+        id: { summary: t('Logical string point ID.', '逻辑字符串点 ID。') },
+        vector: { summary: t('Readonly finite component array.', '只读有限分量数组。') },
+        payload: {
+          summary: t('Optional caller-declared portable fields.', '可选调用方声明便携字段。')
         }
       }
     },

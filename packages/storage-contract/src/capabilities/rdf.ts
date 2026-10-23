@@ -8,6 +8,7 @@ import { StorageContractError, StorageContractErrorCode } from '../errors.js'
 import { StorageContractErrorText } from '../error-text.js'
 import { encodeOrderedStorageKey } from '../key-order.js'
 import type { IStorageKey } from '../context.js'
+import { assertStorageOrgId } from '../org.js'
 
 /** RDF term tags are shared by canonical snapshots, query bindings and SPARQL serialization. */
 export const RdfTermType = {
@@ -274,6 +275,17 @@ function rdfTermKey(value: IRdfTerm): IStorageKey {
     return [value.termType, value.value, value.datatype, value.language ?? '']
   return [value.termType, value.value]
 }
+/**
+ * Encodes one canonical RDF term with the original self-delimiting key writer. Native index
+ * permutations can concatenate these bytes directly without reclassifying them as public binary
+ * keys or applying a second term codec. Raw blank labels remain request-local identities.
+ */
+export function encodeStorageRdfTerm(
+  value: IRdfTerm,
+  backend: IBackendKind | undefined
+): Uint8Array {
+  return encodeOrderedStorageKey(rdfTermKey(snapshotStorageRdfTerm(value, backend)), backend)
+}
 /** Internal lock/native authors encode a validated frozen quad without a second input traversal. */
 export function encodeRdfQuadSnapshot(quad: IQuad): Uint8Array {
   return encodeOrderedStorageKey(
@@ -339,6 +351,78 @@ export const term = /* @__PURE__ */ Object.freeze({
   },
   defaultGraph: DEFAULT_GRAPH
 })
+
+/** Default and named graph tags occupy disjoint physical identities below one organization prefix. */
+const storageOrgDefaultGraph = 'd'
+/** Named graph IRIs use canonical percent encoding so arbitrary authorities remain valid URN paths. */
+const storageOrgNamedGraph = 'n:'
+
+/** Returns the exact native graph prefix without opening a store or selecting an organization. */
+export function getStorageOrgGraphPrefix(orgId: string): string {
+  assertStorageOrgId(orgId)
+  return `urn:migaia:org:${orgId}:`
+}
+
+/** Reports a malformed or foreign physical graph without changing the shared RDF error owner. */
+function invalidOrgGraph(cause?: unknown): StorageContractError {
+  return new StorageContractError(
+    StorageContractErrorCode.invalidArgument,
+    { cause },
+    StorageContractErrorText.orgGraphEnvelope
+  )
+}
+
+/**
+ * Maps a logical default or named graph to a real named graph in the exact organization. The
+ * original RDF position validator captures getters once; percent encoding preserves IRI spelling.
+ */
+export function prefixStorageOrgGraph(
+  orgId: string,
+  graph: IRdfNamedNode | IRdfDefaultGraph
+): IRdfNamedNode {
+  /** UUID admission precedes reflecting the caller's graph. */
+  const prefix = getStorageOrgGraphPrefix(orgId)
+  /** The graph-position owner rejects blank nodes and literals without another term validator. */
+  const captured = snapshotStorageRdfPattern({ graph }, undefined).graph
+  if (!captured) throw invalidOrgGraph()
+  return term.iri(
+    prefix +
+      (captured.termType === RdfTermType.defaultGraph
+        ? storageOrgDefaultGraph
+        : storageOrgNamedGraph + encodeURIComponent(captured.value))
+  )
+}
+
+/**
+ * Accepts only this organization's canonical physical graph. Returned terms reuse the shared frozen
+ * factories; malformed percent encoding retains its original native error as cause.
+ */
+export function unprefixStorageOrgGraph(
+  orgId: string,
+  graph: IRdfNamedNode
+): IRdfNamedNode | IRdfDefaultGraph {
+  /** No graph getter runs until the requested organization has passed canonical UUID admission. */
+  const prefix = getStorageOrgGraphPrefix(orgId)
+  /** Capturing a graph position admits its IRI once and then narrows the physical named identity. */
+  const captured = snapshotStorageRdfPattern({ graph }, undefined).graph
+  if (captured?.termType !== RdfTermType.namedNode || !captured.value.startsWith(prefix))
+    throw invalidOrgGraph()
+  /** Tags and encoded suffix are native identities, not user-controlled namespace selectors. */
+  const suffix = captured.value.slice(prefix.length)
+  if (suffix === storageOrgDefaultGraph) return term.defaultGraph
+  if (!suffix.startsWith(storageOrgNamedGraph)) throw invalidOrgGraph()
+  /** Percent decoding is the inverse of the one canonical writer, never URL normalization. */
+  const encoded = suffix.slice(storageOrgNamedGraph.length)
+  /** Decode errors remain reachable while envelope and term errors keep their existing owner. */
+  let logical: string
+  try {
+    logical = decodeURIComponent(encoded)
+  } catch (cause) {
+    throw invalidOrgGraph(cause)
+  }
+  if (encodeURIComponent(logical) !== encoded) throw invalidOrgGraph()
+  return term.iri(logical)
+}
 
 /** Ground RDF writes and queries share canonical term identity and the backend's original owner. */
 export type IRdfApi<

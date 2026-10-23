@@ -450,6 +450,8 @@ lockKey.text 与 lockKey.record 接收原有 typed storage-key 域，lockKey.byt
 
 `prefixStorageOrgKey(orgId, key)` 返回独立快照 `['$o', orgId, key]`，数组逻辑键保持嵌套在第三项。`unprefixStorageOrgKey(orgId, key)` 只接纳相同组织的精确三项封装，返回独立逻辑键快照。错误组织、大小写错误或无效封装为 INVALID_ARGUMENT；内部无效逻辑键仍为 INVALID_KEY。外层封装不占用逻辑键的深度与节点预算。这些纯函数不创建存储、不选择 namespace，也不执行跨组织 I/O。
 
+`getStorageOrgGraphPrefix(orgId)` 返回 `urn:migaia:org:<orgId>:`，供后端按组织筛选或删除原生命名图。`prefixStorageOrgGraph(orgId, graph)` 把默认图映射为前缀加 `d`，命名图映射为前缀加 `n:` 与 `encodeURIComponent(IRI)`；两类身份无碰撞，包括全零组织。`unprefixStorageOrgGraph(orgId, physicalGraph)` 只接纳同组织的规范封装并返回共享冻结 RDF term；错误组织、无效图或非规范百分号编码均为 INVALID_ARGUMENT。IRI 大小写、百分号拼写、Unicode 与 IPv6 authority 原样往返，不做 URL 规范化。`RdfTermType` 与 `RdfDatatype` 导出共享 term 标签及 RDF 1.1 字符串 datatype 常量。这些纯函数不创建组织、连接或资源。
+
 ### 并发执行
 
 后端与 persist 作者直接把原 options 交给 `runWithConcurrency({ store, options }, port)`；原 store 必须已登记事务 owner。循环只捕获一次借用 getter，再解析捕获的覆盖策略或原 owner 默认策略；显式 request.policy 仍是唯一生效策略，保留原校验与错误。传入真实外层 attempt context 保留精确私有期限与规范锁，无需复制。循环在操作上下文字段前读取 lock/concurrency，只规范化一次锁身份；后端扩展选项仍由原后端准入。
@@ -667,7 +669,7 @@ RDF add/delete/match 沿同一规范 ground IQuad owner。支持事务的 provid
 
 ### Blob 作者接点
 
-后端在原生 I/O 前共用 `snapshotStorageBlobPut`、`snapshotStorageBlobGet` 与 `snapshotStorageBlobList`，独立捕获输入字节和元数据、校验互斥条件与闭区间范围，不消费上传流。`createStorageBlobObject(info, source, { close, report, backend? })` 将一次 stream 或 bytes 消费权接到原资源拥有者；EOF、cancel 与 dispose 释放同一原生内容。主清理保留可拒绝的缓存 Promise，符号清理使用独立缓存 Promise 并报告清理失败。
+后端在原生 I/O 前共用 `snapshotStorageBlobPut`、`snapshotStorageBlobGet` 与 `snapshotStorageBlobList`，独立捕获输入字节和元数据、校验互斥条件与闭区间范围，不消费上传流。`createStorageBlobObject(info, source, { close, report, backend? })` 将一次 stream 或 bytes 消费权接到原资源拥有者；EOF、cancel 与 dispose 释放同一原生内容。主清理保留可拒绝的缓存 Promise，符号清理使用独立缓存 Promise 并报告清理失败。可选 `normalizeFailure(error)` 把原生 read/cancel/close 错误分类交给后端，不改变资源拥有权。
 
 ## 记录与 RDF 的行控制
 
@@ -676,6 +678,8 @@ RDF add/delete/match 沿同一规范 ground IQuad owner。支持事务的 provid
 `distinct(field)` 保留当前顺序中的首行，用 Set 的 SameValueZero 字段身份单遍去重：0/-0 同值，NaN 同值，缺失与 undefined 同值，对象（含 Date）按原身份区分。`skip(count)` 接受非负安全整数，客户端显式逐行推进并在 explain 标出 O(n)，下游 limit 达到后不再读取。记录与 RDF 共用这些节点及 reader；向量仅提供保持排名的 distinct。
 
 原生数据源显式提供 `nativeSteps:true` 后，原 execute 才接收有序 `IQueryNativeStep`（where/select/limit/skip/distinct），并按原声明顺序执行其真实支持的前缀；steps 是执行顺序的依据，兼容保留的 conditions/fields 不可再次乱序应用。未选择此端口的旧源保持原 execute 三字段参数及原客户端 limit 行为。原生 distinct 声明须兑现相同字段身份语义，不能把结构等值冒充对象身份。RDF 也显式选择扩展原生控制，原有遍历 steps 形状不变。事务的这些派生分支沿原包装投影，仍复用完整终端的同一 operation 准入。
+
+向量后端在原生调用前复用 `snapshotStorageVectorCollection`、`snapshotStorageVector`、`snapshotStorageVectorUpsert`、`snapshotStorageVectorFilter` 与 `snapshotStorageVectorSearch`。它们捕获配置、有限分量、全批点及便携 payload、过滤 AST 和搜索选项，非法输入报 `INVALID_ARGUMENT` 并保留原 cause。省略 collection 配置不创建缺省维度；同名配置解析、策略、上下文、检索和关闭仍由实际后端负责。upsert 重复 ID 采用最后一项；payload 经 serialize 投影自有可枚举字段。`k: 0` 也先验证输入；评分、过滤执行和排名不属于这些 helper。
 
 ### 键集分页
 
@@ -704,6 +708,8 @@ RDF 的客户端 `follow`/`inverse` 现在沿同一 reader 逐前驱调用原 `s
 能力发布只对既有 KV 事务 scope 重建受能力集合约束的 use；无 KV 的原生 scope 保留原 use 重载及完整 API。原生 RDF/raw 双重载保留 expect/expectAbsent 与 update-only 原始 tag，RDF Feature 仅增强既有 match 链。`IOptimisticTransactionBuilder` 保留原 scope、既有增强方法和新增事务 Feature，始终不增加 lock。
 
 查询写终点复用同一 planner、reader 与资源清理：记录支持 `delete(ctx?)`、`update(patch,ctx?)`，有界向量仅 `topK(...).delete(ctx?)`，RDF 支持 `delete(ctx?)`、`replace(oldQuad,newQuad,ctx?)`；select/groupBy 后只有读取终点。作者源的可选 `mutate(request,run)` 必须在原宿主 pipeline、事务与锁路径中调用 run，提供该事务的 `execute` 和 `accept(key,row)`；没有接点在 I/O 前报 `UNSUPPORTED_CAPABILITY`。request.ctx 保留原上下文快照身份，request.concurrency 单独交原并发 owner，不能另建重试循环。共享核流式去重，只有 accept 返回 true 才计数；记录按规范键、向量按实际引擎 hit id、RDF 按规范 ground quad 身份去重。RDF replace 仅处理 query 真正选中的 oldQuad，new 已存在是否接纳由原 draft 决定；根终点必须等待真实提交确认，unknown 拒绝且不重放。事务内只返回已接纳 draft 数，不能据此声称提交；事务写不接受独立操作上下文。
+
+`encodeStorageRdfTerm(term, backend)` 经原快照 owner 校验一个 raw RDF term，返回独立、自定界的有序身份字节。原生索引排列可直接拼接这些分量；不能把输出重新送进公开 binary-key 域，否则会把其 1 MiB 输入限制错误施加到合法 RDF literal。IRI 拼写与 datatype/language 身份沿同一规范 term 规则；编码 raw blank 标签不会使它成为可移植的重复写身份。
 
 `implement(capability,api,{ forTransaction })` 的原绑定回调接收 `ITransactionScope<ICodecValue,TCap>`，因此标准 RDF 绑定器可合法使用原 `scope.use(rdf)`。原 KV 成员、显式旧回调类型、token/owner 校验及原登记表保持原样。
 

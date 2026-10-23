@@ -16,7 +16,8 @@ export default defineConfig({
       entry: {
         index: 'src/index.ts',
         entity: 'src/entity.ts',
-        'authoring/backend': 'src/authoring/backend.ts'
+        'authoring/backend': 'src/authoring/backend.ts',
+        'authoring/vector': 'src/authoring/vector.ts'
       },
       formats: ['es'],
       fileName: (_format, name) => `${name}.js`

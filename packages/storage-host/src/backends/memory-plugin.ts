@@ -1,8 +1,4 @@
-import {
-  assertTransactionOwner,
-  type ITransactionScope,
-  type records
-} from '@migaia/storage-contract'
+import { type ITransactionScope, type records } from '@migaia/storage-contract'
 import { StorageError, StorageErrorCode } from '../errors.js'
 import { StorageErrorText } from '../error-text.js'
 import { isStorageErrorFamily } from '../core/error-family.js'
@@ -14,6 +10,7 @@ import type {
   IStorageFeatureStoreCompatibility
 } from '../types.js'
 import { createMemoryBackend, type IMemoryBackendStore, type IMemoryOptions } from './memory.js'
+import { snapshotMemoryCapacity } from './memory-capacity.js'
 
 /** Exact memory token keeps native data and the original transaction owner in the neutral host. */
 export const memoryBackendKind = defineStorageBackendKind<
@@ -64,6 +61,8 @@ export function memoryBackendPlugin<
       const namespace = options.namespace
       const concurrency = options.concurrency
       const owner = options.owner
+      /** Capacity getters detach in the original option capture before any native allocation. */
+      const capacity = snapshotMemoryCapacity(options)
       if (owner !== undefined && (typeof owner !== 'object' || owner === null))
         throw new TypeError(StorageErrorText.memoryOwner)
       const label = owner?.label
@@ -72,6 +71,7 @@ export function memoryBackendPlugin<
       return {
         id,
         features,
+        capacity,
         options: { namespace, concurrency, owner: label === undefined ? undefined : { label } }
       }
     } catch (cause) {
@@ -88,15 +88,16 @@ export function memoryBackendPlugin<
       featureExpose: () => ({
         getClient: () => undefined,
         getTransactionClient: (scope: ITransactionScope<unknown, typeof records>) => {
-          assertTransactionOwner(constructed!.store, scope)
+          constructed!.assertScope(scope)
           return undefined
         }
       }),
       capabilityInstaller: (_store: IMemoryBackendStore) => constructed!.installer,
       install: () => {
-        constructed = createMemoryBackend(core, captured.options)
+        constructed = createMemoryBackend(core, captured.options, captured.capacity)
         core.registerStore(constructed.store)
         core.registerChangeController(constructed.store, constructed.controller)
+        core.registerOrgBinding(constructed.store, constructed.orgBinding)
         return {}
       }
     }

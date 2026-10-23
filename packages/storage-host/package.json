@@ -26,6 +26,10 @@
       "types": "./dist/entity.d.ts",
       "default": "./dist/entity.js"
     },
+    "./authoring/vector": {
+      "types": "./dist/authoring/vector.d.ts",
+      "default": "./dist/authoring/vector.js"
+    },
     "./authoring/backend": {
       "types": "./dist/authoring/backend.d.ts",
       "default": "./dist/authoring/backend.js"

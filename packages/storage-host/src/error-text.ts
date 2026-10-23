@@ -1,5 +1,17 @@
 /** Canonical host boundary messages. */
 export const StorageErrorText = {
+  /** Native memory limits are captured before allocating its original physical namespace. */
+  memoryCapacityArgument: 'memory capacity limits or eviction policy are invalid',
+  /** Explicit byte accounting requires an actual existing canonical encoding rather than estimates. */
+  memoryCapacityEncoding: 'memory maxBytes requires a canonically encodable record or payload',
+  /** Ranking cannot order a non-finite score or a zero cosine candidate direction. */
+  memoryVectorScore: 'memory vector score must be finite and cosine directions must be nonzero',
+  /** Memory collection metadata and live sample identities must agree before ranking. */
+  memoryVectorArgument: 'memory vector collection configuration or sample is invalid',
+  /** Standard recommendation requires nonempty positive samples with common finite dimensions. */
+  vectorRecommendation: 'storage vector recommendation samples are invalid',
+  /** Aggregate organization deletion retains successful targets and every original failed target. */
+  orgDeleteFailed: 'storage organization deletion failed',
   /** Entity definitions capture a complete own upgrade graph before connecting to a backend. */
   entityMigrationGraphIncomplete: 'entity migration graph must contain every version step',
   /** A prepared value-only unique write must reject stale raw inputs before changing data. */

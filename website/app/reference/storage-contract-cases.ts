@@ -3,6 +3,44 @@ import type { ICaseDoc, IText } from './contract.js'
 /** Keeps complete bilingual cases beside their exact observable outputs. */
 const t = (en: string, zh: string): IText => ({ en, zh })
 
+/** Native graph readers and writers share the same reversible organization mapping. */
+const orgGraphCase: ICaseDoc = {
+  title: t(
+    'Keep default and named graphs inside one organization',
+    '把默认图和命名图限定在同一组织'
+  ),
+  problem: t(
+    'Native RDF backends need graph isolation without inventing another IRI codec or default graph.',
+    '原生 RDF 后端需要图隔离，不能另建 IRI codec 或默认图身份。'
+  ),
+  example: t(
+    `import { getStorageOrgGraphPrefix, prefixStorageOrgGraph, unprefixStorageOrgGraph, term, RdfTermType, RdfDatatype } from '@migaia/storage-contract'
+const orgId = '00000000-0000-0000-0000-000000000000'
+const logical = term.iri('https://[::1]/图?x=%aB')
+const physical = prefixStorageOrgGraph(orgId, logical)
+console.log(prefixStorageOrgGraph(orgId, term.defaultGraph).value === getStorageOrgGraphPrefix(orgId) + 'd')
+console.log(unprefixStorageOrgGraph(orgId, physical))
+console.log(RdfTermType.namedNode, RdfDatatype.string)
+// true
+// { termType: 'NamedNode', value: 'https://[::1]/图?x=%aB' }
+// NamedNode http://www.w3.org/2001/XMLSchema#string`,
+    `import { getStorageOrgGraphPrefix, prefixStorageOrgGraph, unprefixStorageOrgGraph, term, RdfTermType, RdfDatatype } from '@migaia/storage-contract'
+const orgId = '00000000-0000-0000-0000-000000000000'
+const logical = term.iri('https://[::1]/图?x=%aB')
+const physical = prefixStorageOrgGraph(orgId, logical)
+console.log(prefixStorageOrgGraph(orgId, term.defaultGraph).value === getStorageOrgGraphPrefix(orgId) + 'd')
+console.log(unprefixStorageOrgGraph(orgId, physical))
+console.log(RdfTermType.namedNode, RdfDatatype.string)
+// true
+// { termType: 'NamedNode', value: 'https://[::1]/图?x=%aB' }
+// NamedNode http://www.w3.org/2001/XMLSchema#string`
+  ),
+  result: t(
+    'The default graph has its own native named identity. The logical IRI returns with exact spelling; foreign or malformed physical graphs throw INVALID_ARGUMENT.',
+    '默认图具有独立原生命名身份；逻辑 IRI 原样返回。其它组织或无效物理图抛 INVALID_ARGUMENT。'
+  )
+}
+
 /** One complete read-only lookup example is shared by the two exact public accessors. */
 const capabilityReadCase: ICaseDoc = {
   title: t(
@@ -28,6 +66,21 @@ async function readGreeting(store: IStorageBase) {
   result: t(
     'A provided KV store reads its original API. A raw/frozen resource without KV returns undefined without mutation or disposal. Published Feature APIs are read through the same provider table.',
     '已提供 KV 的 store 读取原 API；无 KV 的 raw/frozen 资源返回 undefined，不修改或释放；已发布 Feature API 从同一 provider 表读取。'
+  )
+}
+
+/** Native authors share admission without acquiring any connection or search runner. */
+const vectorInputCase: ICaseDoc = {
+  title: t('Capture native vector arguments', '捕获原生向量参数'),
+  problem: t(
+    'Native backends need one input contract before performing their own I/O.',
+    '原生后端在自己的 I/O 前需要同一输入契约。'
+  ),
+  example:
+    "import { snapshotStorageVectorCollection, snapshotStorageVector, snapshotStorageVectorUpsert, snapshotStorageVectorFilter, snapshotStorageVectorSearch } from '@migaia/storage-contract'\nconst configuration = snapshotStorageVectorCollection('docs', { dimensions: 2, metric: 'cosine' }).options!\nconst query = snapshotStorageVector([1, 0], configuration)\nconst points = snapshotStorageVectorUpsert([{ id: 'a', vector: [1, 0], payload: { tag: 'docs' } }], configuration)\nconst filter = snapshotStorageVectorFilter({ field: 'tag', in: ['docs'] })\nconst search = snapshotStorageVectorSearch(query, { k: 0, filter }, configuration)\nconsole.log(points[0]?.id, search.options.k, search.options.withPayload)\n// a 0 false",
+  result: t(
+    'Prints a 0 false. Capture creates no collection or operation and validates zero-result searches.',
+    '输出 a 0 false；捕获不创建 collection 或操作，零结果搜索也先校验。'
   )
 }
 
@@ -81,7 +134,7 @@ const rdfTermCase: ICaseDoc = {
   ),
   example: `import {
   term, snapshotStorageRdfTerm, snapshotStorageRdfPattern,
-  snapshotStorageRdfQuad, encodeStorageRdfQuad
+  snapshotStorageRdfQuad, encodeStorageRdfQuad, encodeStorageRdfTerm
 } from '@migaia/storage-contract'
 const quad = snapshotStorageRdfQuad({
   subject: term.iri('urn:user:1'),
@@ -91,6 +144,7 @@ const quad = snapshotStorageRdfQuad({
 }, 'memory')
 const pattern = snapshotStorageRdfPattern({ subject: quad.subject }, 'memory')
 const identityBytes = encodeStorageRdfQuad(quad, 'memory')
+const termBytes = encodeStorageRdfTerm(quad.object, 'memory')
 const responseLocalBlank = snapshotStorageRdfTerm(term.blank('response-local'), undefined)`,
   result: t(
     'Language becomes lowercase, IRI spelling stays exact, and omitted pattern graph covers all graphs. Identity bytes are self-delimiting; raw blank terms cannot enter ground quad positions.',
@@ -281,6 +335,11 @@ async function deleteDrafts(store: IStorageStore<typeof vector>) {
 
 /** Exercises public contract tools without supplying a fictional storage implementation. */
 export const storageContractCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
+  getStorageOrgGraphPrefix: [orgGraphCase],
+  prefixStorageOrgGraph: [orgGraphCase],
+  unprefixStorageOrgGraph: [orgGraphCase],
+  RdfTermType: [orgGraphCase],
+  RdfDatatype: [orgGraphCase],
   sql: [sqlCapabilityCase],
   vector: [vectorCapabilityCase],
   rdf: [rdfCapabilityCase],
@@ -298,7 +357,30 @@ export const storageContractCases: Readonly<Record<string, readonly ICaseDoc[]>>
   snapshotStorageRdfPattern: [rdfTermCase],
   snapshotStorageRdfQuad: [rdfTermCase],
   encodeStorageRdfQuad: [rdfTermCase],
+  encodeStorageRdfTerm: [rdfTermCase],
   ttl: [ttlCase],
+  decodeOrderedStorageKey: [
+    {
+      title: t('Read an enumerated physical key', '读取枚举的物理键'),
+      problem: t(
+        'Native enumeration returns ordered key bytes; the original owner must read its own format.',
+        '原生枚举返回保序键字节，应由原拥有者读取自身格式。'
+      ),
+      example: t(
+        "import { encodeOrderedStorageKey, decodeOrderedStorageKey } from '@migaia/storage-contract'\nconsole.log(decodeOrderedStorageKey(encodeOrderedStorageKey(['files', 1], 'object'), 'object'))",
+        "import { encodeOrderedStorageKey, decodeOrderedStorageKey } from '@migaia/storage-contract'\nconsole.log(decodeOrderedStorageKey(encodeOrderedStorageKey(['files', 1], 'object'), 'object'))"
+      ),
+      result: t(
+        'Prints the original files/1 tuple without adding another key codec.',
+        '输出原 files/1 元组，不增加另一套键编码。'
+      )
+    }
+  ],
+  snapshotStorageVectorCollection: [vectorInputCase],
+  snapshotStorageVector: [vectorInputCase],
+  snapshotStorageVectorUpsert: [vectorInputCase],
+  snapshotStorageVectorFilter: [vectorInputCase],
+  snapshotStorageVectorSearch: [vectorInputCase],
   snapshotStorageBlobPut: [
     {
       title: t('snapshotStorageBlobPut', 'snapshotStorageBlobPut'),

@@ -5,6 +5,13 @@ const t = (en: string, zh: string): IText => ({ en, zh })
 /** Neutral host and authoring entry, with no browser or native driver import. */
 export const storageHostReference: ILibraryReference = {
   modules: {
+    'authoring/vector': {
+      summary: t(
+        'Expose only standard query vector synthesis; memory scoring and ranking remain private.',
+        '只公开标准查询向量合成；memory 评分与排名仍私有。'
+      ),
+      example: storageHostCases.recommendStorageVector![0]!.example
+    },
     'authoring/backend': {
       summary: t(
         'Share channel, unique-index, error and cancellation rules through finite backend functions. Controller and local key-lock construction stay on the original core; only their types are public through this entry. Features retain only controller lookup. The controller closing signal cancels its own pending lock admission without closing the shared provider. Its key-lock port excludes only the exact original live attempt lease when requested and probes canonical point identities directly, scans only selected channel buckets for ranges, and runs synchronous root writes after a final conflict recheck in the original attempt/FIFO.',
@@ -40,6 +47,29 @@ console.log(host.extensions.label('draft'))`
     }
   },
   symbols: {
+    recommendStorageVector: {
+      role: 'operation',
+      purpose: t(
+        'Compute positive mean minus negative mean for native retrieval.',
+        '为原生检索计算正均值减负均值。'
+      ),
+      params: {
+        positive: t(
+          'Nonempty readonly sample vectors with common finite dimensions.',
+          '具有相同有限维度的非空只读样本向量。'
+        ),
+        negative: t(
+          'Optional readonly samples; omission or empty input contributes zero.',
+          '可选只读样本；省略或空输入贡献零。'
+        )
+      },
+      returns: t(
+        'Independent readonly vector; invalid samples reject with INVALID_ARGUMENT and retain original causes. The collection validates cosine zero direction.',
+        '独立只读向量；非法样本报 INVALID_ARGUMENT 并保留原 cause；cosine 零方向由 collection 校验。'
+      ),
+      example: storageHostCases.recommendStorageVector![0]!.example,
+      cases: storageHostCases.recommendStorageVector
+    },
     observeStorageBatch: {
       role: 'operation',
       purpose: t(
@@ -126,14 +156,17 @@ console.log(host.extensions.label('draft'))`
     memoryBackendPlugin: {
       role: 'factory',
       purpose: t(
-        'Define an isolated memory backend without acquiring data before installation. Native transactions and root writes share the original owner, policy budget and local lock/revision facts. Native value backends register a prepared compare/write endpoint with core.registerValueCommit only inside installation. Replace protects displaced channels; synchronous busy keys reject immediately, while clear/prefix mutation rechecks only affected channels before its uninterrupted native turn.',
-        '定义独立内存后端，安装前不获取数据；原生事务共用原owner与本地锁/修订事实。'
+        'Define an isolated memory backend without acquiring data before installation. Optional namespace-local capacity captures positive maxEntries/maxBytes and lru (default) or lfu once. Linked policy nodes and the original deadline radix select committed victims; native transactions and root writes share the original owner, budget and victim locks. onEvict reports only per-channel counts after commit. Explicit maxBytes requires a real canonical encoding; unsupported records reject before mutation. Omitted capacity and maxEntries preserve the original structuredClone domain.',
+        '定义独立内存后端，安装前不获取数据。可选 namespace 容量单次捕获正 maxEntries/maxBytes 与 lru（缺省）或 lfu。策略双链节点和原 deadline radix 选择提交后的驱逐项，原生事务、根写共用原 owner、预算与目标锁。onEvict 只在提交后报告逐通道数量。显式 maxBytes 必须有真实 canonical 编码，不能编码的 record 修改前拒绝；省略容量及 maxEntries 保留原 structuredClone 值域。'
       ),
       returns: t(
         'A literal-id memory plugin retaining selected Features from the separate final argument memoryBackendPlugin(options, features). The default id is memory; where/select/all run through the shared records query core.',
         '通过独立最后参数memoryBackendPlugin(options, features)保留所选Feature的字面量id内存插件；缺省id为memory，where/select/all复用records查询核心。'
       ),
-      cases: storageHostCases.memoryBackendPlugin
+      cases: [
+        ...(storageHostCases.memoryBackendPlugin ?? []),
+        ...storageHostCases.memoryNativeVector!
+      ]
     },
     memoryBackendKind: {
       role: 'constant',
@@ -354,12 +387,183 @@ console.log(host.extensions.label('draft'))`,
         }
       }
     },
+    IEntityConnectStore: {
+      summary: t(
+        'Entity input accepts a complete raw KV store or an exact host-authenticated business view. Raw inputs retain full resource admission; borrowed views reuse private method facts without exposing close authority.',
+        '实体输入接受完整raw KV或原宿主认证的精确业务视图。raw输入保留完整资源准入；借用视图复用私有方法事实，不暴露关闭权。'
+      ),
+      example: storageHostCases.entityOrganizations?.[0]?.example,
+      members: {}
+    },
     IEntityConnectOptions: {
       summary: t(
         'Explicit original codec/query observer ports; failures only report.',
         '显式原codec/query观察接点；失败只报告。'
       ),
       members: {}
+    },
+    IStorageOrgView: {
+      summary: t(
+        'Immutable business access to one organization under the root host lifecycle. Native backends retain their own data and transaction owners.',
+        '在根宿主生命周期内固定访问单个组织；原生后端保留自己的数据与事务owner。'
+      ),
+      example: storageHostCases.storageOrganizations?.[0]?.example,
+      members: {
+        orgId: {
+          summary: t(
+            'Canonical UUID captured when the view is created.',
+            '创建视图时捕获的规范UUID。'
+          )
+        },
+        org: {
+          summary: t(
+            'Create another immutable business view with the same plugin inference.',
+            '创建保留相同插件推断的另一个不可变业务视图。'
+          ),
+          params: {
+            orgId: t(
+              'Canonical UUID from createOrgId or the application default configuration.',
+              '由createOrgId生成或应用缺省配置提供的规范UUID。'
+            )
+          },
+          returns: t(
+            'Another business view without installation or close authority.',
+            '返回没有安装与关闭权的业务视图。'
+          ),
+          example: storageHostCases.storageOrganizations?.[0]?.example
+        },
+        backend: {
+          summary: t(
+            'Resolve this organization through the installed native registration and remove close ownership.',
+            '通过已安装原生registration解析本组织后端，并移除关闭所有权。'
+          ),
+          params: {
+            id: t(
+              'Literal id of a plugin installed on the root host.',
+              '根宿主已安装插件的字面量id。'
+            )
+          },
+          returns: t(
+            'Precisely typed borrowed backend; extracted methods retain this organization.',
+            '精确类型的借用后端；提取的方法保持本组织。'
+          ),
+          example: storageHostCases.storageOrganizations?.[0]?.example
+        },
+        backends: {
+          summary: t(
+            'Return a detached map of this organization business backends.',
+            '返回本组织业务后端的脱离Map。'
+          ),
+          returns: t(
+            'A readonly map whose mutation cannot change the host registry.',
+            '返回readonly Map，修改副本不会影响宿主registry。'
+          ),
+          example: storageHostCases.storageOrganizations?.[0]?.example
+        },
+        api: {
+          summary: t(
+            'Selected Feature APIs bound to the immutable organization and original native scope.',
+            '绑定不可变组织与原生scope的已选Feature API。'
+          )
+        },
+        extensions: {
+          summary: t(
+            'Original extension definitions with immutable organization call contexts and captured dependencies.',
+            '拥有不可变组织调用上下文与已捕获依赖的原扩展定义。'
+          )
+        },
+        hooks: {
+          summary: t(
+            'Original host observations filtered by this organization identity.',
+            '按本组织身份过滤的原宿主观察。'
+          )
+        }
+      }
+    },
+    IStorageOrgBinding: {
+      summary: t(
+        'Installation-only native target and deletion callbacks owned by the exact store cell. No second registry or lifecycle is introduced.',
+        '由精确storeCell拥有的安装期原生目标与删除回调，不建立第二registry或生命周期。'
+      ),
+      members: {
+        backend: {
+          summary: t(
+            'Resolve a canonical organization to its existing native physical target.',
+            '将规范组织解析到既有原生物理目标。'
+          ),
+          params: {
+            orgId: t(
+              'Canonical UUID validated by the host organization boundary.',
+              '已由宿主组织边界校验的规范UUID。'
+            )
+          },
+          returns: t(
+            'Original native provider store for that organization.',
+            '该组织的原生provider store。'
+          )
+        },
+        drop: {
+          summary: t(
+            'Delete only the requested physical organization without changing other targets.',
+            '只删除请求的物理组织，不改变其它目标。'
+          ),
+          params: {
+            orgId: t('Canonical UUID supplied to host.dropOrg.', '传给host.dropOrg的规范UUID。')
+          },
+          returns: t(
+            'Completion of that native target deletion; failures retain the original error.',
+            '返回该原生目标删除的完成结果，失败保留原错误。'
+          )
+        }
+      }
+    },
+    IStorageBackendOrgContext: {
+      summary: t(
+        'Read-only immutable invocation ports from the original registration. The context grants no store registration, provider installation or close authority.',
+        '来自原registration的只读不可变调用接点；不授予store登记、provider安装或关闭权。'
+      ),
+      members: {
+        orgId: {
+          summary: t(
+            'Canonical organization fixed for every derived invocation.',
+            '固定用于所有派生调用的规范组织身份。'
+          )
+        },
+        execution: {
+          summary: t(
+            'Original shared sync and async runners with original registration admission.',
+            '保留原registration准入的共享同步与异步runner。'
+          )
+        },
+        stageBindings: {
+          summary: t(
+            'Original observation factories emitting the captured organization identity.',
+            '发出已捕获组织身份的原观察工厂。'
+          )
+        },
+        callContext: {
+          summary: t(
+            'Immutable orgId and projection of installation-captured borrowed dependencies.',
+            '不可变orgId与安装时已捕获借用依赖的投影。'
+          )
+        },
+        createTransactionApi: {
+          summary: t(
+            'Bind selected API methods to one authentic native scope before freeze.',
+            '在冻结前将已选API方法绑定到真实原生scope。'
+          ),
+          params: {
+            scope: t(
+              'Fresh scope created and registered by the native transaction owner.',
+              '由原生事务owner构造并登记的新scope。'
+            )
+          },
+          returns: t(
+            'Original Feature transaction projection or undefined when absent.',
+            '返回原Feature事务投影，未选时返回undefined。'
+          )
+        }
+      }
     },
     IStorageHooks: {
       summary: t(
@@ -408,6 +612,19 @@ off()`
       }
     }
   },
-  enums: {},
+  enums: {
+    StorageErrorCode: {
+      summary: t(
+        'Stable host errors retain native types and original causes.',
+        '宿主稳定错误保留原生类型与原错误cause。'
+      ),
+      values: {
+        orgDeleteFailed: t(
+          'At least one organization target failed after every backend was attempted. Inspect all original errors and retry without rolling back successful deletions.',
+          '尝试全部后端后仍有组织目标删除失败；检查所有原错误并重试，不回滚已成功删除。'
+        )
+      }
+    }
+  },
   enhancers: {}
 }

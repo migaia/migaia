@@ -5,7 +5,10 @@ import { asyncDisposeKey } from '@migaia/plugin-host'
 import {
   getBackendEnvelopeStages,
   getBackendValueCommit,
-  getBackendEntityQueryMethods
+  getBackendEntityQueryMethods,
+  getBackendEntityAccess,
+  type IBackendEntityAccess,
+  type IEntitySecondaryMethods
 } from '../core/change-controller.js'
 import { repositoryMigrationKey } from '../core/record-layout.js'
 import {
@@ -98,7 +101,8 @@ import type {
   IMigrateOptions,
   IEntityConnectOptions,
   IEntityQuery,
-  IRepository
+  IRepository,
+  IEntityConnectStore
 } from './types.js'
 import type { ISnapshotEntityIndexes } from './index-projection.js'
 import { projectEntityIndexes } from './index-projection.js'
@@ -258,10 +262,21 @@ const validateListOptions = (options: unknown, backend: IKeyValueStore['backend'
 }
 
 /** Accept every canonical open backend without a second capability/identifier validator. */
-const assertKeyValueStore: (store: unknown) => asserts store is IKeyValueStore = (store) => {
+const snapshotEntityStore = (store: IEntityConnectStore): IBackendEntityAccess => {
+  /** Only the exact original host alias can reuse the already-validated ownership-free facts. */
+  const access = getBackendEntityAccess(store)
+  if (access !== undefined) return access
   const snapshot = snapshotKeyValueStoreDetailed(store)
   if (!snapshot.valid)
     throw new StorageError(StorageErrorCode.invalidConfig, { cause: snapshot.cause })
+  /** Every other input retains the original complete raw resource and record admission. */
+  return {
+    store: snapshot.store,
+    recordStore: () => snapshotRecordStore(store)?.store,
+    secondaryStore: () => (isSecondaryIndexRecordStore(store) ? store : undefined),
+    assertScope: (scope) => assertTransactionOwner(snapshot.store, scope),
+    assertCurrent: () => undefined
+  }
 }
 /** Entity extensions preserve the original neutral family and use this package's error owner. */
 const normalizeError = (
@@ -310,10 +325,12 @@ export const createRepository = <
   TChangeFeed extends boolean = false
 >(
   config: IRepositoryConfig<TDomain, TStored>,
-  store: IKeyValueStore,
+  inputStore: IEntityConnectStore,
   connectOptions?: IEntityConnectOptions
 ): IRepository<TDomain, TIndexes, TChangeFeed, TAugmentMethods> => {
-  assertKeyValueStore(store)
+  /** Entity gets business methods and original owner assertions, never a native close handle. */
+  const backend = snapshotEntityStore(inputStore)
+  const store = backend.store
   const {
     name,
     key: keyProp,
@@ -339,7 +356,7 @@ export const createRepository = <
     throw new StorageError(StorageErrorCode.invalidConfig, { backend: store.backend, cause })
   }
 
-  const recordStore = snapshotRecordStore(store)?.store
+  const recordStore = backend.recordStore()
   const records = recordStore !== undefined
   /** Non-unique selectors retain their existing write call counts; only constraints need scans. */
   const uniqueIndexes: ISnapshotEntityIndexes<TDomain> = Object.freeze(
@@ -1372,11 +1389,16 @@ export const createRepository = <
               }
             }
           }
+          /** Native index admission retains its original lazy position after source preparation. */
+          const secondaryStore =
+            readView === undefined && recordStore !== undefined
+              ? backend.secondaryStore()
+              : undefined
           const native =
             readView === undefined
-              ? recordStore !== undefined && isSecondaryIndexRecordStore(recordStore)
+              ? secondaryStore !== undefined
                 ? (query: Parameters<ISecondaryIndexRecordStore['iterateRecordIndex']>[0]) =>
-                    recordStore.iterateRecordIndex(query, ctx)
+                    secondaryStore.iterateRecordIndex(query, ctx)
                 : undefined
               : readView.iterateRecordIndex
           /** Bound operations carry only readiness proved by their own current native scope. */
@@ -1507,7 +1529,7 @@ export const createRepository = <
     onRead?: () => void,
     orderedSource = true
   ): IStorageIterator<readonly [IStorageKey, TDomain]> => {
-    assertTransactionOwner(store, scope)
+    backend.assertScope(scope)
     const source = scope.iterateRecords()
     const rows = createOrderedRecordIndex<readonly [IStorageKey, TDomain]>()
     const seen = new Set<string>()
@@ -1522,7 +1544,7 @@ export const createRepository = <
       source,
       async (next, _fail, currentScope) => {
         const current = currentScope as ITransactionScope
-        assertTransactionOwner(store, current)
+        backend.assertScope(current)
         const context = readTransactionOperationContext(current)
         const runtime = entityRuntime(current)
         const index = selection.index === undefined ? undefined : config.indexes[selection.index]
@@ -1924,7 +1946,7 @@ export const createRepository = <
   const bindRepository = (
     scope: ITransactionScope
   ): IEntityTransactionScope<TDomain, TIndexes, TAugmentMethods> => {
-    const info = assertTransactionOwner(store, scope)
+    const info = backend.assertScope(scope)
     let stateReference = uniqueStates.get(info)
     if (uniqueDefinitions.length !== 0 && stateReference?.deref() === undefined) {
       const changes = new Map<string, IEntityUniqueMutation>()
@@ -1953,7 +1975,7 @@ export const createRepository = <
       query: () => queryFor<undefined>(scope),
       get: (id: IStorageKey) =>
         runTransactionOperation(scope, async (current) => {
-          assertTransactionOwner(store, current)
+          backend.assertScope(current)
           const context = readTransactionOperationContext(current)
           assertStorageKey(id, store.backend)
           const runtime = entityRuntime(current)
@@ -1966,7 +1988,7 @@ export const createRepository = <
         }),
       put: (value: TDomain) =>
         runTransactionOperation(scope, async (current) => {
-          assertTransactionOwner(store, current)
+          backend.assertScope(current)
           const context = readTransactionOperationContext(current)
           const runtime = entityRuntime(current)
           const prepared = await toEnvelope(value, context, runtime)
@@ -1997,7 +2019,7 @@ export const createRepository = <
         }),
       remove: (id: IStorageKey) =>
         runTransactionOperation(scope, async (current) => {
-          assertTransactionOwner(store, current)
+          backend.assertScope(current)
           assertStorageKey(id, store.backend)
           await current.deleteRecord(composeRepositoryKey(name, id))
           await current.deleteRecord(composeStructuredKey(name, id))
@@ -2005,7 +2027,7 @@ export const createRepository = <
         }),
       list: (options?: IListSnapshot<TDomain> | IIndexedListOptions<TDomain, TIndexes>) =>
         runTransactionOperation(scope, async (current) => {
-          assertTransactionOwner(store, current)
+          backend.assertScope(current)
           const context = readTransactionOperationContext(current)
           /** Metadata probes never build indexes or poison this transaction on a stale generation. */
           const handle =
@@ -2266,13 +2288,11 @@ export const createRepository = <
           }
           migrated += batch.length
         } else {
-          let indexedStore: ISecondaryIndexRecordStore | undefined
+          let indexedStore: IEntitySecondaryMethods | undefined
           let indexedHandle: IRecordIndexHandle | undefined
           try {
             indexedStore =
-              Object.keys(config.indexes).length > 0 && isSecondaryIndexRecordStore(recordStore)
-                ? recordStore
-                : undefined
+              Object.keys(config.indexes).length > 0 ? backend.secondaryStore() : undefined
             /** Materialize the transaction's current snapshot once, not the earlier scan value. */
             const executeMigrationBatch = async (tx: ITransactionScope, indexed: boolean) => {
               /**

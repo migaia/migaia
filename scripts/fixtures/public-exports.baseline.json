@@ -1024,7 +1024,9 @@
         "KEY_DOMAIN_LIMITS",
         "QueryOperation",
         "QueryOperator",
+        "RdfDatatype",
         "RdfQueryMethod",
+        "RdfTermType",
         "RecordQueryMethod",
         "STORAGE_CONTRACT_SOURCE",
         "StorageContractError",
@@ -1063,6 +1065,7 @@
         "createTransactionBuilder",
         "createTransactionOwner",
         "createVectorQuery",
+        "decodeOrderedStorageKey",
         "defineConcurrencyPolicy",
         "defineStorageCapability",
         "deriveStorageSqlQuery",
@@ -1071,7 +1074,9 @@
         "encodeOrderedStorageKey",
         "encodeStorageOrgStringPrefix",
         "encodeStorageRdfQuad",
+        "encodeStorageRdfTerm",
         "fromValueCodec",
+        "getStorageOrgGraphPrefix",
         "hasStorageCapability",
         "implement",
         "intrinsicConstructorName",
@@ -1088,6 +1093,7 @@
         "migrateEnvelopeSync",
         "nextTransactionIterator",
         "orderStorageKeysByBytes",
+        "prefixStorageOrgGraph",
         "prefixStorageOrgKey",
         "provideCapabilities",
         "readConcurrencyLockIdentities",
@@ -1120,6 +1126,11 @@
         "snapshotStorageRdfQuad",
         "snapshotStorageRdfTerm",
         "snapshotStorageTtlTarget",
+        "snapshotStorageVector",
+        "snapshotStorageVectorCollection",
+        "snapshotStorageVectorFilter",
+        "snapshotStorageVectorSearch",
+        "snapshotStorageVectorUpsert",
         "snapshotSyncWriteOptions",
         "term",
         "ttl",
@@ -1127,6 +1138,7 @@
         "sparqlFragment",
         "sql",
         "sqlFragment",
+        "unprefixStorageOrgGraph",
         "unprefixStorageOrgKey",
         "useStorageCapability",
         "useTransactionCapability",
@@ -1774,6 +1786,9 @@
         "throwIfAborted",
         "withAbort"
       ],
+      "./authoring/vector": [
+        "recommendStorageVector"
+      ],
       "./entity": [
         "REPOSITORY_KEY_PREFIX",
         "RecordIndexBackfillPhase",
@@ -1788,6 +1803,23 @@
         "selectCodec",
         "structuredCodec"
       ]
+    },
+    "@migaia/storage-plugin-sparql": {
+      ".": ["ERROR_SOURCE", "SparqlErrorCode"],
+      "./http": ["httpEndpoint"],
+      "./oxigraph": ["oxigraphEndpoint"]
+    },
+    "@migaia/storage-plugin-object": {
+      ".": [
+        "ERROR_SOURCE",
+        "ObjectDriverKind",
+        "ObjectErrorCode",
+        "objectBackendKind",
+        "objectBackendPlugin"
+      ],
+      "./fs": ["fsObjectDriver"],
+      "./s3": ["s3ObjectDriver"],
+      "./features/presign": ["objectPresignFeature"]
     },
     "@migaia/storage-plugin-sqlite": {
       ".": [

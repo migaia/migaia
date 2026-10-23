@@ -174,7 +174,7 @@ export type {
 export { sqlFragment, createSqlTag, deriveStorageSqlQuery } from './sql.js'
 export type { IQueryStageObserver } from './query.js'
 
-export { encodeOrderedStorageKey } from './key-order.js'
+export { encodeOrderedStorageKey, decodeOrderedStorageKey } from './key-order.js'
 export { snapshotStorageBatchKeys, createStorageBatchKeyCapture } from './key-order.js'
 export type { IStorageBatchKey, IStorageBatchKeyCapture } from './key-order.js'
 
@@ -293,11 +293,17 @@ export type {
   IStorageCounterIncrement
 } from './capabilities/counter.js'
 export {
+  RdfTermType,
+  RdfDatatype,
   term,
   snapshotStorageRdfTerm,
   snapshotStorageRdfPattern,
   snapshotStorageRdfQuad,
-  encodeStorageRdfQuad
+  encodeStorageRdfTerm,
+  encodeStorageRdfQuad,
+  getStorageOrgGraphPrefix,
+  prefixStorageOrgGraph,
+  unprefixStorageOrgGraph
 } from './capabilities/rdf.js'
 export type {
   IRdfNamedNode,
@@ -338,7 +344,22 @@ export type {
   ISparqlApi
 } from './capabilities/sparql.js'
 
-export { vector, DeleteCountMode } from './capabilities/vector.js'
-export type { IVectorApi, IVectorCollection, IVectorFilter } from './capabilities/vector.js'
+export {
+  vector,
+  DeleteCountMode,
+  snapshotStorageVectorCollection,
+  snapshotStorageVector,
+  snapshotStorageVectorUpsert,
+  snapshotStorageVectorFilter,
+  snapshotStorageVectorSearch
+} from './capabilities/vector.js'
+export type {
+  IVectorApi,
+  IVectorCollection,
+  IVectorFilter,
+  IStorageVectorConfiguration,
+  IStorageVectorValidation,
+  IStorageVectorPoint
+} from './capabilities/vector.js'
 export { rdf } from './capabilities/rdf.js'
 export type { IRdfApi, ITransactionRdfApi } from './capabilities/rdf.js'

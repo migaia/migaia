@@ -40,6 +40,11 @@ export const StorageErrorCode = {
    * identity. Callers inspect the original cleanup cause and treat that resource as terminal.
    */
   storageHostDisposeFailed: 'STORAGE_HOST_DISPOSE_FAILED',
+  /**
+   * Some organization targets failed deletion after all targets were attempted; inspect errors and
+   * retry.
+   */
+  orgDeleteFailed: 'ORG_DELETE_FAILED',
   /** A backend token does not match the installed store or selected Feature. */
   backendKindMismatch: 'BACKEND_KIND_MISMATCH',
   /** Schema or codec configuration is malformed; repair its descriptor before retrying. */

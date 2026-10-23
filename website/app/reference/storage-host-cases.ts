@@ -3,6 +3,48 @@ import type { ICaseDoc, IText } from './contract.js'
 const t = (en: string, zh: string): IText => ({ en, zh })
 /** Application extensions retain their exact inputs while the host owns installation and cleanup. */
 export const storageHostCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
+  memoryNativeVector: [
+    {
+      title: t('Rank points in the installed memory namespace', '在已安装 memory namespace 排名点'),
+      problem: t(
+        'Use native vector search while sharing original TTL and organization ownership.',
+        '使用原生向量检索并共享原 TTL 与组织拥有者。'
+      ),
+      example: `import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { vector, ttl, lockKey } from '@migaia/storage-contract'
+await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+const store = host.backend('memory')
+const collection = store.use(vector).collection<{ group: string }>('docs', { dimensions: 2, metric: 'dot' })
+await collection.upsert([{ id: 'a', vector: [1, 0], payload: { group: 'docs' } }])
+console.log((await collection.near([1, 0]).where({ group: 'docs' }).topK(1).all())[0]?.id)
+await store.transaction(async (scope) => { await scope.use(ttl).expire(lockKey.vector('docs', 'a'), 0) })
+console.log(await collection.search([1, 0], { k: 1 }))
+// a, []`,
+      result: t(
+        'Returns a, then no hits after the original transaction expires the vector.',
+        '返回 a，原事务设置向量立即到期后无命中。'
+      )
+    }
+  ],
+  recommendStorageVector: [
+    {
+      title: t('Synthesize a native recommendation direction', '合成原生推荐方向'),
+      problem: t(
+        'Backends need the same mean rule before native retrieval.',
+        '后端在原生检索前需要同一均值规则。'
+      ),
+      example: `import { recommendStorageVector } from '@migaia/storage-host/authoring/vector'
+console.log(recommendStorageVector([[2, 0], [0, 2]], [[1, 0]]))
+console.log(recommendStorageVector([[2, 4]], []))
+console.log(recommendStorageVector([[2, 4]]))
+// [0, 1], [2, 4], [2, 4]`,
+      result: t(
+        'Returns detached readonly vectors. Native engines retain search and collection ownership.',
+        '返回独立只读向量；检索与 collection 仍由原生引擎拥有。'
+      )
+    }
+  ],
+
   observeStorageBatch: [
     {
       title: t('Share one batch observation pair', '共享一对批量操作观察事件'),
@@ -58,6 +100,28 @@ console.log(await repo.query().where({ name: 'Ada' }).orderByComparator((left, r
   ],
   memoryBackendPlugin: [
     {
+      title: t('Bound one memory namespace with native LRU', '用原生 LRU 限制一个内存 namespace'),
+      problem: t(
+        'Evict committed physical entries without a second cache or transaction owner.',
+        '驱逐已提交物理条目，不另建缓存或事务 owner。'
+      ),
+      example: `import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+await using host = await createStorageHost({ plugins: [memoryBackendPlugin({ capacity: { maxEntries: 2 } })] })
+const memory = host.backend('memory')
+host.hooks.on('onEvict', event => console.log(event.channel, event.count))
+await memory.set('a', 'a')
+await memory.set('b', 'b')
+await memory.get('a')
+await memory.set('c', 'c')
+console.log(await memory.get('b'))
+// value 1
+// null`,
+      result: t(
+        'Prints value 1 and null; only the committed least-recent entry is evicted.',
+        '输出 value 1 和 null；仅驱逐已提交的最久未访问条目。'
+      )
+    },
+    {
       title: t('Commit three native memory channels', '提交内存的三个原生通道'),
       problem: t(
         'One isolated backend needs text, bytes and queried records within the original transaction owner.',
@@ -98,6 +162,57 @@ console.log(resolveStorageNamespace('cache', org, defaultOrg))`,
       result: t(
         'Prints prefs, prefs/org and cache/org, where org is the supplied canonical UUID.',
         '输出prefs、prefs/org与cache/org，其中org为给出的规范UUID。'
+      )
+    }
+  ],
+  entityOrganizations: [
+    {
+      title: t(
+        'Connect one entity layout to separate organizations',
+        '将同一实体布局连接到不同组织'
+      ),
+      problem: t(
+        'Entity repositories need organization isolation without owning a backend lifetime.',
+        '实体仓储需要组织隔离，同时不取得后端生命周期所有权。'
+      ),
+      example: `import { createStorageHost, createOrgId, memoryBackendPlugin } from '@migaia/storage-host'
+import { defineEntity } from '@migaia/storage-host/entity'
+
+await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+const users = defineEntity<{ id: string; name: string }>({ name: 'users', key: 'id' })
+const left = users.connect(host.org(createOrgId()).backend('memory'))
+const right = users.connect(host.org(createOrgId()).backend('memory'))
+await left.put({ id: 'same', name: 'Ada' })
+await right.put({ id: 'same', name: 'Grace' })
+console.log(await left.get('same'), await right.get('same'))`,
+      result: t(
+        'Prints Ada and Grace from independent native namespaces; root resource syntax closes both.',
+        '分别从独立原生namespace输出Ada与Grace；根资源语法统一关闭。'
+      )
+    }
+  ],
+  storageOrganizations: [
+    {
+      title: t(
+        'Keep captured business methods inside one organization',
+        '让提取的业务方法保持组织隔离'
+      ),
+      problem: t(
+        'Two organizations share one host while writing the same logical key.',
+        '两个组织共用宿主并写入相同逻辑键。'
+      ),
+      example: `import { createStorageHost, createOrgId, memoryBackendPlugin } from '@migaia/storage-host'
+
+await using host = await createStorageHost({ plugins: [memoryBackendPlugin({ namespace: 'prefs' })] })
+const left = host.org(createOrgId()).backend('memory')
+const right = host.org(createOrgId()).backend('memory')
+const writeLeft = left.set
+await right.set('theme', 'light')
+await writeLeft('theme', 'dark')
+console.log(await left.get('theme'), await right.get('theme'))`,
+      result: t(
+        'Prints dark and light. The captured method retains its native namespace.',
+        '输出dark和light，提取的方法保持原生namespace。'
       )
     }
   ],

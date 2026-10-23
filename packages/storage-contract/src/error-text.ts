@@ -1,5 +1,7 @@
 /** Stable validation causes used by codec and synchronous-option admission boundaries. */
 export const StorageContractErrorText = {
+  /** Physical key readers admit only the original complete canonical ordered wire encoding. */
+  orderedKeyInvalid: 'ordered storage key encoding is invalid',
   /** Blob inputs are captured before native object I/O or upload-reader ownership. */
   blobArgument: 'blob key, body or options are invalid',
   /** A returned object grants one stream-or-bytes right for its original resource lifetime. */
@@ -22,6 +24,8 @@ export const StorageContractErrorText = {
   counterIncrement: 'storage counter increment must be a safe integer',
   /** Counter text and arithmetic must preserve canonical decimal safe-integer values. */
   counterValue: 'storage counter value or result is not a canonical safe integer',
+  /** Vector shape and finite values must be valid before a native collection call. */
+  vectorArgument: 'storage vector collection, point, filter or search argument is invalid',
   /** RDF terms and ground quad positions must be portable before native writes or query binding. */
   rdfArgument: 'RDF term, literal annotation or ground quad is invalid',
   /**
@@ -79,6 +83,8 @@ export const StorageContractErrorText = {
   orgId: 'orgId must be a canonical lowercase UUID',
   /** Unwrapping requires one complete physical envelope from the requested organization. */
   orgKeyEnvelope: 'organization key must contain the exact marker, orgId, and logical key',
+  /** Physical RDF graphs must use the exact organization's canonical default or named envelope. */
+  orgGraphEnvelope: 'organization graph must contain the exact orgId and canonical graph envelope',
   /** Locks must identify a supported physical channel and a valid independently owned key. */
   lockArgument: 'lock key must identify a supported channel and valid key',
   /** Policy definitions and options must be valid before any backend or decision callback runs. */

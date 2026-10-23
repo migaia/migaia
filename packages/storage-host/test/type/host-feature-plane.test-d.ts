@@ -95,6 +95,21 @@ void apiHost.api.literal
 // @ts-expect-error unselected method names cannot gain authority through the host projection.
 void apiHost.api['with-api'].missing
 
+/** Organization views retain selected API inference while removing root resource authority. */
+const apiOrg = apiHost.org('00000000-0000-0000-0000-000000000000')
+const orgLiteral: 'literal' = await apiOrg.api['with-api'].literal()
+void orgLiteral
+// @ts-expect-error Organization views cannot install additional plugins.
+apiOrg.use(apiPlugin)
+// @ts-expect-error Organization views cannot delete organizations.
+apiOrg.dropOrg('00000000-0000-0000-0000-000000000000')
+// @ts-expect-error Organization views cannot close the root owner.
+apiOrg.dispose()
+// @ts-expect-error Borrowed native backends retain no close ownership.
+apiOrg.backend('with-api').dispose()
+// @ts-expect-error Borrowed native backends retain no symbol close ownership.
+apiOrg.backend('with-api')[Symbol.asyncDispose]()
+
 /** A descriptor without a typed installer retains the base admission contract. */
 const baseKind = defineStorageBackendKind()('base')
 const basePlugin = definePlugin('base', (core: IStoragePluginCore) => ({

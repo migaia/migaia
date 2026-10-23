@@ -131,6 +131,10 @@ type INativeState = {
   readonly context: IConcurrencyAttemptContext | undefined
   readonly baseline: Map<string, number>
   readonly changed: Map<IChannel, Map<string, IStorageKey>>
+  readonly expirations: Map<
+    string,
+    { readonly target: ISqliteTtlTarget; readonly deadline: number }
+  >
   readonly expiresAt: number | undefined
   mode: 'deferred' | 'immediate'
   failure: unknown
@@ -584,12 +588,7 @@ export function createSqliteStore<TValue>(
       'get',
       state
     )
-    if (
-      row &&
-      channel !== 'metadata' &&
-      row.expires_at !== null &&
-      Number(row.expires_at) <= Date.now()
-    ) {
+    if (row && channel !== 'metadata' && !liveExpiration(channel, key, row.expires_at, state)) {
       if (state) prune(channel, key, state)
       else syncMutation((current) => prune(channel, key, current), [], undefined, orgId)
       return channel === 'text' || channel === 'bytes' ? null : undefined
@@ -609,6 +608,32 @@ export function createSqliteStore<TValue>(
       state
     )
     if (result.changes !== 0 && result.changes !== 0n) changed(state, channel, key)
+  }
+  /** First live reads retain the native snapshot's deadline until the original attempt commits. */
+  const liveExpiration = (
+    channel: Exclude<IChannel, 'metadata'>,
+    key: IStorageKey,
+    expiresAt: ISqliteValue | undefined,
+    state?: INativeState,
+    now = Date.now()
+  ): boolean => {
+    if (expiresAt == null) return true
+    /** The existing revision identity owns this attempt-local observation as well. */
+    const id = identity(channel, key)
+    const deadline = Number(expiresAt)
+    const observed = state?.expirations.get(id)
+    if (observed?.deadline === deadline && !state!.changed.get(channel)?.has(id)) return true
+    if (deadline <= now) return false
+    if (state && !observed && !state.changed.get(channel)?.has(id)) {
+      const target =
+        channel === 'text'
+          ? lockKey.text(key)
+          : channel === 'bytes'
+            ? lockKey.bytes(key as string)
+            : lockKey.record(key)
+      state.expirations.set(id, { target, deadline })
+    }
+    return true
   }
   /** Enumeration uses the existing expiry index and reclaims only expired rows in its own range. */
   const cleanupExpiredRows = (
@@ -638,12 +663,13 @@ export function createSqliteStore<TValue>(
     if (rows.length === 0) return
     /** The original writer rechecks each deadline so a fresh replacement cannot be removed. */
     const reclaim = (current: INativeState): void => {
-      for (const row of rows)
-        prune(
-          channel,
-          channel === 'record' ? decodeKey(row.key as Uint8Array) : decodeHexKey(row.key as string),
-          current
-        )
+      for (const row of rows) {
+        const key =
+          channel === 'record' ? decodeKey(row.key as Uint8Array) : decodeHexKey(row.key as string)
+        const id = identity(channel, key)
+        if (state?.expirations.has(id) && !state.changed.get(channel)?.has(id)) continue
+        prune(channel, key, current)
+      }
     }
     if (state) reclaim(state)
     else syncMutation(reclaim, [], undefined, orgId)
@@ -661,7 +687,8 @@ export function createSqliteStore<TValue>(
   const expiration = (
     target: ISqliteTtlTarget,
     orgId: string,
-    state?: INativeState
+    state?: INativeState,
+    reading = false
   ): ISqliteRow | undefined => {
     if (state) revision(state, target.channel, target.key)
     const row = statement<ISqliteRow | undefined>(
@@ -670,7 +697,12 @@ export function createSqliteStore<TValue>(
       'get',
       state
     )
-    if (row && row.expires_at !== null && Number(row.expires_at) <= Date.now()) {
+    if (
+      row &&
+      (reading
+        ? !liveExpiration(target.channel, target.key, row.expires_at, state)
+        : row.expires_at !== null && Number(row.expires_at) <= Date.now())
+    ) {
       if (state) prune(target.channel, target.key, state)
       else
         syncMutation((current) => prune(target.channel, target.key, current), [], undefined, orgId)
@@ -776,8 +808,8 @@ export function createSqliteStore<TValue>(
     /** Range admission owns copies before native binding. */
     const captured = snapshotKeyRange(range, SqliteNames.backend)
     cleanupExpiredRows('record', orgId, captured, state)
-    const clauses = ['org_id=?', '(expires_at IS NULL OR expires_at>?)']
-    const values: ISqliteValue[] = [orgId, Date.now()]
+    const clauses = ['org_id=?', ...(state ? [] : ['(expires_at IS NULL OR expires_at>?)'])]
+    const values: ISqliteValue[] = [orgId, ...(state ? [] : [Date.now()])]
     if (captured?.lower !== undefined) {
       clauses.push(`key${captured.lowerOpen ? '>' : '>='}?`)
       values.push(encodeOrderedStorageKey(captured.lower, SqliteNames.backend))
@@ -787,7 +819,7 @@ export function createSqliteStore<TValue>(
       values.push(encodeOrderedStorageKey(captured.upper, SqliteNames.backend))
     }
     return statement(
-      `SELECT key,value FROM ${tables.record} WHERE ${clauses.join(' AND ')} ORDER BY key`,
+      `SELECT key,value,expires_at FROM ${tables.record} WHERE ${clauses.join(' AND ')} ORDER BY key`,
       values,
       'all',
       state
@@ -1158,6 +1190,7 @@ export function createSqliteStore<TValue>(
       context: undefined,
       baseline: new Map(),
       changed: new Map(),
+      expirations: new Map(),
       mode: 'deferred',
       failure: undefined,
       expiresAt: undefined
@@ -1198,7 +1231,15 @@ export function createSqliteStore<TValue>(
         state
       )
       for (const row of rows) {
-        if (row.expires_at !== null && Number(row.expires_at) <= now)
+        if (
+          !liveExpiration(
+            'text',
+            keysByIdentity.get(row.key as string)!,
+            row.expires_at,
+            state,
+            now
+          )
+        )
           prune('text', keysByIdentity.get(row.key as string)!, state)
         else result.set(row.key as string, convert('text', 'decode', row.value, scope) as string)
       }
@@ -1302,7 +1343,12 @@ export function createSqliteStore<TValue>(
             SqliteOperation.ttlRemaining,
             () => captureTtlTarget(target),
             (state, _current, input) => {
-              const row = expiration(captureTtlTarget(input as ITtlTarget), state.orgId, state)
+              const row = expiration(
+                captureTtlTarget(input as ITtlTarget),
+                state.orgId,
+                state,
+                true
+              )
               return row?.expires_at == null
                 ? undefined
                 : Math.max(0, Number(row.expires_at) - Date.now())
@@ -1598,6 +1644,8 @@ export function createSqliteStore<TValue>(
     const state = nativeFor(scope)
     let rows: readonly ISqliteRow[] | undefined
     let position = 0
+    /** Cursor position can skip expired physical rows; observation counts only actual values. */
+    let returnedCount = 0
     return transactionOwner.registerIterator<
       ISqliteTransactionScope<TValue>,
       [IStorageKey, TValue]
@@ -1605,21 +1653,28 @@ export function createSqliteStore<TValue>(
       next: (current) =>
         scoped(current, SqliteOperation.next, { range }, (actual, currentScope) => {
           if (rows === undefined) rows = recordRows(actual.orgId, range, actual)
-          const row = rows[position++]
-          if (!row) return { done: true, value: undefined }
-          const key = decodeKey(row.key as Uint8Array)
-          revision(state, 'record', key)
-          return {
-            done: false,
-            value: [key, convert('record', 'decode', row.value, currentScope) as TValue] as [
-              IStorageKey,
-              TValue
-            ]
+          while (position < rows.length) {
+            const row = rows[position++]!
+            const key = decodeKey(row.key as Uint8Array)
+            if (!liveExpiration('record', key, row.expires_at, actual)) {
+              prune('record', key, actual)
+              continue
+            }
+            revision(state, 'record', key)
+            returnedCount++
+            return {
+              done: false,
+              value: [key, convert('record', 'decode', row.value, currentScope) as TValue] as [
+                IStorageKey,
+                TValue
+              ]
+            }
           }
+          return { done: true, value: undefined }
         }),
       close: () => {
         rows = []
-        observe(operationStages, 'onStorageIterationClose', position)
+        observe(operationStages, 'onStorageIterationClose', returnedCount)
       }
     })
   }
@@ -1877,6 +1932,8 @@ export function createSqliteStore<TValue>(
   ): Promise<IConcurrencyAttempt<Awaited<R>>> => {
     /** Original baseline survives only internal physical recovery, never a strategy retry. */
     const baseline = new Map<string, number>()
+    /** First-read deadlines survive only this original attempt and its physical recovery. */
+    const expirations: INativeState['expirations'] = new Map()
     /** A physical upgrade recovery changes only the native BEGIN, not the strategy attempt number. */
     let recover = false
     while (true) {
@@ -1885,6 +1942,7 @@ export function createSqliteStore<TValue>(
         context,
         baseline,
         changed: new Map(),
+        expirations,
         expiresAt: expectedToken?.expiresAt,
         mode: recover || context.locking === 'pessimistic' ? 'immediate' : 'deferred',
         failure: undefined
@@ -1965,6 +2023,17 @@ export function createSqliteStore<TValue>(
         throwIfAborted(context.signal)
         if (state.expiresAt !== undefined && Date.now() >= state.expiresAt)
           throw new StorageContractError(StorageContractErrorCode.lockLost)
+        /** The original commit check uses one local clock sample for all observed native rows. */
+        const commitNow = Date.now()
+        const expired = [...state.expirations.values()]
+          .filter(({ deadline }) => deadline <= commitNow)
+          .map(({ target }) => target)
+        if (expired.length !== 0) {
+          rollbackNative()
+          begun = false
+          observe(terminal, 'afterRollback', StorageContractErrorCode.writeConflict)
+          return { status: 'conflict', phase: 'commit', keys: expired, holder: undefined }
+        }
         await control(SqliteControl.commit, context, false, () => {
           begun = false
           advanceRevisions(state)
@@ -2237,6 +2306,7 @@ export function createSqliteStore<TValue>(
       orgId,
       baseline: new Map(),
       changed: new Map(),
+      expirations: new Map(),
       mode: 'immediate',
       failure: undefined,
       context,
@@ -2288,13 +2358,15 @@ export function createSqliteStore<TValue>(
     const captured = snapshotKeyRange(range, SqliteNames.backend)
     let rows: readonly ISqliteRow[] | undefined
     let position = 0
+    /** Expired snapshot positions do not count as returned iteration values. */
+    let returnedCount = 0
     let returned: Promise<IteratorResult<[IStorageKey, TValue]>> | undefined
     let disposed: Promise<void> | undefined
     const dispose = (): Promise<void> => {
       if (disposed) return disposed
       rows = []
       snapshots.delete(dispose)
-      observe(operationStages, 'onStorageIterationClose', position)
+      observe(operationStages, 'onStorageIterationClose', returnedCount)
       return (disposed = Promise.resolve())
     }
     return {
@@ -2309,18 +2381,24 @@ export function createSqliteStore<TValue>(
               rows = recordRows(orgId, captured)
               snapshots.add(dispose)
             }
-            const row = rows[position++]
-            if (!row) {
-              void dispose()
-              return { done: true, value: undefined }
+            while (position < rows.length) {
+              const row = rows[position++]!
+              const key = decodeKey(row.key as Uint8Array)
+              if (!liveExpiration('record', key, row.expires_at)) {
+                syncMutation((state) => prune('record', key, state), [], undefined, orgId)
+                continue
+              }
+              returnedCount++
+              return {
+                done: false,
+                value: [key, convert('record', 'decode', row.value) as TValue] as [
+                  IStorageKey,
+                  TValue
+                ]
+              }
             }
-            return {
-              done: false,
-              value: [
-                decodeKey(row.key as Uint8Array),
-                convert('record', 'decode', row.value) as TValue
-              ] as [IStorageKey, TValue]
-            }
+            void dispose()
+            return { done: true, value: undefined }
           }
         ).catch((error) => {
           void dispose()
@@ -2813,7 +2891,7 @@ export function createSqliteStore<TValue>(
       controller.assertLive()
       const captured = captureTtlTarget(target)
       return rootRead(SqliteOperation.ttlRemaining, captured, ctx, (orgId, input) => {
-        const row = expiration(captureTtlTarget(input as ITtlTarget), orgId)
+        const row = expiration(captureTtlTarget(input as ITtlTarget), orgId, undefined, true)
         return row?.expires_at == null
           ? undefined
           : Math.max(0, Number(row.expires_at) - Date.now())

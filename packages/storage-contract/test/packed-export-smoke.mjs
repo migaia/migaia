@@ -79,7 +79,7 @@ function main() {
     writeFileSync(join(consumerDirectory, 'package.json'), '{"type":"module"}\n', 'utf8')
     writeFileSync(
       join(consumerDirectory, 'identity.mjs'),
-      `import { fromValueCodec, defineStorageCapability, implement, provideCapabilities, hasStorageCapability, useStorageCapability, sql, createSqlTag, deriveStorageSqlQuery, blob, snapshotStorageBlobPut, snapshotStorageBlobGet, snapshotStorageBlobList, createStorageBlobObject, durableChangeFeed, orderStorageKeysByBytes, encodeStorageOrgStringPrefix, encodeOrderedStorageKey, prefixStorageOrgKey, sparql, sparqlFragment, createSparqlTag, term, rdf, vector, DeleteCountMode, createStorageIteratorLifetime, createRecordQuery } from '@migaia/storage-contract'
+      `import { fromValueCodec, defineStorageCapability, implement, provideCapabilities, hasStorageCapability, useStorageCapability, sql, createSqlTag, deriveStorageSqlQuery, blob, snapshotStorageBlobPut, snapshotStorageBlobGet, snapshotStorageBlobList, createStorageBlobObject, durableChangeFeed, orderStorageKeysByBytes, encodeStorageOrgStringPrefix, encodeOrderedStorageKey, decodeOrderedStorageKey, prefixStorageOrgKey, sparql, sparqlFragment, createSparqlTag, term, rdf, vector, DeleteCountMode, createStorageIteratorLifetime, createRecordQuery } from '@migaia/storage-contract'
 import { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'
 import { isArrayBuffer as utilsBuffer, isUint8Array as utilsBytes } from '@migaia/utils/bytes'
 /** Independent resource bases exercise package-root capability reads without acquiring external clients. */
@@ -160,6 +160,7 @@ const feedApi = { readChanges: noAdmissionIo, tailChanges: noAdmissionIo }
 const optionalStore = provideCapabilities(createBase(), [implement(blob, objectApi), implement(durableChangeFeed, feedApi)])
 if (optionalStore.use(blob) !== objectApi || optionalStore.use(durableChangeFeed) !== feedApi || 'get' in optionalStore) throw new Error('packed independent capability mismatch')
 /** Blob author helpers retain real input snapshots and original resource cleanup after packing. */
+if (decodeOrderedStorageKey(encodeOrderedStorageKey('file', 'packed-fixture'), 'packed-fixture') !== 'file') throw new Error('packed ordered key reader mismatch')
 const uploadBytes = new Uint8Array([3])
 const upload = snapshotStorageBlobPut('file', uploadBytes, undefined, 'packed-fixture')
 uploadBytes[0] = 9

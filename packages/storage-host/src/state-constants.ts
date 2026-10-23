@@ -26,6 +26,8 @@ export const STORAGE_PLUGIN_NAME_PREFIX = 'storage-backend:'
 export const STORAGE_DEFAULT_ORG = '00000000-0000-0000-0000-000000000000'
 /** Memory remains the original fallback label for shared flat-key diagnostic inputs. */
 export const STORAGE_MEMORY_BACKEND = 'memory'
+/** Organization views reject these raw native query entry points before driver execution. */
+export const STORAGE_ORG_NATIVE_QUERY_METHODS = ['sql', 'sparql'] as const
 
 /** Finite fluent families accepted from selected Feature outputs by the original host installer. */
 export const STORAGE_CHAIN_FAMILIES = Object.freeze({
