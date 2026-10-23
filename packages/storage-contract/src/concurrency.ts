@@ -7,20 +7,20 @@ import {
   type IAbortTimeoutSignal,
   type IUtilsReporter
 } from '@migaia/utils/promise'
-import { isUtilsAbortError, isUtilsTimeoutError } from '@migaia/utils/error'
+import { IdentifyError, isUtilsAbortError, isUtilsTimeoutError } from '@migaia/utils/error'
 import { inspectThenable, observeThenableRejection } from '@migaia/utils/function'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { snapshotOperationContext } from './operation-context.js'
 import { readTransactionConcurrency, resolveConcurrencyPolicy } from './transaction.js'
 import type { IStorageBase } from './store.js'
 import { snapshotStorageKey, assertStringStorageKey } from './key.js'
-import { encodeOrderedStorageKey } from './key-order.js'
+import { encodeOrderedStorageKey, snapshotStorageKeyPrefix } from './key-order.js'
 import type { IBackendKind } from './capabilities.js'
 import { StorageContractError, StorageContractErrorCode } from './errors.js'
 import { StorageContractErrorText } from './error-text.js'
 import type { StorageStageKind } from './stage-kind.js'
 import type { IAbortSignal } from '@migaia/utils/promise'
-import type { IOperationContext, IStorageKey } from './context.js'
+import type { IConflictPolicy, IOperationContext, IStorageKey } from './context.js'
 
 /** Physical channel identities used by the original transaction and concurrency owners. */
 export type ILockKey =
@@ -493,6 +493,10 @@ export function normalizeLockKeys(
     const key = snapshotLockKey(value, backend)
     entries.push(Object.freeze({ key, encoded: encodeLockIdentity(key, backend) }))
   }
+  return uniqueNormalizedLockKeys(entries)
+}
+/** Reuses captured byte identities when original options acquire additional implicit locks. */
+function uniqueNormalizedLockKeys(entries: INormalizedLockKey[]): readonly INormalizedLockKey[] {
   sortLockIdentities(entries)
   /** Only adjacent canonical identities are compared; mutable object identity never deduplicates. */
   const unique: INormalizedLockKey[] = []
@@ -502,6 +506,69 @@ export function normalizeLockKeys(
     if (!previous || !equalLockIdentity(previous.encoded, entry.encoded)) unique.push(entry)
   }
   return Object.freeze(unique)
+}
+
+/**
+ * Captures one canonical lock set and its matching immutable identities without granting admission
+ * authority. Consumers share the original key snapshot, ordered encoder and stable deduplication.
+ */
+export function snapshotConcurrencyLockKeys(
+  keys: unknown,
+  backend: IBackendKind
+): { readonly keys: readonly ILockKey[]; readonly identities: readonly string[] } {
+  /** One normalization supplies both detached logical keys and their already captured bytes. */
+  const locks = normalizeLockKeys(keys, backend)
+  return Object.freeze({
+    keys: Object.freeze(locks.map((entry) => entry.key)),
+    identities: snapshotLockIdentities(locks)
+  })
+}
+
+/**
+ * Projects one channel or typed prefix into the same half-open hexadecimal identity interval as
+ * active locks. This is a pure range snapshot, without a lock table or acquisition authority.
+ */
+export function snapshotConcurrencyLockRange(
+  range: { readonly channel: ILockKey['channel']; readonly prefix?: IStorageKey },
+  backend: IBackendKind
+): { readonly lower: string; readonly upper: string } {
+  if (typeof range !== 'object' || range === null || Array.isArray(range))
+    throw invalidLockArgument(backend)
+  /** Borrowed fields are captured once before either channel or typed prefix admission. */
+  let channel: ILockKey['channel']
+  /** Omission selects the entire physical channel without introducing a fabricated logical key. */
+  let prefix: IStorageKey | undefined
+  try {
+    channel = range.channel
+    prefix = range.prefix
+  } catch (cause) {
+    throw invalidLockArgument(backend, cause)
+  }
+  if (
+    channel !== LockChannel.text &&
+    channel !== LockChannel.bytes &&
+    channel !== LockChannel.record
+  )
+    throw invalidLockArgument(backend)
+  /** Only the original channel owner supplies its finite physical ordering. */
+  const rank = LockChannelRank[channel]
+  if (prefix === undefined)
+    return Object.freeze({
+      lower: lockBytesIdentity(new Uint8Array([rank])),
+      upper: lockBytesIdentity(new Uint8Array([rank + 1]))
+    })
+  if (channel === LockChannel.bytes) assertStringStorageKey(prefix, backend)
+  /** The original prefix writer owns all type tags, variable terminators and strict successors. */
+  const bounds = snapshotStorageKeyPrefix(prefix, backend)
+  /** Each bound adds only the same channel byte used by individual lock normalization. */
+  const withChannel = (bytes: Uint8Array): string => {
+    /** One allocation holds the captured channel and the original bound bytes. */
+    const encoded = new Uint8Array(bytes.length + 1)
+    encoded[0] = rank
+    encoded.set(bytes, 1)
+    return lockBytesIdentity(encoded)
+  }
+  return Object.freeze({ lower: withChannel(bounds.lower), upper: withChannel(bounds.upper) })
 }
 
 /** Fixed fields have already been captured by the original option/context admission path. */
@@ -834,6 +901,10 @@ export async function runWithConcurrency<TResult>(
     readonly store: IStorageBase
     readonly options: ITransactionOptions
     readonly policy?: IConcurrencyPolicy
+    /** Derives additional locks once from the original frozen operation-field snapshot. */
+    readonly lock?: (
+      captured: IOperationContext & { readonly conflictPolicy?: IConflictPolicy }
+    ) => readonly ILockKey[]
   },
   port: IConcurrencyPort<TResult>
 ): Promise<Awaited<TResult>> {
@@ -857,30 +928,46 @@ export async function runWithConcurrency<TResult>(
   let capturedLocks: readonly ILockKey[] | undefined
   /** The override is validated but cannot silently replace the already resolved request policy. */
   let capturedOverride: IConcurrencyPolicy | undefined
+  /** Backend derivation is borrowed once and cannot replace any caller-declared lock. */
+  let deriveLocks: typeof request.lock
   try {
     capturedLocks = request.options.lock
     capturedOverride = request.options.concurrency
+    deriveLocks = request.lock
   } catch (cause) {
     throw invalidConcurrencyArgument(cause)
   }
   if (capturedOverride !== undefined) assertConcurrencyPolicy(capturedOverride)
+  if (deriveLocks !== undefined && typeof deriveLocks !== 'function')
+    throw invalidConcurrencyArgument()
   /** Default resolution belongs to the same owner, after the original override getter is read once. */
   const policy = suppliedPolicy ?? resolveConcurrencyPolicy(request.store, capturedOverride)
   /** The exact outer attempt context carries the one shared budget and encoded lock set. */
   const inherited = concurrencyAttemptBudgets.get(request.options)
   /** The original logical identities are encoded/sorted once, not again on nested entries or retry. */
-  const locks = inherited
+  let locks = inherited
     ? inherited.locks
     : capturedLocks === undefined
       ? undefined
       : normalizeLockKeys(capturedLocks, backend)
-  /**
-   * Every actual attempt and nested backend reuses the same immutable identities from
-   * normalization.
-   */
-  const identities = inherited?.identities ?? snapshotLockIdentities(locks)
   /** Context snapshots preserve original signal identity, field causes, org identity and omission. */
   const context = snapshotOperationContext(request.options)
+  if (deriveLocks) {
+    /** Only new keys are captured and encoded; inherited normalized entries remain unchanged. */
+    let additional: readonly ILockKey[]
+    try {
+      additional = deriveLocks(context!)
+    } catch (cause) {
+      if (IdentifyError.identityOf(cause)) throw cause
+      throw invalidConcurrencyArgument(cause)
+    }
+    /** Stable sorting retains the original entry when an implicit lock duplicates an explicit one. */
+    const normalized = normalizeLockKeys(additional, backend)
+    if (normalized.length > 0) locks = uniqueNormalizedLockKeys([...(locks ?? []), ...normalized])
+  }
+  /** Unchanged inherited sets retain their exact immutable identity list as well as their budget. */
+  const identities =
+    locks === inherited?.locks && inherited ? inherited.identities : snapshotLockIdentities(locks)
   /** Native options remain available to a backend while fixed fields keep their single capture. */
   const extensions = snapshotConcurrencyExtensions(request.options)
   /** Only the original operation creates a diagnostic deadline reason and utils signal owner. */

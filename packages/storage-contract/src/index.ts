@@ -194,7 +194,9 @@ export { prefixStorageOrgKey, unprefixStorageOrgKey } from './org.js'
 export {
   runWithConcurrency,
   readConcurrencyLockIdentities,
-  snapshotConcurrencyLockHoldings
+  snapshotConcurrencyLockHoldings,
+  snapshotConcurrencyLockKeys,
+  snapshotConcurrencyLockRange
 } from './concurrency.js'
 export type {
   IConcurrencyAttempt,

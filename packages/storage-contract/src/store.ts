@@ -1,4 +1,4 @@
-import type { ITransactionOptions } from './concurrency.js'
+import type { ITransactionOptions, IWriteConcurrencyOptions } from './concurrency.js'
 import { StorageContractError, StorageContractErrorCode } from './errors.js'
 import {
   snapshotStorageCapabilitiesDetailed,
@@ -121,15 +121,15 @@ export type IKeyValueStore = IStorageBase & {
   /** Writes a string value with optional operation timing and conflict options. */
   set(key: string, value: string, ctx?: IWriteOptions): Promise<void>
   /** Removes one string-channel entry without accessing record keys. */
-  remove(key: string, ctx?: IOperationContext): Promise<void>
+  remove(key: string, ctx?: IOperationContext & IWriteConcurrencyOptions): Promise<void>
   /** Resolves whether a string-channel key exists. */
   has(key: string, ctx?: IOperationContext): Promise<boolean>
   /** Lists currently visible string-channel keys. Opaque provider entries may remain invisible. */
   keys(ctx?: IOperationContext): Promise<string[]>
   /** Clears only this store's string values. */
-  clearValues(ctx?: IOperationContext): Promise<void>
+  clearValues(ctx?: IOperationContext & IWriteConcurrencyOptions): Promise<void>
   /** Clears this store's public value channels; structured extensions also clear bytes and records. */
-  clearAll(ctx?: IOperationContext): Promise<void>
+  clearAll(ctx?: IOperationContext & IWriteConcurrencyOptions): Promise<void>
 
   /**
    * Exists only on synchronous backends. Asynchronous backends such as IndexedDB expose
@@ -163,19 +163,19 @@ export type IRecordStore<TValue = unknown> = IKeyValueStore & {
    * Deletes only this key's byte entry, preserving text and records. Missing byte entries succeed
    * without mutation; asynchronous backends resolve only after the deletion commits.
    */
-  removeBytes(key: string, ctx?: IOperationContext): Promise<void>
+  removeBytes(key: string, ctx?: IOperationContext & IWriteConcurrencyOptions): Promise<void>
   /** Clears the byte channel without clearing string values or records. */
-  clearBytes(ctx?: IOperationContext): Promise<void>
+  clearBytes(ctx?: IOperationContext & IWriteConcurrencyOptions): Promise<void>
   /** Reads a structured record by storage key, resolving to undefined when missing. */
   getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>
   /** Writes a record and resolves its key; omitting key requests provider-defined key generation. */
   putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>
   /** Deletes one structured record. */
-  deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>
+  deleteRecord(key: IStorageKey, ctx?: IOperationContext & IWriteConcurrencyOptions): Promise<void>
   /** Clears records while leaving the other public channels intact. */
-  clearRecords(ctx?: IOperationContext): Promise<void>
+  clearRecords(ctx?: IOperationContext & IWriteConcurrencyOptions): Promise<void>
   /** Clears string values, bytes, and records owned by this store. */
-  clearAll(ctx?: IOperationContext): Promise<void>
+  clearAll(ctx?: IOperationContext & IWriteConcurrencyOptions): Promise<void>
   /** Optional backend-owned metadata channel used by resumable maintenance migrations. */
   readonly metadata?: {
     /** Reads backend-owned maintenance metadata; a missing value resolves to undefined. */
