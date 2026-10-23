@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { it, expect, onTestFinished } from 'vitest'
 import { createStorageHost, defineFeature } from '@migaia/storage-host'
 import type { IStorageChange } from '@migaia/storage-contract'
-import { sqliteBackendPlugin, sqliteBackendKind } from '../src/index.js'
+import { sqliteBackendPlugin, sqliteBackendKind, type ISqliteDriver } from '../src/index.js'
 import { nodeSqliteDriver } from '../src/node.js'
 import { sqliteMaintenanceFeature } from '../src/features/maintenance.js'
 /** Maintenance runs through the real selected Feature and the original connection's SQL tag. */
@@ -51,6 +51,21 @@ it('backs up and vacuums the actual database while rejecting an occupied connect
 /** Publication reaches the real controller through the supported selected Feature getter. */
 it('publishes canonical changed keys once in fixed channel order only after commit', async () => {
   const connection = nodeSqliteDriver(':memory:')
+  /** An allowed injected driver retains native bigint change counts, including zero. */
+  const driver: ISqliteDriver = {
+    exec: connection.exec,
+    prepare: (sql) => {
+      const statement = connection.prepare(sql)
+      return {
+        get: statement.get,
+        all: statement.all,
+        run: (...values) => {
+          const result = statement.run(...values)
+          return { ...result, changes: BigInt(result.changes) }
+        }
+      }
+    }
+  }
   const notifications = defineFeature(sqliteBackendKind, ({ featureExpose }) => ({
     capabilities: [],
     chain: {},
@@ -64,7 +79,7 @@ it('publishes canonical changed keys once in fixed channel order only after comm
     }
   }))
   const host = await createStorageHost({
-    plugins: [sqliteBackendPlugin({ driver: connection }, { notifications })] as const
+    plugins: [sqliteBackendPlugin({ driver }, { notifications })] as const
   })
   onTestFinished(async () => {
     await host.dispose()
@@ -92,6 +107,7 @@ it('publishes canonical changed keys once in fixed channel order only after comm
   events.length = 0
   await store.transaction(async (tx) => {
     await tx.remove('missing')
+    expect(await tx.removeMany(['missing', ['missing'], 'missing'])).toBe(0)
   })
   expect(events).toEqual([])
   await expect(

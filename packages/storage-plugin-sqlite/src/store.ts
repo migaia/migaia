@@ -508,7 +508,7 @@ export function createSqliteStore<TValue>(
       'run',
       state
     )
-    if (result.changes !== 0) changed(state, channel, key)
+    if (result.changes !== 0 && result.changes !== 0n) changed(state, channel, key)
   }
   /** One native write preserves atomic replace across all public channels. */
   const write = (
@@ -570,8 +570,9 @@ export function createSqliteStore<TValue>(
       'run',
       state
     )
-    if (result.changes !== 0) changed(state, channel, key)
-    return result.changes !== 0
+    const mutated = result.changes !== 0 && result.changes !== 0n
+    if (mutated) changed(state, channel, key)
+    return mutated
   }
   /** Native ordered scans preserve the BLOB primary-key order without a JavaScript sort. */
   const recordRows = (
