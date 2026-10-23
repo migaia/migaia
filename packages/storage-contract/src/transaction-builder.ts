@@ -17,6 +17,15 @@ import {
   type ILockedTransactionBuilder
 } from './concurrency.js'
 
+/** Original builder method names remain reserved across locked and unlocked branches. */
+export const TransactionBuilderMethod = Object.freeze({
+  lock: 'lock',
+  concurrency: 'concurrency',
+  signal: 'signal',
+  timeout: 'timeout',
+  run: 'run'
+} as const)
+
 /**
  * This constraint admits an actual transaction function without replacing its scope or option
  * types.
@@ -41,9 +50,13 @@ type IBuilderState = {
   readonly timeoutMs: number | undefined
 }
 /** The locked state determines both actual runtime method presence and the public return shape. */
-type IBuilderOf<TScope, TLocked extends boolean> = TLocked extends true
-  ? ILockedTransactionBuilder<TScope>
-  : ITransactionBuilder<TScope>
+type IBuilderOf<
+  TScope,
+  TLocked extends boolean,
+  TAugmentMethods extends object
+> = TLocked extends true
+  ? ILockedTransactionBuilder<TScope, TAugmentMethods>
+  : ITransactionBuilder<TScope, TAugmentMethods>
 
 /** Produces the existing argument boundary without introducing backend or execution authority. */
 function invalidBuilder(backend: IBackendKind, cause?: unknown): StorageContractError {
@@ -59,10 +72,14 @@ function invalidBuilder(backend: IBackendKind, cause?: unknown): StorageContract
  * normalizes once, and returns the original store.transaction Promise after one direct invocation.
  * The actual store's full scope and option domain remain visible to callers.
  */
-export function createTransactionBuilder<const TStore extends IBuilderStore>(
+export function createTransactionBuilder<
+  const TStore extends IBuilderStore,
+  TAugmentMethods extends object = Record<never, never>
+>(
   store: TStore,
-  options?: Omit<NonNullable<Parameters<TStore['transaction']>[1]>, 'lock'>
-): ITransactionBuilder<IBuilderScopeOf<TStore>> {
+  options?: Omit<NonNullable<Parameters<TStore['transaction']>[1]>, 'lock'>,
+  methods?: TAugmentMethods
+): ITransactionBuilder<IBuilderScopeOf<TStore>, TAugmentMethods> {
   /**
    * Authentic registration supplies fixed backend diagnostics without reading mutable store
    * getters.
@@ -72,6 +89,8 @@ export function createTransactionBuilder<const TStore extends IBuilderStore>(
   let captured: ITransactionOptions & object
   /** The borrowed transaction method is captured once and always invoked with the original store. */
   let transaction: TStore['transaction']
+  /** Pure Feature methods retain their references and receive each real derived builder as this. */
+  let augmentation: TAugmentMethods
   if (
     options !== undefined &&
     (typeof options !== 'object' || options === null || Array.isArray(options))
@@ -80,6 +99,19 @@ export function createTransactionBuilder<const TStore extends IBuilderStore>(
   try {
     captured = { ...options }
     transaction = store.transaction
+    if (
+      methods !== undefined &&
+      (typeof methods !== 'object' || methods === null || Array.isArray(methods))
+    )
+      throw new TypeError(StorageContractErrorText.concurrencyArgument)
+    augmentation = { ...methods } as TAugmentMethods
+    for (const key of Reflect.ownKeys(augmentation))
+      if (
+        (typeof key === 'string' && Object.hasOwn(TransactionBuilderMethod, key)) ||
+        typeof Reflect.get(augmentation, key) !== 'function'
+      )
+        throw new TypeError(StorageContractErrorText.concurrencyArgument)
+    Object.freeze(augmentation)
   } catch (cause) {
     throw invalidBuilder(backend, cause)
   }
@@ -91,9 +123,10 @@ export function createTransactionBuilder<const TStore extends IBuilderStore>(
   function create<TLocked extends boolean>(
     state: IBuilderState,
     locked: TLocked
-  ): IBuilderOf<IBuilderScopeOf<TStore>, TLocked> {
+  ): IBuilderOf<IBuilderScopeOf<TStore>, TLocked, TAugmentMethods> {
     /** Every derived object shares the original immutable options and old lock blocks. */
     const builder = {
+      ...augmentation,
       /** Captures only these newly declared identities; earlier branch history remains untouched. */
       lock(first: ILockKey, ...rest: readonly ILockKey[]) {
         /** Snapshot factories detach mutable key components before this call returns. */
@@ -116,7 +149,8 @@ export function createTransactionBuilder<const TStore extends IBuilderStore>(
         return create({ ...state, timeoutMs }, locked)
       }
     }
-    if (!locked) return Object.freeze(builder) as IBuilderOf<IBuilderScopeOf<TStore>, TLocked>
+    if (!locked)
+      return Object.freeze(builder) as IBuilderOf<IBuilderScopeOf<TStore>, TLocked, TAugmentMethods>
     return Object.freeze({
       ...builder,
       /**
@@ -149,7 +183,7 @@ export function createTransactionBuilder<const TStore extends IBuilderStore>(
           Awaited<TResult>
         >
       }
-    }) as IBuilderOf<IBuilderScopeOf<TStore>, TLocked>
+    }) as IBuilderOf<IBuilderScopeOf<TStore>, TLocked, TAugmentMethods>
   }
   return create(
     {

@@ -921,14 +921,35 @@ export const storageContractReference: ILibraryReference = {
         source: t(
           'IRecordQuerySource captures pushdown facts and execute once. execute receives only safe-prefix conditions, optional fields and captured operation context; projected native rows are unknown.',
           'IRecordQuerySource 一次捕获下推事实与 execute；execute 仅接收安全前缀条件、可选字段及捕获的操作上下文，原生投影行保持 unknown。'
+        ),
+        methods: t(
+          'Optional Feature-owned pure method object; capture once and retain each function reference on every where/select/requirePushdown result.',
+          '可选的 Feature 自有纯方法对象；一次捕获，每个 where/select/requirePushdown 结果保留原函数引用。'
         )
       },
       returns: t(
-        'IQueryChain<T,TContext> with three where forms, one select, all, explain and requirePushdown. This slice does not advertise other terminals. all synchronously admits its full mapper/cleanup lifetime to the original transaction iterator owner and retains its first failure before cleanup.',
-        '返回 IQueryChain<T,TContext>，具有三种 where、一次 select、all、explain 与 requirePushdown；本切片不声明其他终点，all 同步把完整 mapper/清理区间登记到原事务迭代器 owner，清理前保留首错。'
+        'IQueryChain<T,TContext,T,true,TAugmentMethods> with three where forms, one select, all, explain and requirePushdown. This slice does not advertise other terminals. all synchronously admits its full mapper/cleanup lifetime to the original transaction iterator owner and retains its first failure before cleanup.',
+        '返回 IQueryChain<T,TContext,T,true,TAugmentMethods>，具有三种 where、一次 select、all、explain 与 requirePushdown；本切片不声明其他终点，all 同步把完整 mapper/清理区间登记到原事务迭代器 owner，清理前保留首错。'
       ),
       example: storageContractCases.createRecordQuery![0]!.example,
       cases: storageContractCases.createRecordQuery
+    },
+    RecordQueryMethod: {
+      role: 'constant',
+      purpose: t(
+        'Canonical built-in record query names; Feature methods with these names reject before source execution.',
+        '记录查询内建方法的规范名称；同名 Feature 方法在数据源执行前拒绝。'
+      ),
+      example: 'console.log(RecordQueryMethod.where, RecordQueryMethod.all) // where all'
+    },
+    TransactionBuilderMethod: {
+      role: 'constant',
+      purpose: t(
+        'Canonical reserved builder methods shared by unlocked and locked branches.',
+        '未锁定与已锁定分支共用的规范 builder 保留方法。'
+      ),
+      example:
+        'console.log(TransactionBuilderMethod.lock, TransactionBuilderMethod.run) // lock run'
     },
     QueryOperation: {
       role: 'constant',
@@ -979,6 +1000,10 @@ export const storageContractReference: ILibraryReference = {
         options: t(
           'Optional native transaction options excluding lock. Capture fields once; each derivation shares them without copying accumulated lock history.',
           '不含 lock 的可选原生事务选项；字段只捕获一次，各派生共享选项，不复制累计锁历史。'
+        ),
+        methods: t(
+          'Optional Feature-owned pure methods. Configuration and lock branches retain the original references and complete inferred method types.',
+          '可选的 Feature 自有纯方法；配置与 lock 分支保留原函数引用及完整推断方法类型。'
         )
       },
       returns: t(
