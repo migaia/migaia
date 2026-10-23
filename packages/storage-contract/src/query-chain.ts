@@ -433,30 +433,79 @@ export type IQueryRead<R, TContext extends IOperationContext | undefined = IOper
   all(ctx?: TContext): Promise<R[]>
   explain(): IQueryPlan
 }
+/** A minimal structural terminal shape preserves complete result types in generic consumers. */
+export type IQueryShape<TValue = unknown> = { all(ctx?: never): Promise<TValue> }
+/** Extracts the complete all result without erasing its row or augmentation inference. */
+export type IQueryResultOf<TQuery extends IQueryShape> =
+  TQuery extends IQueryShape<infer TValue> ? TValue : never
 /** A selected result cannot select again or apply conditions to an already projected shape. */
 export type IQueryResult<
   R,
-  TContext extends IOperationContext | undefined = IOperationContext
-> = IQueryRead<R, TContext> & {
-  requirePushdown(): IQueryResult<R, TContext>
-}
+  TContext extends IOperationContext | undefined = IOperationContext,
+  TStatistics extends boolean = true,
+  TAugmentMethods extends object = Record<never, never>
+> = IQueryRead<R, TContext> &
+  TAugmentMethods & {
+    requirePushdown(): IQueryResult<R, TContext, TStatistics, TAugmentMethods>
+  }
 /** The implemented immutable record slice; later terminals extend this same canonical owner. */
 export type IQueryChain<
   T,
-  TContext extends IOperationContext | undefined = IOperationContext
-> = IQueryRead<T, TContext> & {
-  where(condition: IWhere<T>): IQueryChain<T, TContext>
-  where<P extends IObjectPath<T>, O extends keyof IFieldOps<IObjectPathValue<T, P>>>(
-    path: P,
-    operator: O,
-    value: IQueryOperand<IObjectPathValue<T, P>, NoInfer<O>>
-  ): IQueryChain<T, TContext>
-  where(predicate: (row: T) => boolean): IQueryChain<T, TContext>
-  select<const K extends Extract<keyof T, string>>(
-    ...fields: readonly [K, ...K[]]
-  ): IQueryResult<Pick<T, K>, TContext>
-  select<N>(mapper: (row: T) => N): IQueryResult<Awaited<N>, TContext>
-  requirePushdown(): IQueryChain<T, TContext>
+  TContext extends IOperationContext | undefined = IOperationContext,
+  TWhere = T,
+  TStatistics extends boolean = true,
+  TAugmentMethods extends object = Record<never, never>
+> = IQueryRead<T, TContext> &
+  TAugmentMethods & {
+    where(condition: IWhere<TWhere>): IQueryChain<T, TContext, TWhere, TStatistics, TAugmentMethods>
+    where<P extends IObjectPath<TWhere>, O extends keyof IFieldOps<IObjectPathValue<TWhere, P>>>(
+      path: P,
+      operator: O,
+      value: IQueryOperand<IObjectPathValue<TWhere, P>, NoInfer<O>>
+    ): IQueryChain<T, TContext, TWhere, TStatistics, TAugmentMethods>
+    where(
+      predicate: (row: TWhere) => boolean
+    ): IQueryChain<T, TContext, TWhere, TStatistics, TAugmentMethods>
+    select<const K extends Extract<keyof T, string>>(
+      ...fields: readonly [K, ...K[]]
+    ): IQueryResult<Pick<T, K>, TContext, TStatistics, TAugmentMethods>
+    select<N>(
+      mapper: (row: T) => N
+    ): IQueryResult<Awaited<N>, TContext, TStatistics, TAugmentMethods>
+    requirePushdown(): IQueryChain<T, TContext, TWhere, TStatistics, TAugmentMethods>
+  }
+/** Implemented record methods are reserved by the original owner before Feature admission. */
+export const RecordQueryMethod = Object.freeze({
+  where: 'where',
+  select: 'select',
+  all: 'all',
+  explain: 'explain',
+  requirePushdown: 'requirePushdown'
+} as const)
+/** Captures only pure Feature methods and rejects collisions before source or cursor admission. */
+function snapshotRecordQueryMethods<T extends object>(methods: T | undefined): T {
+  try {
+    if (
+      methods !== undefined &&
+      (typeof methods !== 'object' || methods === null || Array.isArray(methods))
+    )
+      throw new TypeError(StorageContractErrorText.queryArgument)
+    /** One copy evaluates each enumerable getter once while retaining function identity. */
+    const captured = { ...methods } as T
+    for (const key of Reflect.ownKeys(captured))
+      if (
+        (typeof key === 'string' && Object.hasOwn(RecordQueryMethod, key)) ||
+        typeof Reflect.get(captured, key) !== 'function'
+      )
+        throw new TypeError(StorageContractErrorText.queryArgument)
+    return Object.freeze(captured)
+  } catch (cause) {
+    throw new StorageContractError(
+      StorageContractErrorCode.invalidArgument,
+      { cause },
+      StorageContractErrorText.queryArgument
+    )
+  }
 }
 /** Native execution consumes only the shared AST and optional top-level projection from its plan. */
 export type IRecordQuerySource = {
@@ -789,31 +838,45 @@ function snapshotQueryFields(fields: readonly unknown[]): readonly string[] {
   return Object.freeze(fields as string[])
 }
 /** Creates selected terminals without falsely advertising another select or unsupported terminals. */
-function selectedRecordQuery<R, TContext extends IOperationContext | undefined>(
+function selectedRecordQuery<
+  R,
+  TContext extends IOperationContext | undefined,
+  TAugmentMethods extends object
+>(
   source: IQuerySourceSnapshot,
   node: IQueryNode,
-  strict: boolean
-): IQueryResult<R, TContext> {
+  strict: boolean,
+  methods: TAugmentMethods
+): IQueryResult<R, TContext, true, TAugmentMethods> {
   return Object.freeze({
+    ...methods,
     all: (ctx?: TContext) => executeRecordQuery<R>(source, node, strict, ctx),
     explain: () => planRecordQuery(source, node).explanation,
-    requirePushdown: () => selectedRecordQuery<R, TContext>(source, node, true)
+    requirePushdown: () =>
+      selectedRecordQuery<R, TContext, TAugmentMethods>(source, node, true, methods)
   })
 }
 /** Derivation shares history and captured source facts; each chain owns no I/O or resource lifetime. */
-function recordQuery<T, TContext extends IOperationContext | undefined>(
+function recordQuery<
+  T,
+  TContext extends IOperationContext | undefined,
+  TAugmentMethods extends object
+>(
   source: IQuerySourceSnapshot,
   node: IQueryNode | undefined,
-  strict: boolean
-): IQueryChain<T, TContext> {
+  strict: boolean,
+  methods: TAugmentMethods
+): IQueryChain<T, TContext, T, true, TAugmentMethods> {
   /** Overloads are implemented through one explicit runtime argument-shape dispatcher. */
-  function where(condition: IWhere<T> | ((row: T) => boolean)): IQueryChain<T, TContext>
+  function where(
+    condition: IWhere<T> | ((row: T) => boolean)
+  ): IQueryChain<T, TContext, T, true, TAugmentMethods>
   function where<P extends IObjectPath<T>, O extends keyof IFieldOps<IObjectPathValue<T, P>>>(
     path: P,
     operator: O,
     value: IQueryOperand<IObjectPathValue<T, P>, NoInfer<O>>
-  ): IQueryChain<T, TContext>
-  function where(...args: readonly unknown[]): IQueryChain<T, TContext> {
+  ): IQueryChain<T, TContext, T, true, TAugmentMethods>
+  function where(...args: readonly unknown[]): IQueryChain<T, TContext, T, true, TAugmentMethods> {
     /** Only the added node is captured; previously built condition snapshots are never revisited. */
     let step: IQueryNode['step']
     if (args.length === 1 && typeof args[0] === 'function')
@@ -840,27 +903,32 @@ function recordQuery<T, TContext extends IOperationContext | undefined>(
         throw invalidQueryCondition(cause)
       }
     } else throw invalidQueryCondition()
-    return recordQuery(source, { previous: node, step }, strict)
+    return recordQuery(source, { previous: node, step }, strict, methods)
   }
   /** Projection and callback mapping share one state transition that removes select from the result. */
   function select<const K extends Extract<keyof T, string>>(
     ...fields: readonly [K, ...K[]]
-  ): IQueryResult<Pick<T, K>, TContext>
-  function select<N>(mapper: (row: T) => N): IQueryResult<Awaited<N>, TContext>
-  function select(...args: readonly unknown[]): IQueryResult<unknown, TContext> {
+  ): IQueryResult<Pick<T, K>, TContext, true, TAugmentMethods>
+  function select<N>(
+    mapper: (row: T) => N
+  ): IQueryResult<Awaited<N>, TContext, true, TAugmentMethods>
+  function select(
+    ...args: readonly unknown[]
+  ): IQueryResult<unknown, TContext, true, TAugmentMethods> {
     /** A function is an opaque mapper; it is never parsed or presented as native projection. */
     const step: IQueryNode['step'] =
       args.length === 1 && typeof args[0] === 'function'
         ? { operation: QueryOperation.mapper, mapper: args[0] as (row: unknown) => unknown }
         : { operation: QueryOperation.select, fields: snapshotQueryFields(args) }
-    return selectedRecordQuery(source, { previous: node, step }, strict)
+    return selectedRecordQuery(source, { previous: node, step }, strict, methods)
   }
   return Object.freeze({
+    ...methods,
     where,
     select,
     all: (ctx?: TContext) => executeRecordQuery<T>(source, node, strict, ctx),
     explain: () => planRecordQuery(source, node).explanation,
-    requirePushdown: () => recordQuery<T, TContext>(source, node, true)
+    requirePushdown: () => recordQuery<T, TContext, TAugmentMethods>(source, node, true, methods)
   })
 }
 /**
@@ -872,7 +940,18 @@ function recordQuery<T, TContext extends IOperationContext | undefined>(
  */
 export function createRecordQuery<
   T,
-  TContext extends IOperationContext | undefined = IOperationContext
->(source: IRecordQuerySource): IQueryChain<T, TContext> {
-  return recordQuery<T, TContext>(snapshotQuerySource(source), undefined, false)
+  TContext extends IOperationContext | undefined = IOperationContext,
+  TAugmentMethods extends object = Record<never, never>
+>(
+  source: IRecordQuerySource,
+  methods?: TAugmentMethods
+): IQueryChain<T, TContext, T, true, TAugmentMethods> {
+  /** Feature-owned pure functions are captured once and retained by reference on every branch. */
+  const captured = snapshotRecordQueryMethods(methods)
+  return recordQuery<T, TContext, TAugmentMethods>(
+    snapshotQuerySource(source),
+    undefined,
+    false,
+    captured
+  )
 }

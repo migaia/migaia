@@ -205,13 +205,14 @@ export type {
 } from './concurrency.js'
 export { resolveConcurrencyPolicy } from './transaction.js'
 
-export { createTransactionBuilder } from './transaction-builder.js'
+export { createTransactionBuilder, TransactionBuilderMethod } from './transaction-builder.js'
 
 export {
   QueryOperator,
   QueryOperation,
   compileStorageWhere,
-  createRecordQuery
+  createRecordQuery,
+  RecordQueryMethod
 } from './query-chain.js'
 export type {
   IFieldOps,
@@ -221,6 +222,8 @@ export type {
   IQueryPlan,
   IQueryPushdown,
   IQueryRead,
+  IQueryShape,
+  IQueryResultOf,
   IQueryResult,
   IQueryChain,
   IRecordQuerySource
