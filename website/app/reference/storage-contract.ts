@@ -864,6 +864,97 @@ export const storageContractReference: ILibraryReference = {
       example: storageContractCases.encodeStorageRdfQuad![0]!.example,
       cases: storageContractCases.encodeStorageRdfQuad
     },
+    snapshotStorageBlobPut: {
+      role: 'operation',
+      purpose: t(
+        'Detach upload bytes, metadata and conditions before native work.',
+        '在原生工作前独立捕获上传字节、元数据与条件。'
+      ),
+      params: {
+        key: t('Logical object string key.', '逻辑对象字符串键。'),
+        body: t(
+          'Uint8Array or unlocked WHATWG byte stream; admission never takes its reader.',
+          'Uint8Array 或未锁定 WHATWG 字节流；准入不取得 reader。'
+        ),
+        options: t(
+          'Optional contentType, string metadata, mutually exclusive conditions and operation context.',
+          '可选 contentType、字符串 metadata、互斥条件与操作上下文。'
+        ),
+        backend: t('Actual backend label or undefined.', '真实后端标签或 undefined。')
+      },
+      returns: t(
+        'Frozen input snapshot; malformed fields throw INVALID_ARGUMENT with the original cause.',
+        '冻结输入快照；非法字段抛 INVALID_ARGUMENT 并保留原始 cause。'
+      ),
+      example: storageContractCases.snapshotStorageBlobPut![0]!.example,
+      cases: storageContractCases.snapshotStorageBlobPut
+    },
+    snapshotStorageBlobGet: {
+      role: 'operation',
+      purpose: t(
+        'Capture inclusive range bounds before opening object content.',
+        '打开对象内容前捕获闭区间范围。'
+      ),
+      params: {
+        key: t('Logical object string key.', '逻辑对象字符串键。'),
+        options: t(
+          'Optional safe-integer range with nonnegative start and end at least start, and context.',
+          '可选安全整数范围，start 非负且 end 不小于 start，以及上下文。'
+        ),
+        backend: t('Actual backend label or undefined.', '真实后端标签或 undefined。')
+      },
+      returns: t(
+        'Frozen key/options snapshot; no I/O or body reader.',
+        '冻结键与选项快照；不进行 I/O 或取得 body reader。'
+      ),
+      example: storageContractCases.snapshotStorageBlobGet![0]!.example,
+      cases: storageContractCases.snapshotStorageBlobGet
+    },
+    snapshotStorageBlobList: {
+      role: 'operation',
+      purpose: t('Capture the shared bounded object-page request.', '捕获共享有界对象分页请求。'),
+      params: {
+        options: t(
+          'Optional string prefix and cursor, with positive safe-integer limit defaulting to 100.',
+          '可选字符串前缀和游标，limit 为正安全整数，默认 100。'
+        ),
+        ctx: t(
+          'Optional operation context captured by its original owner.',
+          '由原拥有者捕获的可选操作上下文。'
+        ),
+        backend: t('Actual backend label or undefined.', '真实后端标签或 undefined。')
+      },
+      returns: t(
+        'Frozen prefix, after, limit and context; malformed input throws INVALID_ARGUMENT.',
+        '冻结 prefix、after、limit 与上下文；非法输入抛 INVALID_ARGUMENT。'
+      ),
+      example: storageContractCases.snapshotStorageBlobList![0]!.example,
+      cases: storageContractCases.snapshotStorageBlobList
+    },
+    createStorageBlobObject: {
+      role: 'operation',
+      purpose: t(
+        'Give one native object snapshot one stream-or-bytes right and original resource cleanup.',
+        '为一个原生对象快照提供一次 stream 或 bytes 权限及原资源清理。'
+      ),
+      params: {
+        info: t(
+          'Metadata belonging to the same native content snapshot.',
+          '与原生内容快照相同对象的元数据。'
+        ),
+        source: t('The already-open native WHATWG byte stream.', '已打开的原生 WHATWG 字节流。'),
+        options: t(
+          'Native close, report, optional backend and onSettled callbacks.',
+          '原生 close、report 及可选 backend、onSettled 回调。'
+        )
+      },
+      returns: t(
+        'IBlobObject; EOF/cancel/dispose share native cleanup. Main cleanup rejects, separate symbolic cleanup reports; second consumption throws INVALID_ARGUMENT.',
+        'IBlobObject；EOF、cancel、dispose 共享原生清理。主清理拒绝，独立符号清理报告；第二次消费抛 INVALID_ARGUMENT。'
+      ),
+      example: storageContractCases.createStorageBlobObject![0]!.example,
+      cases: storageContractCases.createStorageBlobObject
+    },
     createStorageBatchKeyCapture: {
       role: 'operation',
       purpose: t(
