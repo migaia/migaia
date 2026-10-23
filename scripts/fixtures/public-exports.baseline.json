@@ -1518,6 +1518,7 @@
         "isUtilsAbortError",
         "isUtilsError",
         "isUtilsTimeoutError",
+        "jitter",
         "noop",
         "normalizeSerializedErrorChain",
         "observeThenableRejection",
@@ -1691,7 +1692,8 @@
         "formatCurrency",
         "formatInteger",
         "formatNumber",
-        "formatPercent"
+        "formatPercent",
+        "jitter"
       ],
       "./testing": [
         "createManualScheduler"

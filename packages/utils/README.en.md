@@ -104,6 +104,7 @@ async function fetchWithTimeout(url: string, ms: number) {
 | Base64 and UTF-8 | `bytesToBase64`, `base64ToBytes`, `encodeUtf8` | `@migaia/utils/bytes` |
 | Fill templates, format numbers and money | `format`, `formatCurrency` | `@migaia/utils/string`, `/number` |
 | Identify the server runtime running the program | `detectServerRuntime` | `@migaia/utils` |
+| Spread cache expiry times without extending the original deadline | `jitter` | `@migaia/utils/number` |
 
 A few terms used across the package:
 

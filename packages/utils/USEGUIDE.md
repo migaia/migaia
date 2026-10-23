@@ -1878,6 +1878,14 @@ console.log(detectServerRuntime()) // Node 中为 'node'
 
 ## `/value`、`/string`、`/number` 高频工具
 
+`jitter(value, ratio, random = Math.random)` 从 `@migaia/utils/number` 或根入口导出，返回 `[value * (1 - ratio), value]` 内的值，只缩短期限。`value` 必须有限且非负，`ratio` 与随机结果必须在闭区间 `[0, 1]`。无效输入抛出带 `@migaia/utils` / `INVALID_ARGUMENT` 的 `RangeError`；随机回调抛错时同样以该错误拒绝，原错保留在 `cause`。参数有效后每次只调用一次随机源，包括 `value` 或 `ratio` 为零时。
+
+```ts doc-test=run
+import { jitter } from '@migaia/utils/number'
+
+console.log(jitter(60_000, 0.2, () => 0.5)) // 54000，永不超过原来的 60000
+```
+
 `isSafeIntegerValue(value)` 从 `/value` 导出，仅接受有限的安全整数 number，不转换字符串、bigint 或 boxed number。
 
 `tryString(value)` 从 `/string` 导出，string 原样通过，其他值只执行一次原生 `String(value)`。它返回 `{ threw: false, value: string }` 或 `{ threw: true, error: unknown }`；失败保留精确原抛出值，不提供 fallback、不调用 reporter、不生成新错误。调用方根据自己的边界选择报告、fallback 或重抛：

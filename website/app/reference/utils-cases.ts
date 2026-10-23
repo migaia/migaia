@@ -9,6 +9,27 @@ const t = (en: string, zh: string): IText => ({ en, zh })
  * output is quoted in `result`.
  */
 export const utilsCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
+  jitter: [
+    {
+      title: t('Spread cache expiration times', '分散缓存到期时间'),
+      problem: t(
+        'Entries written together should expire at different times while respecting the original freshness limit.',
+        '一起写入的缓存需要分散到期时间，同时遵守原来的新鲜度上限。'
+      ),
+      example: {
+        en: `import { jitter } from '@migaia/utils/number'
+
+console.log(jitter(60_000, 0.2, () => 0.5))`,
+        zh: `import { jitter } from '@migaia/utils/number'
+
+console.log(jitter(60_000, 0.2, () => 0.5))`
+      },
+      result: t(
+        'Prints 54000. Every accepted sample produces a TTL between 48000 and 60000 milliseconds.',
+        '输出 54000。每个有效随机结果都使 TTL 位于 48000 至 60000 毫秒之间。'
+      )
+    }
+  ],
   detectServerRuntime: [
     {
       title: t('Select a native server adapter', '选择原生服务端适配器'),

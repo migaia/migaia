@@ -1789,6 +1789,14 @@ console.log(detectServerRuntime()) // 'node' in Node
 
 ## `/value`, `/string` and `/number` everyday tools
 
+`jitter(value, ratio, random = Math.random)` is exported from `@migaia/utils/number` and the root entry. It returns a value in `[value * (1 - ratio), value]`, only shortening the deadline. `value` must be finite and non-negative; `ratio` and the random result must be in the inclusive interval `[0, 1]`. Invalid inputs throw a `RangeError` carrying `@migaia/utils` / `INVALID_ARGUMENT`. A throwing random callback produces the same coded error with the original failure on `cause`. Each call with valid arguments draws exactly one sample, including when `value` or `ratio` is zero.
+
+```ts doc-test=run
+import { jitter } from '@migaia/utils/number'
+
+console.log(jitter(60_000, 0.2, () => 0.5)) // 54000, never above the original 60000
+```
+
 `isSafeIntegerValue(value)` from `/value` accepts only finite safe-integer numbers and converts no strings, bigints or boxed numbers.
 
 `tryString(value)` from `/string` passes strings through unchanged and runs native `String(value)` exactly once on anything else. It returns `{ threw: false, value: string }` or `{ threw: true, error: unknown }`; a failure keeps the exact thrown value, with no fallback, no reporter call and no new error. The caller decides at its own boundary whether to report, fall back or rethrow:
