@@ -7,6 +7,7 @@ import { fileLogStore } from '../src/plugins/durable/file.js'
 import { asyncDisposeKey } from '@migaia/plugin-host'
 import { deferred } from '@migaia/utils/promise'
 import {
+  assertLogInteger,
   memoryLogStore,
   LogRecordState,
   snapshotLogRecords,
@@ -17,6 +18,15 @@ import {
 } from '../src/plugins/durable/index.js'
 
 describe('native committed index authoring', () => {
+  it('retains original integer admission for native adapters', () => {
+    expect(() => assertLogInteger(0, 0)).not.toThrow()
+    expect(() => assertLogInteger(0)).toThrowError(
+      expect.objectContaining({ code: 'INVALID_OPTION', name: 'RangeError' })
+    )
+    expect(() => assertLogInteger(Number.MAX_SAFE_INTEGER + 1)).toThrowError(
+      expect.objectContaining({ code: 'LOG_SEQUENCE_EXHAUSTED', name: 'RangeError' })
+    )
+  })
   it('shares the original index only after actual asynchronous commit and leaves rollback invisible', async () => {
     const database = new DatabaseSync(':memory:')
     database.exec(
