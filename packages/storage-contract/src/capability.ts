@@ -7,6 +7,10 @@ import {
   type IKeyValueStore
 } from './store.js'
 import type { ITransactionBuilder } from './concurrency.js'
+import type { IWriteConcurrencyOptions } from './concurrency.js'
+import type { ICodecValue } from '@migaia/serialize/codec'
+import type { IOperationContext, IStorageKey } from './context.js'
+import type { IQueryChain } from './query-chain.js'
 import type { ITransactionScope, ITransactionKeyValueApi } from './transaction.js'
 import {
   STORAGE_CAPABILITY_METHODS,
@@ -53,6 +57,18 @@ export type IKeyValueApi = Omit<
   IKeyValueStore,
   'backend' | 'capabilities' | 'dispose' | typeof Symbol.asyncDispose
 >
+
+/**
+ * Standard record entry reuses the implemented query core; writes retain the native backend
+ * pipeline.
+ */
+export type IRecordsApi<TValue = ICodecValue> = {
+  query<R = TValue>(): IQueryChain<R>
+  removeByPrefix(
+    prefix: IStorageKey,
+    ctx?: IOperationContext & IWriteConcurrencyOptions
+  ): Promise<number>
+}
 
 /** Only standard capabilities with a declared transaction projection belong to transaction use. */
 export type ITransactionalCapability<TCaps extends IAnyStorageCapability> = Extract<
@@ -190,6 +206,8 @@ export function defineStorageCapability<TApi>(): <const TName extends string>(
 
 /** Standard text key-value API token; its implementation still belongs to the backend. */
 export const kv = defineStorageCapability<IKeyValueApi>()('kv')
+/** Standard records token grants only an authentic provided record API, never a legacy support flag. */
+export const records = defineStorageCapability<IRecordsApi>()('records')
 
 /** Builds the canonical argument error, preserving a reflected provider failure when available. */
 function invalidCapability(cause?: unknown): StorageContractError {
@@ -332,6 +350,20 @@ function admitImplementations(
           STORAGE_KEY_VALUE_METHODS.some(
             (name) => typeof (api.sync as Record<string, unknown>)[name] !== 'function'
           ))
+      )
+        throw invalidCapability()
+    }
+    if (descriptor.capability === records) {
+      /**
+       * Native records and Feature records share the same callable admission without running a
+       * query.
+       */
+      const api = descriptor.api as IRecordsApi | undefined
+      if (
+        typeof api !== 'object' ||
+        api === null ||
+        typeof api.query !== 'function' ||
+        typeof api.removeByPrefix !== 'function'
       )
         throw invalidCapability()
     }

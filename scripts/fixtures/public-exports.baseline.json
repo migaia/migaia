@@ -1069,6 +1069,7 @@
         "prefixStorageOrgKey",
         "provideCapabilities",
         "readTransactionConflictPolicy",
+        "records",
         "registerTransactionFinalizer",
         "resolveConcurrencyPolicy",
         "runTransactionOperation",

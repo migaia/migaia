@@ -3,6 +3,11 @@ import {
   compileStorageWhere,
   createRecordQuery,
   createTransactionOwner,
+  records,
+  provideCapabilities,
+  implement,
+  useStorageCapability,
+  hasStorageCapability,
   StorageContractError,
   StorageContractErrorCode,
   QueryOperation,
@@ -10,6 +15,7 @@ import {
   type IStorageBase,
   type IStorageIterator,
   type IQueryPushdown,
+  type IRecordsApi,
   type IWhere,
   type IQueryCondition
 } from '../src/index.js'
@@ -243,6 +249,127 @@ function ownedRows(
 
 /** An empty support declaration exercises the common client path without inventing native support. */
 const noPushdown: IQueryPushdown = { source: 'fixture', operators: [], operations: [] }
+
+describe('standard record capability', () => {
+  it('provides the shared query entry with precise backend row refinements and native prefix deletion', async () => {
+    /** Data remains owned by the supplied original cursor rather than a capability-local executor. */
+    const rows: IOrder[] = [
+      { status: 'paid', total: 12 },
+      { status: 'pending', total: 3 }
+    ]
+    /**
+     * This independent base owns the capability publication lifetime and no cursor is opened at
+     * admission.
+     */
+    const base: IStorageBase = {
+      backend: 'record-capability-fixture',
+      capabilities: {
+        syncRead: false,
+        binary: false,
+        records: false,
+        transactions: false,
+        iteration: false,
+        secondaryIndexes: false,
+        changeFeed: false,
+        maxValueBytes: undefined,
+        opaqueEntries: false
+      },
+      dispose: async () => undefined,
+      [Symbol.asyncDispose]: async () => undefined
+    }
+    /** Source calls reveal any eager I/O introduced by token admission or fluent construction. */
+    let opened = 0
+    /** A native write stays on its original implementation, with the exact key/context and Promise. */
+    const deletion = Promise.resolve(2)
+    /** Borrowed write inputs must remain untouched until the backend implementation receives them. */
+    let received: readonly unknown[] | undefined
+    /**
+     * Actual native API refines the default row domain while satisfying the single standard
+     * declaration.
+     */
+    const api = {
+      query<R = IOrder>() {
+        return createRecordQuery<R>({
+          pushdown: noPushdown,
+          execute: () => {
+            opened++
+            return ownedRows(rows)
+          }
+        })
+      },
+      removeByPrefix(
+        prefix: Parameters<IRecordsApi['removeByPrefix']>[0],
+        ctx?: Parameters<IRecordsApi['removeByPrefix']>[1]
+      ) {
+        received = [prefix, ctx]
+        return deletion
+      },
+      native: () => 'kept'
+    } satisfies IRecordsApi<IOrder> & { native(): string }
+    /** A false legacy support fact cannot prevent an actual Feature-provided record API. */
+    const store = provideCapabilities(base, [implement(records, api)])
+    expect(hasStorageCapability(store, records)).toBe(true)
+    expect(useStorageCapability(store, records)).toBe(api)
+    expect(store.use(records)).toBe(api)
+    expect(store.use(records).native()).toBe('kept')
+    const query = store.use(records).query().where({ status: 'paid' }).select('total')
+    expect(opened).toBe(0)
+    expectTypeOf(query.all).returns.toEqualTypeOf<Promise<Pick<IOrder, 'total'>[]>>()
+    await expect(query.all()).resolves.toEqual([{ total: 12 }])
+    expect(opened).toBe(1)
+    const key = ['archive', new Date(1)] as const
+    const ctx = { timeoutMs: 100 }
+    expect(store.use(records).removeByPrefix(key, ctx)).toBe(deletion)
+    expect(received).toEqual([key, ctx])
+    expect(received?.[0]).toBe(key)
+    expect(received?.[1]).toBe(ctx)
+  })
+
+  it('rejects incomplete standard APIs and retains query getter failures before publishing', () => {
+    /** Complete bases receive no methods if standard records admission fails. */
+    const base = (): IStorageBase => ({
+      backend: 'records-admission',
+      capabilities: {
+        syncRead: false,
+        binary: false,
+        records: true,
+        transactions: false,
+        iteration: false,
+        secondaryIndexes: false,
+        changeFeed: false,
+        maxValueBytes: undefined,
+        opaqueEntries: false
+      },
+      dispose: async () => undefined,
+      [Symbol.asyncDispose]: async () => undefined
+    })
+    for (const api of [
+      {},
+      { query: () => undefined },
+      { query: 1, removeByPrefix: () => undefined }
+    ]) {
+      const resource = base()
+      expect(() =>
+        provideCapabilities(resource, [implement(records, api as unknown as IRecordsApi)])
+      ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT' }))
+      expect(Object.hasOwn(resource, 'use')).toBe(false)
+      expect(hasStorageCapability(resource, records)).toBe(false)
+    }
+    const original = new Error('record query getter failed')
+    const resource = base()
+    const api = {
+      get query(): never {
+        throw original
+      },
+      removeByPrefix: async () => 0
+    }
+    expect(() => provideCapabilities(resource, [implement(records, api)])).toThrowError(
+      expect.objectContaining({ code: 'INVALID_ARGUMENT', cause: original })
+    )
+    expect(Object.hasOwn(resource, 'use')).toBe(false)
+    expect(hasStorageCapability(resource, records)).toBe(false)
+  })
+})
 
 describe('shared record query execution', () => {
   it.each(['resolve', 'reject'] as const)(
