@@ -617,7 +617,7 @@ export function createSqliteStore<TValue>(
     range?: IKeyRange,
     state?: INativeState
   ): void => {
-    /** One local wall-clock cutoff follows the root D9 SQLite ruling. */
+    /** One local wall-clock cutoff keeps every candidate in this cleanup operation consistent. */
     const clauses = ['org_id=?', 'expires_at IS NOT NULL', 'expires_at<=?']
     const values: ISqliteValue[] = [orgId, Date.now()]
     if (range?.lower !== undefined) {
