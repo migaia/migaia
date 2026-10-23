@@ -3,6 +3,8 @@ import {
   assertOperationContext,
   snapshotOperationContext,
   prefixStorageOrgKey,
+  encodeStorageOrgStringPrefix,
+  encodeOrderedStorageKey,
   unprefixStorageOrgKey,
   type IOperationContext,
   type IStorageKey
@@ -86,6 +88,33 @@ describe('canonical organization identity', () => {
 })
 
 describe('organization key segments', () => {
+  it('encodes content prefixes only inside the exact original organization string envelope', () => {
+    for (const prefix of ['', 'user/', 'a\uD800', '😀']) {
+      const encoded = encodeStorageOrgStringPrefix(firstOrg, prefix, 'memory')
+      const own = encodeOrderedStorageKey(prefixStorageOrgKey(firstOrg, prefix + 'tail'), 'memory')
+      const other = encodeOrderedStorageKey(
+        prefixStorageOrgKey(secondOrg, prefix + 'tail'),
+        'memory'
+      )
+      const tuple = encodeOrderedStorageKey(
+        prefixStorageOrgKey(firstOrg, [prefix + 'tail']),
+        'memory'
+      )
+      expect(own.slice(0, encoded.length)).toEqual(encoded)
+      expect(other.slice(0, encoded.length)).not.toEqual(encoded)
+      expect(tuple.slice(0, encoded.length)).not.toEqual(encoded)
+      expect(encoded).toEqual(
+        encodeOrderedStorageKey(prefixStorageOrgKey(firstOrg, prefix), 'memory').slice(0, -2)
+      )
+    }
+    expect(() => encodeStorageOrgStringPrefix('bad', '', 'memory')).toThrowError(
+      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+    )
+    expect(() => encodeStorageOrgStringPrefix(firstOrg, 1 as never, 'memory')).toThrowError(
+      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+    )
+  })
+
   it('keeps an exact three-part envelope and preserves scalar versus tuple logical identity', () => {
     expect(prefixStorageOrgKey(firstOrg, 'key')).toEqual(['$o', firstOrg, 'key'])
     expect(prefixStorageOrgKey(firstOrg, ['key'])).toEqual(['$o', firstOrg, ['key']])

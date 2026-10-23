@@ -771,3 +771,5 @@ const excluded = prefix.matches(['cache', 'users-extra'])
 `blob` 选择独立原生对象 API，使用 string key、不可变 metadata 和可释放的单次消费对象快照。流为平台 WHATWG `ReadableStream<Uint8Array>`；契约不导入 DOM 运行时或流实现。六个原生方法包括条件 put、范围 get、head、remove、有序 list 与 removeByPrefix。provider 只校验完整形状，不打开流；实际字节、范围、条件与生命周期语义由对象后端实现，令牌本身不实现存储。
 
 `durableChangeFeed` 选择原生 `readChanges` 重放与可释放的 `tailChanges`。游标不透明，至少一次重放；调用方只持久化成功处理的游标。保留期缺口为携带 `StorageContractErrorCode.changeCursorExpired` 的原生 RangeError，调用方全量失效后从 now 恢复。普通变更可携带原 host context 的只读 orgId。blob 与 durable feed 不获得通用事务投影或平铺 KV；memory 发出短暂变更并不意味着获得 durable 令牌。
+
+`orderStorageKeysByBytes(entries, key)` 对每个 selector 结果只读取一次、立即复制其字节，并按稳定字节序返回原条目。它与原锁归一共用同一 radix 实现，保留前缀顺序，不建立持久索引。`encodeStorageOrgStringPrefix(orgId, prefix, backend)` 使用原组织 envelope 与 key writer，只省略最后 string 和 tuple 两个终止符。空前缀与精确 UTF-16 码元有效；编码前缀不会跨组织，也不匹配 tuple 逻辑键。

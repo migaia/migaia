@@ -18,7 +18,8 @@ import { snapshotStorageRdfQuad, encodeRdfQuadSnapshot, type IQuad } from './cap
 import {
   encodeOrderedStorageKey,
   snapshotStorageKeyPrefix,
-  storageKeyBytesIdentity
+  storageKeyBytesIdentity,
+  sortStorageByteIdentities
 } from './key-order.js'
 import type { IBackendKind } from './capabilities.js'
 import { StorageContractError, StorageContractErrorCode } from './errors.js'
@@ -309,11 +310,6 @@ const LockChannel = {
 const LockChannelRank = { text: 1, bytes: 2, record: 3, vector: 4, rdf: 5 } as const
 /** Internal snapshots retain independently owned canonical bytes across all actual attempts. */
 export type INormalizedLockKey = { readonly key: ILockKey; readonly encoded: Uint8Array }
-/** Explicit stack frames visit only still-shared suffixes rather than maximum-length padding. */
-type ILockRadixFrame = { readonly start: number; readonly end: number; readonly depth: number }
-/** Byte values occupy 1..256; bucket zero is reserved for a genuinely ended encoding. */
-const LOCK_RADIX_BUCKETS = 257
-
 /** Builds the existing coded lock-argument boundary with an optional actual backend diagnostic. */
 function invalidLockArgument(
   backend: IBackendKind | undefined,
@@ -421,51 +417,6 @@ function encodeLockIdentity(key: ILockKey, backend: IBackendKind | undefined): U
   encoded.set(ordered, 1)
   return encoded
 }
-/** Stable MSD buckets process each present suffix byte a constant number of times. */
-function sortLockIdentities<T extends { readonly encoded: Uint8Array }>(entries: T[]): void {
-  if (entries.length < 2) return
-  /** One shared scratch array serves every disjoint frame, without copying prefixes. */
-  const scratch: T[] = []
-  scratch.length = entries.length
-  /** Fixed alphabet state is reused for every frame instead of retained per depth. */
-  const counts = new Uint32Array(LOCK_RADIX_BUCKETS)
-  /** Write positions are independently advanced while stable scattering fills the scratch region. */
-  const positions = new Uint32Array(LOCK_RADIX_BUCKETS)
-  /** LIFO suffix work avoids call-stack growth for long equal prefixes. */
-  const frames: ILockRadixFrame[] = [{ start: 0, end: entries.length, depth: 0 }]
-  while (frames.length > 0) {
-    /** Frames are disjoint at this depth and never include an already ended key. */
-    const { start, end, depth } = frames.pop()!
-    counts.fill(0)
-    for (let index = start; index < end; index += 1) {
-      /** Actual zero bytes stay ordinary content; only absence enters the terminator bucket. */
-      const encoded = entries[index]!.encoded
-      counts[depth < encoded.length ? encoded[depth]! + 1 : 0] += 1
-    }
-    /** Bucket boundaries use absolute array positions, independent of key length. */
-    let boundary = start
-    for (let bucket = 0; bucket < LOCK_RADIX_BUCKETS; bucket += 1) {
-      positions[bucket] = boundary
-      boundary += counts[bucket]!
-    }
-    for (let index = start; index < end; index += 1) {
-      /** Stable movement retains the first snapshot when duplicate identities later collapse. */
-      const entry = entries[index]!
-      /** End-of-key has its own bucket and cannot be confused with embedded binary zero. */
-      const bucket = depth < entry.encoded.length ? entry.encoded[depth]! + 1 : 0
-      scratch[positions[bucket]!] = entry
-      positions[bucket] += 1
-    }
-    for (let index = start; index < end; index += 1) entries[index] = scratch[index]!
-    boundary = start + counts[0]!
-    for (let bucket = 1; bucket < LOCK_RADIX_BUCKETS; bucket += 1) {
-      /** Singleton and terminated ranges need no further byte inspection. */
-      const size = counts[bucket]!
-      if (size > 1) frames.push({ start: boundary, end: boundary + size, depth: depth + 1 })
-      boundary += size
-    }
-  }
-}
 /**
  * Detaches only the current inspection rows and orders them with the original stable byte radix.
  * Equal keys retain their individual holder/lease rows; no lock or resource authority is granted.
@@ -505,7 +456,7 @@ export function snapshotConcurrencyLockHoldings(
       row: Object.freeze({ ...captured, key })
     })
   }
-  sortLockIdentities(entries)
+  sortStorageByteIdentities(entries)
   return Object.freeze(entries.map((entry) => entry.row))
 }
 /** Adjacent deduplication charges each compared encoding at most twice. */
@@ -550,7 +501,7 @@ export function normalizeLockKeys(
 }
 /** Reuses captured byte identities when original options acquire additional implicit locks. */
 function uniqueNormalizedLockKeys(entries: INormalizedLockKey[]): readonly INormalizedLockKey[] {
-  sortLockIdentities(entries)
+  sortStorageByteIdentities(entries)
   /** Only adjacent canonical identities are compared; mutable object identity never deduplicates. */
   const unique: INormalizedLockKey[] = []
   for (const entry of entries) {

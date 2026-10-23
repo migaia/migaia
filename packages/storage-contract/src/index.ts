@@ -282,3 +282,5 @@ export type {
   IDurableStorageChange,
   IDurableChangeFeedApi
 } from './capabilities/durable-change-feed.js'
+
+export { orderStorageKeysByBytes, encodeStorageOrgStringPrefix } from './key-order.js'

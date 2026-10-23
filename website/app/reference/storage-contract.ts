@@ -1124,6 +1124,47 @@ export const storageContractReference: ILibraryReference = {
       example: storageContractCases.deriveStorageSqlQuery![0]!.example,
       cases: storageContractCases.deriveStorageSqlQuery
     },
+    orderStorageKeysByBytes: {
+      role: 'operation',
+      purpose: t(
+        'Return original entries in stable canonical byte order.',
+        '按稳定规范字节序返回原条目。'
+      ),
+      params: {
+        entries: t('Input entries in their original order.', '原顺序输入条目。'),
+        key: t(
+          'One byte selector invocation per entry; copied immediately.',
+          '每条目调用一次并立即复制的字节 selector。'
+        )
+      },
+      returns: t(
+        'Frozen array of original entries. Equal byte keys retain input order; selector failures retain cause.',
+        '原条目的冻结数组；相同字节键保留输入顺序，selector 失败保留 cause。'
+      ),
+      example: storageContractCases.orderStorageKeysByBytes![0]!.example,
+      cases: storageContractCases.orderStorageKeysByBytes
+    },
+    encodeStorageOrgStringPrefix: {
+      role: 'operation',
+      purpose: t(
+        'Encode a string content prefix inside the exact original organization envelope.',
+        '在精确原组织 envelope 内编码 string 内容前缀。'
+      ),
+      params: {
+        orgId: t('Canonical lowercase UUID.', '规范小写 UUID。'),
+        prefix: t(
+          'Logical string prefix, including empty or lone UTF-16 surrogates.',
+          '逻辑 string 前缀，含空值与单独 UTF-16 代理项。'
+        ),
+        backend: t('Original backend diagnostic.', '原后端诊断。')
+      },
+      returns: t(
+        'Independent canonical byte prefix, without the final string/tuple terminators.',
+        '独立规范字节前缀，不含最后 string/tuple 终止符。'
+      ),
+      example: storageContractCases.encodeStorageOrgStringPrefix![0]!.example,
+      cases: storageContractCases.encodeStorageOrgStringPrefix
+    },
     snapshotConcurrencyLockKeys: {
       role: 'operation',
       purpose: t(
