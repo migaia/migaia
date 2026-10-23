@@ -598,3 +598,22 @@ function readLocked(store: IRecordStore<{ count: number }>) {
     .run((tx) => tx.getRecord('counter'))
 }
 ```
+
+### Declarative condition compiler
+
+`compileStorageWhere<T>(where)` captures a typed `IWhere<T>` once and returns `(value: T) => boolean`. Nested object fields and repeated constraints combine with AND; explicit and/or/not preserve short-circuit order. `QueryOperator` owns eq, ne, in, exists, gt, gte, lt, lte, between, startsWith, contains and has. Membership lists are copied and compiled to Sets once. Paths reuse the existing utils path admission.
+
+Equality and membership use SameValueZero, including 0/-0 and explicit object identity; ordinary nested object syntax instead checks its fields. Date operands capture their time point. Ordered comparisons require the same number, bigint, string or Date domain and never coerce mismatches. exists distinguishes a missing path from a present undefined. Operator values retain the portable codec carrier plus declared undefined/bigint/Date comparisons and their lists. Explicit object identity comparisons require client execution when a backend offers only structural equality. Invalid conditions, paths and reflected failures produce INVALID_ARGUMENT with their exact cause before candidate reads. The compiler opens no source and creates no query owner.
+
+```ts
+import { compileStorageWhere } from '@migaia/storage-contract'
+const accepts = compileStorageWhere<{ status: string; total: number }>({
+  status: 'paid',
+  total: { gte: 100 }
+})
+const rows = [
+  { status: 'paid', total: 120 },
+  { status: 'paid', total: 50 }
+]
+console.log(rows.filter(accepts).length) // 1
+```
