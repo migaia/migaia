@@ -686,6 +686,19 @@ export const storageContractReference: ILibraryReference = {
     }
   },
   symbols: {
+    records: {
+      role: 'constant',
+      purpose: t(
+        'Authentic standard records API token, implemented by a native backend or a Feature through the same provider table.',
+        '真实标准 records API token，由原生后端或 Feature 经同一 provider 表实现。'
+      ),
+      returns: t(
+        'IRecordsApi query uses the implemented shared IQueryChain slice; removeByPrefix stays with the original native write pipeline.',
+        'IRecordsApi 的 query 使用已实现的共用 IQueryChain 切片；removeByPrefix 保持原生写入 pipeline。'
+      ),
+      example: storageContractCases.records![0]!.example,
+      cases: storageContractCases.records
+    },
     hasStorageCapability: {
       role: 'operation',
       purpose: t(
@@ -1863,6 +1876,26 @@ console.log(candidate.name, candidate.output)`
     }
   },
   types: {
+    IRecordsApi: {
+      summary: t(
+        'Standard record query and prefix deletion boundary; exact native row defaults are preserved by provided implementations.',
+        '标准记录查询与前缀删除边界，所提供实现保留精确原生默认行类型。'
+      ),
+      members: {
+        query: {
+          summary: t(
+            'query<R=TValue>() returns the implemented shared IQueryChain<R> without eager I/O.',
+            'query<R=TValue>() 返回已实现的共用 IQueryChain<R>，不提前 I/O。'
+          )
+        },
+        removeByPrefix: {
+          summary: t(
+            'Original native deletion Promise/count with exact prefix and operation/concurrency context; no wrapper or copied writer.',
+            '原生删除 Promise/计数与精确 prefix、操作/并发上下文，不新增包装或复制 writer。'
+          )
+        }
+      }
+    },
     IFieldOps: {
       summary: t(
         'Field-specific operators retain their actual operand domains.',

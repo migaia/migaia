@@ -531,3 +531,20 @@ function totals(execute: IRecordQuerySource['execute']) {
 ```
 
 传入的游标必须是真实后端资源；当 paid total 为 120、50 时，totals 返回 `[{total:120}]` 并等待清理。排序、分页、写入、统计、watch 与 vector/RDF 方法尚不属于本实现切片。
+
+### 标准 records 能力
+
+`records` 是 `IRecordsApi<TValue>` 的真实标准 token；其 `query<R = TValue>()` 返回已实现的共用 `IQueryChain<R>` 切片：where、一次 select、all、explain、requirePushdown。原生后端与 Feature 通过 `createRecordQuery` 提供查询，保持原迭代器/事务 owner，不另建查询执行器。标准准入只检查 query 与 removeByPrefix 可调用，不调用它们。旧 capabilities.records 布尔值不授予 token 权限，也不代替真实 Feature API。
+
+`removeByPrefix(prefix, ctx?)` 属于所提供的原写入 pipeline，返回真实删除数；ctx 包含原 IWriteConcurrencyOptions。provider 返回精确 API 对象，保留原生默认行类型/API 扩展，不包装删除 Promise、不复制 prefix/ctx。具体后端删除、事务能力投影与其他查询终点仍待后续实现切片。
+
+```ts
+import { records, useStorageCapability, type IStorageBase } from '@migaia/storage-contract'
+async function paidTotals(store: IStorageBase) {
+  return useStorageCapability(store, records)
+    .query<{ status: string; total: number }>()
+    .where({ status: 'paid' })
+    .select('total')
+    .all()
+}
+```
