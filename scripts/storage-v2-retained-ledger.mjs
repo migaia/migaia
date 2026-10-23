@@ -16,24 +16,29 @@ export function normalizeRetainedModule(moduleId, consumerDirectory, installedPa
   if (moduleId === entry) return 'app/bundle-entry.js'
   if (moduleId.startsWith('\0')) return `virtual:${moduleId.slice(1)}`
   if (moduleId.includes('?') || moduleId.includes('#')) return `qualified:${moduleId}`
-  /** Marker constrains first-party package normalization to the reviewed namespace. */
-  const packageMarker = '/node_modules/@migaia/'
+  /** Nearest dependency boundary identifies scoped and unscoped packages without trusting names. */
+  const packageMarker = '/node_modules/'
   /** Last marker handles pnpm's nested virtual-store paths. */
   const packageIndex = moduleId.lastIndexOf(packageMarker)
   if (packageIndex >= 0) {
-    /** Scoped package-relative identity begins after the nearest node_modules segment. */
-    const packageRelativeId = moduleId.slice(packageIndex + '/node_modules/'.length)
+    /** Package-relative identity begins after the nearest node_modules segment. */
+    const packageRelativeId = moduleId.slice(packageIndex + packageMarker.length)
     /** Scope and package segment identify the package before any module path. */
-    const [scope, packageSegment] = packageRelativeId.split('/')
-    /** Exact scoped package name indexes the preauthorized root map. */
-    const packageName = `${scope}/${packageSegment}`
+    const [scopeOrName, packageSegment] = packageRelativeId.split('/')
+    /** Exact package name indexes the roots already authorized from packed content and SRI. */
+    const packageName = scopeOrName.startsWith('@')
+      ? `${scopeOrName}/${packageSegment}`
+      : scopeOrName
     /** Authorization is supplied by the strict lock/root/content verifier. */
     const approvedPackage = installedPackages.get(packageName)
-    if (approvedPackage === undefined) return `unapproved-package:${moduleId}`
+    if (approvedPackage === undefined)
+      return packageName.startsWith('@migaia/')
+        ? `unapproved-package:${moduleId}`
+        : `package:${packageRelativeId}`
     /** Raw package root is canonicalized separately from the requested module. */
     const rawPackageRoot = moduleId.slice(
       0,
-      packageIndex + '/node_modules/'.length + packageName.length
+      packageIndex + packageMarker.length + packageName.length
     )
     /** Canonical package root rejects aliases to another installed tree. */
     let canonicalPackageRoot
@@ -57,12 +62,6 @@ export function normalizeRetainedModule(moduleId, consumerDirectory, installedPa
     )
     return `${packageName}/${stablePackageModule}`
   }
-  /** Generic dependency marker keeps unreviewed third-party modules observable. */
-  const dependencyMarker = '/node_modules/'
-  /** Last generic marker avoids collapsing nested dependency identities. */
-  const dependencyIndex = moduleId.lastIndexOf(dependencyMarker)
-  if (dependencyIndex >= 0)
-    return `package:${moduleId.slice(dependencyIndex + dependencyMarker.length)}`
   return `path:${moduleId}`
 }
 

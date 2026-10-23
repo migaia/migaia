@@ -47,8 +47,9 @@ export function defineProtobufCodec<
   const TBinding extends DescMessage
 >(
   options: IProtobufCodecOptions<TVersion, TSchemaId, TSchemaVersion, TBinding>
-): ICodec<MessageShape<TBinding>, Uint8Array, 'protobuf', TVersion> &
-  Readonly<{ schema: IProtobufSchema<TSchemaId, TSchemaVersion> }> {
+): ICodec<MessageShape<TBinding>, Uint8Array, 'protobuf', TVersion> & {
+  readonly encodedType: 'uint8array'
+} & Readonly<{ schema: IProtobufSchema<TSchemaId, TSchemaVersion> }> {
   let version: TVersion
   try {
     version = assertCodecVersion(options.version)

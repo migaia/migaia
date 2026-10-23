@@ -63,4 +63,34 @@ describe('root-owned package-tree and retained-ledger tools', () => {
       assertExactRetainedModules([...normalized, 'virtual:hostile'], normalized)
     ).toThrow('unexpected retained module: virtual:hostile')
   })
+
+  it('normalizes a packed unscoped dependency only through its admitted root', () => {
+    const fixture = mkdtempSync(join(tmpdir(), 'storage-v2-packed-dependency-'))
+    const consumer = join(fixture, 'consumer')
+    const packageRoot = join(fixture, 'node_modules/.pnpm/ansis/node_modules/ansis')
+    const foreignRoot = join(fixture, 'foreign/node_modules/ansis')
+    mkdirSync(consumer, { recursive: true })
+    mkdirSync(packageRoot, { recursive: true })
+    mkdirSync(foreignRoot, { recursive: true })
+    writeFileSync(join(packageRoot, 'index.mjs'), 'export const color = true\n')
+    writeFileSync(join(foreignRoot, 'index.mjs'), 'export const color = true\n')
+    const moduleId = join(packageRoot, 'index.mjs')
+    const installed = new Map([['ansis', { root: realpathSync(packageRoot) }]])
+    expect(normalizeRetainedModules([moduleId], consumer, installed)).toEqual(['ansis/index.mjs'])
+    expect(normalizeRetainedModules([moduleId], consumer, new Map())).toEqual([
+      'package:ansis/index.mjs'
+    ])
+    expect(() =>
+      assertExactRetainedModules(normalizeRetainedModules([moduleId], consumer, new Map()), [
+        'ansis/index.mjs'
+      ])
+    ).toThrow('unexpected retained module: package:ansis/index.mjs')
+    expect(normalizeRetainedModules([join(foreignRoot, 'index.mjs')], consumer, installed)).toEqual(
+      [`foreign-package:${join(foreignRoot, 'index.mjs')}`]
+    )
+    symlinkSync(join(foreignRoot, 'index.mjs'), join(packageRoot, 'escaped.mjs'))
+    expect(
+      normalizeRetainedModules([join(packageRoot, 'escaped.mjs')], consumer, installed)
+    ).toEqual([`escaped-package:${join(packageRoot, 'escaped.mjs')}`])
+  })
 })

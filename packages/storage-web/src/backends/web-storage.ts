@@ -1,22 +1,43 @@
-import { type IStorageChange } from '@migaia/storage-contract'
-import { snapshotSyncWriteOptions, throwIfAborted, withAbort } from '../core/operation.js'
+import { bindBrowserExecution } from './execution.js'
+import { createTextBatchApi } from './batch.js'
+import { implement, kv, type IStorageChange, type IStorageStore } from '@migaia/storage-contract'
+import { snapshotSyncWriteOptions } from '@migaia/storage-contract'
+import { throwIfAborted, withAbort } from '@migaia/storage-host/authoring/backend'
 import {
   lengthPrefixedNamespaceCodec,
   namespacedKey,
+  namespacedStorageKey,
   snapshotNamespaceCodec,
-  stripNamespace
+  stripStorageNamespace
 } from '../utils/key.js'
 import type { INamespaceCodec } from '../utils/key.js'
 import { probeWebStorage } from '../utils/availability.js'
 import { normalizeStorageException } from '../utils/quota.js'
 import { StorageError, StorageErrorCode, createStorageTypeError } from '../types/errors.js'
 import { StorageErrorText } from '../error-text.js'
-import type { IKeyValueStore, ISyncKeyValueStore, IWebStorageLike } from '../types/storage.js'
+import { StorageBackend, StorageOperation } from '../constants.js'
+import { assertValueSnapshot, withNativeValueWrite } from './native-value-write.js'
+import type {
+  IKeyValueStore,
+  ISyncCapableStore,
+  ISyncKeyValueStore,
+  IWebStorageLike
+} from '../types/storage.js'
 import type { IBackendKind, IStorageCapabilities } from '../types/capabilities.js'
+import type { IStorageKey } from '../types/context.js'
+import { asyncDisposeKey } from '@migaia/plugin-host'
 import {
-  createBackendReactiveController,
-  registerBackendReactiveController
-} from './reactive-controller.js'
+  reportCleanupError,
+  createStorageOperationReporter,
+  type IBackendValueCommit
+} from '@migaia/storage-host/authoring/backend'
+import {
+  provideBackendConstruction,
+  browserKeyValueApi,
+  type IBackendConstruction,
+  type IBackendRuntime,
+  type IKeyValueBackendStore
+} from './construction.js'
 
 const CAPABILITIES: IStorageCapabilities = Object.freeze({
   syncRead: true,
@@ -106,8 +127,12 @@ const assertWebStorageInjection: (
 export const createWebStorageBackend = (
   backend: IBackendKind,
   storage: IWebStorageLike | undefined,
-  options: IWebStorageOptions = {}
-): IKeyValueStore => {
+  options: IWebStorageOptions,
+  runtime: IBackendRuntime
+): IBackendConstruction<
+  IKeyValueBackendStore<ISyncCapableStore<IKeyValueStore>>,
+  IWebStorageLike
+> => {
   const optionsSnapshot = snapshotWebStorageOptions(options, backend)
   const namespace = optionsSnapshot.namespace === undefined ? 'default' : optionsSnapshot.namespace
   const namespaceCodecCandidate =
@@ -138,11 +163,13 @@ export const createWebStorageBackend = (
   const live = storage as IWebStorageLike
 
   /** Private commit-after controller shared by direct and Host-created exact stores. */
-  const controller = createBackendReactiveController({
+  const controller = runtime.createChangeController({
     backend,
     platform: live,
     options: Object.freeze({ namespace, namespaceCodec })
   })
+  /** Explicit and language cleanup keep separate stable promises for the same controller cleanup. */
+  let symbolicDispose: Promise<void> | undefined
 
   /** Publish only after the underlying Web Storage operation has returned successfully. */
   const publishChange = (change: Omit<IStorageChange, 'sequence' | 'origin' | 'scope'>): void => {
@@ -155,9 +182,9 @@ export const createWebStorageBackend = (
 
   const namespacedEntries = (): Array<{
     readonly physicalKey: string
-    readonly logicalKey: string
+    readonly logicalKey: IStorageKey
   }> => {
-    const collected: Array<{ readonly physicalKey: string; readonly logicalKey: string }> = []
+    const collected: ReturnType<typeof namespacedEntries> = []
     /** Detects a contract-violating or concurrently incoherent Storage enumeration. */
     const seenPhysicalKeys = new Set<string>()
     const length = live.length
@@ -179,11 +206,22 @@ export const createWebStorageBackend = (
           StorageErrorText.webStorageKeyDuplicate
         )
       seenPhysicalKeys.add(rawKey)
-      const stripped = stripNamespace(namespace, rawKey, namespaceCodec, backend)
+      const stripped = stripStorageNamespace(namespace, rawKey, namespaceCodec, backend)
       if (stripped !== undefined) collected.push({ physicalKey: rawKey, logicalKey: stripped })
     }
     return collected
   }
+
+  /** Native diagnostics retain their original labels independently from the installed kind. */
+  const clearValuesOperation =
+    backend === StorageBackend.local
+      ? StorageOperation.localClearValues
+      : StorageOperation.sessionClearValues
+  /** Complete namespace cleanup keeps the same public operation protocol. */
+  const clearAllOperation =
+    backend === StorageBackend.local
+      ? StorageOperation.localClearAll
+      : StorageOperation.sessionClearAll
 
   /** Delete a stable physical snapshot while reporting the exact partial-failure boundary. */
   const clearNamespacedEntries = (operation: string, signal?: AbortSignal): void => {
@@ -256,18 +294,57 @@ export const createWebStorageBackend = (
     keys: () => {
       assertLive()
       try {
-        return namespacedEntries().map((entry) => entry.logicalKey)
+        return namespacedEntries().flatMap((entry) =>
+          typeof entry.logicalKey === 'string' ? [entry.logicalKey] : []
+        )
       } catch (error) {
         throw normalizeStorageException(error, backend)
       }
     },
     clearValues: () => {
       assertLive()
-      clearNamespacedEntries(`${backend}.clearValues`)
+      clearNamespacedEntries(clearValuesOperation)
     }
   }
 
-  const store: IKeyValueStore = {
+  /** Entity preparation ends before this backend's original native snapshot/write boundary. */
+  const commitValueWrite: IBackendValueCommit = async (input, ctx) => {
+    /** Hold only the existing controller lease across intervention and native physical admission. */
+    const release = controller.beginMutation()
+    try {
+      await runtime.execution.run(
+        { operation: StorageOperation.entityUniqueWrite, input, ctx },
+        (captured) =>
+          withAbort(ctx, async (signal, _context, operationRuntime) => {
+            await withNativeValueWrite(
+              () => {
+                assertLive()
+                /** Both reads and the private sync write execute without an intervening await. */
+                const actual = namespacedEntries().flatMap((entry) => {
+                  if (
+                    typeof entry.logicalKey !== 'string' ||
+                    !entry.logicalKey.startsWith(captured.prefix)
+                  )
+                    return []
+                  const value = live.getItem(entry.physicalKey)
+                  return value === null ? [] : [[entry.logicalKey, value] as const]
+                })
+                assertValueSnapshot(actual, captured.expected, backend)
+                sync.set(captured.key, captured.value)
+              },
+              backend,
+              signal,
+              operationRuntime,
+              controller.closingSignal
+            )
+          })
+      )
+    } finally {
+      release()
+    }
+  }
+
+  const store: ISyncCapableStore<IKeyValueStore> = {
     backend,
     capabilities: CAPABILITIES,
     sync,
@@ -279,17 +356,61 @@ export const createWebStorageBackend = (
     clearValues: (ctx) =>
       withAbort(ctx, async (signal) => {
         assertLive()
-        clearNamespacedEntries(`${backend}.clearValues`, signal)
+        clearNamespacedEntries(clearValuesOperation, signal)
       }),
     clearAll: (ctx) =>
       withAbort(ctx, async (signal) => {
         assertLive()
-        clearNamespacedEntries(`${backend}.clearAll`, signal)
+        clearNamespacedEntries(clearAllOperation, signal)
       }),
     dispose: () => {
       return controller.dispose()
-    }
+    },
+    [asyncDisposeKey]: () =>
+      (symbolicDispose ??= store
+        .dispose()
+        .catch((error) => reportCleanupError(createStorageOperationReporter(), error)))
   }
-  registerBackendReactiveController(store, controller)
-  return store
+  const construction = provideBackendConstruction(
+    bindBrowserExecution(store, runtime),
+    [
+      implement(
+        kv,
+        browserKeyValueApi(
+          store,
+          createTextBatchApi(
+            backend,
+            runtime,
+            (): IStorageStore<never> => construction.store,
+            assertLive,
+            (keys) => {
+              assertLive()
+              /** Encode every requested key before the first read, including custom typed admission. */
+              const physical = keys.map(({ key }) =>
+                namespacedStorageKey(namespace, key, namespaceCodec, backend)
+              )
+              /** Repeated canonical positions reuse the first actual native result. */
+              const values: (string | undefined)[] = []
+              for (let index = 0; index < keys.length; index += 1) {
+                const entry = keys[index]!
+                if (entry.firstIndex !== index) {
+                  values.push(values[entry.firstIndex])
+                  continue
+                }
+                try {
+                  values.push(live.getItem(physical[index]!) ?? undefined)
+                } catch (cause) {
+                  throw normalizeStorageException(cause, backend, entry.key)
+                }
+              }
+              return values
+            }
+          )
+        )
+      )
+    ],
+    controller,
+    () => live
+  )
+  return { ...construction, commitValueWrite }
 }

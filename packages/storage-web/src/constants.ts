@@ -1,11 +1,13 @@
 /** Storage backend identifiers carried in diagnostics and capability descriptors. */
 export const StorageBackend = {
-  cookie: 'cookie',
-  indexedDb: 'indexeddb',
-  local: 'local',
-  session: 'session',
-  memory: 'memory'
+  cookie: 'cookies',
+  indexedDb: 'indexed-db',
+  local: 'local-storage',
+  session: 'session-storage'
 } as const
+
+/** Browser lock diagnostics use the platform label when the caller supplies no owner label. */
+export const StorageBrowserOwnerLabel = 'browser'
 
 /** Conflict handling policies accepted by storage operations. */
 export const StorageConflictPolicy = {
@@ -23,6 +25,11 @@ export const StorageInvalidRecordAction = {
 export const StorageOperation = {
   cookieSet: 'cookie.set',
   cookieRemove: 'cookie.remove',
+  /** Preserve the pre-cutover native Web Storage cleanup diagnostics. */
+  localClearValues: 'local.clearValues',
+  localClearAll: 'local.clearAll',
+  sessionClearValues: 'session.clearValues',
+  sessionClearAll: 'session.clearAll',
   indexedDbOpen: 'indexeddb.open',
   indexedDbTransaction: 'indexeddb.transaction',
   indexedDbRead: 'indexeddb.read',
@@ -38,6 +45,34 @@ export const StorageOperation = {
   /** Identifies a user index selector or projection that failed at the shared extension boundary. */
   entityIndexProjection: 'entity.index.project'
 } as const
+
+/** Transaction method labels are observed at the original short-lived operation view. */
+export const StorageTransactionOperation = {
+  getMany: 'transaction.getMany',
+  setMany: 'transaction.setMany',
+  removeMany: 'transaction.removeMany',
+  removeByPrefix: 'transaction.removeByPrefix',
+  removeRecordsByPrefix: 'transaction.records.removeByPrefix',
+  get: 'transaction.get',
+  set: 'transaction.set',
+  remove: 'transaction.remove',
+  has: 'transaction.has',
+  getBytes: 'transaction.getBytes',
+  setBytes: 'transaction.setBytes',
+  removeBytes: 'transaction.removeBytes',
+  getRecord: 'transaction.getRecord',
+  putRecord: 'transaction.putRecord',
+  deleteRecord: 'transaction.deleteRecord',
+  iterateRecords: 'transaction.iterateRecords',
+  putIndexedRecord: 'transaction.putIndexedRecord',
+  /** Reads readiness from the same native transaction before an entity uses a cached handle. */
+  isRecordIndexReady: 'transaction.isRecordIndexReady',
+  iterateRecordIndex: 'transaction.iterateRecordIndex'
+} as const
+
+/** Concrete native endpoint labels identify the installed backend without adding another runner. */
+export const storageBackendOperation = (backend: string, method: string, group?: string): string =>
+  group === undefined ? `${backend}.${method}` : `${backend}.${group}.${method}`
 
 /** One origin-wide Web Lock prevents separate KV-backed repositories from racing their commits. */
 export const ENTITY_UNIQUE_WRITE_LOCK = 'migaia:storage-web:entity-unique-write'
@@ -58,13 +93,6 @@ export const StorageMigrationStatus = { running: 'running', complete: 'complete'
 /** Physical-key migration phases, ordered from current layout to legacy layout. */
 export const StorageMigrationPhase = { v2: 'v2', legacy: 'legacy' } as const
 
-/** Codec output labels selected by storage backend capabilities. */
-export const StorageCodecOutput = {
-  text: 'text',
-  structured: 'structured',
-  binary: 'binary'
-} as const
-
 export type IStorageBackend = (typeof StorageBackend)[keyof typeof StorageBackend]
 export type IStorageConflictPolicy =
   (typeof StorageConflictPolicy)[keyof typeof StorageConflictPolicy]
@@ -77,4 +105,3 @@ export type IStorageMigrationStatus =
   (typeof StorageMigrationStatus)[keyof typeof StorageMigrationStatus]
 export type IStorageMigrationPhase =
   (typeof StorageMigrationPhase)[keyof typeof StorageMigrationPhase]
-export type IStorageCodecOutput = (typeof StorageCodecOutput)[keyof typeof StorageCodecOutput]

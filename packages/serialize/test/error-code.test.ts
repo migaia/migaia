@@ -6,14 +6,16 @@ import {
   createSerializeRangeError,
   createSerializeTypeError,
   tagSerializeError
-} from '../src/errors'
+} from '../src/errors.js'
 
 describe('serialize error-code contract', () => {
-  it('declares 8 unique codes under the package source', () => {
+  it('declares 11 unique codes under the package source', () => {
     const codes = Object.values(SerializeErrorCode)
-    expect(codes).toHaveLength(8)
-    expect(new Set(codes).size).toBe(8)
-    expect(codes).toContain('ENV_UNSUPPORTED')
+    expect(codes).toHaveLength(11)
+    expect(new Set(codes).size).toBe(11)
+    expect(codes).toEqual(
+      expect.arrayContaining(['ENV_UNSUPPORTED', 'TAG_MISSING', 'TAG_INVALID', 'TAG_UNKNOWN'])
+    )
     expect(SERIALIZE_SOURCE).toBe('@migaia/serialize')
   })
 })

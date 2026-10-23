@@ -18,6 +18,18 @@ export const fakeCookieDocument = (): { cookie: string } => {
       const name = firstPair.slice(0, eq)
       const rawValue = firstPair.slice(eq + 1)
 
+      /** Native Max-Age takes precedence over Expires when both attributes are present. */
+      const maxAgeAttribute = attributes.find((attribute) =>
+        attribute.toLowerCase().startsWith('max-age=')
+      )
+      if (maxAgeAttribute !== undefined) {
+        if (Number(maxAgeAttribute.slice('max-age='.length)) <= 0) {
+          jar.delete(name)
+          return
+        }
+        jar.set(name, rawValue)
+        return
+      }
       const expiresAttribute = attributes.find((attribute) =>
         attribute.toLowerCase().startsWith('expires=')
       )

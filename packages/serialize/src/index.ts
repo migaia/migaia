@@ -8,6 +8,7 @@ export * from './core.js'
 export * from './plugins.js'
 export type {
   ICodec,
+  ICodecEncodedType,
   ICodecValue,
   IPortableWalkerStrategy,
   IPortableBinaryResult

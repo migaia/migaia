@@ -1,17 +1,48 @@
+import { bindBrowserExecution } from './execution.js'
 import {
   StorageContractError,
   StorageContractErrorCode,
   isStorageContractError,
+  createTransactionOwner,
+  assertTransactionOwner,
+  runTransactionOperation,
+  runWithConcurrency,
+  implement,
+  kv,
+  records,
+  createRecordQuery,
+  snapshotStorageKeyPrefix,
+  snapshotStorageBatchKeys,
+  snapshotConcurrencyLockRange,
+  readConcurrencyLockIdentities,
+  lockKey,
+  useTransactionCapability,
+  createTransactionBuilder,
+  TransactionActivityMode,
+  TransactionBeforeStage,
+  TransactionObservedStage,
+  ConcurrencyHolderState,
+  type ITransactionOptions,
+  type IConcurrencyAttempt,
+  type ILockKey,
+  type ITransactionBuilder,
+  type ILockHolding,
+  type ICapabilityStore,
+  type ICapabilityImpl,
+  type IRecordsApi,
+  type ITransactionRecordsApi,
+  type ITransactionStageObserver,
+  type IStorageIterator,
   type IChangeFeedStore,
   type IStorageChange
 } from '@migaia/storage-contract'
-import { isStorageErrorFamily } from '../core/error-family.js'
+import { isStorageErrorFamily, type IStorageErrorFamily } from './errors.js'
 import {
   createStorageOperationReporter,
   createStorageOperationRuntime,
   reportCleanupError,
   type IStorageOperationRuntime
-} from '../core/operation-reporter.js'
+} from '@migaia/storage-host/authoring/backend'
 import {
   createStorageAggregateError,
   StorageError,
@@ -25,39 +56,40 @@ import {
 } from '../error-text.js'
 import {
   StorageBackend,
-  StorageChannel,
+  StorageBrowserOwnerLabel,
   StorageConflictPolicy,
   StorageMigrationStatus,
-  StorageOperation
+  StorageOperation,
+  StorageTransactionOperation,
+  storageBackendOperation
 } from '../constants.js'
 import {
   mergeSignals,
   readAbortReason,
-  snapshotOperationContext,
-  subscribeToAbort,
   throwIfAborted,
   withAbort
-} from '../core/operation.js'
+} from '@migaia/storage-host/authoring/backend'
+import { snapshotOperationContext } from '@migaia/storage-contract'
+import { subscribeToAbort } from './errors.js'
 import {
   assertStringStorageKey,
   compareStorageKeys,
-  encodeFlatStorageKey,
-  snapshotStorageKey,
-  snapshotKeyRange
-} from '../core/key-domain.js'
-import { planChannelWrite } from '../core/channel-write.js'
+  snapshotStorageKey
+} from '@migaia/storage-contract'
+import { encodeFlatStorageKey, snapshotKeyRange } from '@migaia/storage-host/authoring/backend'
+import { planChannelWrite } from './errors.js'
 /**
  * 's raw-record firewall must distinguish a "canonical entity key" from an unclassifiable/legacy
  * one by physical key shape. `REPOSITORY_KEY_PREFIX` is the one constant that shape depends on; it
  * is a leaf-level string with no dependency back onto this backend module, so importing it here
  * does not create a cycle with `entity/repository.ts` (which does depend on this file).
  */
-import { REPOSITORY_KEY_PREFIX, repositoryMigrationKey } from '../entity/key.js'
-import { isArrayBuffer, isUint8Array } from '../core/bytes.js'
-import { normalizeError } from '../core/errors.js'
-import { collectUniqueIndexOwners } from '../core/unique-index.js'
-import { isStorageKeyInRange } from '../core/query.js'
-import { UtilsAbortError, withTimeout, raceWithAbort } from '@migaia/utils/promise'
+import { REPOSITORY_KEY_PREFIX, repositoryMigrationKey } from '@migaia/storage-host/entity'
+import { isArrayBuffer, isUint8Array } from '@migaia/utils/bytes'
+import { normalizeError } from './errors.js'
+import { collectUniqueIndexOwners } from './errors.js'
+import { isStorageKeyInRange } from '@migaia/storage-host/authoring/backend'
+import { UtilsAbortError, raceWithAbort } from '@migaia/utils/promise'
 import { UtilsErrorCode } from '@migaia/utils/error'
 import { utf8ByteLength } from '@migaia/utils/bytes'
 import {
@@ -84,30 +116,44 @@ import type {
 } from '@migaia/storage-contract'
 import {
   assertTransactionCallback,
-  assertTransactionScopeActive,
   readTransactionConflictPolicy,
   type ITransactionScope
-} from '../core/transaction.js'
+} from '@migaia/storage-contract'
 import type { IStorageCapabilities } from '../types/capabilities.js'
 import {
-  createBackfillContentionFailure,
-  IndexedDbBackfillPhase,
-  registerIndexedDbBackfillStore,
-  type IIndexedDbBackfillBatch,
-  type IIndexedDbBackfillCandidate,
-  type IIndexedDbBackfillPhase,
-  type IIndexedDbBackfillPreparation,
-  type IIndexedDbBackfillReadOptions,
-  type IIndexedDbBackfillRetryReceipt,
-  type IIndexedDbBackfillSession
-} from './indexed-db-backfill.js'
+  RecordIndexBackfillPhase,
+  registerRecordIndexBackfillStore,
+  type IRecordIndexBackfillBatch,
+  type IRecordIndexBackfillCandidate,
+  type IRecordIndexBackfillPhase,
+  type IRecordIndexBackfillPreparation,
+  type IRecordIndexBackfillReadOptions,
+  type IRecordIndexBackfillRetryReceipt,
+  type IRecordIndexBackfillSession
+} from '@migaia/storage-host/entity'
 import { acquireIndexedDbCoordination } from './indexed-db-coordination.js'
-import { safeJsonPayloadByteLength } from '../utils/json.js'
-import { createStorageToken } from '../utils/storage-token.js'
+import { safeJsonPayloadByteLength } from '@migaia/storage-host/authoring/backend'
+import { createStorageToken } from '@migaia/storage-host/authoring/backend'
+import { createBackfillContentionFailure } from './errors.js'
 import {
-  createBackendReactiveController,
-  registerBackendReactiveController
-} from './reactive-controller.js'
+  provideBackendConstruction,
+  browserKeyValueApi,
+  type IBrowserKeyValueApi,
+  type IBackendConstruction,
+  type IBackendRuntime,
+  type IBrowserBatchApi
+} from './construction.js'
+import { BrowserBatchMethod, observeBrowserBatch, snapshotBrowserBatchEntries } from './batch.js'
+import { asyncDisposeKey } from '@migaia/plugin-host'
+import { withStorageIteratorResource } from '../utils/storage-iterator.js'
+import { observeIndexedDbStage, runNativeIndexedDbTransaction } from './indexed-db-transaction.js'
+
+/** Both record APIs declare the same native support; each query captures its own planner facts. */
+const recordQueryPushdown = {
+  source: StorageBackend.indexedDb,
+  operations: [],
+  operators: []
+} as const
 
 const CAPABILITIES: IStorageCapabilities = Object.freeze({
   syncRead: false,
@@ -175,7 +221,48 @@ export type IIndexedDbOptions = {
    * explicitly with `factory` from fake-indexeddb. Browsers default to `globalThis.IDBKeyRange`.
    */
   readonly keyRange?: typeof IDBKeyRange
+  /** Human-readable lock holder label; browser stores default to browser. */
+  readonly owner?: { readonly label?: string }
 }
+
+/** Selected Features declare stores before opening and borrow only an authorized native scope. */
+export type IIndexedDbFeatureExpose = {
+  requireObjectStore(name: string): void
+  getTransactionClient(scope: ITransactionScope<unknown>): IDBTransaction
+}
+
+/** The native store retains its complete transaction scope in the shared immutable builder. */
+type IIndexedDbStore<TValue> = Omit<
+  IRecordStore<TValue> & ISecondaryIndexRecordStore<TValue>,
+  'transaction' | 'transactionIndexed'
+> &
+  IChangeFeedStore & {
+    transaction<TResult>(
+      run: (scope: IIndexedDbTransactionScope<TValue>) => TResult,
+      ctx?: ITransactionOptions
+    ): Promise<Awaited<TResult>>
+    transactionIndexed<TResult>(
+      handle: IRecordIndexHandle,
+      run: (scope: IIndexedDbTransactionScope<TValue>) => TResult,
+      ctx?: ITransactionOptions
+    ): Promise<Awaited<TResult>>
+    tx(): ITransactionBuilder<IIndexedDbTransactionScope<TValue>>
+    inspectLocks(ctx?: IOperationContext): Promise<readonly ILockHolding[]>
+  }
+
+/** Native views retain the exact records capability granted by their original backend. */
+type IIndexedDbTransactionScope<TValue> = Omit<ISecondaryIndexTransactionScope<TValue>, 'use'> &
+  ITransactionScope<TValue, typeof records>
+
+/** The original provided object carries both real native capabilities and their exact APIs. */
+type IIndexedDbProvidedStore<TValue> = ICapabilityStore<
+  IIndexedDbStore<TValue>,
+  typeof kv | typeof records,
+  readonly [
+    ICapabilityImpl<typeof kv, IBrowserKeyValueApi<IIndexedDbStore<TValue>>>,
+    ICapabilityImpl<typeof records, IRecordsApi<TValue>>
+  ]
+>
 
 const REVISIONS_STORE_NAME = '__storage_web_revisions__'
 const META_STORE_NAME = 'storage-web:meta'
@@ -240,8 +327,6 @@ const INDEX_BACKFILL_MIN_LEASE_MS = 5_000
 const INDEX_BACKFILL_MAX_LEASE_MS = 120_000
 /** Default lease duration in milliseconds. */
 const INDEX_BACKFILL_DEFAULT_LEASE_MS = 30_000
-/** Default bound for user transaction callbacks that do not honor cancellation. */
-const TRANSACTION_CALLBACK_DEADLINE_MS = 5_000
 
 /** Persisted owner authority; duration is captured at acquisition and never wall-clock derived. */
 type IBackfillLease = {
@@ -332,7 +417,10 @@ const assertBackfillProjectionLimits = (
 }
 
 /** Preserve contract cancellation identity when `withTimeout` reports through its utils error. */
-const normalizeIndexedDbOperationError = (error: unknown): StorageContractError | StorageError => {
+const normalizeIndexedDbOperationError = (
+  error: unknown,
+  expiredScope?: true
+): IStorageErrorFamily => {
   if (error instanceof UtilsAbortError)
     return new StorageContractError(StorageContractErrorCode.aborted, {
       backend: StorageBackend.indexedDb,
@@ -353,6 +441,7 @@ const normalizeIndexedDbOperationError = (error: unknown): StorageContractError 
   if (isStorageErrorFamily(error)) return error
   return new StorageError(StorageErrorCode.transactionFailed, {
     backend: StorageBackend.indexedDb,
+    operation: expiredScope ? StorageOperation.transactionScope : undefined,
     cause: error
   })
 }
@@ -382,6 +471,13 @@ const snapshotWriteValue = <T>(value: T, key: IStorageKey): T => {
  * intrinsic 内部槽判定真实品牌， 避免 `instanceof` 的跨 realm 假阴性和 `constructor.name` / tag 伪造的假阳性。
  */
 const isRawArrayBuffer = (value: unknown): value is ArrayBuffer => isArrayBuffer(value)
+
+/** Root and transaction reads interpret the same native-cloned binary payload shapes. */
+const readIndexedDbBytes = (value: unknown): Uint8Array | null => {
+  if (isUint8Array(value)) return new Uint8Array(value.buffer, value.byteOffset, value.byteLength)
+  if (isRawArrayBuffer(value)) return new Uint8Array(value)
+  return null
+}
 
 const toIdbRange = (
   range: IKeyRange | undefined,
@@ -456,8 +552,11 @@ const toIdbRecordIndexRange = (
  * coordination resources; it does not delete the database.
  */
 export const indexedDbHost = <TValue = unknown>(
-  options: IIndexedDbOptions = {}
-): IRecordStore<TValue> & ISecondaryIndexRecordStore<TValue> & IChangeFeedStore => {
+  options: IIndexedDbOptions,
+  runtime: IBackendRuntime,
+  declaredObjectStores: readonly string[] = []
+): IBackendConstruction<IIndexedDbProvidedStore<TValue>, IDBDatabase> &
+  Pick<IIndexedDbFeatureExpose, 'getTransactionClient'> => {
   if (options === null || typeof options !== 'object' || Array.isArray(options))
     throw new StorageError(StorageErrorCode.invalidConfig, {
       backend: StorageBackend.indexedDb,
@@ -470,6 +569,8 @@ export const indexedDbHost = <TValue = unknown>(
   let configuredCleanupLegacyRecords: boolean | undefined
   let configuredFactory: IDBFactory | undefined
   let configuredKeyRange: typeof IDBKeyRange | undefined
+  /** Holder diagnostics are snapshotted independently from mutable caller configuration. */
+  let ownerLabel: string
   try {
     configuredDbName = options.dbName
     configuredKvStoreName = options.kvStoreName
@@ -478,6 +579,15 @@ export const indexedDbHost = <TValue = unknown>(
     configuredCleanupLegacyRecords = options.cleanupLegacyRecords
     configuredFactory = options.factory
     configuredKeyRange = options.keyRange
+    /** Read the optional owner and its label only once during this store's construction. */
+    const owner = options.owner
+    if (
+      owner !== undefined &&
+      (typeof owner !== 'object' || owner === null || Array.isArray(owner))
+    )
+      throw new TypeError(StorageErrorText.indexedDbOwnerInvalid)
+    ownerLabel = owner?.label ?? StorageBrowserOwnerLabel
+    if (typeof ownerLabel !== 'string') throw new TypeError(StorageErrorText.indexedDbOwnerInvalid)
   } catch (cause) {
     throw new StorageError(StorageErrorCode.invalidConfig, {
       backend: StorageBackend.indexedDb,
@@ -541,11 +651,20 @@ export const indexedDbHost = <TValue = unknown>(
       cause: new TypeError('IDBKeyRange must provide bound/lowerBound/upperBound')
     })
   const configuredStoreNames = [kvStoreName, bytesStoreName, recordsStoreName]
+  /** Schema requirements are captured once before the existing opener can perform any I/O. */
+  const featureStoreNames = [...declaredObjectStores]
   if (
     !isValidStoreName(dbName) ||
     configuredStoreNames.some((storeName) => !isValidStoreName(storeName)) ||
     new Set(configuredStoreNames).size !== configuredStoreNames.length ||
-    configuredStoreNames.some((storeName) => INTERNAL_STORE_NAMES.has(storeName))
+    configuredStoreNames.some((storeName) => INTERNAL_STORE_NAMES.has(storeName)) ||
+    featureStoreNames.some(
+      (name) =>
+        !isValidStoreName(name) ||
+        INTERNAL_STORE_NAMES.has(name) ||
+        configuredStoreNames.includes(name)
+    ) ||
+    new Set(featureStoreNames).size !== featureStoreNames.length
   )
     throw new StorageError(StorageErrorCode.invalidConfig, {
       backend: StorageBackend.indexedDb,
@@ -909,7 +1028,7 @@ export const indexedDbHost = <TValue = unknown>(
       readonly leaseMs?: number
     },
     ctx?: IOperationContext
-  ): Promise<import('./indexed-db-backfill.js').IIndexedDbBackfillSession<TValue>> => {
+  ): Promise<import('@migaia/storage-host/entity').IRecordIndexBackfillSession<TValue>> => {
     return withMutationLease(async (mutationLease) => {
       assertLive()
       if (!isValidIndexGeneration(handle.generation)) throw staleIndexHandleError()
@@ -968,7 +1087,7 @@ export const indexedDbHost = <TValue = unknown>(
             handle?: IRecordIndexHandle
             readiness?: IRecordIndexReadiness
             checkpoint?: IStorageKey
-            phase?: IIndexedDbBackfillPhase
+            phase?: IRecordIndexBackfillPhase
             lease?: IBackfillLease
             scanStartRawEpoch?: number
           }
@@ -976,12 +1095,12 @@ export const indexedDbHost = <TValue = unknown>(
       if (current?.handle?.generation !== handle.generation) throw staleIndexHandleError()
       const readiness = current.readiness ?? { status: 'pending', scanned: 0, indexed: 0 }
       if (readiness.status === 'complete') throw staleIndexHandleError()
-      const phase = current.phase ?? IndexedDbBackfillPhase.canonical
-      if (phase !== IndexedDbBackfillPhase.canonical && phase !== IndexedDbBackfillPhase.legacy)
+      const phase = current.phase ?? RecordIndexBackfillPhase.canonical
+      if (phase !== RecordIndexBackfillPhase.canonical && phase !== RecordIndexBackfillPhase.legacy)
         throw new StorageError(StorageErrorCode.invalidConfig, {
           backend: StorageBackend.indexedDb
         })
-      if (phase === IndexedDbBackfillPhase.legacy && !includeLegacy)
+      if (phase === RecordIndexBackfillPhase.legacy && !includeLegacy)
         throw new StorageError(StorageErrorCode.invalidConfig, {
           backend: StorageBackend.indexedDb
         })
@@ -1068,9 +1187,9 @@ export const indexedDbHost = <TValue = unknown>(
       }
       const readBatch = async (
         readCtx?: IOperationContext,
-        readOptions?: IIndexedDbBackfillReadOptions<TValue>,
+        readOptions?: IRecordIndexBackfillReadOptions<TValue>,
         inheritedLease?: IMutationLeaseContext
-      ): Promise<Awaited<ReturnType<IIndexedDbBackfillSession<TValue>['readBatch']>>> => {
+      ): Promise<Awaited<ReturnType<IRecordIndexBackfillSession<TValue>['readBatch']>>> => {
         assertSession()
         const readOperation = snapshotOperationContext(readCtx)
         throwIfAborted(readOperation?.signal)
@@ -1082,7 +1201,7 @@ export const indexedDbHost = <TValue = unknown>(
           'readonly'
         )
         const activeRange =
-          currentPhase === IndexedDbBackfillPhase.legacy ? legacyPhysicalRange : physicalRange
+          currentPhase === RecordIndexBackfillPhase.legacy ? legacyPhysicalRange : physicalRange
         const range = toIdbRange(
           checkpoint === undefined
             ? activeRange
@@ -1101,7 +1220,7 @@ export const indexedDbHost = <TValue = unknown>(
           { signal: readOperation?.signal },
           readRuntime
         )) as TValue[]
-        const rawCandidates: IIndexedDbBackfillCandidate<TValue>[] = []
+        const rawCandidates: IRecordIndexBackfillCandidate<TValue>[] = []
         const candidateCount = Math.min(keys.length, batchSize)
         for (let index = 0; index < candidateCount; index += 1) {
           const key = snapshotStorageKey(keys[index] as IStorageKey, StorageBackend.indexedDb)
@@ -1120,8 +1239,8 @@ export const indexedDbHost = <TValue = unknown>(
             })
           )
         }
-        const candidates: IIndexedDbBackfillCandidate<TValue>[] = []
-        const preparations: IIndexedDbBackfillPreparation[] = []
+        const candidates: IRecordIndexBackfillCandidate<TValue>[] = []
+        const preparations: IRecordIndexBackfillPreparation[] = []
         let decodedBytes = 0
         if (readOptions?.prepare !== undefined) {
           for (const candidate of rawCandidates) {
@@ -1186,8 +1305,8 @@ export const indexedDbHost = <TValue = unknown>(
         )
           throw staleIndexHandleError()
         if (
-          ((metadataState?.phase as IIndexedDbBackfillPhase | undefined) ??
-            IndexedDbBackfillPhase.canonical) !== currentPhase
+          ((metadataState?.phase as IRecordIndexBackfillPhase | undefined) ??
+            RecordIndexBackfillPhase.canonical) !== currentPhase
         )
           throw staleIndexHandleError()
         if (
@@ -1230,7 +1349,7 @@ export const indexedDbHost = <TValue = unknown>(
           preparations: readOptions?.prepare === undefined ? undefined : Object.freeze(preparations)
         })
       }
-      const session: IIndexedDbBackfillSession<TValue> = {
+      const session: IRecordIndexBackfillSession<TValue> = {
         generation: handle.generation,
         ownerToken,
         renew: (renewCtx) =>
@@ -1284,12 +1403,12 @@ export const indexedDbHost = <TValue = unknown>(
           }),
         readBatch: (readCtx, readOptions) =>
           withMutationLease((lease) => readBatch(readCtx, readOptions, lease)),
-        commitBatch: (batch: IIndexedDbBackfillBatch, commitCtx) =>
+        commitBatch: (batch: IRecordIndexBackfillBatch, commitCtx) =>
           withMutationLease(async (lease) => {
             assertSession()
             const commitOperation = snapshotOperationContext(commitCtx)
             throwIfAborted(commitOperation?.signal)
-            const batchPhase = batch.phase ?? IndexedDbBackfillPhase.canonical
+            const batchPhase = batch.phase ?? RecordIndexBackfillPhase.canonical
             if (
               batchPhase !== currentPhase ||
               batch.generation !== handle.generation ||
@@ -1351,13 +1470,13 @@ export const indexedDbHost = <TValue = unknown>(
                 | {
                     handle?: IRecordIndexHandle
                     checkpoint?: IStorageKey
-                    phase?: IIndexedDbBackfillPhase
+                    phase?: IRecordIndexBackfillPhase
                     readiness?: IRecordIndexReadiness
                     lastBatch?: string
-                    lastBatchReceipt?: IIndexedDbBackfillRetryReceipt
+                    lastBatchReceipt?: IRecordIndexBackfillRetryReceipt
                     issued?: {
                       ownerToken: string
-                      phase: IIndexedDbBackfillPhase
+                      phase: IRecordIndexBackfillPhase
                       checkpoint?: string
                       endOfScan: boolean
                       finalKey?: string
@@ -1369,8 +1488,8 @@ export const indexedDbHost = <TValue = unknown>(
                 | undefined
               if (state?.handle?.generation !== handle.generation) throw staleIndexHandleError()
               if (
-                ((state?.phase as IIndexedDbBackfillPhase | undefined) ??
-                  IndexedDbBackfillPhase.canonical) !== batchPhase
+                ((state?.phase as IRecordIndexBackfillPhase | undefined) ??
+                  RecordIndexBackfillPhase.canonical) !== batchPhase
               )
                 throw staleIndexHandleError()
               if (state?.readiness?.status === 'complete') throw staleIndexHandleError()
@@ -1493,7 +1612,7 @@ export const indexedDbHost = <TValue = unknown>(
                 }
               }
               const activeRange =
-                batchPhase === IndexedDbBackfillPhase.legacy ? legacyPhysicalRange : physicalRange
+                batchPhase === RecordIndexBackfillPhase.legacy ? legacyPhysicalRange : physicalRange
               const suffixRange = toIdbRange(
                 batch.nextCheckpoint === undefined
                   ? activeRange
@@ -1530,10 +1649,12 @@ export const indexedDbHost = <TValue = unknown>(
                 state.scanStartRawEpoch !== undefined && currentRawEpoch === state.scanStartRawEpoch
               const reachedPhaseEnd = batch.endOfScan && (suffix as IDBValidKey[]).length === 0
               const entersLegacyPhase =
-                batchPhase === IndexedDbBackfillPhase.canonical && includeLegacy && reachedPhaseEnd
+                batchPhase === RecordIndexBackfillPhase.canonical &&
+                includeLegacy &&
+                reachedPhaseEnd
               const reachedScanEnd =
                 options.allowComplete &&
-                (batchPhase === IndexedDbBackfillPhase.legacy || !includeLegacy) &&
+                (batchPhase === RecordIndexBackfillPhase.legacy || !includeLegacy) &&
                 reachedPhaseEnd
               const nextReadiness: IRecordIndexReadiness = {
                 status: reachedScanEnd && scanUnchanged ? 'complete' : 'running',
@@ -1552,7 +1673,7 @@ export const indexedDbHost = <TValue = unknown>(
                * fresh start (per the raw-firewall epoch logic in `openBackfillSession`), so a later
                * clean full re-scan can still reach `complete`.
                */
-              const nextPhase = entersLegacyPhase ? IndexedDbBackfillPhase.legacy : batchPhase
+              const nextPhase = entersLegacyPhase ? RecordIndexBackfillPhase.legacy : batchPhase
               const nextCheckpoint =
                 entersLegacyPhase || (reachedScanEnd && !scanUnchanged)
                   ? undefined
@@ -1670,30 +1791,50 @@ export const indexedDbHost = <TValue = unknown>(
   }
 
   /** Private commit-after controller shared by direct and Host-created exact stores. */
-  const controller = createBackendReactiveController({
+  const controller = runtime.createChangeController({
     backend: StorageBackend.indexedDb,
     platform: factory,
     options: Object.freeze({ dbName, kvStoreName, bytesStoreName, recordsStoreName }),
     origin: `indexeddb:${createStorageToken()}`,
     finalize: async () => {
-      coordination.dispose()
+      /** Cleanup keeps transport and native connection failures in their original order. */
+      const failures: unknown[] = []
+      try {
+        await coordination.dispose()
+      } catch (cause) {
+        failures.push(cause)
+      }
+      /** Detach cached references once; the original controller still owns this cleanup attempt. */
       const pending = connection
       const recoveryDatabase = activeDatabase
       connection = undefined
       activeDatabase = undefined
       let pendingDatabase: IDBDatabase | undefined
       if (pending) {
-        try {
-          pendingDatabase = await pending
-          tryCloseDatabase(pendingDatabase)
-        } catch {
-          // 失败/正在打开的连接已不可用，dispose 是尽力而为。
+        // A rejected opening is already observed by preparation; it acquired no closeable result.
+        pendingDatabase = await pending.then(
+          (database) => database,
+          () => undefined
+        )
+        if (pendingDatabase) {
+          const cause = tryCloseDatabase(pendingDatabase)
+          if (cause !== undefined) failures.push(cause)
         }
       }
-      if (recoveryDatabase && recoveryDatabase !== pendingDatabase)
-        tryCloseDatabase(recoveryDatabase)
+      if (recoveryDatabase && recoveryDatabase !== pendingDatabase) {
+        const cause = tryCloseDatabase(recoveryDatabase)
+        if (cause !== undefined) failures.push(cause)
+      }
+      if (failures.length > 0)
+        throw createStorageAggregateError(
+          StorageErrorCode.backendDisposeFailed,
+          StorageErrorText.backendDisposeFailed,
+          failures
+        )
     }
   })
+  /** Symbol cleanup shares the controller's primary cleanup without exposing its rejection. */
+  let symbolicDispose: Promise<void> | undefined
 
   /** Report-only owner for malformed or unavailable coordination transport behavior. */
   const coordinationReporter = createStorageOperationReporter()
@@ -1706,7 +1847,8 @@ export const indexedDbHost = <TValue = unknown>(
     layoutFingerprint: indexedDbLayoutFingerprint(kvStoreName, bytesStoreName, recordsStoreName),
     ownOrigin: controller.origin,
     onChange: (change) => controller.publishExternal(change),
-    report: (error) => reportCleanupError(coordinationReporter, error)
+    report: (error) => reportCleanupError(coordinationReporter, error),
+    createKeyLockPort: () => runtime.createKeyLockPort()
   })
   /** Immutable capabilities reflect construction-time transport admission and never mutate later. */
   const capabilities: IStorageCapabilities = Object.freeze({
@@ -1933,6 +2075,11 @@ export const indexedDbHost = <TValue = unknown>(
       indexRecords.createIndex('record', ['scope', 'generation', 'recordKey'], {
         unique: false
       })
+      created = true
+    }
+    for (const name of featureStoreNames) {
+      if (database.objectStoreNames.contains(name)) continue
+      database.createObjectStore(name)
       created = true
     }
     return { created, recordsCreated }
@@ -2353,7 +2500,8 @@ export const indexedDbHost = <TValue = unknown>(
           !database.objectStoreNames.contains(bytesStoreName) ||
           !database.objectStoreNames.contains(REVISIONS_STORE_NAME) ||
           !database.objectStoreNames.contains(META_STORE_NAME) ||
-          !database.objectStoreNames.contains(INDEX_RECORDS_STORE_NAME)
+          !database.objectStoreNames.contains(INDEX_RECORDS_STORE_NAME) ||
+          featureStoreNames.some((name) => !database.objectStoreNames.contains(name))
         ) {
           const nextVersion = database.version + 1
           closeForTransition(database)
@@ -2530,609 +2678,1105 @@ export const indexedDbHost = <TValue = unknown>(
       } catch {
         /* already settled */
       }
-      throw new StorageError(StorageErrorCode.transactionFailed, {
+      /** Capture the original write failure before waiting for native rollback cleanup. */
+      const failure = new StorageError(StorageErrorCode.transactionFailed, {
         backend: StorageBackend.indexedDb,
         cause
       })
+      await committed.catch(() => {})
+      throw failure
     }
     await committed
   }
 
-  const writeWithConflict = async (
+  /** The canonical owner is created once after the original provider refines this exact store. */
+  let transactionOwner!: ReturnType<typeof createTransactionOwner<TValue>>
+
+  /** Native handles are indexed only after contract ownership has authorized their live views. */
+  const nativeTransactions = new Map<
+    string,
+    {
+      readonly native: IDBTransaction
+      readonly abort: () => void
+      readonly clearRoot: (channel: 'value' | 'bytes' | 'record' | undefined) => Promise<void>
+      readonly removeRecordsByPrefix: (
+        scope: ITransactionScope<unknown>,
+        prefix: IStorageKey
+      ) => Promise<number>
+    }
+  >()
+
+  /** Native root calls retain only their original endpoint input, notification and lock derivation. */
+  type IRootMode<R> = {
+    readonly executeAttempt: (context: IWriteOptions, proceed: () => Promise<R>) => PromiseLike<R>
+    readonly lock: (context: IWriteOptions) => readonly ILockKey[]
+    readonly ranges: () => readonly {
+      readonly channel: ILockKey['channel']
+      readonly lower: string
+      readonly upper: string
+    }[]
+    readonly notification: {
+      readonly channel: 'value' | 'bytes' | 'record' | 'all'
+      readonly kind: 'put' | 'remove' | 'clear' | 'batch'
+      readonly displacedKind?: 'remove' | 'batch'
+    }
+  }
+
+  /** Run one genuine native attempt; no record draft or callback timeout owner remains here. */
+  const runTransaction = <T>(
+    run: (tx: IIndexedDbTransactionScope<TValue>) => T,
+    options: ITransactionOptions | undefined,
+    lease: IMutationLeaseContext,
+    pipeline = true,
+    root?: IRootMode<Awaited<T>>
+  ): Promise<Awaited<T>> => {
+    assertTransactionCallback(run, StorageBackend.indexedDb)
+    /** The shared loop captures the raw option once and retains inherited attempt identity. */
+    return runWithConcurrency(
+      {
+        store,
+        options: options === undefined ? {} : options,
+        executeAttempt: root?.executeAttempt,
+        lock: root?.lock
+      },
+      {
+        attempt: (context) =>
+          coordination.keyPort.attempt(
+            context,
+            {
+              status: ConcurrencyHolderState.held,
+              owner: controller.origin,
+              label: ownerLabel,
+              scope: 'local',
+              /** The provider captures the actual acquisition time after any logical wait. */
+              get since() {
+                return Date.now()
+              }
+            },
+            {
+              attempt: async (context) => {
+                /** A final native conflict is normalized only after its original pipeline unwinds. */
+                let commitConflict: IConcurrencyAttempt<Awaited<T>> | undefined
+                /** Only rethrowing this exact failure permits the canonical policy to retry. */
+                let commitFailure: StorageContractError | undefined
+                /** Public transactions have one outer endpoint; internal roots use their operation. */
+                const attemptNative = async (
+                  run: (scope: IIndexedDbTransactionScope<TValue>) => T
+                ): Promise<Awaited<T>> => {
+                  assertTransactionCallback(run, StorageBackend.indexedDb)
+                  /** An accepted waiter may drain after disposal but cannot start new native I/O. */
+                  assertLive()
+                  /**
+                   * Database preparation precedes native admission and never runs in the active
+                   * callback.
+                   */
+                  const operationRuntime = createStorageOperationRuntime()
+                  /**
+                   * These waits retain the original overall deadline rather than opening a second
+                   * one.
+                   */
+                  const database = await context.waitPhysical(open(operationRuntime, lease))
+                  /** Every public channel and index sidecar belongs to this same native transaction. */
+                  const native = createTransaction(
+                    database,
+                    [
+                      kvStoreName,
+                      bytesStoreName,
+                      recordsStoreName,
+                      REVISIONS_STORE_NAME,
+                      INDEX_RECORDS_STORE_NAME,
+                      META_STORE_NAME,
+                      ...featureStoreNames
+                    ],
+                    'readwrite'
+                  )
+                  /** Signals are already captured by the canonical attempt context. */
+                  const signal = context.signal as AbortSignal | undefined
+                  /** The original provider has already refined this exact base object in place. */
+                  const stages =
+                    root === undefined
+                      ? runtime.stageBindings.transactionStages(construction.store)
+                      : undefined
+                  /**
+                   * Request rejection reuses the native adapter's first failure, including
+                   * cancellation.
+                   */
+                  let attemptFailure: IStorageErrorFamily | undefined
+                  /** Per-channel insertion order gives one post-commit batch with no duplicate keys. */
+                  const changed = new Map<'value' | 'bytes' | 'record', Map<string, IStorageKey>>()
+                  /** Final unique checks inspect the final sidecar state after swaps and deletions. */
+                  const uniqueChecks = new Map<
+                    string,
+                    {
+                      readonly handle: IRecordIndexHandle
+                      readonly indexName: string
+                      readonly indexValue: IStorageKey
+                    }
+                  >()
+                  /** Indexed writes update one scope epoch in this same transaction. */
+                  const indexedScopes = new Set<string>()
+
+                  /** Mark an actual mutation without publishing before native commit. */
+                  const markChanged = (
+                    channel: 'value' | 'bytes' | 'record',
+                    key: IStorageKey
+                  ): void => {
+                    let keys = changed.get(channel)
+                    if (keys === undefined) {
+                      keys = new Map()
+                      changed.set(channel, keys)
+                    }
+                    keys.set(encodeFlatStorageKey(key), key)
+                  }
+                  /**
+                   * A current operation issues its own native request directly, including after
+                   * awaits.
+                   */
+                  const request = <R>(make: () => IDBRequest<R>): Promise<R> =>
+                    fromIdbRequest(make(), { signal }, operationRuntime).catch((cause) => {
+                      throw attemptFailure ?? cause
+                    })
+                  /**
+                   * Revisions and record invalidation retain their existing physical keys and
+                   * firewall.
+                   */
+                  const reviseRecord = async (key: IStorageKey, raw: boolean): Promise<void> => {
+                    const revisions = native.objectStore(REVISIONS_STORE_NAME)
+                    const revision = (await request(() =>
+                      revisions.get(recordRevisionKey(key))
+                    )) as number | undefined
+                    revisions.put((revision ?? 0) + 1, recordRevisionKey(key))
+                    const epoch = (await request(() => revisions.get(RECORD_EPOCH_KEY))) as
+                      | number
+                      | undefined
+                    revisions.put((epoch ?? 0) + 1, RECORD_EPOCH_KEY)
+                    if (raw)
+                      await applyRawMutationFirewall(
+                        native.objectStore(META_STORE_NAME),
+                        revisions,
+                        native.objectStore(INDEX_RECORDS_STORE_NAME),
+                        key,
+                        signal,
+                        operationRuntime
+                      )
+                  }
+                  /**
+                   * Canonical deletion can maintain existing sidecars without knowing a new
+                   * projection.
+                   */
+                  const deleteRecordSidecars = async (key: IStorageKey): Promise<boolean> => {
+                    /**
+                     * Reuse the existing key classifier rather than granting a new indexed-delete
+                     * mode.
+                     */
+                    const authority = classifyLegacyMutationBatch([key])
+                    if (authority.unscopedPresent) return false
+                    for (const scope of authority.canonicalScopes) {
+                      /** The current handle and its rows are read in this same native transaction. */
+                      const state = (await request(() =>
+                        native.objectStore(META_STORE_NAME).get(indexMetadataKey(scope))
+                      )) as { handle?: IRecordIndexHandle } | undefined
+                      const handle = state?.handle
+                      if (handle === undefined) continue
+                      /** The record index locates only this record's existing projected rows. */
+                      const sidecar = native.objectStore(INDEX_RECORDS_STORE_NAME)
+                      const rows = await request(() =>
+                        sidecar
+                          .index('record')
+                          .getAllKeys([scope, handle.generation, toIdbKey(key)])
+                      )
+                      for (const row of rows) await request(() => sidecar.delete(row))
+                      indexedScopes.add(scope)
+                    }
+                    return true
+                  }
+                  /** Resolve the existing cross-channel policy inside this same native transaction. */
+                  const write = async (
+                    channel: 'value' | 'bytes' | 'record',
+                    key: IStorageKey,
+                    value: unknown,
+                    conflictPolicy: 'conflict' | 'replace',
+                    indexed = false
+                  ): Promise<void> => {
+                    const stringKey = typeof key === 'string' ? key : undefined
+                    const reads = [
+                      request(() => native.objectStore(kvStoreName).get(toIdbKey(key))),
+                      stringKey === undefined
+                        ? Promise.resolve(undefined)
+                        : request(() => native.objectStore(bytesStoreName).get(stringKey)),
+                      request(() => native.objectStore(recordsStoreName).getKey(toIdbKey(key)))
+                    ]
+                    const [text, bytes, record] = await Promise.all(reads)
+                    const existing = new Set<'value' | 'bytes' | 'record'>()
+                    if (text !== undefined) existing.add('value')
+                    if (bytes !== undefined) existing.add('bytes')
+                    if (record !== undefined) existing.add('record')
+                    const plan = planChannelWrite(
+                      key,
+                      channel,
+                      existing,
+                      conflictPolicy,
+                      StorageBackend.indexedDb
+                    )
+                    for (const removal of plan.remove) {
+                      const name =
+                        removal === 'value'
+                          ? kvStoreName
+                          : removal === 'bytes'
+                            ? bytesStoreName
+                            : recordsStoreName
+                      await request(() => native.objectStore(name).delete(toIdbKey(key)))
+                      markChanged(removal, key)
+                      if (removal === 'record')
+                        await reviseRecord(key, !(await deleteRecordSidecars(key)))
+                    }
+                    const name =
+                      channel === 'value'
+                        ? kvStoreName
+                        : channel === 'bytes'
+                          ? bytesStoreName
+                          : recordsStoreName
+                    await request(() => native.objectStore(name).put(value, toIdbKey(key)))
+                    markChanged(channel, key)
+                    if (channel === 'record') await reviseRecord(key, !indexed)
+                  }
+                  /** Missing entries do not mutate revisions or emit a post-commit batch. */
+                  const remove = async (
+                    channel: 'value' | 'bytes' | 'record',
+                    key: IStorageKey
+                  ): Promise<void> => {
+                    const name =
+                      channel === 'value'
+                        ? kvStoreName
+                        : channel === 'bytes'
+                          ? bytesStoreName
+                          : recordsStoreName
+                    const existing = await request(() =>
+                      native.objectStore(name).getKey(toIdbKey(key))
+                    )
+                    if (existing === undefined) return
+                    await request(() => native.objectStore(name).delete(toIdbKey(key)))
+                    markChanged(channel, key)
+                    if (channel === 'record')
+                      await reviseRecord(key, !(await deleteRecordSidecars(key)))
+                  }
+                  /** Root clears reuse this transaction's stores, revisions and raw-record firewall. */
+                  const clearRoot = async (
+                    channel: 'value' | 'bytes' | 'record' | undefined
+                  ): Promise<void> => {
+                    const channels =
+                      channel === undefined ? (['value', 'bytes', 'record'] as const) : [channel]
+                    const revisions = native.objectStore(REVISIONS_STORE_NAME)
+                    const epoch = channels.includes('record')
+                      ? ((await request(() => revisions.get(RECORD_EPOCH_KEY))) as
+                          | number
+                          | undefined)
+                      : undefined
+                    for (const target of channels) {
+                      const name =
+                        target === 'value'
+                          ? kvStoreName
+                          : target === 'bytes'
+                            ? bytesStoreName
+                            : recordsStoreName
+                      const physical = native.objectStore(name)
+                      const count = await request(() => physical.count())
+                      await request(() => physical.clear())
+                      if (count > 0) changed.set(target, new Map())
+                    }
+                    if (channels.includes('record')) {
+                      await request(() => native.objectStore(INDEX_RECORDS_STORE_NAME).clear())
+                      await deleteOwnedMetaKeys(
+                        native.objectStore(META_STORE_NAME),
+                        signal,
+                        operationRuntime
+                      )
+                      await deleteOwnedRevisionKeys(revisions, signal, operationRuntime)
+                      revisions.put((epoch ?? 0) + 1, RECORD_EPOCH_KEY)
+                    }
+                  }
+                  /** Delete one canonical prefix through the existing ordered native cursor. */
+                  const removePrefix = async (
+                    channel: 'value' | 'record',
+                    prefix: ReturnType<typeof snapshotStorageKeyPrefix>
+                  ): Promise<number> => {
+                    /** The same physical store and native transaction own the complete range. */
+                    const target = native.objectStore(
+                      channel === 'value' ? kvStoreName : recordsStoreName
+                    )
+                    /** Optional injected range support only changes the first native seek. */
+                    const cursorRequest = target.openCursor(
+                      keyRange?.lowerBound(toIdbKey(prefix.key))
+                    )
+                    /**
+                     * Cursor continuation seeks directly when the injected factory lacks
+                     * IDBKeyRange.
+                     */
+                    let cursor = await request(() => cursorRequest)
+                    if (
+                      keyRange === undefined &&
+                      cursor !== null &&
+                      compareStorageKeys(cursor.key as IStorageKey, prefix.key) < 0
+                    )
+                      cursor = await request(() => {
+                        cursor!.continue(toIdbKey(prefix.key))
+                        return cursorRequest
+                      })
+                    /** Each matching native entry is deleted once and counted once. */
+                    let removed = 0
+                    while (cursor !== null && prefix.matches(cursor.key as IStorageKey)) {
+                      const key = cursor.key as IStorageKey
+                      await request(() => cursor!.delete())
+                      markChanged(channel, key)
+                      if (channel === 'record')
+                        await reviseRecord(key, !(await deleteRecordSidecars(key)))
+                      removed += 1
+                      cursor = await request(() => {
+                        cursor!.continue()
+                        return cursorRequest
+                      })
+                    }
+                    return removed
+                  }
+                  /** Validate one index handle against this transaction's current metadata. */
+                  const assertHandle = async (handle: IRecordIndexHandle): Promise<void> => {
+                    if (!isValidIndexGeneration(handle.generation)) throw staleIndexHandleError()
+                    const state = (await request(() =>
+                      native.objectStore(META_STORE_NAME).get(indexMetadataKey(handle.scope))
+                    )) as { handle?: IRecordIndexHandle } | undefined
+                    if (
+                      state?.handle?.generation !== handle.generation ||
+                      state.handle.fingerprint !== handle.fingerprint
+                    )
+                      throw staleIndexHandleError()
+                  }
+                  /**
+                   * Execute only an already-authorized short-lived view through the original
+                   * pipeline.
+                   */
+                  const executeOperation = <TScope extends ITransactionScope<unknown>, TInput, R>(
+                    view: TScope,
+                    name: string,
+                    input: TInput,
+                    run: (view: TScope, input: TInput) => R,
+                    batch?: { readonly count?: number }
+                  ): Promise<Awaited<R>> => {
+                    /** Root batch observation already encloses this same native scope. */
+                    const invoke = (): Promise<Awaited<R>> =>
+                      root !== undefined
+                        ? Promise.resolve(run(view, input))
+                        : runtime.execution.run<TInput, Awaited<R>>(
+                            { operation: name, input, ctx: context, scope: view },
+                            async (captured): Promise<Awaited<R>> => {
+                              /**
+                               * Observer failures report without changing the admitted native
+                               * operation.
+                               */
+                              let operationStages: ITransactionStageObserver | undefined
+                              try {
+                                operationStages = stages?.forTransaction(view)
+                              } catch (cause) {
+                                reportCleanupError(operationRuntime.reporter, cause)
+                              }
+                              observeIndexedDbStage(
+                                operationStages,
+                                TransactionBeforeStage.beforeTxOperation,
+                                operationRuntime,
+                                name
+                              )
+                              const value = await run(view, captured)
+                              observeIndexedDbStage(
+                                operationStages,
+                                TransactionObservedStage.afterTxOperation,
+                                operationRuntime,
+                                name
+                              )
+                              return value
+                            }
+                          )
+                    return batch !== undefined && root === undefined
+                      ? observeBrowserBatch(
+                          runtime,
+                          construction.store,
+                          name,
+                          batch.count,
+                          invoke,
+                          view
+                        )
+                      : invoke()
+                  }
+                  /**
+                   * One same-transaction cursor is advanced only by an authorized fresh operation
+                   * view.
+                   */
+                  const recordIterator = (
+                    scope: ITransactionScope<TValue>,
+                    range: IKeyRange | undefined,
+                    query?: IRecordIndexQuery
+                  ): IStorageIterator<[IStorageKey, TValue]> => {
+                    /**
+                     * Capture arguments during the first authorized advance, like the root
+                     * generator.
+                     */
+                    let rangeSnapshot: IKeyRange | undefined
+                    let cursorRequest: IDBRequest<IDBCursorWithValue | null> | undefined
+                    let cursor: IDBCursorWithValue | undefined
+                    let emitted = 0
+                    return transactionOwner.registerIterator<
+                      ITransactionScope<TValue>,
+                      [IStorageKey, TValue]
+                    >(scope, {
+                      next: (view) =>
+                        executeOperation(
+                          view,
+                          query === undefined
+                            ? StorageTransactionOperation.iterateRecords
+                            : StorageTransactionOperation.iterateRecordIndex,
+                          undefined,
+                          async (): Promise<IteratorResult<[IStorageKey, TValue], undefined>> => {
+                            if (query?.limit !== undefined && emitted >= query.limit)
+                              return { done: true, value: undefined }
+                            if (cursorRequest === undefined) {
+                              rangeSnapshot = snapshotKeyRange(range, StorageBackend.indexedDb)
+                              if (query === undefined)
+                                cursorRequest = native
+                                  .objectStore(recordsStoreName)
+                                  .openCursor(toIdbRange(rangeSnapshot, keyRange))
+                              else {
+                                await assertHandle(query.handle)
+                                if (keyRange === undefined)
+                                  throw new StorageError(StorageErrorCode.unavailable, {
+                                    backend: StorageBackend.indexedDb
+                                  })
+                                const direction = query.direction === 'prev' ? 'prev' : 'next'
+                                const prefix = [
+                                  query.handle.scope,
+                                  query.index,
+                                  query.handle.generation
+                                ]
+                                cursorRequest = native
+                                  .objectStore(INDEX_RECORDS_STORE_NAME)
+                                  .index('lookup')
+                                  .openCursor(
+                                    toIdbRecordIndexRange(
+                                      rangeSnapshot,
+                                      prefix,
+                                      keyRange,
+                                      direction,
+                                      undefined
+                                    ),
+                                    direction
+                                  )
+                              }
+                            } else cursor?.continue()
+                            const next = await request(() => cursorRequest!)
+                            if (next === null) return { done: true, value: undefined }
+                            cursor = next
+                            emitted += 1
+                            if (query === undefined)
+                              return {
+                                done: false,
+                                value: [next.key as IStorageKey, next.value as TValue]
+                              }
+                            const recordKey = (next.value as { recordKey: IStorageKey }).recordKey
+                            const value = (await request(() =>
+                              native.objectStore(recordsStoreName).get(toIdbKey(recordKey))
+                            )) as TValue | undefined
+                            if (value === undefined)
+                              throw new StorageError(
+                                StorageErrorCode.indexOrphan,
+                                { backend: StorageBackend.indexedDb },
+                                StorageErrorText.indexOrphan
+                              )
+                            return { done: false, value: [recordKey, value] }
+                          }
+                        ),
+                      close: () => {
+                        cursor = undefined
+                        cursorRequest = undefined
+                      }
+                    })
+                  }
+                  /**
+                   * Every short-lived view closes over the same native transaction and complete
+                   * method set.
+                   */
+                  const createScope = (): IIndexedDbTransactionScope<TValue> => {
+                    let scope!: IIndexedDbTransactionScope<TValue>
+                    /**
+                     * Register before any input projection, clone, stage callback or native request
+                     * begins.
+                     */
+                    const operation = <TInput, R>(
+                      name: string,
+                      input: TInput,
+                      run: (view: IIndexedDbTransactionScope<TValue>, input: TInput) => R
+                    ): Promise<Awaited<R>> =>
+                      runTransactionOperation(scope, (view) =>
+                        executeOperation(view, name, input, run)
+                      )
+                    scope = {
+                      use: (capability) => useTransactionCapability(scope, capability),
+                      removeByPrefix: (prefix) =>
+                        runTransactionOperation(scope, (view) => {
+                          const captured = snapshotStorageKeyPrefix(
+                            prefix,
+                            StorageBackend.indexedDb
+                          )
+                          return executeOperation(
+                            view,
+                            StorageTransactionOperation.removeByPrefix,
+                            undefined,
+                            () => removePrefix('value', captured),
+                            {}
+                          )
+                        }),
+                      getMany: (keys) =>
+                        runTransactionOperation(scope, (view) => {
+                          const captured = snapshotStorageBatchKeys(keys, StorageBackend.indexedDb)
+                          if (captured.length === 0) return []
+                          return executeOperation(
+                            view,
+                            StorageTransactionOperation.getMany,
+                            { count: captured.length },
+                            async () => {
+                              /** Repeated positions reuse one native read in this snapshot. */
+                              const reads: Promise<string | undefined>[] = []
+                              return Promise.all(
+                                captured.map(({ key, firstIndex }, index) => {
+                                  const pending =
+                                    firstIndex === index
+                                      ? request(() =>
+                                          native.objectStore(kvStoreName).get(toIdbKey(key))
+                                        ).then((value) =>
+                                          typeof value === 'string' ? value : undefined
+                                        )
+                                      : reads[firstIndex]!
+                                  reads.push(pending)
+                                  return pending
+                                })
+                              )
+                            },
+                            { count: captured.length }
+                          )
+                        }),
+                      setMany: (entries) =>
+                        runTransactionOperation(scope, (view) => {
+                          /**
+                           * Every entry is captured and validated before the batch issues its first
+                           * write.
+                           */
+                          const captured = snapshotBrowserBatchEntries(
+                            entries,
+                            StorageBackend.indexedDb
+                          )
+                          if (captured.length === 0) return
+                          return executeOperation(
+                            view,
+                            StorageTransactionOperation.setMany,
+                            { count: captured.length },
+                            async () => {
+                              for (const { key, value } of captured)
+                                await write('value', key, value, StorageConflictPolicy.conflict)
+                            },
+                            { count: captured.length }
+                          )
+                        }),
+                      removeMany: (keys) =>
+                        runTransactionOperation(scope, (view) => {
+                          const captured = snapshotStorageBatchKeys(keys, StorageBackend.indexedDb)
+                          if (captured.length === 0) return 0
+                          return executeOperation(
+                            view,
+                            StorageTransactionOperation.removeMany,
+                            { count: captured.length },
+                            async () => {
+                              let removed = 0
+                              for (let index = 0; index < captured.length; index += 1) {
+                                const { key, firstIndex } = captured[index]!
+                                if (firstIndex !== index) continue
+                                const present = await request(() =>
+                                  native.objectStore(kvStoreName).getKey(toIdbKey(key))
+                                )
+                                if (present === undefined) continue
+                                await remove('value', key)
+                                removed += 1
+                              }
+                              return removed
+                            },
+                            { count: captured.length }
+                          )
+                        }),
+                      get: (key) =>
+                        operation(StorageTransactionOperation.get, key, async (_view, key) => {
+                          assertStringStorageKey(key, StorageBackend.indexedDb)
+                          const value = await request(() =>
+                            native.objectStore(kvStoreName).get(key)
+                          )
+                          return typeof value === 'string' ? value : null
+                        }),
+                      set: (key, value, options) =>
+                        operation(
+                          StorageTransactionOperation.set,
+                          { key, value, options },
+                          (_view, { key, value, options }) => {
+                            assertStringStorageKey(key, StorageBackend.indexedDb)
+                            if (typeof value !== 'string')
+                              throw new StorageError(StorageErrorCode.invalidConfig, {
+                                backend: StorageBackend.indexedDb,
+                                key,
+                                cause: new TypeError(StorageErrorText.storageValueInvalid)
+                              })
+                            return write(
+                              'value',
+                              key,
+                              value,
+                              readTransactionConflictPolicy(options, StorageBackend.indexedDb)
+                            )
+                          }
+                        ),
+                      remove: (key) =>
+                        operation(StorageTransactionOperation.remove, key, (_view, key) => {
+                          assertStringStorageKey(key, StorageBackend.indexedDb)
+                          return remove('value', key)
+                        }),
+                      has: (key) =>
+                        operation(StorageTransactionOperation.has, key, async (_view, key) => {
+                          assertStringStorageKey(key, StorageBackend.indexedDb)
+                          return (
+                            (await request(() => native.objectStore(kvStoreName).getKey(key))) !==
+                            undefined
+                          )
+                        }),
+                      getBytes: (key) =>
+                        operation(StorageTransactionOperation.getBytes, key, async (_view, key) => {
+                          assertStringStorageKey(key, StorageBackend.indexedDb)
+                          const value = await request(() =>
+                            native.objectStore(bytesStoreName).get(key)
+                          )
+                          return readIndexedDbBytes(value)
+                        }),
+                      setBytes: (key, value, options) =>
+                        operation(
+                          StorageTransactionOperation.setBytes,
+                          { key, value, options },
+                          (_view, { key, value, options }) => {
+                            assertStringStorageKey(key, StorageBackend.indexedDb)
+                            if (!isUint8Array(value))
+                              throw new StorageError(StorageErrorCode.invalidConfig, {
+                                backend: StorageBackend.indexedDb,
+                                key,
+                                cause: new TypeError(StorageErrorText.storageBytesInvalid)
+                              })
+                            const snapshot = root === undefined ? value.slice() : value
+                            return write(
+                              'bytes',
+                              key,
+                              snapshot,
+                              readTransactionConflictPolicy(options, StorageBackend.indexedDb)
+                            )
+                          }
+                        ),
+                      removeBytes: (key) =>
+                        operation(StorageTransactionOperation.removeBytes, key, (_view, key) => {
+                          assertStringStorageKey(key, StorageBackend.indexedDb)
+                          return remove('bytes', key)
+                        }),
+                      getRecord: (key) =>
+                        operation(StorageTransactionOperation.getRecord, key, (_view, key) => {
+                          const snapshot = snapshotStorageKey(key, StorageBackend.indexedDb)
+                          return request(() =>
+                            native.objectStore(recordsStoreName).get(toIdbKey(snapshot))
+                          ) as Promise<TValue | undefined>
+                        }),
+                      putRecord: (value, key, options) =>
+                        operation(
+                          StorageTransactionOperation.putRecord,
+                          { value, key, options },
+                          async (_view, { value, key, options }) => {
+                            const snapshot = snapshotStorageKey(
+                              key ?? createStorageToken(),
+                              StorageBackend.indexedDb
+                            )
+                            const copy =
+                              root === undefined ? snapshotWriteValue(value, snapshot) : value
+                            await write(
+                              'record',
+                              snapshot,
+                              copy,
+                              readTransactionConflictPolicy(options, StorageBackend.indexedDb)
+                            )
+                            return snapshot
+                          }
+                        ),
+                      deleteRecord: (key) =>
+                        operation(StorageTransactionOperation.deleteRecord, key, (_view, key) => {
+                          const snapshot = snapshotStorageKey(key, StorageBackend.indexedDb)
+                          return remove('record', snapshot)
+                        }),
+                      iterateRecords: (range) => recordIterator(scope, range),
+                      isRecordIndexReady: (handle) =>
+                        operation(
+                          StorageTransactionOperation.isRecordIndexReady,
+                          handle,
+                          async (_view, handle) => {
+                            /**
+                             * A cached repository handle grants no readiness across native
+                             * snapshots.
+                             */
+                            const { scope, generation, fingerprint } = handle
+                            const state = (await request(() =>
+                              native.objectStore(META_STORE_NAME).get(indexMetadataKey(scope))
+                            )) as
+                              | {
+                                  readonly handle?: IRecordIndexHandle
+                                  readonly readiness?: IRecordIndexReadiness
+                                }
+                              | undefined
+                            return (
+                              state?.handle?.generation === generation &&
+                              state.handle.fingerprint === fingerprint &&
+                              state.readiness?.status === 'complete'
+                            )
+                          }
+                        ),
+                      putIndexedRecord: (value, key, handle, projection, options) =>
+                        operation(
+                          StorageTransactionOperation.putIndexedRecord,
+                          { value, key, handle, projection, options },
+                          async (_view, { value, key, handle, projection, options }) => {
+                            const snapshot = snapshotStorageKey(key, StorageBackend.indexedDb)
+                            const copy =
+                              root === undefined ? snapshotWriteValue(value, snapshot) : value
+                            const projected =
+                              root === undefined
+                                ? snapshotWriteValue(projection, snapshot)
+                                : projection
+                            const conflictPolicy = readTransactionConflictPolicy(
+                              options,
+                              StorageBackend.indexedDb
+                            )
+                            await assertHandle(handle)
+                            const definitions = JSON.parse(
+                              handle.fingerprint
+                            ) as IRecordIndexDefinition[]
+                            const owners = collectUniqueIndexOwners(
+                              definitions,
+                              [{ key: snapshot, projection: projected }],
+                              StorageBackend.indexedDb
+                            )
+                            for (const [identity, unique] of owners)
+                              uniqueChecks.set(
+                                JSON.stringify([handle.scope, handle.generation, identity]),
+                                {
+                                  handle,
+                                  indexName: unique.indexName,
+                                  indexValue: unique.indexValue
+                                }
+                              )
+                            const sidecar = native.objectStore(INDEX_RECORDS_STORE_NAME)
+                            const rows = await request(() =>
+                              sidecar
+                                .index('record')
+                                .getAllKeys([handle.scope, handle.generation, toIdbKey(snapshot)])
+                            )
+                            for (const row of rows) await request(() => sidecar.delete(row))
+                            await write('record', snapshot, copy, conflictPolicy, true)
+                            for (const [indexName, entry] of Object.entries(projected)) {
+                              if (entry === undefined) continue
+                              const keys = entry.kind === 'multiple' ? entry.keys : [entry.key]
+                              for (const indexValue of keys)
+                                await request(() =>
+                                  sidecar.put({
+                                    scope: handle.scope,
+                                    generation: handle.generation,
+                                    indexName,
+                                    indexValue: toIdbKey(indexValue),
+                                    recordKey: toIdbKey(snapshot)
+                                  })
+                                )
+                            }
+                            indexedScopes.add(handle.scope)
+                            return snapshot
+                          }
+                        ),
+                      iterateRecordIndex: (query) => recordIterator(scope, query.range, query)
+                    }
+                    /**
+                     * Selected Feature methods are attached to this original complete view before
+                     * freezing.
+                     */
+                    const api = runtime.createTransactionApi(scope)
+                    if (api !== undefined)
+                      Object.defineProperty(scope, 'api', { value: api, enumerable: true })
+                    return Object.freeze(scope)
+                  }
+                  return await runNativeIndexedDbTransaction({
+                    transaction: native,
+                    guardStoreName: REVISIONS_STORE_NAME,
+                    guardKey: RECORD_EPOCH_KEY,
+                    owner: transactionOwner,
+                    createScope,
+                    run,
+                    signal,
+                    context,
+                    runtime: operationRuntime,
+                    normalizeFailure: (cause) =>
+                      (attemptFailure ??= normalizeIndexedDbOperationError(cause)),
+                    observer: stages,
+                    waitPhysical: (pending) => context.waitPhysical(pending),
+                    registerNative: (scope, abort) => {
+                      const { id } = assertTransactionOwner(store, scope)
+                      nativeTransactions.set(id, {
+                        native,
+                        abort,
+                        clearRoot,
+                        removeRecordsByPrefix: (scope, prefix) =>
+                          runTransactionOperation(scope, (view) => {
+                            const captured = snapshotStorageKeyPrefix(
+                              prefix,
+                              StorageBackend.indexedDb
+                            )
+                            return executeOperation(
+                              view,
+                              StorageTransactionOperation.removeRecordsByPrefix,
+                              undefined,
+                              () => removePrefix('record', captured)
+                            )
+                          })
+                      })
+                      return () => {
+                        nativeTransactions.delete(id)
+                      }
+                    },
+                    beforeCommit: async () => {
+                      for (const { handle, indexName, indexValue } of uniqueChecks.values()) {
+                        const owners = await request(() =>
+                          native
+                            .objectStore(INDEX_RECORDS_STORE_NAME)
+                            .index('lookup')
+                            .getAllKeys([
+                              handle.scope,
+                              indexName,
+                              handle.generation,
+                              toIdbKey(indexValue)
+                            ])
+                        )
+                        if (owners.length > 1)
+                          throw new StorageError(
+                            StorageErrorCode.indexUniqueConflict,
+                            { backend: StorageBackend.indexedDb },
+                            indexUniqueConflictText(indexName)
+                          )
+                      }
+                      const revisions = native.objectStore(REVISIONS_STORE_NAME)
+                      for (const scope of indexedScopes) {
+                        const epoch = (await request(() =>
+                          revisions.get(indexScopeEpochKey(scope))
+                        )) as number | undefined
+                        revisions.put((epoch ?? 0) + 1, indexScopeEpochKey(scope))
+                      }
+                    },
+                    validateCommit: () => {
+                      /** New logical holders are checked after real native work and before commit. */
+                      const held = coordination.keyPort.probe(
+                        readConcurrencyLockIdentities(context),
+                        root?.ranges(),
+                        context
+                      )
+                      if (held !== undefined) {
+                        commitFailure = new StorageContractError(
+                          StorageContractErrorCode.writeConflict,
+                          {
+                            backend: StorageBackend.indexedDb,
+                            keys: [held.key],
+                            holder: held.holder
+                          }
+                        )
+                        commitConflict = {
+                          status: 'conflict',
+                          phase: 'commit',
+                          keys: [held.key],
+                          holder: held.holder,
+                          cause: commitFailure
+                        }
+                        throw commitFailure
+                      }
+                    },
+                    changedKeys: () =>
+                      [...changed.values()].reduce((count, keys) => count + keys.size, 0),
+                    afterCommit: () => {
+                      if (root !== undefined) {
+                        /** Root publication retains its existing kind, order and no-op suppression. */
+                        const notification = root.notification
+                        if (notification.channel === 'all') {
+                          if (changed.size > 0) publishChange({ channel: 'all', kind: 'clear' })
+                          return
+                        }
+                        const keys = changed.get(notification.channel)
+                        if (keys !== undefined)
+                          publishChange({
+                            channel: notification.channel,
+                            kind: notification.kind,
+                            ...(notification.kind === 'clear' ? {} : { keys: [...keys.values()] })
+                          })
+                        for (const channel of ['value', 'bytes', 'record'] as const) {
+                          if (channel === notification.channel) continue
+                          const displaced = changed.get(channel)
+                          if (displaced !== undefined && displaced.size > 0)
+                            publishChange({
+                              channel,
+                              kind: notification.displacedKind ?? 'remove',
+                              keys: [...displaced.values()]
+                            })
+                        }
+                        return
+                      }
+                      for (const channel of ['value', 'bytes', 'record'] as const) {
+                        const keys = changed.get(channel)
+                        if (keys !== undefined && keys.size > 0)
+                          publishChange({ channel, kind: 'batch', keys: [...keys.values()] })
+                      }
+                    }
+                  })
+                }
+                try {
+                  const value = pipeline
+                    ? await runtime.execution.run(
+                        {
+                          operation: StorageOperation.indexedDbTransaction,
+                          input: run,
+                          ctx: context
+                        },
+                        attemptNative
+                      )
+                    : await attemptNative(run)
+                  return { status: 'committed', value }
+                } catch (cause) {
+                  if (commitConflict !== undefined && cause === commitFailure) return commitConflict
+                  throw cause
+                }
+              }
+            },
+            runtime.stageBindings.concurrencyStages(construction.store),
+            controller.closingSignal,
+            root?.ranges()
+          )
+      }
+    )
+  }
+
+  /** Each real root attempt captures its payload before logical admission; acquire waits reuse it. */
+  type IRootPrepared<R> = {
+    readonly keys: readonly ILockKey[]
+    readonly ranges?: ReturnType<IRootMode<Awaited<R>>['ranges']>
+    readonly run: (scope: IIndexedDbTransactionScope<TValue>) => R
+  }
+  /** Root execution uses one complete pipeline per native attempt in the original loop/owner. */
+  const rootMutation = <I, R>(
+    method: string,
+    input: I,
+    options: IWriteOptions | undefined,
+    notification: IRootMode<Awaited<R>>['notification'],
+    prepare: (input: I, context: IWriteOptions) => IRootPrepared<R>
+  ): Promise<Awaited<R>> => {
+    /** Pipeline output is fixed before implicit key/range derivation can run. */
+    let capturedInput = input
+    /** One native attempt derives detached arguments once, including across acquire waits. */
+    let prepared!: IRootPrepared<R>
+    return withMutationLease((lease) =>
+      runTransaction((scope) => prepared.run(scope), options, lease, false, {
+        executeAttempt: (context, proceed) =>
+          runtime.execution.run(
+            {
+              operation: storageBackendOperation(StorageBackend.indexedDb, method),
+              input,
+              ctx: context
+            },
+            (captured) => {
+              capturedInput = captured
+              return proceed()
+            }
+          ),
+        lock: (context) => {
+          prepared = prepare(capturedInput, context)
+          return prepared.keys
+        },
+        ranges: () => prepared.ranges ?? [],
+        notification
+      })
+    )
+  }
+  /** Replace protects all channels that the existing native write may displace. */
+  const rootKeys = (
     channel: 'value' | 'bytes' | 'record',
     key: IStorageKey,
-    value: unknown,
-    signal: AbortSignal | undefined,
-    policy: (typeof StorageConflictPolicy)[keyof typeof StorageConflictPolicy] = StorageConflictPolicy.conflict,
-    runtime: IStorageOperationRuntime,
-    inheritedLease?: IMutationLeaseContext
-  ): Promise<void> => {
-    const valueSnapshot = channel === StorageChannel.value ? value : snapshotWriteValue(value, key)
-    const database = await open(runtime, inheritedLease)
-    // A top-level lease admits the complete operation before disposal starts.
-    // Rechecking global liveness after asynchronous preparation would reject
-    // that admitted write while dispose is correctly waiting for its lease.
-    if (inheritedLease === undefined) assertLive()
-    const transaction = createTransaction(
-      database,
-      [
-        kvStoreName,
-        bytesStoreName,
-        recordsStoreName,
-        REVISIONS_STORE_NAME,
-        INDEX_RECORDS_STORE_NAME,
-        META_STORE_NAME
-      ],
-      'readwrite'
+    context: IWriteOptions
+  ): readonly ILockKey[] =>
+    (context.conflictPolicy === 'replace'
+      ? (['value', 'bytes', 'record'] as const)
+      : [channel]
+    ).flatMap<ILockKey>((target) =>
+      target === 'value'
+        ? [lockKey.text(key)]
+        : target === 'record'
+          ? [lockKey.record(key)]
+          : typeof key === 'string'
+            ? [lockKey.bytes(key)]
+            : []
     )
-    const committed = idbTransactionCommit(transaction, { signal }, runtime)
-    void committed.catch(() => {})
-    try {
-      const stringKey = typeof key === 'string' ? key : undefined
-      const kvRequest =
-        stringKey === undefined ? undefined : transaction.objectStore(kvStoreName).get(stringKey)
-      const bytesRequest =
-        stringKey === undefined ? undefined : transaction.objectStore(bytesStoreName).get(stringKey)
-      const recordRequest = transaction.objectStore(recordsStoreName).getKey(toIdbKey(key))
-      const [kvExisting, bytesExisting, recordExisting] = await Promise.all([
-        kvRequest ? fromIdbRequest(kvRequest, { signal }, runtime) : Promise.resolve(undefined),
-        bytesRequest
-          ? fromIdbRequest(bytesRequest, { signal }, runtime)
-          : Promise.resolve(undefined),
-        fromIdbRequest(recordRequest, { signal }, runtime)
-      ])
-      const existing = new Set<'value' | 'bytes' | 'record'>()
-      if (kvExisting !== undefined) existing.add('value')
-      if (bytesExisting !== undefined) existing.add('bytes')
-      if (recordExisting !== undefined) existing.add('record')
-      const plan = planChannelWrite(key, channel, existing, policy, StorageBackend.indexedDb)
-      for (const removal of plan.remove) {
-        if (removal === StorageChannel.value && stringKey !== undefined)
-          transaction.objectStore(kvStoreName).delete(stringKey)
-        if (removal === StorageChannel.bytes && stringKey !== undefined)
-          transaction.objectStore(bytesStoreName).delete(stringKey)
-        if (removal === 'record') transaction.objectStore(recordsStoreName).delete(toIdbKey(key))
-      }
-      const target =
-        channel === StorageChannel.value
-          ? kvStoreName
-          : channel === StorageChannel.bytes
-            ? bytesStoreName
-            : recordsStoreName
-      const targetKey = channel === 'record' ? toIdbKey(key) : (key as string)
-      transaction.objectStore(target).put(valueSnapshot, targetKey)
-      if (channel === 'record') {
-        const revisionStore = transaction.objectStore(REVISIONS_STORE_NAME)
-        const revision = await fromIdbRequest(
-          revisionStore.get(recordRevisionKey(key)) as IDBRequest<number | undefined>,
-          { signal },
-          runtime
-        )
-        revisionStore.put((revision ?? 0) + 1, recordRevisionKey(key))
-      }
-      if (plan.remove.includes('record') && channel !== 'record') {
-        const revisionStore = transaction.objectStore(REVISIONS_STORE_NAME)
-        const encoded = recordRevisionKey(key)
-        const revision = await fromIdbRequest(
-          revisionStore.get(encoded) as IDBRequest<number | undefined>,
-          { signal },
-          runtime
-        )
-        revisionStore.put((revision ?? 0) + 1, encoded)
-      }
-      if (channel === 'record' || plan.remove.includes('record')) {
-        const revisionStore = transaction.objectStore(REVISIONS_STORE_NAME)
-        const epoch = await fromIdbRequest(
-          revisionStore.get(RECORD_EPOCH_KEY) as IDBRequest<number | undefined>,
-          { signal },
-          runtime
-        )
-        revisionStore.put((epoch ?? 0) + 1, RECORD_EPOCH_KEY)
-        // Raw-record firewall: this write staged, replaced, or removed a `record` entry
-        // outside the entity repository's planner, so any index built over it may now be wrong.
-        await applyRawMutationFirewall(
-          transaction.objectStore(META_STORE_NAME),
-          revisionStore,
-          transaction.objectStore(INDEX_RECORDS_STORE_NAME),
-          key,
-          signal,
-          runtime
-        )
-      }
-      await committed
-      // Only after the IDBTransaction has actually committed — an aborted/rolled-back
-      // transaction (the `catch` below) must fire nothing.
-      publishChange({ channel, kind: 'put', keys: [key] })
-      // /055: a `conflictPolicy:'replace'` write can silently evict whatever other
-      // channel already held this key — that eviction is itself a real mutation on its own
-      // channel and must publish its own `remove`, mirroring the memory backend's
-      // `checkCrossChannel`. Only the evicted channel's own event fires here; the attempted
-      // channel's `put` above already covers the write itself.
-      if (plan.remove.includes('value') && channel !== 'value')
-        publishChange({ channel: 'value', kind: 'remove', keys: [key] })
-      if (plan.remove.includes('bytes') && channel !== 'bytes')
-        publishChange({ channel: 'bytes', kind: 'remove', keys: [key] })
-      if (plan.remove.includes('record') && channel !== 'record')
-        publishChange({ channel: 'record', kind: 'remove', keys: [key] })
-    } catch (cause) {
-      try {
-        transaction.abort()
-      } catch {
-        /* transaction already settled */
-      }
-      await committed.catch(() => {})
-      throw cause
-    }
-  }
 
-  const runTransaction = async <T>(
-    run: (tx: ITransactionScope<TValue>) => Promise<T>,
-    signal: AbortSignal | undefined,
-    runtime: IStorageOperationRuntime,
-    context?: { readonly timeoutMs?: number },
-    inheritedLease?: IMutationLeaseContext
-  ): Promise<T> => {
-    const database = await open(runtime, inheritedLease)
-    /** Scope remains usable only while the transaction callback is pending. */
-    let scopeActive = true
-    const tombstone = Symbol('indexeddb-transaction-tombstone')
-    const draft = new Map<
-      string,
-      [IStorageKey, TValue, 'conflict' | 'replace'] | [IStorageKey, typeof tombstone]
-    >()
-    const readRevisions = new Map<
-      string,
-      { readonly key: IStorageKey; readonly revision: number }
-    >()
-    const readSnapshots = new Map<string, TValue | undefined>()
-    let snapshotEpoch: number | undefined
-    const readRevision = async (key: IStorageKey): Promise<void> => {
-      const encoded = encodeFlatStorageKey(key)
-      if (readRevisions.has(encoded)) return
-      const revisionTx = createTransaction(
-        database,
-        [REVISIONS_STORE_NAME, recordsStoreName],
-        'readonly'
-      )
-      const epoch = await fromIdbRequest(
-        revisionTx.objectStore(REVISIONS_STORE_NAME).get(RECORD_EPOCH_KEY) as IDBRequest<
-          number | undefined
-        >,
-        { signal },
-        runtime
-      )
-      const revision = await fromIdbRequest(
-        revisionTx.objectStore(REVISIONS_STORE_NAME).get(recordRevisionKey(key)) as IDBRequest<
-          number | undefined
-        >,
-        { signal },
-        runtime
-      )
-      const value = await fromIdbRequest(
-        revisionTx.objectStore(recordsStoreName).get(toIdbKey(key)) as IDBRequest<
-          TValue | undefined
-        >,
-        { signal },
-        runtime
-      )
-      if (snapshotEpoch === undefined) {
-        snapshotEpoch = epoch ?? 0
-      }
-      readRevisions.set(encoded, { key, revision: revision ?? 0 })
-      readSnapshots.set(encoded, value === undefined ? undefined : structuredClone(value))
-    }
-    const scope: ITransactionScope<TValue> = {
-      get: async (key) => {
-        assertTransactionScopeActive(scopeActive, StorageBackend.indexedDb)
-        const keySnapshot = snapshotStorageKey(key, StorageBackend.indexedDb)
-        await readRevision(keySnapshot)
-        assertTransactionScopeActive(scopeActive, StorageBackend.indexedDb)
-        const entry = draft.get(encodeFlatStorageKey(keySnapshot))
-        if (entry !== undefined && entry.length === 2 && entry[1] === tombstone) return undefined
-        if (entry !== undefined) return structuredClone(entry[1] as TValue)
-        const snapshot = readSnapshots.get(encodeFlatStorageKey(keySnapshot))
-        return snapshot === undefined ? undefined : structuredClone(snapshot)
-      },
-      put: async (value, key, options) => {
-        assertTransactionScopeActive(scopeActive, StorageBackend.indexedDb)
-        const conflictPolicy = readTransactionConflictPolicy(options, StorageBackend.indexedDb)
-        const resolvedKey = key ?? createStorageToken()
-        const keySnapshot = snapshotStorageKey(resolvedKey, StorageBackend.indexedDb)
-        const valueSnapshot = snapshotWriteValue(value, keySnapshot)
-        await readRevision(keySnapshot)
-        assertTransactionScopeActive(scopeActive, StorageBackend.indexedDb)
-        draft.set(encodeFlatStorageKey(keySnapshot), [keySnapshot, valueSnapshot, conflictPolicy])
-        return resolvedKey
-      },
-      delete: async (key) => {
-        assertTransactionScopeActive(scopeActive, StorageBackend.indexedDb)
-        const keySnapshot = snapshotStorageKey(key, StorageBackend.indexedDb)
-        await readRevision(keySnapshot)
-        assertTransactionScopeActive(scopeActive, StorageBackend.indexedDb)
-        draft.set(encodeFlatStorageKey(keySnapshot), [keySnapshot, tombstone])
-      }
-    }
-    let result: T
-    try {
-      result = await withTimeout(() => run(scope), {
-        timeoutMs: context?.timeoutMs ?? TRANSACTION_CALLBACK_DEADLINE_MS,
-        signal,
-        report: runtime.reporter
-      })
-    } catch (error) {
-      throw normalizeIndexedDbOperationError(error)
-    } finally {
-      scopeActive = false
-    }
-    throwIfAborted(signal)
-    assertLive()
-    throwIfAborted(signal)
-    const idbTx = createTransaction(
-      database,
-      [
-        kvStoreName,
-        bytesStoreName,
-        recordsStoreName,
-        REVISIONS_STORE_NAME,
-        INDEX_RECORDS_STORE_NAME,
-        META_STORE_NAME
-      ],
-      'readwrite'
-    )
-    const committed = idbTransactionCommit(idbTx, { signal }, runtime)
-    void committed.catch(() => {})
-    const revisionStore = idbTx.objectStore(REVISIONS_STORE_NAME)
-    const currentEpoch =
-      (await fromIdbRequest(
-        revisionStore.get(RECORD_EPOCH_KEY) as IDBRequest<number | undefined>,
-        {
-          signal
-        },
-        runtime
-      )) ?? 0
-    if (snapshotEpoch !== undefined && currentEpoch !== snapshotEpoch) {
-      idbTx.abort()
-      await committed.catch(() => {})
-      throw new StorageError(StorageErrorCode.transactionConflict, {
-        backend: StorageBackend.indexedDb,
-        operation: StorageOperation.transactionCommit,
-        cause: new Error('record epoch changed')
-      })
-    }
-    for (const { key, revision: expected } of readRevisions.values()) {
-      const actual =
-        (await fromIdbRequest(
-          revisionStore.get(recordRevisionKey(key)) as IDBRequest<number | undefined>,
-          {
-            signal
-          },
-          runtime
-        )) ?? 0
-      if (actual !== expected) {
-        idbTx.abort()
-        await committed.catch(() => {})
-        throw new StorageError(StorageErrorCode.transactionConflict, {
-          backend: StorageBackend.indexedDb,
-          operation: StorageOperation.transactionCommit,
-          cause: new Error(`record revision changed from ${expected} to ${actual}`)
-        })
-      }
-    }
-    let recordMutation = false
-    const committedTransactionKeys: IStorageKey[] = []
-    for (const entry of draft.values()) {
-      if (entry.length === 2 && entry[1] === tombstone) {
-        const key = entry[0] as IStorageKey
-        recordMutation = true
-        committedTransactionKeys.push(key)
-        idbTx.objectStore(recordsStoreName).delete(toIdbKey(key))
-        const current =
-          (await fromIdbRequest(
-            revisionStore.get(recordRevisionKey(key)) as IDBRequest<number | undefined>,
-            {
-              signal
-            },
-            runtime
-          )) ?? 0
-        revisionStore.put(current + 1, recordRevisionKey(key))
-        continue
-      }
-      const [key, value, policy] = entry
-      recordMutation = true
-      committedTransactionKeys.push(key)
-      const stringKey = typeof key === 'string' ? key : undefined
-      const kvExisting = stringKey
-        ? await fromIdbRequest(idbTx.objectStore(kvStoreName).get(stringKey), { signal }, runtime)
-        : undefined
-      const bytesExisting = stringKey
-        ? await fromIdbRequest(
-            idbTx.objectStore(bytesStoreName).get(stringKey),
-            { signal },
-            runtime
-          )
-        : undefined
-      const conflict =
-        (kvExisting !== undefined && 'value') || (bytesExisting !== undefined && 'bytes')
-      if (conflict && policy !== 'replace') {
-        idbTx.abort()
-        await committed.catch(() => {})
-        throw new StorageError(StorageErrorCode.duplicateKey, {
-          backend: StorageBackend.indexedDb,
-          key,
-          existingChannel: conflict,
-          attemptedChannel: 'record'
-        })
-      }
-      if (policy === 'replace' && stringKey !== undefined) {
-        idbTx.objectStore(kvStoreName).delete(stringKey)
-        idbTx.objectStore(bytesStoreName).delete(stringKey)
-      }
-      idbTx.objectStore(recordsStoreName).put(value, toIdbKey(key))
-      const current =
-        (await fromIdbRequest(
-          revisionStore.get(recordRevisionKey(key)) as IDBRequest<number | undefined>,
-          {
-            signal
-          },
-          runtime
-        )) ?? 0
-      revisionStore.put(current + 1, recordRevisionKey(key))
-    }
-    if (recordMutation) {
-      const metaStore = idbTx.objectStore(META_STORE_NAME)
-      const sidecarStore = idbTx.objectStore(INDEX_RECORDS_STORE_NAME)
-      for (const key of committedTransactionKeys)
-        await applyRawMutationFirewall(metaStore, revisionStore, sidecarStore, key, signal, runtime)
-      revisionStore.put(currentEpoch + 1, RECORD_EPOCH_KEY)
-    }
-    await committed
-    // Mirrors the memory backend's `runTransaction` — the whole batch fanouts as
-    // one `kind:'batch'` event after every entry above committed, never per key, and only when
-    // reached at all (rollback via any `throw` above ⇒ no event; a read-only transaction with
-    // `recordMutation` still `false` has nothing to report).
-    if (recordMutation)
-      publishChange({ channel: 'record', kind: 'batch', keys: committedTransactionKeys })
-    return result
-  }
-
-  type IIndexedMutation =
-    | { readonly kind: 'delete'; readonly key: IStorageKey }
-    | {
-        readonly kind: 'put'
-        readonly key: IStorageKey
-        readonly value: TValue
-        readonly projection: IRecordIndexProjection
-      }
-
-  /** Stage asynchronous indexed work, then atomically validate and commit records and sidecars. */
-  const runIndexedTransaction = async <T>(
-    handle: IRecordIndexHandle,
-    run: (tx: ISecondaryIndexTransactionScope<TValue>) => Promise<T>,
-    signal: AbortSignal | undefined,
-    runtime: IStorageOperationRuntime,
-    context?: { readonly timeoutMs?: number },
-    inheritedLease?: IMutationLeaseContext
-  ): Promise<T> => {
-    assertLive()
-    if (!isValidIndexGeneration(handle.generation)) throw staleIndexHandleError()
-    assertTransactionCallback(run, StorageBackend.indexedDb)
-    const database = await open(runtime, inheritedLease)
-    /** Staged final mutation per canonical record key. */
-    const mutations = new Map<string, IIndexedMutation>()
-    /** Optimistic revisions and value snapshots observed by the callback. */
-    const reads = new Map<
-      string,
-      { readonly key: IStorageKey; readonly revision: number; readonly value: TValue | undefined }
-    >()
-    let scopeActive = true
-    const read = async (
-      key: IStorageKey
-    ): Promise<typeof reads extends Map<string, infer V> ? V : never> => {
-      const identity = encodeFlatStorageKey(key)
-      const existing = reads.get(identity)
-      if (existing !== undefined) return existing
-      const transaction = createTransaction(
-        database,
-        [recordsStoreName, REVISIONS_STORE_NAME],
-        'readonly'
-      )
-      const revision =
-        ((await fromIdbRequest(
-          transaction.objectStore(REVISIONS_STORE_NAME).get(recordRevisionKey(key)) as IDBRequest<
-            number | undefined
-          >,
-          { signal },
-          runtime
-        )) as number | undefined) ?? 0
-      const value = (await fromIdbRequest(
-        transaction.objectStore(recordsStoreName).get(toIdbKey(key)) as IDBRequest<
-          TValue | undefined
-        >,
-        { signal },
-        runtime
-      )) as TValue | undefined
-      const snapshot = {
-        key,
-        revision,
-        value: value === undefined ? undefined : snapshotWriteValue(value, key)
-      }
-      reads.set(identity, snapshot)
-      return snapshot
-    }
-    const scope: ISecondaryIndexTransactionScope<TValue> = {
-      get: async (key) => {
-        assertTransactionScopeActive(scopeActive, StorageBackend.indexedDb)
-        const keySnapshot = snapshotStorageKey(key, StorageBackend.indexedDb)
-        const mutation = mutations.get(encodeFlatStorageKey(keySnapshot))
-        if (mutation?.kind === 'delete') return undefined
-        if (mutation?.kind === 'put') return snapshotWriteValue(mutation.value, keySnapshot)
-        const snapshot = await read(keySnapshot)
-        assertTransactionScopeActive(scopeActive, StorageBackend.indexedDb)
-        return snapshot.value
-      },
-      put: async (value, key, projection) => {
-        assertTransactionScopeActive(scopeActive, StorageBackend.indexedDb)
-        const keySnapshot = snapshotStorageKey(key, StorageBackend.indexedDb)
-        await read(keySnapshot)
-        assertTransactionScopeActive(scopeActive, StorageBackend.indexedDb)
-        mutations.set(encodeFlatStorageKey(keySnapshot), {
-          kind: 'put',
-          key: keySnapshot,
-          value: snapshotWriteValue(value, keySnapshot),
-          projection
-        })
-        return keySnapshot
-      },
-      delete: async (key) => {
-        assertTransactionScopeActive(scopeActive, StorageBackend.indexedDb)
-        const keySnapshot = snapshotStorageKey(key, StorageBackend.indexedDb)
-        await read(keySnapshot)
-        assertTransactionScopeActive(scopeActive, StorageBackend.indexedDb)
-        mutations.set(encodeFlatStorageKey(keySnapshot), { kind: 'delete', key: keySnapshot })
-      }
-    }
-    let result: T
-    try {
-      result = await withTimeout(() => run(scope), {
-        timeoutMs: context?.timeoutMs ?? TRANSACTION_CALLBACK_DEADLINE_MS,
-        signal,
-        report: runtime.reporter
-      })
-    } catch (cause) {
-      throw normalizeIndexedDbOperationError(cause)
-    } finally {
-      scopeActive = false
-    }
-    throwIfAborted(signal)
-    const transaction = createTransaction(
-      database,
-      [recordsStoreName, INDEX_RECORDS_STORE_NAME, REVISIONS_STORE_NAME, META_STORE_NAME],
-      'readwrite'
-    )
-    const committed = idbTransactionCommit(transaction, { signal }, runtime)
-    void committed.catch(() => {})
-    try {
-      const metadata = transaction.objectStore(META_STORE_NAME)
-      const state = (await fromIdbRequest(
-        metadata.get(indexMetadataKey(handle.scope)),
-        { signal },
-        runtime
-      )) as { handle?: IRecordIndexHandle } | undefined
-      if (
-        state?.handle?.generation !== handle.generation ||
-        state.handle.fingerprint !== handle.fingerprint
-      )
-        throw staleIndexHandleError()
-      const definitions = JSON.parse(handle.fingerprint) as IRecordIndexDefinition[]
-      /** Native and fallback writes share one canonical owner/key comparison. */
-      const uniqueOwners = collectUniqueIndexOwners(
-        definitions,
-        [...mutations.values()].filter((mutation) => mutation.kind === 'put'),
-        StorageBackend.indexedDb
-      )
-      const sidecar = transaction.objectStore(INDEX_RECORDS_STORE_NAME)
-      const draftedRecords = new Set(mutations.keys())
-      for (const { indexName, indexValue, owner } of uniqueOwners.values()) {
-        const lookupKey = [handle.scope, indexName, handle.generation, toIdbKey(indexValue)]
-        const existing = await fromIdbRequest(
-          sidecar.index('lookup').getAllKeys(keyRange?.bound(lookupKey, lookupKey)),
-          { signal },
-          runtime
-        )
-        if (
-          existing.some((key) => {
-            const recordIdentity = encodeFlatStorageKey((key as IDBValidKey[])[4] as IStorageKey)
-            return recordIdentity !== owner && !draftedRecords.has(recordIdentity)
-          })
-        )
-          throw new StorageError(
-            StorageErrorCode.indexUniqueConflict,
-            { backend: StorageBackend.indexedDb },
-            indexUniqueConflictText(indexName)
-          )
-      }
-      const revisions = transaction.objectStore(REVISIONS_STORE_NAME)
-      for (const snapshot of reads.values()) {
-        const actual =
-          ((await fromIdbRequest(
-            revisions.get(recordRevisionKey(snapshot.key)) as IDBRequest<number | undefined>,
-            { signal },
-            runtime
-          )) as number | undefined) ?? 0
-        if (actual !== snapshot.revision)
-          throw new StorageError(StorageErrorCode.transactionConflict, {
-            backend: StorageBackend.indexedDb
-          })
-      }
-      for (const mutation of mutations.values()) {
-        const oldRows = await fromIdbRequest(
-          sidecar
-            .index('record')
-            .getAllKeys([handle.scope, handle.generation, toIdbKey(mutation.key)]),
-          { signal },
-          runtime
-        )
-        for (const oldRow of oldRows) sidecar.delete(oldRow)
-        if (mutation.kind === 'delete')
-          transaction.objectStore(recordsStoreName).delete(toIdbKey(mutation.key))
-        else {
-          transaction
-            .objectStore(recordsStoreName)
-            .put(snapshotWriteValue(mutation.value, mutation.key), toIdbKey(mutation.key))
-          for (const [indexName, entry] of Object.entries(mutation.projection)) {
-            if (entry === undefined) continue
-            const values = entry.kind === 'multiple' ? entry.keys : [entry.key]
-            for (const indexValue of values)
-              sidecar.put({
-                scope: handle.scope,
-                generation: handle.generation,
-                indexName,
-                indexValue: toIdbKey(indexValue),
-                recordKey: toIdbKey(mutation.key)
-              })
+  /** Channel/range identity is prepared once, before the original provider may wait. */
+  const rootClear = (
+    method: string,
+    channel: 'value' | 'bytes' | 'record' | undefined,
+    ctx?: IWriteOptions
+  ): Promise<void> =>
+    rootMutation(
+      method,
+      channel,
+      ctx,
+      { channel: channel ?? 'all', kind: 'clear' },
+      (captured) => ({
+        keys: [],
+        ranges: (captured === undefined ? (['value', 'bytes', 'record'] as const) : [captured]).map(
+          (target) => {
+            const channel = target === 'value' ? 'text' : target
+            return {
+              channel,
+              ...snapshotConcurrencyLockRange({ channel }, StorageBackend.indexedDb)
+            }
           }
+        ),
+        run: (scope) => {
+          const { id } = assertTransactionOwner(construction.store, scope)
+          const transaction = nativeTransactions.get(id)
+          if (transaction === undefined)
+            throw new StorageContractError(StorageContractErrorCode.invalidArgument)
+          return transaction.clearRoot(captured)
         }
-        const previous = reads.get(encodeFlatStorageKey(mutation.key))?.revision ?? 0
-        revisions.put(previous + 1, recordRevisionKey(mutation.key))
-      }
-      if (mutations.size > 0) {
-        const scopeEpoch =
-          ((await fromIdbRequest(
-            revisions.get(indexScopeEpochKey(handle.scope)) as IDBRequest<number | undefined>,
-            { signal },
-            runtime
-          )) as number | undefined) ?? 0
-        revisions.put(scopeEpoch + 1, indexScopeEpochKey(handle.scope))
-      }
-      await committed
-      // (planner half): the last unwired record-mutating route. Same "batch
-      // one-event, only for what actually committed" contract as `transaction()` and the memory
-      // backend — one `record:batch` for every record this call put/deleted, published only
-      // after the owning `IDBTransaction` has actually committed, never on the `catch` below.
-      if (mutations.size > 0)
-        publishChange({
-          channel: 'record',
-          kind: 'batch',
-          keys: [...mutations.values()].map((mutation) => mutation.key)
-        })
-      return result
-    } catch (cause) {
-      try {
-        transaction.abort()
-      } catch {
-        /* transaction already settled */
-      }
-      await committed.catch(() => {})
-      throw cause
-    }
-  }
+      })
+    )
 
-  const store: IRecordStore<TValue> &
-    ISecondaryIndexRecordStore<TValue> &
-    IChangeFeedStore &
-    Record<PropertyKey, unknown> = {
+  const store: IIndexedDbStore<TValue> = {
     backend: StorageBackend.indexedDb,
     capabilities,
+    inspectLocks: (ctx) =>
+      withAbort(ctx, async (_signal, _context, operationRuntime) => {
+        assertLive()
+        /** Inspections observe this registration while the physical port remains shared by the DB. */
+        const stages = runtime.stageBindings.concurrencyStages(construction.store)
+        observeIndexedDbStage(stages, 'beforeLockInspect', operationRuntime)
+        try {
+          const locks = coordination.keyPort.inspectLocks()
+          observeIndexedDbStage(stages, 'afterLockInspect', operationRuntime, locks.length)
+          return locks
+        } catch (error) {
+          const failure = normalizeIndexedDbOperationError(error)
+          observeIndexedDbStage(stages, 'onLockInspectError', operationRuntime, failure.code)
+          throw failure
+        }
+      }),
     ensureRecordIndexes,
     getRecordIndexReadiness: (handle: IRecordIndexHandle, ctx?: IOperationContext) =>
       withAbort(ctx, async (_signal, _context, runtime) => {
@@ -3147,189 +3791,254 @@ export const indexedDbHost = <TValue = unknown>(
         if (state?.handle?.generation !== handle.generation) throw staleIndexHandleError()
         return state.readiness ?? { status: 'pending', scanned: 0, indexed: 0 }
       }),
-    putIndexedRecord: (
-      value: TValue,
-      key: IStorageKey,
-      handle: IRecordIndexHandle,
-      projection: IRecordIndexProjection,
-      ctx?: IWriteOptions
-    ) =>
-      withMutationLease((lease) =>
-        withAbort(ctx, (signal, _context, runtime) =>
-          runIndexedTransaction(
-            handle,
-            async (transaction) => transaction.put(value, key, projection),
-            signal,
-            runtime,
-            undefined,
-            lease
-          )
-        )
-      ),
-    iterateRecordIndex: async function* (query: IRecordIndexQuery, _ctx?: IOperationContext) {
-      assertLive()
-      if (!isValidIndexGeneration(query.handle.generation)) throw staleIndexHandleError()
-      /** One deadline and abort subscription belong to the entire iterator, including yields. */
-      const runtime = createStorageOperationRuntime()
-      const { signal, dispose: disposeSignal } = mergeSignals(_ctx, runtime.reporter)
-      try {
-        throwIfAborted(signal)
-        if (!keyRange)
-          throw new StorageError(StorageErrorCode.unavailable, {
-            backend: StorageBackend.indexedDb,
-            cause: new Error('IDBKeyRange is unavailable; pass options.keyRange explicitly')
-          })
-        const range = snapshotKeyRange(query.range, StorageBackend.indexedDb)
-        const direction: IDBCursorDirection = query.direction === 'prev' ? 'prev' : 'next'
-        const prefix: IDBValidKey[] = [query.handle.scope, query.index, query.handle.generation]
-        /** Bounded per short readonly transaction; keeps pages small and predictable. */
-        const pageSize = INDEX_QUERY_PAGE_SIZE
-        /**
-         * `{global, scope}` mutation-epoch vector observed on the first page; every later page must
-         * match.
-         */
-        let expectedEpoch: { readonly global: number; readonly scope: number } | undefined
-        /**
-         * Full sidecar primary key ([scope, indexName, generation, indexValue, recordKey]) of the
-         * last cursor position visited. The `lookup` index key alone ([scope, indexName,
-         * generation, indexValue]) is not unique when an index value is shared by multiple records,
-         * so a page boundary falling inside such a tied group must resume by primary key, not by
-         * index key: the next page's range is bounded _inclusively_ at the boundary group's index
-         * key (so remaining ties are not dropped), and every cursor entry already emitted is then
-         * skipped by comparing full primary keys until this position is passed.
-         */
-        let continuation: IDBValidKey[] | undefined
-        let emitted = 0
-        let exhausted = false
-        while (!exhausted) {
-          assertLive()
-          throwIfAborted(signal)
-          if (query.limit !== undefined && emitted >= query.limit) break
-          const database = await (
-            signal === undefined
-              ? open(runtime)
-              : raceWithAbort(() => open(runtime), {
-                  signal,
-                  cleanupPolicy: 'report',
-                  report: runtime.reporter
-                })
-          ).catch((cause: unknown) => {
-            throw normalizeIndexedDbOperationError(cause)
-          })
-          const transaction = createTransaction(
-            database,
-            [recordsStoreName, INDEX_RECORDS_STORE_NAME, META_STORE_NAME, REVISIONS_STORE_NAME],
-            'readonly'
-          )
-          const committed = idbTransactionCommit(transaction, { signal }, runtime)
-          void committed.catch(() => {})
-          const page: Array<[IStorageKey, TValue]> = []
-          let cursorExhausted = true
-          try {
-            const revisionsStore = transaction.objectStore(REVISIONS_STORE_NAME)
-            const globalEpoch =
-              ((await fromIdbRequest(
-                revisionsStore.get(RECORD_EPOCH_KEY) as IDBRequest<number | undefined>,
-                { signal },
-                runtime
-              )) as number | undefined) ?? 0
-            const scopeEpoch =
-              ((await fromIdbRequest(
-                revisionsStore.get(indexScopeEpochKey(query.handle.scope)) as IDBRequest<
-                  number | undefined
-                >,
-                { signal },
-                runtime
-              )) as number | undefined) ?? 0
-            if (expectedEpoch === undefined)
-              expectedEpoch = { global: globalEpoch, scope: scopeEpoch }
-            else if (expectedEpoch.global !== globalEpoch || expectedEpoch.scope !== scopeEpoch)
-              throw new StorageError(
-                StorageErrorCode.indexQueryInvalidated,
-                { backend: StorageBackend.indexedDb },
-                StorageErrorText.indexQueryInvalidated
+    putIndexedRecord: (value, key, handle, projection, ctx) =>
+      rootMutation(
+        'putIndexedRecord',
+        { value, key, handle, projection },
+        ctx,
+        { channel: 'record', kind: 'batch', displacedKind: 'batch' },
+        ({ value, key, handle, projection }, context) => {
+          const captured = snapshotStorageKey(key, StorageBackend.indexedDb)
+          const copy = snapshotWriteValue(value, captured)
+          const capturedHandle = snapshotWriteValue(handle, captured)
+          const capturedProjection = snapshotWriteValue(projection, captured)
+          return {
+            keys: rootKeys('record', captured, context),
+            run: async (scope) => {
+              return scope.putIndexedRecord!(
+                copy,
+                captured,
+                capturedHandle,
+                capturedProjection,
+                context
               )
-            const state = (await fromIdbRequest(
-              transaction.objectStore(META_STORE_NAME).get(indexMetadataKey(query.handle.scope)),
-              { signal },
-              runtime
-            )) as { handle?: IRecordIndexHandle; readiness?: IRecordIndexReadiness } | undefined
-            if (state?.handle?.generation !== query.handle.generation) throw staleIndexHandleError()
-            if (state.readiness?.status !== 'complete')
+            }
+          }
+        }
+      ),
+    iterateRecordIndex: (query, ctx) =>
+      withStorageIteratorResource(
+        (async function* (query: IRecordIndexQuery, _ctx?: IOperationContext) {
+          assertLive()
+          if (!isValidIndexGeneration(query.handle.generation)) throw staleIndexHandleError()
+          /** One deadline and abort subscription belong to the entire iterator, including yields. */
+          const runtime = createStorageOperationRuntime()
+          const { signal, dispose: disposeSignal } = mergeSignals(_ctx, runtime.reporter)
+          try {
+            throwIfAborted(signal)
+            if (!keyRange)
               throw new StorageError(StorageErrorCode.unavailable, {
                 backend: StorageBackend.indexedDb,
-                cause: new Error('record index is not complete; caller must use fallback scan')
+                cause: new Error('IDBKeyRange is unavailable; pass options.keyRange explicitly')
               })
-            const index = transaction.objectStore(INDEX_RECORDS_STORE_NAME).index('lookup')
+            const range = snapshotKeyRange(query.range, StorageBackend.indexedDb)
+            const direction: IDBCursorDirection = query.direction === 'prev' ? 'prev' : 'next'
+            const prefix: IDBValidKey[] = [query.handle.scope, query.index, query.handle.generation]
+            /** Bounded per short readonly transaction; keeps pages small and predictable. */
+            const pageSize = INDEX_QUERY_PAGE_SIZE
             /**
-             * The boundary group's index key ([scope, indexName, generation, indexValue]) is bound
-             * inclusively so records tied with the last-visited entry are not dropped;
-             * already-visited ties are skipped below by comparing full primary keys.
+             * `{global, scope}` mutation-epoch vector observed on the first page; every later page
+             * must match.
              */
-            const continuationIndexKey = continuation?.slice(0, 4)
-            const cursorRange = toIdbRecordIndexRange(
-              range,
-              prefix,
-              keyRange,
-              direction,
-              continuation
-            )
-            const cursorRequest = index.openKeyCursor(cursorRange, direction)
-            let cursor = (await fromIdbRequest(
-              cursorRequest,
-              { signal },
-              runtime
-            )) as IDBCursor | null
-            if (
-              cursor !== null &&
-              continuation !== undefined &&
-              continuationIndexKey !== undefined
-            ) {
-              /**
-               * The inclusive range may land the fresh cursor before, exactly at, or already past
-               * the last-visited entry, and each case needs different handling:
-               * `continuePrimaryKey` throws `DataError` if asked to move to a position at-or-before
-               * the cursor's _current_ one (per spec, even requesting the cursor's own exact
-               * position is rejected), so an exact match must use a plain single-step `continue()`
-               * instead, and an already-past position needs no skip at all. When the cursor is
-               * still strictly before the previous continuation (earlier not-yet-skipped ties in
-               * the same index-key group), `continuePrimaryKey` jumps straight past it in one
-               * engine-side seek. Either branch is O(1) regardless of tie-group size, unlike a JS
-               * walk over every already-emitted tied entry, which would be `Θ(G)` per page and
-               * quadratic across a group spanning multiple pages (paging requires `O(pageSize)` per
-               * page to avoid resource exhaustion).
-               */
-              const currentPrimaryKey = cursor.primaryKey as IDBValidKey[]
-              const comparison = compareStorageKeys(
-                currentPrimaryKey as unknown as IStorageKey,
-                continuation as unknown as IStorageKey
+            let expectedEpoch: { readonly global: number; readonly scope: number } | undefined
+            /**
+             * Full sidecar primary key ([scope, indexName, generation, indexValue, recordKey]) of
+             * the last cursor position visited. The `lookup` index key alone ([scope, indexName,
+             * generation, indexValue]) is not unique when an index value is shared by multiple
+             * records, so a page boundary falling inside such a tied group must resume by primary
+             * key, not by index key: the next page's range is bounded _inclusively_ at the boundary
+             * group's index key (so remaining ties are not dropped), and every cursor entry already
+             * emitted is then skipped by comparing full primary keys until this position is
+             * passed.
+             */
+            let continuation: IDBValidKey[] | undefined
+            let emitted = 0
+            let exhausted = false
+            while (!exhausted) {
+              assertLive()
+              throwIfAborted(signal)
+              if (query.limit !== undefined && emitted >= query.limit) break
+              const database = await (
+                signal === undefined
+                  ? open(runtime)
+                  : raceWithAbort(() => open(runtime), {
+                      signal,
+                      cleanupPolicy: 'report',
+                      report: runtime.reporter
+                    })
+              ).catch((cause: unknown) => {
+                throw normalizeIndexedDbOperationError(cause)
+              })
+              const transaction = createTransaction(
+                database,
+                [recordsStoreName, INDEX_RECORDS_STORE_NAME, META_STORE_NAME, REVISIONS_STORE_NAME],
+                'readonly'
               )
-              const isBeforeContinuation = direction === 'prev' ? comparison > 0 : comparison < 0
-              if (isBeforeContinuation) {
+              const committed = idbTransactionCommit(transaction, { signal }, runtime)
+              void committed.catch(() => {})
+              const page: Array<[IStorageKey, TValue]> = []
+              let cursorExhausted = true
+              try {
+                const revisionsStore = transaction.objectStore(REVISIONS_STORE_NAME)
+                const globalEpoch =
+                  ((await fromIdbRequest(
+                    revisionsStore.get(RECORD_EPOCH_KEY) as IDBRequest<number | undefined>,
+                    { signal },
+                    runtime
+                  )) as number | undefined) ?? 0
+                const scopeEpoch =
+                  ((await fromIdbRequest(
+                    revisionsStore.get(indexScopeEpochKey(query.handle.scope)) as IDBRequest<
+                      number | undefined
+                    >,
+                    { signal },
+                    runtime
+                  )) as number | undefined) ?? 0
+                if (expectedEpoch === undefined)
+                  expectedEpoch = { global: globalEpoch, scope: scopeEpoch }
+                else if (expectedEpoch.global !== globalEpoch || expectedEpoch.scope !== scopeEpoch)
+                  throw new StorageError(
+                    StorageErrorCode.indexQueryInvalidated,
+                    { backend: StorageBackend.indexedDb },
+                    StorageErrorText.indexQueryInvalidated
+                  )
+                const state = (await fromIdbRequest(
+                  transaction
+                    .objectStore(META_STORE_NAME)
+                    .get(indexMetadataKey(query.handle.scope)),
+                  { signal },
+                  runtime
+                )) as { handle?: IRecordIndexHandle; readiness?: IRecordIndexReadiness } | undefined
+                if (state?.handle?.generation !== query.handle.generation)
+                  throw staleIndexHandleError()
+                if (state.readiness?.status !== 'complete')
+                  throw new StorageError(StorageErrorCode.unavailable, {
+                    backend: StorageBackend.indexedDb,
+                    cause: new Error('record index is not complete; caller must use fallback scan')
+                  })
+                const index = transaction.objectStore(INDEX_RECORDS_STORE_NAME).index('lookup')
                 /**
-                 * `continuePrimaryKey` finds the first record whose (index key, primary key) is
-                 * _inclusive_ of the given pair — it may land exactly back on `continuation` itself
-                 * if that sidecar row still exists, not strictly past it. The single `.continue()`
-                 * correction below then steps past it deterministically.
+                 * The boundary group's index key ([scope, indexName, generation, indexValue]) is
+                 * bound inclusively so records tied with the last-visited entry are not dropped;
+                 * already-visited ties are skipped below by comparing full primary keys.
                  */
-                cursor.continuePrimaryKey(
-                  continuationIndexKey,
-                  continuation as unknown as IDBValidKey
+                const continuationIndexKey = continuation?.slice(0, 4)
+                const cursorRange = toIdbRecordIndexRange(
+                  range,
+                  prefix,
+                  keyRange,
+                  direction,
+                  continuation
                 )
-                cursor = (await fromIdbRequest(
+                const cursorRequest = index.openKeyCursor(cursorRange, direction)
+                let cursor = (await fromIdbRequest(
                   cursorRequest,
                   { signal },
                   runtime
                 )) as IDBCursor | null
-              }
-              if (cursor !== null) {
-                const landedPrimaryKey = cursor.primaryKey as IDBValidKey[]
-                const stillAtContinuation =
-                  compareStorageKeys(
-                    landedPrimaryKey as unknown as IStorageKey,
+                if (
+                  cursor !== null &&
+                  continuation !== undefined &&
+                  continuationIndexKey !== undefined
+                ) {
+                  /**
+                   * The inclusive range may land the fresh cursor before, exactly at, or already
+                   * past the last-visited entry, and each case needs different handling:
+                   * `continuePrimaryKey` throws `DataError` if asked to move to a position
+                   * at-or-before the cursor's _current_ one (per spec, even requesting the cursor's
+                   * own exact position is rejected), so an exact match must use a plain single-step
+                   * `continue()` instead, and an already-past position needs no skip at all. When
+                   * the cursor is still strictly before the previous continuation (earlier
+                   * not-yet-skipped ties in the same index-key group), `continuePrimaryKey` jumps
+                   * straight past it in one engine-side seek. Either branch is O(1) regardless of
+                   * tie-group size, unlike a JS walk over every already-emitted tied entry, which
+                   * would be `Θ(G)` per page and quadratic across a group spanning multiple pages
+                   * (paging requires `O(pageSize)` per page to avoid resource exhaustion).
+                   */
+                  const currentPrimaryKey = cursor.primaryKey as IDBValidKey[]
+                  const comparison = compareStorageKeys(
+                    currentPrimaryKey as unknown as IStorageKey,
                     continuation as unknown as IStorageKey
-                  ) === 0
-                if (stillAtContinuation) {
+                  )
+                  const isBeforeContinuation =
+                    direction === 'prev' ? comparison > 0 : comparison < 0
+                  if (isBeforeContinuation) {
+                    /**
+                     * `continuePrimaryKey` finds the first record whose (index key, primary key) is
+                     * _inclusive_ of the given pair — it may land exactly back on `continuation`
+                     * itself if that sidecar row still exists, not strictly past it. The single
+                     * `.continue()` correction below then steps past it deterministically.
+                     */
+                    cursor.continuePrimaryKey(
+                      continuationIndexKey,
+                      continuation as unknown as IDBValidKey
+                    )
+                    cursor = (await fromIdbRequest(
+                      cursorRequest,
+                      { signal },
+                      runtime
+                    )) as IDBCursor | null
+                  }
+                  if (cursor !== null) {
+                    const landedPrimaryKey = cursor.primaryKey as IDBValidKey[]
+                    const stillAtContinuation =
+                      compareStorageKeys(
+                        landedPrimaryKey as unknown as IStorageKey,
+                        continuation as unknown as IStorageKey
+                      ) === 0
+                    if (stillAtContinuation) {
+                      cursor.continue()
+                      cursor = (await fromIdbRequest(
+                        cursorRequest,
+                        { signal },
+                        runtime
+                      )) as IDBCursor | null
+                    }
+                  }
+                }
+                let scannedInPage = 0
+                while (cursor !== null && scannedInPage < pageSize) {
+                  assertLive()
+                  throwIfAborted(signal)
+                  scannedInPage += 1
+                  const lookupKey = cursor.key
+                  if (
+                    !Array.isArray(lookupKey) ||
+                    lookupKey.length !== 4 ||
+                    lookupKey[0] !== prefix[0] ||
+                    lookupKey[1] !== prefix[1] ||
+                    lookupKey[2] !== prefix[2]
+                  ) {
+                    cursor.continue()
+                    cursor = (await fromIdbRequest(
+                      cursorRequest,
+                      { signal },
+                      runtime
+                    )) as IDBCursor | null
+                    continue
+                  }
+                  const primaryKey = cursor.primaryKey as IDBValidKey[]
+                  continuation = primaryKey
+                  const recordKey = primaryKey[4] as IStorageKey
+                  const indexValue = primaryKey[3] as IStorageKey
+                  if (isStorageKeyInRange(indexValue, range)) {
+                    const value = await fromIdbRequest(
+                      transaction
+                        .objectStore(recordsStoreName)
+                        .get(toIdbKey(recordKey)) as IDBRequest<TValue | undefined>,
+                      { signal },
+                      runtime
+                    )
+                    if (value === undefined)
+                      runtime.reporter(
+                        new StorageError(
+                          StorageErrorCode.indexOrphan,
+                          { backend: StorageBackend.indexedDb, key: recordKey },
+                          StorageErrorText.indexOrphan
+                        )
+                      )
+                    else page.push([recordKey, value])
+                  }
                   cursor.continue()
                   cursor = (await fromIdbRequest(
                     cursorRequest,
@@ -3337,100 +4046,56 @@ export const indexedDbHost = <TValue = unknown>(
                     runtime
                   )) as IDBCursor | null
                 }
+                cursorExhausted = cursor === null
+                await committed
+              } catch (cause) {
+                try {
+                  transaction.abort()
+                } catch {
+                  /* transaction already settled */
+                }
+                await committed.catch(() => {})
+                throw cause
               }
-            }
-            let scannedInPage = 0
-            while (cursor !== null && scannedInPage < pageSize) {
-              assertLive()
-              throwIfAborted(signal)
-              scannedInPage += 1
-              const lookupKey = cursor.key
-              if (
-                !Array.isArray(lookupKey) ||
-                lookupKey.length !== 4 ||
-                lookupKey[0] !== prefix[0] ||
-                lookupKey[1] !== prefix[1] ||
-                lookupKey[2] !== prefix[2]
-              ) {
-                cursor.continue()
-                cursor = (await fromIdbRequest(
-                  cursorRequest,
-                  { signal },
-                  runtime
-                )) as IDBCursor | null
-                continue
+              for (const entry of page) {
+                throwIfAborted(signal)
+                if (query.limit !== undefined && emitted >= query.limit) {
+                  exhausted = true
+                  break
+                }
+                emitted += 1
+                yield entry
               }
-              const primaryKey = cursor.primaryKey as IDBValidKey[]
-              continuation = primaryKey
-              const recordKey = primaryKey[4] as IStorageKey
-              const indexValue = primaryKey[3] as IStorageKey
-              if (isStorageKeyInRange(indexValue, range)) {
-                const value = await fromIdbRequest(
-                  transaction.objectStore(recordsStoreName).get(toIdbKey(recordKey)) as IDBRequest<
-                    TValue | undefined
-                  >,
-                  { signal },
-                  runtime
-                )
-                if (value === undefined)
-                  runtime.reporter(
-                    new StorageError(
-                      StorageErrorCode.indexOrphan,
-                      { backend: StorageBackend.indexedDb, key: recordKey },
-                      StorageErrorText.indexOrphan
-                    )
-                  )
-                else page.push([recordKey, value])
-              }
-              cursor.continue()
-              cursor = (await fromIdbRequest(
-                cursorRequest,
-                { signal },
-                runtime
-              )) as IDBCursor | null
+              if (cursorExhausted) exhausted = true
             }
-            cursorExhausted = cursor === null
-            await committed
-          } catch (cause) {
-            try {
-              transaction.abort()
-            } catch {
-              /* transaction already settled */
-            }
-            await committed.catch(() => {})
-            throw cause
+          } finally {
+            disposeSignal()
           }
-          for (const entry of page) {
-            throwIfAborted(signal)
-            if (query.limit !== undefined && emitted >= query.limit) {
-              exhausted = true
-              break
-            }
-            emitted += 1
-            yield entry
-          }
-          if (cursorExhausted) exhausted = true
-        }
-      } finally {
-        disposeSignal()
-      }
-    },
-    transactionIndexed: <T>(
-      handle: IRecordIndexHandle,
-      run: (tx: ISecondaryIndexTransactionScope<TValue>) => Promise<T>,
-      ctx?: IOperationContext
-    ): Promise<T> =>
+        })(query, ctx),
+        { execution: runtime.execution, operation: StorageOperation.indexedDbCursor, ctx }
+      ),
+    transactionIndexed: (handle, run, ctx) =>
       withMutationLease((lease) =>
-        withAbort(ctx, (signal, context, runtime) =>
-          runIndexedTransaction(handle, run, signal, runtime, context, lease)
+        runTransaction(
+          (scope) => {
+            if (!isValidIndexGeneration(handle.generation)) throw staleIndexHandleError()
+            return run(scope)
+          },
+          ctx,
+          lease
         )
       ),
     // sync 未定义：IndexedDB 无同步 API。
 
     dispose: () => {
       prepareState = 'disposed'
+      for (const transaction of nativeTransactions.values()) transaction.abort()
       return controller.dispose()
     },
+    [asyncDisposeKey]: () =>
+      (symbolicDispose ??= store
+        .dispose()
+        .catch((error) => reportCleanupError(createStorageOperationReporter(), error))),
 
     get: (key, ctx) =>
       withAbort(ctx, async (signal, _context, runtime) => {
@@ -3445,56 +4110,30 @@ export const indexedDbHost = <TValue = unknown>(
         return typeof value === 'string' ? value : null
       }),
     set: (key, value, ctx) =>
-      withMutationLease((lease) =>
-        withAbort(ctx, async (signal, context, runtime) => {
-          assertLive()
+      rootMutation(
+        'set',
+        { key, value },
+        ctx,
+        { channel: 'value', kind: 'put' },
+        ({ key, value }, context) => {
           assertStringStorageKey(key, StorageBackend.indexedDb)
           if (typeof value !== 'string')
             throw new StorageError(StorageErrorCode.invalidConfig, {
               backend: StorageBackend.indexedDb,
               key,
-              cause: new TypeError('storage value must be a string')
+              cause: new TypeError(StorageErrorText.storageValueInvalid)
             })
-          await writeWithConflict(
-            'value',
-            key,
-            value,
-            signal,
-            context?.conflictPolicy,
-            runtime,
-            lease
-          )
-        })
+          return {
+            keys: rootKeys('value', key, context),
+            run: (scope) => scope.set(key, value, context)
+          }
+        }
       ),
     remove: (key, ctx) =>
-      withMutationLease((lease) =>
-        withAbort(ctx, async (signal, _context, runtime) => {
-          assertLive()
-          assertStringStorageKey(key, StorageBackend.indexedDb)
-          const database = await open(runtime, lease)
-          assertLive()
-          const transaction = createTransaction(database, kvStoreName, 'readwrite')
-          const committed = idbTransactionCommit(transaction, { signal }, runtime)
-          void committed.catch(() => {})
-          try {
-            const store = transaction.objectStore(kvStoreName)
-            const existingKey = await fromIdbRequest(store.getKey(key), { signal }, runtime)
-            store.delete(key)
-            await committed
-            // Removing an absent key changed nothing, so it must not publish.
-            if (existingKey !== undefined)
-              publishChange({ channel: 'value', kind: 'remove', keys: [key] })
-          } catch (cause) {
-            try {
-              transaction.abort()
-            } catch {
-              /* transaction already settled */
-            }
-            await committed.catch(() => {})
-            throw cause
-          }
-        })
-      ),
+      rootMutation('remove', key, ctx, { channel: 'value', kind: 'remove' }, (key) => {
+        assertStringStorageKey(key, StorageBackend.indexedDb)
+        return { keys: [lockKey.text(key)], run: (scope) => scope.remove(key) }
+      }),
     has: (key, ctx) =>
       withAbort(ctx, async (signal, _context, runtime) => {
         assertLive()
@@ -3516,91 +4155,8 @@ export const indexedDbHost = <TValue = unknown>(
           return key
         })
       }),
-    clearValues: (ctx) =>
-      withMutationLease((lease) =>
-        withAbort(ctx, async (signal, _context, runtime) => {
-          assertLive()
-          const database = await open(runtime, lease)
-          assertLive()
-          const transaction = createTransaction(database, kvStoreName, 'readwrite')
-          const committed = idbTransactionCommit(transaction, { signal }, runtime)
-          void committed.catch(() => {})
-          try {
-            const store = transaction.objectStore(kvStoreName)
-            const count = await fromIdbRequest(store.count(), { signal }, runtime)
-            store.clear()
-            await committed
-            // Clearing an already-empty store changed nothing.
-            if ((count ?? 0) > 0) publishChange({ channel: 'value', kind: 'clear' })
-          } catch (cause) {
-            try {
-              transaction.abort()
-            } catch {
-              /* transaction already settled */
-            }
-            await committed.catch(() => {})
-            throw cause
-          }
-        })
-      ),
-    clearAll: (ctx) =>
-      withMutationLease((lease) =>
-        withAbort(ctx, async (signal, _context, runtime) => {
-          assertLive()
-          const database = await open(runtime, lease)
-          assertLive()
-          throwIfAborted(signal)
-          const transaction = createTransaction(
-            database,
-            [
-              kvStoreName,
-              bytesStoreName,
-              recordsStoreName,
-              REVISIONS_STORE_NAME,
-              INDEX_RECORDS_STORE_NAME,
-              META_STORE_NAME
-            ],
-            'readwrite'
-          )
-          const committed = idbTransactionCommit(transaction, { signal }, runtime)
-          void committed.catch(() => {})
-          try {
-            const revisionStore = transaction.objectStore(REVISIONS_STORE_NAME)
-            const metaStore = transaction.objectStore(META_STORE_NAME)
-            const revision = (await fromIdbRequest(
-              revisionStore.get(RECORD_EPOCH_KEY) as IDBRequest<number | undefined>,
-              { signal },
-              runtime
-            )) as number | undefined
-            const [kvCount, bytesCount, recordCount] = (await Promise.all([
-              fromIdbRequest(transaction.objectStore(kvStoreName).count(), { signal }, runtime),
-              fromIdbRequest(transaction.objectStore(bytesStoreName).count(), { signal }, runtime),
-              fromIdbRequest(transaction.objectStore(recordsStoreName).count(), { signal }, runtime)
-            ])) as number[]
-            transaction.objectStore(kvStoreName).clear()
-            transaction.objectStore(bytesStoreName).clear()
-            transaction.objectStore(recordsStoreName).clear()
-            // Raw-record firewall: see `clearRecords` for why the sidecar must be wiped
-            // atomically with the record store, and why the meta/revisions cleanup is scoped
-            // (`deleteOwnedMetaKeys`/`deleteOwnedRevisionKeys`) rather than a wholesale `.clear()`.
-            transaction.objectStore(INDEX_RECORDS_STORE_NAME).clear()
-            await deleteOwnedMetaKeys(metaStore, signal, runtime)
-            await deleteOwnedRevisionKeys(revisionStore, signal, runtime)
-            revisionStore.put((revision ?? 0) + 1, RECORD_EPOCH_KEY)
-            await committed
-            if ((kvCount ?? 0) + (bytesCount ?? 0) + (recordCount ?? 0) > 0)
-              publishChange({ channel: 'all', kind: 'clear' })
-          } catch (cause) {
-            try {
-              transaction.abort()
-            } catch {
-              /* transaction already settled */
-            }
-            await committed.catch(() => {})
-            throw cause
-          }
-        })
-      ),
+    clearValues: (ctx) => rootClear('clearValues', 'value', ctx),
+    clearAll: (ctx) => rootClear('clearAll', undefined, ctx),
     /**
      * Every mutation route is wired — `record` (`putRecord`/`deleteRecord`/
      * `clearRecords`/`transaction`/`transactionIndexed`/`migrateLegacyRecords`), `value`/`bytes`
@@ -3656,86 +4212,36 @@ export const indexedDbHost = <TValue = unknown>(
           signal,
           runtime
         )
-        if (isUint8Array(value))
-          return new Uint8Array(value.buffer, value.byteOffset, value.byteLength)
-        // IndexedDB 可能把它还原成 ArrayBuffer，取决于实现。
-        if (isRawArrayBuffer(value)) return new Uint8Array(value)
-        return null
+        return readIndexedDbBytes(value)
       }),
     setBytes: (key, value, ctx) =>
-      withMutationLease((lease) =>
-        withAbort(ctx, async (signal, context, runtime) => {
-          assertLive()
+      rootMutation(
+        'setBytes',
+        { key, value },
+        ctx,
+        { channel: 'bytes', kind: 'put' },
+        ({ key, value }, context) => {
           assertStringStorageKey(key, StorageBackend.indexedDb)
           if (!isUint8Array(value))
             throw new StorageError(StorageErrorCode.invalidConfig, {
               backend: StorageBackend.indexedDb,
               key,
-              cause: new TypeError('bytes value must be a Uint8Array')
+              cause: new TypeError(StorageErrorText.storageBytesInvalid)
             })
-          await writeWithConflict(
-            'bytes',
-            key,
-            value,
-            signal,
-            context?.conflictPolicy,
-            runtime,
-            lease
-          )
-        })
-      ),
-    /** Delete one byte key under the existing mutation lease and publish only after native commit. */
-    removeBytes: (key, ctx) =>
-      withMutationLease((lease) =>
-        withAbort(ctx, async (signal, _context, runtime) => {
-          assertLive()
-          assertStringStorageKey(key, StorageBackend.indexedDb)
-          /** Membership and deletion share one native transaction; no-op deletes stay silent. */
-          let existed = false
-          await writeTo(
-            bytesStoreName,
-            (store) => {
-              /** Queue deletion from this request's active transaction, before commit can settle. */
-              const request = store.getKey(key)
-              request.onsuccess = () => {
-                existed = request.result !== undefined
-                if (existed) store.delete(key)
-              }
-            },
-            signal,
-            runtime,
-            lease
-          )
-          if (existed) publishChange({ channel: StorageChannel.bytes, kind: 'remove', keys: [key] })
-        })
-      ),
-    clearBytes: (ctx) =>
-      withMutationLease((lease) =>
-        withAbort(ctx, async (signal, _context, runtime) => {
-          assertLive()
-          const database = await open(runtime, lease)
-          assertLive()
-          const transaction = createTransaction(database, bytesStoreName, 'readwrite')
-          const committed = idbTransactionCommit(transaction, { signal }, runtime)
-          void committed.catch(() => {})
-          try {
-            const store = transaction.objectStore(bytesStoreName)
-            const count = await fromIdbRequest(store.count(), { signal }, runtime)
-            store.clear()
-            await committed
-            // Clearing an already-empty store changed nothing.
-            if ((count ?? 0) > 0) publishChange({ channel: 'bytes', kind: 'clear' })
-          } catch (cause) {
-            try {
-              transaction.abort()
-            } catch {
-              /* transaction already settled */
-            }
-            await committed.catch(() => {})
-            throw cause
+          const captured = snapshotWriteValue(value, key)
+          return {
+            keys: rootKeys('bytes', key, context),
+            run: (scope) => scope.setBytes(key, captured, context)
           }
-        })
+        }
       ),
+    /** Root bytes removal retains the exact native owner and no-op publication suppression. */
+    removeBytes: (key, ctx) =>
+      rootMutation('removeBytes', key, ctx, { channel: 'bytes', kind: 'remove' }, (key) => {
+        assertStringStorageKey(key, StorageBackend.indexedDb)
+        return { keys: [lockKey.bytes(key)], run: (scope) => scope.removeBytes(key) }
+      }),
+    clearBytes: (ctx) => rootClear('clearBytes', 'bytes', ctx),
 
     getRecord: (key, ctx) =>
       withAbort(ctx, async (signal, _context, runtime) => {
@@ -3749,289 +4255,181 @@ export const indexedDbHost = <TValue = unknown>(
         )
       }),
     putRecord: (value, key, ctx) =>
-      withMutationLease((lease) =>
-        withAbort(ctx, async (signal, context, runtime) => {
-          assertLive()
-          const resolvedKey = key ?? createStorageToken()
-          const keySnapshot = snapshotStorageKey(resolvedKey, StorageBackend.indexedDb)
-          await writeWithConflict(
-            'record',
-            keySnapshot,
-            value,
-            signal,
-            context?.conflictPolicy,
-            runtime,
-            lease
-          )
-          return resolvedKey
-        })
+      rootMutation(
+        'putRecord',
+        { value, key },
+        ctx,
+        { channel: 'record', kind: 'put' },
+        ({ value, key }, context) => {
+          const captured = snapshotStorageKey(key ?? createStorageToken(), StorageBackend.indexedDb)
+          const copy = snapshotWriteValue(value, captured)
+          return {
+            keys: rootKeys('record', captured, context),
+            run: (scope) => scope.putRecord(copy, captured, context)
+          }
+        }
       ),
     deleteRecord: (key, ctx) =>
-      withMutationLease((lease) =>
-        withAbort(ctx, async (signal, _context, runtime) => {
+      rootMutation('deleteRecord', key, ctx, { channel: 'record', kind: 'remove' }, (key) => {
+        const captured = snapshotStorageKey(key, StorageBackend.indexedDb)
+        return { keys: [lockKey.record(captured)], run: (scope) => scope.deleteRecord(captured) }
+      }),
+    clearRecords: (ctx) => rootClear('clearRecords', 'record', ctx),
+
+    iterateRecords: (range, ctx) =>
+      withStorageIteratorResource(
+        (async function* (range?: IKeyRange, ctx?: IOperationContext) {
+          const rangeSnapshot = snapshotKeyRange(range, StorageBackend.indexedDb)
           assertLive()
-          const keySnapshot = snapshotStorageKey(key, StorageBackend.indexedDb)
-          const database = await open(runtime, lease)
-          throwIfAborted(signal)
-          const transaction = createTransaction(
-            database,
-            [recordsStoreName, REVISIONS_STORE_NAME, INDEX_RECORDS_STORE_NAME, META_STORE_NAME],
-            'readwrite'
-          )
-          const committed = idbTransactionCommit(transaction, { signal }, runtime)
-          void committed.catch(() => {})
+          /** One reporter shared by every abort subscription inside this iteration operation. */
+          const runtime = createStorageOperationRuntime()
+          const { signal, dispose: disposeSignal, context } = mergeSignals(ctx, runtime.reporter)
+          const pageSize = context?.pageSize ?? 128
+          let lower = rangeSnapshot?.lower
+          let lowerOpen = rangeSnapshot?.lowerOpen
           try {
-            const revisionStore = transaction.objectStore(REVISIONS_STORE_NAME)
-            const existingKey = await fromIdbRequest(
-              transaction.objectStore(recordsStoreName).getKey(toIdbKey(keySnapshot)),
-              { signal },
-              runtime
-            )
-            const revision = (await fromIdbRequest(
-              revisionStore.get(recordRevisionKey(keySnapshot)) as IDBRequest<number | undefined>,
-              { signal },
-              runtime
-            )) as number | undefined
-            transaction.objectStore(recordsStoreName).delete(toIdbKey(keySnapshot))
-            revisionStore.put((revision ?? 0) + 1, recordRevisionKey(keySnapshot))
-            const epoch = (await fromIdbRequest(
-              revisionStore.get(RECORD_EPOCH_KEY) as IDBRequest<number | undefined>,
-              { signal },
-              runtime
-            )) as number | undefined
-            revisionStore.put((epoch ?? 0) + 1, RECORD_EPOCH_KEY)
-            // Raw-record firewall: see `writeWithConflict` for why any record-affecting
-            // raw mutation must run this before commit.
-            await applyRawMutationFirewall(
-              transaction.objectStore(META_STORE_NAME),
-              revisionStore,
-              transaction.objectStore(INDEX_RECORDS_STORE_NAME),
-              keySnapshot,
-              signal,
-              runtime
-            )
-            await committed
-            // Only when the key actually existed (a no-op delete must not
-            // publish) and only after real commit.
-            if (existingKey !== undefined)
-              publishChange({ channel: 'record', kind: 'remove', keys: [keySnapshot] })
-          } catch (cause) {
-            try {
-              transaction.abort()
-            } catch {
-              /* transaction already settled */
-            }
-            await committed.catch(() => {})
-            throw cause
-          }
-        })
-      ),
-    clearRecords: (ctx) =>
-      withMutationLease((lease) =>
-        withAbort(ctx, async (signal, _context, runtime) => {
-          assertLive()
-          const database = await open(runtime, lease)
-          throwIfAborted(signal)
-          const transaction = createTransaction(
-            database,
-            [recordsStoreName, REVISIONS_STORE_NAME, INDEX_RECORDS_STORE_NAME, META_STORE_NAME],
-            'readwrite'
-          )
-          const committed = idbTransactionCommit(transaction, { signal }, runtime)
-          void committed.catch(() => {})
-          try {
-            const revisionStore = transaction.objectStore(REVISIONS_STORE_NAME)
-            const metaStore = transaction.objectStore(META_STORE_NAME)
-            const revision = (await fromIdbRequest(
-              revisionStore.get(RECORD_EPOCH_KEY) as IDBRequest<number | undefined>,
-              { signal },
-              runtime
-            )) as number | undefined
-            const recordCount = (await fromIdbRequest(
-              transaction.objectStore(recordsStoreName).count(),
-              { signal },
-              runtime
-            )) as number
-            transaction.objectStore(recordsStoreName).clear()
-            /**
-             * Raw-record firewall: a raw `clearRecords()` bypasses the entity
-             * put/remove/batch/migrate planner, so every existing sidecar projection row and every
-             * scope's index generation/readiness handle becomes stale in the same atomic step as
-             * the record wipe. Any handle a caller already holds stops matching stored state, so
-             * `iterateRecordIndex`/readiness reads fail closed and callers must re-`ensureRecord
-             * Indexes` and backfill from scratch — no complete handle can silently keep answering
-             * queries against data that no longer exists. `deleteOwnedMetaKeys`/
-             * `deleteOwnedRevisionKeys` scope this to only backend-owned bookkeeping (never the
-             * legacy migration checkpoint or public `metadata`/other revisions) — see their doc
-             * comments.
-             */
-            transaction.objectStore(INDEX_RECORDS_STORE_NAME).clear()
-            await deleteOwnedMetaKeys(metaStore, signal, runtime)
-            await deleteOwnedRevisionKeys(revisionStore, signal, runtime)
-            revisionStore.put((revision ?? 0) + 1, RECORD_EPOCH_KEY)
-            await committed
-            if (recordCount > 0) publishChange({ channel: 'record', kind: 'clear' })
-          } catch (cause) {
-            try {
-              transaction.abort()
-            } catch {
-              /* transaction already settled */
-            }
-            await committed.catch(() => {})
-            throw cause
-          }
-        })
-      ),
-    iterateRecords: async function* (range, ctx) {
-      const rangeSnapshot = snapshotKeyRange(range, StorageBackend.indexedDb)
-      assertLive()
-      /** One reporter shared by every abort subscription inside this iteration operation. */
-      const runtime = createStorageOperationRuntime()
-      const { signal, dispose: disposeSignal, context } = mergeSignals(ctx, runtime.reporter)
-      const pageSize = context?.pageSize ?? 128
-      let lower = rangeSnapshot?.lower
-      let lowerOpen = rangeSnapshot?.lowerOpen
-      try {
-        while (true) {
-          throwIfAborted(signal)
-          const pageRange =
-            lower === undefined && rangeSnapshot?.upper === undefined
-              ? undefined
-              : {
-                  lower,
-                  lowerOpen,
-                  upper: rangeSnapshot?.upper,
-                  upperOpen: rangeSnapshot?.upperOpen
+            while (true) {
+              throwIfAborted(signal)
+              const pageRange =
+                lower === undefined && rangeSnapshot?.upper === undefined
+                  ? undefined
+                  : {
+                      lower,
+                      lowerOpen,
+                      upper: rangeSnapshot?.upper,
+                      upperOpen: rangeSnapshot?.upperOpen
+                    }
+              const database = await open(runtime)
+              assertLive()
+              const transaction = createTransaction(database, recordsStoreName, 'readonly')
+              const store = transaction.objectStore(recordsStoreName)
+              const idbRange = toIdbRange(pageRange, keyRange)
+              const request = idbRange ? store.openCursor(idbRange) : store.openCursor()
+              const page = await new Promise<Array<[IStorageKey, TValue]>>((resolve, reject) => {
+                const values: Array<[IStorageKey, TValue]> = []
+                let cursorFinished = false
+                let settled = false
+                let cancelled = false
+                let abortReason: unknown
+                /** Owns the cursor abort subscription and is safe before registration completes. */
+                let disposeAbort = (): void => {}
+                const finish = (callback: () => void): void => {
+                  if (settled) return
+                  settled = true
+                  disposeAbort()
+                  callback()
                 }
-          const database = await open(runtime)
-          assertLive()
-          const transaction = createTransaction(database, recordsStoreName, 'readonly')
-          const store = transaction.objectStore(recordsStoreName)
-          const idbRange = toIdbRange(pageRange, keyRange)
-          const request = idbRange ? store.openCursor(idbRange) : store.openCursor()
-          const page = await new Promise<Array<[IStorageKey, TValue]>>((resolve, reject) => {
-            const values: Array<[IStorageKey, TValue]> = []
-            let cursorFinished = false
-            let settled = false
-            let cancelled = false
-            let abortReason: unknown
-            /** Owns the cursor abort subscription and is safe before registration completes. */
-            let disposeAbort = (): void => {}
-            const finish = (callback: () => void): void => {
-              if (settled) return
-              settled = true
-              disposeAbort()
-              callback()
-            }
-            /**
-             * Normalize every non-cancellation cursor failure at its owning operation boundary. A
-             * contract error penetrates whole (rule); only a web `StorageError` bridge wrapper is
-             * unwrapped before the cursor boundary assigns its own metadata.
-             */
-            const cursorFailure = (cause: unknown): StorageError | StorageContractError =>
-              isStorageContractError(cause)
-                ? cause
-                : new StorageError(StorageErrorCode.transactionFailed, {
-                    backend: StorageBackend.indexedDb,
-                    operation: StorageOperation.indexedDbCursor,
-                    cause: cause instanceof StorageError ? (cause.cause ?? cause) : cause
-                  })
-            const abort = (): void => {
-              cancelled = true
-              abortReason = readAbortReason(signal)
-              finish(() =>
-                reject(
-                  new StorageContractError(StorageContractErrorCode.aborted, { cause: abortReason })
-                )
-              )
-            }
-            try {
-              installIdbTransactionHandlers(
-                transaction,
-                () => {
-                  finish(() => {
-                    if (cancelled) {
-                      reject(
-                        new StorageContractError(StorageContractErrorCode.aborted, {
-                          cause: abortReason
-                        })
-                      )
-                      return
-                    }
-                    if (!cursorFinished) {
-                      reject(
-                        cursorFailure(
-                          new Error('IndexedDB transaction completed before cursor finished')
-                        )
-                      )
-                      return
-                    }
-                    resolve(values)
-                  })
-                },
-                () => finish(() => reject(cursorFailure(readIdbTransactionError(transaction)))),
-                () => finish(() => reject(cursorFailure(readIdbTransactionError(transaction))))
-              )
-              installIdbRequestHandlers(
-                request,
-                () => {
-                  try {
-                    const cursor = readIdbRequestResult(request)
-                    if (!cursor || values.length >= pageSize) {
-                      cursorFinished = true
-                      finish(() => resolve(values))
-                      return
-                    }
-                    values.push([cursor.key as IStorageKey, cursor.value as TValue])
-                    if (values.length < pageSize) cursor.continue()
-                    else cursorFinished = true
-                  } catch (cause) {
-                    finish(() => reject(cursorFailure(cause)))
-                  }
-                },
-                () => finish(() => reject(cursorFailure(readIdbRequestError(request))))
-              )
-              disposeAbort = subscribeToAbort(signal, abort, runtime.reporter)
-            } catch (cause) {
-              finish(() =>
-                reject(
-                  isStorageContractError(cause) ||
-                    (cause instanceof StorageError && cause.code === StorageErrorCode.invalidConfig)
+                /**
+                 * Normalize every non-cancellation cursor failure at its owning operation boundary.
+                 * A contract error penetrates whole (rule); only a web `StorageError` bridge
+                 * wrapper is unwrapped before the cursor boundary assigns its own metadata.
+                 */
+                const cursorFailure = (cause: unknown): StorageError | StorageContractError =>
+                  isStorageContractError(cause)
                     ? cause
-                    : cursorFailure(cause)
-                )
-              )
-              try {
-                transaction.abort()
-              } catch {
-                /* setup failure already owns the result */
+                    : new StorageError(StorageErrorCode.transactionFailed, {
+                        backend: StorageBackend.indexedDb,
+                        operation: StorageOperation.indexedDbCursor,
+                        cause: cause instanceof StorageError ? (cause.cause ?? cause) : cause
+                      })
+                const abort = (): void => {
+                  cancelled = true
+                  abortReason = readAbortReason(signal)
+                  finish(() =>
+                    reject(
+                      new StorageContractError(StorageContractErrorCode.aborted, {
+                        cause: abortReason
+                      })
+                    )
+                  )
+                }
+                try {
+                  installIdbTransactionHandlers(
+                    transaction,
+                    () => {
+                      finish(() => {
+                        if (cancelled) {
+                          reject(
+                            new StorageContractError(StorageContractErrorCode.aborted, {
+                              cause: abortReason
+                            })
+                          )
+                          return
+                        }
+                        if (!cursorFinished) {
+                          reject(
+                            cursorFailure(
+                              new Error('IndexedDB transaction completed before cursor finished')
+                            )
+                          )
+                          return
+                        }
+                        resolve(values)
+                      })
+                    },
+                    () => finish(() => reject(cursorFailure(readIdbTransactionError(transaction)))),
+                    () => finish(() => reject(cursorFailure(readIdbTransactionError(transaction))))
+                  )
+                  installIdbRequestHandlers(
+                    request,
+                    () => {
+                      try {
+                        const cursor = readIdbRequestResult(request)
+                        if (!cursor || values.length >= pageSize) {
+                          cursorFinished = true
+                          finish(() => resolve(values))
+                          return
+                        }
+                        values.push([cursor.key as IStorageKey, cursor.value as TValue])
+                        if (values.length < pageSize) cursor.continue()
+                        else cursorFinished = true
+                      } catch (cause) {
+                        finish(() => reject(cursorFailure(cause)))
+                      }
+                    },
+                    () => finish(() => reject(cursorFailure(readIdbRequestError(request))))
+                  )
+                  disposeAbort = subscribeToAbort(signal, abort, runtime.reporter)
+                } catch (cause) {
+                  finish(() =>
+                    reject(
+                      isStorageContractError(cause) ||
+                        (cause instanceof StorageError &&
+                          cause.code === StorageErrorCode.invalidConfig)
+                        ? cause
+                        : cursorFailure(cause)
+                    )
+                  )
+                  try {
+                    transaction.abort()
+                  } catch {
+                    /* setup failure already owns the result */
+                  }
+                }
+              })
+              if (page.length === 0) return
+              for (const entry of page) {
+                throwIfAborted(signal)
+                yield entry
               }
+              if (page.length < pageSize) return
+              lower = page[page.length - 1]![0]
+              lowerOpen = true
             }
-          })
-          if (page.length === 0) return
-          for (const entry of page) {
-            throwIfAborted(signal)
-            yield entry
+          } finally {
+            disposeSignal()
           }
-          if (page.length < pageSize) return
-          lower = page[page.length - 1]![0]
-          lowerOpen = true
-        }
-      } finally {
-        disposeSignal()
-      }
-    },
+        })(range, ctx),
+        { execution: runtime.execution, operation: StorageOperation.indexedDbCursor, ctx }
+      ),
+    tx: () =>
+      createTransactionBuilder(construction.store, undefined, runtime.getChainMethods('tx')),
     transaction: (run, ctx) => {
       assertLive()
-      return withMutationLease((lease) =>
-        withAbort(ctx, (signal, context, runtime) => {
-          assertTransactionCallback(run, StorageBackend.indexedDb)
-          return runTransaction(run, signal, runtime, context, lease)
-        })
-      )
+      return withMutationLease((lease) => runTransaction(run, ctx, lease))
     }
   }
-  registerIndexedDbBackfillStore(store, {
+  registerRecordIndexBackfillStore(store, {
     prepare: async () => {
       await open(createStorageOperationRuntime())
     },
@@ -4039,6 +4437,215 @@ export const indexedDbHost = <TValue = unknown>(
     getRecordIndexReadiness: store.getRecordIndexReadiness,
     openBackfillSession
   })
-  registerBackendReactiveController(store, controller)
-  return store
+  /** Queries use the shared planner and the original native cursor rather than another executor. */
+  const recordApi: IRecordsApi<TValue> = {
+    query: <R = TValue>() =>
+      createRecordQuery<R>(
+        {
+          asyncDisposeKey,
+          pushdown: recordQueryPushdown,
+          execute: ({ ctx }) => store.iterateRecords(undefined, ctx)
+        },
+        runtime.getChainMethods('query')
+      ),
+    removeByPrefix: (prefix, ctx) =>
+      rootMutation(
+        'records.removeByPrefix',
+        prefix,
+        ctx,
+        { channel: 'record', kind: 'batch' },
+        (prefix) => {
+          const captured = snapshotStorageKeyPrefix(prefix, StorageBackend.indexedDb)
+          return {
+            keys: [],
+            ranges: [
+              {
+                channel: 'record',
+                ...snapshotConcurrencyLockRange(
+                  { channel: 'record', prefix: captured.key },
+                  StorageBackend.indexedDb
+                )
+              }
+            ],
+            run: (scope) => scope.use(records).removeByPrefix(captured.key)
+          }
+        }
+      )
+  }
+  /** A bound record API borrows only the exact view authorized by the canonical owner. */
+  const transactionRecordApi = (scope: ITransactionScope): ITransactionRecordsApi<TValue> => ({
+    query: <R = TValue>() =>
+      createRecordQuery<R, undefined>(
+        {
+          pushdown: recordQueryPushdown,
+          execute: () => scope.iterateRecords()
+        },
+        runtime.getChainMethods('query')
+      ),
+    removeByPrefix: (prefix) => {
+      /** The native map grants no authority; membership is proved before the original handle lookup. */
+      const { id } = assertTransactionOwner(construction.store, scope)
+      /** This is the same record that owns native abort and physical termination. */
+      const native = nativeTransactions.get(id)
+      if (native === undefined)
+        throw new StorageContractError(StorageContractErrorCode.invalidArgument)
+      return native.removeRecordsByPrefix(scope, prefix)
+    }
+  })
+  /** Counted observations enclose the original native root pipeline without another executor. */
+  const runRootBatch = <I, R>(
+    method: string,
+    input: I,
+    ctx: IWriteOptions | undefined,
+    count: number | undefined,
+    prepare: (input: I, context: IWriteOptions) => IRootPrepared<R>
+  ): Promise<Awaited<R>> =>
+    observeBrowserBatch(
+      runtime,
+      construction.store,
+      storageBackendOperation(StorageBackend.indexedDb, method),
+      count,
+      () => rootMutation(method, input, ctx, { channel: 'value', kind: 'batch' }, prepare)
+    )
+
+  /** Standard root batches reuse the same native views and original concurrency/pipeline owner. */
+  const batchApi: IBrowserBatchApi = {
+    getMany: async (keys, ctx) => {
+      assertLive()
+      const captured = snapshotStorageBatchKeys(keys, StorageBackend.indexedDb)
+      if (captured.length === 0) return []
+      return runRootBatch(
+        BrowserBatchMethod.getMany,
+        captured.map((entry) => entry.key),
+        ctx,
+        captured.length,
+        (keys) => {
+          const entries = snapshotStorageBatchKeys(keys, StorageBackend.indexedDb)
+          return {
+            keys: entries
+              .filter((entry, index) => entry.firstIndex === index)
+              .map((entry) => lockKey.text(entry.key)),
+            run: (scope) => scope.getMany(entries.map((entry) => entry.key))
+          }
+        }
+      )
+    },
+    setMany: async (entries, ctx) => {
+      assertLive()
+      const captured = snapshotBrowserBatchEntries(entries, StorageBackend.indexedDb)
+      if (captured.length === 0) return
+      return runRootBatch(
+        BrowserBatchMethod.setMany,
+        captured.map(({ key, value, ttlMs }) => ({
+          key,
+          value,
+          ...(ttlMs === undefined ? {} : { ttlMs })
+        })),
+        ctx,
+        captured.length,
+        (entries, context) => {
+          const values = snapshotBrowserBatchEntries(entries, StorageBackend.indexedDb)
+          return {
+            keys: values.flatMap((entry) => rootKeys('value', entry.key, context)),
+            run: (scope) => scope.setMany(values)
+          }
+        }
+      )
+    },
+    removeMany: async (keys, ctx) => {
+      assertLive()
+      const captured = snapshotStorageBatchKeys(keys, StorageBackend.indexedDb)
+      if (captured.length === 0) return 0
+      return runRootBatch(
+        BrowserBatchMethod.removeMany,
+        captured.map((entry) => entry.key),
+        ctx,
+        captured.length,
+        (keys) => {
+          const entries = snapshotStorageBatchKeys(keys, StorageBackend.indexedDb)
+          return {
+            keys: entries
+              .filter((entry, index) => entry.firstIndex === index)
+              .map((entry) => lockKey.text(entry.key)),
+            run: (scope) => scope.removeMany(entries.map((entry) => entry.key))
+          }
+        }
+      )
+    },
+    removeByPrefix: async (prefix, ctx) => {
+      assertLive()
+      const captured = snapshotStorageKeyPrefix(prefix, StorageBackend.indexedDb)
+      return runRootBatch(
+        BrowserBatchMethod.removeByPrefix,
+        captured.key,
+        ctx,
+        undefined,
+        (prefix) => {
+          const range = snapshotStorageKeyPrefix(prefix, StorageBackend.indexedDb)
+          return {
+            keys: [],
+            ranges: [
+              {
+                channel: 'text',
+                ...snapshotConcurrencyLockRange(
+                  { channel: 'text', prefix: range.key },
+                  StorageBackend.indexedDb
+                )
+              }
+            ],
+            run: (scope) => scope.removeByPrefix(range.key)
+          }
+        }
+      )
+    }
+  }
+  const construction = provideBackendConstruction(
+    bindBrowserExecution(store, runtime, [
+      'set',
+      'remove',
+      'setBytes',
+      'removeBytes',
+      'putRecord',
+      'deleteRecord',
+      'clearValues',
+      'clearAll',
+      'clearBytes',
+      'clearRecords',
+      'putIndexedRecord'
+    ]),
+    [
+      implement(kv, browserKeyValueApi(store, batchApi), { forTransaction: (scope) => scope }),
+      implement(records, recordApi, { forTransaction: transactionRecordApi })
+    ],
+    controller,
+    () => {
+      if (activeDatabase === undefined)
+        throw new StorageError(StorageErrorCode.unavailable, { backend: StorageBackend.indexedDb })
+      return activeDatabase
+    },
+    async () => {
+      await open(createStorageOperationRuntime())
+    }
+  )
+  transactionOwner = createTransactionOwner<TValue>(
+    construction.store,
+    normalizeIndexedDbOperationError,
+    {
+      activityMode: TransactionActivityMode.native,
+      asyncDisposeKey,
+      concurrencyStages: runtime.stageBindings.concurrencyStages(construction.store)
+    }
+  )
+  return {
+    ...construction,
+    getTransactionClient: (scope) => {
+      /** Only the canonical owner can authorize a live view for this exact provided store. */
+      const { id } = assertTransactionOwner(construction.store, scope)
+      /** This lookup exposes the already-open native transaction and grants no new authority. */
+      const native = nativeTransactions.get(id)
+      if (native === undefined)
+        throw new StorageContractError(StorageContractErrorCode.invalidArgument)
+      return native.native
+    }
+  }
 }

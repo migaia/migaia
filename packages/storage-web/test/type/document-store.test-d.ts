@@ -1,6 +1,7 @@
 import { expectTypeOf } from 'vitest'
 import { asRecordStore } from '../../src/types/storage'
-import { memoryStorageHost, localStorageHost } from '../../src/backends'
+import type { IMemoryBackendStore } from '@migaia/storage-host'
+import type { ILocalStorageBackendStore } from '../../src/local-storage.js'
 import type { IRecordStore, IKeyValueStore } from '../../src/types/storage'
 
 // asRecordStore 正确收窄到 IRecordStore。
@@ -8,8 +9,8 @@ declare const anyStore: IKeyValueStore
 expectTypeOf(asRecordStore(anyStore)).toEqualTypeOf<IRecordStore<unknown>>()
 expectTypeOf(asRecordStore<{ a: number }>(anyStore)).toEqualTypeOf<IRecordStore<{ a: number }>>()
 
-// memoryStorageHost() 本身已经是 IRecordStore 形状（结构上）。
-expectTypeOf(memoryStorageHost()).toMatchTypeOf<IRecordStore<unknown>>()
+// The real installed host memory store retains native record methods.
+expectTypeOf<IMemoryBackendStore>().toMatchTypeOf<IRecordStore<unknown>>()
 
-// localStorageHost() 只是 IKeyValueStore，不满足 IRecordStore（缺 getRecord 等方法）。
-expectTypeOf(localStorageHost()).not.toMatchTypeOf<IRecordStore<unknown>>()
+// The installed local storage plugin does not manufacture native record methods.
+expectTypeOf<ILocalStorageBackendStore>().not.toMatchTypeOf<IRecordStore<unknown>>()

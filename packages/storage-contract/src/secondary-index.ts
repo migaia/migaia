@@ -1,3 +1,6 @@
+import type { ITransactionOptions } from './concurrency.js'
+import type { ITransactionScope } from './transaction.js'
+import type { IStorageIterator } from './resource.js'
 import type { IKeyRange, IOperationContext, IStorageKey, IWriteOptions } from './context.js'
 import { inspectStoreShape, type IRecordStore } from './store.js'
 import { StorageContractError, StorageContractErrorCode } from './errors.js'
@@ -64,14 +67,8 @@ export type IRecordIndexQuery = {
 }
 
 /** Indexed record operations valid during one backend-owned transaction callback. */
-export type ISecondaryIndexTransactionScope<TValue = unknown> = {
-  /** Reads a record within this transaction, or undefined when absent. */
-  get(key: IStorageKey): Promise<TValue | undefined>
-  /** Writes a record with required primary key and index projections, returning that key. */
-  put(value: TValue, key: IStorageKey, projection: IRecordIndexProjection): Promise<IStorageKey>
-  /** Deletes a record and lets the provider update its associated index entries. */
-  delete(key: IStorageKey): Promise<void>
-}
+export type ISecondaryIndexTransactionScope<TValue = unknown> = ITransactionScope<TValue> &
+  Required<Pick<ITransactionScope<TValue>, 'putIndexedRecord' | 'iterateRecordIndex'>>
 
 /** Record-store extension whose logical indexes remain owned and executed by the provider. */
 export type ISecondaryIndexRecordStore<TValue = unknown> = IRecordStore<TValue> & {
@@ -98,13 +95,13 @@ export type ISecondaryIndexRecordStore<TValue = unknown> = IRecordStore<TValue> 
   iterateRecordIndex(
     query: IRecordIndexQuery,
     ctx?: IOperationContext
-  ): AsyncIterableIterator<[IStorageKey, TValue]>
+  ): IStorageIterator<[IStorageKey, TValue]>
   /** Executes work under a provider-owned indexed transaction and returns the callback result. */
-  transactionIndexed<T>(
+  transactionIndexed<TResult>(
     handle: IRecordIndexHandle,
-    run: (tx: ISecondaryIndexTransactionScope<TValue>) => Promise<T>,
-    ctx?: IOperationContext
-  ): Promise<T>
+    run: (tx: ISecondaryIndexTransactionScope<TValue>) => TResult,
+    ctx?: ITransactionOptions
+  ): Promise<Awaited<TResult>>
 }
 
 const SECONDARY_INDEX_METHODS = [

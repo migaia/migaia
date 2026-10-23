@@ -2,7 +2,7 @@
   "name": "@migaia/storage-web",
   "version": "0.0.8",
   "private": true,
-  "description": "Independent web storage library: localStorage, sessionStorage, cookies, IndexedDB CRUD with entity, schema and serialize extension points.",
+  "description": "Browser backend plugins for localStorage, sessionStorage, cookies and native IndexedDB, with optional reactive queries.",
   "repository": {
     "type": "git",
     "url": "git@github.com:kimboyeme-maker/migai.git",
@@ -22,10 +22,6 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
-    "./memory": {
-      "types": "./dist/memory.d.ts",
-      "default": "./dist/memory.js"
-    },
     "./local-storage": {
       "types": "./dist/local-storage.d.ts",
       "default": "./dist/local-storage.js"
@@ -41,14 +37,6 @@
     "./indexed-db": {
       "types": "./dist/indexed-db.d.ts",
       "default": "./dist/indexed-db.js"
-    },
-    "./host": {
-      "types": "./dist/host.d.ts",
-      "default": "./dist/host.js"
-    },
-    "./plugins/memory": {
-      "types": "./dist/plugins/memory.d.ts",
-      "default": "./dist/plugins/memory.js"
     },
     "./plugins/local-storage": {
       "types": "./dist/plugins/local-storage.d.ts",
@@ -66,45 +54,9 @@
       "types": "./dist/plugins/indexed-db.d.ts",
       "default": "./dist/plugins/indexed-db.js"
     },
-    "./entity": {
-      "types": "./dist/entity.d.ts",
-      "default": "./dist/entity.js"
-    },
-    "./schema": {
-      "types": "./dist/schema.d.ts",
-      "default": "./dist/schema.js"
-    },
-    "./serialize": {
-      "types": "./dist/serialize.d.ts",
-      "default": "./dist/serialize.js"
-    },
-    "./reactive-adapter": {
-      "types": "./dist/reactive-adapter.d.ts",
-      "default": "./dist/reactive-adapter.js"
-    },
-    "./plugins/reactive": {
-      "types": "./dist/plugins/reactive/index.d.ts",
-      "default": "./dist/plugins/reactive/index.js"
-    },
-    "./plugins/reactive/memory": {
-      "types": "./dist/plugins/reactive/memory.d.ts",
-      "default": "./dist/plugins/reactive/memory.js"
-    },
-    "./plugins/reactive/local-storage": {
-      "types": "./dist/plugins/reactive/local-storage.d.ts",
-      "default": "./dist/plugins/reactive/local-storage.js"
-    },
-    "./plugins/reactive/session-storage": {
-      "types": "./dist/plugins/reactive/session-storage.d.ts",
-      "default": "./dist/plugins/reactive/session-storage.js"
-    },
-    "./plugins/reactive/cookies": {
-      "types": "./dist/plugins/reactive/cookies.d.ts",
-      "default": "./dist/plugins/reactive/cookies.js"
-    },
-    "./plugins/reactive/indexed-db": {
-      "types": "./dist/plugins/reactive/indexed-db.d.ts",
-      "default": "./dist/plugins/reactive/indexed-db.js"
+    "./features/reactive": {
+      "types": "./dist/features/reactive.d.ts",
+      "default": "./dist/features/reactive.js"
     }
   },
   "publishConfig": {
@@ -136,8 +88,12 @@
   },
   "devDependencies": {
     "@migaia/rpc-contract": "workspace:*",
+    "@migaia/store-persist": "workspace:*",
     "@vitest/coverage-v8": "4.1.10",
     "fake-indexeddb": "6.2.5",
     "jsdom": "29.1.1"
+  },
+  "peerDependencies": {
+    "@migaia/storage-host": "workspace:^"
   }
 }

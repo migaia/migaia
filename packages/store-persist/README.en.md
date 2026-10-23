@@ -23,15 +23,16 @@ Connect Store, collection, or keyed snapshots to storage while coordinating star
 Save overview.ts in an ESM project and run it with Node 24; this real in-memory backend retains data only for its own lifetime:
 
 ```bash
-pnpm add @migaia/store-persist @migaia/store-light @migaia/storage-web
+pnpm add @migaia/store-persist @migaia/store-light @migaia/storage-host
 ```
 
 ```ts doc-test=run
 import { createStore } from '@migaia/store-light'
-import { memoryStorageHost } from '@migaia/storage-web/memory'
+import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
 import { persist } from '@migaia/store-persist/light'
 
-const storage = memoryStorageHost()
+await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })
+const storage = host.backend('memory')
 const settings = createStore({ theme: 'light' })
 const handle = persist(settings, { key: 'settings', storage })
 await handle.ready
@@ -40,7 +41,6 @@ await handle.flush()
 console.log('saved:', (await storage.get('settings')) !== null)
 handle.dispose()
 await settings.$dispose()
-storage.dispose()
 ```
 
 Output:
@@ -59,10 +59,11 @@ The same settings-save task, displayed without execution:
 
 ```ts doc-test=check
 import { createStore } from '@migaia/store-light'
-import { memoryStorageHost } from '@migaia/storage-web/memory'
+import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
 
 const store = createStore({ count: 0 })
-const storage = memoryStorageHost()
+await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })
+const storage = host.backend('memory')
 const off = store.$subscribe(() => {
   void storage.set('settings', JSON.stringify(store.$plain())) // Neither serialized nor awaited
 })
@@ -94,7 +95,7 @@ The preceding example awaits the actual persistence write through flush, then re
 | -------------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------ |
 | Keep edits made while an archive is loading        | persist → local edit → ready → flush                    | [Complete code](./USEGUIDE.en.md#keep-edits-made-while-an-archive-is-loading)        |
 | Repair a failed archive before reopening writes    | ready rejection → repair storage → retryHydrate → flush | [Complete code](./USEGUIDE.en.md#repair-a-failed-archive-before-reopening-writes)    |
-| Migrate old settings and save only selected fields | version / migrate → partialize → flush                  | [Complete code](./USEGUIDE.en.md#migrate-old-settings-and-save-only-selected-fields) |
+| Migrate old settings and save only selected fields | version / migrations → partialize → flush               | [Complete code](./USEGUIDE.en.md#migrate-old-settings-and-save-only-selected-fields) |
 | Restore a Map without losing its entries           | persistCollection → flush → new Map → ready             | [Complete code](./USEGUIDE.en.md#restore-a-map-without-losing-its-entries)           |
 | Stop saving one key while another keeps working    | persistKeyed × 2 → ready → dispose one → flush          | [Complete code](./USEGUIDE.en.md#stop-saving-one-key-while-another-keeps-working)    |
 | Clear saved records without resetting live values  | clearFamily → inspect memory → change → flush           | [Complete code](./USEGUIDE.en.md#clear-saved-records-without-resetting-live-values)  |
@@ -102,7 +103,7 @@ The preceding example awaits the actual persistence write through flush, then re
 ## Installation
 
 ```bash
-pnpm add @migaia/store-persist @migaia/store-light @migaia/storage-web
+pnpm add @migaia/store-persist @migaia/store-light @migaia/storage-host
 ```
 
 Install only the optional Store peer you use. The light example above needs store-light; collection and keyed examples can additionally use:
@@ -148,7 +149,7 @@ persistUnit(unit, options) is the shared engine. A unit supplies synchronous sna
 | storage    | Required minimal KeyValueStore projection, described under routing below.                                                                                                                           |
 | codec      | defaultJsonCodec; encodes the complete version / state envelope, not state alone.                                                                                                                   |
 | version    | 0, a nonnegative safe integer.                                                                                                                                                                      |
-| migrate    | Unset; called as migrate(persisted, fromVersion) on a version mismatch, which otherwise fails hydration. The keyed facade does not expose it.                                                       |
+| migrations | Contiguous target-version steps or `{ reset: () => state }`; synchronous only. Future or unreachable archives fail with VERSION_UNSUPPORTED. Keyed does not expose migrations.                      |
 | partialize | Identity; selects what to save from the current snapshot.                                                                                                                                           |
 | merge      | Custom merge(persisted, current) is available in core / indexed / keyed. The default shallowly reconciles plain objects against startup state and replaces other shapes. light has no merge option. |
 | debounceMs | 0, disabling debounce; finite from 0 through 2147483647, including fractions.                                                                                                                       |
@@ -157,7 +158,7 @@ persistUnit(unit, options) is the shared engine. A unit supplies synchronous sna
 
 Facades snapshot own option properties, invoking getters once with the original options receiver. Core also captures configuration fields during construction and uses the admitted merge rather than rereading a caller getter during restore. Non-object options, failed reflection, or getter failure produce INVALID_OPTION TypeError; caught failures remain on cause. key, namespace, and id are checked as strings before concatenation, without silently converting objects or numbers or imposing an extra nonempty-string requirement. Version, durations, and callback shapes are validated before persistence state construction.
 
-migrate, partialize, and merge must return synchronously. Promise / thenable results, or failed reads of then, produce INVALID_OPTION instead of storing a Promise as business state. Ordinary synchronous callback and backend exceptions retain their existing public error paths; not every failure is relabeled with one local code.
+Migration steps are synchronous. Known Promise/thenable results fail at compile time; runtime MIGRATION_FAILED retains the original failure on cause. partialize and merge keep their synchronous INVALID_OPTION policy.
 
 ### Three state adapters
 
@@ -177,11 +178,11 @@ clearFamily(storage, namespace) requires both arguments and returns `Promise<num
 
 ### Loading, migration, and local edits
 
-Construction captures startup state and subscribes before the asynchronous read. An absent archive hydrates successfully without replacing initial memory. A present archive is decoded and validated, migrated when its version differs and migrate exists, then merged and restored synchronously. Matching versions do not run migrate. A mismatch without migration produces ENVELOPE_INVALID rather than treating old schema as current.
+Attachment creates one frozen plan before subscribing. Hydration uses storage-contract assertVersionedEnvelope and migrateEnvelopeSync. Matching versions preserve state. Reachable older archives run contiguous steps or one reset; future archives fail with VERSION_UNSUPPORTED. Contract hydration errors pass through unchanged and close writes. Upgrading/restoring alone never writes back; application changes and flush retain existing scheduling.
 
 Default merging handles plain objects with Object.prototype or null prototypes. It shallowly compares each current field against construction-time startup state using Object.is: locally changed fields win, untouched fields accept the archive, and unarchived current fields remain. It is not deep conflict resolution; mutation inside a retained nested reference is not recursively compared. Retry uses that same startup baseline. Arrays, Maps, Sets, and other non-plain shapes accept the persisted shape wholesale; a custom merge owns its application rules.
 
-Changes during hydration mark dirty rather than writing over an unknown archive. Synchronous restore notifications join that window. Successful hydration schedules retained dirty work. Failure retains its error and dirty state; flush / clear throw the hydration error without writing until retryHydrate succeeds. A further retry call during recovery does not start a parallel read, but is not guaranteed to await that recovery or return the same Promise. Await the call that initiated retry to observe its result.
+Changes during hydration mark dirty rather than writing over an unknown archive. Synchronous restore notifications are ignored; application changes during the asynchronous read remain dirty. Successful hydration schedules retained dirty work. Failure retains its error and dirty state; flush / clear throw the hydration error without writing until retryHydrate succeeds. A further retry call during recovery does not start a parallel read, but is not guaranteed to await that recovery or return the same Promise. Await the call that initiated retry to observe its result.
 
 ### Handle state and waiting
 
@@ -197,7 +198,7 @@ Changes during hydration mark dirty rather than writing over an unknown archive.
 | ready                | Promise for the first hydration attempt, resolving on success and rejecting on failure or disposal before completion; retry never replaces it.                     |
 | settled              | An always-resolving barrier for the first attempt, not later retry completion.                                                                                     |
 | retryHydrate()       | No arguments; rereads after failure and reopens writing only on success. Await the initiating call itself.                                                         |
-| flush() / clear()    | No arguments; `Promise<void>`, with ordered write / deletion behavior below.                                                                                       |
+| flush(tx?) / clear() | `Promise<void>`; flush accepts an enlisted transaction view, while clear has no arguments.                                                                         |
 | disposed / dispose() | Live boolean getter / synchronous idempotent release.                                                                                                              |
 | disposeAsync()       | Stops synchronously, then awaits admitted writes/removals and the final write; final-write failures stay on writeError; existing flush/clear keep their outcomes.  |
 
@@ -223,11 +224,11 @@ Cancellation reuses lifecycle's native AbortController and default AbortError re
 
 ### Archive, default codec, and compatibility
 
-An envelope contains a nonnegative safe-integer version and non-null / non-undefined state. assertEnvelope(value, key) rejects non-objects, arrays, invalid versions, and absent state, returning the captured version / state. Each property is read once; inaccessible properties or reflection failures become PersistEnvelopeError with the cause retained. This TypeError subclass carries ENVELOPE_INVALID, with key identifying the archive.
+The canonical envelope is a plain object with own version (nonnegative safe integer) and own non-null/undefined state. Import assertVersionedEnvelope and IVersionedEnvelope from @migaia/storage-contract. Fields are read once; ENVELOPE_INVALID retains property failures on cause. Store-persist owns no duplicate validator or envelope error class.
 
-defaultJsonCodec is named migaia-collections-json-v1 with text output. It delegates to storage-contract collectionsJsonCodec and round-trips real Maps / Sets, including cross-realm collections, rather than ordinary JSON's silent empty-object encoding. JSON limits such as cycles and BigInt remain; it is not lossless encoding for arbitrary object graphs. Exact reserved versioned tuple shapes are not unrestricted application-array space.
+defaultJsonCodec is the frozen text codec collections-json@1, wrapping fromValueCodec(defineCollectionsJsonCodec({ version: 1 })). It already preserves nested Map/Set with $rpc map/entries and set/values records. Non-finite numbers, undefined roots, sparse arrays, cycles and Date fail; ordinary class instances project enumerable fields. Encode errors retain store-persist ENCODE_FAILED, contract INVALID_ARGUMENT and serialize ENCODE_FAILED on cause. Non-string/malformed JSON retains the local ENVELOPE_INVALID TypeError; valid JSON envelope failures belong to storage-contract.
 
-Legacy reading recognizes only objects whose sole own key is `__migaia_persist_map__` or `__migaia_persist_set__` with an array value. Similar records containing extra fields retain all their data. An exact legacy marker selects the legacy reviver, preserving ordinary application arrays inside that archive rather than reinterpreting them as current tuples. Archives without exact legacy markers use current decoding. New write format and codec name remain unchanged.
+Historical collection markers and tuple-shaped arrays remain ordinary application data. No legacy collection revival runs; decoding delegates to the canonical codec once.
 
 defaultJsonCodec.encode wraps failure in ENCODE_FAILED TypeError with cause. decode rejects non-string or malformed JSON / markers with ENVELOPE_INVALID TypeError, retaining caught parse failures as cause. The default codec neither encrypts nor redacts. A custom codec owns the shapes it declares.
 
@@ -254,14 +255,91 @@ STORE_PERSIST_SOURCE is @migaia/store-persist. StorePersistErrorCode owns the st
 | codecNotResolved / CODEC_NOT_RESOLVED            | No codec resolved; supply one or correct resolution.                              |
 | codecOutputMismatch / CODEC_OUTPUT_MISMATCH      | Codec output, payload, and backend routing disagree.                              |
 | backendCapability / BACKEND_CAPABILITY           | Binary routing lacks required byte methods.                                       |
-| envelopeInvalid / ENVELOPE_INVALID               | Invalid archive or version mismatch without migration.                            |
+| envelopeInvalid / ENVELOPE_INVALID               | Default JSON non-string input or decoding failure only.                           |
 | encodeFailed / ENCODE_FAILED                     | Default encoding failed; inspect cause and input.                                 |
 | hydrateAndWriteFailed / HYDRATE_AND_WRITE_FAILED | Both hydration and writing failed; inspect AggregateError.errors.                 |
 | abortedByDispose / ABORTED_BY_DISPOSE            | Disposal cancellation retaining DOMException / AbortError and original cause.     |
 | invalidOption / INVALID_OPTION                   | Invalid key, namespace, version, duration, callback, scheduler, or configuration. |
 
-Invalid configuration such as an unsafe version throws TypeError synchronously. Envelope failures use PersistEnvelopeError. Failed hydration keeps flush / clear blocked with hydrationError until successful retry; write failures appear in writeError. Check codec/backend compatibility, and keep handle retirement separate from memory reset or archive deletion.
+Invalid configuration throws a local INVALID_OPTION TypeError with the contract plan error on cause. Hydration preserves contract ENVELOPE_INVALID, VERSION_UNSUPPORTED and MIGRATION_FAILED. Failed hydration blocks flush/clear until retry succeeds; writeError retains write failures. The handle owns subscriptions and admitted writes, while stores and runtimes remain borrowed.
 
 Public createStorePersistError / createStorePersistTypeError require code and message and accept optional options.cause. createStorePersistAbortError takes code, message, and optional cause, returning a native DOMException named AbortError. createStorePersistAggregateError takes code, errors, and message and retains original failures. code has type IStorePersistErrorCode; factories attach identity without overwriting stack. Ordinary Store integration need not reimplement these helpers.
 
 Existing package scripts include fmt, lint, typecheck, typecheck:test, test, build, and test:packed. Actual reports identify which ran; listing commands does not establish verification. Investigate missing fields through partialize / debounce, then hydrationError / writeError. If Map / Set shape is lost, check whether a custom codec replaced the default collection codec.
+
+## Canonical codec composition and observation
+
+```ts
+import { fromValueCodec } from '@migaia/storage-contract'
+import { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'
+import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStore } from '@migaia/store-light'
+import { persist } from '@migaia/store-persist/light'
+
+const codec = fromValueCodec(defineCollectionsJsonCodec({ version: 1 }))
+const text = await codec.encode({ roles: new Map([['Ada', new Set(['read'])]]) })
+console.log(await codec.decode(text))
+
+await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })
+const storage = host.backend('memory')
+const state = createStore({ count: 1 })
+await using handle = persist(state, {
+  key: 'counter',
+  storage,
+  codecStages: host.codecStages(storage)
+})
+await handle.ready
+await handle.flush()
+await handle.disposeAsync()
+await state.$dispose()
+```
+
+The default codec already preserves collections. Use `{ ...row }` to project a named class. codecStages observes each real encode/decode once; before/after/error failures only report, before never waits, and no business values enter observation. disposeAsync caches the rejecting main Promise; Symbol.asyncDispose caches a separate reporting Promise over one cleanup. Neither closes a borrowed store/runtime. Without native Symbol.asyncDispose, plugin-host asyncDisposeKey is the fixed fallback; language-level await using is not promised.
+
+## Commit a snapshot with other writes
+
+`persistTransaction(storage, [handle], run, options?)` pauses and drains these handles before borrowing one transaction from the original complete store. Handles must be active and attached to that exact storage. Empty arrays, copied handles and mismatched transaction views reject with `INVALID_OPTION`; text adapters reject with `BACKEND_CAPABILITY`. Concrete scope extensions, backend options and callback result types remain intact.
+
+```ts doc-test=check
+import { createStore } from '@migaia/store-light'
+import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { persistTransaction } from '@migaia/store-persist'
+import { persist } from '@migaia/store-persist/light'
+
+await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })
+const storage = host.backend('memory')
+const settings = createStore({ count: 0 })
+const handle = persist(settings, { key: 'settings', storage })
+await handle.ready
+try {
+  await persistTransaction(storage, [handle], async (tx) => {
+    settings.count = 1
+    await handle.flush(tx)
+    await tx.set('settings-source', 'user', { conflictPolicy: 'replace' })
+  })
+} finally {
+  await handle.disposeAsync()
+  await settings.$dispose()
+}
+```
+
+`flush(tx)` reads snapshot, applies partialize and starts the same codec at invocation. Repeated calls on one handle write their individual snapshots in order. It waits for this conversion and request; only successful completion of the outer `persistTransaction` means commit. An entity write through `repository.in(tx).put(value)` can share that transaction with the snapshot, text and bytes.
+
+During participation, notifications only record changes; no-argument `flush()`, `clear()` and `retryHydrate()` reject. Afterwards normal debounce mirrors newer memory. Rollback does not undo memory; ordinary mirroring resumes after failure too. Restore application state in catch if rollback of memory is needed. Disposal requests native abort without starting a final side write; disposeAsync waits for actual transaction completion. Handles borrow their store and Runtime.
+
+IndexedDB requests must start directly within a native active window. Read external data before beginning the transaction; do not await fetch, timers or a codec spanning tasks inside the callback. With the objects from the preceding example, keep the external read outside coordination:
+
+```ts
+async function saveExternal(loadSettings: () => Promise<{ count: number }>): Promise<void> {
+  const incoming = await loadSettings()
+  await persistTransaction(storage, [handle], async (tx) => {
+    settings.count = incoming.count
+    await handle.flush(tx)
+    await tx.set('settings-source', 'remote', { conflictPolicy: 'replace' })
+  })
+}
+```
+
+Optional `transactionStages: host.transactionStages(storage)` passes through all three adapters. Persistence emits only beforePersistFlush / afterPersistFlush; after means request completion. codecStages binds the actual operation view and observes each conversion once. Observer failures only report, never wait or alter business results. Exported `ITransactionScopeOf<typeof storage>` preserves the concrete backend scope type.
+
+`ctx.concurrency` overrides the original store default. Busy handles are tried once: fail rejects immediately, and only a wait decision enters the cancellable FIFO. Custom policy runs only after a real conflict. Handle admission and backend retries share this call's deadline and wait budget; entering the backend does not restart timeoutMs. Cancellation still waits for accepted work to actually finish before releasing resources. Backend option values, including symbol fields, retain identity; cancellation uses the same coordination signal.

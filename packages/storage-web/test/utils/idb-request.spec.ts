@@ -1,7 +1,7 @@
 import { IDBFactory } from 'fake-indexeddb'
 import { describe, expect, it } from 'vitest'
-import { fromIdbRequest, idbTransactionCommit } from '../../src/utils/idb-request'
-import { createStorageOperationRuntime } from '../../src/core/operation-reporter.js'
+import { fromIdbRequest, idbTransactionCommit } from '../../src/utils/idb-request.js'
+import { createStorageOperationRuntime } from '@migaia/storage-host/authoring/backend'
 import { captureOperationCleanup } from '../helpers/operation-reporter.js'
 
 const openDb = (): Promise<IDBDatabase> => {
@@ -143,7 +143,7 @@ describe('fromIdbRequest', () => {
       fromIdbRequest(successRequest, undefined, createStorageOperationRuntime())
     ).rejects.toMatchObject({
       code: 'TRANSACTION_FAILED',
-      backend: 'indexeddb',
+      backend: 'indexed-db',
       cause: resultCause
     })
 
@@ -161,7 +161,7 @@ describe('fromIdbRequest', () => {
       fromIdbRequest(errorRequest, undefined, createStorageOperationRuntime())
     ).rejects.toMatchObject({
       code: 'TRANSACTION_FAILED',
-      backend: 'indexeddb',
+      backend: 'indexed-db',
       cause: errorCause
     })
   })
@@ -181,7 +181,7 @@ describe('fromIdbRequest', () => {
         fromIdbRequest(request, undefined, createStorageOperationRuntime())
       ).rejects.toMatchObject({
         code: 'TRANSACTION_FAILED',
-        backend: 'indexeddb',
+        backend: 'indexed-db',
         cause
       })
     }
@@ -213,7 +213,7 @@ describe('idbTransactionCommit', () => {
     tx.abort()
     await expect(pending).rejects.toMatchObject({ code: 'TRANSACTION_FAILED' })
   })
-  it('已 abort 的 signal 立即拒绝', async () => {
+  it('已 abort 的 signal 在真实 rollback 后拒绝', async () => {
     const db = await openDb()
     const tx = db.transaction('kv', 'readwrite')
     const controller = new AbortController()
@@ -236,6 +236,72 @@ describe('idbTransactionCommit', () => {
     )
     controller.abort('mid-flight')
     await expect(pending).rejects.toMatchObject({ code: 'ABORTED' })
+  })
+  it('keeps cancellation pending until the original native abort event', async () => {
+    const db = await openDb()
+    const tx = db.transaction('kv', 'readwrite')
+    tx.objectStore('kv').put('uncommitted', 'key')
+    const controller = new AbortController()
+    const reason = new Error('native cancellation')
+    const pending = idbTransactionCommit(
+      tx,
+      { signal: controller.signal },
+      createStorageOperationRuntime()
+    )
+    let terminal = false
+    let settled = false
+    tx.addEventListener('abort', () => {
+      terminal = true
+    })
+    void pending.then(
+      () => {
+        settled = true
+      },
+      () => {
+        settled = true
+      }
+    )
+    controller.abort(reason)
+    await Promise.resolve()
+    expect(terminal).toBe(false)
+    expect(settled).toBe(false)
+    await expect(pending).rejects.toMatchObject({ code: 'ABORTED', cause: reason })
+    expect(terminal).toBe(true)
+    expect(
+      await fromIdbRequest(
+        db.transaction('kv').objectStore('kv').get('key'),
+        undefined,
+        createStorageOperationRuntime()
+      )
+    ).toBeUndefined()
+  })
+  it('retains the first request error but waits for actual completion when preventDefault permits commit', async () => {
+    const db = await openDb()
+    const seed = db.transaction('kv', 'readwrite')
+    seed.objectStore('kv').put('original', 'existing')
+    await idbTransactionCommit(seed, undefined, createStorageOperationRuntime())
+    const tx = db.transaction('kv', 'readwrite')
+    const failed = tx.objectStore('kv').add('duplicate', 'existing')
+    tx.objectStore('kv').put('committed', 'other')
+    tx.addEventListener('error', (event) => {
+      event.preventDefault()
+    })
+    const pending = idbTransactionCommit(tx, undefined, createStorageOperationRuntime())
+    let terminal = false
+    tx.addEventListener('complete', () => {
+      terminal = true
+    })
+    const failure = await pending.catch((error: unknown) => error)
+    expect(terminal).toBe(true)
+    expect(failure).toMatchObject({ code: 'TRANSACTION_FAILED', cause: failed.error })
+    expect((failure as Error).cause).toBeInstanceOf(DOMException)
+    expect(
+      await fromIdbRequest(
+        db.transaction('kv').objectStore('kv').get('other'),
+        undefined,
+        createStorageOperationRuntime()
+      )
+    ).toBe('committed')
   })
   it('context.signal 只读取一次且不会丢失 check-subscribe 窗口内的 abort', async () => {
     const db = await openDb()
@@ -327,13 +393,15 @@ describe('idbTransactionCommit', () => {
       set onerror(handler: (() => void) | null) {
         queueMicrotask(() => handler?.())
       },
-      set onabort(_handler: unknown) {}
+      set onabort(handler: (() => void) | null) {
+        queueMicrotask(() => handler?.())
+      }
     } as unknown as IDBTransaction
     await expect(
       idbTransactionCommit(transaction, undefined, createStorageOperationRuntime())
     ).rejects.toMatchObject({
       code: 'TRANSACTION_FAILED',
-      backend: 'indexeddb',
+      backend: 'indexed-db',
       cause
     })
   })
@@ -360,7 +428,7 @@ describe('idbTransactionCommit', () => {
         idbTransactionCommit(transaction, undefined, createStorageOperationRuntime())
       ).rejects.toMatchObject({
         code: 'TRANSACTION_FAILED',
-        backend: 'indexeddb',
+        backend: 'indexed-db',
         cause
       })
       expect(abortCalls).toBe(1)

@@ -2,6 +2,9 @@ import { defineConfig } from 'vite'
 import { fileURLToPath } from 'node:url'
 import { withDistFreshness } from '../../scripts/vitest-dist-freshness.mjs'
 
+/** Existing dependency owners stay external through their root and every public subpath. */
+const dependencies = ['@migaia/utils', '@migaia/serialize']
+
 /** Produces one runtime-neutral ESM entry; declarations are emitted by TypeScript. */
 export default defineConfig(
   withDistFreshness({
@@ -15,13 +18,8 @@ export default defineConfig(
       },
       sourcemap: true,
       rollupOptions: {
-        external: [
-          '@migaia/utils',
-          '@migaia/utils/bytes',
-          '@migaia/utils/function',
-          '@migaia/utils/promise',
-          '@migaia/utils/error'
-        ]
+        external: (id) =>
+          dependencies.some((dependency) => id === dependency || id.startsWith(`${dependency}/`))
       }
     }
   })

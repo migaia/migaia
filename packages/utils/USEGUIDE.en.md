@@ -2050,3 +2050,20 @@ The table lists every public name. See the module sections above for parameters,
 | `utf8ByteLength` | `@migaia/utils/bytes` | Counts UTF-8 bytes without allocating a buffer or iterator. |
 | `walkErrorCauses` | `@migaia/utils/error` | Walks `cause` and `AggregateError.errors` with identity deduplication and a depth limit. |
 | `withTimeout` | `@migaia/utils/promise` | Gives a lazy operation a deadline; at the deadline it aborts the operation's signal, then rejects with a timeout error. |
+
+## Optional values
+
+`IMaybe<T>` distinguishes `{ some: true, value: T }` from `{ some: false }`, including a present undefined. Root exports `isSome`/`isNone` for narrowing, `unwrapOr(m, fallback)` for a same-domain fallback, `mapMaybe(m, mapper)` for one synchronous mapping of a present value, and `toUndefined(m)` when collapsing absence is intentional. None is reused without calling the mapper; mapper results retain identity and are not awaited. Typed optional values receive no extra runtime validation.
+
+Mapper failures retain existing coded errors. An uncoded mutable native Error receives utils INVALID_ARGUMENT on the same instance, preserving native type and stack. An identity conflict wraps the original on cause; failed identity attachment aggregates the original first and the attachment failure second. Non-Error values follow existing toError/NON_ERROR_VALUE semantics.
+
+```ts
+import { isSome, isNone, unwrapOr, mapMaybe, toUndefined, type IMaybe } from '@migaia/utils'
+const present: IMaybe<number | undefined> = { some: true, value: undefined }
+const missing: IMaybe<number> = { some: false }
+const mapped = mapMaybe({ some: true, value: 3 }, (value) => value * 2)
+console.log(isSome(present), isNone(missing))
+console.log(unwrapOr(mapped, 0), toUndefined(missing))
+// true true
+// 6 undefined
+```

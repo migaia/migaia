@@ -210,7 +210,7 @@ describe('serialize portable convergence oracle', () => {
     expect(Object.isFrozen((outputs[1]!.second as Record<string, unknown>).child)).toBe(true)
   })
 
-  it('preserves sorted interleaved codec getters and mutable ordinary projection', () => {
+  it('preserves sorted public projection and property-order codec getters', () => {
     /** Codec projection recurses before reading the next sorted parent field. */
     const reads: string[] = []
     /** Repeated child references remain independent copies in the legacy codec path. */
@@ -242,7 +242,7 @@ describe('serialize portable convergence oracle', () => {
     expect(Object.isFrozen(output.a)).toBe(false)
     reads.length = 0
     expect(codecValue(input)).toEqual(output)
-    expect(reads).toEqual(['a', 'shared.value', 'z', 'shared.value'])
+    expect(reads).toEqual(['z', 'shared.value', 'a', 'shared.value'])
   })
 
   it('retains integer-key enumeration and ignores nonenumerable and symbol properties', () => {
@@ -252,10 +252,10 @@ describe('serialize portable convergence oracle', () => {
     Object.defineProperty(input, Symbol('ignored'), { value: undefined, enumerable: true })
     /** Caller strategy preserves insertion order after integer-key enumeration. */
     const snapshot = rpcPortableWalker(input).value as Record<string, unknown>
-    /** Existing format policy retains lexical sort and resulting integer enumeration. */
+    /** Format codecs retain integer enumeration followed by inserted string fields. */
     const codec = codecValue(input) as Record<string, unknown>
     expect(Object.keys(snapshot)).toEqual(['2', '10', 'z', 'a'])
-    expect(Object.keys(codec)).toEqual(['2', '10', 'a', 'z'])
+    expect(Object.keys(codec)).toEqual(['2', '10', 'z', 'a'])
     expect(Reflect.ownKeys(snapshot)).toHaveLength(4)
     expect(Reflect.ownKeys(codec)).toHaveLength(4)
   })
@@ -662,7 +662,7 @@ describe('serialize portable convergence oracle', () => {
     expect(reads).toEqual(['base64url', '$rpc'])
     reads.length = 0
     expect(codecValue(input)).toEqual({ $rpc: 'bytes', base64url: 'AA' })
-    expect(reads).toEqual(['$rpc', 'base64url'])
+    expect(reads).toEqual(['base64url', '$rpc'])
     reads.length = 0
     expect(assertPortableValue(input)).toBeUndefined()
     expect(reads).toEqual(['$rpc', 'base64url', 'base64url'])

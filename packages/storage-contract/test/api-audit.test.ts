@@ -29,6 +29,7 @@ const makeStore = (): contract.IRecordStore => ({
   async clearValues() {},
   async clearAll() {},
   async dispose() {},
+  async [Symbol.asyncDispose]() {},
   async getBytes() {
     return null
   },
@@ -43,16 +44,21 @@ const makeStore = (): contract.IRecordStore => ({
   },
   async deleteRecord() {},
   async clearRecords() {},
-  async *iterateRecords() {},
-  async transaction(run) {
-    return run({
-      async get() {
-        return undefined
-      },
-      async put(_value, key = 'generated') {
-        return key
-      },
-      async delete() {}
+  iterateRecords() {
+    /** This admission fixture has no cursor; explicit and symbolic cleanup share no external work. */
+    const cursor = (async function* () {})()
+    /** Both resource surfaces return native Promises around this fixture cursor. */
+    const dispose = async (): Promise<void> => {
+      await cursor.return()
+    }
+    return Object.assign(cursor, { dispose, [Symbol.asyncDispose]: dispose })
+  },
+  async transaction<TResult>(
+    _run: (scope: contract.ITransactionScope) => TResult
+  ): Promise<Awaited<TResult>> {
+    /** This shape-only admission fixture never executes a transaction or fabricates a scope. */
+    throw new contract.StorageContractError(contract.StorageContractErrorCode.unsupported, {
+      backend: 'memory'
     })
   }
 })
@@ -157,7 +163,7 @@ describe('storage-contract audit boundary regressions', () => {
           throw original
         }
       })
-      expect(() => contract[name](store)).toThrowError(
+      expect(() => Reflect.apply(contract[name], contract, [store])).toThrowError(
         expect.objectContaining({
           source: contract.STORAGE_CONTRACT_SOURCE,
           code: contract.StorageContractErrorCode.unsupported,
@@ -169,7 +175,8 @@ describe('storage-contract audit boundary regressions', () => {
 
   it.each([
     ['asSecondaryIndexRecordStore', 'ensureRecordIndexes'],
-    ['asChangeFeedStore', 'subscribeChanges']
+    ['asChangeFeedStore', 'subscribeChanges'],
+    ['asChangeFeedStore', 'watch']
   ] as const)('%s preserves its extension-method getter failure', (name, method) => {
     /** Extension inspection must retain failures after successful base admission. */
     const original = new Error('extension accessor failed')
@@ -180,7 +187,7 @@ describe('storage-contract audit boundary regressions', () => {
         throw original
       }
     })
-    expect(() => contract[name](store)).toThrowError(
+    expect(() => Reflect.apply(contract[name], contract, [store])).toThrowError(
       expect.objectContaining({
         code: contract.StorageContractErrorCode.unsupported,
         cause: original

@@ -1,13 +1,7 @@
-/**
- * Reference documentation of `@migaia/storage-web`. Rules: `app/reference/contract.ts`. Verified
- * against `packages/storage-web/src` (backends/_, entity/_, host/_, plugins/_, reactive-adapter.ts,
- * schema/_, serialize/_, error-code.ts), README and USEGUIDE follow-ups on 2026-10-18. Store
- * interfaces (`IKeyValueStore`, `IRecordStore`, ...) belong to `@migaia/storage-contract`.
- */
+/** Browser backend reference. Neutral host/entity contracts live in storage-host. */
 import { storageContractReference } from './storage-contract.js'
 import { storageWebCases } from './storage-web-cases.js'
 import type {
-  ICode,
   IEnhancerDoc,
   ILibraryReference,
   IMemberDoc,
@@ -17,1155 +11,379 @@ import type {
   ITypeDoc
 } from './contract.js'
 
-/** A custom Feature, its concrete memory backend, and the Host that owns their installation. */
-export const storageFeatureExample = `import { createStorageHost, defineFeature, definePlugin } from '@migaia/storage-web/host'
-import { memoryStorageHost } from '@migaia/storage-web/memory'
+/** Keep both reader locales beside the same public API contract. */
+const t = (en: string, zh: string): IText => ({ en, zh })
+/** Describe pure external-owner refinements without manufacturing a local runtime contract. */
+const alias = (en: string, zh: string): ITypeDoc => ({ summary: t(en, zh), members: {} })
 
-const metrics = defineFeature((core) => ({
-  backendId: () => core.featureExpose.getBackendId(),
-  count: async () => (await core.featureExpose.getStore().keys()).length
-}))
-const cachePlugin = definePlugin('cache', (core) => {
-  return {
-    install: async () => {
-      core.registerStore(memoryStorageHost())
-      await core.getStore().set('user:1', JSON.stringify({ name: 'Ada' }))
-      return {
-        count: () => core.features.metrics.count(),
-        backendId: () => core.features.metrics.backendId()
-      }
-    }
+/** A real targeted Feature attaches application methods to the original installed store. */
+export const storageFeatureExample = `import {
+  createStorageHost, defineFeature, memoryBackendKind, memoryBackendPlugin
+} from '@migaia/storage-host'
+import { kv } from '@migaia/storage-contract'
+
+const metrics = defineFeature(memoryBackendKind, ({ featureExpose }) => ({
+  capabilities: [],
+  chain: {},
+  api: {
+    store: {
+      async count() { return (await this.store.use(kv).keys()).length },
+      backendId: () => featureExpose.getBackendId()
+    },
+    transaction: {}
   }
-}, { metrics })
-
-const host = await createStorageHost()
+}))
+const host = await createStorageHost({
+  plugins: [memoryBackendPlugin({ id: 'cache' }, { metrics })]
+})
 try {
-  const cache = await host.use(cachePlugin)
-  console.assert(await cache.extensions.count() === 1)
-  console.assert(cache.extensions.backendId() === 'cache')
-  console.log(await cache.extensions.count(), cache.extensions.backendId())
+  const cache = host.backend('cache')
+  await cache.set('user:1', JSON.stringify({ name: 'Ada' }))
+  console.log(await cache.api.count(), cache.api.backendId())
 } finally {
   await host.dispose()
 }`
 
-/** Builds one bilingual text. */
-const t = (en: string, zh: string): IText => ({ en, zh })
-
-/** Short type doc for unions and helper types. */
-const alias = (en: string, zh: string): ITypeDoc => ({ summary: t(en, zh), members: {} })
-
-/** Fields of Web Storage options (`ILocalStorageOptions`, `ISessionStorageOptions`). */
-const webStorageFields = (global: string): Readonly<Record<string, IMemberDoc>> => ({
-  namespace: {
-    summary: t(
-      'Prefix that isolates this store; `keys()` and `clearValues()` only see this namespace.',
-      '隔离当前存储的前缀；`keys()` 与 `clearValues()` 只作用于该命名空间。'
-    ),
-    default: t('`default`.', '默认值为 `default`。')
-  },
-  namespaceCodec: {
-    summary: t(
-      'How namespace and key become one physical key; changing it changes the stored format.',
-      '命名空间与 key 组合为物理 key 的方式；更换它会改变持久化格式。'
-    ),
-    default: t(
-      '`lengthPrefixedNamespaceCodec` (`sw1:3:app:theme`).',
-      '默认使用 `lengthPrefixedNamespaceCodec`（形如 `sw1:3:app:theme`）。'
-    )
-  },
-  storage: {
-    summary: t(
-      'Storage object to use, for tests or non-browser hosts.',
-      '要使用的存储对象，用于测试或非浏览器环境。'
-    ),
-    default: t(`\`globalThis.${global}\`.`, `默认使用全局的 \`globalThis.${global}\`。`)
-  }
-})
-
-/** Fields of `ICookiesOptions`. */
-const cookieFields: Readonly<Record<string, IMemberDoc>> = {
-  namespace: webStorageFields('localStorage').namespace as IMemberDoc,
-  namespaceCodec: webStorageFields('localStorage').namespaceCodec as IMemberDoc,
-  scope: {
-    summary: t(
-      'Fixed cookie scope `{ path, domain, sameSite, secure, partitioned }` used for every write and delete; `sameSite: "none"` and `partitioned` require `secure: true`.',
-      '固定的 cookie 作用域 `{ path, domain, sameSite, secure, partitioned }`，所有写入与删除都使用它；`sameSite: "none"` 与 `partitioned` 要求 `secure: true`。'
-    ),
-    default: t('`{ path: "/" }`.', '默认值为 `{ path: "/" }`。')
-  },
-  document: {
-    summary: t('Object with a `cookie` string, for tests.', '带 `cookie` 字符串的对象，用于测试。'),
-    default: t(
-      '`globalThis.document`; missing throws `BACKEND_UNAVAILABLE`.',
-      '`globalThis.document`；不存在时抛 `BACKEND_UNAVAILABLE`。'
-    )
-  }
-}
-
-/** Fields of `IIndexedDbOptions`. */
-const indexedDbFields: Readonly<Record<string, IMemberDoc>> = {
-  dbName: {
-    summary: t('IndexedDB database name.', '要打开或创建的 IndexedDB 数据库名称。'),
-    default: t('`storage-web`.', '默认值为 `storage-web`。')
-  },
-  kvStoreName: {
-    summary: t('Object store for plain values.', '用于存放普通键值的 object store 名称。'),
-    default: t('`kv`.', '默认值为 `kv`。')
-  },
-  bytesStoreName: {
-    summary: t('Object store for byte values.', '存放二进制字节数据的 object store 名称。'),
-    default: t('`bytes`.', '默认值为 `bytes`。')
-  },
-  recordsStoreName: {
-    summary: t(
-      'Object store for records; the three names must differ and avoid reserved names.',
-      '存放记录的 object store 名称；三个名称必须互不相同，且不能使用保留名。'
-    ),
-    default: t('`records`.', '默认值为 `records`。')
-  },
-  cleanupLegacyRecords: {
-    summary: t(
-      'Delete the old `documents` store after it was fully migrated; enable only when no client needs to roll back.',
-      '在旧的 `documents` store 完整迁移后删除它；只在确认没有客户端需要回滚时开启。'
-    ),
-    default: t('`false`.', '`false`：保留旧数据。')
-  },
-  factory: {
-    example: `import { indexedDbHost } from '@migaia/storage-web/indexed-db'
-
-const store = indexedDbHost({
-  factory: storageEnvironment.indexedDB,
-  keyRange: storageEnvironment.IDBKeyRange
-})
-openEditorPreferences(store)
-onEditorClosed(() => store.dispose())`,
-    summary: t(
-      'IndexedDB factory for tests (e.g. `fake-indexeddb`).',
-      '测试环境使用的 IndexedDB 工厂（例如 `fake-indexeddb`）。'
-    ),
-    default: t(
-      '`globalThis.indexedDB`; missing throws `BACKEND_UNAVAILABLE`.',
-      '`globalThis.indexedDB`；不存在时抛 `BACKEND_UNAVAILABLE`。'
-    )
-  },
-  keyRange: {
-    example: `import { indexedDbHost } from '@migaia/storage-web/indexed-db'
-
-const store = indexedDbHost({
-  factory: storageEnvironment.indexedDB,
-  keyRange: storageEnvironment.IDBKeyRange
-})
-openEditorPreferences(store)
-onEditorClosed(() => store.dispose())`,
-    summary: t(
-      '`IDBKeyRange` constructor, passed together with `factory` in tests.',
-      '`IDBKeyRange` 构造函数，测试时与 `factory` 一起传入。'
-    ),
-    default: t('`globalThis.IDBKeyRange`.', '默认使用全局的 `globalThis.IDBKeyRange`。')
-  }
-}
-
-/**
- * Built-in backend plugins: [symbol, module, default id, store en, store zh, options type, reactive
- * mode].
- */
+/** Backend definitions provide installation recipes rather than independently owned stores. */
 const backends = [
   [
-    'memory',
-    'memory',
-    'memory',
-    'an in-memory record store',
-    '内存记录存储',
-    undefined,
-    'push / instance'
-  ],
-  [
-    'localStorage',
     'local-storage',
+    'localStorageBackendPlugin',
+    'localStorageBackendKind',
     'local',
-    'a namespaced `localStorage` store',
-    '带命名空间的 `localStorage` 存储',
     'ILocalStorageOptions',
-    'hybrid / document-eventual / 1000 ms'
+    'ILocalStorageBackendStore'
   ],
   [
-    'sessionStorage',
     'session-storage',
+    'sessionStorageBackendPlugin',
+    'sessionStorageBackendKind',
     'session',
-    'a namespaced `sessionStorage` store',
-    '带命名空间的 `sessionStorage` 存储',
     'ISessionStorageOptions',
-    'hybrid / top-level-context-eventual / 1000 ms'
+    'ISessionStorageBackendStore'
   ],
   [
-    'cookie',
     'cookies',
+    'cookieBackendPlugin',
+    'cookieBackendKind',
     'cookies',
-    'a `document.cookie` store',
-    '基于 `document.cookie` 的存储',
     'ICookiesOptions',
-    'hybrid / origin-js-visible-eventual'
+    'ICookieBackendStore'
   ],
   [
-    'indexedDb',
     'indexed-db',
+    'indexedDbBackendPlugin',
+    'indexedDbBackendKind',
     'indexed-db',
-    'an IndexedDB record store with indexes and transactions',
-    '支持索引与事务的 IndexedDB 记录存储',
     'IIndexedDbOptions',
-    'hybrid / origin-eventual / 1000 ms'
+    'IIndexedDbBackendStore'
   ]
 ] as const
 
-/** Example of a host with one backend plugin. */
-const hostExample = (
-  factory: string,
-  module: string,
-  id: string
-) => `import { createStorageHost } from '@migaia/storage-web/host'
-import { ${factory} } from '@migaia/storage-web/${module}'
+/** Each example installs the actual native backend and closes its original owning host. */
+const hostExample = (module: string, plugin: string, id: string, options = ''): string =>
+  `import { createStorageHost } from '@migaia/storage-host'
+import { ${plugin} } from '@migaia/storage-web/${module}'
 
-const host = await createStorageHost({ plugins: [${factory}({ id: '${id}' })] as const })
-const store = host.backend('${id}')
-await store.set('theme', 'dark')
-await host.dispose()`
-
-/** Backend examples keep storage layout, cleanup and host identity in separate situations. */
-const backendOptionCases = (
-  kind: string,
-  factory: string,
-  module: string,
-  plugin = false
-): readonly IOptionCaseDoc[] => {
-  /** Selects only the backend entry and optional Host owner used in this example. */
-  const imports = `import { ${factory} } from '@migaia/storage-web/${module}'
-${plugin ? "import { createStorageHost } from '@migaia/storage-web/host'\n" : ''}`
-  /** Shows the backend layout without mixing it with migration or codec choices. */
-  const options =
-    kind === 'memory'
-      ? "  id: 'preferences'"
-      : kind === 'indexed-db'
-        ? "  dbName: 'editor-preferences',\n  kvStoreName: 'preferences',\n  bytesStoreName: 'attachments',\n  recordsStoreName: 'entities'"
-        : kind === 'cookies'
-          ? "  namespace: 'editor',\n  scope: { path: '/editor' },\n  document"
-          : `  namespace: 'editor',\n  storage: window.${kind === 'local-storage' ? 'localStorage' : 'sessionStorage'}`
-  /** Coverage follows the actual option contract for this backend. */
-  const fields =
-    kind === 'memory'
-      ? []
-      : kind === 'indexed-db'
-        ? ['dbName', 'kvStoreName', 'bytesStoreName', 'recordsStoreName']
-        : kind === 'cookies'
-          ? ['namespace', 'scope', 'document']
-          : ['namespace', 'storage']
-  /** Keeps direct-store and plugin ownership explicit in the same reader story. */
-  const open = (configuration: string) =>
-    plugin
-      ? `const host = await createStorageHost({ plugins: [${factory}({
-${configuration}${kind === 'memory' ? '' : ",\n  id: 'preferences'"}
-})] as const })
-const store = host.backend('preferences')`
-      : `const store = ${factory}({
-${configuration}
-})`
-  /** The editor releases whichever owner constructed this store. */
-  const close = `onEditorClosed(() => ${plugin ? 'host' : 'store'}.dispose())`
-  return [
-    {
-      title: t('Save preferences for this editor', '保存当前编辑器的偏好'),
-      problem: t(
-        kind === 'indexed-db'
-          ? 'The editor shares an origin with other tools. Its database and object-store names keep preferences, attachments and entity records in the intended layout.'
-          : kind === 'memory'
-            ? 'The editor needs a temporary preferences backend with an application name. Register that name once and use it when selecting the store.'
-            : 'The editor shares browser storage with other tools. Give its preferences a namespace and use the browser storage belonging to this view; cookies also need the editor path for consistent writes and deletion.',
-        kind === 'indexed-db'
-          ? '编辑器与其他工具共用来源。独立数据库及对象存储名，让偏好、附件和实体记录进入预期布局。'
-          : kind === 'memory'
-            ? '编辑器需要一个具有应用名称的临时偏好后端。登记该名称，并用它选择存储。'
-            : '编辑器与其他工具共用浏览器存储。用命名空间区分偏好，并使用当前视图的浏览器存储；cookie 还需固定编辑器路径，以便一致写入与删除。'
-      ),
-      example: `${imports}
-${open(options)}
-await store.set('theme', selectedTheme)
-applyEditorTheme(await store.get('theme'))
-${close}`,
-      result: t(
-        kind === 'memory'
-          ? 'The editor applies its saved theme for this session and releases the temporary store when closed.'
-          : 'The editor applies its own saved theme; closing the view releases the instance without erasing persistent preferences.',
-        kind === 'memory'
-          ? '编辑器在本次会话应用保存的主题，关闭时释放临时存储。'
-          : '编辑器应用自己的已保存主题，关闭视图释放实例，不清除持久化偏好。'
-      ),
-      covers: [...fields, ...(plugin ? ['id'] : [])]
-    },
-    kind === 'memory'
-      ? {
-          title: t('Keep two temporary workspaces separate', '隔离两个临时工作区'),
-          problem: t(
-            'Two workspace panels each save a theme. Separate plugin ids give each panel its own volatile backend, so one panel does not overwrite the other.',
-            '两个工作区面板都保存主题。不同插件标识让它们各有临时后端，一个面板不会覆盖另一个。'
-          ),
-          example: `${imports}
-const host = await createStorageHost({ plugins: [
-  ${factory}({ id: 'left' }),
-  ${factory}({ id: 'right' })
-] as const })
-await host.backend('left').set('theme', 'dark')
-await host.backend('right').set('theme', 'light')
-renderWorkspaceThemes(
-  await host.backend('left').get('theme'),
-  await host.backend('right').get('theme')
-)
-onEditorClosed(() => host.dispose())`,
-          result: t(
-            'The two panels display different themes for the same logical setting.',
-            '两个面板对同一个逻辑设置显示不同主题。'
-          ),
-          covers: ['id']
-        }
-      : kind === 'indexed-db'
-        ? {
-            title: t('Retire migrated legacy records', '清理已迁移的旧记录'),
-            problem: t(
-              'The deployment no longer needs rollback to the old documents layout. Enable cleanup only at that point; the backend removes the legacy store after a complete migration.',
-              '部署已不再需要回滚到旧 documents 布局。此时才开启清理，后端在完整迁移后删除旧存储。'
-            ),
-            example: `${imports}
-${open("  dbName: 'editor-preferences',\n  cleanupLegacyRecords: true")}
-renderSavedUser(await store.getRecord(['users', selectedUserId]))
-${close}`,
-            result: t(
-              'The editor displays the migrated user record without retaining the obsolete records store.',
-              '编辑器显示迁移后的用户记录，不再保留过时记录存储。'
-            ),
-            covers: ['dbName', 'cleanupLegacyRecords', ...(plugin ? ['id'] : [])]
-          }
-        : {
-            title: t('Keep the deployed physical key format', '保持已部署的物理键格式'),
-            problem: t(
-              'Another view already uses length-prefixed keys for editor preferences. Select the same namespace codec so this view reads that saved theme instead of creating a parallel key format.',
-              '另一个视图已经用长度前缀键保存编辑器偏好。选择相同命名空间编码器，让当前视图读取已有主题，不产生另一套物理键格式。'
-            ),
-            example: `${imports}import { lengthPrefixedNamespaceCodec } from '@migaia/storage-web'
-
-${open("  namespace: 'editor',\n  namespaceCodec: lengthPrefixedNamespaceCodec")}
-applyEditorTheme(await store.get('theme'))
-${close}`,
-            result: t(
-              'Both views address the same saved editor setting.',
-              '两个视图读取同一份已保存编辑器设置。'
-            ),
-            covers: ['namespace', 'namespaceCodec', ...(plugin ? ['id'] : [])]
-          }
-  ]
-}
-
-/** Host examples show application startup separately from late-failure reporting. */
-const hostOptionCases = (classForm: boolean): readonly IOptionCaseDoc[] => [
-  {
-    title: t('Bound storage startup for the editor', '限制编辑器的存储启动时间'),
-    problem: t(
-      'The editor cannot wait indefinitely for storage installation before showing its startup outcome. Use its application clock and a one-second installation budget; later reads have their own lifetime.',
-      '编辑器不能无限等待存储安装才显示启动结果。使用应用时钟与一秒安装预算，之后的读取仍有自己的生命周期。'
-    ),
-    example: `import { ${classForm ? 'StorageHostFacade' : 'createStorageHost'} } from '@migaia/storage-web/host'
-import { memoryBackendPlugin } from '@migaia/storage-web/plugins/memory'
-
-const host = ${classForm ? 'new StorageHostFacade' : 'await createStorageHost'}({
-${classForm ? '' : "  plugins: [memoryBackendPlugin({ id: 'preferences' })] as const,\n"}  installTimeoutMs: 1000,
-  scheduler: storageScheduler
-})
-${classForm ? "const installed = await host.use(memoryBackendPlugin({ id: 'preferences' }))\n" : ''}openEditorPreferences(${classForm ? 'installed' : 'host'}.backend('preferences'))
-onEditorClosed(() => host.dispose())`,
-    result: t(
-      'Successful installation opens editor preferences within the startup budget.',
-      '安装成功后在启动预算内打开编辑器偏好。'
-    ),
-    covers: [...(classForm ? [] : ['plugins']), 'installTimeoutMs', 'scheduler']
-  },
-  {
-    title: t('Keep late startup failures visible', '保留迟到的启动失败'),
-    problem: t(
-      'A remote preferences plugin may reject after its installation has already timed out. Give that later failure a monitoring destination while the editor handles the original startup failure.',
-      '远程偏好插件可能在安装超时后才拒绝。编辑器处理原始启动失败时，仍需把之后的失败交给监控。'
-    ),
-    example: `import { ${classForm ? 'StorageHostFacade' : 'createStorageHost'} } from '@migaia/storage-web/host'
-
-const host = ${classForm ? 'new StorageHostFacade' : 'await createStorageHost'}({
-  ...storageStartupOptions,
-  report: (error) => reportToMonitoring(error)
-})
+const host = await createStorageHost({ plugins: [${plugin}({${options}})] })
 try {
-  const installed = await host.use(remotePreferencesPlugin)
-  openEditorPreferences(installed.backend('preferences'))
-} catch (error) {
-  showPreferencesUnavailable(error)
-}
-onEditorClosed(() => host.dispose())`,
-    result: t(
-      'The editor shows unavailable preferences after startup fails, and monitoring receives a later initializer failure.',
-      '启动失败后编辑器显示偏好不可用，之后的初始化失败仍送达监控。'
+  const store = host.backend('${id}')
+  await store.set('theme', 'dark')
+  console.log(await store.get('theme'))
+} finally {
+  await host.dispose()
+}`
+
+/** Live queries add no host facade and retain the caller's Runtime ownership. */
+const liveExample = `import { createRuntime } from '@migaia/reactive'
+import { records } from '@migaia/storage-contract'
+import { createStorageHost } from '@migaia/storage-host'
+import { indexedDbBackendPlugin, indexedDbBackendKind } from '@migaia/storage-web/indexed-db'
+import { reactiveFeature } from '@migaia/storage-web/features/reactive'
+
+const runtime = createRuntime()
+const host = await createStorageHost({ plugins: [indexedDbBackendPlugin(
+  { dbName: 'users' }, { reactive: reactiveFeature(indexedDbBackendKind) }
+)] })
+try {
+  const query = host.backend('indexed-db').use(records).query().live({ runtime })
+  try {
+    await query.ready
+    console.log(query.state.value)
+  } finally {
+    await query.dispose()
+  }
+} finally {
+  await host.dispose()
+}`
+
+/** Explain browser-specific options, leaving native host/context contracts with their owners. */
+const webStorageFields = (storage: string): Readonly<Record<string, IMemberDoc>> => ({
+  namespace: {
+    summary: t('Logical namespace owned by this backend.', '该后端拥有的逻辑命名空间。'),
+    default: t('`default`.', '默认 `default`。')
+  },
+  namespaceCodec: {
+    summary: t(
+      'Encodes and decodes physical keys without touching foreign namespaces.',
+      '编码与解码物理键，跳过其他命名空间。'
     ),
-    covers: ['report']
+    default: t('`lengthPrefixedNamespaceCodec`.', '默认 `lengthPrefixedNamespaceCodec`。'),
+    whenToUse: t(
+      'Keep the default unless migrating an existing key layout.',
+      '默认布局满足需求时保持不变，仅迁移既有键布局时替换。'
+    ),
+    example: `import { lengthPrefixedNamespaceCodec } from '@migaia/storage-web'
+${hostExample(
+  storage === 'localStorage' ? 'local-storage' : 'session-storage',
+  storage === 'localStorage' ? 'localStorageBackendPlugin' : 'sessionStorageBackendPlugin',
+  storage === 'localStorage' ? 'local' : 'session',
+  ' namespaceCodec: lengthPrefixedNamespaceCodec '
+)}`
+  },
+  storage: {
+    summary: t(
+      'Borrow the native Storage port; disposal does not erase its data.',
+      '借用原生存储端口，释放不清空其数据。'
+    ),
+    default: t(`\`globalThis.${storage}\`.`, `默认 \`globalThis.${storage}\`。`)
+  }
+})
+
+/** Small option cases keep native layout separate from installation identity. */
+const optionCases = (module: string, plugin: string, id: string): readonly IOptionCaseDoc[] => [
+  {
+    title: t('Choose the native data layout', '选择原生数据布局'),
+    problem: t(
+      'Keep this application separate from other browser data.',
+      '让当前应用与其他浏览器数据隔离。'
+    ),
+    covers:
+      module === 'indexed-db'
+        ? ['dbName', 'kvStoreName', 'bytesStoreName', 'recordsStoreName']
+        : module === 'cookies'
+          ? ['namespace', 'scope', 'document']
+          : ['namespace', 'storage'],
+    example: hostExample(
+      module,
+      plugin,
+      id,
+      module === 'indexed-db'
+        ? " dbName: 'editor', kvStoreName: 'values', bytesStoreName: 'files', recordsStoreName: 'rows' "
+        : module === 'cookies'
+          ? " namespace: 'editor', scope: { path: '/' }, document "
+          : ` namespace: 'editor', storage: window.${module === 'local-storage' ? 'localStorage' : 'sessionStorage'} `
+    ),
+    result: t(
+      'Reads and writes use the selected native layout until the host closes.',
+      '宿主关闭前，读写始终使用所选原生布局。'
+    )
   }
 ]
 
-/** Entity examples separate normalization, lookup and stored-version migration. */
-const entityOptionCases: readonly IOptionCaseDoc[] = [
-  {
-    title: t('Save normalized directory names', '保存归一化的通讯录姓名'),
-    problem: t(
-      'Names copied from a form may contain surrounding whitespace. Normalize before encoding and keep read validation enabled so the directory displays clean saved names.',
-      '表单复制的姓名可能带首尾空格。编码前先归一化，并保持读取校验，让通讯录显示整洁的已保存姓名。'
-    ),
-    example: `import { defineEntity } from '@migaia/storage-web/entity'
-import { passthrough } from '@migaia/storage-web/schema'
-import { structuredCodec } from '@migaia/storage-web/serialize'
-
-type IUser = { id: string; name: string }
-const users = defineEntity<IUser>()({
-  name: 'users',
-  key: 'id',
-  schema: {
-    ...passthrough<IUser>(),
-    normalize: async (value) => ({ ...value, name: value.name.trim() })
+/** Native IndexedDB options remain exact inputs to its one preparation path. */
+const indexedDbFields: Readonly<Record<string, IMemberDoc>> = {
+  dbName: {
+    summary: t('Database name used by this installation.', '本次安装使用的数据库名称。'),
+    default: t('`storage-web`.', '默认 `storage-web`。')
   },
-  codec: structuredCodec,
-  validateOnRead: true
-}).connect(directoryStore)
-await users.put(submittedUser)
-renderDirectory(await users.list())`,
-    result: t(
-      'The directory shows names without the form whitespace.',
-      '通讯录显示去掉表单首尾空格的姓名。'
-    ),
-    covers: ['name', 'key', 'schema', 'codec', 'validateOnRead']
+  kvStoreName: {
+    summary: t('Native text object store name.', '原生文本对象存储名称。'),
+    default: t('`kv`.', '默认 `kv`。')
   },
-  {
-    title: t('Find and order directory users by name', '按姓名查找与排序通讯录用户'),
-    problem: t(
-      'The directory needs alphabetical lists and a name lookup. Declare that lookup once; on a backend without native indexes, send fallback explanations to the support panel.',
-      '通讯录需要按姓名排序并查找用户。集中声明查询索引；后端不具备原生索引时，把回退说明交给支持面板。'
-    ),
-    example: `import { defineEntity } from '@migaia/storage-web/entity'
-
-type IUser = { id: string; name: string }
-const users = defineEntity<IUser>()({
-  name: 'users',
-  key: 'id',
-  defaultOrderBy: (left, right) => left.name.localeCompare(right.name),
-  indexes: { byName: { path: 'name' } },
-  onDiagnostic: (message) => showStorageDiagnostic(message)
-}).connect(directoryStore)
-renderDirectory(await users.list())
-showSelectedUser(await users.findBy('byName', selectedName))`,
-    result: t(
-      'The directory is ordered by name, and the selected name opens its matching user.',
-      '通讯录按姓名排序，选中的姓名打开对应用户。'
-    ),
-    covers: ['name', 'key', 'defaultOrderBy', 'indexes', 'onDiagnostic']
+  bytesStoreName: {
+    summary: t('Native byte object store name.', '原生字节对象存储名称。'),
+    default: t('`bytes`.', '默认 `bytes`。')
   },
-  {
-    title: t('Read users saved by the previous release', '读取上一版本保存的用户'),
-    problem: t(
-      'Older directory records use fullName, while the current view reads name. A version-two migration transforms the old stored representation before current decoding.',
-      '旧通讯录记录使用 fullName，当前视图读取 name。第二版迁移在当前解码前转换旧的存储表示。'
+  recordsStoreName: {
+    summary: t('Native authoritative record object store name.', '原生权威记录对象存储名称。'),
+    default: t('`records`.', '默认 `records`。')
+  },
+  cleanupLegacyRecords: {
+    summary: t(
+      'Delete the old documents store only after migration completes.',
+      '仅在迁移完成后删除旧文档存储。'
     ),
-    example: `import { defineEntity } from '@migaia/storage-web/entity'
-
-type IUser = { id: string; name: string }
-const users = defineEntity<IUser>()({
-  name: 'users',
-  key: 'id',
-  version: 2,
-  migrations: {
-    2: async (previous) => {
-      const old = previous as { id: string; fullName: string }
-      return { id: old.id, name: old.fullName }
-    }
+    default: t('`false`.', '默认 `false`。'),
+    example: hostExample(
+      'indexed-db',
+      'indexedDbBackendPlugin',
+      'indexed-db',
+      ' cleanupLegacyRecords: true '
+    )
+  },
+  factory: {
+    summary: t(
+      'Borrow an IndexedDB factory and retain its matching keyRange constructor.',
+      '借用索引数据库工厂，并提供对应的 `keyRange` 构造器。'
+    ),
+    default: t('`globalThis.indexedDB`.', '默认 `globalThis.indexedDB`。'),
+    example: hostExample(
+      'indexed-db',
+      'indexedDbBackendPlugin',
+      'indexed-db',
+      ' factory: window.indexedDB, keyRange: window.IDBKeyRange '
+    )
+  },
+  keyRange: {
+    summary: t(
+      'Native IDBKeyRange implementation belonging to the supplied factory.',
+      '与所提供工厂对应的原生键范围实现。'
+    ),
+    default: t('`globalThis.IDBKeyRange`.', '默认 `globalThis.IDBKeyRange`。'),
+    example: hostExample(
+      'indexed-db',
+      'indexedDbBackendPlugin',
+      'indexed-db',
+      ' factory: window.indexedDB, keyRange: window.IDBKeyRange '
+    )
+  },
+  owner: {
+    summary: t(
+      'Optional human-readable label in lock diagnostics; never an identity.',
+      '锁诊断中可选的可读标签，不作为身份。'
+    ),
+    default: t('The browser label.', '默认浏览器标签。'),
+    example: hostExample(
+      'indexed-db',
+      'indexedDbBackendPlugin',
+      'indexed-db',
+      " owner: { label: 'editor-tab' } "
+    )
   }
-}).connect(directoryStore)
-renderDirectory(await users.list())`,
-    result: t(
-      'The current directory displays users from the older saved layout.',
-      '当前通讯录显示旧布局保存的用户。'
-    ),
-    covers: ['name', 'key', 'version', 'migrations']
-  }
-]
-
-/** Live query example. */
-const liveQueryExample: ICode = {
-  en: `import { createRuntime } from '@migaia/reactive'
-import { createStorageHost } from '@migaia/storage-web/host'
-import { indexedDbReactive } from '@migaia/storage-web/plugins/reactive/indexed-db'
-
-const runtime = createRuntime()
-const host = await createStorageHost({ plugins: [indexedDbReactive({ id: 'app', dbName: 'app-data' })] as const })
-const query = host.liveQuery({
-  backendId: 'app',
-  runtime,
-  scope: 'users',
-  query: ({ store, signal }) => store.getRecord(['users', 'ada'], { signal }),
-  timeoutMs: 5_000
-})
-await query.ready
-runtime.effect(() => console.log(query.state.value.status)) // re-runs on every change
-await query.dispose()
-await host.dispose()`,
-  zh: `import { createRuntime } from '@migaia/reactive'
-import { createStorageHost } from '@migaia/storage-web/host'
-import { indexedDbReactive } from '@migaia/storage-web/plugins/reactive/indexed-db'
-
-const runtime = createRuntime()
-const host = await createStorageHost({ plugins: [indexedDbReactive({ id: 'app', dbName: 'app-data' })] as const })
-const query = host.liveQuery({
-  backendId: 'app',
-  runtime,
-  scope: 'users',
-  query: ({ store, signal }) => store.getRecord(['users', 'ada'], { signal }),
-  timeoutMs: 5_000
-})
-await query.ready
-runtime.effect(() => console.log(query.state.value.status)) // 每次数据变化都会重新执行
-await query.dispose()
-await host.dispose()`
 }
 
-/** Plugin symbols and enhancer docs for every built-in backend, plain and reactive. */
-const pluginSymbols: Record<string, ISymbolDoc> = {}
-const pluginEnhancers: Record<string, IEnhancerDoc> = {}
-for (const [prefix, module, id, en, zh, optionsType, reactive] of backends) {
-  /** Factory names of the plain and reactive variants. */
-  const plain = `${prefix}BackendPlugin`
-  const live = `${prefix === 'cookie' ? 'cookies' : prefix}Reactive`
-  for (const [name, isReactive, path] of [
-    [plain, false, `plugins/${module}`],
-    [live, true, `plugins/reactive/${module}`]
-  ] as const) {
-    pluginSymbols[name] = {
-      role: 'enhancer',
-      optionCases: backendOptionCases(module, name, path, true),
-      optionDocs: {
-        id: {
-          summary: t(
-            'Caller-selected backend registration id; use this exact value with `host.backend()` and live-query `backendId`.',
-            '调用方选择的后端登记标识；在 `host.backend()` 与实时查询的 `backendId` 中使用同一值。'
+/** A fixed Cookie scope is reused for writes and removals. */
+const cookieFields: Readonly<Record<string, IMemberDoc>> = {
+  namespace: webStorageFields('localStorage').namespace!,
+  namespaceCodec: webStorageFields('localStorage').namespaceCodec!,
+  document: {
+    summary: t('Borrow the JS-visible document.cookie port.', '借用脚本可见的 Cookie 文档端口。'),
+    default: t('`globalThis.document`.', '默认 `globalThis.document`。')
+  },
+  scope: {
+    summary: t(
+      'Fixed path/domain/SameSite/Secure/Partitioned attributes; secure is required for none or partitioned.',
+      '固定的路径、域名、同站点、安全与分区属性；不限制同站点或启用分区时必须安全传输。'
+    ),
+    default: t("`{ path: '/' }`.", "默认 `{ path: '/' }`。")
+  }
+}
+
+/** Browser plugin symbols and kind identities share the same real installation examples. */
+const backendSymbols: Readonly<Record<string, ISymbolDoc>> = Object.fromEntries(
+  backends.flatMap(([module, plugin, kind, id, options]) => [
+    [
+      plugin,
+      {
+        role: 'enhancer',
+        options,
+        purpose: t(
+          `Install the native ${module} backend into storage-host. Preparation finishes before publication; the host owns cleanup.`,
+          `把原生浏览器后端安装到 \`@migaia/storage-host\`，准备完成后才发布，由宿主拥有清理责任。`
+        ),
+        params: {
+          options: t(
+            'Native backend options and optional host registration id.',
+            '原生后端选项及可选宿主注册标识。'
           ),
-          default: t(`Omitted: register under \`${id}\`.`, `省略时以 \`${id}\` 登记后端。`)
-        }
-      },
-      purpose: isReactive
-        ? t(
-            `Plugin that installs ${en} under an id and also its reactive adapter (${reactive}), so the host gains \`liveQuery\` for that id.`,
-            `安装${zh}并同时安装其响应式适配器（${reactive}）的插件，使宿主为该 id 获得 \`liveQuery\`。`
+          features: t(
+            'Optional Feature record as the second argument; each installation gets its own output.',
+            '第二参数为可选特性记录，每次安装拥有独立输出。'
           )
-        : t(
-            `Plugin that installs ${en} into a storage host under an id (default \`${id}\`); no reactive capability.`,
-            `把${zh}以指定 id（默认 \`${id}\`）安装进存储宿主的插件；不带响应式能力。`
-          ),
-      ...(optionsType
-        ? { options: optionsType }
-        : {
-            params: {
-              options: t(
-                '`{ id? }`: the backend id, default the plugin name.',
-                '`{ id? }`：要使用的后端 id，默认为该插件的名称。'
-              )
-            }
-          }),
-      returns: t(
-        'A plugin handle for `createStorageHost({ plugins })` or `host.use()`.',
-        '可交给 `createStorageHost({ plugins })` 或 `host.use()` 的插件句柄。'
-      ),
-      example: hostExample(name, path, id)
-    }
-    pluginEnhancers[name] = {
+        },
+        returns: t(
+          'A typed plugin definition; calling it opens no native resource.',
+          '返回类型化插件定义，调用本身不打开原生资源。'
+        ),
+        example: hostExample(module, plugin, id),
+        cases: storageWebCases[plugin]
+      } satisfies ISymbolDoc
+    ],
+    [
+      kind,
+      {
+        role: 'constant',
+        purpose: t(
+          `Opaque identity for targeting Features at ${plugin}; labels do not authorize a backend.`,
+          `为 \`${plugin}\` 选择特性目标的不透明身份，文本标签不授予后端权限。`
+        ),
+        example: `import { ${kind} } from '@migaia/storage-web/${module}'
+import { reactiveFeature } from '@migaia/storage-web/features/reactive'
+const reactive = reactiveFeature(${kind})`
+      } satisfies ISymbolDoc
+    ]
+  ])
+)
+
+/** Installation grants the precise backend at its declared host registration id. */
+const backendEnhancers: Readonly<Record<string, IEnhancerDoc>> = Object.fromEntries(
+  backends.map(([module, plugin, , id]) => [
+    plugin,
+    {
       kind: 'plugin',
       target: 'IStorageHost',
-      summary: isReactive
-        ? t(
-            `After installation \`host.backend("${id}")\` returns the store, \`host.reactiveBackend("${id}")\` returns its reactive handle, and \`host.liveQuery({ backendId: "${id}", ... })\` keeps a query fresh when the store changes.`,
-            `安装后 \`host.backend("${id}")\` 返回该存储，\`host.reactiveBackend("${id}")\` 返回其响应式句柄，\`host.liveQuery({ backendId: "${id}", ... })\` 会在存储变化时保持查询结果最新。`
-          )
-        : t(
-            `After installation \`host.backend("${id}")\` returns the store with exact types, and \`host.hasBackend("${id}")\` is true.`,
-            `安装后 \`host.backend("${id}")\` 返回带精确类型的存储对象，\`host.hasBackend("${id}")\` 返回 true，宿主释放时一并释放该存储。`
-          ),
-      install: hostExample(name, path, id),
+      summary: t(
+        'Adds the selected native store under its exact id; no default backend is implied.',
+        '按精确标识增加选定原生存储，不隐含缺省后端。'
+      ),
+      install: hostExample(module, plugin, id),
+      example: hostExample(module, plugin, id),
+      scenarios: [
+        t(
+          'Use one browser persistence mechanism with host-owned cleanup.',
+          '使用一种浏览器持久化机制，并由宿主拥有清理。'
+        )
+      ],
       grants: [
         {
           signature: `host.backend('${id}')`,
-          summary: t(
-            'Returns the installed store with its exact type.',
-            '返回已安装的存储，并带有其精确类型。'
-          ),
-          params: {
-            id: t(
-              `The id given to the plugin, \`${id}\` by default.`,
-              `插件给出的 id，默认为 \`${id}\`。`
-            )
-          },
+          summary: t('Return the actual installed native backend.', '返回实际已安装原生后端。'),
+          params: { id: t('The id supplied to this backend plugin.', '传给该后端插件的标识。') },
           returns: t(
-            'The store; unknown ids throw `BACKEND_NOT_INSTALLED`.',
-            '存储对象；id 未安装时抛 `BACKEND_NOT_INSTALLED`。'
+            'The precise store, sealed after its owner closes.',
+            '精确存储，所有者关闭后封闭准入。'
           ),
-          example: `await host.backend('${id}').set('k', 'v')`
-        },
-        ...(isReactive
-          ? [
-              {
-                signature: 'host.liveQuery(options)',
-                summary: t(
-                  'Creates a live query on this backend; see `ILiveQueryOptions`.',
-                  '在该后端上创建实时查询，见 `ILiveQueryOptions`。'
-                ),
-                params: {
-                  options: t(
-                    `\`{ backendId: "${id}", runtime, query, ... }\`.`,
-                    `实时查询选项 \`{ backendId: "${id}", runtime, query, ... }\`。`
-                  )
-                },
-                returns: t('An `ILiveQuery`.', '一个实时查询对象 `ILiveQuery`。'),
-                example: `const query = host.liveQuery({ backendId: '${id}', runtime, query: ({ store }) => store.get('theme') })`
-              }
-            ]
-          : [])
-      ],
-      behaviors: [
-        t(
-          'Disposing the host disposes the store and, for reactive plugins, its adapter.',
-          '释放宿主时会一并释放该存储；响应式插件还会释放其适配器。'
-        )
-      ],
-      scenarios: [
-        isReactive
-          ? t(
-              'Update the UI automatically when stored data changes.',
-              '在存储数据变化时自动更新界面。'
-            )
-          : t(
-              'Select one storage backend by id in application code.',
-              '在应用代码中按 id 选择某个存储后端。'
-            )
-      ],
-      example: hostExample(name, path, id)
-    }
-  }
-}
+          example: hostExample(module, plugin, id)
+        }
+      ]
+    } satisfies IEnhancerDoc
+  ])
+)
 
-/** Members of `IStorageHostBase` / `IStorageHost` / `StorageHostFacade`. */
-const hostMembers: Readonly<Record<string, IMemberDoc>> = {
-  extensions: {
-    summary: t(
-      'APIs added by installed plugins (custom `definePlugin` installs).',
-      '已安装插件新增的 API（来自自定义的 `definePlugin`）。'
-    )
-  },
-  use: {
-    summary: t(
-      'Installs more plugins after creation; the whole batch is published atomically or rolled back. A second `use()` during installation throws `STORAGE_HOST_BUSY`.',
-      '在创建之后安装更多插件；整批要么原子发布，要么回滚。安装进行中再次调用 `use()` 抛 `STORAGE_HOST_BUSY`。'
-    ),
-    params: { plugins: t('Plugin handles with new, unique ids.', '带有新且唯一 id 的插件句柄。') },
-    returns: t('The same host, typed with the new backends.', '同一个宿主，类型中加入了新的后端。'),
-    example: `const next = await host.use(indexedDbBackendPlugin({ id: 'primary' }))`
-  },
-  backend: {
-    summary: t('Returns the store installed under an id.', '返回以某个 id 安装的存储对象。'),
-    params: {
-      id: t(
-        'Id given to the plugin (`memoryBackendPlugin({ id })`).',
-        '插件给出的 id（如 `memoryBackendPlugin({ id })`）。'
-      )
-    },
-    returns: t(
-      'The store; unknown ids throw `BACKEND_NOT_INSTALLED`.',
-      '存储对象；id 未安装时抛 `BACKEND_NOT_INSTALLED`。'
-    ),
-    example: `const cache = host.backend('cache')`
-  },
-  hasBackend: {
-    summary: t(
-      'Tells whether an id is installed (also narrows its type).',
-      '判断某个 id 是否已安装（同时收窄类型）。'
-    ),
-    params: { id: t('Backend id to check.', '要检查的后端 id。') },
-    returns: t('`true` when installed.', '已安装时返回 `true`。'),
-    example: `if (host.hasBackend('primary')) await host.backend('primary').get('k')`
-  },
-  backends: {
-    summary: t(
-      'Returns a copied map of all installed stores by id; its ReadonlyMap type prevents typed mutation, but the map is not frozen at runtime.',
-      '返回按标识索引的全部已安装存储的映射副本；`ReadonlyMap` 类型限制类型层面的修改，运行时并未冻结映射。'
-    ),
-    returns: t(
-      'A fresh `ReadonlyMap<string, IKeyValueStore>`; mutating the copy never changes host registrations.',
-      '新的 `ReadonlyMap<string, IKeyValueStore>`；修改副本不会改变宿主登记。'
-    ),
-    example: `[...host.backends().keys()]`
-  },
-  hasReactiveBackend: {
-    summary: t(
-      'Tells whether an id has a reactive adapter.',
-      '判断某个 id 是否安装了响应式适配器。'
-    ),
-    params: { id: t('Backend id to check.', '要检查的后端 id。') },
-    returns: t('`true` when reactive.', '具备响应式能力时返回 `true`。'),
-    example: `host.hasReactiveBackend('app')`
-  },
-  reactiveBackend: {
-    summary: t(
-      'Returns the reactive handle of an id: `{ id, store, liveQuery }`.',
-      '返回某个 id 的响应式句柄：`{ id, store, liveQuery }`。'
-    ),
-    params: {
-      id: t(
-        'Id of a backend installed with a `*Reactive` plugin.',
-        '通过 `*Reactive` 插件安装的后端 id。'
-      )
-    },
-    returns: t(
-      'An `IReactiveBackendHandle`, or `undefined` when the id has no installed reactive adapter.',
-      '返回 `IReactiveBackendHandle`；该 id 没有安装响应式适配器时返回 `undefined`。'
-    ),
-    example: `const handle = host.reactiveBackend('app')`
-  },
-  dispose: {
-    summary: t(
-      'Stops admission, cancels an installation in progress, waits for running work, then releases adapters and stores. Repeated dispose calls share one Promise; other Host operations reject with `STORAGE_HOST_DISPOSED` after closing begins.',
-      '停止接纳、取消进行中的安装、等待运行中的工作，然后释放适配器与存储；重复释放共享同一个 Promise，关闭开始后，其他宿主操作以 `STORAGE_HOST_DISPOSED` 拒绝。'
-    ),
-    returns: t(
-      'Resolves when released; cleanup errors are aggregated.',
-      '释放完成后 resolve；清理错误会被聚合。'
-    ),
-    example: `await host.dispose()`
-  },
-  liveQuery: {
-    summary: t(
-      'Only with reactive backends: creates a live query; see `ILiveQueryOptions`.',
-      '仅在有响应式后端时可用：创建实时查询，见 `ILiveQueryOptions`。'
-    ),
-    params: {
-      options: t(
-        '`{ backendId, runtime, query, ... }`.',
-        '实时查询选项 `{ backendId, runtime, query, ... }`。'
-      )
-    },
-    returns: t('An `ILiveQuery`.', '一个实时查询对象 `ILiveQuery`。'),
-    example: `const query = host.liveQuery({ backendId: 'app', runtime, query: ({ store }) => store.get('theme') })`
-  }
-}
-
-/** Host example used by the host instance types. */
-const createHostExample = `import { createStorageHost } from '@migaia/storage-web/host'
-import { indexedDbBackendPlugin } from '@migaia/storage-web/plugins/indexed-db'
-import { memoryBackendPlugin } from '@migaia/storage-web/plugins/memory'
-
-const host = await createStorageHost({
-  plugins: [memoryBackendPlugin({ id: 'cache' }), indexedDbBackendPlugin({ id: 'primary', dbName: 'app-data' })] as const
-})
-await host.backend('cache').set('theme', 'dark')
-console.log(host.hasBackend('primary'), [...host.backends().keys()])
-await host.dispose()`
-
-/** Repository members (`IRepository`). */
-const repositoryMembers: Readonly<Record<string, IMemberDoc>> = {
-  get: {
-    summary: t(
-      'Reads one record by primary key, migrating and validating it.',
-      '按主键读取一条记录，并执行迁移与校验。'
-    ),
-    params: {
-      id: t(
-        'Primary key value (the `key` property of the record).',
-        '主键值（即记录上 `key` 指定的属性）。'
-      ),
-      ctx: t('`{ signal?, timeoutMs? }`.', '操作上下文 `{ signal?, timeoutMs? }`。')
-    },
-    returns: t('The record, or `undefined` when absent.', '读取到的记录；不存在时为 `undefined`。'),
-    example: `const user = await users.get('ada')`
-  },
-  put: {
-    summary: t(
-      'Validates, normalises, encodes and writes a record (and its index entries).',
-      '校验、规范化、编码并写入一条记录（以及其索引项）。'
-    ),
-    params: {
-      value: t(
-        'The domain object; its `key` property is the primary key.',
-        '领域对象；其 `key` 属性就是主键。'
-      ),
-      ctx: t('Write context.', '写入时的操作上下文。')
-    },
-    returns: t(
-      'The stored key; unique index clashes throw `INDEX_UNIQUE_CONFLICT`.',
-      '写入的存储 key；唯一索引冲突时抛 `INDEX_UNIQUE_CONFLICT`。'
-    ),
-    example: `await users.put({ id: 'ada', email: 'ada@example.com' })`
-  },
-  remove: {
-    summary: t('Deletes a record by primary key.', '按主键删除一条记录及其索引。'),
-    params: {
-      id: t('Primary key value.', '要删除记录的主键值。'),
-      ctx: t('Operation context.', '操作上下文，可用于取消。')
-    },
-    returns: t('Resolves after removal.', '删除完成后 resolve。'),
-    example: `await users.remove('ada')`
-  },
-  list: {
-    summary: t(
-      'Reads many records, optionally by key range, order and limit; invalid records follow `onInvalid`.',
-      '读取多条记录，可按 key 范围、排序与数量限制；无效记录按 `onInvalid` 处理。'
-    ),
-    params: {
-      options: t(
-        '`IListOptions` or indexed options `{ index, range }`.',
-        '`IListOptions`，或带索引的选项 `{ index, range }`。'
-      ),
-      ctx: t('Operation context.', '操作上下文，可用于取消。')
-    },
-    returns: t('An array of records.', '记录数组。'),
-    example: `const recent = await users.list({ limit: 20, direction: 'prev' })`
-  },
-  stream: {
-    summary: t('Same as `list` but yields records one by one.', '与 `list` 相同，但逐条产出记录。'),
-    params: {
-      options: t('Same as `list`.', '与 `list` 相同的选项。'),
-      ctx: t('Operation context.', '操作上下文，可用于取消。')
-    },
-    returns: t('An async iterator.', '记录的异步迭代器。'),
-    example: `for await (const user of users.stream()) console.log(user.id)`
-  },
-  findBy: {
-    summary: t('Finds the first record with an index key.', '按索引 key 查找第一条记录。'),
-    params: {
-      index: t('Index name declared in `indexes`.', '在 `indexes` 中声明的索引名称。'),
-      key: t('Index key value.', '要查找的索引 key 值。'),
-      ctx: t('Operation context.', '操作上下文，可用于取消。')
-    },
-    returns: t('The record or `undefined`.', '找到的记录或 `undefined`。'),
-    example: `await users.findBy('byEmail', 'ada@example.com')`
-  },
-  findManyBy: {
-    summary: t('Finds records whose index key is in a range.', '查找索引 key 位于某范围内的记录。'),
-    params: {
-      index: t('Index name.', '在 `indexes` 中声明的索引名称。'),
-      range: t('`{ lower?, upper? }` of index keys.', '索引 key 的范围 `{ lower?, upper? }`。'),
-      options: t(
-        '`limit`, `direction`, `onInvalid`.',
-        '查询选项：`limit`、`direction`、`onInvalid`。'
-      ),
-      ctx: t('Operation context.', '操作上下文，可用于取消。')
-    },
-    returns: t('An array of records.', '匹配的记录数组。'),
-    example: `await users.findManyBy('byTag', { lower: 'compiler', upper: 'compiler' })`
-  },
-  streamBy: {
-    summary: t(
-      'Same as `findManyBy` but yields records one by one.',
-      '与 `findManyBy` 相同，但逐条产出记录。'
-    ),
-    params: {
-      index: t('Index name.', '在 `indexes` 中声明的索引名称。'),
-      range: t('Index key range.', '索引 key 的范围。'),
-      options: t('Query options.', '查询选项，例如 `limit`。'),
-      ctx: t('Operation context.', '操作上下文，可用于取消。')
-    },
-    returns: t('An async iterator.', '记录的异步迭代器。'),
-    example: `for await (const user of users.streamBy('byTag', { lower: 'a', upper: 'b' })) console.log(user)`
-  },
-  migrate: {
-    summary: t(
-      'Upgrades stored records to the current version in batches; IndexedDB keeps a checkpoint to resume. Record backends materialize the current raw value inside the write transaction. A concurrently upgraded current-version value is preserved and counted as alreadyCurrent; without contention each migration callback runs once.',
-      '分批把已存储记录升级到当前版本；索引数据库保存检查点以便续跑。记录后端在写事务内物化当前原始值；并发更新已达到当前版本时保留该值并计入 `alreadyCurrent`，无竞争时每个迁移回调仍执行一次。'
-    ),
-    params: {
-      options: t(
-        '`{ batchSize? (default 100), onInvalid? }`.',
-        '迁移选项 `{ batchSize?（默认 100）, onInvalid? }`。'
-      ),
-      ctx: t('Operation context.', '操作上下文，可用于取消。')
-    },
-    returns: t(
-      'Counts `{ scanned, eligible, migrated, skipped, alreadyCurrent, conflicted }`.',
-      '统计结果 `{ scanned, eligible, migrated, skipped, alreadyCurrent, conflicted }`。'
-    ),
-    example: `const result = await users.migrate({ batchSize: 200 })`
-  },
-  batch: {
-    summary: t(
-      'Runs reads and writes in one transaction on structured backends; key-value backends throw `UNSUPPORTED_CAPABILITY`. Fallback unique constraints check the final draft, allowing a previous owner to be deleted later in the same batch. Failure leaves the draft uncommitted.',
-      '在结构化后端的一个事务中执行读写；键值后端抛 `UNSUPPORTED_CAPABILITY`。回退唯一约束校验最终草稿，允许在同批次后续删除旧所有者；失败不提交草稿。'
-    ),
-    params: {
-      run: t(
-        '`(tx) => Promise`; `tx` has `get`, `put`, `remove`.',
-        '事务回调 `(tx) => Promise`；`tx` 提供 `get`、`put`、`remove`。'
-      ),
-      ctx: t('Operation context.', '操作上下文，可用于取消。')
-    },
-    returns: t(
-      'The callback result; concurrent writes throw `TRANSACTION_CONFLICT` (retry).',
-      '回调的结果；并发写冲突时抛 `TRANSACTION_CONFLICT`（可重试）。'
-    ),
-    example: `await orders.batch(async (tx) => {
-  for (const item of items) await tx.put(item)
-})`
-  }
-}
-
-/** Repository example. */
-const repositoryExample = `import { defineEntity } from '@migaia/storage-web/entity'
-import { indexedDbHost } from '@migaia/storage-web/indexed-db'
-
-type IUser = { id: string; email: string }
-const users = defineEntity<IUser>()({
-  name: 'users',
-  key: 'id',
-  version: 2,
-  migrations: { 2: async (previous) => previous },
-  indexes: { byEmail: { path: 'email', unique: true } }
-}).connect(indexedDbHost({ dbName: 'app-data' }))
-await users.put({ id: 'ada', email: 'ada@example.com' })
-console.log(await users.findBy('byEmail', 'ada@example.com'))`
-
-/** Reference of `@migaia/storage-web`. */
+/** Reference includes only current public browser entries; neutral ownership is explicit. */
 export const storageWebReference: ILibraryReference = {
   modules: {
     index: {
       summary: t(
-        'Root entry point: ten exports covering the stable error contract, `StorageErrorText` and the default namespace codec. Import host APIs from `@migaia/storage-web/host`, memory storage from `@migaia/storage-web/memory`, other backends from their exact subpaths, and neutral store types from `@migaia/storage-contract`.',
-        '根入口只有错误契约、`StorageErrorText` 与默认命名空间编码器相关的十项导出。宿主从 `@migaia/storage-web/host` 导入，内存存储从 `@migaia/storage-web/memory` 导入，其他后端使用各自精确子路径；中立存储类型从 `@migaia/storage-contract` 导入。'
+        'Stable browser error and namespace contracts. Import host and memory from storage-host, entities and storage codecs from storage-host/entity.',
+        '稳定浏览器错误与命名空间契约。宿主和内存从 `@migaia/storage-host` 导入，实体与存储编解码器从 `@migaia/storage-host/entity` 导入。'
       ),
-      example: `import { StorageError, StorageErrorCode } from '@migaia/storage-web'
-
-try {
-  await store.set('k', 'v')
-} catch (error) {
-  if (error instanceof StorageError && error.code === StorageErrorCode.quotaExceeded) freeSpace()
-}`
+      example: `import { StorageError, StorageErrorCode } from '@migaia/storage-web'`
     },
-    'local-storage': {
+    ...Object.fromEntries(
+      backends.flatMap(([module, plugin, , id]) =>
+        [module, `plugins/${module}`].map((entry) => [
+          entry,
+          {
+            summary: t(
+              `Use ${plugin} with createStorageHost for native browser storage; no direct store factory is exported.`,
+              `使用 \`${plugin}\` 与 \`createStorageHost\` 安装原生浏览器存储，不导出直接存储工厂。`
+            ),
+            example: hostExample(module, plugin, id)
+          }
+        ])
+      )
+    ),
+    'features/reactive': {
       summary: t(
-        'Keep small text settings in browser `localStorage`, with a namespace that separates your keys from other users of the same storage. Import this backend subpath to create a store directly; the package root supplies shared error and key utilities.\n\nStart with `localStorageHost({ namespace })`, then use `get()` and `set()` for asynchronous calls or `sync` for immediate access. This backend stores strings; use the IndexedDB entry for records or transactions.',
-        '将少量文本设置保存在浏览器的 `localStorage` 中，并用命名空间隔离不同用途的键。直接创建存储时导入此后端子路径；包的根入口提供共享的错误与键处理工具。\n\n从 `localStorageHost({ namespace })` 开始，通过 `get()`、`set()` 异步读写，或通过 `sync` 立即读写。此后端只保存字符串；需要记录或事务时选择 IndexedDB 入口。'
+        'Add live terminals to selected query chains. Each installed Feature owns one lazily attached source and retains native eventual visibility.',
+        '为选定查询链增加实时终点，每个已安装特性拥有独立的惰性来源，保留原生最终可见性。'
       ),
-      example: `import { localStorageHost } from '@migaia/storage-web/local-storage'\n\nconst store = localStorageHost({ namespace: 'settings' })`
-    },
-    'session-storage': {
-      summary: t(
-        'Use browser `sessionStorage` through a namespaced store when that is where your page keeps temporary text values. Choose this subpath for the session-storage backend rather than the shared utilities at the package root.\n\nStart with `sessionStorageHost({ namespace })`; its `get()` and `set()` methods wrap text reads and writes, and `sync` exposes immediate access. Choose the local-storage entry when you intend to use `localStorage` instead.',
-        '通过带命名空间的存储访问浏览器 `sessionStorage`，用于页面保存在该处的临时文本值。此子路径创建会话存储后端，根入口则提供共享工具。\n\n从 `sessionStorageHost({ namespace })` 开始，用 `get()`、`set()` 读写文本，也可通过 `sync` 立即读写。如果目标是 `localStorage`，应选择对应的本地存储入口。'
-      ),
-      example: `import { sessionStorageHost } from '@migaia/storage-web/session-storage'\n\nconst store = sessionStorageHost({ namespace: 'wizard' })`
-    },
-    cookies: {
-      summary: t(
-        'Read and write cookies visible through `document.cookie` using the same key-value interface as other stores. Import this subpath for a cookie store; the root entry contains shared utilities rather than backend factories.\n\nStart with `cookiesHost({ scope })` to fix the path and other cookie scope settings used by both writes and removals. Cookies marked `HttpOnly` are hidden from JavaScript, so a missing result does not prove that no such cookie exists.',
-        '通过其他存储也使用的键值接口，读写 `document.cookie` 能看到的浏览器小型数据条目。创建此类存储时使用这个子路径，根入口提供共享工具而非后端工厂。\n\n从 `cookiesHost({ scope })` 开始，固定写入和删除共同使用的路径等作用范围。标有 `HttpOnly` 的条目对脚本不可见，因此读不到并不代表它不存在。'
-      ),
-      example: `import { cookiesHost } from '@migaia/storage-web/cookies'\n\nconst jar = cookiesHost({ scope: { path: '/', secure: true, sameSite: 'lax' } })`
-    },
-    'indexed-db': {
-      summary: t(
-        'Store browser records and bytes when text storage is too limited, or group related changes in a transaction so they commit together. Choose this subpath for the IndexedDB backend; the root entry does not create stores.\n\nStart with `indexedDbHost({ dbName })`, then use `putRecord()` and `getRecord()` to save and retrieve structured values. It also supports indexes for looking up records by fields other than their primary key; use the entity entry to define typed record operations above the backend.',
-        '当文本存储无法满足需求时，在浏览器中保存记录和字节数据，也可用事务让一组相关修改一起提交。此子路径提供 IndexedDB 后端，根入口不负责创建存储。\n\n从 `indexedDbHost({ dbName })` 开始，用 `putRecord()` 和 `getRecord()` 保存、读取结构化值。此后端还支持索引，即按主键之外的字段查找记录；需要定义带类型的记录操作时，再使用实体入口。'
-      ),
-      example: `import { indexedDbHost } from '@migaia/storage-web/indexed-db'\n\nconst db = indexedDbHost({ dbName: 'app-data' })`
-    },
-    memory: {
-      summary: t(
-        'Use an isolated in-memory store for tests, server rendering, or an explicit fallback when browser storage is unavailable. Import this subpath for `memoryStorageHost()` without requiring browser document or storage types; the root entry is for shared utilities.\n\nEach call creates a separate store with text, byte and record operations. Values stay in that instance rather than a persistent browser database, and this backend does not provide secondary indexes.',
-        '在测试、服务端渲染或浏览器存储不可用时，用独立的内存存储承接数据。此子路径提供 `memoryStorageHost()`，不要求浏览器文档或存储接口的类型；根入口则提供共享工具。\n\n每次调用都创建一份独立存储，可保存文本、字节和记录。数据只留在该实例中，不会保存到浏览器数据库；此后端不提供按其他字段查找记录的二级索引。'
-      ),
-      example: `import { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst store = memoryStorageHost()`
-    },
-    entity: {
-      summary: t(
-        'Define typed records once and reuse their read and write operations with different storage backends. Choose this subpath for record definitions and repositories, rather than the shared utilities at the package root.\n\nStart with `defineEntity()` to describe the record name, primary key and optional validation or version changes. Its `connect(store)` method returns operations such as `get()` and `put()`; create the actual store through a backend entry first.',
-        '一次定义带类型的记录，再把同一套读写规则用于不同存储后端。此子路径提供记录定义与读写接口，根入口则提供共享工具。\n\n从 `defineEntity()` 开始，声明记录名称、主键，以及可选的数据校验或版本转换规则。调用定义上的 `connect(store)` 后即可使用 `get()`、`put()` 等操作；实际存储仍需先从对应后端入口创建。'
-      ),
-      example: repositoryExample
-    },
-    schema: {
-      summary: t(
-        'Adapt record validation and version changes without creating a store or repository. Import this subpath for these data-shape tools; the package root does not export them.\n\nStart with `fromStandardSchema()` to wrap a validator implementing Standard Schema, a shared interface used by validation libraries. Use `runMigrations()` to apply declared conversions between saved versions in order; `passthrough()` is available when validation is deliberately omitted.',
-        '为记录接入数据校验和版本转换，而不在此创建存储或记录读写接口。需要这些数据结构工具时导入本子路径，根入口不导出它们。\n\n从 `fromStandardSchema()` 开始，适配支持标准校验协议的校验器；该协议让不同校验库通过同一接口工作。用 `runMigrations()` 按顺序执行保存版本之间的转换；明确不需要校验时可选 `passthrough()`。'
-      ),
-      example: `import { fromStandardSchema } from '@migaia/storage-web/schema'\n\nconst schema = fromStandardSchema(UserSchema)`
-    },
-    serialize: {
-      summary: t(
-        'Choose how application values become storage data and how they are read back. Import this subpath for storage codecs, the paired encode and decode operations; the package root only exposes shared utilities.\n\nStart with `jsonCodec` for JSON text and `selectCodec()` to match a codec to the store capabilities. A byte codec can use a text encoding on a text-only store, but structured values are rejected there rather than silently converted to JSON.',
-        '决定应用值如何转成可保存的数据，以及如何读回原值。此子路径提供编解码器，也就是成对的编码和解码操作；包的根入口只提供共享工具。\n\n从处理 JSON 文本的 `jsonCodec` 开始，再用 `selectCodec()` 根据存储能力选择写入方式。字节编解码器可在纯文本存储上转成文本保存，但结构化值不能在此被悄悄改成 JSON，而会被拒绝。'
-      ),
-      example: `import { jsonCodec } from '@migaia/storage-web/serialize'\n\nawait jsonCodec.encode({ a: 1 })`
-    },
-    host: {
-      summary: t(
-        'Manage several storage backends together and retrieve each by its configured identifier. Import this subpath for host creation and custom plugin contracts; choose a backend subpath when you only need a standalone store.\n\nStart with `createStorageHost({ plugins })`, then use `host.backend(id)` to access an installed store. Reactive plugins additionally enable `host.liveQuery()`, which refreshes a query as storage changes; ordinary backend plugins do not enable that API.',
-        '集中管理多个存储后端，并按配置的标识取用各自的存储。创建宿主或编写自定义插件时导入此子路径；只需独立存储时直接选择后端入口。\n\n从 `createStorageHost({ plugins })` 开始，再用 `host.backend(id)` 取得已安装的存储。响应式插件还会启用 `host.liveQuery()`，让查询随存储变化而刷新；普通后端插件不启用这个接口。'
-      ),
-      example: createHostExample
-    },
-    'reactive-adapter': {
-      summary: t(
-        'Teach a custom storage backend how to tell the host that a query may need refreshing. Choose this advanced subpath for your own change source; built-in stores already have reactive plugin entries.\n\nStart with `defineReactiveAdapterFeature()` and provide a `subscribe` callback that calls `invalidate()` after a relevant change. Declare whether changes arrive as notifications, periodic checks, or both, and provide a check interval when polling is involved.',
-        '为自定义存储后端接入变化通知，让宿主知道何时需要刷新查询。自行实现变化来源时选择此高级入口；内置后端已有对应的响应式插件入口。\n\n从 `defineReactiveAdapterFeature()` 开始，提供 `subscribe` 回调，在相关变化后调用 `invalidate()`。声明变化来自主动通知、定时检查，还是两者结合；使用定时检查时还须提供检查间隔。'
-      ),
-      example: `import { defineReactiveAdapterFeature } from '@migaia/storage-web/reactive-adapter'`
-    },
-    'plugins/reactive': {
-      summary: t(
-        'Choose a built-in storage backend and enable queries that refresh when its data changes. This subpath groups all five reactive plugin factories, while the root entry contains shared utilities; individual backend subpaths are also available.\n\nStart with `memoryReactive()` for an isolated memory store, or `indexedDbReactive()` for browser records and indexes. Pass the returned plugin to `createStorageHost({ plugins })` from the host entry to make `host.liveQuery()` available for that backend.',
-        '选择内置存储后端，并启用随数据变化而刷新的查询。此子路径汇集五种响应式插件工厂，根入口则提供共享工具；也可从各后端的独立子路径导入。\n\n从 `memoryReactive()` 创建独立的内存后端，或用 `indexedDbReactive()` 保存浏览器记录并使用索引。把返回的插件交给宿主入口的 `createStorageHost({ plugins })`，即可为该后端使用 `host.liveQuery()`。'
-      ),
-      example: `import { memoryReactive } from '@migaia/storage-web/plugins/reactive/memory'`
-    },
-    'plugins/memory': {
-      summary: t(
-        'Install an isolated in-memory record store as a named backend in a storage host. Import this subpath for `memoryBackendPlugin()`; use the standalone backend entry when you do not need a host.\n\nPass the plugin to `createStorageHost({ plugins })`, then retrieve its store with `host.backend(id)`; the default identifier is `memory`. This plugin supplies storage access; choose the matching reactive plugin when queries must refresh after changes.',
-        '把独立的内存记录存储作为具名后端装入存储宿主。此子路径提供 `memoryBackendPlugin()`；不需要宿主时可直接使用独立后端入口。\n\n把插件交给 `createStorageHost({ plugins })`，再通过 `host.backend(id)` 取得存储，默认标识为 `memory`。此插件提供存储访问；查询需要随变化刷新时，选择对应的响应式插件。'
-      ),
-      example: hostExample('memoryBackendPlugin', 'plugins/memory', 'memory')
-    },
-    'plugins/reactive/memory': {
-      summary: t(
-        'Install an isolated in-memory record store together with change tracking for queries that refresh as data changes. Choose this subpath for `memoryReactive()` when a plain backend plugin would not provide `host.liveQuery()`.\n\nPass its plugin to `createStorageHost({ plugins })`, then create queries for the configured backend identifier. Changes from this isolated store are pushed to the host; other memory instances do not share its data.',
-        '安装独立的内存记录存储，并接入变化追踪，让查询随数据变化刷新。需要普通后端插件不提供的 `host.liveQuery()` 时，从此子路径导入 `memoryReactive()`。\n\n把返回的插件交给 `createStorageHost({ plugins })`，再为配置的后端标识创建查询。此独立存储将变化主动通知宿主；其他内存实例不共享它的数据。'
-      ),
-      example: hostExample('memoryReactive', 'plugins/reactive/memory', 'memory')
-    },
-    'plugins/local-storage': {
-      summary: t(
-        'Install a namespaced browser text store using `localStorage` as a named backend in a storage host. Import this subpath for `localStorageBackendPlugin()`; use the standalone backend entry when you do not need a host.\n\nPass the plugin to `createStorageHost({ plugins })`, then retrieve its store with `host.backend(id)`; the default identifier is `local`. This plugin supplies storage access; choose the matching reactive plugin when queries must refresh after changes.',
-        '把基于 `localStorage`、按命名空间隔离的浏览器文本存储作为具名后端装入存储宿主。此子路径提供 `localStorageBackendPlugin()`；不需要宿主时可直接使用独立后端入口。\n\n把插件交给 `createStorageHost({ plugins })`，再通过 `host.backend(id)` 取得存储，默认标识为 `local`。此插件提供存储访问；查询需要随变化刷新时，选择对应的响应式插件。'
-      ),
-      example: hostExample('localStorageBackendPlugin', 'plugins/local-storage', 'local')
-    },
-    'plugins/reactive/local-storage': {
-      summary: t(
-        'Install a namespaced browser text store using `localStorage` together with change tracking for queries that refresh as data changes. Choose this subpath for `localStorageReactive()` when a plain backend plugin would not provide `host.liveQuery()`.\n\nPass its plugin to `createStorageHost({ plugins })`, then create queries for the configured backend identifier. The adapter combines change notifications with checks every 1000 ms, so updates are not a promise of immediate observation.',
-        '安装基于 `localStorage`、按命名空间隔离的浏览器文本存储，并接入变化追踪，让查询随数据变化刷新。需要普通后端插件不提供的 `host.liveQuery()` 时，从此子路径导入 `localStorageReactive()`。\n\n把返回的插件交给 `createStorageHost({ plugins })`，再为配置的后端标识创建查询。适配器结合变化通知与每 1000 毫秒一次的检查，因此不保证变化会被立即观察到。'
-      ),
-      example: hostExample('localStorageReactive', 'plugins/reactive/local-storage', 'local')
-    },
-    'plugins/session-storage': {
-      summary: t(
-        'Install a namespaced browser text store using `sessionStorage` as a named backend in a storage host. Import this subpath for `sessionStorageBackendPlugin()`; use the standalone backend entry when you do not need a host.\n\nPass the plugin to `createStorageHost({ plugins })`, then retrieve its store with `host.backend(id)`; the default identifier is `session`. This plugin supplies storage access; choose the matching reactive plugin when queries must refresh after changes.',
-        '把基于 `sessionStorage`、按命名空间隔离的浏览器文本存储作为具名后端装入存储宿主。此子路径提供 `sessionStorageBackendPlugin()`；不需要宿主时可直接使用独立后端入口。\n\n把插件交给 `createStorageHost({ plugins })`，再通过 `host.backend(id)` 取得存储，默认标识为 `session`。此插件提供存储访问；查询需要随变化刷新时，选择对应的响应式插件。'
-      ),
-      example: hostExample('sessionStorageBackendPlugin', 'plugins/session-storage', 'session')
-    },
-    'plugins/reactive/session-storage': {
-      summary: t(
-        'Install a namespaced browser text store using `sessionStorage` together with change tracking for queries that refresh as data changes. Choose this subpath for `sessionStorageReactive()` when a plain backend plugin would not provide `host.liveQuery()`.\n\nPass its plugin to `createStorageHost({ plugins })`, then create queries for the configured backend identifier. The adapter combines change notifications with checks every 1000 ms for the session storage it can access.',
-        '安装基于 `sessionStorage`、按命名空间隔离的浏览器文本存储，并接入变化追踪，让查询随数据变化刷新。需要普通后端插件不提供的 `host.liveQuery()` 时，从此子路径导入 `sessionStorageReactive()`。\n\n把返回的插件交给 `createStorageHost({ plugins })`，再为配置的后端标识创建查询。适配器结合变化通知与每 1000 毫秒一次的检查，观察当前可访问的会话存储。'
-      ),
-      example: hostExample('sessionStorageReactive', 'plugins/reactive/session-storage', 'session')
-    },
-    'plugins/cookies': {
-      summary: t(
-        'Install a scoped cookie store using `document.cookie` as a named backend in a storage host. Import this subpath for `cookieBackendPlugin()`; use the standalone backend entry when you do not need a host.\n\nPass the plugin to `createStorageHost({ plugins })`, then retrieve its store with `host.backend(id)`; the default identifier is `cookies`. This plugin supplies storage access; choose the matching reactive plugin when queries must refresh after changes.',
-        '把基于 `document.cookie`、固定作用范围的存储作为具名后端装入存储宿主。此子路径提供 `cookieBackendPlugin()`；不需要宿主时可直接使用独立后端入口。\n\n把插件交给 `createStorageHost({ plugins })`，再通过 `host.backend(id)` 取得存储，默认标识为 `cookies`。此插件提供存储访问；查询需要随变化刷新时，选择对应的响应式插件。'
-      ),
-      example: hostExample('cookieBackendPlugin', 'plugins/cookies', 'cookies')
-    },
-    'plugins/reactive/cookies': {
-      summary: t(
-        'Install a scoped cookie store using `document.cookie` together with change tracking for queries that refresh as data changes. Choose this subpath for `cookiesReactive()` when a plain backend plugin would not provide `host.liveQuery()`.\n\nPass its plugin to `createStorageHost({ plugins })`, then create queries for the configured backend identifier. The adapter combines notifications with checks every 1000 ms, and can observe only cookies visible to JavaScript.',
-        '安装基于 `document.cookie`、固定作用范围的存储，并接入变化追踪，让查询随数据变化刷新。需要普通后端插件不提供的 `host.liveQuery()` 时，从此子路径导入 `cookiesReactive()`。\n\n把返回的插件交给 `createStorageHost({ plugins })`，再为配置的后端标识创建查询。适配器结合通知与每 1000 毫秒一次的检查，只能观察脚本可见的数据条目。'
-      ),
-      example: hostExample('cookiesReactive', 'plugins/reactive/cookies', 'cookies')
-    },
-    'plugins/indexed-db': {
-      summary: t(
-        'Install a browser record store with indexes and transactions as a named backend in a storage host. Import this subpath for `indexedDbBackendPlugin()`; use the standalone backend entry when you do not need a host.\n\nPass the plugin to `createStorageHost({ plugins })`, then retrieve its store with `host.backend(id)`; the default identifier is `indexed-db`. This plugin supplies storage access; choose the matching reactive plugin when queries must refresh after changes.',
-        '把支持索引与事务的浏览器记录存储作为具名后端装入存储宿主。此子路径提供 `indexedDbBackendPlugin()`；不需要宿主时可直接使用独立后端入口。\n\n把插件交给 `createStorageHost({ plugins })`，再通过 `host.backend(id)` 取得存储，默认标识为 `indexed-db`。此插件提供存储访问；查询需要随变化刷新时，选择对应的响应式插件。'
-      ),
-      example: hostExample('indexedDbBackendPlugin', 'plugins/indexed-db', 'indexed-db')
-    },
-    'plugins/reactive/indexed-db': {
-      summary: t(
-        'Install a browser record store with indexes and transactions together with change tracking for queries that refresh as data changes. Choose this subpath for `indexedDbReactive()` when a plain backend plugin would not provide `host.liveQuery()`.\n\nPass its plugin to `createStorageHost({ plugins })`, then create queries for the configured backend identifier. The adapter combines notifications with checks every 1000 ms; the underlying store still supports indexes and transactions.',
-        '安装支持索引与事务的浏览器记录存储，并接入变化追踪，让查询随数据变化刷新。需要普通后端插件不提供的 `host.liveQuery()` 时，从此子路径导入 `indexedDbReactive()`。\n\n把返回的插件交给 `createStorageHost({ plugins })`，再为配置的后端标识创建查询。适配器结合通知与每 1000 毫秒一次的检查，底层存储仍支持索引与事务。'
-      ),
-      example: hostExample('indexedDbReactive', 'plugins/reactive/indexed-db', 'indexed-db')
+      example: liveExample
     }
   },
   symbols: {
-    localStorageHost: {
-      role: 'factory',
-      purpose: t(
-        'Creates a namespaced `localStorage` store with async and `sync` APIs. A probe write at creation detects private-mode failures early (`BACKEND_UNAVAILABLE`).',
-        '创建带命名空间的 `localStorage` 存储，提供异步与 `sync` 两套 API。创建时会写入一次探测值，提前发现隐私模式下的失败（`BACKEND_UNAVAILABLE`）。'
-      ),
-      returns: t(
-        'A key-value store with `sync`; capabilities: text only, about 5 MiB.',
-        '带 `sync` 的键值存储；能力：仅文本，约 5 MiB。'
-      ),
-      options: 'ILocalStorageOptions',
-      example: `const store = localStorageHost({ namespace: 'settings' })
-await store.set('theme', 'dark')
-store.sync.get('theme') // 'dark'`
-    },
-    sessionStorageHost: {
-      role: 'factory',
-      purpose: t(
-        'Same as `localStorageHost` on `sessionStorage`: data lives until the tab closes.',
-        '与 `localStorageHost` 相同，但使用 `sessionStorage`：数据在当前标签页关闭前一直存在。'
-      ),
-      returns: t('A key-value store with `sync`.', '带 `sync` 同步接口的键值存储。'),
-      options: 'ISessionStorageOptions',
-      example: `const draft = sessionStorageHost({ namespace: 'checkout' })`
-    },
-    cookiesHost: {
-      role: 'factory',
-      purpose: t(
-        'Creates a cookie store with a fixed scope. `set(key, value, { maxAge | expires })` writes a cookie; values over 4096 bytes throw `VALUE_TOO_LARGE`; several visible scopes of one name throw `COOKIE_SCOPE_AMBIGUOUS`.',
-        '创建具有固定作用域的 cookie 存储。`set(key, value, { maxAge | expires })` 写入 cookie；值超过 4096 字节抛 `VALUE_TOO_LARGE`；同名 cookie 在多个作用域可见时抛 `COOKIE_SCOPE_AMBIGUOUS`。'
-      ),
-      returns: t(
-        'A cookie store with `sync`; HttpOnly cookies are invisible, so `has()` false does not prove absence.',
-        '带 `sync` 的 cookie 存储；HttpOnly cookie 不可见，因此 `has()` 为 false 并不代表不存在。'
-      ),
-      options: 'ICookiesOptions',
-      example: `const jar = cookiesHost({ namespace: 'app', scope: { path: '/', secure: true, sameSite: 'lax' } })
-await jar.set('session', 'abc123', { maxAge: 3600 })`
-    },
-    indexedDbHost: {
-      role: 'factory',
-      purpose: t(
-        'Creates an IndexedDB store with values, bytes, records, transactions, iteration and secondary indexes. The connection opens once and yields to version upgrades from other tabs. `ensureRecordIndexes` races shared opening against the operation deadline through `raceWithAbort`; stopping one waiter leaves shared preparation owned by the backend. `iterateRecordIndex` uses one deadline across the whole iterator, including buffered yields, and releases its abort subscription and timer in finally when iteration completes or the consumer calls return.',
-        '创建支持值、字节、记录、事务、迭代与二级索引的 IndexedDB 存储。连接只打开一次，并为其他标签页的版本升级让路。`ensureRecordIndexes` 通过 `raceWithAbort` 让共享打开与操作截止时间竞争；单个等待者停止等待后，共享准备仍由后端持有。`iterateRecordIndex` 在整个迭代生命周期共用一个截止时间，包括缓冲结果产出期间；迭代结束或消费者调用返回方法时，在最终清理中释放中止订阅与计时器。'
-      ),
-      returns: t(
-        'A record store with change feed; capabilities report what is native.',
-        '支持变更通知的记录存储；能力字段如实说明哪些是原生支持的。'
-      ),
-      options: 'IIndexedDbOptions',
-      example: `const db = indexedDbHost<{ id: string }>({ dbName: 'app-data' })
-await db.putRecord({ id: 'ada' }, 'ada')
-for await (const [key, value] of db.iterateRecords()) console.log(key, value)`
-    },
-    memoryStorageHost: {
-      role: 'factory',
-      purpose: t(
-        'Creates an independent volatile store in memory with records, bytes, transactions and change feed. Cross-channel replacement commits all removals and the destination write before publishing remove then put notifications, so reentrant observers see the complete commit. Nothing is shared between calls.',
-        '在内存中创建独立的易失存储，支持记录、字节、事务与变更通知。跨通道替换先完成所有删除和目标写入，再依次发布删除与写入通知，重入观察者看到完整提交；每次调用之间不共享数据。'
-      ),
-      returns: t('A record store with `sync` and change feed.', '带 `sync` 与变更通知的记录存储。'),
-      exampleIntro: t(
-        'The factory takes no arguments. `setBytes(key, value)` accepts a string key and a `Uint8Array`; `getBytes(key)` returns a fresh copy or `null`. `putRecord(value, key?)` accepts the generic record value and a storage key: string, finite number, valid Date, ArrayBuffer, or a nonempty dense array of such keys. Omitting the key generates a token. `getRecord(key)` returns a cloned value or `undefined`. These async methods accept an optional final operation context, omitted here: no signal or timeout is installed, and cross-channel writes default to `conflict`, rejecting `DUPLICATE_KEY`; `replace` explicitly evicts the other channel. `transaction(run)` awaits `(tx) => Promise<T>` and returns its result; `tx.get(key)`, `tx.put(value, key?, options?)` and `tx.delete(key)` operate on the record draft. `options.conflictPolicy` defaults to `conflict`; `replace` permits cross-channel eviction on commit. The optional transaction context is also omitted. `subscribeChanges(listener)` calls the listener after committed writes and returns an unsubscribe function. The shared `change.kind` domain is `put` (write), `remove` (delete), `clear` (broad removal), `batch` (record transaction), or `migrate` (migration invalidation); this memory example emits `put`. `dispose()` takes no arguments and closes the instance.',
-        '工厂不接收参数。`setBytes(key, value)` 接收字符串键和 `Uint8Array`，`getBytes(key)` 返回新副本，不存在时为 `null`；`putRecord(value, key?)` 接收泛型记录值，以及字符串、有限数值、有效日期、ArrayBuffer 或由这些值组成的非空稠密数组键，省略键时自动生成标识；`getRecord(key)` 返回克隆记录，不存在时为 `undefined`。这些异步方法可接收最后一个操作上下文参数，本例省略，不设置取消信号或超时；跨通道写入默认采用 `conflict`，以 `DUPLICATE_KEY` 拒绝冲突，显式 `replace` 才驱逐其他通道。`transaction(run)` 等待回调 `(tx) => Promise<T>` 并返回其结果，`tx.get(key)`、`tx.put(value, key?, options?)`、`tx.delete(key)` 操作记录草稿；`options.conflictPolicy` 默认 `conflict`，显式 `replace` 才在提交时驱逐其他通道，本例也省略事务上下文。`subscribeChanges(listener)` 在写入提交后调用监听器，并返回退订函数，共享 `change.kind` 取值为 `put`（写入）、`remove`（删除）、`clear`（整体清理）、`batch`（记录事务）或 `migrate`（迁移失效通知），本内存示例只发出 `put`；`dispose()` 无参数，关闭当前实例。'
-      ),
-      example: storageWebCases.memoryStorageHost![0]!.example,
-      cases: storageWebCases.memoryStorageHost
-    },
     lengthPrefixedNamespaceCodec: {
       role: 'constant',
       purpose: t(
@@ -1207,13 +425,13 @@ for await (const [key, value] of db.iterateRecords()) console.log(key, value)`
           '仓储阶段：`decode`、`migrate` 或 `validate`。'
         )
       },
-      example: `if (error instanceof StorageError && error.code === StorageErrorCode.transactionConflict) await retry()`
+      example: `if (error instanceof StorageError && error.code === StorageErrorCode.invalidConfig) await retry()`
     },
     StorageErrorCode: {
       role: 'constant',
       purpose: t(
-        'Table of this package’s 37 stable error codes; values are the strings on error.code. `INDEX_BACKFILL_FAILED` identifies backfill and failed-readiness persistence failing together on a native AggregateError.',
-        '本包三十七个稳定错误码的对照表，值为错误对象的 `code` 字符串。`INDEX_BACKFILL_FAILED` 标识回填与失败就绪状态保存同时失败，交付原生聚合错误。'
+        'Table of this package’s stable error codes; values are the strings on error.code. `INDEX_BACKFILL_FAILED` identifies backfill and failed-readiness persistence failing together on a native AggregateError.',
+        '本包稳定错误码的对照表，值为错误对象的 `code` 字符串。`INDEX_BACKFILL_FAILED` 标识回填与失败就绪状态保存同时失败，交付原生聚合错误。'
       ),
       example: `if (error.code === StorageErrorCode.quotaExceeded) await cleanupOldEntries()`
     },
@@ -1223,287 +441,29 @@ for await (const [key, value] of db.iterateRecords()) console.log(key, value)`
         'Stable message texts used by this package, for custom backends and codecs that want the same wording; branch on `code`, not on text.',
         '本包使用的稳定错误文本，供自定义后端与编解码器复用相同措辞；业务分支请比较 `code`，不要比较文本。'
       ),
-      example: `throw new StorageError(StorageErrorCode.invalidConfig, {}, StorageErrorText.backendIdInvalid)`
+      example: `throw new StorageError(StorageErrorCode.invalidConfig, {}, StorageErrorText.namespaceCodecEncodeInvalid)`
     },
-    defineEntity: {
-      role: 'factory',
+    ...backendSymbols,
+    reactiveFeature: {
+      role: 'enhancer',
       purpose: t(
-        'Defines a typed record kind: primary key, schema, codec, version with migrations, read validation and secondary indexes. Use the curried form `defineEntity<T>()({...})` when declaring `indexes`. `connect(store)` binds it to a store.',
-        '定义一类类型化记录：主键、schema、编解码器、带迁移的版本、读取校验以及二级索引。声明 `indexes` 时使用柯里化形式 `defineEntity<T>()({...})`。`connect(store)` 把它绑定到某个存储。'
-      ),
-      returns: t(
-        'An `IEntityDefinition`; every target step from 2 through version must be declared. A version above 1 with omitted migrations is also incomplete and throws `INVALID_CONFIG`.',
-        '返回 `IEntityDefinition`；必须声明从二到当前版本的每个目标迁移步骤。高于一的版本省略迁移表也属于不完整，抛 `INVALID_CONFIG`。'
-      ),
-      options: 'IEntityOptions',
-      example: storageWebCases.defineEntity![0]!.example,
-      exampleIntro: t(
-        '`connect(store)` borrows the supplied backend; disposing that backend remains the owner’s job. Repository `put(value)` takes a domain object whose configured key field supplies its ID; `get(id)` and `remove(id)` accept that storage key. `findBy(index, key)` takes a declared index name and its projected key. `batch(run)` passes an entity transaction with `get(id)`, `put(value)` and `remove(id)` and returns the callback result after commit. Every optional operation context is omitted in these examples, so no signal or timeout is requested. `migrate({ batchSize })` accepts a positive safe integer, default `100`; `onInvalid` defaults to `skip`, while `throw` or a callback returning either action changes failure handling. Its `migrated` result counts saved upgrades.',
-        '`connect(store)` 借用传入后端，仍由后端所有者负责释放；仓储 `put(value)` 接收领域对象，以配置的主键字段确定 ID，`get(id)` 与 `remove(id)` 接收该存储键；`findBy(index, key)` 接收已声明索引名和投影键。`batch(run)` 把提供 `get(id)`、`put(value)`、`remove(id)` 的实体事务交给回调，提交后返回回调结果。本例均省略可选操作上下文，不请求取消或超时。`migrate({ batchSize })` 的批次大小须为正安全整数，默认 `100`；无效记录默认按 `skip` 跳过，可改为 `throw`，或返回这两种动作之一的回调；返回结果中的 `migrated` 统计已保存的升级记录数。'
-      ),
-      cases: storageWebCases.defineEntity,
-      scenarios: [
-        t(
-          'Store user preferences or cached records with validation and safe upgrades.',
-          '在校验与安全升级的前提下保存用户偏好或缓存记录。'
-        )
-      ]
-    },
-    createStorageHost: {
-      role: 'factory',
-      purpose: t(
-        'Creates a storage host and installs the initial plugins atomically before resolving: either every backend is ready or nothing is published.',
-        '创建存储宿主，并在 resolve 前原子地安装初始插件：要么所有后端都就绪，要么什么都不发布。'
-      ),
-      returns: t(
-        'An `IStorageHost` typed by the plugin ids; installation failures throw `BACKEND_INSTALL_FAILED`.',
-        '一个按插件 id 类型化的 `IStorageHost`；安装失败时抛 `BACKEND_INSTALL_FAILED`。'
-      ),
-      options: 'IStorageHostCreateOptions',
-      example: storageWebCases.createStorageHost![0]!.example,
-      exampleIntro: t(
-        'Install `@migaia/storage-contract` directly when importing its `StorageContractError`. Each `memoryBackendPlugin({ id })` creates one store; omitted `id` is `memory`. Choose distinct IDs beginning with an ASCII letter, followed by letters, digits, dots, underscores, or hyphens, with 1–64 characters. `backend(id)` returns the actual installed store; `backends()` returns a copied map. Store `set(key, value)` accepts two strings and overwrites the same value-channel key; `get(key)` returns a string or `null`. Their optional context is omitted here. `host.dispose()` takes no arguments and awaits owned cleanup; retained memory stores then reject operations with `StorageContractError` code `STORE_DISPOSED`.',
-        '导入 `StorageContractError` 时须直接安装 `@migaia/storage-contract`。每个 `memoryBackendPlugin({ id })` 创建一个存储，省略 `id` 时使用 `memory`；多个插件须选择不同 ID，以 ASCII 字母开头，后续仅含字母、数字、点、下划线或连字符，总长为 1–64。`backend(id)` 返回真实安装的存储，`backends()` 返回映射副本。存储 `set(key, value)` 接收两个字符串，覆盖同一文本通道键；`get(key)` 返回字符串，不存在时为 `null`，本例省略两者的可选上下文。`host.dispose()` 无参数，等待所拥有资源清理完成；之后，残留内存存储引用的操作以 `StorageContractError` 和错误码 `STORE_DISPOSED` 拒绝。'
-      ),
-      cases: storageWebCases.createStorageHost,
-      scenarios: [
-        t(
-          'Choose between memory, local and IndexedDB storage by id at runtime.',
-          '在运行时按 id 在内存、本地存储与 IndexedDB 之间选择。'
-        )
-      ]
-    },
-    StorageHostFacade: {
-      role: 'factory',
-      returns: t(
-        'A new empty StorageHostFacade with snapped scheduler and installation budget; no backend is installed by construction. Install backend plugins through use() and await dispose() at the end of its lifetime.',
-        '返回已捕获调度器与安装预算的新空存储宿主，构造不会安装后端；通过安装方法加入后端插件，生命周期结束时等待释放方法。'
-      ),
-      purpose: t(
-        'The host class used by `createStorageHost`; constructing it directly gives an empty host to fill with `await host.use(plugin)`.',
-        '`createStorageHost` 所使用的宿主类；直接构造会得到一个空宿主，之后用 `await host.use(plugin)` 安装后端。'
-      ),
-      options: 'IStorageHostOptions',
-      example: `const host = new StorageHostFacade({ installTimeoutMs: 10_000 })
-await host.use(memoryBackendPlugin({ id: 'cache' }))`
-    },
-    definePlugin: {
-      role: 'factory',
-      purpose: t(
-        'Defines a custom backend plugin: `descriptorFactory(core)` returns the descriptor, whose `install` hook calls `core.registerStore(store)` while installation is active. The descriptor may expose application APIs; `features` can add a reactive adapter.',
-        '定义自定义后端插件：`descriptorFactory(core)` 返回描述对象，由其中的 `install` 钩子在安装活动期间调用 `core.registerStore(store)`。描述对象还可公开应用 API，`features` 可以加入响应式适配器。'
+        'Define per-registration live queries for an explicit backend kind or target union. The Feature starts its original native source on first live and owns cleanup through the host lifecycle.',
+        '为明确后端种类或目标联合定义每次注册独立的实时查询；首次实时终点接入原生来源，并通过宿主生命周期拥有清理。'
       ),
       params: {
-        name: t('Backend id of the plugin.', '该插件的后端 id。'),
-        descriptorFactory: t(
-          '`(core) => descriptor`, called once at installation with an `IStoragePluginCore`.',
-          '`(core) => descriptor`，安装时以 `IStoragePluginCore` 调用一次。'
-        ),
-        features: t(
-          'Optional Features, e.g. `{ reactive: defineReactiveAdapterFeature(...) }`.',
-          '可选的 Feature，例如 `{ reactive: defineReactiveAdapterFeature(...) }`。'
+        target: t(
+          'Opaque kind exported by the selected backend, or a host-defined target union.',
+          '由选定后端导出的不透明种类标识，或宿主定义的目标联合。'
         )
       },
       returns: t(
-        'A plugin handle for `createStorageHost` / `host.use`.',
-        '可交给 `createStorageHost` / `host.use` 的插件句柄。'
+        'A Feature record value for the backend plugin second argument.',
+        '返回用于后端插件第二参数记录的特性。'
       ),
-      example: `const remote = definePlugin('remote', (core) => {
-  return { install: () => {
-    core.registerStore(createRemoteStore())
-    return {}
-  } }
-})`
-    },
-    defineFeature: {
-      role: 'factory',
-      purpose: t(
-        'Defines an optional capability for a storage plugin, such as reading its key count. A Host manages plugin installation and cleanup. A Feature is the recipe for one capability; a Plugin combines a store and selected capabilities for the Host to install. Calling defineFeature only saves the recipe: it creates no Host and opens no storage. Pass the result as the third argument of definePlugin, then install the plugin with createStorageHost({ plugins }) or host.use(). Each installation uses its own store and capability output. To let application code call capability methods, return those methods from install.',
-        '给存储插件定义一项可选能力，例如读取键的数量。Host 是管理插件安装和清理的宿主对象。Feature 是创建一项能力的定义；Plugin 把存储和选定能力组合起来，供宿主安装。调用 defineFeature 只保存能力定义，不会创建宿主或打开存储。把返回值作为第三个参数交给 `definePlugin()`，再通过 `createStorageHost({ plugins })` 或 `host.use()` 安装插件。每次安装使用各自的存储和能力输出。应用需要调用能力方法时，从 `install` 返回这些方法。'
-      ),
-      params: {
-        factory: t(
-          'A required synchronous function that builds the capability object during plugin installation. core.featureExpose supplies getStore() and getBackendId() for this installation. The second argument contains the outputs of other capabilities listed in dependencies. Return the object whose methods the plugin will use; the factory itself must not return a Promise.',
-          '必填的同步函数，在插件安装期间创建能力对象。`core.featureExpose` 提供本次安装的 getStore() 和 getBackendId()，用来访问存储和后端名称。第二个参数包含 dependencies 所列其他能力的输出。返回插件要使用的能力对象，工厂自身不能返回 Promise。'
-        ),
-        dependencies: t(
-          'List other capabilities this factory needs by assigning each Feature reference a name. Their outputs are passed to the factory’s second argument under those names. Omit the record when the factory only needs the store and backend id supplied by core.featureExpose.',
-          '如果工厂需要其他能力，把相应 Feature 引用按名称放在这个对象中。工厂的第二个参数会按这些名称提供对应的能力输出。只需要 `core.featureExpose` 提供的存储和后端名称时，可以省略。'
-        )
-      },
-      returns: t(
-        'A Feature for `definePlugin(name, factory, features)`.',
-        '可交给 `definePlugin(name, factory, features)` 的 Feature。'
-      ),
-      exampleIntro: t(
-        'The example adds key-counting behavior to an in-memory cache. metrics builds the counting methods, cachePlugin registers the memory store, and install saves one user before returning methods that application code can call.',
-        '下面为内存缓存添加统计键数量的能力。metrics 创建统计方法，cachePlugin 登记内存存储，install 保存一个用户后返回供应用调用的方法。'
-      ),
-      example: storageFeatureExample,
-      exampleResult: t(
-        'Both assertions pass and the output is 1 cache: one stored key and the plugin’s backend name. The empty Host has no count method. After cachePlugin is installed, cache.extensions.count() calls the method returned by install. The finally block closes the Host, removes the plugin and releases its memory store.',
-        '两项断言通过，输出为 `1 cache`，分别表示一个已保存的键和插件的后端名称。空宿主没有统计方法；安装 cachePlugin 后，`cache.extensions.count()` 才能调用 install 返回的方法。finally 中关闭宿主，会移除插件并释放内存存储。'
-      )
-    },
-    assertStorageBackendId: {
-      role: 'operation',
-      purpose: t(
-        'Checks that a value is a valid backend id: `^[A-Za-z][A-Za-z0-9._-]{0,63}$`.',
-        '检查某个值是否为合法的后端 id，规则为字母开头、最长 64 个字符：`^[A-Za-z][A-Za-z0-9._-]{0,63}$`。'
-      ),
-      params: { id: t('Value to check.', '要检查的值，通常来自配置。') },
-      returns: t(
-        'Nothing; invalid ids throw `BACKEND_ID_INVALID`.',
-        '无返回值；id 不合法时抛 `BACKEND_ID_INVALID`。'
-      ),
-      example: `assertStorageBackendId(config.backend)`
-    },
-    storageBackendPluginExtensionsBrand: {
-      role: 'constant',
-      purpose: t(
-        'Type-level brand carrying the extension type of a plugin handle; not used at runtime.',
-        '在类型层面携带插件句柄扩展类型的品牌标记；运行时不使用。'
-      ),
-      example: `type IExt = IStorageBackendPluginHandle[typeof storageBackendPluginExtensionsBrand]`
-    },
-    prepareIndexedDbStore: {
-      role: 'operation',
-      purpose: t(
-        'Opens and upgrades an IndexedDB store inside a custom plugin, after its disposer was registered.',
-        '在自定义插件中、登记好清理函数之后，打开并升级 IndexedDB 存储。'
-      ),
-      params: {
-        store: t('Store created by `indexedDbHost()`.', '由 `indexedDbHost()` 创建的存储。')
-      },
-      returns: t('Resolves when the database is ready.', '数据库就绪后 resolve。'),
-      example: `await prepareIndexedDbStore(store)`
-    },
-    defineReactiveAdapterFeature: {
-      role: 'factory',
-      purpose: t(
-        'Defines the reactive adapter Feature of a custom backend: `mode`, `visibility`, optional `pollIntervalMs` and `subscribe(context)` which calls `context.invalidate(change)` when data changes.',
-        '为自定义后端定义响应式适配器 Feature：`mode`、`visibility`、可选的 `pollIntervalMs`，以及在数据变化时调用 `context.invalidate(change)` 的 `subscribe(context)`。'
-      ),
-      params: {
-        definition: t('`IReactiveAdapterDefinition`.', '适配器定义 `IReactiveAdapterDefinition`。')
-      },
-      returns: t(
-        'A Feature to pass as `definePlugin(name, factory, { reactive })`.',
-        '可作为 `definePlugin(name, factory, { reactive })` 传入的 Feature。'
-      ),
-      example: `const reactive = defineReactiveAdapterFeature({
-  mode: 'push',
-  visibility: 'instance',
-  subscribe: ({ store, invalidate }) => store.onChange((change) => invalidate(change))
-})`
-    },
-    passthrough: {
-      role: 'factory',
-      purpose: t(
-        'Schema adapter that accepts any value without validation; the default of `defineEntity`.',
-        '不做任何校验、原样接受值的 schema 适配器；是 `defineEntity` 的默认值。'
-      ),
-      returns: t(
-        '`{ name: "passthrough", validate }`.',
-        '`{ name: "passthrough", validate }` 适配器对象。'
-      ),
-      example: `defineEntity<IUser>({ name: 'users', key: 'id', schema: passthrough<IUser>() })`
-    },
-    fromStandardSchema: {
-      role: 'factory',
-      purpose: t(
-        'Adapts a Standard Schema v1 validator (zod 3.24+, valibot 1+, arktype 2+) for entities.',
-        '把实现了 Standard Schema v1 规范的第三方校验器（zod 3.24+、valibot 1+、arktype 2+）适配为实体可直接使用的 schema。'
-      ),
-      params: {
-        schema: t('A schema object with `~standard`.', '带 `~standard` 属性的 schema 对象。')
-      },
-      returns: t(
-        'A schema adapter; invalid schema descriptors throw `INVALID_CONFIG` at construction. Validator synchronous throws and asynchronous rejections become `VALIDATION_FAILED` with the original failure on cause; issue results use joined issue messages.',
-        '返回结构校验适配器；构造时描述器无效抛 `INVALID_CONFIG`。校验器同步抛错与异步拒绝统一为 `VALIDATION_FAILED`，原始失败保留在原因链；问题结果使用拼接后的问题信息。'
-      ),
-      example: `const schema = fromStandardSchema(z.object({ id: z.string() }))`
-    },
-    runMigrations: {
-      role: 'operation',
-      purpose: t(
-        'Runs migration functions from `fromVersion + 1` to `toVersion` in order; a missing step is treated as no change.',
-        '按顺序执行从 `fromVersion + 1` 到 `toVersion` 的迁移函数；缺少的步骤视为无变化。'
-      ),
-      params: {
-        value: t('Stored value to upgrade.', '需要升级的已存储值。'),
-        fromVersion: t(
-          'Version of `value`, a non-negative safe integer.',
-          '`value` 当前的版本号，非负安全整数。'
-        ),
-        toVersion: t('Target version.', '要升级到的目标版本号。'),
-        migrations: t(
-          '`{ [version]: (previous, ctx) => Promise }`.',
-          '迁移函数表 `{ [版本]: (previous, ctx) => Promise }`。'
-        ),
-        signal: t('Optional cancellation.', '可选的取消信号。')
-      },
-      returns: t(
-        'The upgraded value; failures throw `MIGRATION_FAILED`.',
-        '升级后的值；失败时抛 `MIGRATION_FAILED`。'
-      ),
-      example: `await runMigrations(old, 1, 3, { 2: async (v) => ({ ...(v as object), a: 1 }), 3: async (v) => v })`
-    },
-    jsonCodec: {
-      role: 'constant',
-      purpose: t(
-        'Codec storing JSON text; works on every backend but loses `Date`, `Map`, `Set`, bytes and cycles.',
-        '保存 JSON 文本的编解码器；适用于所有后端，但会丢失 `Date`、`Map`、`Set`、字节与循环引用。'
-      ),
-      example: `await jsonCodec.encode({ a: 1 }) // '{"a":1}'`
-    },
-    structuredCodec: {
-      role: 'constant',
-      purpose: t(
-        'Codec that passes objects through so record backends store them with structured clone (keeps `Date`, `Map`, `Set`, bytes, cycles); rejected on text-only backends.',
-        '原样传递对象、由记录后端以 structured clone 保存的编解码器（保留 `Date`、`Map`、`Set`、字节与循环引用）；在仅文本后端上会被拒绝。'
-      ),
-      example: `const codec = selectCodec(structuredCodec, db.capabilities)`
-    },
-    binaryCodec: {
-      role: 'constant',
-      purpose: t(
-        'Codec for `Uint8Array` values; text-only backends store them as Base64 through `selectCodec`.',
-        '用于 `Uint8Array` 字节值的编解码器；仅文本后端经 `selectCodec` 自动以 Base64 形式保存。'
-      ),
-      example: `await binaryCodec.encode(new Uint8Array([1, 2, 3]))`
-    },
-    selectCodec: {
-      role: 'operation',
-      purpose: t(
-        'Chooses how a codec writes on a backend: direct, reversible Base64 fallback for bytes on text backends, or rejection (`UNSUPPORTED_CAPABILITY`) for structured data on text backends.',
-        '决定编解码器在某个后端上如何写入：直接写入；字节数据在仅文本后端上可逆地回退为 Base64；结构化数据在仅文本后端上直接拒绝（`UNSUPPORTED_CAPABILITY`）。'
-      ),
-      params: {
-        codec: t(
-          '`jsonCodec`, `structuredCodec`, `binaryCodec` or a custom codec.',
-          '`jsonCodec`、`structuredCodec`、`binaryCodec` 或自定义编解码器。'
-        ),
-        capabilities: t(
-          '`store.capabilities` of the target backend.',
-          '目标后端的 `store.capabilities`。'
-        ),
-        onDiagnostic: t(
-          'Receives a message when a fallback is used.',
-          '使用回退路径时接收提示信息。'
-        )
-      },
-      returns: t(
-        'An `ISelectedCodec` with `encode` / `decode`.',
-        '带 `encode` / `decode` 方法的 `ISelectedCodec`。'
-      ),
-      example: `const selected = selectCodec(binaryCodec, store.capabilities, console.warn)`
-    },
-    ...pluginSymbols
+      example: liveExample
+    }
   },
   types: {
-    ICodec: storageContractReference.types.ICodec!,
-    ICodecOutput: storageContractReference.types.ICodecOutput!,
     StorageError: {
       summary: t(
         'Error of this package with its detail fields. Entity stage wrappers preserve the complete original StorageError on the cause chain and keep its message, rather than retaining only the leaf cause.',
@@ -1516,26 +476,8 @@ await host.use(memoryBackendPlugin({ id: 'cache' }))`
         )
       ],
       example: `import { StorageError, StorageErrorCode } from '@migaia/storage-web'
-import { defineEntity } from '@migaia/storage-web/entity'
-import { memoryStorageHost } from '@migaia/storage-web/memory'
-
-const original = new StorageError(StorageErrorCode.validationFailed, { cause: new TypeError('invalid input') })
-const store = memoryStorageHost()
-const users = defineEntity<{ id: string }>({
-  name: 'users',
-  key: 'id',
-  schema: { name: 'reject', validate: async () => { throw original } }
-}).connect(store)
-try {
-  await users.put({ id: 'ada' })
-} catch (error) {
-  if (!(error instanceof Error)) throw error
-  let current: unknown = error
-  while (current instanceof Error && current !== original) current = current.cause
-  console.log(current === original, error.message === original.message, original.cause)
-} finally {
-  await store.dispose()
-}`,
+const error = new StorageError(StorageErrorCode.invalidConfig, { backend: 'indexeddb' })
+console.error(error.source, error.code)`,
       members: {
         source: {
           summary: t(
@@ -1607,18 +549,6 @@ try {
         }
       }
     },
-    IStorageErrorCode: alias(
-      'Union of `StorageErrorCode` values.',
-      '`StorageErrorCode` 全部取值组成的联合类型。'
-    ),
-    IStorageChannel: alias(
-      'Storage channels of one key: `value`, `bytes`, `record`.',
-      '同一个 key 的三种存储通道：`value`、`bytes`、`record`。'
-    ),
-    IExtensionStage: alias(
-      'Extension points: `schema`, `codec`, `migration`, `comparator`, `diagnostic`.',
-      '出错的扩展点名称取值：`schema`、`codec`、`migration`、`comparator`、`diagnostic`。'
-    ),
     INamespaceCodec: {
       summary: t(
         'Encoder between `(namespace, key)` and the physical key; custom codecs own migration and collision safety.',
@@ -1646,32 +576,36 @@ try {
             'The logical key, or undefined for a nonmatching namespace. The default codec also treats malformed encoded namespace text as nonmatching, so enumeration skips it without deleting foreign physical data.',
             '返回逻辑键；其他命名空间返回空值。默认编码器还把损坏的命名空间编码视为不匹配，枚举时跳过且不删除无关物理数据。'
           )
+        },
+        encodeStorageKey: {
+          summary: t(
+            'Optionally encodes typed batch keys without colliding with the original string layout; provide it with decodeStorageKey.',
+            '可选地编码结构批量键，并与原字符串布局隔离；必须与 decodeStorageKey 成对提供。'
+          ),
+          params: {
+            namespace: t('The original configured namespace.', '原配置命名空间。'),
+            key: t(
+              'A canonical IStorageKey captured by the key owner.',
+              '由共享键拥有者捕获的规范 IStorageKey。'
+            )
+          },
+          returns: t('The physical key string.', '物理键字符串。')
+        },
+        decodeStorageKey: {
+          summary: t(
+            'Optionally identifies both string and typed entries for namespace cleanup; missing support rejects non-string batch reads before native I/O.',
+            '可选地识别字符串和结构键供命名空间清理使用；缺少支持时，非字符串批量读取在原生 I/O 前拒绝。'
+          ),
+          params: {
+            namespace: t('The original configured namespace.', '原配置命名空间。'),
+            physicalKey: t('One visible physical storage key.', '一个可见的物理存储键。')
+          },
+          returns: t(
+            'An IStorageKey, or undefined for a foreign or malformed entry.',
+            'IStorageKey；不属于该命名空间或格式损坏时返回空值。'
+          )
         }
       }
-    },
-    ILocalStorageOptions: {
-      optionCases: backendOptionCases('local-storage', 'localStorageHost', 'local-storage'),
-      summary: t(
-        'Options of `localStorageHost()` and `localStorageBackendPlugin()`.',
-        '`localStorageHost()` 与本地存储插件共用的构造选项。'
-      ),
-      members: webStorageFields('localStorage')
-    },
-    ISessionStorageOptions: {
-      optionCases: backendOptionCases('session-storage', 'sessionStorageHost', 'session-storage'),
-      summary: t(
-        'Options of `sessionStorageHost()` and `sessionStorageBackendPlugin()`.',
-        '`sessionStorageHost()` 与会话存储插件共用的构造选项。'
-      ),
-      members: webStorageFields('sessionStorage')
-    },
-    ICookiesOptions: {
-      optionCases: backendOptionCases('cookies', 'cookiesHost', 'cookies'),
-      summary: t(
-        'Options of `cookiesHost()` and the cookie plugins.',
-        '`cookiesHost()` 与两个 cookie 插件共用的选项。'
-      ),
-      members: cookieFields
     },
     ICookieDocument: {
       summary: t(
@@ -1687,623 +621,10 @@ try {
         }
       }
     },
-    IIndexedDbOptions: {
-      optionCases: backendOptionCases('indexed-db', 'indexedDbHost', 'indexed-db'),
-      summary: t(
-        'Options of `indexedDbHost()` and the IndexedDB plugins.',
-        '`indexedDbHost()` 与两个 IndexedDB 插件共用的选项。'
-      ),
-      members: indexedDbFields
-    },
-    IEntityOptions: {
-      optionCases: entityOptionCases,
-      summary: t(
-        'Options of `defineEntity()`.',
-        '`defineEntity()` 的选项：主键、schema、版本与索引。'
-      ),
-      members: {
-        name: {
-          summary: t(
-            'Entity name; non-empty and not starting with `__`.',
-            '实体名称；非空，且不能以 `__` 开头。'
-          )
-        },
-        key: {
-          summary: t(
-            'Property of the domain object used as primary key.',
-            '作为主键的领域对象属性名。'
-          )
-        },
-        schema: {
-          summary: t('Validation and stored-shape conversion.', '校验以及存储形态的转换。'),
-          default: t('`passthrough()`: no validation.', '`passthrough()`：不做校验。')
-        },
-        codec: {
-          summary: t('How records are encoded on the backend.', '记录在后端上的编码方式。'),
-          default: t(
-            '`structuredCodec` on IndexedDB / memory, `jsonCodec` on text backends.',
-            'IndexedDB / 内存上为 `structuredCodec`，仅文本后端上为 `jsonCodec`。'
-          )
-        },
-        version: {
-          summary: t(
-            'Current data version, a positive safe integer.',
-            '当前的数据版本号，正的安全整数。'
-          ),
-          default: t('`1`.', '默认值为 `1`。')
-        },
-        migrations: {
-          summary: t(
-            'Functions for every version from 2 to `version`; a missing step throws `INVALID_CONFIG`.',
-            '从版本 2 到 `version` 的每一步迁移函数；缺一步就抛 `INVALID_CONFIG`。'
-          ),
-          default: t(
-            'Not set: only valid with `version: 1`.',
-            '不设置：只能与 `version: 1` 一起使用。'
-          )
-        },
-        'migrations.<targetVersion>': {
-          summary: t(
-            'Async `(previous, context) => upgradedValue` step keyed by the target version. `previous` is the prior stored representation; migration precedes `schema.decode`. The context supplies `fromVersion`, `toVersion`, and optional `signal` (undefined when the operation has none). The returned value proceeds to the next step, decoding, and read validation. Ordinary step failures become `MIGRATION_FAILED` with the original cause; `StorageContractError` and `StorageError` with `INVALID_CONFIG` retain their classification.',
-            '以目标版本号为键的异步步骤 `(previous, context) => upgradedValue`；`previous` 是此前的存储表示，迁移先于 `schema.decode` 执行。`context` 提供 `fromVersion`、`toVersion` 与可选 `signal`（操作无信号时为 `undefined`），返回值进入下一步、解码及读取校验；普通步骤失败归类为 `MIGRATION_FAILED` 并保留原始原因，`StorageContractError` 与错误码为 `INVALID_CONFIG` 的 `StorageError` 保留原分类。'
-          )
-        },
-        validateOnRead: {
-          summary: t('Validate records when reading them.', '读取记录时也进行 schema 校验。'),
-          default: t('`true`.', '`true`：读取时也校验。')
-        },
-        onDiagnostic: {
-          whenToUse: t(
-            'Set a callback when scans, skipped invalid records or backend fallback choices should appear in application diagnostics. It receives explanatory text without changing query results. Omitting it sends diagnostics to console.warn.',
-            '扫描、跳过无效记录或后端回退选择需要进入应用诊断时，设置回调。它接收说明文本，不改变查询结果。省略时诊断输出到 console.warn。'
-          ),
-          example: entityOptionCases[1]!.example,
-          summary: t(
-            'Receives diagnostic messages (full scans, fallbacks).',
-            '接收诊断信息（全表扫描、回退路径等）。'
-          ),
-          default: t('`console.warn`.', '`console.warn`：输出到控制台。')
-        },
-        defaultOrderBy: {
-          summary: t(
-            'Default sort of `list` / `stream`.',
-            '`list` / `stream` 未指定排序时使用的默认比较函数。'
-          ),
-          default: t('Not set: key order.', '不设置：按 key 顺序。')
-        },
-        indexes: {
-          summary: t(
-            'Secondary indexes `{ name: { path | paths | select, unique?, multiEntry?, revision? } }`.',
-            '实体自带的二级索引定义 `{ 名称: { path | paths | select, unique?, multiEntry?, revision? } }`。'
-          ),
-          default: t('Not set: no indexes.', '不设置：没有二级索引。')
-        },
-        'indexes.<name>.path': {
-          summary: t(
-            'Single object path, such as `email`, whose value becomes the index key. Use exactly one of `path`, compound `paths`, or custom `select`; index names must be nonempty and must not begin with `__`.',
-            '单个对象路径，例如 `email`，其值成为索引键；`path`、复合 `paths` 与自定义 `select` 必须只选其一，索引名须非空且不能以 `__` 开头。'
-          )
-        },
-        'indexes.<name>.unique': {
-          summary: t(
-            'Whether one projected key may belong to only one record; replacement by its existing owner is allowed.',
-            '一个投影键是否只能属于一条记录；现有所有者更新自己仍被允许。'
-          ),
-          default: t('`false`.', '`false`：不强制唯一。'),
-          values: {
-            true: t(
-              'Reject another owner with `INDEX_UNIQUE_CONFLICT`.',
-              '以 `INDEX_UNIQUE_CONFLICT` 拒绝其他所有者。'
-            ),
-            false: t(
-              'Allow several records to share the projected key.',
-              '允许多条记录共享投影键。'
-            )
-          }
-        },
-        'indexes.<name>.multiEntry': {
-          summary: t(
-            'For `path`, expand an array into separate index keys when true; false keeps one key. Compound paths permit only false, and custom selectors must omit this field.',
-            '用于 `path` 时，`true` 把数组展开成独立索引键，`false` 保留一个键；复合路径仅允许 `false`，自定义选择器须省略此字段。'
-          ),
-          default: t('`false` for path projections.', '路径投影默认为 `false`。'),
-          values: {
-            true: t('Project array elements separately.', '分别投影数组元素。'),
-            false: t('Keep a single key.', '保留一个键。')
-          }
-        },
-        'indexes.<name>.revision': {
-          summary: t(
-            'Positive safe-integer projection revision; custom selectors require an explicit revision.',
-            '正安全整数的投影修订号，自定义选择器必须显式提供。'
-          ),
-          default: t('`1` for path or compound projections.', '路径与复合路径投影默认为 `1`。')
-        }
-      }
-    },
-    IEntityDefinition: {
-      summary: t(
-        'Entity returned by `defineEntity()`.',
-        '`defineEntity()` 返回的实体定义对象，可连接存储。'
-      ),
-      scenarios: [
-        t(
-          'Connect the same entity to IndexedDB in production and to memory in tests.',
-          '在生产中把同一个实体连接到 IndexedDB，在测试中连接到内存存储。'
-        )
-      ],
-      example: repositoryExample,
-      members: {
-        name: {
-          summary: t('Entity name used to isolate its records.', '实体的名称，用于隔离记录。')
-        },
-        version: { summary: t('Current data version of the entity.', '实体当前的数据版本号。') },
-        connect: {
-          summary: t(
-            'Binds the entity to a store and returns its repository.',
-            '把实体绑定到某个存储，并返回其仓储。'
-          ),
-          params: {
-            store: t(
-              'Any store, e.g. `indexedDbHost()` or `host.backend(id)`.',
-              '任意存储，例如 `indexedDbHost()` 或 `host.backend(id)`。'
-            )
-          },
-          returns: t('An `IRepository`.', '一个仓储对象 `IRepository`。'),
-          example: `const users = definition.connect(memoryStorageHost())`
-        }
-      }
-    },
-    IRepository: {
-      summary: t(
-        'Typed access to one entity on one store. Fallback unique validation adds full-scan schema and projection reads without a persistent sidecar or a native capability claim. Record put, batch and migration validate the final draft and update the internal two-slot key `[REPOSITORY_KEY_PREFIX, entityName]` (`REPOSITORY_KEY_PREFIX` is `"__storage_web_entity_v2__"`) to detect concurrent new owners; raw record enumeration can see this marker, while entity queries and migration exclude it. KV preparation runs schema and codec callbacks outside the lock, then verifies the raw-text snapshot under an exclusive commit lock; changes during preparation yield retryable `TRANSACTION_CONFLICT`. Host Web Locks guarantee cross-page uniqueness and are provided by modern browsers. Injected ports without a host lock serialize within one module instance. Server-rewritten cookies follow the server and are outside this uniqueness constraint.',
-        '提供单个存储上的实体记录访问。回退唯一约束增加全扫描及结构校验、投影读取，不增加持久化辅助索引，也不声称原生能力。记录写入、批处理和迁移校验最终草稿，并更新内部两段键 `[REPOSITORY_KEY_PREFIX, entityName]`（前缀值为 `"__storage_web_entity_v2__"`） 以检测并发新增所有者；原始记录枚举可见该标记，实体查询与迁移排除它。键值后端在锁外执行结构校验和编解码准备，再在独占提交锁内核对原始文本快照；准备期间发生变化返回可重试的 `TRANSACTION_CONFLICT`。跨页面唯一性由宿主 `Web Locks` 保证，现代浏览器均已提供。没有宿主锁的注入端口只在同一模块实例内串行。服务端改写的 `cookie` 以服务端为准，不在该唯一约束范围内。'
-      ),
-      scenarios: [
-        t(
-          'Query users by email index and page through recent orders.',
-          '按 email 索引查询用户，并分页浏览最近的订单。'
-        )
-      ],
-      example: repositoryExample,
-      members: repositoryMembers
-    },
-    IEntityTransactionScope: {
-      summary: t(
-        'The `tx` argument of `repository.batch(run)`.',
-        '`repository.batch(run)` 的回调函数收到的 `tx` 参数。'
-      ),
-      members: {
-        get: {
-          summary: t('Reads in the transaction.', '在事务内读取一条记录。'),
-          params: { id: t('Primary key.', '要读取记录的主键值。') },
-          returns: t('The record or `undefined`.', '读到的记录或 `undefined`。')
-        },
-        put: {
-          summary: t('Writes in the transaction.', '在事务内写入一条记录。'),
-          params: { value: t('The record.', '要写入的领域对象。') },
-          returns: t('The stored key.', '写入的存储 key。')
-        },
-        remove: {
-          summary: t('Deletes in the transaction.', '在事务内删除一条记录。'),
-          params: { id: t('Primary key.', '要删除记录的主键值。') },
-          returns: t('Resolves when removed.', '删除完成后 resolve。')
-        }
-      }
-    },
-    IEntityIndex: {
-      summary: t(
-        'Caller-authored secondary-index projection: choose exactly one path, compound paths or synchronous selector with an explicit revision.',
-        '调用方编写的二级索引投影：路径、复合路径或带显式修订号的同步选择器，三者必须只选其一。'
-      ),
-      members: {
-        path: {
-          summary: t(
-            'Caller-selected `IObjectPathInput<TDomain>` identifying one domain value used as the index key or multi-entry source.',
-            '调用方选择的 `IObjectPathInput<TDomain>`，指出用于索引键或多项来源的领域值。'
-          )
-        },
-        paths: {
-          summary: t(
-            'Nonempty caller-selected path list; each record projects a compound tuple key in this exact order, with multi-entry disabled.',
-            '调用方指定的非空路径列表；每条记录按此顺序投影复合元组键，并禁用多项展开。'
-          )
-        },
-        unique: {
-          summary: t(
-            'Whether each projected logical key may belong to only one record. Native and fallback paths use the same owner rule: a different owner rejects with `INDEX_UNIQUE_CONFLICT`, while replacement by the same id, reuse after deletion, compound keys and multi-entry keys follow the same rule.',
-            '每个投影逻辑键是否只能属于一条记录。原生与回退路径共用所有者判定：不同所有者冲突以 `INDEX_UNIQUE_CONFLICT` 拒绝；同标识替换、删除后复用、复合键与多项键均适用同一规则。'
-          ),
-          default: t(
-            '`false`: several records may share one logical index key.',
-            '`false`：多条记录可以共享同一个逻辑索引键。'
-          ),
-          values: {
-            true: t(
-              'Enforce uniqueness across different records for every projected key.',
-              '对每个投影键强制执行跨记录唯一性。'
-            ),
-            false: t(
-              'Permit different records to share a projected key.',
-              '允许不同记录共享相同的投影索引键。'
-            )
-          }
-        },
-        multiEntry: {
-          summary: t(
-            'Single-path option expanding an array projection into several keys. Compound paths permit only false; custom selectors must express multiplicity in their result and reject this field.',
-            '单路径选项，把数组投影展开成多个键。复合路径只允许假值；自定义选择器必须在结果中表达多项，并拒绝此字段。'
-          ),
-          default: t(
-            '`false` for path projections; absent for custom selectors.',
-            '路径投影默认为 `false`；自定义选择器必须省略。'
-          ),
-          values: {
-            true: t(
-              'Expand a single path’s array elements into separate index entries.',
-              '把单路径的数组元素展开为独立索引条目。'
-            ),
-            false: t(
-              'Keep one projected key, including a compound tuple.',
-              '保留单个投影键，包括复合元组键。'
-            )
-          }
-        },
-        revision: {
-          summary: t(
-            'Positive safe integer chosen by the caller for projection identity and backfill fingerprinting; custom selectors require it explicitly.',
-            '调用方指定的正安全整数，用于投影身份与回填指纹；自定义选择器必须显式提供。'
-          ),
-          default: t(
-            '`1` for path and compound projections; no omission is allowed for custom selectors.',
-            '路径与复合投影默认为 `1`；自定义选择器不允许省略。'
-          )
-        },
-        select: {
-          summary: t(
-            'Synchronous caller-owned `(value) => projection` receiving the domain record. Return a single key, multiple keys or undefined to omit indexing. Ordinary throws in fallback write validation cross the existing `EXTENSION_FAILED` boundary with operation `entity.index.project` and the original cause; native backfill preserves original error identity.',
-            '调用方持有的同步 `(value) => projection`，接收领域记录，返回单键、多键或空值以跳过索引。回退写校验中的普通抛错经既有 `EXTENSION_FAILED` 边界交付，操作为 `entity.index.project`，保留原始原因；原生回填保留原错误身份。'
-          ),
-          params: {
-            value: t(
-              'Domain record supplied by the entity repository during index projection.',
-              '实体仓库执行索引投影时提供的领域记录。'
-            )
-          },
-          returns: t(
-            '`{ kind: "single", key }`, `{ kind: "multiple", keys }` or undefined; every returned key must satisfy `IStorageKey`.',
-            '`{ kind: "single", key }`、`{ kind: "multiple", keys }` 或空值；各键必须满足 `IStorageKey`。'
-          ),
-          example: `const byStatus = {
-  revision: 1,
-  select: (value: { status: string }) => ({ kind: 'single' as const, key: value.status })
-}
-console.log(byStatus.select({ status: 'ready' }))`
-        }
-      }
-    },
-    IEntityIndexMap: alias(
-      'Map of index names to their key types, inferred from the definition.',
-      '索引名称到其 key 类型的映射，由定义自动推导。'
-    ),
-    IIndexedListOptions: alias(
-      'List options with `index` and an index key `range`.',
-      '带 `index` 与索引 key 范围 `range` 的列表查询选项。'
-    ),
-    IListOptions: {
-      summary: t(
-        'Options of `list` / `stream`.',
-        '`list` / `stream` 的选项：范围、数量、排序与无效记录处理。'
-      ),
-      members: {
-        range: {
-          summary: t(
-            'Primary key range `{ lower?, upper? }`.',
-            '要读取记录的主键范围 `{ lower?, upper? }`。'
-          ),
-          default: t('Not set: all records.', '不设置：读取全部记录。')
-        },
-        index: {
-          summary: t(
-            'Not allowed here; use indexed options.',
-            '此处不允许使用；请改用带索引的选项。'
-          )
-        },
-        limit: {
-          summary: t('Maximum number of records.', '最多返回的记录数量上限。'),
-          default: t('Not set: no limit.', '不设置：不限制数量。')
-        },
-        orderBy: {
-          summary: t(
-            'Comparator `(left, right) => number`.',
-            '决定结果排序的比较函数 `(left, right) => number`。'
-          ),
-          default: t('`defaultOrderBy` or key order.', '`defaultOrderBy` 或按 key 顺序。')
-        },
-        direction: {
-          summary: t('Iteration direction over keys.', '按 key 遍历记录时采用的方向。'),
-          default: t('`next`.', '`next`：升序。'),
-          values: {
-            next: t('Ascending keys.', '按 key 升序遍历。'),
-            prev: t('Descending keys.', '按 key 降序遍历。')
-          }
-        },
-        onInvalid: {
-          summary: t(
-            '`skip`, `throw` or `(issue) => action` for records that fail decode, migrate or validate.',
-            '对解码、迁移或校验失败的记录：`skip`、`throw` 或 `(issue) => action`。'
-          ),
-          default: t('`skip`.', '`skip`：跳过无效记录。')
-        }
-      }
-    },
-    IMigrateOptions: {
-      summary: t(
-        'Options of `repository.migrate()`.',
-        '`repository.migrate()` 的选项：批次大小与无效记录处理。'
-      ),
-      members: {
-        batchSize: {
-          summary: t(
-            'Positive safe-integer record count handled per batch.',
-            '每个批次处理的记录数量，须为正安全整数。'
-          ),
-          default: t('`100`.', '默认值为 `100` 条。')
-        },
-        onInvalid: {
-          summary: t(
-            '`skip`, `throw`, or `(issue) => action` for an invalid record.',
-            '遇到无效记录时使用 `skip`、`throw`，或返回动作的回调 `(issue) => action`。'
-          ),
-          default: t('`skip`.', '`skip`：跳过无效记录。'),
-          values: {
-            skip: t('Count and skip the invalid record.', '计数并跳过无效记录。'),
-            throw: t('Reject the migration at the invalid record.', '在无效记录处拒绝本次迁移。')
-          }
-        }
-      }
-    },
-    IMigrateResult: {
-      summary: t(
-        'Counts returned by `repository.migrate()`.',
-        '调用 `repository.migrate()` 后返回的统计结果。'
-      ),
-      members: {
-        scanned: { summary: t('Records read in this run.', '本次迁移读取的记录总数。') },
-        eligible: {
-          summary: t(
-            'Records older than the current version.',
-            '版本低于当前版本、需要迁移的记录数。'
-          )
-        },
-        migrated: {
-          summary: t('Records upgraded to the current version.', '成功升级到当前版本的记录数。')
-        },
-        skipped: { summary: t('Invalid records skipped.', '因无效而被跳过的记录数。') },
-        alreadyCurrent: {
-          summary: t(
-            'Records already at the current version, including concurrent upgrades observed inside the write transaction and preserved without overwrite.',
-            '已经是当前版本的记录数，包括写事务内观察到并保留、未被覆写的并发升级。'
-          )
-        },
-        conflicted: {
-          summary: t(
-            'Records changed concurrently and left for later.',
-            '被并发修改、留待之后处理的记录数。'
-          )
-        }
-      }
-    },
-    IInvalidRecordIssue: {
-      summary: t('Argument of an `onInvalid` handler.', '`onInvalid` 处理函数收到的问题描述。'),
-      members: {
-        key: { summary: t('Storage key of the invalid record.', '该条无效记录在存储中的 key。') },
-        raw: { summary: t('Raw value read from the store.', '从存储中读出的原始值。') },
-        record: {
-          summary: t('Decoded record, when decoding worked.', '解码后的记录（解码成功时才有）。')
-        },
-        stage: {
-          summary: t(
-            '`decode`, `migrate` or `validate`.',
-            '记录出错时所处的阶段：`decode`、`migrate` 或 `validate`。'
-          )
-        },
-        cause: { summary: t('The error of that stage.', '该阶段产生的原始错误。') }
-      }
-    },
-    IInvalidRecordAction: alias(
-      'Action for an invalid record: `skip` or `throw`.',
-      '对无效记录采取的动作：`skip` 或 `throw`。'
-    ),
-    IInvalidRecordHandler: alias(
-      'Handler `(issue) => "skip" | "throw"`.',
-      '处理无效记录的回调函数 `(issue) => "skip" | "throw"`。'
-    ),
-    IRecordComparator: alias(
-      'Comparator `(left, right) => number` used for ordering.',
-      '用于记录排序的比较函数 `(left, right) => number`。'
-    ),
-    IStorageHostCreateOptions: {
-      optionCases: hostOptionCases(false),
-      summary: t(
-        'Options of `createStorageHost()`.',
-        '`createStorageHost()` 的选项：初始插件与安装设置。'
-      ),
-      members: {
-        plugins: {
-          summary: t(
-            'Initial plugins installed atomically; ids must be unique.',
-            '原子安装的初始插件；id 必须唯一。'
-          ),
-          default: t('`[]`: an empty host.', '`[]`：创建一个空宿主。')
-        },
-        installTimeoutMs: {
-          summary: t('Deadline of one whole installation batch.', '一整批插件安装的截止时间。'),
-          default: t('`30000`.', '默认值为 `30000` 毫秒。')
-        },
-        scheduler: {
-          summary: t(
-            'Clock for installation, rollback and cleanup.',
-            '安装、回滚与清理所用的时钟。'
-          ),
-          default: t('`systemScheduler`.', '`systemScheduler`：宿主原生计时器。')
-        },
-        report: {
-          whenToUse: t(
-            'Supply a reporter when a timed-out initializer or delayed cleanup can fail after its caller has finished. The callback observes those secondary failures. Omission drops these diagnostics; throwing from it does not replace the installation or disposal result.',
-            '超时初始化器或延迟清理可能在调用方结束后失败时，提供报告回调。它观察这些次级失败。省略时丢弃诊断，回调抛错不会替换安装或释放结果。'
-          ),
-          example: hostOptionCases(false)[1]!.example,
-          summary: t(
-            'Receives late rejections and cleanup diagnostics.',
-            '接收迟到的拒绝与清理诊断。'
-          ),
-          default: t('Not set: diagnostics are dropped.', '不设置：诊断信息被丢弃。')
-        }
-      }
-    },
-    IStorageHostOptions: {
-      optionCases: hostOptionCases(true),
-      summary: t(
-        'Options of `new StorageHostFacade()`.',
-        '`new StorageHostFacade()` 的选项：安装超时、时钟与上报。'
-      ),
-      members: {
-        installTimeoutMs: {
-          summary: t('Deadline of one installation batch.', '一整批插件安装的截止时间。'),
-          default: t('`30000`.', '默认值为 `30000` 毫秒。')
-        },
-        scheduler: {
-          summary: t('Clock for installation and cleanup.', '安装与清理所用的时钟。'),
-          default: t('`systemScheduler`.', '`systemScheduler`：宿主原生计时器。')
-        },
-        report: {
-          whenToUse: t(
-            'Supply a reporter when a timed-out initializer or delayed cleanup can fail after its caller has finished. The callback observes those secondary failures. Omission drops these diagnostics; throwing from it does not replace the installation or disposal result.',
-            '超时初始化器或延迟清理可能在调用方结束后失败时，提供报告回调。它观察这些次级失败。省略时丢弃诊断，回调抛错不会替换安装或释放结果。'
-          ),
-          example: hostOptionCases(true)[1]!.example,
-          summary: t(
-            'Receives late rejections and cleanup diagnostics.',
-            '接收迟到的拒绝与清理诊断。'
-          ),
-          default: t('Not set.', '不设置：诊断信息被丢弃。')
-        }
-      }
-    },
-    IStorageHost: {
-      summary: t(
-        'Storage host returned by `createStorageHost()`.',
-        '`createStorageHost()` 返回的存储宿主对象，按 id 管理后端。'
-      ),
-      scenarios: [
-        t(
-          'Keep several storage backends behind ids and dispose them together.',
-          '按 id 管理多个存储后端，并统一释放。'
-        )
-      ],
-      example: createHostExample,
-      members: hostMembers
-    },
-    IStorageHostBase: {
-      summary: t('Members every storage host has.', '每个存储宿主都具备的成员。'),
-      // `liveQuery` belongs to `IStorageHostReactiveApi`, which only a reactive host adds.
-      members: Object.fromEntries(
-        Object.entries(hostMembers).filter(([name]) => name !== 'liveQuery')
-      )
-    },
-    StorageHostFacade: {
-      summary: t(
-        'Host class; same members as `IStorageHost`.',
-        '存储宿主类；其成员与 `IStorageHost` 完全相同。'
-      ),
-      scenarios: [
-        t('Create an empty host and install backends later.', '先创建空宿主，之后再安装后端。')
-      ],
-      example: createHostExample,
-      members: hostMembers
-    },
-    IStorageHostReactiveApi: {
-      summary: t(
-        '`liveQuery` added when a reactive backend is installed.',
-        '安装响应式后端后增加的 `liveQuery`。'
-      ),
-      members: { liveQuery: hostMembers.liveQuery as IMemberDoc }
-    },
-    ILiveQueryOptions: {
-      summary: t(
-        'Options of `host.liveQuery()`.',
-        '`host.liveQuery()` 的选项：后端、运行时、查询与刷新策略。'
-      ),
-      example: liveQueryExample,
-      members: {
-        backendId: {
-          summary: t(
-            'Id of a backend installed with a `*Reactive` plugin.',
-            '通过 `*Reactive` 插件安装的后端的 id。'
-          )
-        },
-        runtime: {
-          summary: t(
-            'Reactive runtime from `createRuntime()`; `state` is a computed on it.',
-            '由 `createRuntime()` 创建的响应式运行时；`state` 是其上的 computed。'
-          )
-        },
-        query: {
-          summary: t(
-            '`({ store, signal, scope }) => value`: reads the data; re-run on every relevant change.',
-            '`({ store, signal, scope }) => value`：读取数据；每次相关变化都会重新执行。'
-          )
-        },
-        scope: {
-          summary: t(
-            'Entity scope that lets unrelated changes be ignored.',
-            '实体范围，用于忽略不相关的变化。'
-          ),
-          default: t('Not set: every change refreshes.', '不设置：任何变化都会刷新。')
-        },
-        matches: {
-          summary: t(
-            '`(change) => boolean`; a throw is reported and refreshes anyway.',
-            '`(change) => boolean`；抛错会被上报，并照常刷新。'
-          ),
-          default: t('Not set.', '不设置：不额外过滤变化。')
-        },
-        keepPreviousData: {
-          summary: t(
-            'Keep showing the last value while refreshing (`refreshing` state).',
-            '刷新期间继续显示上一次的值（`refreshing` 状态）。'
-          ),
-          default: t('`true`.', '`true`：刷新时保留旧值。')
-        },
-        equals: {
-          summary: t(
-            '`(previous, next) => boolean`; equal results do not replace the visible value.',
-            '`(previous, next) => boolean`；结果相等时不替换显示的值。'
-          ),
-          default: t('Not set: every result replaces it.', '不设置：每次结果都替换显示值。')
-        },
-        timeoutMs: {
-          summary: t('Deadline of each query run.', '每次查询执行的截止时间。'),
-          default: t('Not set: no deadline.', '不设置：没有截止时间。')
-        },
-        signal: {
-          summary: t('Cancels the whole live query.', '用于取消整个实时查询的信号。'),
-          default: t('Not set.', '不设置：只能通过 `dispose()` 结束。')
-        },
-        report: {
-          summary: t(
-            'Receives late settlements and cleanup failures.',
-            '接收迟到的结果与清理失败。'
-          ),
-          default: t('Not set.', '不设置：这类诊断被丢弃。')
-        }
-      }
-    },
     ILiveQuery: {
       summary: t(
-        'A live query returned by `host.liveQuery()`.',
-        '`host.liveQuery()` 返回的、会自动刷新的实时查询对象。'
+        'A live query returned by `query.live()`.',
+        '`query.live()` 返回的、会自动刷新的实时查询对象。'
       ),
       scenarios: [
         t(
@@ -2311,7 +632,7 @@ console.log(byStatus.select({ status: 'ready' }))`
           '展示一个在其它标签页写入 IndexedDB 时自动更新的列表。'
         )
       ],
-      example: liveQueryExample,
+      example: liveExample,
       members: {
         state: {
           summary: t(
@@ -2440,38 +761,6 @@ console.log(byStatus.select({ status: 'ready' }))`
         }
       }
     },
-    IReactiveBackendHandle: {
-      summary: t(
-        'Handle returned by `host.reactiveBackend(id)`.',
-        '`host.reactiveBackend(id)` 返回的响应式后端句柄。'
-      ),
-      scenarios: [
-        t(
-          'Give a feature module one backend with live queries but without the whole host.',
-          '把带实时查询的单个后端交给某个功能模块，而不暴露整个宿主。'
-        )
-      ],
-      example: `const handle = host.reactiveBackend('app')
-const query = handle.liveQuery({ runtime, query: ({ store }) => store.get('theme') })`,
-      members: {
-        id: { summary: t('Backend id of the handle.', '该响应式句柄对应的后端 id。') },
-        store: { summary: t('The store of the backend.', '该后端对应的存储对象本身。') },
-        liveQuery: {
-          summary: t(
-            'Creates a live query on this backend (`backendId` is implied).',
-            '在该后端上创建实时查询（隐含 `backendId`）。'
-          ),
-          params: {
-            options: t(
-              'Live query options without `backendId`.',
-              '不含 `backendId` 的实时查询选项。'
-            )
-          },
-          returns: t('An `ILiveQuery`.', '一个实时查询对象 `ILiveQuery`。'),
-          example: `handle.liveQuery({ runtime, query: ({ store }) => store.keys() })`
-        }
-      }
-    },
     IReactiveConsistency: {
       summary: t(
         'Consistency promise of a reactive adapter, shown on `query.consistency`.',
@@ -2497,391 +786,216 @@ const query = handle.liveQuery({ runtime, query: ({ store }) => store.get('theme
         }
       }
     },
-    IStorageReactiveVisibility: alias(
-      'Which writes a reactive adapter can see: `instance`, `document-eventual`, `top-level-context-eventual`, `origin-js-visible-eventual`, `origin-eventual`.',
-      '响应式适配器能观察到哪些写入：`instance`、`document-eventual`、`top-level-context-eventual`、`origin-js-visible-eventual`、`origin-eventual`。'
-    ),
-    IReactiveAdapterDefinition: {
+    ILocalStorageOptions: {
       summary: t(
-        'Input of `defineReactiveAdapterFeature()`.',
-        '`defineReactiveAdapterFeature()` 的输入：模式、可见性与订阅函数。'
+        'Native local-storage options for localStorageBackendPlugin.',
+        '`localStorageBackendPlugin` 使用的原生本地存储选项。'
+      ),
+      members: webStorageFields('localStorage'),
+      optionCases: optionCases('local-storage', 'localStorageBackendPlugin', 'local')
+    },
+    ISessionStorageOptions: {
+      summary: t(
+        'Native session-storage options for sessionStorageBackendPlugin.',
+        '`sessionStorageBackendPlugin` 使用的原生会话存储选项。'
+      ),
+      members: webStorageFields('sessionStorage'),
+      optionCases: optionCases('session-storage', 'sessionStorageBackendPlugin', 'session')
+    },
+    ICookiesOptions: {
+      summary: t(
+        'Cookie native port, namespace and fixed scope.',
+        '浏览器 Cookie 原生端口、命名空间及固定作用域。'
+      ),
+      members: cookieFields,
+      optionCases: optionCases('cookies', 'cookieBackendPlugin', 'cookies')
+    },
+    IIndexedDbOptions: {
+      summary: t(
+        'Native database preparation and physical layout options.',
+        '原生数据库准备与物理布局选项。'
+      ),
+      members: indexedDbFields,
+      optionCases: optionCases('indexed-db', 'indexedDbBackendPlugin', 'indexed-db')
+    },
+    IStorageErrorCode: alias(
+      'One value from the browser-owned error table.',
+      '浏览器错误表中的一个错误码取值。'
+    ),
+    IStorageChannel: alias(
+      'Browser diagnostic channel: value, bytes or record.',
+      '浏览器诊断数据通道：值、字节或记录。'
+    ),
+    IExtensionStage: alias(
+      'The failing extension boundary retained on a browser error.',
+      '浏览器错误保留的失败扩展边界。'
+    ),
+    ILocalStorageBackendStore: {
+      ...storageContractReference.types.IKeyValueStore!,
+      summary: t(
+        'Installed localStorage backend with its original synchronous text API.',
+        '已安装的本地存储后端，保留原同步文本接口。'
+      )
+    },
+    ISessionStorageBackendStore: {
+      ...storageContractReference.types.IKeyValueStore!,
+      summary: t(
+        'Installed sessionStorage backend with its original synchronous text API.',
+        '已安装的会话存储后端，保留原同步文本接口。'
+      )
+    },
+    ICookieBackendStore: {
+      ...storageContractReference.types.IKeyValueStore!,
+      summary: t(
+        'Installed JS-visible cookie backend with fixed-scope writes.',
+        '已安装的脚本可见 Cookie 后端，写入使用固定作用域。'
+      )
+    },
+    IIndexedDbBackendStore: {
+      ...storageContractReference.types.IRecordStore!,
+      summary: t(
+        'Installed native IndexedDB backend with complete same-transaction scope methods.',
+        '已安装的原生索引数据库后端，提供完整同事务作用域方法。'
+      )
+    },
+    IIndexedDbFeatureExpose: {
+      summary: t(
+        'Borrow original native clients and declare stores during installation.',
+        '借用原生客户端，并在安装期间声明对象存储。'
       ),
       members: {
-        mode: {
-          summary: t('How the adapter detects changes.', '该适配器检测数据变化的方式。'),
-          values: {
-            push: t('`subscribe` reports every change.', '由 `subscribe` 报告每一次变化。'),
-            hybrid: t('Events plus polling.', '变化事件加上定期轮询。'),
-            polling: t('Only polling every `pollIntervalMs`.', '只按 `pollIntervalMs` 定期轮询。')
-          }
-        },
-        pollIntervalMs: {
+        getClient: {
           summary: t(
-            'Polling interval for `hybrid` / `polling`.',
-            '`hybrid` / `polling` 模式下的轮询时间间隔。'
+            'Read the original prepared database for this registration.',
+            '读取该注册原有且已准备的数据库。'
           ),
-          default: t('Not set: no polling.', '不设置：不轮询。')
+          returns: t('The original IDBDatabase.', '原有数据库对象。'),
+          example: `const database = featureExpose.getClient()`
         },
-        visibility: {
-          summary: t('Which writers the adapter can observe.', '该适配器能观察到哪些写入方。'),
-          values: {
-            instance: t(
-              'Only writes through this store instance.',
-              '只能观察到通过本存储实例的写入。'
-            ),
-            'document-eventual': t(
-              'Writes from other documents of the origin, eventually.',
-              '最终能观察到同源其它文档的写入。'
-            ),
-            'top-level-context-eventual': t(
-              'Writes within the same top-level browsing context, eventually.',
-              '最终能观察到同一顶层浏览上下文中的写入。'
-            ),
-            'origin-js-visible-eventual': t(
-              'JS-visible writes of the origin (no HttpOnly), eventually.',
-              '最终能观察到同源中 JS 可见的写入（不含 HttpOnly）。'
-            ),
-            'origin-eventual': t(
-              'Writes from any context of the origin, eventually.',
-              '最终能观察到同源任意上下文的写入。'
-            )
-          }
-        },
-        subscribe: {
+        getTransactionClient: {
           summary: t(
-            'Starts listening and calls `context.invalidate(change)` for known changes, or `context.invalidate()` to refresh every query on this adapter when no payload is available.',
-            '开始监听；已知变化时调用 `context.invalidate(change)`，没有具体载荷时调用 `context.invalidate()` 刷新本适配器全部查询。'
+            'Validate exact scope ownership before borrowing its native transaction.',
+            '借用原生事务前校验精确作用域所有权。'
           ),
           params: {
-            context: t(
-              'Host-supplied `{ store, scheduler, signal, invalidate, report }` for this adapter; the signal ends source listening when the adapter stops.',
-              '宿主为本适配器提供的订阅上下文 `{ store, scheduler, signal, invalidate, report }`；适配器停止时信号结束来源监听。'
+            scope: t(
+              'A current scope from this installed store.',
+              '当前已安装存储提供的活跃作用域。'
             )
           },
-          returns: t('A disposer that stops listening.', '停止监听的清理函数。')
-        }
-      }
-    },
-    IReactiveAdapterContext: {
-      summary: t(
-        'Argument of `subscribe` in a reactive adapter.',
-        '响应式适配器中 `subscribe` 收到的上下文。'
-      ),
-      members: {
-        store: { summary: t('The store being observed.', '正在被观察的存储对象。') },
-        scheduler: { summary: t('Host clock used for timers.', '计时器所用的宿主时钟。') },
-        signal: { summary: t('Aborts when the adapter stops.', '适配器停止时中止的信号。') },
-        invalidate: {
-          summary: t(
-            'Marks queries stale; pass a known change to permit filtering. Calling invalidate() without a change refreshes every live query on the same adapter, bypassing scope and matches filters without inventing sequence or origin values.',
-            '把查询标记为过期；已知变化时传入变更以允许过滤。无参数调用使同一适配器全部实时查询刷新，跳过作用域和匹配过滤，不虚构序号或来源值。'
-          )
-        },
-        report: { summary: t('Reports adapter failures.', '上报适配器内部的失败。') }
-      }
-    },
-    IStorageReactiveSubscribeContext: {
-      summary: t(
-        'Low-level subscribe context of reactive metadata.',
-        '响应式元数据所用的底层订阅上下文。'
-      ),
-      members: {
-        store: { summary: t('The store being observed.', '正在被观察的存储对象。') },
-        scheduler: {
-          summary: t(
-            'Host clock shared with installation deadlines.',
-            '与安装截止时间共用的宿主时钟。'
-          )
-        },
-        signal: { summary: t('Aborts when the adapter stops.', '适配器停止时中止的信号。') },
-        report: { summary: t('Reports adapter failures.', '上报适配器内部的失败。') },
-        onChange: {
-          summary: t(
-            'Receives an optional backend change. Undefined invalidates all queries on this adapter; a known change permits scope and matches filtering, with no fabricated sequence or origin.',
-            '接收可选后端变更。空值使本适配器全部查询失效；已知变更允许作用域与匹配过滤，不虚构序号或来源。'
-          )
-        }
-      }
-    },
-    IStorageReactiveFeatureMetadata: {
-      summary: t('Reactive metadata of a built-in adapter.', '内置适配器的响应式元数据。'),
-      members: {
-        mode: {
-          summary: t(
-            '`push`, `hybrid` or `polling`.',
-            '检测数据变化的方式：`push`、`hybrid` 或 `polling`。'
+          returns: t(
+            'The same original native transaction; forged or closed scopes fail.',
+            '同一个原生事务，伪造或已关闭作用域失败。'
           ),
-          values: {
-            push: t('Immediate change reports.', '立即报告每一次变化。'),
-            hybrid: t('Events plus polling.', '变化事件加上定期轮询。'),
-            polling: t('Polling only.', '只通过定期轮询发现变化。')
-          }
+          example: `const transaction = featureExpose.getTransactionClient(scope)`
         },
-        visibility: { summary: t('Which writers are observed.', '该适配器能观察到哪些写入方。') },
-        pollIntervalMs: {
-          summary: t('Polling interval in milliseconds.', '定期轮询的时间间隔，单位毫秒。')
-        },
-        subscribe: { summary: t('Starts listening for changes.', '开始监听存储变化的函数。') }
-      }
-    },
-    IStorageReactiveSourceDisposer: alias(
-      'Function returned by `subscribe` that stops listening.',
-      '`subscribe` 返回的、用于停止监听的函数。'
-    ),
-    IStoragePluginCore: {
-      summary: t(
-        'The `core` passed to `definePlugin(name, (core) => ...)`.',
-        '传给 `definePlugin(name, (core) => ...)` 工厂函数的插件核心 `core` 对象。'
-      ),
-      members: {
-        registerStore: {
+        requireObjectStore: {
           summary: t(
-            'Registers the store of this plugin; must be called once.',
-            '登记该插件的存储；必须调用且只调用一次。'
-          )
-        },
-        getStore: { summary: t('Returns the registered store.', '返回已登记的存储对象。') },
-        getBackendId: {
-          summary: t('Returns the backend id of the plugin.', '返回该插件安装时的后端 id。')
-        },
-        features: {
-          summary: t('Outputs of the declared Features.', '已声明的各 Feature 的输出对象。')
-        },
-        featureExpose: {
-          summary: t(
-            'Values exposed to Features of this plugin.',
-            '暴露给本插件各个 Feature 的值。'
-          )
+            'Declare an additional object store before the original opener is sealed.',
+            '原有打开器封闭前声明额外对象存储。'
+          ),
+          params: {
+            name: t('A nonempty application-owned store name.', '应用拥有的非空对象存储名称。')
+          },
+          returns: t(
+            'Records the schema declaration; late declarations fail INVALID_CONFIG.',
+            '登记结构声明，迟到声明报 `INVALID_CONFIG`。'
+          ),
+          example: `featureExpose.requireObjectStore('attachments')`
         }
       }
     },
-    IStorageNativePluginDescriptor: {
+    IChainLiveQueryOptions: {
       summary: t(
-        'What a `definePlugin` factory may return.',
-        '`definePlugin` 工厂函数可以返回的描述对象。'
+        'Caller-owned Runtime and generation options for query.live().',
+        '`query.live()` 使用的调用者运行时及查询代际选项。'
       ),
+      example: liveExample,
       members: {
-        install: {
+        runtime: {
           summary: t(
-            'Returns extension APIs added to `host.extensions`.',
-            '返回会被合并进 `host.extensions` 的扩展 API。'
+            'The caller Runtime created by createRuntime().',
+            '调用者通过 `createRuntime()` 创建的运行时。'
           )
         },
-        expose: {
-          summary: t('Returns APIs exposed to other plugins.', '返回暴露给其它插件的 API。')
+        scope: {
+          summary: t('Optional logical change scope.', '可选的逻辑变化范围。'),
+          default: t('No scope filter.', '默认不按范围过滤。')
         },
-        featureExpose: {
-          summary: t('Returns values exposed to Features.', '返回暴露给本插件各个 Feature 的值。')
-        }
-      }
-    },
-    IStorageBackendPluginHandle: {
-      summary: t(
-        'Opaque handle of a backend plugin; carries its id and store type.',
-        '后端插件的不透明句柄；携带其 id 与存储类型。'
-      ),
-      scenarios: [
-        t(
-          'Pass plugins around before deciding which host installs them.',
-          '在决定由哪个宿主安装之前传递插件。'
-        )
-      ],
-      example: `const plugin = memoryBackendPlugin({ id: 'cache' })
-await host.use(plugin)`,
-      members: {
-        id: { summary: t('Backend id the plugin installs under.', '插件安装时使用的后端 id。') }
-      }
-    },
-    IStorageBackendPlugin: {
-      summary: t('Typed plugin handle of a built-in backend.', '内置后端的类型化插件句柄。'),
-      scenarios: [
-        t(
-          'Keep the literal backend id returned by a built-in plugin factory so installation and backend lookup retain the same typed identity.',
-          '保留内置插件工厂返回的字面量后端 id，使插件安装与后端查找使用同一个类型化标识。'
-        )
-      ],
-      example: `import { createStorageHost } from '@migaia/storage-web/host'
-import { memoryBackendPlugin } from '@migaia/storage-web/plugins/memory'
-
-const cache = memoryBackendPlugin({ id: 'cache' })
-const host = await createStorageHost({ plugins: [cache] as const })
-try {
-  await host.backend(cache.id).set('theme', 'dark')
-} finally {
-  await host.dispose()
-}`,
-      members: {
-        id: { summary: t('Backend id the plugin installs under.', '插件安装时使用的后端 id。') }
-      }
-    },
-    IStorageBackendKind: {
-      summary: t(
-        'Opaque token of a backend kind used to match adapters.',
-        '用于匹配适配器的后端类型不透明标记。'
-      ),
-      members: {
-        name: {
-          summary: t('Kind name, e.g. `indexed-db`.', '该后端类型的名称，例如 `indexed-db`。')
-        }
-      }
-    },
-    IPluginStoreMap: alias(
-      'Map from plugin ids to store types for a plugin tuple.',
-      '插件元组中插件 id 到存储类型的映射。'
-    ),
-    IRejectInstalledOrDuplicateIds: alias(
-      'Type check that rejects already installed or duplicate ids at compile time.',
-      '在编译期拒绝已安装或重复 id 的类型检查。'
-    ),
-    IStoragePluginExtensions: alias(
-      'Extension API type of a plugin.',
-      '某个插件安装后提供的扩展 API 类型。'
-    ),
-    IStoragePluginId: alias('Literal id type of a plugin.', '某个插件的字面量 id 类型。'),
-    IStoragePluginReactiveId: alias('Id type of a reactive plugin.', '某个响应式插件的 id 类型。'),
-    IStoragePluginStore: alias('Store type provided by a plugin.', '某个插件所提供的存储类型。'),
-    IMigration: alias(
-      'Migration function `(previous, ctx) => Promise<next>`.',
-      '单个版本步骤的迁移函数类型 `(previous, ctx) => Promise<next>`。'
-    ),
-    IMigrationContext: {
-      summary: t('Second argument of a migration function.', '迁移函数收到的第二个参数。'),
-      members: {
-        fromVersion: { summary: t('Version being migrated from.', '本步迁移开始时的版本号。') },
-        toVersion: { summary: t('Version being migrated to.', '本步迁移要达到的版本号。') },
+        matches: {
+          summary: t(
+            'Filter actual changes; throws report and conservatively refresh.',
+            '过滤实际变化，抛错时报告并保守刷新。'
+          ),
+          default: t('No predicate.', '默认无谓词。')
+        },
+        keepPreviousData: {
+          summary: t('Retain the last value while refreshing.', '刷新时保留上次值。'),
+          default: t('`true`.', '默认 `true`。')
+        },
+        equals: {
+          summary: t(
+            'Suppress replacement for equivalent settled results.',
+            '结果等价时抑制可见值替换。'
+          ),
+          default: t('No suppression.', '默认不抑制。')
+        },
+        timeoutMs: {
+          summary: t('Optional deadline per query generation.', '每代查询的可选期限。'),
+          default: t('No deadline.', '默认无限期。')
+        },
         signal: {
-          summary: t('Optional signal to cancel the migration.', '可选的取消信号，用于协作取消。')
+          summary: t('Cancel the entire live-query lifetime.', '取消整个实时查询生命周期。'),
+          default: t('No external signal.', '默认无外部信号。')
+        },
+        report: {
+          summary: t(
+            'Receive existing Resource diagnostics without changing query results.',
+            '接收已有资源诊断，不改变查询结果。'
+          ),
+          default: t('Use the original diagnostic boundary.', '默认使用原有诊断边界。')
         }
       }
     },
-    ISchemaAdapter: {
+    IReactiveLiveMethods: {
       summary: t(
-        'Schema adapter used by entities: validation plus optional stored-shape conversion.',
-        '实体使用的 schema 适配器：校验以及可选的存储形态转换。'
+        'The live terminal installed on an existing all-capable query.',
+        '安装到已有可取全部结果查询上的实时终点。'
       ),
-      scenarios: [
-        t(
-          'Store dates as ISO strings while the domain uses `Date`.',
-          '领域对象使用 `Date`，存储时保存为 ISO 字符串。'
-        )
-      ],
-      example: `const schema: ISchemaAdapter<IEvent, IStoredEvent> = {
-  name: 'event',
-  validate: async (value) => value as IEvent,
-  encode: async (event) => ({ ...event, at: event.at.toISOString() }),
-  decode: async (raw) => ({ ...raw, at: new Date(raw.at) })
-}`,
       members: {
-        name: { summary: t('Name used in diagnostics.', '诊断信息中使用的名称。') },
-        validate: {
+        live: {
           summary: t(
-            'Checks a value and returns the domain object (may be async).',
-            '校验某个值并返回领域对象（可以是异步的）。'
+            'Start a resource-backed live query from this exact query terminal.',
+            '从当前精确查询终点启动资源支持的实时查询。'
           ),
           params: {
-            value: t('Value to check.', '要校验的值。'),
-            ctx: t('Operation context.', '操作上下文，可用于取消。')
+            options: t(
+              'Runtime and generation options supplied by the caller.',
+              '调用者提供的运行时及代际选项。'
+            )
           },
-          returns: t('The domain object.', '校验通过后的领域对象。'),
-          example: `await schema.validate(input)`
-        },
-        encode: {
-          summary: t('Domain object to stored shape.', '把领域对象转换为存储形态。'),
-          params: {
-            value: t('Domain object.', '要转换的领域对象。'),
-            ctx: t('Operation context.', '操作上下文，可用于取消。')
-          },
-          returns: t('Stored shape.', '转换后的存储形态。'),
-          example: `await schema.encode?.(event)`
-        },
-        decode: {
-          summary: t('Stored shape to domain object.', '把存储形态转换回领域对象。'),
-          params: {
-            raw: t('Stored shape.', '已存储的值。'),
-            ctx: t('Operation context.', '操作上下文，可用于取消。')
-          },
-          returns: t('Domain object.', '转换后的领域对象。'),
-          example: `await schema.decode?.(raw)`
-        },
-        normalize: {
-          summary: t('Optional clean-up before writing.', '写入前可选的规范化处理。'),
-          params: {
-            value: t('Validated value.', '已校验的值。'),
-            ctx: t('Operation context.', '操作上下文，可用于取消。')
-          },
-          returns: t('Normalised value.', '规范化后的值。'),
-          example: `await schema.normalize?.(value)`
+          returns: t(
+            'An ILiveQuery retaining the original terminal result type.',
+            '保留原终点结果类型的实时查询。'
+          ),
+          example: liveExample
         }
       }
     },
-    IStandardSchemaV1: {
+    IReactiveFeatureOutput: {
       summary: t(
-        'Standard Schema v1 shape (`~standard.validate`) implemented by zod, valibot and arktype.',
-        '由 zod、valibot、arktype 等校验库实现的 Standard Schema v1 形状（`~standard.validate`）。'
+        'Feature output with query/vector/rdf live methods and no added capability token.',
+        '为普通、向量与图查询提供实时方法且不增加能力令牌的特性输出。'
       ),
       members: {
-        '~standard': {
+        capabilities: { summary: t('An empty capability tuple.', '空能力元组。') },
+        chain: {
           summary: t(
-            'Interface object the validation library attaches to each schema. `fromStandardSchema()` checks that `version` is `1`, `vendor` is a non-empty string and `validate` is a function, and throws `INVALID_CONFIG` otherwise.',
-            '校验库挂在每个 schema 上的接口对象。`fromStandardSchema()` 会检查 `version` 为 `1`、`vendor` 是非空字符串、`validate` 是函数，不满足时抛出 `INVALID_CONFIG`。'
+            'Live methods attached to supported query families.',
+            '附加到受支持查询族的实时方法。'
           )
         },
-        '~standard.version': {
-          summary: t('Spec version; must be `1`.', '规范版本号，必须是 `1`。')
-        },
-        '~standard.vendor': {
-          summary: t(
-            'Nonempty validator vendor label; the adapter is named `standard-schema:<vendor>`.',
-            '校验器的非空提供方标签；适配器名称为 `standard-schema:<vendor>`。'
-          )
-        },
-        '~standard.validate': {
-          summary: t(
-            'Validates one value and returns `{ value }` on success or `{ issues }` on failure, directly or as a Promise. A throw, a rejection, an invalid result or any issue becomes `VALIDATION_FAILED`.',
-            '校验一个值，成功时返回 `{ value }`，失败时返回 `{ issues }`，可以直接返回或返回 Promise。抛错、拒绝、结果格式不对或带有 issues，都会变成 `VALIDATION_FAILED`。'
-          )
-        }
-      }
-    },
-    ISelectedCodec: {
-      summary: t(
-        'Codec route chosen by `selectCodec()` for one backend.',
-        '`selectCodec()` 为某个后端选定的编解码路径。'
-      ),
-      scenarios: [
-        t(
-          'Write bytes to localStorage as Base64 and read them back as bytes.',
-          '把字节以 Base64 写入 localStorage，读取时还原为字节。'
-        )
-      ],
-      example: `const selected = selectCodec(binaryCodec, localStorageHost().capabilities)
-const text = await selected.encode(new Uint8Array([1, 2]))
-const bytes = await selected.decode(text)`,
-      members: {
-        encode: {
-          summary: t(
-            'Produces what the backend stores (string, bytes or object).',
-            '生成后端实际保存的值（字符串、字节或对象）。'
-          ),
-          params: {
-            value: t('Value to encode.', '要编码的值。'),
-            ctx: t('`{ signal? }`.', '可选的上下文 `{ signal? }`。')
-          },
-          returns: t('Encoded value.', '编码后的值。'),
-          example: `await selected.encode(value)`
-        },
-        decode: {
-          summary: t(
-            'Reverses `encode` and returns the value.',
-            '执行 `encode` 的逆过程，还原原始值。'
-          ),
-          params: {
-            raw: t('Stored value.', '已存储的值。'),
-            ctx: t('`{ signal? }`.', '可选的上下文 `{ signal? }`。')
-          },
-          returns: t('Decoded value.', '解码后的值。'),
-          example: `await selected.decode(raw)`
-        }
+        api: { summary: t('Empty store and transaction API records.', '空存储及事务方法记录。') }
       }
     }
   },
@@ -2892,18 +1006,6 @@ const bytes = await selected.decode(text)`,
         '按所属接纳、后端、索引或实时查询失败场景命名的稳定诊断消息。'
       ),
       values: {
-        entityUniqueSnapshotChanged: t(
-          'The KV raw-text snapshot changed during preparation; `TRANSACTION_CONFLICT` asks the caller to retry the complete write.',
-          '键值原始文本快照在准备期间发生变化；`TRANSACTION_CONFLICT` 要求调用方重试完整写入。'
-        ),
-        entityMigrationGraphIncomplete: t(
-          'Entity construction omitted an upgrade step from 2 through the current version; correct the graph before retrying.',
-          '实体构造缺少从二到当前版本的升级步骤；重试前必须补全迁移图。'
-        ),
-        standardSchemaIssuesInvalid: t(
-          'A Standard Schema implementation returned malformed issue entries rather than message-bearing objects.',
-          '标准结构校验实现返回了格式错误的问题条目，而非携带消息的对象。'
-        ),
         namespaceCodecEncodeInvalid: t(
           'A namespace encoder returned a non-string physical key.',
           '命名空间编码器返回了非字符串的物理存储键。'
@@ -2911,6 +1013,22 @@ const bytes = await selected.decode(text)`,
         namespaceCodecDecodeInvalid: t(
           'A namespace decoder returned neither a string key nor undefined for another namespace.',
           '命名空间解码器既未返回字符串键，也未以空值表示其他命名空间。'
+        ),
+        namespaceTypedCodecInvalid: t(
+          'Typed namespace support supplies only one direction or a non-callable method.',
+          '结构键命名空间支持只提供一个方向，或提供了不可调用的方法。'
+        ),
+        namespaceCodecInvalid: t(
+          'The original namespace codec lacks callable encode and decode methods.',
+          '原命名空间编码器缺少可调用的 encode 和 decode。'
+        ),
+        namespaceKeyInvalid: t(
+          'String-key encoding received a non-string namespace or key.',
+          '字符串键编码收到非字符串的命名空间或键。'
+        ),
+        namespacePhysicalKeyInvalid: t(
+          'Namespace decoding received a non-string namespace or physical key.',
+          '命名空间解码收到非字符串的命名空间或物理键。'
         ),
         webStorageInjectionInvalid: t(
           'Injected Web Storage lacks part of the required storage interface.',
@@ -2940,58 +1058,6 @@ const bytes = await selected.decode(text)`,
           'An admitted cookie document stopped exposing its cookie property as a string.',
           '已接纳的网页文档不再以字符串形式提供存储属性。'
         ),
-        entityComparatorInvalid: t(
-          'An entity ordering callback returned an invalid comparison number.',
-          '实体排序回调返回无效比较数字，无法确定记录顺序。'
-        ),
-        storageKeyDecodeLimitExceeded: t(
-          'An encoded key exceeded the supported decode depth or node limits.',
-          '编码存储键超过支持的解码深度或节点数量上限。'
-        ),
-        storageKeyWireInvalid: t(
-          'An encoded key is not the required two-slot wire tuple.',
-          '编码存储键不符合必需的双位置传输元组格式。'
-        ),
-        storageKeyBinaryTooLarge: t(
-          'A binary storage key exceeds the public encoded-key size bound.',
-          '二进制存储键超过公开允许的编码键大小上限。'
-        ),
-        storageKeyWireTagInvalid: t(
-          'An encoded storage key uses an unknown wire type tag.',
-          '编码存储键使用了未知的传输类型标记。'
-        ),
-        backendIdInvalid: t(
-          'A backend identifier violates the registration name grammar before mutation.',
-          '后端标识不符合登记命名语法，在变更前拒绝。'
-        ),
-        backendDuplicate: t(
-          'A backend identifier is already installed or duplicated in the install batch.',
-          '后端标识已经安装，或在安装批次中重复出现。'
-        ),
-        backendNotInstalled: t(
-          'A valid backend identifier has no installed registry entry.',
-          '有效后端标识没有对应的已安装注册表条目。'
-        ),
-        backendPluginInvalid: t(
-          'A backend plugin or returned store violates its public contract.',
-          '后端插件或返回存储违反公开契约，无法接纳。'
-        ),
-        backendInstallFailed: t(
-          'Backend factory creation, preparation or PluginHost installation failed.',
-          '后端工厂创建、准备或插件宿主安装阶段失败。'
-        ),
-        storageHostBusy: t(
-          'A host mutation was requested while another install batch was running.',
-          '其他安装批次正在运行时又请求修改存储宿主。'
-        ),
-        storageHostDisposed: t(
-          'A host operation ran after the host sealed or reached terminal disposal.',
-          '宿主封闭或终止释放后仍然调用宿主操作。'
-        ),
-        storageHostDisposeFailed: t(
-          'Several host cleanup failures are summarized while disposal remains terminal.',
-          '宿主多个清理失败被汇总，释放状态仍保持终止。'
-        ),
         liveQueryDisposeFailed: t(
           'Several live-query cleanup failures are summarized after disposal.',
           '实时查询释放后的多个清理失败被聚合汇总。'
@@ -2999,14 +1065,6 @@ const bytes = await selected.decode(text)`,
         reactiveFeatureInvalid: t(
           'A reactive provider, feature or adapter descriptor has an invalid shape.',
           '响应式提供方、特性或适配器描述形状不合法。'
-        ),
-        reactiveTopologyInvalid: t(
-          'Reactive feature topology has an unknown dependency, duplicate or cycle.',
-          '响应式特性拓扑包含未知依赖、重复声明或环。'
-        ),
-        reactiveServiceNotInstalled: t(
-          'A live-query service was requested before installing its reactive plugin.',
-          '响应式插件尚未安装就请求使用实时查询服务。'
         ),
         reactiveAdapterNotInstalled: t(
           'The requested backend has no installed reactive adapter.',
@@ -3061,8 +1119,8 @@ const bytes = await selected.decode(text)`,
       ),
       values: {
         unavailable: t(
-          '`BACKEND_UNAVAILABLE`: storage is disabled or missing (private mode); pick `memoryStorageHost` or ask for access.',
-          '`BACKEND_UNAVAILABLE`：存储被禁用或不存在（隐私模式）；改用 `memoryStorageHost` 或请用户开启。'
+          '`BACKEND_UNAVAILABLE`: storage is disabled or missing (private mode); pick `memoryBackendPlugin` from `@migaia/storage-host` or ask for access.',
+          '`BACKEND_UNAVAILABLE`：存储被禁用或不存在（隐私模式）；从 `@migaia/storage-host` 显式选择 `memoryBackendPlugin` 或请用户开启。'
         ),
         quotaExceeded: t(
           '`QUOTA_EXCEEDED`: the browser quota is full; delete data or use IndexedDB.',
@@ -3080,14 +1138,6 @@ const bytes = await selected.decode(text)`,
           '`DESERIALIZE_FAILED`: decoding the stored value failed.',
           '`DESERIALIZE_FAILED`：解码已存储的值时失败。'
         ),
-        validationFailed: t(
-          '`VALIDATION_FAILED`: the schema rejected the value.',
-          '`VALIDATION_FAILED`：结构校验拒绝此值，应检查对应校验问题。'
-        ),
-        migrationFailed: t(
-          '`MIGRATION_FAILED`: a migration function threw.',
-          '`MIGRATION_FAILED`：某个迁移函数执行时抛错。'
-        ),
         transactionFailed: t(
           '`TRANSACTION_FAILED`: the IndexedDB transaction failed or the callback threw.',
           '`TRANSACTION_FAILED`：索引数据库事务失败，或事务回调执行时抛错。'
@@ -3103,10 +1153,6 @@ const bytes = await selected.decode(text)`,
         extensionFailed: t(
           '`EXTENSION_FAILED`: a schema, codec or comparator threw.',
           '`EXTENSION_FAILED`：schema、编解码器或比较函数抛错。'
-        ),
-        transactionConflict: t(
-          '`TRANSACTION_CONFLICT`: data changed concurrently; re-read and retry.',
-          '`TRANSACTION_CONFLICT`：数据被并发修改；重新读取后重试。'
         ),
         writeFailed: t(
           '`WRITE_FAILED`: a written cookie was not visible afterwards.',
@@ -3144,38 +1190,6 @@ const bytes = await selected.decode(text)`,
           '`INDEX_BACKFILL_FAILED`: backfill and persisting failed readiness both failed. The native AggregateError keeps the primary error first in errors and as cause, followed by the persistence failure; inspect both original objects before retrying.',
           '`INDEX_BACKFILL_FAILED`：回填与保存失败就绪状态同时失败。原生聚合错误在错误数组首位及原因保留原始主错误，随后保留持久化失败；重试前检查两个原对象。'
         ),
-        backendIdInvalid: t(
-          '`BACKEND_ID_INVALID`: the backend id breaks the id rule.',
-          '`BACKEND_ID_INVALID`：后端标识不符合命名规则，应修正后重新安装。'
-        ),
-        backendDuplicate: t(
-          '`BACKEND_DUPLICATE`: the id is already installed.',
-          '`BACKEND_DUPLICATE`：此后端标识已经安装，或在同一批次重复。'
-        ),
-        backendNotInstalled: t(
-          '`BACKEND_NOT_INSTALLED`: no backend with this id; there is no default.',
-          '`BACKEND_NOT_INSTALLED`：没有这个 id 的后端；不存在默认后端。'
-        ),
-        backendPluginInvalid: t(
-          '`BACKEND_PLUGIN_INVALID`: the plugin or its store breaks the contract.',
-          '`BACKEND_PLUGIN_INVALID`：插件或其存储不符合契约。'
-        ),
-        backendInstallFailed: t(
-          '`BACKEND_INSTALL_FAILED`: installation failed and was rolled back; see `cause`.',
-          '`BACKEND_INSTALL_FAILED`：安装失败并已回滚；查看 `cause`。'
-        ),
-        storageHostBusy: t(
-          '`STORAGE_HOST_BUSY`: another installation is running; retry after it settles.',
-          '`STORAGE_HOST_BUSY`：另一批安装正在进行；结束后再重试。'
-        ),
-        storageHostDisposed: t(
-          '`STORAGE_HOST_DISPOSED`: the host was disposed; create a new one.',
-          '`STORAGE_HOST_DISPOSED`：宿主已释放；需要创建新的宿主。'
-        ),
-        storageHostDisposeFailed: t(
-          '`STORAGE_HOST_DISPOSE_FAILED`: cleanup failed; the host is still terminal.',
-          '`STORAGE_HOST_DISPOSE_FAILED`：清理失败；宿主仍处于终态。'
-        ),
         liveQueryDisposeFailed: t(
           '`LIVE_QUERY_DISPOSE_FAILED`: query cleanup failed; see `errors`.',
           '`LIVE_QUERY_DISPOSE_FAILED`：实时查询清理失败；查看 `errors`。'
@@ -3183,14 +1197,6 @@ const bytes = await selected.decode(text)`,
         reactiveFeatureInvalid: t(
           '`REACTIVE_FEATURE_INVALID`: the reactive Feature does not match the backend.',
           '`REACTIVE_FEATURE_INVALID`：响应式特性描述或其后端对应关系不合法。'
-        ),
-        reactiveTopologyInvalid: t(
-          '`REACTIVE_TOPOLOGY_INVALID`: the Feature graph is unknown, duplicated or cyclic.',
-          '`REACTIVE_TOPOLOGY_INVALID`：Feature 依赖图未知、重复或存在环。'
-        ),
-        reactiveServiceNotInstalled: t(
-          '`REACTIVE_SERVICE_NOT_INSTALLED`: install a reactive plugin before creating queries.',
-          '`REACTIVE_SERVICE_NOT_INSTALLED`：创建查询前需要先安装响应式插件。'
         ),
         reactiveAdapterNotInstalled: t(
           '`REACTIVE_ADAPTER_NOT_INSTALLED`: the backend id is not reactive.',
@@ -3211,5 +1217,37 @@ const bytes = await selected.decode(text)`,
       }
     }
   },
-  enhancers: pluginEnhancers
+  enhancers: {
+    ...backendEnhancers,
+    reactiveFeature: {
+      kind: 'feature',
+      target: 'IQueryChain',
+      summary: t(
+        'Adds live() to selected query families with per-registration source ownership.',
+        '为选定查询族增加实时终点，每次注册独立拥有变化来源。'
+      ),
+      install: liveExample,
+      example: liveExample,
+      grants: [
+        {
+          signature: 'query.live(options)',
+          summary: t(
+            'Create a cancellable, disposable live query from its original terminal.',
+            '从原有终点创建可取消及释放的实时查询。'
+          ),
+          params: {
+            options: t('Runtime plus optional generation controls.', '运行时与可选代际控制。')
+          },
+          returns: t('An ILiveQuery and the shared resource protocol.', '实时查询与共享资源协议。'),
+          example: liveExample
+        }
+      ],
+      scenarios: [
+        t(
+          'Refresh browser record views after relevant native changes.',
+          '相关原生变化后刷新浏览器记录视图。'
+        )
+      ]
+    }
+  }
 }

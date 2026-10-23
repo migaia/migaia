@@ -1375,6 +1375,20 @@ export const serializeReference: ILibraryReference = {
       ),
       example: walkerExample
     },
+    tagged: {
+      summary: t(
+        'Synchronous format router with embedded text, binary or unknown-carrier tags. The first codec writes, registered revisions read, and untagged is an explicit legacy reader.',
+        '内嵌文本、字节或 unknown 载体标签的同步格式路由器。首项写入，登记版本读取，untagged 显式读取旧值。'
+      ),
+      example: serializeCases.createTaggedCodec![0]!.example
+    },
+    'codecs/collections-json': {
+      summary: t(
+        'Synchronous strict portable JSON with recursive Map/Set records and insertion-order projection. No optional format peer is required.',
+        '保留递归 Map/Set 记录及属性顺序的同步严格 portable JSON，无需可选格式 peer。'
+      ),
+      example: serializeCases.defineCollectionsJsonCodec![0]!.example
+    },
     'codecs/cbor': {
       summary: t(
         'Use this entry when both ends need to encode plain data as CBOR bytes and decode it back. `defineCBORCodec({ version: 1 })` creates a synchronous codec with `encode` and `decode` methods and an explicit version.\n\nImport this format subpath because the root does not export the factory. Install `cbor-x` for this format; the codec is not a registry plugin.',
@@ -1606,6 +1620,45 @@ console.log(toPortableValue({ bytes: new Uint8Array([1, 2]) }))`
       exampleResult: serializeCases.defineJsonCodec![0]!.result,
       cases: serializeCases.defineJsonCodec
     },
+    createTaggedCodec: {
+      options: 'ITaggedCodecOptions',
+      role: 'factory',
+      purpose: t(
+        'Creates a frozen tagged@1 codec from unique id/version descriptors sharing one encodedType. Fixed write headers are cached at construction. Missing, malformed and unknown tags use TAG_MISSING, TAG_INVALID and TAG_UNKNOWN.',
+        '从唯一 id/version 且 encodedType 相同的描述器创建冻结 tagged@1 codec，创建时缓存写入头部。缺失、损坏、未知标签分别报 TAG_MISSING、TAG_INVALID、TAG_UNKNOWN。'
+      ),
+      params: {
+        options: t(
+          'Required nonempty codecs tuple; first writes and all read. Optional untagged only reads raw input. Each id follows the serialize type pattern and each version is a positive safe integer.',
+          '必填非空 codecs 元组，首项写入且全部可读。可选 untagged 只读原始输入，id 符合 serialize 类型规则，version 为正安全整数。'
+        )
+      },
+      returns: t(
+        'Precise string, Uint8Array or frozen ITaggedValue output according to the declared carrier. Decode also accepts raw legacy input. Inner serialize errors keep identity; external failures retain cause.',
+        '按声明载体返回精确 string、Uint8Array 或冻结 ITaggedValue。decode 也接纳无标签原始值。内层 serialize 错误保留身份，外部错误保留 cause。'
+      ),
+      exampleIntro: serializeCases.createTaggedCodec![0]!.problem,
+      example: serializeCases.createTaggedCodec![0]!.example,
+      exampleResult: serializeCases.createTaggedCodec![0]!.result,
+      cases: serializeCases.createTaggedCodec
+    },
+    defineCollectionsJsonCodec: {
+      options: 'IJsonCodecOptions',
+      role: 'factory',
+      purpose: t(
+        'Creates a frozen collections-json codec preserving recursive Map/Set order. Other inputs share strict portable rules; bytes decode as records, class fields are projected, and malformed reserved records reject.',
+        '创建冻结的 collections-json codec，保留递归 Map/Set 顺序，其余输入复用严格 portable 规则。字节解码为记录，类实例投影字段，非法保留记录被拒绝。'
+      ),
+      params: { options: t('Required positive safe-integer version.', '必填正安全整数版本。') },
+      returns: t(
+        'String codec with literal id and version. Format failures carry ENCODE_FAILED or DECODE_FAILED and the original error on cause.',
+        '字符串 codec，保留 id 与 version 字面量。格式失败携带 ENCODE_FAILED 或 DECODE_FAILED，原错在 cause。'
+      ),
+      exampleIntro: serializeCases.defineCollectionsJsonCodec![0]!.problem,
+      example: serializeCases.defineCollectionsJsonCodec![0]!.example,
+      exampleResult: serializeCases.defineCollectionsJsonCodec![0]!.result,
+      cases: serializeCases.defineCollectionsJsonCodec
+    },
     defineCBORCodec: {
       options: 'ICborCodecOptions',
       role: 'factory',
@@ -1631,8 +1684,8 @@ console.log(codec.decode(codec.encode({ count: 2 })))`
       options: 'IMessagePackCodecOptions',
       role: 'factory',
       purpose: t(
-        'Creates a frozen synchronous MessagePack codec using @msgpack/msgpack, sorted record keys and no custom extensions. Portable admission is shared with the JSON and CBOR codecs.',
-        '使用 `@msgpack/msgpack` 创建冻结同步 `MessagePack` 编解码器，对记录键排序且不使用自定义扩展，与 `JSON` 和 `CBOR` 共用可移植接纳规则。'
+        'Creates a frozen synchronous MessagePack codec using @msgpack/msgpack, property enumeration order and no custom extensions. Portable admission is shared with the JSON and CBOR codecs.',
+        '使用 `@msgpack/msgpack` 创建冻结同步 `MessagePack` 编解码器，按属性枚举顺序投影且不使用自定义扩展，与 `JSON` 和 `CBOR` 共用可移植接纳规则。'
       ),
       params: {
         options: t(

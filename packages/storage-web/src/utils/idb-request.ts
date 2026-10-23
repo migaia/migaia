@@ -1,10 +1,12 @@
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
-import { isStorageErrorFamily } from '../core/error-family.js'
-import type { IStorageOperationRuntime } from '../core/operation-reporter.js'
+import { isStorageErrorFamily, type IStorageErrorFamily } from '../backends/errors.js'
+import type { IStorageOperationRuntime } from '@migaia/storage-host/authoring/backend'
 import { StorageError, StorageErrorCode } from '../types/errors.js'
 import { normalizeStorageException } from './quota.js'
-import { readAbortReason, snapshotOperationContext, subscribeToAbort } from '../core/operation.js'
+import { readAbortReason } from '@migaia/storage-host/authoring/backend'
+import { snapshotOperationContext } from '@migaia/storage-contract'
+import { subscribeToAbort } from '../backends/errors.js'
 import { StorageBackend } from '../constants.js'
 
 /**
@@ -30,7 +32,7 @@ const normalizeTransactionAbort = (error: unknown): StorageError | StorageContra
   })
 }
 
-export const normalizeIdbRequestFailure = (error: unknown): StorageError | StorageContractError => {
+export const normalizeIdbRequestFailure = (error: unknown): IStorageErrorFamily => {
   if (isStorageErrorFamily(error)) return error
   const normalized = normalizeStorageException(error, StorageBackend.indexedDb)
   return normalized.code === StorageErrorCode.quotaExceeded
@@ -95,7 +97,7 @@ export const installIdbRequestHandlers = (
 export const installIdbTransactionHandlers = (
   transaction: IDBTransaction,
   onComplete: () => void,
-  onError: () => void,
+  onError: (event?: Event) => void,
   onAbort: () => void
 ): void => {
   try {
@@ -105,6 +107,17 @@ export const installIdbTransactionHandlers = (
   } catch (cause) {
     throw normalizeIdbRequestFailure(cause)
   }
+}
+
+/** Observe physical rollback when a transaction's property-handler installation failed. */
+export function afterIdbTransactionAbort(transaction: IDBTransaction): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    try {
+      transaction.addEventListener('abort', () => resolve(), { once: true })
+    } catch (cause) {
+      reject(normalizeIdbRequestFailure(cause))
+    }
+  })
 }
 
 /** Install the complete open-request lifecycle as one normalized host setup boundary. */
@@ -190,6 +203,16 @@ export function idbTransactionCommit(
     let disposeAbort = (): void => {}
     /** Prevents hostile or duplicated transaction events from changing bridge ownership twice. */
     let settled = false
+    /** Request errors are not terminal; retain their first diagnostic until native completion. */
+    let firstFailure: IStorageErrorFamily | undefined
+    /** Only successfully installed native terminal handlers can own asynchronous rollback. */
+    let terminalHandlersInstalled = false
+    /** Caller cancellation wins while preserving its captured original reason. */
+    const cancellationFailure = (): StorageContractError =>
+      new StorageContractError(StorageContractErrorCode.aborted, {
+        backend: StorageBackend.indexedDb,
+        cause: abortReason
+      })
     const onAbort = (): void => {
       cancelled = true
       abortReason = readAbortReason(signal)
@@ -198,14 +221,6 @@ export function idbTransactionCommit(
       } catch {
         // Transaction may already be completed; result still settles through IDB events.
       }
-      finish(() =>
-        reject(
-          new StorageContractError(StorageContractErrorCode.aborted, {
-            backend: StorageBackend.indexedDb,
-            cause: abortReason
-          })
-        )
-      )
     }
     const finish = (settle: () => void): void => {
       if (settled) return
@@ -216,36 +231,45 @@ export function idbTransactionCommit(
     try {
       installIdbTransactionHandlers(
         transaction,
-        () => finish(resolve),
         () =>
-          finish(() =>
-            reject(
-              new StorageError(StorageErrorCode.transactionFailed, {
-                backend: StorageBackend.indexedDb,
-                cause: readIdbTransactionError(transaction)
-              })
-            )
-          ),
+          finish(() => {
+            if (cancelled) reject(cancellationFailure())
+            else if (firstFailure !== undefined) reject(firstFailure)
+            else resolve()
+          }),
+        (event) => {
+          /** Request errors bubble before transaction.error is populated on native abort. */
+          const target = event?.target
+          const cause =
+            target !== undefined && target !== null && target !== transaction
+              ? readIdbRequestError(target as IDBRequest)
+              : readIdbTransactionError(transaction)
+          firstFailure ??= new StorageError(StorageErrorCode.transactionFailed, {
+            backend: StorageBackend.indexedDb,
+            cause
+          })
+        },
         () =>
           finish(() =>
             reject(
               cancelled
-                ? new StorageContractError(StorageContractErrorCode.aborted, {
-                    backend: StorageBackend.indexedDb,
-                    cause: abortReason
-                  })
-                : normalizeTransactionAbort(readIdbTransactionError(transaction))
+                ? cancellationFailure()
+                : (firstFailure ?? normalizeTransactionAbort(readIdbTransactionError(transaction)))
             )
           )
       )
+      terminalHandlersInstalled = true
       disposeAbort = subscribeToAbort(signal, onAbort, runtime.reporter)
     } catch (cause) {
-      finish(() => reject(normalizeIdbRequestFailure(cause)))
+      firstFailure ??= normalizeIdbRequestFailure(cause)
       try {
         transaction.abort()
       } catch {
         /* setup failure already owns the result; transaction may already be settled */
       }
+      // A rejected handler setter acquired no usable terminal bridge. Signal setup failures did,
+      // so their rollback must still drain through the original native abort/complete handlers.
+      if (!terminalHandlersInstalled) finish(() => reject(firstFailure))
     }
   })
 }

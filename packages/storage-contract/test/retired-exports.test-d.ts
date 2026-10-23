@@ -11,3 +11,10 @@ void (undefined as unknown as IStorageContractConflictPolicy)
 void isArrayBuffer
 void isUint8Array
 void StorageContractConflictPolicy
+
+// @ts-expect-error Storage contracts no longer own a collection value codec.
+import { collectionsJsonCodec } from '../src/index.js'
+// @ts-expect-error The removed collection format has no retained compatibility constant.
+import { COLLECTIONS_JSON_CODEC_NAME } from '../src/index.js'
+void collectionsJsonCodec
+void COLLECTIONS_JSON_CODEC_NAME

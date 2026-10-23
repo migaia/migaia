@@ -1,6 +1,5 @@
 export { localStorageHost, type ILocalStorageOptions } from './local-storage.js'
 export { sessionStorageHost, type ISessionStorageOptions } from './session-storage.js'
-export { memoryStorageHost } from './memory.js'
 export { cookiesHost, type ICookiesOptions, type ICookieDocument } from './cookie.js'
 export { indexedDbHost, type IIndexedDbOptions } from './indexed-db.js'
 export type { IWebStorageOptions } from './web-storage.js'

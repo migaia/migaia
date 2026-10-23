@@ -1,0 +1,59 @@
+{
+  "name": "@migaia/storage-plugin-object",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Native filesystem and S3 object storage backend",
+  "files": [
+    "dist",
+    "README.md",
+    "README.en.md",
+    "USEGUIDE.md",
+    "USEGUIDE.en.md"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./fs": {
+      "types": "./dist/fs.d.ts",
+      "default": "./dist/fs.js"
+    },
+    "./s3": {
+      "types": "./dist/s3.d.ts",
+      "default": "./dist/s3.js"
+    },
+    "./features/presign": {
+      "types": "./dist/features/presign.d.ts",
+      "default": "./dist/features/presign.js"
+    }
+  },
+  "scripts": {
+    "fmt": "oxfmt src test README.md README.en.md USEGUIDE.md USEGUIDE.en.md package.json",
+    "lint": "oxlint src test",
+    "typecheck": "bun check -p tsconfig.json",
+    "typecheck:test": "bun check -p tsconfig.test.json",
+    "build": "node ../../scripts/dist-stamp.mjs clean && vite build && tsc -p tsconfig.json --emitDeclarationOnly && node ../../scripts/dist-stamp.mjs write",
+    "test": "pnpm run build && vitest run",
+    "test:packed": "node test/packed.mts"
+  },
+  "dependencies": {
+    "@migaia/lifecycle": "workspace:^",
+    "@migaia/storage-contract": "workspace:^",
+    "@migaia/utils": "workspace:^"
+  },
+  "devDependencies": {
+    "@aws-sdk/client-s3": "3.1140.0",
+    "@aws-sdk/s3-request-presigner": "3.1140.0"
+  },
+  "peerDependencies": {
+    "@aws-sdk/client-s3": "^3.1140.0",
+    "@aws-sdk/s3-request-presigner": "^3.1140.0",
+    "@migaia/storage-host": "workspace:^"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  }
+}

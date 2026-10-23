@@ -1,15 +1,14 @@
-import { type IStorageChange } from '@migaia/storage-contract'
-import {
-  snapshotOperationContext,
-  snapshotSyncWriteOptions,
-  throwIfAborted,
-  withAbort
-} from '../core/operation.js'
+import { bindBrowserExecution } from './execution.js'
+import { createTextBatchApi } from './batch.js'
+import { implement, kv, type IStorageChange, type IStorageStore } from '@migaia/storage-contract'
+import { snapshotOperationContext, snapshotSyncWriteOptions } from '@migaia/storage-contract'
+import { throwIfAborted, withAbort } from '@migaia/storage-host/authoring/backend'
 import {
   lengthPrefixedNamespaceCodec,
   namespacedKey,
+  namespacedStorageKey,
   snapshotNamespaceCodec,
-  stripNamespace
+  stripStorageNamespace
 } from '../utils/key.js'
 import type { INamespaceCodec } from '../utils/key.js'
 import {
@@ -21,6 +20,7 @@ import { StorageError, StorageErrorCode, createStorageTypeError } from '../types
 import { StorageErrorText } from '../error-text.js'
 import { normalizeStorageException } from '../utils/quota.js'
 import { StorageBackend, StorageOperation } from '../constants.js'
+import { assertValueSnapshot, withNativeValueWrite } from './native-value-write.js'
 import type {
   ICookieRemoveContext,
   ICookieScope,
@@ -29,12 +29,21 @@ import type {
   ISyncCookieStore
 } from '../types/cookie.js'
 import type { IStorageCapabilities } from '../types/capabilities.js'
-import type { IOperationContext } from '../types/context.js'
+import type { IOperationContext, IStorageKey } from '../types/context.js'
 import type { ISyncCapableStore } from '../types/storage.js'
+import { asyncDisposeKey } from '@migaia/plugin-host'
 import {
-  createBackendReactiveController,
-  registerBackendReactiveController
-} from './reactive-controller.js'
+  reportCleanupError,
+  createStorageOperationReporter,
+  type IBackendValueCommit
+} from '@migaia/storage-host/authoring/backend'
+import {
+  provideBackendConstruction,
+  browserKeyValueApi,
+  type IBackendConstruction,
+  type IBackendRuntime,
+  type IKeyValueBackendStore
+} from './construction.js'
 
 const CAPABILITIES: IStorageCapabilities = Object.freeze({
   syncRead: true,
@@ -185,7 +194,13 @@ function snapshotCookieScope(scope: unknown): ICookieScope {
  * fail a write, while hidden HttpOnly or differently scoped cookies remain outside read/removal
  * guarantees. Dispose retires this Store without clearing the caller-owned document.
  */
-export const cookiesHost = (options: ICookiesOptions = {}): ISyncCapableStore<ICookieStore> => {
+export const cookiesHost = (
+  options: ICookiesOptions,
+  runtime: IBackendRuntime
+): IBackendConstruction<
+  IKeyValueBackendStore<ISyncCapableStore<ICookieStore>>,
+  ICookieDocument
+> => {
   if (options === null || typeof options !== 'object' || Array.isArray(options))
     throw new StorageError(StorageErrorCode.invalidConfig, {
       backend: StorageBackend.cookie,
@@ -248,11 +263,13 @@ export const cookiesHost = (options: ICookiesOptions = {}): ISyncCapableStore<IC
   const doc = documentCandidate as ICookieDocument
 
   /** Private commit-after controller shared by direct and Host-created exact stores. */
-  const controller = createBackendReactiveController({
+  const controller = runtime.createChangeController({
     backend: StorageBackend.cookie,
     platform: doc,
     options: Object.freeze({ namespace, namespaceCodec, scope })
   })
+  /** Symbol cleanup reports failure while explicit disposal retains the primary rejection. */
+  let symbolicDispose: Promise<void> | undefined
 
   /** Publish only after a visible cookie mutation has completed successfully. */
   const publishChange = (change: Omit<IStorageChange, 'sequence' | 'origin' | 'scope'>): void => {
@@ -260,7 +277,7 @@ export const cookiesHost = (options: ICookiesOptions = {}): ISyncCapableStore<IC
   }
 
   /** Read the live cookie jar while preserving host failures in the storage error protocol. */
-  const readCookie = (operation: string, key?: string): string => {
+  const readCookie = (operation: string, key?: IStorageKey): string => {
     try {
       const value: unknown = doc.cookie
       if (typeof value !== 'string')
@@ -280,7 +297,7 @@ export const cookiesHost = (options: ICookiesOptions = {}): ISyncCapableStore<IC
   }
 
   /** Write the live cookie jar while preserving host failures in the storage error protocol. */
-  const writeCookie = (value: string, operation: string, key?: string): void => {
+  const writeCookie = (value: string, operation: string, key?: IStorageKey): void => {
     try {
       doc.cookie = value
     } catch (cause) {
@@ -301,13 +318,18 @@ export const cookiesHost = (options: ICookiesOptions = {}): ISyncCapableStore<IC
     operation = 'cookie.keys'
   ): Array<{
     readonly physicalKey: string
-    readonly logicalKey: string
+    readonly logicalKey: IStorageKey
   }> => {
-    const collected: Array<{ readonly physicalKey: string; readonly logicalKey: string }> = []
+    const collected: ReturnType<typeof namespacedEntries> = []
     /** Repeated visible names prove that document.cookie cannot identify their scopes. */
     const seenPhysicalKeys = new Set<string>()
     for (const [rawKey] of parseCookieEntries(readCookie(operation))) {
-      const stripped = stripNamespace(namespace, rawKey, namespaceCodec, StorageBackend.cookie)
+      const stripped = stripStorageNamespace(
+        namespace,
+        rawKey,
+        namespaceCodec,
+        StorageBackend.cookie
+      )
       if (stripped === undefined) continue
       if (seenPhysicalKeys.has(rawKey))
         throw new StorageError(StorageErrorCode.cookieScopeAmbiguous, {
@@ -326,7 +348,7 @@ export const cookiesHost = (options: ICookiesOptions = {}): ISyncCapableStore<IC
   const readVisibleCookie = (
     physicalKey: string,
     operation: string,
-    logicalKey: string
+    logicalKey: IStorageKey
   ): string | undefined => {
     let visible: string | undefined
     let matches = 0
@@ -422,8 +444,7 @@ export const cookiesHost = (options: ICookiesOptions = {}): ISyncCapableStore<IC
           cause: new RangeError('cookie expires must be a valid Date')
         })
       const expiresNow =
-        (maxAge !== undefined && maxAge <= 0) ||
-        (expiresTime !== undefined && expiresTime <= Date.now())
+        maxAge !== undefined ? maxAge <= 0 : expiresTime !== undefined && expiresTime <= Date.now()
       const visibleBefore = readVisibleCookie(physicalKey, StorageOperation.cookieSet, key)
       writeCookie(
         expiresNow
@@ -479,11 +500,58 @@ export const cookiesHost = (options: ICookiesOptions = {}): ISyncCapableStore<IC
     },
     keys: () => {
       assertLive()
-      return namespacedEntries().map((entry) => entry.logicalKey)
+      return namespacedEntries().flatMap((entry) =>
+        typeof entry.logicalKey === 'string' ? [entry.logicalKey] : []
+      )
     },
     clearValues: () => {
       assertLive()
       clearNamespacedEntries('cookie.clearValues')
+    }
+  }
+
+  /** Cookie entities retain their fixed scope and the original visibility/quota checks. */
+  const commitValueWrite: IBackendValueCommit = async (input, ctx) => {
+    const release = controller.beginMutation()
+    try {
+      await runtime.execution.run(
+        { operation: StorageOperation.entityUniqueWrite, input, ctx },
+        (captured) =>
+          withAbort(ctx, async (signal, _context, operationRuntime) => {
+            await withNativeValueWrite(
+              () => {
+                assertLive()
+                /**
+                 * Snapshot verification and the original private native write share one synchronous
+                 * turn.
+                 */
+                const actual = namespacedEntries(StorageOperation.entityUniqueWrite).flatMap(
+                  (entry) => {
+                    if (
+                      typeof entry.logicalKey !== 'string' ||
+                      !entry.logicalKey.startsWith(captured.prefix)
+                    )
+                      return []
+                    const value = readVisibleCookie(
+                      entry.physicalKey,
+                      StorageOperation.entityUniqueWrite,
+                      entry.logicalKey
+                    )
+                    return value === undefined ? [] : [[entry.logicalKey, value] as const]
+                  }
+                )
+                assertValueSnapshot(actual, captured.expected, StorageBackend.cookie)
+                sync.set(captured.key, captured.value)
+              },
+              StorageBackend.cookie,
+              signal,
+              operationRuntime,
+              controller.closingSignal
+            )
+          })
+      )
+    } finally {
+      release()
     }
   }
 
@@ -516,8 +584,63 @@ export const cookiesHost = (options: ICookiesOptions = {}): ISyncCapableStore<IC
       }),
     dispose: () => {
       return controller.dispose()
-    }
+    },
+    [asyncDisposeKey]: () =>
+      (symbolicDispose ??= store
+        .dispose()
+        .catch((error) => reportCleanupError(createStorageOperationReporter(), error)))
   }
-  registerBackendReactiveController(store, controller)
-  return store
+  const construction = provideBackendConstruction(
+    bindBrowserExecution(store, runtime),
+    [
+      implement(
+        kv,
+        browserKeyValueApi(
+          store,
+          createTextBatchApi(
+            StorageBackend.cookie,
+            runtime,
+            (): IStorageStore<never> => construction.store,
+            assertLive,
+            (keys, operation) => {
+              assertLive()
+              /** Typed codec admission completes before reading the visible cookie snapshot. */
+              const physical = keys.map(({ key }) =>
+                namespacedStorageKey(namespace, key, namespaceCodec, StorageBackend.cookie)
+              )
+              /** One header snapshot supplies all requested results without per-key public reads. */
+              const visible = new Map<string, string>()
+              /** Duplicate visible names retain the original fixed-scope ambiguity failure. */
+              const ambiguous = new Set<string>()
+              for (const [key, value] of parseCookieEntries(readCookie(operation))) {
+                if (visible.has(key)) ambiguous.add(key)
+                visible.set(key, value)
+              }
+              /** Canonical duplicate positions reuse the first result from this one header. */
+              const values: (string | undefined)[] = []
+              for (let index = 0; index < keys.length; index += 1) {
+                const entry = keys[index]!
+                if (entry.firstIndex !== index) {
+                  values.push(values[entry.firstIndex])
+                  continue
+                }
+                const key = physical[index]!
+                if (ambiguous.has(key))
+                  throw new StorageError(StorageErrorCode.cookieScopeAmbiguous, {
+                    backend: StorageBackend.cookie,
+                    key: entry.key,
+                    operation
+                  })
+                values.push(visible.get(key))
+              }
+              return values
+            }
+          )
+        )
+      )
+    ],
+    controller,
+    () => doc
+  )
+  return { ...construction, commitValueWrite }
 }
