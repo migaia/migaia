@@ -961,8 +961,8 @@ export const storageContractReference: ILibraryReference = {
         ),
         source: t('The already-open native WHATWG byte stream.', '已打开的原生 WHATWG 字节流。'),
         options: t(
-          'Native close, report, optional backend and onSettled callbacks.',
-          '原生 close、report 及可选 backend、onSettled 回调。'
+          'Native close, report, optional backend/onSettled, and optional normalizeFailure for backend-owned native error classification.',
+          '原生 close、report、可选 backend/onSettled，以及供后端分类原生错误的 normalizeFailure。'
         )
       },
       returns: t(

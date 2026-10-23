@@ -2,6 +2,24 @@ import { describe, expect, it, vi } from 'vitest'
 import * as contract from '../src/index.js'
 
 describe('blob input and resource owner', () => {
+  it('classifies native content failures through the backend callback on the original reader', async () => {
+    const original = new Error('native content read')
+    const wrapped = new Error('backend content failed', { cause: original })
+    const normalizeFailure = vi.fn((error: unknown) => (error === original ? wrapped : error))
+    const close = vi.fn(async () => undefined)
+    const object = contract.createStorageBlobObject(
+      { key: 'a', size: 1, etag: 'e', metadata: {}, updatedAt: 1 },
+      new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.error(original)
+        }
+      }),
+      { close, report: vi.fn(), normalizeFailure }
+    )
+    await expect(object.bytes()).rejects.toBe(wrapped)
+    expect(normalizeFailure).toHaveBeenCalledExactlyOnceWith(original)
+    expect(close).toHaveBeenCalledTimes(1)
+  })
   it('captures byte input, metadata, context and conditions before native work', () => {
     const body = new Uint8Array([1, 2])
     const metadata = { owner: 'first' }
