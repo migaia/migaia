@@ -5,6 +5,33 @@ const t = (en: string, zh: string): IText => ({ en, zh })
 
 /** Exercises public contract tools without supplying a fictional storage implementation. */
 export const storageContractCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
+  snapshotStorageBaseDetailed: [
+    {
+      title: t('Keep failed base admission inspectable', '基础准入失败仍可检查原错'),
+      problem: t(
+        'A plugin getter can fail before resource ownership transfers. Admission must retain that exact failure without attempting cleanup.',
+        '插件 getter 可在资源所有权转移前失败。准入必须保留精确原错，不尝试清理。'
+      ),
+      example: t(
+        `import { snapshotStorageBaseDetailed } from '@migaia/storage-contract'
+const original = new Error('backend getter failed')
+const candidate = { get backend(): never { throw original } }
+const result = snapshotStorageBaseDetailed(candidate)
+console.log(result.valid, !result.valid && result.cause === original)
+// false true`,
+        `import { snapshotStorageBaseDetailed } from '@migaia/storage-contract'
+const original = new Error('backend getter failed')
+const candidate = { get backend(): never { throw original } }
+const result = snapshotStorageBaseDetailed(candidate)
+console.log(result.valid, !result.valid && result.cause === original)
+// false true`
+      ),
+      result: t(
+        'Prints false true; no resource method is called.',
+        '输出 false true；不调用资源方法。'
+      )
+    }
+  ],
   defineStorageCapability: [
     {
       title: t('Keep equal capability names independent', '同名能力仍保持独立身份'),

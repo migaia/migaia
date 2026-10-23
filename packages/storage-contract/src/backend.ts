@@ -1,3 +1,10 @@
+import type { StorageStageKind } from './stage-kind.js'
+import type { IStorageStore } from './capability.js'
+import type { ICodecStageObserver } from './codec.js'
+import type { ITransactionStageObserver } from './transaction.js'
+import type { IConcurrencyStageObserver } from './concurrency.js'
+import type { ISqlStageObserver } from './sql.js'
+import type { IQueryStageObserver } from './query.js'
 import type { ITransactionBuilder } from './concurrency.js'
 
 /** Canonical provider label syntax shared by base and KV admission. */
@@ -61,3 +68,39 @@ export type IWithChainMethods<TStore, TMethods extends IChainMethods> = keyof TM
   : Omit<TStore, 'tx' | typeof installedChainMethods> & {
       readonly [installedChainMethods]?: TMethods
     } & IWithTransactionMethods<TStore, TMethods>
+
+/** Backend observations carry no client or payload authority. */
+export type IBackendStageObserver = Readonly<{
+  readonly kind: typeof StorageStageKind.backend
+  beforeBackendCreate?: () => void | PromiseLike<void>
+  afterBackendCreate?: () => void | PromiseLike<void>
+  onBackendRejected?: (code?: string) => void | PromiseLike<void>
+  afterBackendInstall?: () => void | PromiseLike<void>
+  onBackendDisposeStart?: () => void | PromiseLike<void>
+  afterBackendDispose?: () => void | PromiseLike<void>
+  report: (error: unknown) => undefined
+}>
+/** Ordinary operation observations borrow the original scope identity. */
+export type IStorageOperationStageObserver = Readonly<{
+  readonly kind: typeof StorageStageKind.operation
+  forTransaction: (scope: object) => IStorageOperationStageObserver
+  beforeStorageOperation?: (operation: string) => void | PromiseLike<void>
+  afterStorageOperation?: (
+    operation: string,
+    elapsedMs: number,
+    count: number
+  ) => void | PromiseLike<void>
+  onStorageOperationError?: (operation: string, code?: string) => void | PromiseLike<void>
+  onStorageIterationClose?: (count: number) => void | PromiseLike<void>
+  report: (error: unknown) => undefined
+}>
+/** Seven original observer families share one host registry; these ports own no executor. */
+export type IBackendStageBindings = Readonly<{
+  backendStages: IBackendStageObserver
+  operationStages: (store: IStorageStore<never>) => IStorageOperationStageObserver
+  codecStages: (store: IStorageStore<never>) => ICodecStageObserver
+  transactionStages: (store: IStorageStore<never>) => ITransactionStageObserver
+  concurrencyStages: (store: IStorageStore<never>) => IConcurrencyStageObserver
+  sqlStages: (store: IStorageStore<never>) => ISqlStageObserver
+  queryStages: (store: IStorageStore<never>) => IQueryStageObserver
+}>

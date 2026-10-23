@@ -1,10 +1,11 @@
-import type { IBackendKind, IStorageCapabilities } from './capabilities.js'
-import { snapshotStorageCapabilitiesDetailed } from './capabilities.js'
 import { StorageContractError, StorageContractErrorCode } from './errors.js'
 import { StorageContractErrorText } from './error-text.js'
-import type { IStorageResource } from './resource.js'
-import type { IKeyValueStore } from './store.js'
-import { isBackendKind } from './backend.js'
+import {
+  snapshotStorageBaseDetailed,
+  type IStorageBase,
+  type IStorageBaseAdmission,
+  type IKeyValueStore
+} from './store.js'
 import type { ITransactionBuilder } from './concurrency.js'
 import type { ITransactionScope, ITransactionKeyValueApi } from './transaction.js'
 import {
@@ -38,11 +39,7 @@ export type IAnyStorageCapability = IStorageCapability<string, unknown>
 export type ICapabilityApi<TCap extends IAnyStorageCapability> =
   TCap extends IStorageCapability<string, infer TApi> ? TApi : never
 
-/** Runtime-neutral backend identity and lifetime; specialized stores need not pretend to be KV. */
-export type IStorageBase = IStorageResource & {
-  readonly backend: IBackendKind
-  readonly capabilities: IStorageCapabilities
-}
+export type { IStorageBase } from './store.js'
 
 /** Minimal capability-aware store surface, retaining its exact admitted capability set. */
 export type IStorageStore<TCaps extends IAnyStorageCapability = never> = IStorageBase & {
@@ -281,26 +278,17 @@ function admitImplementations(
 }
 
 /** Admits a resource-backed base before any method is installed; failures never dispose it. */
-function admitBase(base: IStorageBase): void {
-  if (
-    typeof base !== 'object' ||
-    base === null ||
-    Array.isArray(base) ||
-    stores.has(base) ||
-    !Object.isExtensible(base) ||
-    !isBackendKind(base.backend) ||
-    typeof base.dispose !== 'function' ||
-    typeof base[Symbol.asyncDispose] !== 'function'
-  )
-    throw invalidCapability()
-  /** Keep original accessor failures when the declared support facts cannot be captured. */
-  const capabilities = snapshotStorageCapabilitiesDetailed(base.capabilities)
-  if (!capabilities.value) throw invalidCapability(capabilities.cause)
+function admitBase(base: IStorageBase): Extract<IStorageBaseAdmission, { readonly valid: true }> {
+  /** The host and provider consume this same non-owning field snapshot. */
+  const admission = snapshotStorageBaseDetailed(base)
+  if (!admission.valid || stores.has(base) || !Object.isExtensible(base))
+    throw invalidCapability(admission.valid ? undefined : admission.cause)
   for (const name of STORAGE_CAPABILITY_METHODS) {
-    /** A provider must be able to replace prior user methods before publishing any registration. */
+    /** Only providers need permission to replace their own use/has methods. */
     const descriptor = Object.getOwnPropertyDescriptor(base, name)
     if (descriptor && !descriptor.configurable) throw invalidCapability()
   }
+  return admission
 }
 
 /** Captures standard KV forwarding once without changing the API's method receiver. */
@@ -343,7 +331,7 @@ export function provideCapabilities<
     /** Capture the optional callback before any base property changes. */
     const onInstaller = options?.onInstaller
     if (onInstaller !== undefined && typeof onInstaller !== 'function') throw invalidCapability()
-    admitBase(base)
+    const baseAdmission = admitBase(base)
     /** This sole map is shared by base capabilities and later Feature publications. */
     const table = new Map<IAnyStorageCapability, IInstalledCapability>()
     /** No caller or base mutation occurs while descriptors and duplicates are checked. */
@@ -375,8 +363,8 @@ export function provideCapabilities<
         if (!installed?.published)
           throw new StorageContractError(
             StorageContractErrorCode.unsupported,
-            { backend: base.backend },
-            StorageContractErrorText.capabilityMissing(capability.name, base.backend)
+            { backend: baseAdmission.backend },
+            StorageContractErrorText.capabilityMissing(capability.name, baseAdmission.backend)
           )
         return installed.implementation.api
       }

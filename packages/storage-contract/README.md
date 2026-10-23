@@ -120,7 +120,7 @@ L0 指所有后端提供的字符串键值通道；L1 指额外提供字节、�
 
 ### L0、同步通道与 L1
 
-`IBackendKind` 只允许 `'local'`、`'session'`、`'cookie'`、`'indexeddb'`、`'memory'`。`IKeyValueStore` 的只读 `backend`、`capabilities` 描述后端与能力。下表的 key 均为字符串；异步方法的 ctx 默认 `undefined`，字段见操作上下文。
+`IBackendKind` 为开放字符串类型；运行时准入要求符合 `[a-z][a-z0-9-]{0,63}`。名称用于描述后端，不授予能力访问权限。`IKeyValueStore` 的只读 `backend`、`capabilities` 描述后端与能力。下表的 key 均为字符串；异步方法的 ctx 默认 `undefined`，字段见操作上下文。
 
 | IKeyValueStore 成员     | 返回与语义                                                                                          |
 | ----------------------- | --------------------------------------------------------------------------------------------------- |
@@ -381,3 +381,11 @@ console.log(codec.name, codec.output, await codec.decode(raw))
 ```
 
 冻结适配器只读取一次五个元数据/回调字段。文本、字节与 unknown 载体分别映射为 text、binary 与 structured 存储路由。encode 与 decode 独立保留输入类型，因此 tagged codec 的旧格式解码输入不会丢失。两条回调各调用一次并等待结果；同步抛错与 Promise 拒绝统一包装为 contract `INVALID_ARGUMENT`，cause 保留原始错误。适配器不二次解析、复制值、派发 hooks 或创建资源/连接。`StorageStageKind` 与 `ICodecStageObserver` 仅描述观察；绑定真实 store 的派发仍归宿主。
+
+### 资源基础准入与观察端口
+
+`snapshotStorageBaseDetailed(candidate, { asyncDisposeKey }?)` 对 `IStorageBase` 准入，不要求键值方法。它只读取一次后端名、能力事实与清理函数。有效的 `IStorageBaseAdmission` 保留原 `store`、捕获的 `backend`、独立 `capabilities`、`dispose`、`receiver` 和可选 `asyncDispose`；普通形状失败返回 `{ valid: false, cause: undefined }`，反射失败则保留精确原错。冻结或已装配的基础对象仍可通过，因为准入不安装方法，也不取得资源所有权。
+
+外层宿主可传入固定的规范 `asyncDisposeKey`；否则使用原生 `Symbol.asyncDispose`，原生键不存在时只要求显式释放。契约不会创建后备符号，也不会在准入时调用清理函数。提供方专属的可扩展性与安装条件仍由 `provideCapabilities` 校验。
+
+`IBackendStageBindings` 连接 backend、operation、codec、transaction、concurrency、SQL 与 query 七个独立观察家族。规范 `kind` 字面量阻止不同家族误用。这些声明不提供执行器或第二套 registry；宿主将观察者绑定到原 store 与事务视图。`IConcurrencyHolder` 区分真实持有者与远端交接区间，`IConcurrencyDecision` 排除 wait/reject/retry 不相容的字段。

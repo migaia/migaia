@@ -1,3 +1,4 @@
+import type { StorageStageKind } from './stage-kind.js'
 import type { IConflictPolicy, IStorageKey } from './context.js'
 import type { IBackendKind } from './capabilities.js'
 import { StorageContractError, StorageContractErrorCode } from './errors.js'
@@ -85,3 +86,20 @@ export const readTransactionConflictPolicy = (
     cause: new TypeError('transaction write options contain an invalid conflictPolicy')
   })
 }
+
+/** Original transaction observations never admit work or alter commit decisions. */
+export type ITransactionStageObserver = Readonly<{
+  readonly kind: typeof StorageStageKind.transaction
+  forTransaction: (scope: object) => ITransactionStageObserver
+  beforeTransaction?: () => void | PromiseLike<void>
+  onTransactionStart?: () => void | PromiseLike<void>
+  beforeTxOperation?: (operation: string) => void | PromiseLike<void>
+  afterTxOperation?: (operation: string) => void | PromiseLike<void>
+  beforeCommit?: () => void | PromiseLike<void>
+  afterCommit?: (changedKeys: number) => void | PromiseLike<void>
+  afterRollback?: (code?: string) => void | PromiseLike<void>
+  onTransactionClose?: () => void | PromiseLike<void>
+  beforePersistFlush?: () => void | PromiseLike<void>
+  afterPersistFlush?: () => void | PromiseLike<void>
+  report: (error: unknown) => undefined
+}>

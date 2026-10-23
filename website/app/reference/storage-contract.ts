@@ -648,6 +648,63 @@ export const storageContractReference: ILibraryReference = {
         '异步迭代器及其自有清理资源。'
       )
     },
+    IStorageBaseAdmission: {
+      purpose: t(
+        'Non-owning single-read base admission retains the original object, disposer receiver and exact reflection failure.',
+        '不取得所有权的单读基础准入，保留原对象、释放接收者和精确反射失败。'
+      )
+    },
+    IBackendStageBindings: {
+      purpose: t(
+        'One host binding surface for the seven distinct canonical observer families, without another registry or executor.',
+        '七个独立规范观察家族的单一宿主绑定面，不创建另一套 registry 或执行器。'
+      )
+    },
+    IBackendStageObserver: {
+      purpose: t('Observe backend installation and disposal.', '观察后端安装与释放。')
+    },
+    IStorageOperationStageObserver: {
+      purpose: t(
+        'Observe store operations bound to original transaction views.',
+        '观察绑定原事务视图的存储操作。'
+      )
+    },
+    ITransactionStageObserver: {
+      purpose: t(
+        'Observe original transaction operations, commit and cleanup.',
+        '观察原事务操作、提交与清理。'
+      )
+    },
+    IConcurrencyStageObserver: {
+      purpose: t('Observe canonical lock and concurrency decisions.', '观察规范锁与并发决策。')
+    },
+    ISqlStageObserver: {
+      purpose: t(
+        'Observe SQL execution counts without receiving statement payloads.',
+        '观察 SQL 执行计数，不接收语句载荷。'
+      )
+    },
+    IQueryStageObserver: {
+      purpose: t(
+        'Observe query plans and terminal counts without executing a query.',
+        '观察查询计划与结束计数，不执行查询。'
+      )
+    },
+    ConcurrencyHolderState: {
+      purpose: t('Canonical held and remote handoff state names.', '规范的持有与远端交接状态名。')
+    },
+    IConcurrencyHolder: {
+      purpose: t(
+        'Real holder identity or a remote handoff interval with no fabricated owner.',
+        '真实持有者身份，或不伪造 owner 的远端交接区间。'
+      )
+    },
+    IConcurrencyDecision: {
+      purpose: t(
+        'Exclusive wait, reject or retry decision fields.',
+        '互斥的 wait、reject 或 retry 决策字段。'
+      )
+    },
     IStorageBase: {
       purpose: t(
         'Runtime-neutral resource, backend name and support facts without a KV requirement.',
@@ -1145,6 +1202,29 @@ unsubscribe()`
       ),
       example: `const snapshot = snapshotKeyValueStore(candidate)
 if (snapshot) console.log(await snapshot.store.get('theme'))`
+    },
+    snapshotStorageBaseDetailed: {
+      role: 'operation',
+      purpose: t(
+        'Admit the common resource, backend and capability facts without requiring key-value operations, mutating the base or taking cleanup ownership.',
+        '准入共用资源、后端与能力事实，不强制键值操作，不修改基础对象，不取得清理所有权。'
+      ),
+      params: {
+        store: t(
+          'Unknown specialized or key-value base; each admitted field is captured once.',
+          '未知专用或键值基础对象；准入字段各捕获一次。'
+        ),
+        options: t(
+          'Optional fixed canonical asyncDisposeKey from the outer host; otherwise use native Symbol.asyncDispose, never a synthesized fallback.',
+          '外层宿主可选的固定规范 asyncDisposeKey；否则使用原生 Symbol.asyncDispose，不创建后备键。'
+        )
+      },
+      returns: t(
+        'IStorageBaseAdmission retains store, backend, capabilities, dispose, receiver and optional asyncDispose on success; failure retains the exact cause without invoking cleanup.',
+        '成功的 IStorageBaseAdmission 保留 store、backend、capabilities、dispose、receiver 与可选 asyncDispose；失败保留精确 cause，不调用清理。'
+      ),
+      example: storageContractCases.snapshotStorageBaseDetailed![0]!.example,
+      cases: storageContractCases.snapshotStorageBaseDetailed
     },
     snapshotKeyValueStoreDetailed: {
       role: 'operation',

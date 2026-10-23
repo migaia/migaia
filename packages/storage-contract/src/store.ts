@@ -13,6 +13,86 @@ import type {
 } from './context.js'
 import type { ITransactionScope } from './transaction.js'
 import { isBackendKind } from './backend.js'
+import type { IStorageResource } from './resource.js'
+
+/** Runtime-neutral resource identity and facts; specialized stores need no KV methods. */
+export type IStorageBase = IStorageResource & {
+  readonly backend: IBackendKind
+  readonly capabilities: IStorageCapabilities
+}
+
+/** Read-only base admission captures exact cleanup functions without taking ownership. */
+export type IStorageBaseAdmission =
+  | {
+      readonly valid: true
+      readonly store: IStorageBase
+      readonly backend: IBackendKind
+      readonly capabilities: IStorageCapabilities
+      readonly dispose: () => Promise<void>
+      readonly receiver: object
+      readonly asyncDispose?: () => Promise<void>
+    }
+  | { readonly valid: false; readonly cause: unknown }
+
+/** Shared field inspection checks a supplied fixed symbol without creating a fallback. */
+function inspectStorageBase(
+  store: unknown,
+  asyncDisposeKey: symbol | undefined
+): IStorageBaseAdmission {
+  try {
+    if (typeof store !== 'object' || store === null || Array.isArray(store))
+      return { valid: false, cause: undefined }
+    /** Each base property is read once before normalization or callable admission. */
+    const candidate = store as Record<PropertyKey, unknown>
+    /** Backend labels select diagnostics, never runtime permissions. */
+    const backend = candidate.backend
+    /** Individual fact fields reuse the existing capability inspector. */
+    const declaredCapabilities = candidate.capabilities
+    /** Cleanup is borrowed and never invoked by admission. */
+    const dispose = candidate.dispose
+    /** The fixed symbol is captured by the caller and never rediscovered later. */
+    const asyncDispose = asyncDisposeKey === undefined ? undefined : candidate[asyncDisposeKey]
+    /** Getter failures remain the exact original cause rather than escaping the guard. */
+    const capabilities = snapshotStorageCapabilitiesDetailed(declaredCapabilities)
+    if (
+      !isBackendKind(backend) ||
+      !capabilities.value ||
+      typeof dispose !== 'function' ||
+      (asyncDisposeKey !== undefined && typeof asyncDispose !== 'function')
+    )
+      return { valid: false, cause: capabilities.cause }
+    return {
+      valid: true,
+      store: store as IStorageBase,
+      backend,
+      capabilities: capabilities.value,
+      dispose: dispose as () => Promise<void>,
+      receiver: store,
+      ...(asyncDispose === undefined ? {} : { asyncDispose: asyncDispose as () => Promise<void> })
+    }
+  } catch (cause) {
+    return { valid: false, cause }
+  }
+}
+
+/**
+ * Admits the original resource base without I/O, cleanup or ownership transfer. The outer host may
+ * supply its canonical async-dispose key; absent native symbols promise only explicit cleanup.
+ */
+export function snapshotStorageBaseDetailed(
+  store: unknown,
+  options?: { readonly asyncDisposeKey?: typeof Symbol.asyncDispose }
+): IStorageBaseAdmission {
+  try {
+    /** Capture the outer fixed key or native key once; no fallback symbol is allocated here. */
+    const asyncDisposeKey: symbol | undefined = options?.asyncDisposeKey ?? Symbol.asyncDispose
+    if (asyncDisposeKey !== undefined && typeof asyncDisposeKey !== 'symbol')
+      return { valid: false, cause: undefined }
+    return inspectStorageBase(store, asyncDisposeKey)
+  } catch (cause) {
+    return { valid: false, cause }
+  }
+}
 
 /**
  * Exposes the synchronous channel only on synchronous backends. The backend drives it directly, and
@@ -166,27 +246,24 @@ export type IKeyValueStoreAdmission =
 
 /** Internal admission owner shared by record extensions; retain reflection and getter failures. */
 export const inspectStoreShape = (store: unknown, records: boolean): IStoreShapeInspection => {
+  /** Original KV admission shares one base-field owner before inspecting its callable API. */
+  const base = inspectStorageBase(store, undefined)
+  if (!base.valid)
+    return {
+      valid: false,
+      backend: undefined,
+      capabilities: undefined,
+      dispose: undefined,
+      cause: base.cause
+    }
+  /** Only KV-specific members remain to be inspected. */
   const candidate = store as Record<string, unknown>
-  let backend: unknown
-  let capabilitiesValue: unknown
   let methods: unknown[]
-  let dispose: unknown
   try {
-    if (typeof store !== 'object' || store === null || Array.isArray(store))
-      return {
-        valid: false,
-        backend: undefined,
-        capabilities: undefined,
-        dispose: undefined,
-        cause: undefined
-      }
-    backend = candidate.backend
-    capabilitiesValue = candidate.capabilities
     methods = ['get', 'set', 'remove', 'has', 'keys', 'clearValues', 'clearAll'].map(
       (name) => candidate[name]
     )
-    dispose = candidate.dispose
-    methods.push(dispose)
+    methods.push(base.dispose)
     if (records)
       methods.push(
         ...[
@@ -211,9 +288,8 @@ export const inspectStoreShape = (store: unknown, records: boolean): IStoreShape
       cause
     }
   }
-  const normalizedBackend = isBackendKind(backend) ? backend : undefined
-  const capabilitiesInspection = snapshotStorageCapabilitiesDetailed(capabilitiesValue)
-  const capabilities = capabilitiesInspection.value
+  const normalizedBackend = base.backend
+  const capabilities = base.capabilities
   const validCapabilities =
     capabilities !== undefined &&
     (!records ||
@@ -228,8 +304,8 @@ export const inspectStoreShape = (store: unknown, records: boolean): IStoreShape
       methods.every((method) => typeof method === 'function'),
     backend: normalizedBackend,
     capabilities,
-    dispose: typeof dispose === 'function' ? (dispose as () => Promise<void>) : undefined,
-    cause: capabilitiesInspection.cause
+    dispose: base.dispose,
+    cause: undefined
   }
 }
 

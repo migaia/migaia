@@ -31,6 +31,7 @@ export {
 export { StorageStageKind } from './stage-kind.js'
 
 export type {
+  IStorageBaseAdmission,
   IKeyValueStoreAdmission,
   IKeyValueStore,
   ISyncKeyValueStore,
@@ -42,6 +43,7 @@ export {
   asRecordStore,
   isRecordStore,
   snapshotKeyValueStore,
+  snapshotStorageBaseDetailed,
   snapshotKeyValueStoreDetailed,
   snapshotRecordStore
 } from './store.js'
@@ -64,7 +66,8 @@ export { asChangeFeedStore, isChangeFeedStore } from './change-feed.js'
 export type {
   ITransactionScope,
   ITransactionWriteOptions,
-  ITransactionKeyValueApi
+  ITransactionKeyValueApi,
+  ITransactionStageObserver
 } from './transaction.js'
 export { assertTransactionCallback, readTransactionConflictPolicy } from './transaction.js'
 
@@ -94,7 +97,10 @@ export {
   isBackendKind,
   type IChainMethods,
   type IChainMethodsOf,
-  type IWithChainMethods
+  type IWithChainMethods,
+  type IBackendStageObserver,
+  type IStorageOperationStageObserver,
+  type IBackendStageBindings
 } from './backend.js'
 export type {
   ILockKey,
@@ -102,7 +108,10 @@ export type {
   ITransactionOptions,
   IWriteConcurrencyOptions,
   ITransactionBuilder,
-  ILockedTransactionBuilder
+  ILockedTransactionBuilder,
+  IConcurrencyHolder,
+  IConcurrencyDecision,
+  IConcurrencyStageObserver
 } from './concurrency.js'
 export {
   defineStorageCapability,
@@ -139,3 +148,7 @@ export {
   type IMigrationStepObserver,
   type IMigrationRunOptions
 } from './versioned.js'
+
+export { ConcurrencyHolderState } from './concurrency.js'
+export type { ISqlStageObserver } from './sql.js'
+export type { IQueryStageObserver } from './query.js'
