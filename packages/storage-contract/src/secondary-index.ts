@@ -1,3 +1,4 @@
+import type { ITransactionOptions } from './concurrency.js'
 import type { ITransactionScope } from './transaction.js'
 import type { IStorageIterator } from './resource.js'
 import type { IKeyRange, IOperationContext, IStorageKey, IWriteOptions } from './context.js'
@@ -99,7 +100,7 @@ export type ISecondaryIndexRecordStore<TValue = unknown> = IRecordStore<TValue> 
   transactionIndexed<TResult>(
     handle: IRecordIndexHandle,
     run: (tx: ISecondaryIndexTransactionScope<TValue>) => TResult,
-    ctx?: IOperationContext
+    ctx?: ITransactionOptions
   ): Promise<Awaited<TResult>>
 }
 

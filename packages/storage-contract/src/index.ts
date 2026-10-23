@@ -173,3 +173,13 @@ export type { IConcurrencyConflict, ILockHolding } from './concurrency.js'
 export { lockKey } from './concurrency.js'
 
 export { prefixStorageOrgKey, unprefixStorageOrgKey } from './org.js'
+
+export { runWithConcurrency } from './concurrency.js'
+export type {
+  IConcurrencyAttempt,
+  IConcurrencyAttemptContext,
+  IConcurrencyPort
+} from './concurrency.js'
+export { resolveConcurrencyPolicy } from './transaction.js'
+
+export { createTransactionBuilder } from './transaction-builder.js'

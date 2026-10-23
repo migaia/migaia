@@ -31,7 +31,7 @@ pnpm add @migaia/store-persist @migaia/storage-web @migaia/store-light @migaia/s
 
 ### 示例参数
 
-memoryStorageHost() 提供本例真实内存后端，初始存档 key 为 settings。defaultJsonCodec 编码完整 version: 0 / state 信封；createStore 初值为 light / 0，省略 Runtime 使用默认实例。persist 必填 key 与 storage，未传 version 为 0、debounceMs 为 0、partialize 为恒等；普通对象默认浅三向合并，最后 await flush 确定本次写入结束。
+memoryBackendPlugin() 提供本例真实内存后端，初始存档 key 为 settings。defaultJsonCodec 编码完整 version: 0 / state 信封；createStore 初值为 light / 0，省略 Runtime 使用默认实例。persist 必填 key 与 storage，未传 version 为 0、debounceMs 为 0、partialize 为恒等；普通对象默认浅三向合并，最后 await flush 确定本次写入结束。
 
 ```ts doc-test=run
 import { createStore } from '@migaia/store-light'
@@ -422,7 +422,7 @@ clearFamily(storage, namespace) 的两个参数均必填，返回 `Promise<numbe
 
 缺省 merge 对普通对象（Object.prototype 或 null 原型）按字段浅比较：以构造时启动快照为基线，用 Object.is 比较当前字段；本地已改字段保留当前值，未改字段接受存档值，同时保留未归档的当前字段。它不是深度冲突解决，嵌套引用内部变化不自动得到逐层比较；重试也沿用这一启动基线。非普通对象、数组、Map、Set 等整体接受持久化形状，自定义 merge 则负责应用自己的规则。
 
-水合期间通知只标 dirty，不提前覆盖未知存档；恢复时的同步通知也归入这个窗口。水合成功后有 dirty 才重新安排写入。水合失败保留错误和 dirty 状态，flush / clear 不写而抛原水合错误；修复配置或存档后，成功 retryHydrate 才重新打开写入。恢复期间再次调用不会另起并行重读，但不保证它等待当前恢复或返回相同 Promise；需要恢复结果时等待发起重试的那次调用。
+水合期间通知只标 dirty，不提前覆盖未知存档；忽略同步 restore 本身的通知；异步读取期间的应用变化仍标 dirty。水合成功后有 dirty 才重新安排写入。水合失败保留错误和 dirty 状态，flush / clear 不写而抛原水合错误；修复配置或存档后，成功 retryHydrate 才重新打开写入。恢复期间再次调用不会另起并行重读，但不保证它等待当前恢复或返回相同 Promise；需要恢复结果时等待发起重试的那次调用。
 
 ### Handle 状态与等待
 
@@ -438,7 +438,7 @@ clearFamily(storage, namespace) 的两个参数均必填，返回 `Promise<numbe
 | ready                | 首次 hydrate 尝试的 Promise：成功 resolve，失败或完成前被释放中断则 reject；重试不替换原 Promise。                            |
 | settled              | 首次尝试无论成功失败都 resolve 的等待屏障，不表示以后 retry 已完成。                                                          |
 | retryHydrate()       | 无参数；失败后重读，成功恢复写入；应等待此调用本身判断恢复结果。                                                              |
-| flush() / clear()    | 无参数，返回 `Promise<void>`，具体串行与删除规则见后文。                                                                      |
+| flush(tx?) / clear() | 返回 `Promise<void>`；flush 可接参与事务视图，clear 无参数。                                                                  |
 | disposed / dispose() | live 布尔 getter / 同步幂等释放。                                                                                             |
 | disposeAsync()       | 同步停止后等待已接纳的写入/删除及最终防抖写入结束；最终写入失败见 writeError；已有 flush/clear 保留原结果。                   |
 
@@ -535,3 +535,51 @@ await state.$dispose()
 ```
 
 The default codec already preserves collections. Use `{ ...row }` to project a named class. codecStages observes each real encode/decode once; before/after/error failures only report, before never waits, and no business values enter observation. disposeAsync caches the rejecting main Promise; Symbol.asyncDispose caches a separate reporting Promise over one cleanup. Neither closes a borrowed store/runtime. Without native Symbol.asyncDispose, plugin-host asyncDisposeKey is the fixed fallback; language-level await using is not promised.
+
+## 快照与其他写入共同提交
+
+`persistTransaction(storage, [handle], run, options?)` 先暂停并排空这些句柄的旧工作，再借用该原始完整 store 的一个事务。句柄必须活动且由同一个 storage 创建；空数组、复制的句柄与错误的事务视图报 `INVALID_OPTION`，文本适配器报 `BACKEND_CAPABILITY`。具体 store 的事务对象扩展、选项与回调返回值类型保持。
+
+```ts doc-test=check
+import { createStore } from '@migaia/store-light'
+import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { persistTransaction } from '@migaia/store-persist'
+import { persist } from '@migaia/store-persist/light'
+
+await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })
+const storage = host.backend('memory')
+const settings = createStore({ count: 0 })
+const handle = persist(settings, { key: 'settings', storage })
+await handle.ready
+try {
+  await persistTransaction(storage, [handle], async (tx) => {
+    settings.count = 1
+    await handle.flush(tx)
+    await tx.set('settings-source', 'user', { conflictPolicy: 'replace' })
+  })
+} finally {
+  await handle.disposeAsync()
+  await settings.$dispose()
+}
+```
+
+`flush(tx)` 在调用时读取 snapshot、执行 partialize 并启动同一个 codec 的编码；同一句柄多次调用按次序写入各自快照。它只等此次编码与请求，外层 `persistTransaction` 成功才表示提交。实体可在同一个回调中用 `repository.in(tx).put(value)` 与快照、文本和字节写入共同提交。
+
+参与期间，订阅只记录变化；无参数 `flush()`、`clear()`、`retryHydrate()` 拒绝。成功后继续按原 debounce 保存更新的内存；失败或回滚也不撤销内存，而是恢复普通镜像写入。需要撤销业务状态时，由调用方在 catch 中恢复。参与期间 dispose 会请求中止事务，不启动最终旁路写入；disposeAsync 等待真实事务结束。句柄始终借用 store 与 Runtime，不负责关闭它们。
+
+IndexedDB 必须在原生活跃窗口直接发起请求。先取外部数据，再开始事务；不要在回调中等待 fetch、定时器或跨任务的 codec。对上例已有对象，可把外部读取放在协调边界之前：
+
+```ts
+async function saveExternal(loadSettings: () => Promise<{ count: number }>): Promise<void> {
+  const incoming = await loadSettings()
+  await persistTransaction(storage, [handle], async (tx) => {
+    settings.count = incoming.count
+    await handle.flush(tx)
+    await tx.set('settings-source', 'remote', { conflictPolicy: 'replace' })
+  })
+}
+```
+
+可选 `transactionStages: host.transactionStages(storage)` 沿三个适配入口传给同一引擎；这里只发出 beforePersistFlush / afterPersistFlush，后者表示请求完成。codecStages 绑定此次真实操作视图，每次转换只观察一次。观察失败只报告，不等待、不改变业务结果。导出的 `ITransactionScopeOf<typeof storage>` 保留具体后端事务类型。
+
+`ctx.concurrency` 可覆盖原始 store 的缺省策略。忙句柄先尝试一次：fail 立即拒绝，只有策略选择 wait 才进入可取消的 FIFO；自定义策略只在真实冲突后运行。句柄等待与后端内部重试共用这次调用的期限和等待预算，`timeoutMs` 不会在进入后端时重新起算。超时或取消后仍等待已开始的工作真正结束才释放占用。后端自有选项（包括 symbol 字段）保留值身份，取消 signal 则沿同一次协调传递。

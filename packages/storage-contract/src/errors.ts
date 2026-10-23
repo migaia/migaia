@@ -1,5 +1,6 @@
 import type { IBackendKind } from './capabilities.js'
 import type { IStorageKey } from './context.js'
+import type { ILockKey, IConcurrencyHolder } from './concurrency.js'
 import { StorageContractErrorCode, type IStorageContractErrorCode } from './error-code.js'
 
 export { StorageContractErrorCode, type IStorageContractErrorCode }
@@ -15,6 +16,10 @@ export type IStorageContractErrorDetails = {
   readonly key?: string | IStorageKey
   /** Original failure retained through the standard Error cause property. */
   readonly cause?: unknown
+  /** Actual lock identities for a rejection or timeout; copied by the concurrency boundary. */
+  readonly keys?: readonly ILockKey[]
+  /** Confirmed holder identity, or undefined when genuinely unknown. */
+  readonly holder?: IConcurrencyHolder
   /** Archive version immediately before a failed migration step or reset. */
   readonly fromVersion?: number
   /** Target version of a failed migration step or reset. */
@@ -35,6 +40,10 @@ export class StorageContractError extends Error {
   readonly backend?: IBackendKind
   /** Key supplied in details, or undefined. */
   readonly key?: string | IStorageKey
+  /** Detached lock identities present on lock rejection and timeout errors. */
+  readonly keys?: readonly ILockKey[]
+  /** Confirmed holder, or undefined when unavailable; handing-off never borrows a previous identity. */
+  readonly holder?: IConcurrencyHolder
   /** Failed migration's source version; absent on unrelated failures. */
   readonly fromVersion?: number
   /** Failed migration's target version; absent on unrelated failures. */
@@ -56,6 +65,8 @@ export class StorageContractError extends Error {
     this.code = code
     this.backend = details.backend
     this.key = details.key
+    if (details.keys !== undefined) this.keys = details.keys
+    if (Object.hasOwn(details, 'holder')) this.holder = details.holder
     if (details.fromVersion !== undefined) this.fromVersion = details.fromVersion
     if (details.toVersion !== undefined) this.toVersion = details.toVersion
     Object.freeze(this)

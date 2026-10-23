@@ -32,7 +32,7 @@ export type IPersistableCollection<TState> = {
 /** Whole-collection attachment options with optional shape-specific write projection and merge. */
 export type IPersistCollectionOptions<TState> = Pick<
   IPersistUnitOptions<TState>,
-  'debounceMs' | 'maxWaitMs' | 'scheduler' | 'codecStages'
+  'debounceMs' | 'maxWaitMs' | 'scheduler' | 'codecStages' | 'transactionStages'
 > & {
   /** Required archive key passed unchanged to storage. */
   key: string
@@ -105,6 +105,7 @@ export function persistCollection<TState>(
     version: snapshot.version,
     migrations: snapshot.migrations,
     codecStages: snapshot.codecStages,
+    transactionStages: snapshot.transactionStages,
     partialize: snapshot.partialize,
     merge: snapshot.merge,
     debounceMs: snapshot.debounceMs,

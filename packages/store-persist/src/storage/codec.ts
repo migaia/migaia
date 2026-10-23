@@ -3,11 +3,32 @@ import { fromValueCodec, type ICodecStageObserver, type ICodec } from '@migaia/s
 import { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'
 import { inspectThenable, observeThenableRejection } from '@migaia/utils/function'
 import { isUint8Array } from '@migaia/utils/bytes'
-import type { IPersistStorage, IPersistByteStorage } from '../core/types.js'
+import type { IPersistStorage } from '../core/types.js'
 import { createStorePersistTypeError } from '../errors.js'
 import { StorePersistErrorCode } from '../error-code.js'
 import { PersistCodecOutput, PersistCodecOperation } from '../state-constants.js'
 import { StorePersistErrorText } from '../error-text.js'
+
+/**
+ * Keeps declared coded failures intact; raw snapshot/codec errors enter the existing encode
+ * boundary.
+ */
+export function normalizeTransactionEncodingFailure(cause: unknown): unknown {
+  if (cause instanceof Error) {
+    /** Error identity is a declared data property, never a getter or transaction permission. */
+    const descriptors = Object.getOwnPropertyDescriptors(cause)
+    if (
+      typeof descriptors.source?.value === 'string' &&
+      typeof descriptors.code?.value === 'string'
+    )
+      return cause
+  }
+  return createStorePersistTypeError(
+    StorePersistErrorCode.encodeFailed,
+    StorePersistErrorText.transactionSnapshot,
+    { cause }
+  )
+}
 
 /** One immutable adapter owns the default collection value-domain and error chain. */
 const collectionsCodec = fromValueCodec(defineCollectionsJsonCodec({ version: 1 }))
@@ -92,7 +113,9 @@ export const defaultJsonCodec: ICodec = Object.freeze({
  * `putRecord`/`getRecord`，这个最小 `IPersistStorage` 形状不声明这两个方法， 传入 structured codec 会在写入时明确抛错，而不是静默按
  * text 处理。
  */
-function assertBinaryCapable(storage: IPersistStorage): asserts storage is IPersistByteStorage {
+function assertBinaryCapable<TStorage extends Pick<IPersistStorage, 'getBytes' | 'setBytes'>>(
+  storage: TStorage
+): asserts storage is TStorage & Required<Pick<IPersistStorage, 'getBytes' | 'setBytes'>> {
   if (typeof storage.getBytes !== 'function' || typeof storage.setBytes !== 'function') {
     throw createStorePersistTypeError(
       StorePersistErrorCode.backendCapability,
@@ -120,12 +143,14 @@ export function writeEnvelope(
 
 /** Internal attachment entry adds its observer while preserving the public helper's shape. */
 export async function writeEnvelopeWithStages(
-  storage: IPersistStorage,
+  storage: Pick<IPersistStorage, 'capabilities' | 'set' | 'getBytes' | 'setBytes'>,
   key: string,
   codec: ICodec,
   value: unknown,
   ctx: { signal?: IAbortSignal },
-  observer?: ICodecStageObserver
+  observer?: ICodecStageObserver,
+  normalizeEncodeFailure?: (cause: unknown) => unknown,
+  beforeWrite?: () => Promise<void>
 ): Promise<void> {
   if (codec.output === PersistCodecOutput.structured) {
     throw createStorePersistTypeError(
@@ -138,15 +163,26 @@ export async function writeEnvelopeWithStages(
   let encoded: unknown
   try {
     encoded = await codec.encode(value, ctx)
+    // Queued requests own the completed codec bytes before a later source mutation can reach them.
+    if (
+      beforeWrite !== undefined &&
+      codec.output === PersistCodecOutput.binary &&
+      isUint8Array(encoded)
+    )
+      encoded = new Uint8Array(encoded)
   } catch (error) {
+    /** Only conversion errors are normalized; native write failures below retain their own identity. */
+    const failure = normalizeEncodeFailure === undefined ? error : normalizeEncodeFailure(error)
     observeCodec(
       observer,
       'onEncodeError',
       PersistCodecOperation.encode,
       codec.name,
-      codec === defaultJsonCodec ? StorePersistErrorCode.encodeFailed : undefined
+      codec === defaultJsonCodec || failure !== error
+        ? StorePersistErrorCode.encodeFailed
+        : undefined
     )
-    throw error
+    throw failure
   }
   observeCodec(observer, 'afterEncode', PersistCodecOperation.encode, codec.name)
   if (codec.output === PersistCodecOutput.binary && storage.capabilities.binary) {
@@ -157,6 +193,8 @@ export async function writeEnvelopeWithStages(
         StorePersistErrorText.binaryUint8(codec.name)
       )
     }
+    // Conversion starts at the caller's synchronous boundary; only requests wait for earlier writes.
+    if (beforeWrite !== undefined) await beforeWrite()
     await storage.setBytes(key, encoded, ctx)
     return
   }
@@ -166,6 +204,7 @@ export async function writeEnvelopeWithStages(
       StorePersistErrorText.stringOutput(codec.name)
     )
   }
+  if (beforeWrite !== undefined) await beforeWrite()
   await storage.set(key, encoded, ctx)
 }
 

@@ -31,7 +31,7 @@ Attach persist before editing, then await ready. Its default plain-object merge 
 
 ### Example parameters
 
-memoryStorageHost() is the real in-memory backend, with settings as the archive key. defaultJsonCodec encodes a complete version 0 / state envelope. createStore starts at light / 0 and uses its default Runtime when omitted. persist requires key and storage; omitted version and debounceMs are 0 and partialize is identity. Plain objects use shallow startup reconciliation, and awaiting flush confirms this write has settled.
+memoryBackendPlugin() is the real in-memory backend, with settings as the archive key. defaultJsonCodec encodes a complete version 0 / state envelope. createStore starts at light / 0 and uses its default Runtime when omitted. persist requires key and storage; omitted version and debounceMs are 0 and partialize is identity. Plain objects use shallow startup reconciliation, and awaiting flush confirms this write has settled.
 
 ```ts doc-test=run
 import { createStore } from '@migaia/store-light'
@@ -422,7 +422,7 @@ Attachment creates one frozen plan before subscribing. Hydration uses storage-co
 
 Default merging handles plain objects with Object.prototype or null prototypes. It shallowly compares each current field against construction-time startup state using Object.is: locally changed fields win, untouched fields accept the archive, and unarchived current fields remain. It is not deep conflict resolution; mutation inside a retained nested reference is not recursively compared. Retry uses that same startup baseline. Arrays, Maps, Sets, and other non-plain shapes accept the persisted shape wholesale; a custom merge owns its application rules.
 
-Changes during hydration mark dirty rather than writing over an unknown archive. Synchronous restore notifications join that window. Successful hydration schedules retained dirty work. Failure retains its error and dirty state; flush / clear throw the hydration error without writing until retryHydrate succeeds. A further retry call during recovery does not start a parallel read, but is not guaranteed to await that recovery or return the same Promise. Await the call that initiated retry to observe its result.
+Changes during hydration mark dirty rather than writing over an unknown archive. Synchronous restore notifications are ignored; application changes during the asynchronous read remain dirty. Successful hydration schedules retained dirty work. Failure retains its error and dirty state; flush / clear throw the hydration error without writing until retryHydrate succeeds. A further retry call during recovery does not start a parallel read, but is not guaranteed to await that recovery or return the same Promise. Await the call that initiated retry to observe its result.
 
 ### Handle state and waiting
 
@@ -438,7 +438,7 @@ Changes during hydration mark dirty rather than writing over an unknown archive.
 | ready                | Promise for the first hydration attempt, resolving on success and rejecting on failure or disposal before completion; retry never replaces it.                             |
 | settled              | An always-resolving barrier for the first attempt, not later retry completion.                                                                                             |
 | retryHydrate()       | No arguments; rereads after failure and reopens writing only on success. Await the initiating call itself.                                                                 |
-| flush() / clear()    | No arguments; `Promise<void>`, with ordered write / deletion behavior below.                                                                                               |
+| flush(tx?) / clear() | `Promise<void>`; flush accepts an enlisted transaction view, while clear has no arguments.                                                                                 |
 | disposed / dispose() | Live boolean getter / synchronous idempotent release.                                                                                                                      |
 | disposeAsync()       | Stops synchronously, then awaits admitted writes/removals and the final debounce write; final-write failures stay on writeError; existing flush/clear keep their outcomes. |
 
@@ -535,3 +535,51 @@ await state.$dispose()
 ```
 
 The default codec already preserves collections. Use `{ ...row }` to project a named class. codecStages observes each real encode/decode once; before/after/error failures only report, before never waits, and no business values enter observation. disposeAsync caches the rejecting main Promise; Symbol.asyncDispose caches a separate reporting Promise over one cleanup. Neither closes a borrowed store/runtime. Without native Symbol.asyncDispose, plugin-host asyncDisposeKey is the fixed fallback; language-level await using is not promised.
+
+## Commit a snapshot with other writes
+
+`persistTransaction(storage, [handle], run, options?)` pauses and drains these handles before borrowing one transaction from the original complete store. Handles must be active and attached to that exact storage. Empty arrays, copied handles and mismatched transaction views reject with `INVALID_OPTION`; text adapters reject with `BACKEND_CAPABILITY`. Concrete scope extensions, backend options and callback result types remain intact.
+
+```ts doc-test=check
+import { createStore } from '@migaia/store-light'
+import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { persistTransaction } from '@migaia/store-persist'
+import { persist } from '@migaia/store-persist/light'
+
+await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })
+const storage = host.backend('memory')
+const settings = createStore({ count: 0 })
+const handle = persist(settings, { key: 'settings', storage })
+await handle.ready
+try {
+  await persistTransaction(storage, [handle], async (tx) => {
+    settings.count = 1
+    await handle.flush(tx)
+    await tx.set('settings-source', 'user', { conflictPolicy: 'replace' })
+  })
+} finally {
+  await handle.disposeAsync()
+  await settings.$dispose()
+}
+```
+
+`flush(tx)` reads snapshot, applies partialize and starts the same codec at invocation. Repeated calls on one handle write their individual snapshots in order. It waits for this conversion and request; only successful completion of the outer `persistTransaction` means commit. An entity write through `repository.in(tx).put(value)` can share that transaction with the snapshot, text and bytes.
+
+During participation, notifications only record changes; no-argument `flush()`, `clear()` and `retryHydrate()` reject. Afterwards normal debounce mirrors newer memory. Rollback does not undo memory; ordinary mirroring resumes after failure too. Restore application state in catch if rollback of memory is needed. Disposal requests native abort without starting a final side write; disposeAsync waits for actual transaction completion. Handles borrow their store and Runtime.
+
+IndexedDB requests must start directly within a native active window. Read external data before beginning the transaction; do not await fetch, timers or a codec spanning tasks inside the callback. With the objects from the preceding example, keep the external read outside coordination:
+
+```ts
+async function saveExternal(loadSettings: () => Promise<{ count: number }>): Promise<void> {
+  const incoming = await loadSettings()
+  await persistTransaction(storage, [handle], async (tx) => {
+    settings.count = incoming.count
+    await handle.flush(tx)
+    await tx.set('settings-source', 'remote', { conflictPolicy: 'replace' })
+  })
+}
+```
+
+Optional `transactionStages: host.transactionStages(storage)` passes through all three adapters. Persistence emits only beforePersistFlush / afterPersistFlush; after means request completion. codecStages binds the actual operation view and observes each conversion once. Observer failures only report, never wait or alter business results. Exported `ITransactionScopeOf<typeof storage>` preserves the concrete backend scope type.
+
+`ctx.concurrency` overrides the original store default. Busy handles are tried once: fail rejects immediately, and only a wait decision enters the cancellable FIFO. Custom policy runs only after a real conflict. Handle admission and backend retries share this call's deadline and wait budget; entering the backend does not restart timeoutMs. Cancellation still waits for accepted work to actually finish before releasing resources. Backend option values, including symbol fields, retain identity; cancellation uses the same coordination signal.

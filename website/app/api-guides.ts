@@ -12772,6 +12772,38 @@ export async function readByEmail(
       }
     ]
   }),
+  'store-persist:index:persistTransaction': {
+    en: {
+      purpose:
+        'Drain authentic handles on one complete store, then commit their snapshots with entity, text and byte writes in its original transaction. Memory does not roll back; normal mirroring resumes afterwards.',
+      quickStart:
+        "import { createStore } from '@migaia/store-light'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { persistTransaction } from '@migaia/store-persist'\nimport { persist } from '@migaia/store-persist/light'\n\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nconst settings = createStore({ count: 0 })\nconst handle = persist(settings, { key: 'settings', storage })\nawait handle.ready\ntry {\n  await persistTransaction(storage, [handle], async (tx) => {\n    settings.count = 1\n    await handle.flush(tx)\n    await tx.set('settings-source', 'user', { conflictPolicy: 'replace' })\n  })\n} finally {\n  await handle.disposeAsync()\n  await settings.$dispose()\n}",
+      scenarios: [
+        'A form snapshot and related storage writes must commit together.',
+        'Concrete backend scope extensions and transaction options must remain available.'
+      ],
+      avoidWhen: [
+        'The adapter is text-only or handles belong to different stores.',
+        'IndexedDB callback waits for external I/O; load that data before starting.'
+      ],
+      options: []
+    },
+    zh: {
+      purpose:
+        '排空同一完整 store 上的真实句柄，在其原始事务中共同提交快照、实体、文本与字节。内存不回滚，结算后恢复普通镜像写入。',
+      quickStart:
+        "import { createStore } from '@migaia/store-light'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { persistTransaction } from '@migaia/store-persist'\nimport { persist } from '@migaia/store-persist/light'\n\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nconst settings = createStore({ count: 0 })\nconst handle = persist(settings, { key: 'settings', storage })\nawait handle.ready\ntry {\n  await persistTransaction(storage, [handle], async (tx) => {\n    settings.count = 1\n    await handle.flush(tx)\n    await tx.set('settings-source', 'user', { conflictPolicy: 'replace' })\n  })\n} finally {\n  await handle.disposeAsync()\n  await settings.$dispose()\n}",
+      scenarios: [
+        '表单快照与相关存储写入必须共同提交。',
+        '需要保留具体后端 scope 扩展与事务选项。'
+      ],
+      avoidWhen: [
+        '适配器只提供文本或句柄来自不同 store。',
+        'IndexedDB 回调等待外部 I/O；应在开始前读取外部数据。'
+      ],
+      options: []
+    }
+  },
   'store-persist:index:persistUnit': {
     en: {
       purpose:

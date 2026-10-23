@@ -1,5 +1,16 @@
 /** Stable validation causes used by codec and synchronous-option admission boundaries. */
 export const StorageContractErrorText = {
+  /**
+   * Confirmed lock diagnostics expose declared identity and holder without inventing a remote
+   * owner.
+   */
+  lockFailure: (code: string, keys: string, holder: string): string =>
+    `[storage-contract] ${code}: keys=${keys}; holder=${holder}`,
+  /**
+   * Invalid policy results retain a typed cause while the public code identifies the decision
+   * boundary.
+   */
+  concurrencyDecision: 'concurrency policy returned an invalid decision',
   /** Organization identity is exact lowercase UUID syntax; outer hosts own defaults and generation. */
   orgId: 'orgId must be a canonical lowercase UUID',
   /** Unwrapping requires one complete physical envelope from the requested organization. */
