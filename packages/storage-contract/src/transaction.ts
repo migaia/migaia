@@ -19,7 +19,7 @@ import { StorageStageKind } from './stage-kind.js'
 import type { IConflictPolicy, IStorageKey, IKeyRange } from './context.js'
 import type { IStorageBase } from './store.js'
 import { snapshotStorageBaseDetailed } from './store.js'
-import type { IStorageIterator } from './resource.js'
+import { createStorageIteratorLifetime, type IStorageIterator } from './resource.js'
 import type {
   IRecordIndexHandle,
   IRecordIndexProjection,
@@ -615,23 +615,13 @@ export function createTransactionOwner<
         if (typeof next !== 'function' || typeof close !== 'function') throw invalidTransaction()
         /** The live transaction reference is detached after cleanup, leaving only immutable facts. */
         let iteratorState: ITransactionState | undefined = state
-        /** Existing advances must actually finish before their native cursor is released. */
-        const advances = new Set<Promise<unknown>>()
-        /** Cleanup stops admission synchronously and has one cached rejecting main Promise. */
-        let main: Promise<void> | undefined
-        /** Symbolic cleanup reports once through a separately cached successful Promise. */
-        let symbolic: Promise<void> | undefined
-        /** Iterator return shares cleanup and caches its first result. */
-        let returned: Promise<IteratorResult<T>> | undefined
         /** Creation-scope authority is discarded after cleanup. */
         let originalScope: object | undefined = scope
         /** Actual registration is assigned before any resource method can run. */
         let resource: IIteratorRegistration
-        /** One native close, after accepted advances, with no data permission requirements. */
-        const cleanup = (): Promise<void> => {
-          if (main) return main
-          main = Promise.resolve().then(async () => {
-            await Promise.allSettled(advances)
+        /** The canonical resource lifetime waits complete accepted advances before native close. */
+        const lifetime = createStorageIteratorLifetime<T>({
+          close: async () => {
             /** Capture before awaiting so reentrant cleanup cannot invoke the port again. */
             const release = close
             close = undefined
@@ -642,46 +632,26 @@ export function createTransactionOwner<
                 throw failTransaction(iteratorState!, error)
               }
             }
-          })
-          void main.then(
-            () => {
-              iteratorState?.iterators.delete(resource)
-              iteratorState = undefined
-              next = undefined
-              originalScope = undefined
-            },
-            () => {
-              iteratorState?.iterators.delete(resource)
-              iteratorState = undefined
-              next = undefined
-              originalScope = undefined
-            }
+          },
+          report: reportTransactionFailure,
+          onSettled: () => {
+            iteratorState?.iterators.delete(resource)
+            iteratorState = undefined
+            next = undefined
+            originalScope = undefined
+          }
+        })
+        /** One original scope still authorizes each complete advance and its operation view. */
+        const advance = (currentScope: object): Promise<IteratorResult<T>> =>
+          lifetime.advance(() =>
+            runTransactionOperation(currentScope, (operationScope) => {
+              if (lifetime.isClosing() || !next)
+                return { done: true, value: undefined } as IteratorResult<T>
+              return next(operationScope as typeof scope)
+            })
           )
-          return main
-        }
-        /** Each next is independently authorized and occupies only its own operation interval. */
-        const advance = (currentScope: object): Promise<IteratorResult<T>> => {
-          /** Closed resources still reject expired data views through the original operation owner. */
-          const pending = runTransactionOperation(currentScope, (operationScope) => {
-            if (main || !next) return { done: true, value: undefined } as IteratorResult<T>
-            return next(operationScope as typeof scope)
-          })
-          advances.add(pending)
-          /** The public advance can outlive an unawaited caller; its owner still observes failure. */
-          const advancement = pending.then(
-            async (result) => {
-              advances.delete(pending)
-              if (result.done) await cleanup()
-              return result
-            },
-            (error) => {
-              advances.delete(pending)
-              throw error
-            }
-          )
-          void advancement.then(undefined, () => undefined)
-          return advancement
-        }
+        /** All existing cleanup paths retain the canonical cached main Promise. */
+        const cleanup = lifetime.dispose
         resource = {
           kind: RegistrationKind.iterator,
           info: state.info,
@@ -713,18 +683,9 @@ export function createTransactionOwner<
               : creationView.state
                 ? Promise.resolve({ done: true, value: undefined })
                 : rejectedTransactionResult(creationView.expiredFailure),
-          return: (value?: unknown) => {
-            if (!returned) {
-              returned = cleanup().then(() => ({ done: true, value }))
-              void returned.then(undefined, () => undefined)
-            }
-            return returned
-          },
+          return: lifetime.returned,
           dispose: cleanup,
-          [owner.asyncDisposeKey]: () =>
-            (symbolic ??= cleanup().then(undefined, (error) => {
-              reportTransactionFailure(error)
-            })),
+          [owner.asyncDisposeKey]: lifetime.symbolic,
           [Symbol.asyncIterator]() {
             return this
           }

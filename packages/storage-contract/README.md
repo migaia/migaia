@@ -512,7 +512,7 @@ async function readGreeting(store: IStorageBase) {
 
 `createRecordQuery<T,TContext,TAugmentMethods>(source, methods?)` 创建共用记录执行器。`IRecordQuery` 在公共 where/select/all/stream/explain/requirePushdown 上增加普通 `limit(count)` 与 `orderByComparator(compare).limit(count)`。比较器声明显式上限前没有 typed 读取终点；绕过类型后的缺失上限与无效 limit 都在数据源执行前以 INVALID_ARGUMENT 拒绝。limit 接受非负安全整数。比较器通过稳定、有界堆选择结果，时间 O(c log k)、保留候选 O(k)，最后只排列堆内结果；本切片的两个控制都在客户端执行。选择后移除 where/select。TContext 为 undefined 时，编译期拒绝新的操作上下文。
 
-`all` 与 `stream` 返回的真实 `IStorageIterator` 共用同一个节点读取器和原游标。普通 limit 达到上限后不再推进数据源。已登记事务流复用原迭代器登记，清理前排空已接纳的完整映射 next；原游标耗尽后的堆内结果仍需原 scope 准入。未登记根迭代器保留其原生清理契约。可选的 Feature 纯方法在每个派生链保留原函数引用，省略方法不分配空方法表。`IQueryShape` 与 `IQueryResultOf` 保留泛型终点结果推断。
+`all` 与 `stream` 返回的真实 `IStorageIterator` 共用同一个节点读取器和原游标。普通 limit 达到上限后不再推进数据源。已登记事务流复用原迭代器登记，清理前排空已接纳的完整映射 next；原游标耗尽后的堆内结果仍需原 scope 准入。根流与事务流复用同一迭代器生命周期实现，主清理和符号清理都会等待已接纳的完整映射后才释放原数据源；mapper 失败保留在原 next 结果上，清理仍保留自身数据源失败策略。可选的 Feature 纯方法在每个派生链保留原函数引用，省略方法不分配空方法表。`IQueryShape` 与 `IQueryResultOf` 保留泛型终点结果推断。
 
 数据源只捕获一次 `IQueryPushdown` 与原 execute 回调。不可变链节点共享历史，执行或 explain 只展开一次；记录查询把最长安全原生前缀作为规范条件 AST 与可选投影字段交给数据源。JS 谓词、mapper 与不透明对象身份比较在客户端执行；后续步骤不能越过客户端边界下推。`QueryOperation` 是共用词汇，不表示所有同名链方法都已实现。explain 不读数据；仅声明索引与原生条件时才保守地排除 fullScan。requirePushdown 在开游标前以 QUERY_NOT_PUSHABLE 与客户端原因拒绝。
 
@@ -586,7 +586,7 @@ async function readUser(executor: ISqlExecutor, id: number) {
 
 `useTransactionCapability(scope, token)` 从真实 scope 的原 transaction owner 找到同一 store，再读取唯一 provider 表。它供后端原方法工厂的 `use: (token) => useTransactionCapability(scope, token)` 使用；不修改 scope，因此公开类型注解的完整 frozen scope 不需要私有 symbol 或 cast。纯 use 不调用 forTransaction、不执行 I/O；同视图、同实现重复 use 返回同一冻结投影，视图失效时清空缓存。
 
-当前标准事务投影覆盖 kv 与 records。kv 提供完整 get/set/remove/has/getMany/setMany/removeMany/removeByPrefix，保留单个真实 native batch；没有根 keys/clear、普通操作 ctx 或独立策略。records 提供真实共用 query 与 removeByPrefix；query 的 all 不接受普通 ctx。每个数据方法都进入原 runTransactionOperation，将新的完整操作视图交给 forTransaction；保存 query 的 all 也先进入同一 owner，严格计划失败、mapper 与真实 iterator 清理保持原首错和排空。关闭后的保存数据方法与 query 终点在 I/O 前拒绝原后端 TRANSACTION_FAILED。
+当前标准事务投影覆盖 kv 与 records。kv 提供完整 get/set/remove/has/getMany/setMany/removeMany/removeByPrefix，保留单个真实 native batch；没有根 keys/clear、普通操作 ctx 或独立策略。records 提供真实共用 query 与 removeByPrefix；query 的 all 不接受普通 ctx。`IWithTransactionQueryMethods<TScope,TAugmentMethods>` 将真实已选查询方法投影到既有事务 records API，不增加根操作上下文、不改原生 scope 成员；规范 builder 类型复用此纯 helper 增强回调 scope。每个数据方法都进入原 runTransactionOperation，将新的完整操作视图交给 forTransaction；保存 query 的 all 也先进入同一 owner，严格计划失败、mapper 与真实 iterator 清理保持原首错和排空。关闭后的保存数据方法与 query 终点在 I/O 前拒绝原后端 TRANSACTION_FAILED。
 
 ```ts
 import { kv, records, type ITransactionScope } from '@migaia/storage-contract'

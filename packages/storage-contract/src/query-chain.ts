@@ -19,7 +19,7 @@ import {
 } from './errors.js'
 import { StorageContractErrorText } from './error-text.js'
 import type { IOperationContext, IStorageKey } from './context.js'
-import type { IStorageIterator } from './resource.js'
+import { createStorageIteratorLifetime, type IStorageIterator } from './resource.js'
 import { snapshotOperationContext } from './operation-context.js'
 import { runTransactionIteratorOperation, deriveTransactionIterator } from './transaction.js'
 
@@ -1021,8 +1021,8 @@ async function executeRecordQuery<R>(
 
 /**
  * Streams the same compiled reader over the original source resource. Each accepted next borrows
- * its original transaction operation. Explicit cleanup keeps the source's existing native-advance
- * drain guarantee; an asynchronous mapper remains tracked by the original operation owner.
+ * its original transaction operation. Root and transaction streams share the canonical resource
+ * lifetime, so cleanup waits the complete accepted read, including an asynchronous mapper.
  */
 function streamRecordQuery<R>(
   source: IQuerySourceSnapshot,
@@ -1041,40 +1041,27 @@ function streamRecordQuery<R>(
     }
   })
   if (derived) return derived
-  /** This output flag only suppresses further buffered emission after original cleanup is requested. */
-  let stopped = false
-  /** Repeated return calls share the first result while disposal still uses the source's Promise. */
-  let returned: Promise<IteratorResult<R>> | undefined
+  /** Root mapped reads share the canonical accepted-advance drain with transaction resources. */
+  const lifetime = createStorageIteratorLifetime<R>({
+    close: () => iterator.dispose(),
+    // The original source owns cleanup diagnostics and its cached report-and-resolve Promise.
+    report: () => iterator[Symbol.asyncDispose]()
+  })
   return {
     next: () =>
-      runTransactionIteratorOperation(iterator, async (advance, fail) => {
-        if (stopped) return { done: true, value: undefined }
-        try {
-          /** The complete predicate or mapper interval belongs to this original accepted operation. */
-          const next = await read(advance)
-          if (next.done || stopped) {
-            stopped = true
-            await iterator.dispose()
-            return { done: true, value: undefined }
+      lifetime.advance(() =>
+        runTransactionIteratorOperation(iterator, async (advance, fail) => {
+          if (lifetime.isClosing()) return { done: true, value: undefined }
+          try {
+            return (await read(advance)) as IteratorResult<R>
+          } catch (cause) {
+            return failedRecordQuery(iterator, fail, cause)
           }
-          return { done: false, value: next.value as R }
-        } catch (cause) {
-          stopped = true
-          return failedRecordQuery(iterator, fail, cause)
-        }
-      }),
-    return: (value?: unknown) => {
-      stopped = true
-      return (returned ??= iterator.dispose().then(() => ({ done: true, value: value as R })))
-    },
-    dispose: () => {
-      stopped = true
-      return iterator.dispose()
-    },
-    [Symbol.asyncDispose]: () => {
-      stopped = true
-      return iterator[Symbol.asyncDispose]()
-    },
+        })
+      ),
+    return: lifetime.returned,
+    dispose: lifetime.dispose,
+    [Symbol.asyncDispose]: lifetime.symbolic,
     [Symbol.asyncIterator]() {
       return this
     }

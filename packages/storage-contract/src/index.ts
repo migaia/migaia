@@ -236,7 +236,7 @@ export type {
 } from './query-chain.js'
 
 export { useTransactionCapability } from './transaction.js'
-export type { ITransactionCapabilityView } from './capability.js'
+export type { ITransactionCapabilityView, IWithTransactionQueryMethods } from './capability.js'
 
 export { snapshotStorageKeyPrefix } from './key-order.js'
 export type { IStorageKeyPrefix } from './key-order.js'

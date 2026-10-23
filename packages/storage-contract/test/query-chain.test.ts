@@ -989,7 +989,7 @@ describe('bounded record execution', () => {
 })
 
 describe('unregistered source resource streaming', () => {
-  it('forwards the original native cleanup Promises without materializing all rows', async () => {
+  it('closes the original native resource once without materializing all rows', async () => {
     let advanced = 0
     let closed = 0
     /** A root backend resource need not be registered as a transaction iterator. */
@@ -1021,7 +1021,7 @@ describe('unregistered source resource streaming', () => {
     expect(advanced).toBe(0)
     await expect(stream.next()).resolves.toEqual({ done: false, value: 2 })
     expect(advanced).toBe(1)
-    expect(stream.dispose()).toBe(native.dispose())
+    expect(stream.dispose()).toBe(stream.dispose())
     await stream.dispose()
     expect(closed).toBe(1)
   })
@@ -1049,4 +1049,72 @@ describe('bounded query operation context', () => {
     ).rejects.toMatchObject({ code: 'ABORTED', cause: 'selected getter' })
     expect(closed).toBe(1)
   })
+})
+
+describe('root mapped read cleanup', () => {
+  it.each(['resolve', 'reject'] as const)(
+    'drains accepted async mapping before main or symbolic cleanup can settle: %s',
+    async (outcome) => {
+      /** This legitimate source wrapper has native ownership but no transaction registration itself. */
+      let closed = 0
+      const native = ownedRows([1], () => {
+        closed++
+      })
+      const source: IStorageIterator<readonly [string, unknown]> = {
+        next: () => native.next(),
+        dispose: () => native.dispose(),
+        [Symbol.asyncDispose]: () => native[Symbol.asyncDispose](),
+        [Symbol.asyncIterator]() {
+          return this
+        }
+      }
+      /** The mapped read remains accepted work after native next has already returned its row. */
+      const entered = Promise.withResolvers<void>()
+      const mapping = Promise.withResolvers<number>()
+      const query = createRecordQuery<number>({ pushdown: noPushdown, execute: () => source })
+      const stream = query
+        .select(async () => {
+          entered.resolve()
+          return mapping.promise
+        })
+        .stream()
+      const pending = stream.next()
+      await entered.promise
+      const cleanup = stream.dispose()
+      const symbolic = stream[Symbol.asyncDispose]()
+      expect(cleanup).toBe(stream.dispose())
+      expect(symbolic).toBe(stream[Symbol.asyncDispose]())
+      expect(symbolic).not.toBe(cleanup)
+      let mainSettled = false
+      let symbolicSettled = false
+      void cleanup.then(() => {
+        mainSettled = true
+      })
+      void symbolic.then(() => {
+        symbolicSettled = true
+      })
+      await Promise.resolve()
+      await Promise.resolve()
+      expect(mainSettled).toBe(false)
+      expect(symbolicSettled).toBe(false)
+      expect(closed).toBe(0)
+      if (outcome === 'reject') {
+        const original = new RangeError('root mapper failed')
+        mapping.reject(original)
+        await expect(pending).rejects.toBe(original)
+        expect(original).toMatchObject({
+          source: '@migaia/storage-contract',
+          code: 'INVALID_ARGUMENT'
+        })
+      } else {
+        mapping.resolve(7)
+        await expect(pending).resolves.toEqual({ done: false, value: 7 })
+      }
+      await cleanup
+      await symbolic
+      expect(mainSettled).toBe(true)
+      expect(symbolicSettled).toBe(true)
+      expect(closed).toBe(1)
+    }
+  )
 })
