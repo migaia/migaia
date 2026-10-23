@@ -3651,7 +3651,8 @@ console.log(candidate.name, candidate.output)`
       summary: t(
         'Named node, literal or authentic SPARQL fragment.',
         'Named node、literal 或真实 SPARQL 片段。'
-      )
+      ),
+      members: {}
     },
     ISparqlRow: {
       summary: t(
