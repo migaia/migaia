@@ -103,6 +103,27 @@ console.log(migrateEnvelopeSync(plan, { version: 0, state: 'old' })) // { previo
       )
     }
   ],
+  encodeOrderedStorageKey: [
+    {
+      title: t('Preserve nested key prefix order', '保留嵌套键前缀顺序'),
+      problem: t(
+        'Record indexes and locks must share the existing key order, including UTF-16 and nested prefixes.',
+        '记录索引与锁须共用现有键顺序，包含 UTF-16 与嵌套前缀。'
+      ),
+      example: t(
+        `import { encodeOrderedStorageKey } from '@migaia/storage-contract'
+console.log([...encodeOrderedStorageKey([''], 'memory')].join(','))
+// 5,3,0,0`,
+        `import { encodeOrderedStorageKey } from '@migaia/storage-contract'
+console.log([...encodeOrderedStorageKey([''], 'memory')].join(','))
+// 5,3,0,0`
+      ),
+      result: t(
+        'Prints 5,3,0,0; the output has its own buffer.',
+        '输出 5,3,0,0；结果持有独立缓冲区。'
+      )
+    }
+  ],
   snapshotStorageKey: [
     {
       title: t('Capture a composite key before its owner changes it', '在调用方修改前捕获复合键'),

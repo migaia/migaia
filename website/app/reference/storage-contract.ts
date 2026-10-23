@@ -1346,6 +1346,20 @@ if (snapshot) console.log(await snapshot.store.getRecord('profile'))`
       ),
       example: `assertStringStorageKey('theme', 'local')`
     },
+    encodeOrderedStorageKey: {
+      role: 'operation',
+      purpose: t(
+        'Validate and copy a key, then encode independently owned bytes whose lexicographic order equals compareStorageKeys.',
+        '校验并复制键，再编码成独立字节；字典序与 compareStorageKeys 相同。'
+      ),
+      params: keyValidationParams,
+      returns: t(
+        'Uint8Array in linear key size; invalid input reuses INVALID_KEY. Signed zero normalizes to the same encoding.',
+        '线性键大小的 Uint8Array；无效输入复用 INVALID_KEY。正负零规范化为同一编码。'
+      ),
+      example: storageContractCases.encodeOrderedStorageKey![0]!.example,
+      cases: storageContractCases.encodeOrderedStorageKey
+    },
     compareStorageKeys: {
       role: 'operation',
       purpose: t(

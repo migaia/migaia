@@ -1026,6 +1026,7 @@
         "compareStorageKeys",
         "createMigrationPlan",
         "defineStorageCapability",
+        "encodeOrderedStorageKey",
         "fromValueCodec",
         "implement",
         "intrinsicConstructorName",
