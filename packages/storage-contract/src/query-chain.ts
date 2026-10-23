@@ -639,11 +639,13 @@ function snapshotQuerySource(source: IRecordQuerySource): IQuerySourceSnapshot {
       /** Borrowed arrays, including proxies, have their length read once during admission. */
       const length = values.length
       for (let position = 0; position < length; position++) {
-        if (!Object.hasOwn(values, position))
-          throw new TypeError(StorageContractErrorText.queryArgument)
-        /** Every value must name a canonical declared operation. */
-        const value = values[position]!
-        if (typeof value !== 'string' || !Object.hasOwn(table, value))
+        /** A missing slot never runs its getter; a present value must name a declared operation. */
+        let value: T | undefined
+        if (
+          !Object.hasOwn(values, position) ||
+          typeof (value = values[position]) !== 'string' ||
+          !Object.hasOwn(table, value)
+        )
           throw new TypeError(StorageContractErrorText.queryArgument)
         result.push(value)
       }
