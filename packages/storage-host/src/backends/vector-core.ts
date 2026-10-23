@@ -1,8 +1,13 @@
 import {
   snapshotStorageVector,
   StorageContractError,
-  StorageContractErrorCode
+  StorageContractErrorCode,
+  encodeOrderedStorageKey,
+  type IStorageVectorConfiguration,
+  type IStorageVectorPoint
 } from '@migaia/storage-contract'
+import { createOrderedRecordIndex } from '../core/ordered-record-index.js'
+import { STORAGE_MEMORY_BACKEND } from '../state-constants.js'
 import { StorageErrorText } from '../error-text.js'
 
 /** Reject invalid synthesis input without creating an operation, collection or native resource. */
@@ -74,4 +79,93 @@ export function recommendStorageVector(
       StorageErrorText.vectorRecommendation
     )
   }
+}
+
+/** A private score row borrows immutable stored point data until the bounded output is detached. */
+export type IMemoryVectorHit<TPayload> = {
+  readonly point: IStorageVectorPoint<TPayload>
+  readonly score: number
+}
+/** Non-finite reference scores and undefined cosine directions never enter the rank radix. */
+function invalidVectorScore(): never {
+  throw new StorageContractError(
+    StorageContractErrorCode.invalidArgument,
+    {},
+    StorageErrorText.memoryVectorScore
+  )
+}
+/** Memory-only exact scoring never becomes a server retrieval fallback or public authoring API. */
+function scoreMemoryVector(
+  left: readonly number[],
+  right: readonly number[],
+  metric: IStorageVectorConfiguration['metric']
+): number {
+  /** Only the final finite score enters the ordered index. */
+  let score = 0
+  if (metric === 'cosine') {
+    /** Scaling avoids overflowing cosine's norms for otherwise valid finite directions. */
+    let leftScale = 0
+    /** Both vectors keep independent magnitude scales. */
+    let rightScale = 0
+    for (let index = 0; index < left.length; index++) {
+      leftScale = Math.max(leftScale, Math.abs(left[index]!))
+      rightScale = Math.max(rightScale, Math.abs(right[index]!))
+    }
+    if (leftScale === 0 || rightScale === 0) invalidVectorScore()
+    /** Scaled dot and square sums are bounded by the actual component count. */
+    let dot = 0
+    /** Independent squared lengths retain the exact reference direction. */
+    let leftNorm = 0
+    /** The second squared length uses the same scaled component turn. */
+    let rightNorm = 0
+    for (let index = 0; index < left.length; index++) {
+      /** Each admitted component participates once in this scoring pass. */
+      const a = left[index]! / leftScale
+      /** The candidate component is scaled only by its own vector magnitude. */
+      const b = right[index]! / rightScale
+      dot += a * b
+      leftNorm += a * a
+      rightNorm += b * b
+    }
+    score = Math.max(-1, Math.min(1, dot / (Math.sqrt(leftNorm) * Math.sqrt(rightNorm))))
+  } else if (metric === 'dot') {
+    for (let index = 0; index < left.length; index++) score += left[index]! * right[index]!
+  } else {
+    /** The native two-argument hypot avoids a spread argument limit and square overflow. */
+    let distance = 0
+    for (let index = 0; index < left.length; index++)
+      distance = Math.hypot(distance, left[index]! - right[index]!)
+    score = -distance
+  }
+  if (!Number.isFinite(score)) invalidVectorScore()
+  return score
+}
+
+/**
+ * Rank only native live candidates with the existing compressed radix. A score/id key gives
+ * descending score and exact UTF-16 ID ties, retaining at most k hits without comparison sorting.
+ */
+export function rankMemoryVectors<TPayload>(
+  points: Iterable<IStorageVectorPoint<TPayload>>,
+  query: readonly number[],
+  metric: IStorageVectorConfiguration['metric'],
+  k: number,
+  minScore: number | undefined,
+  accept: (point: IStorageVectorPoint<TPayload>) => boolean
+): readonly IMemoryVectorHit<TPayload>[] {
+  if (k === 0) return []
+  /** The original radix owns all rank-key paths and constant-time neighboring leaves. */
+  const ranked = createOrderedRecordIndex<IMemoryVectorHit<TPayload>>()
+  for (const point of points) {
+    if (!accept(point)) continue
+    /** Org/TTL/declarative filters have already excluded candidates before scoring. */
+    const score = scoreMemoryVector(query, point.vector, metric)
+    if (minScore !== undefined && score < minScore) continue
+    ranked.set(encodeOrderedStorageKey([-score, point.id], STORAGE_MEMORY_BACKEND), {
+      point,
+      score
+    })
+    if (ranked.size > k) ranked.delete(ranked.last!.key)
+  }
+  return [...ranked.range()].map((leaf) => leaf.value)
 }

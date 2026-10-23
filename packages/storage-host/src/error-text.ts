@@ -1,5 +1,9 @@
 /** Canonical host boundary messages. */
 export const StorageErrorText = {
+  /** Ranking cannot order a non-finite score or a zero cosine candidate direction. */
+  memoryVectorScore: 'memory vector score must be finite and cosine directions must be nonzero',
+  /** Memory collection metadata and live sample identities must agree before ranking. */
+  memoryVectorArgument: 'memory vector collection configuration or sample is invalid',
   /** Standard recommendation requires nonempty positive samples with common finite dimensions. */
   vectorRecommendation: 'storage vector recommendation samples are invalid',
   /** Aggregate organization deletion retains successful targets and every original failed target. */
