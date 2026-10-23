@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { IdentifyError, walkErrorCauses } from '@migaia/utils/error'
+import { STORAGE_HOST_SOURCE } from '../src/errors.js'
 import {
   planChannelWrite,
   collectUniqueIndexOwners,
@@ -128,7 +129,7 @@ describe('backend error and cancellation boundaries', () => {
         { reporter: report }
       )
     ).rejects.toMatchObject({
-      source: '@migaia/storage-host',
+      source: STORAGE_HOST_SOURCE,
       code: 'EXTENSION_FAILED',
       operation: 'search',
       extensionStage: 'pipeline',
