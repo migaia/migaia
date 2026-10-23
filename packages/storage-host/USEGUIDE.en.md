@@ -17,6 +17,8 @@ console.log(host.extensions.status())
 
 Ordinary plugins can expose application extensions without pretending to provide a storage backend. They retain PluginHost's original Feature dependency protocol. Backend plugins additionally declare an authentic kind token and register one admitted store.
 
+`host.api[id]` exposes that published backend's original `store.api`; different instances may use the same method names. Each read returns a frozen backend-id snapshot, so later `use` batches do not change a saved snapshot and failed batches publish no ids. Methods retain the original Feature lifetime guard, including extracted methods after disposal.
+
 Keep native connections private. `featureExpose` contains own enumerable string-keyed functions, including `getClient`; additional transaction-aware backends supply `getTransactionClient(scope)` through the original transaction owner. The host reserves `getKind`, `getStore`, `getBackendId`, `getLifecycle`, `onDispose` and `getScheduler`.
 
 Register resources in the original install window through `core.onDispose`. Pass supported operations through `core.execution` before native I/O. Do not create a second transaction owner, middleware runner, capability table or Feature graph. `capabilityInstaller` returns the original port issued by `provideCapabilities`; genuine `implement(...)` records carry runtime authority.

@@ -7,6 +7,8 @@ import {
   definePlugin,
   defineFeature,
   defineStorageBackendKind,
+  memoryBackendKind,
+  memoryBackendPlugin,
   StorageErrorCode
 } from '../src/index.js'
 import type { IStoragePluginCore } from '../src/index.js'
@@ -59,6 +61,8 @@ describe('neutral storage installation', () => {
     const host = await createStorageHost({ plugins: [left.plugin, right.plugin] })
     expect(host.backend('left')).toBe(left.state().store)
     expect(host.backend('right')).toBe(right.state().store)
+    expect(host.api.left).toBeUndefined()
+    expect(host.api.right).toBeUndefined()
     expect(await host.backend('left').get('name')).toBe('one')
     expect(await host.backend('right').get('name')).toBe('two')
     const snapshot = host.backends()
@@ -79,6 +83,7 @@ describe('neutral storage installation', () => {
     await using host = await createStorageHost({ plugins: [ordinary] })
     expect(host.extensions.ping()).toBe(42)
     expect(host.hasBackend('utility')).toBe(false)
+    expect(Object.keys(host.api)).toEqual([])
   })
   it('rejects a mismatched same-name token before a Feature factory or driver is used', async () => {
     const otherKind = defineStorageBackendKind<
@@ -184,10 +189,54 @@ describe('neutral storage installation', () => {
     })
     const definition = definePlugin('feature', descriptor, { upper })
     const host = await createStorageHost({ plugins: [definition] })
+    expect(host.api.feature).toBe(host.backend('feature').api)
     expect(await host.backend('feature').api.uppercase('name')).toBe('ONE')
-    const retained = host.backend('feature').api.uppercase
+    const retained = host.api.feature.uppercase
     await host.dispose()
     await expect(retained('name')).rejects.toBeInstanceOf(Error)
+    expect(() => host.api).toThrowError(expect.objectContaining({ code: 'STORAGE_HOST_DISPOSED' }))
+  })
+  it('projects selected APIs by exact backend id without changing API identity or publication', async () => {
+    /** Both instances intentionally publish the same method name from one selected Feature. */
+    const identity = defineFeature(memoryBackendKind, () => ({
+      capabilities: [],
+      chain: {},
+      api: {
+        store: {
+          async identity() {
+            return this.store
+          }
+        },
+        transaction: {}
+      }
+    }))
+    await using host = await createStorageHost({
+      plugins: [memoryBackendPlugin({ id: 'left' }, { identity })]
+    })
+    /** This immutable projection contains only the original committed registration. */
+    const before = host.api
+    expect(Object.isFrozen(before)).toBe(true)
+    expect(Object.getPrototypeOf(before)).toBeNull()
+    expect(before.left).toBe(host.backend('left').api)
+    expect(await before.left.identity()).toBe(host.backend('left'))
+    /** A later publication adds its own API without mutating a saved projection. */
+    const expanded = await host.use(memoryBackendPlugin({ id: 'right' }, { identity }))
+    expect(Object.keys(before)).toEqual(['left'])
+    expect(Object.keys(expanded.api)).toEqual(['left', 'right'])
+    expect(expanded.api.left).toBe(before.left)
+    expect(expanded.api.right).toBe(expanded.backend('right').api)
+    await expanded.detect()
+    expect(await expanded.api.right.identity()).toBe(expanded.backend('right'))
+    /** Rollback never exposes an uncommitted id in the host's existing publication snapshot. */
+    const reject = definePlugin('reject', () => ({
+      install: () => {
+        throw new Error('install')
+      }
+    }))
+    await expect(
+      expanded.use(memoryBackendPlugin({ id: 'uncommitted' }, { identity }), reject)
+    ).rejects.toMatchObject({ code: 'BACKEND_INSTALL_FAILED' })
+    expect(Object.keys(expanded.api)).toEqual(['left', 'right'])
   })
   it('keeps explicit cleanup failure while resource syntax reports one stable projection', async () => {
     /** Original cleanup failure must remain reachable without being replaced by reporting. */
