@@ -833,3 +833,5 @@ RDF 的客户端 `follow`/`inverse` 现在沿同一 reader 逐前驱调用原 `s
 后端作者使用根导出 `createStorageIteratorLifetime<T>({ close, report, onSettled? })` 复用既有游标清理。将一次完整接纳的推进交给 `advance`，由原 helper 排空后关闭一次，并保留主清理与符号清理的独立缓存 Promise；数据准入、错误规范化和事务迭代器登记仍由原后端负责。`IStorageIteratorLifetime<T>` 仅公开同一组推进与清理函数，不授予事务权限。
 
 能力发布只对既有 KV 事务 scope 重建受能力集合约束的 use；无 KV 的原生 scope 保留原 use 重载及完整 API。原生 RDF/raw 双重载保留 expect/expectAbsent 与 update-only 原始 tag，RDF Feature 仅增强既有 match 链。`IOptimisticTransactionBuilder` 保留原 scope、既有增强方法和新增事务 Feature，始终不增加 lock。
+
+`encodeStorageRdfTerm(term, backend)` 经原快照 owner 校验一个 raw RDF term，返回独立、自定界的有序身份字节。原生索引排列可直接拼接这些分量；不能把输出重新送进公开 binary-key 域，否则会把其 1 MiB 输入限制错误施加到合法 RDF literal。IRI 拼写与 datatype/language 身份沿同一规范 term 规则；编码 raw blank 标签不会使它成为可移植的重复写身份。

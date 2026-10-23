@@ -844,6 +844,29 @@ export const storageContractReference: ILibraryReference = {
       example: storageContractCases.snapshotStorageRdfQuad![0]!.example,
       cases: storageContractCases.snapshotStorageRdfQuad
     },
+    encodeStorageRdfTerm: {
+      role: 'operation',
+      purpose: t(
+        'Encode a canonical raw RDF term for native ordered index components using the original key writer.',
+        '沿原 key writer 编码规范 raw RDF term，作为原生有序索引分量。'
+      ),
+      params: {
+        value: t(
+          'Structural raw term admitted by snapshotStorageRdfTerm; blank labels remain request-local.',
+          'snapshotStorageRdfTerm 接纳的结构 raw term，blank 标签仍局限请求。'
+        ),
+        backend: t(
+          'Optional diagnostic backend supplied explicitly as a name or undefined.',
+          '显式传入后端名或 undefined，供可选诊断使用。'
+        )
+      },
+      returns: t(
+        'Independent self-delimiting Uint8Array. Native indexes concatenate components directly without the public binary-key limit; malformed terms throw INVALID_ARGUMENT with original getter cause.',
+        '独立、自定界 Uint8Array。原生索引直接拼接分量，不施加公开 binary-key 限制；无效 term 抛 INVALID_ARGUMENT 并保留原 getter cause。'
+      ),
+      example: storageContractCases.encodeStorageRdfTerm![0]!.example,
+      cases: storageContractCases.encodeStorageRdfTerm
+    },
     encodeStorageRdfQuad: {
       role: 'operation',
       purpose: t(

@@ -275,6 +275,17 @@ function rdfTermKey(value: IRdfTerm): IStorageKey {
     return [value.termType, value.value, value.datatype, value.language ?? '']
   return [value.termType, value.value]
 }
+/**
+ * Encodes one canonical RDF term with the original self-delimiting key writer. Native index
+ * permutations can concatenate these bytes directly without reclassifying them as public binary
+ * keys or applying a second term codec. Raw blank labels remain request-local identities.
+ */
+export function encodeStorageRdfTerm(
+  value: IRdfTerm,
+  backend: IBackendKind | undefined
+): Uint8Array {
+  return encodeOrderedStorageKey(rdfTermKey(snapshotStorageRdfTerm(value, backend)), backend)
+}
 /** Internal lock/native authors encode a validated frozen quad without a second input traversal. */
 export function encodeRdfQuadSnapshot(quad: IQuad): Uint8Array {
   return encodeOrderedStorageKey(
