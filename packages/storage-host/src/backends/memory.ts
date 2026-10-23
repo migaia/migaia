@@ -169,11 +169,12 @@ export function createMemoryBackend<T = unknown>(
     }
   })
   /** Unknown backend callback failures gain their original memory transaction boundary. */
-  const normalize = (cause: unknown) =>
+  const normalize = (cause: unknown, expiredScope?: true) =>
     isStorageErrorFamily(cause)
       ? cause
       : new StorageError(StorageErrorCode.transactionFailed, {
           backend: STORAGE_MEMORY_BACKEND,
+          ...(expiredScope ? { operation: MemoryOperation.transactionScope } : {}),
           cause
         })
   /** The existing token helper retains one opaque owner identity for the physical store. */
