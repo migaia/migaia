@@ -2,7 +2,12 @@ import { bindBrowserExecution } from './execution.js'
 import { createTextBatchApi } from './batch.js'
 import { implement, kv, type IStorageChange, type IStorageStore } from '@migaia/storage-contract'
 import { snapshotSyncWriteOptions } from '@migaia/storage-contract'
-import { throwIfAborted, withAbort } from '@migaia/storage-host/authoring/backend'
+import {
+  resolveStorageNamespace,
+  throwIfAborted,
+  withAbort
+} from '@migaia/storage-host/authoring/backend'
+import { createBrowserOrgBinding } from './organizations.js'
 import {
   lengthPrefixedNamespaceCodec,
   namespacedKey,
@@ -128,7 +133,8 @@ export const createWebStorageBackend = (
   backend: IBackendKind,
   storage: IWebStorageLike | undefined,
   options: IWebStorageOptions,
-  runtime: IBackendRuntime
+  runtime: IBackendRuntime,
+  bindOrganizations = true
 ): IBackendConstruction<
   IKeyValueBackendStore<ISyncCapableStore<IKeyValueStore>>,
   IWebStorageLike
@@ -144,6 +150,8 @@ export const createWebStorageBackend = (
       backend,
       cause: new TypeError('namespace must be non-empty and namespaceCodec must be callable')
     })
+  if (bindOrganizations)
+    resolveStorageNamespace(namespace, runtime.defaultOrgId, runtime.defaultOrgId)
   const namespaceCodec = snapshotNamespaceCodec(namespaceCodecCandidate, backend)
   assertWebStorageInjection(storage, backend)
 
@@ -173,7 +181,7 @@ export const createWebStorageBackend = (
 
   /** Publish only after the underlying Web Storage operation has returned successfully. */
   const publishChange = (change: Omit<IStorageChange, 'sequence' | 'origin' | 'scope'>): void => {
-    controller.publish(change)
+    controller.publish({ ...change, orgId: runtime.defaultOrgId })
   }
 
   const assertLive = (): void => {
@@ -412,5 +420,22 @@ export const createWebStorageBackend = (
     controller,
     () => live
   )
-  return { ...construction, commitValueWrite }
+  /** Keep native value commits attached to the same physical construction when borrowed by org. */
+  const physical = { ...construction, commitValueWrite }
+  return {
+    ...physical,
+    ...(bindOrganizations
+      ? {
+          orgBinding: createBrowserOrgBinding(runtime, namespace, physical, (target, ports) =>
+            createWebStorageBackend(
+              backend,
+              live,
+              { namespace: target, namespaceCodec },
+              ports,
+              false
+            )
+          )
+        }
+      : {})
+  }
 }

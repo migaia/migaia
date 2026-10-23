@@ -29,6 +29,19 @@ try {
         'Reads dark from the selected namespace. Host disposal releases resources and leaves persistent browser data intact.',
         '从选定命名空间读到深色主题；宿主释放资源后，浏览器持久化数据仍保留。'
       )
+    },
+    {
+      title: t('Keep organization preferences separate', '隔离组织偏好'),
+      problem: t(
+        'One configured browser namespace serves a default organization and explicit UUID organizations without sharing their keys.',
+        '同一配置命名空间分别服务缺省组织与显式UUID组织，不共享键值。'
+      ),
+      example:
+        "import { createStorageHost, createOrgId } from '@migaia/storage-host'\nimport { localStorageBackendPlugin } from '@migaia/storage-web/local-storage'\nconst host = await createStorageHost({ plugins: [localStorageBackendPlugin({ namespace: 'preferences' })] })\ntry {\n  const org = createOrgId()\n  const settings = host.org(org).backend('local')\n  await host.backend('local').set('theme', 'light')\n  await settings.set('theme', 'dark')\n  console.log(await host.backend('local').get('theme'), await settings.get('theme'))\n  await host.dropOrg(org)\n  console.log(await settings.get('theme'))\n} finally { await host.dispose() }",
+      result: t(
+        'Prints light dark, then null. The original organization view remains reusable after its target is cleared.',
+        '依次输出light dark及null；目标清理后原组织视图仍可复用。'
+      )
     }
   ],
   indexedDbBackendPlugin: [
