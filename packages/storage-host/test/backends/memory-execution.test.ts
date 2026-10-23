@@ -72,11 +72,22 @@ describe('memory execution and the original concurrency budget', () => {
 
   it('reenters the original pipeline for each real transaction attempt after a commit conflict', async () => {
     let stages = 0
+    const events: string[] = []
     const intervention = definePlugin('intervention', (core) => ({
       install: () => {
         core.useAsyncPipeline(async (input, next) => {
-          if (input.operation === MemoryOperation.transaction) stages++
-          await next(input)
+          if (input.operation !== MemoryOperation.transaction) return next(input)
+          const current = ++stages
+          events.push(`enter:${current}`)
+          try {
+            await next(input)
+            events.push(`committed:${current}`)
+          } catch (error) {
+            events.push((error as { code: string }).code)
+            throw error
+          } finally {
+            events.push(`exit:${current}`)
+          }
         })
         return {}
       }
@@ -96,6 +107,14 @@ describe('memory execution and the original concurrency budget', () => {
     )
     expect(callbacks).toBe(2)
     expect(stages).toBe(2)
+    expect(events).toEqual([
+      'enter:1',
+      'WRITE_CONFLICT',
+      'exit:1',
+      'enter:2',
+      'committed:2',
+      'exit:2'
+    ])
     expect(await store.getRecord('row')).toEqual({ value: 2 })
   })
 })
