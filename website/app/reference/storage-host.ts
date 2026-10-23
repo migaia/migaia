@@ -66,8 +66,8 @@ console.log(host.extensions.label('draft'))`
     storageLogStore: {
       role: 'factory',
       purpose: t(
-        'Recover a caller-closeable private ILogStore without granting raw backend or host authority.',
-        '恢复可由调用方释放的私有 ILogStore，不授予 raw 后端或宿主权。'
+        'Recover a caller-closeable private ILogStore without granting raw backend or host authority. Native selection certifies the exact original registration, including across hosts with matching ids and orgs.',
+        '恢复可由调用方释放的私有 ILogStore，不授予 raw 后端或宿主权；原生选择认证精确原 registration，跨宿主的同名 id/org 也不能替代。'
       ),
       params: {
         host: t(
