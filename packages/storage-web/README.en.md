@@ -45,6 +45,12 @@ Memory, `createStorageHost`, `defineFeature`, and backend authoring belong to `@
 
 Unique entity writes require a real record transaction or the backend’s native atomic value-commit endpoint. Built-in browser backends provide it. A custom value-only backend without `core.registerValueCommit` rejects unique writes with `UNSUPPORTED_CAPABILITY` before schema work or mutation; ordinary KV remains available. See the host entity guide for the authoring contract.
 
+## KV batches
+
+`store.use(kv)` provides `getMany`, `setMany`, `removeMany`, and `removeByPrefix`. IndexedDB executes a batch in one native transaction and supports string, number, Date, binary, and tuple keys. String keys retain the same data as the original single-key methods. Reads preserve input order and duplicate positions, missing values are `undefined`, and deletion returns the actual count. Canonical duplicate write keys reject with `INVALID_ARGUMENT` before I/O. Empty batches enter neither the pipeline nor a native transaction.
+
+localStorage, sessionStorage, and Cookie support batch reads. Multi-key writes require WAL and reject with `UNSUPPORTED_CAPABILITY` before mutation when it is absent. The default namespace codec retains the string `sw1` layout and uses a separate `sw2` layout for typed keys. `keys()` still lists strings; namespace cleanup covers both layouts. A custom codec must provide both `encodeStorageKey` and `decodeStorageKey` to read non-string batch keys; otherwise those keys reject before native I/O.
+
 ## IndexedDB transactions
 
 ```ts

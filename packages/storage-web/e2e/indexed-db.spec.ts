@@ -176,6 +176,20 @@ test('真实 IndexedDB transaction scope 逃逸 callback 后拒绝读写', async
   expect(result.outsideValue).toBeUndefined()
 })
 
+test('真实 IndexedDB root KV batch 保持结构键、顺序与整批回滚', async ({ page }) => {
+  await page.goto('/')
+  const result = await page.evaluate(() => window.runIndexedDbNativeBatchScenario())
+  expect(result).toEqual({
+    ordered: ['tuple', 'date', undefined, 'date', 'string'],
+    rollbackCode: 'DUPLICATE_KEY',
+    rolledBack: true,
+    recordPreserved: true,
+    removed: 2,
+    prefixRemoved: 2,
+    outside: [undefined, 'c', 'string']
+  })
+})
+
 test('真实 IndexedDB 小页分页扫描完整且提前停止', async ({ page }) => {
   await page.goto('/')
   const result = await page.evaluate(() => window.runIndexedDbPagedScanScenario())

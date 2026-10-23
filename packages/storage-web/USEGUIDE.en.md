@@ -63,6 +63,14 @@ try {
 
 Write options accept a valid `expires: Date` or integer `maxAge`. Expired writes delete the cookie. The 4096-byte bound covers the complete assignment, including attributes. A same-name cookie visible in several scopes yields `COOKIE_SCOPE_AMBIGUOUS`; a normal write that is not visible afterwards yields `WRITE_FAILED`. JS cannot observe HttpOnly entries or guarantee server-side deletion.
 
+## KV batches and typed keys
+
+Use `store.use(kv)` for `getMany(keys)`, `setMany(entries)`, `removeMany(keys)`, and `removeByPrefix(prefix)`. Each nonempty IndexedDB batch enters one pipeline and one native transaction; a later channel conflict rolls back the complete batch. Reads retain duplicate positions and `undefined` missing values. Removal counts a canonical key once. Duplicate canonical write keys reject before any I/O, and `ttlMs` requires the TTL capability. Empty batches return without pipeline, hooks, or native requests.
+
+Text Web backends use synchronous native reads for `getMany`; Cookie reads one visible header snapshot. Without WAL, multi-key writes and prefix deletion reject with `UNSUPPORTED_CAPABILITY` before mutation. A loop over public `set` calls is not an atomic batch.
+
+The default namespace codec retains the original string `sw1` layout and gives non-string batch keys a separate top-level `sw2` layout using the shared canonical key codec. Every old string key remains distinct from a typed key. `keys()` retains `string[]`; namespace clear removes both layouts. A custom `INamespaceCodec` can add `encodeStorageKey(namespace,key)` and `decodeStorageKey(namespace,physicalKey)`. Provide both and keep all key types collision-free. Without this pair, new non-string batch reads reject before native I/O while original string data and calls remain unchanged.
+
 ## Native IndexedDB transactions
 
 ```ts

@@ -21,6 +21,15 @@ export const StorageErrorText = Object.freeze({
   namespaceCodecEncodeInvalid: 'namespace codec encode must return a string',
   /** Namespace codecs may decode only a string key or an absent foreign namespace. */
   namespaceCodecDecodeInvalid: 'namespace codec decode must return string or undefined',
+  /** Typed namespace support requires both directions so cleanup can identify every written key. */
+  namespaceTypedCodecInvalid:
+    'typed namespace codec must provide callable encode and decode methods',
+  /** Original namespace codec admission requires both callable string-key methods. */
+  namespaceCodecInvalid: 'namespace codec must provide callable encode and decode methods',
+  /** Physical string-key encoding preserves the original namespace/key argument boundary. */
+  namespaceKeyInvalid: 'namespace and key must be strings',
+  /** Physical-key decoding preserves the original string-only argument boundary. */
+  namespacePhysicalKeyInvalid: 'namespace and physicalKey must be strings',
   /** Injected Web Storage values must implement the complete Storage surface. */
   webStorageInjectionInvalid: 'web storage injection must implement the Storage surface',
   /** Live Web Storage length must remain a usable enumeration bound. */

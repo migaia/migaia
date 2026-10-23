@@ -1,4 +1,8 @@
-import { isStorageContractError, type StorageContractError } from '@migaia/storage-contract'
+import {
+  isStorageContractError,
+  type StorageContractError,
+  type IStorageKey
+} from '@migaia/storage-contract'
 import { StorageError, StorageErrorCode } from '../types/errors.js'
 import type { IBackendKind } from '../types/capabilities.js'
 
@@ -21,7 +25,7 @@ const isQuotaException = (error: unknown): boolean =>
 export const normalizeStorageException = (
   error: unknown,
   backend: IBackendKind,
-  key?: string,
+  key?: IStorageKey,
   operation?: string
 ): StorageError | StorageContractError => {
   if (error instanceof StorageError) {
