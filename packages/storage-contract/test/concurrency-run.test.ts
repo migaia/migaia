@@ -1199,6 +1199,36 @@ describe('original concurrency execution per native commit attempt', () => {
     expect(attempt).toHaveBeenCalledTimes(1)
   })
 
+  it('drains an unawaited terminal before recovery without an unhandled native rejection', async () => {
+    const { store, report } = base()
+    /** The real native operation remains outstanding after the stage has already recovered. */
+    const native = deferred<IConcurrencyAttempt<number>>()
+    /** The exact native failure must remain observed even when the stage discards its Promise. */
+    const failure = new StorageContractError(StorageContractErrorCode.writeConflict)
+    /** Early stage return cannot release the actual accepted native attempt. */
+    let settled = false
+    /** The stage may legally return a recovery value without awaiting its typed continuation. */
+    const pending = runWithConcurrency(
+      {
+        store,
+        options: {},
+        executeAttempt: (_ctx, proceed) => {
+          void proceed()
+          return 6
+        }
+      },
+      { attempt: () => native.promise }
+    )
+    void pending.then(() => {
+      settled = true
+    })
+    await Promise.resolve()
+    expect(settled).toBe(false)
+    native.resolve(conflict('commit', failure))
+    await expect(pending).resolves.toBe(6)
+    expect(report).not.toHaveBeenCalled()
+  })
+
   it('allows a stage to halt without native work and rejects mixed execution modes', async () => {
     const { store } = base()
     const attempt = vi.fn()

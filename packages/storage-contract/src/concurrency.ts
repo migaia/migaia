@@ -1080,6 +1080,8 @@ export async function runWithConcurrency<TResult>(
       resolveNative = resolve
       rejectNative = reject
     })
+    // A typed stage may return after calling its terminal without awaiting the native Promise.
+    void native.then(undefined, () => undefined)
     /** Stage halt, failure and terminal admission all wake the original loop without a timer. */
     let resolveReady!: () => void
     /** The stage either reaches its terminal or completes without any native work. */
