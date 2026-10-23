@@ -981,6 +981,9 @@ importers:
         specifier: workspace:^
         version: link:../utils
     devDependencies:
+      '@migaia/storage-host':
+        specifier: workspace:^
+        version: link:../storage-host
       '@migaia/storage-web':
         specifier: workspace:^
         version: link:../storage-web

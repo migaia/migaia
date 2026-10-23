@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { memoryStorageHost } from '@migaia/storage-web/memory'
-import { binaryCodec } from '@migaia/storage-web/serialize'
+import { binaryCodec } from '@migaia/storage-host/entity'
 import { createStore } from '@migaia/store-light'
 import { StorageContractError, type ICodec } from '@migaia/storage-contract'
 import { persist } from '../src/light-index.js'
