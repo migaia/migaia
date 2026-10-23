@@ -1821,6 +1821,12 @@
       "./features/group-by": ["qdrantGroupByFeature"],
       "./features/management": ["qdrantManagementFeature"]
     },
+    "@migaia/storage-plugin-redis": {
+      ".": ["ERROR_SOURCE", "RedisErrorCode"],
+      "./ioredis": ["ioredisDriver"],
+      "./node-redis": ["nodeRedisDriver"],
+      "./bun": ["bunRedisDriver"]
+    },
     "@migaia/storage-plugin-sparql": {
       ".": ["ERROR_SOURCE", "SparqlErrorCode", "sparqlBackendKind", "sparqlBackendPlugin"],
       "./http": ["httpEndpoint"],
