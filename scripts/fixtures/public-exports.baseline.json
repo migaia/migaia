@@ -1740,10 +1740,12 @@
         "defineStorageBackendKind"
       ],
       "./entity": [
+        "REPOSITORY_KEY_PREFIX",
         "binaryCodec",
         "fromStandardSchema",
         "jsonCodec",
         "passthrough",
+        "repositoryMigrationKey",
         "selectCodec",
         "structuredCodec"
       ]

@@ -23,6 +23,8 @@ describe('storage host package exports', () => {
       baseline.packages['@migaia/storage-host']!['./entity']
     )
     expect(runtime.jsonCodec.name).toBe('json@1')
+    expect(runtime.REPOSITORY_KEY_PREFIX).toBe('__storage_web_entity_v2__')
+    expect(runtime.repositoryMigrationKey('users')).toBe('repository:users:migration')
     await expect(runtime.jsonCodec.encode({ ready: true })).resolves.toBe('{"ready":true}')
   })
 })

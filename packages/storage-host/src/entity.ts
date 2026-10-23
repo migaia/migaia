@@ -3,3 +3,4 @@ export { fromStandardSchema, type IStandardSchemaV1 } from './schema/standard-sc
 export type { ISchemaAdapter } from './schema/types.js'
 export { jsonCodec, structuredCodec, binaryCodec, selectCodec } from './serialize/index.js'
 export type { ICodec, ICodecOutput, ISelectedCodec } from './serialize/index.js'
+export { REPOSITORY_KEY_PREFIX, repositoryMigrationKey } from './core/record-layout.js'
