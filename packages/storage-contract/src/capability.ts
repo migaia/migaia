@@ -291,16 +291,16 @@ function hasCapability(record: ICapabilityStoreRecord | undefined, capability: u
   return isToken(capability) && record?.table.get(capability)?.published === true
 }
 
-/** Shared token lookup retains the original captured backend diagnostic and exact API identity. */
+/** Shared token lookup returns the original descriptor with its captured backend diagnostics. */
 function useCapability(
   store: IStorageBase,
   record: ICapabilityStoreRecord | undefined,
   capability: unknown
-): unknown {
+): ICapabilityImpl {
   if (!isToken(capability)) throw invalidCapability()
   /** Prepared Feature entries remain absent until their original publication is visible. */
   const installed = record?.table.get(capability)
-  if (installed?.published) return installed.implementation.api
+  if (installed?.published) return installed.implementation
   /** Provided stores never re-read backend getters; a raw base has no prior captured identity. */
   let backend: IStorageBase['backend']
   try {
@@ -336,7 +336,7 @@ export function useStorageCapability<
   TStore extends IStorageBase,
   TCap extends IAnyStorageCapability
 >(store: TStore, capability: TCap): IProvidedApi<IStorageImplementationsOf<TStore>, TCap> {
-  return useCapability(store, stores.get(store), capability) as IProvidedApi<
+  return useCapability(store, stores.get(store), capability).api as IProvidedApi<
     IStorageImplementationsOf<TStore>,
     TCap
   >
@@ -352,11 +352,10 @@ export function readTransactionImplementation(
 ): IImplementationRecord & { readonly forTransaction: (scope: ITransactionScope) => unknown } {
   /** Root membership and forged-token diagnostics use the exact canonical lookup first. */
   const record = stores.get(store)
-  useCapability(store, record, capability)
+  const descriptor = useCapability(store, record, capability)
   /** Published implementation identity remains the authority for transaction binding. */
-  const installed = record!.table.get(capability)!
+  const binding = implementations.get(descriptor)!
   /** Only the implemented finite standard projections can be requested from this owner. */
-  const binding = implementations.get(installed.implementation)!
   if ((capability !== kv && capability !== records) || binding.forTransaction === undefined)
     throw new StorageContractError(
       StorageContractErrorCode.unsupported,
@@ -552,7 +551,7 @@ export function provideCapabilities<
     definitions.use = {
       configurable: true,
       enumerable: true,
-      value: (capability: unknown): unknown => useCapability(base, record, capability)
+      value: (capability: unknown): unknown => useCapability(base, record, capability).api
     }
     definitions.has = {
       configurable: true,
