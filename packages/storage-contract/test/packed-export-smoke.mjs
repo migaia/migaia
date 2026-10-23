@@ -142,6 +142,12 @@ const queryMutation = createRecordQuery({
   })
 })
 if (await queryMutation.where(row => row.state === 'old').delete() !== 1 || queryDraft.size !== 1 || !queryDraft.has('b')) throw new Error('packed query mutation mismatch')
+/** Native subscriptions return the same packed-root resource without opening a data cursor. */
+const watchLifetime = createStorageIteratorLifetime({ close: async () => undefined, report: console.error })
+const nativeFeed = { next: () => watchLifetime.advance(async () => ({ done: true, value: undefined })), dispose: watchLifetime.dispose, return: watchLifetime.returned, [Symbol.asyncDispose]: watchLifetime.symbolic, [Symbol.asyncIterator]() { return this } }
+const nativeWatching = createRecordQuery({ pushdown: { source: 'packed-native-feed', operators: [], operations: [] }, execute: noAdmissionIo, watch: () => nativeFeed })
+if (nativeWatching.watch() !== nativeFeed) throw new Error('packed native watch identity mismatch')
+await nativeFeed.dispose()
 /** Both organization byte helpers reuse canonical packed-root identities. */
 const packedOrg = '12345678-1234-1234-1234-123456789abc'
 const packedPrefix = encodeStorageOrgStringPrefix(packedOrg, 'a', 'packed-fixture')

@@ -10,7 +10,7 @@ import type { ITransactionBuilder, IOptimisticTransactionBuilder } from './concu
 import type { IWriteConcurrencyOptions } from './concurrency.js'
 import type { ICodecValue } from '@migaia/serialize/codec'
 import type { IOperationContext, IStorageKey } from './context.js'
-import type { IRecordQuery } from './query-chain.js'
+import type { IRecordQuery, IQueryWatch } from './query-chain.js'
 import type {
   ITransactionScope,
   ITransactionKeyValueApi,
@@ -111,10 +111,14 @@ export type IKeyValueApi = Omit<
  */
 export type IRecordsApi<
   TValue = ICodecValue,
-  _TChangeFeed extends boolean = false,
+  TChangeFeed extends boolean = false,
   TAugmentMethods extends object = Record<never, never>
 > = {
-  query<R = TValue>(): IRecordQuery<R, IOperationContext, TAugmentMethods>
+  query<R = TValue>(): IRecordQuery<
+    R,
+    IOperationContext,
+    TAugmentMethods & (TChangeFeed extends true ? IQueryWatch : Record<never, never>)
+  >
   removeByPrefix(
     prefix: IStorageKey,
     ctx?: IOperationContext & IWriteConcurrencyOptions
