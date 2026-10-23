@@ -913,6 +913,7 @@ function transactionRecordQuery<R>(
       /** Original argument admission stays at the comparator call, before any terminal. */
       const pending = query.orderByComparator(compare)
       return {
+        first: () => runTransactionOperation(scope, () => pending.first()),
         limit: (count: number) =>
           transactionRecordQuery(scope, pending.limit(count) as IRecordQuery<R, undefined>)
       }

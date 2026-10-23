@@ -15,6 +15,12 @@ export const StorageContractErrorText = {
   queryLimit: 'storage query limit must be a nonnegative safe integer',
   /** Opaque comparator ordering requires an immediately declared bound before source execution. */
   queryComparatorLimit: 'storage query comparator requires an explicit limit',
+  /** An explicitly required first row was absent after the original source finished cleanup. */
+  queryEmptyResult: 'storage query has no result',
+  /** Chunk callbacks require a positive finite allocation bound before cursor admission. */
+  queryChunk: 'storage query chunk size must be a positive safe integer',
+  /** Statistics accept present finite numbers and skip only null or undefined fields. */
+  queryNumericField: 'storage query numeric field must contain a finite number',
   /**
    * User predicates, mappers and native cursor failures retain original identity and cleanup
    * traceability.
