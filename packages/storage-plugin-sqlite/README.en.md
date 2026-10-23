@@ -101,6 +101,12 @@ final checks receive their own original-owner views. Caught or unawaited data
 failures still force rollback. `tx.sql` and KV always use the same native
 transaction. User SQL does not infer logical keys from SQL text.
 
+`readTransactionOperationContext(tx)` reads the frozen attempt context retained
+by the original transaction owner. Composed operations and final checks share
+its captured fields and original live signal without rereading caller getters,
+resetting deadlines or creating another cancellation controller. Cooperatively
+cancelled work settles before native rollback and logical lock release complete.
+
 Selected Features use the same transaction and query creators. `tx.api` is bound before
 its original short view is frozen. Its SQL and KV operations commit or roll back together;
 caught and unawaited failures still belong to the original transaction owner. Feature
