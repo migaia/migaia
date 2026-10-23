@@ -124,8 +124,20 @@ describe('controlled backend change authoring', () => {
     /** The original channel preserves local event sequence and post-commit metadata. */
     const events: unknown[] = []
     controller.subscribe((event) => events.push(event))
+    /** The same primary is cached before closure listeners can reenter disposal. */
+    let reentered: Promise<void> | undefined
+    controller.closingSignal.addEventListener(
+      'abort',
+      () => {
+        reentered = controller.dispose()
+      },
+      { once: true }
+    )
     /** Repeated disposal retains the exact original controller Promise. */
     const disposing = controller.dispose()
+    expect(reentered).toBe(disposing)
+    expect(controller.closingSignal.aborted).toBe(true)
+    expect(controller.closingSignal.reason).toMatchObject({ code: 'STORE_DISPOSED' })
     expect(controller.dispose()).toBe(disposing)
     controller.publish({ channel: 'value', kind: 'put', keys: ['key'] })
     expect(events).toHaveLength(1)

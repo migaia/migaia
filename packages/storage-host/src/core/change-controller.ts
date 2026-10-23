@@ -7,7 +7,8 @@ import {
   type IStorageKey
 } from '@migaia/storage-contract'
 import { createEventChannel, EventDispatchPolicy } from '@migaia/event-subscriber'
-import { createStringLeaseRegistry } from '@migaia/lifecycle'
+import { createStringLeaseRegistry, createAbortController } from '@migaia/lifecycle'
+import type { INativeAbortSignal } from '@migaia/utils/promise'
 import { IdentifyError, isNativeErrorValue } from '@migaia/utils/error'
 import { createStorageOperationReporter, reportCleanupError } from '../core/operation-reporter.js'
 import { REPOSITORY_KEY_PREFIX } from './record-layout.js'
@@ -25,6 +26,7 @@ export type IBackendChangeSnapshot = {
 export type IBackendChangeController = {
   readonly snapshot: IBackendChangeSnapshot
   readonly origin: string
+  readonly closingSignal: INativeAbortSignal
   assertLive(): void
   beginMutation(): () => void
   publish(change: Omit<IStorageChange, 'sequence' | 'origin' | 'scope'>): IStorageChange | undefined
@@ -88,8 +90,8 @@ export const createBackendChangeController = (
   let sequence = 0
   /** Physical disposal clears the original channel after all mutation leases drain. */
   let disposed = false
-  /** Logical closure rejects new mutations before actual cleanup has completed. */
-  let disposeRequested = false
+  /** The original logical closure signal seals new work and cancels only pending admissions. */
+  const closing = createAbortController()
   /** All callers await the same original controller cleanup Promise. */
   let disposePromise: Promise<void> | undefined
   /** Existing lifecycle leases own admitted mutations; no backend queue is introduced. */
@@ -146,8 +148,9 @@ export const createBackendChangeController = (
   const controller: IBackendChangeController = {
     snapshot,
     origin,
+    closingSignal: closing.signal,
     assertLive: () => {
-      if (disposeRequested || disposed)
+      if (closing.signal.aborted || disposed)
         throw new StorageContractError(StorageContractErrorCode.disposed, {
           backend: options.backend
         })
@@ -187,7 +190,6 @@ export const createBackendChangeController = (
     subscribe: (listener) => channel.subscribe((event) => listener(event.value)),
     dispose: () => {
       if (disposePromise !== undefined) return disposePromise
-      disposeRequested = true
       mutationLeases.seal(mutationLeaseKey)
       disposePromise = mutationLeases.whenZero(mutationLeaseKey).then(async () => {
         try {
@@ -205,6 +207,12 @@ export const createBackendChangeController = (
           finishDispose()
         }
       })
+      /** Cache the original primary before notifying listeners, which may reenter disposal. */
+      closing.abort(
+        new StorageContractError(StorageContractErrorCode.disposed, {
+          backend: options.backend
+        })
+      )
       return disposePromise
     }
   }
