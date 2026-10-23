@@ -227,3 +227,5 @@ await log.append([{ kind: 'order.created', payload: { id: 'o1' } }])
 await log.setState(1, LogRecordState.done)
 console.log(await log.lastSeq(), await log.states(LogRecordState.pending)) // 1 []
 ```
+
+后端作者可在原安装窗口调用 core.registerFeatureClientResolver(store, resolver)，为精确已登记 store 提供组织原生客户端选择。resolver.getClient(orgId) 可先沿原 opener 准备再返回客户端；只有真实异步结果才等待，完成后再次核对原 registration。可选 getTransactionClient(scope, orgId) 必须同步返回该原认证 scope 已打开的事务，不得另开或等待。未登记 resolver 时，原 Feature 的 getClient/getTransactionClient 调用顺序与行为保持。resolver 只占原 storeCell 的一个可选字段，业务视图不能登记或获得该接点，Feature factory 不重跑。

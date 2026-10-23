@@ -16,8 +16,10 @@ import { StorageErrorText } from './error-text.js'
 import type {
   IStorageExecutionPort,
   IStorageFeatureOutput,
-  IStoragePluginCallContext
+  IStoragePluginCallContext,
+  IStorageFeatureClientResolver
 } from './types.js'
+import { assimilateCapturedThen, inspectThenable } from '@migaia/utils/function'
 import { STORAGE_CHAIN_FAMILIES } from './state-constants.js'
 /** A closed output-shape failure stays at the existing backend definition boundary. */
 function invalid(cause?: unknown): never {
@@ -87,6 +89,7 @@ export function installStorageFeatures(input: {
   readonly expose: Readonly<Record<string, Function>>
   readonly onDispose: (release: () => void) => void
   readonly callContext: IStoragePluginCallContext
+  readonly clientResolver?: IStorageFeatureClientResolver
 }): IStorageFeatureProjection | undefined {
   /** Publish selected root outputs without implicitly publishing dependencies. */
   const roots = Object.values(input.features)
@@ -222,6 +225,24 @@ export function installStorageFeatures(input: {
           return execution.run({ operation: path, input: args }, (captured) => {
             /** Use the original admitted backend object instead of creating a replacement. */
             input.expose.getStore!()
+            if (input.clientResolver !== undefined) {
+              /** Only opt-in native routing may prepare this exact organization's client. */
+              const client = input.clientResolver.getClient(context.orgId)
+              /** Reuse the original thenable inspector rather than rereading a lazy then getter. */
+              const inspection = inspectThenable(client)
+              if ('error' in inspection) return invalid(inspection.error)
+              if (inspection.then !== undefined)
+                return assimilateCapturedThen(inspection.then, client).then((ready) => {
+                  /** A late preparation never revives a disposed original registration. */
+                  input.expose.getStore!()
+                  return Reflect.apply(
+                    value,
+                    { ...context, store, client: ready, scope: undefined },
+                    captured
+                  )
+                })
+              return Reflect.apply(value, { ...context, store, client, scope: undefined }, captured)
+            }
             /** Fetch the lazy native client only at its actual execution endpoint. */
             const client = input.expose.getClient?.()
             return Reflect.apply(value, { ...context, store, client, scope: undefined }, captured)
@@ -231,7 +252,10 @@ export function installStorageFeatures(input: {
           assertTransactionOwner(store, current)
           return execution.run({ operation: path, input: args, scope: current }, (captured) => {
             /** Client projection is lazy and uses this operation's exact current registered view. */
-            const client = input.expose.getTransactionClient!(current)
+            const client =
+              input.clientResolver?.getTransactionClient === undefined
+                ? input.expose.getTransactionClient!(current)
+                : input.clientResolver.getTransactionClient(current, context.orgId)
             return Reflect.apply(
               value,
               { ...context, store: current, client, scope: current },

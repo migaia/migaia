@@ -239,6 +239,9 @@ type IStorageNativeCore = IPluginHostCore<IStoragePipelineInput> & {
   readonly createTransactionApi: IStoragePluginCore['createTransactionApi']
   readonly getChainMethods: IStoragePluginCore['getChainMethods']
   setStorageFeatureProjection(projection: IStorageFeatureProjection | undefined): void
+  getStorageFeatureClientResolver(): ReturnType<
+    import('./store-cell.js').IStorageStoreCell['getFeatureClientResolver']
+  >
   setStorageJournalBinding(
     binding: import('./journal/types.js').IStorageJournalBackendBinding
   ): void
@@ -251,6 +254,7 @@ type IStorageNativeCore = IPluginHostCore<IStoragePipelineInput> & {
   readonly getPublishedBackend: IStoragePluginCore['getPublishedBackend']
   readonly registerDetect: IStoragePluginCore['registerDetect']
   readonly registerOrgBinding: IStoragePluginCore['registerOrgBinding']
+  readonly registerFeatureClientResolver: IStoragePluginCore['registerFeatureClientResolver']
   readonly getOrgContext: IStoragePluginCore['getOrgContext']
   captureStorageExtension(key: PropertyKey, value: unknown, receiver: object): unknown
 }
@@ -307,6 +311,7 @@ export const definePlugin: IStorageDefinePlugin = ((
         registerChangeController: nativeCore.registerChangeController,
         registerValueCommit: nativeCore.registerValueCommit,
         registerOrgBinding: nativeCore.registerOrgBinding,
+        registerFeatureClientResolver: nativeCore.registerFeatureClientResolver,
         getOrgContext: nativeCore.getOrgContext,
         getPublishedBackend: nativeCore.getPublishedBackend,
         registerDetect: nativeCore.registerDetect,
@@ -412,7 +417,8 @@ export const definePlugin: IStorageDefinePlugin = ((
                   execution: nativeCore.execution,
                   expose: nativeCore.featureExpose as Readonly<Record<string, Function>>,
                   onDispose: nativeCore.onDispose,
-                  callContext: nativeCore.getOrgContext(nativeCore.defaultOrgId).callContext
+                  callContext: nativeCore.getOrgContext(nativeCore.defaultOrgId).callContext,
+                  clientResolver: nativeCore.getStorageFeatureClientResolver()
                 })
                 if (projection !== undefined) {
                   /** Original registration cleanup drops only its own selected Feature projection. */
