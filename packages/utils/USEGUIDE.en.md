@@ -1985,6 +1985,7 @@ The table lists every public name. See the module sections above for parameters,
 | `deferTask` | `@migaia/utils/scheduler` | Schedules one job to run after the current call through a scheduler. |
 | `deferred` | `@migaia/utils/promise` | Creates a native Promise you settle from outside; prefer `Promise.withResolvers()` in new code. |
 | `deserializeErrorChain` | `@migaia/utils/error` | Validates an untrusted error tree in full, then rebuilds the native error graph. |
+| `detectServerRuntime` | `@migaia/utils` | Identifies Deno before Bun before Node; browsers without server globals return `undefined`. |
 | `diagnosticSnapshot` | `@migaia/utils/object` | Copies a value as far as possible and returns explicit diagnostics. |
 | `encodeUtf8` | `@migaia/utils/bytes` | Encodes a string into a new UTF-8 byte array. |
 | `format` | `@migaia/utils/string` | Replaces placeholder paths in a template in one linear scan. |
@@ -2011,6 +2012,7 @@ The table lists every public name. See the module sections above for parameters,
 | `isUtilsAbortError` | `@migaia/utils/error` | Checks this package's error shape and identity, then that the code is `ABORTED`. |
 | `isUtilsError` | `@migaia/utils/error` | Recognizes this package's error shape only when both identity fields are valid. |
 | `isUtilsTimeoutError` | `@migaia/utils/error` | Checks this package's error shape and identity, then that the code is `DEADLINE_EXCEEDED`. |
+| `jitter` | `@migaia/utils/number` | Shortens a finite non-negative value into `[value * (1 - ratio), value]`; invalid inputs use `INVALID_ARGUMENT`. |
 | `noop` | `@migaia/utils/function` | Empty function that always returns `undefined`, used as a default callback. |
 | `normalizeSerializedErrorChain` | `@migaia/utils/error` | Validates and freezes a fresh wire error tree before the receiver uses any field. |
 | `observeThenableRejection` | `@migaia/utils/function` | Observes a captured thenable's rejection while isolating reporter failures at the boundary. |

@@ -2072,6 +2072,7 @@ UTF-8 的 fatal 解码失败使用 INVALID_ENCODING，并在 message 中标明 U
 | `deferTask` | `@migaia/utils/scheduler` | 通过调度器安排一个在当前调用结束后执行的任务。 |
 | `deferred` | `@migaia/utils/promise` | 创建可以从外部结算的原生 Promise；新代码优先用 `Promise.withResolvers()`。 |
 | `deserializeErrorChain` | `@migaia/utils/error` | 先完整校验不可信的错误树，再重建原生错误图。 |
+| `detectServerRuntime` | `@migaia/utils` | 依次识别 Deno、Bun、Node；没有服务端全局的浏览器返回 `undefined`。 |
 | `diagnosticSnapshot` | `@migaia/utils/object` | 尽力复制一个值，并给出明确的诊断列表。 |
 | `encodeUtf8` | `@migaia/utils/bytes` | 把字符串编码为新的 UTF-8 字节数组。 |
 | `format` | `@migaia/utils/string` | 一次线性扫描替换模板中的占位符路径。 |
@@ -2098,6 +2099,7 @@ UTF-8 的 fatal 解码失败使用 INVALID_ENCODING，并在 message 中标明 U
 | `isUtilsAbortError` | `@migaia/utils/error` | 先确认是本包的错误形状和身份，再检查代码是否为 `ABORTED`。 |
 | `isUtilsError` | `@migaia/utils/error` | 只有两个身份字段都有效时，才认定为本包的错误形状。 |
 | `isUtilsTimeoutError` | `@migaia/utils/error` | 先确认是本包的错误形状和身份，再检查代码是否为 `DEADLINE_EXCEEDED`。 |
+| `jitter` | `@migaia/utils/number` | 将有限非负值随机缩短至 `[value * (1 - ratio), value]`；非法输入使用 `INVALID_ARGUMENT`。 |
 | `noop` | `@migaia/utils/function` | 恒返回 `undefined` 的空函数，用作默认回调。 |
 | `normalizeSerializedErrorChain` | `@migaia/utils/error` | 接收方使用之前，先校验并冻结一份新的线上错误树。 |
 | `observeThenableRejection` | `@migaia/utils/function` | 观察已捕获 thenable 的拒绝，并在边界上隔离 reporter 自身的失败。 |
