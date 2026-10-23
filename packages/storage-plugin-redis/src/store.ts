@@ -1480,8 +1480,9 @@ export function createRedisStore(
             resource: IStorageResource = {
               dispose,
               [asyncDisposeKey]: () => {
-                void dispose().then(undefined, () => undefined)
-                return underlying[asyncDisposeKey]()
+                const pending = underlying[asyncDisposeKey]()
+                void pending.then(release, release)
+                return pending
               }
             }
           resources.add(resource)

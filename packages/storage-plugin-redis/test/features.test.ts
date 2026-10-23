@@ -29,8 +29,54 @@ for (const url of [
     afterAll(async () => {
       if (pool.isOpen) await pool.close()
     })
+    it('forwards one symbolic subscription close without entering explicit disposal', async () => {
+      if (!pool.isOpen) await pool.connect()
+      const entries: { explicit: number; symbolic: number }[] = []
+      /** Transparent counters observe the real original driver's two disposal entries. */
+      const observed: typeof driver = {
+        ...driver,
+        subscribe: async (channel, listener) => {
+          const original = await driver.subscribe(channel, listener),
+            count = { explicit: 0, symbolic: 0 }
+          entries.push(count)
+          return {
+            dispose: () => {
+              count.explicit++
+              return original.dispose()
+            },
+            [Symbol.asyncDispose]: () => {
+              count.symbolic++
+              return original[Symbol.asyncDispose]()
+            }
+          }
+        }
+      }
+      const host = await createStorageHost({
+        plugins: [
+          redisBackendPlugin(
+            { driver: observed, prefix: crypto.randomUUID() },
+            { pubsub: redisPubSubFeature() }
+          )
+        ] as const
+      })
+      try {
+        const resource = await host
+            .backend('redis')
+            .api.pubsub.subscribe('symbolic-close', () => undefined),
+          count = entries.at(-1)!
+        const closed = resource[Symbol.asyncDispose]()
+        expect(count.symbolic).toBe(1)
+        expect(count.explicit).toBe(0)
+        expect(resource[Symbol.asyncDispose]()).toBe(closed)
+        await closed
+        expect(count.symbolic).toBe(2)
+        expect(count.explicit).toBe(0)
+      } finally {
+        await host.dispose()
+      }
+    })
     it('runs real streams, group claim/ack, PubSub, UTF16 sorted ties and atomic fixed windows', async () => {
-      await pool.connect()
+      if (!pool.isOpen) await pool.connect()
       const commands: import('../src/hooks.js').IRedisCommandHookPayload[] = [],
         counts = new Map<string, number>(),
         stage = definePlugin('observe', (core) => ({
