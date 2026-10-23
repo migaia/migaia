@@ -2757,6 +2757,32 @@ if (snapshot) console.log(await snapshot.store.getRecord('profile'))`
       ),
       example: `assertStringStorageKey('theme', 'local')`
     },
+    encodeStorageOrgKey: {
+      role: 'operation',
+      purpose: t(
+        'Encode the original organization envelope without reducing logical key limits.',
+        '编码原组织封装，不缩减逻辑键限制。'
+      ),
+      returns: t(
+        'Original ordered bytes; only the logical key consumes depth and node budgets.',
+        '原保序字节；只有逻辑键消耗深度和节点预算。'
+      ),
+      example: storageContractCases.encodeStorageOrgKey![0]!.example,
+      cases: storageContractCases.encodeStorageOrgKey
+    },
+    decodeStorageOrgKey: {
+      role: 'operation',
+      purpose: t(
+        'Validate the requested organization boundary and reuse the original logical decoder.',
+        '校验请求的组织边界，复用原逻辑键解码器。'
+      ),
+      returns: t(
+        'Detached logical key; foreign boundaries are INVALID_ARGUMENT, invalid logical bytes are INVALID_KEY.',
+        '独立逻辑键；其它组织边界报INVALID_ARGUMENT，无效逻辑字节报INVALID_KEY。'
+      ),
+      example: storageContractCases.decodeStorageOrgKey![0]!.example,
+      cases: storageContractCases.decodeStorageOrgKey
+    },
     encodeOrderedStorageKey: {
       role: 'operation',
       purpose: t(
