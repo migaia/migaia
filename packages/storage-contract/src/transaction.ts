@@ -8,6 +8,14 @@ import { StorageCapabilityMethod } from './capability-constants.js'
 import { readCapabilityTokenFacts } from './capability-token.js'
 import type { kv } from './capabilities/kv.js'
 import type { records } from './capabilities/records.js'
+import {
+  deriveStorageSqlQuery,
+  SqlQueryMethod,
+  type ISqlExecutor,
+  type ISqlTag,
+  type ISqlInput,
+  type ISqlQuery
+} from './sql.js'
 import type { ICodecValue } from '@migaia/serialize/codec'
 import { RecordQueryMethod, type IRecordQuery, type IQueryResult } from './query-chain.js'
 import {
@@ -876,6 +884,70 @@ function runTransactionCapabilityMethod(
     return Reflect.apply(execute, api, args)
   })
 }
+/** Fresh native SQL binding runs only inside the original accepted operation and its budget. */
+function runTransactionSqlQuery(
+  scope: object,
+  capability: IAnyStorageCapability,
+  fragment: ISqlQuery,
+  method: (typeof SqlQueryMethod)[keyof typeof SqlQueryMethod]
+): Promise<unknown> {
+  return runTransactionOperation(scope, (operationScope) => {
+    /** Binding authority is re-read for every terminal, including a saved derived query. */
+    const { binding } = liveTransactionCapability(operationScope, capability)
+    /** The actual backend tag receives the new full operation view, never the old constructor view. */
+    const native = Reflect.apply(binding.forTransaction, binding, [operationScope]) as ISqlExecutor
+    /** One fragment reference reuses captured nodes and bytes without rereading caller input. */
+    const query = native.sql`${fragment}`
+    return Reflect.apply(query[method], query, [])
+  })
+}
+/** Pure SQL composition retains its fragment owner; terminals acquire no independent lifetime. */
+function transactionSqlTag(
+  scope: object,
+  capability: IAnyStorageCapability,
+  root: ISqlExecutor
+): ISqlTag {
+  /** Capture the published pure constructor and tools without entering a binder or native call. */
+  const original = root.sql
+  /** Original tools preserve their own receiver even through a projected tag. */
+  const id = original.id
+  /** Join and empty remain the original pure fragment composition operations. */
+  const join = original.join
+  /** No SQL text or fragment is compiled during capability lookup or query construction. */
+  const empty = original.empty
+  /** Construction only captures the original graph; every data terminal enters the same owner. */
+  const tag = (strings: TemplateStringsArray, ...values: readonly ISqlInput[]) => {
+    /** An expired saved tag cannot construct another transaction-bound operation. */
+    const { state } = liveTransactionCapability(scope, capability)
+    try {
+      /** The root tag supplies pure composition only; its execution callbacks are never selected. */
+      const fragment = Reflect.apply(original, root, [strings, ...values]) as ISqlQuery
+      return deriveStorageSqlQuery(fragment, {
+        all: () =>
+          runTransactionSqlQuery(scope, capability, fragment, SqlQueryMethod.all) as ReturnType<
+            ISqlQuery['all']
+          >,
+        get: () =>
+          runTransactionSqlQuery(scope, capability, fragment, SqlQueryMethod.get) as ReturnType<
+            ISqlQuery['get']
+          >,
+        run: () =>
+          runTransactionSqlQuery(scope, capability, fragment, SqlQueryMethod.run) as ReturnType<
+            ISqlQuery['run']
+          >
+      })
+    } catch (error) {
+      throw failTransaction(state, error)
+    }
+  }
+  return Object.freeze(
+    Object.assign(tag, {
+      id: (...parts: readonly [string, ...string[]]) => Reflect.apply(id, original, parts),
+      join: (...args: Parameters<ISqlTag['join']>) => Reflect.apply(join, original, args),
+      empty
+    })
+  ) as ISqlTag
+}
 /** Complete read terminals enter the original operation before validation, execution and cleanup. */
 function transactionRecordQueryReads<R>(scope: object, query: IQueryResult<R, undefined>) {
   /** Only business arguments cross this zero-context projection; stream retains its iterator owner. */
@@ -1008,6 +1080,8 @@ export function useTransactionCapability<
         prefix
       ])
   }
+  if (transaction.sql)
+    api.sql = transactionSqlTag(scope, capability, binding.implementation.api as ISqlExecutor)
   /** Standard scalar methods use the original fresh-view operation path, without token imports. */
   for (const method of transaction.methods)
     api[method] = (...args: readonly unknown[]) =>

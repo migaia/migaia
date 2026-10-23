@@ -1,6 +1,7 @@
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import {
   createSqlTag,
+  deriveStorageSqlQuery,
   sqlFragment,
   createTransactionOwner,
   runTransactionOperation,
@@ -42,6 +43,41 @@ function template(text: string): TemplateStringsArray {
 }
 
 describe('shared SQL composition and original execution', () => {
+  it('derives terminals over the same authentic fragment without invoking or recompiling its source', async () => {
+    const fixture = setup('postgres')
+    const input = new Uint8Array([1])
+    const original = fixture.tag`SELECT ${input}`
+    const promise = Promise.resolve([{ value: 9 }])
+    const context = { pageSize: 2 }
+    const callbacks = {
+      all(this: object, ctx?: IOperationContext) {
+        expect(this).toBe(callbacks)
+        expect(ctx).toBe(context)
+        return promise
+      },
+      get: async () => ({ value: 9 }),
+      run: async () => ({ changes: 9 })
+    }
+    const derived = deriveStorageSqlQuery(original, callbacks)
+    input.fill(99)
+    expect(Object.isFrozen(derived)).toBe(true)
+    expect(derived.all(context)).toBe(promise)
+    expect(fixture.prepared).toEqual([])
+    await fixture.tag`${derived}`.run()
+    expect(fixture.prepared).toEqual([{ text: 'SELECT $1', values: [new Uint8Array([1])] }])
+    expect(() => deriveStorageSqlQuery({} as ISqlFragment, callbacks)).toThrowError(
+      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+    )
+    const cause = new Error('SQL terminal getter failed')
+    expect(() =>
+      deriveStorageSqlQuery(original, {
+        get all(): never {
+          throw cause
+        }
+      } as never)
+    ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT', cause }))
+  })
+
   it('binds values, escapes identifier segments and shares pure and bound fragment identity', async () => {
     const fixture = setup()
     const source = new Uint8Array([1, 2])

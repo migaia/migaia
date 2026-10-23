@@ -765,3 +765,5 @@ const excluded = prefix.matches(['cache', 'users-extra'])
 `snapshotStorageRdfTerm`、`snapshotStorageRdfPattern` 与 `snapshotStorageRdfQuad` 单次捕获并复制结构字段；非法项或位置报 `INVALID_ARGUMENT`，保留 getter 原因。pattern 省略的字段不加约束，graph 也如此；完整 quad 必须提供四个位置。`encodeStorageRdfQuad` 通过规范 term 字段与既有自定界有序键 writer 生成独立身份字节。这些纯 helper 不打开原生 store、query 或资源。
 
 `lockKey.vector(collection, id)` 与 `lockKey.rdf(quad)` 扩展原规范锁拥有者。通道顺序保留 text、bytes、record，再追加 vector、rdf。向量使用精确 collection/point 元组；RDF 与写入共用规范 ground quad 快照与保序字节。工厂分离调用方数据，归一时一次去重。整通道锁范围涵盖两个新通道；typed prefix 仍只支持 text、bytes、record。TTL 接受向量 collection/point 目标，在原生操作前拒绝 RDF。不支持某通道的后端必须明确拒绝。
+
+`sql` 为标准嵌套原生执行能力：`store.use(sql).sql` 保留原 tag 与工具。事务 provider 提供 `forTransaction`；`tx.use(sql).sql` 只组合片段，不调用 binder 或根执行。每次 all/get/run 终端进入既有事务 owner，获得新的原生 operation view，并使用原事务预算；保存的查询在到期后不能执行。后端作者可用 `deriveStorageSqlQuery(fragment, terminals)`，只在同一真实片段节点上替换终端回调，保留原回调 receiver、context 与 Promise 身份；不创建 compiler、连接、队列或资源 owner。

@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   ttl,
   counter,
+  sql,
+  createSqlTag,
   implement,
   provideCapabilities,
   defineStorageCapability,
@@ -57,6 +59,18 @@ describe('standard scalar capability contracts', () => {
     expect(() => provideCapabilities(base(), [implement(counter, {} as never)])).toThrowError(
       expect.objectContaining({ code: 'INVALID_ARGUMENT' })
     )
+    const rootSql = vi.fn(async (): Promise<never> => {
+      throw new Error('SQL admission must not execute')
+    })
+    const executor = {
+      sql: createSqlTag({ dialect: 'sqlite', all: rootSql, get: rootSql, run: rootSql })
+    }
+    expect(provideCapabilities(base(), [implement(sql, executor)]).use(sql)).toBe(executor)
+    expect(rootSql).not.toHaveBeenCalled()
+    for (const invalid of [{}, { sql: null }, { sql: () => undefined }])
+      expect(() => provideCapabilities(base(), [implement(sql, invalid as never)])).toThrowError(
+        expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+      )
     const missing = provideCapabilities(base(), [])
     expect(() => missing.use(ttl as never)).toThrowError(
       expect.objectContaining({
