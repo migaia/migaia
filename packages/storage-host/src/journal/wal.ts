@@ -160,8 +160,17 @@ export async function createStorageExternalWal(options: {
   try {
     for (const record of await wal.pending()) {
       if (record.kind !== StorageJournalKind.intent) continue
+      /** A foreign complete target grants no authority to interpret or repair its body. */
+      let owner: IStorageJournalTargetIdentity
+      try {
+        owner = identity(object(record.payload).target)
+      } catch (cause) {
+        if (cause instanceof StorageError && cause.code === StorageErrorCode.journalRecordInvalid)
+          throw cause
+        invalid(cause)
+      }
+      if (!matches(owner, options.target)) continue
       const pending = intent(record.payload, options.backend)
-      if (!matches(pending.target, options.target)) continue
       if (await binding.hasCommitMarker(pending.txId)) {
         await binlog.append(StorageJournalKind.commit, pending.commit)
         await wal.complete(record.seq)

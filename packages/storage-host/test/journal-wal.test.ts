@@ -86,6 +86,10 @@ describe('external storage WAL', () => {
       foreign.target.orgId = createOrgId()
       foreign.commit.target.orgId = foreign.target.orgId
       const foreignSeq = await logger.wal.begin(StorageJournalKind.intent, foreign)
+      const damagedForeignSeq = await logger.wal.begin(StorageJournalKind.intent, {
+        target: foreign.target,
+        commit: false
+      })
       const unrelatedSeq = await logger.wal.begin('application.intent', { own: false })
       await resources[0]!.dispose()
       fail = false
