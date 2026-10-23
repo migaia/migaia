@@ -21,7 +21,12 @@ export const StorageContractErrorText = {
   /** Migration failures retain the original error and the exact failed version transition. */
   migrationFailed: 'migration step failed',
   /** The synchronous recovery path cannot wait for migration results. */
-  migrationSyncThenable: 'synchronous migration steps must not return thenables'
+  migrationSyncThenable: 'synchronous migration steps must not return thenables',
+  /** Invalid capability descriptors and provider resources fail before installation side effects. */
+  capabilityArgument: 'capability token, implementation or provider base is invalid',
+  /** Missing token diagnostics identify backend and capability without granting authority by name. */
+  capabilityMissing: (capability: string, backend: string): string =>
+    `backend ${backend} does not provide capability ${capability}`
 } as const
 /** Stable cause text for a collection codec that cannot represent an undefined root. */
 export const COLLECTIONS_CODEC_UNDEFINED_ROOT = 'collection codec cannot encode an undefined root'

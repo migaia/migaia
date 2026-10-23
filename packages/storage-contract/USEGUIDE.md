@@ -466,3 +466,25 @@ try {
 `migrateEnvelope` 支持异步步骤和取消信号；即使版本相等，也先检查取消。同步入口拒绝已知的异步步骤，运行期遇到 thenable 同样拒绝并消费迟到拒绝。`{ version, reset: () => ({}) }` 计划对旧档只重置一次，同版保留引用，未来版本仍拒绝。步骤对 state 的原地修改及外部副作用不会回滚。
 
 `observe.beforeStep` 与 `observe.afterStep` 只观察，不等待返回值。观察失败交给同步 `observe.report`，不改变迁移结果；省略时使用 utils 的宿主异常报告。资源释放、宿主管线与存储写回由各自拥有者负责。
+
+## 能力令牌与实现
+
+`defineStorageCapability` 只创建冻结的 API 令牌，不提供存储实现。后端作者通过 `implement` 提供真实实现，再由 `provideCapabilities` 改装原有基础对象。种类名与能力名只用于诊断，同名令牌仍是不同权限。提供方保留类方法、非枚举成员以及具体 API 类型，不克隆基础对象。
+
+```ts
+import {
+  defineStorageCapability,
+  implement,
+  provideCapabilities,
+  type IStorageBase
+} from '@migaia/storage-contract'
+
+const catalog = defineStorageCapability<{ read(key: string): Promise<string | null> }>()('catalog')
+function attachCatalog(base: IStorageBase, read: (key: string) => Promise<string | null>) {
+  return provideCapabilities(base, [implement(catalog, { read })])
+}
+```
+
+这是后端内部的装配函数，实际 store 仍由宿主安装与释放。`store.use(catalog)` 返回原实现对象；真实但未登记的令牌抛带后端名与能力名的 `UNSUPPORTED_CAPABILITY`，伪造令牌抛 `INVALID_ARGUMENT`。`store.has(token)` 同步返回布尔值。标准 `kv` 令牌同时提供原有平铺方法，`has(key, ctx)` 保留异步键查询。
+
+宿主通过 `onInstaller` 捕获本 store 唯一的安装口。`prepare` 先验证整批真实记录并保留令牌，`publish` 才使能力可见，`release` 幂等撤回该批。失败不调用基础对象的 `dispose`；资源回滚仍由创建它的后端拥有。事务与查询链的实际执行由其既有拥有者实现，类型投影不会创建事务或获得连接。

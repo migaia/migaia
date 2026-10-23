@@ -11,6 +11,24 @@ export type ITransactionWriteOptions = {
   readonly conflictPolicy?: IConflictPolicy
 }
 
+/** Text operations bound to the original transaction scope, without root operation contexts. */
+export type ITransactionKeyValueApi = {
+  get(key: string): Promise<string | null>
+  set(key: string, value: string, options?: ITransactionWriteOptions): Promise<void>
+  remove(key: string): Promise<void>
+  has(key: string): Promise<boolean>
+  getMany(keys: readonly IStorageKey[]): Promise<readonly (string | undefined)[]>
+  setMany(
+    entries: readonly {
+      readonly key: IStorageKey
+      readonly value: string
+      readonly ttlMs?: number
+    }[]
+  ): Promise<void>
+  removeMany(keys: readonly IStorageKey[]): Promise<number>
+  removeByPrefix(prefix: IStorageKey): Promise<number>
+}
+
 /**
  * Record operations exposed only for the duration of a provider's transaction callback. Do not
  * retain the scope after that callback settles. Isolation, commit scheduling, and retries are

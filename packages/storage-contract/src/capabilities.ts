@@ -1,8 +1,8 @@
 /**
- * Known provider labels. A label identifies a backend family; inspect capabilities before using
- * extensions.
+ * Open provider label domain. Runtime admission applies the canonical lowercase backend-name
+ * pattern; a label never grants capability or extension authority.
  */
-export type IBackendKind = 'local' | 'session' | 'cookie' | 'indexeddb' | 'memory'
+export type IBackendKind = string
 
 /** Provider capability facts, independent of any browser or database implementation. */
 export type IStorageCapabilities = {
