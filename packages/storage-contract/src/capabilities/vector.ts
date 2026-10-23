@@ -139,6 +139,14 @@ function assertVectorObject(
 ): asserts value is object {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) invalidVector(backend)
 }
+/** Actual borrowed array bounds must be safe integers, without imposing a business size cap. */
+function assertVectorArrayLength(
+  length: number,
+  minimum: 0 | 1,
+  backend: IBackendKind | undefined
+): void {
+  if (!Number.isSafeInteger(length) || length < minimum) invalidVector(backend)
+}
 /** Snapshot declared configuration once; absence is resolved only by the native collection owner. */
 export function snapshotStorageVectorCollection(
   name: string,
@@ -179,7 +187,8 @@ export function snapshotStorageVector(
       invalidVector(backend)
     /** Read the borrowed array bound once before copying each component. */
     const length = input.length
-    if (length === 0 || (dimensions !== undefined && length !== dimensions)) invalidVector(backend)
+    assertVectorArrayLength(length, 1, backend)
+    if (dimensions !== undefined && length !== dimensions) invalidVector(backend)
     /** The accepted vector owns its component array and exposes no mutable input. */
     const result: number[] = []
     /** Zero detection avoids a norm sum that can overflow on otherwise finite components. */
@@ -213,6 +222,7 @@ export function snapshotStorageVectorUpsert<TPayload>(
     if (!Array.isArray(points)) invalidVector(backend)
     /** A dense batch is visited completely before any write plan is exposed. */
     const length = points.length
+    assertVectorArrayLength(length, 0, backend)
     /** Repeated IDs replace their earlier value only after that input also passed validation. */
     const result = new Map<string, IStorageVectorPoint<TPayload>>()
     for (let index = 0; index < length; index++) {
@@ -262,6 +272,7 @@ export function snapshotStorageVectorFilter(
           if (!Array.isArray(value)) invalidVector(backend)
           /** Snapshot the child bound once before descending. */
           const length = value.length
+          assertVectorArrayLength(length, 0, backend)
           /** Children are fresh immutable nodes rather than aliases to the original AST. */
           const children: IVectorFilter[] = []
           for (let index = 0; index < length; index++) {
@@ -294,6 +305,7 @@ export function snapshotStorageVectorFilter(
           if (!Array.isArray(values)) invalidVector(backend)
           /** Read only this invocation's membership array bound. */
           const length = values.length
+          assertVectorArrayLength(length, 0, backend)
           /** Native engines receive an immutable operand sequence for their own translation. */
           const members: (string | number)[] = []
           for (let index = 0; index < length; index++) {

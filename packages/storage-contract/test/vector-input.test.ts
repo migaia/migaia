@@ -5,6 +5,21 @@ import * as contract from '../src/index.js'
 const configuration = { dimensions: 2, metric: 'cosine' } as const
 
 describe('vector native input snapshots', () => {
+  it('rejects invalid borrowed Proxy array bounds before treating input as empty', () => {
+    /** A supported array Proxy can report a bound different from its physical target length. */
+    const invalid = new Proxy([1, 2], {
+      get(target, key, receiver) {
+        return key === 'length' ? -1 : Reflect.get(target, key, receiver)
+      }
+    })
+    for (const capture of [
+      () => contract.snapshotStorageVector(invalid),
+      () => contract.snapshotStorageVectorUpsert(invalid as never, configuration),
+      () => contract.snapshotStorageVectorFilter({ all: invalid as never }),
+      () => contract.snapshotStorageVectorFilter({ field: 'tag', in: invalid })
+    ])
+      expect(capture).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT' }))
+  })
   it('captures optional collection configuration without inventing a native default', () => {
     expect(contract.snapshotStorageVectorCollection('existing')).toEqual({
       name: 'existing',
