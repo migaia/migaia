@@ -9,7 +9,7 @@ export type IStorageResource = {
 /** A live storage iterator closes through the same cleanup path as return and natural completion. */
 export type IStorageIterator<T> = AsyncIterableIterator<T> & IStorageResource
 
-/** Internal shared lifetime; transaction registration retains all scope and error authority. */
+/** Shared backend-author lifetime; transaction registration retains scope and error authority. */
 export type IStorageIteratorLifetime<T> = {
   readonly isClosing: () => boolean
   readonly advance: (run: () => Promise<IteratorResult<T>>) => Promise<IteratorResult<T>>
@@ -22,7 +22,7 @@ export type IStorageIteratorLifetime<T> = {
  * Owns the existing iterator drain and cached cleanup paths. Both native transaction iterators and
  * mapped root readers submit their complete accepted advance here; neither creates another queue or
  * lifecycle implementation. Error normalization and reporting remain with the original caller. This
- * helper is internal and is not exported from the package entry.
+ * backend-author helper does not authorize data admission or register a transaction resource.
  */
 export function createStorageIteratorLifetime<T>(options: {
   readonly close: () => Promise<void>

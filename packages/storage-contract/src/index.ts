@@ -92,7 +92,8 @@ export {
 
 export { intrinsicConstructorName } from './bytes.js'
 
-export type { IStorageResource, IStorageIterator } from './resource.js'
+export { createStorageIteratorLifetime } from './resource.js'
+export type { IStorageResource, IStorageIterator, IStorageIteratorLifetime } from './resource.js'
 export {
   BACKEND_KIND_PATTERN,
   isBackendKind,
@@ -110,6 +111,7 @@ export type {
   IWriteConcurrencyOptions,
   ITransactionBuilder,
   ILockedTransactionBuilder,
+  IOptimisticTransactionBuilder,
   IConcurrencyHolder,
   IConcurrencyDecision,
   IConcurrencyStageObserver
@@ -212,6 +214,7 @@ export type {
 export { resolveConcurrencyPolicy } from './transaction.js'
 
 export { createTransactionBuilder, TransactionBuilderMethod } from './transaction-builder.js'
+export type { IOptimisticTransactionBuilderMode } from './transaction-builder.js'
 
 export {
   QueryOperator,
@@ -243,6 +246,10 @@ export type {
   IQueryChain,
   IRecordQuerySource,
   IQueryNativeStep,
+  IRecordQueryInput,
+  IQueryReduction,
+  IQueryReductionResult,
+  IQueryReducer,
   IRecordQuery,
   IRecordQueryCore,
   IRecordOrderedQuery,

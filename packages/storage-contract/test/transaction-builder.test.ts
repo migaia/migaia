@@ -8,7 +8,8 @@ import {
   resolveConcurrencyPolicy,
   type IStorageBase,
   type ITransactionOptions,
-  type ILockedTransactionBuilder
+  type ILockedTransactionBuilder,
+  type IOptimisticTransactionBuilder
 } from '../src/index.js'
 
 /** A store with native scope/options proves delegation rather than implementing a second executor. */
@@ -53,6 +54,142 @@ function fixture() {
 }
 
 describe('immutable transaction builder', () => {
+  it('delegates native unlocked run with exact scope, options, one-read descriptors and original Promise', async () => {
+    const { store, calls, scope } = fixture()
+    const transaction = store.transaction
+    let transactionReads = 0
+    Object.defineProperty(store, 'transaction', {
+      get: () => {
+        transactionReads++
+        return transaction
+      }
+    })
+    const nativeTag = { value: 'native' }
+    const policy = ConcurrencyPolicy.optimistic({ retries: 1 })
+    let optionReads = 0
+    let modeReads = 0
+    const hint = () => 'kept' as const
+    const root = createTransactionBuilder(
+      store,
+      {
+        get nativeTag() {
+          optionReads++
+          return nativeTag
+        }
+      },
+      { hint },
+      {
+        get mode() {
+          modeReads++
+          return 'optimistic' as const
+        }
+      }
+    )
+    expect(root.hint).toBe(hint)
+    expect('lock' in root).toBe(false)
+    expect('run' in root).toBe(true)
+    expect(calls).toHaveLength(0)
+    const run = (current: typeof scope) => {
+      expectTypeOf(current).toEqualTypeOf<typeof scope>()
+      return Promise.resolve(current.sql('native'))
+    }
+    const pending = root.concurrency(policy).timeout(1000).run(run)
+    expect(pending).toBe(calls[0]!.promise)
+    expect(await pending).toBe('native')
+    expect(calls[0]!.receiver).toBe(store)
+    expect(calls[0]!.run).toBe(run)
+    expect(calls[0]!.options).toMatchObject({ nativeTag, concurrency: policy, timeoutMs: 1000 })
+    expect(Object.hasOwn(calls[0]!.options as object, 'lock')).toBe(false)
+    expect(root.hint()).toBe('kept')
+    expect(transactionReads).toBe(1)
+    expect(optionReads).toBe(1)
+    expect(modeReads).toBe(1)
+    expectTypeOf(root).toMatchTypeOf<
+      IOptimisticTransactionBuilder<typeof scope, { hint: typeof hint }>
+    >()
+  })
+
+  it('rejects unsupported native locking policies and keys before the original transaction starts', () => {
+    const { store, calls } = fixture()
+    const mode = { mode: 'optimistic' } as const
+    const root = createTransactionBuilder(store, undefined, undefined, mode)
+    for (const policy of [ConcurrencyPolicy.wait(), ConcurrencyPolicy.fail()]) {
+      expect(() => root.concurrency(policy as never)).toThrowError(
+        expect.objectContaining({ code: 'UNSUPPORTED_CAPABILITY' })
+      )
+      expect(() =>
+        createTransactionBuilder(store, { concurrency: policy } as never, undefined, mode)
+      ).toThrowError(expect.objectContaining({ code: 'UNSUPPORTED_CAPABILITY' }))
+    }
+    expect(() => root.concurrency({ name: 'copy', locking: 'optimistic' } as never)).toThrowError(
+      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+    )
+    expect(() =>
+      createTransactionBuilder(store, { lock: [] } as never, undefined, mode)
+    ).toThrowError(expect.objectContaining({ code: 'UNSUPPORTED_CAPABILITY' }))
+    const cause = new Error('native mode getter failed')
+    expect(() =>
+      createTransactionBuilder(store, undefined, undefined, {
+        get mode(): 'optimistic' {
+          throw cause
+        }
+      })
+    ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT', cause }))
+    expect(() => root.run(undefined as never)).toThrowError(
+      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+    )
+    expect(calls).toHaveLength(0)
+    function invalidTypes() {
+      // @ts-expect-error Native unlocked builders have no key-lock transition.
+      root.lock(lockKey.text('a'))
+      // @ts-expect-error Native unlocked builders accept only optimistic policies.
+      root.concurrency(ConcurrencyPolicy.wait())
+      // @ts-expect-error Native author mode rejects explicit keys before native invocation.
+      createTransactionBuilder(store, { lock: [] }, undefined, mode)
+      // @ts-expect-error Backend-native option extensions stay precise in this mode.
+      createTransactionBuilder(store, { nativeTag: 'wrong' }, undefined, mode)
+    }
+    void invalidTypes
+  })
+
+  it('uses the original optimistic loop and returns its native Promise without a second runner', async () => {
+    const { store, scope } = fixture()
+    const policy = ConcurrencyPolicy.optimistic({ retries: 1, backoffMs: 0 })
+    let nativePromise: Promise<unknown> | undefined
+    let attempts = 0
+    store.transaction = <TResult>(
+      run: (current: typeof scope) => TResult,
+      options?: ITransactionOptions
+    ): Promise<Awaited<TResult>> => {
+      expect(Object.hasOwn(options!, 'lock')).toBe(false)
+      const pending = runWithConcurrency<TResult>(
+        { store, options: options ?? {}, policy },
+        {
+          attempt: async (context) => {
+            expect(context.lock).toBeUndefined()
+            attempts++
+            return attempts === 1
+              ? {
+                  status: 'conflict' as const,
+                  phase: 'commit' as const,
+                  keys: [],
+                  holder: undefined
+                }
+              : { status: 'committed' as const, value: run(scope) }
+          }
+        }
+      )
+      nativePromise = pending
+      return pending
+    }
+    const pending = createTransactionBuilder(store, { concurrency: policy }, undefined, {
+      mode: 'optimistic'
+    }).run((current) => current.read())
+    expect(pending).toBe(nativePromise)
+    expect(await pending).toBe(1)
+    expect(attempts).toBe(2)
+  })
+
   it('has no root execution method and delegates once with the actual scope, native options and original Promise', async () => {
     const { store, calls } = fixture()
     const nativeTag = { value: 'kept' }

@@ -7,6 +7,7 @@ import { StorageContractError, StorageContractErrorCode } from './errors.js'
 import { StorageContractErrorText } from './error-text.js'
 import {
   assertConcurrencyPolicy,
+  ConcurrencyLocking,
   snapshotLockKey,
   normalizeLockKeys,
   associateNormalizedLockKeys,
@@ -14,7 +15,8 @@ import {
   type IConcurrencyPolicy,
   type ITransactionOptions,
   type ITransactionBuilder,
-  type ILockedTransactionBuilder
+  type ILockedTransactionBuilder,
+  type IOptimisticTransactionBuilder
 } from './concurrency.js'
 
 /** Original builder method names remain reserved across locked and unlocked branches. */
@@ -66,6 +68,35 @@ function invalidBuilder(backend: IBackendKind, cause?: unknown): StorageContract
     StorageContractErrorText.concurrencyArgument
   )
 }
+/** Optional native author mode exposes no key locks and delegates optimistic execution unchanged. */
+export type IOptimisticTransactionBuilderMode = { readonly mode: 'optimistic' }
+/** Native option extensions remain precise while key locking and pessimistic overrides are excluded. */
+type IOptimisticBuilderOptions<TStore extends IBuilderStore> = Omit<
+  NonNullable<Parameters<TStore['transaction']>[1]>,
+  'lock' | 'concurrency'
+> & {
+  readonly lock?: never
+  readonly concurrency?: IConcurrencyPolicy & { readonly locking: 'optimistic' }
+}
+/** The explicit author mode exposes the native backend's actual unlocked scope and run terminal. */
+export function createTransactionBuilder<
+  const TStore extends IBuilderStore,
+  TAugmentMethods extends object = Record<never, never>
+>(
+  store: TStore,
+  options: IOptimisticBuilderOptions<TStore> | undefined,
+  methods: TAugmentMethods | undefined,
+  mode: IOptimisticTransactionBuilderMode
+): IOptimisticTransactionBuilder<IBuilderScopeOf<TStore>, TAugmentMethods>
+/** The default public builder still requires at least one declared lock before execution. */
+export function createTransactionBuilder<
+  const TStore extends IBuilderStore,
+  TAugmentMethods extends object = Record<never, never>
+>(
+  store: TStore,
+  options?: Omit<NonNullable<Parameters<TStore['transaction']>[1]>, 'lock'>,
+  methods?: TAugmentMethods
+): ITransactionBuilder<IBuilderScopeOf<TStore>, TAugmentMethods>
 /**
  * Creates an immutable transaction builder for an original registered store. Configuration starts
  * no I/O or timing owner. Each lock step copies only new keys; run unfolds the shared blocks once,
@@ -78,13 +109,32 @@ export function createTransactionBuilder<
 >(
   store: TStore,
   options?: Omit<NonNullable<Parameters<TStore['transaction']>[1]>, 'lock'>,
-  methods?: TAugmentMethods
-): ITransactionBuilder<IBuilderScopeOf<TStore>, TAugmentMethods> {
+  methods?: TAugmentMethods,
+  mode?: IOptimisticTransactionBuilderMode
+):
+  | ITransactionBuilder<IBuilderScopeOf<TStore>, TAugmentMethods>
+  | IOptimisticTransactionBuilder<IBuilderScopeOf<TStore>, TAugmentMethods> {
   /**
    * Authentic registration supplies fixed backend diagnostics without reading mutable store
    * getters.
    */
   const { backend } = readTransactionConcurrency(store)
+  /** The author descriptor is captured once; it creates no policy, lock or native executor. */
+  let optimistic = false
+  if (mode !== undefined) {
+    try {
+      if (
+        typeof mode !== 'object' ||
+        mode === null ||
+        Array.isArray(mode) ||
+        mode.mode !== ConcurrencyLocking.optimistic
+      )
+        throw new TypeError(StorageContractErrorText.concurrencyArgument)
+      optimistic = true
+    } catch (cause) {
+      throw invalidBuilder(backend, cause)
+    }
+  }
   /** Captured native options are shared by every branch and copied only at the terminal. */
   let captured: ITransactionOptions & object
   /** The borrowed transaction method is captured once and always invoked with the original store. */
@@ -118,25 +168,47 @@ export function createTransactionBuilder<
   }
   if (typeof transaction !== 'function') throw invalidBuilder(backend)
   snapshotOperationContext(captured)
-  if (captured.concurrency !== undefined) assertConcurrencyPolicy(captured.concurrency)
+  if (captured.concurrency !== undefined)
+    assertConcurrencyPolicy(
+      captured.concurrency,
+      optimistic ? ConcurrencyLocking.optimistic : undefined,
+      backend
+    )
+  if (optimistic && captured.lock !== undefined)
+    throw new StorageContractError(StorageContractErrorCode.unsupported, { backend })
   Object.freeze(captured)
   /** Factory-local state contains no lock, queue, budget or disposer beyond immutable configuration. */
   function create<TLocked extends boolean>(
     state: IBuilderState,
     locked: TLocked
-  ): IBuilderOf<IBuilderScopeOf<TStore>, TLocked, TAugmentMethods> {
+  ):
+    | IBuilderOf<IBuilderScopeOf<TStore>, TLocked, TAugmentMethods>
+    | IOptimisticTransactionBuilder<IBuilderScopeOf<TStore>, TAugmentMethods> {
     /** Every derived object shares the original immutable options and old lock blocks. */
     const builder = {
       ...augmentation,
-      /** Captures only these newly declared identities; earlier branch history remains untouched. */
-      lock(first: ILockKey, ...rest: readonly ILockKey[]) {
-        /** Snapshot factories detach mutable key components before this call returns. */
-        const keys = Object.freeze([first, ...rest].map((key) => snapshotLockKey(key, backend)))
-        return create({ ...state, block: { previous: state.block, keys } }, true)
-      },
+      ...(optimistic
+        ? {}
+        : {
+            /**
+             * Captures only these newly declared identities; earlier branch history remains
+             * untouched.
+             */
+            lock(first: ILockKey, ...rest: readonly ILockKey[]) {
+              /** Snapshot factories detach mutable key components before this call returns. */
+              const keys = Object.freeze(
+                [first, ...rest].map((key) => snapshotLockKey(key, backend))
+              )
+              return create({ ...state, block: { previous: state.block, keys } }, true)
+            }
+          }),
       /** Derives policy metadata without executing its decision callback. */
       concurrency(policy: IConcurrencyPolicy) {
-        assertConcurrencyPolicy(policy)
+        assertConcurrencyPolicy(
+          policy,
+          optimistic ? ConcurrencyLocking.optimistic : undefined,
+          backend
+        )
         return create({ ...state, concurrency: policy }, locked)
       },
       /** Validates cancellation intent while preserving the same original signal object. */
@@ -150,7 +222,7 @@ export function createTransactionBuilder<
         return create({ ...state, timeoutMs }, locked)
       }
     }
-    if (!locked)
+    if (!locked && !optimistic)
       return Object.freeze(builder) as IBuilderOf<IBuilderScopeOf<TStore>, TLocked, TAugmentMethods>
     return Object.freeze({
       ...builder,
@@ -160,14 +232,18 @@ export function createTransactionBuilder<
        */
       run<TResult>(run: (scope: IBuilderScopeOf<TStore>) => TResult): Promise<Awaited<TResult>> {
         assertTransactionCallback(run, backend)
-        /** An explicit stack reverses persistent history once, even for long builder chains. */
-        const blocks: IBuilderLockBlock[] = []
-        for (let block = state.block; block; block = block.previous) blocks.push(block)
-        /** Flattening costs only the declared entries before canonical sorting and deduplication. */
-        const keys: ILockKey[] = []
-        while (blocks.length > 0) for (const key of blocks.pop()!.keys) keys.push(key)
-        /** The same normalization owner shares encoded identities with the real concurrency loop. */
-        const normalized = normalizeLockKeys(keys, backend)
+        /** Only the existing locked mode normalizes or publishes physical key identities. */
+        let normalized: ReturnType<typeof normalizeLockKeys> | undefined
+        if (!optimistic) {
+          /** An explicit stack reverses persistent history once, even for long builder chains. */
+          const blocks: IBuilderLockBlock[] = []
+          for (let block = state.block; block; block = block.previous) blocks.push(block)
+          /** Flattening costs only the declared entries before canonical sorting and deduplication. */
+          const keys: ILockKey[] = []
+          while (blocks.length > 0) for (const key of blocks.pop()!.keys) keys.push(key)
+          /** The same normalization owner shares encoded identities with the real concurrency loop. */
+          normalized = normalizeLockKeys(keys, backend)
+        }
         /**
          * Fixed context overrides retain all captured native fields rather than narrowing the
          * backend.
@@ -177,9 +253,9 @@ export function createTransactionBuilder<
           concurrency: state.concurrency,
           signal: state.signal,
           timeoutMs: state.timeoutMs,
-          lock: normalized.map((entry) => entry.key)
+          ...(normalized === undefined ? {} : { lock: normalized.map((entry) => entry.key) })
         }
-        associateNormalizedLockKeys(transactionOptions, normalized)
+        if (normalized !== undefined) associateNormalizedLockKeys(transactionOptions, normalized)
         return Reflect.apply(transaction, store, [run, transactionOptions]) as Promise<
           Awaited<TResult>
         >

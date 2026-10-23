@@ -26,6 +26,7 @@ import {
   type IRecordQuery,
   type IQueryResult,
   type IRecordQuerySource,
+  type IQueryReductionResult,
   type IQueryCondition
 } from '../src/index.js'
 
@@ -246,8 +247,8 @@ function normalizeQueryFixtureFailure(cause: unknown): IQueryFixtureFailure {
     : new StorageContractError(StorageContractErrorCode.invalidArgument, { cause })
 }
 /** Original resource ownership is exercised rather than a second iterator implementation. */
-function ownedRows<TKey extends IStorageKey = string>(
-  rows: readonly unknown[],
+function ownedRows<TKey extends IStorageKey = string, TRow = unknown>(
+  rows: readonly TRow[],
   close: () => PromiseLike<void> | void = () => undefined,
   nextFailure?: Error,
   options?: {
@@ -256,7 +257,7 @@ function ownedRows<TKey extends IStorageKey = string>(
     readonly key?: (row: unknown, position: number) => TKey
     readonly asyncDisposeKey?: typeof Symbol.asyncDispose
   }
-): IStorageIterator<readonly [TKey | string, unknown]> {
+): IStorageIterator<readonly [TKey | string, TRow]> {
   /** The fixture base and its original owner expose the same host-selected resource key. */
   const asyncDisposeKey: typeof Symbol.asyncDispose =
     options?.asyncDisposeKey ?? Symbol.asyncDispose
@@ -278,7 +279,7 @@ function ownedRows<TKey extends IStorageKey = string>(
     [asyncDisposeKey]: async () => undefined
   }
   /** Backend normalization keeps the original cursor error reachable through its existing code. */
-  const owner = createTransactionOwner<unknown, object>(base, normalizeQueryFixtureFailure, {
+  const owner = createTransactionOwner<TRow, object>(base, normalizeQueryFixtureFailure, {
     asyncDisposeKey
   })
   /** One root belongs to the callback interval of the original transaction owner. */
@@ -291,14 +292,14 @@ function ownedRows<TKey extends IStorageKey = string>(
   /** The port advances its original source once for every native next. */
   let index = 0
   return owner.registerIterator(scope, {
-    next: async (): Promise<IteratorResult<readonly [TKey | string, unknown]>> => {
+    next: async (): Promise<IteratorResult<readonly [TKey | string, TRow]>> => {
       options?.onNext?.()
       if (nextFailure !== undefined) throw nextFailure
       if (index >= rows.length) return { done: true, value: undefined }
       /** One source projection supplies the existing canonical key, never a client-side re-sort. */
       const position = index++
       /** The native row and its once-projected key remain paired for this source advance. */
-      const row = rows[position]
+      const row = rows[position]!
       return { done: false, value: [options?.key?.(row, position) ?? String(position), row] }
     },
     close
@@ -1666,6 +1667,147 @@ describe('shared selector ordering and row controls', () => {
     })
     await expect(query.all()).rejects.toBe(original)
     expect(close).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('native query reductions', () => {
+  it('executes declared scalar terminals in the original native cursor without reading records', async () => {
+    const candidates: IOrder[] = [
+      { status: 'paid', total: 4 },
+      { status: 'paid', total: 6 },
+      { status: 'cancelled', total: 1 }
+    ]
+    const close = vi.fn()
+    const execute = vi.fn(() => ownedRows(candidates))
+    let getterReads = 0
+    const reduce: NonNullable<IRecordQuerySource['reduce']> = vi.fn(
+      (input: Parameters<NonNullable<IRecordQuerySource['reduce']>>[0]) => {
+        const tests = input.conditions.map((condition) =>
+          compileStorageQueryCondition<IOrder>(condition)
+        )
+        const matching = candidates.filter((row) => tests.every((test) => test(row)))
+        const request = input.reduction
+        let value: IQueryReductionResult
+        if (request.operation === 'count') value = matching.length
+        else if (request.operation === 'exists') value = matching.length > 0
+        else {
+          const numbers = matching.map((row) => row.total)
+          const sum = numbers.reduce((total, sample) => total + sample, 0)
+          value =
+            request.aggregate === 'sum'
+              ? sum
+              : numbers.length === 0
+                ? { some: false }
+                : {
+                    some: true,
+                    value:
+                      request.aggregate === 'min'
+                        ? Math.min(...numbers)
+                        : request.aggregate === 'max'
+                          ? Math.max(...numbers)
+                          : sum / numbers.length
+                  }
+        }
+        return ownedRows([value], close)
+      }
+    )
+    const query = createRecordQuery<IOrder>({
+      pushdown: {
+        source: 'scalar-native',
+        operators: ['eq'],
+        operations: ['where', 'select', 'count', 'exists', 'aggregate']
+      },
+      get reduce() {
+        getterReads++
+        return reduce
+      },
+      execute
+    })
+      .where({ status: 'paid' })
+      .requirePushdown()
+    let contextReads = 0
+    expect(
+      await query.count({
+        get timeoutMs() {
+          contextReads++
+          return 1000
+        }
+      })
+    ).toBe(2)
+    expect(await query.exists()).toBe(true)
+    expect(await query.min('total')).toEqual({ some: true, value: 4 })
+    expect(await query.max('total')).toEqual({ some: true, value: 6 })
+    expect(await query.select('total').sum('total')).toBe(10)
+    expect(await query.avg('total')).toEqual({ some: true, value: 5 })
+    expect(getterReads).toBe(1)
+    expect(contextReads).toBe(1)
+    expect(execute).not.toHaveBeenCalled()
+    expect(close).toHaveBeenCalledTimes(6)
+  })
+
+  it('falls back for opaque predicates and skips only statistically irrelevant selector ordering', async () => {
+    const candidates = [{ total: 4 }, { total: 6 }, { total: 1 }]
+    const reduce = vi.fn(() => ownedRows([11]))
+    const execute = vi.fn(() => ownedRows(candidates))
+    const query = createRecordQuery<{ total: number }>({
+      pushdown: {
+        source: 'native-fallback',
+        operators: [],
+        operations: ['count', 'exists', 'aggregate']
+      },
+      reduce,
+      execute
+    })
+    const predicate = vi.fn((row: { total: number }) => row.total > 1)
+    expect(await query.where(predicate).count()).toBe(2)
+    expect(predicate).toHaveBeenCalledTimes(3)
+    const order = vi.fn((row: { total: number }) => row.total)
+    expect(await query.orderBy(order).sum('total')).toBe(11)
+    expect(order).not.toHaveBeenCalled()
+    expect(await query.orderBy(order, 'desc').limit(1).sum('total')).toBe(6)
+    expect(order).toHaveBeenCalledTimes(3)
+    const mapper = vi.fn((row: { total: number }) => ({ doubled: row.total * 2 }))
+    expect(await query.select(mapper).sum('doubled')).toBe(22)
+    expect(mapper).toHaveBeenCalledTimes(3)
+    let position = 0
+    expect(
+      await query
+        .orderBy(order, 'desc')
+        .select((row) => ({ weighted: row.total * ++position }))
+        .sum('weighted')
+    ).toBe(17)
+    expect(reduce).toHaveBeenCalledTimes(1)
+    const before = execute.mock.calls.length
+    await expect(query.where(predicate).requirePushdown().count()).rejects.toMatchObject({
+      code: 'QUERY_NOT_PUSHABLE'
+    })
+    expect(execute).toHaveBeenCalledTimes(before)
+  })
+
+  it('retains original scalar cursor failures and cleanup in the accepted operation', async () => {
+    const failure = new Error('native scalar read failed')
+    const close = vi.fn()
+    const query = createRecordQuery<{ total: number }>({
+      pushdown: { source: 'scalar-failure', operators: [], operations: ['count'] },
+      execute: () => ownedRows([]),
+      reduce: () => ownedRows([1], close, failure)
+    })
+    await expect(query.count()).rejects.toMatchObject({ cause: failure })
+    expect(close).toHaveBeenCalledTimes(1)
+    let stop: () => void = () => undefined
+    const accepted = createRecordQuery<{ total: number }>({
+      pushdown: { source: 'scalar-admission', operators: [], operations: ['count'] },
+      execute: () => ownedRows([]),
+      reduce: () =>
+        ownedRows([3], close, undefined, {
+          onStopAdmission: (value) => {
+            stop = value
+          },
+          onNext: () => stop()
+        })
+    })
+    expect(await accepted.count()).toBe(3)
+    expect(close).toHaveBeenCalledTimes(2)
   })
 })
 

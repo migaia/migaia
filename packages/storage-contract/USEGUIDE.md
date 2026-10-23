@@ -597,6 +597,8 @@ LOCK_REJECTED 与 LOCK_TIMEOUT 携只读 keys、holder。已确认身份时消�
 
 `createTransactionBuilder(store, options?)` 接收具备真实 transaction 签名的原登记 store。根对象只有 lock/concurrency/signal/timeout，没有 run；声明至少一个锁后才启用 run。每次派生返回独立不可变分支，每次 lock 只快照新增键。run 用显式栈展开共享历史，经原 owner 只规范化一次，再直接调用原 transaction 一次；保留原 Promise 身份、完整原生 scope 与 options 类型。配置不创建期限、队列或 I/O。
 
+后端作者可传第四参数 `{ mode: 'optimistic' }`，得到 `IOptimisticTransactionBuilder`：根部即可 run，没有 lock 方法，只接受真实的 optimistic 策略。wait/fail 在配置时同步报 `UNSUPPORTED_CAPABILITY`，伪造策略仍报 `INVALID_ARGUMENT`。run 不注入 lock 或规范化空键，直接返回原 transaction Promise，保留原生选项及完整 scope；重试仍由原并发 owner 负责。省略第四参数保持上述需声明锁的行为。
+
 `IRecordStore.transaction` 与索引事务选项包含原 `ITransactionOptions` 的 lock/concurrency 字段。具体 tx()/inspectLocks 方法仍由真实实现接入。对已安装且登记的记录 store：
 
 ```ts
@@ -784,7 +786,7 @@ SPARQL 通过纯 sparqlFragment 与原生 sparql 能力复用规范 RDF 项。�
 
 `createVectorQuery<TPayload,TGroupable>(source, methods?)` 返回不可变 builder；声明正安全整数 `topK(k)` 后才有读取终点。原生 execute 接收 `IVectorQueryInput`：全部可译 payload conditions、最终 topK/minScore、withVector 与原 context。声明式条件跨函数谓词下推，org/TTL 仍由后端在排名前处理；函数只过滤原引擎命中，不补搜。withVector 缺省 false，显式开启后结果类型才包含 vector。exact:true 的 explain 标记 fullScan。groupBy:true 才提供标准分组，在原 topK 命中上单遍按 payload 自有标量字段分组，每组保留 perGroup 个原序命中。
 
-`createRdfQuery(source, pattern, methods?)` 捕获规范 ground pattern，保留省略 graph 的全 graph 语义。原生 execute 接收 `IRdfQueryInput`，其有序 steps 保留 where/follow/inverse/select 的原调用顺序；execute 的原生行载体为 unknown，实际 select 可返回 Pick 投影，无须伪装完整 quad；follow/inverse 只接受 ground IRI。当前读取单元提供原生安全前缀遍历与普通 limit；当前不能在客户端执行的遍历在 I/O 前拒绝 QUERY_NOT_PUSHABLE。RDF 客户端遍历与写终点由后续单元补齐；分页见后文。
+`createRdfQuery(source, pattern, methods?)` 捕获规范 ground pattern，保留省略 graph 的全 graph 语义。原生 execute 接收 `IRdfQueryInput`，其有序 steps 保留 where/follow/inverse/select 的原调用顺序；execute 的原生行载体为 unknown，实际 select 可返回 Pick 投影，无须伪装完整 quad；follow/inverse 只接受 ground IRI。原生安全前缀遍历与客户端 ground match 遍历共用同一 reader；strict 下的客户端遍历在 I/O 前拒绝 QUERY_NOT_PUSHABLE。RDF 写终点由后续单元补齐；分页与客户端遍历见后文。
 
 两个作者入口复用记录查询的同一节点、planner、reader 与原 IStorageIterator，保留 asyncDisposeKey、取消、事务资源与清理首错。可选纯方法保留原函数引用；`VectorQueryMethod` 与 `RdfQueryMethod` 为同名冲突的规范保留表。
 
@@ -817,3 +819,17 @@ RDF add/delete/match 沿同一规范 ground IQuad owner。支持事务的 provid
 原 `nativeSteps:true` 端口扩展主键 `order` 与 `{operation:'after',key,direction}`；后端仅声明其真实索引 seek 支持。具有相应索引的原 execute 可做 O(log n + 页大小) seek；共享 fallback 明确保留客户端排序/过滤成本，strict 会在 I/O 前拒绝。向量查询没有 page/after。
 
 `compileStorageQueryCondition<T>(condition)` 只编译原生 source 回调已经收到的规范 `IQueryCondition`，直接复用原 compiler，不再捕获 IWhere、不增加 parser 或登记表。Date、对象身份、操作符和返回谓词的错误语义保持；编译失败沿原 INVALID_ARGUMENT。外部声明式输入仍用 `compileStorageWhere`。
+
+原生统计通过可选只读 `source.reduce` 接点与真实 `pushdown.operations` 声明启用：count、exists，或覆盖 min/max/sum/avg 的 aggregate。`IQueryReducer<TInput>` 接收该家族原执行输入加 `reduction`，返回后端原有单行标量 storage iterator；count/sum 为 number，exists 为 boolean，min/max/avg 为 Maybe<number>。标量不是记录物化；原 open/consume、事务 operation 和资源清理仍是唯一 owner。后端在原生查询内完成过滤、边界与聚合，仅把结果送入该游标。
+
+只有完整所需计划均可下推时才调用 reduce。缺端口或包含客户端步骤时沿原 reader 单遍计算，strict 在 I/O 前拒绝；exists 的既有 first/输出回调语义保留。数值统计跳过不影响样本集合的 selector 排序；limit/skip/distinct 使选行身份影响数值时保留必要排序，下游 mapper/函数谓词也保留其依赖的排序与原调用顺序。不新增评分、SQL 编译、查询队列或资源登记表。
+
+RDF 的客户端 `follow`/`inverse` 现在沿同一 reader 逐前驱调用原 `source.execute`，只发送原生 ground match pattern 与空 steps；follow 由当前 named object 接下一 subject，可选 target 约束下一 object，inverse 由当前 subject 接前一 object，两者都固定当前 graph。literal object 没有 forward 步骤。共享层不扫描或评分另一份图，不复制 term 编码器；实际 match 的索引与数据仍由后端拥有。strict 仍在 I/O 前拒绝客户端遍历。
+
+每个遍历节点至多借用一个原匹配游标；并发 accepted pull 共用一次惰性前驱查找，不增加队列或调度器。后开的子源先关闭，所有原源都尝试清理；首错及后续清理错误保持可追溯。root symbolic cleanup 分别复用子源与根源原有的报告 Promise，注册资源则沿原 derive 的 additional-close 接点。
+
+`IRdfQueryInput<TOperationScope>` 与 `IRdfQuerySource<TOperationScope>` 可精确声明后端原 scope；只读 `operationScope?: Readonly<TOperationScope>` 仅在嵌套 match 时借用当前仍有效的原 operation view。事务作者用 `input.operationScope ?? 原创建scope` 做现有 iterator 登记；`createRdfQuery` 的第三个可省泛型声明该 scope，旧泛型参数保持。这个对象只在当前 accepted 操作内有效，不延长其寿命；跨 stream next 的 child advance 继续通过原 nextTransactionIterator 的同 owner 校验，错配 scope 不能获得读取权。
+
+后端作者使用根导出 `createStorageIteratorLifetime<T>({ close, report, onSettled? })` 复用既有游标清理。将一次完整接纳的推进交给 `advance`，由原 helper 排空后关闭一次，并保留主清理与符号清理的独立缓存 Promise；数据准入、错误规范化和事务迭代器登记仍由原后端负责。`IStorageIteratorLifetime<T>` 仅公开同一组推进与清理函数，不授予事务权限。
+
+能力发布只对既有 KV 事务 scope 重建受能力集合约束的 use；无 KV 的原生 scope 保留原 use 重载及完整 API。原生 RDF/raw 双重载保留 expect/expectAbsent 与 update-only 原始 tag，RDF Feature 仅增强既有 match 链。`IOptimisticTransactionBuilder` 保留原 scope、既有增强方法和新增事务 Feature，始终不增加 lock。

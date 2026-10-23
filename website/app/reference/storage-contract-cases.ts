@@ -705,6 +705,31 @@ async function paidTotals(store: IStorageBase) {
   useStorageCapability: [capabilityReadCase],
   createRecordQuery: [
     {
+      title: t('Use an indexed native count cursor', '使用有索引的原生计数游标'),
+      problem: t(
+        'Count a native filtered result without returning its records.',
+        '原生过滤后计数，无须返回记录。'
+      ),
+      example: t(
+        `import { createRecordQuery, type IRecordQuerySource } from '@migaia/storage-contract'
+function count(execute: IRecordQuerySource['execute'], reduce: NonNullable<IRecordQuerySource['reduce']>) {
+  return createRecordQuery<{ enabled: boolean }>({
+    pushdown: { source: 'indexed', operators: ['eq'], operations: ['where', 'count'] }, execute, reduce
+  }).where({ enabled: true }).requirePushdown().count()
+}`,
+        `import { createRecordQuery, type IRecordQuerySource } from '@migaia/storage-contract'
+function count(execute: IRecordQuerySource['execute'], reduce: NonNullable<IRecordQuerySource['reduce']>) {
+  return createRecordQuery<{ enabled: boolean }>({
+    pushdown: { source: 'indexed', operators: ['eq'], operations: ['where', 'count'] }, execute, reduce
+  }).where({ enabled: true }).requirePushdown().count()
+}`
+      ),
+      result: t(
+        'Consumes one scalar from the provided original native cursor and awaits its cleanup. No matching records cross the boundary.',
+        '从提供的原生原游标读取一个标量并等待清理，匹配记录不跨越边界。'
+      )
+    },
+    {
       title: t('Share a record executor over an original cursor', '在原游标上共用记录执行器'),
       problem: t(
         'A backend needs declarative conditions and typed projections without another fluent chain or resource owner.',
@@ -857,6 +882,66 @@ function readLocked(store: IRecordStore<{ count: number }>) {
       result: t(
         'The supplied registered store starts one transaction at run, returning its original Promise. The scope remains that store’s complete native scope.',
         '所提供登记 store 在 run 时启动一次事务，返回原 Promise；scope 保留该 store 的完整原生结构。'
+      )
+    },
+    {
+      title: t('Expose an original native optimistic transaction', '公开原生乐观事务'),
+      problem: t(
+        'A native backend with no physical key locks must reuse the original builder without exposing lock or creating another policy loop.',
+        '没有物理键锁的原生后端须复用原 builder，不公开 lock，也不创建第二策略循环。'
+      ),
+      example: t(
+        `import { createTransactionBuilder, ConcurrencyPolicy, type IRecordStore } from '@migaia/storage-contract'
+function readNative(store: IRecordStore<{ count: number }>) {
+  return createTransactionBuilder(store, undefined, undefined, { mode: 'optimistic' })
+    .concurrency(ConcurrencyPolicy.optimistic({ retries: 1 })).timeout(2_000)
+    .run(tx => tx.getRecord('counter'))
+}`,
+        `import { createTransactionBuilder, ConcurrencyPolicy, type IRecordStore } from '@migaia/storage-contract'
+function readNative(store: IRecordStore<{ count: number }>) {
+  return createTransactionBuilder(store, undefined, undefined, { mode: 'optimistic' })
+    .concurrency(ConcurrencyPolicy.optimistic({ retries: 1 })).timeout(2_000)
+    .run(tx => tx.getRecord('counter'))
+}`
+      ),
+      result: t(
+        'Run receives the original scope and returns the original Promise. Native fields are preserved, no lock option is injected, and wait/fail policies reject synchronously with UNSUPPORTED_CAPABILITY.',
+        'run 接收原 scope、返回原 Promise，保留原生字段，不注入 lock 选项；wait/fail 策略同步报 UNSUPPORTED_CAPABILITY。'
+      )
+    }
+  ],
+  createStorageIteratorLifetime: [
+    {
+      title: t('Share native cursor cleanup', '共享原生游标清理'),
+      problem: t(
+        'A native backend needs the existing accepted-advance drain and two cleanup Promises without another resource owner.',
+        '原生后端需要既有接纳推进排空与双清理 Promise，不能另建资源 owner。'
+      ),
+      example: t(
+        `import { createStorageIteratorLifetime } from '@migaia/storage-contract'
+let closed = 0
+const lifetime = createStorageIteratorLifetime<number>({
+  close: async () => { closed += 1 }, report: console.error
+})
+await lifetime.advance(async () => ({ done: false, value: 1 }))
+const cleanup = lifetime.dispose()
+console.log(cleanup === lifetime.dispose()) // true
+await cleanup
+console.log(closed) // 1`,
+        `import { createStorageIteratorLifetime } from '@migaia/storage-contract'
+let closed = 0
+const lifetime = createStorageIteratorLifetime<number>({
+  close: async () => { closed += 1 }, report: console.error
+})
+await lifetime.advance(async () => ({ done: false, value: 1 }))
+const cleanup = lifetime.dispose()
+console.log(cleanup === lifetime.dispose()) // true
+await cleanup
+console.log(closed) // 1`
+      ),
+      result: t(
+        'Prints true and 1. The original backend must still check admission before advance and register native transaction iterators with its original scope.',
+        '输出 true 与 1；原后端仍须在 advance 前检查准入，并把原生事务迭代器登记到原 scope。'
       )
     }
   ],
@@ -1217,6 +1302,31 @@ console.log([...encodeOrderedStorageKey([''], 'memory')].join(','))
     }
   ],
   createRdfQuery: [
+    {
+      title: t('Traverse after a client predicate', '在客户端谓词之后遍历'),
+      problem: t(
+        'Keep one original ground-match backend while a function predicate creates a client boundary.',
+        '函数谓词形成客户端边界时，继续复用原 ground-match 后端。'
+      ),
+      example: t(
+        `import { createRdfQuery, term, type IRdfQuerySource } from '@migaia/storage-contract'
+function next(source: IRdfQuerySource) {
+  return createRdfQuery(source, { subject: term.iri('urn:a') })
+    .where((quad) => quad.object.termType === 'NamedNode')
+    .follow(term.iri('urn:knows'), term.iri('urn:c')).limit(1).all()
+}`,
+        `import { createRdfQuery, term, type IRdfQuerySource } from '@migaia/storage-contract'
+function next(source: IRdfQuerySource) {
+  return createRdfQuery(source, { subject: term.iri('urn:a') })
+    .where((quad) => quad.object.termType === 'NamedNode')
+    .follow(term.iri('urn:knows'), term.iri('urn:c')).limit(1).all()
+}`
+      ),
+      result: t(
+        'Uses the supplied native ground matcher for the next subject and same graph, closing the child cursor before the root cursor.',
+        '用所提供的原生 ground matcher 匹配下一 subject 与同 graph，先关闭子游标，再关闭根游标。'
+      )
+    },
     {
       title: t('Bind ground RDF traversal to its original cursor', '把 ground RDF 遍历接入原游标'),
       problem: t(

@@ -79,7 +79,7 @@ function main() {
     writeFileSync(join(consumerDirectory, 'package.json'), '{"type":"module"}\n', 'utf8')
     writeFileSync(
       join(consumerDirectory, 'identity.mjs'),
-      `import { fromValueCodec, defineStorageCapability, implement, provideCapabilities, hasStorageCapability, useStorageCapability, sql, createSqlTag, deriveStorageSqlQuery, blob, snapshotStorageBlobPut, snapshotStorageBlobGet, snapshotStorageBlobList, createStorageBlobObject, durableChangeFeed, orderStorageKeysByBytes, encodeStorageOrgStringPrefix, encodeOrderedStorageKey, prefixStorageOrgKey, sparql, sparqlFragment, createSparqlTag, term, rdf, vector, DeleteCountMode } from '@migaia/storage-contract'
+      `import { fromValueCodec, defineStorageCapability, implement, provideCapabilities, hasStorageCapability, useStorageCapability, sql, createSqlTag, deriveStorageSqlQuery, blob, snapshotStorageBlobPut, snapshotStorageBlobGet, snapshotStorageBlobList, createStorageBlobObject, durableChangeFeed, orderStorageKeysByBytes, encodeStorageOrgStringPrefix, encodeOrderedStorageKey, prefixStorageOrgKey, sparql, sparqlFragment, createSparqlTag, term, rdf, vector, DeleteCountMode, createStorageIteratorLifetime } from '@migaia/storage-contract'
 import { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'
 import { isArrayBuffer as utilsBuffer, isUint8Array as utilsBytes } from '@migaia/utils/bytes'
 /** Independent resource bases exercise package-root capability reads without acquiring external clients. */
@@ -118,6 +118,15 @@ const sparqlTemplate = Object.freeze(Object.assign(['ASK { ', ' }'], { raw: Obje
 const pureTemplate = Object.freeze(Object.assign(['', ''], { raw: Object.freeze(['', '']) }))
 const pureSparql = sparqlFragment(pureTemplate, term.literal('text'))
 if (sparqlStore.use(sparql) !== sparqlApi || 'ask' in pureSparql || !(await sparqlApi(sparqlTemplate, pureSparql).ask()) || preparedSparql.length !== 1 || !preparedSparql[0].startsWith('ASK { ')) throw new Error('packed SPARQL native binding mismatch')
+/** The packed-root author entry reuses one original cursor lifetime and cached main cleanup. */
+let cursorClosed = 0
+const cursorLifetime = createStorageIteratorLifetime({ close: async () => { cursorClosed++ }, report: console.error })
+if ((await cursorLifetime.advance(async () => ({ done: false, value: 7 }))).value !== 7) throw new Error('packed cursor advance mismatch')
+const cursorCleanup = cursorLifetime.dispose()
+if (cursorCleanup !== cursorLifetime.dispose()) throw new Error('packed cursor cleanup Promise mismatch')
+await cursorCleanup
+await cursorLifetime.symbolic()
+if (cursorClosed !== 1) throw new Error('packed cursor close count mismatch')
 /** Both organization byte helpers reuse canonical packed-root identities. */
 const packedOrg = '12345678-1234-1234-1234-123456789abc'
 const packedPrefix = encodeStorageOrgStringPrefix(packedOrg, 'a', 'packed-fixture')

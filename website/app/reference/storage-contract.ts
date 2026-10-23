@@ -1640,8 +1640,8 @@ export const storageContractReference: ILibraryReference = {
         methods: t('Optional original pure Feature functions.', '可选的原 Feature 纯函数。')
       },
       returns: t(
-        'IRdfQuery with common reads, projection, limit and native follow/inverse. Client traversal, pages and writes remain subsequent units.',
-        '返回 IRdfQuery，支持共享读取、投影、limit 与原生 follow/inverse；客户端遍历与写入仍待后续单元；支持共享键集分页。'
+        'IRdfQuery with common reads, projections, keyset pages and native/client ground follow/inverse. Write terminals remain a subsequent unit.',
+        '返回 IRdfQuery，支持共享读取、投影、limit 与原生 follow/inverse；写入仍待后续单元；支持共享键集分页与客户端 ground 遍历。'
       ),
       example: storageContractCases.createRdfQuery![0]!.example,
       cases: storageContractCases.createRdfQuery
@@ -1751,11 +1751,15 @@ export const storageContractReference: ILibraryReference = {
         methods: t(
           'Optional Feature-owned pure methods. Configuration and lock branches retain the original references and complete inferred method types.',
           '可选的 Feature 自有纯方法；配置与 lock 分支保留原函数引用及完整推断方法类型。'
+        ),
+        mode: t(
+          'Optional fourth author argument {mode:"optimistic"} enables the native unlocked builder: run exists immediately, lock is absent and only authentic optimistic policies are accepted.',
+          '可选第四作者参数 {mode:"optimistic"} 启用原生无锁 builder：立即具备 run、不含 lock，且只接受真实乐观策略。'
         )
       },
       returns: t(
-        'Unlocked ITransactionBuilder with no run method. lock creates a locked builder; run normalizes once, invokes the original transaction once and preserves its Promise identity.',
-        '没有 run 方法的未锁定 ITransactionBuilder；lock 创建已锁定 builder；run 只规范化一次、调用原 transaction 一次并保留 Promise 身份。'
+        'Default ITransactionBuilder requires lock before run; explicit optimistic author mode returns IOptimisticTransactionBuilder without physical key normalization. Both invoke the original transaction once and preserve its Promise, complete scope and native option fields.',
+        '缺省 ITransactionBuilder 需先 lock 再 run；显式乐观作者模式返回 IOptimisticTransactionBuilder，不规范化物理锁键。两者均调用原 transaction 一次，保留原 Promise、完整 scope 与原生选项字段。'
       ),
       example: storageContractCases.createTransactionBuilder![0]!.example,
       cases: storageContractCases.createTransactionBuilder
@@ -1981,6 +1985,25 @@ export const storageContractReference: ILibraryReference = {
         'Canonical operation and terminal transaction observation names.',
         '规范操作与事务终态观察名。'
       )
+    },
+    createStorageIteratorLifetime: {
+      role: 'factory',
+      purpose: t(
+        'Reuse the original iterator drain and cached cleanup paths when authoring a native cursor; data admission and transaction registration stay with the original backend.',
+        '编写原生游标时复用既有迭代器排空与缓存清理路径；数据准入和事务登记仍属于原后端。'
+      ),
+      params: {
+        options: t(
+          'Original close and report callbacks, plus optional onSettled. Submit each complete accepted advance through advance; the helper owns no query, policy loop or native client.',
+          '原 close 与 report 回调，以及可选 onSettled；每次完整接纳的推进经 advance 提交；助手不拥有查询、策略循环或原生客户端。'
+        )
+      },
+      returns: t(
+        'IStorageIteratorLifetime<T> with accepted-advance drain, cached rejecting dispose, cached return and separately cached report-only symbolic cleanup.',
+        'IStorageIteratorLifetime<T>：排空已接纳推进，缓存拒绝型 dispose、return，以及独立缓存的只报告符号清理。'
+      ),
+      example: storageContractCases.createStorageIteratorLifetime![0]!.example,
+      cases: storageContractCases.createStorageIteratorLifetime
     },
     createTransactionOwner: {
       role: 'operation',
@@ -3470,6 +3493,12 @@ console.log(candidate.name, candidate.output)`
         '原生排名回调与捕获的支持、资源事实。'
       ),
       members: {
+        reduce: {
+          summary: t(
+            'Optional native one-row scalar cursor for declared count/exists/aggregate support; uses the original resource owner.',
+            '可选原生单行标量游标，兑现声明的 count/exists/aggregate，复用原资源 owner。'
+          )
+        },
         pushdown: {
           summary: t('Original native operation/operator support.', '原生操作及操作符支持。')
         },
@@ -3513,8 +3542,8 @@ console.log(candidate.name, candidate.output)`
         },
         follow: {
           summary: t(
-            'Append a ground forward predicate/target step.',
-            '追加 ground 正向 predicate/target 步骤。'
+            'Follow through original same-graph ground matches, natively or through the shared client reader.',
+            '通过同 graph ground match 正向跟随，可由原生或共享客户端 reader 执行。'
           )
         },
         inverse: {
@@ -3559,6 +3588,12 @@ console.log(candidate.name, candidate.output)`
         'ground pattern、有序原生前缀步骤与捕获上下文。'
       ),
       members: {
+        operationScope: {
+          summary: t(
+            'Optional readonly exact backend operation view for nested ground matches, valid only within the accepted operation; original owner checks remain authoritative.',
+            '嵌套 ground match 可选借用的只读精确后端 operation view，仅在 accepted 操作内有效，仍以原 owner 校验为准。'
+          )
+        },
         pattern: {
           summary: t(
             'Captured partial ground match; omitted graph matches all graphs.',
@@ -3580,6 +3615,12 @@ console.log(candidate.name, candidate.output)`
         '原生 RDF 原迭代器回调及 unknown 投影行、支持与资源事实。'
       ),
       members: {
+        reduce: {
+          summary: t(
+            'Optional native one-row scalar cursor for declared count/exists/aggregate support; uses the original resource owner.',
+            '可选原生单行标量游标，兑现声明的 count/exists/aggregate，复用原资源 owner。'
+          )
+        },
         cursorSource: {
           summary: t(
             'Optional single-read private collection identity, reused by equivalent query descriptors; never exposed by a cursor.',
@@ -3605,6 +3646,10 @@ console.log(candidate.name, candidate.output)`
       summary: t(
         'Project independent record and RDF Feature groups onto an existing transaction scope. The optional third RDF group defaults empty, preserving two-argument record calls.',
         '把独立的记录与 RDF Feature 组投影到既有事务 scope；可选第三 RDF 组缺省为空，保留旧两参数记录调用。'
+      ),
+      example: t(
+        'Standard KV scopes keep capability-set projection; a native RDF/raw scope keeps its original overloads and native refinements while only match receives the RDF Feature group.',
+        '标准 KV scope 保留能力集合投影；原生 RDF/raw scope 保留原重载和原生扩展，仅 match 接收 RDF Feature 组。'
       ),
       members: {
         use: {
@@ -3635,6 +3680,54 @@ console.log(candidate.name, candidate.output)`
           )
         }
       }
+    },
+    IRecordQueryInput: {
+      summary: t(
+        'The unchanged record execute argument shared by native scalar reductions.',
+        '原记录 execute 参数，与原生标量统计共享。'
+      ),
+      members: {
+        conditions: { summary: t('Canonical safe-prefix AST nodes.', '安全前缀的规范 AST 节点。') },
+        fields: { summary: t('Optional native field projection.', '可选原生字段投影。') },
+        ctx: { summary: t('Single captured operation intent.', '单次捕获的 operation 意图。') },
+        steps: {
+          summary: t('Opted-in authoritative native step order.', '显式选择的原生步骤顺序。')
+        }
+      }
+    },
+    IQueryReduction: {
+      summary: t(
+        'Finite native count/exists or numeric aggregate request without JavaScript callbacks.',
+        '有限原生 count/exists 或数值 aggregate 请求，不含 JavaScript 回调。'
+      ),
+      members: {
+        operation: {
+          summary: t(
+            'Declared count, exists or aggregate operation.',
+            '声明的 count、exists 或 aggregate。'
+          )
+        },
+        aggregate: {
+          summary: t('min, max, sum or avg for aggregate.', 'aggregate 的 min、max、sum 或 avg。')
+        },
+        field: {
+          summary: t('Numeric field in the current result domain.', '当前结果域的数值字段。')
+        }
+      }
+    },
+    IQueryReductionResult: {
+      summary: t(
+        'Number, boolean or the existing Maybe<number> returned in one native scalar row.',
+        '原生单行标量携带的 number、boolean 或既有 Maybe<number>。'
+      ),
+      members: {}
+    },
+    IQueryReducer: {
+      summary: t(
+        'Family-typed optional native scalar cursor callback; no independent runner or lifetime.',
+        '按家族精确类型的可选原生标量游标回调，不另建 runner 或生命周期。'
+      ),
+      members: {}
     },
     IQueryNativeStep: {
       summary: t(
@@ -3790,6 +3883,12 @@ console.log(candidate.name, candidate.output)`
         '作者接点：一个 execute 回调返回原 unknown 行 IStorageIterator，不新增资源 owner。'
       ),
       members: {
+        reduce: {
+          summary: t(
+            'Optional native one-row scalar cursor for declared count/exists/aggregate support; uses the original resource owner.',
+            '可选原生单行标量游标，兑现声明的 count/exists/aggregate，复用原资源 owner。'
+          )
+        },
         cursorSource: {
           summary: t(
             'Optional single-read private collection identity, reused by equivalent query descriptors; never exposed by a cursor.',
@@ -4107,6 +4206,13 @@ console.log(candidate.name, candidate.output)`
       summary: t(
         'Asynchronous iterator and owned cleanup resource.',
         '异步迭代器及其自有清理资源。'
+      ),
+      members: {}
+    },
+    IStorageIteratorLifetime: {
+      summary: t(
+        'Original backend-author advance and cleanup functions. It supplies no admission check or transaction authority; native callers retain those responsibilities.',
+        '原后端作者推进和清理函数，不提供准入检查或事务权限；这些职责仍由原生调用方持有。'
       ),
       members: {}
     },
@@ -4881,6 +4987,20 @@ console.log(candidate.name, candidate.output)`
       summary: t(
         'Locked chain type exposes run and retains full scope and method augmentation.',
         '加锁链类型公开 run，并保留完整视图与方法增强。'
+      ),
+      members: {}
+    },
+    IOptimisticTransactionBuilder: {
+      summary: t(
+        'Native immutable transaction chain with run from the root, no lock method and only authentic optimistic policies; the original transaction retains execution authority.',
+        '原生不可变事务链：根部具备 run、没有 lock，仅接受真实乐观策略；执行权限仍属于原 transaction。'
+      ),
+      members: {}
+    },
+    IOptimisticTransactionBuilderMode: {
+      summary: t(
+        'Optional fourth author descriptor {mode:"optimistic"}; omission preserves the existing lock-required builder.',
+        '可选第四作者描述符 {mode:"optimistic"}；省略时保持既有需声明锁的 builder。'
       ),
       members: {}
     },
