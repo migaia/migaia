@@ -73,6 +73,12 @@ export async function storageLogStore<
   id: N,
   options: { readonly prefix: string }
 ): Promise<ILogStore> {
+  const prefix = snapshotStorageLogPrefix(options)
+  return openStorageLogStore(resolveStorageJournalBinding(host, id), prefix)
+}
+
+/** Capture the original prefix boundary before any host lookup or private namespace I/O. */
+export function snapshotStorageLogPrefix(options: { readonly prefix: string }): string {
   let prefix: string
   try {
     prefix = options?.prefix
@@ -82,7 +88,14 @@ export async function storageLogStore<
     if (isStorageErrorFamily(cause)) throw cause
     throw new StorageContractError(StorageContractErrorCode.invalidArgument, { cause })
   }
-  const access = resolveStorageJournalBinding(host, id)
+  return prefix
+}
+
+/** The same factory accepts only the original host's authenticated cell access and captured prefix. */
+export async function openStorageLogStore(
+  access: IStorageJournalBackendAccess,
+  prefix: string
+): Promise<ILogStore> {
   let namespace: IStorageJournalNamespace
   try {
     namespace = await access.binding.openNamespace(prefix)
@@ -95,7 +108,15 @@ export async function storageLogStore<
   let runCommitted: IStorageJournalNamespace['runCommitted']
   /** This descriptor fact is read once before exposing any native append composition. */
   let nativeAtomic: boolean
+  /** The original namespace alone can invalidate a cached index after physical organization drop. */
+  let assertNamespaceLive: (() => void) | undefined
   try {
+    const assertLive = namespace.assertLive
+    if (assertLive !== undefined) {
+      if (typeof assertLive !== 'function')
+        throw new StorageContractError(StorageContractErrorCode.invalidArgument)
+      assertNamespaceLive = () => Reflect.apply(assertLive, namespace, [])
+    }
     nativeAtomic = namespace.nativeAtomic
     if (typeof nativeAtomic !== 'boolean')
       throw new StorageContractError(StorageContractErrorCode.invalidArgument)
@@ -129,6 +150,7 @@ export async function storageLogStore<
   const admit = (): void => {
     if (failure !== undefined) throw failure
     if (!accepting) throw new StorageContractError(StorageContractErrorCode.disposed)
+    assertNamespaceLive?.()
   }
   /** Admission happens before the FIFO; accepted work keeps its original place during closing. */
   const run = <R>(work: () => R | PromiseLike<R>): Promise<R> => {
@@ -139,6 +161,7 @@ export async function storageLogStore<
     }
     return limiter.run(() => {
       if (failure !== undefined) throw failure
+      assertNamespaceLive?.()
       return work()
     })
   }

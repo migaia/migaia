@@ -277,6 +277,8 @@ type IMemoryRootMutation<R> = {
     readonly upper: string
   }[]
   readonly capacityChanges?: () => readonly IMemoryCapacityChange[]
+  /** Opt-in journaling runs this same prepared mutation in the original native draft. */
+  readonly invoke?: (draft: IMemoryTextDraft) => R
   run(): R
 }
 /** Text batches retain detached canonical keys and prepared values before lock admission. */
@@ -287,9 +289,24 @@ type IMemoryTextEntry = {
 }
 /** Only original native draft functions are passed to an internal batch callback. */
 type IMemoryTextDraft = {
+  write(channel: IStorageChannel, key: IStorageKey, value: unknown, policy: IConflictPolicy): void
+  remove(channel: IStorageChannel | 'vector', key: IStorageKey): boolean
+  ttl(target: IMemoryTtlTarget, ms: number | undefined, persist: boolean): boolean
+  increment(key: string, increment: ReturnType<typeof snapshotStorageCounterIncrement>): number
+  upsertVector(
+    collection: string,
+    points: readonly IStorageVectorPoint<unknown>[],
+    sizes: readonly number[],
+    ttlMs?: number
+  ): void
+  deleteVector(
+    collection: string,
+    predicate: (point: IStorageVectorPoint<unknown>) => boolean
+  ): number
+  rdf(quads: readonly IQuad[], remove: boolean): void
   setMany(entries: readonly IMemoryTextEntry[]): void
   removeMany(keys: readonly IStorageKey[]): number
-  removeByPrefix(prefix: IStorageKey): number
+  removeByPrefix(prefix: IStorageKey, channel?: IStorageChannel): number
 }
 /** One prepared batch reuses the original transaction attempt and its fixed input locks. */
 type IMemoryAtomicWork<T, R> = {
@@ -348,6 +365,7 @@ export function createMemoryBackend<T = unknown>(
       backend: (orgId: string) => forOrg(orgId).store,
       drop: async (orgId: string) => {
         const current = forOrg(orgId)
+        if (core.journal !== undefined) return current.drop()
         await current.store.clearAll()
         current.journal.clear()
       }
@@ -481,7 +499,8 @@ function createMemoryNamespace<T>(
         (captured) => ({
           keys: [storageJournalLockKey(prefix, StorageJournalLock.head)],
           invoke: (scope) => captured(scope[journalOperations])
-        })
+        }),
+        false
       ),
     scope: (scope) => ({
       info: assertTransactionOwner(store, scope),
@@ -728,8 +747,16 @@ function createMemoryNamespace<T>(
     })
   }
   /** Capacity mutations and their events share the original final synchronous native turn. */
-  const commitCapacity = <R>(plan: ReturnType<typeof planCapacity>, run: () => R): R => {
-    if (plan === undefined) return run()
+  const commitCapacity = <R>(
+    plan: ReturnType<typeof planCapacity>,
+    run: () => R,
+    committed?: () => void
+  ): R => {
+    if (plan === undefined) {
+      const result = run()
+      committed?.()
+      return result
+    }
     pendingChanges = []
     /** Counts retain only actual capacity removals, never ordinary expiry or user values. */
     const counts = new Map<IMemoryPhysicalChannel, number>()
@@ -747,6 +774,7 @@ function createMemoryNamespace<T>(
         publish(channel, 'remove', [removed.key])
         counts.set(channel, (counts.get(channel) ?? 0) + 1)
       }
+      committed?.()
       return result
     } finally {
       /** Clear the native event buffer before observers can synchronously reenter this store. */
@@ -922,6 +950,7 @@ function createMemoryNamespace<T>(
               changes.push(capacityFact(channel, captured, bytes))
               return changes
             },
+      invoke: (draft) => draft.write(channel, captured, prepared, policy ?? 'conflict'),
       run: () => write(channel, captured, prepared, policy, bytes)
     }
   }
@@ -930,18 +959,26 @@ function createMemoryNamespace<T>(
     operation: string,
     input: I,
     ctx: IWriteOptions | undefined,
-    prepareMutation: (captured: I, context: IOperationContextSnapshot) => IMemoryRootMutation<R>
+    prepareMutation: (captured: I, context: IOperationContextSnapshot) => IMemoryRootMutation<R>,
+    journaled = true
   ): Promise<R> => {
+    /** Original metadata/drop operations must not recursively journal their own invalidation. */
+    const selectedJournal = journaled ? core.journal : undefined
     /** Pipeline intervention fixes this input before the original loop derives affected keys. */
     let capturedInput = input
     /** The sole derivation captures inputs and affected keys once, before any native attempt. */
     let mutation!: IMemoryRootMutation<R>
     /** The last readonly preflight is consumed immediately by the same native synchronous terminal. */
     let capacityPlan: ReturnType<typeof planCapacity>
-    return runWithConcurrency(
+    /** Only this selected native attempt's real victim identities enter the original lock provider. */
+    let capacityIdentities: readonly string[] = []
+    /** Preparation is accepted work of this original controller, including close races. */
+    const preparing = selectedJournal === undefined ? undefined : controller.beginMutation()
+    const pending = runWithConcurrency<R>(
       {
         store: base,
         options: ctx === undefined ? {} : ctx,
+        prepare: selectedJournal === undefined ? undefined : () => selectedJournal!.prepare(),
         execute: (context, invoke) =>
           core.execution.run({ operation, input, ctx: context }, (captured) => {
             controller.assertLive()
@@ -958,12 +995,37 @@ function createMemoryNamespace<T>(
           }),
         lock: (context) => {
           mutation = prepareMutation(capturedInput, context)
-          return mutation.keys
+          return selectedJournal === undefined
+            ? mutation.keys
+            : [...mutation.keys, ...selectedJournal.headLocks()]
         }
       },
       {
-        attempt: (attempt) =>
-          locks.attemptWrite(
+        attempt: (attempt) => {
+          if (selectedJournal?.active()) {
+            if (mutation.invoke === undefined)
+              throw new StorageContractError(StorageContractErrorCode.unsupported)
+            return locks.attempt(
+              attempt,
+              holding(),
+              {
+                attempt: () =>
+                  transact(
+                    (_scope, draft) => mutation.invoke!(draft),
+                    attempt,
+                    mutation.ranges,
+                    (identities) => {
+                      capacityIdentities = identities
+                    }
+                  )
+              },
+              core.stageBindings.concurrencyStages(store),
+              controller.closingSignal,
+              mutation.ranges,
+              capacity === undefined ? undefined : () => capacityIdentities
+            )
+          }
+          return locks.attemptWrite(
             attempt,
             holding(),
             () => commitCapacity(capacityPlan, mutation.run),
@@ -981,8 +1043,10 @@ function createMemoryNamespace<T>(
                   return capacityPlan?.identities ?? []
                 }
           )
+        }
       }
     )
+    return preparing === undefined ? pending : pending.finally(preparing)
   }
   /** All-channel clearing retains its original one coarse event after one synchronous merge. */
   const clearAll = (): void => {
@@ -1019,10 +1083,29 @@ function createMemoryNamespace<T>(
     input: I,
     ctx: IOperationContext | undefined,
     run: (captured: I) => R
-  ): Promise<R> =>
-    core.execution.run({ operation, input, ctx }, (captured) =>
-      withAbort(ctx, async () => run(captured))
-    )
+  ): Promise<R> => {
+    if (core.journal === undefined)
+      return core.execution.run({ operation, input, ctx }, (captured) =>
+        withAbort(ctx, async () => run(captured))
+      )
+    /** The original controller drains lazy org preparation before its native cleanup can finish. */
+    const release = controller.beginMutation()
+    return runWithConcurrency<R>(
+      {
+        store: base,
+        options: ctx ?? {},
+        prepare: () => core.journal!.prepare()
+      },
+      {
+        attempt: async (context) => ({
+          status: 'committed',
+          value: await core.execution.run({ operation, input, ctx: context }, (captured) =>
+            withAbort(context, async () => run(captured))
+          )
+        })
+      }
+    ).finally(release)
+  }
 
   /** Native feeds share one original subscription bridge and the backend's per-next pipeline. */
   function watchChanges(
@@ -1113,14 +1196,18 @@ function createMemoryNamespace<T>(
     operation: string,
     input: (context: IOperationContextSnapshot) => I,
     ctx: ITransactionOptions | undefined,
-    prepare: (captured: I, admit: () => void) => IMemoryAtomicWork<T, R>
+    prepare: (captured: I, admit: () => void) => IMemoryAtomicWork<T, R>,
+    journaled = true
   ): Promise<Awaited<R>> => {
+    /** Private metadata work keeps its original draft and never recursively journals itself. */
+    const selectedJournal = journaled ? core.journal : undefined
     /** One accepted lifetime spans every real attempt and all original pipeline settlement. */
     let release: (() => void) | undefined
     /** The existing lease admits once, including the original callback-capture boundary. */
     const admit = (): void => {
       release ??= controller.beginMutation()
     }
+    if (selectedJournal !== undefined) admit()
     /** Each pipeline fixes this attempt's original callback or detached native batch. */
     let work: IMemoryAtomicWork<T, R>
     /** Only actual previous-attempt victim identities feed the original policy's waiting admission. */
@@ -1129,6 +1216,7 @@ function createMemoryNamespace<T>(
       {
         store: base,
         options: ctx === undefined ? {} : ctx,
+        prepare: selectedJournal === undefined ? undefined : () => selectedJournal.prepare(),
         executeAttempt: (context, invoke) =>
           core.execution.run({ operation, input: input(context), ctx: context }, (captured) => {
             controller.assertLive()
@@ -1136,7 +1224,10 @@ function createMemoryNamespace<T>(
             admit()
             return invoke()
           }),
-        lock: () => work.keys ?? []
+        lock: () =>
+          selectedJournal === undefined
+            ? (work.keys ?? [])
+            : [...(work.keys ?? []), ...selectedJournal.headLocks()]
       },
       {
         attempt: (attempt) =>
@@ -1145,9 +1236,15 @@ function createMemoryNamespace<T>(
             holding(),
             {
               attempt: () =>
-                transact(work.invoke, attempt, work.ranges, (identities) => {
-                  capacityIdentities = identities
-                })
+                transact(
+                  work.invoke,
+                  attempt,
+                  work.ranges,
+                  (identities) => {
+                    capacityIdentities = identities
+                  },
+                  journaled
+                )
             },
             core.stageBindings.concurrencyStages(store),
             controller.closingSignal,
@@ -1250,7 +1347,13 @@ function createMemoryNamespace<T>(
     remove: (key, ctx) =>
       mutationEntry(MemoryOperation.remove, key, ctx, (captured) => {
         assertStringStorageKey(captured, STORAGE_MEMORY_BACKEND)
-        return { keys: [lockKey.text(captured)], run: () => remove('value', captured) }
+        return {
+          keys: [lockKey.text(captured)],
+          invoke: (draft) => {
+            draft.remove('value', captured)
+          },
+          run: () => remove('value', captured)
+        }
       }),
     has: (key, ctx) =>
       asyncEntry(MemoryOperation.has, key, ctx, (captured) => {
@@ -1280,7 +1383,13 @@ function createMemoryNamespace<T>(
     removeBytes: (key, ctx) =>
       mutationEntry(MemoryOperation.removeBytes, key, ctx, (captured) => {
         assertStringStorageKey(captured, STORAGE_MEMORY_BACKEND)
-        return { keys: [lockKey.bytes(captured)], run: () => remove('bytes', captured) }
+        return {
+          keys: [lockKey.bytes(captured)],
+          invoke: (draft) => {
+            draft.remove('bytes', captured)
+          },
+          run: () => remove('bytes', captured)
+        }
       }),
     clearBytes: (ctx) => clearEntry(MemoryOperation.clearBytes, 'bytes', ctx),
     getRecord: (key, ctx) =>
@@ -1301,6 +1410,10 @@ function createMemoryNamespace<T>(
         const mutation = prepareWrite('record', resolved, captured.value, context.conflictPolicy)
         return {
           ...mutation,
+          invoke: (draft) => {
+            mutation.invoke!(draft)
+            return resolved
+          },
           run: () => {
             mutation.run()
             return resolved
@@ -1311,7 +1424,13 @@ function createMemoryNamespace<T>(
       mutationEntry(MemoryOperation.deleteRecord, key, ctx, (captured) => {
         /** Mutable record identity detaches before the original policy can wait. */
         const key = snapshotStorageKey(captured, STORAGE_MEMORY_BACKEND)
-        return { keys: [lockKey.record(key)], run: () => remove('record', key) }
+        return {
+          keys: [lockKey.record(key)],
+          invoke: (draft) => {
+            draft.remove('record', key)
+          },
+          run: () => remove('record', key)
+        }
       }),
     clearRecords: (ctx) => clearEntry(MemoryOperation.clearRecords, 'record', ctx),
     iterateRecords: (range, ctx) => rootIterator(range, ctx),
@@ -1584,7 +1703,8 @@ function createMemoryNamespace<T>(
     run: (scope: IMemoryScope<T>, draft: IMemoryTextDraft) => R,
     ctx: IConcurrencyAttemptContext,
     protectedRanges?: IMemoryRootMutation<unknown>['ranges'],
-    setCapacityIdentities?: (identities: readonly string[]) => void
+    setCapacityIdentities?: (identities: readonly string[]) => void,
+    journaled = true
   ): Promise<IConcurrencyAttempt<Awaited<R>>> {
     controller.assertLive()
     throwIfAborted(ctx.signal)
@@ -1597,6 +1717,10 @@ function createMemoryNamespace<T>(
     const draft = new Map<string, IMemoryDraft>()
     /** Opt-in ordered facts exist only for this authentic attempt, never for ordinary memory work. */
     let journalChanges: Array<Omit<IStorageJournalChange, 'afterRevision'>> | undefined
+    /** Only journal-selected policy victims gain draft tombstones before the same final commit. */
+    let journalVictims: Set<string> | undefined
+    /** The original capacity plan must still select these same rows after asynchronous append. */
+    let journalCapacity: ReturnType<typeof planCapacity>
     /** Each channel draft reuses the same compressed radix implementation, including tombstones. */
     const draftOrdered = {
       value: createOrderedRecordIndex<IMemoryDraft>(),
@@ -1932,6 +2056,45 @@ function createMemoryNamespace<T>(
     }
     /** Native text batches stage only into this attempt's existing draft and revision baseline. */
     const textDraft: IMemoryTextDraft = {
+      write: txWrite,
+      remove: txRemove,
+      ttl: (target, ms, persist) => txTtl(target, ms, persist),
+      increment: (key, increment) => {
+        const result = increment(txRead('value', key) as string | undefined)
+        txWrite('value', key, String(result), 'conflict')
+        return result
+      },
+      upsertVector: (collection, points, sizes, ttlMs) => {
+        /** Captured vector inputs enter the existing native draft without a second public pipeline. */
+        const now = scheduler.now()
+        for (const [index, point] of points.entries()) {
+          const key = vectorKey(collection, point.id)
+          const encoded = encodeFlatStorageKey(key)
+          const current = txEntry('vector', key)
+          const deadline = ttlMs === undefined ? current?.deadline : now + ttlMs
+          if (deadline !== undefined && deadline <= now) {
+            txRemove('vector', key)
+            continue
+          }
+          stageDraft({
+            channel: 'vector',
+            key,
+            encoded,
+            value: point,
+            remove: false,
+            ordered: current?.ordered ?? encodeOrderedStorageKey(key, STORAGE_MEMORY_BACKEND),
+            bytes: sizes[index],
+            deadline
+          })
+        }
+      },
+      deleteVector: (collection, predicate) => {
+        let count = 0
+        for (const point of txVectorPoints(collection))
+          if (predicate(point) && txRemove('vector', vectorKey(collection, point.id))) count++
+        return count
+      },
+      rdf: txRdfWrite,
       setMany: (entries) => {
         for (const entry of entries)
           txWrite('value', entry.key, entry.value, 'conflict', entry.ttlMs)
@@ -1942,17 +2105,17 @@ function createMemoryNamespace<T>(
         for (const key of keys) if (txRemove('value', key)) count++
         return count
       },
-      removeByPrefix: (prefix) => {
+      removeByPrefix: (prefix, channel = 'value') => {
         /** Native prefix localization reuses the original canonical bounds and ordered draft merge. */
         const captured = snapshotStorageKeyPrefix(prefix, STORAGE_MEMORY_BACKEND)
         /** Count only actual removals in this channel and this native attempt. */
         let count = 0
-        for (const row of txRows('value', {
+        for (const row of txRows(channel, {
           lower: captured.lower,
           upper: captured.upper,
           upperOpen: true
         }))
-          if (captured.matches(row.key) && txRemove('value', row.key)) count++
+          if (captured.matches(row.key) && txRemove(channel, row.key)) count++
         return count
       }
     }
@@ -2606,8 +2769,31 @@ function createMemoryNamespace<T>(
       if (api !== undefined) Object.defineProperty(scope, 'api', { value: api, enumerable: true })
       return Object.freeze(scope)
     }
+    /** Preview the original business draft, excluding only journal's own planned victim facts. */
+    const draftCapacityPlan = () =>
+      capacity === undefined
+        ? undefined
+        : planCapacity(
+            [...draft.values()]
+              .filter(
+                (proposed) => !journalVictims?.has(identity(proposed.channel, proposed.encoded))
+              )
+              .map((proposed) =>
+                capacityFact(
+                  proposed.channel,
+                  proposed.key,
+                  proposed.remove ||
+                    (proposed.deadline !== undefined && proposed.deadline <= scheduler.now())
+                    ? undefined
+                    : (proposed.bytes ?? 0),
+                  proposed.rdfLock
+                )
+              )
+          )
     /** The initial callback view is created and registered by the original owner exactly once. */
     const scope = createScope()
+    /** Original registration authenticates this same scope before any journal capture is enabled. */
+    let journalAttempt: ReturnType<NonNullable<IStoragePluginCore['journal']>['begin']>
     /** Final checks receive fresh complete native views under the same transaction identity. */
     const control = owner.register(scope, {
       context: ctx,
@@ -2619,11 +2805,25 @@ function createMemoryNamespace<T>(
         controller.assertLive()
         throwIfAborted(ctx.signal)
         void core.stageBindings.transactionStages(store).forTransaction(current).beforeCommit?.()
+        if (journalAttempt === undefined) return
+        journalCapacity = draftCapacityPlan()
+        for (const victim of journalCapacity?.victims ?? []) {
+          /** Blob has no shared transaction target; never fabricate a logical blob lock/image. */
+          if (victim.channel === 'blob')
+            throw new StorageContractError(StorageContractErrorCode.unsupported)
+          const channel = victim.channel as IMemoryChannel
+          const current = txSnapshot(channel, victim.encoded, victim.key)
+          if (current === undefined) continue
+          ;(journalVictims ??= new Set()).add(victim.id)
+          stageDraft({ ...current, channel, encoded: victim.encoded, remove: true })
+        }
+        return journalAttempt.record(current)
       }
     })
     /** Terminal observations retain identity captured while the original scope was valid. */
     const stage = core.stageBindings.transactionStages(store).forTransaction(scope)
     try {
+      if (journaled) journalAttempt = core.journal?.begin(scope)
       void stage.beforeTransaction?.()
       void stage.onTransactionStart?.()
       /**
@@ -2696,22 +2896,21 @@ function createMemoryNamespace<T>(
         }
       }
       /** Final capacity admission shares the same original attempt, locks and no-await commit turn. */
-      const capacityPlan =
-        capacity === undefined
-          ? undefined
-          : planCapacity(
-              [...draft.values()].map((proposed) =>
-                capacityFact(
-                  proposed.channel,
-                  proposed.key,
-                  proposed.remove ||
-                    (proposed.deadline !== undefined && proposed.deadline <= scheduler.now())
-                    ? undefined
-                    : (proposed.bytes ?? 0),
-                  proposed.rdfLock
-                )
-              )
-            )
+      const capacityPlan = draftCapacityPlan()
+      if (
+        journalAttempt !== undefined &&
+        (capacityPlan?.expired.length !== journalCapacity?.expired.length ||
+          capacityPlan?.victims.length !== journalCapacity?.victims.length ||
+          capacityPlan?.expired.some(
+            (entry, index) => entry.id !== journalCapacity!.expired[index]!.id
+          ) ||
+          capacityPlan?.victims.some(
+            (entry, index) => entry.id !== journalCapacity!.victims[index]!.id
+          ))
+      ) {
+        void stage.afterRollback?.(StorageContractErrorCode.writeConflict)
+        return { status: 'conflict', phase: 'commit', keys: [], holder: undefined }
+      }
       setCapacityIdentities?.(capacityPlan?.identities ?? [])
       const capacityHeld =
         capacityPlan === undefined
@@ -2734,52 +2933,65 @@ function createMemoryNamespace<T>(
         vector: [] as IStorageKey[],
         rdf: [] as IStorageKey[]
       }
-      commitCapacity(capacityPlan, () => {
-        for (const proposed of draft.values()) {
-          /** Existing draft identities retain their already captured logical key. */
-          const encoded = proposed.encoded
-          /** New deadlines that elapsed within this draft commit as immediate absence. */
-          if (
-            proposed.remove ||
-            (proposed.deadline !== undefined && proposed.deadline <= scheduler.now())
-          ) {
-            setDeadline(proposed.channel, encoded, undefined)
-            capacityIndex?.remove(identity(proposed.channel, encoded))
-            if (!data[proposed.channel].delete(encoded)) continue
-            if (proposed.channel === 'rdf') rdfIndex.delete(proposed.rdfKeys!)
-            else ordered[proposed.channel].delete(proposed.ordered)
-          } else {
-            /**
-             * An overwrite retains its original live ordered encoding instead of keeping duplicate
-             * key bytes.
-             */
-            const keyBytes =
-              ordered[proposed.channel].get(proposed.ordered)?.key ?? proposed.ordered
-            const entry = {
-              key: proposed.key,
-              value: proposed.value,
-              ordered: keyBytes,
-              bytes: proposed.bytes,
-              rdfKeys: proposed.rdfKeys,
-              rdfLock: proposed.rdfLock
+      commitCapacity(
+        capacityPlan,
+        () => {
+          for (const proposed of draft.values()) {
+            /** Policy eviction remains owned by commitCapacity, including revision and onEvict. */
+            if (journalVictims?.has(identity(proposed.channel, proposed.encoded))) continue
+            /** Existing draft identities retain their already captured logical key. */
+            const encoded = proposed.encoded
+            /** New deadlines that elapsed within this draft commit as immediate absence. */
+            if (
+              proposed.remove ||
+              (proposed.deadline !== undefined && proposed.deadline <= scheduler.now())
+            ) {
+              setDeadline(proposed.channel, encoded, undefined)
+              capacityIndex?.remove(identity(proposed.channel, encoded))
+              if (!data[proposed.channel].delete(encoded)) continue
+              if (proposed.channel === 'rdf') rdfIndex.delete(proposed.rdfKeys!)
+              else ordered[proposed.channel].delete(proposed.ordered)
+            } else {
+              /**
+               * An overwrite retains its original live ordered encoding instead of keeping
+               * duplicate key bytes.
+               */
+              const keyBytes =
+                ordered[proposed.channel].get(proposed.ordered)?.key ?? proposed.ordered
+              const entry = {
+                key: proposed.key,
+                value: proposed.value,
+                ordered: keyBytes,
+                bytes: proposed.bytes,
+                rdfKeys: proposed.rdfKeys,
+                rdfLock: proposed.rdfLock
+              }
+              data[proposed.channel].set(encoded, entry)
+              if (proposed.channel === 'rdf') rdfIndex.set(proposed.rdfKeys!, entry)
+              else ordered[proposed.channel].set(keyBytes, entry)
+              setDeadline(proposed.channel, encoded, proposed.deadline)
+              capacityIndex?.put({
+                ...capacityFact(proposed.channel, proposed.key, undefined, proposed.rdfLock),
+                bytes: proposed.bytes ?? 0
+              })
             }
-            data[proposed.channel].set(encoded, entry)
-            if (proposed.channel === 'rdf') rdfIndex.set(proposed.rdfKeys!, entry)
-            else ordered[proposed.channel].set(keyBytes, entry)
-            setDeadline(proposed.channel, encoded, proposed.deadline)
-            capacityIndex?.put({
-              ...capacityFact(proposed.channel, proposed.key, undefined, proposed.rdfLock),
-              bytes: proposed.bytes ?? 0
-            })
+            bump(proposed.channel, encoded)
+            changed[proposed.channel].push(proposed.key)
           }
-          bump(proposed.channel, encoded)
-          changed[proposed.channel].push(proposed.key)
+          /** The original capacity buffer preserves batch-before-victim notification order. */
+          if (capacityPlan !== undefined)
+            for (const channel of physicalChannels)
+              if (changed[channel].length !== 0) publish(channel, 'batch', changed[channel])
+        },
+        () => {
+          /** Actual data and capacity victims are final before private indexes become visible. */
+          journalDraft?.commit()
+          journalDraft?.complete(true)
+          if (capacityPlan === undefined)
+            for (const channel of physicalChannels)
+              if (changed[channel].length !== 0) publish(channel, 'batch', changed[channel])
         }
-        journalDraft?.commit()
-        journalDraft?.complete(true)
-        for (const channel of physicalChannels)
-          if (changed[channel].length !== 0) publish(channel, 'batch', changed[channel])
-      })
+      )
       void stage.afterCommit?.(
         physicalChannels.reduce((count, channel) => count + changed[channel].length, 0) +
           (capacityPlan?.expired.length ?? 0) +
@@ -2947,7 +3159,11 @@ function createMemoryNamespace<T>(
         /** The supplied duration remains fixed while the original policy waits for admission. */
         const ms = input.ms
         assertStorageTtlDuration(ms, STORAGE_MEMORY_BACKEND)
-        return { keys: [target], run: () => changeDeadline(target, ms, false) }
+        return {
+          keys: [target],
+          invoke: (draft) => draft.ttl(target, ms, false),
+          run: () => changeDeadline(target, ms, false)
+        }
       }),
     remaining: (target, ctx) =>
       asyncEntry(MemoryOperation.ttlRemaining, target, ctx, (input) => {
@@ -2961,7 +3177,11 @@ function createMemoryNamespace<T>(
     persist: (target, ctx) =>
       mutationEntry(MemoryOperation.ttlPersist, target, ctx, (input) => {
         const target = captureTtlTarget(input)
-        return { keys: [target], run: () => changeDeadline(target, undefined, true) }
+        return {
+          keys: [target],
+          invoke: (draft) => draft.ttl(target, undefined, true),
+          run: () => changeDeadline(target, undefined, true)
+        }
       })
   }
   /** A native counter read and write occupy the same original synchronous admitted mutation. */
@@ -2980,6 +3200,7 @@ function createMemoryNamespace<T>(
         let capacityResult: ReturnType<typeof increment> | undefined
         return {
           keys: [lockKey.text(key)],
+          invoke: (draft) => draft.increment(key, increment),
           capacityChanges:
             capacity === undefined
               ? undefined
@@ -3274,6 +3495,7 @@ function createMemoryNamespace<T>(
               if (ttlMs !== undefined) assertStorageTtlDuration(ttlMs, STORAGE_MEMORY_BACKEND)
               return {
                 keys: prepared.map((point) => lockKey.vector(captured.name, point.id)),
+                invoke: (draft) => draft.upsertVector(captured.name, prepared, sizes, ttlMs),
                 capacityChanges:
                   capacity === undefined
                     ? undefined
@@ -3327,6 +3549,9 @@ function createMemoryNamespace<T>(
               const capturedIds = vectorIds(input)
               return {
                 keys: capturedIds.map((id) => lockKey.vector(captured.name, id)),
+                invoke: (draft) => {
+                  for (const id of capturedIds) draft.remove('vector', vectorKey(captured.name, id))
+                },
                 run: () => {
                   let count = 0
                   for (const id of capturedIds) if (removeVector(captured.name, id)) count++
@@ -3348,6 +3573,10 @@ function createMemoryNamespace<T>(
               const predicate = compileStorageWhere<TPayload | undefined>(input)
               return {
                 keys: [],
+                invoke: (draft) =>
+                  draft.deleteVector(captured.name, (point) =>
+                    predicate(point.payload as TPayload | undefined)
+                  ),
                 ranges: [
                   {
                     channel: 'vector',
@@ -3403,6 +3632,7 @@ function createMemoryNamespace<T>(
         const entries = captureRdfEntries(input)
         return {
           keys: entries.map((entry) => entry.rdfLock),
+          invoke: (draft) => draft.rdf(entries.map(logicalRdfQuad), false),
           capacityChanges:
             capacity === undefined
               ? undefined
@@ -3437,6 +3667,7 @@ function createMemoryNamespace<T>(
         const entries = captureRdfEntries(input)
         return {
           keys: entries.map((entry) => entry.rdfLock),
+          invoke: (draft) => draft.rdf(entries.map(logicalRdfQuad), true),
           run: () => {
             /** Repeated or absent deletions do not manufacture revisions or events. */
             let changed = false
@@ -3566,10 +3797,24 @@ function createMemoryNamespace<T>(
       let physicalKey: IStorageKey
       /** The original lock owner's final synchronous preflight selects the exact capacity victims. */
       let plan: ReturnType<typeof planCapacity>
-      return runWithConcurrency(
+      /** Selected preparation remains accepted original-controller work even when rejected. */
+      const preparing = core.journal === undefined ? undefined : controller.beginMutation()
+      const pending = runWithConcurrency<IBlobInfo>(
         {
           store: base,
           options: input.options.ctx ?? {},
+          prepare:
+            core.journal === undefined
+              ? undefined
+              : async () => {
+                  await core.journal!.prepare()
+                  /**
+                   * Blob has no shared journal target; reject before taking upload reader
+                   * ownership.
+                   */
+                  if (core.journal!.active())
+                    throw new StorageContractError(StorageContractErrorCode.unsupported)
+                },
           execute: (context, invoke) =>
             core.execution.run(
               { operation: MemoryOperation.blobPut, input: pipelineInput, ctx: context },
@@ -3640,6 +3885,7 @@ function createMemoryNamespace<T>(
             )
         }
       )
+      return preparing === undefined ? pending : pending.finally(preparing)
     },
     async get(key, options) {
       controller.assertLive()
@@ -3802,6 +4048,7 @@ function createMemoryNamespace<T>(
               const captured = snapshotStorageKeyPrefix(input, STORAGE_MEMORY_BACKEND)
               return {
                 keys: [],
+                invoke: (draft) => draft.removeByPrefix(captured.key, 'record'),
                 ranges: [
                   {
                     channel: 'record',
@@ -3876,7 +4123,31 @@ function createMemoryNamespace<T>(
       return (scope as IMemoryScope<T>)[journalOperations].readRevision(target)
     }
   }
-  return { store, controller, installer, finalize, journal, journalImages }
+  return {
+    store,
+    controller,
+    installer,
+    finalize,
+    journal,
+    journalImages,
+    /** Only selected global journals need generation invalidation inside the original clear turn. */
+    drop: () =>
+      mutationEntry(
+        MemoryOperation.clearAll,
+        undefined,
+        undefined,
+        () => ({
+          keys: [],
+          ranges: mutationRanges(physicalChannels),
+          run: () => {
+            controller.assertLive()
+            journal.clear()
+            clearAll()
+          }
+        }),
+        false
+      )
+  }
 }
 
 /** Precise native store shape is retained by the first-party plugin factory. */
