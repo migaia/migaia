@@ -53,7 +53,8 @@ type ICompositionStrictCleanupResult<TRegistration> = ICleanupResult &
     readonly leafErrorsByRegistration: ReadonlyMap<TRegistration, ICleanupResult>
   }>
 
-type IPluginHostCompositionRuntimePort<TDomainCore extends object, TValue> = Readonly<{
+/** Original Host authority captured at construction and acquired by the composition entry on demand. */
+export type IPluginHostCompositionRuntimePort<TDomainCore extends object, TValue> = Readonly<{
   readonly host: object
   readonly scheduler: IScheduler
   readonly pipelineDrainTimeoutMs: number | false
