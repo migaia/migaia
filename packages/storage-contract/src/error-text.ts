@@ -11,6 +11,10 @@ export const StorageContractErrorText = {
   queryCondition: 'storage query condition is invalid',
   /** Query author descriptors and selection fields must be valid before a native cursor is opened. */
   queryArgument: 'storage query source or selection is invalid',
+  /** Record limits are nonnegative safe integers so retained rows stay explicitly bounded. */
+  queryLimit: 'storage query limit must be a nonnegative safe integer',
+  /** Opaque comparator ordering requires an immediately declared bound before source execution. */
+  queryComparatorLimit: 'storage query comparator requires an explicit limit',
   /**
    * User predicates, mappers and native cursor failures retain original identity and cleanup
    * traceability.

@@ -227,7 +227,12 @@ export type {
   IQueryResultOf,
   IQueryResult,
   IQueryChain,
-  IRecordQuerySource
+  IRecordQuerySource,
+  IRecordQuery,
+  IRecordQueryCore,
+  IRecordQueryBase,
+  IRecordQueryBaseCore,
+  IRecordQueryNeedsLimit
 } from './query-chain.js'
 
 export { useTransactionCapability } from './transaction.js'

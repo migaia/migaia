@@ -914,8 +914,8 @@ export const storageContractReference: ILibraryReference = {
     createRecordQuery: {
       role: 'factory',
       purpose: t(
-        'Create the shared immutable record where/select/all executor over one original backend cursor callback.',
-        '在原后端游标回调上创建共用、不可变的记录 where/select/all 执行器。'
+        'Create the shared immutable record reader with conditions, projections, limit, bounded comparator ordering, all and stream over one original cursor.',
+        '在原游标上创建共用、不可变的记录读取器，支持条件、投影、limit、有界比较器排序、all 与 stream。'
       ),
       params: {
         source: t(
@@ -928,8 +928,8 @@ export const storageContractReference: ILibraryReference = {
         )
       },
       returns: t(
-        'IQueryChain<T,TContext,T,true,TAugmentMethods> with three where forms, one select, all, explain and requirePushdown. This slice does not advertise other terminals. all synchronously admits its full mapper/cleanup lifetime to the original transaction iterator owner and retains its first failure before cleanup.',
-        '返回 IQueryChain<T,TContext,T,true,TAugmentMethods>，具有三种 where、一次 select、all、explain 与 requirePushdown；本切片不声明其他终点，all 同步把完整 mapper/清理区间登记到原事务迭代器 owner，清理前保留首错。'
+        'IRecordQuery<T,TContext,TAugmentMethods> with three where forms, one select, all, real stream, explain, requirePushdown, limit and orderByComparator(compare).limit(k). Missing comparator bounds and invalid limits reject before source execution. Limit and comparator are client steps in this slice. all synchronously admits its full mapper/cleanup lifetime to the original transaction iterator owner and retains its first failure before cleanup.',
+        '返回 IRecordQuery<T,TContext,TAugmentMethods>，具有三种 where、一次 select、all、真实 stream、explain、requirePushdown、limit 与 orderByComparator(compare).limit(k)；缺少比较器上限或 limit 无效时在源执行前拒绝，本切片 limit 与比较器为客户端步骤。all 同步把完整 mapper/清理区间登记到原事务迭代器 owner，清理前保留首错。'
       ),
       example: storageContractCases.createRecordQuery![0]!.example,
       cases: storageContractCases.createRecordQuery

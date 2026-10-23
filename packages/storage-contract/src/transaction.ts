@@ -8,7 +8,7 @@ import {
 } from './capability.js'
 import { TRANSACTION_KEY_VALUE_METHODS, StorageCapabilityMethod } from './capability-constants.js'
 import type { ICodecValue } from '@migaia/serialize/codec'
-import type { IQueryChain, IQueryResult } from './query-chain.js'
+import type { IRecordQuery, IQueryResult } from './query-chain.js'
 import {
   ConcurrencyPolicy,
   assertConcurrencyPolicy,
@@ -62,8 +62,11 @@ export type ITransactionKeyValueApi = {
 }
 
 /** Transaction record queries share the real executor while refusing ordinary operation contexts. */
-export type ITransactionRecordsApi<TValue = ICodecValue> = {
-  query<R = TValue>(): IQueryChain<R, undefined>
+export type ITransactionRecordsApi<
+  TValue = ICodecValue,
+  TAugmentMethods extends object = Record<never, never>
+> = {
+  query<R = TValue>(): IRecordQuery<R, undefined, TAugmentMethods>
   removeByPrefix(prefix: IStorageKey): Promise<number>
 }
 /** Complete backend-owned transaction view; all methods use the same physical transaction. */
@@ -214,6 +217,13 @@ type IIteratorRegistration = {
   readonly compose: <TResult>(
     run: (scope: object | undefined) => Promise<TResult>
   ) => Promise<TResult>
+  /** Query projection reuses this exact owner's iterator registration and cleanup implementation. */
+  readonly derive: <TResult>(
+    read: (
+      next: () => Promise<IteratorResult<unknown>>,
+      fail: (error: unknown) => unknown
+    ) => Promise<IteratorResult<TResult>>
+  ) => IStorageIterator<TResult>
   readonly fail: (error: unknown) => unknown
 }
 /** Only active work and resources are retained; completed history is removed at settlement. */
@@ -579,7 +589,7 @@ export function createTransactionOwner<
           throw invalidTransaction(cause)
         }
       },
-      registerIterator<TScope extends TBaseScope, T>(
+      registerIterator: function registerIterator<TScope extends TBaseScope, T>(
         scope: TScope,
         port: {
           readonly next: (currentScope: NoInfer<TScope>) => PromiseLike<IteratorResult<T>>
@@ -680,6 +690,15 @@ export function createTransactionOwner<
           /** A complete query borrows its own real operation view rather than the expired user view. */
           compose: (run) =>
             originalScope ? runTransactionOperation(originalScope, run) : run(undefined),
+          /** A mapped stream remains a real resource in the original scope after native exhaustion. */
+          derive: (read) => {
+            if (!originalScope) throw invalidTransaction()
+            return registerIterator(originalScope as TScope, {
+              next: (currentScope) =>
+                read(() => nextTransactionIterator(currentScope, iterator), resource.fail),
+              close: cleanup
+            })
+          },
           /** Primary query failure reaches the original owner before cursor cleanup can fail. */
           fail: (error) =>
             iteratorState
@@ -751,6 +770,29 @@ export function runTransactionIteratorOperation<T, TResult>(
   )
 }
 
+/**
+ * Projects one query read through the original iterator owner. The existing registration alone
+ * supplies scope admission, accepted-next draining and cached cleanup; no second lifecycle exists.
+ * Unregistered source resources retain their own native iterator contract and return undefined.
+ */
+export function deriveTransactionIterator<T, TResult>(
+  iterator: IStorageIterator<T>,
+  read: (
+    next: () => Promise<IteratorResult<T>>,
+    fail: (error: unknown) => unknown
+  ) => Promise<IteratorResult<TResult>>
+): IStorageIterator<TResult> | undefined {
+  /** Only an original actual registration can create a resource in that same scope. */
+  const resource = transactionRegistrations.get(iterator)
+  if (resource?.kind !== RegistrationKind.iterator) return undefined
+  return resource.derive(
+    read as (
+      next: () => Promise<IteratorResult<unknown>>,
+      fail: (error: unknown) => unknown
+    ) => Promise<IteratorResult<TResult>>
+  )
+}
+
 /** Returns authentic live identity without granting registration, reads or future validity. */
 export function assertTransactionOwner(store: IStorageBase, scope: object): ITransactionInfo {
   /** Store and view must both be present in the same private owner table. */
@@ -813,6 +855,7 @@ function transactionRecordQueryResult<R>(
   query: IQueryResult<R, undefined>
 ): IQueryResult<R, undefined> {
   return Object.freeze({
+    ...query,
     all: () => runTransactionOperation(scope, () => query.all()),
     explain: () => query.explain(),
     requirePushdown: () => transactionRecordQueryResult(scope, query.requirePushdown())
@@ -821,27 +864,37 @@ function transactionRecordQueryResult<R>(
 /** Preserves the actual immutable query and every typed branch; only terminal admission is added. */
 function transactionRecordQuery<R>(
   scope: object,
-  query: IQueryChain<R, undefined>
-): IQueryChain<R, undefined> {
+  query: IRecordQuery<R, undefined>
+): IRecordQuery<R, undefined> {
   /** Forwarding retains the original overloads, row inference and one-time condition capture. */
   const where = ((...args: readonly unknown[]) =>
-    transactionRecordQuery(scope, Reflect.apply(query.where, query, args))) as IQueryChain<
+    transactionRecordQuery(scope, Reflect.apply(query.where, query, args))) as IRecordQuery<
     R,
     undefined
   >['where']
   /** Selection remains the original shared node constructor and never gains a second executor. */
   const select = ((...args: readonly unknown[]) =>
-    transactionRecordQueryResult(scope, Reflect.apply(query.select, query, args))) as IQueryChain<
+    transactionRecordQueryResult(scope, Reflect.apply(query.select, query, args))) as IRecordQuery<
     R,
     undefined
   >['select']
   return Object.freeze({
+    ...query,
     where,
     select,
+    limit: (count: number) => transactionRecordQuery(scope, query.limit(count)),
+    orderByComparator: (compare: (left: R, right: R) => number) => {
+      /** Original argument admission stays at the comparator call, before any terminal. */
+      const pending = query.orderByComparator(compare)
+      return {
+        limit: (count: number) =>
+          transactionRecordQuery(scope, pending.limit(count) as IRecordQuery<R, undefined>)
+      }
+    },
     all: () => runTransactionOperation(scope, () => query.all()),
     explain: () => query.explain(),
     requirePushdown: () => transactionRecordQuery(scope, query.requirePushdown())
-  })
+  }) as IRecordQuery<R, undefined>
 }
 /**
  * Reads the original store capability table from an authentic view. Pure lookup invokes no binder
