@@ -83,7 +83,7 @@ console.log(await memory.use(records).query<Order>().where({ state: 'paid' }).se
 
 memory 的根 `getMany`、`setMany`、`removeMany` 与 `removeByPrefix` 也可从 `use(kv)` 取用。批量结构键与原文本通道共享身份；字符串写入可由单点与 sync 方法读取。非空写批量在原事务草稿里一次提交，失败不留下先前项；重复写键在事务前拒绝，重复删除只计一次。每次高层调用只进入一次 pipeline 和一组操作观察，空批不进入 pipeline 或新事务；前缀删除沿原 radix 范围定位。
 
-记录查询的 where/select/all 复用 contract 查询核心；当前内存 source 如实声明客户端执行。tx 文本批量方法支持规范结构键与 prefix；显式 ttlMs 当前以 UNSUPPORTED_CAPABILITY 拒绝。事务失败丢弃草稿，提交前检查键修订和 clear epoch，实际提交后发布批量变化。根资源关闭会取消本实例排队锁准入，并等待已接纳的事务真实结算。
+记录查询的 where/select/all 复用 contract 查询核心；当前内存 source 如实声明客户端执行。tx 文本批量方法支持规范结构键、prefix 与经校验的 ttlMs。事务失败丢弃草稿，提交前检查键修订和 clear epoch，实际提交后发布批量变化。根资源关闭会取消本实例排队锁准入，并等待已接纳的事务真实结算。
 
 普通范围、事务草稿与前缀删除复用同一包内压缩 radix 索引。基础数据仍用哈希点查；范围仅定位边界并归并命中草稿，tombstone 抑制同键基础项。树维护首尾与相邻叶，不在查询时全量排序；记录和文本各自拥有独立索引实例。
 
@@ -127,3 +127,7 @@ await memory.transaction(async (tx) => {
 `connect(store, {codecStages, queryStages})` 接收原宿主相应的观察接点。codec 围绕每次实际转换；query 的每次 `all` 和 stream 的每次 `next` 观察实际操作。stream 统计累计，消费方两次推进之间的停顿不计执行时间。观察不等待、不否决，抛错与迟到拒绝进入原报告渠道。
 
 自定义 value-only 后端的 unique 写入必须具备 record 事务或原子 value commit 接点；仅有 sync 通道不等于具备该原子终点。两者都缺少时，仅这个 unique 写入组合在修改前拒绝 `UNSUPPORTED_CAPABILITY`；普通 KV 写入仍可使用。原后端安装窗口内，先 `core.registerStore(store)`，再 `core.registerValueCommit(store, commit)`。`IBackendValueCommit` 从 `@migaia/storage-host/authoring/backend` 导出：`commit({prefix, expected, key, value}, ctx?)` 返回 `Promise<void>`；`expected` 是该前缀捕获的原始 `[key,value]` 对。异步 schema/codec 准备完成后，后端须原子复核这份前缀快照并写入 `key/value`，复核和修改之间不得有 await 缝隙；快照变化时以 `WRITE_CONFLICT` 拒绝且不修改数据。该接点只借用原 native store，不新增资源或关闭权。
+
+memory 原生发布 `ttl` 与 `counter`。`expire`、`remaining`、`persist` 指向既有 text、bytes 或 record 通道，结构文本键与批量键共享规范身份。期限为有限非负毫秒，0 立即过期；sync/async 读取、枚举与跨通道冲突检查使用同一惰性到期路径。覆盖活记录保留期限，删除、clear 与跨通道 replace 清除旧期限；`setMany` 的 `ttlMs` 与值在同一原子草稿提交。事务首次读保留值与期限，提交经原修订检查发现观察后的到期。
+
+`store.use(counter).increment('visits', 1)` 在原单键原子写路径修改规范十进制文本。缺失从 0 开始；非规范文本、非安全整数增量与溢出在修改前拒绝 `INVALID_ARGUMENT`。`tx.use(ttl)` 与 `tx.use(counter)` 使用当前原生草稿和原事务预算。
