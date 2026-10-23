@@ -1260,10 +1260,10 @@ export function createSqliteStore<TValue>(
             return (input = { keys: captured.map(({ key }) => key) })
           },
           (state, current, prepared) => {
-            const actual =
-              prepared === input
-                ? captured
-                : snapshotStorageBatchKeys((prepared as typeof input).keys, SqliteNames.backend)
+            const actual = snapshotStorageBatchKeys(
+              (prepared as typeof input).keys,
+              SqliteNames.backend
+            )
             return getMany(actual, state.orgId, state, current)
           },
           {
@@ -1286,8 +1286,7 @@ export function createSqliteStore<TValue>(
             })
           },
           (state, current, prepared) => {
-            const actual =
-              prepared === input ? captured : captureTextEntries((prepared as typeof input).entries)
+            const actual = captureTextEntries((prepared as typeof input).entries)
             for (const entry of actual)
               write('text', entry.key, entry.value, state, 'conflict', current, entry.ttlMs)
           },
@@ -1309,10 +1308,10 @@ export function createSqliteStore<TValue>(
             return (input = { keys: captured.map(({ key }) => key) })
           },
           (state, _current, prepared) => {
-            const actual =
-              prepared === input
-                ? captured
-                : snapshotStorageBatchKeys((prepared as typeof input).keys, SqliteNames.backend)
+            const actual = snapshotStorageBatchKeys(
+              (prepared as typeof input).keys,
+              SqliteNames.backend
+            )
             return removeTextBatch(actual, state)
           },
           {
@@ -1331,7 +1330,12 @@ export function createSqliteStore<TValue>(
             captured = snapshotStorageKey(prefix, SqliteNames.backend)
             return { prefix: captured }
           },
-          (state) => removePrefix('text', captured, state),
+          (state, _current, input) =>
+            removePrefix(
+              'text',
+              snapshotStorageKey((input as { prefix: IStorageKey }).prefix, SqliteNames.backend),
+              state
+            ),
           { count: undefined }
         )
       },
@@ -2433,7 +2437,7 @@ export function createSqliteStore<TValue>(
         throwIfAborted(snapshotOperationContext(ctx)?.signal)
         return []
       }
-      /** Capture caller keys once; unchanged pipeline input reuses these exact canonical facts. */
+      /** Capture caller keys before stages; terminal capture includes supported in-place rewrites. */
       const captured = snapshotStorageBatchKeys(keys, SqliteNames.backend)
       const input = { keys: captured.map(({ key }) => key) }
       return rootRead(
@@ -2441,10 +2445,10 @@ export function createSqliteStore<TValue>(
         input,
         ctx,
         (orgId, prepared) => {
-          const actual =
-            prepared === input
-              ? captured
-              : snapshotStorageBatchKeys((prepared as typeof input).keys, SqliteNames.backend)
+          const actual = snapshotStorageBatchKeys(
+            (prepared as typeof input).keys,
+            SqliteNames.backend
+          )
           return readSnapshot(() => getMany(actual, orgId))
         },
         { count }
@@ -2464,7 +2468,7 @@ export function createSqliteStore<TValue>(
         input,
         ctx,
         (prepared) => {
-          const actual = prepared === input ? captured : captureTextEntries(prepared.entries)
+          const actual = captureTextEntries(prepared.entries)
           /** Codec success precedes locks and table changes, matching ordinary root replacement. */
           const raw = actual.map((entry) => ({
             ...entry,
@@ -2506,10 +2510,7 @@ export function createSqliteStore<TValue>(
         input,
         ctx,
         (prepared) => {
-          const actual =
-            prepared === input
-              ? captured
-              : snapshotStorageBatchKeys(prepared.keys, SqliteNames.backend)
+          const actual = snapshotStorageBatchKeys(prepared.keys, SqliteNames.backend)
           return {
             keys: actual
               .filter(({ firstIndex }, index) => firstIndex === index)
@@ -2591,8 +2592,16 @@ export function createSqliteStore<TValue>(
             core.getChainMethods('query')
           ),
         removeByPrefix: (prefix) =>
-          scoped(scope, SqliteOperation.removeByPrefix, { prefix }, (state) =>
-            removePrefix('record', prefix, state)
+          scoped(
+            scope,
+            SqliteOperation.removeByPrefix,
+            () => ({ prefix: snapshotStorageKey(prefix, SqliteNames.backend) }),
+            (state, _current, input) =>
+              removePrefix(
+                'record',
+                snapshotStorageKey((input as { prefix: IStorageKey }).prefix, SqliteNames.backend),
+                state
+              )
           )
       }) satisfies ITransactionRecordsApi<TValue>
   })

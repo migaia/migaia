@@ -212,6 +212,58 @@ describe('native SQLite installation', () => {
     expect(native).toEqual([])
   })
 
+  it('uses supported in-place pipeline edits for native root and scoped batches', async () => {
+    /** This is the original public pipeline entry; its input is shallow-readonly, not deep-frozen. */
+    const { store, host } = await installed({ memory: true })
+    await host.use(
+      definePlugin('rewrite-batch', (core) => ({
+        install() {
+          core.usePipeline((request, next) => {
+            if (request.operation === 'setMany') {
+              const input = request.input as { entries: Array<{ key: IStorageKey; value: string }> }
+              input.entries[0]!.key = 'redirected:point'
+              input.entries[0]!.value = 'changed'
+            } else if (request.operation === 'getMany' || request.operation === 'removeMany') {
+              const input = request.input as { keys: IStorageKey[] }
+              input.keys[0] = 'redirected:point'
+            } else if (request.operation === 'removeByPrefix') {
+              const input = request.input as { prefix: IStorageKey }
+              input.prefix = 'redirected:'
+            }
+            return next(request)
+          })
+          return {}
+        }
+      }))
+    )
+    /** Original caller getters run once; the pipeline edits only the detached native payload. */
+    let keyReads = 0
+    await store.use(kv).setMany([
+      {
+        get key() {
+          keyReads++
+          return 'caller'
+        },
+        value: 'original'
+      }
+    ])
+    expect(keyReads).toBe(1)
+    expect(await store.get('caller')).toBeNull()
+    expect(await store.get('redirected:point')).toBe('changed')
+    expect(await store.use(kv).getMany(['caller'])).toEqual(['changed'])
+    expect(await store.use(kv).removeMany(['caller'])).toBe(1)
+    await store.transaction(async (tx) => {
+      await tx.setMany([{ key: 'caller', value: 'original' }])
+      expect(await tx.getMany(['caller'])).toEqual(['changed'])
+      expect(await tx.removeMany(['caller'])).toBe(1)
+      await tx.setMany([{ key: 'caller', value: 'original' }])
+      expect(await tx.removeByPrefix('wrong-prefix')).toBe(1)
+      await tx.putRecord({ retained: false }, 'redirected:record')
+      expect(await tx.use(records).removeByPrefix('wrong-prefix')).toBe(1)
+    })
+    expect(await store.getRecord('redirected:record')).toBeUndefined()
+  })
+
   it('rejects null root write contexts before native admission', async () => {
     /** The real installed backend retains its original native and mutation owners. */
     const { store, host, connection } = await installed({ memory: true })
