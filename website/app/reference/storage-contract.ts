@@ -718,6 +718,12 @@ const keyValidationParams = {
 
 /** Error fields stay on the frozen native error; the original cause remains independently reachable. */
 const errorMembers: Readonly<Record<string, IMemberDoc>> = {
+  capability: {
+    summary: t(
+      'Optional missing capability name retained before the original error is frozen; the name grants no authority.',
+      '原错误冻结前保留的可选缺失能力名；名称不授予权限。'
+    )
+  },
   keys: {
     summary: t(
       'Detached read-only lock identities on LOCK_REJECTED and LOCK_TIMEOUT; physical timeout carries declared keys.',
@@ -769,6 +775,81 @@ export const storageContractReference: ILibraryReference = {
     }
   },
   symbols: {
+    ttl: {
+      role: 'constant',
+      purpose: t(
+        'Exact standard token for native physical-channel TTL.',
+        '原生物理通道 TTL 的精确标准令牌。'
+      ),
+      example: `await store.use(ttl).expire({ channel: 'text', key: 'session' }, 1000)`
+    },
+    counter: {
+      role: 'constant',
+      purpose: t(
+        'Exact standard token for atomic canonical decimal text increments.',
+        '原子规范十进制文本递增的精确标准令牌。'
+      ),
+      example: `await store.use(counter).increment('visits')`
+    },
+    snapshotStorageTtlTarget: {
+      role: 'operation',
+      purpose: t(
+        'Capture TTL targets with the original physical lock-key validator.',
+        '通过原物理锁键 validator 捕获 TTL 目标。'
+      ),
+      params: {
+        target: t(
+          'Typed text, byte or record target; use the channel containing the value.',
+          'typed 文本、字节或记录目标，选择实际持有值的通道。'
+        ),
+        backend: t('Actual backend diagnostic or undefined.', '真实后端诊断，或 undefined。')
+      },
+      returns: t(
+        'Detached frozen ITtlTarget, with original INVALID_KEY or INVALID_ARGUMENT failures.',
+        '独立冻结的 ITtlTarget，保留原 INVALID_KEY 或 INVALID_ARGUMENT 失败。'
+      ),
+      example: `const target = snapshotStorageTtlTarget({ channel: 'record', key: ['users', 1] }, 'memory')`
+    },
+    assertStorageTtlDuration: {
+      role: 'operation',
+      purpose: t(
+        'Admit finite nonnegative milliseconds before native TTL work.',
+        '在原生 TTL 操作前接纳有限非负毫秒数。'
+      ),
+      params: {
+        ms: t(
+          'Finite nonnegative milliseconds, including zero and fractions.',
+          '有限非负毫秒数，包含零与小数。'
+        ),
+        backend: t('Actual backend diagnostic or undefined.', '真实后端诊断，或 undefined。')
+      },
+      returns: t(
+        'Returns void; invalid duration throws INVALID_ARGUMENT before I/O.',
+        '返回 void；非法期限在 I/O 前抛 INVALID_ARGUMENT。'
+      ),
+      example: `assertStorageTtlDuration(0.5, 'memory')`
+    },
+    snapshotStorageCounterIncrement: {
+      role: 'operation',
+      purpose: t(
+        'Capture a safe integer delta before I/O for calculation inside an existing atomic text operation.',
+        '在 I/O 前捕获安全整数增量，供既有原子文本操作内部计算。'
+      ),
+      params: {
+        by: t(
+          'Safe integer delta; undefined captures the default of one.',
+          '安全整数增量；undefined 捕获默认值一。'
+        ),
+        backend: t('Actual backend diagnostic or undefined.', '真实后端诊断，或 undefined。')
+      },
+      returns: t(
+        'Pure IStorageCounterIncrement from current text to the next safe integer. Missing text starts at zero; noncanonical text or overflow throws INVALID_ARGUMENT and never writes.',
+        '从当前文本计算下一安全整数的纯 IStorageCounterIncrement。缺失文本从零起算；非规范文本或溢出抛 INVALID_ARGUMENT，不执行写入。'
+      ),
+      example: `const increment = snapshotStorageCounterIncrement(undefined, 'memory')
+// Inside the original atomic native operation:
+const next = increment(currentText)`
+    },
     snapshotStorageBatchKeys: {
       role: 'operation',
       purpose: t(
@@ -2231,6 +2312,155 @@ console.log(candidate.name, candidate.output)`
     }
   },
   types: {
+    ITtlTarget: {
+      summary: t(
+        'The existing expiring physical lock-key channels, with the same logical key domain.',
+        '既有可过期物理锁键通道，沿用相同逻辑键域。'
+      ),
+      members: {
+        channel: {
+          summary: t(
+            'The physical text, bytes or record channel.',
+            '物理 text、bytes 或 record 通道。'
+          )
+        },
+        key: { summary: t('The channel’s original logical key.', '该通道原有逻辑键。') }
+      }
+    },
+    ITtlApi: {
+      summary: t(
+        'Native point TTL operations on one physical channel; deadlines use the backend scheduler.',
+        '单物理通道上的原生点 TTL；期限使用后端 scheduler。'
+      ),
+      members: {
+        expire: {
+          summary: t(
+            'Assign a deadline; zero expires immediately. Missing or expired targets return false.',
+            '设置期限；零立即到期。缺失或已过期目标返回 false。'
+          ),
+          params: {
+            target: t('Original typed physical target.', '原 typed 物理目标。'),
+            ms: t('Finite nonnegative milliseconds.', '有限非负毫秒数。'),
+            ctx: writeContextParam
+          },
+          returns: t('Whether a live target received the deadline.', '是否为活目标设置了期限。'),
+          example: `await store.use(ttl).expire({ channel: 'text', key: 'session' }, 1000)`
+        },
+        remaining: {
+          summary: t(
+            'Read nonnegative remaining milliseconds; missing or unlimited targets return undefined.',
+            '读取非负剩余毫秒数；缺失或无限期目标返回 undefined。'
+          ),
+          params: {
+            target: t('Original typed physical target.', '原 typed 物理目标。'),
+            ctx: contextParam
+          },
+          returns: t('Remaining milliseconds or undefined.', '剩余毫秒数或 undefined。'),
+          example: `await store.use(ttl).remaining({ channel: 'text', key: 'session' })`
+        },
+        persist: {
+          summary: t(
+            'Remove an active deadline. Missing, expired or already unlimited targets return false.',
+            '移除活期限；缺失、已过期或已无限期目标返回 false。'
+          ),
+          params: {
+            target: t('Original typed physical target.', '原 typed 物理目标。'),
+            ctx: writeContextParam
+          },
+          returns: t('Whether an active deadline was removed.', '是否移除了活期限。'),
+          example: `await store.use(ttl).persist({ channel: 'text', key: 'session' })`
+        }
+      }
+    },
+    ITransactionTtlApi: {
+      summary: t(
+        'The same TTL operations on the original native draft, without root context or another budget.',
+        '原生 draft 上的相同 TTL 操作，不接根上下文，不另建预算。'
+      ),
+      members: {
+        expire: {
+          summary: t(
+            'Set the current draft target deadline atomically with the transaction.',
+            '随事务原子设置当前 draft 目标期限。'
+          ),
+          params: {
+            target: t('Original typed target.', '原 typed 目标。'),
+            ms: t('Finite nonnegative milliseconds.', '有限非负毫秒数。')
+          },
+          returns: t(
+            'Whether a live draft target received the deadline.',
+            '是否为活 draft 目标设置期限。'
+          ),
+          example: `await tx.use(ttl).expire({ channel: 'record', key: 'profile' }, 1000)`
+        },
+        remaining: {
+          summary: t(
+            'Read the draft’s captured deadline and value snapshot.',
+            '读取 draft 捕获的期限和值快照。'
+          ),
+          params: { target: t('Original typed target.', '原 typed 目标。') },
+          returns: t('Remaining milliseconds or undefined.', '剩余毫秒数或 undefined。'),
+          example: `await tx.use(ttl).remaining({ channel: 'record', key: 'profile' })`
+        },
+        persist: {
+          summary: t(
+            'Remove the current draft deadline in this same transaction.',
+            '在同一事务中移除当前 draft 期限。'
+          ),
+          params: { target: t('Original typed target.', '原 typed 目标。') },
+          returns: t('Whether an active deadline was removed.', '是否移除了活期限。'),
+          example: `await tx.use(ttl).persist({ channel: 'record', key: 'profile' })`
+        }
+      }
+    },
+    ICounterApi: {
+      summary: t(
+        'An atomic text-channel counter using canonical decimal safe integers.',
+        '使用规范十进制安全整数的原子文本通道计数器。'
+      ),
+      members: {
+        increment: {
+          summary: t(
+            'Missing values start at zero; invalid decimal text, unsafe delta or overflow rejects without a write.',
+            '缺失值从零起算；非法十进制文本、不安全增量或溢出均拒绝且不写入。'
+          ),
+          params: {
+            key: stringKeyParam,
+            by: t('Safe integer delta; omitted means one.', '安全整数增量；省略为一。'),
+            ctx: writeContextParam
+          },
+          returns: t('The committed safe integer value.', '已提交的安全整数值。'),
+          example: `await store.use(counter).increment('visits', 2)`
+        }
+      }
+    },
+    ITransactionCounterApi: {
+      summary: t(
+        'Atomic counter updates in the same original transaction text draft.',
+        '同一原事务文本 draft 中的原子计数更新。'
+      ),
+      members: {
+        increment: {
+          summary: t(
+            'Increment without opening a root operation or budget.',
+            '递增时不打开根操作或预算。'
+          ),
+          params: {
+            key: stringKeyParam,
+            by: t('Safe integer delta; omitted means one.', '安全整数增量；省略为一。')
+          },
+          returns: t('The draft safe integer value.', 'draft 安全整数值。'),
+          example: `await tx.use(counter).increment('visits')`
+        }
+      }
+    },
+    IStorageCounterIncrement: {
+      summary: t(
+        'Pure captured calculation from current native text (null/undefined means zero) to the next safe integer; apply inside the existing atomic owner.',
+        '从当前原生文本（null/undefined 代表零）到下一安全整数的纯捕获计算；须在既有原子 owner 内应用。'
+      ),
+      members: {}
+    },
     IStorageBatchKey: {
       summary: t(
         'One captured position in a native typed-key batch.',
@@ -4184,6 +4414,7 @@ console.log(compareStorageKeys(key, ['users', 2]))`,
         '生产者编写的中立错误详情，包含可选后端、原始键、锁身份、持有者和原因失败。'
       ),
       members: {
+        capability: errorMembers.capability!,
         keys: errorMembers.keys!,
         holder: errorMembers.holder!,
         backend: {

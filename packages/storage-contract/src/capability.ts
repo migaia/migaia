@@ -29,9 +29,13 @@ import {
 } from './capability-token.js'
 import type { kv } from './capabilities/kv.js'
 import type { records } from './capabilities/records.js'
+import type { ttl, ITransactionTtlApi } from './capabilities/ttl.js'
+import type { counter, ITransactionCounterApi } from './capabilities/counter.js'
 export { defineStorageCapability } from './capability-token.js'
 export { kv } from './capabilities/kv.js'
 export { records } from './capabilities/records.js'
+export { ttl } from './capabilities/ttl.js'
+export { counter } from './capabilities/counter.js'
 
 /** Type-only API carrier; runtime authority belongs exclusively to the private token set. */
 declare const capabilityApi: unique symbol
@@ -116,7 +120,7 @@ export type IRecordsApi<
 /** Only standard capabilities with a declared transaction projection belong to transaction use. */
 export type ITransactionalCapability<TCaps extends IAnyStorageCapability> = Extract<
   TCaps,
-  typeof kv | typeof records
+  typeof kv | typeof records | typeof ttl | typeof counter
 >
 
 /** Projects the standard transaction API without creating or admitting a transaction scope. */
@@ -124,7 +128,11 @@ export type ITransactionCapabilityApi<TCap extends IAnyStorageCapability> = TCap
   ? ITransactionKeyValueApi
   : TCap extends typeof records
     ? ITransactionRecordsApi
-    : never
+    : TCap extends typeof ttl
+      ? ITransactionTtlApi
+      : TCap extends typeof counter
+        ? ITransactionCounterApi
+        : never
 
 /** Optional contravariant proof permits complete external scopes without private symbol access. */
 export type ITransactionCapabilityView<
@@ -310,7 +318,7 @@ function useCapability(
   }
   throw new StorageContractError(
     StorageContractErrorCode.unsupported,
-    { backend },
+    { backend, capability: capability.name },
     StorageContractErrorText.capabilityMissing(capability.name, backend)
   )
 }
@@ -364,7 +372,7 @@ export function readTransactionImplementation(
   )
     throw new StorageContractError(
       StorageContractErrorCode.unsupported,
-      { backend: record!.backend },
+      { backend: record!.backend, capability: capability.name },
       StorageContractErrorText.capabilityTransactionMissing(capability.name, record!.backend)
     )
   return binding as IImplementationRecord & {

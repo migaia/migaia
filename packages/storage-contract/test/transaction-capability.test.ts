@@ -8,6 +8,8 @@ import {
   implement,
   kv,
   records,
+  ttl,
+  counter,
   defineStorageCapability,
   createRecordQuery,
   type IStorageBase,
@@ -19,7 +21,10 @@ import {
   type IRecordsApi,
   type IStorageKey,
   type IQueryResult,
-  type IStorageCapabilitySet
+  type IStorageCapabilitySet,
+  type ICapabilityInstallPort,
+  type ITransactionTtlApi,
+  type ITransactionCounterApi
 } from '../src/index.js'
 
 /** Concrete rows and full externally constructible scopes require no private symbol or cast. */
@@ -226,17 +231,98 @@ function setup() {
       throw new Error('root deletion must not be used')
     }
   }
-  const store = provideCapabilities(base, [
-    implement(kv, rootKv, { forTransaction: bindKv }),
-    implement(records, rootRecords, { forTransaction: bindRecords })
-  ])
+  /** Feature publication uses the original provider window, without fabricating a second store. */
+  let installer!: ICapabilityInstallPort
+  const store = provideCapabilities(
+    base,
+    [
+      implement(kv, rootKv, { forTransaction: bindKv }),
+      implement(records, rootRecords, { forTransaction: bindRecords })
+    ],
+    {
+      onInstaller: (port) => {
+        installer = port
+      }
+    }
+  )
   const scope = createScope()
   const onFailure = vi.fn()
   const controller = owner.register(scope, { createScope, onFailure })
-  return { store, scope, controller, bindKv, bindRecords, text, rows, rootText, native, onFailure }
+  return {
+    store,
+    scope,
+    controller,
+    bindKv,
+    bindRecords,
+    text,
+    rows,
+    rootText,
+    native,
+    onFailure,
+    installer
+  }
 }
 
 describe('original transaction capability projections', () => {
+  it('binds scalar capabilities to fresh original views without invoking their root API', async () => {
+    const fixture = setup()
+    /** Native scalar adapters validate the same supplied original operation scope. */
+    const bindTtl = vi.fn((scope: ITransactionScope): ITransactionTtlApi => {
+      assertTransactionOwner(fixture.store, scope)
+      return {
+        expire: async () => true,
+        remaining: async () => 3,
+        persist: async () => false
+      }
+    })
+    const bindCounter = vi.fn((scope: ITransactionScope): ITransactionCounterApi => {
+      assertTransactionOwner(fixture.store, scope)
+      return { increment: async () => 7 }
+    })
+    /** Root endpoints must never become transaction fallbacks. */
+    const root = vi.fn(async (): Promise<never> => {
+      throw new Error('root scalar must not run')
+    })
+    fixture.installer
+      .prepare([
+        implement(
+          ttl,
+          { expire: root, remaining: root, persist: root },
+          { forTransaction: bindTtl }
+        ),
+        implement(counter, { increment: root }, { forTransaction: bindCounter })
+      ])
+      .publish()
+    /** The same authentic object now carries the capabilities actually published by its provider. */
+    const scope = fixture.scope as ITransactionScope<
+      IRow,
+      typeof records | typeof ttl | typeof counter
+    >
+    const expiration = scope.use(ttl)
+    const increments = scope.use(counter)
+    expectTypeOf(expiration).toEqualTypeOf<ITransactionTtlApi>()
+    expectTypeOf(increments).toEqualTypeOf<ITransactionCounterApi>()
+    expect(scope.use(ttl)).toBe(expiration)
+    expect(bindTtl).not.toHaveBeenCalled()
+    expect(bindCounter).not.toHaveBeenCalled()
+    await expect(expiration.expire({ channel: 'text', key: 'x' }, 0.5)).resolves.toBe(true)
+    await expect(expiration.remaining({ channel: 'record', key: ['x'] })).resolves.toBe(3)
+    await expect(expiration.persist({ channel: 'bytes', key: 'x' })).resolves.toBe(false)
+    await expect(increments.increment('count', 2)).resolves.toBe(7)
+    expect(
+      new Set([...bindTtl.mock.calls, ...bindCounter.mock.calls].map(([scope]) => scope)).size
+    ).toBe(4)
+    expect(root).not.toHaveBeenCalled()
+    fixture.controller.stopAdmission()
+    await fixture.controller.runFinalizers()
+    fixture.controller.close()
+    await expect(increments.increment('count')).rejects.toMatchObject({
+      code: 'TRANSACTION_FAILED'
+    })
+    await expect(expiration.expire({ channel: 'text', key: 'x' }, -1)).rejects.toMatchObject({
+      code: 'TRANSACTION_FAILED'
+    })
+  })
   it('keeps pure cached lookup separate from native binding and executes every KV method on fresh views', async () => {
     const fixture = setup()
     const descriptors = Object.getOwnPropertyDescriptors(fixture.scope)
