@@ -79,7 +79,7 @@ function main() {
     writeFileSync(join(consumerDirectory, 'package.json'), '{"type":"module"}\n', 'utf8')
     writeFileSync(
       join(consumerDirectory, 'identity.mjs'),
-      `import { fromValueCodec, defineStorageCapability, implement, provideCapabilities, hasStorageCapability, useStorageCapability, sql, createSqlTag, deriveStorageSqlQuery, blob, durableChangeFeed, orderStorageKeysByBytes, encodeStorageOrgStringPrefix, encodeOrderedStorageKey, prefixStorageOrgKey, sparql, sparqlFragment, createSparqlTag, term, rdf, vector, DeleteCountMode } from '@migaia/storage-contract'
+      `import { fromValueCodec, defineStorageCapability, implement, provideCapabilities, hasStorageCapability, useStorageCapability, sql, createSqlTag, deriveStorageSqlQuery, blob, snapshotStorageBlobPut, snapshotStorageBlobGet, snapshotStorageBlobList, createStorageBlobObject, durableChangeFeed, orderStorageKeysByBytes, encodeStorageOrgStringPrefix, encodeOrderedStorageKey, prefixStorageOrgKey, sparql, sparqlFragment, createSparqlTag, term, rdf, vector, DeleteCountMode } from '@migaia/storage-contract'
 import { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'
 import { isArrayBuffer as utilsBuffer, isUint8Array as utilsBytes } from '@migaia/utils/bytes'
 /** Independent resource bases exercise package-root capability reads without acquiring external clients. */
@@ -129,6 +129,15 @@ const objectApi = { put: noAdmissionIo, get: noAdmissionIo, head: noAdmissionIo,
 const feedApi = { readChanges: noAdmissionIo, tailChanges: noAdmissionIo }
 const optionalStore = provideCapabilities(createBase(), [implement(blob, objectApi), implement(durableChangeFeed, feedApi)])
 if (optionalStore.use(blob) !== objectApi || optionalStore.use(durableChangeFeed) !== feedApi || 'get' in optionalStore) throw new Error('packed independent capability mismatch')
+/** Blob author helpers retain real input snapshots and original resource cleanup after packing. */
+const uploadBytes = new Uint8Array([3])
+const upload = snapshotStorageBlobPut('file', uploadBytes, undefined, 'packed-fixture')
+uploadBytes[0] = 9
+if (upload.body[0] !== 3 || snapshotStorageBlobGet('file', { range: { start: 0, end: 0 } }, 'packed-fixture').options.range.end !== 0 || snapshotStorageBlobList(undefined, undefined, 'packed-fixture').limit !== 100) throw new Error('packed blob input mismatch')
+let blobClosed = 0
+const object = createStorageBlobObject({ key: 'file', size: 1, etag: 'native', updatedAt: 1, metadata: {} }, new ReadableStream({ start(controller) { controller.enqueue(new Uint8Array([3])); controller.close() } }), { close: async () => { blobClosed++ }, report: console.error })
+if ((await object.bytes())[0] !== 3 || blobClosed !== 1) throw new Error('packed blob resource mismatch')
+await object.dispose()
 /** Standard SQL and derived terminals load through the same real packed package root. */
 const sqlPromise = Promise.resolve([{ value: 1 }])
 const nativeSql = createSqlTag({ dialect: 'sqlite', all: () => sqlPromise, get: async () => undefined, run: async () => ({ changes: 0 }) })

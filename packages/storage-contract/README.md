@@ -662,3 +662,7 @@ SPARQL 通过纯 sparqlFragment 与原生 sparql 能力复用规范 RDF 项。�
 vector 与 rdf 现发布各自精确标准原生 API。向量 collection 返回共享 IVectorQueryBuilder/IVectorHit family，保留 topK 前类型状态与可选原生分组；借用 store 生命周期，不获得通用事务投影。payload 声明支持 readonly/optional 便携字段，拒绝 Date/function schema。DeleteCountMode 为 precount 或 scroll；返回真实删除数的引擎保留该计数，Qdrant 依其明确原生策略。发布令牌本身不实现搜索引擎。
 
 RDF add/delete/match 沿同一规范 ground IQuad owner。支持事务的 provider 提供 forTransaction：写入绑定新原 operation view；match 保留真实 family query 与原 iterator 登记。全部完整读终端，包括选择结果、回调与数值终端，均在参数、strict 或空结果失败前进入同一事务 owner；保存查询在到期后拒绝。Feature 方法保持精确泛型投影。change-feed 类型参数先预留，直到共享 watch 契约实现；这些声明不虚称已有 watch 或持久投递。
+
+### Blob 作者接点
+
+后端在原生 I/O 前共用 `snapshotStorageBlobPut`、`snapshotStorageBlobGet` 与 `snapshotStorageBlobList`，独立捕获输入字节和元数据、校验互斥条件与闭区间范围，不消费上传流。`createStorageBlobObject(info, source, { close, report, backend? })` 将一次 stream 或 bytes 消费权接到原资源拥有者；EOF、cancel 与 dispose 释放同一原生内容。主清理保留可拒绝的缓存 Promise，符号清理使用独立缓存 Promise 并报告清理失败。
