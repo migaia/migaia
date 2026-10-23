@@ -24,6 +24,22 @@
     "./client": {
       "types": "./dist/client.d.ts",
       "default": "./dist/client.js"
+    },
+    "./features/hybrid": {
+      "types": "./dist/features/hybrid.d.ts",
+      "default": "./dist/features/hybrid.js"
+    },
+    "./features/recommend": {
+      "types": "./dist/features/recommend.d.ts",
+      "default": "./dist/features/recommend.js"
+    },
+    "./features/group-by": {
+      "types": "./dist/features/group-by.d.ts",
+      "default": "./dist/features/group-by.js"
+    },
+    "./features/management": {
+      "types": "./dist/features/management.d.ts",
+      "default": "./dist/features/management.js"
     }
   },
   "scripts": {
@@ -35,6 +51,7 @@
     "test": "pnpm run build && vitest run"
   },
   "dependencies": {
+    "@migaia/lifecycle": "workspace:^",
     "@migaia/serialize": "workspace:^",
     "@migaia/storage-contract": "workspace:^",
     "@migaia/utils": "workspace:^"

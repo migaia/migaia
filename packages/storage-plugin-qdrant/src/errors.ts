@@ -1,6 +1,7 @@
 import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
 import { attachErrorIdentity, walkErrorCauses } from '@migaia/utils/error'
 import { normalizeError } from '@migaia/storage-host/authoring/backend'
+import { StorageError, StorageErrorCode } from '@migaia/storage-host'
 import { ERROR_SOURCE, QdrantErrorCode, type IQdrantErrorCode } from './error-code.js'
 import { QdrantErrorText } from './error-text.js'
 import { QdrantText } from './constants.js'
@@ -73,7 +74,7 @@ export function normalizeQdrantError(error: unknown): Error {
 export function invalidArgument(cause?: unknown): StorageContractError {
   return new StorageContractError(
     StorageContractErrorCode.invalidArgument,
-    { backend: 'qdrant', cause },
+    { backend: QdrantText.backend, cause },
     QdrantErrorText.argument
   )
 }
@@ -85,4 +86,19 @@ export function capture<T>(read: () => T): T {
     if (cause instanceof StorageContractError) throw cause
     throw invalidArgument(cause)
   }
+}
+
+/** Uncoded logical execution failures are extension failures, never invented network outages. */
+export function normalizeOperationError(error: unknown, operation: string): Error {
+  return normalizeError(
+    error,
+    (cause) =>
+      new StorageError(StorageErrorCode.extensionFailed, {
+        backend: QdrantText.backend,
+        operation,
+        cause
+      }),
+    (value): value is Error =>
+      value instanceof Error && 'source' in value && value.source === ERROR_SOURCE
+  )
 }

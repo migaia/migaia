@@ -1,16 +1,17 @@
 import type { IQdrantOperationName } from './types.js'
 /** Canonical API metadata is shared by native fetch, SDK adaptation and observation. */
-export const QdrantRoute: Record<
-  IQdrantOperationName,
-  {
+export const QdrantRoute: {
+  readonly [K in IQdrantOperationName]: {
+    readonly name: K
     readonly method: 'GET' | 'POST' | 'PUT' | 'DELETE'
     readonly path: string
     readonly query: readonly string[]
     readonly collection: boolean
     readonly parameters: boolean
   }
-> = {
+} = {
   scroll: {
+    name: 'scroll',
     method: 'POST',
     path: 'collections/:collection/points/scroll',
     query: ['consistency', 'timeout'],
@@ -18,6 +19,7 @@ export const QdrantRoute: Record<
     parameters: true
   },
   upsert: {
+    name: 'upsert',
     method: 'PUT',
     path: 'collections/:collection/points',
     query: ['wait', 'ordering'],
@@ -25,6 +27,7 @@ export const QdrantRoute: Record<
     parameters: true
   },
   delete: {
+    name: 'delete',
     method: 'POST',
     path: 'collections/:collection/points/delete',
     query: ['wait', 'ordering'],
@@ -32,6 +35,7 @@ export const QdrantRoute: Record<
     parameters: true
   },
   retrieve: {
+    name: 'retrieve',
     method: 'POST',
     path: 'collections/:collection/points',
     query: ['consistency', 'timeout'],
@@ -39,6 +43,7 @@ export const QdrantRoute: Record<
     parameters: true
   },
   getCollection: {
+    name: 'getCollection',
     method: 'GET',
     path: 'collections/:collection',
     query: [],
@@ -46,6 +51,7 @@ export const QdrantRoute: Record<
     parameters: false
   },
   createCollection: {
+    name: 'createCollection',
     method: 'PUT',
     path: 'collections/:collection',
     query: ['timeout'],
@@ -53,6 +59,7 @@ export const QdrantRoute: Record<
     parameters: true
   },
   getCollections: {
+    name: 'getCollections',
     method: 'GET',
     path: 'collections',
     query: [],
@@ -60,6 +67,7 @@ export const QdrantRoute: Record<
     parameters: false
   },
   deleteCollection: {
+    name: 'deleteCollection',
     method: 'DELETE',
     path: 'collections/:collection',
     query: ['timeout'],
@@ -67,6 +75,7 @@ export const QdrantRoute: Record<
     parameters: true
   },
   query: {
+    name: 'query',
     method: 'POST',
     path: 'collections/:collection/points/query',
     query: ['consistency', 'timeout'],
@@ -74,6 +83,7 @@ export const QdrantRoute: Record<
     parameters: true
   },
   recommend: {
+    name: 'recommend',
     method: 'POST',
     path: 'collections/:collection/points/recommend',
     query: ['consistency', 'timeout'],
@@ -81,6 +91,7 @@ export const QdrantRoute: Record<
     parameters: true
   },
   searchPointGroups: {
+    name: 'searchPointGroups',
     method: 'POST',
     path: 'collections/:collection/points/search/groups',
     query: ['consistency', 'timeout'],
@@ -88,6 +99,7 @@ export const QdrantRoute: Record<
     parameters: true
   },
   updateVectors: {
+    name: 'updateVectors',
     method: 'PUT',
     path: 'collections/:collection/points/vectors',
     query: ['wait', 'ordering'],
@@ -95,6 +107,7 @@ export const QdrantRoute: Record<
     parameters: true
   },
   updateCollectionAliases: {
+    name: 'updateCollectionAliases',
     method: 'POST',
     path: 'collections/aliases',
     query: ['timeout'],
@@ -102,6 +115,7 @@ export const QdrantRoute: Record<
     parameters: true
   },
   createSnapshot: {
+    name: 'createSnapshot',
     method: 'POST',
     path: 'collections/:collection/snapshots',
     query: ['wait'],
@@ -109,6 +123,7 @@ export const QdrantRoute: Record<
     parameters: true
   },
   createPayloadIndex: {
+    name: 'createPayloadIndex',
     method: 'PUT',
     path: 'collections/:collection/index',
     query: ['wait', 'ordering'],
@@ -116,6 +131,7 @@ export const QdrantRoute: Record<
     parameters: true
   },
   count: {
+    name: 'count',
     method: 'POST',
     path: 'collections/:collection/points/count',
     query: ['timeout'],
@@ -123,6 +139,7 @@ export const QdrantRoute: Record<
     parameters: true
   },
   setPayload: {
+    name: 'setPayload',
     method: 'POST',
     path: 'collections/:collection/points/payload',
     query: ['wait', 'ordering'],
@@ -130,6 +147,7 @@ export const QdrantRoute: Record<
     parameters: true
   },
   deletePayload: {
+    name: 'deletePayload',
     method: 'POST',
     path: 'collections/:collection/points/payload/delete',
     query: ['wait', 'ordering'],
@@ -146,10 +164,19 @@ export const QdrantText = {
   org: '$org',
   expiresAt: '$expiresAt',
   envelope: '$migaia',
+  fields: 'migaia_fields',
   version: 1,
   onHttpRequest: 'onHttpRequest',
   json: 'application/json',
   apiKey: 'api-key',
   sdkMinimum: '1.11.0',
+  search: 'vector.search',
+  upsert: 'vector.upsert',
+  delete: 'vector.delete',
+  deleteWhere: 'vector.deleteWhere',
+  ttl: 'ttl.',
+  deleteByFilter: 'qdrant.deleteByFilter',
+  purgeExpired: 'qdrant.purgeExpired',
+  dropOrg: 'org.drop',
   sdkUnexpectedResponse: 'QdrantClientUnexpectedResponseError'
 } as const
