@@ -67,6 +67,13 @@ type IPreauthorizedPackageIdentity = {
   readonly root: string
   readonly tarballLocator: string
 }
+/** Native output captured unchanged from the single configured browser bundler. */
+type IRetainedBrowserChunk = {
+  readonly fileName: string
+  readonly code: string
+  readonly map: unknown
+  readonly modules: Readonly<Record<string, unknown>>
+}
 /** Repository root used by the release and lockfile acceptance probes. */
 const repositoryRoot = resolve(import.meta.dirname, '..', '..', '..')
 /** Reads one JSON file without allowing a module cache to hide a rewritten manifest. */
@@ -246,15 +253,24 @@ async function measureMainBrowserBaseline(smokeDirectory: string) {
       'utf8'
     )
     const modules = new Set<string>()
+    /** Baseline chunks retain the same native metadata and emitted code as the candidate. */
+    const retainedOutputs: IRetainedBrowserChunk[] = []
     await build({
       ...packedBrowserBuild(consumer),
       plugins: [
         {
           name: 'fixed-main-retained',
           generateBundle(_options, bundle) {
-            for (const output of Object.values(bundle))
-              if (output.type === 'chunk')
-                for (const moduleId of Object.keys(output.modules)) modules.add(moduleId)
+            for (const output of Object.values(bundle)) {
+              if (output.type !== 'chunk') continue
+              retainedOutputs.push({
+                fileName: output.fileName,
+                code: output.code,
+                map: output.map,
+                modules: output.modules
+              })
+              for (const moduleId of Object.keys(output.modules)) modules.add(moduleId)
+            }
           }
         }
       ]
@@ -262,6 +278,12 @@ async function measureMainBrowserBaseline(smokeDirectory: string) {
     /** Even baseline measurement must resolve every retained module through its actual packed root. */
     for (const normalized of normalizeRetainedModules(modules, consumer, installed))
       expect(normalized).toMatch(/^(?:app\/bundle-entry\.js|@migaia\/[^/]+\/.+)$/)
+    writeRenderedBrowserModules(
+      'storage-browser-baseline-rendered-modules.json',
+      retainedOutputs,
+      consumer,
+      installed
+    )
     return browserBundleBytes(join(consumer, 'bundle'))
   } finally {
     /** This newly created fixture worktree contains only reproducible installs/build artifacts. */
@@ -270,6 +292,81 @@ async function measureMainBrowserBaseline(smokeDirectory: string) {
       stdio: 'pipe'
     })
   }
+}
+
+/** Save identical native module attribution for the fixed baseline and candidate output. */
+function writeRenderedBrowserModules(
+  cacheFile: string,
+  retainedOutputs: readonly IRetainedBrowserChunk[],
+  consumerDirectory: string,
+  installedPackages: ReadonlyMap<string, IInstalledPackageIdentity>
+): void {
+  /** Native bundler metadata attributes retained code without estimating absent fields. */
+  const renderedModules = retainedOutputs.flatMap((output) =>
+    Object.entries(output.modules).map(([moduleId, value]) => {
+      /** Canonical identity binds each measurement to its already authorized packed root. */
+      const module = normalizeRetainedModule(moduleId, consumerDirectory, installedPackages)
+      /** The app entry is separate from every normally installed package owner. */
+      const packageName =
+        module === 'app/bundle-entry.js'
+          ? 'workspace-root'
+          : ([...installedPackages.keys()].find((name) => module.startsWith(`${name}/`)) ?? null)
+      /** These optional fields are supplied by the real bundler, never synthesized. */
+      const metadata = value as {
+        readonly originalLength?: number
+        readonly renderedLength?: number
+        readonly renderedExports?: readonly string[]
+        readonly removedExports?: readonly string[]
+        readonly code?: string | null
+      }
+      return {
+        fileName: output.fileName,
+        module,
+        packageName,
+        originalLength: metadata.originalLength ?? null,
+        renderedLength: metadata.renderedLength ?? null,
+        renderedExports: metadata.renderedExports ?? null,
+        removedExports: metadata.removedExports ?? null,
+        hostRootRenderedCode:
+          module === '@migaia/storage-host/dist/index.js' ? (metadata.code ?? null) : undefined
+      }
+    })
+  )
+  /** Package totals remain unknown if even one native module length is unavailable. */
+  const renderedPackages = [...new Set(renderedModules.map((module) => module.packageName))].map(
+    (packageName) => {
+      /** Aggregate only modules whose canonical identity resolves to this exact owner. */
+      const modules = renderedModules.filter((module) => module.packageName === packageName)
+      return {
+        packageName,
+        modules: modules.length,
+        originalLength: modules.some((module) => module.originalLength === null)
+          ? null
+          : modules.reduce((total, module) => total + module.originalLength!, 0),
+        renderedLength: modules.some((module) => module.renderedLength === null)
+          ? null
+          : modules.reduce((total, module) => total + module.renderedLength!, 0)
+      }
+    }
+  )
+  writeFileSync(
+    join(repositoryRoot, 'node_modules/.cache', cacheFile),
+    `${JSON.stringify(
+      {
+        lengthUnit: 'Native bundler code length, distinct from final minified/gzip bytes.',
+        packages: renderedPackages,
+        modules: renderedModules,
+        /** Retain actual emitted code so shared host chunks can be inspected after cleanup. */
+        chunks: retainedOutputs.map((output) => ({
+          fileName: output.fileName,
+          code: output.code
+        }))
+      },
+      undefined,
+      2
+    )}\n`,
+    'utf8'
+  )
 }
 
 /** Exact host/entity and selected IndexedDB graph from the authorized packed consumer. */
@@ -629,12 +726,7 @@ describe('host and release boundary', () => {
       const bundleDirectory = join(consumerDirectory, 'bundle')
       writeFileSync(bundleEntry, browserQueryEntry, 'utf8')
       const retainedModuleIds = new Set<string>()
-      const retainedOutputs: {
-        readonly fileName: string
-        readonly code: string
-        readonly map: unknown
-        readonly modules: Readonly<Record<string, unknown>>
-      }[] = []
+      const retainedOutputs: IRetainedBrowserChunk[] = []
       await build({
         ...packedBrowserBuild(consumerDirectory),
         plugins: [
@@ -667,72 +759,11 @@ describe('host and release boundary', () => {
         `${JSON.stringify(retained, undefined, 2)}\n`,
         'utf8'
       )
-      /** Native bundler metadata attributes retained code without estimating absent fields. */
-      const renderedModules = retainedOutputs.flatMap((output) =>
-        Object.entries(output.modules).map(([moduleId, value]) => {
-          /** Canonical identity binds each measurement to its already authorized packed root. */
-          const module = normalizeRetainedModule(moduleId, consumerDirectory, installedPackages)
-          /** The app entry is separate from every normally installed package owner. */
-          const packageName =
-            module === 'app/bundle-entry.js'
-              ? 'workspace-root'
-              : ([...installedPackages.keys()].find((name) => module.startsWith(`${name}/`)) ??
-                null)
-          /** These optional fields are supplied by the real bundler, never synthesized. */
-          const metadata = value as {
-            readonly originalLength?: number
-            readonly renderedLength?: number
-            readonly renderedExports?: readonly string[]
-            readonly removedExports?: readonly string[]
-            readonly code?: string | null
-          }
-          return {
-            fileName: output.fileName,
-            module,
-            packageName,
-            originalLength: metadata.originalLength ?? null,
-            renderedLength: metadata.renderedLength ?? null,
-            renderedExports: metadata.renderedExports ?? null,
-            removedExports: metadata.removedExports ?? null,
-            hostRootRenderedCode:
-              module === '@migaia/storage-host/dist/index.js' ? (metadata.code ?? null) : undefined
-          }
-        })
-      )
-      /** Package totals remain unknown if even one native module length is unavailable. */
-      const renderedPackages = [
-        ...new Set(renderedModules.map((module) => module.packageName))
-      ].map((packageName) => {
-        /** Aggregate only modules whose canonical identity resolves to this exact owner. */
-        const modules = renderedModules.filter((module) => module.packageName === packageName)
-        return {
-          packageName,
-          modules: modules.length,
-          originalLength: modules.some((module) => module.originalLength === null)
-            ? null
-            : modules.reduce((total, module) => total + module.originalLength!, 0),
-          renderedLength: modules.some((module) => module.renderedLength === null)
-            ? null
-            : modules.reduce((total, module) => total + module.renderedLength!, 0)
-        }
-      })
-      writeFileSync(
-        join(repositoryRoot, 'node_modules/.cache/storage-browser-rendered-modules.json'),
-        `${JSON.stringify(
-          {
-            lengthUnit: 'Native bundler code length, distinct from final minified/gzip bytes.',
-            packages: renderedPackages,
-            modules: renderedModules,
-            /** Retain actual emitted code so shared host chunks can be inspected after cleanup. */
-            chunks: retainedOutputs.map((output) => ({
-              fileName: output.fileName,
-              code: output.code
-            }))
-          },
-          undefined,
-          2
-        )}\n`,
-        'utf8'
+      writeRenderedBrowserModules(
+        'storage-browser-rendered-modules.json',
+        retainedOutputs,
+        consumerDirectory,
+        installedPackages
       )
       assertExactRetainedModules(retained)
       const semanticRetained = normalizeSemanticRetainedGraph(
