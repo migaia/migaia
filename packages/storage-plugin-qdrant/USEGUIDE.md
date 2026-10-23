@@ -55,6 +55,8 @@ Hybrid 接受恰两个 named dense/sparse prefetch 分支及 `{fusion:'rrf'}`。
 
 缺省在 host 创建时检测；`autoDetect:false` 必须显式 `host.detect()`。未检测的业务终点拒绝且不发送隐式检测。服务端与 SDK 至少 1.11。
 
+检测检查标准 vector、TTL 与组织清理所需方法。可选原生 Feature 方法在调用时检查；缺少方法时在发送修改前报 `UNSUPPORTED_CAPABILITY`。
+
 `dispose()` 封闭新调用，等待已接受的实际请求及 iterator。主释放与符号释放分别缓存 Promise，共用一次清理。后端从不关闭借用的 HTTP/SDK client。fetch 接收原操作取消信号；SDK 1.11 没有 per-call signal，必须等真实请求结算。写入不自动重试或跟随重定向，已发送失败的结果可能未知。
 
 错误域 `storage.backend.qdrant`：原生 4xx 为 `QDRANT_REQUEST_FAILED`；网络/5xx 为 `QDRANT_UNAVAILABLE`；坏响应或意外响应为 `QDRANT_RESPONSE_INVALID`。保留原错误及适配端能取得的全部证据。HTTP 保留完整 status/body；SDK 1.11 的非等待 snapshot 遇到 202 时，自身 `QdrantClientUnexpectedResponseError` 会丢弃 status 并截断文案，适配器报告 response-invalid，但快照可能已接受。HTTP 端口对此返回原生 null。没有自动 fallback 或重放。hooks 只含净化路由、耗时与可取得的 status，不含认证头或正文。

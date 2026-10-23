@@ -14,6 +14,7 @@ import { qdrantHybridFeature } from '../src/features/hybrid.js'
 import { qdrantRecommendFeature } from '../src/features/recommend.js'
 import { qdrantGroupByFeature } from '../src/features/group-by.js'
 import { nativeHttp } from '../src/native.js'
+import { QdrantManagedVectorName } from '../src/constants.js'
 import type { IQdrantHttp } from '../src/types.js'
 /** Real service addresses come exclusively from the shared fixture launcher. */
 const url = process.env.MIGAIA_QDRANT_URL
@@ -47,6 +48,36 @@ function native() {
   }
 }
 describe('real native vector backend', () => {
+  it.skipIf(!url)(
+    'detects required standard methods and rejects missing optional native methods only on use',
+    async () => {
+      const fixture = native(),
+        http = { ...fixture.http }
+      Reflect.deleteProperty(http, 'createSnapshot')
+      const host = await createStorageHost({
+          plugins: [
+            qdrantBackendPlugin(
+              { url: url!, collectionPrefix: crypto.randomUUID(), http },
+              { management: qdrantManagementFeature() }
+            )
+          ] as const
+        }),
+        store = host.backend('qdrant')
+      try {
+        const collection = store.use(vector).collection('valid', { dimensions: 1, metric: 'dot' })
+        await collection.upsert([{ id: 'one', vector: [1] }])
+        const before = fixture.calls.length
+        await expect(async () =>
+          store.api.qdrantManagement!.createSnapshot(fixture.created[0]!, { wait: true })
+        ).rejects.toMatchObject({ code: 'UNSUPPORTED_CAPABILITY' })
+        expect(fixture.calls).toHaveLength(before)
+      } finally {
+        await host.dispose()
+        await fixture.close()
+      }
+    },
+    30_000
+  )
   it.skipIf(!url)(
     'retains native precount divergence and the actual multi-page scroll collection boundary',
     async () => {
@@ -313,6 +344,32 @@ describe('real native vector backend', () => {
             collection.upsert([{ id: 'bad', vector: [1, Number.NaN], payload }])
           ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' })
         }
+        const recommendation = store
+          .use(vector)
+          .collection('amplitude', { dimensions: 2, metric: 'cosine' })
+        await recommendation.upsert([
+          { id: 'p1', vector: [100, 0] },
+          { id: 'p2', vector: [0, 1] },
+          { id: 'c1', vector: [1, 0] },
+          { id: 'c2', vector: [1, 1] }
+        ])
+        const beforeSamples = fixture.requests.length
+        expect(
+          (
+            await recommendation
+              .recommend({ positive: ['p1', 'p2'] })
+              .topK(1)
+              .withVector()
+              .all()
+          )[0]!.id
+        ).toBe('c1')
+        const requests = fixture.requests.slice(beforeSamples)
+        for (const request of requests.filter((item) => item.operation === 'retrieve'))
+          expect(request.args[1]).toMatchObject({ with_vector: [QdrantManagedVectorName.source] })
+        expect(requests.find((request) => request.operation === 'query')!.args[1]).toMatchObject({
+          using: QdrantManagedVectorName.search,
+          with_vector: [QdrantManagedVectorName.source]
+        })
         const saved = store.use(vector).collection('cosine').near([1, 0]).topK(1)
         await host.dispose()
         await expect(saved.all()).rejects.toMatchObject({ code: 'STORE_DISPOSED' })
@@ -428,9 +485,26 @@ describe('real native vector backend', () => {
         expect(
           await store.api.qdrantManagement!.createCollection(name, {
             vectors: { dense: { size: 2, distance: 'Cosine' } },
-            sparse_vectors: { sparse: {} }
+            sparse_vectors: { sparse: {} },
+            quantization_config: { scalar: { type: 'int8', always_ram: true } }
           })
         ).toBe(true)
+        expect((await fixture.http.getCollection(name)).config.quantization_config).toMatchObject({
+          scalar: { type: 'int8', always_ram: true }
+        })
+        const alias = name + '_current'
+        expect(
+          await store.api.qdrantManagement!.updateCollectionAliases({
+            actions: [{ create_alias: { collection_name: name, alias_name: alias } }]
+          })
+        ).toBe(true)
+        expect((await fixture.http.getCollection(alias)).config.params.vectors).toMatchObject({
+          dense: { size: 2, distance: 'Cosine' }
+        })
+        await store.api.qdrantManagement!.updateCollectionAliases({
+          actions: [{ delete_alias: { alias_name: alias } }]
+        })
+        expect(await store.api.qdrantManagement!.createSnapshot(name, { wait: false })).toBeNull()
         await fixture.http.upsert(name, {
           points: [
             {
