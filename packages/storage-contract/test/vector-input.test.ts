@@ -189,6 +189,44 @@ describe('vector native input snapshots', () => {
       )
   })
 
+  it('captures search query, options and filter before native schema lookup', () => {
+    let reads = 0
+    const query = [0]
+    const allowed = ['one']
+    const captured = contract.snapshotStorageVectorSearch(query, {
+      get k() {
+        reads += 1
+        return 1
+      },
+      get filter() {
+        reads += 1
+        return { field: 'category', in: allowed }
+      },
+      get withPayload() {
+        reads += 1
+        return true
+      },
+      get exact() {
+        reads += 1
+        return true
+      }
+    })
+    query[0] = 9
+    allowed.push('two')
+    expect(reads).toBe(4)
+    expect(captured).toEqual({
+      query: [0],
+      options: { k: 1, filter: { field: 'category', in: ['one'] }, withPayload: true, exact: true }
+    })
+    expect(() =>
+      contract.snapshotStorageVector(captured.query, { dimensions: 1, metric: 'cosine' })
+    ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT' }))
+    expect(() => contract.snapshotStorageVectorSearch([NaN], { k: 0 })).toThrowError(
+      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+    )
+    expect(reads).toBe(4)
+  })
+
   it('snapshots search once and validates k=0 without suppressing invalid input', () => {
     let queryReads = 0
     let filterReads = 0

@@ -728,3 +728,5 @@ RDF 的客户端 `follow`/`inverse` 现在沿同一 reader 逐前驱调用原 `s
 原生后端可在既有 `IQueryPushdown` 上提供可选纯 `canPushCondition(condition)`，用同一原生翻译器判定规范 AST 的实际值域是否可忠实下推。原操作符与对象身份规则先执行；false 保留客户端步骤并使 `requirePushdown` 在 I/O 前拒绝，省略保持既有语义。函数和原 receiver 单次捕获，不增加查询执行器。
 
 `snapshotStorageVectorUpsert(points, configuration?)` 可省略配置以在原生 schema 查询前完整捕获 batch。此时仍沿原有限分量、稠密数组与 serialize payload 规则，不推断维度或 metric；取得真实 schema 后，对已脱离的 vector 调同一 `snapshotStorageVector` 校验再写入。显式配置的语义、错误与读取顺序不变。
+
+`snapshotStorageVectorSearch(query, options, configuration?)` 同样可在 schema 查询前捕获原查询、全部 options 与 filter；取得真实 schema 后只用原 `snapshotStorageVector` 复核已脱离的 query。显式配置仍先于 option getter 校验。五个原 helper 已统一核对：collection/vector/upsert/search 的 schema 均可省，filter 不依赖 schema；都不推断或查询原生配置。
