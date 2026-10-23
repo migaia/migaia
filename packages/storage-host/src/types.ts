@@ -201,9 +201,11 @@ export type IStorageFeatureOutput<
   A extends IStorageFeatureApi = IStorageFeatureApi
 > = { readonly capabilities: C; readonly chain: M; readonly api: A }
 type IInvalidMethods<C> = {
-  [G in keyof C]: {
-    [N in keyof C[G]]: C[G][N] extends (...args: never[]) => unknown ? never : N
-  }[keyof C[G]]
+  [G in keyof C]-?: {
+    [N in keyof NonNullable<C[G]>]: NonNullable<C[G]>[N] extends (...args: never[]) => unknown
+      ? never
+      : N
+  }[keyof NonNullable<C[G]>]
 }[keyof C]
 type IExactOutput<O extends IStorageFeatureOutput> = Record<
   Exclude<keyof O, keyof IStorageFeatureOutput>,
@@ -306,6 +308,10 @@ export type IStoragePluginCore<F extends IStorageFeatureRecord = {}> = Pick<
     readonly execution: IStorageExecutionPort
     readonly hooks: IStorageHooks
     readonly stageBindings: IBackendStageBindings
+    /** Project selected transaction methods onto the original backend-created view before freeze. */
+    createTransactionApi(scope: object): object | undefined
+    /** Read installed methods for one actual original fluent creator; omission allocates nothing. */
+    getChainMethods(family: keyof IChainMethods): object | undefined
     createKeyLockPort(): IBackendKeyLockPort
     /** Construct revision facts for one physical data universe during this installation window. */
     createRevisionPort(): IBackendRevisionPort
