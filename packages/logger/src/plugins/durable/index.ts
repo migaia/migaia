@@ -1,6 +1,11 @@
 export { memoryLogStore } from './store.js'
 export { snapshotLogRecords } from './snapshot.js'
-export { prepareLogAppend, snapshotLogStoreState, createLogStoreIndex } from './committed-index.js'
+export {
+  assertLogInteger,
+  prepareLogAppend,
+  snapshotLogStoreState,
+  createLogStoreIndex
+} from './committed-index.js'
 export type {
   ILogRecordSnapshot,
   ILogStoreSnapshot,

@@ -1494,6 +1494,23 @@ ${create}
     }
   },
   symbols: {
+    assertLogInteger: {
+      role: 'operation',
+      purpose: t(
+        'Assert the original safe-integer domain and preserve numeric error semantics.',
+        '校验原安全整数范围并保留数字错误语义。'
+      ),
+      returns: t(
+        'Narrows unknown to number; the default minimum is one.',
+        '将 unknown 收窄为 number；缺省最小值为一。'
+      ),
+      example: `import { assertLogInteger } from '@migaia/logger/plugins/durable'
+
+const input: unknown = 0
+assertLogInteger(input, 0)
+console.log(input)`,
+      cases: loggerCases.integerAdmission
+    },
     snapshotLogRecords: {
       role: 'factory',
       purpose: t(

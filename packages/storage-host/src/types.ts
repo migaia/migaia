@@ -356,7 +356,8 @@ export type IStorageNativePluginDescriptor<
   expose?(): Record<string, unknown> & ThisType<IStoragePluginCallContext>
   featureExpose?(): object
   capabilityInstaller?(store: S): ICapabilityInstallPort
-  journalBinding?(store: S): never
+  /** Capture original private journal I/O once after this exact store is admitted. */
+  journalBinding?(store: S): import('./journal/types.js').IStorageJournalBackendBinding
 }
 export declare const storageBackendPluginExtensionsBrand: unique symbol
 export type IStorageNativePluginExtensions<D extends IStorageNativePluginDescriptor> = (D extends {

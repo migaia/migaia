@@ -93,6 +93,7 @@ export function memoryBackendPlugin<
         }
       }),
       capabilityInstaller: (_store: IMemoryBackendStore) => constructed!.installer,
+      journalBinding: (_store: IMemoryBackendStore) => constructed!.journalBinding,
       install: () => {
         constructed = createMemoryBackend(core, captured.options, captured.capacity)
         core.registerStore(constructed.store)

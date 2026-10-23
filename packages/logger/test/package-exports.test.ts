@@ -8,6 +8,7 @@ describe('durable package entries', () => {
     expect(Object.keys(entry).sort()).toEqual([
       'LogRecordState',
       'LogStage',
+      'assertLogInteger',
       'binlog',
       'createLogStoreIndex',
       'memoryLogStore',

@@ -1,3 +1,4 @@
+import type { IRecordIndexHandle } from '../secondary-index.js'
 import type { IStorageCapabilities } from '../capabilities.js'
 import type { IAnyStorageCapability, ICapabilityApi, IStorageStore } from '../capability.js'
 import type { IStorageIterator, IStorageResource } from '../resource.js'
@@ -47,6 +48,11 @@ export type IConformanceSubject<TStore extends IStorageStore<never>> = {
   readonly create: () => TStore | PromiseLike<TStore>
   readonly capabilities: readonly IAnyStorageCapability[]
   readonly features: IStorageCapabilities
+  /** Let the native owner prepare this fresh empty fixture's index generation before assertions. */
+  readonly prepareSecondaryIndexes?: (
+    store: TStore,
+    handle: IRecordIndexHandle
+  ) => void | PromiseLike<void>
 }
 /** Private registration adapter borrows one original store for exactly one case. */
 export type IConformanceCase = (
@@ -76,10 +82,10 @@ export function conformanceApi<TCap extends IAnyStorageCapability>(
 }
 
 /** Assert the complete declared snapshots and authentic token shape for every fresh fixture. */
-export function inspectConformanceSubject(
+export function inspectConformanceSubject<TStore extends IStorageStore<never>>(
   harness: IConformanceHarness,
-  subject: IConformanceSubject<IStorageStore<never>>,
-  store: IStorageStore<never>
+  subject: IConformanceSubject<TStore>,
+  store: TStore
 ): void {
   /** Original admission owns resource, backend and capability descriptor validation. */
   const admitted = snapshotStorageBaseDetailed(store, { asyncDisposeKey: Symbol.asyncDispose })

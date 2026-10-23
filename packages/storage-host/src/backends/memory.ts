@@ -5,6 +5,7 @@ import type { IBackendChangeController } from '../core/change-controller.js'
 import {
   StorageContractError,
   StorageContractErrorCode,
+  ConcurrencyPolicy,
   assertStringStorageKey,
   snapshotStorageKey,
   snapshotStorageBatchKeys,
@@ -112,6 +113,9 @@ import { parseObjectPath } from '@migaia/utils/object-path'
 import { rankMemoryVectors, recommendStorageVector } from './vector-core.js'
 import { createMemoryRdfIndex, memoryRdfKeys, type IMemoryRdfKeys } from './rdf-core.js'
 import { createMemoryBlobData } from './memory-blob.js'
+import { createMemoryJournalData, type IMemoryJournalTransaction } from './memory-journal.js'
+import type { IStorageJournalBackendBinding } from '../journal/types.js'
+import { storageJournalLockKey, StorageJournalLock } from '../journal/keys.js'
 import { detectServerRuntime } from '@migaia/utils'
 import { isUint8Array, utf8ByteLength } from '@migaia/utils/bytes'
 import { StorageError, StorageErrorCode, type IStorageChannel } from '../errors.js'
@@ -172,6 +176,8 @@ const rdfOperations = Symbol()
 const queryDraft = Symbol()
 /** The record binder keeps the current scope's actual query factory and accepted operation. */
 const recordQueries = Symbol()
+/** Journal metadata borrows this authentic view's original draft and terminal callbacks only. */
+const journalOperations = Symbol()
 /** One private selector keeps the native ranking algorithm shared by read and write cursors. */
 type IMemoryVectorSelection<P> = (
   input: IVectorQueryInput,
@@ -203,6 +209,7 @@ type IMemoryScope<T> = ITransactionScope<
   readonly [rdfOperations]: ITransactionRdfApi
   readonly [queryDraft]: IMemoryQueryDraft
   readonly [recordQueries]: ITransactionRecordsApi['query']
+  readonly [journalOperations]: IMemoryJournalTransaction
 }
 /** The original store retains the concrete complete native transaction view. */
 type IMemoryBase<T> = Omit<ISyncCapableStore<IRecordStore<T>>, 'transaction'> &
@@ -323,9 +330,19 @@ export function createMemoryBackend<T = unknown>(
     orgBinding: {
       backend: (orgId: string) => forOrg(orgId).store,
       drop: async (orgId: string) => {
-        await forOrg(orgId).store.clearAll()
+        const current = forOrg(orgId)
+        await current.store.clearAll()
+        current.journal.clear()
       }
     },
+    journalBinding: (() => {
+      /** The descriptor owns one projector; every result closes over one existing physical org. */
+      const binding = (orgId: string): IStorageJournalBackendBinding => ({
+        forOrg: binding,
+        openNamespace: (prefix) => forOrg(orgId).journal.open(prefix)
+      })
+      return binding(core.defaultOrgId)
+    })(),
     assertScope: (scope: ITransactionScope) => {
       for (const physical of namespaces.values()) {
         try {
@@ -403,6 +420,49 @@ function createMemoryNamespace<T>(
   let installer!: ICapabilityInstallPort
   /** Native transaction views share this namespace's original canonical owner. */
   let owner!: ReturnType<typeof createTransactionOwner<T>>
+  /** Private metadata uses this same physical namespace, original native attempt and owner. */
+  const journal = createMemoryJournalData({
+    assertLive: controller.assertLive,
+    report: (error) => reportCleanupError(report, error),
+    closingSignal: controller.closingSignal,
+    reserve: (prefix, run) =>
+      runWithConcurrency(
+        {
+          store: base,
+          options: { lock: [storageJournalLockKey(prefix, StorageJournalLock.resource)] },
+          policy: ConcurrencyPolicy.fail()
+        },
+        {
+          attempt: (context) =>
+            locks.attemptMetadata(
+              context,
+              holding(),
+              {
+                attempt: async () => {
+                  await run()
+                  return { status: 'committed', value: undefined }
+                }
+              },
+              core.stageBindings.concurrencyStages(store),
+              controller.closingSignal
+            )
+        }
+      ),
+    transaction: (prefix, work) =>
+      atomicEntry(
+        MemoryOperation.transaction,
+        () => work,
+        undefined,
+        (captured) => ({
+          keys: [storageJournalLockKey(prefix, StorageJournalLock.head)],
+          invoke: (scope) => captured(scope[journalOperations])
+        })
+      ),
+    scope: (scope) => ({
+      info: assertTransactionOwner(store, scope),
+      port: (scope as IMemoryScope<T>)[journalOperations]
+    })
+  })
   /** Root lifecycle finalization releases each namespace's physical facts exactly once. */
   const finalize = async () => {
     await locks.dispose()
@@ -417,6 +477,7 @@ function createMemoryNamespace<T>(
     vectorCollections.clear()
     rdfIndex.clear()
     blobs.clear()
+    journal.clear()
   }
   /** Unknown backend callback failures gain their original memory transaction boundary. */
   const normalize = (cause: unknown, expiredScope?: true) =>
@@ -1503,6 +1564,10 @@ function createMemoryNamespace<T>(
     controller.assertLive()
     throwIfAborted(ctx.signal)
     setCapacityIdentities?.([])
+    /** Private log writes and terminal effects belong to this exact original native attempt. */
+    let journalDraft: ReturnType<typeof journal.draft> | undefined
+    /** Ordinary transactions allocate no private metadata rows or terminal channels until used. */
+    const privateJournal = () => (journalDraft ??= journal.draft())
     /** Only touched identities retain draft entries; rollback never rewrites committed maps. */
     const draft = new Map<string, IMemoryDraft>()
     /** Each channel draft reuses the same compressed radix implementation, including tombstones. */
@@ -1890,6 +1955,22 @@ function createMemoryNamespace<T>(
     const createScope = (): IMemoryScope<T> => {
       /** Each method closes over its own authentic view, never an independently registered guard. */
       const scope: IMemoryScope<T> = {
+        [journalOperations]: {
+          run: (prefix, work) =>
+            runTransactionOperation(scope, (current) =>
+              privateJournal().port.run(prefix, work, (run) =>
+                runTransactionOperation(current, run)
+              )
+            ),
+          onCommit: (effect) => {
+            assertTransactionOwner(store, scope)
+            return privateJournal().port.onCommit(effect)
+          },
+          onRollback: (effect) => {
+            assertTransactionOwner(store, scope)
+            return privateJournal().port.onRollback(effect)
+          }
+        },
         [queryDraft]: {
           record: (request, run) => {
             assertTransactionOwner(store, scope)
@@ -2342,6 +2423,12 @@ function createMemoryNamespace<T>(
       }
       /** Expiry after an observed read changes the same original revision before commit checks. */
       for (const entry of expected.values()) liveEntry(entry.channel, entry.encoded)
+      /** The same original retry owner handles concurrent private-head changes and drop/reopen. */
+      const journalConflict = journalDraft?.conflict()
+      if (journalConflict !== undefined) {
+        void stage.afterRollback?.(StorageContractErrorCode.writeConflict)
+        return { status: 'conflict', phase: 'commit', keys: [], holder: undefined }
+      }
       /** Conflict identities are collected before the synchronous all-channel draft merge. */
       const conflicts = [...expected.values()].filter(
         (entry) =>
@@ -2466,6 +2553,8 @@ function createMemoryNamespace<T>(
           bump(proposed.channel, encoded)
           changed[proposed.channel].push(proposed.key)
         }
+        journalDraft?.commit()
+        journalDraft?.complete(true)
         for (const channel of physicalChannels)
           if (changed[channel].length !== 0) publish(channel, 'batch', changed[channel])
       })
@@ -2486,6 +2575,7 @@ function createMemoryNamespace<T>(
       void stage.afterRollback?.(primary.code)
       throw primary
     } finally {
+      journalDraft?.complete(false)
       control.close()
       draft.clear()
       snapshots.clear()
@@ -3541,7 +3631,7 @@ function createMemoryNamespace<T>(
     defaultPolicy: options.concurrency,
     concurrencyStages: core.stageBindings.concurrencyStages(store)
   })
-  return { store, controller, installer, finalize }
+  return { store, controller, installer, finalize, journal }
 }
 
 /** Precise native store shape is retained by the first-party plugin factory. */

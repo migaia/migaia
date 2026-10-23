@@ -59,6 +59,32 @@ try {
         'The record is readable after the original native transaction completes. An operation failure rolls back participating channels. Timers and network waits do not preserve native activity.',
         '原生事务完成后可读到记录；操作失败会回滚参与的数据通道，定时器和网络等待不保留原生活跃性。'
       )
+    },
+    {
+      title: t('Keep an expiry draft in the native transaction', '在原生事务中提交期限草稿'),
+      problem: t(
+        'A text entry and its expiry must share one atomic rollback boundary.',
+        '文本值与期限需要共用原子的回滚边界。'
+      ),
+      example: `import { createStorageHost } from '@migaia/storage-host'
+import { ttl } from '@migaia/storage-contract'
+import { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'
+
+const host = await createStorageHost({ plugins: [indexedDbBackendPlugin({dbName:'expiry'})] })
+try {
+  const store=host.backend('indexed-db')
+  await store.transaction(async(scope)=>{
+    await scope.set('draft','temporary')
+    await scope.use(ttl).expire({channel:'text',key:'draft'},0)
+  })
+  console.log(await store.get('draft'))
+} finally {
+  await host.dispose()
+}`,
+      result: t(
+        'Prints null. A zero duration removes the target in the same native transaction; text, bytes and records share the TTL capability.',
+        '输出 null。零期限在同一原生事务删除目标，文本、字节和记录均支持 TTL 能力。'
+      )
     }
   ],
   cookieBackendPlugin: [

@@ -10,7 +10,7 @@ import {
 } from '../../errors.js'
 import { createObservation } from './observation.js'
 import { logStorageFailure } from './store.js'
-import { requireInteger } from './committed-index.js'
+import { assertLogInteger } from './committed-index.js'
 import { LogOperation, LogStage } from './state-constants.js'
 import { DurableText } from './text.js'
 import type { IDurablePluginOptions, ILogAppendPort, ILogPayload, ILogStore } from './types.js'
@@ -316,7 +316,7 @@ export function captureLimit(options: { readonly limit?: number } | undefined): 
     if (options !== undefined && (!options || typeof options !== 'object'))
       throw createLoggerTypeError(LoggerErrorCode.invalidOption, DurableText.invalidOption)
     const limit = options?.limit ?? 100
-    requireInteger(limit, 0)
+    assertLogInteger(limit, 0)
     return limit
   } catch (error) {
     throw optionFailure(error)

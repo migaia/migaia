@@ -1,5 +1,5 @@
 import { createLoggerError, createLoggerTypeError, LoggerErrorCode } from '../../errors.js'
-import { requireInteger } from './committed-index.js'
+import { assertLogInteger } from './committed-index.js'
 import { snapshotPayload, snapshotLogRecords } from './snapshot.js'
 import {
   captureDurableOptions,
@@ -176,7 +176,7 @@ export function binlog(options: IBinlogOptions): IDurablePlugin<IBinlogExt> {
         read: (fromSeq, readOptions) => {
           let limit: number
           try {
-            requireInteger(fromSeq)
+            assertLogInteger(fromSeq)
             limit = captureLimit(readOptions)
           } catch (error) {
             return Promise.reject(error)
@@ -186,7 +186,7 @@ export function binlog(options: IBinlogOptions): IDurablePlugin<IBinlogExt> {
         lastSeq: () => runtime.run(LogOperation.lastSeq, () => runtime.store.lastSeq()),
         truncate: (beforeSeq) => {
           try {
-            requireInteger(beforeSeq)
+            assertLogInteger(beforeSeq)
           } catch (error) {
             return Promise.reject(error)
           }
@@ -203,7 +203,7 @@ export function binlog(options: IBinlogOptions): IDurablePlugin<IBinlogExt> {
         },
         subscribe: (fromSeq, listener) => {
           runtime.admit()
-          requireInteger(fromSeq)
+          assertLogInteger(fromSeq)
           if (typeof listener !== 'function')
             throw createLoggerTypeError(LoggerErrorCode.invalidOption, DurableText.invalidOption)
           const cursor: ICursor = {

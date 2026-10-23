@@ -238,6 +238,9 @@ type IStorageNativeCore = IPluginHostCore<IStoragePipelineInput> & {
   readonly createTransactionApi: IStoragePluginCore['createTransactionApi']
   readonly getChainMethods: IStoragePluginCore['getChainMethods']
   setStorageFeatureProjection(projection: IStorageFeatureProjection | undefined): void
+  setStorageJournalBinding(
+    binding: import('./journal/types.js').IStorageJournalBackendBinding
+  ): void
   readonly defaultOrgId: string
   readonly createRevisionPort: IStoragePluginCore['createRevisionPort']
   readonly createChangeController: IStoragePluginCore['createChangeController']
@@ -355,6 +358,9 @@ export const definePlugin: IStorageDefinePlugin = ((
       /** The provider-issued installation port belongs to this exact backend construction. */
       const capabilityInstaller =
         metadata.capabilityInstaller as IStorageNativePluginDescriptor['capabilityInstaller']
+      /** The original descriptor factory grants journal access only after exact store admission. */
+      const journalBinding =
+        metadata.journalBinding as IStorageNativePluginDescriptor['journalBinding']
 
       if (kind !== undefined && !kinds.has(kind))
         throw createStorageTypeError(
@@ -386,6 +392,10 @@ export const definePlugin: IStorageDefinePlugin = ((
                 throw createStorageTypeError(
                   StorageErrorCode.backendPluginInvalid,
                   StorageErrorText.backendPluginInvalid
+                )
+              if (kind !== undefined && journalBinding !== undefined)
+                nativeCore.setStorageJournalBinding(
+                  Reflect.apply(journalBinding, descriptor, [nativeCore.getStore()])
                 )
               if (kind !== undefined && features !== undefined) {
                 /** An empty selection creates neither a projection nor an extra cleanup closure. */

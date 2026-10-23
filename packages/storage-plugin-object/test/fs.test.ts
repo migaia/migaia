@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { describe, it, expect, onTestFinished, vi } from 'vitest'
 import { createStorageHost, createOrgId } from '@migaia/storage-host'
 import { blob } from '@migaia/storage-contract'
+import { runConformance } from '@migaia/storage-contract/conformance'
 import { objectBackendPlugin } from '../src/index.js'
 import { fsObjectDriver } from '../src/fs.js'
 import { objectPresignFeature } from '../src/features/presign.js'
@@ -20,6 +21,26 @@ async function installed() {
   })
   return { directory, host, api: host.backend('object').use(blob) }
 }
+
+runConformance(
+  { describe, it, expect },
+  {
+    name: 'fresh native filesystem blob conformance',
+    create: async () => (await installed()).host.backend('object'),
+    capabilities: [blob],
+    features: {
+      syncRead: false,
+      binary: false,
+      records: false,
+      transactions: false,
+      iteration: false,
+      secondaryIndexes: false,
+      changeFeed: false,
+      maxValueBytes: undefined,
+      opaqueEntries: false
+    }
+  }
+)
 
 describe('native filesystem objects', () => {
   it('publishes immutable data/metadata snapshots, inclusive ranges and one content right', async () => {
