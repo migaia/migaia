@@ -1,3 +1,4 @@
+import { asyncDisposeKey } from '@migaia/plugin-host'
 import { describe, expect, it, vi } from 'vitest'
 import { deferred, type IAbortSignal } from '@migaia/utils/promise'
 import {
@@ -713,8 +714,8 @@ describe('the shared local key-lock provider', () => {
     /** The two resource entries retain independent cached Promise identities. */
     const disposal = current.port.dispose()
     expect(current.port.dispose()).toBe(disposal)
-    const symbolic = current.port[Symbol.asyncDispose]()
-    expect(current.port[Symbol.asyncDispose]()).toBe(symbolic)
+    const symbolic = current.port[asyncDisposeKey]()
+    expect(current.port[asyncDisposeKey]()).toBe(symbolic)
     expect(symbolic).not.toBe(disposal)
     /** A closed port rejects new work without running its native callback. */
     const late = vi.fn(async () => ({ status: 'committed' as const, value: 0 }))

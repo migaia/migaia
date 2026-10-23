@@ -1,3 +1,4 @@
+import { asyncDisposeKey } from '@migaia/plugin-host'
 import {
   kv,
   isChangeFeedStore,
@@ -240,7 +241,11 @@ describe('memory backend', () => {
   })
   it('dispose 后 sync 方法也拒绝', async () => {
     const store = await memoryBackend()
-    await store.dispose()
+    const disposal = store.dispose()
+    const symbolic = store[asyncDisposeKey]()
+    expect(store[asyncDisposeKey]()).toBe(symbolic)
+    expect(symbolic).not.toBe(disposal)
+    await Promise.all([disposal, symbolic])
     expect(() => store.sync!.get('k')).toThrow(expect.objectContaining({ code: 'STORE_DISPOSED' }))
   })
   it('iterate 按 range 的 lower/upper 边界过滤', async () => {
@@ -270,6 +275,10 @@ describe('memory backend', () => {
     await expect(iterator.next()).resolves.toMatchObject({ value: [['tenant', 2], { value: 2 }] })
     await expect(iterator.next()).resolves.toMatchObject({ value: [['tenant', 3], { value: 3 }] })
     await expect(iterator.next()).resolves.toMatchObject({ done: true })
+    const symbolic = iterator[asyncDisposeKey]()
+    expect(iterator[asyncDisposeKey]()).toBe(symbolic)
+    expect(symbolic).not.toBe(iterator.dispose())
+    await symbolic
   })
   it('自动生成 key 在 crypto.randomUUID 不可用时回退', async () => {
     const original = crypto.randomUUID

@@ -1,3 +1,4 @@
+import { asyncDisposeKey } from '@migaia/plugin-host'
 import {
   StorageContractError,
   StorageContractErrorCode,
@@ -663,7 +664,7 @@ export function createMemoryBackend<T = unknown>(
       return controller.subscribe(listener)
     },
     dispose: () => controller.dispose(),
-    [Symbol.asyncDispose]: () =>
+    [asyncDisposeKey]: () =>
       (symbolic ??= controller.dispose().catch((error) => reportCleanupError(report, error)))
   }
 
@@ -746,7 +747,7 @@ export function createMemoryBackend<T = unknown>(
         ),
       return: (value) => (returned ??= dispose().then(() => ({ done: true, value }))),
       dispose,
-      [Symbol.asyncDispose]: () =>
+      [asyncDisposeKey]: () =>
         (symbolic ??= dispose().catch((error) => reportCleanupError(report, error))),
       [Symbol.asyncIterator]() {
         return this
@@ -1342,6 +1343,7 @@ export function createMemoryBackend<T = unknown>(
     }
   )
   owner = createTransactionOwner<T>(store, normalize, {
+    asyncDisposeKey,
     defaultPolicy: options.concurrency,
     concurrencyStages: core.stageBindings.concurrencyStages(store)
   })
