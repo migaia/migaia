@@ -158,7 +158,17 @@ export async function recoverStorageLog(
       yield row
     }
   }
-  const snapshot = snapshotLogStoreState(head, rows())
+  let snapshot: ILogStoreSnapshot
+  try {
+    snapshot = snapshotLogStoreState(head, rows())
+  } catch (cause) {
+    /** The canonical validator can retain this generator's original journal error on one cause. */
+    const original =
+      cause instanceof StorageError ? cause : cause instanceof Error ? cause.cause : undefined
+    if (original instanceof StorageError && original.code === StorageErrorCode.journalRecordInvalid)
+      throw original
+    invalid(cause)
+  }
   await reclaimStorageLogRows(view, head)
   return snapshot
 }

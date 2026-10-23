@@ -76,6 +76,29 @@ function nonAtomicPrivatePlugin(fault: {
 }
 
 describe('private storage log resource', () => {
+  it('attributes malformed owned payloads to the journal wire while retaining the canonical validator cause', async () => {
+    await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+    await using raw = await resolveStorageJournalBinding(host, 'memory').binding.openNamespace(
+      'corrupt-payload'
+    )
+    await raw.run(async (view) => {
+      await view.set(
+        'head',
+        JSON.stringify({ format: 1, generation: 1, lastSeq: 1, time: 1, floor: 1 })
+      )
+      await view.set(
+        'record:0000000000000001',
+        '{"generation":1,"record":{"seq":1,"time":1,"kind":"event","payload":1e999}}'
+      )
+    })
+    await raw.dispose()
+    await expect(
+      storageLogStore(host, 'memory', { prefix: 'corrupt-payload' })
+    ).rejects.toMatchObject({
+      code: 'JOURNAL_RECORD_INVALID',
+      cause: { code: 'LOG_STORE_CORRUPT', cause: { code: 'LOG_PAYLOAD_INVALID' } }
+    })
+  })
   it('preserves the original exhausted sequence error without sealing committed reads', async () => {
     await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
     await using raw = await resolveStorageJournalBinding(host, 'memory').binding.openNamespace(
