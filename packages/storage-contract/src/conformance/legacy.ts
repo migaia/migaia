@@ -192,11 +192,11 @@ export function recordsConformance(
     // Other native isolation guarantees remain in the corresponding backend's own conformance.
     if (store.backend !== 'memory' && store.backend !== 'indexed-db') {
       await store.transaction(async (tx) => {
-        await expect(tx.getRecord('revision-conflict')).resolves.toEqual({ value: 0 })
-        await tx.putRecord({ value: 1 }, 'revision-conflict')
+        await expect(tx.getRecord('aba-record')).resolves.toEqual({ value: 0 })
+        await tx.putRecord({ value: 1 }, 'aba-record')
       })
-      await store.putRecord({ value: 2 }, 'revision-conflict', { conflictPolicy: 'replace' })
-      await expect(store.getRecord('revision-conflict')).resolves.toEqual({ value: 2 })
+      await store.putRecord({ value: 2 }, 'aba-record', { conflictPolicy: 'replace' })
+      await expect(store.getRecord('aba-record')).resolves.toEqual({ value: 2 })
       return
     }
     if (store.backend === 'indexed-db') {
@@ -430,11 +430,11 @@ export function transactionsConformance(
     // Other native isolation guarantees remain in the corresponding backend's own conformance.
     if (store.backend !== 'memory' && store.backend !== 'indexed-db') {
       await store.transaction(async (tx) => {
-        await expect(tx.getRecord('repeatable-read')).resolves.toEqual({ value: 0 })
-        await expect(tx.getRecord('repeatable-read')).resolves.toEqual({ value: 0 })
+        await expect(tx.getRecord('revision-conflict')).resolves.toEqual({ value: 0 })
+        await expect(tx.getRecord('revision-conflict')).resolves.toEqual({ value: 0 })
       })
-      await store.putRecord({ value: 1 }, 'repeatable-read', { conflictPolicy: 'replace' })
-      await expect(store.getRecord('repeatable-read')).resolves.toEqual({ value: 1 })
+      await store.putRecord({ value: 1 }, 'revision-conflict', { conflictPolicy: 'replace' })
+      await expect(store.getRecord('revision-conflict')).resolves.toEqual({ value: 1 })
       return
     }
     if (store.backend === 'indexed-db') {
@@ -475,11 +475,11 @@ export function transactionsConformance(
     // Other native isolation guarantees remain in the corresponding backend's own conformance.
     if (store.backend !== 'memory' && store.backend !== 'indexed-db') {
       await store.transaction(async (tx) => {
-        await tx.putRecord({ value: 2 }, 'aba-record')
+        await expect(tx.getRecord('repeatable-read')).resolves.toEqual({ value: 0 })
+        await expect(tx.getRecord('repeatable-read')).resolves.toEqual({ value: 0 })
       })
-      await store.clearRecords()
-      await store.putRecord({ value: 1 }, 'aba-record')
-      await expect(store.getRecord('aba-record')).resolves.toEqual({ value: 1 })
+      await store.putRecord({ value: 1 }, 'repeatable-read', { conflictPolicy: 'replace' })
+      await expect(store.getRecord('repeatable-read')).resolves.toEqual({ value: 1 })
       return
     }
     if (store.backend === 'indexed-db') {

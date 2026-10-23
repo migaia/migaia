@@ -6,7 +6,13 @@ import {
   ttl,
   durableChangeFeed,
   vector,
+  rdf,
   sql,
+  createVectorQuery,
+  createRdfQuery,
+  createTransactionOwner,
+  runTransactionOperation,
+  compileStorageWhere,
   implement,
   provideCapabilities,
   StorageContractError,
@@ -16,6 +22,12 @@ import {
   type IStorageStore,
   type IAnyStorageCapability,
   type IVectorApi,
+  type IVectorHit,
+  type IVectorCollection,
+  type IQuad,
+  type IRdfApi,
+  type ITransactionRdfApi,
+  type ITtlTarget,
   type ISqlExecutor,
   type IOperationContext,
   type IStorageChange
@@ -226,8 +238,197 @@ function wrongFixture(
   return {
     ...item,
     native,
-    store: provideCapabilities(Object.assign(item.base, native), [implement(kv, item.api)])
+    store: provideCapabilities(Object.assign(item.base, native), [
+      implement(kv, item.api, { forTransaction: (scope) => scope })
+    ])
   }
+}
+
+/** This pure vector subject rejects every non-vector TTL target, like a native vector backend. */
+function vectorTtlFixture(mode?: 'ignore-expire' | 'ignore-persist') {
+  const item = fixture()
+  const points = new Map<string, { vector: readonly number[]; payload?: unknown }>()
+  const channels: string[] = []
+  const exactRequests: (boolean | undefined)[] = []
+  let deadline: number | undefined
+  const vectorApi: IVectorApi = {
+    collection<TPayload>(): IVectorCollection<TPayload> {
+      const hits = (query: readonly number[]): IVectorHit<TPayload>[] =>
+        [...points]
+          .map(([id, point]) => ({
+            id,
+            vector: point.vector,
+            payload: point.payload as TPayload,
+            score: point.vector.reduce((sum, value, index) => sum + value * query[index]!, 0)
+          }))
+          .sort((a, b) => b.score - a.score)
+      const near = (query: readonly number[], options?: { readonly exact?: boolean }) => {
+        exactRequests.push(options?.exact)
+        return createVectorQuery<TPayload>({
+          pushdown: {
+            source: 'vector-ttl-fixture',
+            operators: [],
+            operations: ['topK']
+          },
+          execute: (input) =>
+            rows(
+              hits(query)
+                .slice(0, input.topK ?? Infinity)
+                .map((hit) => [hit.id, hit] as const)
+            )
+        })
+      }
+      return {
+        near,
+        similarTo: (id) => near(points.get(id)?.vector ?? [0]),
+        recommend: (examples) => near(points.get(examples.positive[0])?.vector ?? [0]),
+        upsert: async (values) => {
+          for (const point of values) points.set(point.id, point)
+        },
+        delete: async (ids) => {
+          for (const id of ids) points.delete(id)
+        },
+        deleteWhere: async (where) => {
+          const matches = compileStorageWhere(where)
+          let count = 0
+          for (const [id, point] of points)
+            if (matches(point.payload as TPayload)) {
+              points.delete(id)
+              count += 1
+            }
+          return count
+        },
+        search: async (query, options) => {
+          exactRequests.push(options.exact)
+          return hits(query).slice(0, options.k)
+        }
+      }
+    }
+  }
+  const target = (value: ITtlTarget) => {
+    channels.push(value.channel)
+    if (value.channel !== 'vector')
+      throw new StorageContractError(StorageContractErrorCode.unsupported)
+    expect(value).toEqual({ channel: 'vector', collection: 'conformance-ttl', id: 'ttl-key' })
+    return points.has(value.id)
+  }
+  const store = provideCapabilities(item.base, [
+    implement(vector, vectorApi),
+    implement(ttl, {
+      expire: async (value, ms) => {
+        if (!target(value)) return false
+        if (mode !== 'ignore-expire') {
+          deadline = Date.now() + ms
+          if (ms === 0) {
+            points.delete('ttl-key')
+            deadline = undefined
+          }
+        }
+        return true
+      },
+      persist: async (value) => {
+        if (!target(value)) return false
+        if (mode !== 'ignore-persist') deadline = undefined
+        return true
+      },
+      remaining: async (value) => {
+        target(value)
+        return deadline === undefined ? undefined : Math.max(0, deadline - Date.now())
+      }
+    })
+  ])
+  return { store, channels, exactRequests }
+}
+
+/** Native RDF drafts borrow the canonical transaction owner; this fixture has no KV methods. */
+function rdfTransactionFixture(mode?: 'drop-writes' | 'commit-rollback') {
+  const features = { ...noFeatures, transactions: true }
+  const item = fixture(features)
+  let committed = new Map<string, IQuad>()
+  const api = (data: Map<string, IQuad>): IRdfApi => ({
+    add: async (quads) => {
+      for (const quad of quads) data.set(JSON.stringify(quad), quad)
+    },
+    delete: async (quads) => {
+      for (const quad of quads) data.delete(JSON.stringify(quad))
+    },
+    match: (pattern) =>
+      createRdfQuery(
+        {
+          pushdown: { source: 'rdf-transaction-fixture', operators: [], operations: [] },
+          execute: (input) => {
+            const matches = compileStorageWhere(input.pattern)
+            return rows(
+              [...data]
+                .filter(([, quad]) => matches(quad))
+                .map(([key, quad]) => [key, quad] as const)
+            )
+          }
+        },
+        pattern
+      )
+  })
+  type IScope = { use(capability: typeof rdf): ITransactionRdfApi }
+  const owner = createTransactionOwner<unknown, IScope>(
+    item.base,
+    (error) => new StorageContractError(StorageContractErrorCode.invalidArgument, { cause: error })
+  )
+  const base = Object.assign(item.base, {
+    transaction: async (run: (scope: IScope) => unknown, ctx?: IOperationContext) => {
+      const draft = new Map(committed)
+      const createScope = (): IScope => {
+        const scope: IScope = {
+          use: () => ({
+            add: (quads) =>
+              runTransactionOperation(scope, async () => {
+                await Promise.resolve()
+                if (mode !== 'drop-writes') await api(draft).add(quads)
+              }),
+            delete: (quads) => runTransactionOperation(scope, () => api(draft).delete(quads)),
+            match: (pattern) =>
+              createRdfQuery<undefined>(
+                {
+                  pushdown: { source: 'rdf-transaction-draft', operators: [], operations: [] },
+                  execute: () => rows([...draft].map(([key, quad]) => [key, quad] as const))
+                },
+                pattern
+              )
+          })
+        }
+        return scope
+      }
+      const scope = createScope()
+      const controller = owner.register(scope, {
+        createScope,
+        onFailure: () => undefined,
+        context: ctx
+      })
+      try {
+        const result = await run(scope)
+        await controller.runFinalizers()
+        if (ctx?.signal?.aborted) throw new StorageContractError(StorageContractErrorCode.aborted)
+        committed = draft
+        return result
+      } catch (error) {
+        if (mode === 'commit-rollback') committed = draft
+        throw error
+      } finally {
+        controller.close()
+      }
+    }
+  })
+  const store = provideCapabilities(base, [
+    implement(
+      rdf,
+      {
+        add: (quads) => api(committed).add(quads),
+        delete: (quads) => api(committed).delete(quads),
+        match: (pattern) => api(committed).match(pattern)
+      },
+      { forTransaction: (scope) => scope.use(rdf) }
+    )
+  ])
+  return { store, features }
 }
 
 describe('public consumer-owned conformance', () => {
@@ -345,6 +546,108 @@ describe('public consumer-owned conformance', () => {
     await item.run()
   })
 
+  it('uses only the actual vector TTL channel and rejects ignored expiry or persist', async () => {
+    const item = vectorTtlFixture()
+    await cases(() => item.store, [vector, ttl])
+      .find((item) => item.name.startsWith('ttl ·'))!
+      .run()
+    expect(new Set(item.channels)).toEqual(new Set(['vector']))
+    for (const mode of ['ignore-expire', 'ignore-persist'] as const) {
+      const wrong = vectorTtlFixture(mode)
+      await expect(
+        cases(() => wrong.store, [vector, ttl])
+          .find((item) => item.name.startsWith('ttl ·'))!
+          .run()
+      ).rejects.toThrow()
+    }
+  })
+
+  it('uses exact native vector requests for deterministic standard assertions', async () => {
+    const item = vectorTtlFixture()
+    await cases(() => item.store, [vector, ttl])
+      .find((item) => item.name.startsWith('vector ·'))!
+      .run()
+    expect(item.exactRequests).toEqual([true, true, true, true])
+  })
+
+  it('keeps every serial native record fallback on its own initialized key', async () => {
+    const features = { ...noFeatures, records: true, transactions: true }
+    const names = [
+      'clear 后重建 record 遵守原生串行或乐观 ABA 检查',
+      'transaction 对实际并发写采用后端隔离语义',
+      'transaction 保持 repeatable snapshot，按后端原生或乐观规则提交'
+    ]
+    const selected = cases(
+      () => {
+        const item = wrongFixture(features)
+        const values = new Map<IStorageKey, unknown>()
+        Object.assign(item.store, {
+          getRecord: async (key: IStorageKey) => values.get(key),
+          putRecord: async (value: unknown, key: IStorageKey) => {
+            values.set(key, value)
+            return key
+          },
+          clearRecords: async () => {
+            values.clear()
+          },
+          transaction: async (run: (scope: typeof item.store) => unknown) => run(item.store)
+        })
+        return item.store
+      },
+      [kv],
+      features
+    ).filter((item) => names.includes(item.name))
+    expect(selected).toHaveLength(names.length)
+    for (const item of selected) await item.run()
+  })
+
+  it('runs native RDF commit, rollback and accepted/abort cases without any KV surface', async () => {
+    const selected = cases(() => rdfTransactionFixture().store, [rdf], {
+      ...noFeatures,
+      transactions: true
+    }).filter((item) => item.name.startsWith('transactions ·'))
+    expect(selected).toHaveLength(3)
+    for (const item of selected) await item.run()
+    for (const [mode, name] of [
+      ['drop-writes', 'accepted'],
+      ['commit-rollback', 'failure']
+    ] as const) {
+      const wrong = rdfTransactionFixture(mode)
+      await expect(
+        cases(() => wrong.store, [rdf], wrong.features)
+          .find((item) => item.name.startsWith('transactions ·') && item.name.includes(name))!
+          .run()
+      ).rejects.toThrow()
+    }
+  })
+
+  it('checks callback-only native transactions without inventing a writable token', async () => {
+    const features = { ...noFeatures, transactions: true }
+    const create = (ignoreCallback = false) => {
+      const item = fixture(features)
+      return provideCapabilities(
+        Object.assign(item.base, {
+          transaction: async (run: () => unknown, ctx?: IOperationContext) => {
+            if (ignoreCallback) return undefined
+            const result = await run()
+            if (ctx?.signal?.aborted)
+              throw new StorageContractError(StorageContractErrorCode.aborted)
+            return result
+          }
+        }),
+        []
+      )
+    }
+    await cases(() => create(), [], features)
+      .find((item) => item.name.startsWith('transactions ·'))!
+      .run()
+    await expect(
+      cases(() => create(true), [], features)
+        .find((item) => item.name.startsWith('transactions ·'))!
+        .run()
+    ).rejects.toThrow()
+  })
+
   it('observes committed feed values and unsubscribes once on the original fixture', async () => {
     const features = { ...noFeatures, changeFeed: true }
     const item = fixture(features)
@@ -410,7 +713,8 @@ describe('public consumer-owned conformance', () => {
           wrongFixture(
             feature === 'secondaryIndexes'
               ? { ...features, records: true, binary: true, iteration: true, transactions: true }
-              : features
+              : features,
+            feature === 'secondaryIndexes' ? 'empty' : undefined
           ).store,
         [kv],
         feature === 'secondaryIndexes'
@@ -422,8 +726,8 @@ describe('public consumer-owned conformance', () => {
         binary: 'getBytes/setBytes',
         records: 'putRecord 不传',
         iteration: 'iterateRecords',
-        transactions: 'transaction 内的写入',
-        secondaryIndexes: 'secondaryIndexes ·'
+        transactions: 'transactions · native accepted',
+        secondaryIndexes: 'secondaryIndexes · ranges'
       }[feature]
       await expect(selected.find((item) => item.name.startsWith(prefix))!.run()).rejects.toThrow()
     })

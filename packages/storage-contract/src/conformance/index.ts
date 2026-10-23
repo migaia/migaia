@@ -12,6 +12,7 @@ import {
 } from './legacy.js'
 import { syncConformance, indexConformance, feedConformance } from './features.js'
 import { standardConformance } from './standards.js'
+import { nativeTransactionsConformance } from './transactions.js'
 
 export type {
   IConformanceMatchers,
@@ -34,7 +35,11 @@ export function runConformance<TStore extends IStorageStore<never>>(
     if (features.binary) binaryConformance(check, harness)
     if (features.records) recordsConformance(check, harness)
     if (features.iteration) iterationConformance(check, harness)
-    if (features.transactions) transactionsConformance(check, harness)
+    if (features.transactions) {
+      if (features.records && subject.capabilities.includes(kv))
+        transactionsConformance(check, harness)
+      else nativeTransactionsConformance(check, harness, subject.capabilities)
+    }
     if (features.binary && features.records) crossChannelConformance(check, harness)
     if (features.syncRead && features.binary) syncBinaryConformance(check, harness)
     if (features.secondaryIndexes) indexConformance(check, harness)
