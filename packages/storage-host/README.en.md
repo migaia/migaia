@@ -56,6 +56,8 @@ The original backend installation core exposes the captured host default identit
 
 The host root exports `memoryBackendPlugin()` and `memoryBackendKind`. Each installation owns isolated memory data, including when namespaces match. Text, bytes and record transactions reuse the original transaction owner, concurrency policy and local locks. `scope.use(kv)` exposes eight text operations on that same transaction; `scope.use(records)` executes queries through its actual record cursor. A configured owner.label is captured once; defaults use runtime and pid, or browser. The native client getter returns undefined; the transaction client checks the original scope and returns undefined.
 
+Memory root asynchronous `set/setBytes/putRecord/remove/removeBytes/deleteRecord`, clears and record prefix deletion share the original concurrency policy and one operation budget; ctx.concurrency overrides the original default. Replacement protects the target and every potentially displaced channel in canonical order. Synchronous set/remove/clearValues probe active locks directly and immediately throw LOCK_REJECTED when busy, without executing asynchronous policies. Clears and prefix deletion inspect only the affected channels; final checks and native data/revision changes have no await gap. Keys and mutable payloads are captured before waiting. Reads acquire no write locks; concurrency policy does not change ConflictPolicy duplicate/replacement rules.
+
 ```ts
 import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
 import { records } from '@migaia/storage-contract'
