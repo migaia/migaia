@@ -597,6 +597,8 @@ LOCK_REJECTED 与 LOCK_TIMEOUT 携只读 keys、holder。已确认身份时消�
 
 `createTransactionBuilder(store, options?)` 接收具备真实 transaction 签名的原登记 store。根对象只有 lock/concurrency/signal/timeout，没有 run；声明至少一个锁后才启用 run。每次派生返回独立不可变分支，每次 lock 只快照新增键。run 用显式栈展开共享历史，经原 owner 只规范化一次，再直接调用原 transaction 一次；保留原 Promise 身份、完整原生 scope 与 options 类型。配置不创建期限、队列或 I/O。
 
+后端作者可传第四参数 `{ mode: 'optimistic' }`，得到 `IOptimisticTransactionBuilder`：根部即可 run，没有 lock 方法，只接受真实的 optimistic 策略。wait/fail 在配置时同步报 `UNSUPPORTED_CAPABILITY`，伪造策略仍报 `INVALID_ARGUMENT`。run 不注入 lock 或规范化空键，直接返回原 transaction Promise，保留原生选项及完整 scope；重试仍由原并发 owner 负责。省略第四参数保持上述需声明锁的行为。
+
 `IRecordStore.transaction` 与索引事务选项包含原 `ITransactionOptions` 的 lock/concurrency 字段。具体 tx()/inspectLocks 方法仍由真实实现接入。对已安装且登记的记录 store：
 
 ```ts
@@ -827,3 +829,5 @@ RDF 的客户端 `follow`/`inverse` 现在沿同一 reader 逐前驱调用原 `s
 每个遍历节点至多借用一个原匹配游标；并发 accepted pull 共用一次惰性前驱查找，不增加队列或调度器。后开的子源先关闭，所有原源都尝试清理；首错及后续清理错误保持可追溯。root symbolic cleanup 分别复用子源与根源原有的报告 Promise，注册资源则沿原 derive 的 additional-close 接点。
 
 `IRdfQueryInput<TOperationScope>` 与 `IRdfQuerySource<TOperationScope>` 可精确声明后端原 scope；只读 `operationScope?: Readonly<TOperationScope>` 仅在嵌套 match 时借用当前仍有效的原 operation view。事务作者用 `input.operationScope ?? 原创建scope` 做现有 iterator 登记；`createRdfQuery` 的第三个可省泛型声明该 scope，旧泛型参数保持。这个对象只在当前 accepted 操作内有效，不延长其寿命；跨 stream next 的 child advance 继续通过原 nextTransactionIterator 的同 owner 校验，错配 scope 不能获得读取权。
+
+后端作者使用根导出 `createStorageIteratorLifetime<T>({ close, report, onSettled? })` 复用既有游标清理。将一次完整接纳的推进交给 `advance`，由原 helper 排空后关闭一次，并保留主清理与符号清理的独立缓存 Promise；数据准入、错误规范化和事务迭代器登记仍由原后端负责。`IStorageIteratorLifetime<T>` 仅公开同一组推进与清理函数，不授予事务权限。

@@ -2,6 +2,7 @@ import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import {
   createRdfQuery,
   createVectorQuery,
+  createStorageIteratorLifetime,
   QueryOperation,
   QueryOperator,
   term,
@@ -14,7 +15,6 @@ import {
   type IVectorQuerySource,
   type IVectorQueryInput
 } from '../src/index.js'
-import { createStorageIteratorLifetime } from '../src/resource.js'
 
 /** Original cursor ownership is shared by every family test, including early-exit cleanup. */
 function rows<T>(

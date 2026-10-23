@@ -900,6 +900,66 @@ function readLocked(store: IRecordStore<{ count: number }>) {
         'The supplied registered store starts one transaction at run, returning its original Promise. The scope remains that store’s complete native scope.',
         '所提供登记 store 在 run 时启动一次事务，返回原 Promise；scope 保留该 store 的完整原生结构。'
       )
+    },
+    {
+      title: t('Expose an original native optimistic transaction', '公开原生乐观事务'),
+      problem: t(
+        'A native backend with no physical key locks must reuse the original builder without exposing lock or creating another policy loop.',
+        '没有物理键锁的原生后端须复用原 builder，不公开 lock，也不创建第二策略循环。'
+      ),
+      example: t(
+        `import { createTransactionBuilder, ConcurrencyPolicy, type IRecordStore } from '@migaia/storage-contract'
+function readNative(store: IRecordStore<{ count: number }>) {
+  return createTransactionBuilder(store, undefined, undefined, { mode: 'optimistic' })
+    .concurrency(ConcurrencyPolicy.optimistic({ retries: 1 })).timeout(2_000)
+    .run(tx => tx.getRecord('counter'))
+}`,
+        `import { createTransactionBuilder, ConcurrencyPolicy, type IRecordStore } from '@migaia/storage-contract'
+function readNative(store: IRecordStore<{ count: number }>) {
+  return createTransactionBuilder(store, undefined, undefined, { mode: 'optimistic' })
+    .concurrency(ConcurrencyPolicy.optimistic({ retries: 1 })).timeout(2_000)
+    .run(tx => tx.getRecord('counter'))
+}`
+      ),
+      result: t(
+        'Run receives the original scope and returns the original Promise. Native fields are preserved, no lock option is injected, and wait/fail policies reject synchronously with UNSUPPORTED_CAPABILITY.',
+        'run 接收原 scope、返回原 Promise，保留原生字段，不注入 lock 选项；wait/fail 策略同步报 UNSUPPORTED_CAPABILITY。'
+      )
+    }
+  ],
+  createStorageIteratorLifetime: [
+    {
+      title: t('Share native cursor cleanup', '共享原生游标清理'),
+      problem: t(
+        'A native backend needs the existing accepted-advance drain and two cleanup Promises without another resource owner.',
+        '原生后端需要既有接纳推进排空与双清理 Promise，不能另建资源 owner。'
+      ),
+      example: t(
+        `import { createStorageIteratorLifetime } from '@migaia/storage-contract'
+let closed = 0
+const lifetime = createStorageIteratorLifetime<number>({
+  close: async () => { closed += 1 }, report: console.error
+})
+await lifetime.advance(async () => ({ done: false, value: 1 }))
+const cleanup = lifetime.dispose()
+console.log(cleanup === lifetime.dispose()) // true
+await cleanup
+console.log(closed) // 1`,
+        `import { createStorageIteratorLifetime } from '@migaia/storage-contract'
+let closed = 0
+const lifetime = createStorageIteratorLifetime<number>({
+  close: async () => { closed += 1 }, report: console.error
+})
+await lifetime.advance(async () => ({ done: false, value: 1 }))
+const cleanup = lifetime.dispose()
+console.log(cleanup === lifetime.dispose()) // true
+await cleanup
+console.log(closed) // 1`
+      ),
+      result: t(
+        'Prints true and 1. The original backend must still check admission before advance and register native transaction iterators with its original scope.',
+        '输出 true 与 1；原后端仍须在 advance 前检查准入，并把原生事务迭代器登记到原 scope。'
+      )
     }
   ],
   runWithConcurrency: [
