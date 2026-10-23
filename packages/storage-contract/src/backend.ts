@@ -3,6 +3,7 @@ import type {
   IStorageStore,
   IStorageCapabilitySet,
   IStorageCapabilityApiOf,
+  IWithTransactionQueryMethods,
   records
 } from './capability.js'
 import type { IRecordQuery } from './query-chain.js'
@@ -50,7 +51,10 @@ type IChainPart<
 /** Preserves both the canonical builder's second generic and specialized no-lock builders. */
 type IWithTransactionBuilderMethods<TBuilder, TMethods extends IChainMethods> =
   TBuilder extends ITransactionBuilder<infer TScope, infer TAugmentMethods>
-    ? ITransactionBuilder<TScope, TAugmentMethods & IChainPart<TMethods, 'tx'>>
+    ? ITransactionBuilder<
+        IWithTransactionQueryMethods<TScope, IChainPart<TMethods, 'query'>>,
+        TAugmentMethods & IChainPart<TMethods, 'tx'>
+      >
     : TBuilder extends { run(run: (scope: infer TScope) => unknown): unknown }
       ? {
           [K in Exclude<keyof TBuilder, 'run'>]: TBuilder[K] extends (
@@ -59,7 +63,11 @@ type IWithTransactionBuilderMethods<TBuilder, TMethods extends IChainMethods> =
             ? (...args: TArguments) => IWithTransactionBuilderMethods<TBuilder, TMethods>
             : TBuilder[K]
         } & {
-          run<TResult>(run: (scope: TScope) => TResult): Promise<Awaited<TResult>>
+          run<TResult>(
+            run: (
+              scope: IWithTransactionQueryMethods<TScope, IChainPart<TMethods, 'query'>>
+            ) => TResult
+          ): Promise<Awaited<TResult>>
         } & IChainPart<TMethods, 'tx'>
       : TBuilder
 

@@ -108,6 +108,30 @@ type IScopeRecordValue<TScope> = TScope extends {
 }
   ? TValue
   : ICodecValue
+/**
+ * Adds selected query methods only to an existing standard transaction capability lookup. Native
+ * scope members remain untouched, token availability follows the original use parameter, and the
+ * records query keeps undefined context rather than acquiring a root operation context.
+ */
+export type IWithTransactionQueryMethods<
+  TScope,
+  TAugmentMethods extends object
+> = keyof TAugmentMethods extends never
+  ? TScope
+  : TScope extends { use: (...args: never[]) => unknown }
+    ? Omit<TScope, 'use'> & {
+        use<
+          TCap extends ITransactionalCapability<
+            Extract<Parameters<TScope['use']>[0], IAnyStorageCapability>
+          >
+        >(
+          capability: TCap
+        ): TCap extends typeof records
+          ? ITransactionRecordsApi<IScopeRecordValue<TScope>, TAugmentMethods>
+          : ITransactionCapabilityApi<TCap>
+      }
+    : TScope
+
 /** Replaces only capability-facing members while preserving every native scope extension. */
 type IAddScopedCapabilities<TScope, TCaps extends IAnyStorageCapability> = Omit<
   TScope,
