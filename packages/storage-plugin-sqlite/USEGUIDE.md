@@ -33,6 +33,14 @@ store 提供文本、字节、记录、有序记录迭代、同步文本方法�
 及绑定的 SQL 标签。`kv`、`records` 使用 `@migaia/storage-contract` 的原令牌；
 记录查询复用其真实 `where`/`select`/`all` 执行器，并如实标明客户端求值。
 
+`storage.use(kv)` 原生支持 `getMany`、`setMany`、`removeMany` 与 `removeByPrefix`，
+事务内用 `tx.use(kv)` 或对应短方法。批次键接受规范结构键；读取按输入顺序保留重复
+位置，缺失返回 `undefined`。重复写键在 I/O 前拒绝；写入与删除在同一原生事务中
+提交或回滚，删除返回实际数量。读取和删除的 IN 参数分块，读取分块共享一个原生
+快照。每批只有一次 pipeline 与计数 hook；空批仍检查有效期，但不执行这些工作。
+`setMany` 的 `ttlMs` 接受有限非负毫秒数，期限与值同事务写入。SQLite 不提供向量
+集合或 RDF 图；对应锁在任何原生调用前报 `UNSUPPORTED_CAPABILITY`。
+
 文本和字节缺失返回 `null`，记录和 metadata 缺失返回 `undefined`。`keys()` 只列
 文本通道的字符串 key。删除指定通道不影响其它通道；`clearAll()` 保留 metadata。
 跨通道同 key 写入报 `DUPLICATE_KEY`；显式选择 `{ conflictPolicy: 'replace' }`

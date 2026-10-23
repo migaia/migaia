@@ -4,6 +4,15 @@ A native SQLite backend installed in `@migaia/storage-host`. Node and Deno use
 `node:sqlite`; Bun uses `bun:sqlite`. The package root loads neither driver.
 No npm native addon is required.
 
+`storage.use(kv)` provides native `getMany`, `setMany`, `removeMany`, and `removeByPrefix`.
+Use `tx.use(kv)` or the corresponding short methods inside a transaction. Canonical structured
+keys preserve input order and duplicate read positions; missing values are `undefined`. Duplicate
+write keys reject before I/O. Writes and removals commit or roll back in one native transaction;
+removals return the actual count. Bounded IN chunks share one native read snapshot. Each batch
+enters one pipeline and count hook; empty admitted batches do neither. `setMany` accepts finite,
+nonnegative `ttlMs`, stored atomically with its value. Vector and RDF locks reject with
+`UNSUPPORTED_CAPABILITY` before native I/O because SQLite owns neither domain.
+
 ## Install a backend
 
 ```ts
