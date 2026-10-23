@@ -3,6 +3,44 @@ import type { ICaseDoc, IText } from './contract.js'
 /** Keeps complete bilingual cases beside their exact observable outputs. */
 const t = (en: string, zh: string): IText => ({ en, zh })
 
+/** Native graph readers and writers share the same reversible organization mapping. */
+const orgGraphCase: ICaseDoc = {
+  title: t(
+    'Keep default and named graphs inside one organization',
+    '把默认图和命名图限定在同一组织'
+  ),
+  problem: t(
+    'Native RDF backends need graph isolation without inventing another IRI codec or default graph.',
+    '原生 RDF 后端需要图隔离，不能另建 IRI codec 或默认图身份。'
+  ),
+  example: t(
+    `import { getStorageOrgGraphPrefix, prefixStorageOrgGraph, unprefixStorageOrgGraph, term, RdfTermType, RdfDatatype } from '@migaia/storage-contract'
+const orgId = '00000000-0000-0000-0000-000000000000'
+const logical = term.iri('https://[::1]/图?x=%aB')
+const physical = prefixStorageOrgGraph(orgId, logical)
+console.log(prefixStorageOrgGraph(orgId, term.defaultGraph).value === getStorageOrgGraphPrefix(orgId) + 'd')
+console.log(unprefixStorageOrgGraph(orgId, physical))
+console.log(RdfTermType.namedNode, RdfDatatype.string)
+// true
+// { termType: 'NamedNode', value: 'https://[::1]/图?x=%aB' }
+// NamedNode http://www.w3.org/2001/XMLSchema#string`,
+    `import { getStorageOrgGraphPrefix, prefixStorageOrgGraph, unprefixStorageOrgGraph, term, RdfTermType, RdfDatatype } from '@migaia/storage-contract'
+const orgId = '00000000-0000-0000-0000-000000000000'
+const logical = term.iri('https://[::1]/图?x=%aB')
+const physical = prefixStorageOrgGraph(orgId, logical)
+console.log(prefixStorageOrgGraph(orgId, term.defaultGraph).value === getStorageOrgGraphPrefix(orgId) + 'd')
+console.log(unprefixStorageOrgGraph(orgId, physical))
+console.log(RdfTermType.namedNode, RdfDatatype.string)
+// true
+// { termType: 'NamedNode', value: 'https://[::1]/图?x=%aB' }
+// NamedNode http://www.w3.org/2001/XMLSchema#string`
+  ),
+  result: t(
+    'The default graph has its own native named identity. The logical IRI returns with exact spelling; foreign or malformed physical graphs throw INVALID_ARGUMENT.',
+    '默认图具有独立原生命名身份；逻辑 IRI 原样返回。其它组织或无效物理图抛 INVALID_ARGUMENT。'
+  )
+}
+
 /** One complete read-only lookup example is shared by the two exact public accessors. */
 const capabilityReadCase: ICaseDoc = {
   title: t(
@@ -296,6 +334,11 @@ async function deleteDrafts(store: IStorageStore<typeof vector>) {
 
 /** Exercises public contract tools without supplying a fictional storage implementation. */
 export const storageContractCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
+  getStorageOrgGraphPrefix: [orgGraphCase],
+  prefixStorageOrgGraph: [orgGraphCase],
+  unprefixStorageOrgGraph: [orgGraphCase],
+  RdfTermType: [orgGraphCase],
+  RdfDatatype: [orgGraphCase],
   sql: [sqlCapabilityCase],
   vector: [vectorCapabilityCase],
   rdf: [rdfCapabilityCase],

@@ -577,6 +577,8 @@ lockKey.text 与 lockKey.record 接收原有 typed storage-key 域，lockKey.byt
 
 `prefixStorageOrgKey(orgId, key)` 返回独立快照 `['$o', orgId, key]`，数组逻辑键保持嵌套在第三项。`unprefixStorageOrgKey(orgId, key)` 只接纳相同组织的精确三项封装，返回独立逻辑键快照。错误组织、大小写错误或无效封装为 INVALID_ARGUMENT；内部无效逻辑键仍为 INVALID_KEY。外层封装不占用逻辑键的深度与节点预算。这些纯函数不创建存储、不选择 namespace，也不执行跨组织 I/O。
 
+`getStorageOrgGraphPrefix(orgId)` 返回 `urn:migaia:org:<orgId>:`，供后端按组织筛选或删除原生命名图。`prefixStorageOrgGraph(orgId, graph)` 把默认图映射为前缀加 `d`，命名图映射为前缀加 `n:` 与 `encodeURIComponent(IRI)`；两类身份无碰撞，包括全零组织。`unprefixStorageOrgGraph(orgId, physicalGraph)` 只接纳同组织的规范封装并返回共享冻结 RDF term；错误组织、无效图或非规范百分号编码均为 INVALID_ARGUMENT。IRI 大小写、百分号拼写、Unicode 与 IPv6 authority 原样往返，不做 URL 规范化。`RdfTermType` 与 `RdfDatatype` 导出共享 term 标签及 RDF 1.1 字符串 datatype 常量。这些纯函数不创建组织、连接或资源。
+
 ### 并发执行
 
 后端与 persist 作者直接把原 options 交给 `runWithConcurrency({ store, options }, port)`；原 store 必须已登记事务 owner。循环只捕获一次借用 getter，再解析捕获的覆盖策略或原 owner 默认策略；显式 request.policy 仍是唯一生效策略，保留原校验与错误。传入真实外层 attempt context 保留精确私有期限与规范锁，无需复制。循环在操作上下文字段前读取 lock/concurrency，只规范化一次锁身份；后端扩展选项仍由原后端准入。

@@ -282,11 +282,16 @@ export type {
   IStorageCounterIncrement
 } from './capabilities/counter.js'
 export {
+  RdfTermType,
+  RdfDatatype,
   term,
   snapshotStorageRdfTerm,
   snapshotStorageRdfPattern,
   snapshotStorageRdfQuad,
-  encodeStorageRdfQuad
+  encodeStorageRdfQuad,
+  getStorageOrgGraphPrefix,
+  prefixStorageOrgGraph,
+  unprefixStorageOrgGraph
 } from './capabilities/rdf.js'
 export type {
   IRdfNamedNode,

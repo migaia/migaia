@@ -83,6 +83,8 @@ export const StorageContractErrorText = {
   orgId: 'orgId must be a canonical lowercase UUID',
   /** Unwrapping requires one complete physical envelope from the requested organization. */
   orgKeyEnvelope: 'organization key must contain the exact marker, orgId, and logical key',
+  /** Physical RDF graphs must use the exact organization's canonical default or named envelope. */
+  orgGraphEnvelope: 'organization graph must contain the exact orgId and canonical graph envelope',
   /** Locks must identify a supported physical channel and a valid independently owned key. */
   lockArgument: 'lock key must identify a supported channel and valid key',
   /** Policy definitions and options must be valid before any backend or decision callback runs. */
