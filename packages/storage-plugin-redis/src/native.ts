@@ -4,6 +4,7 @@ import {
   type IStorageResource
 } from '@migaia/storage-contract'
 import {
+  asyncDisposeKey,
   createStorageOperationReporter,
   reportCleanupError
 } from '@migaia/storage-host/authoring/backend'
@@ -99,7 +100,7 @@ export function subscriptionResource(close: () => Promise<void>): {
       report
     })
   return {
-    resource: { dispose: lifetime.dispose, [Symbol.asyncDispose]: lifetime.symbolic },
+    resource: { dispose: lifetime.dispose, [asyncDisposeKey]: lifetime.symbolic },
     isClosing: lifetime.isClosing,
     report
   }

@@ -3,15 +3,25 @@ import { normalizeError } from '@migaia/storage-host/authoring/backend'
 import { attachErrorIdentity } from '@migaia/utils/error'
 import { ERROR_SOURCE, RedisErrorCode, type IRedisErrorCode } from './error-code.js'
 import { RedisText } from './constants.js'
+/** The normalization boundary always returns an actual registered identity. */
+export type IRedisFailure = Error & { readonly source: string; readonly code: string }
+/** Registered Redis family inspection does not accept an uncoded error with only a matching label. */
+export function isRedisError(value: unknown): value is IRedisFailure {
+  return (
+    value instanceof Error &&
+    Reflect.get(value, 'source') === ERROR_SOURCE &&
+    Object.values(RedisErrorCode).includes(Reflect.get(value, 'code'))
+  )
+}
 /** Native classes remain intact when identity can be attached; immutable failures stay on cause. */
-export function redisError(code: IRedisErrorCode, cause?: unknown): Error {
+export function redisError(code: IRedisErrorCode, cause?: unknown): IRedisFailure {
   const message =
     code === RedisErrorCode.failed
       ? RedisText.failed
       : code === RedisErrorCode.transactionFailed
         ? RedisText.transactionFailed
         : RedisText.decodeFailed
-  const fallback = (): Error => {
+  const fallback = (): IRedisFailure => {
     const error =
       cause instanceof TypeError
         ? new TypeError(message, { cause })
@@ -26,24 +36,19 @@ export function redisError(code: IRedisErrorCode, cause?: unknown): Error {
                 : new Error(message, { cause })
     if (typeof DOMException !== 'undefined' && error instanceof DOMException)
       Object.defineProperty(error, 'cause', { value: cause })
-    return attachErrorIdentity(error, { source: ERROR_SOURCE, code })
+    return attachErrorIdentity(error, { source: ERROR_SOURCE, code }) as IRedisFailure
   }
   return cause instanceof Error && cause.stack
-    ? attachErrorIdentity(
+    ? (attachErrorIdentity(
         cause,
         { source: ERROR_SOURCE, code },
         { onConflict: fallback, onFailure: fallback }
-      )
+      ) as IRedisFailure)
     : fallback()
 }
 /** Existing contract/host failures are never relabelled as native Redis failures. */
-export function normalizeRedisError(error: unknown): Error {
-  return normalizeError(
-    error,
-    (cause) => redisError(RedisErrorCode.failed, cause),
-    (value): value is Error =>
-      value instanceof Error && 'source' in value && value.source === ERROR_SOURCE
-  )
+export function normalizeRedisError(error: unknown): IRedisFailure {
+  return normalizeError(error, (cause) => redisError(RedisErrorCode.failed, cause), isRedisError)
 }
 /** Invalid public driver input is rejected before borrowing or writing a native connection. */
 export function invalidArgument(cause?: unknown): StorageContractError {
@@ -61,11 +66,10 @@ export function unsupported(): never {
 }
 
 /** User code is distinguished at its original callback boundary, before the native lease catches it. */
-export function normalizeRedisTransactionFailure(error: unknown): Error {
+export function normalizeRedisTransactionFailure(error: unknown): IRedisFailure {
   return normalizeError(
     error,
     (cause) => redisError(RedisErrorCode.transactionFailed, cause),
-    (value): value is Error =>
-      value instanceof Error && 'source' in value && value.source === ERROR_SOURCE
+    isRedisError
   )
 }

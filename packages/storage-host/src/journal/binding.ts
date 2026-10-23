@@ -10,6 +10,7 @@ import { isStorageErrorFamily } from '../core/error-family.js'
 export const storageJournalAccess = Symbol()
 /** A resolved view cannot change org, install a backend, close the host, or return a raw store. */
 export type IStorageJournalBackendAccess = {
+  readonly registration: object
   readonly orgId: string
   readonly backendInstanceId: string
   readonly binding: Omit<IStorageJournalBackendBinding, 'forOrg'>

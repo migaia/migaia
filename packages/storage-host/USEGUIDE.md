@@ -41,6 +41,8 @@ Schema 与 codec 适配位于 `@migaia/storage-host/entity`：`passthrough`、`f
 
 需要按需创建物理组织后端的作者，在原安装窗口捕获 core.createOrgAuthoringPort()，只把端口保存在后端闭包。安装后它仍复用原 controller、本地键锁与精确 store 的 controller/value-commit 登记函数；子资源由同一 registration 清理，撤销后拒绝使用。业务视图和 getOrgContext 不暴露该权限。组织借用优先使用其物理后端已登记的原 controller，保留资源生命周期与组织通知过滤。
 
+作者入口还从原 plugin-host 拥有者重导出 asyncDisposeKey；支持环境缺少原生 Symbol.asyncDispose 时，后端仍使用同一 symbol，不新建符号或生命周期拥有者。
+
 实体可直接使用 `defineEntity(...).connect(host.org(orgId).backend(id))`，具备 KV 声明的安装期 `core.getPublishedBackend(id)` 借用视图也可连接；动态 ID 的缺省类型不声明 KV 渠道，调用方需明确已知依赖的渠道类型。只有原宿主 registry 认证的精确视图能复用 KV/record 方法事实；复制对象或再包一层 Proxy 不继承认证。实体不取得关闭权，事务校验仍由原生 owner 执行；任意 raw 输入继续要求原资源准入。记录 metadata 仍通过同一业务视图读取。
 
 memory 缺省组织和普通根后端共用配置 namespace；其它组织使用 `namespace + "/" + orgId`，每个插件实例仍独立。各 namespace 的数据、期限、修订和锁独立，关闭共用原 controller。根变更订阅接收全部组织事件；org 后端与 org hooks 仅接收本组织。`host.dropOrg(orgId)` 尝试全部已发布后端，成功目标不回滚；失败抛原生 `AggregateError`，code 为 `ORG_DELETE_FAILED`，`errors` 和首个 `cause` 保留原错误。
@@ -201,6 +203,12 @@ console.log(
 memory 已提供该私有 namespace 接点。私有字符串行与原业务 draft 一起稀疏暂存、原子提交，提交前与回滚后均不可见。业务 keys、clear、capacity 和 change-feed 不包含这些元数据行；dropOrg 删除目标组织的私有行。显式组织绑定拒绝其它组织的 scope，提取出的私有 view 随原操作失效。该作者接点本身不增加自动 binlog、undo/redo 或公开 storageLogStore 工厂。
 
 memory 日志 namespace 在整个资源期持有原规范 resource-owner 文本 lease；同组织、同 prefix 再次打开报 `LOCK_REJECTED`。普通私有事务在最初的原生锁集合中取得另一个固定 head 键。原后端关闭信号也会关闭部分构造的 namespace 资源。`transactionInfo(scope)` 返回精确 store/org 的原认证事务身份，同事务追加归并不信任调用方 id。后端作者仅对私有元数据 lease 使用 `IBackendKeyLockPort.attemptMetadata`：规范点身份冲突和原 acquire/release/wait 拥有者不变，业务 clear 范围跳过其本就不能触及的私有行；普通业务锁保持原范围行为。
+
+memory 的 `readImage`、`writeImage`、`readRevision` 只接受该固定组织的真实 native scope，并复用原 draft、写入校验与完整 `{epoch, revision}` 墓碑修订。覆盖 text、bytes、record、vector、逻辑 RDF quad 和同点锁下的 deadline 元数据；镜像明确携带原 JSON codec id/version，bytes 复用原 base64 编码，缺失不等于 null。可持久镜像使用原 serialize portable 值域；Date、Map、undefined 等不在该值域的记录读取镜像时保留原校验错误，普通 memory 的 structured-clone 支持不变。恢复仍参加同一原子提交与回滚；本单元不声称已经完成全局日志捕获或自动 undo。
+
+memory 的 `changes(scope)` 首次调用须在该真实 attempt 的首项业务写前，之后原 `stageDraft` 在修改前检查可记录性，并保留 text/bytes/record/vector/RDF 与 deadline 的实际顺序。返回值冻结，反映每键最终修订；先新增再删除且最终没有物理变更的身份不生成变更。迟到首次调用报 `UNSUPPORTED_CAPABILITY`，普通未开启事务不分配镜像。`writeCommitMarker` 只接受原认证事务 id，marker 与业务同提交/回滚，使用原私有 namespace Map 的不可公开 symbol 分区；同名用户 prefix、业务 clear 与其它 org 均不能触及。`hasCommitMarker`/`removeCommitMarker` 沿原 native 事务读取或回收。根快速写路径、capacity victim、blob 和全局桥仍未由这些作者方法自动接管。
+
+包内 native journal 提交桥已用真实 logger 的 binlog/undoLog 与两份 storageLogStore 验证：ready 在业务 native scope 前完成，head 锁交回原第一次规范取锁，按序 storage.commit 与按原身份合并的 undo 镜像在同一事务追加。binlogValues 默认不含值，undo 始终保留完整编码镜像与 afterRevision；rollback 不推进两个日志的已提交索引。原 storeCell 的冻结空身份仅用于私有精确 registration 比较；另一个宿主即使 backend id/org 相同，也不能选其日志。logger 自己继续检查实际载体身份。该提交桥尚为包内显式调用，未声明全局自动配置、外置 WAL、自动 undo 执行或根写路径已经完成。
 
 ### 私有日志资源
 

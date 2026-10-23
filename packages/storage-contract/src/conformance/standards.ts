@@ -11,7 +11,7 @@ import { blob } from '../capabilities/blob.js'
 import { durableChangeFeed } from '../capabilities/durable-change-feed.js'
 import type { IRecordStore } from '../store.js'
 import type { IConformanceCase, IConformanceHarness } from './harness.js'
-import { conformanceApi, conformanceCleanup } from './harness.js'
+import { conformanceApi, conformanceCleanup, invocation } from './harness.js'
 
 /** Standard groups use only public operations and never infer an unlisted capability. */
 export function standardConformance(
@@ -31,10 +31,12 @@ export function standardConformance(
         api.getMany([['batch', 2], 'missing', ['batch', 1], ['batch', 2]])
       ).resolves.toEqual(['two', undefined, 'one', 'two'])
       await expect(
-        api.setMany([
-          { key: ['duplicate'], value: 'one' },
-          { key: ['duplicate'], value: 'two' }
-        ])
+        invocation(() =>
+          api.setMany([
+            { key: ['duplicate'], value: 'one' },
+            { key: ['duplicate'], value: 'two' }
+          ])
+        )
       ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' })
       await expect(api.getMany([['duplicate']])).resolves.toEqual([undefined])
       await expect(api.removeMany([['batch', 1], ['batch', 1], 'missing'])).resolves.toBe(1)
@@ -121,7 +123,7 @@ export function standardConformance(
       await Promise.all(Array.from({ length: 100 }, () => api.increment('counter-key')))
       await expect(api.increment('counter-key', 0)).resolves.toBe(100)
       await expect(api.increment('counter-key', -2)).resolves.toBe(98)
-      await expect(api.increment('counter-key', 0.5)).rejects.toMatchObject({
+      await expect(invocation(() => api.increment('counter-key', 0.5))).rejects.toMatchObject({
         code: 'INVALID_ARGUMENT'
       })
       await expect(api.increment('counter-key', 0)).resolves.toBe(98)

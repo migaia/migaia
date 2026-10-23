@@ -54,11 +54,20 @@ console.log(host.extensions.label('draft'))`
     }
   },
   symbols: {
+    asyncDisposeKey: {
+      role: 'constant',
+      purpose: t(
+        'The original plugin-host disposal symbol, re-exported through the backend authoring entry. It preserves the same identity on runtimes with or without native Symbol.asyncDispose.',
+        '通过后端作者入口重导出的原plugin-host释放symbol；无论运行时是否提供原生Symbol.asyncDispose，都保留同一身份。'
+      ),
+      example: storageHostCases.asyncDisposeKey![0]!.example,
+      cases: storageHostCases.asyncDisposeKey
+    },
     storageLogStore: {
       role: 'factory',
       purpose: t(
-        'Recover a caller-closeable private ILogStore without granting raw backend or host authority.',
-        '恢复可由调用方释放的私有 ILogStore，不授予 raw 后端或宿主权。'
+        'Recover a caller-closeable private ILogStore without granting raw backend or host authority. Native selection certifies the exact original registration, including across hosts with matching ids and orgs.',
+        '恢复可由调用方释放的私有 ILogStore，不授予 raw 后端或宿主权；原生选择认证精确原 registration，跨宿主的同名 id/org 也不能替代。'
       ),
       params: {
         host: t(
@@ -402,7 +411,50 @@ console.log(host.extensions.label('draft'))`,
         'Descriptor-captured original native I/O with immutable forOrg projection, never public KV prefixes.',
         'descriptor 捕获的原生 I/O 与不可变 forOrg 投影，不使用公开 KV 前缀。'
       ),
-      members: {}
+      members: {
+        changes: {
+          summary: t(
+            'Memory enables ordered draft capture on the first call before business writes. Later reads return immutable images with final per-key revisions; late activation rejects instead of inventing history.',
+            'memory 首次调用在业务写前开启原 draft 按序捕获；后续返回不可变镜像与每键最终修订，迟到开启明确拒绝而不猜历史。'
+          )
+        },
+        writeCommitMarker: {
+          summary: t(
+            'Memory writes only its authentic native transaction id into the same private draft. Actual commit exposes the marker; rollback leaves none.',
+            'memory 只把原认证 native 事务 id 写入同一私有 draft；真实 commit 后可见，rollback 不留 marker。'
+          )
+        },
+        hasCommitMarker: {
+          summary: t(
+            'Read fixed-org private commit evidence through the original native owner, isolated from business clear and arbitrary user log prefixes.',
+            '经原 native owner 读取固定组织的私有提交证据，与业务 clear 及任意用户日志 prefix 隔离。'
+          )
+        },
+        removeCommitMarker: {
+          summary: t(
+            'Remove only terminal intent evidence in this original org through its existing native transaction path.',
+            '沿本组织既有 native 事务路径仅回收已终态 intent 的提交证据。'
+          )
+        },
+        readImage: {
+          summary: t(
+            'Read a missing/present durable image from the exact authenticated org scope. Memory uses the existing versioned portable JSON codec, original bytes encoding and logical RDF identity.',
+            '从精确认证组织 scope 读取缺失或存在的持久镜像；memory 复用已有版本化 portable JSON codec、字节编码与逻辑 RDF 身份。'
+          )
+        },
+        writeImage: {
+          summary: t(
+            'Restore through the original native draft and write validators; the same transaction commits or rolls back every restored channel and deadline.',
+            '经原 native draft 与写入校验恢复；同一事务提交或回滚各恢复通道与 deadline。'
+          )
+        },
+        readRevision: {
+          summary: t(
+            'Read complete original revision facts, including clear epochs and tombstones; memory own writes predict its one final per-key commit increment.',
+            '读取含 clear epoch 与墓碑的完整原修订；memory 自有写入沿每键最终一次提交递增。'
+          )
+        }
+      }
     },
     IStorageJournalTarget: {
       summary: t(

@@ -5,6 +5,8 @@ import { conformanceTransactionFailure } from '../src/conformance/legacy.js'
 import {
   kv,
   ttl,
+  counter,
+  snapshotStorageCounterIncrement,
   durableChangeFeed,
   vector,
   rdf,
@@ -506,6 +508,41 @@ describe('public consumer-owned conformance', () => {
     expect(error.errors).toEqual([cleanup])
     expect(error.stack).toBe(primary.stack)
   })
+
+  it.each(['throw', 'reject', 'wrong-code', 'accept'] as const)(
+    'observes counter invalid delta using the original %s outcome',
+    async (mode) => {
+      /** One test-only counter isolates the assertion adapter from any backend transaction owner. */
+      let value = 0
+      const selected = cases(
+        () =>
+          provideCapabilities(fixture().base, [
+            implement(counter, {
+              increment: (_key: string, by = 1) => {
+                if (!Number.isSafeInteger(by)) {
+                  if (mode === 'accept') return Promise.resolve(value)
+                  const error = new StorageContractError(
+                    mode === 'wrong-code'
+                      ? StorageContractErrorCode.invalidKey
+                      : StorageContractErrorCode.invalidArgument
+                  )
+                  if (mode === 'throw') throw error
+                  return Promise.reject(error)
+                }
+                value = snapshotStorageCounterIncrement(by, undefined)(String(value))
+                return Promise.resolve(value)
+              }
+            })
+          ]),
+        [counter]
+      )
+      const run = selected.find((item) => item.name.startsWith('counter ·'))!.run
+      if (mode === 'throw' || mode === 'reject') {
+        await run()
+        expect(value).toBe(98)
+      } else await expect(run()).rejects.toThrow()
+    }
+  )
 
   it('rejects an omitted actual standard token and a TTL API missing persist', async () => {
     const item = fixture()
