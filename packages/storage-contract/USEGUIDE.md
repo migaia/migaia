@@ -603,7 +603,7 @@ function readLocked(store: IRecordStore<{ count: number }>) {
 
 `compileStorageWhere<T>(where)` 只捕获一次 typed `IWhere<T>`，返回 `(value: T) => boolean`。嵌套对象字段与多个约束按 AND 组合，显式 and/or/not 保留短路顺序。`QueryOperator` 统一拥有 eq、ne、in、exists、gt、gte、lt、lte、between、startsWith、contains、has；in 列表只复制、编译为 Set 一次，路径复用原 utils 准入。
 
-相等与成员判断使用 SameValueZero，包括 0/-0 同值与显式对象身份；普通 nested object 语法则检查其字段。Date 操作数捕获时间点。范围仅比较相同 number、bigint、string 或 Date 域，不强制转换类型；exists 区分缺失路径与存在的 undefined。操作数沿 portable codec 载体，并补足已声明的 undefined/bigint/Date 比较及列表。后端只有结构等值时，显式对象身份比较必须在客户端执行。非法条件、路径和反射失败在读取候选前以 INVALID_ARGUMENT 保留精确 cause。编译器不打开数据源、不创建查询 owner。
+相等与成员判断使用 SameValueZero，包括 0/-0 同值与显式对象身份；普通 nested object 语法则检查其字段。Date 操作数捕获时间点。范围仅比较相同 number、bigint、string 或 Date 域，不强制转换类型；exists 区分缺失路径与存在的 undefined。操作数保留 portable 标量载体、已声明的 undefined/bigint/Date 比较、不透明对象身份及列表。后端只有结构等值时，显式对象身份比较必须在客户端执行。非法条件、路径和反射失败在读取候选前以 INVALID_ARGUMENT 保留精确 cause。编译器不打开数据源、不创建查询 owner。
 
 ```ts
 import { compileStorageWhere } from '@migaia/storage-contract'

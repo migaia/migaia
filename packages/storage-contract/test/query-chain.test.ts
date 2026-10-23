@@ -95,6 +95,18 @@ describe('canonical declarative conditions', () => {
     expect(byIdentity({ value: identity })).toBe(true)
     expect(inIdentity({ value: identity })).toBe(true)
     expect(byIdentity({ value: { code: 'changed' } })).toBe(false)
+    /** Opaque identity never inspects nested non-JSON fields or getter contents. */
+    const complex = {
+      date: new Date(1),
+      large: 2n,
+      get untouched(): never {
+        throw new Error('identity must not inspect contents')
+      }
+    }
+    const eqComplex = compileStorageWhere<{ value: typeof complex }>({ value: { eq: complex } })
+    const inComplex = compileStorageWhere<{ value: typeof complex }>({ value: { in: [complex] } })
+    expect(eqComplex({ value: complex })).toBe(true)
+    expect(inComplex({ value: complex })).toBe(true)
   })
 
   it('preserves Date time snapshots, bigint domains and explicit undefined operands', () => {

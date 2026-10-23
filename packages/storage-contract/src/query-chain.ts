@@ -59,7 +59,7 @@ export type IWhere<T> = {
   readonly not?: IWhere<T>
 }
 /** Exact condition operands extend the portable codec carrier only for declared field comparisons. */
-type IQueryOperandValue = ICodecValue | undefined | bigint | Date
+type IQueryOperandValue = ICodecValue | undefined | bigint | Date | object
 /**
  * The sole backend-neutral condition tree; operand lists include declared Date/bigint/undefined
  * fields.
@@ -95,6 +95,7 @@ function snapshotQueryOperand(value: unknown): IQueryOperandValue {
     if (!Number.isFinite(time)) throw new TypeError(StorageContractErrorText.queryCondition)
     return new Date(time)
   }
+  if (typeof value === 'object' && value !== null) return value
   return asCodecValue(value)
 }
 /**
