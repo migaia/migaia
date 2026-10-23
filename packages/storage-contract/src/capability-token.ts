@@ -24,6 +24,15 @@ export function invalidCapability(cause?: unknown): StorageContractError {
     StorageContractErrorText.capabilityArgument
   )
 }
+/** Standard modules share callable-shape admission without importing each other into the provider. */
+export function validateCapabilityMethods(value: unknown, methods: readonly string[]): void {
+  if (
+    typeof value !== 'object' ||
+    value === null ||
+    methods.some((method) => typeof (value as Record<string, unknown>)[method] !== 'function')
+  )
+    throw invalidCapability()
+}
 /** Issues one frozen token; names remain diagnostics and never authorize another same-name token. */
 function createCapabilityToken<TApi, TName extends string>(
   name: TName,

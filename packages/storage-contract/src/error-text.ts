@@ -8,6 +8,12 @@ export const StorageContractErrorText = {
   batchKeys: 'storage batch keys or options are invalid',
   /** Atomic batches cannot write the same canonical typed key more than once. */
   batchDuplicate: 'storage batch contains duplicate keys',
+  /** TTL deadlines accept finite nonnegative milliseconds, including zero and fractions. */
+  ttlDuration: 'storage TTL duration must be finite and nonnegative',
+  /** Counter deltas must remain exactly representable integers before the native operation starts. */
+  counterIncrement: 'storage counter increment must be a safe integer',
+  /** Counter text and arithmetic must preserve canonical decimal safe-integer values. */
+  counterValue: 'storage counter value or result is not a canonical safe integer',
   /**
    * Declarative query admission rejects malformed boolean, field, path and operator inputs before
    * reading candidates.

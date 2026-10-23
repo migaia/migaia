@@ -5,6 +5,11 @@ export const StorageCapabilityMethod = {
   removeByPrefix: 'removeByPrefix'
 } as const
 
+/** TTL point operations bind to the existing physical channel owner in both root and transaction. */
+export const STORAGE_TTL_METHODS = ['expire', 'remaining', 'persist'] as const
+/** A counter is one atomic text update, without independent read/write endpoints. */
+export const STORAGE_COUNTER_METHODS = ['increment'] as const
+
 /** Native text batch endpoints share the same public and transaction capability shape. */
 export const STORAGE_BATCH_METHODS = [
   'getMany',

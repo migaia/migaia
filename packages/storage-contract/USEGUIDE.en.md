@@ -753,3 +753,7 @@ const excluded = prefix.matches(['cache', 'users-extra'])
 // included === true; excluded === false
 // Native ordered stores use prefix.lower <= encodedKey < prefix.upper.
 ```
+
+`ttl` and `counter` are standard capability identities. Backends publish complete native APIs; transaction-enabled providers also supply `forTransaction`. `store.use(ttl)` exposes `expire/remaining/persist` on physical text, byte or record targets. Durations are finite nonnegative milliseconds, including fractions and zero. Missing/expired targets return false for writes; missing/unlimited targets return undefined for remaining. Persisting an already unlimited target returns false. Transaction projections use the original draft and budget.
+
+`store.use(counter).increment(key, by?)` atomically updates canonical decimal safe-integer text; missing text starts at zero and omitted `by` is one. Whitespace, exponents, leading zeroes, negative zero, unsafe deltas and overflow reject with `INVALID_ARGUMENT` without writing. Backend authors call `snapshotStorageCounterIncrement(by, backend)` before I/O, then apply its pure calculation to current text inside the existing atomic operation. `snapshotStorageTtlTarget` reuses the original physical key validator; `assertStorageTtlDuration` admits finite nonnegative durations. These helpers create no store, deadline state or operation budget.

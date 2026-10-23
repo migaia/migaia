@@ -753,3 +753,7 @@ const excluded = prefix.matches(['cache', 'users-extra'])
 // included === true; excluded === false
 // Native ordered stores use prefix.lower <= encodedKey < prefix.upper.
 ```
+
+`ttl` 与 `counter` 是标准能力身份。后端发布完整原生 API；支持事务的 provider 同时提供 `forTransaction`。`store.use(ttl)` 对物理文本、字节或记录目标提供 `expire/remaining/persist`。期限为有限非负毫秒，含小数与零；缺失/已过期目标的写返回 false，缺失/无限期目标的 remaining 返回 undefined；对已无限期目标 persist 返回 false。事务投影使用原 draft 与预算。
+
+`store.use(counter).increment(key, by?)` 原子修改规范十进制安全整数文本；缺失文本从零起算，省略 `by` 为一。空白、指数、前导零、负零、不安全增量和结果溢出均报 `INVALID_ARGUMENT`，不执行写入。后端作者在 I/O 前调用 `snapshotStorageCounterIncrement(by, backend)`，再在既有原子操作内部对当前文本应用其纯计算。`snapshotStorageTtlTarget` 复用原物理键 validator，`assertStorageTtlDuration` 接纳有限非负期限；这些 helper 不创建 store、期限状态或操作预算。
