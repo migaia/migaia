@@ -31,8 +31,54 @@ async function readGreeting(store: IStorageBase) {
   )
 }
 
+/** TTL callers use their actual provided backend; the helper owns only target/duration admission. */
+const ttlCase: ICaseDoc = {
+  title: t('Expire an existing physical entry', '为已有物理条目设置期限'),
+  problem: t(
+    'TTL must identify the actual channel and use its backend’s original deadline owner.',
+    'TTL 须标识实际通道，并沿后端原期限 owner 执行。'
+  ),
+  example: `import {
+  ttl, snapshotStorageTtlTarget, assertStorageTtlDuration, type IStorageStore
+} from '@migaia/storage-contract'
+async function expireSession(store: IStorageStore<typeof ttl>) {
+  const target = snapshotStorageTtlTarget({ channel: 'text', key: 'session' }, store.backend)
+  assertStorageTtlDuration(1000, store.backend)
+  await store.use(ttl).expire(target, 1000)
+  return store.use(ttl).remaining(target)
+}`,
+  result: t(
+    'An actual backend controls expiry. Missing or expired entries are not recreated; target capture starts no clock or operation budget.',
+    '实际后端控制到期；不重建缺失或已过期条目；目标捕获不启动时钟或操作预算。'
+  )
+}
+/** Counter authors reuse pure validation inside their existing atomic native text update. */
+const counterCase: ICaseDoc = {
+  title: t('Increment canonical text atomically', '原子递增规范文本'),
+  problem: t(
+    'Native backends must validate canonical decimal arithmetic without copying a second counter rule.',
+    '原生后端须校验规范十进制运算，不能复制第二套计数规则。'
+  ),
+  example: `import { counter, snapshotStorageCounterIncrement, type IStorageStore } from '@migaia/storage-contract'
+async function recordVisit(store: IStorageStore<typeof counter>) {
+  return store.use(counter).increment('visits')
+}
+const increment = snapshotStorageCounterIncrement(undefined, 'memory')
+// A backend applies increment(currentText) inside its existing atomic native operation.
+const nextText = String(increment('41'))`,
+  result: t(
+    'The actual native increment is atomic. The pure captured calculation validates safe integers and canonical text but opens no transaction or resource.',
+    '实际原生递增具原子性；纯捕获计算校验安全整数与规范文本，不打开事务或资源。'
+  )
+}
+
 /** Exercises public contract tools without supplying a fictional storage implementation. */
 export const storageContractCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
+  ttl: [ttlCase],
+  snapshotStorageTtlTarget: [ttlCase],
+  assertStorageTtlDuration: [ttlCase],
+  counter: [counterCase],
+  snapshotStorageCounterIncrement: [counterCase],
   snapshotStorageBatchKeys: [
     {
       title: t('Prepare one canonical native batch', '准备一个规范原生批次'),
