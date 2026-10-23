@@ -2,10 +2,25 @@ import { asCodecValue, type ICodecValue } from '@migaia/serialize/codec'
 import {
   parseObjectPath,
   probeObjectPathSegments,
-  type IObjectPathTupleFor
+  type IObjectPathTupleFor,
+  type IObjectPath,
+  type IObjectPathValue
 } from '@migaia/utils/object-path'
-import { StorageContractError, StorageContractErrorCode } from './errors.js'
+import {
+  attachErrorIdentity,
+  attachSecondaryErrors,
+  IdentifyError,
+  toError
+} from '@migaia/utils/error'
+import {
+  StorageContractError,
+  StorageContractErrorCode,
+  STORAGE_CONTRACT_SOURCE
+} from './errors.js'
 import { StorageContractErrorText } from './error-text.js'
+import type { IOperationContext, IStorageKey } from './context.js'
+import type { IStorageIterator } from './resource.js'
+import { snapshotOperationContext } from './operation-context.js'
 
 /** Declarative field operators are shared by condition admission, native plans and client execution. */
 export const QueryOperator = Object.freeze({
@@ -350,4 +365,504 @@ function compileQueryCondition<T>(condition: IQueryCondition): (value: T) => boo
  */
 export function compileStorageWhere<T>(where: IWhere<T>): (value: T) => boolean {
   return compileQueryCondition<T>(snapshotStorageWhere(where))
+}
+
+/** Operation names are the shared planner vocabulary; each backend declares its actual subset. */
+export const QueryOperation = Object.freeze({
+  where: 'where',
+  predicate: 'predicate',
+  select: 'select',
+  mapper: 'mapper',
+  order: 'order',
+  comparator: 'comparator',
+  skip: 'skip',
+  after: 'after',
+  limit: 'limit',
+  distinct: 'distinct',
+  count: 'count',
+  exists: 'exists',
+  aggregate: 'aggregate',
+  topK: 'topK',
+  minScore: 'minScore',
+  follow: 'follow',
+  inverse: 'inverse',
+  groupBy: 'groupBy'
+} as const)
+/** Operation values and names intentionally share one planner namespace. */
+export type QueryOperation = keyof typeof QueryOperation
+/** One immutable plan step describes native execution or an explicit client reason. */
+export type IQueryPlanStep = {
+  readonly operation: QueryOperation
+  readonly reason?: string
+  readonly index?: string
+}
+/** An explain result describes the complete prefix decision without opening a source. */
+export type IQueryPlan = {
+  readonly pushed: readonly IQueryPlanStep[]
+  readonly client: readonly IQueryPlanStep[]
+  readonly fullScan: boolean
+  readonly source: string
+  readonly index?: string
+}
+/** Backend authors declare native support once; they do not provide another fluent executor. */
+export type IQueryPushdown = {
+  readonly operators: readonly QueryOperator[]
+  readonly operations: readonly QueryOperation[]
+  readonly source: string
+  readonly index?: string
+}
+/** Operand types follow the selected path and operator without widening the public input. */
+type IQueryOperand<V, O> = O extends 'eq' | 'ne'
+  ? V
+  : O extends 'in'
+    ? readonly V[]
+    : O extends 'exists'
+      ? boolean
+      : O extends 'between'
+        ? readonly [V, V]
+        : O extends 'has'
+          ? NonNullable<V> extends readonly (infer E)[]
+            ? E
+            : never
+          : O extends 'startsWith' | 'contains'
+            ? string
+            : V
+/** Implemented read terminals share the same source and client executor. */
+export type IQueryRead<R, TContext extends IOperationContext | undefined = IOperationContext> = {
+  all(ctx?: TContext): Promise<R[]>
+  explain(): IQueryPlan
+}
+/** A selected result cannot select again or apply conditions to an already projected shape. */
+export type IQueryResult<
+  R,
+  TContext extends IOperationContext | undefined = IOperationContext
+> = IQueryRead<R, TContext> & {
+  requirePushdown(): IQueryResult<R, TContext>
+}
+/** The implemented immutable record slice; later terminals extend this same canonical owner. */
+export type IQueryChain<
+  T,
+  TContext extends IOperationContext | undefined = IOperationContext
+> = IQueryRead<T, TContext> & {
+  where(condition: IWhere<T>): IQueryChain<T, TContext>
+  where<P extends IObjectPath<T>, O extends keyof IFieldOps<IObjectPathValue<T, P>>>(
+    path: P,
+    operator: O,
+    value: IQueryOperand<IObjectPathValue<T, P>, NoInfer<O>>
+  ): IQueryChain<T, TContext>
+  where(predicate: (row: T) => boolean): IQueryChain<T, TContext>
+  select<const K extends Extract<keyof T, string>>(
+    ...fields: readonly [K, ...K[]]
+  ): IQueryResult<Pick<T, K>, TContext>
+  select<N>(mapper: (row: T) => N): IQueryResult<Awaited<N>, TContext>
+  requirePushdown(): IQueryChain<T, TContext>
+}
+/** Native execution consumes only the shared AST and optional top-level projection from its plan. */
+export type IRecordQuerySource = {
+  readonly pushdown: IQueryPushdown
+  readonly execute: (input: {
+    readonly conditions: readonly IQueryCondition[]
+    readonly fields: readonly string[] | undefined
+    readonly ctx: IOperationContext | undefined
+  }) => IStorageIterator<readonly [IStorageKey, unknown]>
+}
+/** Nodes retain only their immediate predecessor, so deriving a branch never copies its history. */
+type IQueryNode = {
+  readonly previous: IQueryNode | undefined
+  readonly step:
+    | { readonly operation: typeof QueryOperation.where; readonly condition: IQueryCondition }
+    | {
+        readonly operation: typeof QueryOperation.predicate
+        readonly predicate: (row: unknown) => boolean
+      }
+    | { readonly operation: typeof QueryOperation.select; readonly fields: readonly string[] }
+    | {
+        readonly operation: typeof QueryOperation.mapper
+        readonly mapper: (row: unknown) => unknown
+      }
+}
+/** Captured author facts and methods remain independent of later source getter mutation. */
+type IQuerySourceSnapshot = {
+  readonly pushdown: IQueryPushdown
+  readonly execute: IRecordQuerySource['execute']
+  readonly receiver: IRecordQuerySource
+}
+/** Planning retains the actual nodes so native and client execution cannot diverge from explain. */
+type IRecordExecutionPlan = {
+  readonly explanation: IQueryPlan
+  readonly pushed: readonly IQueryNode['step'][]
+  readonly client: readonly IQueryNode['step'][]
+}
+
+/** Attaches query identity without replacing a mutable native failure or an already coded error. */
+function queryExecutionFailure(cause: unknown): Error {
+  /** Existing package identity remains authoritative, including native source cursor failures. */
+  const failure = toError(cause)
+  if (IdentifyError.identityOf(failure)) return failure
+  /** The already registered argument boundary owns callback contract failures. */
+  const identity = {
+    source: STORAGE_CONTRACT_SOURCE,
+    code: StorageContractErrorCode.invalidArgument
+  }
+  return attachErrorIdentity(failure, identity, {
+    onConflict: ({ target }) =>
+      attachErrorIdentity(
+        new Error(StorageContractErrorText.queryExecution, { cause: target }),
+        identity
+      ),
+    onFailure: ({ target, cause: attachmentFailure }) =>
+      attachErrorIdentity(
+        new AggregateError([target, attachmentFailure], StorageContractErrorText.queryExecution),
+        identity
+      )
+  })
+}
+/** A top-level native support declaration is snapshotted once before any chain is returned. */
+function snapshotQuerySource(source: IRecordQuerySource): IQuerySourceSnapshot {
+  try {
+    if (typeof source !== 'object' || source === null)
+      throw new TypeError(StorageContractErrorText.queryArgument)
+    /** Every borrowed descriptor field is captured once, never consulted during later execution. */
+    const { pushdown, execute } = source
+    /** Support arrays become independent immutable planner facts. */
+    const { operators, operations, source: sourceName, index } = pushdown
+    if (
+      !Array.isArray(operators) ||
+      !Array.isArray(operations) ||
+      typeof sourceName !== 'string' ||
+      sourceName.length === 0 ||
+      (index !== undefined && typeof index !== 'string') ||
+      typeof execute !== 'function'
+    )
+      throw new TypeError(StorageContractErrorText.queryArgument)
+    /** Dense declaration arrays reject an omitted operator rather than silently widening support. */
+    const capture = <T extends string>(values: readonly T[], table: object): readonly T[] => {
+      /** The owning snapshot checks and copies each actual declaration once. */
+      const result: T[] = []
+      /** Borrowed arrays, including proxies, have their length read once during admission. */
+      const length = values.length
+      for (let position = 0; position < length; position++) {
+        if (!Object.hasOwn(values, position))
+          throw new TypeError(StorageContractErrorText.queryArgument)
+        /** Every value must name a canonical declared operation. */
+        const value = values[position]!
+        if (typeof value !== 'string' || !Object.hasOwn(table, value))
+          throw new TypeError(StorageContractErrorText.queryArgument)
+        result.push(value)
+      }
+      return Object.freeze(result)
+    }
+    return {
+      receiver: source,
+      execute,
+      pushdown: Object.freeze({
+        operators: capture(operators, QueryOperator),
+        operations: capture(operations, QueryOperation),
+        source: sourceName,
+        ...(index === undefined ? {} : { index })
+      })
+    }
+  } catch (cause) {
+    throw new StorageContractError(
+      StorageContractErrorCode.invalidArgument,
+      { cause },
+      StorageContractErrorText.queryArgument
+    )
+  }
+}
+/** Object identity must stay client-side even when a backend can compare native structured values. */
+function queryConditionReason(
+  condition: IQueryCondition,
+  operators: ReadonlySet<QueryOperator>
+): string | undefined {
+  if (condition.kind === QueryConditionKind.not)
+    return queryConditionReason(condition.condition, operators)
+  if (condition.kind !== QueryConditionKind.field) {
+    for (const child of condition.conditions) {
+      /** The first actual reason explains why the complete boolean node cannot be pushed. */
+      const reason = queryConditionReason(child, operators)
+      if (reason !== undefined) return reason
+    }
+    return undefined
+  }
+  if (!operators.has(condition.operator)) return StorageContractErrorText.queryUnsupported
+  /** Dates have native time semantics; other non-null objects have JavaScript identity semantics. */
+  const identity = (value: unknown): boolean =>
+    typeof value === 'object' && value !== null && !(value instanceof Date)
+  if (
+    (condition.operator === QueryOperator.in &&
+      Array.isArray(condition.value) &&
+      condition.value.some(identity)) ||
+    ((condition.operator === QueryOperator.eq ||
+      condition.operator === QueryOperator.ne ||
+      condition.operator === QueryOperator.has) &&
+      identity(condition.value))
+  )
+    return StorageContractErrorText.queryIdentity
+  return undefined
+}
+/** Flattens history once and keeps the longest semantically safe native record prefix. */
+function planRecordQuery(
+  source: IQuerySourceSnapshot,
+  node: IQueryNode | undefined
+): IRecordExecutionPlan {
+  /** One reverse traversal avoids repeated prefix allocation during fluent construction. */
+  const steps: IQueryNode['step'][] = []
+  for (let current = node; current !== undefined; current = current.previous)
+    steps.push(current.step)
+  steps.reverse()
+  /** Membership lookups are compiled once per plan, never once per row. */
+  const operations = new Set(source.pushdown.operations)
+  /** Field support has the same lifetime as this single execution plan. */
+  const operators = new Set(source.pushdown.operators)
+  /** Actual pushed nodes are handed unchanged to the source execution callback. */
+  const pushed: IQueryNode['step'][] = []
+  /** Client nodes preserve declaration order after the first non-pushable operation. */
+  const client: IQueryNode['step'][] = []
+  /** Explain exposes independent immutable facts without callbacks or data reads. */
+  const pushedSteps: IQueryPlanStep[] = []
+  /** A reason is attached to each client step, including later safe-prefix boundaries. */
+  const clientSteps: IQueryPlanStep[] = []
+  for (const step of steps) {
+    /** A prior client node is a barrier for every subsequent record operation. */
+    const reason =
+      client.length > 0
+        ? StorageContractErrorText.queryPrefix
+        : step.operation === QueryOperation.predicate || step.operation === QueryOperation.mapper
+          ? StorageContractErrorText.queryFunction
+          : !operations.has(step.operation)
+            ? StorageContractErrorText.queryUnsupported
+            : step.operation === QueryOperation.where
+              ? queryConditionReason(step.condition, operators)
+              : undefined
+    if (reason === undefined) {
+      pushed.push(step)
+      pushedSteps.push(
+        Object.freeze({
+          operation: step.operation,
+          ...(source.pushdown.index === undefined ? {} : { index: source.pushdown.index })
+        })
+      )
+    } else {
+      client.push(step)
+      clientSteps.push(Object.freeze({ operation: step.operation, reason }))
+    }
+  }
+  return {
+    pushed,
+    client,
+    explanation: Object.freeze({
+      pushed: Object.freeze(pushedSteps),
+      client: Object.freeze(clientSteps),
+      fullScan:
+        source.pushdown.index === undefined ||
+        !pushed.some((step) => step.operation === QueryOperation.where),
+      source: source.pushdown.source,
+      ...(source.pushdown.index === undefined ? {} : { index: source.pushdown.index })
+    })
+  }
+}
+/** External cancellation is observed around accepted work without abandoning a native cursor. */
+function assertQueryActive(ctx: IOperationContext | undefined): void {
+  if (ctx?.signal?.aborted)
+    throw new StorageContractError(StorageContractErrorCode.aborted, { cause: ctx.signal.reason })
+}
+/**
+ * Executes one terminal while leaving iterator creation, transaction ownership and cleanup with its
+ * source.
+ */
+async function executeRecordQuery<R>(
+  source: IQuerySourceSnapshot,
+  node: IQueryNode | undefined,
+  strict: boolean,
+  ctx: IOperationContext | undefined
+): Promise<R[]> {
+  /** Strictness is checked before context resources or a native cursor can be created. */
+  const plan = planRecordQuery(source, node)
+  if (strict && plan.client.length > 0)
+    throw new StorageContractError(
+      StorageContractErrorCode.queryNotPushable,
+      {},
+      StorageContractErrorText.queryNotPushable(plan.explanation.client.map((step) => step.reason!))
+    )
+  /** Base operation fields are captured once and delegated to the original iterator owner. */
+  const captured = snapshotOperationContext(ctx)
+  assertQueryActive(captured)
+  /** The source consumes only the actual native prefix, never an independently recompiled condition. */
+  const conditions = Object.freeze(
+    plan.pushed.flatMap((step) => (step.operation === QueryOperation.where ? [step.condition] : []))
+  )
+  /** Field projection can be native only after all preceding steps are native. */
+  const fields = plan.pushed.find((step) => step.operation === QueryOperation.select)?.fields
+  /** Client declarative predicates are compiled once, including their membership Sets. */
+  const client = plan.client.map((step) =>
+    step.operation === QueryOperation.where
+      ? { ...step, predicate: compileQueryCondition<unknown>(step.condition) }
+      : step
+  )
+  /** The result retains output rows only; candidates are processed one at a time. */
+  const rows: R[] = []
+  /** The original iterator remains the sole resource; finally awaits its real cleanup Promise. */
+  let iterator: IStorageIterator<readonly [IStorageKey, unknown]> | undefined
+  /** The first normalized failure survives cleanup failure and remains first in an aggregate. */
+  let primary: Error | undefined
+  try {
+    iterator = Reflect.apply(source.execute, source.receiver, [
+      { conditions, fields, ctx: captured }
+    ])
+    while (true) {
+      assertQueryActive(captured)
+      /** Native next is always awaited to settlement before any cleanup is requested. */
+      const next = await iterator.next()
+      assertQueryActive(captured)
+      if (next.done) break
+      /** Mapping is local to this row and never mutates a backend-owned candidate. */
+      let value = next.value[1]
+      /** Short-circuit filtering preserves callback order and avoids unnecessary mapping. */
+      let accepted = true
+      for (const step of client) {
+        if (
+          step.operation === QueryOperation.where ||
+          step.operation === QueryOperation.predicate
+        ) {
+          if (!step.predicate(value)) {
+            accepted = false
+            break
+          }
+        } else if (step.operation === QueryOperation.mapper) value = await step.mapper(value)
+        else {
+          /** Projection copies only requested own fields and cannot trigger prototype mutation. */
+          const selected: Record<string, unknown> = {}
+          for (const field of step.fields)
+            Object.defineProperty(selected, field, {
+              enumerable: true,
+              configurable: true,
+              writable: true,
+              value:
+                value === null || value === undefined
+                  ? undefined
+                  : Reflect.get(Object(value), field)
+            })
+          value = selected
+        }
+        assertQueryActive(captured)
+      }
+      if (accepted) rows.push(value as R)
+    }
+  } catch (cause) {
+    primary = queryExecutionFailure(cause)
+  } finally {
+    if (iterator !== undefined) {
+      try {
+        await iterator.dispose()
+      } catch (cause) {
+        /** Cleanup cannot hide an earlier mapper, predicate or native read failure. */
+        const cleanup = queryExecutionFailure(cause)
+        primary =
+          primary === undefined
+            ? cleanup
+            : queryExecutionFailure(attachSecondaryErrors(primary, [cleanup]))
+      }
+    }
+  }
+  if (primary !== undefined) throw primary
+  return rows
+}
+/** Captures an immutable string projection before creating another chain node. */
+function snapshotQueryFields(fields: readonly unknown[]): readonly string[] {
+  if (fields.length === 0 || fields.some((field) => typeof field !== 'string'))
+    throw new StorageContractError(
+      StorageContractErrorCode.invalidArgument,
+      {},
+      StorageContractErrorText.queryArgument
+    )
+  return Object.freeze(fields as string[])
+}
+/** Creates selected terminals without falsely advertising another select or unsupported terminals. */
+function selectedRecordQuery<R, TContext extends IOperationContext | undefined>(
+  source: IQuerySourceSnapshot,
+  node: IQueryNode,
+  strict: boolean
+): IQueryResult<R, TContext> {
+  return Object.freeze({
+    all: (ctx?: TContext) => executeRecordQuery<R>(source, node, strict, ctx),
+    explain: () => planRecordQuery(source, node).explanation,
+    requirePushdown: () => selectedRecordQuery<R, TContext>(source, node, true)
+  })
+}
+/** Derivation shares history and captured source facts; each chain owns no I/O or resource lifetime. */
+function recordQuery<T, TContext extends IOperationContext | undefined>(
+  source: IQuerySourceSnapshot,
+  node: IQueryNode | undefined,
+  strict: boolean
+): IQueryChain<T, TContext> {
+  /** Overloads are implemented through one explicit runtime argument-shape dispatcher. */
+  function where(condition: IWhere<T> | ((row: T) => boolean)): IQueryChain<T, TContext>
+  function where<P extends IObjectPath<T>, O extends keyof IFieldOps<IObjectPathValue<T, P>>>(
+    path: P,
+    operator: O,
+    value: IQueryOperand<IObjectPathValue<T, P>, NoInfer<O>>
+  ): IQueryChain<T, TContext>
+  function where(...args: readonly unknown[]): IQueryChain<T, TContext> {
+    /** Only the added node is captured; previously built condition snapshots are never revisited. */
+    let step: IQueryNode['step']
+    if (args.length === 1 && typeof args[0] === 'function')
+      step = {
+        operation: QueryOperation.predicate,
+        predicate: args[0] as (row: unknown) => boolean
+      }
+    else if (args.length === 1)
+      step = { operation: QueryOperation.where, condition: snapshotStorageWhere(args[0]) }
+    else if (
+      args.length === 3 &&
+      (typeof args[0] === 'string' || Array.isArray(args[0])) &&
+      typeof args[1] === 'string' &&
+      Object.hasOwn(QueryOperator, args[1])
+    ) {
+      try {
+        /** Typed paths use the same canonical path validator as object conditions. */
+        const path = Object.freeze(parseObjectPath(args[0]).map(String))
+        step = {
+          operation: QueryOperation.where,
+          condition: snapshotQueryField(path, args[1] as QueryOperator, args[2])
+        }
+      } catch (cause) {
+        throw invalidQueryCondition(cause)
+      }
+    } else throw invalidQueryCondition()
+    return recordQuery(source, { previous: node, step }, strict)
+  }
+  /** Projection and callback mapping share one state transition that removes select from the result. */
+  function select<const K extends Extract<keyof T, string>>(
+    ...fields: readonly [K, ...K[]]
+  ): IQueryResult<Pick<T, K>, TContext>
+  function select<N>(mapper: (row: T) => N): IQueryResult<Awaited<N>, TContext>
+  function select(...args: readonly unknown[]): IQueryResult<unknown, TContext> {
+    /** A function is an opaque mapper; it is never parsed or presented as native projection. */
+    const step: IQueryNode['step'] =
+      args.length === 1 && typeof args[0] === 'function'
+        ? { operation: QueryOperation.mapper, mapper: args[0] as (row: unknown) => unknown }
+        : { operation: QueryOperation.select, fields: snapshotQueryFields(args) }
+    return selectedRecordQuery(source, { previous: node, step }, strict)
+  }
+  return Object.freeze({
+    where,
+    select,
+    all: (ctx?: TContext) => executeRecordQuery<T>(source, node, strict, ctx),
+    explain: () => planRecordQuery(source, node).explanation,
+    requirePushdown: () => recordQuery<T, TContext>(source, node, true)
+  })
+}
+/**
+ * Creates the shared record where/select/all executor from one backend author callback. Native
+ * projection rows are intentionally unknown; T declares the complete pre-projection row domain.
+ * Construction performs no I/O. Every all invocation plans once, passes only the safe native
+ * prefix, preserves callback order and awaits the original storage iterator's disposal on success
+ * or failure. The original source owns operation timing and transaction lifetime.
+ */
+export function createRecordQuery<
+  T,
+  TContext extends IOperationContext | undefined = IOperationContext
+>(source: IRecordQuerySource): IQueryChain<T, TContext> {
+  return recordQuery<T, TContext>(snapshotQuerySource(source), undefined, false)
 }

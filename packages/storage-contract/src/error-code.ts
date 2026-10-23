@@ -60,6 +60,12 @@ export const StorageContractErrorCode = Object.freeze({
    */
   aborted: 'ABORTED',
 
+  /**
+   * A strict query contains client-only steps; inspect its plan or remove strictness before
+   * reading.
+   */
+  queryNotPushable: 'QUERY_NOT_PUSHABLE',
+
   /** A genuine policy threw or returned an invalid/inapplicable decision; correct the policy. */
   concurrencyPolicyFailed: 'CONCURRENCY_POLICY_FAILED',
   /** A logical admission or physical operation deadline expired; resources have finished cleanup. */

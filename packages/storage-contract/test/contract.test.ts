@@ -30,6 +30,7 @@ describe('StorageContractError 家族', () => {
       'lockTimeout',
       'migrationFailed',
       'migrationGap',
+      'queryNotPushable',
       'unsupported',
       'versionUnsupported',
       'writeConflict'

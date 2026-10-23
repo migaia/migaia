@@ -1,7 +1,15 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import {
   compileStorageWhere,
+  createRecordQuery,
+  createTransactionOwner,
+  StorageContractError,
+  StorageContractErrorCode,
+  QueryOperation,
   QueryOperator,
+  type IStorageBase,
+  type IStorageIterator,
+  type IQueryPushdown,
   type IWhere,
   type IQueryCondition
 } from '../src/index.js'
@@ -181,5 +189,298 @@ describe('canonical declarative conditions', () => {
       compileStorageWhere<IOrder>((row: IOrder) => row.total > 1)
     }
     void invalidTypes
+  })
+})
+
+/** Original resource ownership is exercised rather than a second iterator implementation. */
+function ownedRows(
+  rows: readonly unknown[],
+  close: () => PromiseLike<void> | void = () => undefined,
+  nextFailure?: Error
+): IStorageIterator<readonly [string, unknown]> {
+  /** A specialized backend needs no fabricated KV methods to own the native cursor. */
+  const base: IStorageBase = {
+    backend: 'query-fixture',
+    capabilities: {
+      syncRead: false,
+      binary: false,
+      records: true,
+      transactions: true,
+      iteration: true,
+      secondaryIndexes: false,
+      changeFeed: false,
+      maxValueBytes: undefined,
+      opaqueEntries: false
+    },
+    dispose: async () => undefined,
+    [Symbol.asyncDispose]: async () => undefined
+  }
+  /** Backend normalization keeps the original cursor error reachable through its existing code. */
+  const owner = createTransactionOwner<unknown, object>(base, (cause) =>
+    cause instanceof StorageContractError
+      ? cause
+      : new StorageContractError(StorageContractErrorCode.invalidArgument, { cause })
+  )
+  /** One root belongs to the callback interval of the original transaction owner. */
+  const scope = {}
+  owner.register(scope, { createScope: () => ({}), onFailure: () => undefined })
+  /** The port advances its original source once for every native next. */
+  let index = 0
+  return owner.registerIterator(scope, {
+    next: async (): Promise<IteratorResult<readonly [string, unknown]>> => {
+      if (nextFailure !== undefined) throw nextFailure
+      return index < rows.length
+        ? { done: false, value: [String(index), rows[index++]] as const }
+        : { done: true, value: undefined }
+    },
+    close
+  })
+}
+
+/** An empty support declaration exercises the common client path without inventing native support. */
+const noPushdown: IQueryPushdown = { source: 'fixture', operators: [], operations: [] }
+
+describe('shared record query execution', () => {
+  it('constructs immutable branches without I/O and combines all where forms before one select', async () => {
+    let opened = 0
+    let closed = 0
+    const rows: IOrder[] = [
+      { status: 'paid', total: 12, address: { city: 'Shanghai' } },
+      { status: 'paid', total: 15, address: { city: 'Beijing' } },
+      { status: 'pending', total: 3 }
+    ]
+    const query = createRecordQuery<IOrder>({
+      pushdown: noPushdown,
+      execute: () => {
+        opened++
+        return ownedRows(rows, () => {
+          closed++
+        })
+      }
+    })
+    const paid = query.where({ status: 'paid' })
+    const shanghai = paid.where('address.city', 'eq', 'Shanghai').where((row) => row.total > 10)
+    const selected = shanghai.select('total')
+    expect(opened).toBe(0)
+    await expect(selected.all()).resolves.toEqual([{ total: 12 }])
+    await expect(paid.all()).resolves.toEqual(rows.slice(0, 2))
+    await expect(query.all()).resolves.toEqual(rows)
+    expect(opened).toBe(3)
+    expect(closed).toBe(3)
+    expect(Object.isFrozen(query)).toBe(true)
+    expect('select' in selected).toBe(false)
+    expect('where' in selected).toBe(false)
+    expectTypeOf(selected.all).returns.toEqualTypeOf<Promise<Pick<IOrder, 'total'>[]>>()
+    function invalidTypes() {
+      // @ts-expect-error A selected result has no second select transition.
+      selected.select('total')
+      // @ts-expect-error Path operands follow their exact field domain.
+      query.where('total', 'gt', 'wrong')
+    }
+    void invalidTypes
+  })
+
+  it('hands the sole AST and projection to native execution and preserves the longest safe prefix', async () => {
+    let calls = 0
+    let conditions: readonly IQueryCondition[] = []
+    let fields: readonly string[] | undefined
+    const support: IQueryPushdown = {
+      source: 'indexed-fixture',
+      index: 'by-total',
+      operations: [QueryOperation.where, QueryOperation.select],
+      operators: [QueryOperator.gte, QueryOperator.eq]
+    }
+    const query = createRecordQuery<IOrder>({
+      pushdown: support,
+      execute: (input) => {
+        calls++
+        conditions = input.conditions
+        fields = input.fields
+        return ownedRows(fields === undefined ? [{ total: 12, status: 'paid' }] : [{ total: 12 }])
+      }
+    })
+    const native = query
+      .where({ total: { gte: 10 } })
+      .select('total')
+      .requirePushdown()
+    expect(native.explain()).toEqual({
+      source: 'indexed-fixture',
+      index: 'by-total',
+      fullScan: false,
+      pushed: [
+        { operation: 'where', index: 'by-total' },
+        { operation: 'select', index: 'by-total' }
+      ],
+      client: []
+    })
+    expect(calls).toBe(0)
+    await expect(native.all()).resolves.toEqual([{ total: 12 }])
+    expect(fields).toEqual(['total'])
+    expect(conditions).toEqual([
+      { kind: 'and', conditions: [{ kind: 'field', path: ['total'], operator: 'gte', value: 10 }] }
+    ])
+    const mixed = query
+      .where({ total: { gte: 10 } })
+      .where((row) => row.status === 'paid')
+      .where({ status: 'paid' })
+      .select(async (row) => row.total * 2)
+    expect(mixed.explain().pushed.map((step) => step.operation)).toEqual(['where'])
+    expect(mixed.explain().client.map((step) => step.operation)).toEqual([
+      'predicate',
+      'where',
+      'mapper'
+    ])
+    await expect(mixed.all()).resolves.toEqual([24])
+    expect(fields).toBeUndefined()
+    expect(conditions).toHaveLength(1)
+    expectTypeOf(mixed.all).returns.toEqualTypeOf<Promise<number[]>>()
+    await expect(mixed.requirePushdown().all()).rejects.toMatchObject({
+      code: 'QUERY_NOT_PUSHABLE',
+      message: expect.stringContaining('client')
+    })
+    expect(calls).toBe(2)
+  })
+
+  it('retains getter snapshots, typed transaction context and object identity as client work', async () => {
+    let descriptors = 0
+    let contextReads = 0
+    const identity = { stamp: new Date(1) }
+    const operations = [QueryOperation.where]
+    const query = createRecordQuery<{ identity: typeof identity }, undefined>({
+      get pushdown() {
+        descriptors++
+        return { source: 'fixture', operations, operators: [QueryOperator.eq] }
+      },
+      execute: ({ ctx }) => {
+        expect(ctx).toBeUndefined()
+        return ownedRows([{ identity }, { identity: { stamp: new Date(1) } }])
+      }
+    }).where({ identity: { eq: identity } })
+    operations.length = 0
+    expect(descriptors).toBe(1)
+    expect(query.explain().client[0]?.reason).toContain('identity')
+    await expect(query.all()).resolves.toEqual([{ identity }])
+    const contextual = createRecordQuery<IOrder>({
+      pushdown: noPushdown,
+      execute: ({ ctx }) => {
+        expect(ctx?.pageSize).toBe(8)
+        return ownedRows([])
+      }
+    })
+    await contextual.all({
+      get pageSize() {
+        contextReads++
+        return 8
+      }
+    })
+    expect(contextReads).toBe(1)
+    function invalidTypes() {
+      // @ts-expect-error Transaction-bound queries cannot accept operation contexts.
+      query.all({ timeoutMs: 1 })
+    }
+    void invalidTypes
+  })
+
+  it('awaits accepted mapping and cleanup, preserving the first native error and cleanup trace', async () => {
+    const gate = Promise.withResolvers<number>()
+    const cleanup = Promise.withResolvers<void>()
+    let closed = 0
+    const query = createRecordQuery<IOrder>({
+      pushdown: noPushdown,
+      execute: () =>
+        ownedRows([{ total: 1 }], () => {
+          closed++
+          return cleanup.promise
+        })
+    })
+    const pending = query.select(() => gate.promise).all()
+    await Promise.resolve()
+    expect(closed).toBe(0)
+    gate.resolve(9)
+    await Promise.resolve()
+    await Promise.resolve()
+    cleanup.resolve()
+    await expect(pending).resolves.toEqual([9])
+    expect(closed).toBe(1)
+    const original = new RangeError('mapper failed')
+    const closeFailure = new Error('cursor cleanup failed')
+    const failing = createRecordQuery<IOrder>({
+      pushdown: noPushdown,
+      execute: () =>
+        ownedRows([{ total: 1 }], () => {
+          throw closeFailure
+        })
+    }).select(() => {
+      throw original
+    })
+    await expect(failing.all()).rejects.toBe(original)
+    expect(original).toMatchObject({
+      code: 'INVALID_ARGUMENT',
+      errors: [expect.objectContaining({ cause: closeFailure })]
+    })
+    const frozen = Object.freeze(new TypeError('frozen mapper'))
+    const frozenQuery = createRecordQuery<IOrder>({
+      pushdown: noPushdown,
+      execute: () => ownedRows([{ total: 1 }])
+    }).select(() => {
+      throw frozen
+    })
+    await expect(frozenQuery.all()).rejects.toMatchObject({
+      code: 'INVALID_ARGUMENT',
+      errors: [frozen, expect.any(Error)]
+    })
+  })
+
+  it('closes on cancellation or source failure and rejects invalid input before opening a cursor', async () => {
+    const abort = new AbortController()
+    const reason = new Error('cancel query')
+    let opened = 0
+    let closed = 0
+    const query = createRecordQuery<IOrder>({
+      pushdown: noPushdown,
+      execute: () => {
+        opened++
+        return ownedRows([{ total: 1 }], () => {
+          closed++
+        })
+      }
+    })
+    await expect(
+      query
+        .select(() => {
+          abort.abort(reason)
+          return 1
+        })
+        .all({ signal: abort.signal })
+    ).rejects.toMatchObject({ code: 'ABORTED', cause: reason })
+    expect(closed).toBe(1)
+    await expect(query.all({ signal: abort.signal })).rejects.toMatchObject({
+      code: 'ABORTED',
+      cause: reason
+    })
+    expect(opened).toBe(1)
+    expect(() => query.select(...([] as unknown as ['total']))).toThrowError(
+      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+    )
+    expect(() => query.where('constructor.x' as 'total', 'eq', 1)).toThrowError(
+      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+    )
+    const original = new Error('native next failed')
+    const failedSource = createRecordQuery<IOrder>({
+      pushdown: noPushdown,
+      execute: () =>
+        ownedRows(
+          [],
+          () => {
+            closed++
+          },
+          original
+        )
+    })
+    await expect(failedSource.all()).rejects.toMatchObject({
+      code: 'INVALID_ARGUMENT',
+      cause: original
+    })
+    expect(closed).toBe(2)
   })
 })

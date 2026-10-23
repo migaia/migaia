@@ -5,6 +5,24 @@ export const StorageContractErrorText = {
    * reading candidates.
    */
   queryCondition: 'storage query condition is invalid',
+  /** Query author descriptors and selection fields must be valid before a native cursor is opened. */
+  queryArgument: 'storage query source or selection is invalid',
+  /**
+   * User predicates, mappers and native cursor failures retain original identity and cleanup
+   * traceability.
+   */
+  queryExecution: 'storage query execution failed',
+  /** Strict execution identifies every client step before the backend is invoked. */
+  queryNotPushable: (reasons: readonly string[]): string =>
+    `storage query cannot be pushed: ${reasons.join('; ')}`,
+  /** Client functions have no declarative translation and form a record prefix boundary. */
+  queryFunction: 'JavaScript callback requires client execution',
+  /** Native equality cannot promise JavaScript opaque object identity. */
+  queryIdentity: 'object identity comparison requires client execution',
+  /** Native admission explicitly lists each supported operation and field operator. */
+  queryUnsupported: 'backend does not declare this operation or operator',
+  /** A record operation following a client step cannot cross the longest safe native prefix. */
+  queryPrefix: 'operation follows a client execution boundary',
   /**
    * Confirmed lock diagnostics expose declared identity and holder without inventing a remote
    * owner.
