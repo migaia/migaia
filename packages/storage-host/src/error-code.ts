@@ -67,7 +67,11 @@ export const StorageErrorCode = {
   versionUnsupported: 'VERSION_UNSUPPORTED',
   /** A native memory transaction failed; inspect its original cause before retrying. */
   transactionFailed: 'TRANSACTION_FAILED',
-  /** A user extension failed; inspect its original cause and operation context before retrying. */
+  /**
+   * A user extension, including an original backend pipeline callback, failed. Inspect its original
+   * cause and operation/phase before retrying; this does not imply a native service is
+   * unavailable.
+   */
   extensionFailed: 'EXTENSION_FAILED'
 } as const
 
