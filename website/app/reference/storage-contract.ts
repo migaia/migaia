@@ -766,6 +766,13 @@ const errorMembers: Readonly<Record<string, IMemberDoc>> = {
 /** Complete bilingual contract reference; implementations remain external consumers. */
 export const storageContractReference: ILibraryReference = {
   modules: {
+    conformance: {
+      summary: t(
+        'Consumer-run storage conformance. Import runConformance and pass the existing runner plus a fresh fixture factory and complete capability manifest.',
+        '由消费者 runner 执行的存储一致性套件。导入 runConformance，传入现有 runner、新 fixture 工厂与完整能力清单。'
+      ),
+      example: storageContractCases.runConformance![0]!.example
+    },
     index: {
       summary: t(
         'Runtime-neutral storage shapes, capability narrowing, key validation, codecs, operation contexts and errors. Start with `IKeyValueStore` for an injected backend, use `asRecordStore()` when structured storage is required, or `snapshotCodec()` at a codec admission boundary. This package opens no database.',
@@ -775,6 +782,25 @@ export const storageContractReference: ILibraryReference = {
     }
   },
   symbols: {
+    runConformance: {
+      role: 'operation',
+      purpose: t(
+        'Register all declared standard-token and Boolean behavior groups without acquiring a runner, host or driver dependency. Every case validates the complete manifest and finally disposes its original fixture; primary and cleanup failures remain reachable.',
+        '登记声明的标准 token 与布尔行为组，不依赖 runner、host 或 driver。每例核对完整清单并 finally 释放原 fixture，主体与清理错误均可追踪。'
+      ),
+      params: {
+        harness: t(
+          'Original describe/it/expect registration and matchers. Notification waiting uses only this runner’s case timeout.',
+          '原 describe/it/expect 与 matcher；通知等待仅沿该 runner 的 case 超时。'
+        ),
+        subject: t(
+          'Name, independent create factory, complete authentic capability list and full features snapshot. KV is selected by kv token; pure vector/SQL subjects need none.',
+          '名称、独立 create 工厂、完整真实 token 清单与全量 features 快照。KV 由 kv token 选择；纯 vector/SQL 无需 KV。'
+        )
+      },
+      example: storageContractCases.runConformance![0]!.example,
+      cases: storageContractCases.runConformance
+    },
     term: {
       role: 'constant',
       purpose: t(
@@ -957,7 +983,10 @@ export const storageContractReference: ILibraryReference = {
           'Readonly points; every input is checked and duplicate IDs keep the last value.',
           '只读点；全部输入逐项校验，重复 ID 保留末值。'
         ),
-        configuration: t('Existing declared dimensions and metric.', '已有声明维度与 metric。'),
+        configuration: t(
+          'Optional existing dimensions and metric. Omission captures finite components and portable payloads only; validate the detached vectors against the actual native schema before writing.',
+          '可选已有维度与 metric。省略时仅捕获有限分量与便携 payload；写入前再按真实原生 schema 校验脱离的向量。'
+        ),
         backend: t('Optional native diagnostic label.', '可选原生诊断标签。')
       },
       returns: t(
@@ -1002,7 +1031,10 @@ export const storageContractReference: ILibraryReference = {
           'Nonnegative safe k, optional filter/withPayload/exact; booleans default false.',
           '非负安全 k、可选 filter/withPayload/exact；布尔缺省 false。'
         ),
-        configuration: t('Existing declared dimensions and metric.', '已有声明维度与 metric。'),
+        configuration: t(
+          'Optional existing schema. Omission snapshots the complete finite query/options/filter; validate the detached query against actual native dimensions and metric before searching.',
+          '可选已有 schema。省略时完整捕获有限 query/options/filter；检索前按真实原生维度与 metric 校验脱离的 query。'
+        ),
         backend: t('Optional native diagnostic label.', '可选原生诊断标签。')
       },
       returns: t(
@@ -1749,6 +1781,25 @@ export const storageContractReference: ILibraryReference = {
         '规范规划词汇；后端声明真实支持的子集，名称本身不安装查询方法。'
       ),
       example: 'console.log(QueryOperation.where, QueryOperation.select) // where select'
+    },
+    snapshotStorageWhere: {
+      role: 'operation',
+      purpose: t(
+        'Capture the original immutable canonical query AST for native translation; reuse the same single-read parser, field validation and INVALID_ARGUMENT cause.',
+        '捕获原不可变规范查询 AST 供原生翻译；复用同一单读 parser、字段校验及 INVALID_ARGUMENT 原因。'
+      ),
+      params: {
+        where: t(
+          'Declarative IWhere input; field accessors are captured once.',
+          '声明式 IWhere 输入，字段访问器只读取一次。'
+        )
+      },
+      returns: t(
+        'The same frozen IQueryCondition domain supplied to native source callbacks; no I/O, compiler or owner is created.',
+        '与原生 source 回调相同的冻结 IQueryCondition 值域；不创建 I/O、compiler 或 owner。'
+      ),
+      example: storageContractCases.snapshotStorageWhere![0]!.example,
+      cases: storageContractCases.snapshotStorageWhere
     },
     compileStorageQueryCondition: {
       role: 'operation',
@@ -3430,7 +3481,13 @@ console.log(candidate.name, candidate.output)`
         operators: { summary: t('Supported field operators.', '支持的字段操作符。') },
         operations: { summary: t('Supported native operations.', '支持的原生操作。') },
         source: { summary: t('Stable source label.', '稳定数据源标签。') },
-        index: { summary: t('Optional native index label.', '可选原生索引标签。') }
+        index: { summary: t('Optional native index label.', '可选原生索引标签。') },
+        canPushCondition: {
+          summary: t(
+            'Optional pure exact-domain predicate for one canonical condition, after original operator/identity checks. Its original function and receiver are captured once; false retains client filtering and requirePushdown rejects before I/O. Omission preserves prior declarations.',
+            '原操作符与身份检查后，对一个规范条件做可选纯精确值域判定。原函数与 receiver 单次捕获；false 保留客户端过滤，requirePushdown 在 I/O 前拒绝。省略时保留原声明语义。'
+          )
+        }
       }
     },
     IVectorHit: {
@@ -5370,6 +5427,58 @@ if (sync) {
       ],
       example: storeExample,
       members: recordMembers
+    },
+    IConformanceHarness: {
+      summary: t(
+        'Existing consumer runner adapter; the contract owns no execution scheduler or notification deadline.',
+        '现有消费者 runner 接点；契约不拥有执行调度或通知期限。'
+      ),
+      members: {
+        describe: { summary: t('Register a named case group.', '登记具名用例组。') },
+        it: {
+          summary: t(
+            'Register one independently created and disposed case.',
+            '登记一个独立创建与释放的用例。'
+          )
+        },
+        expect: {
+          summary: t(
+            'Return the supplied synchronous and async assertion vocabulary.',
+            '返回消费者的同步与异步断言。'
+          )
+        }
+      }
+    },
+    IConformanceMatchers: {
+      summary: t(
+        'Required consumer assertions; assertion failures retain their runner identity.',
+        '必需的消费者断言；失败保留 runner 原错误身份。'
+      ),
+      members: {
+        toBe: {
+          summary: t('Assert exact identity or primitive equality.', '断言精确身份或原始值相等。')
+        },
+        toEqual: { summary: t('Assert structural equality.', '断言结构相等。') },
+        toBeNull: { summary: t('Assert null.', '断言 null。') },
+        toBeUndefined: { summary: t('Assert undefined.', '断言 undefined。') },
+        toBeDefined: { summary: t('Assert a defined value.', '断言值已定义。') },
+        toThrow: {
+          summary: t(
+            'Assert a callable fails, optionally matching its text.',
+            '断言函数失败，可匹配错误文本。'
+          )
+        },
+        toMatchObject: {
+          summary: t('Assert the expected observable fields.', '断言预期可观察字段。')
+        }
+      }
+    },
+    IConformanceAsyncMatchers: {
+      summary: t(
+        'The same matcher arguments with Promise<void> results for resolves/rejects.',
+        '与同步 matcher 参数相同，resolves/rejects 返回 Promise<void>。'
+      ),
+      members: {}
     },
     ITextWatchApi: {
       summary: t(

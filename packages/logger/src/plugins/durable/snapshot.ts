@@ -123,7 +123,7 @@ export function snapshotPayload(input: unknown): ILogPayload {
 }
 
 /** Captures record descriptors at the same admission boundary as payload reflection. */
-export function snapshotRecords(
+export function snapshotLogRecords(
   records: readonly ILogRecordInput[]
 ): readonly { readonly kind: string; readonly payload: ILogPayload }[] {
   try {

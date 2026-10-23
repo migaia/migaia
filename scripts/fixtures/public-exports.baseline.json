@@ -169,7 +169,11 @@
         "LogRecordState",
         "LogStage",
         "binlog",
+        "createLogStoreIndex",
         "memoryLogStore",
+        "prepareLogAppend",
+        "snapshotLogRecords",
+        "snapshotLogStoreState",
         "undoLog",
         "wal"
       ],
@@ -1132,6 +1136,7 @@
         "snapshotStorageVectorFilter",
         "snapshotStorageVectorSearch",
         "snapshotStorageVectorUpsert",
+        "snapshotStorageWhere",
         "snapshotSyncWriteOptions",
         "term",
         "ttl",
@@ -1144,7 +1149,8 @@
         "useStorageCapability",
         "useTransactionCapability",
         "vector"
-      ]
+      ],
+      "./conformance": ["runConformance"]
     },
     "@migaia/storage-web": {
       ".": [
@@ -1805,6 +1811,15 @@
         "selectCodec",
         "structuredCodec"
       ]
+    },
+    "@migaia/storage-plugin-qdrant": {
+      ".": ["ERROR_SOURCE", "QdrantErrorCode", "qdrantBackendKind", "qdrantBackendPlugin"],
+      "./http": ["fetchHttp"],
+      "./client": ["qdrantClientHttp"],
+      "./features/hybrid": ["qdrantHybridFeature"],
+      "./features/recommend": ["qdrantRecommendFeature"],
+      "./features/group-by": ["qdrantGroupByFeature"],
+      "./features/management": ["qdrantManagementFeature"]
     },
     "@migaia/storage-plugin-sparql": {
       ".": ["ERROR_SOURCE", "SparqlErrorCode", "sparqlBackendKind", "sparqlBackendPlugin"],

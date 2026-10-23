@@ -814,6 +814,28 @@ importers:
         specifier: 3.1140.0
         version: 3.1140.0
 
+  packages/storage-plugin-qdrant:
+    dependencies:
+      '@migaia/lifecycle':
+        specifier: workspace:^
+        version: link:../lifecycle
+      '@migaia/serialize':
+        specifier: workspace:^
+        version: link:../serialize
+      '@migaia/storage-contract':
+        specifier: workspace:^
+        version: link:../storage-contract
+      '@migaia/storage-host':
+        specifier: workspace:^
+        version: link:../storage-host
+      '@migaia/utils':
+        specifier: workspace:^
+        version: link:../utils
+    devDependencies:
+      '@qdrant/js-client-rest':
+        specifier: 1.11.0
+        version: 1.11.0(typescript@7.0.2)
+
   packages/storage-plugin-sparql:
     dependencies:
       '@migaia/lifecycle':
@@ -1669,6 +1691,10 @@ packages:
       '@noble/hashes':
         optional: true
 
+  '@fastify/busboy@2.1.1':
+    resolution: {integrity: sha512-vBZP4NlzfOlerQTnba4aqZoMhE/a9HY7HRqoOPaETQcSQuWEIyZMHGfVu6w9wGtGK5fED5qRs2DteVCjOH60sA==}
+    engines: {node: '>=14'}
+
   '@jridgewell/resolve-uri@3.1.2':
     resolution: {integrity: sha512-bRISgCIjP20/tbWSPWMEi54QVPRZExkuD9lJL+UIxUKtwVJA8wW1Trb1jMs1RFXo1CBTNZ/5hpC9QvmKWdopKw==}
     engines: {node: '>=6.0.0'}
@@ -2197,6 +2223,16 @@ packages:
     engines: {node: '>=20'}
     hasBin: true
 
+  '@qdrant/js-client-rest@1.11.0':
+    resolution: {integrity: sha512-RzF+HxL8A7bb/uaxU1jVS1a919bb3FCo1giB/D19UT3d50AYl4+4AyklbsjlXpWEHekbNocQAQ016fqT9hSRtQ==}
+    engines: {node: '>=18.0.0', pnpm: '>=8'}
+    peerDependencies:
+      typescript: '>=4.7'
+
+  '@qdrant/openapi-typescript-fetch@1.2.6':
+    resolution: {integrity: sha512-oQG/FejNpItrxRHoyctYvT3rwGZOnK4jr3JdppO/c78ktDvkWiPXPHNsrDf33K9sZdRb6PR7gi4noIapu5q4HA==}
+    engines: {node: '>=18.0.0', pnpm: '>=8'}
+
   '@rdfjs/types@2.0.1':
     resolution: {integrity: sha512-uyAzpugX7KekAXAHq26m3JlUIZJOC0uSBhpnefGV5i15bevDyyejoB7I+9MKeUrzXD8OOUI3+4FeV1wwQr5ihA==}
 
@@ -2297,6 +2333,9 @@ packages:
 
   '@rolldown/pluginutils@1.0.1':
     resolution: {integrity: sha512-2j9bGt5Jh8hj+vPtgzPtl72j0yRxHAyumoo6TNfAjsLB04UtpSvPbPcDcBMxz7n+9CYB0c1GxQFxYRg2jimqGw==}
+
+  '@sevinf/maybe@0.5.0':
+    resolution: {integrity: sha512-ARhyoYDnY1LES3vYI0fiG6e9esWfTNcXcO6+MPJJXcnyMV3bim4lnFt45VXouV7y82F4x3YH8nOQ6VztuvUiWg==}
 
   '@sinclair/typebox@0.34.52':
     resolution: {integrity: sha512-XiMQh7qqVlxZzcVD+kkGMNGMzcTrDMLWI7S4x7z1MkCkbDPrekpZXEUK0eZqZFMuHQg2a2DZOcDIh9o5v3Gonw==}
@@ -3117,6 +3156,10 @@ packages:
   undici-types@7.18.2:
     resolution: {integrity: sha512-AsuCzffGHJybSaRrmr5eHr81mwJU3kjw6M+uprWvCXiNeN9SOGwQ3Jn8jb8m3Z6izVgknn1R0FTCEAP2QrLY/w==}
 
+  undici@5.28.5:
+    resolution: {integrity: sha512-zICwjrDrcrUE0pyyJc1I2QzBkLM8FINsgOrt6WjA+BgajVq9Nxu2PbFFXUrAggLfDXlZGZBVZYw7WNV5KiBiBA==}
+    engines: {node: '>=14.0'}
+
   undici@7.29.0:
     resolution: {integrity: sha512-IDxfleLmmbSskfWSUATiN1nfn2rDuvnMOqb5CWR92iIfojA0Ud+ulOAAEQ57LPr9rWmsreUyf5lwyao+7GNNVw==}
     engines: {node: '>=20.18.1'}
@@ -3628,6 +3671,8 @@ snapshots:
 
   '@exodus/bytes@1.15.1': {}
 
+  '@fastify/busboy@2.1.1': {}
+
   '@jridgewell/resolve-uri@3.1.2': {}
 
   '@jridgewell/sourcemap-codec@1.5.5': {}
@@ -3903,6 +3948,15 @@ snapshots:
     dependencies:
       playwright: 1.62.1
 
+  '@qdrant/js-client-rest@1.11.0(typescript@7.0.2)':
+    dependencies:
+      '@qdrant/openapi-typescript-fetch': 1.2.6
+      '@sevinf/maybe': 0.5.0
+      typescript: 7.0.2
+      undici: 5.28.5
+
+  '@qdrant/openapi-typescript-fetch@1.2.6': {}
+
   '@rdfjs/types@2.0.1':
     dependencies:
       '@types/node': 24.13.2
@@ -3957,6 +4011,8 @@ snapshots:
     optional: true
 
   '@rolldown/pluginutils@1.0.1': {}
+
+  '@sevinf/maybe@0.5.0': {}
 
   '@sinclair/typebox@0.34.52': {}
 
@@ -4801,6 +4857,10 @@ snapshots:
   uint8array-extras@1.5.0: {}
 
   undici-types@7.18.2: {}
+
+  undici@5.28.5:
+    dependencies:
+      '@fastify/busboy': 2.1.1
 
   undici@7.29.0: {}
 

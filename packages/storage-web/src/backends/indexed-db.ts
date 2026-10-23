@@ -38,6 +38,7 @@ import {
 } from '@migaia/storage-contract'
 import { isStorageErrorFamily, type IStorageErrorFamily } from './errors.js'
 import {
+  createBackendChangeIterator,
   createStorageOperationReporter,
   createStorageOperationRuntime,
   reportCleanupError,
@@ -1836,6 +1837,9 @@ export const indexedDbHost = <TValue = unknown>(
   /** Symbol cleanup shares the controller's primary cleanup without exposing its rejection. */
   let symbolicDispose: Promise<void> | undefined
 
+  /** The original installation owns the physical database's default organization identity. */
+  const orgId = runtime.defaultOrgId
+
   /** Report-only owner for malformed or unavailable coordination transport behavior. */
   const coordinationReporter = createStorageOperationReporter()
   /** One private registry member shared by every exact store in this physical data universe. */
@@ -1846,6 +1850,7 @@ export const indexedDbHost = <TValue = unknown>(
     dbName,
     layoutFingerprint: indexedDbLayoutFingerprint(kvStoreName, bytesStoreName, recordsStoreName),
     ownOrigin: controller.origin,
+    orgId,
     onChange: (change) => controller.publishExternal(change),
     report: (error) => reportCleanupError(coordinationReporter, error),
     createKeyLockPort: () => runtime.createKeyLockPort()
@@ -1905,7 +1910,7 @@ export const indexedDbHost = <TValue = unknown>(
    */
   /** Route existing post-commit events through the one private controller owner. */
   const publishChange = (change: Omit<IStorageChange, 'sequence' | 'origin' | 'scope'>): void => {
-    const event = controller.publish(change)
+    const event = controller.publish({ ...change, orgId })
     if (event !== undefined) coordination.publish(event)
   }
 
@@ -4173,6 +4178,30 @@ export const indexedDbHost = <TValue = unknown>(
      * hint to same-page handles and the realm transport, while non-admitted factories remain
      * fail-closed through the immutable capability snapshot.
      */
+    /** Native text invalidations borrow the original controller and iterator resource owner. */
+    watch: (key, ctx) => {
+      assertLive()
+      if (!capabilities.changeFeed)
+        throw new StorageContractError(StorageContractErrorCode.unsupported, {
+          backend: StorageBackend.indexedDb
+        })
+      assertStringStorageKey(key, StorageBackend.indexedDb, 'watch key')
+      return createBackendChangeIterator(controller, {
+        orgId,
+        channel: 'value',
+        key,
+        ctx,
+        execute: (advance, context) =>
+          runtime.execution.run(
+            {
+              operation: storageBackendOperation(StorageBackend.indexedDb, 'watch'),
+              input: key,
+              ctx: context
+            },
+            advance
+          )
+      })
+    },
     subscribeChanges: (listener) => {
       assertLive()
       return controller.subscribe(listener)

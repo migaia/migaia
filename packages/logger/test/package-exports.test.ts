@@ -9,7 +9,11 @@ describe('durable package entries', () => {
       'LogRecordState',
       'LogStage',
       'binlog',
+      'createLogStoreIndex',
       'memoryLogStore',
+      'prepareLogAppend',
+      'snapshotLogRecords',
+      'snapshotLogStoreState',
       'undoLog',
       'wal'
     ])

@@ -17,6 +17,7 @@ import type {
 /** Backend factories borrow the original registration's execution and controller ports. */
 export type IBackendRuntime = Pick<
   IStoragePluginCore,
+  | 'defaultOrgId'
   | 'createChangeController'
   | 'createKeyLockPort'
   | 'createTransactionApi'

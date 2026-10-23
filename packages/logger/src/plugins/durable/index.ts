@@ -1,4 +1,12 @@
 export { memoryLogStore } from './store.js'
+export { snapshotLogRecords } from './snapshot.js'
+export { prepareLogAppend, snapshotLogStoreState, createLogStoreIndex } from './committed-index.js'
+export type {
+  ILogRecordSnapshot,
+  ILogStoreSnapshot,
+  ILogStoreRecoveryRow,
+  ILogStoreIndex
+} from './committed-index.js'
 export { LogRecordState, LogStage } from './state-constants.js'
 export type {
   ILogPayload,

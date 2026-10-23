@@ -335,6 +335,29 @@ async function deleteDrafts(store: IStorageStore<typeof vector>) {
 
 /** Exercises public contract tools without supplying a fictional storage implementation. */
 export const storageContractCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
+  runConformance: [
+    {
+      title: t('Verify a backend with its existing runner', '用现有 runner 验证后端'),
+      problem: t(
+        'A backend must prove its declared capabilities without importing another backend or runner into the contract.',
+        '后端须证明所声明的能力，契约不能依赖另一后端或 runner。'
+      ),
+      example: `import { runConformance, type IConformanceHarness } from '@migaia/storage-contract/conformance'
+import { kv, type IStorageStore, type IStorageCapabilities } from '@migaia/storage-contract'
+
+export function verifyKvBackend(
+  harness: IConformanceHarness,
+  create: () => IStorageStore<typeof kv> | PromiseLike<IStorageStore<typeof kv>>,
+  features: IStorageCapabilities
+) {
+  runConformance(harness, { name: 'my-backend', create, capabilities: [kv], features })
+}`,
+      result: t(
+        'The consumer runner executes the registered cases. Each creates a fresh fixture, verifies the complete manifest, and finally disposes that store; extra declared tokens belong in capabilities.',
+        '消费者 runner 执行登记的用例。每例新建 fixture、核对完整清单并 finally 释放 store；其它已声明 token 也必须列入 capabilities。'
+      )
+    }
+  ],
   createStorageBlobBodyReader: [
     {
       title: t('Read an admitted upload body', '读取已准入的上传内容'),
@@ -843,6 +866,24 @@ async function pages(source: IRecordQuerySource) {
       result: t(
         'With canonical keys a,b,c,d, returns pages a,b and c,d. A different source, condition or ordering rejects before new I/O.',
         '规范键为 a,b,c,d 时返回 a,b 与 c,d 两页；源、条件或排序不匹配在新 I/O 前拒绝。'
+      )
+    }
+  ],
+  snapshotStorageWhere: [
+    {
+      title: t('Share a canonical native filter input', '共享规范原生过滤输入'),
+      problem: t(
+        'A native backend must translate the same query AST without repeating operator or getter rules.',
+        '原生后端须翻译相同查询 AST，不能重复操作符或 getter 规则。'
+      ),
+      example: `import { snapshotStorageWhere, compileStorageQueryCondition } from '@migaia/storage-contract'
+const condition = snapshotStorageWhere({ total: { gte: 2 } })
+const matches = compileStorageQueryCondition<{ total: number }>(condition)
+console.log(matches({ total: 3 }), matches({ total: 1 }))
+// true false`,
+      result: t(
+        'One immutable AST serves native translation and the original predicate compiler.',
+        '一个不可变 AST 同时供原生翻译与原谓词 compiler 使用。'
       )
     }
   ],

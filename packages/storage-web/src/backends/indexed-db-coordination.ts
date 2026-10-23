@@ -1,4 +1,4 @@
-import type { IStorageChange } from '@migaia/storage-contract'
+import { assertOperationContext, type IStorageChange } from '@migaia/storage-contract'
 import {
   createEventChannel,
   EventDispatchPolicy,
@@ -15,6 +15,7 @@ import { StorageErrorCode, createStorageTypeError } from '../types/errors.js'
 type IIndexedDbWireHint = {
   readonly version: 1
   readonly origin: string
+  readonly orgId?: string
   readonly sequence: number
   readonly channel: IStorageChange['channel']
   readonly kind: IStorageChange['kind']
@@ -55,6 +56,7 @@ type IIndexedDbCoordinationOptions = {
   readonly dbName: string
   readonly layoutFingerprint: string
   readonly ownOrigin: string
+  readonly orgId: string
   readonly onChange: (change: IStorageChange) => void
   readonly report: (error: unknown) => void
   readonly createKeyLockPort: () => IBackendKeyLockPort
@@ -102,6 +104,7 @@ const hashChannelIdentity = (value: string): string => {
 const isAllowedWireKey = (key: string): boolean =>
   key === 'version' ||
   key === 'origin' ||
+  key === 'orgId' ||
   key === 'sequence' ||
   key === 'channel' ||
   key === 'kind' ||
@@ -111,6 +114,7 @@ const isAllowedWireKey = (key: string): boolean =>
 type IIndexedDbWireSnapshot = {
   readonly version: unknown
   readonly origin: unknown
+  readonly orgId?: unknown
   readonly sequence: unknown
   readonly channel: unknown
   readonly kind: unknown
@@ -130,9 +134,12 @@ const snapshotWireHint = (value: object): IIndexedDbWireSnapshot => {
     : sourceKeys
   /** Captures optional scope once while omitting absent fields from the snapshot. */
   const scope = source.scope
+  /** Organization is metadata and shares the same single-read wire snapshot. */
+  const orgId = source.orgId
   return Object.freeze({
     version: source.version,
     origin: source.origin,
+    ...(orgId === undefined ? {} : { orgId }),
     sequence: source.sequence,
     channel: source.channel,
     kind: source.kind,
@@ -145,6 +152,7 @@ const snapshotWireHint = (value: object): IIndexedDbWireSnapshot => {
 const decodeWireHint = (
   value: unknown,
   ownOrigin: string,
+  defaultOrgId: string,
   report: (error: unknown) => void
 ): IStorageChange | undefined => {
   try {
@@ -153,7 +161,7 @@ const decodeWireHint = (
     if (!keys.every((key) => typeof key === 'string' && isAllowedWireKey(key))) return
     const snapshot = snapshotWireHint(value)
     if (safeJsonPayloadByteLength(snapshot) > MAX_HINT_BYTES) return
-    const { version, origin, sequence, channel, kind, scope, keys: encodedKeys } = snapshot
+    const { version, origin, orgId, sequence, channel, kind, scope, keys: encodedKeys } = snapshot
     if (
       version !== 1 ||
       typeof origin !== 'string' ||
@@ -171,6 +179,7 @@ const decodeWireHint = (
         kind !== 'migrate')
     )
       return
+    if (orgId !== undefined) assertOperationContext({ orgId: orgId as string })
     if (scope !== undefined && (typeof scope !== 'string' || scope.length > MAX_SCOPE_LENGTH))
       return
     if (encodedKeys !== undefined) {
@@ -193,7 +202,16 @@ const decodeWireHint = (
         return decoded
       })
     }
-    return { origin, sequence, channel, kind, scope, keys: decodedKeys }
+    /** Legacy version-one hints belong to this already-admitted physical database's organization. */
+    return {
+      origin,
+      orgId: orgId === undefined ? defaultOrgId : (orgId as string),
+      sequence,
+      channel,
+      kind,
+      scope,
+      keys: decodedKeys
+    }
   } catch (error) {
     report(error)
     return
@@ -224,6 +242,7 @@ const encodeWireHint = (
   const candidate: IIndexedDbWireHint = {
     version: 1,
     origin: change.origin,
+    ...(change.orgId === undefined ? {} : { orgId: change.orgId }),
     sequence: change.sequence,
     channel: change.channel,
     kind: change.kind,
@@ -234,6 +253,7 @@ const encodeWireHint = (
   return {
     version: 1,
     origin: change.origin,
+    ...(change.orgId === undefined ? {} : { orgId: change.orgId }),
     sequence: change.sequence,
     channel: change.channel,
     kind: change.kind,
@@ -303,6 +323,7 @@ const enqueueHint = (
     entry.pending.push({
       change: {
         origin: change.origin,
+        ...(change.orgId === undefined ? {} : { orgId: change.orgId }),
         sequence: change.sequence,
         channel: 'all',
         kind: 'clear'
@@ -342,7 +363,7 @@ const createEntry = (
   } as IIndexedDbCoordinationEntry
   entry.onMessage = (event) => {
     if (entry.disposed) return
-    const decoded = decodeWireHint(event.data, options.ownOrigin, options.report)
+    const decoded = decodeWireHint(event.data, options.ownOrigin, options.orgId, options.report)
     if (decoded === undefined || !rememberHint(entry, decoded)) return
     enqueueHint(entry, decoded)
   }
