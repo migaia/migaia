@@ -193,6 +193,23 @@ test('真实 IndexedDB 小页分页扫描完整且提前停止', async ({ page }
     'TRANSACTION_FAILED'
   ])
   expect(result.requestSetterCode).toBe('TRANSACTION_FAILED')
+  for (const [name, value] of Object.entries(result.queryStreams)) {
+    if (typeof value !== 'object') continue
+    expect(
+      value,
+      `${name}: native Symbol available=${result.queryStreams.nativeSymbolAvailable}`
+    ).toEqual({
+      canonicalKey: true,
+      mainCached: true,
+      symbolicCached: true,
+      distinct: true,
+      value: { index: name.endsWith('Entity') || name === 'entity' ? 7 : 0 }
+    })
+  }
+  expect(result.queryStreams.beforeQueries).toBe(2)
+  expect(result.queryStreams.afterQueries).toBe(2)
+  expect(result.queryStreams.transactionQueries).toBe(1)
+  expect(result.queryStreams.diagnostics).toBe(0)
 })
 
 test('三个连接的双原生 transaction 串行提交全部递增', async ({ page }) => {
