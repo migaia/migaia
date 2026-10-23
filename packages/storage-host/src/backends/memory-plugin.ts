@@ -24,37 +24,35 @@ export const memoryBackendKind = defineStorageBackendKind<
   }
 >()('memory')
 
-/** The public factory retains selected roots while keeping the absent-id literal exact. */
-type IMemoryPluginOptions<N extends string, F extends IStorageFeatureRecord> = IMemoryOptions & {
-  readonly id?: N
-  readonly features?: F &
-    IStorageFeatureStoreCompatibility<typeof memoryBackendKind, F, IMemoryBackendStore>
-}
-/** Default construction stays literal even inside createStorageHost's contextual plugin tuple. */
+/** Options preserve the original native fields and literal installation id. */
+type IMemoryPluginOptions<N extends string> = IMemoryOptions & { readonly id?: N }
+/** Default construction stays literal inside the contextual host plugin tuple. */
 export function memoryBackendPlugin(
-  options?: IMemoryPluginOptions<'memory', {}> & {
-    readonly id?: undefined
-    readonly features?: undefined
-  }
+  options?: IMemoryPluginOptions<'memory'> & { readonly id?: undefined },
+  features?: undefined
 ): IStorageBackendPlugin<typeof memoryBackendKind, 'memory', {}, IMemoryBackendStore>
-/** Selected Features retain their exact graph when the default backend id is used. */
+/** Selected roots are a separate final parameter, independent of native options. */
 export function memoryBackendPlugin<const F extends IStorageFeatureRecord>(
-  options: IMemoryPluginOptions<'memory', F> & { readonly id?: undefined; readonly features: F }
+  options: (IMemoryPluginOptions<'memory'> & { readonly id?: undefined }) | undefined,
+  features: F & IStorageFeatureStoreCompatibility<typeof memoryBackendKind, F, IMemoryBackendStore>
 ): IStorageBackendPlugin<typeof memoryBackendKind, 'memory', F, IMemoryBackendStore>
 /** An explicit id retains its literal without widening the absent Feature set. */
 export function memoryBackendPlugin<const N extends string>(
-  options: IMemoryPluginOptions<N, {}> & { readonly id: N; readonly features?: undefined }
+  options: IMemoryPluginOptions<N> & { readonly id: N },
+  features?: undefined
 ): IStorageBackendPlugin<typeof memoryBackendKind, N, {}, IMemoryBackendStore>
-/** Explicit ids and selected Features both retain their exact public type facts. */
+/** Explicit ids and selected roots retain both exact public type facts. */
 export function memoryBackendPlugin<const N extends string, const F extends IStorageFeatureRecord>(
-  options: IMemoryPluginOptions<N, F> & { readonly id: N; readonly features: F }
+  options: IMemoryPluginOptions<N> & { readonly id: N },
+  features: F & IStorageFeatureStoreCompatibility<typeof memoryBackendKind, F, IMemoryBackendStore>
 ): IStorageBackendPlugin<typeof memoryBackendKind, N, F, IMemoryBackendStore>
 /** Define an isolated native memory backend; acquisition waits for its original install window. */
 export function memoryBackendPlugin<
   const N extends string = 'memory',
   const F extends IStorageFeatureRecord = {}
 >(
-  options: IMemoryPluginOptions<N, F> = {}
+  options: IMemoryPluginOptions<N> = {},
+  features?: F & IStorageFeatureStoreCompatibility<typeof memoryBackendKind, F, IMemoryBackendStore>
 ): IStorageBackendPlugin<typeof memoryBackendKind, N, F, IMemoryBackendStore> {
   /** The plugin identity is captured before registering the original static Feature graph. */
   const captured = (() => {
@@ -63,7 +61,6 @@ export function memoryBackendPlugin<
         throw new TypeError(StorageErrorText.memoryOptions)
       /** Own getters are consumed once before native acquisition and the Feature graph is captured. */
       const id = (options.id ?? 'memory') as N
-      const features = options.features
       const namespace = options.namespace
       const concurrency = options.concurrency
       const owner = options.owner

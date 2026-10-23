@@ -22,7 +22,7 @@ describe('owner convergence', () => {
       return { capabilities: [], chain: {}, api: { store: {}, transaction: {} } }
     })
     await using _host = await createStorageHost({
-      plugins: [memoryBackendPlugin({ features: { probe } })]
+      plugins: [memoryBackendPlugin(undefined, { probe })]
     })
     const controller = getController()!
     const changes: unknown[] = []

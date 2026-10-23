@@ -56,7 +56,7 @@ controller 的只读 `closingSignal` 代表原关闭阶段。将其作为可选 
 
 后端原安装 core 的 `defaultOrgId` 只读返回宿主已捕获的缺省组织身份。`createRevisionPort()` 在同一安装窗口创建本地修订事实；一个物理数据宇宙共享该对象，`read/write/epoch/clear` 使用既有 text/bytes/record 通道和后端已捕获的键身份。仅原生提交成功后推进修订；clear 清墓碑并推进通道 epoch，防止旧快照通过 ABA 检查。此口不拥有资源或其它成员的关闭权。
 
-`memoryBackendPlugin()` 与 `memoryBackendKind` 由宿主根入口提供。每次安装拥有独立内存数据，即使 namespace 相同也不共享。文本、字节、记录事务复用原事务 owner、并发策略和本地锁；`scope.use(kv)` 提供同事务的八个文本方法，`scope.use(records)` 使用同一实际记录游标执行查询。配置的 owner.label 捕获后保持稳定；没有标签时使用运行时与 pid，浏览器使用 browser。原生 client getter 返回 undefined，事务 client 校验原 scope 后返回 undefined。
+`memoryBackendPlugin()` 与 `memoryBackendKind` 由宿主根入口提供。每次安装拥有独立内存数据，即使 namespace 相同也不共享。文本、字节、记录事务复用原事务 owner、并发策略和本地锁；`scope.use(kv)` 提供同事务的八个文本方法，`scope.use(records)` 使用同一实际记录游标执行查询。配置的 owner.label 捕获后保持稳定；没有标签时使用运行时与 pid，浏览器使用 browser。原生 client getter 返回 undefined，事务 client 校验原 scope 后返回 undefined。 所选 Feature 记录独立放在最后一个参数：`memoryBackendPlugin(options, features)`；省略 options 可传 undefined，缺省 id 仍为 memory。
 
 memory 的根异步 `set/setBytes/putRecord/remove/removeBytes/deleteRecord`、clear 与 records 前缀删除使用同一原并发策略和单次预算；单次 ctx.concurrency 覆盖原默认。replace 按固定顺序保护目标和可能删除的其它通道。同步 set/remove/clearValues 只直接探测活锁，忙时立即 LOCK_REJECTED，不运行异步策略。clear 和前缀删除只检查受影响通道的活锁；最终检查与实际数据、修订修改无 await 间隙。输入键与可变 payload 在等待前捕获。读取不加写锁；并发策略不改变 ConflictPolicy 的 duplicate/replace 语义。
 
