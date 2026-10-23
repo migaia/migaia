@@ -227,3 +227,5 @@ await log.append([{ kind: 'order.created', payload: { id: 'o1' } }])
 await log.setState(1, LogRecordState.done)
 console.log(await log.lastSeq(), await log.states(LogRecordState.pending)) // 1 []
 ```
+
+Backend authors may call core.registerFeatureClientResolver(store, resolver) only in the original installation window for the exact registered store. resolver.getClient(orgId) may prepare through its original opener and return that organization's native client; only actual asynchronous results are awaited, followed by original registration admission. Optional getTransactionClient(scope, orgId) must synchronously return that authenticated scope's already-open transaction, without opening or waiting. Without a registered resolver, original Feature getClient/getTransactionClient order and behavior stay unchanged. The resolver occupies one optional original storeCell field; business views cannot register or receive it, and Feature factories do not rerun.

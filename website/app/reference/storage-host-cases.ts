@@ -3,6 +3,21 @@ import type { ICaseDoc, IText } from './contract.js'
 const t = (en: string, zh: string): IText => ({ en, zh })
 /** Application extensions retain their exact inputs while the host owns installation and cleanup. */
 export const storageHostCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
+  IStorageFeatureClientResolver: [
+    {
+      title: t('Declare a finite native client resolver', '声明有限原生客户端选择'),
+      problem: t(
+        'Backend authors need an explicit client selection shape without another capability or resource registry.',
+        '后端作者需要显式客户端选择形状，不另建能力或资源登记表。'
+      ),
+      example:
+        "import type { IStorageFeatureClientResolver } from '@migaia/storage-host'\nconst resolver: IStorageFeatureClientResolver<undefined, undefined> = {\n  getClient: (_orgId) => undefined,\n  getTransactionClient: (_scope, _orgId) => undefined\n}\nconsole.log(await resolver.getClient('00000000-0000-0000-0000-000000000000'))",
+      result: t(
+        'Prints undefined for a backend with no native client. Real native backends return their original client and already-open transaction; only their installation may register this resolver.',
+        '无原生客户端的后端输出undefined。真实原生后端返回原客户端及已打开事务，仅原安装窗口能登记resolver。'
+      )
+    }
+  ],
   asyncDisposeKey: [
     {
       title: t('Use the original disposal key', '使用原释放键'),

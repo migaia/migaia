@@ -545,6 +545,40 @@ export class PluginHost<
           nodeId: readHostNodeId(this),
           matchesHost: (host: object) => matchesManagedHost(host, this),
           assertCurrent,
+          assertPreparedRegistration: () => {
+            this.#assertActive()
+            if (registration.lifecycle === PluginHostRegistrationLifecycle.install) {
+              this.#state.assertRegistrationValid(registration, (current) =>
+                this.#operationRuntime.assertCurrent(current)
+              )
+              return
+            }
+            if (this.#state.registrations.get(registration.name) === registration) {
+              assertCurrent()
+              return
+            }
+            /** The original lifecycle owner already retains the exact active install row. */
+            const current = this.#hookRegistration
+            if (
+              batch &&
+              !batch.committed &&
+              batch.registrations.get(registration.name) === registration &&
+              registration.installed &&
+              !registration.lifecycleController?.signal.aborted &&
+              current !== undefined &&
+              batch.registrations.get(current.name) === current &&
+              current.lifecycle === PluginHostRegistrationLifecycle.install &&
+              this.#operationRuntime.isCurrent(current.operation)
+            ) {
+              /** The original candidate handle owns installed/enabled/activation checks. */
+              void this.#createHandle(registration.name, batch).extensions
+              return
+            }
+            throw new PluginHostError(
+              PluginHostErrorCode.registrationRevoked,
+              ERROR_TEXT.REGISTRATION_REVOKED
+            )
+          },
           readSharedExtension: (key: PropertyKey) => {
             this.#assertActive()
             return this.#state.readSharedExtension(key)
