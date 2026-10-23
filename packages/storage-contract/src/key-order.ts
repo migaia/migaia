@@ -23,7 +23,10 @@ function measureKey(key: IStorageKey): number {
  * UTF-16 code units, byte prefixes, nested keys and normalized signed zero retain comparator
  * order.
  */
-export function encodeOrderedStorageKey(key: unknown, backend: IBackendKind): Uint8Array {
+export function encodeOrderedStorageKey(
+  key: unknown,
+  backend: IBackendKind | undefined
+): Uint8Array {
   /** Existing key ownership handles validation, domain limits and mutable components. */
   const snapshot = snapshotStorageKey(key, backend)
   /** One allocation holds the complete encoded tree. */

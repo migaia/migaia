@@ -1065,6 +1065,7 @@
         "runTransactionOperation",
         "runWithConcurrency",
         "snapshotCodec",
+"snapshotConcurrencyLockHoldings",
         "snapshotKeyValueStore",
         "snapshotKeyValueStoreDetailed",
         "snapshotOperationContext",

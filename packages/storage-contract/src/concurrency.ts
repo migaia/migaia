@@ -359,7 +359,7 @@ export const lockKey = Object.freeze({
   }
 })
 /** Adds only channel identity around the sole canonical ordered-key encoder. */
-function encodeLockIdentity(key: ILockKey, backend: IBackendKind): Uint8Array {
+function encodeLockIdentity(key: ILockKey, backend: IBackendKind | undefined): Uint8Array {
   /** Key-order owns every key tag and self-delimiting scalar/array representation. */
   const ordered = encodeOrderedStorageKey(key.key, backend)
   /** One channel marker keeps the original text < bytes < record order. */
@@ -369,10 +369,10 @@ function encodeLockIdentity(key: ILockKey, backend: IBackendKind): Uint8Array {
   return encoded
 }
 /** Stable MSD buckets process each present suffix byte a constant number of times. */
-function sortLockIdentities(entries: INormalizedLockKey[]): void {
+function sortLockIdentities<T extends { readonly encoded: Uint8Array }>(entries: T[]): void {
   if (entries.length < 2) return
   /** One shared scratch array serves every disjoint frame, without copying prefixes. */
-  const scratch: INormalizedLockKey[] = []
+  const scratch: T[] = []
   scratch.length = entries.length
   /** Fixed alphabet state is reused for every frame instead of retained per depth. */
   const counts = new Uint32Array(LOCK_RADIX_BUCKETS)
@@ -412,6 +412,48 @@ function sortLockIdentities(entries: INormalizedLockKey[]): void {
       boundary += size
     }
   }
+}
+/**
+ * Detaches only the current inspection rows and orders them with the original stable byte radix.
+ * Equal keys retain their individual holder/lease rows; no lock or resource authority is granted.
+ */
+export function snapshotConcurrencyLockHoldings(
+  rows: readonly ILockHolding[]
+): readonly ILockHolding[] {
+  if (!Array.isArray(rows)) throw invalidLockArgument(undefined)
+  /** Encodings belong only to this inspection and never replace authentic attempt metadata. */
+  const entries: { readonly encoded: Uint8Array; readonly row: ILockHolding }[] = []
+  /** Captured length prevents borrowed accessors from extending the snapshot. */
+  let length: number
+  try {
+    length = rows.length
+  } catch (cause) {
+    throw invalidLockArgument(undefined, cause)
+  }
+  for (let index = 0; index < length; index += 1) {
+    /** Capture the original row fields once before canonical key admission. */
+    let captured: ILockHolding
+    try {
+      /** Each borrowed inspection row is read once before its individual fields. */
+      const row = rows[index]!
+      captured = {
+        key: row.key,
+        holder: Object.freeze({ ...row.holder }),
+        expired: row.expired,
+        expiresAt: row.expiresAt
+      }
+    } catch (cause) {
+      throw invalidLockArgument(undefined, cause)
+    }
+    /** Keys detach Dates and binary segments through the existing unique key snapshot. */
+    const key = snapshotLockKey(captured.key, undefined)
+    entries.push({
+      encoded: encodeLockIdentity(key, undefined),
+      row: Object.freeze({ ...captured, key })
+    })
+  }
+  sortLockIdentities(entries)
+  return Object.freeze(entries.map((entry) => entry.row))
 }
 /** Adjacent deduplication charges each compared encoding at most twice. */
 function equalLockIdentity(left: Uint8Array, right: Uint8Array): boolean {
