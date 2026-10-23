@@ -66,7 +66,8 @@ import type {
   IStorageOrgView,
   IStorageBackendOrgContext,
   IStoragePluginCallContext,
-  IStorageBorrowedBackend
+  IStorageBorrowedBackend,
+  IStorageOrgBinding
 } from './types.js'
 
 /** Minimal PluginHost domain core; storage materializers do not expose host mutation to plugins. */
@@ -212,8 +213,14 @@ export function createStoragePluginHost(options: IPluginHostOptions): IStoragePl
           /** The original window and exact store cell remain the only registration authority. */
           registrationCore!.onDispose(context.storeCell.releaseOrgBindings)
           /** Capture the original callbacks once so later descriptor mutation cannot reroute an org. */
-          const backend = binding?.backend
-          const drop = binding?.drop
+          let backend: IStorageOrgBinding['backend']
+          let drop: IStorageOrgBinding['drop']
+          try {
+            backend = binding?.backend
+            drop = binding?.drop
+          } catch (cause) {
+            throw new StorageContractError(StorageContractErrorCode.invalidArgument, { cause })
+          }
           if (
             context.storeCell.get() !== store ||
             typeof backend !== 'function' ||
