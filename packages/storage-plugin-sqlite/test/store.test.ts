@@ -9,12 +9,14 @@ import {
   ttl,
   counter,
   records,
+  sql,
   sqlFragment,
   lockKey,
   ConcurrencyPolicy,
   compareStorageKeys,
   type IStorageKey
 } from '@migaia/storage-contract'
+import { runConformance } from '@migaia/storage-contract/conformance'
 import { sqliteBackendPlugin, type ISqliteValue } from '../src/index.js'
 import { nodeSqliteDriver } from '../src/node.js'
 
@@ -59,6 +61,27 @@ async function installed(options: { wal?: boolean; memory?: boolean; native?: st
   })
   return { store: host.backend('sqlite'), host, connection, path }
 }
+
+/** Each selected standard group receives a fresh actual native database and original owner. */
+runConformance(
+  { describe, it, expect },
+  {
+    name: 'native SQLite standard capabilities',
+    capabilities: [kv, records, sql, ttl, counter],
+    features: {
+      syncRead: true,
+      binary: true,
+      records: true,
+      transactions: true,
+      iteration: true,
+      secondaryIndexes: false,
+      changeFeed: false,
+      maxValueBytes: undefined,
+      opaqueEntries: false
+    },
+    create: async () => (await installed({ memory: true })).store
+  }
+)
 
 describe('native SQLite installation', () => {
   it('keeps native TTL with values, reclaims expiry, and rolls back the same three channels', async () => {
