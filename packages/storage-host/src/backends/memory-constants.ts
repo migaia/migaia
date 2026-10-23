@@ -26,7 +26,11 @@ export const MemoryOperation = {
   setMany: 'setMany',
   removeMany: 'removeMany',
   removeByPrefix: 'removeByPrefix',
-  recordRemoveByPrefix: 'records.removeByPrefix'
+  recordRemoveByPrefix: 'records.removeByPrefix',
+  ttlExpire: 'ttl.expire',
+  ttlRemaining: 'ttl.remaining',
+  ttlPersist: 'ttl.persist',
+  counterIncrement: 'counter.increment'
 } as const
 
 /** Physical memory identity and diagnostic names remain private to this native backend. */

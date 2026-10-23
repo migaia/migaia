@@ -82,7 +82,9 @@ export function createBackendKeyLockPort(): IBackendKeyLockPort {
   const entries = {
     text: new Map<string, IKeyEntry>(),
     bytes: new Map<string, IKeyEntry>(),
-    record: new Map<string, IKeyEntry>()
+    record: new Map<string, IKeyEntry>(),
+    vector: new Map<string, IKeyEntry>(),
+    rdf: new Map<string, IKeyEntry>()
   }
   /** Only contended waiting admissions enter the existing utility FIFO. */
   const limiter = createConcurrencyLimiter({ concurrency: 1 })
@@ -126,7 +128,11 @@ export function createBackendKeyLockPort(): IBackendKeyLockPort {
 
   /** Fixed finite channel buckets retain each physical entry once without interpreting its bytes. */
   const readEntry = (identity: string): IKeyEntry | undefined =>
-    entries.text.get(identity) ?? entries.bytes.get(identity) ?? entries.record.get(identity)
+    entries.text.get(identity) ??
+    entries.bytes.get(identity) ??
+    entries.record.get(identity) ??
+    entries.vector.get(identity) ??
+    entries.rdf.get(identity)
 
   /** Canonical input order determines the first actual conflicting holder. */
   const conflict = (
@@ -399,6 +405,11 @@ export function createBackendKeyLockPort(): IBackendKeyLockPort {
       /** Only the first actual holder is copied; point probing never sorts or scans other keys. */
       const held = conflict(identities, ranges, current)
       if (held === undefined) return undefined
+      /** New finite identities detach through the original contract snapshot owner. */
+      if (held.key.channel === 'vector' || held.key.channel === 'rdf')
+        return snapshotConcurrencyLockHoldings([
+          { key: held.key, holder: held.holder, expired: false }
+        ])[0]
       return Object.freeze({
         key:
           held.key.channel === 'bytes'
