@@ -95,6 +95,32 @@ describe('native filesystem objects', () => {
       expect(error.stack).toBe(stack)
       expect(await api.head('failed')).toBeUndefined()
     }
+    const identified = new TypeError('upload source already has another identity')
+    Object.defineProperties(identified, {
+      source: { value: 'fixture.other-package' },
+      code: { value: 'OTHER_FAILURE' }
+    })
+    for (const error of [Object.freeze(new TypeError('upload source is frozen')), identified]) {
+      const stack = error.stack
+      const source = new ReadableStream<Uint8Array>({
+        pull(controller) {
+          controller.error(error)
+        }
+      })
+      const failure = await api.put('failed', source).then(
+        () => undefined,
+        (cause: unknown) => cause
+      )
+      expect(failure).toBeInstanceOf(TypeError)
+      expect(failure).toMatchObject({
+        source: 'storage.backend.object',
+        code: 'OBJECT_FAILED',
+        cause: error,
+        stack: expect.any(String)
+      })
+      expect(error.stack).toBe(stack)
+      expect(await api.head('failed')).toBeUndefined()
+    }
   })
 
   it('orders UTF-16 logical keys, binds cursors and isolates organization prefix deletion', async () => {

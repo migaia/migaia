@@ -1,4 +1,5 @@
 import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
+import { attachErrorIdentity } from '@migaia/utils/error'
 import { ERROR_SOURCE, ObjectErrorCode, type IObjectErrorCode } from './error-code.js'
 import { ObjectErrorText } from './error-text.js'
 import { ObjectNames } from './constants.js'
@@ -36,11 +37,26 @@ export function normalizeObjectError(error: unknown): Error {
     error instanceof RangeError ||
     (typeof DOMException !== 'undefined' && error instanceof DOMException)
   ) {
-    Object.defineProperties(error, {
-      source: { value: ERROR_SOURCE, enumerable: true },
-      code: { value: ObjectErrorCode.failed, enumerable: true }
-    })
-    return error
+    /** Immutable or already-identified native errors keep their exact original on the cause chain. */
+    const fallback = (): Error => {
+      const replacement =
+        error instanceof TypeError
+          ? new TypeError(ObjectErrorText.failed, { cause: error })
+          : error instanceof RangeError
+            ? new RangeError(ObjectErrorText.failed, { cause: error })
+            : new DOMException(ObjectErrorText.failed, error.name)
+      if (replacement instanceof DOMException)
+        Object.defineProperty(replacement, 'cause', { value: error })
+      return attachErrorIdentity(replacement, {
+        source: ERROR_SOURCE,
+        code: ObjectErrorCode.failed
+      })
+    }
+    return attachErrorIdentity<Error>(
+      error,
+      { source: ERROR_SOURCE, code: ObjectErrorCode.failed },
+      { onConflict: fallback, onFailure: fallback }
+    )
   }
   return objectError(ObjectErrorCode.failed, error)
 }
