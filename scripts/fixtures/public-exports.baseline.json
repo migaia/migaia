@@ -1802,6 +1802,11 @@
         "structuredCodec"
       ]
     },
+    "@migaia/storage-plugin-sparql": {
+      ".": ["ERROR_SOURCE", "SparqlErrorCode"],
+      "./http": ["httpEndpoint"],
+      "./oxigraph": ["oxigraphEndpoint"]
+    },
     "@migaia/storage-plugin-object": {
       ".": [
         "ERROR_SOURCE",
