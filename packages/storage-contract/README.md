@@ -14,7 +14,7 @@
 
 ## 为什么选它
 
-- **文本往返后仍是集合。** 普通 JSON 会丢掉 Map/Set；内置 codec 在两端使用同一版本元组并还原嵌套类型。[运行证明](./USEGUIDE.md#从文本恢复嵌套的-map-与-set)。
+- **文本往返后仍是集合。** 普通 JSON 会丢掉 Map/Set；共享 serialize 集合 codec 在两端使用同一保留记录并还原嵌套类型。[运行证明](./USEGUIDE.md#从文本恢复嵌套的-map-与-set)。
 - **键的可变组件不再与调用方共享。** 浅拷贝数组仍共享 Date 和缓冲区；键快照递归复制并复验这些组件。[运行证明](./USEGUIDE.md#在调用方修改前捕获复合键)。
 - **能力分支基于接纳时的完整描述。** 只检查真假可能接纳错误字段，继续引用原对象又会让判断漂移；能力快照校验字段，只给旧版缺失的两个标志补 false，并返回独立记录。[运行证明](./USEGUIDE.md#选择通道前规范化旧版能力描述)。
 - **同一次操作只有一份选项记录。** 重读 getter 可能改变意图；上下文快照各字段只读一次、冻结并可复用，同时把取消执行留给后端。[运行证明](./USEGUIDE.md#只读取一次操作选项把取消执行留给后端)。
@@ -25,15 +25,21 @@
 把嵌套权限集合编码为文本，再恢复真实的集合实例：
 
 ```ts doc-test=run
-import { collectionsJsonCodec } from '@migaia/storage-contract'
+import { fromValueCodec } from '@migaia/storage-contract'
+import { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'
 
-const settings = { roles: new Map([['Ada', new Set(['read', 'write'])]]) }
-const raw = await collectionsJsonCodec.encode(settings)
-const restored = (await collectionsJsonCodec.decode(raw)) as typeof settings
-console.log('输出形式:', collectionsJsonCodec.output)
-console.log('Map:', restored.roles instanceof Map)
-console.log('Set:', restored.roles.get('Ada') instanceof Set)
-console.log('权限:', [...(restored.roles.get('Ada') ?? [])].join(', '))
+const codec = fromValueCodec(defineCollectionsJsonCodec({ version: 1 }))
+
+const settings = new Map([['Ada', new Set(['read', 'write'])]])
+const raw = await codec.encode(settings)
+const restored = await codec.decode(raw)
+if (!(restored instanceof Map)) throw new Error('Expected Map')
+const permissions = restored.get('Ada')
+if (!(permissions instanceof Set)) throw new Error('Expected Set')
+console.log('输出形式:', codec.output)
+console.log('Map:', restored instanceof Map)
+console.log('Set:', permissions instanceof Set)
+console.log('权限:', [...permissions].join(', '))
 ```
 
 输出：
@@ -68,7 +74,7 @@ console.log(restored.roles.get('Ada')) // 隐患：roles 是普通对象，调�
 | 需要字节、记录、迭代和事务         | IRecordStore（L1），先用 asRecordStore 收窄            |
 | 接纳外部描述或会变化的选项         | snapshotStorageCapabilities / snapshotOperationContext |
 | 异步工作不能继续引用调用方的可变键 | snapshotStorageKey                                     |
-| 文本需要保留 Map/Set               | collectionsJsonCodec                                   |
+| 文本需要保留 Map/Set               | fromValueCodec                                         |
 
 “契约”是实现方与调用方共同遵守的输入、输出和错误规则；“能力”描述当前对象实际提供的操作；“收窄”是在运行时检查后使用更具体的接口；“快照”是捕获当前值，是否复制或冻结由具体 API 决定；“codec”是值与存储表示之间的编解码器。
 
@@ -79,7 +85,7 @@ console.log(restored.roles.get('Ada')) // 隐患：roles 是普通对象，调�
 | 在调用方修改前捕获复合键               | `snapshotStorageKey`          | [完整示例](./USEGUIDE.md#在调用方修改前捕获复合键)             |
 | 把普通对象作为记录键前先拒绝           | `snapshotStorageKey`          | [完整示例](./USEGUIDE.md#把普通对象作为记录键前先拒绝)         |
 | 只读取一次操作选项，把取消执行留给后端 | `snapshotOperationContext`    | [完整示例](./USEGUIDE.md#只读取一次操作选项把取消执行留给后端) |
-| 从文本恢复嵌套的 Map 与 Set            | `collectionsJsonCodec`        | [完整示例](./USEGUIDE.md#从文本恢复嵌套的-map-与-set)          |
+| 从文本恢复嵌套的 Map 与 Set            | `fromValueCodec`              | [完整示例](./USEGUIDE.md#从文本恢复嵌套的-map-与-set)          |
 | 选择通道前规范化旧版能力描述           | `snapshotStorageCapabilities` | [完整示例](./USEGUIDE.md#选择通道前规范化旧版能力描述)         |
 | 报告契约错误时保留原始失败             | `StorageContractError`        | [完整示例](./USEGUIDE.md#报告契约错误时保留原始失败)           |
 
@@ -97,7 +103,7 @@ pnpm add @migaia/storage-contract
 | -------------------------------------------------- | ------------------------------------------- |
 | IKeyValueStore / IRecordStore                      | 定义功能与实现之间的 L0/L1 边界             |
 | asRecordStore                                      | 调用记录方法前确认完整能力                  |
-| collectionsJsonCodec                               | 将 JSON 兼容数据中的 Map/Set 编成文本并还原 |
+| fromValueCodec                                     | 将 JSON 兼容数据中的 Map/Set 编成文本并还原 |
 | snapshotStorageKey                                 | 在异步工作前校验并复制键                    |
 | snapshotOperationContext                           | 一次捕获操作选项                            |
 | snapshotStorageCapabilities / StorageContractError | 接纳能力描述，报告可追溯的契约失败          |
@@ -223,7 +229,7 @@ metadata 供可恢复维护迁移使用，与 values、bytes、records 独立，
 
 `snapshotCodec(codec)` 接受 unknown；要求非 null、非数组的对象，也接纳满足结构的 class 实例。name 必须是 trim 后非空字符串，output 是三种值之一，encode/decode 必须可调用。四个属性各读取一次，返回新的浅说明对象 { name, output, encode, decode }；函数引用不变，不绑定旧 receiver，也不冻结。`assertCodec(codec)` 使用相同校验并将输入类型收窄，不返回说明对象。非法形状或读取失败为 INVALID_ARGUMENT。
 
-`collectionsJsonCodec` 是内置、冻结的 codec，name 固定为 `COLLECTIONS_JSON_CODEC_NAME`，即 `'migaia-collections-json-v1'`，output 为 text。Map 和 Set 编为带版本名、map/set kind 与数组 payload 的三元 tuple；解码只解释完全匹配的保留形式。普通或仅相似数组不猜成集合；精确匹配该保留形式的数组会被解释为集合，因此不要把这组 tuple 当普通业务数组使用。
+`fromValueCodec` 适配 serialize codec，不另建值格式。组合 `defineCollectionsJsonCodec({ version: 1 })`，用 serialize 拥有的 `$rpc` map/entries 与 set/values 保留记录保存 Map/Set。适配器名称为 `collections-json@1`，output 为 text；不支持的值由 serialize 拒绝。
 
 集合之外仍遵循 JSON 表达能力，不是任意对象图的无损序列化。无法表示的根值、循环、BigInt 等 JSON 编码失败，非字符串输入、坏 JSON 或坏保留集合内容，都以 INVALID_ARGUMENT 保留原始 cause。浏览器 structured/binary codec 属于 storage-web；压缩、加密等自定义 codec 实现同一接口接入，不在本包提供。
 
@@ -361,3 +367,17 @@ function attachCatalog(base: IStorageBase, read: (key: string) => Promise<string
 这是后端内部的装配函数，实际 store 仍由宿主安装与释放。`store.use(catalog)` 返回原实现对象；真实但未登记的令牌抛带后端名与能力名的 `UNSUPPORTED_CAPABILITY`，伪造令牌抛 `INVALID_ARGUMENT`。`store.has(token)` 同步返回布尔值。标准 `kv` 令牌同时提供原有平铺方法，`has(key, ctx)` 保留异步键查询。
 
 宿主通过 `onInstaller` 捕获本 store 唯一的安装口。`prepare` 先验证整批真实记录并保留令牌，`publish` 才使能力可见，`release` 幂等撤回该批。失败不调用基础对象的 `dispose`；资源回滚仍由创建它的后端拥有。事务与查询链的实际执行由其既有拥有者实现，类型投影不会创建事务或获得连接。
+
+### fromValueCodec
+
+```ts
+import { fromValueCodec } from '@migaia/storage-contract'
+import { defineJsonCodec } from '@migaia/serialize/codecs/json'
+
+const codec = fromValueCodec(defineJsonCodec({ version: 2 }))
+const raw = await codec.encode({ count: 1 })
+console.log(codec.name, codec.output, await codec.decode(raw))
+// json@2 text { count: 1 }
+```
+
+冻结适配器只读取一次五个元数据/回调字段。文本、字节与 unknown 载体分别映射为 text、binary 与 structured 存储路由。encode 与 decode 独立保留输入类型，因此 tagged codec 的旧格式解码输入不会丢失。两条回调各调用一次并等待结果；同步抛错与 Promise 拒绝统一包装为 contract `INVALID_ARGUMENT`，cause 保留原始错误。适配器不二次解析、复制值、派发 hooks 或创建资源/连接。`StorageStageKind` 与 `ICodecStageObserver` 仅描述观察；绑定真实 store 的派发仍归宿主。

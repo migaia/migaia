@@ -2,7 +2,7 @@
 
 [中文](./README.md)
 
-Give features and storage implementations shared interfaces, key rules and validation boundaries, with a text codec that preserves Map/Set. Backends perform the actual storage operations.
+Give features and storage implementations shared interfaces, key rules and validation boundaries, with an adapter to the shared serialize codecs. Backends perform the actual storage operations.
 
 ## You may have run into this
 
@@ -14,7 +14,7 @@ Give features and storage implementations shared interfaces, key rules and valid
 
 ## Why choose it
 
-- **Collection types survive a text round trip.** Native JSON loses Map/Set values; the built-in codec uses one versioned tuple format at both ends and restores nested types. [Run the example](./USEGUIDE.en.md#restore-nested-map-and-set-values-from-text).
+- **Collection types survive a text round trip.** Native JSON loses Map/Set values; the shared serialize collection codec owns the format at both ends, while the adapter preserves its types. [Run the example](./USEGUIDE.en.md#restore-nested-map-and-set-values-from-text).
 - **Mutable key components stop sharing the caller’s objects.** A shallow array copy still shares Dates and buffers; key snapshots recursively copy and revalidate them. [Run the example](./USEGUIDE.en.md#capture-a-composite-key-before-its-owner-changes-it).
 - **Capability decisions use one admitted description.** Truthy checks can accept invalid fields, and retaining the input lets later mutation change a decision. Capability snapshots validate fields, default only two legacy flags to false and return a separate record. [Run the example](./USEGUIDE.en.md#normalize-an-older-capability-descriptor-before-choosing-a-channel).
 - **An operation has one captured option record.** Rereading getters can change intent; context snapshots read fields once, freeze the record and reuse it, leaving cancellation execution to backends. [Run the example](./USEGUIDE.en.md#read-operation-options-once-without-claiming-to-execute-cancellation).
@@ -25,15 +25,21 @@ Give features and storage implementations shared interfaces, key rules and valid
 Encode nested permissions as text, then restore actual collection instances:
 
 ```ts doc-test=run
-import { collectionsJsonCodec } from '@migaia/storage-contract'
+import { fromValueCodec } from '@migaia/storage-contract'
+import { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'
 
-const settings = { roles: new Map([['Ada', new Set(['read', 'write'])]]) }
-const raw = await collectionsJsonCodec.encode(settings)
-const restored = (await collectionsJsonCodec.decode(raw)) as typeof settings
-console.log('output:', collectionsJsonCodec.output)
-console.log('Map:', restored.roles instanceof Map)
-console.log('Set:', restored.roles.get('Ada') instanceof Set)
-console.log('permissions:', [...(restored.roles.get('Ada') ?? [])].join(', '))
+const codec = fromValueCodec(defineCollectionsJsonCodec({ version: 1 }))
+
+const settings = new Map([['Ada', new Set(['read', 'write'])]])
+const raw = await codec.encode(settings)
+const restored = await codec.decode(raw)
+if (!(restored instanceof Map)) throw new Error('Expected Map')
+const permissions = restored.get('Ada')
+if (!(permissions instanceof Set)) throw new Error('Expected Set')
+console.log('output:', codec.output)
+console.log('Map:', restored instanceof Map)
+console.log('Set:', permissions instanceof Set)
+console.log('permissions:', [...permissions].join(', '))
 ```
 
 Output:
@@ -68,7 +74,7 @@ The codec above owns the version tags and collection revival, so callers do not 
 | Bytes, records, iteration and transactions are required | IRecordStore (L1), after asRecordStore admission       |
 | Descriptors or operation options may change             | snapshotStorageCapabilities / snapshotOperationContext |
 | Async work cannot retain the caller’s mutable key       | snapshotStorageKey                                     |
-| Text must preserve Map/Set values                       | collectionsJsonCodec                                   |
+| Text must preserve Map/Set values                       | fromValueCodec                                         |
 
 A “contract” is the input, output and error agreement between caller and implementation. A “capability” describes operations actually available on an object. “Narrowing” checks an object before using a more specific interface. A “snapshot” captures current values; its API determines copying and freezing. A “codec” translates values to and from a storage representation.
 
@@ -79,7 +85,7 @@ A “contract” is the input, output and error agreement between caller and imp
 | Capture a composite key before its owner changes it                  | `snapshotStorageKey`          | [Complete example](./USEGUIDE.en.md#capture-a-composite-key-before-its-owner-changes-it)                  |
 | Reject an object before treating it as a record key                  | `snapshotStorageKey`          | [Complete example](./USEGUIDE.en.md#reject-an-object-before-treating-it-as-a-record-key)                  |
 | Read operation options once without claiming to execute cancellation | `snapshotOperationContext`    | [Complete example](./USEGUIDE.en.md#read-operation-options-once-without-claiming-to-execute-cancellation) |
-| Restore nested Map and Set values from text                          | `collectionsJsonCodec`        | [Complete example](./USEGUIDE.en.md#restore-nested-map-and-set-values-from-text)                          |
+| Restore nested Map and Set values from text                          | `fromValueCodec`              | [Complete example](./USEGUIDE.en.md#restore-nested-map-and-set-values-from-text)                          |
 | Normalize an older capability descriptor before choosing a channel   | `snapshotStorageCapabilities` | [Complete example](./USEGUIDE.en.md#normalize-an-older-capability-descriptor-before-choosing-a-channel)   |
 | Keep the original failure when reporting a contract error            | `StorageContractError`        | [Complete example](./USEGUIDE.en.md#keep-the-original-failure-when-reporting-a-contract-error)            |
 
@@ -89,7 +95,7 @@ A “contract” is the input, output and error agreement between caller and imp
 pnpm add @migaia/storage-contract
 ```
 
-Inside the workspace, use `@migaia/storage-contract@workspace:^`. The runtime dependency is `@migaia/utils`. Choose an implementation package when you need an actual backend.
+Inside the workspace, use `@migaia/storage-contract@workspace:^`. Dependencies are `@migaia/utils` and `@migaia/serialize`; serialize is imported only as a type by this adapter. Choose an implementation package when you need an actual backend.
 
 ## Essential APIs
 
@@ -97,7 +103,7 @@ Inside the workspace, use `@migaia/storage-contract@workspace:^`. The runtime de
 | -------------------------------------------------- | -------------------------------------------------------------------- |
 | IKeyValueStore / IRecordStore                      | Define the L0/L1 boundary between features and implementations       |
 | asRecordStore                                      | Verify complete capabilities before calling record methods           |
-| collectionsJsonCodec                               | Round-trip Map/Set inside JSON-compatible data through text          |
+| fromValueCodec                                     | Round-trip Map/Set inside JSON-compatible data through text          |
 | snapshotStorageKey                                 | Validate and copy a key before async work                            |
 | snapshotOperationContext                           | Capture operation options once                                       |
 | snapshotStorageCapabilities / StorageContractError | Admit capability descriptions and report traceable contract failures |
@@ -106,7 +112,7 @@ Inside the workspace, use `@migaia/storage-contract@workspace:^`. The runtime de
 
 ### Entry point, ownership and boundaries
 
-The package has one root entry, `@migaia/storage-contract`, with no public subpaths. It provides storage interfaces, capability descriptions, key domains, operation contexts, codecs, transaction scopes and contract errors, plus validators, snapshot helpers and a collection JSON codec. Its runtime dependency is `@migaia/utils`; the structural `IAbortSignal` type comes from `@migaia/utils/promise`.
+The package has one root entry, `@migaia/storage-contract`, with no public subpaths. It provides storage interfaces, capability descriptions, key domains, operation contexts, codecs, transaction scopes and contract errors, plus validators, snapshot helpers and a serialize codec adapter. Its declared dependencies are `@migaia/utils` and `@migaia/serialize`; the adapter imports serialize types only; the structural `IAbortSignal` type comes from `@migaia/utils/promise`.
 
 There is no persistence backend here. It opens no database, writes no disk, and depends on neither DOM nor IndexedDB nor Node. Connections, reads, writes, commits, isolation and retry belong to implementations such as `@migaia/storage-web`. Features depend on these interfaces; implementations depend on the contract, never the reverse. Compression, encryption or Worker recoding can implement the same codec interface, but those extensions are not supplied here.
 
@@ -223,7 +229,7 @@ Type ordering is number < Date < string < ArrayBuffer < array. Numbers compare b
 
 `snapshotCodec(codec)` takes unknown. It requires a non-null, non-array object, including a class instance satisfying the shape. name must be nonblank after trimming, output must be one of the three values, and encode/decode must be callable. Each of the four fields is read once. The new shallow { name, output, encode, decode } description retains function references without binding their old receiver and is not frozen. `assertCodec(codec)` checks the same shape and narrows the input type without returning a description. Bad shapes and reads produce INVALID_ARGUMENT.
 
-`collectionsJsonCodec` is the built-in frozen codec. Its name is `COLLECTIONS_JSON_CODEC_NAME`, or `'migaia-collections-json-v1'`, and output is text. Maps and Sets become three-item tuples containing that version name, a map/set kind and an array payload. Decoding interprets only the exact reserved forms. Ordinary or merely similar arrays are left alone; arrays exactly matching the reserved form are interpreted as collections, so that tuple form is unavailable as ordinary application data.
+`fromValueCodec` adapts a serialize codec without implementing another value format. Compose `defineCollectionsJsonCodec({ version: 1 })` to preserve Map/Set with the serialize-owned `$rpc` map/entries and set/values records. The adapter name is `collections-json@1`, output is text, and unsupported values are rejected by serialize.
 
 Other values retain JSON's limits: this is not lossless serialization of arbitrary object graphs. Unrepresentable roots, cycles, BigInts and other JSON encoding failures produce INVALID_ARGUMENT, as do non-string input, invalid JSON and invalid reserved collection payloads. Original failures stay on cause. Browser structured/binary codecs belong to storage-web. Custom compression, encryption and Worker codecs implement the same interface outside this package.
 
@@ -361,3 +367,17 @@ function attachCatalog(base: IStorageBase, read: (key: string) => Promise<string
 This is an internal backend assembly function; the host still installs and disposes the resulting store. `store.use(catalog)` returns the exact implementation object. A real unregistered token throws `UNSUPPORTED_CAPABILITY` naming its backend and capability; a forged token throws `INVALID_ARGUMENT`. `store.has(token)` synchronously returns a boolean. The standard `kv` token also publishes the existing flat methods, while `has(key, ctx)` remains an asynchronous key lookup.
 
 The host captures this store's unique installation port through `onInstaller`. `prepare` validates the entire authentic batch and reserves tokens, `publish` makes it visible, and `release` removes that publication idempotently. Failure does not dispose the base; the backend that created it retains rollback ownership. Transaction and query execution remain with their existing owners; pure type projection creates no transaction or connection.
+
+### fromValueCodec
+
+```ts
+import { fromValueCodec } from '@migaia/storage-contract'
+import { defineJsonCodec } from '@migaia/serialize/codecs/json'
+
+const codec = fromValueCodec(defineJsonCodec({ version: 2 }))
+const raw = await codec.encode({ count: 1 })
+console.log(codec.name, codec.output, await codec.decode(raw))
+// json@2 text { count: 1 }
+```
+
+The frozen adapter snapshots all five metadata/callback fields once. Text, byte and unknown carriers map to text, binary and structured storage routes. Encode and decode keep independent input types; tagged codecs therefore retain their legacy decode inputs. Both callbacks run once and are awaited. Synchronous throws and rejected Promises become contract `INVALID_ARGUMENT` with the exact source error on cause. No second parsing, value copying, hooks, resource or connection is created. `StorageStageKind` and `ICodecStageObserver` describe observation only; actual store-bound dispatch belongs to the host.

@@ -1,5 +1,12 @@
 /** Stable validation causes used by codec and synchronous-option admission boundaries. */
 export const StorageContractErrorText = {
+  /** Value-codec adaptation captures valid metadata and both conversion functions before use. */
+  valueCodecDescriptor:
+    'value codec must declare id, positive safe version, encodedType, encode, and decode',
+  /** Encoding failures retain the exact source codec error on the contract wrapper cause. */
+  valueCodecEncode: 'value codec encoding failed',
+  /** Decoding failures retain the exact source codec error on the contract wrapper cause. */
+  valueCodecDecode: 'value codec decoding failed',
   /** SnapshotCodec requires the structural four-field descriptor, including class instances. */
   codecDescriptor: 'codec must declare name, output, encode, and decode',
   /** SnapshotSyncWriteOptions accepts undefined or a non-array object. */
@@ -28,8 +35,3 @@ export const StorageContractErrorText = {
   capabilityMissing: (capability: string, backend: string): string =>
     `backend ${backend} does not provide capability ${capability}`
 } as const
-/** Stable cause text for a collection codec that cannot represent an undefined root. */
-export const COLLECTIONS_CODEC_UNDEFINED_ROOT = 'collection codec cannot encode an undefined root'
-
-/** Stable cause text for collection codec callers that provide a non-text payload. */
-export const COLLECTIONS_CODEC_STRING_PAYLOAD = 'collection codec expects a string payload'
