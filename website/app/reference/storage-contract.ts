@@ -3664,6 +3664,10 @@ console.log(candidate.name, candidate.output)`
         'Project independent record and RDF Feature groups onto an existing transaction scope. The optional third RDF group defaults empty, preserving two-argument record calls.',
         '把独立的记录与 RDF Feature 组投影到既有事务 scope；可选第三 RDF 组缺省为空，保留旧两参数记录调用。'
       ),
+      example: t(
+        'Standard KV scopes keep capability-set projection; a native RDF/raw scope keeps its original overloads and native refinements while only match receives the RDF Feature group.',
+        '标准 KV scope 保留能力集合投影；原生 RDF/raw scope 保留原重载和原生扩展，仅 match 接收 RDF Feature 组。'
+      ),
       members: {
         use: {
           summary: t(
