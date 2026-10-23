@@ -161,7 +161,7 @@ export function createRedisStore(
     label = owner?.label,
     report = createStorageOperationReporter(),
     resources = new Set<IStorageResource>(),
-    projections = new Map<string, ReturnType<typeof createOrg>>()
+    projections = new Map<string | symbol, ReturnType<typeof createOrg>>()
   if (
     !driver ||
     typeof driver.command !== 'function' ||
@@ -173,6 +173,8 @@ export function createRedisStore(
     maxLockMs < 1
   )
     throw invalidArgument()
+  /** Root alone observes every org; explicit default-org views retain a separate original provider. */
+  const rootProjection = Symbol('redis-root-projection')
   let subscription: IStorageResource | undefined, poison: Error | undefined
   /**
    * The selected durable Feature configures only this original commit path before detection
@@ -219,12 +221,13 @@ export function createRedisStore(
     }
   })
   /** Each org receives a native provider projection without DDL, registry I/O or another lifetime. */
-  function forOrg(orgId: string) {
+  function forOrg(orgId: string, allOrganizations = false) {
     controller.assertLive()
-    let current = projections.get(orgId)
+    const identity = allOrganizations ? rootProjection : orgId
+    let current = projections.get(identity)
     if (!current) {
-      current = createOrg(orgId)
-      projections.set(orgId, current)
+      current = createOrg(orgId, allOrganizations)
+      projections.set(identity, current)
     }
     current.configureFeatures()
     return current
@@ -300,7 +303,7 @@ export function createRedisStore(
     orgId: string
   ) => observeNative(RedisCommand.exec, orgId, () => connection.exec(commands))
   /** Independent organization providers share only native Redis state and the original controller. */
-  function createOrg(orgId: string) {
+  function createOrg(orgId: string, allOrganizations: boolean) {
     const ports = core.getOrgContext(orgId),
       layout = createRedisLayout(prefix, orgId)
     let store!: IRedisStore,
@@ -1417,7 +1420,7 @@ export function createRedisStore(
       driver: nativeDriver,
       now: () => core.featureExpose.getScheduler().now(),
       closingSignal: controller.closingSignal,
-      allOrganizations: orgId === core.defaultOrgId,
+      allOrganizations,
       enableDurable: (maxLen, create) => {
         if (
           !Number.isSafeInteger(maxLen) ||
@@ -1636,7 +1639,7 @@ export function createRedisStore(
       subscribeChanges: (listener) => {
         controller.assertLive()
         return controller.subscribe((change) => {
-          if (orgId === core.defaultOrgId || change.orgId === orgId) return listener(change)
+          if (allOrganizations || change.orgId === orgId) return listener(change)
         })
       },
       watch: (input, ctx) =>
@@ -1854,7 +1857,7 @@ export function createRedisStore(
     /** Child providers publish the selected factory through their original installer only. */
     let durablePublication: ReturnType<ICapabilityInstallPort['prepare']> | undefined
     const configureFeatures = (): void => {
-      if (orgId !== core.defaultOrgId && durableFactory && !durablePublication) {
+      if (!allOrganizations && durableFactory && !durablePublication) {
         durablePublication = installer.prepare([
           implement(durableChangeFeed, durableFactory(store))
         ])
@@ -1866,7 +1869,7 @@ export function createRedisStore(
     }
     return { store, installer, configureFeatures, releaseFeatures }
   }
-  const root = forOrg(core.defaultOrgId)
+  const root = forOrg(core.defaultOrgId, true)
   return {
     ...root,
     controller,
