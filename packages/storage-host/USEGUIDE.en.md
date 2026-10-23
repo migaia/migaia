@@ -78,6 +78,8 @@ await memory.transaction(async (tx) => {
 console.log(await memory.use(records).query<Order>().where({ state: 'paid' }).select('total').all())
 ```
 
+Memory root `getMany`, `setMany`, `removeMany` and `removeByPrefix` are also available through `use(kv)`. Batch structural keys share the original text-channel identity; string writes remain readable through single-key and sync methods. Nonempty write batches commit once through the original transaction draft, and failure leaves no earlier items behind. Duplicate write keys reject before opening the transaction; repeated removals count once. Each high-level call enters one pipeline and one operation observation pair. Empty batches enter neither a pipeline nor a new transaction; prefix deletion uses the existing radix range.
+
 Record where/select/all reuse the contract query core; this memory source honestly declares client execution. Transaction text batches support canonical structural keys and prefixes; explicit ttlMs currently rejects with UNSUPPORTED_CAPABILITY. Failure discards the draft, while commit checks key revisions and clear epochs before publishing committed batches. Closing the resource cancels this instance queued lock admission and drains accepted native transactions through actual settlement.
 
 Native ranges, transaction drafts and prefix deletion reuse one package-private compressed radix implementation. Hash maps retain point lookups; ranges localize their bounds and merge only matching draft candidates, with tombstones masking physical entries. The tree maintains extrema and adjacent leaves without query-time full sorting. Text and records retain independent index instances.

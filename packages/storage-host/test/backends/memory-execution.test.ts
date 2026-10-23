@@ -97,7 +97,9 @@ describe('memory execution and the original concurrency budget', () => {
     await store.putRecord({ value: 0 }, 'row')
     let callbacks = 0
     await store.transaction(
-      async (scope) => {
+      async function (this: undefined, scope) {
+        expect(this).toBeUndefined()
+        expect(arguments).toHaveLength(1)
         const before = (await scope.getRecord('row')) as { value: number }
         if (++callbacks === 1)
           await store.putRecord({ value: 1 }, 'row', { conflictPolicy: 'replace' })

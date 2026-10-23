@@ -42,6 +42,51 @@ function observedCatalog() {
 }
 
 describe('the shared storage observation owner', () => {
+  it('adds explicit batch counts while preserving the exact original single-operation payload', async () => {
+    /** The existing catalog registration supplies the same real operation observer adapter. */
+    const fixture = observedCatalog()
+    await using host = await createStorageHost({ plugins: [fixture.plugin] })
+    /** Original hooks receive one payload, never keys, values or another execution owner. */
+    const before = vi.fn()
+    const failed = vi.fn()
+    host.hooks.on('beforeStorageOperation', before)
+    host.hooks.on('onStorageOperationError', failed)
+    /** This public port is bound to the exact admitted catalog store. */
+    const stages = host.operationStages(fixture.state().store)
+    stages.beforeStorageOperation?.('read')
+    stages.onStorageOperationError?.('read', 'INVALID_ARGUMENT')
+    expect(before).toHaveBeenLastCalledWith({
+      backendId: 'observed',
+      backend: 'catalog',
+      orgId: '00000000-0000-0000-0000-000000000000',
+      operation: 'read'
+    })
+    expect(failed).toHaveBeenLastCalledWith({
+      backendId: 'observed',
+      backend: 'catalog',
+      orgId: '00000000-0000-0000-0000-000000000000',
+      operation: 'read',
+      code: 'INVALID_ARGUMENT'
+    })
+    stages.beforeStorageOperation?.('setMany', 0)
+    stages.onStorageOperationError?.('setMany', 'INVALID_ARGUMENT', 0)
+    expect(before).toHaveBeenLastCalledWith({
+      backendId: 'observed',
+      backend: 'catalog',
+      orgId: '00000000-0000-0000-0000-000000000000',
+      operation: 'setMany',
+      count: 0
+    })
+    expect(failed).toHaveBeenLastCalledWith({
+      backendId: 'observed',
+      backend: 'catalog',
+      orgId: '00000000-0000-0000-0000-000000000000',
+      operation: 'setMany',
+      code: 'INVALID_ARGUMENT',
+      count: 0
+    })
+  })
+
   it('codes hook option reflection failures while preserving their exact original cause', async () => {
     /** Getter and own-key failures are configuration input failures, before any backend is opened. */
     const primary = new Error('hook descriptor failed')
