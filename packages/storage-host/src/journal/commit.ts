@@ -9,6 +9,7 @@ import {
 import {
   snapshotLogRecords,
   type IBinlogExt,
+  type IWalExt,
   type IUndoLogExt,
   type IUndoImage,
   type ILogPayload,
@@ -21,8 +22,8 @@ import type { IStorageJournalChange, IStorageJournalTarget } from './types.js'
 import { createStorageOperationReporter, reportCleanupError } from '../core/operation-reporter.js'
 import { isStorageErrorFamily } from '../core/error-family.js'
 
-/** Shared durable kind belongs to the storage bridge; logger treats its payload as ordinary JSON. */
-export const StorageJournalKind = { commit: 'storage.commit' } as const
+import { StorageJournalKind } from './constants.js'
+import { createStorageExternalWal } from './wal.js'
 /** Private terminal access shares the original namespace resource and never enters business KV. */
 const terminalNamespace = 'storage.journal.terminal'
 /** Complete undo targets survive the original logger's target/before/after projection. */
@@ -94,11 +95,15 @@ export async function createStorageNativeJournal(options: {
   readonly access: IStorageJournalBackendAccess
   readonly backend: IBackendKind
   readonly namespace: string
-  readonly logger: Partial<IBinlogExt & IUndoLogExt>
+  readonly logger: Partial<IBinlogExt & IUndoLogExt & IWalExt>
   readonly atomicBinlog?: ILogStore
   readonly atomicUndo?: ILogStore
   readonly binlogValues?: boolean
   readonly onBinlogAppendError?: (txId: string, error: unknown) => void
+  readonly report?: (error: unknown) => void
+  readonly beforeRecover?: () => void
+  readonly afterRecover?: (count: number, elapsedMs: number) => void
+  readonly onRecoverError?: (error: unknown) => void
 }) {
   const { access, logger } = options
   /** Borrow exact installed extension objects once; the bridge never closes or reconfigures them. */
@@ -134,7 +139,9 @@ export async function createStorageNativeJournal(options: {
   const binlogNative = selected(atomicBinlog)
   /** Separate selected stores retain separate original head locks and logger indexes. */
   const undoNative = selected(atomicUndo)
-  await Promise.all([binlog?.ready(), undo?.ready()])
+  await Promise.all([binlog?.ready(), undo?.ready(), logger.wal?.ready()])
+  /** Recovery uses only the original terminal after its native guarantee is admitted. */
+  let wal: Awaited<ReturnType<typeof createStorageExternalWal>> | undefined
   /** The existing namespace owns authentication and eventual cleanup, rather than a new scope. */
   const terminal = await access.binding.openNamespace(
     encodeFlatStorageKey([terminalNamespace, namespace, access.backendInstanceId])
@@ -142,6 +149,18 @@ export async function createStorageNativeJournal(options: {
   try {
     if (!terminal.nativeAtomic) throw new StorageContractError(StorageContractErrorCode.unsupported)
     access.retain(terminal)
+    if (logger.wal !== undefined && binlogNative === undefined)
+      wal = await createStorageExternalWal({
+        access,
+        target,
+        binlog,
+        wal: logger.wal,
+        backend: options.backend,
+        report: options.report,
+        beforeRecover: options.beforeRecover,
+        afterRecover: options.afterRecover,
+        onRecoverError: options.onRecoverError
+      })
   } catch (cause) {
     try {
       await terminal.dispose()
@@ -198,12 +217,27 @@ export async function createStorageNativeJournal(options: {
               await binlog.append(StorageJournalKind.commit, payload, {
                 transaction: binlogNative.createPort(current)
               })
-            else
+            else {
+              /** Intent is durable before the original owner stages its same-transaction marker. */
+              const intent = await wal?.begin(
+                current,
+                payload,
+                changes.map((change) => ({
+                  ...change,
+                  target: storageJournalTargetWire(change.target)
+                }))
+              )
+              if (intent !== undefined)
+                terminal.onRollback(current, () => {
+                  external = intent.abort()
+                })
               terminal.onCommit(current, () => {
                 /** Awaited native results cannot be replaced after data is actually committed. */
                 external = (async () => {
                   try {
-                    await binlog.append(StorageJournalKind.commit, payload)
+                    if (intent === undefined)
+                      await binlog.append(StorageJournalKind.commit, payload)
+                    else await intent.complete()
                   } catch (error) {
                     if (options.onBinlogAppendError !== undefined)
                       options.onBinlogAppendError(info.id, error)
@@ -211,6 +245,7 @@ export async function createStorageNativeJournal(options: {
                   }
                 })()
               })
+            }
           }
           if (undo !== undefined)
             await undo.record(info.id, storageJournalUndoImages(target, changes, options.backend), {

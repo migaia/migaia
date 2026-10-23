@@ -1399,17 +1399,47 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
         configured,
         this.#journalContextAccess(context, orgId),
         context.storeCell.get().backend,
-        (txId, error) => {
-          this.#report(error)
-          this.#events.emit(Hook.onBinlogAppendError, () => ({
-            backendId: context.id,
-            backend: context.storeCell.get().backend,
-            orgId,
-            namespace: configured.namespace,
-            backendInstanceId: context.id,
-            txId,
-            code: readStorageHookFailureCode(error, this.#report)
-          }))
+        {
+          report: this.#report,
+          onBinlogAppendError: (txId, error) => {
+            this.#report(error)
+            this.#events.emit(Hook.onBinlogAppendError, () => ({
+              backendId: context.id,
+              backend: context.storeCell.get().backend,
+              orgId,
+              namespace: configured.namespace,
+              backendInstanceId: context.id,
+              txId,
+              code: readStorageHookFailureCode(error, this.#report)
+            }))
+          },
+          beforeRecover: () =>
+            this.#events.emit(Hook.beforeJournalRecover, () => ({
+              backendId: context.id,
+              backend: context.storeCell.get().backend,
+              orgId,
+              namespace: configured.namespace,
+              backendInstanceId: context.id
+            })),
+          afterRecover: (count, elapsedMs) =>
+            this.#events.emit(Hook.afterJournalRecover, () => ({
+              backendId: context.id,
+              backend: context.storeCell.get().backend,
+              orgId,
+              namespace: configured.namespace,
+              backendInstanceId: context.id,
+              count,
+              elapsedMs
+            })),
+          onRecoverError: (error) =>
+            this.#events.emit(Hook.onJournalRecoverError, () => ({
+              backendId: context.id,
+              backend: context.storeCell.get().backend,
+              orgId,
+              namespace: configured.namespace,
+              backendInstanceId: context.id,
+              code: readStorageHookFailureCode(error, this.#report)
+            }))
         }
       )
       entry.complete = true
