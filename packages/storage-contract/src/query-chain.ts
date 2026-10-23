@@ -816,7 +816,7 @@ export type IRecordQueryMutation =
   | IQueryDelete
   | {
       readonly operation: 'update'
-      readonly patch: Readonly<Partial<Record<string, ICodecValue>>>
+      readonly patch: Readonly<Partial<Record<string, unknown>>>
       readonly ctx: IOperationContext | undefined
       readonly concurrency?: IConcurrencyPolicy
     }
@@ -2461,13 +2461,13 @@ function queryWriteContext(
   }
 }
 /** A patch is detached at the terminal before its original backend transaction can start. */
-function snapshotQueryPatch(patch: unknown): Readonly<Partial<Record<string, ICodecValue>>> {
+function snapshotQueryPatch(patch: unknown): Readonly<Partial<Record<string, unknown>>> {
   try {
     if (typeof patch !== 'object' || patch === null || Array.isArray(patch))
       throw new TypeError(StorageContractErrorText.queryArgument)
-    /** The existing value and snapshot owners reject unsupported payloads without a new codec. */
-    const captured = asCodecValue(immutableSnapshot(patch))
-    return Object.freeze(captured as Record<string, ICodecValue>)
+    /** The original snapshot owner detaches data; the actual backend codec retains value admission. */
+    const captured = immutableSnapshot(patch)
+    return Object.freeze(captured as Record<string, unknown>)
   } catch (cause) {
     throw invalidQueryCondition(cause, StorageContractErrorText.queryArgument)
   }

@@ -55,6 +55,28 @@ function quad(subject: string, object: string): IQuad {
 }
 
 describe('original query mutation callbacks', () => {
+  it('detaches generic record patches without imposing a different codec value profile', async () => {
+    /** These supported generic record fields are encoded by the original backend codec. */
+    const patch = { updated: new Date(5), labels: new Map([['role', 'reader']]) }
+    /** The actual draft observes detached values while retaining their original native domains. */
+    const query = createRecordQuery<{ updated: Date; labels: Map<string, string> }>({
+      pushdown: { source: 'original-codec-patch', operators: [], operations: [] },
+      execute: () => {
+        throw new Error('root source must not open')
+      },
+      mutate: (request, run) => {
+        expect(request.operation).toBe('update')
+        if (request.operation !== 'update') throw new Error('expected update')
+        expect(request.patch.updated).toBeInstanceOf(Date)
+        expect(request.patch.updated).not.toBe(patch.updated)
+        expect(request.patch.labels).toBeInstanceOf(Map)
+        expect(request.patch.labels).not.toBe(patch.labels)
+        return run({ execute: () => rows([['a', patch]]), accept: () => true })
+      }
+    })
+    expect(await query.update(patch)).toBe(1)
+  })
+
   it('streams selected unique record keys inside the original write owner and awaits commit', async () => {
     const entries: readonly (readonly [IStorageKey, { total: number }])[] = [
       ['a', { total: 1 }],

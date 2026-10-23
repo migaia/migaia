@@ -841,3 +841,5 @@ RDF 的客户端 `follow`/`inverse` 现在沿同一 reader 逐前驱调用原 `s
 `implement(capability,api,{ forTransaction })` 的原绑定回调接收 `ITransactionScope<ICodecValue,TCap>`，因此标准 RDF 绑定器可合法使用原 `scope.use(rdf)`。原 KV 成员、显式旧回调类型、token/owner 校验及原登记表保持原样。
 
 原生查询 `watch(ctx?)` 仅由真实 source.watch 提供，返回原 `IStorageIterator<IStorageChange>`，保留原 iterator、dispose 与符号清理身份。它复用同一 planner 和原生输入编译器，完整条件、投影、遍历等均能下推才订阅；JS 谓词、mapper、客户端 follow 等在订阅前报 `QUERY_NOT_PUSHABLE`。构建与 explain 不订阅、不打开数据游标，不创建共享事件队列或重订阅器。标准 records/RDF/vector 的 changeFeed=true 类型包含 `IQueryWatch`；向量仅 topK 后可调用，事务 API 不授予 watch。
+
+记录 update 的 patch 只经原 `immutableSnapshot` 分离一次，不额外套用便携值 profile；Date、Map 等 generic record 字段由原后端 codec 验证。事务操作仍先准入再读取 patch，访问器只在原快照过程中读取一次。
