@@ -284,3 +284,13 @@ export type {
 } from './capabilities/durable-change-feed.js'
 
 export { orderStorageKeysByBytes, encodeStorageOrgStringPrefix } from './key-order.js'
+
+export { sparql, sparqlFragment, createSparqlTag } from './capabilities/sparql.js'
+export type {
+  ISparqlFragment,
+  ISparqlInput,
+  ISparqlRow,
+  ISparqlQuery,
+  ISparqlTagTools,
+  ISparqlApi
+} from './capabilities/sparql.js'

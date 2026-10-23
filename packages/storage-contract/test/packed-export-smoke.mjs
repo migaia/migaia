@@ -79,7 +79,7 @@ function main() {
     writeFileSync(join(consumerDirectory, 'package.json'), '{"type":"module"}\n', 'utf8')
     writeFileSync(
       join(consumerDirectory, 'identity.mjs'),
-      `import { fromValueCodec, defineStorageCapability, implement, provideCapabilities, hasStorageCapability, useStorageCapability, sql, createSqlTag, deriveStorageSqlQuery, blob, durableChangeFeed, orderStorageKeysByBytes, encodeStorageOrgStringPrefix, encodeOrderedStorageKey, prefixStorageOrgKey } from '@migaia/storage-contract'
+      `import { fromValueCodec, defineStorageCapability, implement, provideCapabilities, hasStorageCapability, useStorageCapability, sql, createSqlTag, deriveStorageSqlQuery, blob, durableChangeFeed, orderStorageKeysByBytes, encodeStorageOrgStringPrefix, encodeOrderedStorageKey, prefixStorageOrgKey, sparql, sparqlFragment, createSparqlTag, term } from '@migaia/storage-contract'
 import { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'
 import { isArrayBuffer as utilsBuffer, isUint8Array as utilsBytes } from '@migaia/utils/bytes'
 /** Independent resource bases exercise package-root capability reads without acquiring external clients. */
@@ -103,6 +103,14 @@ if (hasStorageCapability(raw, token) || Object.hasOwn(raw, 'use')) throw new Err
 let missing
 try { useStorageCapability(raw, token) } catch (error) { missing = error }
 if (missing?.source !== '@migaia/storage-contract' || missing.code !== 'UNSUPPORTED_CAPABILITY' || missing.backend !== 'packed-fixture' || Object.hasOwn(raw, 'use')) throw new Error('packed missing capability identity mismatch')
+/** Packed native SPARQL keeps callable capability and pure fragment identities together. */
+const preparedSparql = []
+const sparqlApi = createSparqlTag({ select: async () => [], ask: prepare => { preparedSparql.push(prepare()); return Promise.resolve(true) }, construct: async () => [], update: async () => undefined })
+const sparqlStore = provideCapabilities(createBase(), [implement(sparql, sparqlApi)])
+const sparqlTemplate = Object.freeze(Object.assign(['ASK { ', ' }'], { raw: Object.freeze(['ASK { ', ' }']) }))
+const pureTemplate = Object.freeze(Object.assign(['', ''], { raw: Object.freeze(['', '']) }))
+const pureSparql = sparqlFragment(pureTemplate, term.literal('text'))
+if (sparqlStore.use(sparql) !== sparqlApi || 'ask' in pureSparql || !(await sparqlApi(sparqlTemplate, pureSparql).ask()) || preparedSparql.length !== 1 || !preparedSparql[0].startsWith('ASK { ')) throw new Error('packed SPARQL native binding mismatch')
 /** Both organization byte helpers reuse canonical packed-root identities. */
 const packedOrg = '12345678-1234-1234-1234-123456789abc'
 const packedPrefix = encodeStorageOrgStringPrefix(packedOrg, 'a', 'packed-fixture')

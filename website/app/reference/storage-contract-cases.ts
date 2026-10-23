@@ -190,9 +190,46 @@ const ordered = orderStorageKeysByBytes(['user/z', 'user/a'], key => encodeOrder
   )
 }
 
+/** Native SPARQL selection consumes only a real published endpoint capability. */
+const sparqlCase: ICaseDoc = {
+  title: t('Compose safe RDF bindings for native SPARQL', '为原生 SPARQL 组合安全 RDF 绑定'),
+  problem: t(
+    'RDF values must not become unescaped query grammar.',
+    'RDF 值不能变成未转义查询语法。'
+  ),
+  example: `import { sparql, sparqlFragment, term, type IStorageStore } from '@migaia/storage-contract'
+async function readLabel(store: IStorageStore<typeof sparql>) {
+  const condition = sparqlFragment\`FILTER (?label = \${term.literal('A"B')})\`
+  return store.use(sparql)\`SELECT ?label WHERE { ?s ?p ?label . \${condition} }\`.select()
+}`,
+  result: t(
+    'Only the native select terminal executes. The literal quote is escaped by the shared renderer before endpoint execution.',
+    '只有原生 select 终端执行；literal 引号在 endpoint 执行前由同一 renderer 转义。'
+  )
+}
+/** Lazy native binding retains admission and lifecycle authority with the original backend. */
+const sparqlAuthorCase: ICaseDoc = {
+  title: t('Bind original SPARQL callbacks', '绑定原 SPARQL 回调'),
+  problem: t(
+    'A native backend must reuse one fragment renderer without acquiring another executor.',
+    '原生后端须复用同一片段 renderer，不能获得另一套 executor。'
+  ),
+  example: `import { createSparqlTag } from '@migaia/storage-contract'
+function bindNative(original: Parameters<typeof createSparqlTag>[0]) {
+  return createSparqlTag(original)
+}`,
+  result: t(
+    'Callbacks own native admission and invoke lazy prepare afterward. Receiver, context and Promise identity remain exact.',
+    '回调拥有原生准入并在准入后调用 lazy prepare；receiver、context 与 Promise 身份保持精确。'
+  )
+}
+
 /** Exercises public contract tools without supplying a fictional storage implementation. */
 export const storageContractCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
   sql: [sqlCapabilityCase],
+  sparql: [sparqlCase],
+  sparqlFragment: [sparqlCase],
+  createSparqlTag: [sparqlAuthorCase],
   orderStorageKeysByBytes: [orgByteOrderCase],
   encodeStorageOrgStringPrefix: [orgByteOrderCase],
   blob: [blobCase],

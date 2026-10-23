@@ -773,3 +773,7 @@ const excluded = prefix.matches(['cache', 'users-extra'])
 `durableChangeFeed` 选择原生 `readChanges` 重放与可释放的 `tailChanges`。游标不透明，至少一次重放；调用方只持久化成功处理的游标。保留期缺口为携带 `StorageContractErrorCode.changeCursorExpired` 的原生 RangeError，调用方全量失效后从 now 恢复。普通变更可携带原 host context 的只读 orgId。blob 与 durable feed 不获得通用事务投影或平铺 KV；memory 发出短暂变更并不意味着获得 durable 令牌。
 
 `orderStorageKeysByBytes(entries, key)` 对每个 selector 结果只读取一次、立即复制其字节，并按稳定字节序返回原条目。它与原锁归一共用同一 radix 实现，保留前缀顺序，不建立持久索引。`encodeStorageOrgStringPrefix(orgId, prefix, backend)` 使用原组织 envelope 与 key writer，只省略最后 string 和 tuple 两个终止符。空前缀与精确 UTF-16 码元有效；编码前缀不会跨组织，也不匹配 tuple 逻辑键。
+
+SPARQL 通过纯 sparqlFragment 与原生 sparql 能力复用规范 RDF 项。插值只收 NamedNode、Literal 或真实片段；raw blank/default graph、普通 string 与假片段在 I/O 前拒绝。literal 转义引号、反斜杠与控制值；变量名采用完整 SPARQL VARNAME 语法，不带问号或美元前缀。join 默认空白分隔，empty 只有一个身份；深层与重复片段按实际输出位置迭代展开。
+
+后端作者用 createSparqlTag({select,ask,construct,update}) 绑定原生回调。各回调接收返回不可变 body 的 lazy prepare 与原 context；后端先做既有操作准入，再 prepare。包装保留 receiver 与 Promise 身份。SELECT 保留未绑定字段的 undefined；CONSTRUCT 保留完整 raw quad 和响应局部 blank。纯组合不启动查询、parser、endpoint、retry loop 或资源。SPARQL 没有通用 KV/record 事务投影；端点专有原子 update 事务仍归原生后端。

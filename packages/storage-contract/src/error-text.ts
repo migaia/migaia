@@ -2,6 +2,8 @@
 export const StorageContractErrorText = {
   /** SQL templates, identifiers and pure fragment inputs are admitted before native execution. */
   sqlArgument: 'SQL fragment input is invalid',
+  /** SPARQL accepts only real templates, validated RDF values and authentic fragments. */
+  sparqlArgument: 'SPARQL fragment input is invalid',
   /** The shared lexer rejects empty/multiple statements and transaction-owned user commands. */
   sqlStatement: 'SQL must contain one permitted statement',
   /** Batch keys and duplicate policy are captured before native requests or mutations can start. */
