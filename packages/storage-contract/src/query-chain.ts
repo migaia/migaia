@@ -22,6 +22,7 @@ import type { IOperationContext, IStorageKey } from './context.js'
 import { createStorageIteratorLifetime, type IStorageIterator } from './resource.js'
 import { snapshotOperationContext } from './operation-context.js'
 import { runTransactionIteratorOperation, deriveTransactionIterator } from './transaction.js'
+import { compareStorageKeys, snapshotStorageKey } from './key.js'
 
 /** Declarative field operators are shared by condition admission, native plans and client execution. */
 export const QueryOperator = Object.freeze({
@@ -548,6 +549,8 @@ function snapshotRecordQueryMethods<T extends object>(methods: T | undefined): T
 /** Native execution consumes only the shared AST and optional top-level projection from its plan. */
 export type IRecordQuerySource = {
   readonly pushdown: IQueryPushdown
+  /** Optional source-key tail order; parts marks an author container of independently valid keys. */
+  readonly tieBreakByKey?: Readonly<{ direction: 'next' | 'prev'; parts?: true }>
   readonly execute: (input: {
     readonly conditions: readonly IQueryCondition[]
     readonly fields: readonly string[] | undefined
@@ -577,9 +580,12 @@ type IQueryNode = {
 /** Captured author facts and methods remain independent of later source getter mutation. */
 type IQuerySourceSnapshot = {
   readonly pushdown: IQueryPushdown
+  readonly tieBreakByKey: IRecordQuerySource['tieBreakByKey']
   readonly execute: IRecordQuerySource['execute']
   readonly receiver: IRecordQuerySource
 }
+/** Canonical key directions apply only to explicit comparator tie resolution. */
+const QueryKeyDirection = { next: 'next', prev: 'prev' } as const
 /** Planning retains the actual nodes so native and client execution cannot diverge from explain. */
 type IRecordExecutionPlan = {
   readonly explanation: IQueryPlan
@@ -645,16 +651,30 @@ function snapshotQuerySource(source: IRecordQuerySource): IQuerySourceSnapshot {
       }
       return Object.freeze(result)
     }
-    return {
-      receiver: source,
-      execute,
-      pushdown: Object.freeze({
-        operators: capture(operators, QueryOperator),
-        operations: capture(operations, QueryOperation),
-        source: sourceName,
-        ...(index === undefined ? {} : { index })
-      })
+    /** Existing source admission finishes before reading the new optional key-order fact. */
+    const capturedPushdown = Object.freeze({
+      operators: capture(operators, QueryOperator),
+      operations: capture(operations, QueryOperation),
+      source: sourceName,
+      ...(index === undefined ? {} : { index })
+    })
+    /** One read keeps a mutable author descriptor from changing later comparison semantics. */
+    const keyOrder = source.tieBreakByKey
+    /** The captured declaration cannot change direction or key-budget interpretation later. */
+    let tieBreakByKey: IRecordQuerySource['tieBreakByKey']
+    if (keyOrder !== undefined) {
+      if (typeof keyOrder !== 'object' || keyOrder === null || Array.isArray(keyOrder))
+        throw new TypeError(StorageContractErrorText.queryArgument)
+      /** Each descriptor field is borrowed once under the original source-admission boundary. */
+      const { direction, parts } = keyOrder
+      if (
+        (direction !== QueryKeyDirection.next && direction !== QueryKeyDirection.prev) ||
+        (parts !== undefined && parts !== true)
+      )
+        throw new TypeError(StorageContractErrorText.queryArgument)
+      tieBreakByKey = Object.freeze({ direction, ...(parts === undefined ? {} : { parts }) })
     }
+    return { receiver: source, execute, pushdown: capturedPushdown, tieBreakByKey }
   } catch (cause) {
     throw new StorageContractError(
       StorageContractErrorCode.invalidArgument,
@@ -775,9 +795,30 @@ function assertQueryActive(ctx: IOperationContext | undefined): void {
 /** One pull stays inside the original source operation view supplied for this accepted read. */
 type IQueryAdvance = () => Promise<IteratorResult<readonly [IStorageKey, unknown]>>
 /** Each compiled node transforms one upstream pull without owning another cursor or queue. */
-type IQueryReader = (advance: IQueryAdvance) => Promise<IteratorResult<unknown>>
+type IQueryReader = (
+  advance: IQueryAdvance
+) => Promise<IteratorResult<unknown> & { readonly key?: IStorageKey }>
 /** Stable candidate order resolves comparator ties without retaining discarded source rows. */
-type IQueryHeapEntry = { readonly value: unknown; readonly position: number }
+type IQueryHeapEntry = {
+  readonly value: unknown
+  readonly position: number
+  readonly key?: IStorageKey
+}
+/** An author-only composite adds no logical-key depth or node cost to its valid components. */
+function snapshotQuerySourceKey(
+  key: IStorageKey,
+  order: NonNullable<IRecordQuerySource['tieBreakByKey']>
+): IStorageKey {
+  if (order.parts !== true) return snapshotStorageKey(key, undefined)
+  if (!Array.isArray(key)) throw new TypeError(StorageContractErrorText.queryArgument)
+  /** Only the metadata container is borrowed here; every component uses the canonical key owner. */
+  const length = key.length
+  if (length === 0) throw new TypeError(StorageContractErrorText.queryArgument)
+  /** Component snapshots retain the same comparison representation without re-encoding keys. */
+  const parts: IStorageKey[] = []
+  for (let index = 0; index < length; index++) parts.push(snapshotStorageKey(key[index], undefined))
+  return parts
+}
 /** The largest retained candidate sits at the root, allowing one bounded replacement per source row. */
 function queryHeapSiftDown(
   heap: IQueryHeapEntry[],
@@ -798,7 +839,8 @@ function queryHeapSiftDown(
 /** Compiles the existing client plan once; comparator buffering is bounded by its explicit limit. */
 function compileRecordQueryReader(
   steps: readonly IQueryNode['step'][],
-  ctx: IOperationContext | undefined
+  ctx: IOperationContext | undefined,
+  tieBreakByKey: IRecordQuerySource['tieBreakByKey']
 ): IQueryReader {
   /** The leaf borrows the one original backend cursor; no row array is materialized. */
   let read: IQueryReader = async (advance) => {
@@ -806,7 +848,13 @@ function compileRecordQueryReader(
     /** Native next settles before any client node or cleanup starts. */
     const next = await advance()
     assertQueryActive(ctx)
-    return next.done ? { done: true, value: undefined } : { done: false, value: next.value[1] }
+    if (next.done) return { done: true, value: undefined }
+    if (tieBreakByKey === undefined) return { done: false, value: next.value[1] }
+    /** Capture the native tuple once; only explicit key ordering owns a detached key snapshot. */
+    const row = next.value
+    /** Retained keys detach before projected value access can mutate any borrowed source objects. */
+    const key = snapshotQuerySourceKey(row[0], tieBreakByKey)
+    return { done: false, value: row[1], key }
   }
   for (let index = 0; index < steps.length; index++) {
     /** A node captures its direct upstream reader rather than copying preceding history. */
@@ -843,7 +891,9 @@ function compileRecordQueryReader(
           /** Awaited mapping remains part of the original accepted read. */
           const value = await step.mapper(next.value)
           assertQueryActive(ctx)
-          return { done: false, value }
+          return tieBreakByKey === undefined
+            ? { done: false, value }
+            : { done: false, value, key: next.key }
         }
         /** Own data properties cannot mutate a row prototype, including a selected **proto**. */
         const value: Record<string, unknown> = {}
@@ -857,7 +907,9 @@ function compileRecordQueryReader(
                 ? undefined
                 : Reflect.get(Object(next.value), field)
           })
-        return { done: false, value }
+        return tieBreakByKey === undefined
+          ? { done: false, value }
+          : { done: false, value, key: next.key }
       }
     } else if (step.operation === QueryOperation.limit) {
       /** Admission reserves one remaining position before awaiting the upstream read. */
@@ -878,9 +930,18 @@ function compileRecordQueryReader(
       let emitted = 0
       /** Borrowed callbacks keep their original plain invocation receiver. */
       const compareRows = step.compare
-      /** JavaScript comparator NaN and zero both retain the original source order. */
-      const compare = (left: IQueryHeapEntry, right: IQueryHeapEntry): number =>
-        compareRows(left.value, right.value) || left.position - right.position
+      /** Comparator equality uses an explicit source key tail, otherwise original stable position. */
+      const compare = (left: IQueryHeapEntry, right: IQueryHeapEntry): number => {
+        /** JavaScript comparator NaN and zero both enter the declared tie path. */
+        const order = compareRows(left.value, right.value)
+        if (order) return order
+        /** Every keyed candidate carries its one captured original source key through all nodes. */
+        const keyOrder = tieBreakByKey === undefined ? 0 : compareStorageKeys(left.key!, right.key!)
+        return (
+          (tieBreakByKey?.direction === QueryKeyDirection.prev ? -keyOrder : keyOrder) ||
+          left.position - right.position
+        )
+      }
       /** Scans each upstream candidate once and sorts only the retained bounded heap. */
       async function prepare(advance: IQueryAdvance): Promise<void> {
         if (bound.count === 0) return
@@ -891,7 +952,10 @@ function compileRecordQueryReader(
           const next = await upstream(advance)
           if (next.done) break
           /** Only this candidate and the retained heap are live during selection. */
-          const entry = { value: next.value, position: position++ }
+          const entry: IQueryHeapEntry =
+            tieBreakByKey === undefined
+              ? { value: next.value, position: position++ }
+              : { value: next.value, position: position++, key: next.key }
           if (heap.length < bound.count) {
             heap.push(entry)
             /** Appending can violate only this new leaf's ancestor path. */
@@ -916,9 +980,12 @@ function compileRecordQueryReader(
       }
       read = async (advance) => {
         await (prepared ??= prepare(advance))
-        return emitted < heap.length
-          ? { done: false, value: heap[emitted++]!.value }
-          : { done: true, value: undefined }
+        if (emitted >= heap.length) return { done: true, value: undefined }
+        /** A bounded winner keeps its key available to later compiled reader nodes. */
+        const entry = heap[emitted++]!
+        return tieBreakByKey === undefined
+          ? { done: false, value: entry.value }
+          : { done: false, value: entry.value, key: entry.key }
       }
     }
   }
@@ -928,7 +995,7 @@ function compileRecordQueryReader(
     /** The compiled node chain retains no operation view beyond this accepted read. */
     const next = await read(advance)
     assertQueryActive(ctx)
-    return next
+    return tieBreakByKey === undefined || next.done ? next : { done: false, value: next.value }
   }
 }
 /** Plans once and opens only the original native prefix; terminal adapters share this execution. */
@@ -959,7 +1026,7 @@ function openRecordQuery(
   /** Only a fully native prefix can project source rows. */
   const fields = plan.pushed.find((step) => step.operation === QueryOperation.select)?.fields
   /** Node compilation creates no source I/O and retains no materialized row array. */
-  const read = compileRecordQueryReader(plan.client, captured)
+  const read = compileRecordQueryReader(plan.client, captured, source.tieBreakByKey)
   try {
     return {
       iterator: Reflect.apply(source.execute, source.receiver, [
