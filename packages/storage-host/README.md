@@ -192,3 +192,7 @@ console.log(
     .update({ active: false })
 ) // 1
 ```
+
+后端 descriptor 可提供 `journalBinding(store)`。原安装窗口在精确 store 准入后调用一次，并把原生回调捕获到该 registration 的 storeCell。`forOrg(orgId)` 必须返回固定物理组织的原 I/O 闭包，不能用公开 KV 前缀或其它连接替代。`IStorageJournalNamespaceView` 只含原六个字符串方法（`get`、`has`、`set`、`remove`、`clearValues`、`clearAll`）和 `keys`，不继承业务批量或 TTL 能力。namespace 转发原生事务及真实 commit/rollback 回调，保留独立的 main/符号清理 Promise，并排空已接纳工作直到原生终态。事务、资源和登记权仍归原后端。
+
+memory 已提供该私有 namespace 接点。私有字符串行与原业务 draft 一起稀疏暂存、原子提交，提交前与回滚后均不可见。业务 keys、clear、capacity 和 change-feed 不包含这些元数据行；dropOrg 删除目标组织的私有行。显式组织绑定拒绝其它组织的 scope，提取出的私有 view 随原操作失效。该作者接点本身不增加自动 binlog、undo/redo 或公开 storageLogStore 工厂。

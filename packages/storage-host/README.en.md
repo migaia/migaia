@@ -192,3 +192,7 @@ console.log(
     .update({ active: false })
 ) // 1
 ```
+
+Backend descriptors may provide `journalBinding(store)`. The original install window invokes it once after exact store admission and captures its native callbacks in that registration's store cell. `forOrg(orgId)` must return original I/O closures for that immutable physical organization. It cannot substitute public KV prefixes or another connection. `IStorageJournalNamespaceView` contains only the six original string methods (`get`, `has`, `set`, `remove`, `clearValues`, `clearAll`) plus `keys`; it does not inherit business bulk or TTL capabilities. A namespace forwards its original native transaction and commit/rollback callbacks, retains independent main/symbolic disposal promises, and drains accepted work through actual native terminal completion. The backend keeps transaction, resource, and registration authority.
+
+Memory supplies this private namespace port. Private string rows stage sparsely beside the original business draft, commit atomically, and remain invisible before commit or after rollback. Business keys, clear, capacity, and change-feed notifications exclude these metadata rows; dropOrg removes the target's private rows. Explicit organization bindings reject foreign scopes, and extracted private views expire with their original operation. This author port does not itself add automatic binlog, undo/redo, or a public storageLogStore factory.
