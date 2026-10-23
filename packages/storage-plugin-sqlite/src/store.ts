@@ -16,6 +16,8 @@ import {
   createTransactionBuilder,
   runWithConcurrency,
   readConcurrencyLockIdentities,
+  snapshotConcurrencyLockKeys,
+  snapshotConcurrencyLockRange,
   snapshotConcurrencyLockHoldings,
   lockKey,
   provideCapabilities,
@@ -138,6 +140,12 @@ type IWriteGuard = {
   readonly channels: readonly ('text' | 'bytes' | 'record')[]
   readonly prefix?: IStorageKey
 }
+/** A root operation prepares its payload and exact protected range before any admission can wait. */
+type IRootMutation<R> = {
+  readonly keys: readonly ILockKey[]
+  readonly guard?: IWriteGuard
+  run(state: INativeState): R
+}
 /** Backend authoring state is supplied only by the original installation window. */
 export type ISqliteRuntime = { readonly core: IStoragePluginCore; readonly orgId: string }
 /** Construction returns only exact provider/controller handles needed for original host admission. */
@@ -200,6 +208,11 @@ export function createSqliteStore<TValue>(
     journal: quoteSqliteIdentifier(`${table}_${SqliteNames.journal}`),
     markers: quoteSqliteIdentifier(`${table}_${SqliteNames.markers}`)
   }
+  /** The original channel owner supplies native identity bounds and inverse channel recognition. */
+  const channelRanges = (['text', 'bytes', 'record'] as const).map((channel) => ({
+    channel,
+    ...snapshotConcurrencyLockRange({ channel }, SqliteNames.backend)
+  }))
   /** The builtin driver reports the actual physical file, not the caller's path spelling. */
   let physical: object | string = driver
   /** Actual WAL result determines which approved concurrency primitive is selected. */
@@ -406,7 +419,27 @@ export function createSqliteStore<TValue>(
   }
   /** Revision keys reuse the canonical original channel identity rather than another key format. */
   const identity = (channel: IChannel, key: IStorageKey): string =>
-    `${channel === 'text' ? '01' : channel === 'bytes' ? '02' : '03'}${keyHex(encodeOrderedStorageKey(key, SqliteNames.backend))}`
+    channel === 'metadata'
+      ? keyHex(encodeOrderedStorageKey(key, SqliteNames.backend))
+      : snapshotConcurrencyLockKeys([{ channel, key }], SqliteNames.backend).identities[0]!
+  /** Native diagnostics recognize the channel through original bounds without copying rank tags. */
+  const identityRange = (id: string) => {
+    const range = channelRanges.find(({ lower, upper }) => id >= lower && id < upper)
+    if (!range)
+      throw sqliteError(SqliteErrorCode.decodeFailed, new Error(SqliteErrorText.malformedKey))
+    return range
+  }
+  /** Persistence decoding reuses canonical admission after removing the original channel prefix. */
+  const decodeLockIdentity = (id: string): ILockKey => {
+    const range = identityRange(id)
+    const captured = snapshotConcurrencyLockKeys(
+      [{ channel: range.channel, key: decodeHexKey(id.slice(range.lower.length)) }],
+      SqliteNames.backend
+    )
+    if (captured.identities[0] !== id)
+      throw sqliteError(SqliteErrorCode.decodeFailed, new Error(SqliteErrorText.malformedKey))
+    return captured.keys[0]!
+  }
   /** Read/write baselines retain missing-row tombstones in the original native revision table. */
   const revision = (state: INativeState, channel: IChannel, key: IStorageKey): void => {
     if (channel === 'metadata') return
@@ -439,6 +472,12 @@ export function createSqliteStore<TValue>(
         'run',
         state
       )
+  }
+  /** The shared revision owner advances in the same synchronous turn as successful native COMMIT. */
+  const advanceRevisions = (state: INativeState): void => {
+    if (wal) return
+    for (const channel of ['text', 'bytes', 'record'] as const)
+      for (const id of state.changed.get(channel)?.keys() ?? []) group!.revisions.write(channel, id)
   }
   /** Actual codec calls share one failure policy for roots, scopes and iterator advances. */
   const convert = (
@@ -525,6 +564,17 @@ export function createSqliteStore<TValue>(
       channel === 'bytes'
         ? (value as Uint8Array).slice()
         : (convert(channel, 'encode', value, scope) as string)
+    writeRaw(channel, key, raw, state, policy, ttlMs)
+  }
+  /** Prepared values cannot invoke caller code between final lock admission and native mutation. */
+  const writeRaw = (
+    channel: IChannel,
+    key: IStorageKey,
+    raw: string | Uint8Array,
+    state: INativeState,
+    policy: 'conflict' | 'replace',
+    ttlMs?: number
+  ): void => {
     if (channel !== 'metadata') {
       for (const other of ['text', 'bytes', 'record'] as const) {
         if (other === 'bytes' && typeof key !== 'string') continue
@@ -601,25 +651,25 @@ export function createSqliteStore<TValue>(
   }
 
   /** Bind original host operation observation without granting observers control. */
-  const operation = <R>(
+  const operation = <I, R>(
     name: string,
-    input: unknown,
+    input: I,
     context: IOperationContext | undefined,
     scope: object | undefined,
-    run: () => R
+    run: (captured: I) => R
   ): Promise<Awaited<R>> => {
     /** The original owner admits scope work synchronously before pipeline or codec work. */
     const execute = (currentScope?: object): Promise<Awaited<R>> =>
-      core.execution.run<unknown, Awaited<R>>(
+      core.execution.run<I, Awaited<R>>(
         { operation: name, input, ctx: context, scope: currentScope },
-        async (): Promise<Awaited<R>> => {
+        async (captured): Promise<Awaited<R>> => {
           const observer = currentScope
             ? operationStages.forTransaction(currentScope)
             : operationStages
           const started = Date.now()
           observe(observer, 'beforeStorageOperation', name)
           try {
-            const result = await run()
+            const result = await run(captured)
             observe(observer, 'afterStorageOperation', name, Date.now() - started, 1)
             return result as Awaited<R>
           } catch (error) {
@@ -721,23 +771,125 @@ export function createSqliteStore<TValue>(
     }).finally(finish)
   }
   /** Root mutations declare affected original channel keys before logical lock acquisition. */
-  const rootWrite = <R>(
+  const rootWrite = <I, R>(
     name: string,
-    input: unknown,
-    keys: readonly ILockKey[],
+    input: I,
     ctx: IOperationContext | undefined,
-    run: (state: INativeState, scope: ISqliteTransactionScope<TValue>) => R,
-    guard?: IWriteGuard
+    prepare: (captured: I) => IRootMutation<R>
   ): Promise<Awaited<R>> => {
     controller.assertLive()
-    /** Capture extended write fields once; the original loop owns all resulting budgets. */
-    const options = { ...ctx, lock: keys }
-    return transact(
-      (scope) => operation(name, input, undefined, scope, () => run(nativeFor(scope), scope)),
-      options,
-      false,
-      guard
-    )
+    const finish = controller.beginMutation()
+    return operation(name, input, ctx, undefined, (captured) => {
+      let mutation!: IRootMutation<R>
+      return runWithConcurrency<Awaited<R>>(
+        {
+          store,
+          options: ctx ?? {},
+          lock: () => {
+            mutation = prepare(captured)
+            return mutation.keys
+          }
+        },
+        {
+          attempt: async (context) => {
+            const guard = mutation.guard
+            const ranges = guard ? lockRanges(guard) : []
+            const ids = readConcurrencyLockIdentities(context)
+            /** Logical fail decisions remain observable before entering the physical queue. */
+            const conflict = wal
+              ? conflictingLock(context, ids, '')
+              : group!.locks.probe(ids, ranges)
+            const range =
+              wal && guard ? rangeConflict(context.orgId ?? runtime.orgId, guard) : undefined
+            if ((conflict || range) && context.admission === 'try')
+              return {
+                status: 'conflict' as const,
+                phase: 'acquire' as const,
+                keys: conflict ? [conflict.key] : range!.keys,
+                holder: conflict
+                  ? 'row' in conflict
+                    ? holderOf(conflict.row)
+                    : conflict.holder
+                  : range!.holder
+              }
+            return physicalRun(context, async () => {
+              while (true) {
+                throwIfAborted(context.signal)
+                try {
+                  const write = () =>
+                    syncMutation(
+                      mutation.run,
+                      context.lock ?? [],
+                      guard,
+                      context.orgId ?? runtime.orgId,
+                      context
+                    ) as Awaited<R>
+                  return wal
+                    ? await walAttempt(context, async () => ({
+                        status: 'committed' as const,
+                        value: write()
+                      }))
+                    : await group!.locks.attemptWrite(
+                        context,
+                        {
+                          owner: controller.origin,
+                          ...(label === undefined ? {} : { label }),
+                          since: Date.now(),
+                          status: 'held',
+                          scope: 'local'
+                        },
+                        write,
+                        concurrencyStages,
+                        controller.closingSignal,
+                        ranges
+                      )
+                } catch (error) {
+                  if (error instanceof SqliteLogicalConflict) {
+                    if (context.admission === 'try')
+                      return {
+                        status: 'conflict' as const,
+                        phase: 'acquire' as const,
+                        keys: error.keys,
+                        holder: error.holder
+                      }
+                    await context.wait(sleep(SqliteLimits.pollMs, { signal: context.signal }))
+                  } else if (isBusy(error))
+                    await context.waitPhysical(
+                      sleep(SqliteLimits.pollMs, { signal: context.signal })
+                    )
+                  else throw error
+                }
+              }
+            })
+          }
+        }
+      )
+    }).finally(finish)
+  }
+  /** Standard channel preparation owns payload conversion before the shared lock provider runs. */
+  const prepareWrite = (
+    channel: 'text' | 'bytes' | 'record',
+    key: IStorageKey,
+    value: unknown
+  ): IRootMutation<void> => {
+    const raw =
+      channel === 'bytes'
+        ? (value as Uint8Array).slice()
+        : (convert(channel, 'encode', value) as string)
+    return {
+      keys:
+        typeof key === 'string'
+          ? [lockKey.text(key), lockKey.bytes(key), lockKey.record(key)]
+          : [lockKey.text(key), lockKey.record(key)],
+      run: (state) =>
+        writeRaw(
+          channel,
+          key,
+          raw,
+          state,
+          readTransactionConflictPolicy(state.context, SqliteNames.backend)
+        )
+    }
   }
   /** Complete batch input is snapshotted once before a native request or stage starts. */
   const batchKeys = (keys: readonly IStorageKey[]): readonly IStorageKey[] => {
@@ -775,11 +927,7 @@ export function createSqliteStore<TValue>(
     prefix: IStorageKey,
     state: INativeState
   ): number => {
-    const held = rangeConflict(
-      state.orgId,
-      { channels: [channel], prefix },
-      new Set(state.context ? readConcurrencyLockIdentities(state.context) : [])
-    )
+    const held = rangeConflict(state.orgId, { channels: [channel], prefix }, state.context)
     if (held) throw new SqliteLogicalConflict(held.keys, held.holder)
     const range = snapshotStorageKeyPrefix(prefix, SqliteNames.backend)
     const lower = channel === 'record' ? range.lower : keyHex(range.lower)
@@ -1095,7 +1243,8 @@ export function createSqliteStore<TValue>(
   const control = async (
     text: string,
     context: IConcurrencyAttemptContext,
-    cleanup = false
+    cleanup = false,
+    committed?: () => void
   ): Promise<void> => {
     while (true) {
       if (!cleanup) throwIfAborted(context.signal)
@@ -1111,6 +1260,7 @@ export function createSqliteStore<TValue>(
           active === SQLITE_CONTROL_ACTIVE
         )
           active = undefined
+        if (text === SqliteControl.commit) committed?.()
         return
       } catch (error) {
         if (!isBusy(error)) throw normalizeSqliteFailure(error)
@@ -1154,62 +1304,52 @@ export function createSqliteStore<TValue>(
   const rangeConflict = (
     orgId: string,
     guard: IWriteGuard,
-    ownIds: ReadonlySet<string> = new Set()
+    current?: IConcurrencyAttemptContext
   ):
     | { readonly keys: readonly ILockKey[]; readonly holder: IConcurrencyHolder | undefined }
     | undefined => {
-    const prefix =
-      guard.prefix === undefined
-        ? undefined
-        : snapshotStorageKeyPrefix(guard.prefix, SqliteNames.backend)
     if (!wal) {
-      for (const holding of group!.locks.inspectLocks()) {
-        const key = holding.key
-        if (!guard.channels.includes(key.channel) || (prefix && !prefix.matches(key.key))) continue
-        const id = identity(key.channel, key.key)
-        if (
-          holding.holder?.status === 'held' &&
-          holding.holder.owner === controller.origin &&
-          ownIds.has(id)
-        )
-          continue
-        return { keys: [key], holder: holding.holder }
-      }
-      return
+      const holding = group!.locks.probe([], lockRanges(guard), current)
+      return holding ? { keys: [holding.key], holder: holding.holder } : undefined
     }
     const conditions: string[] = []
     const values: ISqliteValue[] = [orgId, Date.now()]
     for (const channel of guard.channels) {
-      const rank = channel === 'text' ? '01' : channel === 'bytes' ? '02' : '03'
-      conditions.push('(key>=? AND key<?)')
-      values.push(
-        prefix ? rank + keyHex(prefix.lower) : rank,
-        prefix
-          ? rank + keyHex(prefix.upper)
-          : channel === 'text'
-            ? '02'
-            : channel === 'bytes'
-              ? '03'
-              : '04'
+      const bounds = snapshotConcurrencyLockRange(
+        { channel, prefix: guard.prefix },
+        SqliteNames.backend
       )
+      conditions.push('(key>=? AND key<?)')
+      values.push(bounds.lower, bounds.upper)
     }
     if (conditions.length === 0) return
     const rows = statement<readonly ISqliteRow[]>(
-      `SELECT key,owner,label,pid,since,expires_at FROM ${tables.locks} WHERE org_id=? AND expires_at>? AND (${conditions.join(' OR ')})`,
+      `SELECT key,owner,label,pid,since,expires_at,attempt_token FROM ${tables.locks} WHERE org_id=? AND expires_at>? AND (${conditions.join(' OR ')})`,
       values,
       'all'
     )
     for (const row of rows) {
       const id = row.key as string
-      if (row.owner === controller.origin && ownIds.has(id)) continue
-      const channel = id.startsWith('01') ? 'text' : id.startsWith('02') ? 'bytes' : 'record'
+      if (
+        current !== undefined &&
+        expectedToken?.context === current &&
+        row.attempt_token === expectedToken.token &&
+        row.owner === controller.origin
+      )
+        continue
       return {
-        keys: [{ channel, key: decodeHexKey(id.slice(2)) } as ILockKey],
+        keys: [decodeLockIdentity(id)],
         holder: holderOf(row)
       }
     }
     return
   }
+  /** The canonical owner computes bounds; this backend supplies only known affected channels. */
+  const lockRanges = (guard: IWriteGuard) =>
+    guard.channels.map((channel) => ({
+      channel,
+      ...snapshotConcurrencyLockRange({ channel, prefix: guard.prefix }, SqliteNames.backend)
+    }))
   /** Logical conflicts are visible before any attempt to acquire SQLite's physical writer lock. */
   const conflictingLock = (
     context: IConcurrencyAttemptContext,
@@ -1323,15 +1463,21 @@ export function createSqliteStore<TValue>(
     return result!
   }
   /** Work token is scoped to the real driver's admission interval, not public scope properties. */
-  let expectedToken: { readonly token: string; readonly expiresAt: number } | undefined
+  let expectedToken:
+    | {
+        readonly context: IConcurrencyAttemptContext
+        readonly token: string
+        readonly expiresAt: number
+      }
+    | undefined
   /** Preserve one temporary native token binding without another owner registry. */
   const runWithWalToken = async <R>(
-    _context: IConcurrencyAttemptContext,
+    context: IConcurrencyAttemptContext,
     token: string,
     expiresAt: number,
     run: () => Promise<IConcurrencyAttempt<R>>
   ): Promise<IConcurrencyAttempt<R>> => {
-    expectedToken = { token, expiresAt }
+    expectedToken = { context, token, expiresAt }
     try {
       return await run()
     } finally {
@@ -1388,7 +1534,7 @@ export function createSqliteStore<TValue>(
         if (recover) {
           /** Compare in the new writer transaction before the callback can change its own baseline. */
           for (const [id, expected] of baseline) {
-            const channel = id.startsWith('01') ? 'text' : id.startsWith('02') ? 'bytes' : 'record'
+            const channel = identityRange(id).channel
             const row = wal
               ? statement<ISqliteRow | undefined>(
                   `SELECT revision FROM ${tables.revisions} WHERE org_id=? AND key=?`,
@@ -1433,8 +1579,10 @@ export function createSqliteStore<TValue>(
         throwIfAborted(context.signal)
         if (state.expiresAt !== undefined && Date.now() >= state.expiresAt)
           throw new StorageContractError(StorageContractErrorCode.lockLost)
-        await control(SqliteControl.commit, context)
-        begun = false
+        await control(SqliteControl.commit, context, false, () => {
+          begun = false
+          advanceRevisions(state)
+        })
         let changedKeys = 0
         for (const keys of state.changed.values()) changedKeys += keys.size
         observe(terminal, 'afterCommit', changedKeys)
@@ -1442,7 +1590,6 @@ export function createSqliteStore<TValue>(
         for (const channel of ['text', 'bytes', 'record'] as const) {
           const keys = state.changed.get(channel)
           if (!keys?.size) continue
-          if (!wal) for (const id of keys.keys()) group!.revisions.write(channel, id)
           controller.publish({
             channel: channel === 'text' ? 'value' : channel,
             kind: 'batch',
@@ -1499,12 +1646,70 @@ export function createSqliteStore<TValue>(
       }
     }
   }
+  /** The existing utility FIFO owns physical admission; only queue time enters waitPhysical. */
+  const physicalRun = async <R>(
+    context: IConcurrencyAttemptContext,
+    run: () => R | Promise<R>
+  ): Promise<R> => {
+    const admission = createAbortController()
+    const admitted = deferred<void>()
+    const unsubscribeContext = subscribeToAbort(
+      context.signal,
+      () => admission.abort(readAbortReason(context.signal)),
+      report
+    )
+    const unsubscribeClosing = subscribeToAbort(
+      controller.closingSignal,
+      () =>
+        admission.abort(
+          new StorageContractError(StorageContractErrorCode.aborted, {
+            cause: readAbortReason(controller.closingSignal)
+          })
+        ),
+      report
+    )
+    const finished = physicalAdmission.run(
+      async () => {
+        admitted.resolve()
+        controller.assertLive()
+        if (active !== undefined) throw sqliteError(SqliteErrorCode.transactionFailed)
+        throwIfAborted(context.signal)
+        return run()
+      },
+      { signal: admission.signal }
+    )
+    void finished.then(undefined, (error) => admitted.reject(error))
+    try {
+      await context.waitPhysical(admitted.promise)
+      return await finished
+    } catch (primary) {
+      const reason = context.signal?.aborted
+        ? readAbortReason(context.signal)
+        : primary instanceof StorageContractError &&
+            primary.code === StorageContractErrorCode.lockTimeout
+          ? primary.cause
+          : primary
+      admission.abort(reason)
+      try {
+        await finished
+      } catch (secondary) {
+        if (
+          secondary !== primary &&
+          secondary !== reason &&
+          !walkErrorCauses(secondary).includes(primary)
+        )
+          reportCleanupError(report, secondary)
+      }
+      throw primary
+    } finally {
+      unsubscribeClosing()
+      unsubscribeContext()
+    }
+  }
   /** All public transactions enter the existing concurrency loop and original physical limiter. */
   const transact = <R>(
     callback: (scope: ISqliteTransactionScope<TValue>) => R,
-    options: ITransactionOptions = {},
-    publicEntry = true,
-    guard?: IWriteGuard
+    options: ITransactionOptions = {}
   ): Promise<Awaited<R>> => {
     assertTransactionCallback(callback, SqliteNames.backend)
     controller.assertLive()
@@ -1513,84 +1718,15 @@ export function createSqliteStore<TValue>(
       { store, options },
       {
         attempt: async (context) => {
-          if (guard) {
-            while (true) {
-              const held = rangeConflict(context.orgId ?? runtime.orgId, guard)
-              if (!held) break
-              if (context.admission === 'try')
-                return {
-                  status: 'conflict',
-                  phase: 'acquire',
-                  keys: held.keys,
-                  holder: held.holder
-                }
-              await context.wait(sleep(SqliteLimits.pollMs, { signal: context.signal }))
-            }
-          }
-          /** The utility FIFO owns physical admission; waitPhysical measures only queue time. */
-          const run = async (): Promise<IConcurrencyAttempt<Awaited<R>>> => {
-            const admission = createAbortController()
-            const admitted = deferred<void>()
-            const unsubscribeContext = subscribeToAbort(
-              context.signal,
-              () => admission.abort(readAbortReason(context.signal)),
-              report
-            )
-            const unsubscribeClosing = subscribeToAbort(
-              controller.closingSignal,
-              () =>
-                admission.abort(
-                  new StorageContractError(StorageContractErrorCode.aborted, {
-                    cause: readAbortReason(controller.closingSignal)
-                  })
-                ),
-              report
-            )
-            const finished = physicalAdmission.run(
-              async () => {
-                admitted.resolve()
-                controller.assertLive()
-                if (active !== undefined) throw sqliteError(SqliteErrorCode.transactionFailed)
-                throwIfAborted(context.signal)
-                const invoke = () => nativeAttempt(context, callback)
-                const execute = () => (wal ? walAttempt(context, invoke) : invoke())
-                return publicEntry
-                  ? core.execution.run(
-                      { operation: SqliteOperation.transaction, input: {}, ctx: context },
-                      execute
-                    )
-                  : execute()
-              },
-              { signal: admission.signal }
-            )
-            void finished.then(undefined, (error) => admitted.reject(error))
-            try {
-              await context.waitPhysical(admitted.promise)
-              return await finished
-            } catch (primary) {
-              const reason = context.signal?.aborted
-                ? readAbortReason(context.signal)
-                : primary instanceof StorageContractError &&
-                    primary.code === StorageContractErrorCode.lockTimeout
-                  ? primary.cause
-                  : primary
-              admission.abort(reason)
-              try {
-                await finished
-              } catch (secondary) {
-                if (
-                  secondary !== primary &&
-                  secondary !== reason &&
-                  !walkErrorCauses(secondary).includes(primary)
-                )
-                  reportCleanupError(report, secondary)
-              }
-              throw primary
-            } finally {
-              unsubscribeClosing()
-              unsubscribeContext()
-            }
-          }
+          const run = () =>
+            physicalRun(context, () => {
+              const invoke = () => nativeAttempt(context, callback)
+              const execute = () => (wal ? walAttempt(context, invoke) : invoke())
+              return core.execution.run(
+                { operation: SqliteOperation.transaction, input: {}, ctx: context },
+                execute
+              )
+            })
           if (wal && context.locking === 'pessimistic' && context.lock?.length) {
             const ids = readConcurrencyLockIdentities(context)
             const conflict = conflictingLock(context, ids, '')
@@ -1620,25 +1756,7 @@ export function createSqliteStore<TValue>(
         }
       }
     )
-    /** Internal root atomicity preserves the declared operation error, including original identity. */
-    const exposed = publicEntry
-      ? result
-      : result.catch((error) => {
-          if (
-            !(error instanceof AggregateError) &&
-            error instanceof Error &&
-            'source' in error &&
-            error.source === '@migaia/storage-plugin-sqlite' &&
-            'code' in error &&
-            error.code === SqliteErrorCode.transactionFailed &&
-            error.cause instanceof Error &&
-            'source' in error.cause &&
-            'code' in error.cause
-          )
-            throw error.cause
-          throw error
-        })
-    return exposed.finally(finish)
+    return result.finally(finish)
   }
 
   /** Clear enumerates only rows actually affected, for original revision and change ownership. */
@@ -1647,7 +1765,7 @@ export function createSqliteStore<TValue>(
     const held = rangeConflict(
       state.orgId,
       { channels: channels.filter((channel) => channel !== 'metadata') },
-      new Set(state.context ? readConcurrencyLockIdentities(state.context) : [])
+      state.context
     )
     if (held) throw new SqliteLogicalConflict(held.keys, held.holder)
     for (const channel of channels) {
@@ -1685,34 +1803,51 @@ export function createSqliteStore<TValue>(
     run: (state: INativeState) => R,
     keys: readonly ILockKey[] = [],
     guard?: IWriteGuard,
-    orgId = runtime.orgId
+    orgId = runtime.orgId,
+    context?: IConcurrencyAttemptContext
   ): R => {
     assertRoot()
     /** Synchronous entry cannot wait or invoke a user strategy while another logical holder exists. */
-    let conflict = guard ? rangeConflict(orgId, guard) : undefined
-    if (!conflict && keys.length) {
-      const identities = new Set(keys.map((key) => identity(key.channel, key.key)))
-      if (wal) {
-        for (const [index, id] of [...identities].entries()) {
-          const row = lockRow(orgId, id)
-          if (row && Number(row.expires_at) > Date.now()) {
-            conflict = { keys: [keys[index]!], holder: holderOf(row) }
-            break
+    const captured = context
+      ? { keys: context.lock ?? [], identities: readConcurrencyLockIdentities(context) }
+      : snapshotConcurrencyLockKeys(keys, SqliteNames.backend)
+    const assertAvailable = (): void => {
+      let conflict = guard ? rangeConflict(orgId, guard, context) : undefined
+      if (!conflict && captured.keys.length) {
+        if (wal) {
+          for (const [index, id] of captured.identities.entries()) {
+            const row = lockRow(orgId, id)
+            if (
+              row &&
+              Number(row.expires_at) > Date.now() &&
+              !(
+                context !== undefined &&
+                expectedToken?.context === context &&
+                row.attempt_token === expectedToken.token &&
+                row.owner === controller.origin
+              )
+            ) {
+              conflict = { keys: [captured.keys[index]!], holder: holderOf(row) }
+              break
+            }
           }
+        } else {
+          const held = group!.locks.probe(captured.identities, undefined, context)
+          if (held) conflict = { keys: [held.key], holder: held.holder }
         }
-      } else {
-        for (const held of group!.locks.inspectLocks())
-          if (identities.has(identity(held.key.channel, held.key.key))) {
-            conflict = { keys: [held.key], holder: held.holder }
-            break
-          }
       }
+      if (conflict) throw new SqliteLogicalConflict(conflict.keys, conflict.holder)
     }
-    if (conflict)
-      throw new StorageContractError(StorageContractErrorCode.lockRejected, {
-        backend: SqliteNames.backend,
-        cause: new SqliteLogicalConflict(conflict.keys, conflict.holder)
-      })
+    try {
+      assertAvailable()
+    } catch (error) {
+      if (error instanceof SqliteLogicalConflict && context === undefined)
+        throw new StorageContractError(StorageContractErrorCode.lockRejected, {
+          backend: SqliteNames.backend,
+          cause: error
+        })
+      throw error
+    }
     /** No async attempt context is exposed; this native segment performs no waiting or callback. */
     const state = {
       orgId,
@@ -1720,9 +1855,15 @@ export function createSqliteStore<TValue>(
       changed: new Map(),
       mode: 'immediate',
       failure: undefined,
-      context: undefined,
-      expiresAt: undefined
+      context,
+      expiresAt: expectedToken?.context === context ? expectedToken?.expiresAt : undefined
     } satisfies INativeState
+    /** Native cancellation or lease loss before commit still rolls back this short atomic write. */
+    const assertAttempt = (): void => {
+      throwIfAborted(context?.signal)
+      if (state.expiresAt !== undefined && Date.now() >= state.expiresAt)
+        throw new StorageContractError(StorageContractErrorCode.lockLost)
+    }
     try {
       statements.get(SqliteControl.begin).run()
       active = SQLITE_CONTROL_ACTIVE
@@ -1730,17 +1871,21 @@ export function createSqliteStore<TValue>(
       throw normalizeSqliteFailure(error)
     }
     try {
+      /** A competing process cannot insert a new lock row after this writer-side recheck. */
+      assertAttempt()
+      assertAvailable()
       const value = run(state)
+      assertAttempt()
       try {
         statements.get(SqliteControl.commit).run()
         active = undefined
+        advanceRevisions(state)
       } catch (error) {
         throw normalizeSqliteFailure(error)
       }
       for (const channel of ['text', 'bytes', 'record'] as const) {
         const keys = state.changed.get(channel)
         if (!keys?.size) continue
-        if (!wal) for (const id of keys.keys()) group!.revisions.write(channel, id)
         controller.publish({
           channel: channel === 'text' ? 'value' : channel,
           kind: 'batch',
@@ -1750,7 +1895,7 @@ export function createSqliteStore<TValue>(
       return value
     } catch (error) {
       return rollback(
-        error instanceof SqliteLogicalConflict
+        error instanceof SqliteLogicalConflict && context === undefined
           ? new StorageContractError(StorageContractErrorCode.lockRejected, {
               backend: SqliteNames.backend,
               cause: error
@@ -1838,26 +1983,21 @@ export function createSqliteStore<TValue>(
     },
     set: (key, value, ctx) => {
       textInput(key, value, true)
-      return rootWrite(
-        SqliteOperation.set,
-        { key, value },
-        [lockKey.text(key), lockKey.bytes(key), lockKey.record(key)],
-        ctx,
-        (state, scope) =>
-          write(
-            'text',
-            key,
-            value,
-            state,
-            readTransactionConflictPolicy(state.context, SqliteNames.backend),
-            scope
-          )
-      )
+      return rootWrite(SqliteOperation.set, { key, value }, ctx, (captured) => {
+        textInput(captured.key, captured.value, true)
+        return prepareWrite('text', captured.key, captured.value)
+      })
     },
     remove: (key, ctx) => {
       textInput(key)
-      return rootWrite(SqliteOperation.remove, { key }, [lockKey.text(key)], ctx, (state) => {
-        remove('text', key, state)
+      return rootWrite(SqliteOperation.remove, { key }, ctx, (captured) => {
+        textInput(captured.key)
+        return {
+          keys: [lockKey.text(captured.key)],
+          run: (state) => {
+            remove('text', captured.key, state)
+          }
+        }
       })
     },
     has: (key, ctx) => {
@@ -1871,18 +2011,17 @@ export function createSqliteStore<TValue>(
     },
     keys: (ctx) => rootRead(SqliteOperation.keys, {}, ctx, textKeys),
     clearValues: (ctx) =>
-      rootWrite(SqliteOperation.clearValues, {}, [], ctx, (state) => clear(['text'], state), {
-        channels: ['text']
-      }),
+      rootWrite(SqliteOperation.clearValues, {}, ctx, () => ({
+        keys: [],
+        guard: { channels: ['text'] },
+        run: (state) => clear(['text'], state)
+      })),
     clearAll: (ctx) =>
-      rootWrite(
-        SqliteOperation.clearAll,
-        {},
-        [],
-        ctx,
-        (state) => clear(['text', 'bytes', 'record'], state),
-        { channels: ['text', 'bytes', 'record'] }
-      ),
+      rootWrite(SqliteOperation.clearAll, {}, ctx, () => ({
+        keys: [],
+        guard: { channels: ['text', 'bytes', 'record'] },
+        run: (state) => clear(['text', 'bytes', 'record'], state)
+      })),
     getBytes: (key, ctx) => {
       textInput(key)
       return rootRead(
@@ -1894,32 +2033,28 @@ export function createSqliteStore<TValue>(
     },
     setBytes: (key, value, ctx) => {
       const bytes = bytesInput(key, value)
-      return rootWrite(
-        SqliteOperation.setBytes,
-        { key, value: bytes },
-        [lockKey.text(key), lockKey.bytes(key), lockKey.record(key)],
-        ctx,
-        (state, scope) =>
-          write(
-            'bytes',
-            key,
-            bytes,
-            state,
-            readTransactionConflictPolicy(state.context, SqliteNames.backend),
-            scope
-          )
+      return rootWrite(SqliteOperation.setBytes, { key, value: bytes }, ctx, (captured) =>
+        prepareWrite('bytes', captured.key, bytesInput(captured.key, captured.value))
       )
     },
     removeBytes: (key, ctx) => {
       textInput(key)
-      return rootWrite(SqliteOperation.removeBytes, { key }, [lockKey.bytes(key)], ctx, (state) => {
-        remove('bytes', key, state)
+      return rootWrite(SqliteOperation.removeBytes, { key }, ctx, (captured) => {
+        textInput(captured.key)
+        return {
+          keys: [lockKey.bytes(captured.key)],
+          run: (state) => {
+            remove('bytes', captured.key, state)
+          }
+        }
       })
     },
     clearBytes: (ctx) =>
-      rootWrite(SqliteOperation.clearBytes, {}, [], ctx, (state) => clear(['bytes'], state), {
-        channels: ['bytes']
-      }),
+      rootWrite(SqliteOperation.clearBytes, {}, ctx, () => ({
+        keys: [],
+        guard: { channels: ['bytes'] },
+        run: (state) => clear(['bytes'], state)
+      })),
     getRecord: (key, ctx) => {
       const captured = snapshotStorageKey(key, SqliteNames.backend)
       return rootRead(
@@ -1931,49 +2066,56 @@ export function createSqliteStore<TValue>(
     },
     putRecord: (value, key, ctx) => {
       const captured = key === undefined ? undefined : snapshotStorageKey(key, SqliteNames.backend)
-      const keys =
-        captured === undefined
-          ? []
-          : typeof captured === 'string'
-            ? [lockKey.text(captured), lockKey.bytes(captured), lockKey.record(captured)]
-            : [lockKey.text(captured), lockKey.record(captured)]
-      return rootWrite(
-        SqliteOperation.putRecord,
-        { value, key: captured },
-        keys,
-        ctx,
-        (state, scope) => {
-          const actual =
-            captured ??
-            String(statement<ISqliteRow>(SqliteControl.generatedKey, [], 'get', state).key)
-          write(
-            'record',
-            actual,
-            value,
-            state,
-            readTransactionConflictPolicy(state.context, SqliteNames.backend),
-            scope
-          )
-          return actual
+      return rootWrite(SqliteOperation.putRecord, { value, key: captured }, ctx, (input) => {
+        const key =
+          input.key === undefined ? undefined : snapshotStorageKey(input.key, SqliteNames.backend)
+        if (key !== undefined) {
+          const mutation = prepareWrite('record', key, input.value)
+          return {
+            ...mutation,
+            run: (state) => {
+              mutation.run(state)
+              return key
+            }
+          }
         }
-      )
+        const raw = convert('record', 'encode', input.value) as string
+        return {
+          keys: [],
+          run: (state) => {
+            const actual = String(
+              statement<ISqliteRow>(SqliteControl.generatedKey, [], 'get', state).key
+            )
+            writeRaw(
+              'record',
+              actual,
+              raw,
+              state,
+              readTransactionConflictPolicy(state.context, SqliteNames.backend)
+            )
+            return actual
+          }
+        }
+      })
     },
     deleteRecord: (key, ctx) => {
       const captured = snapshotStorageKey(key, SqliteNames.backend)
-      return rootWrite(
-        SqliteOperation.deleteRecord,
-        { key: captured },
-        [lockKey.record(captured)],
-        ctx,
-        (state) => {
-          remove('record', captured, state)
+      return rootWrite(SqliteOperation.deleteRecord, { key: captured }, ctx, (input) => {
+        const key = snapshotStorageKey(input.key, SqliteNames.backend)
+        return {
+          keys: [lockKey.record(key)],
+          run: (state) => {
+            remove('record', key, state)
+          }
         }
-      )
+      })
     },
     clearRecords: (ctx) =>
-      rootWrite(SqliteOperation.clearRecords, {}, [], ctx, (state) => clear(['record'], state), {
-        channels: ['record']
-      }),
+      rootWrite(SqliteOperation.clearRecords, {}, ctx, () => ({
+        keys: [],
+        guard: { channels: ['record'] },
+        run: (state) => clear(['record'], state)
+      })),
     iterateRecords: iterator,
     transaction: (run, options) => transact(run, options),
     tx: () => createTransactionBuilder(store),
@@ -2064,14 +2206,8 @@ export function createSqliteStore<TValue>(
               return snapshotConcurrencyLockHoldings(
                 rows.map((row) => {
                   const id = row.key as string
-                  const key = decodeHexKey(id.slice(2))
-                  const channel = id.startsWith('01')
-                    ? 'text'
-                    : id.startsWith('02')
-                      ? 'bytes'
-                      : 'record'
                   return {
-                    key: { channel, key } as ILockKey,
+                    key: decodeLockIdentity(id),
                     holder: holderOf(row),
                     expired: Number(row.expires_at) <= Date.now(),
                     expiresAt: Number(row.expires_at)
@@ -2120,14 +2256,14 @@ export function createSqliteStore<TValue>(
       }),
     removeByPrefix: (prefix, ctx) => {
       const captured = snapshotStorageKey(prefix, SqliteNames.backend)
-      return rootWrite(
-        SqliteOperation.removeByPrefix,
-        { prefix: captured },
-        [],
-        ctx,
-        (state) => removePrefix('record', captured, state),
-        { channels: ['record'], prefix: captured }
-      )
+      return rootWrite(SqliteOperation.removeByPrefix, { prefix: captured }, ctx, (input) => {
+        const prefix = snapshotStorageKey(input.prefix, SqliteNames.backend)
+        return {
+          keys: [],
+          guard: { channels: ['record'], prefix },
+          run: (state) => removePrefix('record', prefix, state)
+        }
+      })
     }
   }
   const recordImplementation = implement(records, recordApi, {
