@@ -40,6 +40,18 @@ describe('backend error and cancellation boundaries', () => {
       projection: { email: { kind: 'multiple' as const, keys: ['same', 'same'] } }
     }
     expect(collectUniqueIndexOwners(definitions, [row], 'native').size).toBe(1)
+    /** Several projected values still read and encode the logical owner only once. */
+    let keyReads = 0
+    /** The original key accessor exposes accidental per-projection owner encoding. */
+    const projected = {
+      get key() {
+        keyReads += 1
+        return 'projected'
+      },
+      projection: { email: { kind: 'multiple' as const, keys: ['a', 'b', 'c'] } }
+    }
+    expect(collectUniqueIndexOwners(definitions, [projected], 'native').size).toBe(3)
+    expect(keyReads).toBe(1)
     /** A second row must reject the whole proposed commit with the backend's exact error. */
     const original = backendError()
     expect(() =>
