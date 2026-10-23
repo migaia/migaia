@@ -5,8 +5,16 @@ export const StorageCapabilityMethod = {
   removeByPrefix: 'removeByPrefix'
 } as const
 
-/** Standard key-value methods validated and published by the canonical capability provider. */
-export const STORAGE_KEY_VALUE_METHODS = [
+/** Native text batch endpoints share the same public and transaction capability shape. */
+export const STORAGE_BATCH_METHODS = [
+  'getMany',
+  'setMany',
+  'removeMany',
+  StorageCapabilityMethod.removeByPrefix
+] as const
+
+/** Ordinary raw KV remains the original seven-method base, independent of native batch support. */
+export const STORAGE_KEY_VALUE_BASE_METHODS = [
   'get',
   'set',
   'remove',
@@ -14,6 +22,12 @@ export const STORAGE_KEY_VALUE_METHODS = [
   'keys',
   'clearValues',
   'clearAll'
+] as const
+
+/** A published standard KV capability promises the complete native batch surface too. */
+export const STORAGE_KEY_VALUE_METHODS = [
+  ...STORAGE_KEY_VALUE_BASE_METHODS,
+  ...STORAGE_BATCH_METHODS
 ] as const
 
 /** The existing synchronous channel has six methods and deliberately does not expose clearAll. */
@@ -41,8 +55,5 @@ export const TRANSACTION_KEY_VALUE_METHODS = [
   'set',
   'remove',
   StorageCapabilityMethod.has,
-  'getMany',
-  'setMany',
-  'removeMany',
-  StorageCapabilityMethod.removeByPrefix
+  ...STORAGE_BATCH_METHODS
 ] as const

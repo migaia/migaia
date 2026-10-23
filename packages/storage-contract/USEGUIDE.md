@@ -503,6 +503,8 @@ function attachCatalog(base: IStorageBase, read: (key: string) => Promise<string
 
 这是后端内部的装配函数，实际 store 仍由宿主安装与释放。`store.use(catalog)` 返回原实现对象；真实但未登记的令牌抛带后端名与能力名的 `UNSUPPORTED_CAPABILITY`，伪造令牌抛 `INVALID_ARGUMENT`。`store.has(token)` 同步返回布尔值。标准 `kv` 令牌同时提供原有平铺方法，`has(key, ctx)` 保留异步键查询。
 
+原 `IKeyValueStore` 与 raw KV 准入保留七个普通方法，不承诺缺失的原生批量入口。已发布的标准 `kv` API 及其平铺投影要求 `getMany`、`setMany`、`removeMany` 和 `removeByPrefix`。批量键接受 `IStorageKey`，单点与同步入口仍只接受字符串；同一字符串在两类入口共享值、锁、修订和期限。getMany 保持输入顺序与重复位置，缺失为 undefined；setMany 的规范重复键在 I/O 前拒绝，removeMany 去重后返回实际删除数。批写由后端在一次原生事务中执行，空批不打开事务或发观察事件；ttlMs 需要已登记 ttl 能力，否则在 I/O 前拒绝。provider 只转发原方法一次，保留输入、ctx、receiver 和 Promise。
+
 宿主通过 `onInstaller` 捕获本 store 唯一的安装口。`prepare` 先验证整批真实记录并保留令牌，`publish` 才使能力可见，`release` 幂等撤回该批。失败不调用基础对象的 `dispose`；资源回滚仍由创建它的后端拥有。事务与查询链的实际执行由其既有拥有者实现，类型投影不会创建事务或获得连接。
 
 ### fromValueCodec
