@@ -9,6 +9,7 @@ import {
   kv,
   records,
   rdf,
+  sparql,
   StorageContractErrorCode,
   type ICapabilityInstallPort,
   type IStorageBase,
@@ -20,6 +21,10 @@ import {
   type ICapabilityImpl,
   type IRecordsApi,
   type ITransactionBuilder,
+  type IOptimisticTransactionBuilder,
+  type ITransactionRdfApi,
+  type ISparqlInput,
+  type ISparqlTagTools,
   type ITransactionCapabilityView,
   type IWithTransactionQueryMethods,
   type IStorageKey,
@@ -574,6 +579,65 @@ describe('standard KV capability forwarding', () => {
 })
 
 describe('capability type boundaries', () => {
+  it('preserves actual non-KV native scope overloads through provider and optimistic builder projection', () => {
+    /** These are the SPARQL consumer's actual native overloads, without fabricated KV members. */
+    type IRdfDraft = ITransactionRdfApi & { expect(): void; expectAbsent(): void }
+    /** A native raw transaction tag can update but cannot query a separate read snapshot. */
+    type IUpdate = ISparqlTagTools & {
+      (
+        strings: TemplateStringsArray,
+        ...values: readonly ISparqlInput[]
+      ): { update(ctx?: never): Promise<void> }
+    }
+    /** Capability publication must preserve both overloads and their original refinements. */
+    type IScope = {
+      use(capability: typeof rdf): IRdfDraft
+      use(capability: typeof sparql): IUpdate
+    }
+    /** The existing native builder remains immutable and has no physical lock method. */
+    type IBackend = IStorageBase & {
+      transaction<T>(run: (scope: IScope) => T, options?: { lock?: never }): Promise<Awaited<T>>
+      tx(): IOptimisticTransactionBuilder<IScope, { existing(): string }>
+    }
+    /** Provider types retain the complete native scope rather than inventing generic KV use. */
+    type IProvided = ICapabilityStore<IBackend, typeof rdf | typeof sparql>
+    /** A transaction-only Feature extends the same optimistic builder without losing native use. */
+    type IEnhanced = IWithChainMethods<
+      IProvided,
+      { tx: { added(): number }; rdf: { rdfOnly(): 'rdf' } }
+    >
+    function validTypes(store: IProvided, enhanced: IEnhanced): void {
+      const original: IBackend = store
+      original.transaction((scope) => {
+        scope.use(rdf).expect()
+        scope.use(rdf).expectAbsent()
+        scope.use(sparql)`DELETE WHERE { ?s ?p ?o }`.update()
+        // @ts-expect-error Native SPARQL transaction tags are update-only.
+        scope.use(sparql)`SELECT * WHERE { ?s ?p ?o }`.select()
+        // @ts-expect-error Native scopes must not acquire KV capabilities from the provider.
+        scope.use(kv)
+      })
+      enhanced.tx().existing()
+      enhanced.tx().added()
+      enhanced
+        .tx()
+        .timeout(1)
+        .run((scope) => {
+          scope.use(rdf).expect()
+          scope.use(rdf).expectAbsent()
+          scope.use(rdf).match({}).select('subject').rdfOnly()
+          // @ts-expect-error The native raw transaction tag remains update-only after RDF enhancement.
+          scope.use(sparql)`SELECT * WHERE { ?s ?p ?o }`.select()
+          // @ts-expect-error Native RDF Feature projection cannot grant record capability.
+          scope.use(records)
+        })
+      // @ts-expect-error The original optimistic builder exposes no lock method.
+      enhanced.tx().lock({ channel: 'text', key: 'a' })
+    }
+    void validTypes
+    expectTypeOf<Parameters<Parameters<IProvided['transaction']>[0]>[0]>().toEqualTypeOf<IScope>()
+  })
+
   it('preserves concrete transaction scopes and both builder augmentation layers', () => {
     /** Concrete backend scope members must survive provider and host type projection. */
     type IScope = {
