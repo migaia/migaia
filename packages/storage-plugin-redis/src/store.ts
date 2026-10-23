@@ -5,6 +5,8 @@ import {
   records,
   ttl,
   counter,
+  durableChangeFeed,
+  type IDurableChangeFeedApi,
   provideCapabilities,
   implement,
   createTransactionOwner,
@@ -67,6 +69,8 @@ import {
   createStorageOperationReporter,
   reportCleanupError,
   withAbort,
+  mergeSignals,
+  subscribeToAbort,
   throwIfAborted,
   snapshotKeyRange,
   observeStorageBatch,
@@ -104,7 +108,7 @@ import {
   type IRedisNativeStore,
   type IRedisTransactionScope
 } from './types.js'
-import type { IRedisConnection } from './driver.js'
+import type { IRedisConnection, IRedisDriver } from './driver.js'
 import type {} from './hooks.js'
 import { nativeFeaturePort, type IRedisNativeFeaturePort } from './native-feature.js'
 
@@ -170,6 +174,13 @@ export function createRedisStore(
   )
     throw invalidArgument()
   let subscription: IStorageResource | undefined, poison: Error | undefined
+  /**
+   * The selected durable Feature configures only this original commit path before detection
+   * completes.
+   */
+  let durableMaxLen: number | undefined
+  /** The selected module supplies this finite org API factory; provider ownership stays original. */
+  let durableFactory: ((store: IRedisStore) => IDurableChangeFeedApi) | undefined
   const controller = core.createChangeController({
     backend: RedisText.backend,
     platform: driver,
@@ -192,6 +203,13 @@ export function createRedisStore(
           failures.push(error)
         }
       }
+      for (const projection of projections.values()) {
+        try {
+          projection.releaseFeatures()
+        } catch (error) {
+          failures.push(error)
+        }
+      }
       projections.clear()
       if (failures.length)
         throw redisError(
@@ -208,6 +226,7 @@ export function createRedisStore(
       current = createOrg(orgId)
       projections.set(orgId, current)
     }
+    current.configureFeatures()
     return current
   }
   /** Observer promises are observed but cannot delay, replace or abort the original operation. */
@@ -249,25 +268,37 @@ export function createRedisStore(
     controller.assertLive()
     if (poison) throw poison
   }
-  /** Fixed driver observation never includes arguments or application data. */
-  const command = async (
-    connection: IRedisConnection,
-    args: readonly string[],
-    orgId: string
-  ): Promise<unknown> => {
+  /** Fixed command observation never includes arguments or application data. */
+  const observeNative = async <R>(
+    name: string,
+    orgId: string,
+    run: () => Promise<R>
+  ): Promise<R> => {
     const started = core.featureExpose.getScheduler().now()
     try {
-      return await connection.command(args)
+      return await run()
     } finally {
       core.emit(RedisOperation.onRedisCommand, () => ({
         backendId: core.getBackendId(),
         backend: RedisText.backend,
         orgId,
-        command: args[0]!,
+        command: name,
         elapsedMs: core.featureExpose.getScheduler().now() - started
       }))
     }
   }
+  /** Standard drafts and selected Features share the same original native observation path. */
+  const command = (
+    connection: IRedisConnection,
+    args: readonly string[],
+    orgId: string
+  ): Promise<unknown> => observeNative(args[0]!, orgId, () => connection.command(args))
+  /** EXEC observation measures the full actual native batch, without fabricating per-item timings. */
+  const exec = (
+    connection: IRedisConnection,
+    commands: Parameters<IRedisConnection['exec']>[0],
+    orgId: string
+  ) => observeNative(RedisCommand.exec, orgId, () => connection.exec(commands))
   /** Independent organization providers share only native Redis state and the original controller. */
   function createOrg(orgId: string) {
     const ports = core.getOrgContext(orgId),
@@ -388,11 +419,22 @@ export function createRedisStore(
                 [RedisCommand.hset, layout.revisions, RedisSuffix.sequence, String(sequence)],
                 [RedisCommand.publish, layout.changes, change.wire]
               )
+              if (durableMaxLen !== undefined)
+                commands.push([
+                  RedisCommand.xadd,
+                  layout.durableChanges,
+                  RedisCommand.maxlen,
+                  '~',
+                  String(durableMaxLen),
+                  '*',
+                  RedisSuffix.changeField,
+                  change.wire
+                ])
             }
             throwIfAborted(context.signal)
             let replies: Awaited<ReturnType<IRedisConnection['exec']>>
             try {
-              replies = await connection.exec(commands)
+              replies = await exec(connection, commands, orgId)
             } catch (error) {
               poison = normalizeRedisError(error)
               throw poison
@@ -1342,33 +1384,134 @@ export function createRedisStore(
         },
         1
       )
+    /**
+     * Wrapping only observation retains the genuine native client, original lease and reply
+     * evidence.
+     */
+    const observedConnection = (connection: IRedisConnection): IRedisConnection => {
+      const binary = connection.binaryCommand
+      return {
+        getClient: () => connection.getClient(),
+        command: (args) => command(connection, args, orgId),
+        exec: (commands) => exec(connection, commands, orgId),
+        ...(binary
+          ? {
+              binaryCommand: (
+                args: Parameters<NonNullable<IRedisConnection['binaryCommand']>>[0]
+              ) =>
+                observeNative(args[0] as string, orgId, () =>
+                  Reflect.apply(binary, connection, [args])
+                )
+            }
+          : {})
+      }
+    }
+    const nativeDriver: IRedisDriver = {
+      command: (args) => observeNative(args[0]!, orgId, () => driver.command(args)),
+      withConnection: (run) =>
+        driver.withConnection((connection) => run(observedConnection(connection))),
+      subscribe: (channel, listener) =>
+        observeNative(RedisCommand.subscribe, orgId, () => driver.subscribe(channel, listener))
+    }
     const native: IRedisNativeFeaturePort = {
-      driver,
-      run: (name, input, ctx, writing, run) => {
+      driver: nativeDriver,
+      now: () => core.featureExpose.getScheduler().now(),
+      closingSignal: controller.closingSignal,
+      allOrganizations: orgId === core.defaultOrgId,
+      enableDurable: (maxLen, create) => {
+        if (
+          !Number.isSafeInteger(maxLen) ||
+          maxLen < 1 ||
+          (durableMaxLen !== undefined && durableMaxLen !== maxLen)
+        )
+          throw invalidArgument()
+        durableMaxLen = maxLen
+        durableFactory = create
+      },
+      run: (name, input, ctx, writing, run, pipeline = true) => {
         if (writing) assertWrite()
         else controller.assertLive()
         const finish = controller.beginMutation()
-        return withAbort(ctx, async (signal, context) =>
-          operate(name, input, context, undefined, (actual) => {
+        return withAbort(ctx, async (signal, context) => {
+          const invoke = (actual: typeof input) => {
             throwIfAborted(signal)
-            return driver.withConnection((connection) => run(actual, connection, layout, signal))
-          })
-        ).finally(finish)
+            return nativeDriver.withConnection((connection) =>
+              run(actual, connection, layout, signal)
+            )
+          }
+          return pipeline
+            ? operate(name, input, context, undefined, invoke)
+            : observeStorageBatch(
+                operations(),
+                core.featureExpose.getScheduler(),
+                name,
+                undefined,
+                () => invoke(input)
+              )
+        }).finally(finish)
       },
-      resource: (name, input, ctx, run) => {
+      resource: (name, input, ctx, run, pipeline = true) => {
         controller.assertLive()
         const finish = controller.beginMutation()
-        return withAbort(ctx, async (signal, context) =>
-          operate(name, input, context, undefined, async (actual) => {
-            throwIfAborted(signal)
-            const resource = await run(actual, layout)
-            resources.add(resource)
-            return resource
+        let merged: ReturnType<typeof mergeSignals>
+        try {
+          merged = mergeSignals(ctx, report)
+        } catch (error) {
+          finish()
+          throw error
+        }
+        const invoke = async (actual: typeof input): Promise<IStorageResource> => {
+          throwIfAborted(merged.signal)
+          const underlying = await run(actual, layout, merged.signal)
+          let off = () => undefined as void
+          const release = () => {
+              off()
+              merged.dispose()
+              resources.delete(resource)
+            },
+            dispose = (): Promise<void> => {
+              const pending = underlying.dispose()
+              void pending.then(release, release)
+              return pending
+            },
+            resource: IStorageResource = {
+              dispose,
+              [asyncDisposeKey]: () => {
+                void dispose().then(undefined, () => undefined)
+                return underlying[asyncDisposeKey]()
+              }
+            }
+          resources.add(resource)
+          off = subscribeToAbort(
+            merged.signal,
+            () => {
+              void resource[asyncDisposeKey]()
+            },
+            report
+          )
+          try {
+            throwIfAborted(merged.signal)
+          } catch (error) {
+            await resource[asyncDisposeKey]()
+            throw error
+          }
+          return resource
+        }
+        const pending = pipeline
+          ? operate(name, input, merged.context, undefined, invoke)
+          : observeStorageBatch(
+              operations(),
+              core.featureExpose.getScheduler(),
+              name,
+              undefined,
+              () => invoke(input)
+            )
+        return pending
+          .catch((error) => {
+            merged.dispose()
+            throw error
           })
-        ).finally(finish)
-      },
-      own: (resource) => {
-        resources.add(resource)
+          .finally(finish)
       },
       report: (error) => reportCleanupError(report, error)
     }
@@ -1708,7 +1851,20 @@ export function createRedisStore(
         concurrencyStages: concurrencyStages()
       }
     )
-    return { store, installer }
+    /** Child providers publish the selected factory through their original installer only. */
+    let durablePublication: ReturnType<ICapabilityInstallPort['prepare']> | undefined
+    const configureFeatures = (): void => {
+      if (orgId !== core.defaultOrgId && durableFactory && !durablePublication) {
+        durablePublication = installer.prepare([
+          implement(durableChangeFeed, durableFactory(store))
+        ])
+        durablePublication.publish()
+      }
+    }
+    const releaseFeatures = (): void => {
+      durablePublication?.release()
+    }
+    return { store, installer, configureFeatures, releaseFeatures }
   }
   const root = forOrg(core.defaultOrgId)
   return {

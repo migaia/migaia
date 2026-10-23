@@ -1,4 +1,8 @@
-import type { IOperationContext, IStorageResource } from '@migaia/storage-contract'
+import type {
+  IOperationContext,
+  IStorageResource,
+  IDurableChangeFeedApi
+} from '@migaia/storage-contract'
 import type { IRedisConnection, IRedisDriver } from './driver.js'
 import type { createRedisLayout } from './layout.js'
 import type { IRedisStore } from './types.js'
@@ -19,16 +23,25 @@ export type IRedisNativeFeaturePort = {
       connection: IRedisConnection,
       layout: ReturnType<typeof createRedisLayout>,
       signal: AbortSignal | undefined
-    ) => Promise<R>
+    ) => Promise<R>,
+    pipeline?: boolean
   ): Promise<R>
+  enableDurable(maxLen: number, create: (store: IRedisStore) => IDurableChangeFeedApi): void
   resource<I>(
     operation: string,
     input: I,
     ctx: IOperationContext | undefined,
-    run: (input: I, layout: ReturnType<typeof createRedisLayout>) => Promise<IStorageResource>
+    run: (
+      input: I,
+      layout: ReturnType<typeof createRedisLayout>,
+      signal: AbortSignal | undefined
+    ) => Promise<IStorageResource>,
+    pipeline?: boolean
   ): Promise<IStorageResource>
+  now(): number
+  readonly closingSignal: AbortSignal
+  readonly allOrganizations: boolean
   readonly driver: IRedisDriver
-  own(resource: IStorageResource): void
   report(error: unknown): void
 }
 /** No second provider map or lifecycle is introduced. */

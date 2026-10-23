@@ -65,3 +65,67 @@ P 是原规范 prefix 编码生成的非空 `{hex}` hash tag，所有键同槽�
 | 提交提示       | Pub/Sub  | P:changes                            |
 
 前缀删除通过 ZRANGEBYLEX 取匹配成员，跳过过期值并重新检查残留。`inspectLocks`/字节清空用 SCAN，成本包含全库扫描候选。变更提示是 best-effort，不承诺外部原生命令、断连重放或过期即时通知。`dispose()` 返回缓存主 Promise；符号释放返回另一个缓存 Promise，清理失败只报告。两者只清理自有订阅和租约，不关闭注入客户端。
+
+## 原生 Feature
+
+从独立子路径导入后作为 `redisBackendPlugin` 第二参数选择。API 只出现在 `store.api`，不进入 `tx.api`；固定 API 复用宿主已有的一次 pipeline。Streams/PubSub 二进制载荷用唯一 canonical base64 文本 wire。
+
+| 入口                      | API                                                                                    | 默认与边界                                                                                                 |
+| ------------------------- | -------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `/features/streams`       | `redisStreamsFeature()`，`api.streams.add/range/createGroup/readGroup/ack/autoClaim`   | range -/+、count100；group 0-0、createStream=true；read count100、省略 block 不阻塞；仅同名 BUSYGROUP 幂等 |
+| `/features/pubsub`        | `redisPubSubFeature()`，`api.pubsub.publish/subscribe/keyspace`                        | 只接 expired/del/set；keyspace 回传真实物理键的 UTF-8 字节；过滤 namespace 与子组织；不修改服务通知配置    |
+| `/features/sorted-sets`   | `redisSortedSetsFeature()`，`api.sortedSets.add/rank/top`                              | 有限 score；top10、升序；同分按原 UTF16 键序；空 add 零命令                                                |
+| `/features/rate-limit`    | `redisRateLimitFeature({limit,windowMs})`，`api.rateLimit.consume`                     | 正安全整数；cost1；原子拒绝不增加计数；resetAfterMs 为原生 PTTL                                            |
+| `/features/change-stream` | `redisChangeStreamFeature({maxLen})`，`use(durableChangeFeed).readChanges/tailChanges` | maxLen 正安全整数；read limit100；原生 Stream ID；数据和 XADD 同 EXEC                                      |
+
+Streams group 阻塞读取使用专用真实连接。每条原生 BLOCK 最多1000ms；仅收到原生空结果才继续等待，原生错误立即拒绝、不重放。取消与关闭排空当前阻塞片后归还连接。订阅资源的取消预算持续到释放；回调拒绝只报告，不改变已提交写入。
+
+可靠变更流只覆盖标准库提交。`readChanges({after,limit})` 从排他 cursor 读取；`tailChanges({from:'now',onChange,onError})` 先取实际高水位再读，callback 成功才推进，失败报告并关闭，不确认失败项。落后于已保留首项的非初始 cursor 报 `CHANGE_CURSOR_EXPIRED`。初始 `0-0` 仅在原生 XINFO 确认从未移除条目时可续读，裁剪后同样拒绝；读取跨裁剪边界保守拒绝。MAXLEN 使用原生近似裁剪；外部原生命令不伪装成标准变更。
+
+```ts
+import { createClientPool } from 'redis'
+import { createStorageHost } from '@migaia/storage-host'
+import { durableChangeFeed } from '@migaia/storage-contract'
+import { redisBackendPlugin } from '@migaia/storage-plugin-redis'
+import { nodeRedisDriver } from '@migaia/storage-plugin-redis/node-redis'
+import { redisStreamsFeature } from '@migaia/storage-plugin-redis/features/streams'
+import { redisPubSubFeature } from '@migaia/storage-plugin-redis/features/pubsub'
+import { redisSortedSetsFeature } from '@migaia/storage-plugin-redis/features/sorted-sets'
+import { redisRateLimitFeature } from '@migaia/storage-plugin-redis/features/rate-limit'
+import { redisChangeStreamFeature } from '@migaia/storage-plugin-redis/features/change-stream'
+const pool = createClientPool({ url: process.env.MIGAIA_REDIS_URL! }, { maximum: 8 })
+await pool.connect()
+const host = await createStorageHost({
+  plugins: [
+    redisBackendPlugin(
+      {
+        driver: nodeRedisDriver(pool),
+        prefix: process.env.MIGAIA_EXAMPLE_REDIS_PREFIX ?? crypto.randomUUID()
+      },
+      {
+        streams: redisStreamsFeature(),
+        pubsub: redisPubSubFeature(),
+        scores: redisSortedSetsFeature(),
+        rate: redisRateLimitFeature({ limit: 3, windowMs: 1000 }),
+        history: redisChangeStreamFeature({ maxLen: 1000 })
+      }
+    )
+  ] as const
+})
+const store = host.backend('redis')
+try {
+  const id = await store.api.streams.add('jobs', { body: new Uint8Array([1, 2]) })
+  console.log((await store.api.streams.range('jobs'))[0]?.id === id)
+  await store.api.sortedSets.add('scores', [{ member: 'one', score: 1 }])
+  console.log((await store.api.sortedSets.top('scores'))[0]?.member)
+  console.log((await store.api.rateLimit.consume('quota')).allowed)
+  const subscription = await store.api.pubsub.subscribe('events', () => undefined)
+  await store.api.pubsub.publish('events', new Uint8Array([3]))
+  await subscription.dispose()
+  await store.set('checkpoint', 'ready')
+  console.log((await store.use(durableChangeFeed).readChanges()).changes.length)
+} finally {
+  await host.dispose()
+  await pool.close()
+}
+```

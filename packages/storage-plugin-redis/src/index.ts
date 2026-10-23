@@ -15,3 +15,18 @@ export type {
   IRedisTransactionScope
 } from './types.js'
 export type { IRedisCommandHookPayload, IRedisWatchConflictHookPayload } from './hooks.js'
+
+export type {
+  IRedisStreamEntry,
+  IRedisStreamsApi,
+  IRedisStreamsOutput
+} from './features/streams.js'
+export type { IRedisPubSubApi, IRedisPubSubOutput } from './features/pubsub.js'
+export type { IRedisSortedSetsApi, IRedisSortedSetsOutput } from './features/sorted-sets.js'
+export type {
+  IRedisRateLimitOptions,
+  IRedisRateLimitResult,
+  IRedisRateLimitApi,
+  IRedisRateLimitOutput
+} from './features/rate-limit.js'
+export type { IRedisChangeStreamOutput } from './features/change-stream.js'

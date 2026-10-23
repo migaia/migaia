@@ -1831,7 +1831,12 @@
       ".": ["ERROR_SOURCE", "RedisErrorCode", "redisBackendKind", "redisBackendPlugin"],
       "./ioredis": ["ioredisDriver"],
       "./node-redis": ["nodeRedisDriver"],
-      "./bun": ["bunRedisDriver"]
+      "./bun": ["bunRedisDriver"],
+      "./features/streams": ["redisStreamsFeature"],
+      "./features/pubsub": ["redisPubSubFeature"],
+      "./features/sorted-sets": ["redisSortedSetsFeature"],
+      "./features/rate-limit": ["redisRateLimitFeature"],
+      "./features/change-stream": ["redisChangeStreamFeature"]
     },
     "@migaia/storage-plugin-sparql": {
       ".": ["ERROR_SOURCE", "SparqlErrorCode", "sparqlBackendKind", "sparqlBackendPlugin"],
