@@ -80,3 +80,5 @@ console.log(await memory.use(records).query<Order>().where({ state: 'paid' }).se
 普通范围、事务草稿与前缀删除复用同一包内压缩 radix 索引。基础数据仍用哈希点查；范围仅定位边界并归并命中草稿，tombstone 抑制同键基础项。树维护首尾与相邻叶，不在查询时全量排序；记录和文本各自拥有独立索引实例。
 
 /entity 的 registerRecordIndexBackfillStore 只登记原后端工厂捕获的补录 provider；RecordIndexBackfillPhase 保留原持久化 canonical/legacy 值。原生后端创建既有 coded 争用错误后调用 markRecordIndexBackfillContentionFailure，原对象不变。会话、checkpoint 与真实原生事务仍归后端，实体编排复用这同一原私表。
+
+memory 的根操作在原并发 budget 内包住完整 pipeline：阶段修改一次输入，终点调用唯一原 loop，`await next()` 仍等待实际写入和失败。阶段等待计入同一期限；取消后不派生锁或执行原生写入。事务的 loop 位于 pipeline 外，每个真实 attempt 重新进入同一 pipeline，提交冲突重放 callback 时也重新运行阶段。

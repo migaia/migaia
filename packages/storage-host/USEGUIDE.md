@@ -81,3 +81,5 @@ console.log(await memory.use(records).query<Order>().where({ state: 'paid' }).se
 /entity 的 registerRecordIndexBackfillStore 只登记原后端工厂捕获的补录 provider；RecordIndexBackfillPhase 保留原持久化 canonical/legacy 值。原生后端创建既有 coded 争用错误后调用 markRecordIndexBackfillContentionFailure，原对象不变。会话、checkpoint 与真实原生事务仍归后端，实体编排复用这同一原私表。
 
 后端原 scope factory 在冻结同一个视图前调用 `core.createTransactionApi(scope)`；没有选中事务方法时返回 undefined。已选方法通过原 `runTransactionOperation` 登记、排空和保留首错，再进入同一 execution 与当前 scope 的惰性 client getter；过期方法保留原后端事务错误。`core.getChainMethods(family)` 把已选链方法交给原 query/builder creator，所有派生分支保留同一方法引用和原 this。纯链配置同步执行且不进入干预阶段，实际 I/O 终点才进入原 runner；内置方法和重复名称在能力发布前拒绝。
+
+memory 的根操作在原并发 budget 内包住完整 pipeline：阶段修改一次输入，终点调用唯一原 loop，`await next()` 仍等待实际写入和失败。阶段等待计入同一期限；取消后不派生锁或执行原生写入。事务的 loop 位于 pipeline 外，每个真实 attempt 重新进入同一 pipeline，提交冲突重放 callback 时也重新运行阶段。
