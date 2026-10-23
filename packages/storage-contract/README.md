@@ -740,3 +740,5 @@ RDF 的客户端 `follow`/`inverse` 现在沿同一 reader 逐前驱调用原 `s
 原生后端用 encodeStorageOrgKey(orgId, key, backend) 编码组织物理键，用 decodeStorageOrgKey(orgId, bytes, backend) 取回逻辑键。两者复用原保序线格式，组织封装不占逻辑键的深度或节点预算。无效或其它组织的头部及无效结束字节报 INVALID_ARGUMENT，截断或无效逻辑字节仍报 INVALID_KEY。prefixStorageOrgKey 可选第三参数 backend 只补逻辑键错误上下文，省略时原行为不变。
 
 原生入口验证可以同步抛出或异步拒绝；conformance 观察同一原错误。原生事务包装须在原 cause 链保留预期语义码；memory 与 IndexedDB 保持更严格的外层错误断言。subject 可提供 `prepareSecondaryIndexes(originalStore, originalHandle)`，为全新空索引 fixture 调用既有原生 backfill 拥有者。准备后套件仍要求 complete 就绪，并验证真实范围、投影与唯一性行为。
+
+snapshotStorageOrgKeyPrefix(orgId, prefix, backend) 返回独立的原生半开字节界。prefix 为 undefined 时选择该组织内全部逻辑键；指定前缀沿原 string/binary/array 前缀或 number/Date 精确语义，不缩小逻辑深度和节点预算。
