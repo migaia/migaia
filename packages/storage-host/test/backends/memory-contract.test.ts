@@ -76,6 +76,13 @@ describe('memory native contract integration', () => {
       'string'
     ])
     expect(store.sync.get('plain')).toBe('value')
+    await store.transaction(async (scope) => {
+      expect(await scope.getMany([['group', 2], 'missing', ['group', 2]])).toEqual([
+        'two',
+        undefined,
+        'two'
+      ])
+    })
     expect(await store.get('plain')).toBe('value')
     await store.set('single', 'shared')
     expect(await text.getMany(['single'])).toEqual(['shared'])

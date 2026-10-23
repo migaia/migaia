@@ -550,6 +550,19 @@ export function createMemoryBackend<T = unknown>(
       return { key: fact.key, value: prepare('value', entry.value, fact.key) as string }
     })
   }
+  /** Every duplicate position reuses its first result in both native root and scoped snapshots. */
+  const readTextBatch = (
+    keys: readonly IStorageKey[],
+    readValue: (key: IStorageKey) => string | undefined
+  ): Array<string | undefined> => {
+    /** The canonical owner alone validates keys and records their first positions. */
+    const captured = snapshotStorageBatchKeys(keys, STORAGE_MEMORY_BACKEND)
+    /** Positions are retained without a second identity map or a repeated native read. */
+    const values: Array<string | undefined> = []
+    for (const [index, fact] of captured.entries())
+      values.push(fact.firstIndex === index ? readValue(fact.key) : values[fact.firstIndex])
+    return values
+  }
   /** Public transactions and native batches use one original loop, pipeline and attempt owner. */
   const atomicEntry = <I, R>(
     operation: string,
@@ -1098,9 +1111,7 @@ export function createMemoryBackend<T = unknown>(
           }),
         getMany: (keys) =>
           batchOperation(MemoryOperation.getMany, keys, (current) =>
-            snapshotStorageBatchKeys(current, STORAGE_MEMORY_BACKEND).map(
-              ({ key }) => txRead('value', key) as string | undefined
-            )
+            readTextBatch(current, (key) => txRead('value', key) as string | undefined)
           ),
         setMany: (entries) =>
           batchOperation(MemoryOperation.setMany, entries, (current) =>
@@ -1415,19 +1426,9 @@ export function createMemoryBackend<T = unknown>(
       const count = batchSize(keys)
       if (count === 0) return []
       return observeBatch(MemoryOperation.getMany, count, () =>
-        asyncEntry(MemoryOperation.getMany, keys, ctx, (input) => {
-          /** Capture all keys before reading, and share repeated identities within this snapshot. */
-          const captured = snapshotStorageBatchKeys(input, STORAGE_MEMORY_BACKEND)
-          /** Strings retain their exact results without repeated native reads for equivalent keys. */
-          const values: Array<string | undefined> = []
-          for (const [index, fact] of captured.entries())
-            values.push(
-              fact.firstIndex === index
-                ? (read('value', fact.key) as string | undefined)
-                : values[fact.firstIndex]
-            )
-          return values
-        })
+        asyncEntry(MemoryOperation.getMany, keys, ctx, (input) =>
+          readTextBatch(input, (key) => read('value', key) as string | undefined)
+        )
       )
     },
     setMany: async (entries, ctx) => {
