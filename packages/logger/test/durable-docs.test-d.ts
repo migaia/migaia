@@ -1,7 +1,31 @@
 import { Logger } from '@migaia/logger'
-import { binlog, wal, undoLog, memoryLogStore } from '@migaia/logger/plugins/durable'
+import {
+  binlog,
+  wal,
+  undoLog,
+  memoryLogStore,
+  snapshotLogRecords,
+  prepareLogAppend,
+  snapshotLogStoreState,
+  createLogStoreIndex
+} from '@migaia/logger/plugins/durable'
 import { fileLogStore } from '@migaia/logger/plugins/durable/file'
 import type { ILogStore } from '@migaia/logger/plugins/durable'
+
+/** Native authors share index data without acquiring another queue, resource or close handle. */
+export function compileCommittedIndexExample(): void {
+  const snapshot = snapshotLogStoreState({ lastSeq: 0, time: 0, floor: 1 }, [])
+  const index = createLogStoreIndex(snapshot)
+  const batch = prepareLogAppend(
+    snapshotLogRecords([{ kind: 'order.created', payload: { id: 'o1' } }]),
+    index
+  )
+  console.log(index.lastSeq, batch[0]?.seq)
+  // @ts-expect-error The author index does not own the adapter resource.
+  void index.dispose
+  // @ts-expect-error Captured records cannot acquire unsupported payloads.
+  batch[0]!.payload = undefined
+}
 
 /** The maintained public examples compile against emitted package entries. */
 export async function compilePluginExample(): Promise<void> {

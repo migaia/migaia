@@ -1,12 +1,17 @@
 import { detectServerRuntime } from '@migaia/utils'
 import { createLoggerError, LoggerErrorCode, LOGGER_SOURCE } from '../../errors.js'
-import { createLogStore, type ILogStoreSnapshot } from './store.js'
-import { requireText, snapshotPayload } from './snapshot.js'
+import { createLogStore } from './store.js'
+import {
+  snapshotLogStoreState,
+  type ILogStoreSnapshot,
+  type ILogStoreRecoveryRow
+} from './committed-index.js'
+import { requireText } from './snapshot.js'
 import { createObservation, durableReporter, captureStoreOptions } from './observation.js'
 import { DurableKind, LogOperation, LogRecordState, LogStage } from './state-constants.js'
 import { LogSql, LogSqliteModule } from './sql.js'
 import { DurableText } from './text.js'
-import type { ILogRecord, ILogStore, ILogStoreOptions } from './types.js'
+import type { ILogStore, ILogStoreOptions } from './types.js'
 
 /** Minimal actual builtin SQLite surface shared by Node/Deno and Bun. */
 type IStatement = {
@@ -52,46 +57,20 @@ function recover(database: IDatabase): ILogStoreSnapshot {
   const meta = database.prepare(LogSql.meta).all()[0] as
     | { last_seq: number; time: number; floor: number }
     | undefined
-  if (
-    !meta ||
-    !Number.isSafeInteger(meta.last_seq) ||
-    meta.last_seq < 0 ||
-    !Number.isSafeInteger(meta.floor) ||
-    meta.floor < 1 ||
-    meta.floor > meta.last_seq + 1 ||
-    !Number.isFinite(meta.time) ||
-    meta.time < 0
-  )
-    fail()
-  const snapshot = meta!
-  const records: (ILogRecord & { state: LogRecordState })[] = []
-  let expected = snapshot.floor
-  let previousTime = 0
-  for (const value of database.prepare(LogSql.records).all()) {
-    const row = value as ILogRecord & { payload: string; state: LogRecordState }
-    if (
-      row.seq !== expected++ ||
-      !Number.isSafeInteger(row.seq) ||
-      row.seq > snapshot.last_seq ||
-      !Number.isFinite(row.time) ||
-      row.time < previousTime ||
-      row.time > snapshot.time ||
-      typeof row.kind !== 'string' ||
-      !row.kind ||
-      !Object.values(LogRecordState).includes(row.state)
-    )
-      fail()
+  if (!meta) fail()
+  /** Head validation still precedes the original records query and its native I/O failures. */
+  function* rows(): IterableIterator<ILogStoreRecoveryRow> {
     try {
-      records.push({ ...row, payload: snapshotPayload(JSON.parse(row.payload)) })
-      previousTime = row.time
+      yield* database.prepare(LogSql.records).all() as ILogStoreRecoveryRow[]
     } catch (error) {
-      throw createLoggerError(LoggerErrorCode.logStoreCorrupt, DurableText.corrupt, {
-        cause: error
-      })
+      throw sqliteFailure(error)
     }
   }
-  if (expected !== snapshot.last_seq + 1) fail()
-  return { lastSeq: snapshot.last_seq, time: snapshot.time, floor: snapshot.floor, records }
+  return snapshotLogStoreState(
+    { lastSeq: meta!.last_seq, time: meta!.time, floor: meta!.floor },
+    rows(),
+    (payload) => JSON.parse(payload as string)
+  )
 }
 /** Opens one local SQLite file, taking a retained engine lock before recovering committed records. */
 export async function fileLogStore(

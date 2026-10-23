@@ -5,7 +5,122 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileLogStore } from '../src/plugins/durable/file.js'
 import { asyncDisposeKey } from '@migaia/plugin-host'
-import { memoryLogStore, LogRecordState } from '../src/plugins/durable/index.js'
+import { deferred } from '@migaia/utils/promise'
+import {
+  memoryLogStore,
+  LogRecordState,
+  snapshotLogRecords,
+  prepareLogAppend,
+  snapshotLogStoreState,
+  createLogStoreIndex,
+  type ILogRecord
+} from '../src/plugins/durable/index.js'
+
+describe('native committed index authoring', () => {
+  it('shares the original index only after actual asynchronous commit and leaves rollback invisible', async () => {
+    const database = new DatabaseSync(':memory:')
+    database.exec(
+      'CREATE TABLE committed(seq INTEGER PRIMARY KEY, time REAL, kind TEXT, payload TEXT, state TEXT)'
+    )
+    const insert = database.prepare('INSERT INTO committed VALUES(?, ?, ?, ?, ?)')
+    const index = createLogStoreIndex()
+    const gate = deferred<void>()
+    const payload = { value: 1 }
+    const captured = snapshotLogRecords([{ kind: 'native', payload }])
+    payload.value = 2
+    const batch = prepareLogAppend(captured, index, 100)
+    try {
+      const commit = (async () => {
+        database.exec('BEGIN')
+        for (const row of batch)
+          insert.run(
+            row.seq,
+            row.time,
+            row.kind,
+            JSON.stringify(row.payload),
+            LogRecordState.pending
+          )
+        await gate.promise
+        database.exec('COMMIT')
+        index.applyAppend(batch)
+      })()
+      expect(index.lastSeq).toBe(0)
+      expect(index.read(1, 10)).toEqual([])
+      expect(index.pending()).toEqual([])
+      gate.resolve()
+      await commit
+      expect(index.lastSeq).toBe(1)
+      expect(index.read(1, 10)).toEqual([
+        { seq: 1, time: 100, kind: 'native', payload: { value: 1 } }
+      ])
+      const rolledBack = prepareLogAppend(
+        snapshotLogRecords([{ kind: 'rollback', payload: null }]),
+        index,
+        90
+      )
+      database.exec('BEGIN')
+      for (const row of rolledBack)
+        insert.run(row.seq, row.time, row.kind, JSON.stringify(row.payload), LogRecordState.pending)
+      database.exec('ROLLBACK')
+      expect(index.lastSeq).toBe(1)
+      expect(index.pending()).toEqual([1])
+      expect(
+        prepareLogAppend(snapshotLogRecords([{ kind: 'next', payload: null }]), index, 90)[0]
+      ).toMatchObject({ seq: 2, time: 100 })
+      const snapshot = snapshotLogStoreState(
+        index,
+        database.prepare('SELECT * FROM committed ORDER BY seq').all() as (ILogRecord & {
+          state: LogRecordState
+        })[],
+        (value) => JSON.parse(value as string)
+      )
+      const recovered = createLogStoreIndex(snapshot)
+      expect(recovered.read(1, 10)).toEqual(index.read(1, 10))
+      expect(recovered.pending()).toEqual([1])
+      if (recovered.checkState(1, LogRecordState.done)) recovered.applyState(1, LogRecordState.done)
+      expect(recovered.pending()).toEqual([])
+      if (recovered.checkTruncate(2)) recovered.applyTruncate(2)
+      expect(recovered.read(1, 10)).toEqual([])
+      expect(recovered.lastSeq).toBe(1)
+      expect(recovered.floor).toBe(2)
+    } finally {
+      database.close()
+    }
+  })
+
+  it('keeps recovery validation before row I/O and preserves payload corruption causes', () => {
+    let visits = 0
+    const rows = {
+      *[Symbol.iterator]() {
+        visits++
+        yield { seq: 1, time: 1, kind: 'one', payload: null, state: LogRecordState.pending }
+      }
+    }
+    expect(() => snapshotLogStoreState({ lastSeq: -1, time: 1, floor: 1 }, rows)).toThrowError(
+      expect.objectContaining({ code: 'LOG_STORE_CORRUPT' })
+    )
+    expect(visits).toBe(0)
+    const cause = new SyntaxError('native payload is corrupt')
+    expect(() =>
+      snapshotLogStoreState({ lastSeq: 1, time: 1, floor: 1 }, rows, () => {
+        throw cause
+      })
+    ).toThrowError(expect.objectContaining({ code: 'LOG_STORE_CORRUPT', cause }))
+    const clock = vi.spyOn(Date, 'now')
+    try {
+      expect(prepareLogAppend([], { lastSeq: 0, time: 0 })).toEqual([])
+      expect(() =>
+        prepareLogAppend(snapshotLogRecords([{ kind: 'one', payload: null }]), {
+          lastSeq: Number.MAX_SAFE_INTEGER,
+          time: 0
+        })
+      ).toThrowError(expect.objectContaining({ code: 'LOG_SEQUENCE_EXHAUSTED' }))
+      expect(clock).not.toHaveBeenCalled()
+    } finally {
+      clock.mockRestore()
+    }
+  })
+})
 
 describe('durable stores', () => {
   it('commits concurrent batches in admission order and preserves its high watermark', async () => {
