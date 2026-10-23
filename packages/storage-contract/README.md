@@ -686,3 +686,7 @@ RDF add/delete/match 沿同一规范 ground IQuad owner。支持事务的 provid
 原 `nativeSteps:true` 端口扩展主键 `order` 与 `{operation:'after',key,direction}`；后端仅声明其真实索引 seek 支持。具有相应索引的原 execute 可做 O(log n + 页大小) seek；共享 fallback 明确保留客户端排序/过滤成本，strict 会在 I/O 前拒绝。向量查询没有 page/after。
 
 `compileStorageQueryCondition<T>(condition)` 只编译原生 source 回调已经收到的规范 `IQueryCondition`，直接复用原 compiler，不再捕获 IWhere、不增加 parser 或登记表。Date、对象身份、操作符和返回谓词的错误语义保持；编译失败沿原 INVALID_ARGUMENT。外部声明式输入仍用 `compileStorageWhere`。
+
+原生统计通过可选只读 `source.reduce` 接点与真实 `pushdown.operations` 声明启用：count、exists，或覆盖 min/max/sum/avg 的 aggregate。`IQueryReducer<TInput>` 接收该家族原执行输入加 `reduction`，返回后端原有单行标量 storage iterator；count/sum 为 number，exists 为 boolean，min/max/avg 为 Maybe<number>。标量不是记录物化；原 open/consume、事务 operation 和资源清理仍是唯一 owner。后端在原生查询内完成过滤、边界与聚合，仅把结果送入该游标。
+
+只有完整所需计划均可下推时才调用 reduce。缺端口或包含客户端步骤时沿原 reader 单遍计算，strict 在 I/O 前拒绝；exists 的既有 first/输出回调语义保留。数值统计跳过不影响样本集合的 selector 排序；limit/skip/distinct 使选行身份影响数值时保留必要排序，下游 mapper/函数谓词也保留其依赖的排序与原调用顺序。不新增评分、SQL 编译、查询队列或资源登记表。

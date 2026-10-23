@@ -642,6 +642,31 @@ async function paidTotals(store: IStorageBase) {
   useStorageCapability: [capabilityReadCase],
   createRecordQuery: [
     {
+      title: t('Use an indexed native count cursor', '使用有索引的原生计数游标'),
+      problem: t(
+        'Count a native filtered result without returning its records.',
+        '原生过滤后计数，无须返回记录。'
+      ),
+      example: t(
+        `import { createRecordQuery, type IRecordQuerySource } from '@migaia/storage-contract'
+function count(execute: IRecordQuerySource['execute'], reduce: NonNullable<IRecordQuerySource['reduce']>) {
+  return createRecordQuery<{ enabled: boolean }>({
+    pushdown: { source: 'indexed', operators: ['eq'], operations: ['where', 'count'] }, execute, reduce
+  }).where({ enabled: true }).requirePushdown().count()
+}`,
+        `import { createRecordQuery, type IRecordQuerySource } from '@migaia/storage-contract'
+function count(execute: IRecordQuerySource['execute'], reduce: NonNullable<IRecordQuerySource['reduce']>) {
+  return createRecordQuery<{ enabled: boolean }>({
+    pushdown: { source: 'indexed', operators: ['eq'], operations: ['where', 'count'] }, execute, reduce
+  }).where({ enabled: true }).requirePushdown().count()
+}`
+      ),
+      result: t(
+        'Consumes one scalar from the provided original native cursor and awaits its cleanup. No matching records cross the boundary.',
+        '从提供的原生原游标读取一个标量并等待清理，匹配记录不跨越边界。'
+      )
+    },
+    {
       title: t('Share a record executor over an original cursor', '在原游标上共用记录执行器'),
       problem: t(
         'A backend needs declarative conditions and typed projections without another fluent chain or resource owner.',
