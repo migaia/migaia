@@ -1,0 +1,668 @@
+import {
+  StorageContractError,
+  StorageContractErrorCode,
+  snapshotStorageVectorCollection,
+  snapshotStorageVector,
+  snapshotStorageVectorUpsert,
+  snapshotStorageVectorSearch,
+  snapshotStorageWhere,
+  createVectorQuery,
+  createStorageIteratorLifetime,
+  assertStorageTtlDuration,
+  lockKey,
+  DeleteCountMode,
+  type IVectorApi,
+  type IVectorCollection,
+  type IStorageVectorConfiguration,
+  type IOperationContext,
+  type ITransactionOptions,
+  type IStorageIterator,
+  type IStorageKey,
+  type IVectorQueryInput,
+  type IVectorHit,
+  type ITtlTarget,
+  type IStorageChange
+} from '@migaia/storage-contract'
+import { asyncDisposeKey } from '@migaia/plugin-host'
+import { recommendStorageVector } from '@migaia/storage-host/authoring/vector'
+import { createStorageOperationReporter } from '@migaia/storage-host/authoring/backend'
+import type { IPgConfiguration, IPgTables } from './schema.js'
+import type { IPgState } from './native.js'
+import { observePgRevision, observePgRange, observePgBatch, markPgChanged } from './native.js'
+import type { IPgNativeParameter } from './types.js'
+import { pgKey, pgTextKey, encodePgRecord, decodePgRecord } from './codec.js'
+import { quotePgIdentifier } from './copy-command.js'
+import { pgVectorCondition, pgVectorFilter, pgVectorProjection } from './vector-filter.js'
+import { invalidArgument, postgresError } from './errors.js'
+import { PostgresErrorCode } from './error-code.js'
+import { PgNames } from './constants.js'
+/** One native table belongs to the store-wide logical collection rather than one organization. */
+type IPgVectorCollectionState = IStorageVectorConfiguration & { readonly table: string }
+/** This private source receives only the backend's original native transaction operation. */
+export type IPgVectorRuntime = {
+  readonly configuration: IPgConfiguration
+  readonly tables: IPgTables
+  readonly defaultOrgId: string
+  readonly orgId: string
+  assertLive(): void
+  run<R>(
+    operation: string,
+    ctx: ITransactionOptions | undefined,
+    work: (state: IPgState) => Promise<R>
+  ): Promise<R>
+  readonly methods: () => object | undefined
+  watch(ctx?: IOperationContext): IStorageIterator<IStorageChange>
+}
+/** The distance operator and score projection are finite native engine choices. */
+const metrics = {
+  cosine: { operator: '<=>', score: '1-' },
+  dot: { operator: '<#>', score: '-' },
+  euclid: { operator: '<->', score: '-' }
+} as const
+/** Unsupported native conditions never fall back to a full managed collection scan. */
+function unsupported(): StorageContractError {
+  return new StorageContractError(StorageContractErrorCode.unsupported, {
+    backend: PgNames.backend
+  })
+}
+/** Actual native embedding text is re-admitted by the original finite-vector owner. */
+function decodeVector(
+  value: unknown,
+  configuration: IStorageVectorConfiguration
+): readonly number[] {
+  try {
+    if (typeof value !== 'string') throw unsupported()
+    const decoded: unknown = JSON.parse(value)
+    if (!Array.isArray(decoded)) throw unsupported()
+    return snapshotStorageVector(decoded, configuration, PgNames.backend)
+  } catch (cause) {
+    throw postgresError(PostgresErrorCode.decodeFailed, cause)
+  }
+}
+/**
+ * Canonical point IDs may contain any supported string code units; native TEXT stores only their
+ * key hex.
+ */
+function pointId(value: unknown): string {
+  const decoded = pgTextKey(value)
+  if (typeof decoded !== 'string') throw postgresError(PostgresErrorCode.decodeFailed)
+  return decoded
+}
+/** Native result buffering is bounded by topK and owned by the original iterator lifetime. */
+function vectorRows<T>(read: () => Promise<readonly T[]>): IStorageIterator<T> {
+  const report = createStorageOperationReporter()
+  let rows: readonly T[] | undefined
+  let index = 0
+  const lifetime = createStorageIteratorLifetime<T>({
+    close: async () => {
+      rows = []
+    },
+    report
+  })
+  return {
+    next: () =>
+      lifetime.advance(async () => {
+        rows ??= await read()
+        return index < rows.length
+          ? { done: false, value: rows[index++]! }
+          : { done: true, value: undefined }
+      }),
+    return: (value) => lifetime.returned(value),
+    dispose: lifetime.dispose,
+    [asyncDisposeKey]: lifetime.symbolic,
+    [Symbol.asyncIterator]() {
+      return this
+    }
+  }
+}
+/** Managed vectors remain native vector(d); all scoring and pre-topK filtering run in PostgreSQL. */
+export function createPgVectors(runtime: IPgVectorRuntime) {
+  const { configuration, tables } = runtime
+  /** Collection metadata uses the original private TEXT codec and one default-org configuration row. */
+  const collection = async (
+    state: IPgState,
+    name: string,
+    options: IStorageVectorConfiguration | undefined
+  ): Promise<IPgVectorCollectionState> => {
+    const extension = (
+      await state.client.query(
+        "SELECT extversion FROM pg_extension WHERE extname='vector'",
+        [],
+        state.ctx
+      )
+    ).rows[0]
+    if (typeof extension?.extversion !== 'string') throw unsupported()
+    const key = pgKey(name).hex
+    let row = (
+      await state.client.query(
+        'SELECT value FROM ' + tables.vectorConfiguration + ' WHERE org_id=$1 AND key=$2',
+        [runtime.defaultOrgId, key],
+        state.ctx
+      )
+    ).rows[0]
+    if (!row) {
+      if (options === undefined) throw invalidArgument()
+      const limit = Number(
+        (await state.client.query('SHOW max_identifier_length', [], state.ctx)).rows[0]
+          ?.max_identifier_length
+      )
+      const available = limit - new TextEncoder().encode(configuration.prefix + '_v').length
+      if (available < 1) throw invalidArgument()
+      const suffix = String(
+        (await state.client.query('SELECT gen_random_uuid()::text AS id', [], state.ctx)).rows[0]
+          ?.id
+      )
+        .replaceAll('-', '')
+        .slice(0, available)
+      const table =
+        quotePgIdentifier(configuration.schema) +
+        '.' +
+        quotePgIdentifier(configuration.prefix + '_v' + suffix)
+      const value = encodePgRecord({ ...options, table })
+      const inserted = await state.client.query(
+        'INSERT INTO ' +
+          tables.vectorConfiguration +
+          ' (org_id,key,value) VALUES($1,$2,$3) ON CONFLICT(org_id,key) DO NOTHING RETURNING value',
+        [runtime.defaultOrgId, key, value],
+        state.ctx
+      )
+      if (inserted.rows.length !== 0) {
+        await state.client.query(
+          'CREATE TABLE ' +
+            table +
+            ' (org_id TEXT NOT NULL,key TEXT COLLATE "C" NOT NULL,embedding vector(' +
+            options.dimensions +
+            ') NOT NULL,payload TEXT,projection jsonb,expires_at timestamptz,PRIMARY KEY(org_id,key))',
+          [],
+          state.ctx
+        )
+        row = inserted.rows[0]
+      } else
+        row = (
+          await state.client.query(
+            'SELECT value FROM ' + tables.vectorConfiguration + ' WHERE org_id=$1 AND key=$2',
+            [runtime.defaultOrgId, key],
+            state.ctx
+          )
+        ).rows[0]
+    }
+    const stored = decodePgRecord<IPgVectorCollectionState>(row?.value)
+    const actual = snapshotStorageVectorCollection(name, stored, PgNames.backend).options!
+    if (
+      typeof stored.table !== 'string' ||
+      (options !== undefined &&
+        (actual.dimensions !== options.dimensions || actual.metric !== options.metric))
+    )
+      throw invalidArgument()
+    const column = (
+      await state.client.query(
+        "SELECT format_type(atttypid,atttypmod) AS type FROM pg_attribute WHERE attrelid=$1::regclass AND attname='embedding'",
+        [stored.table],
+        state.ctx
+      )
+    ).rows[0]?.type
+    if (column !== 'vector(' + actual.dimensions + ')') throw unsupported()
+    return { ...actual, table: stored.table }
+  }
+  /** One native search is the only ranking path for direct and fluent managed queries. */
+  const search = async <T>(
+    state: IPgState,
+    name: string,
+    options: IStorageVectorConfiguration | undefined,
+    query: readonly number[],
+    input: IVectorQueryInput,
+    metric: IStorageVectorConfiguration['metric'] | undefined,
+    exact: boolean,
+    forUpdate = false,
+    excluded: readonly string[] = []
+  ): Promise<readonly (readonly [IStorageKey, IVectorHit<T, boolean>])[]> => {
+    const config = await collection(state, name, options)
+    const selected = metric ?? config.metric
+    const direction = snapshotStorageVector(
+      query,
+      { dimensions: config.dimensions, metric: selected },
+      PgNames.backend
+    )
+    if (exact) await state.client.query('SET LOCAL enable_indexscan=off', [], state.ctx)
+    await observePgRange(state, tables, 'vector')
+    const params: IPgNativeParameter[] = [state.orgId, JSON.stringify(direction)]
+    const predicates = ['org_id=$1', '(expires_at IS NULL OR expires_at>clock_timestamp())']
+    if (excluded.length !== 0) {
+      params.push({ arrayType: 'text', values: excluded.map((id) => pgKey(id).hex) })
+      predicates.push('key<>ALL($' + params.length + '::text[])')
+    }
+    for (const condition of input.conditions) {
+      const translated = pgVectorCondition(condition, params)
+      if (translated === undefined) throw unsupported()
+      predicates.push(translated)
+    }
+    const distance = 'embedding ' + metrics[selected].operator + ' $2::vector'
+    params.push(input.topK)
+    const inner =
+      'SELECT key,payload' +
+      (input.withVector ? ',embedding::text AS vector' : '') +
+      ',' +
+      metrics[selected].score +
+      '(' +
+      distance +
+      ') AS score FROM ' +
+      config.table +
+      ' WHERE ' +
+      predicates.join(' AND ') +
+      ' ORDER BY ' +
+      distance +
+      ',key LIMIT $' +
+      params.length +
+      (forUpdate ? ' FOR UPDATE' : '')
+    let text = 'SELECT * FROM (' + inner + ') AS ranked'
+    if (input.minScore !== undefined) {
+      params.push(input.minScore)
+      text += ' WHERE score>=$' + params.length
+    }
+    text += ' ORDER BY score DESC,key'
+    const rows = (await state.client.query(text, params, state.ctx)).rows
+    await observePgBatch(
+      state,
+      tables,
+      'vector',
+      rows.map((row) => [name, pointId(row.key)])
+    )
+    const result: (readonly [IStorageKey, IVectorHit<T, boolean>])[] = []
+    for (const row of rows) {
+      const id = pointId(row.key)
+      if (typeof row.score !== 'number' || !Number.isFinite(row.score))
+        throw postgresError(PostgresErrorCode.decodeFailed)
+      result.push([
+        id,
+        {
+          id,
+          score: row.score,
+          ...(row.payload == null ? {} : { payload: state.codecs.decodeRecord<T>(row.payload) }),
+          ...(input.withVector ? { vector: decodeVector(row.vector, config) } : {})
+        }
+      ])
+    }
+    return result
+  }
+  /** Samples load only selected IDs and preserve the original shared recommendation algorithm. */
+  const sample = async (
+    state: IPgState,
+    name: string,
+    options: IStorageVectorConfiguration | undefined,
+    ids: readonly string[]
+  ): Promise<readonly (readonly number[])[]> => {
+    const config = await collection(state, name, options)
+    const rows = (
+      await state.client.query(
+        'SELECT key,embedding::text AS vector FROM ' +
+          config.table +
+          ' WHERE org_id=$1 AND key=ANY($2::text[]) AND (expires_at IS NULL OR expires_at>clock_timestamp())',
+        [state.orgId, { arrayType: 'text', values: ids.map((id) => pgKey(id).hex) }],
+        state.ctx
+      )
+    ).rows
+    const byId = new Map(rows.map((row) => [pointId(row.key), decodeVector(row.vector, config)]))
+    return ids.map((id) => {
+      const vector = byId.get(id)
+      if (vector === undefined) throw invalidArgument()
+      return vector
+    })
+  }
+  /** Managed point deletion keeps the original native lock, revision and real affected-row count. */
+  const remove = async (
+    state: IPgState,
+    name: string,
+    config: IPgVectorCollectionState,
+    ids: readonly string[]
+  ): Promise<number> => {
+    const unique = [...new Set(ids)]
+    await observePgBatch(
+      state,
+      tables,
+      'vector',
+      unique.map((id) => [name, id])
+    )
+    await state.guardKeys(unique.map((id) => lockKey.vector(name, id)))
+    const rows = (
+      await state.client.query(
+        'DELETE FROM ' + config.table + ' WHERE org_id=$1 AND key=ANY($2::text[]) RETURNING key',
+        [state.orgId, { arrayType: 'text', values: unique.map((id) => pgKey(id).hex) }],
+        state.ctx
+      )
+    ).rows
+    for (const row of rows) markPgChanged(state, 'vector', [name, pointId(row.key)])
+    return rows.length
+  }
+  /**
+   * The original immutable vector family receives its actual native source and shared client
+   * concerns.
+   */
+  const standard: IVectorApi<true> = {
+    collection<T>(name: string, options?: IStorageVectorConfiguration): IVectorCollection<T, true> {
+      runtime.assertLive()
+      const captured = snapshotStorageVectorCollection(name, options, PgNames.backend)
+      const build = (
+        resolve: (state: IPgState) => Promise<readonly number[]>,
+        metric?: IStorageVectorConfiguration['metric'],
+        exact = false,
+        excluded: readonly string[] = []
+      ) => {
+        const source: import('@migaia/storage-contract').IVectorQuerySource<T, true> = {
+          pushdown: {
+            source: PgNames.backend,
+            operators: [
+              'eq',
+              'ne',
+              'in',
+              'exists',
+              'gt',
+              'gte',
+              'lt',
+              'lte',
+              'between',
+              'has'
+            ] as const,
+            operations: ['where', 'topK', 'minScore'] as const,
+            canPushCondition: (condition: import('@migaia/storage-contract').IQueryCondition) =>
+              pgVectorCondition(condition, []) !== undefined
+          },
+          asyncDisposeKey,
+          groupBy: true as const,
+          exact,
+          execute: (input: IVectorQueryInput) =>
+            vectorRows(() =>
+              runtime.run('vector.search', input.ctx, async (state) =>
+                search<T>(
+                  state,
+                  name,
+                  captured.options,
+                  await resolve(state),
+                  input,
+                  metric,
+                  exact,
+                  false,
+                  excluded
+                )
+              )
+            ),
+          mutate: (
+            request: import('@migaia/storage-contract').IQueryDelete,
+            run: Parameters<
+              NonNullable<import('@migaia/storage-contract').IVectorQuerySource<T>['mutate']>
+            >[1]
+          ) =>
+            runtime.run(
+              'vector.delete',
+              {
+                ...request.ctx,
+                ...(request.concurrency === undefined ? {} : { concurrency: request.concurrency })
+              },
+              async (state) =>
+                run({
+                  execute: (input) =>
+                    vectorRows(async () =>
+                      search<T>(
+                        state,
+                        name,
+                        captured.options,
+                        await resolve(state),
+                        input,
+                        metric,
+                        exact,
+                        true,
+                        excluded
+                      )
+                    ),
+                  accept: async (_key, hit) =>
+                    remove(state, name, await collection(state, name, captured.options), [
+                      hit.id
+                    ]).then((count) => count !== 0)
+                })
+            ),
+          ...(configuration.server === 'postgres'
+            ? { watch: (input: IVectorQueryInput) => runtime.watch(input.ctx) }
+            : {})
+        }
+        return createVectorQuery<T, true>(source, runtime.methods())
+      }
+      return {
+        near(query, options) {
+          const { metric, exact = false } = options ?? {}
+          if (exact !== true && exact !== false) throw invalidArgument()
+          const direction = snapshotStorageVector(
+            query,
+            { ...captured.options, ...(metric === undefined ? {} : { metric }) },
+            PgNames.backend
+          )
+          return build(async () => direction, metric, exact)
+        },
+        similarTo(id) {
+          if (typeof id !== 'string') throw invalidArgument()
+          return build(
+            async (state) => (await sample(state, name, captured.options, [id]))[0]!,
+            undefined,
+            false,
+            [id]
+          )
+        },
+        recommend(examples) {
+          const { positive, negative = [] } = examples
+          const positives = [...positive]
+          const negatives = [...negative]
+          if (
+            positives.length === 0 ||
+            [...positives, ...negatives].some((id) => typeof id !== 'string') ||
+            new Set([...positives, ...negatives]).size !== positives.length + negatives.length
+          )
+            throw invalidArgument()
+          return build(
+            async (state) => {
+              const good = await sample(state, name, captured.options, positives)
+              const bad = await sample(state, name, captured.options, negatives)
+              return recommendStorageVector([good[0]!, ...good.slice(1)], bad)
+            },
+            undefined,
+            false,
+            [...positives, ...negatives]
+          )
+        },
+        async upsert(points, ctx) {
+          const prepared = snapshotStorageVectorUpsert(points, captured.options, PgNames.backend)
+          const { ttlMs, ...options } = ctx ?? {}
+          if (ttlMs !== undefined) assertStorageTtlDuration(ttlMs, PgNames.backend)
+          if (prepared.length === 0) return
+          await runtime.run('vector.upsert', options, async (state) => {
+            const config = await collection(state, name, captured.options)
+            for (const point of prepared)
+              snapshotStorageVector(point.vector, config, PgNames.backend)
+            await state.guardKeys(prepared.map((point) => lockKey.vector(name, point.id)))
+            await observePgBatch(
+              state,
+              tables,
+              'vector',
+              prepared.map((point) => [name, point.id])
+            )
+            await state.client.query(
+              'INSERT INTO ' +
+                config.table +
+                ' (org_id,key,embedding,payload,projection,expires_at) SELECT $1,input.key,input.embedding::vector,input.payload,input.projection::jsonb,' +
+                (ttlMs === undefined ? 'NULL' : "clock.now+($6::float8*interval '1 millisecond')") +
+                ' FROM unnest($2::text[],$3::text[],$4::text[],$5::text[]) AS input(key,embedding,payload,projection) CROSS JOIN (SELECT clock_timestamp() AS now) AS clock ON CONFLICT(org_id,key) DO UPDATE SET embedding=excluded.embedding,payload=excluded.payload,projection=excluded.projection,expires_at=' +
+                (ttlMs === undefined
+                  ? 'CASE WHEN ' +
+                    config.table +
+                    '.expires_at<=clock_timestamp() THEN NULL ELSE ' +
+                    config.table +
+                    '.expires_at END'
+                  : 'excluded.expires_at'),
+              [
+                state.orgId,
+                { arrayType: 'text', values: prepared.map((point) => pgKey(point.id).hex) },
+                {
+                  arrayType: 'text',
+                  values: prepared.map((point) => JSON.stringify(point.vector))
+                },
+                {
+                  arrayType: 'text',
+                  values: prepared.map((point) =>
+                    point.payload === undefined ? null : state.codecs.encodeRecord(point.payload)
+                  )
+                },
+                {
+                  arrayType: 'text',
+                  values: prepared.map((point) =>
+                    point.payload === undefined
+                      ? null
+                      : JSON.stringify(pgVectorProjection(point.payload))
+                  )
+                },
+                ...(ttlMs === undefined ? [] : [ttlMs])
+              ],
+              state.ctx
+            )
+            for (const point of prepared) markPgChanged(state, 'vector', [name, point.id])
+          })
+        },
+        async delete(ids, ctx) {
+          const prepared = [...ids]
+          if (prepared.some((id) => typeof id !== 'string')) throw invalidArgument()
+          if (prepared.length === 0) return
+          await runtime.run('vector.delete', ctx, async (state) => {
+            await remove(state, name, await collection(state, name, captured.options), prepared)
+          })
+        },
+        async deleteWhere(where, ctx) {
+          if (typeof where === 'function') throw unsupported()
+          const condition = snapshotStorageWhere(where)
+          const { count = DeleteCountMode.precount, ...options } = ctx ?? {}
+          if (count !== DeleteCountMode.precount && count !== DeleteCountMode.scroll)
+            throw invalidArgument()
+          if (pgVectorCondition(condition, []) === undefined) throw unsupported()
+          return runtime.run('vector.deleteWhere', options, async (state) => {
+            const config = await collection(state, name, captured.options)
+            await observePgRange(state, tables, 'vector')
+            const params: IPgNativeParameter[] = [state.orgId]
+            const translated = pgVectorCondition(condition, params)!
+            const rows = (
+              await state.client.query(
+                'SELECT key FROM ' +
+                  config.table +
+                  ' WHERE org_id=$1 AND ' +
+                  translated +
+                  ' FOR UPDATE',
+                params,
+                state.ctx
+              )
+            ).rows
+            const ids = rows.map((row) => pointId(row.key))
+            await observePgBatch(
+              state,
+              tables,
+              'vector',
+              ids.map((id) => [name, id])
+            )
+            await state.guardKeys(ids.map((id) => lockKey.vector(name, id)))
+            const removed = (
+              await state.client.query(
+                'DELETE FROM ' +
+                  config.table +
+                  ' WHERE org_id=$1 AND ' +
+                  translated +
+                  ' RETURNING key',
+                params,
+                state.ctx
+              )
+            ).rows
+            for (const row of removed) markPgChanged(state, 'vector', [name, pointId(row.key)])
+            return removed.length
+          })
+        },
+        async search(query, options, ctx) {
+          const prepared = snapshotStorageVectorSearch(
+            query,
+            options,
+            captured.options,
+            PgNames.backend
+          )
+          if (prepared.options.k === 0) return []
+          const conditions =
+            prepared.options.filter === undefined ? [] : [pgVectorFilter(prepared.options.filter)]
+          if (conditions.some((condition) => pgVectorCondition(condition, []) === undefined))
+            throw unsupported()
+          const rows = await runtime.run('vector.search', ctx, (state) =>
+            search<T>(
+              state,
+              name,
+              captured.options,
+              prepared.query,
+              { conditions, topK: prepared.options.k, minScore: undefined, withVector: false, ctx },
+              undefined,
+              prepared.options.exact
+            )
+          )
+          return rows.map(([, hit]) => ({
+            id: hit.id,
+            score: hit.score,
+            ...(prepared.options.withPayload && hit.payload !== undefined
+              ? { payload: hit.payload }
+              : {})
+          }))
+        }
+      }
+    }
+  }
+  return {
+    standard,
+    collection,
+    search,
+    remove,
+    async deadline(
+      state: IPgState,
+      target: Extract<ITtlTarget, { channel: 'vector' }>,
+      ms?: number,
+      persist = false
+    ): Promise<number | boolean | undefined> {
+      const config = await collection(state, target.collection, undefined)
+      await observePgRevision(state, tables, 'vector', [target.collection, target.id])
+      await state.guardKeys([target])
+      const key = pgKey(target.id).hex
+      const expired = (
+        await state.client.query(
+          'DELETE FROM ' +
+            config.table +
+            ' WHERE org_id=$1 AND key=$2 AND expires_at<=clock_timestamp() RETURNING key',
+          [state.orgId, key],
+          state.ctx
+        )
+      ).rowCount
+      if (expired) markPgChanged(state, 'vector', [target.collection, target.id])
+      if (ms === undefined && !persist) {
+        const row = (
+          await state.client.query(
+            'SELECT CASE WHEN expires_at IS NULL THEN NULL ELSE GREATEST(0,extract(epoch FROM (expires_at-clock_timestamp()))*1000) END AS remaining FROM ' +
+              config.table +
+              ' WHERE org_id=$1 AND key=$2',
+            [state.orgId, key],
+            state.ctx
+          )
+        ).rows[0]
+        return row?.remaining == null ? undefined : Number(row.remaining)
+      }
+      const changed = (
+        await state.client.query(
+          'UPDATE ' +
+            config.table +
+            ' SET expires_at=' +
+            (persist ? 'NULL' : "clock_timestamp()+($3::float8*interval '1 millisecond')") +
+            ' WHERE org_id=$1 AND key=$2' +
+            (persist ? ' AND expires_at IS NOT NULL' : '') +
+            ' RETURNING key',
+          [state.orgId, key, ...(persist ? [] : [ms!])],
+          state.ctx
+        )
+      ).rowCount
+      if (changed) markPgChanged(state, 'vector', [target.collection, target.id])
+      return changed !== 0
+    }
+  }
+}
