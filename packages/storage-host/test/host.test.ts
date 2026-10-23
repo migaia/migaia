@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
+import { deferred } from '@migaia/utils/promise'
 import {
   createStorageHost,
+  StorageHostFacade,
   definePlugin,
   defineFeature,
   defineStorageBackendKind,
@@ -245,5 +247,129 @@ describe('neutral storage installation', () => {
     await expect(symbolic).resolves.toBeUndefined()
     expect(host.dispose()).toBe(primary)
     expect(report).toHaveBeenCalledExactlyOnceWith(failure)
+  })
+  it.each([false, true])(
+    'cleans an admitted mismatched store once when cleanup rejects: %s',
+    async (failCleanup) => {
+      /** Secondary cleanup failure must reach the existing reporter without replacing admission. */
+      const cleanupError = new Error('rollback cleanup failed')
+      /** The backend kind describes the intended store, independently of a wrong returned label. */
+      const expected = defineStorageBackendKind<IStorageBase>()('expected')
+      /** Original receiver and call count prove the actual admitted disposer was registered. */
+      const cleanup = vi.fn(function (this: IStorageBase) {
+        expect(this.backend).toBe('other')
+        return failCleanup ? Promise.reject(cleanupError) : Promise.resolve()
+      })
+      /** The host owns only resources handed over after shape admission. */
+      const report = vi.fn()
+      /** A fresh base shape deliberately has a valid but mismatched backend label. */
+      const descriptor = (core: IStoragePluginCore) => ({
+        kind: expected,
+        featureExpose: () => ({ getClient: () => undefined }),
+        install: () => {
+          core.registerStore({
+            backend: 'other',
+            capabilities: {
+              syncRead: false,
+              binary: false,
+              records: false,
+              transactions: false,
+              iteration: false,
+              secondaryIndexes: false,
+              changeFeed: false,
+              maxValueBytes: undefined,
+              opaqueEntries: false
+            },
+            dispose: cleanup,
+            [Symbol.asyncDispose]: () => Promise.resolve()
+          })
+          return {}
+        }
+      })
+      /** Installation must remain atomic even though the constructed resource is valid. */
+      const failure = await createStorageHost({
+        plugins: [definePlugin('wrong', descriptor)],
+        report
+      }).catch((error) => error)
+      expect(failure).toMatchObject({
+        source: '@migaia/storage-host',
+        code: 'BACKEND_INSTALL_FAILED'
+      })
+      /** Walk only the bounded existing cause chain to identify the primary semantic rejection. */
+      let cursor: unknown = failure
+      /** Native install and facade wrappers add a finite number of ownership boundaries. */
+      const codes: string[] = []
+      for (let depth = 0; depth < 8 && cursor instanceof Error; depth += 1) {
+        if ('code' in cursor) codes.push(String(cursor.code))
+        cursor = cursor.cause
+      }
+      expect(codes).toContain('BACKEND_KIND_MISMATCH')
+      expect(cleanup).toHaveBeenCalledTimes(1)
+      if (failCleanup) expect(report).toHaveBeenCalledExactlyOnceWith(cleanupError)
+      else expect(report).not.toHaveBeenCalled()
+    }
+  )
+  it('uses the single captured disposer when a late store loses its batch', async () => {
+    /** Pause the actual install before its ownership handoff. */
+    const entered = deferred<void>()
+    /** Resume only after the host has sealed the original batch. */
+    const resume = deferred<void>()
+    /** A changing getter would select the wrong cleanup if admission were repeated. */
+    let reads = 0
+    /** This is the original function and receiver captured by the successful base snapshot. */
+    const original = vi.fn(function (this: IStorageBase) {
+      expect(this.backend).toBe('late')
+      return Promise.resolve()
+    })
+    /** A second read must never replace the original captured disposer. */
+    const replacement = vi.fn(() => Promise.resolve())
+    /** The test observes expected late rejection diagnostics without changing cleanup. */
+    const report = vi.fn()
+    /** The kind and returned store agree; only the closing batch invalidates handoff. */
+    const lateKind = defineStorageBackendKind<IStorageBase>()('late')
+    /** One host owns the actual asynchronous install and its cancellation signal. */
+    const host = new StorageHostFacade({ report })
+    /** The getter is legal input to contract single-read admission. */
+    const store: IStorageBase = {
+      backend: 'late',
+      capabilities: {
+        syncRead: false,
+        binary: false,
+        records: false,
+        transactions: false,
+        iteration: false,
+        secondaryIndexes: false,
+        changeFeed: false,
+        maxValueBytes: undefined,
+        opaqueEntries: false
+      },
+      get dispose() {
+        reads += 1
+        return reads === 1 ? original : replacement
+      },
+      [Symbol.asyncDispose]: () => Promise.resolve()
+    }
+    /** The backend returns its actual resource after its original install has expired. */
+    const descriptor = (core: IStoragePluginCore) => ({
+      kind: lateKind,
+      featureExpose: () => ({ getClient: () => undefined }),
+      install: async () => {
+        entered.resolve()
+        await resume.promise
+        core.registerStore(store)
+        return {}
+      }
+    })
+    /** Observe the install failure immediately so cancellation cannot create an unhandled rejection. */
+    const installing = host.use(definePlugin('late', descriptor)).catch((error) => error)
+    await entered.promise
+    /** Closing wins publication authority while the backend's actual work remains pending. */
+    const closing = host.dispose()
+    await installing
+    resume.resolve()
+    await closing
+    expect(reads).toBe(1)
+    expect(original).toHaveBeenCalledTimes(1)
+    expect(replacement).not.toHaveBeenCalled()
   })
 })

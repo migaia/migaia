@@ -1,6 +1,7 @@
 import {
   defineHost,
   asyncDisposeKey,
+  PluginHostErrorCode,
   getPluginRuntimeIntegration,
   type IHostHandle,
   type IPluginHostOptions,
@@ -23,7 +24,7 @@ import { StorageErrorText } from './error-text.js'
 import { readStorageNativePluginDefinition, readStorageNativePluginMetadata } from './contracts.js'
 import { forwardStorageExecution } from './execution.js'
 import { createStorageStoreCell, type IStorageStoreCell } from './store-cell.js'
-import type { IStorageBase } from '@migaia/storage-contract'
+import type { IStorageBase, IStorageBaseAdmission } from '@migaia/storage-contract'
 import type {
   IStorageBackendPluginHandle,
   IStorageHost,
@@ -262,7 +263,14 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
       pipeline: { mode: 'async' },
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
       scheduler: this.#scheduler,
-      diagnostic: (_message) => {}
+      diagnostic: (_message, code, error) => {
+        // Provisional rollback returns original cleanup failures through its existing diagnostic.
+        if (
+          code === PluginHostErrorCode.pluginInstallRollbackFailed &&
+          error instanceof AggregateError
+        )
+          for (const failure of error.errors) this.#report(failure)
+      }
     })
   }
 
@@ -391,13 +399,8 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
                 StorageErrorText.backendPluginInvalid,
                 snapshot.cause
               )
-            if (kind === undefined || snapshot.backend !== kind.name)
-              throw createStorageTypeError(
-                StorageErrorCode.backendKindMismatch,
-                StorageErrorText.backendKindMismatch
-              )
             if (!batchToken.active || this.#activeBatchToken !== batchToken) {
-              void this.#disposeLateStore(snapshot.store)
+              void this.#disposeLateStore(snapshot)
               throw new StorageError(
                 StorageErrorCode.storageHostDisposed,
                 {},
@@ -407,9 +410,14 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
             try {
               core.onDispose(() => Reflect.apply(snapshot.dispose, snapshot.receiver, []))
             } catch (error) {
-              void this.#disposeLateStore(snapshot.store)
+              void this.#disposeLateStore(snapshot)
               throw error
             }
+            if (kind === undefined || snapshot.backend !== kind.name)
+              throw createStorageTypeError(
+                StorageErrorCode.backendKindMismatch,
+                StorageErrorText.backendKindMismatch
+              )
             storeCell.set(snapshot.store)
           }
         }
@@ -586,19 +594,9 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
   }
 
   /** Best-effort cleanup for a factory value that lost publication ownership. */
-  async #disposeLateStore(value: unknown): Promise<void> {
-    /** Use contract-owned admission and its captured original disposal receiver. */
-    const snapshot = snapshotStorageBaseDetailed(value, { asyncDisposeKey })
-    if (!snapshot.valid) {
-      this.#report(
-        createStorageTypeError(
-          StorageErrorCode.backendPluginInvalid,
-          StorageErrorText.backendPluginInvalid,
-          snapshot.cause
-        )
-      )
-      return
-    }
+  async #disposeLateStore(
+    snapshot: Extract<IStorageBaseAdmission, { readonly valid: true }>
+  ): Promise<void> {
     try {
       await Reflect.apply(snapshot.dispose, snapshot.receiver, [])
     } catch (error) {
