@@ -13,9 +13,11 @@ import type {
   IRecordsApi,
   IConcurrencyPolicy,
   ILockHolding,
-  ISyncCapableStore
+  ISyncCapableStore,
+  ITtlApi,
+  ICounterApi
 } from '@migaia/storage-contract'
-import { kv, records, sql } from '@migaia/storage-contract'
+import { kv, records, sql, ttl, counter } from '@migaia/storage-contract'
 /** SQLite columns exclude booleans; SQL inputs still accept booleans and bind them as integers. */
 export type ISqliteValue = Exclude<ISqlValue, boolean>
 /** Native dynamic rows preserve exact integers and copied binary values. */
@@ -35,7 +37,12 @@ export type ISqliteStatement = {
 /** Creating callers alone own the native connection resource. */
 export type ISqliteConnection = ISqliteDriver & IStorageResource
 /** Only capabilities with actual published implementations appear in the current slice. */
-export type ISqliteCapabilities = typeof kv | typeof records | typeof sql
+export type ISqliteCapabilities =
+  | typeof kv
+  | typeof records
+  | typeof sql
+  | typeof ttl
+  | typeof counter
 /** Complete original scope retains the same connection's native SQL executor. */
 export type ISqliteTransactionScope<TValue = unknown> = ITransactionScope<
   TValue,
@@ -64,7 +71,9 @@ export type ISqliteStore<TValue = unknown> = ICapabilityStore<
   readonly [
     ICapabilityImpl<typeof kv>,
     ICapabilityImpl<typeof records, IRecordsApi<TValue>>,
-    ICapabilityImpl<typeof sql, ISqliteExecutor>
+    ICapabilityImpl<typeof sql, ISqliteExecutor>,
+    ICapabilityImpl<typeof ttl, ITtlApi>,
+    ICapabilityImpl<typeof counter, ICounterApi>
   ]
 >
 /** Driver is exclusive to one store until that store has fully drained. */

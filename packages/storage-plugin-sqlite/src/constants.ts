@@ -52,7 +52,11 @@ export const SqliteOperation = {
   getMany: 'getMany',
   setMany: 'setMany',
   removeMany: 'removeMany',
-  removeByPrefix: 'removeByPrefix'
+  removeByPrefix: 'removeByPrefix',
+  ttlExpire: 'ttl.expire',
+  ttlRemaining: 'ttl.remaining',
+  ttlPersist: 'ttl.persist',
+  counterIncrement: 'counter.increment'
 } as const
 /** Quote one complete physical identifier; caller values are always separately bound. */
 export function quoteSqliteIdentifier(value: string): string {

@@ -155,3 +155,11 @@ The standard `sql` token exposes the same native tag as `storage.use(sql).sql`.
 Inside transactions, `tx.use(sql).sql` binds the current short view through the original owner.
 Native results, exact root row types and SQLite's required `lastInsertRowid` remain intact;
 there is no second budget or compiler.
+
+The standard `ttl` capability provides expire, remaining and persist for text, bytes and records
+using local Date.now. Deadlines and values share the native transaction; live overwrites retain
+deadlines, while deletion, clear and replacement remove them. Reads, enumeration and queries
+lazily reclaim expired rows through the original native mutation path without a timer.
+The standard `counter.increment` validates canonical decimal text and safe integers before an
+atomic native text update. Missing values start at 0; malformed text, invalid deltas and overflow
+reject before writing. Both capabilities support tx.use on the original native scope.

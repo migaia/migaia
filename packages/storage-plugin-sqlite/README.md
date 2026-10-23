@@ -121,3 +121,9 @@ TRANSACTION_FAILED、DUPLICATE_KEY 或 DECODE_FAILED。原生/codec 错误保留
 显式 dispose 重复返回同一 Promise；符号释放使用不同的缓存 Promise，报告失败后
 成功，共享一次真实清理。始终先释放 host/store，再释放调用方拥有的 connection。
 清理失败后 store 仍然终止。
+
+标准 `ttl` 为 text/bytes/records 提供 expire、remaining、persist，使用本地 Date.now。
+期限与值同一原生事务写入；覆盖活值保留期限，删除/clear/替换清除旧期限。
+读取、枚举和查询沿原生写路径惰性回收到期行，不启动 timer。
+标准 `counter.increment` 在同一原生文本事务内验证规范十进制与安全整数后更新，
+缺失从 0 开始；非法文本、非法增量和溢出在写入前拒绝。两项能力均支持 tx.use。
