@@ -669,7 +669,7 @@ function totals(execute: IRecordQuerySource['execute']) {
 }
 ```
 
-传入的游标必须是真实后端资源；当 paid total 为 120、50 时，totals 返回 `[{total:120}]` 并等待清理。排序、分页、写入、统计、watch 与 vector/RDF 方法尚不属于本实现切片。
+传入的游标必须是真实后端资源；当 paid total 为 120、50 时，totals 返回 `[{total:120}]` 并等待清理。完整方法与当前限制见后文。
 
 ### 标准 records 能力
 
@@ -782,7 +782,7 @@ SPARQL 通过纯 sparqlFragment 与原生 sparql 能力复用规范 RDF 项。�
 
 `createVectorQuery<TPayload,TGroupable>(source, methods?)` 返回不可变 builder；声明正安全整数 `topK(k)` 后才有读取终点。原生 execute 接收 `IVectorQueryInput`：全部可译 payload conditions、最终 topK/minScore、withVector 与原 context。声明式条件跨函数谓词下推，org/TTL 仍由后端在排名前处理；函数只过滤原引擎命中，不补搜。withVector 缺省 false，显式开启后结果类型才包含 vector。exact:true 的 explain 标记 fullScan。groupBy:true 才提供标准分组，在原 topK 命中上单遍按 payload 自有标量字段分组，每组保留 perGroup 个原序命中。
 
-`createRdfQuery(source, pattern, methods?)` 捕获规范 ground pattern，保留省略 graph 的全 graph 语义。原生 execute 接收 `IRdfQueryInput`，其有序 steps 保留 where/follow/inverse/select 的原调用顺序；execute 的原生行载体为 unknown，实际 select 可返回 Pick 投影，无须伪装完整 quad；follow/inverse 只接受 ground IRI。当前读取单元提供原生安全前缀遍历与普通 limit；当前不能在客户端执行的遍历在 I/O 前拒绝 QUERY_NOT_PUSHABLE。RDF 客户端遍历、分页与写终点由后续单元补齐。
+`createRdfQuery(source, pattern, methods?)` 捕获规范 ground pattern，保留省略 graph 的全 graph 语义。原生 execute 接收 `IRdfQueryInput`，其有序 steps 保留 where/follow/inverse/select 的原调用顺序；execute 的原生行载体为 unknown，实际 select 可返回 Pick 投影，无须伪装完整 quad；follow/inverse 只接受 ground IRI。当前读取单元提供原生安全前缀遍历与普通 limit；当前不能在客户端执行的遍历在 I/O 前拒绝 QUERY_NOT_PUSHABLE。RDF 客户端遍历与写终点由后续单元补齐；分页见后文。
 
 两个作者入口复用记录查询的同一节点、planner、reader 与原 IStorageIterator，保留 asyncDisposeKey、取消、事务资源与清理首错。可选纯方法保留原函数引用；`VectorQueryMethod` 与 `RdfQueryMethod` 为同名冲突的规范保留表。
 
@@ -803,3 +803,13 @@ RDF add/delete/match 沿同一规范 ground IQuad owner。支持事务的 provid
 原生数据源显式提供 `nativeSteps:true` 后，原 execute 才接收有序 `IQueryNativeStep`（where/select/limit/skip/distinct），并按原声明顺序执行其真实支持的前缀；steps 是执行顺序的依据，兼容保留的 conditions/fields 不可再次乱序应用。未选择此端口的旧源保持原 execute 三字段参数及原客户端 limit 行为。原生 distinct 声明须兑现相同字段身份语义，不能把结构等值冒充对象身份。RDF 也显式选择扩展原生控制，原有遍历 steps 形状不变。事务的这些派生分支沿原包装投影，仍复用完整终端的同一 operation 准入。
 
 向量后端在原生调用前复用 `snapshotStorageVectorCollection`、`snapshotStorageVector`、`snapshotStorageVectorUpsert`、`snapshotStorageVectorFilter` 与 `snapshotStorageVectorSearch`。它们捕获配置、有限分量、全批点及便携 payload、过滤 AST 和搜索选项，非法输入报 `INVALID_ARGUMENT` 并保留原 cause。省略 collection 配置不创建缺省维度；同名配置解析、策略、上下文、检索和关闭仍由实际后端负责。upsert 重复 ID 采用最后一项；payload 经 serialize 投影自有可枚举字段。`k: 0` 也先验证输入；评分、过滤执行和排名不属于这些 helper。
+
+### 键集分页
+
+记录与 RDF 的 `page(size, ctx?)` 返回 `{ items, next? }`；`after(next)` 继续相同源、条件与排序。size 必须为正安全整数。未显式排序时使用规范主键顺序，selector 排序以原主键决胜。分页读取一条额外命中判断 next，函数映射只处理实际返回的 items，清理与回调仍属于原资源 operation。删除上一页记录不会使游标退回 offset；扫描期间新增记录遵循当前排序锚点，不提供跨页快照。
+
+游标是进程内只读值，私有字段拒绝伪造与 Reflect 属性副本；不返回源、store、注册或关闭句柄。可选只读 `cursorSource` 在创建查询时单读，缺省为原 source 对象；同 collection 的新描述器需复用同一身份。后端须为不同 collection/index/组织隔离域使用不同身份。游标还匹配 source/index/key-tail 元数据、ctx.orgId、RDF ground pattern、有序条件/predicate、排序、distinct 与遍历；函数按原引用比较，不序列化闭包。投影/mapper、limit/skip、页大小和执行预算可变。不匹配在任何新 I/O 前报 INVALID_ARGUMENT。
+
+新 keyset 执行中，条件、selector 排序与 distinct 在 after 之前，limit/skip 是其后的页控制；原来没有 page/after 的链保持声明顺序。comparator 的 after 在原 comparator+limit 有界堆之前比较，游标锚点使用 utils 原 structuredClone 快照域，不增加无界排序。`query.after(next).limit(2).all()` 返回锚点之后的两条。
+
+原 `nativeSteps:true` 端口扩展主键 `order` 与 `{operation:'after',key,direction}`；后端仅声明其真实索引 seek 支持。具有相应索引的原 execute 可做 O(log n + 页大小) seek；共享 fallback 明确保留客户端排序/过滤成本，strict 会在 I/O 前拒绝。向量查询没有 page/after。

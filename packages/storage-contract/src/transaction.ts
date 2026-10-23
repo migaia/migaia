@@ -971,7 +971,8 @@ function transactionQueryReads<R>(scope: object, query: IQueryResult<R, undefine
     [RecordQueryMethod.min, 1],
     [RecordQueryMethod.max, 1],
     [RecordQueryMethod.sum, 1],
-    [RecordQueryMethod.avg, 1]
+    [RecordQueryMethod.avg, 1],
+    [RecordQueryMethod.page, 1]
   ] as const
   /** These wrappers borrow the immutable query rather than copying its nodes or owning execution. */
   const reads: Record<string, unknown> = {}
@@ -1019,7 +1020,8 @@ const transactionQueryBranchMethods = [
   RecordQueryMethod.limit,
   RecordQueryMethod.skip,
   RecordQueryMethod.distinct,
-  RecordQueryMethod.orderBy
+  RecordQueryMethod.orderBy,
+  RecordQueryMethod.after
 ] as const
 /** Preserves the actual immutable query and every typed branch; only terminal admission is added. */
 function transactionRecordQuery<TQuery extends IQueryResult<unknown, undefined>>(
