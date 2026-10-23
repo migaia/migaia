@@ -12,6 +12,7 @@ import {
   snapshotStorageKeyPrefix,
   snapshotConcurrencyLockKeys,
   snapshotConcurrencyLockRange,
+  readConcurrencyLockIdentities,
   lockKey,
   type ITransactionRecordsApi,
   assertTransactionCallback,
@@ -24,6 +25,7 @@ import {
   kv,
   records,
   type IKeyValueApi,
+  type ITransactionKeyValueApi,
   type IStorageKey,
   type IStorageIterator,
   type ITransactionScope,
@@ -66,6 +68,7 @@ import { isStorageErrorFamily } from '../core/error-family.js'
 import { resolveStorageNamespace } from '../core/namespace.js'
 import { throwIfAborted, mergeSignals, withAbort } from '../core/operation.js'
 import { createStorageOperationReporter, reportCleanupError } from '../core/operation-reporter.js'
+import { readStorageHookFailureCode } from '../hooks.js'
 
 /** Memory options retain one private data universe for this concrete plugin instance. */
 export type IMemoryOptions = {
@@ -119,6 +122,20 @@ type IMemoryRootMutation<R> = {
   }[]
   run(): R
 }
+/** Text batches retain detached canonical keys and prepared values before lock admission. */
+type IMemoryTextEntry = { readonly key: IStorageKey; readonly value: string }
+/** Only original native draft functions are passed to an internal batch callback. */
+type IMemoryTextDraft = {
+  setMany(entries: readonly IMemoryTextEntry[]): void
+  removeMany(keys: readonly IStorageKey[]): number
+  removeByPrefix(prefix: IStorageKey): number
+}
+/** One prepared batch reuses the original transaction attempt and its fixed input locks. */
+type IMemoryAtomicWork<T, R> = {
+  readonly keys?: readonly ILockKey[]
+  readonly ranges?: IMemoryRootMutation<unknown>['ranges']
+  readonly invoke: (scope: IMemoryScope<T>, draft: IMemoryTextDraft) => R
+}
 
 /** Create the real native backend only from its original installed core. */
 export function createMemoryBackend<T = unknown>(
@@ -149,6 +166,8 @@ export function createMemoryBackend<T = unknown>(
   const locks = core.createKeyLockPort()
   /** Original cleanup diagnostics never alter the committed data result. */
   const report = createStorageOperationReporter()
+  /** Native deadlines and operation durations share the scheduler already captured by this host. */
+  const scheduler = core.featureExpose.getScheduler()
   /** Symbol cleanup retains its own cached derivative of the controller's primary Promise. */
   let symbolic: Promise<void> | undefined
   /** Capabilities are published on the original mutable base, with one captured installer. */
@@ -473,6 +492,121 @@ export function createMemoryBackend<T = unknown>(
       withAbort(ctx, async () => run(captured))
     )
 
+  /** New root batch admission keeps borrowed accessor failures on the contract error chain. */
+  const captureBatch = <R>(capture: () => R): R => {
+    try {
+      return capture()
+    } catch (cause) {
+      if (isStorageErrorFamily(cause)) throw cause
+      throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
+        backend: STORAGE_MEMORY_BACKEND,
+        cause
+      })
+    }
+  }
+  /** Empty batches have no pipeline or native transaction, while resource expiry still applies. */
+  const emptyBatch = (input: readonly unknown[]): boolean => {
+    controller.assertLive()
+    return captureBatch(() => {
+      if (!Array.isArray(input))
+        throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
+          backend: STORAGE_MEMORY_BACKEND
+        })
+      return input.length === 0
+    })
+  }
+  /** One high-level batch reports one observation without exposing per-key native work. */
+  const observeBatch = async <R>(
+    operation: string,
+    count: number,
+    invoke: () => R | Promise<R>,
+    scope?: IMemoryScope<T>
+  ): Promise<R> => {
+    /** Observation remains on the original registration and authentic transaction view. */
+    const root = core.stageBindings.operationStages(store)
+    /** A scoped observer captures its real transaction identity before that view expires. */
+    const stages = scope === undefined ? root : root.forTransaction(scope)
+    /** The original scheduler measures the entire pipeline and native settlement. */
+    const started = scheduler.now()
+    void stages.beforeStorageOperation?.(operation)
+    try {
+      /** The actual pipeline or original draft callback runs once for this batch terminal. */
+      const result = await invoke()
+      void stages.afterStorageOperation?.(
+        operation,
+        Math.max(0, scheduler.now() - started),
+        typeof result === 'number' ? result : count
+      )
+      return result
+    } catch (error) {
+      void stages.onStorageOperationError?.(
+        operation,
+        readStorageHookFailureCode(error, stages.report)
+      )
+      throw error
+    }
+  }
+  /** Both root and scoped batches capture the same keys and reject duplicates before staging. */
+  const captureTextEntries = (
+    entries: Parameters<ITransactionKeyValueApi['setMany']>[0]
+  ): readonly IMemoryTextEntry[] => {
+    /** Identity uses the existing native text map encoding, including structural key equivalence. */
+    const seen = new Set<string>()
+    return entries.map((entry) => {
+      /** Borrowed fields and payload detach once before a policy can wait or a draft can change. */
+      const key = snapshotStorageKey(entry.key, STORAGE_MEMORY_BACKEND)
+      /** Duplicate detection shares the physical identity used by all ordinary text methods. */
+      const encoded = encodeFlatStorageKey(key)
+      if (seen.has(encoded))
+        throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
+          backend: STORAGE_MEMORY_BACKEND
+        })
+      seen.add(encoded)
+      if (entry.ttlMs !== undefined)
+        throw new StorageContractError(StorageContractErrorCode.unsupported, {
+          backend: STORAGE_MEMORY_BACKEND
+        })
+      return { key, value: prepare('value', entry.value, key) as string }
+    })
+  }
+  /** Public transactions and native batches use one original loop, pipeline and attempt owner. */
+  const atomicEntry = <I, R>(
+    operation: string,
+    input: (context: IOperationContextSnapshot) => I,
+    ctx: ITransactionOptions | undefined,
+    prepare: (captured: I) => IMemoryAtomicWork<T, R>
+  ): Promise<Awaited<R>> => {
+    /** One accepted lifetime spans every real attempt and all original pipeline settlement. */
+    let release: (() => void) | undefined
+    /** Each pipeline fixes this attempt's original callback or detached native batch. */
+    let work: IMemoryAtomicWork<T, R>
+    return runWithConcurrency<Awaited<R>>(
+      {
+        store: base,
+        options: ctx === undefined ? {} : ctx,
+        executeAttempt: (context, invoke) =>
+          core.execution.run({ operation, input: input(context), ctx: context }, (captured) => {
+            controller.assertLive()
+            work = prepare(captured)
+            release ??= controller.beginMutation()
+            return invoke()
+          }),
+        lock: () => work.keys ?? []
+      },
+      {
+        attempt: (attempt) =>
+          locks.attempt(
+            attempt,
+            holding(),
+            { attempt: () => transact(work.invoke, attempt, work.ranges) },
+            core.stageBindings.concurrencyStages(store),
+            controller.closingSignal,
+            work.ranges
+          )
+      }
+    ).finally(() => release?.())
+  }
+
   /** Native store construction keeps public sync methods separate from internal asynchronous calls. */
   const base: IMemoryBase<T> = {
     backend: STORAGE_MEMORY_BACKEND,
@@ -616,43 +750,16 @@ export function createMemoryBackend<T = unknown>(
     transaction: <R>(
       run: (scope: IMemoryScope<T>) => R,
       ctx?: ITransactionOptions
-    ): Promise<Awaited<R>> => {
-      /** One accepted lifetime spans every real attempt and all original pipeline settlement. */
-      let release: (() => void) | undefined
-      /** Each stage terminal supplies its callback before the original loop enters native work. */
-      let callback = run
-      return runWithConcurrency<Awaited<R>>(
-        {
-          store: base,
-          options: ctx === undefined ? {} : ctx,
-          executeAttempt: (context, invoke) =>
-            core.execution.run(
-              {
-                operation: MemoryOperation.transaction,
-                input: { run, ctx: context },
-                ctx: context
-              },
-              (captured) => {
-                controller.assertLive()
-                assertTransactionCallback(captured.run, STORAGE_MEMORY_BACKEND)
-                release ??= controller.beginMutation()
-                callback = captured.run
-                return invoke()
-              }
-            )
-        },
-        {
-          attempt: (attempt) =>
-            locks.attempt(
-              attempt,
-              holding(),
-              { attempt: () => transact(callback, attempt) },
-              core.stageBindings.concurrencyStages(store),
-              controller.closingSignal
-            )
+    ): Promise<Awaited<R>> =>
+      atomicEntry(
+        MemoryOperation.transaction,
+        (context) => ({ run, ctx: context }),
+        ctx,
+        (input) => {
+          assertTransactionCallback(input.run, STORAGE_MEMORY_BACKEND)
+          return { invoke: (scope) => input.run(scope) }
         }
-      ).finally(() => release?.())
-    },
+      ),
     tx: () => createTransactionBuilder(store, undefined, core.getChainMethods('tx')),
     inspectLocks: (ctx) =>
       asyncEntry(MemoryOperation.inspectLocks, undefined, ctx, () => {
@@ -757,8 +864,9 @@ export function createMemoryBackend<T = unknown>(
 
   /** Execute one isolated native attempt; the contract alone decides policy and retry. */
   async function transact<R>(
-    run: (scope: IMemoryScope<T>) => R,
-    ctx: IConcurrencyAttemptContext
+    run: (scope: IMemoryScope<T>, draft: IMemoryTextDraft) => R,
+    ctx: IConcurrencyAttemptContext,
+    protectedRanges?: IMemoryRootMutation<unknown>['ranges']
   ): Promise<IConcurrencyAttempt<Awaited<R>>> {
     controller.assertLive()
     throwIfAborted(ctx.signal)
@@ -929,6 +1037,31 @@ export function createMemoryBackend<T = unknown>(
       }
       return rows
     }
+    /** Native text batches stage only into this attempt's existing draft and revision baseline. */
+    const textDraft: IMemoryTextDraft = {
+      setMany: (entries) => {
+        for (const entry of entries) txWrite('value', entry.key, entry.value, 'conflict')
+      },
+      removeMany: (keys) => {
+        /** Duplicate identities can only remove the first still-present draft entry. */
+        let count = 0
+        for (const key of keys) if (txRemove('value', key)) count++
+        return count
+      },
+      removeByPrefix: (prefix) => {
+        /** Native prefix localization reuses the original canonical bounds and ordered draft merge. */
+        const captured = snapshotStorageKeyPrefix(prefix, STORAGE_MEMORY_BACKEND)
+        /** Count only actual removals in this channel and this native attempt. */
+        let count = 0
+        for (const row of txRows('value', {
+          lower: captured.lower,
+          upper: captured.upper,
+          upperOpen: true
+        }))
+          if (captured.matches(row.key) && txRemove('value', row.key)) count++
+        return count
+      }
+    }
     /** The same physical scope factory serves callbacks, nested operations and final checks. */
     const createScope = (): IMemoryScope<T> => {
       /** Each method closes over its own authentic view, never an independently registered guard. */
@@ -973,61 +1106,28 @@ export function createMemoryBackend<T = unknown>(
             return txRead('value', current) !== undefined
           }),
         getMany: (keys) =>
-          operation(MemoryOperation.getMany, keys, (current) =>
+          batchOperation(MemoryOperation.getMany, keys, (current) =>
             current.map((key) => txRead('value', key) as string | undefined)
           ),
         setMany: (entries) =>
-          operation(MemoryOperation.setMany, entries, (current) => {
-            /**
-             * Validate the entire batch before any draft mutation can become visible to later
-             * operations.
-             */
-            /** Duplicate canonical identities reject the entire batch before its first draft write. */
-            const seen = new Set<string>()
-            const captured = current.map((entry) => {
-              /** Each structural key and text payload is captured once before staging writes. */
-              const key = snapshotStorageKey(entry.key, STORAGE_MEMORY_BACKEND)
-              /**
-               * Flat identity is the same canonical membership already owned by all text
-               * operations.
-               */
-              const encoded = encodeFlatStorageKey(key)
-              if (seen.has(encoded))
-                throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
-                  backend: STORAGE_MEMORY_BACKEND
-                })
-              seen.add(encoded)
-              if (entry.ttlMs !== undefined)
-                throw new StorageContractError(StorageContractErrorCode.unsupported, {
-                  backend: STORAGE_MEMORY_BACKEND
-                })
-              return { key, value: prepare('value', entry.value, key) }
-            })
-            for (const entry of captured) txWrite('value', entry.key, entry.value, 'conflict')
-          }),
+          batchOperation(MemoryOperation.setMany, entries, (current) =>
+            textDraft.setMany(captureTextEntries(current))
+          ),
         removeMany: (keys) =>
-          operation(MemoryOperation.removeMany, keys, (current) => {
+          batchOperation(MemoryOperation.removeMany, keys, (current) => {
             /** Validate every key before applying the batch's first tombstone. */
             const captured = current.map((key) => snapshotStorageKey(key, STORAGE_MEMORY_BACKEND))
-            /** Actual removals, including duplicate inputs, determine the result. */
-            let count = 0
-            for (const key of captured) if (txRemove('value', key)) count++
-            return count
+            return textDraft.removeMany(captured)
           }),
         removeByPrefix: (prefix) =>
-          operation(MemoryOperation.removeByPrefix, prefix, (current) => {
-            /** Prefix identity and matching belong to the canonical contract writer. */
-            const captured = snapshotStorageKeyPrefix(current, STORAGE_MEMORY_BACKEND)
-            /** A single native scan counts only existing text-channel entries. */
-            let count = 0
-            for (const row of txRows('value', {
-              lower: captured.lower,
-              upper: captured.upper,
-              upperOpen: true
-            }))
-              if (captured.matches(row.key) && txRemove('value', row.key)) count++
-            return count
-          }),
+          operation(MemoryOperation.removeByPrefix, prefix, (current) =>
+            observeBatch(
+              MemoryOperation.removeByPrefix,
+              0,
+              () => textDraft.removeByPrefix(current),
+              scope
+            )
+          ),
         getBytes: (key) =>
           operation(MemoryOperation.getBytes, key, (current) => {
             assertStringStorageKey(current, STORAGE_MEMORY_BACKEND)
@@ -1125,6 +1225,18 @@ export function createMemoryBackend<T = unknown>(
           })
         )
       }
+      /** Existing scopes retain owner admission for empty batches without entering the pipeline. */
+      function batchOperation<I extends readonly unknown[], V>(
+        name: string,
+        input: I,
+        invoke: (captured: I) => V
+      ): Promise<Awaited<V>> {
+        return Array.isArray(input) && input.length === 0
+          ? runTransactionOperation(scope, () => invoke(input))
+          : operation(name, input, (captured) =>
+              observeBatch(name, captured.length, () => invoke(captured), scope)
+            )
+      }
       /** Feature methods belong to this exact original view, before its owner admission/freeze. */
       const api = core.createTransactionApi(scope)
       if (api !== undefined) Object.defineProperty(scope, 'api', { value: api, enumerable: true })
@@ -1154,11 +1266,19 @@ export function createMemoryBackend<T = unknown>(
        * The callback itself is an accepted operation, so its failure cannot bypass first-error
        * state.
        */
-      const value = await runTransactionOperation(scope, (current) => run(current))
+      const value = await runTransactionOperation(scope, (current) => run(current, textDraft))
       control.stopAdmission()
       await control.runFinalizers()
       controller.assertLive()
       throwIfAborted(ctx.signal)
+      if (protectedRanges !== undefined) {
+        /** Batch commits cannot bypass a holder admitted while this original draft was preparing. */
+        const held = locks.probe(readConcurrencyLockIdentities(ctx), protectedRanges, ctx)
+        if (held !== undefined) {
+          void stage.afterRollback?.(StorageContractErrorCode.lockRejected)
+          return { status: 'conflict', phase: 'acquire', keys: [held.key], holder: held.holder }
+        }
+      }
       /** Conflict identities are collected before the synchronous all-channel draft merge. */
       const conflicts = [...expected.values()].filter(
         (entry) =>
@@ -1273,7 +1393,90 @@ export function createMemoryBackend<T = unknown>(
     keys: base.keys,
     clearValues: base.clearValues,
     clearAll: base.clearAll,
-    sync: base.sync
+    sync: base.sync,
+    getMany: async (keys, ctx) => {
+      if (emptyBatch(keys)) return []
+      return observeBatch(MemoryOperation.getMany, keys.length, () =>
+        asyncEntry(MemoryOperation.getMany, keys, ctx, (input) => {
+          /** Capture all keys before reading, and share repeated identities within this snapshot. */
+          const captured = captureBatch(() =>
+            input.map((key) => snapshotStorageKey(key, STORAGE_MEMORY_BACKEND))
+          )
+          /** Strings retain their exact results without repeated native reads for equivalent keys. */
+          const values = new Map<string, string | undefined>()
+          return captured.map((key) => {
+            /** The text channel's native wire is shared with single-key operations and transactions. */
+            const encoded = encodeFlatStorageKey(key)
+            if (!values.has(encoded)) values.set(encoded, read('value', key) as string | undefined)
+            return values.get(encoded)
+          })
+        })
+      )
+    },
+    setMany: async (entries, ctx) => {
+      if (emptyBatch(entries)) return
+      return observeBatch(MemoryOperation.setMany, entries.length, () =>
+        atomicEntry(
+          MemoryOperation.setMany,
+          () => entries,
+          ctx,
+          (input) => {
+            /** Preparation precedes implicit lock derivation and the sole native transaction. */
+            const captured = captureBatch(() => captureTextEntries(input))
+            return {
+              keys: captured.map((entry) => lockKey.text(entry.key)),
+              ranges: [],
+              invoke: (_scope, draft) => draft.setMany(captured)
+            }
+          }
+        )
+      )
+    },
+    removeMany: async (keys, ctx) => {
+      if (emptyBatch(keys)) return 0
+      return observeBatch(MemoryOperation.removeMany, keys.length, () =>
+        atomicEntry(
+          MemoryOperation.removeMany,
+          () => keys,
+          ctx,
+          (input) => {
+            /** Every structural identity detaches before native admission or any removal. */
+            const captured = captureBatch(() =>
+              input.map((key) => snapshotStorageKey(key, STORAGE_MEMORY_BACKEND))
+            )
+            return {
+              keys: captured.map((key) => lockKey.text(key)),
+              ranges: [],
+              invoke: (_scope, draft) => draft.removeMany(captured)
+            }
+          }
+        )
+      )
+    },
+    removeByPrefix: (prefix, ctx) =>
+      observeBatch(MemoryOperation.removeByPrefix, 0, () =>
+        atomicEntry(
+          MemoryOperation.removeByPrefix,
+          () => prefix,
+          ctx,
+          (input) => {
+            /** The same prefix owner supplies native radix bounds and the original range lock probe. */
+            const captured = snapshotStorageKeyPrefix(input, STORAGE_MEMORY_BACKEND)
+            return {
+              ranges: [
+                {
+                  channel: 'text',
+                  ...snapshotConcurrencyLockRange(
+                    { channel: 'text', prefix: captured.key },
+                    STORAGE_MEMORY_BACKEND
+                  )
+                }
+              ],
+              invoke: (_scope, draft) => draft.removeByPrefix(captured.key)
+            }
+          }
+        )
+      )
   }
   /** Publish the real built-in APIs on the original resource, never a copied base. */
   const store = provideCapabilities(

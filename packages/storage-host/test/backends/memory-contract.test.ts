@@ -9,12 +9,181 @@ import {
   type ITransactionKeyValueApi,
   type ITransactionScope
 } from '@migaia/storage-contract'
-import { createStorageHost, memoryBackendPlugin, StorageError } from '../../src/index.js'
+import {
+  createStorageHost,
+  definePlugin,
+  memoryBackendPlugin,
+  StorageError
+} from '../../src/index.js'
 
 /** The selected row domain belongs to the actual native memory record channel. */
 type IOrder = { state: string; total: number }
 
 describe('memory native contract integration', () => {
+  it('commits real root batches through one pipeline and the same canonical text draft', async () => {
+    /** Count actual runner entry, without replacing any native memory operation. */
+    const operations: string[] = []
+    /** Observe one before/after pair for each high-level batch. */
+    const observations: string[] = []
+    /** This existing intervention port leaves captured input and native result unchanged. */
+    const counting = definePlugin('counting', (core) => ({
+      install: () => {
+        core.usePipeline((input, next) => {
+          operations.push(input.operation)
+          return next(input)
+        })
+        return {}
+      }
+    }))
+    await using host = await createStorageHost({
+      plugins: [memoryBackendPlugin(), counting],
+      hooks: {
+        beforeStorageOperation: ({ operation }) => observations.push(`before:${operation}`),
+        afterStorageOperation: ({ operation }) => observations.push(`after:${operation}`)
+      }
+    })
+    const store = host.backend('memory')
+    const text = store.use(kv)
+    await text.setMany([
+      { key: 'plain', value: 'value' },
+      { key: 1, value: 'number' },
+      { key: '1', value: 'string' },
+      { key: ['group', 1], value: 'one' },
+      { key: ['group', 2], value: 'two' }
+    ])
+    expect(operations).toEqual(['setMany'])
+    expect(observations).toEqual(['before:setMany', 'after:setMany'])
+    expect(await text.getMany([['group', 2], 'missing', ['group', 2], 1, '1'])).toEqual([
+      'two',
+      undefined,
+      'two',
+      'number',
+      'string'
+    ])
+    expect(store.sync.get('plain')).toBe('value')
+    expect(await store.get('plain')).toBe('value')
+    await store.set('single', 'shared')
+    expect(await text.getMany(['single'])).toEqual(['shared'])
+    expect(await text.removeMany([['group', 1], ['group', 1], 'absent'])).toBe(1)
+    expect(await text.removeByPrefix(['group'])).toBe(1)
+    expect(
+      await text.getMany([
+        ['group', 1],
+        ['group', 2]
+      ])
+    ).toEqual([undefined, undefined])
+    expect(await store.keys()).toEqual(['plain', '1', 'single'])
+    await store.clearValues()
+    expect(await text.getMany([1, '1', 'plain'])).toEqual([undefined, undefined, undefined])
+  })
+
+  it('rejects duplicate root writes before a native transaction and rolls back a later channel conflict', async () => {
+    /** Native transaction hooks distinguish admission rejection from a committed partial batch. */
+    let transactions = 0
+    await using host = await createStorageHost({
+      plugins: [memoryBackendPlugin()],
+      hooks: {
+        beforeTransaction: () => {
+          transactions++
+        }
+      }
+    })
+    const store = host.backend('memory')
+    const text = store.use(kv)
+    await expect(
+      text.setMany([
+        { key: ['same', new Date(0)], value: 'one' },
+        { key: ['same', new Date(0)], value: 'two' }
+      ])
+    ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' })
+    expect(transactions).toBe(0)
+    /** A reachable borrowed key getter must retain the original failure before native admission. */
+    const original = new Error('batch key getter')
+    await expect(
+      text.setMany([
+        {
+          get key(): string {
+            throw original
+          },
+          value: 'unreachable'
+        }
+      ])
+    ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT', cause: original })
+    expect(transactions).toBe(0)
+    await store.putRecord({ occupied: true }, 'blocked')
+    await expect(
+      text.setMany([
+        { key: 'earlier', value: 'draft' },
+        { key: 'blocked', value: 'conflict' }
+      ])
+    ).rejects.toMatchObject({ code: 'DUPLICATE_KEY' })
+    expect(transactions).toBe(1)
+    expect(await text.getMany(['earlier', 'blocked'])).toEqual([undefined, undefined])
+    expect(await store.getRecord('blocked')).toEqual({ occupied: true })
+  })
+
+  it('keeps empty root and scoped batches outside pipelines and operation hooks', async () => {
+    /** Reset inside the existing transaction to exclude its own one required pipeline entry. */
+    let pipelines = 0
+    let observations = 0
+    const counting = definePlugin('counting', (core) => ({
+      install: () => {
+        core.usePipeline((input, next) => {
+          pipelines++
+          return next(input)
+        })
+        return {}
+      }
+    }))
+    await using host = await createStorageHost({
+      plugins: [memoryBackendPlugin(), counting],
+      hooks: {
+        beforeStorageOperation: () => {
+          observations++
+        }
+      }
+    })
+    const store = host.backend('memory')
+    expect(await store.getMany([])).toEqual([])
+    await store.setMany([])
+    expect(await store.removeMany([])).toBe(0)
+    expect(pipelines).toBe(0)
+    expect(observations).toBe(0)
+    await store.transaction(async (scope) => {
+      pipelines = 0
+      expect(await scope.getMany([])).toEqual([])
+      await scope.setMany([])
+      expect(await scope.removeMany([])).toBe(0)
+      expect(pipelines).toBe(0)
+      expect(observations).toBe(0)
+    })
+  })
+
+  it('uses original implicit batch locks against an already held single-key transaction', async () => {
+    await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+    const store = host.backend('memory')
+    const entered = deferred<void>()
+    const finish = deferred<void>()
+    const holding = store
+      .tx()
+      .lock(lockKey.text('shared'))
+      .run(async () => {
+        entered.resolve()
+        await finish.promise
+      })
+    await entered.promise
+    await expect(
+      store.setMany([{ key: 'shared', value: 'blocked' }], {
+        concurrency: ConcurrencyPolicy.fail()
+      })
+    ).rejects.toMatchObject({ code: 'LOCK_REJECTED' })
+    expect(await store.get('shared')).toBeNull()
+    finish.resolve()
+    await holding
+    await store.setMany([{ key: 'shared', value: 'committed' }])
+    expect(await store.get('shared')).toBe('committed')
+  })
+
   it('uses all three channels and the original capability query inside one native commit', async () => {
     await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
     const store = host.backend('memory')
