@@ -96,6 +96,46 @@ describe('storage-web audit medium severity regressions', () => {
     })
   })
 
+  it('retains a moved schema failure owner through repository read staging', async () => {
+    /** Toggle only the actual validator so a public write can seed the subsequent read. */
+    let rejectValidation = false
+    /** Preserve this exact validator failure through host and repository wrappers. */
+    const primary = new Error('read validator rejected')
+    /** The moved adapter remains the error owner while Web still owns this repository. */
+    const schema = fromStandardSchema<{ id: string }>({
+      '~standard': {
+        version: 1,
+        vendor: 'moved-schema',
+        async validate(value) {
+          if (rejectValidation) throw primary
+          return { value: value as { id: string } }
+        }
+      }
+    })
+    /** Drive the existing public storage and entity entries instead of internal staging helpers. */
+    const store = memoryStorageHost()
+    try {
+      /** Reads must preserve the host error, its stage and the original validator cause. */
+      const repository = defineEntity({ name: 'moved-schema', key: 'id', schema }).connect(store)
+      await repository.put({ id: 'row' })
+      rejectValidation = true
+      /** The cause graph must retain the exact original rejection after stage enrichment. */
+      const failure = await repository.get('row').then(
+        () => undefined,
+        (error: unknown) => error
+      )
+      expect(failure).toMatchObject({
+        source: '@migaia/storage-host',
+        code: 'VALIDATION_FAILED',
+        stage: 'validate',
+        extensionStage: 'schema'
+      })
+      expect(reaches(failure, primary)).toBe(true)
+    } finally {
+      await store.dispose()
+    }
+  })
+
   it('skips malformed foreign physical keys while enumerating its own namespace', async () => {
     expect(lengthPrefixedNamespaceCodec.decode('app', 'sw1:3:%GG:foreign')).toBeUndefined()
     /** Reuse the existing complete RAM Storage port; no user persistence is touched. */

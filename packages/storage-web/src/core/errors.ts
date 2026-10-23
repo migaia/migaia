@@ -1,3 +1,4 @@
+import { StorageError as HostStorageError } from '@migaia/storage-host'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import {
   StorageContractError,
@@ -66,21 +67,21 @@ export const invokeExtension = async <T>(
         backend,
         cause: error
       })
-    if (error instanceof StorageError) {
+    if (error instanceof StorageError || error instanceof HostStorageError) {
       if (error.operation !== undefined && error.extensionStage !== undefined) throw error
-      throw new StorageError(
-        error.code,
-        {
-          backend: error.backend ?? backend,
-          key: error.key,
-          existingChannel: error.existingChannel,
-          attemptedChannel: error.attemptedChannel,
-          operation: error.operation ?? operation,
-          extensionStage: error.extensionStage ?? extensionStage,
-          cause: error
-        },
-        error.message
-      )
+      /** Attach operation context with the original owner and keep its exact failure on cause. */
+      const details = {
+        backend: error.backend ?? backend,
+        key: error.key,
+        existingChannel: error.existingChannel,
+        attemptedChannel: error.attemptedChannel,
+        operation: error.operation ?? operation,
+        extensionStage: error.extensionStage ?? extensionStage,
+        cause: error
+      }
+      throw error instanceof HostStorageError
+        ? new HostStorageError(error.code, details, error.message)
+        : new StorageError(error.code, details, error.message)
     }
     if (isStorageContractError(error)) throw error
     throw normalizeError(
