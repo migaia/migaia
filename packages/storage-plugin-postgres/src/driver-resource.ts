@@ -1,5 +1,4 @@
 import { PgNames } from './constants.js'
-import { asyncDisposeKey } from '@migaia/plugin-host'
 import { createQuiescenceTracker } from '@migaia/lifecycle'
 import {
   StorageContractError,
@@ -8,6 +7,7 @@ import {
 } from '@migaia/storage-contract'
 import {
   createStorageOperationReporter,
+  asyncDisposeKey,
   reportCleanupError
 } from '@migaia/storage-host/authoring/backend'
 /** Native borrowed resources reuse the original lifecycle tracker for accepted work and release. */

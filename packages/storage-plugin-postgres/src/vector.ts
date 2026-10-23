@@ -23,9 +23,11 @@ import {
   type ITtlTarget,
   type IStorageChange
 } from '@migaia/storage-contract'
-import { asyncDisposeKey } from '@migaia/plugin-host'
 import { recommendStorageVector } from '@migaia/storage-host/authoring/vector'
-import { createStorageOperationReporter } from '@migaia/storage-host/authoring/backend'
+import {
+  asyncDisposeKey,
+  createStorageOperationReporter
+} from '@migaia/storage-host/authoring/backend'
 import type { IPgConfiguration, IPgTables } from './schema.js'
 import type { IPgState } from './native.js'
 import { observePgRevision, observePgRange, observePgBatch, markPgChanged } from './native.js'

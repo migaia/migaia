@@ -48,13 +48,13 @@ import {
   type IStorageChange,
   type IStorageStore
 } from '@migaia/storage-contract'
-import { asyncDisposeKey } from '@migaia/plugin-host'
 import type {
   IStoragePluginCore,
   IStorageBackendOrgContext,
   IStorageOrgBinding
 } from '@migaia/storage-host'
 import {
+  asyncDisposeKey,
   snapshotKeyRange,
   createBackendChangeIterator,
   createStorageOperationReporter,

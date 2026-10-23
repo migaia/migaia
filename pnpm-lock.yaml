@@ -819,9 +819,6 @@ importers:
       '@migaia/lifecycle':
         specifier: workspace:^
         version: link:../lifecycle
-      '@migaia/plugin-host':
-        specifier: workspace:^
-        version: link:../plugin-host
       '@migaia/serialize':
         specifier: workspace:^
         version: link:../serialize
