@@ -10,6 +10,8 @@ import { createStorageEnvelopeStages } from './envelope-stages.js'
 import {
   createBackendChangeController,
   registerBackendChangeController,
+  registerBackendEnvelopeStages,
+  registerBackendValueCommit,
   getBackendChangeController,
   type IBackendChangeController
 } from './core/change-controller.js'
@@ -179,6 +181,17 @@ export function createStoragePluginHost(options: IPluginHostOptions): IStoragePl
             )
           release = registerBackendChangeController(store, controller)
         }) satisfies IStoragePluginCore['registerChangeController'],
+        registerValueCommit: ((store, commit) => {
+          /** The original installation window owns both admission and exact registration cleanup. */
+          let release: (() => void) | undefined
+          registrationCore!.onDispose(() => release?.())
+          if (context.storeCell.get() !== store)
+            throw createStorageTypeError(
+              StorageErrorCode.backendPluginInvalid,
+              StorageErrorText.backendPluginInvalid
+            )
+          release = registerBackendValueCommit(store, commit)
+        }) satisfies IStoragePluginCore['registerValueCommit'],
         getChangeController: () => {
           context.assertCurrent()
           return getBackendChangeController(context.storeCell.get())
@@ -764,6 +777,13 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
                 StorageErrorCode.backendKindMismatch,
                 StorageErrorText.backendKindMismatch
               )
+            /** Every admitted base, including frozen raw stores, shares this host's observer owner. */
+            let releaseEnvelope: (() => void) | undefined
+            core.onDispose(() => releaseEnvelope?.())
+            releaseEnvelope = registerBackendEnvelopeStages(
+              snapshot.store,
+              context.getEnvelopeStages
+            )
             storeCell.set(snapshot.store)
             this.#events.emit(Hook.afterBackendCreate, observerBinding.identity)
           }

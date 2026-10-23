@@ -4,7 +4,8 @@ import {
   type IBackendKind,
   type IStorageBase,
   type IStorageChange,
-  type IStorageKey
+  type IStorageKey,
+  type IWriteOptions
 } from '@migaia/storage-contract'
 import { createEventChannel, EventDispatchPolicy } from '@migaia/event-subscriber'
 import { createStringLeaseRegistry, createAbortController } from '@migaia/lifecycle'
@@ -14,6 +15,7 @@ import { createStorageOperationReporter, reportCleanupError } from '../core/oper
 import { REPOSITORY_KEY_PREFIX } from './record-layout.js'
 import { StorageError, StorageErrorCode } from '../errors.js'
 import { StorageErrorText } from '../error-text.js'
+import type { IStorageEnvelopeStages } from '../types.js'
 
 /** Construction-time references and options retained by the backend authoring boundary. */
 export type IBackendChangeSnapshot = {
@@ -48,8 +50,28 @@ export type IBackendChangeControllerOptions = {
   readonly finalize?: () => void | Promise<void>
 }
 
-/** One private exact-store registration per factory-created store. */
-const controllerRegistry = new WeakMap<IStorageBase, IBackendChangeController>()
+/** Prepared text mutation checked and committed by the backend's original physical owner. */
+export type IBackendValueCommit = (
+  input: Readonly<{
+    prefix: string
+    expected: readonly (readonly [string, string])[]
+    key: string
+    value: string
+  }>,
+  ctx?: IWriteOptions
+) => Promise<void>
+
+/** Original exact-store row shares optional change and envelope observation bindings. */
+type IBackendRegistration = {
+  controller?: IBackendChangeController
+  valueCommit?: IBackendValueCommit
+  envelope?: (
+    operation: Readonly<{ operation: string; targetVersion: number }>
+  ) => IStorageEnvelopeStages
+}
+
+/** One private exact-store registry; observation also supports admitted stores without a controller. */
+const controllerRegistry = new WeakMap<IStorageBase, IBackendRegistration>()
 
 /** Monotonic fallback for unique same-realm event origins. */
 let controllerOriginSequence = 0
@@ -224,13 +246,19 @@ export const registerBackendChangeController = (
   store: IStorageBase,
   controller: IBackendChangeController
 ): (() => void) => {
-  if (controllerRegistry.has(store))
+  if (controllerRegistry.get(store)?.controller !== undefined)
     throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
       backend: store.backend
     })
-  controllerRegistry.set(store, controller)
+  /** Admission may already have bound envelope observation to this original row. */
+  const row = controllerRegistry.get(store) ?? {}
+  row.controller = controller
+  controllerRegistry.set(store, row)
   return () => {
-    if (controllerRegistry.get(store) === controller) controllerRegistry.delete(store)
+    if (controllerRegistry.get(store) !== row || row.controller !== controller) return
+    delete row.controller
+    if (row.envelope === undefined && row.valueCommit === undefined)
+      controllerRegistry.delete(store)
   }
 }
 
@@ -239,5 +267,50 @@ export const getBackendChangeController = (
   store: unknown
 ): IBackendChangeController | undefined => {
   if (typeof store !== 'object' || store === null) return undefined
-  return controllerRegistry.get(store as IStorageBase)
+  return controllerRegistry.get(store as IStorageBase)?.controller
 }
+
+/** Bind original host observation at resource admission without changing or patching the store. */
+export const registerBackendEnvelopeStages = (
+  store: IStorageBase,
+  factory: NonNullable<IBackendRegistration['envelope']>
+): (() => void) => {
+  /** The same row remains the sole owner of optional controller and envelope references. */
+  const row = controllerRegistry.get(store) ?? {}
+  row.envelope = factory
+  controllerRegistry.set(store, row)
+  return () => {
+    if (controllerRegistry.get(store) !== row || row.envelope !== factory) return
+    delete row.envelope
+    if (row.controller === undefined && row.valueCommit === undefined)
+      controllerRegistry.delete(store)
+  }
+}
+
+/** Entity operations borrow the admitted host observer without gaining construction authority. */
+export const getBackendEnvelopeStages = (
+  store: IStorageBase,
+  operation: Readonly<{ operation: string; targetVersion: number }>
+): IStorageEnvelopeStages | undefined => controllerRegistry.get(store)?.envelope?.(operation)
+
+/** Install one original native compare-and-write terminal on the exact admitted store row. */
+export const registerBackendValueCommit = (
+  store: IStorageBase,
+  commit: IBackendValueCommit
+): (() => void) => {
+  if (typeof commit !== 'function' || controllerRegistry.get(store)?.valueCommit !== undefined)
+    throw new StorageContractError(StorageContractErrorCode.invalidArgument)
+  /** This uses the same original row as resource observation and change publication. */
+  const row = controllerRegistry.get(store) ?? {}
+  row.valueCommit = commit
+  controllerRegistry.set(store, row)
+  return () => {
+    if (controllerRegistry.get(store) !== row || row.valueCommit !== commit) return
+    delete row.valueCommit
+    if (row.controller === undefined && row.envelope === undefined) controllerRegistry.delete(store)
+  }
+}
+
+/** Entity borrows the captured native endpoint without exposing its registration authority. */
+export const getBackendValueCommit = (store: IStorageBase): IBackendValueCommit | undefined =>
+  controllerRegistry.get(store)?.valueCommit
