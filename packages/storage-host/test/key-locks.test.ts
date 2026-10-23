@@ -6,6 +6,8 @@ import {
   lockKey,
   runWithConcurrency,
   StorageStageKind,
+  snapshotConcurrencyLockKeys,
+  snapshotConcurrencyLockRange,
   type IConcurrencyAttempt,
   type IConcurrencyAttemptContext,
   type IConcurrencyHolder,
@@ -298,6 +300,75 @@ describe('the shared local key-lock provider', () => {
     expect(port.inspectLocks()[0]!.holder).toMatchObject({ owner: 'holder' })
     finish.resolve()
     await expect(first).resolves.toBe('first')
+  })
+
+  it('probes exact identities and rechecks root ranges after the original acquisition observation', async () => {
+    const current = await fixture()
+    await using _host = current.host
+    await using port = current.port
+    /** A stage can synchronously admit a different physical lock before the root mutation starts. */
+    const entered = deferred<void>()
+    const finish = deferred<void>()
+    /** This native holder stays alive through the final range recheck and the original FIFO wait. */
+    let late: Promise<string> | undefined
+    let mutations = 0
+    const bounds = {
+      channel: 'text' as const,
+      ...snapshotConcurrencyLockRange({ channel: 'text' }, 'catalog')
+    }
+    const root = runWithConcurrency(
+      {
+        store: current.state.store,
+        options: { lock: [lockKey.bytes('gate')], concurrency: ConcurrencyPolicy.wait() }
+      },
+      {
+        attempt: (ctx) =>
+          port.attemptWrite(
+            ctx,
+            holder('root'),
+            () => ++mutations,
+            {
+              kind: StorageStageKind.concurrency,
+              report: () => undefined,
+              onLockAcquired: () => {
+                if (late) return
+                late = run(current, 'late', { lock: [lockKey.text('busy')] }, async () => {
+                  entered.resolve()
+                  await finish.promise
+                  return { status: 'committed', value: 'late' }
+                })
+              }
+            },
+            undefined,
+            [bounds]
+          )
+      }
+    )
+    await entered.promise
+    try {
+      const identity = snapshotConcurrencyLockKeys([lockKey.text('busy')], 'catalog')
+      expect(port.probe(identity.identities)).toMatchObject({
+        key: lockKey.text('busy'),
+        holder: { owner: 'late' },
+        expired: false
+      })
+      expect(port.probe([], [bounds])).toMatchObject({ holder: { owner: 'late' } })
+      expect(
+        port.probe(
+          [],
+          [{ channel: 'record', ...snapshotConcurrencyLockRange({ channel: 'record' }, 'catalog') }]
+        )
+      ).toBeUndefined()
+      expect(mutations).toBe(0)
+      finish.resolve()
+      await expect(root).resolves.toBe(1)
+      await expect(late).resolves.toBe('late')
+      expect(mutations).toBe(1)
+      expect(port.probe(identity.identities)).toBeUndefined()
+    } finally {
+      finish.resolve()
+      await Promise.allSettled([root, ...(late ? [late] : [])])
+    }
   })
 
   it('keeps optimistic work unlocked and reports failed resource observers without affecting results', async () => {
