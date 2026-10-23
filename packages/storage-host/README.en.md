@@ -51,3 +51,24 @@ Backend core `createKeyLockPort()` constructs the shared local key-lock port onl
 The controller exposes its original `closingSignal`. Pass it as the optional admission signal so direct member disposal removes only that member’s queued request; it never closes a shared provider or releases an already running native attempt.
 
 The original backend installation core exposes the captured host default identity as readonly `defaultOrgId`. `createRevisionPort()` creates local revision facts during that same installation window. One physical data universe shares this object; `read/write/epoch/clear` use the existing text/bytes/record channels and backend-captured key identities. Advance revisions only after native commit succeeds. Clear drops tombstones and advances the channel epoch so older snapshots cannot pass an ABA check. This port owns no resources or closure authority over other members.
+
+The host root exports `memoryBackendPlugin()` and `memoryBackendKind`. Each installation owns isolated memory data, including when namespaces match. Text, bytes and record transactions reuse the original transaction owner, concurrency policy and local locks. `scope.use(kv)` exposes eight text operations on that same transaction; `scope.use(records)` executes queries through its actual record cursor. A configured owner.label is captured once; defaults use runtime and pid, or browser. The native client getter returns undefined; the transaction client checks the original scope and returns undefined.
+
+```ts
+import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { records } from '@migaia/storage-contract'
+
+type Order = { state: string; total: number }
+await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+const memory = host.backend('memory')
+await memory.transaction(async (tx) => {
+  await tx.set('status', 'ready')
+  await tx.setBytes('receipt', new Uint8Array([1, 2]))
+  await tx.putRecord({ state: 'paid', total: 20 }, 'order-1')
+})
+console.log(await memory.use(records).query<Order>().where({ state: 'paid' }).select('total').all())
+```
+
+Record where/select/all reuse the contract query core; this memory source honestly declares client execution. Transaction text batches support canonical structural keys and prefixes; explicit ttlMs currently rejects with UNSUPPORTED_CAPABILITY. Failure discards the draft, while commit checks key revisions and clear epochs before publishing committed batches. Closing the resource cancels this instance queued lock admission and drains accepted native transactions through actual settlement.
+
+Native ranges, transaction drafts and prefix deletion reuse one package-private compressed radix implementation. Hash maps retain point lookups; ranges localize their bounds and merge only matching draft candidates, with tombstones masking physical entries. The tree maintains extrema and adjacent leaves without query-time full sorting. Text and records retain independent index instances.

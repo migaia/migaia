@@ -1763,7 +1763,9 @@
         "createStorageHost",
         "defineFeature",
         "definePlugin",
-        "defineStorageBackendKind"
+        "defineStorageBackendKind",
+        "memoryBackendKind",
+        "memoryBackendPlugin"
       ],
       "./authoring/backend": [
         "assertKeyRange",
