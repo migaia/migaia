@@ -21,6 +21,8 @@ describe('memory native contract integration', () => {
     let expired!: ITransactionScope<unknown, typeof records>
     let expiredText!: ITransactionKeyValueApi
     let checkRuns = 0
+    /** Compare actual draft results with the same committed query after native commit. */
+    let transactionRows: readonly { total: number }[] | undefined
     await store.transaction(async (scope) => {
       expired = scope
       const text = scope.use(kv)
@@ -56,7 +58,8 @@ describe('memory native contract integration', () => {
       await scope.putRecord({ state: 'open', total: 7 }, 'two')
       await scope.putRecord({ state: 'paid', total: 4 }, ['tenant', 1])
       const paid = scope.use(records).query<IOrder>().where({ state: 'paid' }).select('total')
-      expect(await paid.all()).toEqual([{ total: 2 }, { total: 4 }])
+      transactionRows = await paid.all()
+      expect(transactionRows).toEqual([{ total: 2 }, { total: 4 }])
       registerTransactionFinalizer(scope, async (check) => {
         expect(check).not.toBe(scope)
         expect(
@@ -67,9 +70,14 @@ describe('memory native contract integration', () => {
     })
     expect(checkRuns).toBe(1)
     expect(await store.getBytes('bytes')).toEqual(new Uint8Array([3]))
-    expect(
-      await store.use(records).query<IOrder>().where({ state: 'paid' }).select('total').all()
-    ).toEqual([{ total: 2 }, { total: 4 }])
+    const committedRows = await store
+      .use(records)
+      .query<IOrder>()
+      .where({ state: 'paid' })
+      .select('total')
+      .all()
+    expect(committedRows).toEqual(transactionRows)
+    expect(committedRows).toEqual([{ total: 2 }, { total: 4 }])
     expect(await store.use(records).removeByPrefix(['tenant'])).toBe(1)
     expect(await store.getRecord(['tenant', 1])).toBeUndefined()
     await expect(expired.getRecord('one')).rejects.toMatchObject({
