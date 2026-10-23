@@ -1262,7 +1262,7 @@ function createMemoryNamespace<T>(
     subscribeChanges: (listener) => {
       controller.assertLive()
       return controller.subscribe((change) => {
-        if (root || change.orgId === orgId) listener(change)
+        if (root || change.orgId === orgId) return listener(change)
       })
     },
     dispose: () => controller.dispose(),

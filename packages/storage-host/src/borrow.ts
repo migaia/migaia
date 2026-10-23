@@ -68,7 +68,7 @@ export function borrowStorageBackend(
         const listener = args[0] as (change: { readonly orgId?: string }) => void
         return Reflect.apply(value, store, [
           (change: { readonly orgId?: string }) => {
-            if (change.orgId === projection.orgId) listener(change)
+            if (change.orgId === projection.orgId) return listener(change)
           }
         ])
       }
