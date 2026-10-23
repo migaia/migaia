@@ -1,6 +1,11 @@
 /** Stable validation causes used by codec and synchronous-option admission boundaries. */
 export const StorageContractErrorText = {
   /**
+   * Declarative query admission rejects malformed boolean, field, path and operator inputs before
+   * reading candidates.
+   */
+  queryCondition: 'storage query condition is invalid',
+  /**
    * Confirmed lock diagnostics expose declared identity and holder without inventing a remote
    * owner.
    */

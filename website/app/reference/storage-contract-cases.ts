@@ -5,6 +5,26 @@ const t = (en: string, zh: string): IText => ({ en, zh })
 
 /** Exercises public contract tools without supplying a fictional storage implementation. */
 export const storageContractCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
+  compileStorageWhere: [
+    {
+      title: t(
+        'Compile one business condition before scanning candidates',
+        '扫描候选前编译一次业务条件'
+      ),
+      problem: t(
+        'A prefix candidate stream needs the same declarative semantics without constructing another query or rebuilding membership lists per row.',
+        '有序前缀候选流需要相同声明语义，不应另建查询或逐行重建成员列表。'
+      ),
+      example: t(
+        "import { compileStorageWhere } from '@migaia/storage-contract'\nconst accepts = compileStorageWhere<{ status: string; total: number }>({\n  status: 'paid', total: { gte: 100 }\n})\nconst rows = [{ status: 'paid', total: 120 }, { status: 'paid', total: 50 }]\nconsole.log(rows.filter(accepts).length) // 1",
+        "import { compileStorageWhere } from '@migaia/storage-contract'\nconst accepts = compileStorageWhere<{ status: string; total: number }>({\n  status: 'paid', total: { gte: 100 }\n})\nconst rows = [{ status: 'paid', total: 120 }, { status: 'paid', total: 50 }]\nconsole.log(rows.filter(accepts).length) // 1"
+      ),
+      result: t(
+        'Prints 1. Only the paid row with total at least 100 matches; compilation reads no storage.',
+        '输出 1；仅 total 至少 100 的 paid 记录匹配，编译不读取存储。'
+      )
+    }
+  ],
   createTransactionBuilder: [
     {
       title: t('Declare locks without starting a transaction', '声明锁而不提前启动事务'),
