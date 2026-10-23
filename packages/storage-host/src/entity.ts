@@ -21,3 +21,27 @@ export type {
   IRecordIndexBackfillSession,
   IRecordIndexBackfillStore
 } from './entity/backfill.js'
+
+export { defineEntity } from './entity/define.js'
+export type {
+  IEntityDefinition,
+  IEntityQuery,
+  IEntityQueryNarrowed,
+  IEntityConnectOptions,
+  IEntityStoreQueryMethods,
+  IEntityIndex,
+  IEntityIndexMap,
+  IEntityOptions,
+  IEntityTransactionScope,
+  IEntityListOrder,
+  IEntityIndexOptions,
+  IIndexedListOptions,
+  IListOptions,
+  IMigrateOptions,
+  IMigrateResult,
+  IInvalidRecordAction,
+  IInvalidRecordIssue,
+  IInvalidRecordHandler,
+  IRecordComparator,
+  IRepository
+} from './entity/types.js'

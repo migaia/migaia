@@ -1800,6 +1800,7 @@
         "REPOSITORY_KEY_PREFIX",
         "RecordIndexBackfillPhase",
         "binaryCodec",
+        "defineEntity",
         "fromStandardSchema",
         "jsonCodec",
         "markRecordIndexBackfillContentionFailure",
