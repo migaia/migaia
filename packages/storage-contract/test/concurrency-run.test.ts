@@ -870,3 +870,114 @@ describe('original concurrency preparation budget', () => {
     expect(beforeLockAcquire).not.toHaveBeenCalled()
   })
 })
+
+describe('original concurrency execution continuation', () => {
+  it('runs after-next after actual commit and derives locks from the fixed terminal input once', async () => {
+    const { store } = base()
+    const order: string[] = []
+    let input = 'before'
+    let committed = false
+    const lock = vi.fn(() => [lockKey.text(input)])
+    await expect(
+      runWithConcurrency(
+        {
+          store,
+          options: {},
+          lock,
+          execute: async (_ctx, invokeOriginalLoop) => {
+            order.push('before')
+            input = 'fixed'
+            const result = await invokeOriginalLoop()
+            expect(committed).toBe(true)
+            order.push('after')
+            return result
+          }
+        },
+        {
+          attempt: async (ctx) => {
+            expect(ctx.lock).toEqual([lockKey.text('fixed')])
+            order.push('native')
+            committed = true
+            return { status: 'committed', value: 9 }
+          }
+        }
+      )
+    ).resolves.toBe(9)
+    expect(lock).toHaveBeenCalledTimes(1)
+    expect(order).toEqual(['before', 'native', 'after'])
+  })
+
+  it('keeps catch around the original native error and releases the same signal only after the outer pipeline settles', async () => {
+    vi.useFakeTimers()
+    const { store } = base()
+    const failure = new StorageContractError(StorageContractErrorCode.invalidArgument)
+    let signal: AbortSignal | undefined
+    let caught: unknown
+    const pending = runWithConcurrency(
+      {
+        store,
+        options: { timeoutMs: 10 },
+        execute: async (ctx, invokeOriginalLoop) => {
+          signal = ctx.signal as AbortSignal
+          try {
+            return await invokeOriginalLoop()
+          } catch (cause) {
+            caught = cause
+            await new Promise((resolve) => setTimeout(resolve, 20))
+            throw cause
+          }
+        }
+      },
+      {
+        attempt: async () => {
+          throw failure
+        }
+      }
+    )
+    const rejected = expect(pending).rejects.toBe(failure)
+    await vi.advanceTimersByTimeAsync(10)
+    expect(signal?.aborted).toBe(true)
+    expect(caught).toBe(failure)
+    await vi.advanceTimersByTimeAsync(10)
+    await rejected
+  })
+
+  it('expires before-next work without lock derivation or native admission and rejects duplicate continuation calls', async () => {
+    vi.useFakeTimers()
+    const { store } = base()
+    const lock = vi.fn(() => [])
+    const attempt = vi.fn()
+    const pending = runWithConcurrency(
+      {
+        store,
+        options: { timeoutMs: 10 },
+        lock,
+        execute: async (_ctx, invokeOriginalLoop) => {
+          await new Promise((resolve) => setTimeout(resolve, 20))
+          return invokeOriginalLoop()
+        }
+      },
+      { attempt }
+    )
+    const rejected = expect(pending).rejects.toMatchObject({ code: 'ABORTED' })
+    await vi.advanceTimersByTimeAsync(20)
+    await rejected
+    expect(lock).not.toHaveBeenCalled()
+    expect(attempt).not.toHaveBeenCalled()
+    const once = vi.fn(async () => ({ status: 'committed', value: 1 }) as const)
+    await expect(
+      runWithConcurrency(
+        {
+          store,
+          options: {},
+          execute: async (_ctx, invokeOriginalLoop) => {
+            await invokeOriginalLoop()
+            return invokeOriginalLoop()
+          }
+        },
+        { attempt: once }
+      )
+    ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' })
+    expect(once).toHaveBeenCalledTimes(1)
+  })
+})

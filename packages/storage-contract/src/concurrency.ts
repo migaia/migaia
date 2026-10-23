@@ -901,6 +901,14 @@ export async function runWithConcurrency<TResult>(
     readonly store: IStorageBase
     readonly options: ITransactionOptions
     readonly policy?: IConcurrencyPolicy
+    /**
+     * Wraps the original logical loop so one pipeline terminal supplies fixed input before native
+     * work.
+     */
+    readonly execute?: (
+      captured: IOperationContext & { readonly conflictPolicy?: IConflictPolicy },
+      invokeOriginalLoop: () => Promise<Awaited<TResult>>
+    ) => Awaited<TResult> | PromiseLike<Awaited<TResult>>
     /** Runs one original pipeline within this call's budget before deriving its fixed-input locks. */
     readonly prepare?: (
       captured: IOperationContext & { readonly conflictPolicy?: IConflictPolicy }
@@ -936,18 +944,22 @@ export async function runWithConcurrency<TResult>(
   let deriveLocks: typeof request.lock
   /** Preparation is a single pre-attempt callback, never a native attempt or a retry hook. */
   let prepare: typeof request.prepare
+  /** The actual outer pipeline may wrap only this original loop and its existing call budget. */
+  let execute: typeof request.execute
   try {
     capturedLocks = request.options.lock
     capturedOverride = request.options.concurrency
     deriveLocks = request.lock
     prepare = request.prepare
+    execute = request.execute
   } catch (cause) {
     throw invalidConcurrencyArgument(cause)
   }
   if (capturedOverride !== undefined) assertConcurrencyPolicy(capturedOverride)
   if (
     (deriveLocks !== undefined && typeof deriveLocks !== 'function') ||
-    (prepare !== undefined && typeof prepare !== 'function')
+    (prepare !== undefined && typeof prepare !== 'function') ||
+    (execute !== undefined && typeof execute !== 'function')
   )
     throw invalidConcurrencyArgument()
   /** Default resolution belongs to the same owner, after the original override getter is read once. */
@@ -978,7 +990,7 @@ export async function runWithConcurrency<TResult>(
     if (normalized.length > 0) locks = uniqueNormalizedLockKeys([...(locks ?? []), ...normalized])
   }
   // Preserve admission ordering for existing callers that have no preparation phase.
-  if (!prepare) derivePreparedLocks()
+  if (!prepare && !execute) derivePreparedLocks()
   /** Unchanged inherited sets retain their exact immutable identity list as well as their budget. */
   let identities =
     locks === inherited?.locks && inherited ? inherited.identities : snapshotLockIdentities(locks)
@@ -1032,12 +1044,42 @@ export async function runWithConcurrency<TResult>(
       /** Accepted preparation settles before cancellation can release this call's signal owner. */
       const afterPreparation = concurrencyAbort(budget, false)
       if (afterPreparation) throw afterPreparation
-      derivePreparedLocks()
+      if (!execute) derivePreparedLocks()
       identities =
         locks === inherited?.locks && inherited
           ? inherited.identities
           : snapshotLockIdentities(locks)
     }
+    if (execute) {
+      /** Pre-canceled calls start neither an outer pipeline nor native work. */
+      const beforeExecution = concurrencyAbort(budget, false)
+      if (beforeExecution) throw beforeExecution
+      /** Reusing the continuation cannot create a second logical run or duplicate a committed write. */
+      let invoked = false
+      /** The pipeline terminal enters the same loop once after fixing its actual operation input. */
+      const invokeOriginalLoop = (): Promise<Awaited<TResult>> => {
+        if (invoked) return Promise.reject(invalidConcurrencyArgument())
+        invoked = true
+        /** Expired preparation or before-next work cannot derive keys or start native admission. */
+        const aborted = concurrencyAbort(budget, false)
+        if (aborted) return Promise.reject(aborted)
+        derivePreparedLocks()
+        identities =
+          locks === inherited?.locks && inherited
+            ? inherited.identities
+            : snapshotLockIdentities(locks)
+        return runOriginalLoop()
+      }
+      /** After-next and catch stay around actual native settlement under the original call budget. */
+      const executionContext = Object.freeze({ ...context, signal: budget.cancellation.signal })
+      return (await execute(executionContext, invokeOriginalLoop)) as Awaited<TResult>
+    }
+    return await runOriginalLoop()
+  } finally {
+    if (!inherited?.budget) budget.cancellation.dispose()
+  }
+  /** The sole existing logical loop retains all attempt, wait, decision and retry ownership. */
+  async function runOriginalLoop(): Promise<Awaited<TResult>> {
     while (true) {
       /** Cancellation before resource admission starts no native attempt. */
       const aborted = concurrencyAbort(budget, false)
@@ -1193,7 +1235,5 @@ export async function runWithConcurrency<TResult>(
         }
       }
     }
-  } finally {
-    if (!inherited?.budget) budget.cancellation.dispose()
   }
 }
