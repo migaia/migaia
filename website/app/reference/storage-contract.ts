@@ -889,6 +889,15 @@ export const storageContractReference: ILibraryReference = {
       example: storageContractCases.ttl![0]!.example,
       cases: storageContractCases.ttl
     },
+    sql: {
+      role: 'constant',
+      purpose: t(
+        'Exact standard token for a nested native SQL executor.',
+        '嵌套原生 SQL executor 的精确标准令牌。'
+      ),
+      example: storageContractCases.sql![0]!.example,
+      cases: storageContractCases.sql
+    },
     counter: {
       role: 'constant',
       purpose: t(
@@ -906,8 +915,8 @@ export const storageContractReference: ILibraryReference = {
       ),
       params: {
         target: t(
-          'Typed text, byte or record target; use the channel containing the value.',
-          'typed 文本、字节或记录目标，选择实际持有值的通道。'
+          'Typed text, byte, record or vector target; use the channel containing the value.',
+          'typed 文本、字节、记录或向量目标，选择实际持有值的通道。'
         ),
         backend: t('Actual backend diagnostic or undefined.', '真实后端诊断，或 undefined。')
       },
@@ -1076,6 +1085,26 @@ export const storageContractReference: ILibraryReference = {
       ),
       example: storageContractCases.createSqlTag![0]!.example,
       cases: storageContractCases.createSqlTag
+    },
+    deriveStorageSqlQuery: {
+      role: 'operation',
+      purpose: t(
+        'Derive terminal callbacks over the same authentic SQL node.',
+        '在同一真实 SQL 节点上派生终端回调。'
+      ),
+      params: {
+        fragment: t('An authentic existing SQL fragment or query.', '已有真实 SQL 片段或查询。'),
+        terminals: t(
+          'Original all/get/run callbacks, captured once.',
+          '一次捕获的原 all/get/run 回调。'
+        )
+      },
+      returns: t(
+        'Frozen ISqlQuery sharing the original node; callback receiver, context and Promise identity remain exact.',
+        '共享原节点的冻结 ISqlQuery；原回调 receiver、context 与 Promise 身份保持精确。'
+      ),
+      example: storageContractCases.deriveStorageSqlQuery![0]!.example,
+      cases: storageContractCases.deriveStorageSqlQuery
     },
     snapshotConcurrencyLockKeys: {
       role: 'operation',
@@ -3402,6 +3431,17 @@ console.log(candidate.name, candidate.output)`
           )
         },
         empty: { summary: t('Canonical empty pure fragment.', '规范空纯片段。') }
+      }
+    },
+    IStorageSqlQueryTerminals: {
+      summary: t(
+        'Finite callbacks replacing SQL query execution without altering fragment identity.',
+        '替换 SQL 查询执行且不改变片段身份的有限回调。'
+      ),
+      members: {
+        all: { summary: t('Return the native row Promise.', '返回原生行 Promise。') },
+        get: { summary: t('Return the native first-row Promise.', '返回原生首行 Promise。') },
+        run: { summary: t('Return the native write-result Promise.', '返回原生写结果 Promise。') }
       }
     },
     ISqlExecutor: {

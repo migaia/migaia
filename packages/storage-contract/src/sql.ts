@@ -58,6 +58,14 @@ export type ISqlExecutor<
   TValue extends ISqlValue = ISqlValue,
   TResult extends ISqlRunResult = ISqlRunResult
 > = { readonly sql: ISqlTag<TValue, TResult> }
+/** Stable native SQL endpoints are shared by finite transaction projections and their owner. */
+export const SqlQueryMethod = { all: 'all', get: 'get', run: 'run' } as const
+/** Read-only terminal replacement keeps the exact original fragment node and native result shape. */
+export type IStorageSqlQueryTerminals<TRow extends object, TResult extends ISqlRunResult> = {
+  all(ctx?: IOperationContext): Promise<readonly TRow[]>
+  get(ctx?: IOperationContext): Promise<TRow | undefined>
+  run(ctx?: IOperationContext): Promise<TResult>
+}
 /** Private node tags distinguish immutable composition references from copied bound values. */
 const SqlNodeKind = { sequence: 'sequence', binding: 'binding' } as const
 /** A node stores only new input and references; it never expands an accumulated SQL prefix. */
@@ -547,4 +555,40 @@ export function createSqlTag<
   return Object.freeze(
     Object.assign(tag, { id: sqlIdentifier, join: joinSqlFragments, empty: emptySqlFragment })
   )
+}
+
+/**
+ * Derives only execution endpoints over an authentic existing fragment node. The original SQL
+ * identity table, scanner and backend preparation remain canonical; no driver or scope is created.
+ */
+export function deriveStorageSqlQuery<
+  TRow extends object & { readonly [K in keyof TRow]: ISqlValue } = ISqlRow,
+  TResult extends ISqlRunResult = ISqlRunResult
+>(
+  fragment: ISqlFragment,
+  terminals: IStorageSqlQueryTerminals<TRow, TResult>
+): ISqlQuery<TRow, TResult> {
+  /** Authentication retains the original node graph rather than expanding or compiling it. */
+  const node = sqlNode(fragment)
+  try {
+    /** Borrowed terminal getters are captured once, before publication of the derived identity. */
+    const all = terminals.all
+    /** The original caller continues to own its native callbacks and their Promise results. */
+    const get = terminals.get
+    /** Write execution is delegated through that same captured native endpoint. */
+    const run = terminals.run
+    if (typeof all !== 'function' || typeof get !== 'function' || typeof run !== 'function')
+      throw invalidSqlArgument()
+    /** The original receiver, context and Promise are forwarded without async assimilation. */
+    const query = {
+      all: (ctx?: IOperationContext) => Reflect.apply(all, terminals, [ctx]),
+      get: (ctx?: IOperationContext) => Reflect.apply(get, terminals, [ctx]),
+      run: (ctx?: IOperationContext) => Reflect.apply(run, terminals, [ctx])
+    } as ISqlQuery<TRow, TResult>
+    sqlNodes.set(query, node)
+    return Object.freeze(query)
+  } catch (cause) {
+    if (cause instanceof StorageContractError) throw cause
+    throw invalidSqlArgument(cause)
+  }
 }

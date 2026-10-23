@@ -6,6 +6,7 @@ import { StorageContractErrorText } from './error-text.js'
 export type ICapabilityTransactionFacts = {
   readonly methods: readonly string[]
   readonly query?: true
+  readonly sql?: true
 }
 /** Only authentic standard tokens carry validation and projection facts in the identity row. */
 export type ICapabilityTokenFacts = {

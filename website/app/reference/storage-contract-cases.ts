@@ -98,8 +98,47 @@ const responseLocalBlank = snapshotStorageRdfTerm(term.blank('response-local'), 
   )
 }
 
+/** SQL capability access requires an actual native provider and reuses its original executor. */
+const sqlCapabilityCase: ICaseDoc = {
+  title: t('Use the native SQL capability', '使用原生 SQL 能力'),
+  problem: t(
+    'A consumer must select the published native SQL API by exact token.',
+    '消费者须按精确令牌选择已发布的原生 SQL API。'
+  ),
+  example: `import { sql, type IStorageStore } from '@migaia/storage-contract'
+async function readOne(store: IStorageStore<typeof sql>) {
+  return store.use(sql).sql<{ value: number }>\`SELECT 1 AS value\`.get()
+}`,
+  result: t(
+    'The actual backend executes one statement. Transaction projections use the same original draft and budget.',
+    '实际后端执行一条语句；事务投影沿同一原 draft 与预算。'
+  )
+}
+/** Terminal derivation changes only the finite callbacks of an authentic existing SQL node. */
+const deriveSqlCase: ICaseDoc = {
+  title: t('Derive an existing SQL query', '派生已有 SQL 查询'),
+  problem: t(
+    'A transaction wrapper must retain captured fragment identity without a second compiler.',
+    '事务包装须保留已捕获片段身份，不能复制 compiler。'
+  ),
+  example: `import { deriveStorageSqlQuery, type ISqlQuery } from '@migaia/storage-contract'
+function observe(query: ISqlQuery) {
+  return deriveStorageSqlQuery(query, {
+    all: ctx => query.all(ctx),
+    get: ctx => query.get(ctx),
+    run: ctx => query.run(ctx)
+  })
+}`,
+  result: t(
+    'Construction performs no I/O. The derived query shares its original node and forwards original terminal Promises.',
+    '构造不做 I/O；派生查询共享原节点并转发原终端 Promise。'
+  )
+}
+
 /** Exercises public contract tools without supplying a fictional storage implementation. */
 export const storageContractCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
+  sql: [sqlCapabilityCase],
+  deriveStorageSqlQuery: [deriveSqlCase],
   term: [rdfTermCase],
   snapshotStorageRdfTerm: [rdfTermCase],
   snapshotStorageRdfPattern: [rdfTermCase],

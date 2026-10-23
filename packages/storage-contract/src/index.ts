@@ -166,9 +166,10 @@ export type {
   ISqlQuery,
   ISqlTag,
   ISqlExecutor,
-  ICompiledStorageSql
+  ICompiledStorageSql,
+  IStorageSqlQueryTerminals
 } from './sql.js'
-export { sqlFragment, createSqlTag } from './sql.js'
+export { sqlFragment, createSqlTag, deriveStorageSqlQuery } from './sql.js'
 export type { IQueryStageObserver } from './query.js'
 
 export { encodeOrderedStorageKey } from './key-order.js'
@@ -271,3 +272,5 @@ export type {
   IRawQuad,
   IQuad
 } from './capabilities/rdf.js'
+
+export { sql } from './capabilities/sql.js'
