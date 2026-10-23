@@ -176,7 +176,14 @@ describe('canonical concurrency attempts', () => {
               }
               expect(outer.lock).toEqual([lockKey.text('root'), lockKey.record(new Date(1))])
               const before = readConcurrencyLockIdentities(outer)
-              ;(outer.lock![1]!.key as Date).setTime(90)
+              ;(
+                (
+                  outer.lock![1]! as Extract<
+                    import('../src/index.js').ILockKey,
+                    { channel: 'record' }
+                  >
+                ).key as Date
+              ).setTime(90)
               encode.mockClear()
               await expect(
                 runWithConcurrency(
@@ -310,7 +317,7 @@ describe('canonical concurrency attempts', () => {
       expect(ctx.orgId).toBe('00000000-0000-0000-0000-000000000000')
       expect(Object.hasOwn(ctx, 'timeoutMs')).toBe(false)
       expect(ctx.pageSize).toBe(7)
-      expect(ctx.lock?.map((k) => k.key)).toEqual(['a', 'z'])
+      expect(ctx.lock?.map((key) => ('key' in key ? key.key : undefined))).toEqual(['a', 'z'])
       return { status: 'committed' as const, value: Promise.resolve(42) }
     })
     expect(
@@ -375,8 +382,16 @@ describe('canonical concurrency attempts', () => {
       name: 'mutate',
       locking: 'pessimistic',
       decide: (c) => {
-        expect((c.keys[0]!.key as Date).getTime()).toBe(1)
-        ;(c.keys[0]!.key as Date).setTime(99)
+        expect(
+          (
+            (c.keys[0]! as Extract<import('../src/index.js').ILockKey, { channel: 'record' }>)
+              .key as Date
+          ).getTime()
+        ).toBe(1)
+        ;(
+          (c.keys[0]! as Extract<import('../src/index.js').ILockKey, { channel: 'record' }>)
+            .key as Date
+        ).setTime(99)
         return c.attempt < 2 ? { action: 'retry', delayMs: 0 } : { action: 'reject' }
       }
     })
