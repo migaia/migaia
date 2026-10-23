@@ -85,6 +85,20 @@ describe('native SQLite installation', () => {
     ).toBe(marker)
     expect(await store.sql`SELECT name FROM users`.get()).toMatchObject({ name: 'Alice' })
     expect(await store.get('count')).toBe('1')
+    await store.metadata.set('private', { version: 1 })
+    await store.transaction(async (tx) => {
+      await expect(store.metadata.set('private', { version: 2 })).rejects.toMatchObject({
+        code: 'TRANSACTION_FAILED'
+      })
+      await expect(store.metadata.delete('private')).rejects.toMatchObject({
+        code: 'TRANSACTION_FAILED'
+      })
+      await tx.set('after-metadata-rejection', 'committed')
+    })
+    expect(await store.metadata.get('private')).toEqual({ version: 1 })
+    expect(await store.get('after-metadata-rejection')).toBe('committed')
+    await store.metadata.delete('private')
+    expect(await store.metadata.get('private')).toBeUndefined()
   })
 
   it('locks caught operation and SQL scanner failures into the original transaction owner', async () => {

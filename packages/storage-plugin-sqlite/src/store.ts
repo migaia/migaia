@@ -1683,16 +1683,17 @@ export function createSqliteStore<TValue>(
   const syncMutation = <R>(
     run: (state: INativeState) => R,
     keys: readonly ILockKey[] = [],
-    guard?: IWriteGuard
+    guard?: IWriteGuard,
+    orgId = runtime.orgId
   ): R => {
     assertRoot()
     /** Synchronous entry cannot wait or invoke a user strategy while another logical holder exists. */
-    let conflict = guard ? rangeConflict(runtime.orgId, guard) : undefined
+    let conflict = guard ? rangeConflict(orgId, guard) : undefined
     if (!conflict && keys.length) {
       const identities = new Set(keys.map((key) => identity(key.channel, key.key)))
       if (wal) {
         for (const [index, id] of [...identities].entries()) {
-          const row = lockRow(runtime.orgId, id)
+          const row = lockRow(orgId, id)
           if (row && Number(row.expires_at) > Date.now()) {
             conflict = { keys: [keys[index]!], holder: holderOf(row) }
             break
@@ -1713,7 +1714,7 @@ export function createSqliteStore<TValue>(
       })
     /** No async attempt context is exposed; this native segment performs no waiting or callback. */
     const state = {
-      orgId: runtime.orgId,
+      orgId,
       baseline: new Map(),
       changed: new Map(),
       mode: 'immediate',
@@ -1984,15 +1985,27 @@ export function createSqliteStore<TValue>(
       },
       set: (key, value, ctx) => {
         textInput(key)
-        return rootWrite(SqliteOperation.metadataSet, { key, value }, [], ctx, (state, scope) =>
-          write('metadata', key, value, state, 'replace', scope)
+        return rootRead(SqliteOperation.metadataSet, { key, value }, ctx, (orgId) =>
+          syncMutation(
+            (state) => write('metadata', key, value, state, 'replace'),
+            [],
+            undefined,
+            orgId
+          )
         )
       },
       delete: (key, ctx) => {
         textInput(key)
-        return rootWrite(SqliteOperation.metadataDelete, { key }, [], ctx, (state) => {
-          remove('metadata', key, state)
-        })
+        return rootRead(SqliteOperation.metadataDelete, { key }, ctx, (orgId) =>
+          syncMutation(
+            (state) => {
+              remove('metadata', key, state)
+            },
+            [],
+            undefined,
+            orgId
+          )
+        )
       }
     },
     sync: {
