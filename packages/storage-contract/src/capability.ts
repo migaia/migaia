@@ -67,8 +67,12 @@ export type IKeyValueApi = Omit<
  * Standard record entry reuses the implemented query core; writes retain the native backend
  * pipeline.
  */
-export type IRecordsApi<TValue = ICodecValue> = {
-  query<R = TValue>(): IQueryChain<R>
+export type IRecordsApi<
+  TValue = ICodecValue,
+  _TChangeFeed extends boolean = false,
+  TAugmentMethods extends object = Record<never, never>
+> = {
+  query<R = TValue>(): IQueryChain<R, IOperationContext, R, true, TAugmentMethods>
   removeByPrefix(
     prefix: IStorageKey,
     ctx?: IOperationContext & IWriteConcurrencyOptions
@@ -187,6 +191,12 @@ export type IStorageImplementationsOf<TStore> = TStore extends {
 }
   ? TImplementations
   : readonly []
+
+/** Projects the original API from admitted implementation metadata without creating authority. */
+export type IStorageCapabilityApiOf<TStore, TCap extends IAnyStorageCapability> = IProvidedApi<
+  IStorageImplementationsOf<TStore>,
+  TCap
+>
 
 /** A prepared publication is local until publish; release removes only its own installations. */
 export type ICapabilityPublication = {

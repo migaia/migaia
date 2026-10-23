@@ -144,6 +144,9 @@ export function createStoragePluginHost(options: IPluginHostOptions): IStoragePl
           context.setRegistrationCore(core)
         },
         getStore: context.storeCell.get,
+        setStorageFeatureProjection: context.storeCell.setFeatureProjection,
+        createTransactionApi: context.storeCell.createTransactionApi,
+        getChainMethods: context.storeCell.getChainMethods,
         getBackendId: () => context.id,
         defaultOrgId: context.defaultOrgId,
         getScheduler: () => context.scheduler,

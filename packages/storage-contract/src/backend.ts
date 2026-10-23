@@ -1,5 +1,13 @@
 import type { StorageStageKind } from './stage-kind.js'
-import type { IStorageStore } from './capability.js'
+import type {
+  IStorageStore,
+  IStorageCapabilitySet,
+  IStorageCapabilityApiOf,
+  records
+} from './capability.js'
+import type { IQueryChain } from './query-chain.js'
+import type { IStorageKey, IOperationContext } from './context.js'
+import type { ICodecValue } from '@migaia/serialize/codec'
 import type { ICodecStageObserver } from './codec.js'
 import type { ITransactionStageObserver } from './transaction.js'
 import type { IConcurrencyStageObserver } from './concurrency.js'
@@ -62,12 +70,44 @@ type IWithTransactionMethods<TStore, TMethods extends IChainMethods> = TStore ex
   ? { tx(): IWithTransactionBuilderMethods<TBuilder, TMethods> }
   : Record<never, never>
 
+/** Native record values retain their original backend's declared row domain when available. */
+type IRecordValueOf<TStore> = TStore extends {
+  getRecord(key: IStorageKey): Promise<(infer TValue) | undefined>
+}
+  ? TValue
+  : ICodecValue
+/** Replaces only the common query controls, preserving native API and chain refinements. */
+type IWithRecordQueryMethods<TApi, TValue, TMethods extends IChainMethods> = TApi extends {
+  query(): infer TQuery
+}
+  ? Omit<TApi, 'query'> & {
+      query<R = TValue>(): Omit<TQuery, keyof IQueryChain<unknown>> &
+        IQueryChain<R, IOperationContext, R, true, IChainPart<TMethods, 'query'>> &
+        IChainPart<TMethods, 'query'>
+    }
+  : TApi
+/** Capability lookup keeps the original implementation API for every token outside records. */
+type IWithQueryMethods<TStore, TMethods extends IChainMethods> = 'query' extends keyof TMethods
+  ? {
+      use<TCap extends IStorageCapabilitySet<TStore>>(
+        capability: TCap
+      ): TCap extends typeof records
+        ? IWithRecordQueryMethods<
+            IStorageCapabilityApiOf<TStore, TCap>,
+            IRecordValueOf<TStore>,
+            TMethods
+          >
+        : IStorageCapabilityApiOf<TStore, TCap>
+    }
+  : Pick<TStore, Extract<keyof TStore, 'use'>>
+
 /** Pure authoring projection; actual methods are installed by the owning host and chain owners. */
 export type IWithChainMethods<TStore, TMethods extends IChainMethods> = keyof TMethods extends never
   ? TStore
-  : Omit<TStore, 'tx' | typeof installedChainMethods> & {
+  : Omit<TStore, 'tx' | 'use' | typeof installedChainMethods> & {
       readonly [installedChainMethods]?: TMethods
-    } & IWithTransactionMethods<TStore, TMethods>
+    } & IWithTransactionMethods<TStore, TMethods> &
+      IWithQueryMethods<TStore, TMethods>
 
 /** Backend observations carry no client or payload authority. */
 export type IBackendStageObserver = Readonly<{

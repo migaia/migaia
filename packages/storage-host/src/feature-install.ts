@@ -1,4 +1,11 @@
 import { PluginHostError, PluginHostErrorCode, ERROR_TEXT } from '@migaia/plugin-host'
+import {
+  assertTransactionOwner,
+  runTransactionOperation,
+  RecordQueryMethod,
+  TransactionBuilderMethod,
+  type IChainMethods
+} from '@migaia/storage-contract'
 import type {
   ICapabilityImpl,
   ICapabilityInstallPort,
@@ -7,11 +14,13 @@ import type {
 import { createStorageTypeError, StorageErrorCode } from './errors.js'
 import { StorageErrorText } from './error-text.js'
 import type { IStorageExecutionPort, IStorageFeatureOutput } from './types.js'
+import { STORAGE_CHAIN_FAMILIES } from './state-constants.js'
 /** A closed output-shape failure stays at the existing backend definition boundary. */
-function invalid(): never {
+function invalid(cause?: unknown): never {
   throw createStorageTypeError(
     StorageErrorCode.backendPluginInvalid,
-    StorageErrorText.backendPluginInvalid
+    StorageErrorText.backendPluginInvalid,
+    cause
   )
 }
 /** Reuse PluginHost's duplicate-registration semantics for published method collisions. */
@@ -24,9 +33,17 @@ function duplicate(name: string, key: PropertyKey): never {
 /** Snapshot own data once; methods are rebound only at their actual execution endpoint. */
 function entries(value: unknown): readonly (readonly [string, unknown])[] {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return invalid()
-  return Reflect.ownKeys(value).map((key) => {
+  /** Reflection failure belongs to this same definition boundary and retains its original cause. */
+  let properties: readonly (readonly [PropertyKey, PropertyDescriptor | undefined])[]
+  try {
+    properties = Reflect.ownKeys(value).map(
+      (key) => [key, Object.getOwnPropertyDescriptor(value, key)] as const
+    )
+  } catch (cause) {
+    return invalid(cause)
+  }
+  return properties.map(([key, descriptor]) => {
     /** Retain one own data snapshot without executing a caller accessor. */
-    const descriptor = Object.getOwnPropertyDescriptor(value, key)
     if (
       typeof key !== 'string' ||
       descriptor === undefined ||
@@ -37,6 +54,12 @@ function entries(value: unknown): readonly (readonly [string, unknown])[] {
     return [key, descriptor.value] as const
   })
 }
+/** Original registration-local projections contain no transaction or fluent construction owner. */
+export type IStorageFeatureProjection = {
+  readonly createTransactionApi?: (scope: object) => object
+  readonly chain?: IChainMethods
+}
+
 /**
  * Prepare selected roots only; dependencies remain raw construction outputs until explicitly
  * copied.
@@ -49,7 +72,7 @@ export function installStorageFeatures(input: {
   readonly execution: IStorageExecutionPort
   readonly expose: Readonly<Record<string, Function>>
   readonly onDispose: (release: () => void) => void
-}): void {
+}): IStorageFeatureProjection | undefined {
   /** Publish selected root outputs without implicitly publishing dependencies. */
   const roots = Object.values(input.features)
   if (roots.length === 0) return
@@ -57,6 +80,10 @@ export function installStorageFeatures(input: {
   const implementations: ICapabilityImpl[] = []
   /** API names are scoped to this one backend instance and this install lifetime. */
   const storeApi = Object.create(null) as Record<string, unknown>
+  /** Absent groups retain no method table or scope projection callback. */
+  let transactionApi: Record<string, unknown> | undefined
+  /** Only selected root families contribute methods to the original fluent creators. */
+  let chain: Partial<Record<keyof IChainMethods, Record<string, Function>>> | undefined
   for (const root of roots) {
     /** Reject unknown Feature output fields before installing capabilities. */
     const outputEntries = entries(root)
@@ -66,20 +93,51 @@ export function installStorageFeatures(input: {
     )
       invalid()
     /** Consume only this admitted three-field root output. */
-    const output = root as IStorageFeatureOutput
+    const output = Object.fromEntries(outputEntries) as IStorageFeatureOutput
     if (!Array.isArray(output.capabilities)) invalid()
     implementations.push(...output.capabilities)
     /** Keep store and transaction API namespaces distinct during admission. */
     const groups = entries(output.api)
     if (groups.length !== 2 || groups.some(([key]) => key !== 'store' && key !== 'transaction'))
       invalid()
-    for (const [key, value] of entries(output.api.store)) {
+    /** Later admission consumes captured data rather than rereading a Feature-owned proxy. */
+    const api = Object.fromEntries(groups)
+    for (const [key, value] of entries(api.store)) {
       if (Object.hasOwn(storeApi, key)) duplicate(input.name, key)
       storeApi[key] = bindApi(value, key)
     }
-    // Reject groups that cannot be attached to a real scope or fluent owner.
-    if (entries(output.api.transaction).length !== 0 || entries(output.chain).length !== 0)
-      invalid()
+    for (const [key, value] of entries(api.transaction)) {
+      if (typeof input.expose.getTransactionClient !== 'function') invalid()
+      transactionApi ??= Object.create(null) as Record<string, unknown>
+      if (Object.hasOwn(transactionApi, key)) duplicate(input.name, key)
+      transactionApi[key] = snapshotApi(value)
+    }
+    for (const [family, methods] of entries(output.chain)) {
+      if (!Object.hasOwn(STORAGE_CHAIN_FAMILIES, family)) invalid()
+      /** The family is one finite original fluent surface, not an extension registry. */
+      const key = family as keyof IChainMethods
+      chain ??= Object.create(null) as NonNullable<typeof chain>
+      /** Each selected family is created once and subsequently mixed into actual original nodes. */
+      const target = chain[key] ?? (chain[key] = Object.create(null) as Record<string, Function>)
+      for (const [name, method] of entries(methods)) {
+        if (typeof method !== 'function') invalid()
+        if (
+          (key === 'query' && Object.hasOwn(RecordQueryMethod, name)) ||
+          (key === 'tx' && Object.hasOwn(TransactionBuilderMethod, name))
+        )
+          duplicate(input.name, name)
+        if (Object.hasOwn(target, name)) duplicate(input.name, name)
+        target[name] = function (this: object, ...args: unknown[]) {
+          /** Fluent methods configure original nodes; actual I/O terminals own pipeline entry. */
+          input.expose.getStore!()
+          return Reflect.apply(method, this, args)
+        }
+      }
+    }
+  }
+  if (chain !== undefined) {
+    for (const methods of Object.values(chain)) Object.freeze(methods)
+    Object.freeze(chain)
   }
   if (implementations.length !== 0) {
     if (input.installer === undefined) invalid()
@@ -95,20 +153,59 @@ export function installStorageFeatures(input: {
     configurable: true
   })
 
+  return {
+    ...(transactionApi === undefined
+      ? {}
+      : {
+          createTransactionApi: (scope: object): object => {
+            /** Each actual original view receives its own bound API before the backend freezes it. */
+            const api = Object.create(null) as Record<string, unknown>
+            for (const [key, value] of Object.entries(transactionApi))
+              api[key] = bindApi(value, key, scope)
+            return Object.freeze(api)
+          }
+        }),
+    ...(chain === undefined ? {} : { chain })
+  }
+
+  /** Definition data is captured once; no later scope construction rereads Feature-owned objects. */
+  function snapshotApi(value: unknown): unknown {
+    if (typeof value === 'function') return value
+    /** Capture nested groups now so mutation/getters cannot alter a later registered native view. */
+    const group = Object.create(null) as Record<string, unknown>
+    for (const [key, member] of entries(value)) group[key] = snapshotApi(member)
+    return Object.freeze(group)
+  }
+
   /** Every nested API leaf performs canonical registration admission before touching a client. */
-  function bindApi(value: unknown, path: string): unknown {
+  function bindApi(value: unknown, path: string, scope?: object): unknown {
     if (typeof value === 'function')
-      return (...args: unknown[]) =>
-        input.execution.run({ operation: path, input: args }, (captured) => {
-          /** Use the original admitted backend object instead of creating a replacement. */
-          const store = input.expose.getStore!()
-          /** Fetch the lazy native client only at its actual execution endpoint. */
-          const client = input.expose.getClient?.()
-          return Reflect.apply(value, { store, client, scope: undefined }, captured)
+      return (...args: unknown[]) => {
+        if (scope === undefined)
+          return input.execution.run({ operation: path, input: args }, (captured) => {
+            /** Use the original admitted backend object instead of creating a replacement. */
+            const store = input.expose.getStore!()
+            /** Fetch the lazy native client only at its actual execution endpoint. */
+            const client = input.expose.getClient?.()
+            return Reflect.apply(value, { store, client, scope: undefined }, captured)
+          })
+        /** Original scope admission owns expiry/first-failure semantics before any host/client work. */
+        return runTransactionOperation(scope, (current) => {
+          assertTransactionOwner(input.store, current)
+          return input.execution.run(
+            { operation: path, input: args, scope: current },
+            (captured) => {
+              /** Client projection is lazy and uses this operation's exact current registered view. */
+              const client = input.expose.getTransactionClient!(current)
+              return Reflect.apply(value, { store: current, client, scope: current }, captured)
+            }
+          )
         })
+      }
     /** Freeze a nested API group while its leaves retain registration guards. */
     const group = Object.create(null) as Record<string, unknown>
-    for (const [key, member] of entries(value)) group[key] = bindApi(member, `${path}.${key}`)
+    for (const [key, member] of entries(value))
+      group[key] = bindApi(member, `${path}.${key}`, scope)
     return Object.freeze(group)
   }
 }

@@ -191,8 +191,8 @@ console.log(host.extensions.label('draft'))`,
     defineFeature: {
       role: 'factory',
       purpose: t(
-        'Bind a synchronous Feature definition to authentic backend kind identities. Its selected capabilities, chain methods and grouped API retain precise author types.',
-        '把同步Feature定义绑定到真实后端种类身份，保留所选能力、链方法和分组API的作者类型。'
+        'Bind a synchronous Feature definition to authentic backend kind identities. Its selected capabilities, chain methods and grouped API retain precise author types. Original scope factories project transaction methods before freezing; original query and builder branches retain fluent methods and their receivers.',
+        '把同步Feature定义绑定到真实后端种类身份，保留所选能力、链方法和分组API的作者类型；原scope工厂冻结前投影事务方法，原query和builder分支保留链方法与receiver。'
       ),
       returns: t(
         'The original opaque PluginHost Feature with private storage target metadata.',
