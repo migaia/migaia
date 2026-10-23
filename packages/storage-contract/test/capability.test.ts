@@ -905,7 +905,23 @@ describe('transaction query Feature type projection', () => {
       expectTypeOf(store.use(rdf)).toEqualTypeOf<IRdfApi<true>>()
     }
     void publish
-    function validTypes(store: IEnhanced, rdfOnly: IRdfOnly, vectorOnly: IVectorOnly): void {
+    function validTypes(
+      store: IEnhanced & IKeyValueStore,
+      rdfOnly: IRdfOnly,
+      vectorOnly: IVectorOnly
+    ): void {
+      const fed = asChangeFeedStore(store)
+      fed.use(records).query<{ id: string }>().select('id').originalRecord()
+      fed.use(rdf).match({}).select('object').originalRdf()
+      fed.use(vector).collection('native').nativeCollection()
+      fed.use(vector).collection('native').near([1]).topK(2).select('id').originalVector()
+      fed.use(vector).collection('native').near([1]).topK(2).watch()
+      fed
+        .use(vector)
+        .collection<{ id: string }>('native')
+        .near([1])
+        .topK(2)
+        .groupBy('id', { perGroup: 1 })
       const record = store.use(records).query<{ id: string; value: number }>()
       record.select('id').queryOnly()
       record.select('value').originalRecord()
