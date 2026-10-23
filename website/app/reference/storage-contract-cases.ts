@@ -3,8 +3,58 @@ import type { ICaseDoc, IText } from './contract.js'
 /** Keeps complete bilingual cases beside their exact observable outputs. */
 const t = (en: string, zh: string): IText => ({ en, zh })
 
+/** One complete read-only lookup example is shared by the two exact public accessors. */
+const capabilityReadCase: ICaseDoc = {
+  title: t(
+    'Read a capability without acquiring provider authority',
+    '读取能力而不取得 provider 权限'
+  ),
+  problem: t(
+    'Consumers need capability access without modifying a supplied base or receiving its installation/close controls.',
+    '消费者需要访问能力，不应修改传入 base 或取得安装、关闭控制。'
+  ),
+  example: t(
+    `import { hasStorageCapability, useStorageCapability, kv, type IStorageBase } from '@migaia/storage-contract'
+async function readGreeting(store: IStorageBase) {
+  if (!hasStorageCapability(store, kv)) return undefined
+  return useStorageCapability(store, kv).get('greeting')
+}`,
+    `import { hasStorageCapability, useStorageCapability, kv, type IStorageBase } from '@migaia/storage-contract'
+async function readGreeting(store: IStorageBase) {
+  if (!hasStorageCapability(store, kv)) return undefined
+  return useStorageCapability(store, kv).get('greeting')
+}`
+  ),
+  result: t(
+    'A provided KV store reads its original API. A raw/frozen resource without KV returns undefined without mutation or disposal. Published Feature APIs are read through the same provider table.',
+    '已提供 KV 的 store 读取原 API；无 KV 的 raw/frozen 资源返回 undefined，不修改或释放；已发布 Feature API 从同一 provider 表读取。'
+  )
+}
+
 /** Exercises public contract tools without supplying a fictional storage implementation. */
 export const storageContractCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
+  hasStorageCapability: [capabilityReadCase],
+  useStorageCapability: [capabilityReadCase],
+  compileStorageWhere: [
+    {
+      title: t(
+        'Compile one business condition before scanning candidates',
+        '扫描候选前编译一次业务条件'
+      ),
+      problem: t(
+        'A prefix candidate stream needs the same declarative semantics without constructing another query or rebuilding membership lists per row.',
+        '有序前缀候选流需要相同声明语义，不应另建查询或逐行重建成员列表。'
+      ),
+      example: t(
+        "import { compileStorageWhere } from '@migaia/storage-contract'\nconst accepts = compileStorageWhere<{ status: string; total: number }>({\n  status: 'paid', total: { gte: 100 }\n})\nconst rows = [{ status: 'paid', total: 120 }, { status: 'paid', total: 50 }]\nconsole.log(rows.filter(accepts).length) // 1",
+        "import { compileStorageWhere } from '@migaia/storage-contract'\nconst accepts = compileStorageWhere<{ status: string; total: number }>({\n  status: 'paid', total: { gte: 100 }\n})\nconst rows = [{ status: 'paid', total: 120 }, { status: 'paid', total: 50 }]\nconsole.log(rows.filter(accepts).length) // 1"
+      ),
+      result: t(
+        'Prints 1. Only the paid row with total at least 100 matches; compilation reads no storage.',
+        '输出 1；仅 total 至少 100 的 paid 记录匹配，编译不读取存储。'
+      )
+    }
+  ],
   createTransactionBuilder: [
     {
       title: t('Declare locks without starting a transaction', '声明锁而不提前启动事务'),

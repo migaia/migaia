@@ -598,3 +598,39 @@ function readLocked(store: IRecordStore<{ count: number }>) {
     .run((tx) => tx.getRecord('counter'))
 }
 ```
+
+### Declarative condition compiler
+
+`compileStorageWhere<T>(where)` captures a typed `IWhere<T>` once and returns `(value: T) => boolean`. Nested object fields and repeated constraints combine with AND; explicit and/or/not preserve short-circuit order. `QueryOperator` owns eq, ne, in, exists, gt, gte, lt, lte, between, startsWith, contains and has. Membership lists are copied and compiled to Sets once. Paths reuse the existing utils path admission.
+
+Equality and membership use SameValueZero, including 0/-0 and explicit object identity; ordinary nested object syntax instead checks its fields. Date operands capture their time point. Ordered comparisons require the same number, bigint, string or Date domain and never coerce mismatches. exists distinguishes a missing path from a present undefined. Operator values retain the portable scalar carrier, declared undefined/bigint/Date comparisons, opaque object identity and their lists. Explicit object identity comparisons require client execution when a backend offers only structural equality. Invalid conditions, paths and reflected failures produce INVALID_ARGUMENT with their exact cause before candidate reads. The compiler opens no source and creates no query owner.
+
+```ts
+import { compileStorageWhere } from '@migaia/storage-contract'
+const accepts = compileStorageWhere<{ status: string; total: number }>({
+  status: 'paid',
+  total: { gte: 100 }
+})
+const rows = [
+  { status: 'paid', total: 120 },
+  { status: 'paid', total: 50 }
+]
+console.log(rows.filter(accepts).length) // 1
+```
+
+### Read-only capability access
+
+`hasStorageCapability(store, token)` and `useStorageCapability(store, token)` read the original provider table without installing methods, publishing capabilities, acquiring ownership or returning a provider/base handle. Their token behavior is exactly the original store.has(token)/store.use(token) behavior: authentic published tokens return the same API identity; forged tokens return false from has and throw INVALID_ARGUMENT from use; authentic missing tokens throw UNSUPPORTED_CAPABILITY. Raw or frozen unprovided resources remain missing and unmodified. Provided stores use their captured backend diagnostic rather than re-reading backend getters. use retains exact native implementation refinements. Late Feature prepare/publish/release is visible through the same table. The original store.has(stringKey) KV forwarding remains intact.
+
+```ts
+import {
+  hasStorageCapability,
+  useStorageCapability,
+  kv,
+  type IStorageBase
+} from '@migaia/storage-contract'
+async function readGreeting(store: IStorageBase) {
+  if (!hasStorageCapability(store, kv)) return undefined
+  return useStorageCapability(store, kv).get('greeting')
+}
+```

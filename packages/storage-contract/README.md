@@ -471,3 +471,39 @@ function readLocked(store: IRecordStore<{ count: number }>) {
     .run((tx) => tx.getRecord('counter'))
 }
 ```
+
+### 声明式条件编译器
+
+`compileStorageWhere<T>(where)` 只捕获一次 typed `IWhere<T>`，返回 `(value: T) => boolean`。嵌套对象字段与多个约束按 AND 组合，显式 and/or/not 保留短路顺序。`QueryOperator` 统一拥有 eq、ne、in、exists、gt、gte、lt、lte、between、startsWith、contains、has；in 列表只复制、编译为 Set 一次，路径复用原 utils 准入。
+
+相等与成员判断使用 SameValueZero，包括 0/-0 同值与显式对象身份；普通 nested object 语法则检查其字段。Date 操作数捕获时间点。范围仅比较相同 number、bigint、string 或 Date 域，不强制转换类型；exists 区分缺失路径与存在的 undefined。操作数保留 portable 标量载体、已声明的 undefined/bigint/Date 比较、不透明对象身份及列表。后端只有结构等值时，显式对象身份比较必须在客户端执行。非法条件、路径和反射失败在读取候选前以 INVALID_ARGUMENT 保留精确 cause。编译器不打开数据源、不创建查询 owner。
+
+```ts
+import { compileStorageWhere } from '@migaia/storage-contract'
+const accepts = compileStorageWhere<{ status: string; total: number }>({
+  status: 'paid',
+  total: { gte: 100 }
+})
+const rows = [
+  { status: 'paid', total: 120 },
+  { status: 'paid', total: 50 }
+]
+console.log(rows.filter(accepts).length) // 1
+```
+
+### 只读 capability 访问
+
+`hasStorageCapability(store, token)` 与 `useStorageCapability(store, token)` 读取原 provider 表，不安装方法、不发布能力、不取得所有权，也不返回 provider/base 控制句柄。token 语义与原 store.has(token)/store.use(token) 完全一致：真实已发布 token 返回同一 API 身份；伪造 token 的 has 返回 false、use 抛 INVALID_ARGUMENT；真实缺失 token 抛 UNSUPPORTED_CAPABILITY。未提供能力的 raw 或 frozen 资源保持缺失且不被修改。已提供 store 复用捕获的 backend 诊断，不重新读取 getter；use 保留原生实现的精确扩展类型。晚发布 Feature 的 prepare/publish/release 通过同一表立即可见；原 store.has(stringKey) 的 KV 转发保持不变。
+
+```ts
+import {
+  hasStorageCapability,
+  useStorageCapability,
+  kv,
+  type IStorageBase
+} from '@migaia/storage-contract'
+async function readGreeting(store: IStorageBase) {
+  if (!hasStorageCapability(store, kv)) return undefined
+  return useStorageCapability(store, kv).get('greeting')
+}
+```

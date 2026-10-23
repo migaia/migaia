@@ -686,6 +686,79 @@ export const storageContractReference: ILibraryReference = {
     }
   },
   symbols: {
+    hasStorageCapability: {
+      role: 'operation',
+      purpose: t(
+        'Read authentic published token membership through the original provider table without modifying the base.',
+        '通过原 provider 表读取真实已发布 token 成员关系，不修改 base。'
+      ),
+      params: {
+        store: t(
+          'Original IStorageBase, including raw/frozen resources.',
+          '原 IStorageBase，包括 raw/frozen 资源。'
+        ),
+        capability: t(
+          'Capability token; forged or missing tokens return false, exactly like store.has(token).',
+          '能力 token；伪造或缺失返回 false，与 store.has(token) 相同。'
+        )
+      },
+      returns: t(
+        'Boolean membership only; no installation, ownership or base handle.',
+        '仅 boolean 成员关系，不提供安装、所有权或 base 句柄。'
+      ),
+      example: storageContractCases.hasStorageCapability![0]!.example,
+      cases: storageContractCases.hasStorageCapability
+    },
+    useStorageCapability: {
+      role: 'operation',
+      purpose: t(
+        'Read the same original capability API and native refinements as store.use(token), without provider authority.',
+        '读取与 store.use(token) 相同的原能力 API 与原生扩展，不取得 provider 权限。'
+      ),
+      params: {
+        store: t(
+          'Original IStorageBase; provided diagnostics reuse its captured backend.',
+          '原 IStorageBase；已提供 store 的诊断复用捕获 backend。'
+        ),
+        capability: t(
+          'Authentic published token. Forged tokens throw INVALID_ARGUMENT; authentic missing tokens throw UNSUPPORTED_CAPABILITY.',
+          '真实已发布 token；伪造抛 INVALID_ARGUMENT，真实缺失抛 UNSUPPORTED_CAPABILITY。'
+        )
+      },
+      returns: t(
+        'The exact installed API object with native implementation types; late Feature publication uses the same table.',
+        '精确已安装 API 对象与原生实现类型，晚发布 Feature 复用同一表。'
+      ),
+      example: storageContractCases.useStorageCapability![0]!.example,
+      cases: storageContractCases.useStorageCapability
+    },
+    compileStorageWhere: {
+      role: 'operation',
+      purpose: t(
+        'Capture the canonical declarative AST once and compile a stateless typed candidate predicate.',
+        '一次捕获规范声明式 AST，编译无状态 typed 候选谓词。'
+      ),
+      params: {
+        where: t(
+          'Typed IWhere<T> with nested fields, and/or/not and valid field operators; function predicates are not declarative input.',
+          '包含嵌套字段、and/or/not 与有效字段操作符的 typed IWhere<T>，函数谓词不是声明式输入。'
+        )
+      },
+      returns: t(
+        '(value:T)=>boolean with one-time membership Sets, captured Date bounds and noncoercive comparison. Invalid conditions or paths reject before reading a source.',
+        '(value:T)=>boolean；成员 Set 只编译一次，Date 边界捕获时间，比较不强制转换；无效条件或路径在读取数据源前拒绝。'
+      ),
+      example: storageContractCases.compileStorageWhere![0]!.example,
+      cases: storageContractCases.compileStorageWhere
+    },
+    QueryOperator: {
+      role: 'constant',
+      purpose: t(
+        'Single runtime table of supported declarative field operators.',
+        '声明式字段操作符的唯一运行时表。'
+      ),
+      example: 'console.log(QueryOperator.eq, QueryOperator.in) // eq in'
+    },
     createTransactionBuilder: {
       role: 'factory',
       purpose: t(
@@ -1763,6 +1836,73 @@ console.log(candidate.name, candidate.output)`
     }
   },
   types: {
+    IFieldOps: {
+      summary: t(
+        'Field-specific operators retain their actual operand domains.',
+        '按字段保留实际操作数域的操作符类型。'
+      ),
+      members: {
+        eq: {
+          summary: t(
+            'SameValueZero equality or Date time equality; opaque object operands compare identity.',
+            'SameValueZero 或 Date 时间值相等，显式对象操作数比较身份。'
+          )
+        },
+        in: {
+          summary: t(
+            'One captured membership list compiled to Sets.',
+            '捕获一次并编译为 Set 的成员列表。'
+          )
+        },
+        exists: {
+          summary: t(
+            'Whether the path is present, including a present undefined value.',
+            '路径是否存在，包括存在的 undefined 值。'
+          )
+        },
+        between: {
+          summary: t(
+            'Inclusive endpoints in the same ordered field domain.',
+            '同一有序字段域中的闭区间端点。'
+          )
+        }
+      }
+    },
+    IWhere: {
+      summary: t(
+        'Typed nested field conditions and recursive and/or/not.',
+        'typed 嵌套字段条件与递归 and/or/not。'
+      ),
+      members: {
+        and: { summary: t('All declared conditions must match.', '所有条件必须匹配。') },
+        or: { summary: t('At least one declared condition must match.', '至少一个条件必须匹配。') },
+        not: { summary: t('Negates one nested condition.', '取反一个嵌套条件。') }
+      }
+    },
+    IQueryCondition: {
+      summary: t(
+        'The sole canonical field/boolean AST shared by planning and client predicates.',
+        '规划与客户端谓词共用的唯一规范字段/布尔 AST。'
+      ),
+      members: {
+        kind: { summary: t('Field, and, or or not.', 'field、and、or 或 not。') },
+        path: {
+          summary: t(
+            'Validated property segments owned by the canonical utils path parser.',
+            '由规范 utils 路径解析器接纳的属性片段。'
+          )
+        },
+        operator: {
+          summary: t('A canonical QueryOperator for field nodes.', '字段节点的规范 QueryOperator。')
+        },
+        value: {
+          summary: t(
+            'Portable codec value, undefined, bigint, Date, opaque object identity, or an operator list. Identity objects are not traversed.',
+            'portable codec 值、undefined、bigint、Date、不透明对象身份或操作符列表；不遍历身份对象内容。'
+          )
+        }
+      }
+    },
     IConcurrencyAttempt: {
       summary: t(
         'A fully completed native attempt, either committed with a value or conflicted after rollback/cleanup.',
@@ -3355,6 +3495,23 @@ console.log(compareStorageKeys(key, ['users', 2]))`,
     }
   },
   enums: {
+    QueryOperator: {
+      summary: t('Canonical declarative operators.', '规范声明式操作符。'),
+      values: {
+        eq: t('SameValueZero or Date time equality.', 'SameValueZero 或 Date 时间相等。'),
+        ne: t('Negated equality.', '相等判断取反。'),
+        in: t('Membership compiled once to Sets.', '一次编译为 Set 的成员判断。'),
+        exists: t('Presence independently of undefined.', '独立于 undefined 的存在性。'),
+        gt: t('Greater than a same-domain bound.', '大于同域边界。'),
+        gte: t('At least a same-domain bound.', '大于等于同域边界。'),
+        lt: t('Less than a same-domain bound.', '小于同域边界。'),
+        lte: t('At most a same-domain bound.', '小于等于同域边界。'),
+        between: t('Inclusive same-domain interval.', '同域闭区间。'),
+        startsWith: t('String prefix without coercion.', '不强制转换的字符串前缀。'),
+        contains: t('String substring without coercion.', '不强制转换的字符串包含。'),
+        has: t('Array element equality.', '数组元素相等。')
+      }
+    },
     TransactionActivityMode: {
       summary: t(
         'Actual activity constraint chosen by the backend owner.',
