@@ -172,10 +172,12 @@ describe('Feature transaction methods on original native views', () => {
     expect(codes).toContain('EXTENSION_DUPLICATE')
   })
 
-  it('keeps fluent configuration synchronous when an async intervention is installed', async () => {
+  it('keeps pure fluent configuration outside intervention while real terminals enter it', async () => {
+    let stages = 0
     const intervention = definePlugin('intervention', (core) => ({
       install: () => {
         core.useAsyncPipeline(async (input, next) => {
+          stages++
           await next(input)
         })
         return {}
@@ -184,9 +186,11 @@ describe('Feature transaction methods on original native views', () => {
     await using host = await createStorageHost({
       plugins: [memoryBackendPlugin({ features: { scoped: scopedFeature() } }), intervention]
     })
-    expect(() => host.backend('memory').tx().mark()).toThrowError(
-      expect.objectContaining({ code: 'ASYNC_STAGE_IN_SYNC_ENTRY' })
-    )
+    const builder = host.backend('memory').tx()
+    expect(builder.mark()).toBe(builder)
+    expect(stages).toBe(0)
+    await builder.lock({ channel: 'record', key: 'item' }).run(() => undefined)
+    expect(stages).toBe(1)
   })
 
   it('retains a Feature method-table reflection failure on the coded installation cause chain', async () => {

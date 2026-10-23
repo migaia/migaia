@@ -128,14 +128,9 @@ export function installStorageFeatures(input: {
           duplicate(input.name, name)
         if (Object.hasOwn(target, name)) duplicate(input.name, name)
         target[name] = function (this: object, ...args: unknown[]) {
-          /** Fluent configuration remains synchronous; async stages use the original sync refusal. */
-          return input.execution.runSync(
-            { operation: `${family}.${name}`, input: args },
-            (captured) => {
-              input.expose.getStore!()
-              return Reflect.apply(method, this, captured)
-            }
-          )
+          /** Fluent methods configure original nodes; actual I/O terminals own pipeline entry. */
+          input.expose.getStore!()
+          return Reflect.apply(method, this, args)
         }
       }
     }

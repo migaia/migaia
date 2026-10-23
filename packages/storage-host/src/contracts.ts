@@ -364,22 +364,24 @@ export const definePlugin: IStorageDefinePlugin = ((
                   StorageErrorText.backendPluginInvalid
                 )
               if (kind !== undefined && features !== undefined) {
-                /** Original registration cleanup drops only its own selected Feature projection. */
-                nativeCore.onDispose(() => nativeCore.setStorageFeatureProjection(undefined))
-                nativeCore.setStorageFeatureProjection(
-                  installStorageFeatures({
-                    name,
-                    store: nativeCore.getStore(),
-                    features: nativeCore.features,
-                    installer:
-                      capabilityInstaller === undefined
-                        ? undefined
-                        : Reflect.apply(capabilityInstaller, descriptor, [nativeCore.getStore()]),
-                    execution: nativeCore.execution,
-                    expose: nativeCore.featureExpose as Readonly<Record<string, Function>>,
-                    onDispose: nativeCore.onDispose
-                  })
-                )
+                /** An empty selection creates neither a projection nor an extra cleanup closure. */
+                const projection = installStorageFeatures({
+                  name,
+                  store: nativeCore.getStore(),
+                  features: nativeCore.features,
+                  installer:
+                    capabilityInstaller === undefined
+                      ? undefined
+                      : Reflect.apply(capabilityInstaller, descriptor, [nativeCore.getStore()]),
+                  execution: nativeCore.execution,
+                  expose: nativeCore.featureExpose as Readonly<Record<string, Function>>,
+                  onDispose: nativeCore.onDispose
+                })
+                if (projection !== undefined) {
+                  /** Original registration cleanup drops only its own selected Feature projection. */
+                  nativeCore.onDispose(() => nativeCore.setStorageFeatureProjection(undefined))
+                  nativeCore.setStorageFeatureProjection(projection)
+                }
               }
               if (
                 extensions === null ||
