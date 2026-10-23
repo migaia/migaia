@@ -3,6 +3,26 @@ import type { ICaseDoc, IText } from './contract.js'
 const t = (en: string, zh: string): IText => ({ en, zh })
 /** Application extensions retain their exact inputs while the host owns installation and cleanup. */
 export const storageHostCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
+  resolveStorageNamespace: [
+    {
+      title: t('Retain per-instance organization prefixes', '保留各实例组织前缀'),
+      problem: t(
+        'Two backend instances need distinct configured targets even for the same organization.',
+        '两个后端实例在同一组织中仍需保留不同配置目标。'
+      ),
+      example: `import { resolveStorageNamespace } from '@migaia/storage-host/authoring/backend'
+
+const defaultOrg = '00000000-0000-0000-0000-000000000000'
+const org = '10000000-0000-0000-0000-000000000000'
+console.log(resolveStorageNamespace('prefs', defaultOrg, defaultOrg))
+console.log(resolveStorageNamespace('prefs', org, defaultOrg))
+console.log(resolveStorageNamespace('cache', org, defaultOrg))`,
+      result: t(
+        'Prints prefs, prefs/org and cache/org, where org is the supplied canonical UUID.',
+        '输出prefs、prefs/org与cache/org，其中org为给出的规范UUID。'
+      )
+    }
+  ],
   createOrgId: [
     {
       title: t('Generate native organization identity', '生成原生组织身份'),

@@ -1760,9 +1760,27 @@
         "defineStorageBackendKind"
       ],
       "./authoring/backend": [
+        "assertKeyRange",
+        "collectUniqueIndexOwners",
         "createStorageOperationReporter",
         "createStorageOperationRuntime",
-        "reportCleanupError"
+        "createStorageToken",
+        "decodeFlatStorageKey",
+        "encodeFlatStorageKey",
+        "invokeExtension",
+        "isStorageErrorFamily",
+        "isStorageKeyInRange",
+        "mergeSignals",
+        "normalizeError",
+        "planChannelWrite",
+        "readAbortReason",
+        "reportCleanupError",
+        "resolveStorageNamespace",
+        "safeJsonPayloadByteLength",
+        "snapshotKeyRange",
+        "subscribeToAbort",
+        "throwIfAborted",
+        "withAbort"
       ],
       "./entity": [
         "REPOSITORY_KEY_PREFIX",

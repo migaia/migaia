@@ -7,8 +7,8 @@ export const storageHostReference: ILibraryReference = {
   modules: {
     'authoring/backend': {
       summary: t(
-        'Consume finite neutral backend functions and controller types. Controller creation, registration and lookup remain guarded by the original core and Feature ports.',
-        '消费有限中立后端函数与controller类型。controller构造、登记和读取仍由原core与Feature接点约束。'
+        'Share channel, unique-index, error and cancellation rules through finite backend functions. Controller creation, registration and lookup remain guarded by the original core and Feature ports.',
+        '通过有限后端函数共享通道、唯一索引、错误和取消规则。controller构造、登记和读取仍由原core与Feature接点约束。'
       ),
       example: `import { createStorageOperationReporter, reportCleanupError } from '@migaia/storage-host/authoring/backend'
 
@@ -40,6 +40,18 @@ console.log(host.extensions.label('draft'))`
     }
   },
   symbols: {
+    resolveStorageNamespace: {
+      role: 'operation',
+      purpose: t(
+        'Resolve one configured backend namespace while keeping each instance prefix and canonical organization identity.',
+        '解析后端配置namespace，保留各实例前缀与规范组织身份。'
+      ),
+      returns: t(
+        'The configured target for the default organization, or configured/orgId for another organization. A slash UUID configuration suffix rejects before I/O.',
+        '缺省组织返回原配置目标，其它组织返回configured/orgId。配置的slash UUID后缀在I/O前拒绝。'
+      ),
+      cases: storageHostCases.resolveStorageNamespace
+    },
     createOrgId: {
       role: 'factory',
       purpose: t(

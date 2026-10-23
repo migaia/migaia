@@ -52,7 +52,10 @@ describe('controlled backend change authoring', () => {
         plugins: [definePlugin('finalize', descriptor)],
         report: vi.fn()
       })
-      /** The original stable Promise carries either the already-coded failure or its one host wrapper. */
+      /**
+       * The original stable Promise carries either the already-coded failure or its one host
+       * wrapper.
+       */
       const failure = await controller.dispose().catch((error) => error)
       if (coded) expect(failure).toBe(original)
       else
