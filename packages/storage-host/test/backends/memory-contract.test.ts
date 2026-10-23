@@ -15,6 +15,7 @@ import {
   memoryBackendPlugin,
   StorageError
 } from '../../src/index.js'
+import type { IStorageHookMap } from '../../src/index.js'
 
 /** The selected row domain belongs to the actual native memory record channel. */
 type IOrder = { state: string; total: number }
@@ -25,6 +26,8 @@ describe('memory native contract integration', () => {
     const operations: string[] = []
     /** Observe one before/after pair for each high-level batch. */
     const observations: string[] = []
+    /** Counts describe the complete high-level call while omitting every business key and value. */
+    const beforePayloads: IStorageHookMap['beforeStorageOperation'][] = []
     /** This existing intervention port leaves captured input and native result unchanged. */
     const counting = definePlugin('counting', (core) => ({
       install: () => {
@@ -38,7 +41,10 @@ describe('memory native contract integration', () => {
     await using host = await createStorageHost({
       plugins: [memoryBackendPlugin(), counting],
       hooks: {
-        beforeStorageOperation: ({ operation }) => observations.push(`before:${operation}`),
+        beforeStorageOperation: (payload) => {
+          beforePayloads.push(payload)
+          observations.push(`before:${payload.operation}`)
+        },
         afterStorageOperation: ({ operation }) => observations.push(`after:${operation}`)
       }
     })
@@ -53,6 +59,15 @@ describe('memory native contract integration', () => {
     ])
     expect(operations).toEqual(['setMany'])
     expect(observations).toEqual(['before:setMany', 'after:setMany'])
+    expect(beforePayloads).toEqual([
+      {
+        backendId: 'memory',
+        backend: 'memory',
+        orgId: '00000000-0000-0000-0000-000000000000',
+        operation: 'setMany',
+        count: 5
+      }
+    ])
     expect(await text.getMany([['group', 2], 'missing', ['group', 2], 1, '1'])).toEqual([
       'two',
       undefined,
@@ -80,11 +95,16 @@ describe('memory native contract integration', () => {
   it('rejects duplicate root writes before a native transaction and rolls back a later channel conflict', async () => {
     /** Native transaction hooks distinguish admission rejection from a committed partial batch. */
     let transactions = 0
+    /** Failure payloads retain only the original identity, operation, code and batch count. */
+    const errors: IStorageHookMap['onStorageOperationError'][] = []
     await using host = await createStorageHost({
       plugins: [memoryBackendPlugin()],
       hooks: {
         beforeTransaction: () => {
           transactions++
+        },
+        onStorageOperationError: (payload) => {
+          errors.push(payload)
         }
       }
     })
@@ -120,6 +140,20 @@ describe('memory native contract integration', () => {
     expect(transactions).toBe(1)
     expect(await text.getMany(['earlier', 'blocked'])).toEqual([undefined, undefined])
     expect(await store.getRecord('blocked')).toEqual({ occupied: true })
+    expect(errors.map(({ count, code }) => ({ count, code }))).toEqual([
+      { count: 2, code: 'INVALID_ARGUMENT' },
+      { count: 1, code: 'INVALID_ARGUMENT' },
+      { count: 2, code: 'DUPLICATE_KEY' }
+    ])
+    for (const payload of errors)
+      expect(Object.keys(payload).sort()).toEqual([
+        'backend',
+        'backendId',
+        'code',
+        'count',
+        'operation',
+        'orgId'
+      ])
   })
 
   it('keeps empty root and scoped batches outside pipelines and operation hooks', async () => {

@@ -518,7 +518,7 @@ export function createMemoryBackend<T = unknown>(
   /** One high-level batch reports one observation without exposing per-key native work. */
   const observeBatch = async <R>(
     operation: string,
-    count: number,
+    count: number | undefined,
     invoke: () => R | Promise<R>,
     scope?: IMemoryScope<T>
   ): Promise<R> => {
@@ -528,20 +528,21 @@ export function createMemoryBackend<T = unknown>(
     const stages = scope === undefined ? root : root.forTransaction(scope)
     /** The original scheduler measures the entire pipeline and native settlement. */
     const started = scheduler.now()
-    void stages.beforeStorageOperation?.(operation)
+    void stages.beforeStorageOperation?.(operation, count)
     try {
       /** The actual pipeline or original draft callback runs once for this batch terminal. */
       const result = await invoke()
       void stages.afterStorageOperation?.(
         operation,
         Math.max(0, scheduler.now() - started),
-        typeof result === 'number' ? result : count
+        typeof result === 'number' ? result : (count ?? 0)
       )
       return result
     } catch (error) {
       void stages.onStorageOperationError?.(
         operation,
-        readStorageHookFailureCode(error, stages.report)
+        readStorageHookFailureCode(error, stages.report),
+        count
       )
       throw error
     }
@@ -1133,7 +1134,7 @@ export function createMemoryBackend<T = unknown>(
           operation(MemoryOperation.removeByPrefix, prefix, (current) =>
             observeBatch(
               MemoryOperation.removeByPrefix,
-              0,
+              undefined,
               () => textDraft.removeByPrefix(current),
               scope
             )
@@ -1464,7 +1465,7 @@ export function createMemoryBackend<T = unknown>(
       )
     },
     removeByPrefix: (prefix, ctx) =>
-      observeBatch(MemoryOperation.removeByPrefix, 0, () =>
+      observeBatch(MemoryOperation.removeByPrefix, undefined, () =>
         atomicEntry(
           MemoryOperation.removeByPrefix,
           () => prefix,
