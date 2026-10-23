@@ -100,6 +100,28 @@ console.log(await repo.query().where({ name: 'Ada' }).orderByComparator((left, r
   ],
   memoryBackendPlugin: [
     {
+      title: t('Bound one memory namespace with native LRU', '用原生 LRU 限制一个内存 namespace'),
+      problem: t(
+        'Evict committed physical entries without a second cache or transaction owner.',
+        '驱逐已提交物理条目，不另建缓存或事务 owner。'
+      ),
+      example: `import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+await using host = await createStorageHost({ plugins: [memoryBackendPlugin({ capacity: { maxEntries: 2 } })] })
+const memory = host.backend('memory')
+host.hooks.on('onEvict', event => console.log(event.channel, event.count))
+await memory.set('a', 'a')
+await memory.set('b', 'b')
+await memory.get('a')
+await memory.set('c', 'c')
+console.log(await memory.get('b'))
+// value 1
+// null`,
+      result: t(
+        'Prints value 1 and null; only the committed least-recent entry is evicted.',
+        '输出 value 1 和 null；仅驱逐已提交的最久未访问条目。'
+      )
+    },
+    {
       title: t('Commit three native memory channels', '提交内存的三个原生通道'),
       problem: t(
         'One isolated backend needs text, bytes and queried records within the original transaction owner.',
