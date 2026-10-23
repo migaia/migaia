@@ -325,7 +325,7 @@ describe('createWebStorageBackend', () => {
     await expect(store.clearAll()).rejects.toMatchObject({
       code: 'BACKEND_UNAVAILABLE',
       backend: 'local-storage',
-      operation: 'local-storage.clearAll',
+      operation: 'local.clearAll',
       key: 'second'
     })
     await expect(store.get('first')).resolves.toBeNull()
@@ -342,7 +342,7 @@ describe('createWebStorageBackend', () => {
     await expect(store.clearAll()).rejects.toMatchObject({
       code: 'BACKEND_UNAVAILABLE',
       backend: 'local-storage',
-      operation: 'local-storage.clearAll',
+      operation: 'local.clearAll',
       cause: expect.objectContaining({ message: 'hostile clear snapshot' })
     })
   })
@@ -380,7 +380,7 @@ describe('createWebStorageBackend', () => {
     await expect(store.clearAll()).rejects.toMatchObject({
       code: 'BACKEND_UNAVAILABLE',
       backend: 'local-storage',
-      operation: 'local-storage.clearAll',
+      operation: 'local.clearAll',
       cause: expect.any(TypeError)
     })
     expect(storage.length).toBe(2)
