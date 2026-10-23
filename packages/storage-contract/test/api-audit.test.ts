@@ -54,22 +54,11 @@ const makeStore = (): contract.IRecordStore => ({
     return Object.assign(cursor, { dispose, [Symbol.asyncDispose]: dispose })
   },
   async transaction<TResult>(
-    run: (scope: contract.ITransactionScope) => TResult
+    _run: (scope: contract.ITransactionScope) => TResult
   ): Promise<Awaited<TResult>> {
-    /** Fixture exercises the complete public shape without executing backend storage. */
-    const store = makeStore()
-    return await run({
-      get: store.get,
-      set: store.set,
-      remove: store.remove,
-      has: store.has,
-      getBytes: store.getBytes,
-      setBytes: store.setBytes,
-      removeBytes: store.removeBytes,
-      getRecord: store.getRecord,
-      putRecord: store.putRecord,
-      deleteRecord: store.deleteRecord,
-      iterateRecords: store.iterateRecords
+    /** This shape-only admission fixture never executes a transaction or fabricates a scope. */
+    throw new contract.StorageContractError(contract.StorageContractErrorCode.unsupported, {
+      backend: 'memory'
     })
   }
 })

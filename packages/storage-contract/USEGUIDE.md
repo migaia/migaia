@@ -681,3 +681,40 @@ async function paidTotals(store: IStorageBase) {
 `snapshotConcurrencyLockHoldings(rows)` 对当前检查行制作独立快照，复用同一通道与键字节顺序稳定排序，保留每行的 holder、expired 与 expiresAt。相同键的行不会合并；返回值不关联内部锁表或授予锁权限。
 
 `IConcurrencyAttemptContext.attempt` 等于原共用冲突计数加一；后端把此只读序号转发给观察，不自行计数，嵌套尝试沿同一预算来源。
+
+## SQL 片段与后端绑定
+
+`sqlFragment` 是无连接的纯标签，仅有 `id`、`join` 与 `empty`；没有 all/get/run。插值只接受 ISqlValue 或同一 owner 创建的真实片段；普通对象、Date、undefined 与伪造片段在构造时拒绝 INVALID_ARGUMENT。模板必须具有冻结的真实 cooked/raw 数组形状。id 独立引用每段名称并转义双引号；join 保留重复子片段。字节在构造时复制，不会把输入值拼入 SQL 文本。
+
+片段按不可变节点引用增长，不复制历史 SQL；首次执行通过显式栈展开一次。SQLite 使用 ?，PostgreSQL 从 $1 连续编号。每次 prepare 都给驱动独立的字节副本；没有共享可变参数或全局语句缓存。
+
+```ts
+import { sqlFragment, type ISqlExecutor } from '@migaia/storage-contract'
+async function readUser(executor: ISqlExecutor, id: number) {
+  const columns = sqlFragment.join([sqlFragment.id('id'), sqlFragment.id('name')])
+  return executor.sql<{
+    id: number
+    name?: string
+  }>`SELECT ${columns} FROM ${sqlFragment.id('users')} WHERE id = ${id}`.get()
+}
+```
+
+`createSqlTag({ dialect, all, get, run })` 供原后端作者把这些节点接入真实终点。三个回调接收 `prepare: () => ICompiledStorageSql` 与原 ctx，必须先进入自己的原 operation/transaction owner，再调用 prepare，随后执行原驱动方法。标签直接返回该回调的原 Promise，并保留回调 receiver 与 ctx；不创建连接、pipeline、lease、取消计时器或 dispose 拥有者。ICompiledStorageSql 只含 text 与 readonly values。首次完整文本会检查单语句、引号、注释、事务控制与 SQLite journal_mode 修改；拒绝发生在原准入内、原生调用前，进入同一事务首错。合法末尾分号和注释允许，CREATE TRIGGER 的内部多语句列表拒绝。
+
+共享 ISqlValue 包含 boolean、bigint 与 Uint8Array；ISqlRunResult 只承诺 changes，不承诺插入 ID。后端用 ISqlTag<TValue, TResult>/ISqlExecutor<TValue, TResult> 保留具体输出值域和结果；显式行类型是调用方声明，不代表运行时验证了 SQL 输出 schema。SQLite 的布尔输入转换及 lastInsertRowid 由其原适配器负责；PostgreSQL 普通字符串采用受支持的 standard_conforming_strings=on，并支持 E 字符串、dollar quote 与嵌套块注释。真实连接、驱动错误、观察与事务清理由后端沿原拥有者执行。
+
+## 原事务能力投影
+
+`useTransactionCapability(scope, token)` 从真实 scope 的原 transaction owner 找到同一 store，再读取唯一 provider 表。它供后端原方法工厂的 `use: (token) => useTransactionCapability(scope, token)` 使用；不修改 scope，因此公开类型注解的完整 frozen scope 不需要私有 symbol 或 cast。纯 use 不调用 forTransaction、不执行 I/O；同视图、同实现重复 use 返回同一冻结投影，视图失效时清空缓存。
+
+当前标准事务投影覆盖 kv 与 records。kv 提供完整 get/set/remove/has/getMany/setMany/removeMany/removeByPrefix，保留单个真实 native batch；没有根 keys/clear、普通操作 ctx 或独立策略。records 提供真实共用 query 与 removeByPrefix；query 的 all 不接受普通 ctx。每个数据方法都进入原 runTransactionOperation，将新的完整操作视图交给 forTransaction；保存 query 的 all 也先进入同一 owner，严格计划失败、mapper 与真实 iterator 清理保持原首错和排空。关闭后的保存数据方法与 query 终点在 I/O 前拒绝原后端 TRANSACTION_FAILED。
+
+```ts
+import { kv, records, type ITransactionScope } from '@migaia/storage-contract'
+async function paidValues(tx: ITransactionScope<{ state: string; value: number }, typeof records>) {
+  await tx.use(kv).setMany([{ key: 'status', value: 'paid' }])
+  return tx.use(records).query().where({ state: 'paid' }).select('value').all()
+}
+```
+
+声明 transactions 的 base/Feature 必须为已提供的 kv、records 提供真实 forTransaction，provider 在发布或修改 base 前检查；binder 只绑定当前原生视图，不得返回根 API。查询构造保持纯函数，后端 source 必须把真实 iterator 登记到该 scope 的原 owner。ITransactionScope 的第二泛型与 ITransactionCapabilityView 保留能力集合的反变约束；provider 重新投影原 transaction/tx 的 use 类型，同时保留原生附加成员、options、builder 增强和 Awaited 结果。其它标准事务投影与根 KV 批量面待对应后续实现，不由此处宣称完成。

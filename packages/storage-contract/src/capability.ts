@@ -11,7 +11,11 @@ import type { IWriteConcurrencyOptions } from './concurrency.js'
 import type { ICodecValue } from '@migaia/serialize/codec'
 import type { IOperationContext, IStorageKey } from './context.js'
 import type { IQueryChain } from './query-chain.js'
-import type { ITransactionScope, ITransactionKeyValueApi } from './transaction.js'
+import type {
+  ITransactionScope,
+  ITransactionKeyValueApi,
+  ITransactionRecordsApi
+} from './transaction.js'
 import {
   STORAGE_CAPABILITY_METHODS,
   STORAGE_KEY_VALUE_METHODS,
@@ -73,14 +77,38 @@ export type IRecordsApi<TValue = ICodecValue> = {
 /** Only standard capabilities with a declared transaction projection belong to transaction use. */
 export type ITransactionalCapability<TCaps extends IAnyStorageCapability> = Extract<
   TCaps,
-  typeof kv
+  typeof kv | typeof records
 >
 
 /** Projects the standard transaction API without creating or admitting a transaction scope. */
 export type ITransactionCapabilityApi<TCap extends IAnyStorageCapability> = TCap extends typeof kv
   ? ITransactionKeyValueApi
-  : never
+  : TCap extends typeof records
+    ? ITransactionRecordsApi
+    : never
 
+/** Optional contravariant proof permits complete external scopes without private symbol access. */
+export type ITransactionCapabilityView<
+  TCaps extends IAnyStorageCapability,
+  TValue = ICodecValue
+> = {
+  readonly [storeCapabilities]?: (capability: TCaps) => void
+  use<TCap extends ITransactionalCapability<TCaps>>(
+    capability: TCap
+  ): TCap extends typeof records ? ITransactionRecordsApi<TValue> : ITransactionCapabilityApi<TCap>
+}
+/** Actual record values follow the original backend getRecord declaration, never a root API cast. */
+type IScopeRecordValue<TScope> = TScope extends {
+  getRecord(key: IStorageKey): Promise<(infer TValue) | undefined>
+}
+  ? TValue
+  : ICodecValue
+/** Replaces only capability-facing members while preserving every native scope extension. */
+type IAddScopedCapabilities<TScope, TCaps extends IAnyStorageCapability> = Omit<
+  TScope,
+  'use' | typeof storeCapabilities
+> &
+  ITransactionCapabilityView<TCaps, IScopeRecordValue<TScope>>
 /** Frozen implementation descriptor; the API object keeps its backend-owned lifetime. */
 export type ICapabilityImpl<
   TCap extends IAnyStorageCapability = IAnyStorageCapability,
@@ -115,16 +143,16 @@ type IFlatKeyValue<TCaps extends IAnyStorageCapability> = [Extract<TCaps, typeof
  * Retains the backend's full scope, options and existing builder augmentation without owning
  * execution.
  */
-type ITransactionMembers<TBase> = TBase extends {
+type ITransactionMembers<TBase, TCaps extends IAnyStorageCapability> = TBase extends {
   transaction(run: (scope: infer TScope) => unknown, options?: infer TOptions): unknown
 }
   ? {
       transaction<TResult>(
-        run: (scope: TScope) => TResult,
+        run: (scope: IAddScopedCapabilities<TScope, TCaps>) => TResult,
         options?: TOptions
       ): Promise<Awaited<TResult>>
     } & (TBase extends { tx(): ITransactionBuilder<infer TBuilderScope, infer TAugmentMethods> }
-      ? { tx(): ITransactionBuilder<TBuilderScope, TAugmentMethods> }
+      ? { tx(): ITransactionBuilder<IAddScopedCapabilities<TBuilderScope, TCaps>, TAugmentMethods> }
       : TBase extends { tx(): infer TBuilder }
         ? { tx(): TBuilder }
         : Record<never, never>)
@@ -143,7 +171,7 @@ export type ICapabilityStore<
     readonly [providedImplementations]?: TImplementations
     use<TCap extends TCaps>(capability: TCap): IProvidedApi<TImplementations, TCap>
   } & IFlatKeyValue<TCaps> &
-  ITransactionMembers<TBase>
+  ITransactionMembers<TBase, TCaps>
 
 /** Public type projection; only the provider's private object table grants runtime authority. */
 export type IStorageCapabilitySet<TStore> = TStore extends {
@@ -279,6 +307,31 @@ export function useStorageCapability<
   >
 }
 
+/**
+ * Internal original-owner access reads the same published store table and private implementation
+ * record. It returns no public provider/registration authority and never invokes the binder.
+ */
+export function readTransactionImplementation(
+  store: IStorageBase,
+  capability: IAnyStorageCapability
+): IImplementationRecord & { readonly forTransaction: (scope: ITransactionScope) => unknown } {
+  /** Root membership and forged-token diagnostics use the exact canonical lookup first. */
+  const record = stores.get(store)
+  useCapability(store, record, capability)
+  /** Published implementation identity remains the authority for transaction binding. */
+  const installed = record!.table.get(capability)!
+  /** Only the implemented finite standard projections can be requested from this owner. */
+  const binding = implementations.get(installed.implementation)!
+  if ((capability !== kv && capability !== records) || binding.forTransaction === undefined)
+    throw new StorageContractError(
+      StorageContractErrorCode.unsupported,
+      { backend: record!.backend },
+      StorageContractErrorText.capabilityTransactionMissing(capability.name, record!.backend)
+    )
+  return binding as IImplementationRecord & {
+    readonly forTransaction: (scope: ITransactionScope) => unknown
+  }
+}
 /** Creates a frozen authentic implementation descriptor without taking ownership of its API. */
 export function implement<
   TCap extends IAnyStorageCapability,
@@ -300,7 +353,10 @@ export function implement<
     )
       throw invalidCapability()
     forTransaction = options?.forTransaction
-    if (forTransaction !== undefined && (capability !== kv || typeof forTransaction !== 'function'))
+    if (
+      forTransaction !== undefined &&
+      ((capability !== kv && capability !== records) || typeof forTransaction !== 'function')
+    )
       throw invalidCapability()
   } catch (cause) {
     if (
@@ -319,7 +375,8 @@ export function implement<
 /** Admits all descriptors before changing the base or reserving a token in its unique table. */
 function admitImplementations(
   entries: readonly ICapabilityImpl[],
-  table: Map<IAnyStorageCapability, IInstalledCapability>
+  table: Map<IAnyStorageCapability, IInstalledCapability>,
+  transactions: boolean
 ): readonly ICapabilityImpl[] {
   if (!Array.isArray(entries)) throw invalidCapability()
   /** Local uniqueness is linear and does not reserve partially admitted input. */
@@ -367,6 +424,12 @@ function admitImplementations(
       )
         throw invalidCapability()
     }
+    if (
+      transactions &&
+      (descriptor.capability === kv || descriptor.capability === records) &&
+      implementations.get(descriptor)?.forTransaction === undefined
+    )
+      throw invalidCapability()
     seen.add(descriptor.capability)
     captured.push(descriptor)
   }
@@ -433,7 +496,7 @@ export function provideCapabilities<
     /** Method closures and root read access share the same table and captured diagnostic. */
     const record: ICapabilityStoreRecord = { table, backend: baseAdmission.backend }
     /** No caller or base mutation occurs while descriptors and duplicates are checked. */
-    const captured = admitImplementations(entries, table)
+    const captured = admitImplementations(entries, table, baseAdmission.capabilities.transactions)
     /** Capture original KV method receivers before replacing the overlapping has entry. */
     const kvDescriptor = captured.find((entry) => entry.capability === kv)
     /** Definitions are staged locally so ordinary descriptor failures cannot partially install. */
@@ -469,7 +532,11 @@ export function provideCapabilities<
       prepare(next: readonly ICapabilityImpl[]): ICapabilityPublication {
         try {
           /** Reserve all admitted tokens together, including other unpublished preparations. */
-          const additions = admitImplementations(next, table)
+          const additions = admitImplementations(
+            next,
+            table,
+            baseAdmission.capabilities.transactions
+          )
           /** A Feature can add the same standard KV API that a native backend provides. */
           const keyValue = additions.find((entry) => entry.capability === kv)
           /** Stage optional flat KV methods before reserving any descriptor. */

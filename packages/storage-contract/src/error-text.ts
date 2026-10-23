@@ -1,5 +1,9 @@
 /** Stable validation causes used by codec and synchronous-option admission boundaries. */
 export const StorageContractErrorText = {
+  /** SQL templates, identifiers and pure fragment inputs are admitted before native execution. */
+  sqlArgument: 'SQL fragment input is invalid',
+  /** The shared lexer rejects empty/multiple statements and transaction-owned user commands. */
+  sqlStatement: 'SQL must contain one permitted statement',
   /**
    * Declarative query admission rejects malformed boolean, field, path and operator inputs before
    * reading candidates.
@@ -84,6 +88,9 @@ export const StorageContractErrorText = {
   /** Invalid capability descriptors and provider resources fail before installation side effects. */
   capabilityArgument: 'capability token, implementation or provider base is invalid',
   /** Missing token diagnostics identify backend and capability without granting authority by name. */
+  /** Root membership alone does not authorize a capability on an original transaction view. */
+  capabilityTransactionMissing: (capability: string, backend: string): string =>
+    `backend ${backend} does not provide transaction capability ${capability}`,
   capabilityMissing: (capability: string, backend: string): string =>
     `backend ${backend} does not provide capability ${capability}`
 } as const

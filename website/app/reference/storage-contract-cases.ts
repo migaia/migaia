@@ -33,6 +33,89 @@ async function readGreeting(store: IStorageBase) {
 
 /** Exercises public contract tools without supplying a fictional storage implementation. */
 export const storageContractCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
+  useTransactionCapability: [
+    {
+      title: t(
+        'Keep transaction capability execution in its original owner',
+        '将事务能力执行保持在原 owner'
+      ),
+      problem: t(
+        'Capability lookup must not expose root APIs, mutate frozen scopes or bypass transaction first failure and lifetime.',
+        '能力取用不能暴露根 API、修改冻结 scope 或绕过事务首错与生命周期。'
+      ),
+      example: t(
+        `import { kv, records, type ITransactionScope } from '@migaia/storage-contract'
+async function paidValues(tx: ITransactionScope<{ state: string; value: number }, typeof records>) {
+  await tx.use(kv).setMany([{ key: 'status', value: 'paid' }])
+  return tx.use(records).query().where({ state: 'paid' }).select('value').all()
+}`,
+        `import { kv, records, type ITransactionScope } from '@migaia/storage-contract'
+async function paidValues(tx: ITransactionScope<{ state: string; value: number }, typeof records>) {
+  await tx.use(kv).setMany([{ key: 'status', value: 'paid' }])
+  return tx.use(records).query().where({ state: 'paid' }).select('value').all()
+}`
+      ),
+      result: t(
+        'KV batches and record queries use the same native transaction. Pure repeated lookup is cached without I/O; each data call receives an original fresh operation view, and expired terminals reject before I/O.',
+        'KV 批量与记录查询使用同一原生事务；重复纯取用缓存但不 I/O；每次数据调用得到原新操作视图，过期终点在 I/O 前拒绝。'
+      )
+    }
+  ],
+  sqlFragment: [
+    {
+      title: t(
+        'Bind values while composing identifiers and fragments',
+        '组合标识符与片段，并独立绑定值'
+      ),
+      problem: t(
+        'SQL composition must preserve parameter identity without granting pure fragments a connection or copying accumulated prefixes.',
+        'SQL 组合必须保留参数身份，不能给纯片段连接权限或反复复制历史前缀。'
+      ),
+      example: t(
+        `import { sqlFragment, type ISqlExecutor } from '@migaia/storage-contract'
+async function readUser(executor: ISqlExecutor, id: number) {
+  const columns = sqlFragment.join([sqlFragment.id('id'), sqlFragment.id('name')])
+  return executor.sql<{ id: number; name?: string }>\`SELECT \${columns} FROM \${sqlFragment.id('users')} WHERE id = \${id}\`.get()
+}`,
+        `import { sqlFragment, type ISqlExecutor } from '@migaia/storage-contract'
+async function readUser(executor: ISqlExecutor, id: number) {
+  const columns = sqlFragment.join([sqlFragment.id('id'), sqlFragment.id('name')])
+  return executor.sql<{ id: number; name?: string }>\`SELECT \${columns} FROM \${sqlFragment.id('users')} WHERE id = \${id}\`.get()
+}`
+      ),
+      result: t(
+        'The original injected executor runs one statement with bound id. Pure fragments own no terminals; byte inputs are snapshotted and each prepare supplies fresh copies.',
+        '原注入 executor 执行单条语句并绑定 id；纯片段没有终点；字节输入制作快照，每次 prepare 提供独立副本。'
+      )
+    }
+  ],
+  createSqlTag: [
+    {
+      title: t('Prepare only after original operation admission', '在原操作准入后才 prepare'),
+      problem: t(
+        'Backend authors need the shared scanner and bindings without a second connection, transaction or resource owner.',
+        '后端作者需要共用 scanner 与绑定，不能新增连接、事务或资源拥有者。'
+      ),
+      example: t(
+        `import { createSqlTag } from '@migaia/storage-contract'
+function bindNative(
+  original: Omit<Parameters<typeof createSqlTag>[0], 'dialect'>
+) {
+  return createSqlTag({ dialect: 'postgres', ...original })
+}`,
+        `import { createSqlTag } from '@migaia/storage-contract'
+function bindNative(
+  original: Omit<Parameters<typeof createSqlTag>[0], 'dialect'>
+) {
+  return createSqlTag({ dialect: 'postgres', ...original })
+}`
+      ),
+      result: t(
+        'execute must own original admission and call prepare before its native driver. The factory returns each supplied callback Promise directly, adds no I/O and keeps lexical failure in the original owner.',
+        'execute 必须拥有原准入，并在原生驱动前调用 prepare；工厂直接返回各原回调 Promise，不新增 I/O，词法失败保持原 owner。'
+      )
+    }
+  ],
   snapshotConcurrencyLockHoldings: [
     {
       title: t('Inspect detached holdings in canonical order', '按规范顺序检查独立持锁快照'),

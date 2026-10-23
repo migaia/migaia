@@ -452,14 +452,19 @@ describe('capability type boundaries', () => {
     type IProvided = ICapabilityStore<IBackend, never>
     /** Host additions extend the original builder's second generic instead of replacing it. */
     type IEnhanced = IWithChainMethods<IProvided, { readonly tx: { added(): number } }>
-    expectTypeOf<Parameters<Parameters<IProvided['transaction']>[0]>[0]>().toEqualTypeOf<IScope>()
+    expectTypeOf<
+      Pick<Parameters<Parameters<IProvided['transaction']>[0]>[0], keyof IScope>
+    >().toEqualTypeOf<IScope>()
     expectTypeOf<Parameters<IProvided['transaction']>[1]>().toEqualTypeOf<
       { readonly isolation: 'native' } | undefined
     >()
     expectTypeOf<ReturnType<IEnhanced['tx']>['existing']>().toEqualTypeOf<() => string>()
     expectTypeOf<ReturnType<IEnhanced['tx']>['added']>().toEqualTypeOf<() => number>()
     expectTypeOf<
-      Parameters<Parameters<ReturnType<ReturnType<IEnhanced['tx']>['lock']>['run']>[0]>[0]
+      Pick<
+        Parameters<Parameters<ReturnType<ReturnType<IEnhanced['tx']>['lock']>['run']>[0]>[0],
+        keyof IScope
+      >
     >().toEqualTypeOf<IScope>()
     /** A specialized transaction builder has no lock method and keeps that public shape. */
     type ISpecializedBuilder = {

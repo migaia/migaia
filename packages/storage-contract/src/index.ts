@@ -67,6 +67,7 @@ export type {
   ITransactionScope,
   ITransactionWriteOptions,
   ITransactionKeyValueApi,
+  ITransactionRecordsApi,
   ITransactionStageObserver
 } from './transaction.js'
 export { assertTransactionCallback, readTransactionConflictPolicy } from './transaction.js'
@@ -154,7 +155,19 @@ export {
 } from './versioned.js'
 
 export { ConcurrencyHolderState } from './concurrency.js'
-export type { ISqlStageObserver } from './sql.js'
+export type {
+  ISqlStageObserver,
+  ISqlValue,
+  ISqlRow,
+  ISqlRunResult,
+  ISqlFragment,
+  ISqlInput,
+  ISqlQuery,
+  ISqlTag,
+  ISqlExecutor,
+  ICompiledStorageSql
+} from './sql.js'
+export { sqlFragment, createSqlTag } from './sql.js'
 export type { IQueryStageObserver } from './query.js'
 
 export { encodeOrderedStorageKey } from './key-order.js'
@@ -210,3 +223,6 @@ export type {
   IQueryChain,
   IRecordQuerySource
 } from './query-chain.js'
+
+export { useTransactionCapability } from './transaction.js'
+export type { ITransactionCapabilityView } from './capability.js'
