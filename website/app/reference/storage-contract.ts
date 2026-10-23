@@ -3449,7 +3449,13 @@ console.log(candidate.name, candidate.output)`
         operators: { summary: t('Supported field operators.', '支持的字段操作符。') },
         operations: { summary: t('Supported native operations.', '支持的原生操作。') },
         source: { summary: t('Stable source label.', '稳定数据源标签。') },
-        index: { summary: t('Optional native index label.', '可选原生索引标签。') }
+        index: { summary: t('Optional native index label.', '可选原生索引标签。') },
+        canPushCondition: {
+          summary: t(
+            'Optional pure exact-domain predicate for one canonical condition, after original operator/identity checks. Its original function and receiver are captured once; false retains client filtering and requirePushdown rejects before I/O. Omission preserves prior declarations.',
+            '原操作符与身份检查后，对一个规范条件做可选纯精确值域判定。原函数与 receiver 单次捕获；false 保留客户端过滤，requirePushdown 在 I/O 前拒绝。省略时保留原声明语义。'
+          )
+        }
       }
     },
     IVectorHit: {

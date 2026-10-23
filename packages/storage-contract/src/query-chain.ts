@@ -445,6 +445,8 @@ export type IQueryPushdown = {
   readonly operations: readonly QueryOperation[]
   readonly source: string
   readonly index?: string
+  /** Optional exact native-domain check after the original operator and identity rules. */
+  readonly canPushCondition?: (condition: IQueryCondition) => boolean
 }
 /** Operand types follow the selected path and operator without widening the public input. */
 type IQueryOperand<V, O> = O extends 'eq' | 'ne'
@@ -1058,13 +1060,14 @@ function snapshotQuerySource(source: IRecordQuerySource): IQuerySourceSnapshot {
     /** Every borrowed descriptor field is captured once, never consulted during later execution. */
     const { pushdown, execute } = source
     /** Support arrays become independent immutable planner facts. */
-    const { operators, operations, source: sourceName, index } = pushdown
+    const { operators, operations, source: sourceName, index, canPushCondition } = pushdown
     if (
       !Array.isArray(operators) ||
       !Array.isArray(operations) ||
       typeof sourceName !== 'string' ||
       sourceName.length === 0 ||
       (index !== undefined && typeof index !== 'string') ||
+      (canPushCondition !== undefined && typeof canPushCondition !== 'function') ||
       typeof execute !== 'function'
     )
       throw new TypeError(StorageContractErrorText.queryArgument)
@@ -1092,7 +1095,18 @@ function snapshotQuerySource(source: IRecordQuerySource): IQuerySourceSnapshot {
       operators: capture(operators, QueryOperator),
       operations: capture(operations, QueryOperation),
       source: sourceName,
-      ...(index === undefined ? {} : { index })
+      ...(index === undefined ? {} : { index }),
+      ...(canPushCondition === undefined
+        ? {}
+        : {
+            canPushCondition: (condition: IQueryCondition): boolean => {
+              try {
+                return Reflect.apply(canPushCondition, pushdown, [condition]) === true
+              } catch (cause) {
+                throw queryExecutionFailure(cause)
+              }
+            }
+          })
     })
     /** One read keeps a mutable author descriptor from changing later comparison semantics. */
     const keyOrder = source.tieBreakByKey
@@ -1512,7 +1526,10 @@ function planRecordQuery(
               !operations.has(step.operation)
             ? StorageContractErrorText.queryUnsupported
             : step.operation === QueryOperation.where
-              ? queryConditionReason(step.condition, operators)
+              ? (queryConditionReason(step.condition, operators) ??
+                (source.pushdown.canPushCondition?.(step.condition) === false
+                  ? StorageContractErrorText.queryUnsupported
+                  : undefined))
               : undefined
     if (reason === undefined) {
       pushed.push(step)
