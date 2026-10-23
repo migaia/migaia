@@ -514,7 +514,7 @@ async function readGreeting(store: IStorageBase) {
 
 数据源只捕获一次 `IQueryPushdown` 与原 execute 回调。不可变链节点共享历史，执行或 explain 只展开一次；记录查询把最长安全原生前缀作为规范条件 AST 与可选投影字段交给数据源。JS 谓词、mapper 与不透明对象身份比较在客户端执行；后续步骤不能越过客户端边界下推。`QueryOperation` 是共用词汇，不表示所有同名链方法都已实现。explain 不读数据；仅声明索引与原生条件时才保守地排除 fullScan。requirePushdown 在开游标前以 QUERY_NOT_PUSHABLE 与客户端原因拒绝。
 
-`execute({conditions,fields,ctx})` 返回原 `IStorageIterator<readonly [IStorageKey,unknown]>`，原生投影行不会谎称完整 T 域。all 按顺序处理候选，并始终等待原迭代器真实 dispose Promise；不创建第二资源 owner、计时器或事务，取消/期限仍由原数据源负责。回调失败保留已有 coded 身份；未编码可变原生错误附 INVALID_ARGUMENT，附着失败由原错误工具保留原错。清理失败不能覆盖首错。不透明身份操作数，包括含 Date/bigint 的对象，从不遍历内容。
+`execute({conditions,fields,ctx})` 返回原 `IStorageIterator<readonly [IStorageKey,unknown]>`，原生投影行不会谎称完整 T 域。all 按顺序处理候选，并始终等待原迭代器真实 dispose Promise；不创建第二资源 owner、计时器或事务，取消/期限仍由原数据源负责。原事务迭代器上的 all 同步把完整消费、mapper 与清理区间登记到同一 owner；回调未等待 all 也不能在其结束前提交，mapper 首错在清理前进入原 firstFailure。回调失败保留已有 coded 身份；未编码可变原生错误附 INVALID_ARGUMENT，附着失败由原错误工具保留原错。清理失败不能覆盖首错。不透明身份操作数，包括含 Date/bigint 的对象，从不遍历内容。
 
 ```ts
 import { createRecordQuery, type IRecordQuerySource } from '@migaia/storage-contract'

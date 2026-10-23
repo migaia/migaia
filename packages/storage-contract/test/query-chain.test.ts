@@ -192,6 +192,14 @@ describe('canonical declarative conditions', () => {
   })
 })
 
+/** Fixture failures retain the same coded native identity as the original transaction owner. */
+type IQueryFixtureFailure = Error & { readonly source: string; readonly code: string }
+/** Fixture normalization retains coded native errors, matching the original owner contract. */
+function normalizeQueryFixtureFailure(cause: unknown): IQueryFixtureFailure {
+  return cause instanceof Error && 'source' in cause && 'code' in cause
+    ? (cause as IQueryFixtureFailure)
+    : new StorageContractError(StorageContractErrorCode.invalidArgument, { cause })
+}
 /** Original resource ownership is exercised rather than a second iterator implementation. */
 function ownedRows(
   rows: readonly unknown[],
@@ -216,11 +224,7 @@ function ownedRows(
     [Symbol.asyncDispose]: async () => undefined
   }
   /** Backend normalization keeps the original cursor error reachable through its existing code. */
-  const owner = createTransactionOwner<unknown, object>(base, (cause) =>
-    cause instanceof StorageContractError
-      ? cause
-      : new StorageContractError(StorageContractErrorCode.invalidArgument, { cause })
-  )
+  const owner = createTransactionOwner<unknown, object>(base, normalizeQueryFixtureFailure)
   /** One root belongs to the callback interval of the original transaction owner. */
   const scope = {}
   owner.register(scope, { createScope: () => ({}), onFailure: () => undefined })
@@ -241,6 +245,95 @@ function ownedRows(
 const noPushdown: IQueryPushdown = { source: 'fixture', operators: [], operations: [] }
 
 describe('shared record query execution', () => {
+  it.each(['resolve', 'reject'] as const)(
+    'keeps the complete unawaited terminal owned through mapper %s',
+    async (outcome) => {
+      /** This real controller models the backend callback returning without awaiting all. */
+      const base: IStorageBase = {
+        backend: 'composed-query',
+        capabilities: {
+          syncRead: false,
+          binary: false,
+          records: true,
+          transactions: true,
+          iteration: true,
+          secondaryIndexes: false,
+          changeFeed: false,
+          maxValueBytes: undefined,
+          opaqueEntries: false
+        },
+        dispose: async () => undefined,
+        [Symbol.asyncDispose]: async () => undefined
+      }
+      /** The normalizer preserves the same first failure chosen by the original transaction. */
+      const owner = createTransactionOwner<unknown, object>(base, normalizeQueryFixtureFailure)
+      /** No other object may supply cursor or transaction authority. */
+      const scope = {}
+      /** Actual rollback notification records the original owner's first normalized error. */
+      let firstFailure: unknown
+      const controller = owner.register(scope, {
+        createScope: () => ({}),
+        onFailure: (error) => {
+          firstFailure = error
+        }
+      })
+      /** The mapper remains accepted work between two native advances. */
+      const entered = Promise.withResolvers<void>()
+      /** The mapper failure must be observed after callback admission closes. */
+      const mapping = Promise.withResolvers<number>()
+      /** Native cleanup is counted separately from logical query completion. */
+      let closed = 0
+      /** The original iterator advances just one actual row. */
+      let advanced = false
+      const query = createRecordQuery<{ total: number }, undefined>({
+        pushdown: noPushdown,
+        execute: () =>
+          owner.registerIterator(scope, {
+            next: async (): Promise<IteratorResult<readonly [string, unknown]>> =>
+              advanced
+                ? { done: true, value: undefined }
+                : ((advanced = true), { done: false, value: ['key', { total: 1 }] }),
+            close: () => {
+              closed++
+            }
+          })
+      })
+      const pending = query
+        .select(async () => {
+          entered.resolve()
+          return await mapping.promise
+        })
+        .all()
+      void pending.catch(() => undefined)
+      await entered.promise
+      controller.stopAdmission()
+      /** A commit candidate must remain pending until the whole accepted terminal settles. */
+      let completed = false
+      const finalized = controller.runFinalizers()
+      void finalized.then(
+        () => {
+          completed = true
+        },
+        () => undefined
+      )
+      await new Promise<void>((resolve) => setTimeout(resolve, 0))
+      expect(completed).toBe(false)
+      expect(closed).toBe(0)
+      if (outcome === 'reject') {
+        const original = new RangeError('unawaited mapper failed')
+        mapping.reject(original)
+        await expect(pending).rejects.toBe(original)
+        await expect(finalized).rejects.toBe(firstFailure)
+        expect(firstFailure).toBe(original)
+      } else {
+        mapping.resolve(7)
+        await expect(pending).resolves.toEqual([7])
+        await expect(finalized).resolves.toBeUndefined()
+        expect(firstFailure).toBeUndefined()
+      }
+      expect(closed).toBe(1)
+    }
+  )
   it('constructs immutable branches without I/O and combines all where forms before one select', async () => {
     let opened = 0
     let closed = 0
