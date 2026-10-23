@@ -1,3 +1,4 @@
+import { QdrantRoute } from './constants.js'
 import type { IQdrantHttp, IQdrantOperationName } from './types.js'
 import { QdrantErrorCode } from './error-code.js'
 import { qdrantError } from './errors.js'
@@ -7,19 +8,19 @@ export function nativeResult<K extends IQdrantOperationName>(
   value: unknown
 ): Awaited<ReturnType<IQdrantHttp[K]>> {
   // The SDK's snapshot method maps an accepted response without a result to null.
-  if (name === 'createSnapshot' && value === undefined) value = null
+  if (name === QdrantRoute.createSnapshot.name && value === undefined) value = null
   const bad = () => {
     throw qdrantError(QdrantErrorCode.responseInvalid)
   }
   if (
-    name === 'createCollection' ||
-    name === 'deleteCollection' ||
-    name === 'updateCollectionAliases'
+    name === QdrantRoute.createCollection.name ||
+    name === QdrantRoute.deleteCollection.name ||
+    name === QdrantRoute.updateCollectionAliases.name
   ) {
     if (typeof value !== 'boolean') bad()
-  } else if (name === 'createSnapshot') {
+  } else if (name === QdrantRoute.createSnapshot.name) {
     if (value !== null && (typeof value !== 'object' || Array.isArray(value))) bad()
-  } else if (name === 'retrieve' || name === 'recommend') {
+  } else if (name === QdrantRoute.retrieve.name || name === QdrantRoute.recommend.name) {
     if (!Array.isArray(value)) bad()
   } else if (value === null || typeof value !== 'object' || Array.isArray(value)) bad()
   return value as Awaited<ReturnType<IQdrantHttp[K]>>

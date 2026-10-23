@@ -1808,9 +1808,13 @@
       ]
     },
     "@migaia/storage-plugin-qdrant": {
-      ".": ["ERROR_SOURCE", "QdrantErrorCode"],
+      ".": ["ERROR_SOURCE", "QdrantErrorCode", "qdrantBackendKind", "qdrantBackendPlugin"],
       "./http": ["fetchHttp"],
-      "./client": ["qdrantClientHttp"]
+      "./client": ["qdrantClientHttp"],
+      "./features/hybrid": ["qdrantHybridFeature"],
+      "./features/recommend": ["qdrantRecommendFeature"],
+      "./features/group-by": ["qdrantGroupByFeature"],
+      "./features/management": ["qdrantManagementFeature"]
     },
     "@migaia/storage-plugin-sparql": {
       ".": ["ERROR_SOURCE", "SparqlErrorCode", "sparqlBackendKind", "sparqlBackendPlugin"],

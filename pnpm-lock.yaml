@@ -816,6 +816,9 @@ importers:
 
   packages/storage-plugin-qdrant:
     dependencies:
+      '@migaia/lifecycle':
+        specifier: workspace:^
+        version: link:../lifecycle
       '@migaia/serialize':
         specifier: workspace:^
         version: link:../serialize
