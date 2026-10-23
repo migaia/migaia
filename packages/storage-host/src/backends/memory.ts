@@ -117,10 +117,12 @@ import { createMemoryJournalData, type IMemoryJournalTransaction } from './memor
 import {
   decodeMemoryJournalImage,
   encodeMemoryJournalImage,
+  memoryJournalDeadlineTarget,
   snapshotMemoryJournalTarget
 } from './memory-journal-image.js'
 import type {
   IStorageJournalBackendBinding,
+  IStorageJournalChange,
   IStorageJournalImage,
   IStorageJournalTarget
 } from '../journal/types.js'
@@ -220,6 +222,7 @@ type IMemoryScope<T> = ITransactionScope<
   readonly [queryDraft]: IMemoryQueryDraft
   readonly [recordQueries]: ITransactionRecordsApi['query']
   readonly [journalOperations]: IMemoryJournalTransaction & {
+    changes(): readonly IStorageJournalChange[]
     readImage(target: IStorageJournalTarget): Promise<IStorageJournalImage>
     writeImage(target: IStorageJournalTarget, image: IStorageJournalImage): Promise<void>
     readRevision(target: IStorageJournalTarget): Promise<ILogPayload>
@@ -354,10 +357,14 @@ export function createMemoryBackend<T = unknown>(
       const binding = (orgId: string): IStorageJournalBackendBinding => ({
         forOrg: binding,
         openNamespace: (prefix) => forOrg(orgId).journal.open(prefix),
+        changes: (scope) => forOrg(orgId).journalImages.changes(scope),
         readImage: (scope, target) => forOrg(orgId).journalImages.readImage(scope, target),
         writeImage: (scope, target, image) =>
           forOrg(orgId).journalImages.writeImage(scope, target, image),
-        readRevision: (scope, target) => forOrg(orgId).journalImages.readRevision(scope, target)
+        readRevision: (scope, target) => forOrg(orgId).journalImages.readRevision(scope, target),
+        writeCommitMarker: (scope, txId) => forOrg(orgId).journal.writeMarker(scope, txId),
+        hasCommitMarker: (txId) => forOrg(orgId).journal.hasMarker(txId),
+        removeCommitMarker: (txId) => forOrg(orgId).journal.removeMarker(txId)
       })
       return binding(core.defaultOrgId)
     })(),
@@ -1588,6 +1595,8 @@ function createMemoryNamespace<T>(
     const privateJournal = () => (journalDraft ??= journal.draft())
     /** Only touched identities retain draft entries; rollback never rewrites committed maps. */
     const draft = new Map<string, IMemoryDraft>()
+    /** Opt-in ordered facts exist only for this authentic attempt, never for ordinary memory work. */
+    let journalChanges: Array<Omit<IStorageJournalChange, 'afterRevision'>> | undefined
     /** Each channel draft reuses the same compressed radix implementation, including tombstones. */
     const draftOrdered = {
       value: createOrderedRecordIndex<IMemoryDraft>(),
@@ -1677,7 +1686,8 @@ function createMemoryNamespace<T>(
       return proposed ? !proposed.remove : txSnapshot(channel, encoded, key) !== undefined
     }
     /** Draft hash and ordered range lookup retain one actual proposed row reference. */
-    const stageDraft = (entry: IMemoryDraft): void => {
+    const stageDraft = (entry: IMemoryDraft, metadataOnly = false): void => {
+      captureJournalStage(entry, metadataOnly)
       /** Replacing one draft value keeps its original independently owned key encoding. */
       const proposed = {
         ...entry,
@@ -1952,13 +1962,16 @@ function createMemoryNamespace<T>(
       const channel = ttlChannel(target)
       const current = txEntry(channel, ttlKey(target))
       if (current === undefined || (persist && current.deadline === undefined)) return false
-      stageDraft({
-        ...current,
-        channel,
-        encoded: encodeFlatStorageKey(current.key),
-        remove: ms === 0,
-        deadline: persist ? undefined : scheduler.now() + ms!
-      })
+      stageDraft(
+        {
+          ...current,
+          channel,
+          encoded: encodeFlatStorageKey(current.key),
+          remove: ms === 0,
+          deadline: persist ? undefined : scheduler.now() + ms!
+        },
+        true
+      )
       return true
     }
     /** Remaining duration observes the same retained transaction value and captured deadline. */
@@ -2019,13 +2032,16 @@ function createMemoryNamespace<T>(
           if (value === undefined) return
           throw new StorageContractError(StorageContractErrorCode.invalidArgument)
         }
-        stageDraft({
-          ...row.current,
-          channel: row.channel,
-          encoded: row.encoded,
-          remove: value !== undefined && value <= scheduler.now(),
-          deadline: value as number | undefined
-        })
+        stageDraft(
+          {
+            ...row.current,
+            channel: row.channel,
+            encoded: row.encoded,
+            remove: value !== undefined && value <= scheduler.now(),
+            deadline: value as number | undefined
+          },
+          true
+        )
         return
       }
       if (row.lock.channel === 'rdf') {
@@ -2065,7 +2081,7 @@ function createMemoryNamespace<T>(
       txWrite(row.channel as IStorageChannel, row.key, value, 'replace')
     }
     /** Full revisions include the original clear generation and the final draft's tombstone effect. */
-    const readJournalRevision = (input: IStorageJournalTarget): ILogPayload => {
+    const readJournalRevision = (input: IStorageJournalTarget) => {
       const row = journalRow(input)
       const id = identity(row.channel, row.encoded)
       const proposed = draft.get(id)
@@ -2078,11 +2094,85 @@ function createMemoryNamespace<T>(
         revision: expected.get(id)!.revision + (changed ? 1 : 0)
       })
     }
+    /** Capture each actual native staging step before it changes this attempt's existing draft. */
+    const captureJournalStage = (entry: IMemoryDraft, metadataOnly: boolean): void => {
+      if (journalChanges === undefined) return
+      const id = identity(entry.channel, entry.encoded)
+      const previous = draft.get(id)
+      const before = previous
+        ? previous.remove
+          ? undefined
+          : previous
+        : txSnapshot(entry.channel, entry.encoded, entry.key)
+      const target =
+        entry.channel === 'value'
+          ? lockKey.text(entry.key)
+          : entry.channel === 'bytes'
+            ? lockKey.bytes(entry.key as string)
+            : entry.channel === 'record'
+              ? lockKey.record(entry.key)
+              : entry.channel === 'vector'
+                ? lockKey.vector(
+                    (entry.key as readonly [string, string])[0],
+                    (entry.key as readonly [string, string])[1]
+                  )
+                : entry.rdfLock!
+      const after = entry.remove ? undefined : entry
+      /** All image encoding finishes before either a draft row or the ordered fact list changes. */
+      const proposed: Array<Omit<IStorageJournalChange, 'afterRevision'>> = []
+      if (!metadataOnly || entry.remove) {
+        const beforeImage = encodeMemoryJournalImage(
+          before !== undefined,
+          entry.channel === 'rdf' ? true : before?.value,
+          entry.channel === 'bytes'
+        )
+        const afterImage = encodeMemoryJournalImage(
+          after !== undefined,
+          entry.channel === 'rdf' ? true : after?.value,
+          entry.channel === 'bytes'
+        )
+        if (beforeImage.present || afterImage.present)
+          proposed.push(Object.freeze({ target, before: beforeImage, after: afterImage }))
+      }
+      if (target.channel !== 'rdf' && before?.deadline !== after?.deadline)
+        proposed.push(
+          Object.freeze({
+            target: memoryJournalDeadlineTarget(target),
+            before: encodeMemoryJournalImage(before?.deadline !== undefined, before?.deadline),
+            after: encodeMemoryJournalImage(after?.deadline !== undefined, after?.deadline)
+          })
+        )
+      journalChanges.push(...proposed)
+    }
+    /**
+     * Begin capture before the first write, then return detached ordered facts with final
+     * revisions.
+     */
+    const changes = (): readonly IStorageJournalChange[] => {
+      if (journalChanges === undefined) {
+        if (draft.size !== 0) throw new StorageContractError(StorageContractErrorCode.unsupported)
+        journalChanges = []
+      }
+      const result: IStorageJournalChange[] = []
+      for (const change of journalChanges) {
+        const row = journalRow(change.target)
+        const afterRevision = readJournalRevision(change.target)
+        /** A new row removed again leaves no physical mutation or storage.commit to describe. */
+        if (afterRevision.revision === expected.get(identity(row.channel, row.encoded))!.revision)
+          continue
+        result.push(Object.freeze({ ...change, afterRevision }))
+      }
+      return Object.freeze(result)
+    }
     /** The same physical scope factory serves callbacks, nested operations and final checks. */
     const createScope = (): IMemoryScope<T> => {
       /** Each method closes over its own authentic view, never an independently registered guard. */
       const scope: IMemoryScope<T> = {
         [journalOperations]: {
+          changes: () => {
+            assertTransactionOwner(store, scope)
+            return changes()
+          },
           readImage: (target) => runTransactionOperation(scope, () => readJournalImage(target)),
           writeImage: (target, image) =>
             runTransactionOperation(scope, () => writeJournalImage(target, image)),
@@ -3765,6 +3855,10 @@ function createMemoryNamespace<T>(
   })
   /** Only this original registration can forward image operations to an authenticated native scope. */
   const journalImages = {
+    changes: (scope: Omit<ITransactionScope, 'use'>) => {
+      assertTransactionOwner(store, scope)
+      return (scope as IMemoryScope<T>)[journalOperations].changes()
+    },
     readImage: (scope: Omit<ITransactionScope, 'use'>, target: IStorageJournalTarget) => {
       assertTransactionOwner(store, scope)
       return (scope as IMemoryScope<T>)[journalOperations].readImage(target)
