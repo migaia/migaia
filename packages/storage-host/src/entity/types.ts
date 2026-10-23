@@ -381,7 +381,7 @@ export type IRepository<
   /** Bind to the exact original owner without creating another native transaction. */
   in(tx: ITransactionScope): IEntityTransactionScope<TDomain, TIndexes, TAugmentMethods>
   /** Derive the actual physical record key used by this repository. */
-  lockKey(id: IStorageKey): ILockKey
+  lockKey(id: IStorageKey): Extract<ILockKey, { readonly channel: 'text' | 'record' }>
 }
 
 /**

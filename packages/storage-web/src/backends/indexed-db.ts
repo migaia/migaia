@@ -12,6 +12,7 @@ import {
   records,
   createRecordQuery,
   snapshotStorageKeyPrefix,
+  snapshotStorageBatchKeys,
   snapshotConcurrencyLockRange,
   readConcurrencyLockIdentities,
   lockKey,
@@ -139,8 +140,10 @@ import {
   browserKeyValueApi,
   type IBrowserKeyValueApi,
   type IBackendConstruction,
-  type IBackendRuntime
+  type IBackendRuntime,
+  type IBrowserBatchApi
 } from './construction.js'
+import { BrowserBatchMethod, observeBrowserBatch, snapshotBrowserBatchEntries } from './batch.js'
 import { asyncDisposeKey } from '@migaia/plugin-host'
 import { withStorageIteratorResource } from '../utils/storage-iterator.js'
 import { observeIndexedDbStage, runNativeIndexedDbTransaction } from './indexed-db-transaction.js'
@@ -260,26 +263,6 @@ type IIndexedDbProvidedStore<TValue> = ICapabilityStore<
     ICapabilityImpl<typeof records, IRecordsApi<TValue>>
   ]
 >
-
-/** Capture a supported native batch once; each key retains the contract owner's canonical snapshot. */
-const snapshotIndexedDbBatchKeys = (keys: readonly IStorageKey[]): readonly IStorageKey[] => {
-  try {
-    if (!Array.isArray(keys)) throw new TypeError(StorageErrorText.storageBatchKeysInvalid)
-    /** The batch length and every element are observed once before any native request. */
-    const length = keys.length
-    /** Detached keys prevent caller mutation during the following native requests. */
-    const captured: IStorageKey[] = []
-    for (let index = 0; index < length; index += 1)
-      captured.push(snapshotStorageKey(keys[index]!, StorageBackend.indexedDb))
-    return captured
-  } catch (cause) {
-    if (isStorageErrorFamily(cause)) throw cause
-    throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
-      backend: StorageBackend.indexedDb,
-      cause
-    })
-  }
-}
 
 const REVISIONS_STORE_NAME = '__storage_web_revisions__'
 const META_STORE_NAME = 'storage-web:meta'
@@ -3075,39 +3058,53 @@ export const indexedDbHost = <TValue = unknown>(
                     view: TScope,
                     name: string,
                     input: TInput,
-                    run: (view: TScope, input: TInput) => R
-                  ): Promise<Awaited<R>> =>
-                    root !== undefined
-                      ? Promise.resolve(run(view, input))
-                      : runtime.execution.run<TInput, Awaited<R>>(
-                          { operation: name, input, ctx: context, scope: view },
-                          async (captured): Promise<Awaited<R>> => {
-                            /**
-                             * Observer failures report without changing the admitted native
-                             * operation.
-                             */
-                            let operationStages: ITransactionStageObserver | undefined
-                            try {
-                              operationStages = stages?.forTransaction(view)
-                            } catch (cause) {
-                              reportCleanupError(operationRuntime.reporter, cause)
+                    run: (view: TScope, input: TInput) => R,
+                    batch?: { readonly count?: number }
+                  ): Promise<Awaited<R>> => {
+                    /** Root batch observation already encloses this same native scope. */
+                    const invoke = (): Promise<Awaited<R>> =>
+                      root !== undefined
+                        ? Promise.resolve(run(view, input))
+                        : runtime.execution.run<TInput, Awaited<R>>(
+                            { operation: name, input, ctx: context, scope: view },
+                            async (captured): Promise<Awaited<R>> => {
+                              /**
+                               * Observer failures report without changing the admitted native
+                               * operation.
+                               */
+                              let operationStages: ITransactionStageObserver | undefined
+                              try {
+                                operationStages = stages?.forTransaction(view)
+                              } catch (cause) {
+                                reportCleanupError(operationRuntime.reporter, cause)
+                              }
+                              observeIndexedDbStage(
+                                operationStages,
+                                TransactionBeforeStage.beforeTxOperation,
+                                operationRuntime,
+                                name
+                              )
+                              const value = await run(view, captured)
+                              observeIndexedDbStage(
+                                operationStages,
+                                TransactionObservedStage.afterTxOperation,
+                                operationRuntime,
+                                name
+                              )
+                              return value
                             }
-                            observeIndexedDbStage(
-                              operationStages,
-                              TransactionBeforeStage.beforeTxOperation,
-                              operationRuntime,
-                              name
-                            )
-                            const value = await run(view, captured)
-                            observeIndexedDbStage(
-                              operationStages,
-                              TransactionObservedStage.afterTxOperation,
-                              operationRuntime,
-                              name
-                            )
-                            return value
-                          }
+                          )
+                    return batch !== undefined && root === undefined
+                      ? observeBrowserBatch(
+                          runtime,
+                          construction.store,
+                          name,
+                          batch.count,
+                          invoke,
+                          view
                         )
+                      : invoke()
+                  }
                   /**
                    * One same-transaction cursor is advanced only by an authorized fresh operation
                    * view.
@@ -3230,12 +3227,13 @@ export const indexedDbHost = <TValue = unknown>(
                             view,
                             StorageTransactionOperation.removeByPrefix,
                             undefined,
-                            () => removePrefix('value', captured)
+                            () => removePrefix('value', captured),
+                            {}
                           )
                         }),
                       getMany: (keys) =>
                         runTransactionOperation(scope, (view) => {
-                          const captured = snapshotIndexedDbBatchKeys(keys)
+                          const captured = snapshotStorageBatchKeys(keys, StorageBackend.indexedDb)
                           if (captured.length === 0) return []
                           return executeOperation(
                             view,
@@ -3243,23 +3241,23 @@ export const indexedDbHost = <TValue = unknown>(
                             { count: captured.length },
                             async () => {
                               /** Repeated positions reuse one native read in this snapshot. */
-                              const reads = new Map<string, Promise<string | undefined>>()
+                              const reads: Promise<string | undefined>[] = []
                               return Promise.all(
-                                captured.map((key) => {
-                                  const identity = encodeFlatStorageKey(key)
-                                  let pending = reads.get(identity)
-                                  if (pending === undefined) {
-                                    pending = request(() =>
-                                      native.objectStore(kvStoreName).get(toIdbKey(key))
-                                    ).then((value) =>
-                                      typeof value === 'string' ? value : undefined
-                                    )
-                                    reads.set(identity, pending)
-                                  }
+                                captured.map(({ key, firstIndex }, index) => {
+                                  const pending =
+                                    firstIndex === index
+                                      ? request(() =>
+                                          native.objectStore(kvStoreName).get(toIdbKey(key))
+                                        ).then((value) =>
+                                          typeof value === 'string' ? value : undefined
+                                        )
+                                      : reads[firstIndex]!
+                                  reads.push(pending)
                                   return pending
                                 })
                               )
-                            }
+                            },
+                            { count: captured.length }
                           )
                         }),
                       setMany: (entries) =>
@@ -3268,38 +3266,10 @@ export const indexedDbHost = <TValue = unknown>(
                            * Every entry is captured and validated before the batch issues its first
                            * write.
                            */
-                          let captured: { readonly key: IStorageKey; readonly value: string }[]
-                          try {
-                            if (!Array.isArray(entries))
-                              throw new TypeError(StorageErrorText.storageBatchEntriesInvalid)
-                            const seen = new Set<string>()
-                            captured = []
-                            const length = entries.length
-                            for (let index = 0; index < length; index += 1) {
-                              const entry = entries[index]!
-                              const key = snapshotStorageKey(entry.key, StorageBackend.indexedDb)
-                              const value = entry.value
-                              const ttlMs = entry.ttlMs
-                              if (typeof value !== 'string')
-                                throw new TypeError(StorageErrorText.storageValueInvalid)
-                              if (ttlMs !== undefined)
-                                throw new StorageContractError(
-                                  StorageContractErrorCode.unsupported,
-                                  { backend: StorageBackend.indexedDb }
-                                )
-                              const identity = encodeFlatStorageKey(key)
-                              if (seen.has(identity))
-                                throw new TypeError(StorageErrorText.storageBatchDuplicateKey)
-                              seen.add(identity)
-                              captured.push({ key, value })
-                            }
-                          } catch (cause) {
-                            if (isStorageErrorFamily(cause)) throw cause
-                            throw new StorageContractError(
-                              StorageContractErrorCode.invalidArgument,
-                              { backend: StorageBackend.indexedDb, cause }
-                            )
-                          }
+                          const captured = snapshotBrowserBatchEntries(
+                            entries,
+                            StorageBackend.indexedDb
+                          )
                           if (captured.length === 0) return
                           return executeOperation(
                             view,
@@ -3308,24 +3278,23 @@ export const indexedDbHost = <TValue = unknown>(
                             async () => {
                               for (const { key, value } of captured)
                                 await write('value', key, value, StorageConflictPolicy.conflict)
-                            }
+                            },
+                            { count: captured.length }
                           )
                         }),
                       removeMany: (keys) =>
                         runTransactionOperation(scope, (view) => {
-                          const captured = snapshotIndexedDbBatchKeys(keys)
+                          const captured = snapshotStorageBatchKeys(keys, StorageBackend.indexedDb)
                           if (captured.length === 0) return 0
                           return executeOperation(
                             view,
                             StorageTransactionOperation.removeMany,
                             { count: captured.length },
                             async () => {
-                              const seen = new Set<string>()
                               let removed = 0
-                              for (const key of captured) {
-                                const identity = encodeFlatStorageKey(key)
-                                if (seen.has(identity)) continue
-                                seen.add(identity)
+                              for (let index = 0; index < captured.length; index += 1) {
+                                const { key, firstIndex } = captured[index]!
+                                if (firstIndex !== index) continue
                                 const present = await request(() =>
                                   native.objectStore(kvStoreName).getKey(toIdbKey(key))
                                 )
@@ -3334,7 +3303,8 @@ export const indexedDbHost = <TValue = unknown>(
                                 removed += 1
                               }
                               return removed
-                            }
+                            },
+                            { count: captured.length }
                           )
                         }),
                       get: (key) =>
@@ -4522,6 +4492,113 @@ export const indexedDbHost = <TValue = unknown>(
       return native.removeRecordsByPrefix(scope, prefix)
     }
   })
+  /** Counted observations enclose the original native root pipeline without another executor. */
+  const runRootBatch = <I, R>(
+    method: string,
+    input: I,
+    ctx: IWriteOptions | undefined,
+    count: number | undefined,
+    prepare: (input: I, context: IWriteOptions) => IRootPrepared<R>
+  ): Promise<Awaited<R>> =>
+    observeBrowserBatch(
+      runtime,
+      construction.store,
+      storageBackendOperation(StorageBackend.indexedDb, method),
+      count,
+      () => rootMutation(method, input, ctx, { channel: 'value', kind: 'batch' }, prepare)
+    )
+
+  /** Standard root batches reuse the same native views and original concurrency/pipeline owner. */
+  const batchApi: IBrowserBatchApi = {
+    getMany: async (keys, ctx) => {
+      assertLive()
+      const captured = snapshotStorageBatchKeys(keys, StorageBackend.indexedDb)
+      if (captured.length === 0) return []
+      return runRootBatch(
+        BrowserBatchMethod.getMany,
+        captured.map((entry) => entry.key),
+        ctx,
+        captured.length,
+        (keys) => {
+          const entries = snapshotStorageBatchKeys(keys, StorageBackend.indexedDb)
+          return {
+            keys: entries
+              .filter((entry, index) => entry.firstIndex === index)
+              .map((entry) => lockKey.text(entry.key)),
+            run: (scope) => scope.getMany(entries.map((entry) => entry.key))
+          }
+        }
+      )
+    },
+    setMany: async (entries, ctx) => {
+      assertLive()
+      const captured = snapshotBrowserBatchEntries(entries, StorageBackend.indexedDb)
+      if (captured.length === 0) return
+      return runRootBatch(
+        BrowserBatchMethod.setMany,
+        captured.map(({ key, value, ttlMs }) => ({
+          key,
+          value,
+          ...(ttlMs === undefined ? {} : { ttlMs })
+        })),
+        ctx,
+        captured.length,
+        (entries, context) => {
+          const values = snapshotBrowserBatchEntries(entries, StorageBackend.indexedDb)
+          return {
+            keys: values.flatMap((entry) => rootKeys('value', entry.key, context)),
+            run: (scope) => scope.setMany(values)
+          }
+        }
+      )
+    },
+    removeMany: async (keys, ctx) => {
+      assertLive()
+      const captured = snapshotStorageBatchKeys(keys, StorageBackend.indexedDb)
+      if (captured.length === 0) return 0
+      return runRootBatch(
+        BrowserBatchMethod.removeMany,
+        captured.map((entry) => entry.key),
+        ctx,
+        captured.length,
+        (keys) => {
+          const entries = snapshotStorageBatchKeys(keys, StorageBackend.indexedDb)
+          return {
+            keys: entries
+              .filter((entry, index) => entry.firstIndex === index)
+              .map((entry) => lockKey.text(entry.key)),
+            run: (scope) => scope.removeMany(entries.map((entry) => entry.key))
+          }
+        }
+      )
+    },
+    removeByPrefix: async (prefix, ctx) => {
+      assertLive()
+      const captured = snapshotStorageKeyPrefix(prefix, StorageBackend.indexedDb)
+      return runRootBatch(
+        BrowserBatchMethod.removeByPrefix,
+        captured.key,
+        ctx,
+        undefined,
+        (prefix) => {
+          const range = snapshotStorageKeyPrefix(prefix, StorageBackend.indexedDb)
+          return {
+            keys: [],
+            ranges: [
+              {
+                channel: 'text',
+                ...snapshotConcurrencyLockRange(
+                  { channel: 'text', prefix: range.key },
+                  StorageBackend.indexedDb
+                )
+              }
+            ],
+            run: (scope) => scope.removeByPrefix(range.key)
+          }
+        }
+      )
+    }
+  }
   const construction = provideBackendConstruction(
     bindBrowserExecution(store, runtime, [
       'set',
@@ -4537,7 +4614,7 @@ export const indexedDbHost = <TValue = unknown>(
       'putIndexedRecord'
     ]),
     [
-      implement(kv, browserKeyValueApi(store), { forTransaction: (scope) => scope }),
+      implement(kv, browserKeyValueApi(store, batchApi), { forTransaction: (scope) => scope }),
       implement(records, recordApi, { forTransaction: transactionRecordApi })
     ],
     controller,

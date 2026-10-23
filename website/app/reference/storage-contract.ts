@@ -889,6 +889,33 @@ export const storageContractReference: ILibraryReference = {
       example: storageContractCases.ttl![0]!.example,
       cases: storageContractCases.ttl
     },
+    sql: {
+      role: 'constant',
+      purpose: t(
+        'Exact standard token for a nested native SQL executor.',
+        '嵌套原生 SQL executor 的精确标准令牌。'
+      ),
+      example: storageContractCases.sql![0]!.example,
+      cases: storageContractCases.sql
+    },
+    blob: {
+      role: 'constant',
+      purpose: t(
+        'Exact standard token for independent native byte objects.',
+        '独立原生字节对象的精确标准令牌。'
+      ),
+      example: storageContractCases.blob![0]!.example,
+      cases: storageContractCases.blob
+    },
+    durableChangeFeed: {
+      role: 'constant',
+      purpose: t(
+        'Exact optional token for native durable replay and tails.',
+        '原生持久重放与 tail 的精确可选令牌。'
+      ),
+      example: storageContractCases.durableChangeFeed![0]!.example,
+      cases: storageContractCases.durableChangeFeed
+    },
     counter: {
       role: 'constant',
       purpose: t(
@@ -906,8 +933,8 @@ export const storageContractReference: ILibraryReference = {
       ),
       params: {
         target: t(
-          'Typed text, byte or record target; use the channel containing the value.',
-          'typed 文本、字节或记录目标，选择实际持有值的通道。'
+          'Typed text, byte, record or vector target; use the channel containing the value.',
+          'typed 文本、字节、记录或向量目标，选择实际持有值的通道。'
         ),
         backend: t('Actual backend diagnostic or undefined.', '真实后端诊断，或 undefined。')
       },
@@ -1076,6 +1103,26 @@ export const storageContractReference: ILibraryReference = {
       ),
       example: storageContractCases.createSqlTag![0]!.example,
       cases: storageContractCases.createSqlTag
+    },
+    deriveStorageSqlQuery: {
+      role: 'operation',
+      purpose: t(
+        'Derive terminal callbacks over the same authentic SQL node.',
+        '在同一真实 SQL 节点上派生终端回调。'
+      ),
+      params: {
+        fragment: t('An authentic existing SQL fragment or query.', '已有真实 SQL 片段或查询。'),
+        terminals: t(
+          'Original all/get/run callbacks, captured once.',
+          '一次捕获的原 all/get/run 回调。'
+        )
+      },
+      returns: t(
+        'Frozen ISqlQuery sharing the original node; callback receiver, context and Promise identity remain exact.',
+        '共享原节点的冻结 ISqlQuery；原回调 receiver、context 与 Promise 身份保持精确。'
+      ),
+      example: storageContractCases.deriveStorageSqlQuery![0]!.example,
+      cases: storageContractCases.deriveStorageSqlQuery
     },
     snapshotConcurrencyLockKeys: {
       role: 'operation',
@@ -3402,6 +3449,109 @@ console.log(candidate.name, candidate.output)`
           )
         },
         empty: { summary: t('Canonical empty pure fragment.', '规范空纯片段。') }
+      }
+    },
+    IStorageSqlQueryTerminals: {
+      summary: t(
+        'Finite callbacks replacing SQL query execution without altering fragment identity.',
+        '替换 SQL 查询执行且不改变片段身份的有限回调。'
+      ),
+      members: {
+        all: { summary: t('Return the native row Promise.', '返回原生行 Promise。') },
+        get: { summary: t('Return the native first-row Promise.', '返回原生首行 Promise。') },
+        run: { summary: t('Return the native write-result Promise.', '返回原生写结果 Promise。') }
+      }
+    },
+    IBlobInfo: {
+      summary: t(
+        'Immutable metadata of an actual native object snapshot.',
+        '实际原生对象快照的不可变 metadata。'
+      ),
+      members: {
+        key: { summary: t('Logical string key.', '逻辑 string key。') },
+        size: { summary: t('Byte length.', '字节长度。') },
+        etag: { summary: t('Conditional-write identity.', '条件写身份。') },
+        contentType: { summary: t('Optional media type.', '可选媒体类型。') },
+        metadata: { summary: t('Frozen native string metadata.', '冻结的原生 string metadata。') },
+        updatedAt: { summary: t('Native update timestamp.', '原生更新时间。') }
+      }
+    },
+    IBlobObject: {
+      summary: t(
+        'One disposable, single-consumption native object snapshot.',
+        '可释放且单次消费的原生对象快照。'
+      ),
+      members: {
+        info: { summary: t('Snapshot metadata.', '快照 metadata。') },
+        stream: {
+          summary: t(
+            'Consume through the platform WHATWG byte stream once.',
+            '通过平台 WHATWG 字节流消费一次。'
+          )
+        },
+        bytes: {
+          summary: t(
+            'Consume the same read right into detached bytes.',
+            '将同一读取权消费为独立字节。'
+          )
+        }
+      }
+    },
+    IBlobApi: {
+      summary: t(
+        'Native object operations, independent from KV and generic transactions.',
+        '独立于 KV 与通用事务的原生对象操作。'
+      ),
+      members: {
+        put: {
+          summary: t('Write bytes or a stream with optional conditions.', '可带条件写入字节或流。')
+        },
+        get: {
+          summary: t(
+            'Get a disposable snapshot or inclusive range.',
+            '读取可释放快照或 inclusive 范围。'
+          )
+        },
+        head: { summary: t('Read metadata without content.', '只读 metadata，不读内容。') },
+        remove: {
+          summary: t(
+            'Remove one object and report actual presence.',
+            '移除一个对象并返回实际存在状态。'
+          )
+        },
+        list: { summary: t('Read an ordered opaque-cursor page.', '读取有序不透明游标页。') },
+        removeByPrefix: {
+          summary: t(
+            'Remove matching native objects and return the count.',
+            '移除匹配原生对象并返回数量。'
+          )
+        }
+      }
+    },
+    IDurableStorageChange: {
+      summary: t(
+        'A retained storage change with an opaque commit cursor.',
+        '携带不透明提交游标的保留存储变更。'
+      ),
+      members: {
+        cursor: { summary: t('Caller-persisted replay position.', '由调用方持久化的重放位置。') }
+      }
+    },
+    IDurableChangeFeedApi: {
+      summary: t(
+        'Native at-least-once replay and disposable tails.',
+        '原生至少一次重放与可释放 tail。'
+      ),
+      members: {
+        readChanges: {
+          summary: t('Read retained commits without acknowledging them.', '读取保留提交但不确认。')
+        },
+        tailChanges: {
+          summary: t(
+            'Follow commits, acknowledging only successful callbacks.',
+            '跟随提交，仅确认成功回调。'
+          )
+        }
       }
     },
     ISqlExecutor: {

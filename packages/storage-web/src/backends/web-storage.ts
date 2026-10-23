@@ -1,12 +1,14 @@
 import { bindBrowserExecution } from './execution.js'
-import { implement, kv, type IStorageChange } from '@migaia/storage-contract'
+import { createTextBatchApi } from './batch.js'
+import { implement, kv, type IStorageChange, type IStorageStore } from '@migaia/storage-contract'
 import { snapshotSyncWriteOptions } from '@migaia/storage-contract'
 import { throwIfAborted, withAbort } from '@migaia/storage-host/authoring/backend'
 import {
   lengthPrefixedNamespaceCodec,
   namespacedKey,
+  namespacedStorageKey,
   snapshotNamespaceCodec,
-  stripNamespace
+  stripStorageNamespace
 } from '../utils/key.js'
 import type { INamespaceCodec } from '../utils/key.js'
 import { probeWebStorage } from '../utils/availability.js'
@@ -22,6 +24,7 @@ import type {
   IWebStorageLike
 } from '../types/storage.js'
 import type { IBackendKind, IStorageCapabilities } from '../types/capabilities.js'
+import type { IStorageKey } from '../types/context.js'
 import { asyncDisposeKey } from '@migaia/plugin-host'
 import {
   reportCleanupError,
@@ -179,9 +182,9 @@ export const createWebStorageBackend = (
 
   const namespacedEntries = (): Array<{
     readonly physicalKey: string
-    readonly logicalKey: string
+    readonly logicalKey: IStorageKey
   }> => {
-    const collected: Array<{ readonly physicalKey: string; readonly logicalKey: string }> = []
+    const collected: ReturnType<typeof namespacedEntries> = []
     /** Detects a contract-violating or concurrently incoherent Storage enumeration. */
     const seenPhysicalKeys = new Set<string>()
     const length = live.length
@@ -203,7 +206,7 @@ export const createWebStorageBackend = (
           StorageErrorText.webStorageKeyDuplicate
         )
       seenPhysicalKeys.add(rawKey)
-      const stripped = stripNamespace(namespace, rawKey, namespaceCodec, backend)
+      const stripped = stripStorageNamespace(namespace, rawKey, namespaceCodec, backend)
       if (stripped !== undefined) collected.push({ physicalKey: rawKey, logicalKey: stripped })
     }
     return collected
@@ -291,7 +294,9 @@ export const createWebStorageBackend = (
     keys: () => {
       assertLive()
       try {
-        return namespacedEntries().map((entry) => entry.logicalKey)
+        return namespacedEntries().flatMap((entry) =>
+          typeof entry.logicalKey === 'string' ? [entry.logicalKey] : []
+        )
       } catch (error) {
         throw normalizeStorageException(error, backend)
       }
@@ -315,12 +320,15 @@ export const createWebStorageBackend = (
               () => {
                 assertLive()
                 /** Both reads and the private sync write execute without an intervening await. */
-                const actual = namespacedEntries()
-                  .filter((entry) => entry.logicalKey.startsWith(captured.prefix))
-                  .flatMap((entry) => {
-                    const value = live.getItem(entry.physicalKey)
-                    return value === null ? [] : [[entry.logicalKey, value] as const]
-                  })
+                const actual = namespacedEntries().flatMap((entry) => {
+                  if (
+                    typeof entry.logicalKey !== 'string' ||
+                    !entry.logicalKey.startsWith(captured.prefix)
+                  )
+                    return []
+                  const value = live.getItem(entry.physicalKey)
+                  return value === null ? [] : [[entry.logicalKey, value] as const]
+                })
                 assertValueSnapshot(actual, captured.expected, backend)
                 sync.set(captured.key, captured.value)
               },
@@ -365,7 +373,42 @@ export const createWebStorageBackend = (
   }
   const construction = provideBackendConstruction(
     bindBrowserExecution(store, runtime),
-    [implement(kv, browserKeyValueApi(store))],
+    [
+      implement(
+        kv,
+        browserKeyValueApi(
+          store,
+          createTextBatchApi(
+            backend,
+            runtime,
+            (): IStorageStore<never> => construction.store,
+            assertLive,
+            (keys) => {
+              assertLive()
+              /** Encode every requested key before the first read, including custom typed admission. */
+              const physical = keys.map(({ key }) =>
+                namespacedStorageKey(namespace, key, namespaceCodec, backend)
+              )
+              /** Repeated canonical positions reuse the first actual native result. */
+              const values: (string | undefined)[] = []
+              for (let index = 0; index < keys.length; index += 1) {
+                const entry = keys[index]!
+                if (entry.firstIndex !== index) {
+                  values.push(values[entry.firstIndex])
+                  continue
+                }
+                try {
+                  values.push(live.getItem(physical[index]!) ?? undefined)
+                } catch (cause) {
+                  throw normalizeStorageException(cause, backend, entry.key)
+                }
+              }
+              return values
+            }
+          )
+        )
+      )
+    ],
     controller,
     () => live
   )

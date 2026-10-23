@@ -69,6 +69,9 @@ export const StorageContractErrorCode = Object.freeze({
   /** FirstOrThrow exhausted the query; use first or maybe when absence is expected. */
   queryEmptyResult: 'QUERY_EMPTY_RESULT',
 
+  /** A durable replay cursor was evicted; invalidate the full cache and subscribe from now. */
+  changeCursorExpired: 'CHANGE_CURSOR_EXPIRED',
+
   /** A genuine policy threw or returned an invalid/inapplicable decision; correct the policy. */
   concurrencyPolicyFailed: 'CONCURRENCY_POLICY_FAILED',
   /** A logical admission or physical operation deadline expired; resources have finished cleanup. */

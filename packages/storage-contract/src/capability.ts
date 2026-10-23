@@ -31,11 +31,14 @@ import type { kv } from './capabilities/kv.js'
 import type { records } from './capabilities/records.js'
 import type { ttl, ITransactionTtlApi } from './capabilities/ttl.js'
 import type { counter, ITransactionCounterApi } from './capabilities/counter.js'
+import type { sql } from './capabilities/sql.js'
+import type { ISqlExecutor } from './sql.js'
 export { defineStorageCapability } from './capability-token.js'
 export { kv } from './capabilities/kv.js'
 export { records } from './capabilities/records.js'
 export { ttl } from './capabilities/ttl.js'
 export { counter } from './capabilities/counter.js'
+export { sql } from './capabilities/sql.js'
 
 /** Type-only API carrier; runtime authority belongs exclusively to the private token set. */
 declare const capabilityApi: unique symbol
@@ -120,7 +123,7 @@ export type IRecordsApi<
 /** Only standard capabilities with a declared transaction projection belong to transaction use. */
 export type ITransactionalCapability<TCaps extends IAnyStorageCapability> = Extract<
   TCaps,
-  typeof kv | typeof records | typeof ttl | typeof counter
+  typeof kv | typeof records | typeof ttl | typeof counter | typeof sql
 >
 
 /** Projects the standard transaction API without creating or admitting a transaction scope. */
@@ -132,7 +135,9 @@ export type ITransactionCapabilityApi<TCap extends IAnyStorageCapability> = TCap
       ? ITransactionTtlApi
       : TCap extends typeof counter
         ? ITransactionCounterApi
-        : never
+        : TCap extends typeof sql
+          ? ISqlExecutor
+          : never
 
 /** Optional contravariant proof permits complete external scopes without private symbol access. */
 export type ITransactionCapabilityView<

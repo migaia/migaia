@@ -10,6 +10,10 @@ import {
   records,
   ttl,
   counter,
+  sql,
+  createSqlTag,
+  sqlFragment,
+  type ISqlExecutor,
   defineStorageCapability,
   createRecordQuery,
   type IStorageBase,
@@ -264,6 +268,78 @@ function setup() {
 }
 
 describe('original transaction capability projections', () => {
+  it('keeps SQL construction pure and binds each saved terminal to a fresh original operation', async () => {
+    const fixture = setup()
+    const root = vi.fn(async (): Promise<never> => {
+      throw new Error('root SQL must not execute')
+    })
+    const observed: object[] = []
+    const prepared: unknown[] = []
+    const bindSql = vi.fn((scope: ITransactionScope): ISqlExecutor => {
+      assertTransactionOwner(fixture.store, scope)
+      observed.push(scope)
+      const capture = (prepare: () => unknown, ctx?: unknown) => {
+        assertTransactionOwner(fixture.store, scope)
+        expect(ctx).toBeUndefined()
+        prepared.push(prepare())
+      }
+      return {
+        sql: createSqlTag({
+          dialect: 'sqlite',
+          all: async (prepare, ctx) => {
+            capture(prepare, ctx)
+            return [{ value: 2 }]
+          },
+          get: async (prepare, ctx) => {
+            capture(prepare, ctx)
+            return { value: 2 }
+          },
+          run: async (prepare, ctx) => {
+            capture(prepare, ctx)
+            return { changes: 1 }
+          }
+        })
+      }
+    })
+    fixture.installer
+      .prepare([
+        implement(
+          sql,
+          { sql: createSqlTag({ dialect: 'sqlite', all: root, get: root, run: root }) },
+          { forTransaction: bindSql }
+        )
+      ])
+      .publish()
+    const scope = fixture.scope as ITransactionScope<IRow, typeof records | typeof sql>
+    const executor = scope.use(sql)
+    expectTypeOf(executor).toEqualTypeOf<ISqlExecutor>()
+    expect(scope.use(sql)).toBe(executor)
+    const bytes = new Uint8Array([1])
+    const query = executor.sql`SELECT ${executor.sql.id('column')} FROM ${sqlFragment.id('table')} WHERE data = ${bytes}`
+    bytes.fill(99)
+    expect(bindSql).not.toHaveBeenCalled()
+    expect(root).not.toHaveBeenCalled()
+    expect(executor.sql.empty).toBe(sqlFragment.empty)
+    expect(await query.all({ pageSize: 99 })).toEqual([{ value: 2 }])
+    expect(await query.get()).toEqual({ value: 2 })
+    expect(await query.run()).toEqual({ changes: 1 })
+    expect(prepared).toEqual(
+      Array.from({ length: 3 }, () => ({
+        text: 'SELECT "column" FROM "table" WHERE data = ?',
+        values: [new Uint8Array([1])]
+      }))
+    )
+    expect(new Set(observed).size).toBe(3)
+    for (const current of observed)
+      expect(() => assertTransactionOwner(fixture.store, current)).toThrow()
+    expect(root).not.toHaveBeenCalled()
+    fixture.controller.stopAdmission()
+    await fixture.controller.runFinalizers()
+    fixture.controller.close()
+    await expect(query.run()).rejects.toMatchObject({ code: 'TRANSACTION_FAILED' })
+    expect(bindSql).toHaveBeenCalledTimes(3)
+  })
+
   it('binds scalar capabilities to fresh original views without invoking their root API', async () => {
     const fixture = setup()
     /** Native scalar adapters validate the same supplied original operation scope. */

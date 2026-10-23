@@ -6,6 +6,9 @@ import {
   snapshotStorageKey,
   snapshotStorageBatchKeys,
   createStorageBatchKeyCapture,
+  snapshotStorageTtlTarget,
+  assertStorageTtlDuration,
+  snapshotStorageCounterIncrement,
   snapshotSyncWriteOptions,
   encodeOrderedStorageKey,
   createTransactionOwner,
@@ -26,6 +29,13 @@ import {
   implement,
   kv,
   records,
+  ttl,
+  counter,
+  type ITtlTarget,
+  type ITtlApi,
+  type ICounterApi,
+  type ITransactionCounterApi,
+  type ITransactionTtlApi,
   type IKeyValueApi,
   type ITransactionKeyValueApi,
   type IStorageKey,
@@ -84,12 +94,18 @@ export type IMemoryOptions = {
  * registry.
  */
 const recordPrefix = Symbol()
+/** The original capability binder borrows only this current native view's TTL methods. */
+const ttlOperations = Symbol()
+/** The counter binder borrows the same accepted operation and text draft from its fresh view. */
+const counterOperations = Symbol()
 /**
  * This private member runs through the same original operation owner as every other native scope
  * method.
  */
-type IMemoryScope<T> = ITransactionScope<T, typeof records> & {
+type IMemoryScope<T> = ITransactionScope<T, typeof records | typeof ttl | typeof counter> & {
   [recordPrefix](prefix: IStorageKey): Promise<number>
+  readonly [ttlOperations]: ITransactionTtlApi
+  readonly [counterOperations]: ITransactionCounterApi
 }
 /** The original store retains the concrete complete native transaction view. */
 type IMemoryBase<T> = Omit<ISyncCapableStore<IRecordStore<T>>, 'transaction'> &
@@ -107,8 +123,12 @@ type IMemoryEntry = {
   readonly value: unknown
   readonly ordered: Uint8Array
 }
+/** A transaction retains its first deadline beside the existing detached value snapshot. */
+type IMemorySnapshot = IMemoryEntry & { readonly deadline?: number }
+/** This native unit supports only its actual three physical value channels. */
+type IMemoryTtlTarget = Extract<ITtlTarget, { readonly channel: 'text' | 'bytes' | 'record' }>
 /** A draft deletion remains distinct from an untouched identity. */
-type IMemoryDraft = IMemoryEntry & {
+type IMemoryDraft = IMemorySnapshot & {
   readonly channel: IStorageChannel
   readonly remove: boolean
   readonly encoded: string
@@ -125,7 +145,11 @@ type IMemoryRootMutation<R> = {
   run(): R
 }
 /** Text batches retain detached canonical keys and prepared values before lock admission. */
-type IMemoryTextEntry = { readonly key: IStorageKey; readonly value: string }
+type IMemoryTextEntry = {
+  readonly key: IStorageKey
+  readonly value: string
+  readonly ttlMs?: number
+}
 /** Only original native draft functions are passed to an internal batch callback. */
 type IMemoryTextDraft = {
   setMany(entries: readonly IMemoryTextEntry[]): void
@@ -156,6 +180,8 @@ export function createMemoryBackend<T = unknown>(
     bytes: new Map<string, IMemoryEntry>(),
     record: new Map<string, IMemoryEntry>()
   }
+  /** Only expiring physical identities own metadata; no timer or expiry history is retained. */
+  const deadlines = new Map<string, number>()
   /** Hash point reads and ordered ranges refer to the same physical entries in each channel. */
   const ordered = {
     value: createOrderedRecordIndex<IMemoryEntry>(),
@@ -188,6 +214,7 @@ export function createMemoryBackend<T = unknown>(
       }
       for (const channel of MemoryState.channels)
         revisions.clear(channel === 'value' ? 'text' : channel)
+      deadlines.clear()
     }
   })
   /** Unknown backend callback failures gain their original memory transaction boundary. */
@@ -286,6 +313,24 @@ export function createMemoryBackend<T = unknown>(
   ): void => {
     controller.publish({ channel, kind, ...(keys === undefined ? {} : { keys }) })
   }
+  /** Every physical access shares one deadline check and the original removal/revision path. */
+  const liveEntry = (channel: IStorageChannel, encoded: string): IMemoryEntry | undefined => {
+    /** Physical membership and deadline use the same canonical channel/key identity. */
+    const entry = data[channel].get(encoded)
+    /** Omitted deadlines remain unlimited, including keys first written before TTL is used. */
+    const id = identity(channel, encoded)
+    /** The original monotonic clock is consulted once for this physical access. */
+    const deadline = deadlines.get(id)
+    if (entry !== undefined && deadline !== undefined && deadline <= scheduler.now()) {
+      data[channel].delete(encoded)
+      ordered[channel].delete(entry.ordered)
+      deadlines.delete(id)
+      bump(channel, encoded)
+      publish(channel, 'remove', [entry.key])
+      return undefined
+    }
+    return entry
+  }
   /** Apply one already prepared root write synchronously, then publish its complete result. */
   const write = (
     channel: IStorageChannel,
@@ -305,12 +350,15 @@ export function createMemoryBackend<T = unknown>(
     /** Overwrite keeps the already retained live bytes for the exact canonical identity. */
     const keyBytes = ordered[channel].get(encodedBytes)?.key ?? encodedBytes
     /** Actual physical membership alone determines channel replacement. */
-    const existing = new Set(MemoryState.channels.filter((current) => data[current].has(encoded)))
+    const existing = new Set(
+      MemoryState.channels.filter((current) => liveEntry(current, encoded) !== undefined)
+    )
     /** Shared conflict policy owns one removal order for all backends. */
     const plan = planChannelWrite(captured, channel, existing, policy, STORAGE_MEMORY_BACKEND)
     for (const previous of plan.remove) {
       data[previous].delete(encoded)
       ordered[previous].delete(keyBytes)
+      deadlines.delete(identity(previous, encoded))
       bump(previous, encoded)
     }
     /** The hash and radix owners share this exact committed entry reference. */
@@ -329,10 +377,11 @@ export function createMemoryBackend<T = unknown>(
     /** The same wire identity is used by reads, writes and revision tombstones. */
     const encoded = encodeFlatStorageKey(captured)
     /** The actual entry already owns the canonical ordered bytes needed for removal. */
-    const entry = data[channel].get(encoded)
+    const entry = liveEntry(channel, encoded)
     if (!entry) return
     data[channel].delete(encoded)
     ordered[channel].delete(entry.ordered)
+    deadlines.delete(identity(channel, encoded))
     bump(channel, encoded)
     publish(channel, 'remove', [captured])
   }
@@ -341,6 +390,7 @@ export function createMemoryBackend<T = unknown>(
     controller.assertLive()
     /** Preserve the original rule that an empty clear emits no notification. */
     const changed = data[channel].size !== 0
+    for (const encoded of data[channel].keys()) deadlines.delete(identity(channel, encoded))
     data[channel].clear()
     ordered[channel].clear()
     revisions.clear(channel === 'value' ? 'text' : channel)
@@ -352,7 +402,7 @@ export function createMemoryBackend<T = unknown>(
     /** Record keys remain structured; flat text and bytes remain string-only. */
     const captured = snapshotStorageKey(key, STORAGE_MEMORY_BACKEND)
     /** Reading never allocates a revision or changes physical membership. */
-    const entry = data[channel].get(encodeFlatStorageKey(captured))
+    const entry = liveEntry(channel, encodeFlatStorageKey(captured))
     return entry === undefined ? undefined : copyValue(channel, entry.value, captured)
   }
   /** Replace admits every possible displaced channel in the same fixed canonical order. */
@@ -469,6 +519,7 @@ export function createMemoryBackend<T = unknown>(
       ordered[channel].clear()
       revisions.clear(channel === 'value' ? 'text' : channel)
     }
+    deadlines.clear()
     if (changed) controller.publish({ channel: 'all', kind: 'clear' })
   }
   /** Channel selection is captured before the shared provider's final synchronous range check. */
@@ -543,11 +594,10 @@ export function createMemoryBackend<T = unknown>(
         throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
           backend: STORAGE_MEMORY_BACKEND
         })
-      if (entry.ttlMs !== undefined)
-        throw new StorageContractError(StorageContractErrorCode.unsupported, {
-          backend: STORAGE_MEMORY_BACKEND
-        })
-      return { key: fact.key, value: prepare('value', entry.value, fact.key) as string }
+      /** Each optional duration is captured once before any native draft mutation. */
+      const ttlMs = entry.ttlMs
+      if (ttlMs !== undefined) assertStorageTtlDuration(ttlMs, STORAGE_MEMORY_BACKEND)
+      return { key: fact.key, value: prepare('value', entry.value, fact.key) as string, ttlMs }
     })
   }
   /** Every duplicate position reuses its first result in both native root and scoped snapshots. */
@@ -657,8 +707,9 @@ export function createMemoryBackend<T = unknown>(
       keys: () =>
         core.execution.runSync({ operation: MemoryOperation.keys, input: undefined }, () => {
           controller.assertLive()
-          return [...data.value.values()]
-            .map((entry) => entry.key)
+          return [...data.value.entries()]
+            .filter(([encoded]) => liveEntry('value', encoded) !== undefined)
+            .map(([, entry]) => entry.key)
             .filter((key): key is string => typeof key === 'string')
         }),
       clearValues: () =>
@@ -691,8 +742,9 @@ export function createMemoryBackend<T = unknown>(
     keys: (ctx) =>
       asyncEntry(MemoryOperation.keys, undefined, ctx, () => {
         controller.assertLive()
-        return [...data.value.values()]
-          .map((entry) => entry.key)
+        return [...data.value.entries()]
+          .filter(([encoded]) => liveEntry('value', encoded) !== undefined)
+          .map(([, entry]) => entry.key)
           .filter((key): key is string => typeof key === 'string')
       }),
     clearValues: (ctx) => clearEntry(MemoryOperation.clearValues, 'value', ctx),
@@ -817,7 +869,9 @@ export function createMemoryBackend<T = unknown>(
       controller.assertLive()
       throwIfAborted(merged.signal)
       /** Committed values are immutable to callers and snapshot with native membership. */
-      const rows = [...ordered.record.range(captured)].map((leaf) => leaf.value)
+      const rows = [...ordered.record.range(captured)]
+        .map((leaf) => liveEntry('record', encodeFlatStorageKey(leaf.value.key)))
+        .filter((entry): entry is IMemoryEntry => entry !== undefined)
       for (const row of rows) {
         controller.assertLive()
         throwIfAborted(merged.signal)
@@ -883,7 +937,7 @@ export function createMemoryBackend<T = unknown>(
       record: createOrderedRecordIndex<IMemoryDraft>()
     }
     /** First reads are repeatable until a write in this attempt replaces their snapshot. */
-    const snapshots = new Map<string, IMemoryEntry | undefined>()
+    const snapshots = new Map<string, IMemorySnapshot | undefined>()
     /** Per-key tombstone revisions detect delete/reinsert and other ABA writes. */
     const expected = new Map<
       string,
@@ -903,43 +957,57 @@ export function createMemoryBackend<T = unknown>(
         expected.set(id, { channel, encoded, key, revision: revision(channel, encoded) })
       return id
     }
-    /** Read own writes first; otherwise retain the first committed value in this attempt. */
-    const txRead = (channel: IStorageChannel, key: IStorageKey): unknown => {
-      /** Caller-owned keys detach before contributing to revision or draft identity. */
-      const captured = snapshotStorageKey(key, STORAGE_MEMORY_BACKEND)
-      /** Every channel uses the same canonical logical-key wire. */
-      const encoded = encodeFlatStorageKey(captured)
-      /** Native revision tracking remains separate from a value's undefined representation. */
-      const id = track(channel, encoded, captured)
-      /** A draft row replaces the previous read snapshot immediately. */
-      const proposed = draft.get(id)
-      if (proposed)
-        return proposed.remove ? undefined : copyValue(channel, proposed.value, captured)
+    /** First access captures value, deadline and revision once; later reads retain that snapshot. */
+    const txSnapshot = (
+      channel: IStorageChannel,
+      encoded: string,
+      key: IStorageKey
+    ): IMemorySnapshot | undefined => {
+      /** Existing observations are never refreshed from a later clock or physical mutation. */
+      const id = identity(channel, encoded)
       if (!snapshots.has(id)) {
-        /** Clone at first read, so later root mutations cannot alter a repeatable record snapshot. */
-        const current = data[channel].get(encoded)
+        /** Expiry removes the physical row before its revision baseline is observed. */
+        const current = liveEntry(channel, encoded)
+        track(channel, encoded, key)
         snapshots.set(
           id,
           current === undefined
             ? undefined
             : {
-                key: captured,
-                value: copyValue(channel, current.value, captured),
-                ordered: current.ordered
+                key,
+                value: copyValue(channel, current.value, key),
+                ordered: current.ordered,
+                deadline: deadlines.get(id)
               }
         )
       }
-      /** Every returned mutable value is detached from the retained native snapshot. */
-      const current = snapshots.get(id)
-      return current === undefined ? undefined : copyValue(channel, current.value, captured)
+      return snapshots.get(id)
     }
-    /** Membership is tracked independently from undefined-valued records. */
+    /** Read own writes first; otherwise retain the first committed value in this attempt. */
+    const txEntry = (channel: IStorageChannel, key: IStorageKey): IMemorySnapshot | undefined => {
+      /** Caller-owned keys detach before contributing to revision or draft identity. */
+      const captured = snapshotStorageKey(key, STORAGE_MEMORY_BACKEND)
+      /** Every channel uses the same canonical logical-key wire. */
+      const encoded = encodeFlatStorageKey(captured)
+      /** A draft row replaces the previous read snapshot immediately. */
+      const proposed = draft.get(identity(channel, encoded))
+      return proposed
+        ? proposed.remove
+          ? undefined
+          : proposed
+        : txSnapshot(channel, encoded, captured)
+    }
+    /** Every mutable value returned from a retained native snapshot has independent ownership. */
+    const txRead = (channel: IStorageChannel, key: IStorageKey): unknown => {
+      /** Membership and an undefined-valued record remain separate facts. */
+      const current = txEntry(channel, key)
+      return current === undefined ? undefined : copyValue(channel, current.value, current.key)
+    }
+    /** Membership shares the same first snapshot, including undefined-valued records. */
     const txHas = (channel: IStorageChannel, encoded: string, key: IStorageKey): boolean => {
-      /** Reads and writes share one revision baseline for this channel. */
-      const id = track(channel, encoded, key)
       /** A tombstone masks physical membership until the attempt commits. */
-      const proposed = draft.get(id)
-      return proposed ? !proposed.remove : data[channel].has(encoded)
+      const proposed = draft.get(identity(channel, encoded))
+      return proposed ? !proposed.remove : txSnapshot(channel, encoded, key) !== undefined
     }
     /** Draft hash and ordered range lookup retain one actual proposed row reference. */
     const stageDraft = (entry: IMemoryDraft): void => {
@@ -956,7 +1024,8 @@ export function createMemoryBackend<T = unknown>(
       channel: IStorageChannel,
       key: IStorageKey,
       value: unknown,
-      policy: IConflictPolicy
+      policy: IConflictPolicy,
+      ttlMs?: number
     ): void => {
       /** Preparation can reject before any prior channel loses draft membership. */
       const captured = snapshotStorageKey(key, STORAGE_MEMORY_BACKEND)
@@ -981,13 +1050,16 @@ export function createMemoryBackend<T = unknown>(
           encoded,
           ordered: keyBytes
         })
+      /** Overwriting a live row retains its deadline unless this batch supplies a new duration. */
+      const current = txEntry(channel, captured)
       stageDraft({
         channel,
         key: captured,
         value: prepared,
         remove: false,
         encoded,
-        ordered: keyBytes
+        ordered: keyBytes,
+        deadline: ttlMs === undefined ? current?.deadline : scheduler.now() + ttlMs
       })
     }
     /** Delete returns actual draft membership, so repeated keys count at most once. */
@@ -998,7 +1070,8 @@ export function createMemoryBackend<T = unknown>(
       const encoded = encodeFlatStorageKey(captured)
       if (!txHas(channel, encoded, captured)) return false
       /** Existing physical or proposed membership already owns this exact ordered identity. */
-      const current = draft.get(identity(channel, encoded)) ?? data[channel].get(encoded)!
+      const current =
+        draft.get(identity(channel, encoded)) ?? txSnapshot(channel, encoded, captured)!
       stageDraft({
         channel,
         key: captured,
@@ -1031,8 +1104,12 @@ export function createMemoryBackend<T = unknown>(
             ? -1
             : compareRecordIndexKeys(left.value.key, right.value.key)
         if (comparison < 0) {
-          rows.push(left.value!.value)
+          /** First range access uses the same repeatable membership and deadline as point reads. */
+          const row = left.value!.value
+          /** Expiry unlinks this leaf, so retain the next original candidate before pruning it. */
           left = physical.next()
+          const current = txSnapshot(channel, encodeFlatStorageKey(row.key), row.key)
+          if (current !== undefined) rows.push(current)
         } else {
           if (!right.value!.value.remove) rows.push(right.value!.value)
           if (comparison === 0) left = physical.next()
@@ -1044,7 +1121,8 @@ export function createMemoryBackend<T = unknown>(
     /** Native text batches stage only into this attempt's existing draft and revision baseline. */
     const textDraft: IMemoryTextDraft = {
       setMany: (entries) => {
-        for (const entry of entries) txWrite('value', entry.key, entry.value, 'conflict')
+        for (const entry of entries)
+          txWrite('value', entry.key, entry.value, 'conflict', entry.ttlMs)
       },
       removeMany: (keys) => {
         /** Duplicate identities can only remove the first still-present draft entry. */
@@ -1066,10 +1144,81 @@ export function createMemoryBackend<T = unknown>(
         return count
       }
     }
+    /** TTL metadata changes stage beside the original value and never create a second draft. */
+    const txTtl = (target: IMemoryTtlTarget, ms: number | undefined, persist: boolean): boolean => {
+      /** A TTL target has already been captured by the original contract lock owner. */
+      const channel = ttlChannel(target)
+      const current = txEntry(channel, target.key)
+      if (current === undefined || (persist && current.deadline === undefined)) return false
+      stageDraft({
+        ...current,
+        channel,
+        encoded: encodeFlatStorageKey(current.key),
+        remove: ms === 0,
+        deadline: persist ? undefined : scheduler.now() + ms!
+      })
+      return true
+    }
+    /** Remaining duration observes the same retained transaction value and captured deadline. */
+    const txRemaining = (target: IMemoryTtlTarget): number | undefined => {
+      /** Missing and unlimited rows share the documented undefined result. */
+      const current = txEntry(ttlChannel(target), target.key)
+      return current?.deadline === undefined
+        ? undefined
+        : Math.max(0, current.deadline - scheduler.now())
+    }
     /** The same physical scope factory serves callbacks, nested operations and final checks. */
     const createScope = (): IMemoryScope<T> => {
       /** Each method closes over its own authentic view, never an independently registered guard. */
       const scope: IMemoryScope<T> = {
+        [ttlOperations]: {
+          expire: (target, ms) =>
+            acceptedOperation(
+              MemoryOperation.ttlExpire,
+              { target, ms },
+              (input) => {
+                /** Validation stays inside the one operation already admitted by tx.use(ttl). */
+                const target = captureTtlTarget(input.target)
+                /** Preserve this pipeline-provided duration while the native operation settles. */
+                const ms = input.ms
+                assertStorageTtlDuration(ms, STORAGE_MEMORY_BACKEND)
+                return txTtl(target, ms, false)
+              },
+              scope
+            ),
+          remaining: (target) =>
+            acceptedOperation(
+              MemoryOperation.ttlRemaining,
+              target,
+              (input) => txRemaining(captureTtlTarget(input)),
+              scope
+            ),
+          persist: (target) =>
+            acceptedOperation(
+              MemoryOperation.ttlPersist,
+              target,
+              (input) => txTtl(captureTtlTarget(input), undefined, true),
+              scope
+            )
+        },
+        [counterOperations]: {
+          increment: (key, by) =>
+            acceptedOperation(
+              MemoryOperation.counterIncrement,
+              { key, by },
+              (input) => {
+                /** Snapshot pipeline-provided identity before any native text access. */
+                const key = input.key
+                assertStringStorageKey(key, STORAGE_MEMORY_BACKEND)
+                /** The pure contract calculation runs against this native text draft only. */
+                const increment = snapshotStorageCounterIncrement(input.by, STORAGE_MEMORY_BACKEND)
+                const result = increment(txRead('value', key) as string | undefined)
+                txWrite('value', key, String(result), 'conflict')
+                return result
+              },
+              scope
+            )
+        },
         [recordPrefix]: (prefix) =>
           operation(MemoryOperation.recordRemoveByPrefix, prefix, (current) => {
             /** Native record prefix deletion uses the same bounded draft merge as record iteration. */
@@ -1307,6 +1456,8 @@ export function createMemoryBackend<T = unknown>(
           return { status: 'conflict', phase: 'acquire', keys: [held.key], holder: held.holder }
         }
       }
+      /** Expiry after an observed read changes the same original revision before commit checks. */
+      for (const entry of expected.values()) liveEntry(entry.channel, entry.encoded)
       /** Conflict identities are collected before the synchronous all-channel draft merge. */
       const conflicts = [...expected.values()].filter(
         (entry) =>
@@ -1352,7 +1503,12 @@ export function createMemoryBackend<T = unknown>(
       for (const proposed of draft.values()) {
         /** Existing draft identities retain their already captured logical key. */
         const encoded = proposed.encoded
-        if (proposed.remove) {
+        /** New deadlines that elapsed within this draft commit as immediate absence. */
+        if (
+          proposed.remove ||
+          (proposed.deadline !== undefined && proposed.deadline <= scheduler.now())
+        ) {
+          deadlines.delete(identity(proposed.channel, encoded))
           if (!data[proposed.channel].delete(encoded)) continue
           ordered[proposed.channel].delete(proposed.ordered)
         } else {
@@ -1364,6 +1520,8 @@ export function createMemoryBackend<T = unknown>(
           const entry = { key: proposed.key, value: proposed.value, ordered: keyBytes }
           data[proposed.channel].set(encoded, entry)
           ordered[proposed.channel].set(keyBytes, entry)
+          if (proposed.deadline === undefined) deadlines.delete(identity(proposed.channel, encoded))
+          else deadlines.set(identity(proposed.channel, encoded), proposed.deadline)
         }
         bump(proposed.channel, encoded)
         changed[proposed.channel].push(proposed.key)
@@ -1498,11 +1656,97 @@ export function createMemoryBackend<T = unknown>(
         )
       )
   }
+  /** Capture canonical target identity and reject channels that this native unit does not implement. */
+  function captureTtlTarget(input: ITtlTarget): IMemoryTtlTarget {
+    /** The original lock owner validates and detaches the complete channel-specific identity. */
+    const target = snapshotStorageTtlTarget(input, STORAGE_MEMORY_BACKEND)
+    if (target.channel === 'text' || target.channel === 'bytes' || target.channel === 'record')
+      return target
+    throw new StorageContractError(StorageContractErrorCode.unsupported, {
+      backend: STORAGE_MEMORY_BACKEND
+    })
+  }
+  /** Only the canonical text tag differs from the original native value-channel name. */
+  function ttlChannel(target: IMemoryTtlTarget): IStorageChannel {
+    return target.channel === 'text' ? 'value' : target.channel
+  }
+  /** One metadata mutation keeps the same physical value, revision and local notification owner. */
+  const changeDeadline = (
+    target: IMemoryTtlTarget,
+    ms: number | undefined,
+    persist: boolean
+  ): boolean => {
+    /** Canonical target snapshot has already detached every mutable key segment. */
+    const channel = ttlChannel(target)
+    const encoded = encodeFlatStorageKey(target.key)
+    const current = liveEntry(channel, encoded)
+    const id = identity(channel, encoded)
+    if (current === undefined || (persist && !deadlines.has(id))) return false
+    if (persist) deadlines.delete(id)
+    else deadlines.set(id, scheduler.now() + ms!)
+    if (ms === 0) liveEntry(channel, encoded)
+    else {
+      bump(channel, encoded)
+      publish(channel, 'put', [current.key])
+    }
+    return true
+  }
+  /** TTL reads and writes use the original root pipeline, implicit locks and operation budget. */
+  const timeToLive: ITtlApi = {
+    expire: (target, ms, ctx) =>
+      mutationEntry(MemoryOperation.ttlExpire, { target, ms }, ctx, (input) => {
+        const target = captureTtlTarget(input.target)
+        /** The supplied duration remains fixed while the original policy waits for admission. */
+        const ms = input.ms
+        assertStorageTtlDuration(ms, STORAGE_MEMORY_BACKEND)
+        return { keys: [target], run: () => changeDeadline(target, ms, false) }
+      }),
+    remaining: (target, ctx) =>
+      asyncEntry(MemoryOperation.ttlRemaining, target, ctx, (input) => {
+        const target = captureTtlTarget(input)
+        const channel = ttlChannel(target)
+        const encoded = encodeFlatStorageKey(target.key)
+        if (liveEntry(channel, encoded) === undefined) return undefined
+        const deadline = deadlines.get(identity(channel, encoded))
+        return deadline === undefined ? undefined : Math.max(0, deadline - scheduler.now())
+      }),
+    persist: (target, ctx) =>
+      mutationEntry(MemoryOperation.ttlPersist, target, ctx, (input) => {
+        const target = captureTtlTarget(input)
+        return { keys: [target], run: () => changeDeadline(target, undefined, true) }
+      })
+  }
+  /** A native counter read and write occupy the same original synchronous admitted mutation. */
+  const counters: ICounterApi = {
+    increment: (key, by, ctx) =>
+      mutationEntry(MemoryOperation.counterIncrement, { key, by }, ctx, (input) => {
+        /** Capture a pipeline-provided identity before lock derivation and native work. */
+        const key = input.key
+        assertStringStorageKey(key, STORAGE_MEMORY_BACKEND)
+        /** Decimal and overflow validation stays with the original contract helper. */
+        const increment = snapshotStorageCounterIncrement(input.by, STORAGE_MEMORY_BACKEND)
+        return {
+          keys: [lockKey.text(key)],
+          run: () => {
+            /** This calculation and its write share one synchronous admitted native turn. */
+            const result = increment(read('value', key) as string | undefined)
+            write('value', key, String(result))
+            return result
+          }
+        }
+      })
+  }
   /** Publish the real built-in APIs on the original resource, never a copied base. */
   const store = provideCapabilities(
     base,
     [
       implement(kv, keyValue, { forTransaction: (scope) => scope }),
+      implement(ttl, timeToLive, {
+        forTransaction: (scope) => (scope as IMemoryScope<T>)[ttlOperations]
+      }),
+      implement(counter, counters, {
+        forTransaction: (scope) => (scope as IMemoryScope<T>)[counterOperations]
+      }),
       implement(
         records,
         {
@@ -1539,11 +1783,14 @@ export function createMemoryBackend<T = unknown>(
                       upper: captured.upper,
                       upperOpen: true
                     })
-                  ].map((leaf) => leaf.value)
+                  ]
+                    .map((leaf) => liveEntry('record', encodeFlatStorageKey(leaf.value.key)))
+                    .filter((entry): entry is IMemoryEntry => entry !== undefined)
                   for (const row of rows) {
                     /** Every selected live row shares the original hash/radix/revision identity. */
                     const encoded = encodeFlatStorageKey(row.key)
                     data.record.delete(encoded)
+                    deadlines.delete(identity('record', encoded))
                     ordered.record.delete(row.ordered)
                     bump('record', encoded)
                   }

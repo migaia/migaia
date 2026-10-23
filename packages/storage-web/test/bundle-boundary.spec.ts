@@ -469,7 +469,7 @@ const expectedRetainedModules = [
   '@migaia/storage-host/dist/index.js',
   '@migaia/storage-host/dist/json-[chunk].js',
   '@migaia/storage-host/dist/key-domain-[chunk].js',
-  '@migaia/storage-host/dist/namespace-[chunk].js',
+  '@migaia/storage-host/dist/batch-observation-[chunk].js',
   '@migaia/storage-host/dist/ordered-record-index-[chunk].js',
   '@migaia/storage-web/dist/builtin-factory-[chunk].js',
   '@migaia/storage-web/dist/builtin-kinds-[chunk].js',

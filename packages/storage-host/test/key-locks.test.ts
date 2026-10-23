@@ -93,6 +93,58 @@ function run<R>(
 }
 
 describe('the shared local key-lock provider', () => {
+  it('keeps native vector and RDF locks distinct from record tuples in the same original provider', async () => {
+    const current = await fixture()
+    await using _host = current.host
+    await using port = current.port
+    /** Ground identity is validated by the contract's existing RDF owner. */
+    const quad = {
+      subject: { termType: 'NamedNode', value: 'urn:subject' },
+      predicate: { termType: 'NamedNode', value: 'urn:predicate' },
+      object: { termType: 'NamedNode', value: 'urn:object' },
+      graph: { termType: 'DefaultGraph', value: '' }
+    } as const
+    /** Retain actual native lifetime while inspecting and contending on both new finite buckets. */
+    const entered = deferred<void>()
+    const finish = deferred<void>()
+    const pending = run(
+      current,
+      'native',
+      { lock: [lockKey.rdf(quad), lockKey.vector('collection', 'point')] },
+      async () => {
+        entered.resolve()
+        await finish.promise
+        return { status: 'committed', value: 'complete' }
+      }
+    )
+    await entered.promise
+    try {
+      expect(port.inspectLocks().map(({ key }) => key.channel)).toEqual(['vector', 'rdf'])
+      for (const key of [lockKey.vector('collection', 'point'), lockKey.rdf(quad)]) {
+        const captured = snapshotConcurrencyLockKeys([key], 'catalog')
+        expect(port.probe(captured.identities)?.key).toEqual(key)
+        await expect(
+          run(
+            current,
+            'conflict',
+            { lock: [key], concurrency: ConcurrencyPolicy.fail() },
+            async () => ({ status: 'committed', value: 'wrong' })
+          )
+        ).rejects.toMatchObject({ code: 'LOCK_REJECTED' })
+      }
+      await expect(
+        run(current, 'record', { lock: [lockKey.record(['collection', 'point'])] }, async () => ({
+          status: 'committed',
+          value: 'record'
+        }))
+      ).resolves.toBe('record')
+    } finally {
+      finish.resolve()
+      await expect(pending).resolves.toBe('complete')
+    }
+    expect(port.inspectLocks()).toEqual([])
+  })
+
   it('tries atomically, allows unrelated native work and retains locks through actual cleanup', async () => {
     /** Resource acquisition uses the actual backend core and canonical loop. */
     const current = await fixture()
@@ -140,9 +192,14 @@ describe('the shared local key-lock provider', () => {
     await entered.promise
     expect(port.inspectLocks().map((row) => row.key.channel)).toEqual(['text', 'record'])
     /** Inspection is a detached key snapshot, including Date's mutable internal slot. */
-    const record = port.inspectLocks()[1]!.key.key as Date
+    const recordKey = port.inspectLocks()[1]!.key
+    expect(recordKey.channel).toBe('record')
+    if (recordKey.channel !== 'record') expect.fail()
+    const record = recordKey.key as Date
     record.setTime(99)
-    expect((port.inspectLocks()[1]!.key.key as Date).getTime()).toBe(2)
+    const nextRecordKey = port.inspectLocks()[1]!.key
+    if (nextRecordKey.channel !== 'record') expect.fail()
+    expect((nextRecordKey.key as Date).getTime()).toBe(2)
     await expect(
       run(
         current,

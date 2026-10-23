@@ -98,8 +98,87 @@ const responseLocalBlank = snapshotStorageRdfTerm(term.blank('response-local'), 
   )
 }
 
+/** SQL capability access requires an actual native provider and reuses its original executor. */
+const sqlCapabilityCase: ICaseDoc = {
+  title: t('Use the native SQL capability', '使用原生 SQL 能力'),
+  problem: t(
+    'A consumer must select the published native SQL API by exact token.',
+    '消费者须按精确令牌选择已发布的原生 SQL API。'
+  ),
+  example: `import { sql, type IStorageStore } from '@migaia/storage-contract'
+async function readOne(store: IStorageStore<typeof sql>) {
+  return store.use(sql).sql<{ value: number }>\`SELECT 1 AS value\`.get()
+}`,
+  result: t(
+    'The actual backend executes one statement. Transaction projections use the same original draft and budget.',
+    '实际后端执行一条语句；事务投影沿同一原 draft 与预算。'
+  )
+}
+/** Terminal derivation changes only the finite callbacks of an authentic existing SQL node. */
+const deriveSqlCase: ICaseDoc = {
+  title: t('Derive an existing SQL query', '派生已有 SQL 查询'),
+  problem: t(
+    'A transaction wrapper must retain captured fragment identity without a second compiler.',
+    '事务包装须保留已捕获片段身份，不能复制 compiler。'
+  ),
+  example: `import { deriveStorageSqlQuery, type ISqlQuery } from '@migaia/storage-contract'
+function observe(query: ISqlQuery) {
+  return deriveStorageSqlQuery(query, {
+    all: ctx => query.all(ctx),
+    get: ctx => query.get(ctx),
+    run: ctx => query.run(ctx)
+  })
+}`,
+  result: t(
+    'Construction performs no I/O. The derived query shares its original node and forwards original terminal Promises.',
+    '构造不做 I/O；派生查询共享原节点并转发原终端 Promise。'
+  )
+}
+
+/** Object reads acquire the backend's actual snapshot and dispose it through the original owner. */
+const blobCase: ICaseDoc = {
+  title: t('Read an independent object snapshot', '读取独立对象快照'),
+  problem: t(
+    'Object resources must be consumed once and released after reading.',
+    '对象资源须单次消费，并在读取后释放。'
+  ),
+  example: `import { blob, type IStorageStore } from '@migaia/storage-contract'
+async function readObject(store: IStorageStore<typeof blob>) {
+  const object = await store.use(blob).get('readme')
+  if (!object) return undefined
+  await using owned = object
+  return object.bytes()
+}`,
+  result: t(
+    'The actual backend supplies detached bytes; the original object lifetime closes once.',
+    '实际后端提供独立字节；原对象生命周期只关闭一次。'
+  )
+}
+/** Replay cursors advance only after the consumer has processed the returned native commits. */
+const durableChangeCase: ICaseDoc = {
+  title: t('Replay durable commit summaries', '重放持久提交摘要'),
+  problem: t(
+    'Consumers must retain their cursor only after successful processing.',
+    '消费者须在成功处理后才保存游标。'
+  ),
+  example: `import { durableChangeFeed, type IStorageStore, type IDurableStorageChange } from '@migaia/storage-contract'
+async function replay(store: IStorageStore<typeof durableChangeFeed>, after: string, process: (change: IDurableStorageChange) => Promise<void>) {
+  const batch = await store.use(durableChangeFeed).readChanges({ after })
+  for (const change of batch.changes) await process(change)
+  return batch.cursor
+}`,
+  result: t(
+    'Actual retained commits replay at least once. A retention gap rejects CHANGE_CURSOR_EXPIRED and requires full invalidation.',
+    '实际保留提交至少一次重放；保留期缺口拒绝 CHANGE_CURSOR_EXPIRED，并要求全量失效。'
+  )
+}
+
 /** Exercises public contract tools without supplying a fictional storage implementation. */
 export const storageContractCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
+  sql: [sqlCapabilityCase],
+  blob: [blobCase],
+  durableChangeFeed: [durableChangeCase],
+  deriveStorageSqlQuery: [deriveSqlCase],
   term: [rdfTermCase],
   snapshotStorageRdfTerm: [rdfTermCase],
   snapshotStorageRdfPattern: [rdfTermCase],
