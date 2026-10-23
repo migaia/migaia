@@ -55,6 +55,8 @@ Hybrid accepts exactly two named dense/sparse prefetch branches and `{ fusion: '
 
 Detection normally runs during host creation. With `autoDetect: false`, call `host.detect()` explicitly; business terminals reject before detection without sending implicit detection requests. Server and SDK require version 1.11 or later.
 
+Detection checks the standard vector, TTL and organization cleanup methods. Optional native Feature methods are checked when called; an absent method rejects with `UNSUPPORTED_CAPABILITY` before sending a modification.
+
 `dispose()` seals new calls and waits for accepted native requests and iterators. Its primary and symbolic cleanup Promises are separately cached. The backend never closes a borrowed HTTP or SDK client. Native fetch receives the operation cancellation signal. SDK 1.11 lacks per-call signals, so its request must actually settle before admission is released. No write is automatically retried or redirected; sent failures may have an unknown result.
 
 Errors use `storage.backend.qdrant`: native 4xx is `QDRANT_REQUEST_FAILED`, network/5xx is `QDRANT_UNAVAILABLE`, and malformed or unexpected responses are `QDRANT_RESPONSE_INVALID`. Original errors and all evidence available from the adapter stay reachable. HTTP retains full status/body; SDK 1.11 itself discards status and truncates the message of `QdrantClientUnexpectedResponseError` for a non-waiting snapshot returning 202. That path reports response-invalid even though the snapshot may be accepted. The HTTP port returns native null for that accepted response. There is no automatic fallback or replay. Hooks contain sanitized route, elapsed time and available status, without authentication headers or payloads.

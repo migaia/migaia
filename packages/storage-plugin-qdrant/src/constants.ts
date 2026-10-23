@@ -155,6 +155,21 @@ export const QdrantRoute: {
     parameters: true
   }
 }
+/** Detection requires only standard vector, TTL and organization cleanup protocol methods. */
+export const QdrantRequiredOperations = [
+  QdrantRoute.getCollections.name,
+  QdrantRoute.getCollection.name,
+  QdrantRoute.createCollection.name,
+  QdrantRoute.createPayloadIndex.name,
+  QdrantRoute.upsert.name,
+  QdrantRoute.delete.name,
+  QdrantRoute.count.name,
+  QdrantRoute.scroll.name,
+  QdrantRoute.retrieve.name,
+  QdrantRoute.query.name,
+  QdrantRoute.setPayload.name,
+  QdrantRoute.deletePayload.name
+] as const
 /** Managed slots use native engine storage; the source Dot slot preserves cosine input amplitude. */
 export const QdrantManagedVectorName = { search: 'migaia_search', source: 'migaia_source' } as const
 /** Reserved fields and stable point/configuration names belong only to this backend. */

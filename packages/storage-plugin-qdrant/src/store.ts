@@ -50,7 +50,12 @@ import {
   readAbortReason
 } from '@migaia/storage-host/authoring/backend'
 import { recommendStorageVector } from '@migaia/storage-host/authoring/vector'
-import { QdrantRoute, QdrantText, QdrantManagedVectorName } from './constants.js'
+import {
+  QdrantRoute,
+  QdrantText,
+  QdrantManagedVectorName,
+  QdrantRequiredOperations
+} from './constants.js'
 import {
   capture,
   invalidArgument,
@@ -383,11 +388,29 @@ export function createQdrantBackend(
         throw qdrantError(QdrantErrorCode.responseInvalid, error)
       }
     }
-    const retrieve = async (name: string, ids: readonly string[], ctx: IOperationContext) => {
+    const retrieve = async (
+      name: string,
+      ids: readonly string[],
+      ctx: IOperationContext,
+      configuration?: IStorageVectorConfiguration
+    ) => {
       const physical = await Promise.all(ids.map((id) => nativeId([orgId, id]))),
         rows = await send(
           'retrieve',
-          [name, { ids: physical, with_payload: true, with_vector: true }],
+          [
+            name,
+            {
+              ids: physical,
+              with_payload: true,
+              with_vector: configuration
+                ? [
+                    configuration.metric === 'cosine'
+                      ? QdrantManagedVectorName.source
+                      : QdrantManagedVectorName.search
+                  ]
+                : false
+            }
+          ],
           ctx
         )
       if (!Array.isArray(rows)) throw qdrantError(QdrantErrorCode.responseInvalid)
@@ -638,7 +661,7 @@ export function createQdrantBackend(
             return query<TPayload>(
               current,
               async (name, configuration, ctx, now) => {
-                const row = (await retrieve(name, [id], ctx))[0]
+                const row = (await retrieve(name, [id], ctx, configuration))[0]
                 if (!row || (row.expiresAt !== undefined && row.expiresAt <= now))
                   throw invalidArgument()
                 return { query: sample(row.point, configuration), exclude: [id] }
@@ -658,7 +681,12 @@ export function createQdrantBackend(
             return query<TPayload>(
               current,
               async (name, configuration, ctx, now) => {
-                const rows = await retrieve(name, [...captured.pos, ...captured.neg], ctx),
+                const rows = await retrieve(
+                    name,
+                    [...captured.pos, ...captured.neg],
+                    ctx,
+                    configuration
+                  ),
                   byId = new Map(rows.map((row) => [row.id, row]))
                 const load = (id: string) => {
                   const row = byId.get(id)
@@ -1026,7 +1054,7 @@ export function createQdrantBackend(
     },
     detect: async (signal: import('@migaia/utils/promise').INativeAbortSignal) => {
       controller.assertLive()
-      for (const operation of Object.keys(QdrantRoute) as IQdrantOperationName[])
+      for (const operation of QdrantRequiredOperations)
         if (typeof http[operation] !== 'function') unsupported()
       if (typeof http.getVersion !== 'function') unsupported()
       const version = await http.getVersion({ signal }),
