@@ -32,6 +32,10 @@ describe('native endpoint adapters', () => {
     await endpoint.graphStore!.remove(target)
     expect(await endpoint.graphStore!.has(target)).toBe(false)
     expect(await endpoint.query('ASK {}', 'application/sparql-results+json')).toContain('true')
+    const malformed = oxigraphEndpoint(Object.assign(new Store(), { query: () => true }))
+    await expect(
+      malformed.query('ASK {}', 'application/sparql-results+json')
+    ).rejects.toMatchObject({ code: 'SPARQL_RESPONSE_INVALID' })
   })
   it('uses actual fetch protocol, encoded targets and precise response/commit errors', async () => {
     const seen: { method: string; url: string; auth: string | undefined; body: string }[] = []
@@ -44,6 +48,11 @@ describe('native endpoint adapters', () => {
         auth: request.headers.authorization,
         body
       })
+      if (request.url?.startsWith('/redirect')) {
+        response.writeHead(307, { Location: '/destination' })
+        response.end('native redirect')
+        return
+      }
       if (request.url?.startsWith('/failed')) {
         response.writeHead(503)
         response.end('native server detail')
@@ -96,6 +105,32 @@ describe('native endpoint adapters', () => {
       await expect(failure.update('INSERT DATA {}')).rejects.toMatchObject({
         code: 'SPARQL_COMMIT_UNKNOWN'
       })
+      let users = 0,
+        passwords = 0
+      const redirected = httpEndpoint({
+        queryUrl: origin + '/redirect',
+        updateUrl: origin + '/redirect',
+        auth: {
+          basic: {
+            get user() {
+              users++
+              return 'fixture'
+            },
+            get password() {
+              passwords++
+              return 'private'
+            }
+          }
+        }
+      })
+      expect([users, passwords]).toEqual([1, 1])
+      await expect(redirected.update('INSERT DATA {}')).rejects.toMatchObject({
+        code: 'SPARQL_REQUEST_FAILED',
+        cause: { status: 307, body: 'native redirect' }
+      })
+      expect(seen.filter((item) => item.url === '/destination')).toHaveLength(0)
+      expect(await redirected.query('ASK {}', 'application/sparql-results+json')).toContain('true')
+      expect(seen.filter((item) => item.url === '/destination')).toHaveLength(1)
     } finally {
       await new Promise<void>((resolve, reject) =>
         server.close((error) => (error ? reject(error) : resolve()))

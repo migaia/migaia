@@ -31,7 +31,13 @@ function binding(value: unknown): IRdfBindingTerm {
   if (item.type === 'literal' || item.type === 'typed-literal') {
     if (item['xml:lang'] !== undefined) {
       if (typeof item['xml:lang'] !== 'string') return malformed()
-      return term.literal(item.value, { language: item['xml:lang'] })
+      const literal = term.literal(item.value, { language: item['xml:lang'] })
+      return item.datatype === undefined
+        ? literal
+        : (snapshotStorageRdfTerm(
+            { ...literal, datatype: item.datatype as string },
+            undefined
+          ) as IRdfBindingTerm)
     }
     if (item.datatype !== undefined && typeof item.datatype !== 'string') return malformed()
     return term.literal(

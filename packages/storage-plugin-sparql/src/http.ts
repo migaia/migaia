@@ -62,9 +62,10 @@ export function httpEndpoint(options: ISparqlHttpOptions): ISparqlEndpoint {
       if (typeof bearer !== 'string' || /[\r\n]/.test(bearer)) throw invalidArgument()
       return 'Bearer ' + bearer
     }
-    if (typeof basic?.user !== 'string' || typeof basic.password !== 'string')
-      throw invalidArgument()
-    return 'Basic ' + bytesToBase64(new TextEncoder().encode(basic.user + ':' + basic.password))
+    const user = basic?.user,
+      password = basic?.password
+    if (typeof user !== 'string' || typeof password !== 'string') throw invalidArgument()
+    return 'Basic ' + bytesToBase64(new TextEncoder().encode(user + ':' + password))
   })
   /** Each native request is sent once; transport uncertainty is never automatically replayed. */
   const request = async (
@@ -88,6 +89,7 @@ export function httpEndpoint(options: ISparqlHttpOptions): ISparqlEndpoint {
           ...(auth === undefined ? {} : { Authorization: auth })
         },
         ...(body === undefined ? {} : { body }),
+        ...(mutation ? { redirect: 'manual' as const } : {}),
         signal: signal as AbortSignal | undefined
       })
     } catch (cause) {

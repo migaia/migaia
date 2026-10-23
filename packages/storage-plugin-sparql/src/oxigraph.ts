@@ -85,13 +85,14 @@ export function oxigraphEndpoint(store: Store): ISparqlEndpoint {
   return Object.freeze({
     query: async (text, accept, signal) => {
       throwIfAborted(signal)
+      let value: ReturnType<Store['query']>
       try {
-        const value = Reflect.apply(native.query, store, [text, { results_format: accept }])
-        if (typeof value !== 'string') throw sparqlError(SparqlErrorCode.responseInvalid)
-        return value
+        value = Reflect.apply(native.query, store, [text, { results_format: accept }])
       } catch (cause) {
         throw sparqlError(SparqlErrorCode.requestFailed, cause)
       }
+      if (typeof value !== 'string') throw sparqlError(SparqlErrorCode.responseInvalid)
+      return value
     },
     update,
     atomicUpdate: update,

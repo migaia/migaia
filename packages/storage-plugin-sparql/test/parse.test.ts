@@ -32,6 +32,18 @@ describe('native RDF protocol decoding', () => {
       unbound: undefined
     })
     expect(parseSparqlResults('{"boolean":false}', 'ask')).toBe(false)
+    for (const datatype of [5, 'http://www.w3.org/2001/XMLSchema#integer'])
+      expect(() =>
+        parseSparqlResults(
+          JSON.stringify({
+            head: { vars: ['value'] },
+            results: {
+              bindings: [{ value: { type: 'literal', value: 'text', 'xml:lang': 'en', datatype } }]
+            }
+          }),
+          'select'
+        )
+      ).toThrow(expect.objectContaining({ code: 'SPARQL_RESPONSE_INVALID' }))
     for (const text of ['{}', 'not json', '{"head":{"vars":[]},"results":{"bindings":[5]}}'])
       expect(() => parseSparqlResults(text, 'select')).toThrow(
         expect.objectContaining({
