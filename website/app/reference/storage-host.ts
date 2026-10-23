@@ -47,8 +47,8 @@ console.log(host.extensions.label('draft'))`
         '解析后端配置namespace，保留各实例前缀与规范组织身份。'
       ),
       returns: t(
-        'The configured target for the default organization, or configured/orgId for another organization. A slash UUID configuration suffix rejects before I/O.',
-        '缺省组织返回原配置目标，其它组织返回configured/orgId。配置的slash UUID后缀在I/O前拒绝。'
+        'One argument validates and returns the configured target. Three arguments return the configured default target, or configured/orgId for another organization. A slash UUID configuration suffix rejects before I/O.',
+        '单参校验并返回原配置；三参在缺省组织返回原配置目标，其它组织返回configured/orgId。配置的slash UUID后缀在I/O前拒绝。'
       ),
       cases: storageHostCases.resolveStorageNamespace
     },
