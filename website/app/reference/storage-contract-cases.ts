@@ -33,6 +33,32 @@ async function readGreeting(store: IStorageBase) {
 
 /** Exercises public contract tools without supplying a fictional storage implementation. */
 export const storageContractCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
+  readConcurrencyLockIdentities: [
+    {
+      title: t(
+        'Read canonical identities without encoding another key set',
+        '读取规范身份，不重新编码键集合'
+      ),
+      problem: t(
+        'A native key-lock provider must use the same normalized identities as its original active attempt.',
+        '原生键锁 provider 必须使用与原活跃 attempt 相同的规范身份。'
+      ),
+      example: t(
+        `import { readConcurrencyLockIdentities, type IConcurrencyAttemptContext } from '@migaia/storage-contract'
+function lockIdentities(ctx: IConcurrencyAttemptContext) {
+  return readConcurrencyLockIdentities(ctx)
+}`,
+        `import { readConcurrencyLockIdentities, type IConcurrencyAttemptContext } from '@migaia/storage-contract'
+function lockIdentities(ctx: IConcurrencyAttemptContext) {
+  return readConcurrencyLockIdentities(ctx)
+}`
+      ),
+      result: t(
+        'The active original attempt supplies one frozen sorted/deduplicated hex string list, reused by nested attempts. Forged or settled contexts throw INVALID_ARGUMENT; no mutable bytes or control handles are returned.',
+        '原活跃 attempt 提供一个冻结、排序去重的十六进制字符串列表，嵌套尝试复用；伪造或已结算 context 抛 INVALID_ARGUMENT，不返回可变字节或控制句柄。'
+      )
+    }
+  ],
   records: [
     {
       title: t('Use one standard record query entry', '使用唯一标准记录查询入口'),
@@ -145,20 +171,18 @@ function readLocked(store: IRecordStore<{ count: number }>) {
         '后端与 persist 组合须保留原生选项字段，不能另建重试循环或重开操作期限。'
       ),
       example: t(
-        `import { resolveConcurrencyPolicy, runWithConcurrency, type IStorageBase, type ITransactionOptions, type IConcurrencyPort } from '@migaia/storage-contract'
-async function execute(store: IStorageBase, capturedOptions: ITransactionOptions, port: IConcurrencyPort<boolean>) {
-  const policy = resolveConcurrencyPolicy(store, capturedOptions.concurrency)
-  return runWithConcurrency({ store, options: capturedOptions, policy }, port)
+        `import { runWithConcurrency, type IStorageBase, type ITransactionOptions, type IConcurrencyPort } from '@migaia/storage-contract'
+async function execute(store: IStorageBase, options: ITransactionOptions, port: IConcurrencyPort<boolean>) {
+  return runWithConcurrency({ store, options }, port)
 }`,
-        `import { resolveConcurrencyPolicy, runWithConcurrency, type IStorageBase, type ITransactionOptions, type IConcurrencyPort } from '@migaia/storage-contract'
-async function execute(store: IStorageBase, capturedOptions: ITransactionOptions, port: IConcurrencyPort<boolean>) {
-  const policy = resolveConcurrencyPolicy(store, capturedOptions.concurrency)
-  return runWithConcurrency({ store, options: capturedOptions, policy }, port)
+        `import { runWithConcurrency, type IStorageBase, type ITransactionOptions, type IConcurrencyPort } from '@migaia/storage-contract'
+async function execute(store: IStorageBase, options: ITransactionOptions, port: IConcurrencyPort<boolean>) {
+  return runWithConcurrency({ store, options }, port)
 }`
       ),
       result: t(
-        'The function returns the real port’s committed boolean. The caller supplies a registered original store and captured options; no fictional backend is created by this example.',
-        '函数返回真实 port 的提交布尔值。调用方提供原登记 store 与已捕获选项；示例不构造虚拟后端。'
+        'The function returns the real port’s committed boolean. The caller supplies the registered original store and original options or exact outer attempt; the loop captures policy once.',
+        '函数返回真实 port 的提交布尔值。调用方提供原登记 store 与原选项或精确外层 attempt；循环只捕获一次策略。'
       )
     }
   ],
