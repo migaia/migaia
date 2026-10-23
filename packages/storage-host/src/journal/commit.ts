@@ -98,6 +98,7 @@ export async function createStorageNativeJournal(options: {
   readonly atomicBinlog?: ILogStore
   readonly atomicUndo?: ILogStore
   readonly binlogValues?: boolean
+  readonly onBinlogAppendError?: (txId: string, error: unknown) => void
 }) {
   const { access, logger } = options
   /** Borrow exact installed extension objects once; the bridge never closes or reconfigures them. */
@@ -112,11 +113,7 @@ export async function createStorageNativeJournal(options: {
     (binlogValues !== undefined && typeof binlogValues !== 'boolean')
   )
     throw new StorageContractError(StorageContractErrorCode.invalidArgument)
-  if (
-    (binlog !== undefined && atomicBinlog === undefined) ||
-    (undo !== undefined && atomicUndo === undefined) ||
-    access.binding.changes === undefined
-  )
+  if ((undo !== undefined && atomicUndo === undefined) || access.binding.changes === undefined)
     throw new StorageContractError(StorageContractErrorCode.unsupported)
   /** Stable target fields come only from the host's original fixed-org access closure. */
   const target = Object.freeze({
@@ -166,8 +163,13 @@ export async function createStorageNativeJournal(options: {
       /** Do not trust an arbitrary caller id or an unrelated object with matching fields. */
       const info = terminal.transactionInfo(scope)
       access.binding.changes!(scope)
+      /** Only the actual original terminal starts external I/O; rollback leaves it absent. */
+      let external: Promise<void> | undefined
       return Object.freeze({
         txId: info.id,
+        ...(binlog !== undefined && binlogNative === undefined
+          ? { settle: () => external ?? Promise.resolve() }
+          : {}),
         /** Called by the original owner after its final business plan and before actual COMMIT. */
         record: async (current: Omit<ITransactionScope, 'use'>): Promise<void> => {
           if (terminal.transactionInfo(current).id !== info.id)
@@ -192,9 +194,23 @@ export async function createStorageNativeJournal(options: {
                 }
               }
             ])[0]!.payload
-            await binlog.append(StorageJournalKind.commit, payload, {
-              transaction: binlogNative!.createPort(current)
-            })
+            if (binlogNative !== undefined)
+              await binlog.append(StorageJournalKind.commit, payload, {
+                transaction: binlogNative.createPort(current)
+              })
+            else
+              terminal.onCommit(current, () => {
+                /** Awaited native results cannot be replaced after data is actually committed. */
+                external = (async () => {
+                  try {
+                    await binlog.append(StorageJournalKind.commit, payload)
+                  } catch (error) {
+                    if (options.onBinlogAppendError !== undefined)
+                      options.onBinlogAppendError(info.id, error)
+                    else reportCleanupError(createStorageOperationReporter(), error)
+                  }
+                })()
+              })
           }
           if (undo !== undefined)
             await undo.record(info.id, storageJournalUndoImages(target, changes, options.backend), {

@@ -42,6 +42,8 @@ export type IStorageJournalConfiguration =
 export type IStorageJournalAttempt = {
   readonly txId: string
   record(scope: Omit<ITransactionScope, 'use'>): Promise<void>
+  /** Drain commit-only external work; failures are reported without changing the native result. */
+  settle?(): Promise<void>
 }
 /** Fixed-org author ports prepare before acquisition and leave all commits with the original owner. */
 export type IStorageJournalExecutionPort = {
@@ -67,6 +69,8 @@ export type IStorageJournalNamespaceView = {
 /** A namespace borrows authentic native scopes and forwards their actual terminal callbacks. */
 export type IStorageJournalNamespace = IStorageResource & {
   readonly nativeAtomic: boolean
+  /** False when the original owner cannot keep a cached log index exclusively valid for its life. */
+  readonly indexExclusive?: false
   /** Recheck the original namespace generation before cached reads or native append composition. */
   assertLive?(): void
   /** Return the original authenticated transaction identity for this exact store and organization. */

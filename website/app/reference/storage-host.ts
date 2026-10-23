@@ -388,8 +388,8 @@ console.log(host.extensions.label('draft'))`,
     },
     IStorageJournalAttempt: {
       summary: t(
-        'Original authenticated txId and pre-commit record(scope) only; no new transaction or terminal authority.',
-        '仅含原认证 txId 与提交前 record(scope)，不授予新事务或终态权。'
+        'Original authenticated txId, pre-commit record(scope), and optional settle() for terminal-started external append. No new transaction or terminal authority.',
+        '原认证 txId、提交前 record(scope)，以及仅排空原 terminal 外置追加的可选 settle()；不授予新事务或终态权。'
       ),
       members: {}
     },
@@ -405,8 +405,8 @@ console.log(host.extensions.label('draft'))`,
       members: {
         journal: {
           summary: t(
-            'Optional global journal configuration; omitted configurations leave the original execution path unchanged. Automatic undo execution, external WAL, redo, clear/blob capture and other-backend routing are not completed by the current memory unit.',
-            '可选全局 journal；省略时保持原路径。当前 memory 单元不代表自动 undo、外置 WAL、redo、clear/blob 捕获或其它后端路由已完成。'
+            'Optional global journal configuration; omitted configurations leave the original execution path unchanged. Automatic undo execution, external WAL, redo, blob capture and other-backend routing are not completed by the current memory unit.',
+            '可选全局 journal；省略时保持原路径。当前 memory 单元不代表自动 undo、外置 WAL、redo、blob 捕获或其它后端路由已完成。'
           )
         }
       }
@@ -438,6 +438,12 @@ console.log(host.extensions.label('draft'))`,
         '私有原生 run、真实 commit/rollback 回调和已接纳工作清理，不关闭其后端。'
       ),
       members: {
+        indexExclusive: {
+          summary: t(
+            'Optional false fact rejects storageLogStore before recovery I/O or cached index construction. Native transaction/terminal authority remains available to the commit bridge; omission preserves existing binding semantics.',
+            '可选 false 事实使 storageLogStore 在恢复 I/O 或缓存索引建立前拒绝；提交桥仍可借用原生事务/terminal 权限，省略时保持原有绑定语义。'
+          )
+        },
         assertLive: {
           summary: t(
             'Optional original generation check, captured once by storageLogStore and reused before cached reads and native ports. Memory drop invalidates old handles; it never silently reuses deleted indexes.',

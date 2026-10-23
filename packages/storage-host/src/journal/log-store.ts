@@ -111,6 +111,13 @@ export async function openStorageLogStore(
   /** The original namespace alone can invalidate a cached index after physical organization drop. */
   let assertNamespaceLive: (() => void) | undefined
   try {
+    /** Native commit/terminal authority alone does not prove a lifetime-exclusive cached index. */
+    const indexExclusive = namespace.indexExclusive
+    if (indexExclusive !== undefined) {
+      if (indexExclusive !== false)
+        throw new StorageContractError(StorageContractErrorCode.invalidArgument)
+      throw new StorageContractError(StorageContractErrorCode.unsupported)
+    }
     const assertLive = namespace.assertLive
     if (assertLive !== undefined) {
       if (typeof assertLive !== 'function')
