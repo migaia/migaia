@@ -796,9 +796,7 @@ export function createSqliteStore<TValue>(
             const ranges = guard ? lockRanges(guard) : []
             const ids = readConcurrencyLockIdentities(context)
             /** Logical fail decisions remain observable before entering the physical queue. */
-            const conflict = wal
-              ? conflictingLock(context, ids, '')
-              : group!.locks.probe(ids, ranges)
+            const conflict = wal ? conflictingLock(context, ids, '') : undefined
             const range =
               wal && guard ? rangeConflict(context.orgId ?? runtime.orgId, guard) : undefined
             if ((conflict || range) && context.admission === 'try')
@@ -806,61 +804,56 @@ export function createSqliteStore<TValue>(
                 status: 'conflict' as const,
                 phase: 'acquire' as const,
                 keys: conflict ? [conflict.key] : range!.keys,
-                holder: conflict
-                  ? 'row' in conflict
-                    ? holderOf(conflict.row)
-                    : conflict.holder
-                  : range!.holder
+                holder: conflict ? holderOf(conflict.row) : range!.holder
               }
-            return physicalRun(context, async () => {
-              while (true) {
-                throwIfAborted(context.signal)
-                try {
-                  const write = () =>
-                    syncMutation(
-                      mutation.run,
-                      context.lock ?? [],
-                      guard,
-                      context.orgId ?? runtime.orgId,
-                      context
-                    ) as Awaited<R>
-                  return wal
-                    ? await walAttempt(context, async () => ({
+            while (true) {
+              throwIfAborted(context.signal)
+              try {
+                const write = () =>
+                  syncMutation(
+                    mutation.run,
+                    context.lock ?? [],
+                    guard,
+                    context.orgId ?? runtime.orgId,
+                    context
+                  ) as Awaited<R>
+                return wal
+                  ? await physicalRun(context, () =>
+                      walAttempt(context, async () => ({
                         status: 'committed' as const,
                         value: write()
                       }))
-                    : await group!.locks.attemptWrite(
-                        context,
-                        {
-                          owner: controller.origin,
-                          ...(label === undefined ? {} : { label }),
-                          since: Date.now(),
-                          status: 'held',
-                          scope: 'local'
-                        },
-                        write,
-                        concurrencyStages,
-                        controller.closingSignal,
-                        ranges
-                      )
-                } catch (error) {
-                  if (error instanceof SqliteLogicalConflict) {
-                    if (context.admission === 'try')
-                      return {
-                        status: 'conflict' as const,
-                        phase: 'acquire' as const,
-                        keys: error.keys,
-                        holder: error.holder
-                      }
-                    await context.wait(sleep(SqliteLimits.pollMs, { signal: context.signal }))
-                  } else if (isBusy(error))
-                    await context.waitPhysical(
-                      sleep(SqliteLimits.pollMs, { signal: context.signal })
                     )
-                  else throw error
-                }
+                  : await group!.locks.attemptWrite(
+                      context,
+                      {
+                        owner: controller.origin,
+                        ...(label === undefined ? {} : { label }),
+                        since: Date.now(),
+                        status: 'held',
+                        scope: 'local'
+                      },
+                      write,
+                      concurrencyStages,
+                      controller.closingSignal,
+                      ranges,
+                      (commit) => physicalRun(context, commit)
+                    )
+              } catch (error) {
+                if (error instanceof SqliteLogicalConflict) {
+                  if (context.admission === 'try')
+                    return {
+                      status: 'conflict' as const,
+                      phase: 'acquire' as const,
+                      keys: error.keys,
+                      holder: error.holder
+                    }
+                  await context.wait(sleep(SqliteLimits.pollMs, { signal: context.signal }))
+                } else if (!(error instanceof AggregateError) && isBusy(error))
+                  await context.waitPhysical(sleep(SqliteLimits.pollMs, { signal: context.signal }))
+                else throw error
               }
-            })
+            }
           }
         }
       )

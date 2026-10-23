@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, it, expect, onTestFinished } from 'vitest'
 import { createStorageHost, definePlugin } from '@migaia/storage-host'
+import { deferred } from '@migaia/utils/promise'
 import {
   kv,
   records,
@@ -376,4 +377,59 @@ describe('native SQLite installation', () => {
       expect(await second.get('redirect')).toBeNull()
     }
   )
+
+  it('keeps logical admission ahead of the physical queue on the same store', async () => {
+    const { store, host } = await installed({ memory: true })
+    const entered = deferred<void>()
+    const release = deferred<void>()
+    const queued = deferred<void>()
+    await host.use(
+      definePlugin('queue-marker', (core) => ({
+        install() {
+          core.usePipeline((request, next) => {
+            const result = next(request)
+            if (request.operation === 'set' && (request.input as { key?: unknown }).key === 'A')
+              queued.resolve()
+            return result
+          })
+          return {}
+        }
+      }))
+    )
+    const initial = store.transaction(
+      async (tx) => {
+        await tx.set('physical', 'held')
+        entered.resolve()
+        await release.promise
+      },
+      { lock: [lockKey.text('physical')], timeoutMs: 1000 }
+    )
+    await entered.promise
+    try {
+      const root = store.set('A', 'root', {
+        timeoutMs: 1000,
+        concurrency: ConcurrencyPolicy.wait()
+      })
+      await queued.promise
+      await new Promise<void>((resolve) => setImmediate(resolve))
+      const following = store.transaction(
+        async (tx) => {
+          expect(await tx.get('A')).toBe('root')
+          await tx.set('A', 'transaction')
+        },
+        { lock: [lockKey.text('A')], timeoutMs: 1000, concurrency: ConcurrencyPolicy.wait() }
+      )
+      await new Promise<void>((resolve) => setImmediate(resolve))
+      release.resolve()
+      const results = await Promise.allSettled([initial, root, following])
+      expect(results.map((result) => result.status)).toEqual([
+        'fulfilled',
+        'fulfilled',
+        'fulfilled'
+      ])
+      expect(await store.get('A')).toBe('transaction')
+    } finally {
+      release.resolve()
+    }
+  })
 })
