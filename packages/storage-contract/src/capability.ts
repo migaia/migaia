@@ -19,6 +19,7 @@ import type {
 import {
   STORAGE_CAPABILITY_METHODS,
   STORAGE_KEY_VALUE_METHODS,
+  SYNC_KEY_VALUE_METHODS,
   STORAGE_KEY_VALUE_PROPERTIES,
   StorageCapabilityMethod
 } from './capability-constants.js'
@@ -404,7 +405,7 @@ function admitImplementations(
         api.sync !== undefined &&
         (typeof api.sync !== 'object' ||
           api.sync === null ||
-          STORAGE_KEY_VALUE_METHODS.some(
+          SYNC_KEY_VALUE_METHODS.some(
             (name) => typeof (api.sync as Record<string, unknown>)[name] !== 'function'
           ))
       )

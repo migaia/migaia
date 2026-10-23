@@ -7,6 +7,9 @@ import {
   ConcurrencyPolicy,
   defineConcurrencyPolicy,
   runTransactionOperation,
+  useTransactionCapability,
+  StorageContractError,
+  StorageContractErrorCode,
   TransactionActivityMode,
   type IRecordStore,
   type ICodec,
@@ -134,6 +137,11 @@ function recordingPort() {
   function createScope(): ITransactionScope {
     /** Each text request is registered under the same original owner. */
     const scope: ITransactionScope = {
+      use: (capability) => useTransactionCapability(scope, capability),
+      getMany: () => unsupportedBatch(scope),
+      setMany: () => unsupportedBatch(scope),
+      removeMany: () => unsupportedBatch(scope),
+      removeByPrefix: () => unsupportedBatch(scope),
       get: storage.get,
       set: (key, text) => runTransactionOperation(scope, () => storage.set(key, text)),
       remove: storage.remove,
@@ -147,6 +155,14 @@ function recordingPort() {
       iterateRecords: emptyRecords
     }
     return scope
+  }
+  /** This conversion fixture owns no batch backend and must not pretend to provide one. */
+  function unsupportedBatch(scope: ITransactionScope): Promise<never> {
+    return runTransactionOperation(scope, () => {
+      throw new StorageContractError(StorageContractErrorCode.unsupported, {
+        backend: storage.backend
+      })
+    })
   }
   return { storage, writes, byteWrites, entered }
 }
