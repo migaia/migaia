@@ -4,12 +4,17 @@ import {
   LogRecordState,
   prepareLogAppend,
   snapshotLogRecords,
+  type ILogAppendPort,
   type ILogAppendNotice,
   type ILogStore
 } from '@migaia/logger/plugins/durable'
 import { createEventChannel, EventDispatchPolicy } from '@migaia/event-subscriber'
 import { createConcurrencyLimiter, deferred } from '@migaia/utils/promise'
-import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
+import {
+  StorageContractError,
+  StorageContractErrorCode,
+  type ITransactionScope
+} from '@migaia/storage-contract'
 import { PluginHostError } from '@migaia/plugin-host'
 import { StorageError, StorageErrorCode } from '../errors.js'
 import { StorageErrorText } from '../error-text.js'
@@ -18,10 +23,15 @@ import { createStorageOperationReporter, reportCleanupError } from '../core/oper
 import { resolveStorageJournalBinding } from './binding.js'
 import {
   appendStorageLog,
+  prepareStorageLogAppend,
+  persistStorageLogAppend,
+  readStorageLogHead,
   recoverStorageLog,
   reclaimStorageLogRows,
   setStorageLogState,
-  truncateStorageLog
+  truncateStorageLog,
+  type IStorageLogHead,
+  type IStorageLogAppend
 } from './protocol.js'
 import type {
   IStorageBackendPluginHandle,
@@ -30,6 +40,15 @@ import type {
   IStorageOrgView
 } from '../types.js'
 import type { IStorageJournalNamespace, IStorageJournalNamespaceView } from './types.js'
+import { storageLogNativeAccess, type IStorageLogNativeAccess } from './append-port.js'
+import { storageJournalLockKey, StorageJournalLock } from './keys.js'
+
+/** Pending records belong only to one authenticated live attempt and vanish at its actual terminal. */
+type IStorageLogPending = {
+  head: IStorageLogHead | undefined
+  readonly ready: Promise<void>
+  readonly plans: IStorageLogAppend[]
+}
 
 /** Keep original coded storage failures and retain unknown native I/O errors on cause. */
 function journalFailure(cause: unknown): Error {
@@ -72,7 +91,17 @@ export async function storageLogStore<
   }
   const report = createStorageOperationReporter()
   let index: ReturnType<typeof createLogStoreIndex> | undefined
+  /** Native append composition requires the original owner's pre-release publication callback. */
+  let runCommitted: IStorageJournalNamespace['runCommitted']
+  /** This descriptor fact is read once before exposing any native append composition. */
+  let nativeAtomic: boolean
   try {
+    nativeAtomic = namespace.nativeAtomic
+    if (typeof nativeAtomic !== 'boolean')
+      throw new StorageContractError(StorageContractErrorCode.invalidArgument)
+    runCommitted = namespace.runCommitted
+    if (runCommitted !== undefined && typeof runCommitted !== 'function')
+      throw new StorageContractError(StorageContractErrorCode.invalidArgument)
     index = createLogStoreIndex(await namespace.run(recoverStorageLog))
   } catch (cause) {
     try {
@@ -89,6 +118,8 @@ export async function storageLogStore<
     dispatchPolicy: EventDispatchPolicy.queued,
     report: ({ error }) => reportCleanupError(report, error)
   })
+  /** This contains only active attempt data; namespace authentication and lifecycle remain original. */
+  const pending = new Map<string, IStorageLogPending>()
   let accepting = true
   let failure: Error | undefined
   let main: Promise<void> | undefined
@@ -113,19 +144,25 @@ export async function storageLogStore<
   }
   /** Any uncertain physical write seals this handle; reopening reads the single durable head. */
   const write = async <R>(
-    work: (view: IStorageJournalNamespaceView, beforeWrite: () => void) => Promise<R>
+    work: (view: IStorageJournalNamespaceView, beforeWrite: () => void) => Promise<R>,
+    committed?: (value: R) => void
   ): Promise<R> => {
     /** Native admission can reject before the protocol performs any private I/O. */
     let entered = false
     /** Only a physical write attempt can leave a candidate or an unconfirmed head behind. */
     let writing = false
     try {
-      return await namespace.run((view) => {
+      const operation = (view: IStorageJournalNamespaceView) => {
         entered = true
         return work(view, () => {
           writing = true
         })
-      })
+      }
+      if (runCommitted !== undefined && committed !== undefined)
+        return (await Reflect.apply(runCommitted, namespace, [operation, committed])) as R
+      const value = await namespace.run(operation)
+      committed?.(value)
+      return value
     } catch (cause) {
       if (!entered) {
         if (isStorageErrorFamily(cause) || cause instanceof PluginHostError) throw cause
@@ -135,6 +172,86 @@ export async function storageLogStore<
       failure = journalFailure(cause)
       throw failure
     }
+  }
+  /** Publish all same-attempt batches after their original native owner has actually committed. */
+  const committed = (plans: readonly IStorageLogAppend[]): void => {
+    let count = 0
+    for (const plan of plans) {
+      if (plan.batch.length === 0) continue
+      index!.applyAppend(plan.batch)
+      count += plan.batch.length
+    }
+    if (count === 0) return
+    try {
+      appended.publish(Object.freeze({ lastSeq: index!.lastSeq, count }))
+    } catch (cause) {
+      reportCleanupError(report, cause)
+    }
+  }
+  /** Only the original private namespace authenticates scopes and owns real terminal callbacks. */
+  const createPort = (scope: Omit<ITransactionScope, 'use'>): ILogAppendPort => {
+    admit()
+    if (!nativeAtomic || runCommitted === undefined)
+      throw new StorageContractError(StorageContractErrorCode.unsupported)
+    const info = namespace.transactionInfo(scope)
+    return Object.freeze({
+      store,
+      append: (input: Parameters<ILogAppendPort['append']>[0]) => {
+        try {
+          admit()
+          if (namespace.transactionInfo(scope).id !== info.id)
+            throw new StorageContractError(StorageContractErrorCode.invalidArgument)
+          let group = pending.get(info.id)
+          if (group === undefined) {
+            /** One original native head read closes the gap between physical commit and publication. */
+            const ready = deferred<void>()
+            group = { head: undefined, ready: ready.promise, plans: [] }
+            const original = group
+            let offCommit = () => undefined as void
+            let offRollback = () => undefined as void
+            const release = () => {
+              pending.delete(info.id)
+              offCommit()
+              offRollback()
+            }
+            try {
+              offCommit = namespace.onCommit(scope, () => {
+                release()
+                committed(original.plans)
+              })
+              offRollback = namespace.onRollback(scope, release)
+              pending.set(info.id, original)
+              void namespace.run(readStorageLogHead, scope).then((current) => {
+                original.head = current
+                ready.resolve()
+              }, ready.reject)
+            } catch (cause) {
+              release()
+              throw cause
+            }
+          }
+          const original = group
+          /** Only the same native GET is awaited; there is no ordinary FIFO or external task here. */
+          return namespace.run((view) => {
+            const captured = snapshotLogRecords(input)
+            return original.ready.then(() => {
+              const plan = prepareStorageLogAppend(original.head!, captured)
+              if (plan.batch.length !== 0) {
+                original.head = plan.head
+                original.plans.push(plan)
+              }
+              return persistStorageLogAppend(view, plan, undefined, true).then(() =>
+                plan.batch.map((row) => row.seq)
+              )
+            })
+          }, scope)
+        } catch (cause) {
+          return Promise.reject(cause)
+        }
+      },
+      onCommit: (effect: () => void) => namespace.onCommit(scope, effect),
+      onRollback: (effect: () => void) => namespace.onRollback(scope, effect)
+    })
   }
   const store: ILogStore = {
     append: (input) => {
@@ -149,16 +266,11 @@ export async function storageLogStore<
         if (captured.length === 0) return []
         /** Pure logger admission precedes native wrapping and consults its clock exactly once. */
         const prepared = prepareLogAppend(captured, index!)
-        const batch = await write((view, beforeWrite) =>
-          appendStorageLog(view, captured, prepared, beforeWrite)
+        const plan = await write(
+          (view, beforeWrite) => appendStorageLog(view, captured, prepared, beforeWrite),
+          (plan) => committed([plan])
         )
-        index!.applyAppend(batch)
-        try {
-          appended.publish(Object.freeze({ lastSeq: index!.lastSeq, count: batch.length }))
-        } catch (cause) {
-          reportCleanupError(report, cause)
-        }
-        return batch.map((row) => row.seq)
+        return plan.batch.map((row) => row.seq)
       })
     },
     read: (fromSeq, limit) => {
@@ -185,12 +297,12 @@ export async function storageLogStore<
       }
       return run(async () => {
         if (!index!.checkTruncate(beforeSeq)) return
-        const head = await write((view, beforeWrite) =>
-          truncateStorageLog(view, beforeSeq, beforeWrite)
+        const truncated = await write(
+          (view, beforeWrite) => truncateStorageLog(view, beforeSeq, beforeWrite),
+          () => index!.applyTruncate(beforeSeq)
         )
-        index!.applyTruncate(beforeSeq)
         /** Cleanup runs after the floor's real commit, even when native transactions are available. */
-        await write((view, beforeWrite) => reclaimStorageLogRows(view, head, beforeWrite))
+        await write((view, beforeWrite) => reclaimStorageLogRows(view, truncated, beforeWrite))
       })
     },
     setState: (seq, state) => {
@@ -203,8 +315,10 @@ export async function storageLogStore<
       }
       return run(async () => {
         if (!index!.checkState(seq, state)) return
-        await write((view, beforeWrite) => setStorageLogState(view, seq, state, beforeWrite))
-        index!.applyState(seq, state)
+        await write(
+          (view, beforeWrite) => setStorageLogState(view, seq, state, beforeWrite),
+          () => index!.applyState(seq, state)
+        )
       })
     },
     states: (filter) =>
@@ -240,6 +354,19 @@ export async function storageLogStore<
       return symbolic
     }
   }
+  /** The closure verifies this exact object even if a caller copies an enumerable symbol manually. */
+  const nativeAccess: IStorageLogNativeAccess = Object.freeze({
+    orgId: access.orgId,
+    backendInstanceId: access.backendInstanceId,
+    headLock: storageJournalLockKey(prefix, StorageJournalLock.head),
+    createPort
+  })
+  Object.defineProperty(store, storageLogNativeAccess, {
+    value: (candidate: ILogStore) => {
+      if (candidate !== store) throw new StorageContractError(StorageContractErrorCode.unsupported)
+      return nativeAccess
+    }
+  })
   try {
     forget = access.retain(store)
   } catch (cause) {

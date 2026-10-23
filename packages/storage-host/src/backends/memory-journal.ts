@@ -252,23 +252,43 @@ export function createMemoryJournalData(options: {
       },
       options.report
     )
+    /** An optional publication belongs to this same native terminal, not the outer result Promise. */
+    const run = <R>(
+      work: (view: IStorageJournalNamespaceView) => Promise<R>,
+      scope?: Omit<ITransactionScope, 'use'>,
+      committed?: (value: R) => void
+    ): Promise<R> => {
+      try {
+        assertOpen()
+        if (typeof work !== 'function')
+          throw new StorageContractError(StorageContractErrorCode.invalidArgument)
+        const invoke = (port: IMemoryJournalTransaction): Promise<R> =>
+          committed === undefined
+            ? port.run(prefix, work)
+            : port.run(prefix, (view) =>
+                work(view).then((value) => {
+                  port.onCommit(() => committed(value))
+                  return value
+                })
+              )
+        if (scope !== undefined) return invoke(transaction(scope))
+        const release = lifetime.retain(resource)
+        return options.transaction(prefix, invoke).finally(release)
+      } catch (error) {
+        return Promise.reject(error)
+      }
+    }
     return Object.freeze({
       nativeAtomic: true,
       transactionInfo: (scope: Omit<ITransactionScope, 'use'>) => options.scope(scope).info,
-      run: <R>(
+      run,
+      runCommitted: <R>(
         work: (view: IStorageJournalNamespaceView) => Promise<R>,
-        scope?: Omit<ITransactionScope, 'use'>
+        committed: (value: R) => void
       ): Promise<R> => {
-        try {
-          assertOpen()
-          if (typeof work !== 'function')
-            throw new StorageContractError(StorageContractErrorCode.invalidArgument)
-          if (scope !== undefined) return transaction(scope).run(prefix, work)
-          const release = lifetime.retain(resource)
-          return options.transaction(prefix, (port) => port.run(prefix, work)).finally(release)
-        } catch (error) {
-          return Promise.reject(error)
-        }
+        if (typeof committed !== 'function')
+          return Promise.reject(new StorageContractError(StorageContractErrorCode.invalidArgument))
+        return run(work, undefined, committed)
       },
       onCommit: (scope: Omit<ITransactionScope, 'use'>, effect: () => void) => {
         if (typeof effect !== 'function')

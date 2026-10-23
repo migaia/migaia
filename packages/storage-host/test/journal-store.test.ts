@@ -31,6 +31,7 @@ function nonAtomicPrivatePlugin(fault: {
         return {
           ...namespace,
           nativeAtomic: false,
+          runCommitted: undefined,
           run: (work) =>
             work({
               get: (key) => namespace.run((view) => view.get(key)),
@@ -62,8 +63,10 @@ function nonAtomicPrivatePlugin(fault: {
           return undefined
         }
       }),
-      capabilityInstaller: () => constructed.installer,
-      journalBinding: () => project(constructed.journalBinding),
+      capabilityInstaller: (_store: ReturnType<typeof createMemoryBackend>['store']) =>
+        constructed.installer,
+      journalBinding: (_store: ReturnType<typeof createMemoryBackend>['store']) =>
+        project(constructed.journalBinding),
       install: () => {
         constructed = createMemoryBackend(core, {})
         core.registerStore(constructed.store)

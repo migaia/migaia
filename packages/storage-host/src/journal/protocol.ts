@@ -27,6 +27,11 @@ export type IStorageLogHead = {
   readonly time: number
   readonly floor: number
 }
+/** A prepared batch contains no native authority and is invisible until its original owner commits. */
+export type IStorageLogAppend = {
+  readonly head: IStorageLogHead
+  readonly batch: readonly ILogRecord[]
+}
 /** Records are immutable after their append generation commits. */
 type IStorageLogRow = { readonly generation: number; readonly record: ILogRecord }
 /** An unconfirmed state candidate retains its previous committed state for reopening. */
@@ -172,15 +177,13 @@ export async function recoverStorageLog(
   await reclaimStorageLogRows(view, head)
   return snapshot
 }
-/** Write invisible append rows first and atomically replace the one commit head last. */
-export async function appendStorageLog(
-  view: IStorageJournalNamespaceView,
+/** Pure preparation reserves sequence/time/generation once without any native request or queue. */
+export function prepareStorageLogAppend(
+  head: IStorageLogHead,
   captured: readonly ILogRecordSnapshot[],
-  prepared?: readonly ILogRecord[],
-  beforeWrite?: () => void
-): Promise<readonly ILogRecord[]> {
-  if (captured.length === 0) return []
-  const head = await readStorageLogHead(view)
+  prepared?: readonly ILogRecord[]
+): IStorageLogAppend {
+  if (captured.length === 0) return { head, batch: [] }
   /** An ordinary FIFO can prepare before native admission without wrapping pure logger errors. */
   const first = prepared?.[0]
   const batch =
@@ -189,16 +192,51 @@ export async function appendStorageLog(
       : prepareLogAppend(captured, head, first?.time)
   const last = batch[batch.length - 1]!
   const next = { ...nextHead(head), lastSeq: last.seq, time: last.time }
-  beforeWrite?.()
-  for (const record of batch) {
-    await view.set(
-      sequenceKey(StorageLogWire.record, record.seq),
-      JSON.stringify({ generation: next.generation, record })
+  return { head: next, batch }
+}
+/**
+ * Issue every prepared native request in this call stack, with the single head last. The original
+ * transaction owns their settlement and rollback; no FIFO wait can lose an active native window.
+ */
+export function persistStorageLogAppend(
+  view: IStorageJournalNamespaceView,
+  plan: IStorageLogAppend,
+  beforeWrite?: () => void,
+  nativeWindow = false
+): Promise<void> {
+  if (plan.batch.length === 0) return Promise.resolve()
+  /** Both I/O modes use the same encoded request order, ending with the one head replacement. */
+  const writes: { readonly key: string; readonly value?: string }[] = []
+  for (const record of plan.batch) {
+    writes.push(
+      {
+        key: sequenceKey(StorageLogWire.record, record.seq),
+        value: JSON.stringify({ generation: plan.head.generation, record })
+      },
+      { key: sequenceKey(StorageLogWire.state, record.seq) }
     )
-    await view.remove(sequenceKey(StorageLogWire.state, record.seq))
   }
-  await view.set(StorageLogWire.head, JSON.stringify(next))
-  return batch
+  writes.push({ key: StorageLogWire.head, value: JSON.stringify(plan.head) })
+  beforeWrite?.()
+  /** Native methods issue requests immediately; no await is inserted into their active window. */
+  const invoke = (write: (typeof writes)[number]) =>
+    write.value === undefined ? view.remove(write.key) : view.set(write.key, write.value)
+  if (nativeWindow) return Promise.all(writes.map(invoke)).then(() => undefined)
+  /** A non-native namespace must complete every invisible row before its atomic head replacement. */
+  return (async () => {
+    for (const write of writes) await invoke(write)
+  })()
+}
+/** Write invisible append rows first and atomically replace the one commit head last. */
+export async function appendStorageLog(
+  view: IStorageJournalNamespaceView,
+  captured: readonly ILogRecordSnapshot[],
+  prepared?: readonly ILogRecord[],
+  beforeWrite?: () => void
+): Promise<IStorageLogAppend> {
+  const plan = prepareStorageLogAppend(await readStorageLogHead(view), captured, prepared)
+  await persistStorageLogAppend(view, plan, beforeWrite)
+  return plan
 }
 /** Stage one one-way state candidate before committing its generation in the original head. */
 export async function setStorageLogState(
