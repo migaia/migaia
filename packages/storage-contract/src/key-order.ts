@@ -95,6 +95,31 @@ export type IStorageBatchKey = {
   readonly identity: string
   readonly firstIndex: number
 }
+/** One pure native-batch capture detaches keys in the caller's existing per-entry access order. */
+export type IStorageBatchKeyCapture = (key: IStorageKey) => IStorageBatchKey
+/**
+ * Owns only this batch's temporary equality facts. Native authors choose when to reject a duplicate
+ * from firstIndex, preserving their existing key/value/TTL getter order and original error owner.
+ */
+export function createStorageBatchKeyCapture(
+  backend: IBackendKind | undefined
+): IStorageBatchKeyCapture {
+  /** Only this pure call owns the temporary equality index; no backend state is retained. */
+  const firstPositions = new Map<string, number>()
+  /** Successful captures retain caller order without reading any later input position. */
+  let position = 0
+  return (input) => {
+    /** The original key owner validates and detaches this position exactly once. */
+    const key = snapshotStorageKey(input, backend)
+    /** The same private writer consumes only the detached snapshot. */
+    const identity = storageKeyBytesIdentity(encodeKeySnapshot(key, false))
+    /** Equal signed zero, dates, buffers and tuples share the original canonical identity. */
+    const firstIndex = firstPositions.get(identity) ?? position
+    if (firstIndex === position) firstPositions.set(identity, position)
+    position++
+    return Object.freeze({ key, identity, firstIndex })
+  }
+}
 /**
  * Captures a native batch before I/O. Reads preserve duplicates; native removals use firstIndex,
  * while atomic writes reject equivalent keys when rejectDuplicates is requested.
@@ -123,27 +148,22 @@ export function snapshotStorageBatchKeys(
         { backend },
         StorageContractErrorText.batchKeys
       )
-    /** Only this pure call owns the temporary equality index; no backend state is retained. */
-    const firstPositions = new Map<string, number>()
+    /** Eager array capture and ordered native authors reuse the very same key/equality owner. */
+    const capture = createStorageBatchKeyCapture(backend)
     /** Each returned position owns the detached snapshot used to derive its exact identity. */
     const result: IStorageBatchKey[] = []
     /** Caller mutation cannot extend the admitted operation while a key getter is evaluated. */
     const length = keys.length
     for (let index = 0; index < length; index++) {
-      /** The original key owner validates and snapshots each input position exactly once. */
-      const key = snapshotStorageKey(keys[index], backend)
-      /** The same private writer consumes only the detached snapshot. */
-      const identity = storageKeyBytesIdentity(encodeKeySnapshot(key, false))
-      /** Equal signed zero, dates, buffers and tuples share the original canonical identity. */
-      const firstIndex = firstPositions.get(identity)
-      if (firstIndex !== undefined && rejectDuplicates)
+      /** Only this position is read before its independent canonical capture. */
+      const captured = capture(keys[index]!)
+      if (captured.firstIndex !== index && rejectDuplicates)
         throw new StorageContractError(
           StorageContractErrorCode.invalidArgument,
           { backend },
           StorageContractErrorText.batchDuplicate
         )
-      if (firstIndex === undefined) firstPositions.set(identity, index)
-      result.push(Object.freeze({ key, identity, firstIndex: firstIndex ?? index }))
+      result.push(captured)
     }
     return Object.freeze(result)
   } catch (cause) {
