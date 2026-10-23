@@ -228,8 +228,10 @@ type IIteratorRegistration = {
   readonly derive: <TResult>(
     read: (
       next: () => Promise<IteratorResult<unknown>>,
-      fail: (error: unknown) => unknown
-    ) => Promise<IteratorResult<TResult>>
+      fail: (error: unknown) => unknown,
+      currentScope: object
+    ) => Promise<IteratorResult<TResult>>,
+    close?: () => void | PromiseLike<void>
   ) => IStorageIterator<TResult>
   readonly fail: (error: unknown) => unknown
 }
@@ -675,12 +677,33 @@ export function createTransactionOwner<
           compose: (run) =>
             originalScope ? runTransactionOperation(originalScope, run) : run(undefined),
           /** A mapped stream remains a real resource in the original scope after native exhaustion. */
-          derive: (read) => {
+          derive: (read, closeExtra) => {
             if (!originalScope) throw invalidTransaction()
             return registerIterator(originalScope as TScope, {
               next: (currentScope) =>
-                read(() => nextTransactionIterator(currentScope, iterator), resource.fail),
-              close: cleanup
+                read(
+                  () => nextTransactionIterator(currentScope, iterator),
+                  resource.fail,
+                  currentScope
+                ),
+              close:
+                closeExtra === undefined
+                  ? cleanup
+                  : async () => {
+                      /** Later-created additional sources close first, with both failures retained. */
+                      const errors: unknown[] = []
+                      try {
+                        await awaitTransactionResult(closeExtra())
+                      } catch (error) {
+                        errors.push(failTransaction(state, error))
+                      }
+                      try {
+                        await cleanup()
+                      } catch (error) {
+                        errors.push(error)
+                      }
+                      if (errors.length > 0) throw cleanupFailure(state, errors)
+                    }
             })
           },
           /** Primary query failure reaches the original owner before cursor cleanup can fail. */
@@ -748,23 +771,32 @@ export function runTransactionIteratorOperation<T, TResult>(
 /**
  * Projects one query read through the original iterator owner. The existing registration alone
  * supplies scope admission, accepted-next draining and cached cleanup; no second lifecycle exists.
- * Unregistered source resources retain their own native iterator contract and return undefined.
+ * read receives the actual current operation view; retaining it never extends its lifetime.
+ * Optional additional-source close runs before original-source cleanup, and both are attempted on
+ * failure. Unregistered source resources retain their own native iterator contract and return
+ * undefined.
  */
 export function deriveTransactionIterator<T, TResult>(
   iterator: IStorageIterator<T>,
   read: (
     next: () => Promise<IteratorResult<T>>,
-    fail: (error: unknown) => unknown
-  ) => Promise<IteratorResult<TResult>>
+    fail: (error: unknown) => unknown,
+    currentScope: object
+  ) => Promise<IteratorResult<TResult>>,
+  close?: () => void | PromiseLike<void>
 ): IStorageIterator<TResult> | undefined {
   /** Only an original actual registration can create a resource in that same scope. */
   const resource = transactionRegistrations.get(iterator)
   if (resource?.kind !== RegistrationKind.iterator) return undefined
+  if (typeof read !== 'function' || (close !== undefined && typeof close !== 'function'))
+    throw invalidTransaction()
   return resource.derive(
     read as (
       next: () => Promise<IteratorResult<unknown>>,
-      fail: (error: unknown) => unknown
-    ) => Promise<IteratorResult<TResult>>
+      fail: (error: unknown) => unknown,
+      currentScope: object
+    ) => Promise<IteratorResult<TResult>>,
+    close
   )
 }
 

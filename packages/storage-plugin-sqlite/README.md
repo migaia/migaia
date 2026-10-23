@@ -81,6 +81,10 @@ inspectLocks 返回真实持锁方与过期信息。WAL 租约 maxLockMs 缺省 
 未 await 的数据失败仍使事务回滚。tx.sql 与 KV 始终处于同一个原生事务；不会从
 用户 SQL 文本猜测逻辑键。
 
+`readTransactionOperationContext(tx)` 读取原事务拥有者保存的冻结 attempt context。
+组合操作与最终检查复用同一份字段及原实时 signal；不会重读调用方 getter、重置期限
+或另建取消控制器。合作取消的异步工作结算后，原生回滚与逻辑锁释放才完成。
+
 选中的 Feature 复用同一事务和查询创建器。`tx.api` 在原事务短视图冻结前绑定；
 其 SQL 与 KV 操作一起提交或回滚，被捕获或未 await 的失败也沿原事务拥有者处理。
 Feature 的 `query` 和 `tx` 链方法保留在实际派生链上。Feature 借用的原生 client

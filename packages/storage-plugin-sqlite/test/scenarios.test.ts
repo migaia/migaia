@@ -3,8 +3,14 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { it, expect, onTestFinished, vi } from 'vitest'
 import { createStorageHost, defineFeature, definePlugin } from '@migaia/storage-host'
-import { sleep } from '@migaia/utils/promise'
-import type { IStorageChange } from '@migaia/storage-contract'
+import { deferred, sleep } from '@migaia/utils/promise'
+import {
+  lockKey,
+  readTransactionOperationContext,
+  runTransactionOperation,
+  type IOperationContext,
+  type IStorageChange
+} from '@migaia/storage-contract'
 import { sqliteBackendPlugin, sqliteBackendKind, type ISqliteDriver } from '../src/index.js'
 import { nodeSqliteDriver } from '../src/node.js'
 import { sqliteMaintenanceFeature } from '../src/features/maintenance.js'
@@ -204,4 +210,94 @@ it('keeps after-next reads and native error catches around the real terminal', a
   const failure = await store.set('failed', 'native').catch((error) => error)
   expect(failure).toMatchObject({ code: 'SQLITE_FAILED', cause: expect.any(Error) })
   expect([afterNext, caught === failure]).toEqual(['committed', true])
+})
+
+/** Composed work borrows the actual attempt signal and drains before native rollback releases it. */
+it('shares the original attempt context with cancellable transaction composition', async () => {
+  /** The installed middleware sees the same attempt fields passed to the native owner. */
+  let attemptContext: IOperationContext | undefined
+  const inspect = definePlugin('inspect-context', (core) => ({
+    install() {
+      core.useAsyncPipeline((request, next) => {
+        if (request.operation === 'transaction') attemptContext = request.ctx
+        return next(request)
+      })
+      return {}
+    }
+  }))
+  const connection = nodeSqliteDriver(':memory:')
+  const host = await createStorageHost({
+    plugins: [sqliteBackendPlugin({ driver: connection }), inspect] as const
+  })
+  onTestFinished(async () => {
+    await host.dispose()
+    await connection.dispose()
+  })
+  const store = host.backend('sqlite')
+  /** Caller cancellation propagates through the existing concurrency budget's live signal. */
+  const cancellation = new AbortController()
+  const entered = deferred<void>()
+  const reads = { signal: 0, timeoutMs: 0 }
+  /** Saved user views lose context access when the original callback ends. */
+  let expired!: Parameters<Parameters<typeof store.transaction>[0]>[0]
+  let settled = false
+  /** Native owner normalization keeps a cooperative callback failure reachable by identity. */
+  let cancelledWorkFailure: unknown
+  const result = store
+    .transaction(
+      async (tx) => {
+        expired = tx
+        await tx.set('cancelled-context', 'rollback')
+        const captured = readTransactionOperationContext(tx)
+        await runTransactionOperation(tx, async (operation) => {
+          entered.resolve()
+          expect(captured).toBeDefined()
+          expect(Object.isFrozen(captured)).toBe(true)
+          expect(readTransactionOperationContext(operation)).toBe(captured)
+          expect(captured?.signal).toBe(attemptContext?.signal)
+          expect(captured?.signal).toBeDefined()
+          try {
+            await sleep(60_000, { signal: captured?.signal })
+          } catch (error) {
+            cancelledWorkFailure = error
+            throw error
+          } finally {
+            settled = true
+          }
+        })
+      },
+      {
+        lock: [lockKey.text('cancelled-context')],
+        get signal() {
+          reads.signal++
+          return cancellation.signal
+        },
+        get timeoutMs() {
+          reads.timeoutMs++
+          return 1000
+        }
+      }
+    )
+    .catch((error: unknown) => error)
+  await entered.promise
+  cancellation.abort()
+  const failure = await result
+  expect((failure as Error).cause).toBe(cancelledWorkFailure)
+  expect(failure).toMatchObject({
+    source: '@migaia/storage-plugin-sqlite',
+    code: 'TRANSACTION_FAILED',
+    cause: cancelledWorkFailure
+  })
+  expect(cancelledWorkFailure).toMatchObject({
+    source: '@migaia/utils',
+    code: 'ABORTED',
+    cause: cancellation.signal.reason
+  })
+  expect(settled).toBe(true)
+  expect(reads).toEqual({ signal: 1, timeoutMs: 1 })
+  expect(await store.get('cancelled-context')).toBeNull()
+  expect(await store.inspectLocks()).toEqual([])
+  expect(() => readTransactionOperationContext(expired)).toThrowError(
+    expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+  )
 })
