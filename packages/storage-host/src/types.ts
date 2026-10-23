@@ -104,6 +104,12 @@ export type IStorageBorrowedBackend<S extends IStorageBase = IStorageStore<never
   has(capability: IAnyStorageCapability): boolean
 }
 
+/** Borrow only earlier committed backends during the original installation window. */
+export type IStorageBorrowPort = {
+  getPublishedBackend(id: string): IStorageBorrowedBackend
+  readonly emit: IStorageHookEmitter
+}
+
 /** The original registration binds each invocation to its org and captured dependencies. */
 export type IStoragePluginCallContext = {
   readonly orgId: string
@@ -124,6 +130,7 @@ export type IStorageFeatureExpose<K extends IStorageBackendKind> = K extends ISt
       getLifecycle(): IPluginRegistrationContext
       onDispose: IPluginHostCore['onDispose']
       getScheduler(): IScheduler
+      getPublishedBackend: IStorageBorrowPort['getPublishedBackend']
       emit: IStorageHookEmitter
       registerDetect(check: (signal: INativeAbortSignal) => Promise<void>): void
     }> &
@@ -145,6 +152,7 @@ export type IStorageDescriptorFeatureExpose<K extends IStorageBackendKind> = Rea
   getLifecycle?: never
   onDispose?: never
   getScheduler?: never
+  getPublishedBackend?: never
   emit?: never
   registerDetect?: never
 }> &
@@ -290,20 +298,20 @@ export type IStoragePipelineInput = IStorageExecutionRequest<unknown> &
 export type IStoragePluginCore<F extends IStorageFeatureRecord = {}> = Pick<
   IPluginHostCore<IStoragePipelineInput>,
   'operation' | 'lifecycle' | 'onDispose' | 'usePipeline' | 'useAsyncPipeline'
-> & {
-  readonly execution: IStorageExecutionPort
-  readonly hooks: IStorageHooks
-  readonly stageBindings: IBackendStageBindings
-  readonly emit: IStorageHookEmitter
-  createChangeController(options: IBackendChangeControllerOptions): IBackendChangeController
-  registerChangeController(store: IStorageBase, controller: IBackendChangeController): void
-  registerDetect(check: (signal: INativeAbortSignal) => Promise<void>): void
-  registerStore<S extends IStorageBase>(store: S): void
-  getStore(): IStorageBase
-  getBackendId(): string
-  readonly features: IFeatureOutputs<F>
-  readonly featureExpose: IStorageFeatureExpose<IStorageBackendKind>
-}
+> &
+  IStorageBorrowPort & {
+    readonly execution: IStorageExecutionPort
+    readonly hooks: IStorageHooks
+    readonly stageBindings: IBackendStageBindings
+    createChangeController(options: IBackendChangeControllerOptions): IBackendChangeController
+    registerChangeController(store: IStorageBase, controller: IBackendChangeController): void
+    registerDetect(check: (signal: INativeAbortSignal) => Promise<void>): void
+    registerStore<S extends IStorageBase>(store: S): void
+    getStore(): IStorageBase
+    getBackendId(): string
+    readonly features: IFeatureOutputs<F>
+    readonly featureExpose: IStorageFeatureExpose<IStorageBackendKind>
+  }
 export type IStorageNativePluginDescriptor<
   K extends IStorageBackendKind = IStorageBackendKind,
   S extends IStorageBase = IStorageBase
@@ -547,6 +555,7 @@ export type IStorageDefinePlugin = {
         | 'hooks'
         | 'emit'
         | 'registerDetect'
+        | 'getPublishedBackend'
       > & { readonly features: IFeatureOutputs<F> }
     ) => IStorageNativePluginDescriptor & { readonly kind?: never },
     const F extends IFeatureRecord = {}

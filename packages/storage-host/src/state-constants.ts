@@ -15,6 +15,7 @@ export const STORAGE_RESERVED_EXPOSE = [
   'getLifecycle',
   'onDispose',
   'getScheduler',
+  'getPublishedBackend',
   'emit',
   'registerDetect'
 ] as const
