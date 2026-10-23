@@ -655,7 +655,7 @@ SPARQL 通过纯 sparqlFragment 与原生 sparql 能力复用规范 RDF 项。�
 
 `createVectorQuery<TPayload,TGroupable>(source, methods?)` 返回不可变 builder；声明正安全整数 `topK(k)` 后才有读取终点。原生 execute 接收 `IVectorQueryInput`：全部可译 payload conditions、最终 topK/minScore、withVector 与原 context。声明式条件跨函数谓词下推，org/TTL 仍由后端在排名前处理；函数只过滤原引擎命中，不补搜。withVector 缺省 false，显式开启后结果类型才包含 vector。exact:true 的 explain 标记 fullScan。groupBy:true 才提供标准分组，在原 topK 命中上单遍按 payload 自有标量字段分组，每组保留 perGroup 个原序命中。
 
-`createRdfQuery(source, pattern, methods?)` 捕获规范 ground pattern，保留省略 graph 的全 graph 语义。原生 execute 接收 `IRdfQueryInput`，其有序 steps 保留 where/follow/inverse/select 的原调用顺序；execute 的原生行载体为 unknown，实际 select 可返回 Pick 投影，无须伪装完整 quad；follow/inverse 只接受 ground IRI。当前读取单元提供原生安全前缀遍历与普通 limit；当前不能在客户端执行的遍历在 I/O 前拒绝 QUERY_NOT_PUSHABLE。RDF 客户端遍历与写终点由后续单元补齐；分页见后文。
+`createRdfQuery(source, pattern, methods?)` 捕获规范 ground pattern，保留省略 graph 的全 graph 语义。原生 execute 接收 `IRdfQueryInput`，其有序 steps 保留 where/follow/inverse/select 的原调用顺序；execute 的原生行载体为 unknown，实际 select 可返回 Pick 投影，无须伪装完整 quad；follow/inverse 只接受 ground IRI。原生安全前缀遍历与客户端 ground match 遍历共用同一 reader；strict 下的客户端遍历在 I/O 前拒绝 QUERY_NOT_PUSHABLE。RDF 写终点由后续单元补齐；分页与客户端遍历见后文。
 
 两个作者入口复用记录查询的同一节点、planner、reader 与原 IStorageIterator，保留 asyncDisposeKey、取消、事务资源与清理首错。可选纯方法保留原函数引用；`VectorQueryMethod` 与 `RdfQueryMethod` 为同名冲突的规范保留表。
 
@@ -690,3 +690,9 @@ RDF add/delete/match 沿同一规范 ground IQuad owner。支持事务的 provid
 原生统计通过可选只读 `source.reduce` 接点与真实 `pushdown.operations` 声明启用：count、exists，或覆盖 min/max/sum/avg 的 aggregate。`IQueryReducer<TInput>` 接收该家族原执行输入加 `reduction`，返回后端原有单行标量 storage iterator；count/sum 为 number，exists 为 boolean，min/max/avg 为 Maybe<number>。标量不是记录物化；原 open/consume、事务 operation 和资源清理仍是唯一 owner。后端在原生查询内完成过滤、边界与聚合，仅把结果送入该游标。
 
 只有完整所需计划均可下推时才调用 reduce。缺端口或包含客户端步骤时沿原 reader 单遍计算，strict 在 I/O 前拒绝；exists 的既有 first/输出回调语义保留。数值统计跳过不影响样本集合的 selector 排序；limit/skip/distinct 使选行身份影响数值时保留必要排序，下游 mapper/函数谓词也保留其依赖的排序与原调用顺序。不新增评分、SQL 编译、查询队列或资源登记表。
+
+RDF 的客户端 `follow`/`inverse` 现在沿同一 reader 逐前驱调用原 `source.execute`，只发送原生 ground match pattern 与空 steps；follow 由当前 named object 接下一 subject，可选 target 约束下一 object，inverse 由当前 subject 接前一 object，两者都固定当前 graph。literal object 没有 forward 步骤。共享层不扫描或评分另一份图，不复制 term 编码器；实际 match 的索引与数据仍由后端拥有。strict 仍在 I/O 前拒绝客户端遍历。
+
+每个遍历节点至多借用一个原匹配游标；并发 accepted pull 共用一次惰性前驱查找，不增加队列或调度器。后开的子源先关闭，所有原源都尝试清理；首错及后续清理错误保持可追溯。root symbolic cleanup 分别复用子源与根源原有的报告 Promise，注册资源则沿原 derive 的 additional-close 接点。
+
+`IRdfQueryInput<TOperationScope>` 与 `IRdfQuerySource<TOperationScope>` 可精确声明后端原 scope；只读 `operationScope?: Readonly<TOperationScope>` 仅在嵌套 match 时借用当前仍有效的原 operation view。事务作者用 `input.operationScope ?? 原创建scope` 做现有 iterator 登记；`createRdfQuery` 的第三个可省泛型声明该 scope，旧泛型参数保持。这个对象只在当前 accepted 操作内有效，不延长其寿命；跨 stream next 的 child advance 继续通过原 nextTransactionIterator 的同 owner 校验，错配 scope 不能获得读取权。
