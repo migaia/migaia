@@ -132,13 +132,19 @@ export type IBackendStageObserver = Readonly<{
 export type IStorageOperationStageObserver = Readonly<{
   readonly kind: typeof StorageStageKind.operation
   forTransaction: (scope: object) => IStorageOperationStageObserver
-  beforeStorageOperation?: (operation: string) => void | PromiseLike<void>
+  /** Batch callers may include their entry count without exposing keys or values. */
+  beforeStorageOperation?: (operation: string, count?: number) => void | PromiseLike<void>
   afterStorageOperation?: (
     operation: string,
     elapsedMs: number,
     count: number
   ) => void | PromiseLike<void>
-  onStorageOperationError?: (operation: string, code?: string) => void | PromiseLike<void>
+  /** Optional batch count preserves the original single-operation argument positions. */
+  onStorageOperationError?: (
+    operation: string,
+    code?: string,
+    count?: number
+  ) => void | PromiseLike<void>
   onStorageIterationClose?: (count: number) => void | PromiseLike<void>
   report: (error: unknown) => undefined
 }>

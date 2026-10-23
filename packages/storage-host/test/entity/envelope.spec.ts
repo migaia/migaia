@@ -1,11 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  provideCapabilities,
-  implement,
-  kv,
-  type ICapabilityInstallPort,
-  type IKeyValueStore
-} from '@migaia/storage-contract'
+import type { IKeyValueStore } from '@migaia/storage-contract'
 import {
   createStorageHost,
   definePlugin,
@@ -23,9 +17,8 @@ import { composeFlatKey } from '../../src/entity/key.js'
 function rawPlugin(shared?: IKeyValueStore, marked = false, synchronous = false) {
   /** The original resource is acquired only in the actual install hook. */
   let store!: IKeyValueStore
-  let installer!: ICapabilityInstallPort
   /** Open kind identity carries the raw native shape without a capability installer. */
-  const kind = defineStorageBackendKind<IKeyValueStore>()('raw-entity')
+  const kind = defineStorageBackendKind()('raw-entity')
   /** Named descriptors retain native store inference through the authoring boundary. */
   const descriptor = (core: IStoragePluginCore) => ({
     kind,
@@ -85,27 +78,7 @@ function rawPlugin(shared?: IKeyValueStore, marked = false, synchronous = false)
         dispose,
         [Symbol.asyncDispose]: dispose
       }
-      store = marked
-        ? provideCapabilities(
-            native,
-            [
-              implement(kv, {
-                get: native.get,
-                set: native.set,
-                remove: native.remove,
-                has: native.has,
-                keys: native.keys,
-                clearValues: native.clearValues,
-                clearAll: native.clearAll
-              })
-            ] as const,
-            {
-              onInstaller: (port) => {
-                installer = port
-              }
-            }
-          )
-        : Object.freeze(native)
+      store = marked ? native : Object.freeze(native)
       core.registerStore(store)
       return {}
     }
@@ -122,10 +95,7 @@ function rawPlugin(shared?: IKeyValueStore, marked = false, synchronous = false)
         }
       }
     }))
-    const factory = (core: IStoragePluginCore) => ({
-      ...descriptor(core),
-      capabilityInstaller: (_store: IKeyValueStore) => installer
-    })
+    const factory = (core: IStoragePluginCore) => descriptor(core)
     return {
       plugin: definePlugin<'raw', typeof factory, { marker: typeof marker }>('raw', factory, {
         marker
