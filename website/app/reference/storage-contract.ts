@@ -2126,6 +2126,12 @@ console.log(candidate.name, candidate.output)`
         '一次真实后端尝试的已捕获操作意图与共享准入预算。'
       ),
       members: {
+        attempt: {
+          summary: t(
+            'Original shared conflict count plus one, forwarded to observations without backend counters.',
+            '原共用冲突计数加一，直接转发给观察，不设后端计数器。'
+          )
+        },
         ...operationMembers,
         admission: {
           summary: t(

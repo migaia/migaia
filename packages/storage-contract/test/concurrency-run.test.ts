@@ -90,6 +90,7 @@ describe('canonical concurrency attempts', () => {
         {
           attempt: async (outer) => {
             outerContext = outer
+            expect(outer.attempt).toBe(1)
             expect(outer.concurrency).toBe(policy)
             expect(outer.locking).toBe('pessimistic')
             identities = readConcurrencyLockIdentities(outer)
@@ -106,6 +107,7 @@ describe('canonical concurrency attempts', () => {
                 {
                   attempt: async (inner) => {
                     expect(inner.signal).toBe(outer.signal)
+                    expect(inner.attempt).toBe(outer.attempt)
                     expect(inner.timeoutMs).toBeUndefined()
                     expect(readConcurrencyLockIdentities(inner)).toBe(identities)
                     return { status: 'committed', value: 7 }
@@ -206,9 +208,11 @@ describe('canonical concurrency attempts', () => {
     const { store } = base()
     const trace: string[] = []
     let count = 0
+    const attempts: number[] = []
     const result = await run(
       store,
       async (ctx) => {
+        attempts.push(ctx.attempt)
         trace.push(`start:${ctx.admission}`)
         count += 1
         await Promise.resolve()
@@ -219,6 +223,7 @@ describe('canonical concurrency attempts', () => {
       ConcurrencyPolicy.optimistic({ retries: 2, backoffMs: 0 })
     )
     expect(result).toBe('done')
+    expect(attempts).toEqual([1, 2, 3])
     expect(trace).toEqual(['start:try', 'cleanup', 'start:try', 'cleanup', 'start:try', 'cleanup'])
   })
 
