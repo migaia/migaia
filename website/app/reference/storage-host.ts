@@ -783,8 +783,8 @@ console.log(host.extensions.label('draft'))`,
     },
     IStorageOrgAuthoringPort: {
       summary: t(
-        'Backend-only authority captured by core.createOrgAuthoringPort during installation. Lazy physical children share the original controller, key-lock and exact-store registry implementations and existing registration cleanup. Revocation seals this port; business views never receive it.',
-        '后端作者在安装窗口通过core.createOrgAuthoringPort捕获的有限权限；按需物理子后端复用原controller、键锁、精确store登记及原registration清理。撤销后拒绝，业务视图不接收此端口。'
+        'Backend-only authority captured by core.createOrgAuthoringPort during installation. Lazy physical children share the original controller, key-lock, independent createRevisionPort factory and exact-store registry implementations and existing registration cleanup. Revocation seals this port; business views never receive it.',
+        '后端作者在安装窗口通过core.createOrgAuthoringPort捕获的有限权限；按需物理子后端复用原controller、键锁、独立createRevisionPort工厂和精确store登记及原registration清理。撤销后拒绝，业务视图不接收此端口。'
       ),
       members: {
         createChangeController: {
