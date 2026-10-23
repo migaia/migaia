@@ -418,25 +418,34 @@ type IWithFeatureChains<S extends IStorageBase, F extends IStorageFeatureRecord>
 type IScopeQueryMethods<S> = 'query' extends keyof IChainMethodsOf<S>
   ? NonNullable<IChainMethodsOf<S>['query']>
   : Record<never, never>
+/** RDF augmentation remains separate from the record query family. */
+type IScopeRdfMethods<S> = 'rdf' extends keyof IChainMethodsOf<S>
+  ? NonNullable<IChainMethodsOf<S>['rdf']>
+  : Record<never, never>
 /** Scope query methods retain transaction-only context while native top-level members survive. */
-type IScopeApi<S, F extends IStorageFeatureRecord, Q extends object> =
-  IWithTransactionQueryMethods<S, Q> extends infer T
+type IScopeApi<S, F extends IStorageFeatureRecord, Q extends object, R extends object> =
+  IWithTransactionQueryMethods<S, Q, R> extends infer T
     ? keyof IFeatureApi<F, 'transaction'> extends never
       ? T
       : Omit<T, 'api'> & { readonly api: IFeatureApi<F, 'transaction'> }
     : never
 type IApiTransactionMembers<S, F extends IStorageFeatureRecord> = [
-  keyof IFeatureApi<F, 'transaction'> | keyof IScopeQueryMethods<S>
+  keyof IFeatureApi<F, 'transaction'> | keyof IScopeQueryMethods<S> | keyof IScopeRdfMethods<S>
 ] extends [never]
   ? Pick<S, Extract<keyof S, 'transaction' | 'tx'>>
   : S extends { transaction(run: (scope: infer T) => unknown, options?: infer O): unknown }
     ? {
         transaction<R>(
-          run: (scope: IScopeApi<T, F, IScopeQueryMethods<S>>) => R,
+          run: (scope: IScopeApi<T, F, IScopeQueryMethods<S>, IScopeRdfMethods<S>>) => R,
           options?: O
         ): Promise<Awaited<R>>
       } & (S extends { tx(): ITransactionBuilder<infer T, infer A> }
-        ? { tx(): ITransactionBuilder<IScopeApi<T, F, IScopeQueryMethods<S>>, A> }
+        ? {
+            tx(): ITransactionBuilder<
+              IScopeApi<T, F, IScopeQueryMethods<S>, IScopeRdfMethods<S>>,
+              A
+            >
+          }
         : {})
     : {}
 export type IStorageStoreWithFeatures<
