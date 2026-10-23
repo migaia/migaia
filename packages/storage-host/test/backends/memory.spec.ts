@@ -48,8 +48,24 @@ describe('memory backend', () => {
       native.mockRestore()
     }
   })
-  it('在无冲突写入路径也拒绝非法 conflictPolicy', async () => {
+  it('在无冲突写入路径也拒绝非法 context 与 conflictPolicy', async () => {
     const store = await memoryBackend()
+    /** Invalid JS contexts must fail before either native mutation or a transaction callback. */
+    const callback = vi.fn()
+    const changes: IStorageChange[] = []
+    const stop = store.subscribeChanges((change) => changes.push(change))
+    for (const context of [null, [], 'context', 1]) {
+      await expect(store.set('key', 'value', context as never)).rejects.toMatchObject({
+        code: 'INVALID_ARGUMENT'
+      })
+      await expect(store.transaction(callback, context as never)).rejects.toMatchObject({
+        code: 'INVALID_ARGUMENT'
+      })
+    }
+    expect(callback).not.toHaveBeenCalled()
+    expect(await store.get('key')).toBeNull()
+    expect(changes).toEqual([])
+    stop()
     await expect(
       store.set('key', 'value', { conflictPolicy: 'invalid' as never })
     ).rejects.toMatchObject({
