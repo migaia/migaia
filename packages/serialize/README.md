@@ -56,7 +56,7 @@ const restored = JSON.parse(saved.chunk) as { theme: string } // 隐患：类型
 console.log(JSON.stringify(restored))
 ```
 
-registry 集中登记和选择 parser，JSON replacer 可明确移除 localCache；格式标签仍由应用另存，chunk 本身不会自动带上 type。仅需一次普通 JSON 往返时，原生 API 已足够。
+registry 集中登记和选择 parser，JSON replacer 可明确移除 localCache；格式标签仍由应用另存，chunk 本身不会自动带上 type；需要编码值携带 codec 身份时使用 tagged 入口。仅需一次普通 JSON 往返时，原生 API 已足够。
 
 ## 三分钟心智模型
 
@@ -296,6 +296,9 @@ SerializeCodecError(message, details) 的 details 必含 code、type、phase、c
 | aborted                 | ABORTED：协作式取消；可能为 SerializeCodecError 或 tagged 原生错误，取决于边界。 |
 | invalidOption           | INVALID_OPTION：插件、版本、portable、scheduler、流选项、Base64 或输出准入非法。 |
 | envUnsupported          | ENV_UNSUPPORTED：Encoding 等必需宿主能力缺失。                                   |
+| tagMissing              | TAG_MISSING：无标签输入缺少显式 untagged 读取器。                                |
+| tagInvalid              | TAG_INVALID：保留头部损坏，不回退。                                              |
+| tagUnknown              | TAG_UNKNOWN：合法标签没有对应的登记版本。                                        |
 
 tagSerializeError(error, code, context?) 返回原错误并附只读 source/code，context 未提供保持未设；同身份重复附加幂等，context 仅补一次。冲突委托 utils，抛 (@migaia/utils, ERROR_IDENTITY_CONFLICT)，原错误在 cause，不能静默改写身份。
 
@@ -320,3 +323,26 @@ console.log(codec.decode(text)) // Map { 'roles' => Set { 'read', 'write' } }
 ```
 
 格式 codec 先枚举整数索引，再按字符串插入顺序输出，getter 遍历顺序相同。公开 toPortableValue 与 RPC owned 快照保持既有顺序。普通 RPC 字节 fallback 使用所选 JSON codec，因此按属性顺序输出；对象 fallback 继续使用原 portable 拥有者。
+
+### 编码结果自带格式标签
+
+首项 codec 写新值，列表内各 id/version 读取自己的带标签载荷。可选 untagged 只读取原始旧数据。未知标签报 TAG_UNKNOWN；保留头部损坏报 TAG_INVALID，不回退。无标签文本若以 mgt1: 开头，也会当作有标签输入，即使它来自 untagged codec。
+
+```ts
+import { createTaggedCodec } from '@migaia/serialize/tagged'
+import { defineJsonCodec } from '@migaia/serialize/codecs/json'
+
+const current = defineJsonCodec({ version: 2 })
+const previous = defineJsonCodec({ version: 1 })
+const tagged = createTaggedCodec({ codecs: [current, previous], untagged: previous })
+console.log(tagged.encode({ count: 2 })) // mgt1:json@2;{"count":2}
+console.log(tagged.decode('mgt1:json@1;{"count":1}')) // { count: 1 }
+console.log(tagged.decode('{"count":1}')) // { count: 1 }
+try {
+  tagged.decode('mgt1:json@3;{"count":3}')
+} catch (error) {
+  console.log((error as Error & { code: string }).code) // TAG_UNKNOWN
+}
+```
+
+字符串载体前置 mgt1:<id>@<version>;。字节载体前置 00 4d 47 54、格式字节 01、两字节大端 UTF-8 标签长度与标签。unknown 载体返回带自有 $migaia.codec 和 value 的冻结对象，内层值不冻结。所有 codec 声明同一载体，外层身份为 tagged@1，与存储 envelope 版本独立。ICodecEncodedType、ITaggedCodecOptions、ITaggedEncoded、ITaggedValue 与 ITaggedCodec 保留载体及业务值推断。

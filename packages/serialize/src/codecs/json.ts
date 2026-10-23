@@ -24,7 +24,7 @@ export type IJsonCodecOptions<TVersion extends number> = Readonly<{
  */
 export function defineJsonCodec<const TVersion extends number>(
   options: IJsonCodecOptions<TVersion>
-): ICodec<ICodecValue, string, 'json', TVersion> {
+): ICodec<ICodecValue, string, 'json', TVersion> & { readonly encodedType: 'string' } {
   const version = assertCodecVersion(options.version)
   return Object.freeze({
     id: 'json' as const,

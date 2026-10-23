@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { createTaggedCodec } from '@migaia/serialize/tagged'
 import { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'
 import type { IScheduler } from '@migaia/utils/scheduler'
 import {
@@ -87,6 +88,9 @@ describe('package exports', () => {
     expect(typeof collectStream).toBe('function')
     expect(SERIALIZE_SOURCE).toBe('@migaia/serialize')
     expect(defineCollectionsJsonCodec({ version: 1 }).id).toBe('collections-json')
+    expect(createTaggedCodec({ codecs: [defineCollectionsJsonCodec({ version: 1 })] }).id).toBe(
+      'tagged'
+    )
     expect(SerializeErrorCode.invalidOption).toBe('INVALID_OPTION')
     expect(typeof registryChunkToText).toBe('function')
     expect(typeof registryChunkToBytes).toBe('function')

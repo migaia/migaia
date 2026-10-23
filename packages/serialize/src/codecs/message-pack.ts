@@ -25,7 +25,9 @@ export type IMessagePackCodecOptions<TVersion extends number> = Readonly<{
  */
 export function defineMessagePackCodec<const TVersion extends number>(
   options: IMessagePackCodecOptions<TVersion>
-): ICodec<ICodecValue, Uint8Array, 'message-pack', TVersion> {
+): ICodec<ICodecValue, Uint8Array, 'message-pack', TVersion> & {
+  readonly encodedType: 'uint8array'
+} {
   const version = assertCodecVersion(options.version)
   return Object.freeze({
     id: 'message-pack' as const,
