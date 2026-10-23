@@ -957,7 +957,10 @@ export const storageContractReference: ILibraryReference = {
           'Readonly points; every input is checked and duplicate IDs keep the last value.',
           '只读点；全部输入逐项校验，重复 ID 保留末值。'
         ),
-        configuration: t('Existing declared dimensions and metric.', '已有声明维度与 metric。'),
+        configuration: t(
+          'Optional existing dimensions and metric. Omission captures finite components and portable payloads only; validate the detached vectors against the actual native schema before writing.',
+          '可选已有维度与 metric。省略时仅捕获有限分量与便携 payload；写入前再按真实原生 schema 校验脱离的向量。'
+        ),
         backend: t('Optional native diagnostic label.', '可选原生诊断标签。')
       },
       returns: t(

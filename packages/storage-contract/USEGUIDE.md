@@ -851,3 +851,5 @@ RDF 的客户端 `follow`/`inverse` 现在沿同一 reader 逐前驱调用原 `s
 原生后端可从包根调用 `snapshotStorageWhere(where)`，取得原查询 owner 的冻结 `IQueryCondition`；翻译或交 `compileStorageQueryCondition` 使用同一 AST。它复用既有字段单读、校验与 `INVALID_ARGUMENT` 原 cause，不另建 parser、编码器或执行器。
 
 原生后端可在既有 `IQueryPushdown` 上提供可选纯 `canPushCondition(condition)`，用同一原生翻译器判定规范 AST 的实际值域是否可忠实下推。原操作符与对象身份规则先执行；false 保留客户端步骤并使 `requirePushdown` 在 I/O 前拒绝，省略保持既有语义。函数和原 receiver 单次捕获，不增加查询执行器。
+
+`snapshotStorageVectorUpsert(points, configuration?)` 可省略配置以在原生 schema 查询前完整捕获 batch。此时仍沿原有限分量、稠密数组与 serialize payload 规则，不推断维度或 metric；取得真实 schema 后，对已脱离的 vector 调同一 `snapshotStorageVector` 校验再写入。显式配置的语义、错误与读取顺序不变。
