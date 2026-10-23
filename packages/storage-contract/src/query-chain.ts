@@ -1,4 +1,5 @@
 import { asCodecValue, type ICodecValue } from '@migaia/serialize/codec'
+import type { IMaybe } from '@migaia/utils'
 import {
   parseObjectPath,
   probeObjectPathSegments,
@@ -431,8 +432,32 @@ type IQueryOperand<V, O> = O extends 'eq' | 'ne'
 /** Implemented read terminals share the same source and client executor. */
 export type IQueryRead<R, TContext extends IOperationContext | undefined = IOperationContext> = {
   all(ctx?: TContext): Promise<R[]>
+  first(ctx?: TContext): Promise<R | undefined>
+  maybe(ctx?: TContext): Promise<IMaybe<R>>
+  firstOrThrow(ctx?: TContext): Promise<R>
+  pluck<K extends Extract<keyof R, string>>(field: K, ctx?: TContext): Promise<R[K][]>
+  exists(ctx?: TContext): Promise<boolean>
+  count(ctx?: TContext): Promise<number>
+  each(fn: (row: R, index: number) => void | PromiseLike<void>, ctx?: TContext): Promise<number>
+  chunk(
+    size: number,
+    fn: (rows: readonly R[]) => void | PromiseLike<void>,
+    ctx?: TContext
+  ): Promise<number>
   stream(ctx?: TContext): IStorageIterator<R>
   explain(): IQueryPlan
+}
+/** Optional numeric fields remain valid selectors; absence contributes no aggregate sample. */
+export type INumericKeys<R> = Extract<
+  { [K in keyof R]-?: [NonNullable<R[K]>] extends [number] ? K : never }[keyof R],
+  string
+>
+/** Numeric aggregates retain constant state over the original query reader rather than rows. */
+export type IQueryStatistics<R, TContext extends IOperationContext | undefined> = {
+  min<K extends INumericKeys<R>>(field: K, ctx?: TContext): Promise<IMaybe<NonNullable<R[K]>>>
+  max<K extends INumericKeys<R>>(field: K, ctx?: TContext): Promise<IMaybe<NonNullable<R[K]>>>
+  sum<K extends INumericKeys<R>>(field: K, ctx?: TContext): Promise<number>
+  avg<K extends INumericKeys<R>>(field: K, ctx?: TContext): Promise<IMaybe<number>>
 }
 /** A minimal structural terminal shape preserves complete result types in generic consumers. */
 export type IQueryShape<TValue = unknown> = { all(ctx?: never): Promise<TValue> }
@@ -448,7 +473,7 @@ export type IQueryResult<
 > = IQueryRead<R, TContext> &
   TAugmentMethods & {
     requirePushdown(): IQueryResult<R, TContext, TStatistics, TAugmentMethods>
-  }
+  } & (TStatistics extends true ? IQueryStatistics<R, TContext> : Record<never, never>)
 /** Interface semantics retain the real record or Feature extension after a common condition step. */
 export interface IQueryChain<
   T,
@@ -475,7 +500,8 @@ export interface IRecordQueryBaseCore<
   T,
   TContext extends IOperationContext | undefined = IOperationContext,
   TAugmentMethods extends object = Record<never, never>
-> extends IQueryChain<T, TContext, T, true, TAugmentMethods> {
+>
+  extends IQueryChain<T, TContext, T, true, TAugmentMethods>, IQueryStatistics<T, TContext> {
   limit(count: number): this
 }
 /** The comparator transition requires an explicit finite limit before any read terminal exists. */
@@ -495,6 +521,7 @@ export type IRecordQueryNeedsLimit<
   TAugmentMethods extends object = Record<never, never>
 > = {
   limit(count: number): IRecordQueryBase<T, TContext, TAugmentMethods>
+  first(ctx?: TContext): Promise<T | undefined>
 }
 /** A bounded comparator cannot introduce another ordering mode. */
 export type IRecordQueryBase<
@@ -513,6 +540,18 @@ export const RecordQueryMethod = Object.freeze({
   where: 'where',
   select: 'select',
   all: 'all',
+  first: 'first',
+  maybe: 'maybe',
+  firstOrThrow: 'firstOrThrow',
+  pluck: 'pluck',
+  exists: 'exists',
+  count: 'count',
+  each: 'each',
+  chunk: 'chunk',
+  min: 'min',
+  max: 'max',
+  sum: 'sum',
+  avg: 'avg',
   explain: 'explain',
   requirePushdown: 'requirePushdown',
   stream: 'stream',
@@ -1009,6 +1048,7 @@ function openRecordQuery(
 ): {
   readonly iterator: IStorageIterator<readonly [IStorageKey, unknown]>
   readonly read: IQueryReader
+  readonly ctx: IOperationContext | undefined
 } {
   /** Strictness and missing comparator bounds reject before a source can open. */
   const plan = planRecordQuery(source, node)
@@ -1034,7 +1074,8 @@ function openRecordQuery(
       iterator: Reflect.apply(source.execute, source.receiver, [
         { conditions, fields, ctx: captured }
       ]),
-      read
+      read,
+      ctx: captured
     }
   } catch (cause) {
     throw queryExecutionFailure(cause)
@@ -1057,25 +1098,22 @@ async function failedRecordQuery(
   }
   throw primary
 }
-/** All and stream consume the same compiled reader and original source resource. */
-async function executeRecordQuery<R>(
+/** Every read terminal remains accepted through its callbacks and original cursor cleanup. */
+async function consumeRecordQuery<R, TResult>(
   source: IQuerySourceSnapshot,
   node: IQueryNode | undefined,
   strict: boolean,
-  ctx: IOperationContext | undefined
-): Promise<R[]> {
+  ctx: IOperationContext | undefined,
+  consume: (read: () => Promise<IteratorResult<R>>) => Promise<TResult>
+): Promise<TResult> {
   /** Opening synchronously admits the complete terminal to the original transaction owner. */
-  const { iterator, read } = openRecordQuery(source, node, strict, ctx)
+  const { iterator, read, ctx: captured } = openRecordQuery(source, node, strict, ctx)
   return runTransactionIteratorOperation(iterator, async (advance, fail) => {
-    /** Only the explicit all terminal materializes its accepted output. */
-    const rows: R[] = []
+    /** The terminal's scalar, bounded chunk or explicit all result stays inside the same operation. */
+    let result: TResult
     try {
-      while (true) {
-        /** Each result follows the exact same transitions exposed by stream. */
-        const next = await read(advance)
-        if (next.done) break
-        rows.push(next.value as R)
-      }
+      result = await consume(async () => (await read(advance)) as IteratorResult<R>)
+      assertQueryActive(captured)
     } catch (cause) {
       return failedRecordQuery(iterator, fail, cause)
     }
@@ -1084,8 +1122,206 @@ async function executeRecordQuery<R>(
     } catch (cause) {
       throw queryExecutionFailure(fail(queryExecutionFailure(cause)))
     }
-    return rows
+    return result
   })
+}
+
+/** Terminal field names are captured before a source is opened, without inspecting row shapes. */
+function assertQueryField(field: unknown): asserts field is string {
+  if (typeof field !== 'string')
+    throw invalidQueryCondition(undefined, StorageContractErrorText.queryArgument)
+}
+
+/** Common read and numeric terminals borrow only the existing planner, reader and resource owner. */
+function recordQueryReads<R, TContext extends IOperationContext | undefined>(
+  source: IQuerySourceSnapshot,
+  node: IQueryNode | undefined,
+  strict: boolean
+): IQueryRead<R, TContext> & IQueryStatistics<R, TContext> {
+  /** These new terminal reductions have no native author callback in the current source shape. */
+  function assertClientTerminal(): void {
+    if (strict)
+      throw new StorageContractError(
+        StorageContractErrorCode.queryNotPushable,
+        {},
+        StorageContractErrorText.queryNotPushable([StorageContractErrorText.queryUnsupported])
+      )
+  }
+  /** Only comparator.first supplies the documented implicit one-row retained bound. */
+  const firstNode: IQueryNode | undefined =
+    node?.step.operation === QueryOperation.comparator
+      ? { previous: node, step: { operation: QueryOperation.limit, count: 1 } }
+      : node
+  /** Presence is the original IteratorResult.done bit, including a present undefined value. */
+  const first = (ctx?: TContext): Promise<IteratorResult<R>> =>
+    consumeRecordQuery<R, IteratorResult<R>>(source, firstNode, strict, ctx, (read) => read())
+  /** One scalar accumulator reads each actual numeric field once and never retains source rows. */
+  async function aggregate(
+    operation:
+      | typeof RecordQueryMethod.min
+      | typeof RecordQueryMethod.max
+      | typeof RecordQueryMethod.sum
+      | typeof RecordQueryMethod.avg,
+    field: string,
+    ctx?: TContext
+  ): Promise<number | IMaybe<number>> {
+    assertQueryField(field)
+    assertClientTerminal()
+    return consumeRecordQuery<R, number | IMaybe<number>>(
+      source,
+      node,
+      strict,
+      ctx,
+      async (read) => {
+        /** Missing optional samples do not turn a real zero into an empty result. */
+        let count = 0
+        /** The same scalar holds a running sum or the current extremum. */
+        let value = 0
+        while (true) {
+          /** The canonical reader applies every condition, projection and bound before aggregation. */
+          const next = await read()
+          if (next.done) break
+          /** A typed numeric field may be absent; real nonnumeric/nonfinite data is invalid. */
+          const sample = next.value == null ? undefined : Reflect.get(Object(next.value), field)
+          if (sample === undefined || sample === null) continue
+          if (typeof sample !== 'number' || !Number.isFinite(sample))
+            throw invalidQueryCondition(undefined, StorageContractErrorText.queryNumericField)
+          if (operation === RecordQueryMethod.min)
+            value = count === 0 || sample < value ? sample : value
+          else if (operation === RecordQueryMethod.max)
+            value = count === 0 || sample > value ? sample : value
+          else value += sample
+          count++
+        }
+        if (operation === RecordQueryMethod.sum) return value
+        return count === 0
+          ? { some: false }
+          : { some: true, value: operation === RecordQueryMethod.avg ? value / count : value }
+      }
+    )
+  }
+  return {
+    all: (ctx) =>
+      consumeRecordQuery<R, R[]>(source, node, strict, ctx, async (read) => {
+        /** Only the explicit all terminal retains all accepted rows. */
+        const rows: R[] = []
+        while (true) {
+          /** Rows come from the same lazy reader exposed by stream. */
+          const next = await read()
+          if (next.done) return rows
+          rows.push(next.value)
+        }
+      }),
+    first: async (ctx) => {
+      /** A present undefined value intentionally collapses only at this terminal. */
+      const next = await first(ctx)
+      return next.done ? undefined : next.value
+    },
+    maybe: async (ctx) => {
+      /** The discriminant preserves presence independently of payload value. */
+      const next = await first(ctx)
+      return next.done ? { some: false } : { some: true, value: next.value }
+    },
+    firstOrThrow: async (ctx) => {
+      /** Cleanup finishes before the empty-result error crosses the package boundary. */
+      const next = await first(ctx)
+      if (next.done)
+        throw new StorageContractError(
+          StorageContractErrorCode.queryEmptyResult,
+          {},
+          StorageContractErrorText.queryEmptyResult
+        )
+      return next.value
+    },
+    exists: async (ctx) => !(await first(ctx)).done,
+    count: async (ctx) => {
+      assertClientTerminal()
+      return consumeRecordQuery<R, number>(source, node, strict, ctx, async (read) => {
+        /** Cardinality retains no accepted row. */
+        let count = 0
+        while (!(await read()).done) count++
+        return count
+      })
+    },
+    pluck: async (field, ctx) => {
+      assertQueryField(field)
+      /** Pluck uses the existing field-projection node, including native projection when declared. */
+      const projection: IQueryNode = {
+        previous: node,
+        step: { operation: QueryOperation.select, fields: Object.freeze([field]) }
+      }
+      return consumeRecordQuery<R, R[typeof field][]>(
+        source,
+        projection,
+        strict,
+        ctx,
+        async (read) => {
+          /** Pluck explicitly returns only selected field values, without retaining full rows. */
+          const values: R[typeof field][] = []
+          while (true) {
+            /** Missing values remain undefined, matching normal field projection. */
+            const next = await read()
+            if (next.done) return values
+            values.push(
+              (next.value == null
+                ? undefined
+                : Reflect.get(Object(next.value), field)) as R[typeof field]
+            )
+          }
+        }
+      )
+    },
+    each: async (fn, ctx) => {
+      if (typeof fn !== 'function')
+        throw invalidQueryCondition(undefined, StorageContractErrorText.queryArgument)
+      assertClientTerminal()
+      return consumeRecordQuery<R, number>(source, node, strict, ctx, async (read) => {
+        /** The next original row is requested only after this callback completes. */
+        let count = 0
+        while (true) {
+          /** The callback belongs to the terminal's already accepted transaction operation. */
+          const next = await read()
+          if (next.done) return count
+          await fn(next.value, count++)
+        }
+      })
+    },
+    chunk: async (size, fn, ctx) => {
+      if (!Number.isSafeInteger(size) || size <= 0)
+        throw invalidQueryCondition(undefined, StorageContractErrorText.queryChunk)
+      if (typeof fn !== 'function')
+        throw invalidQueryCondition(undefined, StorageContractErrorText.queryArgument)
+      assertClientTerminal()
+      return consumeRecordQuery<R, number>(source, node, strict, ctx, async (read) => {
+        /** One caller-declared bounded batch is live at a time. */
+        let rows: R[] = []
+        /** The terminal counts accepted rows, including a final partial batch. */
+        let count = 0
+        while (true) {
+          /** Native exhaustion is observed through the same registered reader. */
+          const next = await read()
+          if (next.done) {
+            if (rows.length > 0) await fn(rows)
+            return count
+          }
+          rows.push(next.value)
+          count++
+          if (rows.length === size) {
+            await fn(rows)
+            rows = []
+          }
+        }
+      })
+    },
+    min: (field, ctx) =>
+      aggregate(RecordQueryMethod.min, field, ctx) as Promise<IMaybe<NonNullable<R[typeof field]>>>,
+    max: (field, ctx) =>
+      aggregate(RecordQueryMethod.max, field, ctx) as Promise<IMaybe<NonNullable<R[typeof field]>>>,
+    sum: (field, ctx) => aggregate(RecordQueryMethod.sum, field, ctx) as Promise<number>,
+    avg: (field, ctx) => aggregate(RecordQueryMethod.avg, field, ctx) as Promise<IMaybe<number>>,
+    stream: (ctx) => streamRecordQuery<R>(source, node, strict, ctx),
+    explain: () => planRecordQuery(source, node).explanation
+  }
 }
 
 /**
@@ -1158,9 +1394,7 @@ function selectedRecordQuery<
 ): IQueryResult<R, TContext, true, TAugmentMethods> {
   return Object.freeze({
     ...methods,
-    all: (ctx?: TContext) => executeRecordQuery<R>(source, node, strict, ctx),
-    stream: (ctx?: TContext) => streamRecordQuery<R>(source, node, strict, ctx),
-    explain: () => planRecordQuery(source, node).explanation,
+    ...recordQueryReads<R, TContext>(source, node, strict),
     requirePushdown: () =>
       selectedRecordQuery<R, TContext, TAugmentMethods>(source, node, true, methods)
   }) as IQueryResult<R, TContext, true, TAugmentMethods>
@@ -1263,9 +1497,7 @@ function recordQuery<
     },
     where,
     select,
-    all: (ctx?: TContext) => executeRecordQuery<T>(source, node, strict, ctx),
-    stream: (ctx?: TContext) => streamRecordQuery<T>(source, node, strict, ctx),
-    explain: () => planRecordQuery(source, node).explanation,
+    ...recordQueryReads<T, TContext>(source, node, strict),
     requirePushdown: () => recordQuery<T, TContext, TAugmentMethods>(source, node, true, methods)
   }) as IRecordQuery<T, TContext, TAugmentMethods>
 }

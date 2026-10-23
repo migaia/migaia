@@ -225,6 +225,8 @@ export type {
   IQueryPlan,
   IQueryPushdown,
   IQueryRead,
+  INumericKeys,
+  IQueryStatistics,
   IQueryShape,
   IQueryResultOf,
   IQueryResult,

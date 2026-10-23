@@ -17,6 +17,8 @@ console.log(host.extensions.status())
 
 普通插件可只提供业务扩展，不冒充存储后端，并保留原 PluginHost Feature 依赖协议。后端插件额外声明真实 kind 令牌，并登记一个准入 store。
 
+`host.api[id]` 直接取用该已发布后端的原 `store.api`，两个实例可保留同名方法。每次读取返回冻结的后端 id 快照，旧快照不随 `use` 批次变动；失败批次不发布新 id。方法仍受原 Feature 有效期保护，关闭后提取的方法也会拒绝。
+
 原生连接只通过 `featureExpose` 暴露惰性函数。它只接收自有、可枚举、字符串键的函数属性，包括 `getClient`。事务后端通过原事务 owner 提供 `getTransactionClient(scope)`。`getKind/getStore/getBackendId/getLifecycle/onDispose/getScheduler` 由宿主保留，作者不能覆盖。
 
 资源在原安装窗口通过 `core.onDispose` 登记。真实操作在原生 I/O 前进入 `core.execution`。事务 owner、middleware runner、能力表与 Feature 图继续由原拥有者维护。`capabilityInstaller` 必须交出 `provideCapabilities` 发出的原端口；能力记录必须来自真实 `implement(...)`。
