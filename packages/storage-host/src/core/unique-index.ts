@@ -32,6 +32,8 @@ export function collectUniqueIndexOwners(
   /** This is the original validation-local owner map, shared by scan and native commit plans. */
   const owners = new Map<string, IUniqueIndexOwner>()
   for (const record of records) {
+    /** One canonical record identity is shared by every projected value of this row. */
+    const owner = encodeFlatStorageKey(record.key)
     for (const [indexName, entry] of Object.entries(record.projection)) {
       /** Reject undeclared projections before considering multiplicity. */
       const definition = definitionsByName.get(indexName)
@@ -46,8 +48,6 @@ export function collectUniqueIndexOwners(
       for (const indexValue of values) {
         /** Preserve the original persisted identity used by the native sidecar. */
         const identity = JSON.stringify([indexName, encodeFlatStorageKey(indexValue)])
-        /** Duplicate projected values on one row retain one logical owner. */
-        const owner = encodeFlatStorageKey(record.key)
         /** A second row invalidates the complete proposed commit. */
         const existing = owners.get(identity)
         if (existing !== undefined && existing.owner !== owner)
