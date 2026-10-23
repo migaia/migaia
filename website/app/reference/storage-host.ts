@@ -383,6 +383,12 @@ console.log(host.extensions.label('draft'))`,
         '私有原生 run、真实 commit/rollback 回调和已接纳工作清理，不关闭其后端。'
       ),
       members: {
+        runCommitted: {
+          summary: t(
+            'Optionally publish an ordinary result inside the original actual commit terminal, before its head lease ends. Native append composition requires this port; ordinary logs do not.',
+            '可选地在原真实提交 terminal 内、head lease 释放前发布普通操作结果；原生追加组合需要此接点，普通日志不需要。'
+          )
+        },
         transactionInfo: {
           summary: t(
             'Read the original authenticated transaction identity for this exact native namespace.',

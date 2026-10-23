@@ -46,6 +46,16 @@ export async function compileJournalBinding(
     await view.set('head', 'encoded', { ttlMs: 1 })
   }, scope)
   off()
+  await namespace.runCommitted?.(
+    async (view) => {
+      await view.set('head', 'committed')
+      return { committed: true }
+    },
+    (result) => {
+      const committed: boolean = result.committed
+      void committed
+    }
+  )
   await namespace.dispose()
   // @ts-expect-error Private I/O does not grant backend installation authority.
   void namespace.registerStore
