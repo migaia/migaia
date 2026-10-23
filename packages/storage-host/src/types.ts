@@ -11,6 +11,7 @@ import type {
   IMergePluginExts
 } from '@migaia/plugin-host'
 import type { IScheduler } from '@migaia/utils/scheduler'
+import type { INativeAbortSignal } from '@migaia/utils/promise'
 import type {
   IOperationContext,
   IStorageBase,
@@ -110,6 +111,7 @@ export type IStorageFeatureExpose<K extends IStorageBackendKind> = K extends ISt
       onDispose: IPluginHostCore['onDispose']
       getScheduler(): IScheduler
       emit: IStorageHookEmitter
+      registerDetect(check: (signal: INativeAbortSignal) => Promise<void>): void
     }> &
       IStorageKindExpose<K>
   : never
@@ -129,6 +131,7 @@ export type IStorageDescriptorFeatureExpose<K extends IStorageBackendKind> = Rea
   onDispose?: never
   getScheduler?: never
   emit?: never
+  registerDetect?: never
 }> &
   IStorageKindExpose<K> &
   IStorageMethodExpose<IStorageKindExpose<K>>
@@ -277,6 +280,7 @@ export type IStoragePluginCore<F extends IStorageFeatureRecord = {}> = Pick<
   readonly hooks: IStorageHooks
   readonly stageBindings: IBackendStageBindings
   readonly emit: IStorageHookEmitter
+  registerDetect(check: (signal: INativeAbortSignal) => Promise<void>): void
   registerStore<S extends IStorageBase>(store: S): void
   getStore(): IStorageBase
   getBackendId(): string
@@ -446,6 +450,8 @@ export type IRejectInstalledOrDuplicateIds<
     : never
 /** Construction captures timing and diagnostic ownership before a plugin runs. */
 export type IStorageHostOptions = {
+  readonly org?: string
+  readonly autoDetect?: boolean
   readonly installTimeoutMs?: number
   readonly scheduler?: IScheduler
   readonly report?: (error: unknown) => void | PromiseLike<void>
@@ -458,6 +464,7 @@ export type IStorageHostCreateOptions<P extends readonly IStorageBackendPluginHa
 export type IStorageHost<P extends readonly IStorageBackendPluginHandle[]> =
   import('@migaia/storage-contract').IStorageResource & {
     readonly hooks: IStorageHooks
+    detect(): Promise<void>
     codecStages(store: IStorageBase): ICodecStageObserver
     queryStages(store: IStorageBase): IQueryStageObserver
     transactionStages(store: IStorageBase): ITransactionStageObserver
@@ -518,6 +525,7 @@ export type IStorageDefinePlugin = {
         | 'execution'
         | 'hooks'
         | 'emit'
+        | 'registerDetect'
       > & { readonly features: IFeatureOutputs<F> }
     ) => IStorageNativePluginDescriptor & { readonly kind?: never },
     const F extends IFeatureRecord = {}
