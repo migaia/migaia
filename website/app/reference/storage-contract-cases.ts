@@ -820,6 +820,31 @@ function readLocked(store: IRecordStore<{ count: number }>) {
         'The supplied registered store starts one transaction at run, returning its original Promise. The scope remains that store’s complete native scope.',
         '所提供登记 store 在 run 时启动一次事务，返回原 Promise；scope 保留该 store 的完整原生结构。'
       )
+    },
+    {
+      title: t('Expose an original native optimistic transaction', '公开原生乐观事务'),
+      problem: t(
+        'A native backend with no physical key locks must reuse the original builder without exposing lock or creating another policy loop.',
+        '没有物理键锁的原生后端须复用原 builder，不公开 lock，也不创建第二策略循环。'
+      ),
+      example: t(
+        `import { createTransactionBuilder, ConcurrencyPolicy, type IRecordStore } from '@migaia/storage-contract'
+function readNative(store: IRecordStore<{ count: number }>) {
+  return createTransactionBuilder(store, undefined, undefined, { mode: 'optimistic' })
+    .concurrency(ConcurrencyPolicy.optimistic({ retries: 1 })).timeout(2_000)
+    .run(tx => tx.getRecord('counter'))
+}`,
+        `import { createTransactionBuilder, ConcurrencyPolicy, type IRecordStore } from '@migaia/storage-contract'
+function readNative(store: IRecordStore<{ count: number }>) {
+  return createTransactionBuilder(store, undefined, undefined, { mode: 'optimistic' })
+    .concurrency(ConcurrencyPolicy.optimistic({ retries: 1 })).timeout(2_000)
+    .run(tx => tx.getRecord('counter'))
+}`
+      ),
+      result: t(
+        'Run receives the original scope and returns the original Promise. Native fields are preserved, no lock option is injected, and wait/fail policies reject synchronously with UNSUPPORTED_CAPABILITY.',
+        'run 接收原 scope、返回原 Promise，保留原生字段，不注入 lock 选项；wait/fail 策略同步报 UNSUPPORTED_CAPABILITY。'
+      )
     }
   ],
   runWithConcurrency: [

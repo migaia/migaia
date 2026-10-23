@@ -110,6 +110,7 @@ export type {
   IWriteConcurrencyOptions,
   ITransactionBuilder,
   ILockedTransactionBuilder,
+  IOptimisticTransactionBuilder,
   IConcurrencyHolder,
   IConcurrencyDecision,
   IConcurrencyStageObserver
@@ -212,6 +213,7 @@ export type {
 export { resolveConcurrencyPolicy } from './transaction.js'
 
 export { createTransactionBuilder, TransactionBuilderMethod } from './transaction-builder.js'
+export type { IOptimisticTransactionBuilderMode } from './transaction-builder.js'
 
 export {
   QueryOperator,

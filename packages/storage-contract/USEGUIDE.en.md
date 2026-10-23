@@ -595,6 +595,8 @@ The loop also forwards captured native option fields and symbol properties to ev
 
 `createTransactionBuilder(store, options?)` accepts the original registered store with its actual transaction signature. The root has lock/concurrency/signal/timeout and no run method. Declaring at least one lock enables run; every derivation returns a new immutable branch. Only newly declared keys are snapshotted at each lock step. Run unfolds shared blocks with an explicit stack, normalizes once through the existing owner, and invokes the original transaction exactly once. It preserves the original transaction Promise and full native scope/options types. Configuration creates no deadline, queue or I/O.
 
+Backend authors may pass a fourth argument, `{ mode: 'optimistic' }`, to obtain `IOptimisticTransactionBuilder`: run is available from the root, lock is absent, and only authentic optimistic policies are accepted. wait/fail reject synchronously during configuration with `UNSUPPORTED_CAPABILITY`; forged policies still produce `INVALID_ARGUMENT`. Run injects no lock option, normalizes no empty key list, and returns the original transaction Promise with native options and the complete scope intact. The original concurrency owner retains retries. Omitting the fourth argument preserves the lock-required behavior above.
+
 `IRecordStore.transaction` and indexed transaction options include the original `ITransactionOptions` lock/concurrency fields. Native tx()/inspectLocks methods still belong to concrete implementations. For an already installed, registered record store:
 
 ```ts

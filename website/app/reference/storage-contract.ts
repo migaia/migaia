@@ -1643,11 +1643,15 @@ export const storageContractReference: ILibraryReference = {
         methods: t(
           'Optional Feature-owned pure methods. Configuration and lock branches retain the original references and complete inferred method types.',
           '可选的 Feature 自有纯方法；配置与 lock 分支保留原函数引用及完整推断方法类型。'
+        ),
+        mode: t(
+          'Optional fourth author argument {mode:"optimistic"} enables the native unlocked builder: run exists immediately, lock is absent and only authentic optimistic policies are accepted.',
+          '可选第四作者参数 {mode:"optimistic"} 启用原生无锁 builder：立即具备 run、不含 lock，且只接受真实乐观策略。'
         )
       },
       returns: t(
-        'Unlocked ITransactionBuilder with no run method. lock creates a locked builder; run normalizes once, invokes the original transaction once and preserves its Promise identity.',
-        '没有 run 方法的未锁定 ITransactionBuilder；lock 创建已锁定 builder；run 只规范化一次、调用原 transaction 一次并保留 Promise 身份。'
+        'Default ITransactionBuilder requires lock before run; explicit optimistic author mode returns IOptimisticTransactionBuilder without physical key normalization. Both invoke the original transaction once and preserve its Promise, complete scope and native option fields.',
+        '缺省 ITransactionBuilder 需先 lock 再 run；显式乐观作者模式返回 IOptimisticTransactionBuilder，不规范化物理锁键。两者均调用原 transaction 一次，保留原 Promise、完整 scope 与原生选项字段。'
       ),
       example: storageContractCases.createTransactionBuilder![0]!.example,
       cases: storageContractCases.createTransactionBuilder
@@ -4733,6 +4737,20 @@ console.log(candidate.name, candidate.output)`
       summary: t(
         'Locked chain type exposes run and retains full scope and method augmentation.',
         '加锁链类型公开 run，并保留完整视图与方法增强。'
+      ),
+      members: {}
+    },
+    IOptimisticTransactionBuilder: {
+      summary: t(
+        'Native immutable transaction chain with run from the root, no lock method and only authentic optimistic policies; the original transaction retains execution authority.',
+        '原生不可变事务链：根部具备 run、没有 lock，仅接受真实乐观策略；执行权限仍属于原 transaction。'
+      ),
+      members: {}
+    },
+    IOptimisticTransactionBuilderMode: {
+      summary: t(
+        'Optional fourth author descriptor {mode:"optimistic"}; omission preserves the existing lock-required builder.',
+        '可选第四作者描述符 {mode:"optimistic"}；省略时保持既有需声明锁的 builder。'
       ),
       members: {}
     },

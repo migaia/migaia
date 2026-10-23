@@ -595,6 +595,8 @@ LOCK_REJECTED 与 LOCK_TIMEOUT 携只读 keys、holder。已确认身份时消�
 
 `createTransactionBuilder(store, options?)` 接收具备真实 transaction 签名的原登记 store。根对象只有 lock/concurrency/signal/timeout，没有 run；声明至少一个锁后才启用 run。每次派生返回独立不可变分支，每次 lock 只快照新增键。run 用显式栈展开共享历史，经原 owner 只规范化一次，再直接调用原 transaction 一次；保留原 Promise 身份、完整原生 scope 与 options 类型。配置不创建期限、队列或 I/O。
 
+后端作者可传第四参数 `{ mode: 'optimistic' }`，得到 `IOptimisticTransactionBuilder`：根部即可 run，没有 lock 方法，只接受真实的 optimistic 策略。wait/fail 在配置时同步报 `UNSUPPORTED_CAPABILITY`，伪造策略仍报 `INVALID_ARGUMENT`。run 不注入 lock 或规范化空键，直接返回原 transaction Promise，保留原生选项及完整 scope；重试仍由原并发 owner 负责。省略第四参数保持上述需声明锁的行为。
+
 `IRecordStore.transaction` 与索引事务选项包含原 `ITransactionOptions` 的 lock/concurrency 字段。具体 tx()/inspectLocks 方法仍由真实实现接入。对已安装且登记的记录 store：
 
 ```ts
