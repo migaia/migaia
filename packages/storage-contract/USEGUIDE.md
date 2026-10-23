@@ -782,7 +782,7 @@ SPARQL 通过纯 sparqlFragment 与原生 sparql 能力复用规范 RDF 项。�
 
 `createVectorQuery<TPayload,TGroupable>(source, methods?)` 返回不可变 builder；声明正安全整数 `topK(k)` 后才有读取终点。原生 execute 接收 `IVectorQueryInput`：全部可译 payload conditions、最终 topK/minScore、withVector 与原 context。声明式条件跨函数谓词下推，org/TTL 仍由后端在排名前处理；函数只过滤原引擎命中，不补搜。withVector 缺省 false，显式开启后结果类型才包含 vector。exact:true 的 explain 标记 fullScan。groupBy:true 才提供标准分组，在原 topK 命中上单遍按 payload 自有标量字段分组，每组保留 perGroup 个原序命中。
 
-`createRdfQuery(source, pattern, methods?)` 捕获规范 ground pattern，保留省略 graph 的全 graph 语义。原生 execute 接收 `IRdfQueryInput`，其有序 steps 保留 where/follow/inverse/select 的原调用顺序；follow/inverse 只接受 ground IRI。当前读取单元提供原生安全前缀遍历与普通 limit；当前不能在客户端执行的遍历在 I/O 前拒绝 QUERY_NOT_PUSHABLE。RDF 客户端遍历、分页与写终点由后续单元补齐。
+`createRdfQuery(source, pattern, methods?)` 捕获规范 ground pattern，保留省略 graph 的全 graph 语义。原生 execute 接收 `IRdfQueryInput`，其有序 steps 保留 where/follow/inverse/select 的原调用顺序；execute 的原生行载体为 unknown，实际 select 可返回 Pick 投影，无须伪装完整 quad；follow/inverse 只接受 ground IRI。当前读取单元提供原生安全前缀遍历与普通 limit；当前不能在客户端执行的遍历在 I/O 前拒绝 QUERY_NOT_PUSHABLE。RDF 客户端遍历、分页与写终点由后续单元补齐。
 
 两个作者入口复用记录查询的同一节点、planner、reader 与原 IStorageIterator，保留 asyncDisposeKey、取消、事务资源与清理首错。可选纯方法保留原函数引用；`VectorQueryMethod` 与 `RdfQueryMethod` 为同名冲突的规范保留表。
 

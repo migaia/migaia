@@ -746,11 +746,11 @@ export type IRdfQueryInput = {
   )[]
   readonly ctx: IOperationContext | undefined
 }
-/** RDF sources keep their original indexed/remote cursor and original operation lifetime. */
+/** RDF sources retain their native cursor and actual projected row shape, owned by the plan. */
 export type IRdfQuerySource = {
   readonly pushdown: IQueryPushdown
   readonly asyncDisposeKey?: typeof Symbol.asyncDispose
-  readonly execute: (input: IRdfQueryInput) => IStorageIterator<readonly [IStorageKey, IQuad]>
+  readonly execute: (input: IRdfQueryInput) => IStorageIterator<readonly [IStorageKey, unknown]>
 }
 /** Nodes retain only their immediate predecessor, so deriving a branch never copies its history. */
 type IQueryNode = {
