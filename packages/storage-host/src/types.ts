@@ -34,8 +34,17 @@ import type {
   IConcurrencyStageObserver,
   IBackendStageObserver,
   ISqlStageObserver,
-  IStorageOperationStageObserver
+  IStorageOperationStageObserver,
+  IMigrationStepObserver
 } from '@migaia/storage-contract'
+/** Envelope boundaries observe the original migration plan and retain no archive or state. */
+export type IStorageEnvelopeStages = {
+  beforeEnvelopeCheck(): void
+  afterEnvelopeCheck(version: number): void
+  onVersionRejected(version?: number, code?: string): void
+  afterMigrate(version: number, mode: 'steps' | 'reset', stepCount: number, elapsedMs: number): void
+  readonly observe: IMigrationStepObserver
+}
 /** Requests forward typed inputs to the original pipeline without owning its stages. */
 export type IStorageExecutionRequest<TInput> = Readonly<{
   operation: string
@@ -472,6 +481,10 @@ export type IStorageHost<P extends readonly IStorageBackendPluginHandle[]> =
     backendStages(store: IStorageBase): IBackendStageObserver
     sqlStages(store: IStorageBase): ISqlStageObserver
     operationStages(store: IStorageBase): IStorageOperationStageObserver
+    envelopeStages(
+      store: IStorageBase,
+      operation: Readonly<{ operation: string; targetVersion: number }>
+    ): IStorageEnvelopeStages
     readonly extensions: Readonly<IStoragePluginExtensions<P[number]>>
     use<const Next extends readonly IStorageBackendPluginHandle[]>(
       ...plugins: IRejectInstalledOrDuplicateIds<{ [N in IStoragePluginId<P[number]>]: true }, Next>
