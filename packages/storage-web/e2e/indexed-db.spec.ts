@@ -38,6 +38,62 @@ test('真实 IndexedDB 的基本 put/get 冒烟测试', async ({ page }) => {
   expect(result.metadata).toEqual({ ready: true })
 })
 
+test('persistTransaction commits native entity and snapshot together and restores mirroring after rollback', async ({
+  page
+}) => {
+  await page.goto('/')
+  const result = await page.evaluate(() => window.runIndexedDbPersistNativeScenario())
+  expect(result.committed).toEqual({
+    result: 'committed',
+    envelope: { version: 0, state: { count: 1 } },
+    entity: { id: 'committed', email: 'one' },
+    business: 'committed'
+  })
+  expect(result.rolledBack).toEqual({
+    primaryReachable: true,
+    envelope: { version: 0, state: { count: 1 } },
+    entity: undefined,
+    business: null,
+    memory: 2,
+    writeErrorSame: true
+  })
+  expect(result.mirrored).toEqual({ version: 0, state: { count: 2 } })
+  expect(result.unique).toEqual({
+    code: 'INDEX_UNIQUE_CONFLICT',
+    envelope: { version: 0, state: { count: 2 } },
+    entity: undefined,
+    memory: 3
+  })
+  expect(result.cancelled).toEqual({
+    reasonReachable: true,
+    envelope: { version: 0, state: { count: 3 } },
+    entity: undefined,
+    memory: 4
+  })
+  expect(result.restored).toEqual({
+    primaryReachable: true,
+    envelope: { version: 0, state: { count: 4 } },
+    entity: undefined,
+    memory: 4
+  })
+})
+
+test('persistTransaction rolls back the native snapshot when its codec crosses a task boundary', async ({
+  page
+}) => {
+  await page.goto('/')
+  const result = await page.evaluate(() => window.runIndexedDbPersistCrossTaskCodecScenario())
+  expect(result).toEqual({
+    failed: true,
+    code: 'TRANSACTION_FAILED',
+    causeName: 'TransactionInactiveError',
+    operationAndOuterSame: true,
+    envelope: { version: 0, state: { count: 0 } },
+    business: null,
+    memory: 1
+  })
+})
+
 test('distinct pages receive a BroadcastChannel hint then reread authoritative IndexedDB state', async ({
   page,
   context

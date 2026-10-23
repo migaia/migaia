@@ -25,6 +25,10 @@ import { deferred } from '@migaia/utils/promise'
 import { isKeyValueStore, isRecordStore } from '../src/types/storage'
 import type { IStorageKey } from '../src/types/context'
 import { isArrayBuffer, isUint8Array } from '@migaia/utils/bytes'
+import {
+  runPersistNativeConsumerScenario,
+  runPersistCrossTaskCodecScenario
+} from '../../store-persist/test/helpers/native-transaction.js'
 
 /** Installer scenarios classify the original native Web error through the public host chain. */
 const browserFailure = (error: unknown): { code?: string; cause?: unknown } =>
@@ -250,6 +254,8 @@ declare global {
       connectionSetterRecovered: boolean
     }>
     runIndexedDbSmokeScenario(): Promise<{ ok: boolean; value: unknown; metadata: unknown }>
+    runIndexedDbPersistNativeScenario(): ReturnType<typeof runPersistNativeConsumerScenario>
+    runIndexedDbPersistCrossTaskCodecScenario(): ReturnType<typeof runPersistCrossTaskCodecScenario>
     runIndexedDbOptionsGuardScenario(): Promise<Array<string | undefined>>
     runIndexedDbTransactionConflictScenario(): Promise<{
       code: string | undefined
@@ -4172,6 +4178,36 @@ window.runIndexedDbSmokeScenario = async () => {
     return { ok: true, value, metadata }
   } finally {
     await storeHost.dispose()
+  }
+}
+
+/** Run the shared persistence/entity workflow through this exact host's native browser store. */
+window.runIndexedDbPersistNativeScenario = async () => {
+  /** The host owns the original connection; the shared fixture owns only its attachment. */
+  const host = await createStorageHost({
+    plugins: [
+      indexedDbBackendPlugin({ dbName: `persist-native-${Math.random().toString(36).slice(2)}` })
+    ]
+  })
+  try {
+    return await runPersistNativeConsumerScenario(host.backend('indexed-db'))
+  } finally {
+    await host.dispose()
+  }
+}
+
+/** Keep the codec's task boundary on the genuine native transaction, without a substitute scope. */
+window.runIndexedDbPersistCrossTaskCodecScenario = async () => {
+  /** The same public plugin supplies both the participating scope and its final cleanup. */
+  const host = await createStorageHost({
+    plugins: [
+      indexedDbBackendPlugin({ dbName: `persist-codec-${Math.random().toString(36).slice(2)}` })
+    ]
+  })
+  try {
+    return await runPersistCrossTaskCodecScenario(host.backend('indexed-db'))
+  } finally {
+    await host.dispose()
   }
 }
 
