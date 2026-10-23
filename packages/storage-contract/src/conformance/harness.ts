@@ -1,3 +1,4 @@
+import type { IStorageKey } from '../context.js'
 import type { IRecordIndexHandle } from '../secondary-index.js'
 import type { IStorageCapabilities } from '../capabilities.js'
 import type { IAnyStorageCapability, ICapabilityApi, IStorageStore } from '../capability.js'
@@ -40,6 +41,11 @@ export type IConformanceHarness = {
   }
 }
 /**
+ * Original native key projection keeps index fixtures in the backend owner's canonical record
+ * domain.
+ */
+type IConformanceIndexKeys = (key: string) => IStorageKey
+/**
  * Each invocation creates an empty isolated logical fixture; no store or data survives between
  * cases.
  */
@@ -52,7 +58,7 @@ export type IConformanceSubject<TStore extends IStorageStore<never>> = {
   readonly prepareSecondaryIndexes?: (
     store: TStore,
     handle: IRecordIndexHandle
-  ) => void | PromiseLike<void>
+  ) => void | IConformanceIndexKeys | PromiseLike<void | IConformanceIndexKeys>
 }
 /** Private registration adapter borrows one original store for exactly one case. */
 export type IConformanceCase = (
