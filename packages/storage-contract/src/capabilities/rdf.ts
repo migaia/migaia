@@ -1,3 +1,8 @@
+import type { IOperationContext } from '../context.js'
+import type { IWriteConcurrencyOptions } from '../concurrency.js'
+import type { IRdfQuery } from '../query-chain.js'
+import { defineStandardStorageCapability, validateCapabilityMethods } from '../capability-token.js'
+import { STORAGE_RDF_METHODS, STORAGE_RDF_WRITE_METHODS } from '../capability-constants.js'
 import type { IBackendKind } from '../capabilities.js'
 import { StorageContractError, StorageContractErrorCode } from '../errors.js'
 import { StorageContractErrorText } from '../error-text.js'
@@ -333,4 +338,25 @@ export const term = /* @__PURE__ */ Object.freeze({
     }
   },
   defaultGraph: DEFAULT_GRAPH
+})
+
+/** Ground RDF writes and queries share canonical term identity and the backend's original owner. */
+export type IRdfApi<
+  _TChangeFeed extends boolean = false,
+  TAugmentMethods extends object = Record<never, never>
+> = {
+  add(quads: readonly IQuad[], ctx?: IOperationContext & IWriteConcurrencyOptions): Promise<void>
+  delete(quads: readonly IQuad[], ctx?: IOperationContext & IWriteConcurrencyOptions): Promise<void>
+  match(pattern: Partial<IQuad>): IRdfQuery<IOperationContext, TAugmentMethods>
+}
+/** Generic RDF transactions expose only actual draft writes and zero-context queries. */
+export type ITransactionRdfApi<TAugmentMethods extends object = Record<never, never>> = {
+  add(quads: readonly IQuad[]): Promise<void>
+  delete(quads: readonly IQuad[]): Promise<void>
+  match(pattern: Partial<IQuad>): IRdfQuery<undefined, TAugmentMethods>
+}
+/** The authentic RDF token reuses the original fresh-view transaction projection. */
+export const rdf = /* @__PURE__ */ defineStandardStorageCapability<IRdfApi, 'rdf'>('rdf', {
+  validate: (api) => validateCapabilityMethods(api, STORAGE_RDF_METHODS),
+  transaction: { methods: STORAGE_RDF_WRITE_METHODS, rdf: true }
 })

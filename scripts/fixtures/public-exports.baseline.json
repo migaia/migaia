@@ -1019,6 +1019,7 @@
         "BACKEND_KIND_PATTERN",
         "ConcurrencyHolderState",
         "ConcurrencyPolicy",
+        "DeleteCountMode",
         "ConflictPolicy",
         "KEY_DOMAIN_LIMITS",
         "QueryOperation",
@@ -1089,6 +1090,7 @@
         "readConcurrencyLockIdentities",
         "readTransactionConflictPolicy",
         "readTransactionOperationContext",
+        "rdf",
         "records",
         "registerTransactionFinalizer",
         "resolveConcurrencyPolicy",
@@ -1121,7 +1123,8 @@
         "sqlFragment",
         "unprefixStorageOrgKey",
         "useStorageCapability",
-        "useTransactionCapability"
+        "useTransactionCapability",
+        "vector"
       ]
     },
     "@migaia/storage-web": {

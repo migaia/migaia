@@ -2,6 +2,11 @@ import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import {
   ttl,
   counter,
+  vector,
+  rdf,
+  DeleteCountMode,
+  type IVectorApi,
+  type IVectorCollection,
   blob,
   durableChangeFeed,
   type ITransactionalCapability,
@@ -41,6 +46,36 @@ function base(): IStorageBase {
 }
 
 describe('standard scalar capability contracts', () => {
+  it('publishes exact vector/RDF APIs and retains portable payload schema constraints', () => {
+    const collection = vi.fn()
+    const rootVector = { collection }
+    const rootRdf = { add: vi.fn(), delete: vi.fn(), match: vi.fn() }
+    const store = provideCapabilities(base(), [
+      implement(vector, rootVector as never),
+      implement(rdf, rootRdf as never)
+    ])
+    expect(store.use(vector)).toBe(rootVector)
+    expect(store.use(rdf)).toBe(rootRdf)
+    expect(collection).not.toHaveBeenCalled()
+    expect(DeleteCountMode).toEqual({ precount: 'precount', scroll: 'scroll' })
+    expectTypeOf<ITransactionalCapability<typeof vector>>().toEqualTypeOf<never>()
+    for (const method of ['add', 'delete', 'match'])
+      expect(() =>
+        provideCapabilities(base(), [implement(rdf, { ...rootRdf, [method]: undefined } as never)])
+      ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT' }))
+    expect(() => provideCapabilities(base(), [implement(vector, {} as never)])).toThrowError(
+      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+    )
+    type IPayload = { readonly label: string; readonly nested?: { readonly enabled: boolean } }
+    const selectTyped = (api: IVectorApi) => {
+      const result = api.collection<IPayload>('typed', { dimensions: 2, metric: 'cosine' })
+      // @ts-expect-error Date fields are not a portable vector payload output schema.
+      api.collection<{ date: Date }>('invalid')
+      return result
+    }
+    expectTypeOf<ReturnType<typeof selectTyped>>().toEqualTypeOf<IVectorCollection<IPayload>>()
+  })
+
   it('publishes independent blob and durable APIs without flat KV or transaction authority', () => {
     const native = vi.fn(async (): Promise<never> => {
       throw new Error('admission must not execute')

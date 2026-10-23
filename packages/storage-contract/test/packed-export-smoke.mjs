@@ -79,7 +79,7 @@ function main() {
     writeFileSync(join(consumerDirectory, 'package.json'), '{"type":"module"}\n', 'utf8')
     writeFileSync(
       join(consumerDirectory, 'identity.mjs'),
-      `import { fromValueCodec, defineStorageCapability, implement, provideCapabilities, hasStorageCapability, useStorageCapability, sql, createSqlTag, deriveStorageSqlQuery, blob, durableChangeFeed, orderStorageKeysByBytes, encodeStorageOrgStringPrefix, encodeOrderedStorageKey, prefixStorageOrgKey, sparql, sparqlFragment, createSparqlTag, term } from '@migaia/storage-contract'
+      `import { fromValueCodec, defineStorageCapability, implement, provideCapabilities, hasStorageCapability, useStorageCapability, sql, createSqlTag, deriveStorageSqlQuery, blob, durableChangeFeed, orderStorageKeysByBytes, encodeStorageOrgStringPrefix, encodeOrderedStorageKey, prefixStorageOrgKey, sparql, sparqlFragment, createSparqlTag, term, rdf, vector, DeleteCountMode } from '@migaia/storage-contract'
 import { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'
 import { isArrayBuffer as utilsBuffer, isUint8Array as utilsBytes } from '@migaia/utils/bytes'
 /** Independent resource bases exercise package-root capability reads without acquiring external clients. */
@@ -103,6 +103,13 @@ if (hasStorageCapability(raw, token) || Object.hasOwn(raw, 'use')) throw new Err
 let missing
 try { useStorageCapability(raw, token) } catch (error) { missing = error }
 if (missing?.source !== '@migaia/storage-contract' || missing.code !== 'UNSUPPORTED_CAPABILITY' || missing.backend !== 'packed-fixture' || Object.hasOwn(raw, 'use')) throw new Error('packed missing capability identity mismatch')
+/** Admission callbacks fail if a token lookup unexpectedly performs native work. */
+const noAdmissionIo = () => { throw new Error('capability admission performed I/O') }
+/** Packed RDF/vector publication preserves exact native APIs without generic vector transactions. */
+const vectorApi = { collection: noAdmissionIo }
+const rdfApi = { add: noAdmissionIo, delete: noAdmissionIo, match: noAdmissionIo }
+const semanticStore = provideCapabilities(createBase(), [implement(vector, vectorApi), implement(rdf, rdfApi)])
+if (semanticStore.use(vector) !== vectorApi || semanticStore.use(rdf) !== rdfApi || DeleteCountMode.scroll !== 'scroll') throw new Error('packed semantic capability mismatch')
 /** Packed native SPARQL keeps callable capability and pure fragment identities together. */
 const preparedSparql = []
 const sparqlApi = createSparqlTag({ select: async () => [], ask: prepare => { preparedSparql.push(prepare()); return Promise.resolve(true) }, construct: async () => [], update: async () => undefined })
@@ -118,7 +125,6 @@ const packedFullKey = encodeOrderedStorageKey(prefixStorageOrgKey(packedOrg, 'ab
 if (packedPrefix.some((byte, index) => byte !== packedFullKey[index])) throw new Error('packed organization prefix mismatch')
 if (orderStorageKeysByBytes([2, 1], key => new Uint8Array([key])).join(',') !== '1,2') throw new Error('packed byte ordering mismatch')
 /** Optional object/feed tokens expose only their own original native APIs after packing. */
-const noAdmissionIo = () => { throw new Error('capability admission performed I/O') }
 const objectApi = { put: noAdmissionIo, get: noAdmissionIo, head: noAdmissionIo, remove: noAdmissionIo, list: noAdmissionIo, removeByPrefix: noAdmissionIo }
 const feedApi = { readChanges: noAdmissionIo, tailChanges: noAdmissionIo }
 const optionalStore = provideCapabilities(createBase(), [implement(blob, objectApi), implement(durableChangeFeed, feedApi)])
