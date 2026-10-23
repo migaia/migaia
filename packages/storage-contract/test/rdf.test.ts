@@ -54,18 +54,12 @@ describe('canonical RDF terms and ground quad identity', () => {
       'de-CH-1901',
       'en-US-u-ca-gregory',
       'i-klingon',
-      'x-Foo-Foo'
+      'x-Foo-Foo',
+      'sl-ROZAJ-rozaj',
+      'en-U-ca-gregory-u-nu-latn'
     ])
       expect(term.literal('text', { language }).language).toBe(language.toLowerCase())
-    for (const language of [
-      '',
-      'en_US',
-      'en--US',
-      '123',
-      'en-u',
-      'sl-rozaj-rozaj',
-      'en-u-ca-gregory-u-nu-latn'
-    ])
+    for (const language of ['', 'en_US', 'en--US', '123', 'en-u'])
       expect(() => term.literal('text', { language })).toThrowError(
         expect.objectContaining({ code: 'INVALID_ARGUMENT' })
       )
