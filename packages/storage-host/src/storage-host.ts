@@ -1168,7 +1168,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
           publish: (change) => controller.publish({ ...change, orgId }),
           subscribe: (listener) =>
             controller.subscribe((change) => {
-              if (change.orgId === orgId) listener(change)
+              if (change.orgId === orgId) return listener(change)
             })
         }
         context.storeCell.retainOrgBinding(

@@ -14,6 +14,32 @@ import { createBackendChangeIterator } from '../../src/authoring/backend.js'
 
 /** Native watch streams are invalidation hints from the same original commit controller. */
 describe('memory native text watch', () => {
+  it('reports late observer rejection once while preserving root and organization commits', async () => {
+    await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+    const root = host.backend('memory')
+    const org = host.org(createOrgId()).backend('memory')
+    const failures = [
+      new Error('root observer rejected'),
+      new Error('organization observer rejected')
+    ]
+    const diagnostics: unknown[][] = []
+    const consoleError = vi.spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
+      diagnostics.push(args)
+    })
+    try {
+      for (const [index, store] of [root, org].entries()) {
+        const off = store.subscribeChanges(() => Promise.reject(failures[index]))
+        await expect(store.set('committed', 'value')).resolves.toBeUndefined()
+        await expect(store.get('committed')).resolves.toBe('value')
+        await vi.waitFor(() => expect(diagnostics).toHaveLength(index + 1))
+        expect(diagnostics[index]?.[1]).toBe(failures[index])
+        off()
+      }
+    } finally {
+      consoleError.mockRestore()
+    }
+  })
+
   it('exposes genuine text watch and coalesces only unconsumed matching invalidations', async () => {
     await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
     const store = host.backend('memory')
