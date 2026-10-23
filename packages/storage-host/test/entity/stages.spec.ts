@@ -1,4 +1,5 @@
 import { expect, it, vi } from 'vitest'
+import { asyncDisposeKey } from '@migaia/plugin-host'
 import { deferred } from '@migaia/utils/promise'
 import {
   assertTransactionOwner,
@@ -115,6 +116,16 @@ it('binds codec conversions and whole queries to the actual store and current tr
   expect(await stream.next()).toMatchObject({ done: false })
   expect(await stream.next()).toMatchObject({ done: true })
   expect(query.at(-1)).toMatchObject({ stats: { readCount: 1, returnedCount: 1, completed: true } })
+  /** Observation forwards the mapped root iterator's original canonical cleanup methods. */
+  const mapped = repo.query().select('id').stream()
+  expect(await mapped.next()).toMatchObject({ done: false, value: { id: 'a' } })
+  expect(query.at(-1)).toMatchObject({ stats: { returnedCount: 1, completed: false } })
+  const closing = mapped.dispose()
+  expect(mapped.dispose()).toBe(closing)
+  const symbolic = mapped[asyncDisposeKey]()
+  expect(mapped[asyncDisposeKey]()).toBe(symbolic)
+  expect(symbolic).not.toBe(closing)
+  await Promise.all([closing, symbolic])
   waiting.resolve()
 })
 

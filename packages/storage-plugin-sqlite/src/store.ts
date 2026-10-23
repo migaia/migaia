@@ -2256,6 +2256,7 @@ export function createSqliteStore<TValue>(
     query: <R = TValue>() =>
       createRecordQuery<R>(
         {
+          asyncDisposeKey,
           pushdown: {
             operators: [],
             operations: [],
@@ -2284,6 +2285,7 @@ export function createSqliteStore<TValue>(
         query: <R = TValue>() =>
           createRecordQuery<R, undefined>(
             {
+              asyncDisposeKey,
               pushdown: {
                 operators: [],
                 operations: [],

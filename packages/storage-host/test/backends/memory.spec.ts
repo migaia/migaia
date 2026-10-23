@@ -1,6 +1,7 @@
 import { asyncDisposeKey } from '@migaia/plugin-host'
 import {
   kv,
+  records,
   isChangeFeedStore,
   type IStorageChange,
   type IStorageResource
@@ -279,6 +280,15 @@ describe('memory backend', () => {
     expect(iterator[asyncDisposeKey]()).toBe(symbolic)
     expect(symbolic).not.toBe(iterator.dispose())
     await symbolic
+    /** Root mapped queries keep the original canonical resource key and both cached projections. */
+    const mapped = store.use(records).query<{ value: number }>().select('value').stream()
+    expect(await mapped.next()).toMatchObject({ done: false, value: { value: 1 } })
+    const closing = mapped.dispose()
+    expect(mapped.dispose()).toBe(closing)
+    const mappedSymbolic = mapped[asyncDisposeKey]()
+    expect(mapped[asyncDisposeKey]()).toBe(mappedSymbolic)
+    expect(mappedSymbolic).not.toBe(closing)
+    await Promise.all([closing, mappedSymbolic])
   })
   it('自动生成 key 在 crypto.randomUUID 不可用时回退', async () => {
     const original = crypto.randomUUID
