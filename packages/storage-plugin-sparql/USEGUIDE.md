@@ -57,7 +57,7 @@ await store
 
 scope 仅提供带 expect/expectAbsent 的 native RDF 与 update-only raw tag，不提供 KV、lock 或 wait/fail 策略。原 transaction owner 管理 accepted work、首错、iterator、finalizer 与过期 scope；不另建生命周期。草稿按规范身份去重，最后操作覆盖前操作。present 条件按合取，每个 absent 独立 NOT EXISTS。
 
-一次条件 DELETE/INSERT WHERE 原子写用户 quad 与 `urn:migaia:commit` 中随机 marker；一次 ASK 确认，再单独清理 marker。只有 Update 成功且 ASK 成功并明确 marker 不存在才是可沿原 optimistic policy 重试的冲突。Update 已发送但结果未知、ASK 失败/取消均为 SPARQL_COMMIT_UNKNOWN，停止当前安装后端后续写入，不重放；先检查原生数据库再创建新后端。清理 marker 失败只上报，用户数据已经提交。没有写前提时后提交覆盖先提交，不暗示自动读集校验。
+一次条件 DELETE/INSERT WHERE 原子写用户 quad 与 `urn:migaia:commit` 中随机 marker；一次 ASK 确认，再单独清理 marker。只有 Update 成功且 ASK 成功并明确 marker 不存在才是可沿原 optimistic policy 重试的冲突。Update 已发送但结果未知、ASK 失败/取消均为 SPARQL_COMMIT_UNKNOWN，停止当前安装后端后续写入，不重放；先检查原生数据库再创建新后端。清理 marker 失败只上报，用户数据已经提交。没有写前提时仍按规范 quad 的集合身份执行 add/delete：同一 quad 的最后成员操作生效，但并发事务写入不同宾语可同时保留两条 quad，不提供谓词单值覆盖，也不自动校验读集。需要此类竞争保护时，使用 `expect`。
 
 有真实 atomicUpdate 的端点才可在事务内执行一个 `scope.use(sparql)\`INSERT DATA { ... }\`.update()` body，不能混任何 RDF 操作/前提或第二个 raw body。通用 HTTP 在写入前拒绝此能力。根 raw tag 支持 select/ask/construct/update，值绑定归共享编译器；普通字符串不是 SPARQL 语法，不得作为语法插入。
 

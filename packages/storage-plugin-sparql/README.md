@@ -50,3 +50,5 @@ endpoint 与 Oxigraph Store 均由调用方创建并拥有，后端不关闭它�
 HTTP 部署要求、事务、查询写入、Graph Store、ontology、成本与 marker 清理见 [USEGUIDE.md](./USEGUIDE.md)。
 
 事务 callback、draft 或 finalizer 的业务失败使用 `TRANSACTION_FAILED`，保留原生类型与原 primary，不冒充端点不可用；已有 contract 与原生协议错误保持原身份。
+
+未设置 `expect` 时，仅保证规范 quad 的集合成员操作；并发读取旧值后分别写入不同宾语，两个新 quad 可以同时保留，不提供谓词单值的后写覆盖。需要检测这类竞争时，使用 `expect` 校验读到的 quad。
