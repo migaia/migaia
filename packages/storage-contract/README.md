@@ -561,7 +561,9 @@ async function paidTotals(store: IStorageBase) {
 
 `snapshotConcurrencyLockKeys(keys, backend)` 一次规范化、排序去重并返回配对的冻结 `{keys, identities}`；键为独立快照，identity 是原通道编码的十六进制字符串，不授予取锁权限。`snapshotConcurrencyLockRange({channel,prefix?}, backend)` 返回同一 identity 域的半开 `{lower,upper}`；省略 prefix 选整个通道，有值时复用原 typed 前缀规则，bytes 前缀仅接受字符串（含空串）。
 
-`runWithConcurrency` 的可选 `request.lock(captured)` 在原固定上下文字段完成一次捕获后调用一次；返回的隐式锁与显式 options.lock 合并、排序去重，保留显式锁。嵌套调用只规范化新增键，复用原锁编码与同一预算；重试不重新调用派生函数。派生 getter、raw 回调失败沿 INVALID_ARGUMENT 保留 cause，已有 coded 回调错误保持原身份。`IWriteOptions` 以及根 remove/clear 各数据通道上下文包含 `IWriteConcurrencyOptions`，省略 concurrency 使用原 owner 默认策略。
+`runWithConcurrency` 的可选 `request.lock(captured)` 在原固定上下文字段完成一次捕获后调用一次；返回的隐式锁与显式 options.lock 合并、排序去重，保留显式锁。嵌套调用只规范化新增键，复用原锁编码与同一预算；默认模式重试不重新调用派生函数。派生 getter、raw 回调失败沿 INVALID_ARGUMENT 保留 cause，已有 coded 回调错误保持原身份。`IWriteOptions` 以及根 remove/clear 各数据通道上下文包含 `IWriteConcurrencyOptions`，省略 concurrency 使用原 owner 默认策略。
+
+后端可选用 `request.executeAttempt(captured, proceed)` 代替 `execute`，两者不能同时提供。默认 execute 仍只包围完整逻辑循环一次。executeAttempt 在每次真实原生提交尝试周围运行完整 pipeline；纯获取锁冲突的等待或重试留在当前段内，不重新干预输入。提交冲突必须先完成原生回滚与清理，proceed 再以该冲突的原 coded cause 拒绝；缺失或未编码的 cause 由同一 owner 包为保留 cause 的 WRITE_CONFLICT，形成该段唯一失败身份。只有 stage 完整收尾后仍抛同一失败，原循环才咨询策略并重开下一段；stage 恢复返回值或改抛其他身份时直接结算。stage 不调用 proceed 也可正常提前返回，重复调用则报 INVALID_ARGUMENT。每个新段从最初捕获的显式或继承锁重新派生本段变换输入的隐式锁，不积累上一段的锁。原 options 单读、整体 signal、期限与冲突计数始终共用；不新增循环、队列或超时拥有者。
 
 `IConcurrencyAttemptContext.attempt` 等于原共用冲突计数加一；后端把此只读序号转发给观察，不自行计数，嵌套尝试沿同一预算来源。
 
