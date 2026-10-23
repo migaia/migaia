@@ -8,6 +8,7 @@ import {
   useStorageCapability,
   kv,
   records,
+  rdf,
   StorageContractErrorCode,
   type ICapabilityInstallPort,
   type IStorageBase,
@@ -696,6 +697,48 @@ describe('record query Feature type projection', () => {
 })
 
 describe('transaction query Feature type projection', () => {
+  it('keeps record and RDF Feature groups separate through both scope and builder projection', () => {
+    /** Both standard lookups borrow the same native transaction scope without mixing method groups. */
+    type IScope = ITransactionCapabilityView<typeof records | typeof rdf> & {
+      readonly native: 'kept'
+    }
+    /** The optional RDF group leaves the original two-argument record projection unchanged. */
+    type IRecordOnly = IWithTransactionQueryMethods<IScope, { queryOnly(): 'query' }>
+    /** An RDF-only Feature must still project when the record group is empty. */
+    type IRdfOnly = IWithTransactionQueryMethods<IScope, Record<never, never>, { rdfOnly(): 'rdf' }>
+    /** Canonical builders consume the same independently selected groups as direct scope views. */
+    type IEnhanced = IWithChainMethods<
+      { tx(): ITransactionBuilder<IScope> },
+      {
+        readonly query: { queryOnly(): 'query' }
+        readonly rdf: { rdfOnly(): 'rdf' }
+      }
+    >
+    function validTypes(
+      recordOnly: IRecordOnly,
+      rdfOnly: IRdfOnly,
+      builder: ReturnType<IEnhanced['tx']>
+    ): void {
+      expectTypeOf(recordOnly.native).toEqualTypeOf<'kept'>()
+      recordOnly.use(records).query().queryOnly()
+      // @ts-expect-error The old record group never grants RDF methods.
+      recordOnly.use(rdf).match({}).queryOnly()
+      rdfOnly.use(rdf).match({}).select('subject').rdfOnly()
+      // @ts-expect-error An RDF-only group never grants record methods.
+      rdfOnly.use(records).query().rdfOnly()
+      builder.lock({ channel: 'record', key: 'one' }).run((scope) => {
+        expectTypeOf(scope.use(records).query().queryOnly()).toEqualTypeOf<'query'>()
+        expectTypeOf(scope.use(rdf).match({}).rdfOnly()).toEqualTypeOf<'rdf'>()
+        expectTypeOf(scope.use(rdf).match({}).select('subject').rdfOnly()).toEqualTypeOf<'rdf'>()
+        // @ts-expect-error Record chains do not receive the RDF method group.
+        scope.use(records).query().rdfOnly()
+        // @ts-expect-error RDF chains do not receive the record method group.
+        scope.use(rdf).match({}).queryOnly()
+      })
+    }
+    void validTypes
+  })
+
   it('keeps transaction query context absent while preserving builder methods, native scope members and standard token availability', () => {
     /** Native top-level members and the original standard transaction lookup remain authoritative. */
     type IScope = ITransactionCapabilityView<typeof kv | typeof records, string> & {

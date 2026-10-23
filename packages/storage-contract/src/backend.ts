@@ -52,7 +52,11 @@ type IChainPart<
 type IWithTransactionBuilderMethods<TBuilder, TMethods extends IChainMethods> =
   TBuilder extends ITransactionBuilder<infer TScope, infer TAugmentMethods>
     ? ITransactionBuilder<
-        IWithTransactionQueryMethods<TScope, IChainPart<TMethods, 'query'>>,
+        IWithTransactionQueryMethods<
+          TScope,
+          IChainPart<TMethods, 'query'>,
+          IChainPart<TMethods, 'rdf'>
+        >,
         TAugmentMethods & IChainPart<TMethods, 'tx'>
       >
     : TBuilder extends { run(run: (scope: infer TScope) => unknown): unknown }
@@ -65,7 +69,11 @@ type IWithTransactionBuilderMethods<TBuilder, TMethods extends IChainMethods> =
         } & {
           run<TResult>(
             run: (
-              scope: IWithTransactionQueryMethods<TScope, IChainPart<TMethods, 'query'>>
+              scope: IWithTransactionQueryMethods<
+                TScope,
+                IChainPart<TMethods, 'query'>,
+                IChainPart<TMethods, 'rdf'>
+              >
             ) => TResult
           ): Promise<Awaited<TResult>>
         } & IChainPart<TMethods, 'tx'>
