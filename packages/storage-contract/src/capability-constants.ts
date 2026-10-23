@@ -5,6 +5,14 @@ export const StorageCapabilityMethod = {
   removeByPrefix: 'removeByPrefix'
 } as const
 
+/** Native text batch endpoints share the same public and transaction capability shape. */
+export const STORAGE_BATCH_METHODS = [
+  'getMany',
+  'setMany',
+  'removeMany',
+  StorageCapabilityMethod.removeByPrefix
+] as const
+
 /** Standard key-value methods validated and published by the canonical capability provider. */
 export const STORAGE_KEY_VALUE_METHODS = [
   'get',
@@ -13,7 +21,8 @@ export const STORAGE_KEY_VALUE_METHODS = [
   StorageCapabilityMethod.has,
   'keys',
   'clearValues',
-  'clearAll'
+  'clearAll',
+  ...STORAGE_BATCH_METHODS
 ] as const
 
 /** The existing synchronous channel has six methods and deliberately does not expose clearAll. */
@@ -41,8 +50,5 @@ export const TRANSACTION_KEY_VALUE_METHODS = [
   'set',
   'remove',
   StorageCapabilityMethod.has,
-  'getMany',
-  'setMany',
-  'removeMany',
-  StorageCapabilityMethod.removeByPrefix
+  ...STORAGE_BATCH_METHODS
 ] as const

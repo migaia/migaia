@@ -157,6 +157,78 @@ const recordKeyParam = t(
 
 /** L0 methods describe the contract without promising an implementation supplied by this package. */
 const storeMembers: Readonly<Record<string, IMemberDoc>> = {
+  getMany: {
+    summary: t(
+      'Read one native text snapshot in input order, including duplicate positions.',
+      '按输入顺序读取同一原生文本快照，保留重复位置。'
+    ),
+    params: {
+      keys: t(
+        'Logical IStorageKey values; strings share the single-key text domain.',
+        '逻辑 IStorageKey；字符串与单点文本键共享身份。'
+      ),
+      ctx: contextParam
+    },
+    returns: t(
+      'Same-length values with undefined for missing keys; any decode failure rejects the batch.',
+      '同长度值数组，缺失项为 undefined；任一解码失败拒绝整批。'
+    ),
+    example: "const values = await store.getMany(['theme', ['profile', 1]])"
+  },
+  setMany: {
+    summary: t(
+      'Atomically write a text batch in one native transaction and one operation pipeline.',
+      '在一个原生事务与一次操作管线中原子写入文本批量。'
+    ),
+    params: {
+      entries: t(
+        'Key/value entries with optional ttlMs; canonical duplicate keys reject before I/O. ttlMs requires ttl capability.',
+        '键值条目与可选 ttlMs；规范重复键在 I/O 前拒绝，ttlMs 要求 ttl 能力。'
+      ),
+      ctx: writeContextParam
+    },
+    returns: t(
+      'Original native Promise<void>; empty input opens no transaction.',
+      '原生 Promise<void>；空输入不打开事务。'
+    ),
+    example: "await store.setMany([{ key: 'theme', value: 'dark' }])"
+  },
+  removeMany: {
+    summary: t(
+      'Atomically delete distinct canonical text keys in one native transaction.',
+      '在一个原生事务中原子删除去重后的规范文本键。'
+    ),
+    params: {
+      keys: t(
+        'Logical keys; equivalent duplicates count only once.',
+        '逻辑键；等价重复项只计一次。'
+      ),
+      ctx: writeContextParam
+    },
+    returns: t(
+      'Actual deleted count; an empty batch returns zero without a transaction.',
+      '实际删除数；空批返回零且不开事务。'
+    ),
+    example: "const removed = await store.removeMany(['theme', 'theme'])"
+  },
+  removeByPrefix: {
+    summary: t(
+      'Delete only current-organization text entries matching the canonical key prefix.',
+      '仅删除当前组织内匹配规范键前缀的文本条目。'
+    ),
+    params: {
+      prefix: t(
+        'Canonical IStorageKey prefix, using the existing ordered key domain.',
+        '既有保序键域中的规范 IStorageKey 前缀。'
+      ),
+      ctx: writeContextParam
+    },
+    returns: t(
+      'Actual deleted count from the native prefix range.',
+      '原生前缀范围内的实际删除数。'
+    ),
+    example: "const removed = await store.removeByPrefix(['profile'])"
+  },
   backend: {
     summary: t(
       'Implementation family declared by the backend; use capabilities rather than this label to choose optional operations.',
@@ -2939,7 +3011,12 @@ console.log(candidate.name, candidate.output)`
         'Public KV methods projected from the canonical store contract.',
         '由唯一 store 契约投影的公开 KV 方法。'
       ),
-      members: {}
+      members: {
+        getMany: storeMembers.getMany!,
+        setMany: storeMembers.setMany!,
+        removeMany: storeMembers.removeMany!,
+        removeByPrefix: storeMembers.removeByPrefix!
+      }
     },
     ICapabilityImpl: {
       summary: t(

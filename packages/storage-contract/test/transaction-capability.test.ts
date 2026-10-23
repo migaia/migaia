@@ -189,7 +189,15 @@ function setup() {
         return count
       })
   }))
+  /** Transaction batch tests must never fall back to a root endpoint. */
+  const rootBatch = async (): Promise<never> => {
+    throw new Error('root batch must not be used')
+  }
   const rootKv: IKeyValueApi = {
+    getMany: rootBatch,
+    setMany: rootBatch,
+    removeMany: rootBatch,
+    removeByPrefix: rootBatch,
     get: async (key) => rootText.get(key) ?? null,
     set: async (key, value) => {
       rootText.set(key, value)
