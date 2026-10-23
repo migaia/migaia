@@ -74,3 +74,13 @@ definePlugin<
   // @ts-expect-error a base Store kind cannot satisfy a Feature requiring ICustomStore.
   { customFeature }
 )
+
+/** Only the original backend installation can capture late physical-child construction authority. */
+declare const authorCore: IStoragePluginCore
+const childAuthoring = authorCore.createOrgAuthoringPort()
+childAuthoring.createChangeController({ backend: 'native' })
+childAuthoring.createKeyLockPort()
+// @ts-expect-error organization authoring grants no capability provider or installer.
+childAuthoring.registerStore(store)
+// @ts-expect-error business organization views cannot construct physical children.
+builtInHost.org('00000000-0000-0000-0000-000000000001').createOrgAuthoringPort()
