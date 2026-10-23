@@ -101,6 +101,7 @@ describe('external storage WAL', () => {
       expect(await access.binding.hasCommitMarker!(attempt!.txId)).toBe(false)
       expect((await logger.wal.pending()).map((entry) => entry.seq)).toEqual([
         foreignSeq,
+        damagedForeignSeq,
         unrelatedSeq
       ])
       /** A crash before commit leaves this exact valid intent but no marker or business change. */
@@ -110,6 +111,7 @@ describe('external storage WAL', () => {
       expect(await logger.binlog.read(1)).toHaveLength(1)
       expect((await logger.wal.pending()).map((entry) => entry.seq)).toEqual([
         foreignSeq,
+        damagedForeignSeq,
         unrelatedSeq
       ])
       expect(recovered.headLocks).toEqual([])
