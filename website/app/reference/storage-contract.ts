@@ -1005,7 +1005,10 @@ export const storageContractReference: ILibraryReference = {
           'Nonnegative safe k, optional filter/withPayload/exact; booleans default false.',
           '非负安全 k、可选 filter/withPayload/exact；布尔缺省 false。'
         ),
-        configuration: t('Existing declared dimensions and metric.', '已有声明维度与 metric。'),
+        configuration: t(
+          'Optional existing schema. Omission snapshots the complete finite query/options/filter; validate the detached query against actual native dimensions and metric before searching.',
+          '可选已有 schema。省略时完整捕获有限 query/options/filter；检索前按真实原生维度与 metric 校验脱离的 query。'
+        ),
         backend: t('Optional native diagnostic label.', '可选原生诊断标签。')
       },
       returns: t(
