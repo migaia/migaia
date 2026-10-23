@@ -14,6 +14,8 @@ import type { IStorageJournalBackendBinding } from './journal/types.js'
 import { snapshotStorageJournalBinding } from './journal/binding.js'
 /** One registration binds one construction identity and publishes it only after admission. */
 export type IStorageStoreCell = {
+  /** A read-only original registration identity grants no methods or resource authority. */
+  readonly journalIdentity: object
   bind(store: IStorageBase): void
   set(store: IStorageBase): void
   get(): IStorageBase
@@ -23,7 +25,7 @@ export type IStorageStoreCell = {
   setOrgBinding(binding: IStorageOrgBinding): void
   setJournalBinding(binding: IStorageJournalBackendBinding): void
   journalForOrg(orgId: string): Omit<IStorageJournalBackendBinding, 'forOrg'>
-  retainJournalResource(resource: IStorageResource): void
+  retainJournalResource(resource: IStorageResource): () => void
   releaseJournalResources(): Promise<void>
   forOrg(orgId: string, defaultOrgId: string): IStorageBase
   dropOrg(orgId: string): Promise<void>
@@ -46,8 +48,8 @@ export type IStorageStoreCell = {
   ): unknown
   projectExtensions(context: IStoragePluginCallContext, assertCurrent: () => void): object
   projectOrgBackend(orgId: string, create: () => IStorageBorrowedBackend): IStorageBorrowedBackend
-  retainOrgBinding(release: () => void): void
-  releaseOrgBindings(): void
+  retainOrgBinding(release: () => void | Promise<void>): void
+  releaseOrgBindings(): Promise<void>
 }
 /** Preserve the original install handoff without letting a Feature replace its store. */
 export function createStorageStoreCell(): IStorageStoreCell {
@@ -68,10 +70,11 @@ export function createStorageStoreCell(): IStorageStoreCell {
   /** Each organization retains one business view, avoiding per-lookup resource aliases. */
   const orgViews = new Map<string, IStorageBorrowedBackend>()
   /** Exact aliases are released by the registration's existing resource scope. */
-  const orgReleases: Array<() => void> = []
+  const orgReleases: Array<() => void | Promise<void>> = []
   return {
+    journalIdentity: Object.freeze({}),
     retainJournalResource: (resource) => {
-      if (journalResources.has(resource)) return
+      if (journalResources.has(resource)) return () => undefined
       let dispose: IStorageResource['dispose']
       try {
         dispose = resource?.dispose
@@ -80,7 +83,11 @@ export function createStorageStoreCell(): IStorageStoreCell {
       }
       if (typeof dispose !== 'function')
         throw new StorageContractError(StorageContractErrorCode.invalidArgument)
-      journalResources.set(resource, () => Reflect.apply(dispose, resource, []))
+      const release = () => Reflect.apply(dispose, resource, [])
+      journalResources.set(resource, release)
+      return () => {
+        if (journalResources.get(resource) === release) journalResources.delete(resource)
+      }
     },
     releaseJournalResources: async () => {
       const releases = [...journalResources.values()]
@@ -118,9 +125,17 @@ export function createStorageStoreCell(): IStorageStoreCell {
     retainOrgBinding: (release) => {
       orgReleases.push(release)
     },
-    releaseOrgBindings: () => {
-      for (const release of orgReleases.splice(0)) release()
+    releaseOrgBindings: async () => {
+      const errors = createErrorCollector('throw', undefined)
+      for (const release of orgReleases.splice(0)) {
+        try {
+          await release()
+        } catch (error) {
+          errors.add(STORAGE_HOST_SOURCE, error)
+        }
+      }
       orgViews.clear()
+      errors.finalize(StorageErrorText.storageHostDisposeFailed)
     },
     setOrgBinding: (binding) => {
       if (orgBinding !== undefined)

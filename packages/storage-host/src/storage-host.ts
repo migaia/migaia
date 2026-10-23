@@ -184,6 +184,36 @@ export function createStoragePluginHost(options: IPluginHostOptions): IStoragePl
           registrationCore!.onDispose(() => undefined)
           return createBackendKeyLockPort()
         }) satisfies IStoragePluginCore['createKeyLockPort'],
+        createOrgAuthoringPort: (() => {
+          /** Only this original installation can capture late child construction authority. */
+          registrationCore!.onDispose(context.storeCell.releaseOrgBindings)
+          return Object.freeze({
+            createChangeController: (options) => {
+              context.assertExecution()
+              const controller = createBackendChangeController(options)
+              context.storeCell.retainOrgBinding(() => controller.dispose())
+              return controller
+            },
+            createKeyLockPort: () => {
+              context.assertExecution()
+              return createBackendKeyLockPort()
+            },
+            registerChangeController: (store, controller) => {
+              context.assertExecution()
+              context.storeCell.retainOrgBinding(registerBackendChangeController(store, controller))
+              /** Root observers retain all organizations through their original controller channel. */
+              const root = getBackendChangeController(context.storeCell.get())
+              if (root !== undefined && root !== controller)
+                context.storeCell.retainOrgBinding(
+                  controller.subscribe((change) => root.publishExternal(change))
+                )
+            },
+            registerValueCommit: (store, commit) => {
+              context.assertExecution()
+              context.storeCell.retainOrgBinding(registerBackendValueCommit(store, commit))
+            }
+          }) satisfies ReturnType<IStoragePluginCore['createOrgAuthoringPort']>
+        }) satisfies IStoragePluginCore['createOrgAuthoringPort'],
         createRevisionPort: (() => {
           /** Window admission belongs to the original owner; physical backends retain the facts. */
           registrationCore!.onDispose(() => undefined)
@@ -1157,13 +1187,14 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
     context.assertExecution()
     const binding = context.storeCell.journalForOrg(orgId)
     return Object.freeze({
+      registration: context.storeCell.journalIdentity,
       orgId,
       backendInstanceId: context.id,
       binding,
       retain: (resource: import('@migaia/storage-contract').IStorageResource) => {
         this.#assertOpen()
         context.assertExecution()
-        context.storeCell.retainJournalResource(resource)
+        return context.storeCell.retainJournalResource(resource)
       }
     })
   }
@@ -1202,7 +1233,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
       )
       this.#storeContexts.set(view, { context, native, orgId })
       /** Entity borrows the same controller, filtered through this immutable organization boundary. */
-      const controller = getBackendChangeController(store)
+      const controller = getBackendChangeController(native) ?? getBackendChangeController(store)
       if (controller !== undefined) {
         const projectedController: IBackendChangeController = {
           ...controller,

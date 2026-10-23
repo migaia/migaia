@@ -22,6 +22,10 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./journal": {
+      "types": "./dist/journal.d.ts",
+      "default": "./dist/journal.js"
+    },
     "./entity": {
       "types": "./dist/entity.d.ts",
       "default": "./dist/entity.js"

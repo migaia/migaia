@@ -133,6 +133,14 @@ export type IStorageBackendOrgContext = {
   readonly callContext: IStoragePluginCallContext
   createTransactionApi(scope: object): object | undefined
 }
+/** Installation-captured authority for physical org children, held only by their backend author. */
+export type IStorageOrgAuthoringPort = Pick<
+  IStoragePluginCore,
+  | 'createChangeController'
+  | 'createKeyLockPort'
+  | 'registerChangeController'
+  | 'registerValueCommit'
+>
 type ITargetKind<T extends IStorageFeatureTarget> = T extends readonly IStorageBackendKind[]
   ? T[number]
   : T extends IStorageBackendKind
@@ -329,6 +337,8 @@ export type IStoragePluginCore<F extends IStorageFeatureRecord = {}> = Pick<
     /** Read installed methods for one actual original fluent creator; omission allocates nothing. */
     getChainMethods(family: keyof IChainMethods): object | undefined
     createKeyLockPort(): IBackendKeyLockPort
+    /** Capture the original registration once; lazy org children retain its existing cleanup owner. */
+    createOrgAuthoringPort(): IStorageOrgAuthoringPort
     /** Construct revision facts for one physical data universe during this installation window. */
     createRevisionPort(): IBackendRevisionPort
     createChangeController(options: IBackendChangeControllerOptions): IBackendChangeController

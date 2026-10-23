@@ -232,6 +232,22 @@ describe('memory private journal binding', () => {
       expect(await namespace.run((view) => view.get('head'))).toBe('committed')
       await vi.waitFor(() => expect(diagnostics).toHaveLength(1))
       expect(diagnostics[0]?.[1]).toBe(cause)
+      const result = Object.freeze({ committed: true })
+      await expect(
+        namespace.runCommitted!(
+          async (view) => {
+            await view.set('head', 'terminal publication')
+            return result
+          },
+          (value) => {
+            expect(value).toBe(result)
+            return Promise.reject(cause)
+          }
+        )
+      ).resolves.toBe(result)
+      await vi.waitFor(() => expect(diagnostics).toHaveLength(2))
+      expect(diagnostics[1]?.[1]).toBe(cause)
+      expect(await namespace.run((view) => view.get('head'))).toBe('terminal publication')
     } finally {
       consoleError.mockRestore()
     }

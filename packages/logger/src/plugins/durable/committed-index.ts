@@ -46,7 +46,7 @@ export type ILogStoreIndex = {
 type IPendingNode = { seq: number; previous?: IPendingNode; next?: IPendingNode }
 
 /** Original numeric admission distinguishes invalid arguments from sequence exhaustion. */
-export function requireInteger(value: unknown, minimum = 1): asserts value is number {
+export function assertLogInteger(value: unknown, minimum = 1): asserts value is number {
   if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < minimum) {
     /** Representational exhaustion remains distinct from malformed numeric arguments. */
     const exhausted =
@@ -73,7 +73,7 @@ export function prepareLogAppend(
   let time: number
   try {
     lastSeq = head.lastSeq
-    requireInteger(lastSeq, 0)
+    assertLogInteger(lastSeq, 0)
     time = head.time
     if (
       !Number.isFinite(time) ||

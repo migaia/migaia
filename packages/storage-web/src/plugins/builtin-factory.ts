@@ -47,6 +47,8 @@ export function createBuiltInBackendPlugin<
         construction = createStore(core)
         core.registerStore(construction.store)
         core.registerChangeController(construction.store, construction.controller)
+        if (construction.orgBinding !== undefined)
+          core.registerOrgBinding(construction.store, construction.orgBinding)
         if (construction.commitValueWrite !== undefined)
           core.registerValueCommit(construction.store, construction.commitValueWrite)
         return construction.prepare ? construction.prepare().then(() => ({})) : {}

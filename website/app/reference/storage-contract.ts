@@ -785,8 +785,8 @@ export const storageContractReference: ILibraryReference = {
     runConformance: {
       role: 'operation',
       purpose: t(
-        'Register all declared standard-token and Boolean behavior groups without acquiring a runner, host or driver dependency. Every case validates the complete manifest and finally disposes its original fixture; primary and cleanup failures remain reachable.',
-        '登记声明的标准 token 与布尔行为组，不依赖 runner、host 或 driver。每例核对完整清单并 finally 释放原 fixture，主体与清理错误均可追踪。'
+        'Register all declared standard-token and Boolean behavior groups without acquiring a runner, host or driver dependency. Every case validates the complete manifest and finally disposes its original fixture; primary and cleanup failures remain reachable. Invalid-input assertions observe both synchronous native throws and Promise rejection without changing the required original semantic code.',
+        '登记声明的标准 token 与布尔行为组，不依赖 runner、host 或 driver。每例核对完整清单并 finally 释放原 fixture，主体与清理错误均可追踪。输入错误断言同时观察原生同步抛错与Promise拒绝，仍要求原语义码。'
       ),
       params: {
         harness: t(
@@ -794,8 +794,8 @@ export const storageContractReference: ILibraryReference = {
           '原 describe/it/expect 与 matcher；通知等待仅沿该 runner 的 case 超时。'
         ),
         subject: t(
-          'Name, independent create factory, complete authentic capability list and full features snapshot. KV is selected by kv token; pure vector/SQL subjects need none.',
-          '名称、独立 create 工厂、完整真实 token 清单与全量 features 快照。KV 由 kv token 选择；纯 vector/SQL 无需 KV。'
+          'Name, independent create factory, complete authentic capability list and full features snapshot, plus optional prepareSecondaryIndexes(originalStore, originalHandle) calling only the native backfill owner. It may return the original record-key projection for fixture ids; complete readiness remains required. KV is selected by kv token; pure vector/SQL subjects need none.',
+          '名称、独立 create 工厂、完整真实 token 清单与全量 features 快照；可选 prepareSecondaryIndexes(originalStore, originalHandle) 只调用原生 backfill 拥有者，可返回原record-key投影供fixture id使用，仍须complete就绪。KV 由 kv token 选择；纯 vector/SQL 无需 KV。'
         )
       },
       example: storageContractCases.runConformance![0]!.example,
@@ -2756,6 +2756,19 @@ if (snapshot) console.log(await snapshot.store.getRecord('profile'))`
         '没有结果；把值收窄为字符串，否则抛带类型原因的 `INVALID_ARGUMENT`。'
       ),
       example: `assertStringStorageKey('theme', 'local')`
+    },
+    snapshotStorageOrgKeyPrefix: {
+      role: 'operation',
+      purpose: t(
+        'Project half-open native byte bounds from the original organization and logical prefix owners.',
+        '从原组织与逻辑前缀拥有者投影原生半开字节界。'
+      ),
+      returns: t(
+        'Detached lower/upper bytes; undefined prefix selects all logical keys in only that organization.',
+        '独立lower/upper字节；undefined前缀仅选择该组织全部逻辑键。'
+      ),
+      example: storageContractCases.snapshotStorageOrgKeyPrefix![0]!.example,
+      cases: storageContractCases.snapshotStorageOrgKeyPrefix
     },
     encodeStorageOrgKey: {
       role: 'operation',

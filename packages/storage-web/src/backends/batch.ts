@@ -1,6 +1,7 @@
 import {
   StorageContractError,
   StorageContractErrorCode,
+  assertStorageTtlDuration,
   snapshotStorageBatchKeys,
   createStorageBatchKeyCapture,
   snapshotStorageKeyPrefix,
@@ -51,7 +52,8 @@ export function observeBrowserBatch<R>(
 /** Capture entry getters once, delegating all typed identity and duplicate rules to the key owner. */
 export function snapshotBrowserBatchEntries(
   entries: Parameters<IBrowserBatchApi['setMany']>[0],
-  backend: IBackendKind
+  backend: IBackendKind,
+  ttlSupported = false
 ): readonly IBrowserBatchEntry[] {
   try {
     if (!Array.isArray(entries)) throw new TypeError(StorageErrorText.storageBatchEntriesInvalid)
@@ -67,8 +69,11 @@ export function snapshotBrowserBatchEntries(
       const value = entry.value
       const ttlMs = entry.ttlMs
       if (typeof value !== 'string') throw new TypeError(StorageErrorText.storageValueInvalid)
-      if (ttlMs !== undefined)
-        throw new StorageContractError(StorageContractErrorCode.unsupported, { backend })
+      if (ttlMs !== undefined) {
+        if (!ttlSupported)
+          throw new StorageContractError(StorageContractErrorCode.unsupported, { backend })
+        assertStorageTtlDuration(ttlMs, backend)
+      }
       if (key.firstIndex !== index) throw new TypeError(StorageErrorText.storageBatchDuplicateKey)
       values.push({ ...key, value, ...(ttlMs === undefined ? {} : { ttlMs }) })
     }

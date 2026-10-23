@@ -6,7 +6,8 @@ const dependencies = [
   '@migaia/lifecycle',
   '@migaia/event-subscriber',
   '@migaia/utils',
-  '@migaia/serialize'
+  '@migaia/serialize',
+  '@migaia/logger'
 ]
 /** Emit a browser-safe host without bundling another lifecycle or capability owner. */
 export default defineConfig({
@@ -16,6 +17,7 @@ export default defineConfig({
       entry: {
         index: 'src/index.ts',
         entity: 'src/entity.ts',
+        journal: 'src/journal.ts',
         'authoring/backend': 'src/authoring/backend.ts',
         'authoring/vector': 'src/authoring/vector.ts'
       },

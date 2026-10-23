@@ -166,6 +166,7 @@
         "file"
       ],
       "./plugins/durable": [
+        "assertLogInteger",
         "LogRecordState",
         "LogStage",
         "binlog",
@@ -1129,6 +1130,7 @@
         "snapshotStorageCounterIncrement",
         "snapshotStorageKey",
         "snapshotStorageKeyPrefix",
+        "snapshotStorageOrgKeyPrefix",
         "snapshotStorageRdfPattern",
         "snapshotStorageRdfQuad",
         "snapshotStorageRdfTerm",
@@ -1773,6 +1775,7 @@
       ],
       "./authoring/backend": [
         "assertKeyRange",
+        "asyncDisposeKey",
         "collectUniqueIndexOwners",
         "createBackendChangeIterator",
         "createStorageOperationReporter",
@@ -1799,6 +1802,7 @@
       "./authoring/vector": [
         "recommendStorageVector"
       ],
+      "./journal": ["storageLogStore"],
       "./entity": [
         "REPOSITORY_KEY_PREFIX",
         "RecordIndexBackfillPhase",
@@ -1822,6 +1826,12 @@
       "./features/recommend": ["qdrantRecommendFeature"],
       "./features/group-by": ["qdrantGroupByFeature"],
       "./features/management": ["qdrantManagementFeature"]
+    },
+    "@migaia/storage-plugin-redis": {
+      ".": ["ERROR_SOURCE", "RedisErrorCode", "redisBackendKind", "redisBackendPlugin"],
+      "./ioredis": ["ioredisDriver"],
+      "./node-redis": ["nodeRedisDriver"],
+      "./bun": ["bunRedisDriver"]
     },
     "@migaia/storage-plugin-sparql": {
       ".": ["ERROR_SOURCE", "SparqlErrorCode", "sparqlBackendKind", "sparqlBackendPlugin"],

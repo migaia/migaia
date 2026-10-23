@@ -9,6 +9,23 @@ export const loggerIndexExample =
 
 /** Complete examples use in-memory sinks and the public host capability port. */
 export const loggerCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
+  integerAdmission: [
+    {
+      title: t('Reuse log integer admission', '复用日志整数准入'),
+      problem: t(
+        'Preserve numeric errors in native log adapters.',
+        '原生日志适配器保留数字错误语义。'
+      ),
+      example: t(
+        "import { assertLogInteger } from '@migaia/logger/plugins/durable'\n\nconst input: unknown = 0\nassertLogInteger(input, 0)\nconsole.log(input)",
+        "import { assertLogInteger } from '@migaia/logger/plugins/durable'\n\nconst input: unknown = 0\nassertLogInteger(input, 0)\nconsole.log(input)"
+      ),
+      result: t(
+        'Prints 0; fractional values reject with the original coded RangeError.',
+        '输出 0；小数仍按原带码 RangeError 拒绝。'
+      )
+    }
+  ],
   committedIndex: [
     {
       title: t('Prepare a native append before commit', '原生提交前准备追加批次'),

@@ -42,7 +42,14 @@ export function runConformance<TStore extends IStorageStore<never>>(
     }
     if (features.binary && features.records) crossChannelConformance(check, harness)
     if (features.syncRead && features.binary) syncBinaryConformance(check, harness)
-    if (features.secondaryIndexes) indexConformance(check, harness)
+    if (features.secondaryIndexes) {
+      const prepare = subject.prepareSecondaryIndexes
+      indexConformance(
+        check,
+        harness,
+        prepare ? (store, handle) => prepare(store as TStore, handle) : undefined
+      )
+    }
     if (features.changeFeed) feedConformance(check, harness)
     standardConformance(check, harness, subject.capabilities)
   })

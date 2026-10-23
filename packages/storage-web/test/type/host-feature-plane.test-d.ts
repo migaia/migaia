@@ -1,8 +1,9 @@
 import { createRuntime } from '@migaia/reactive'
-import { records } from '@migaia/storage-contract'
+import { records, type IStorageIterator, type IStorageChange } from '@migaia/storage-contract'
 import { createStorageHost, memoryBackendKind, memoryBackendPlugin } from '@migaia/storage-host'
 import { expectTypeOf } from 'vitest'
 import { reactiveFeature } from '../../src/features/reactive.js'
+import { localStorageBackendPlugin } from '../../src/local-storage.js'
 
 /** Selecting the Feature adds live only to the existing chain, preserving its selected result. */
 const host = await createStorageHost({
@@ -24,3 +25,11 @@ host.backend('live').live({ runtime: createRuntime() })
 const ordinary = await createStorageHost({ plugins: [memoryBackendPlugin()] })
 // @ts-expect-error no live terminal exists without a selected reactive Feature.
 ordinary.backend('memory').use(records).query().live({ runtime: createRuntime() })
+
+/** Static watch methods retain runtime admission and never grant organization close ownership. */
+const browser = await createStorageHost({ plugins: [localStorageBackendPlugin()] })
+/** This original borrowed view shares the native feed but owns only its returned iterator. */
+const org = browser.org('00000000-0000-0000-0000-000000000000').backend('local')
+expectTypeOf(org.watch('theme')).toEqualTypeOf<IStorageIterator<IStorageChange>>()
+// @ts-expect-error borrowed organization views retain no backend disposal authority.
+org.dispose()

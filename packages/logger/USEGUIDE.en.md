@@ -569,6 +569,8 @@ await custom.append([{ kind: 'custom', payload: null }])
 await custom.dispose()
 ```
 
+`assertLogInteger(value, minimum = 1)` reuses original numeric admission: a safe integer at or above minimum. Invalid values retain `RangeError/INVALID_OPTION`; exhausted integers retain `LOG_SEQUENCE_EXHAUSTED`.
+
 Native log adapters reuse `snapshotLogRecords`, `prepareLogAppend`, `snapshotLogStoreState`, and `createLogStoreIndex` from the same durable entry. Capture portable JSON before asynchronous admission, prepare sequence/time from the serialized committed head, and persist with the adapter's original transaction. Only after its actual commit, apply the exact prepared batch with `index.applyAppend` and publish the original append notice once. Rollback does not apply the batch or advance watermarks. Check state/truncation before native writes and apply those changes after commit. Recovery reuses the file store's row/state/payload checks; an optional payload decoder runs after row identity validation. The index contains committed data and the original pending-list algorithm only; it provides no queue, resource, notification channel, or close authority. These author helpers do not change the synchronous commit or observation timing of memory/file stores.
 
 ```ts

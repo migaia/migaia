@@ -34,6 +34,8 @@ export const StorageOperation = {
   indexedDbTransaction: 'indexeddb.transaction',
   indexedDbRead: 'indexeddb.read',
   indexedDbClose: 'indexeddb.close',
+  /** Physical organization deletion belongs to the same native database opener. */
+  indexedDbDelete: 'indexeddb.delete',
   indexedDbLegacyMigration: 'indexeddb.legacy.migration',
   indexedDbSchema: 'indexeddb.schema',
   indexedDbCursor: 'indexeddb.cursor',
@@ -46,8 +48,19 @@ export const StorageOperation = {
   entityIndexProjection: 'entity.index.project'
 } as const
 
+/** Standard TTL endpoint labels are shared by native root pipelines and diagnostics. */
+export const BrowserTtlMethod = {
+  expire: 'ttl.expire',
+  remaining: 'ttl.remaining',
+  persist: 'ttl.persist'
+} as const
+
 /** Transaction method labels are observed at the original short-lived operation view. */
 export const StorageTransactionOperation = {
+  /** TTL operations borrow the same admitted native transaction and its operation observer. */
+  ttlExpire: 'transaction.ttl.expire',
+  ttlRemaining: 'transaction.ttl.remaining',
+  ttlPersist: 'transaction.ttl.persist',
   getMany: 'transaction.getMany',
   setMany: 'transaction.setMany',
   removeMany: 'transaction.removeMany',

@@ -66,6 +66,11 @@ export type IPluginRuntimeIntegration = Readonly<{
   matchesHost(host: object): boolean
   /** Reuse original Host/registration admission for explicitly exposed reserved controls. */
   assertCurrent(): void
+  /**
+   * Admit this exact prepared registration while its original batch has a current install, or reuse
+   * ordinary published admission. This grants no install, resource, or mutation authority.
+   */
+  assertPreparedRegistration(): void
   /** Read an already committed facade without acquiring ownership or creating another slot. */
   readSharedExtension(key: PropertyKey): object | undefined
   /**

@@ -67,6 +67,10 @@ export const StorageErrorCode = {
   versionUnsupported: 'VERSION_UNSUPPORTED',
   /** A native memory transaction failed; inspect its original cause before retrying. */
   transactionFailed: 'TRANSACTION_FAILED',
+  /** Private journal bytes are malformed; stop opening this journal and retain its original bytes. */
+  journalRecordInvalid: 'JOURNAL_RECORD_INVALID',
+  /** Recovery or a journal commit is uncertain; close this handle and reopen from its durable head. */
+  journalRecoveryFailed: 'JOURNAL_RECOVERY_FAILED',
   /** A user extension failed; inspect its original cause and operation context before retrying. */
   extensionFailed: 'EXTENSION_FAILED'
 } as const

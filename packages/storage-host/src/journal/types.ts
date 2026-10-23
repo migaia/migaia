@@ -29,6 +29,11 @@ export type IStorageJournalNamespace = IStorageResource & {
     work: (view: IStorageJournalNamespaceView) => Promise<R>,
     scope?: Omit<ITransactionScope, 'use'>
   ): Promise<R>
+  /** Publish ordinary committed metadata inside the original terminal, before its head lease ends. */
+  runCommitted?<R>(
+    work: (view: IStorageJournalNamespaceView) => Promise<R>,
+    committed: (value: R) => void
+  ): Promise<R>
   onCommit(scope: Omit<ITransactionScope, 'use'>, effect: () => void): () => void
   onRollback(scope: Omit<ITransactionScope, 'use'>, effect: () => void): () => void
 }

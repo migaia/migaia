@@ -279,8 +279,8 @@ const backendSymbols: Readonly<Record<string, ISymbolDoc>> = Object.fromEntries(
         role: 'enhancer',
         options,
         purpose: t(
-          `Install the native ${module} backend into storage-host. Preparation finishes before publication; the host owns cleanup.`,
-          `把原生浏览器后端安装到 \`@migaia/storage-host\`，准备完成后才发布，由宿主拥有清理责任。`
+          `Install the native ${module} backend into storage-host. Preparation finishes before publication; the host owns cleanup.${module === 'indexed-db' ? ' Native ttl covers text, bytes and records within the same transaction. Organization dbName mapping preserves the configured default and adds "/" + orgId otherwise. dropOrg drains and closes the target connection, deletes only that database, and keeps borrowed views reusable.' : ' Native localStorage watch requires its matching Window event source; injected ports alone retain changeFeed:false. Text organization views preserve the configured default namespace and use namespace + "/" + orgId otherwise; dropOrg clears only that target and keeps borrowed unique writes native.'}`,
+          `把原生浏览器后端安装到 \`@migaia/storage-host\`，准备完成后才发布，由宿主拥有清理责任。${module === 'indexed-db' ? '原生 ttl 在同一事务支持文本、字节与记录期限。组织 dbName 保留配置的缺省目标，其它组织追加"/" + orgId；dropOrg 排空并关闭目标连接，只删除该数据库，既有借用视图可复用。' : '原生localStorage watch须准入同Window事件源，单独注入端口仍changeFeed:false。文本组织视图保留配置的缺省namespace，其它组织使用namespace + "/" + orgId；dropOrg只清该目标，借用唯一写仍由原生拥有者完成。'}`
         ),
         params: {
           options: t(
