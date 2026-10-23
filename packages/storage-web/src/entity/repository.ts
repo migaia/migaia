@@ -1,3 +1,4 @@
+import { StorageError as HostStorageError } from '@migaia/storage-host'
 import {
   StorageContractError,
   StorageContractErrorCode,
@@ -110,22 +111,20 @@ type IEntityRetryTransactionScope = {
 /* c8 ignore start -- defensive stage wrapping is exercised through the public error assertions. */
 const stageFailure = (stage: IStageFailure['stage'], cause: unknown): IStageFailure => {
   /* c8 ignore next -- all current extension boundaries normalize to StorageError; retain a defensive path for future callers. */
-  if (cause instanceof StorageError) {
-    const staged = new StorageError(
-      cause.code,
-      {
-        backend: cause.backend,
-        key: cause.key,
-        existingChannel: cause.existingChannel,
-        attemptedChannel: cause.attemptedChannel,
-        operation: cause.operation,
-        extensionStage: cause.extensionStage,
-        cause
-      },
-      cause.message,
-      stage
-    ) as unknown as IStageFailure
-    return staged
+  if (cause instanceof StorageError || cause instanceof HostStorageError) {
+    /** Preserve the moved error owner while adding the existing invalid-record stage. */
+    const details = {
+      backend: cause.backend,
+      key: cause.key,
+      existingChannel: cause.existingChannel,
+      attemptedChannel: cause.attemptedChannel,
+      operation: cause.operation,
+      extensionStage: cause.extensionStage,
+      cause
+    }
+    return (cause instanceof HostStorageError
+      ? new HostStorageError(cause.code, details, cause.message, stage)
+      : new StorageError(cause.code, details, cause.message, stage)) as unknown as IStageFailure
   }
   if (isStorageContractError(cause)) return cause as unknown as IStageFailure
   const error = new Error(String(cause)) as IStageFailure
