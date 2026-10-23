@@ -40,6 +40,36 @@ console.log(host.extensions.label('draft'))`
     }
   },
   symbols: {
+    observeStorageBatch: {
+      role: 'operation',
+      purpose: t(
+        'Observe one already-admitted native batch through the original operation stages and scheduler.',
+        '借用原operation stages与scheduler观察一个已准入的原生批量操作。'
+      ),
+      params: {
+        stages: t(
+          'Original store or authenticated transaction operation observer.',
+          '原store或真实事务的操作观察接点。'
+        ),
+        scheduler: t(
+          'Original host scheduler used only for elapsed time.',
+          '原宿主scheduler，仅用于测量耗时。'
+        ),
+        operation: t('Owning backend operation name.', '所属后端的操作名。'),
+        count: t(
+          'Input entry count, or undefined for a prefix operation.',
+          '输入条目数，前缀操作可为undefined。'
+        ),
+        invoke: t(
+          'Already-admitted native work, invoked exactly once.',
+          '已准入的原生工作，仅调用一次。'
+        )
+      },
+      returns: t(
+        'Promise of the unchanged native result; original errors reject unchanged.',
+        '返回原生结果的Promise；拒绝保持原异常对象。'
+      )
+    },
     registerRecordIndexBackfillStore: {
       role: 'operation',
       purpose: t(

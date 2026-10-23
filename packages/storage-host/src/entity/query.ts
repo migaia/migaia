@@ -4,6 +4,8 @@ import {
   type IRecordQuery,
   type IRecordQueryBase,
   type IRecordQueryNeedsLimit,
+  type IQueryRead,
+  type IQueryStatistics,
   type IQueryResult,
   type IRecordQuerySource,
   type IStorageKey,
@@ -41,10 +43,11 @@ export function createEntityQuery<
     readonly invalid: (action: unknown) => void
     readonly methods: TMethods | undefined
     readonly run: <R>(
-      invoke: () => Promise<R[]>,
+      invoke: () => Promise<R>,
       plan: IEntityQueryPlan,
-      selection: IEntityQuerySourceSelection<T>
-    ) => Promise<R[]>
+      selection: IEntityQuerySourceSelection<T>,
+      returnedCount: (value: R) => number
+    ) => Promise<R>
     readonly stream: <R>(
       open: () => IStorageIterator<R>,
       plan: IEntityQueryPlan,
@@ -58,29 +61,133 @@ export function createEntityQuery<
   },
   selection: IEntityQuerySourceSelection<T> = {}
 ): IEntityQuery<T, TIndexes, TContext, TMethods> {
+  /** Every read delegates to the original terminal inside the existing entity operation owner. */
+  const reads = <R>(
+    prepare: (first?: true) => IQueryRead<R, TContext> & IQueryStatistics<R, TContext>,
+    plan: IEntityQueryPlan,
+    invalid: IInvalidRecordAction | IInvalidRecordHandler<T> | undefined,
+    countQuery = () => prepare()
+  ): Omit<IQueryRead<R, TContext>, 'explain'> & IQueryStatistics<R, TContext> => ({
+    all: (ctx) =>
+      input.run(
+        () => prepare().all(ctx),
+        plan,
+        { ...selection, onInvalid: invalid },
+        (rows) => rows.length
+      ),
+    first: (ctx) =>
+      input.run(
+        () => prepare(true).first(ctx),
+        { ...plan, hasLimit: true },
+        { ...selection, onInvalid: invalid },
+        (row) => (row === undefined ? 0 : 1)
+      ),
+    maybe: (ctx) =>
+      input.run(
+        () => prepare().maybe(ctx),
+        plan,
+        { ...selection, onInvalid: invalid },
+        (value) => (value.some ? 1 : 0)
+      ),
+    firstOrThrow: (ctx) =>
+      input.run(
+        () => prepare().firstOrThrow(ctx),
+        plan,
+        { ...selection, onInvalid: invalid },
+        () => 1
+      ),
+    pluck: (field, ctx) =>
+      input.run(
+        () => prepare().pluck(field, ctx),
+        plan,
+        { ...selection, onInvalid: invalid },
+        (values) => values.length
+      ),
+    exists: (ctx) =>
+      input.run(
+        () => prepare().exists(ctx),
+        plan,
+        { ...selection, onInvalid: invalid },
+        (value) => (value ? 1 : 0)
+      ),
+    count: (ctx) =>
+      input.run(
+        () => countQuery().count(ctx),
+        { ...plan, hasOrder: false },
+        { ...selection, onInvalid: invalid },
+        (count) => count
+      ),
+    each: (fn, ctx) =>
+      input.run(
+        () => prepare().each(fn, ctx),
+        plan,
+        { ...selection, onInvalid: invalid },
+        (count) => count
+      ),
+    chunk: (size, fn, ctx) =>
+      input.run(
+        () => prepare().chunk(size, fn, ctx),
+        plan,
+        { ...selection, onInvalid: invalid },
+        (count) => count
+      ),
+    min: (field, ctx) =>
+      input.run(
+        () => prepare().min(field, ctx),
+        plan,
+        { ...selection, onInvalid: invalid },
+        (value) => (value.some ? 1 : 0)
+      ),
+    max: (field, ctx) =>
+      input.run(
+        () => prepare().max(field, ctx),
+        plan,
+        { ...selection, onInvalid: invalid },
+        (value) => (value.some ? 1 : 0)
+      ),
+    sum: (field, ctx) =>
+      input.run(
+        () => prepare().sum(field, ctx),
+        plan,
+        { ...selection, onInvalid: invalid },
+        () => 1
+      ),
+    avg: (field, ctx) =>
+      input.run(
+        () => prepare().avg(field, ctx),
+        plan,
+        { ...selection, onInvalid: invalid },
+        (value) => (value.some ? 1 : 0)
+      ),
+    stream: (ctx) =>
+      input.stream(() => prepare().stream(ctx), plan, { ...selection, onInvalid: invalid })
+  })
   /** Final projections retain original method references and terminal Promise semantics. */
   const result = <R>(
     query: IQueryResult<R, TContext, true, TMethods>,
     plan: IEntityQueryPlan,
-    invalid: IInvalidRecordAction | IInvalidRecordHandler<T> | undefined
+    invalid: IInvalidRecordAction | IInvalidRecordHandler<T> | undefined,
+    prepareResult: (first?: true) => IQueryResult<R, TContext, true, TMethods> = () => query
   ): IQueryResult<R, TContext, true, TMethods> =>
     Object.freeze({
       ...query,
-      all: (ctx?: TContext): Promise<R[]> =>
-        input.run(() => query.all(ctx), plan, { ...selection, onInvalid: invalid }),
-      stream: (ctx?: TContext): IStorageIterator<R> =>
-        input.stream(() => query.stream(ctx), plan, { ...selection, onInvalid: invalid }),
-      requirePushdown: () => result(query.requirePushdown(), plan, invalid)
+      ...reads(prepareResult, plan, invalid, () => query),
+      explain: () => prepareResult().explain(),
+      requirePushdown: (): IQueryResult<R, TContext, true, TMethods> =>
+        result(query.requirePushdown(), plan, invalid, (first) =>
+          prepareResult(first).requirePushdown()
+        )
     }) as IQueryResult<R, TContext, true, TMethods>
   /** A default comparator is an entity option; the original query heap performs its actual work. */
   const prepare = (
     query: IRecordQuery<T, TContext, TMethods>,
     limit: number | undefined,
-    explicit: boolean
+    explicit: boolean,
+    first?: true
   ): IRecordQueryBase<T, TContext, TMethods> => {
     if (explicit || input.defaultComparator === undefined) return query
-    if (limit === undefined) return input.missingLimit()
-    return query.orderByComparator(input.comparator(input.defaultComparator)).limit(limit)
+    if (limit === undefined && first !== true) return input.missingLimit()
+    return query.orderByComparator(input.comparator(input.defaultComparator)).limit(limit ?? 1)
   }
   /** Each branch retains the actual immutable core query rather than replaying its configuration. */
   const wrap = (
@@ -107,21 +214,32 @@ export function createEntityQuery<
         { ...plan, hasWhere: true },
         invalid
       )) as IEntityQueryNarrowed<T, TIndexes, TContext, TMethods>['where']
-    const select = ((...args: readonly unknown[]) =>
-      (() => {
-        const prepared = prepare(query, limit, explicit)
-        return result(
-          Reflect.apply(
-            prepared.select,
-            prepared,
-            typeof args[0] === 'function' ? [input.mapper(args[0] as (value: T) => unknown)] : args
-          ),
-          plan,
-          invalid
-        )
-      })()) as IEntityQueryNarrowed<T, TIndexes, TContext, TMethods>['select']
+    const select = ((...args: readonly unknown[]) => {
+      /** Public projection arguments are validated now; its wrapped mapper is captured once. */
+      const captured =
+        typeof args[0] === 'function' ? [input.mapper(args[0] as (value: T) => unknown)] : args
+      /** Count keeps the current page without introducing the unused default comparator. */
+      const unprepared =
+        input.defaultComparator !== undefined && !explicit && limit !== undefined
+          ? query.limit(limit)
+          : query
+      /** This immutable canonical branch retains the validated fields and original augmentation. */
+      const selected = Reflect.apply(unprepared.select, unprepared, captured)
+      return result(selected, plan, invalid, (first) => {
+        if (input.defaultComparator === undefined || explicit) return selected
+        /** Other reads retain the original pre-projection bounded ordering and limit error. */
+        const prepared = prepare(query, limit, explicit, first)
+        return Reflect.apply(prepared.select, prepared, captured)
+      })
+    }) as IEntityQueryNarrowed<T, TIndexes, TContext, TMethods>['select']
     return Object.freeze({
       ...query,
+      ...reads(
+        (first) => prepare(query, limit, explicit, first),
+        plan,
+        invalid,
+        () => (limit === undefined ? query : query.limit(limit))
+      ),
       where,
       select,
       limit: (count: number) => {
@@ -141,6 +259,13 @@ export function createEntityQuery<
           typeof compare === 'function' ? input.comparator(compare) : compare
         )
         return {
+          first: (ctx?: TContext) =>
+            input.run(
+              () => pending.first(ctx),
+              { ...plan, hasOrder: true, hasLimit: true },
+              { ...selection, onInvalid: invalid },
+              (row) => (row === undefined ? 0 : 1)
+            ),
           limit: (count: number) =>
             wrap(
               pending.limit(count) as IRecordQuery<T, TContext, TMethods>,
@@ -155,16 +280,6 @@ export function createEntityQuery<
             )
         }
       },
-      all: (ctx?: TContext): Promise<T[]> =>
-        input.run(() => prepare(query, limit, explicit).all(ctx), plan, {
-          ...selection,
-          onInvalid: invalid
-        }),
-      stream: (ctx?: TContext): IStorageIterator<T> =>
-        input.stream(() => prepare(query, limit, explicit).stream(ctx), plan, {
-          ...selection,
-          onInvalid: invalid
-        }),
       onInvalid: (action: IInvalidRecordAction | IInvalidRecordHandler<T>) => {
         input.invalid(action)
         return wrap(query, limit, explicit, plan, action)

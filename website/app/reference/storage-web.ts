@@ -576,6 +576,34 @@ console.error(error.source, error.code)`,
             'The logical key, or undefined for a nonmatching namespace. The default codec also treats malformed encoded namespace text as nonmatching, so enumeration skips it without deleting foreign physical data.',
             '返回逻辑键；其他命名空间返回空值。默认编码器还把损坏的命名空间编码视为不匹配，枚举时跳过且不删除无关物理数据。'
           )
+        },
+        encodeStorageKey: {
+          summary: t(
+            'Optionally encodes typed batch keys without colliding with the original string layout; provide it with decodeStorageKey.',
+            '可选地编码结构批量键，并与原字符串布局隔离；必须与 decodeStorageKey 成对提供。'
+          ),
+          params: {
+            namespace: t('The original configured namespace.', '原配置命名空间。'),
+            key: t(
+              'A canonical IStorageKey captured by the key owner.',
+              '由共享键拥有者捕获的规范 IStorageKey。'
+            )
+          },
+          returns: t('The physical key string.', '物理键字符串。')
+        },
+        decodeStorageKey: {
+          summary: t(
+            'Optionally identifies both string and typed entries for namespace cleanup; missing support rejects non-string batch reads before native I/O.',
+            '可选地识别字符串和结构键供命名空间清理使用；缺少支持时，非字符串批量读取在原生 I/O 前拒绝。'
+          ),
+          params: {
+            namespace: t('The original configured namespace.', '原配置命名空间。'),
+            physicalKey: t('One visible physical storage key.', '一个可见的物理存储键。')
+          },
+          returns: t(
+            'An IStorageKey, or undefined for a foreign or malformed entry.',
+            'IStorageKey；不属于该命名空间或格式损坏时返回空值。'
+          )
         }
       }
     },
@@ -985,6 +1013,22 @@ console.error(error.source, error.code)`,
         namespaceCodecDecodeInvalid: t(
           'A namespace decoder returned neither a string key nor undefined for another namespace.',
           '命名空间解码器既未返回字符串键，也未以空值表示其他命名空间。'
+        ),
+        namespaceTypedCodecInvalid: t(
+          'Typed namespace support supplies only one direction or a non-callable method.',
+          '结构键命名空间支持只提供一个方向，或提供了不可调用的方法。'
+        ),
+        namespaceCodecInvalid: t(
+          'The original namespace codec lacks callable encode and decode methods.',
+          '原命名空间编码器缺少可调用的 encode 和 decode。'
+        ),
+        namespaceKeyInvalid: t(
+          'String-key encoding received a non-string namespace or key.',
+          '字符串键编码收到非字符串的命名空间或键。'
+        ),
+        namespacePhysicalKeyInvalid: t(
+          'Namespace decoding received a non-string namespace or physical key.',
+          '命名空间解码收到非字符串的命名空间或物理键。'
         ),
         webStorageInjectionInvalid: t(
           'Injected Web Storage lacks part of the required storage interface.',

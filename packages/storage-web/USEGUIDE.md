@@ -63,6 +63,14 @@ try {
 
 写选项接受有效的 `expires: Date` 或整数 `maxAge`，已到期写入删除 Cookie。4096 字节上限覆盖包括属性的完整赋值。同名 Cookie 在多个 scope 同时可见时报 `COOKIE_SCOPE_AMBIGUOUS`，普通写入后不可见时报 `WRITE_FAILED`。JS 无法观察 HttpOnly 条目，也不能保证删除服务端 Cookie。
 
+## 批量 KV 与结构键
+
+通过 `store.use(kv)` 调用 `getMany(keys)`、`setMany(entries)`、`removeMany(keys)` 和 `removeByPrefix(prefix)`。IndexedDB 的每次非空批量调用只进入一次管线并使用一个原生事务；中途通道冲突使整批回滚。`getMany` 保留重复位置与缺失的 `undefined`；`removeMany` 对规范等价键只计一次。`setMany` 的重复规范键在任何 I/O 前报 `INVALID_ARGUMENT`；携带 `ttlMs` 还要求后端声明 TTL 能力。空批直接返回，不触发管线、hooks 或原生请求。
+
+文本 Web 后端使用同步原生读取处理 `getMany`，Cookie 从一次可见 header 快照读取整批。未配置 WAL 时，多键写入和前缀删除在修改前报 `UNSUPPORTED_CAPABILITY`，不能依靠逐个公开 `set` 组成原子批量。
+
+默认 namespace codec 保留原字符串 `sw1` 格式；非字符串批量键以顶层 `sw2` 格式区分，键内容复用共享规范编码。任意旧字符串键均不会与结构键碰撞。`keys()` 保持 `string[]`，命名空间 clear 同时删除该命名空间的两种布局。自定义 `INamespaceCodec` 可以增加 `encodeStorageKey(namespace,key)` 与 `decodeStorageKey(namespace,physicalKey)`；两者必须成对提供并保证跨键类型不碰撞。缺少这两个接点时，新的非字符串批量读取在任何原生 I/O 前报 `UNSUPPORTED_CAPABILITY`，原字符串布局和调用保持。
+
 ## 原生 IndexedDB 事务
 
 ```ts

@@ -85,6 +85,94 @@ it('retains the complete unawaited transaction query and mapper under the origin
   await expect(saved.all()).rejects.toMatchObject({ code: 'TRANSACTION_FAILED' })
 })
 
+it('forwards selected scalar and callback terminals through the same entity source', async () => {
+  const repo = rows.connect(await memoryBackend())
+  await repo.put({ id: 'a', group: 'one', score: 2 })
+  await repo.put({ id: 'b', group: 'one', score: 4 })
+  await repo.put({ id: 'c', group: 'two', score: 99 })
+  const query = repo.query().index('group', 'one').select('id', 'score')
+  expect(await query.first()).toEqual({ id: 'a', score: 2 })
+  expect(await query.maybe()).toEqual({ some: true, value: { id: 'a', score: 2 } })
+  expect(await query.firstOrThrow()).toEqual({ id: 'a', score: 2 })
+  expect(await query.pluck('id')).toEqual(['a', 'b'])
+  expect(await query.exists()).toBe(true)
+  expect(await query.count()).toBe(2)
+  const seen: unknown[] = []
+  expect(
+    await query.each((row, index) => {
+      seen.push([row.id, index])
+    })
+  ).toBe(2)
+  expect(seen).toEqual([
+    ['a', 0],
+    ['b', 1]
+  ])
+  const chunks: unknown[] = []
+  expect(
+    await query.chunk(1, (batch) => {
+      chunks.push(batch.map((row) => row.id))
+    })
+  ).toBe(2)
+  expect(chunks).toEqual([['a'], ['b']])
+  expect(await query.min('score')).toEqual({ some: true, value: 2 })
+  expect(await query.max('score')).toEqual({ some: true, value: 4 })
+  expect(await query.sum('score')).toBe(6)
+  expect(await query.avg('score')).toEqual({ some: true, value: 3 })
+  expect(await repo.query().index('group', 'missing').maybe()).toEqual({ some: false })
+  await expect(repo.query().index('group', 'missing').firstOrThrow()).rejects.toMatchObject({
+    code: 'QUERY_EMPTY_RESULT'
+  })
+  expect(
+    await repo
+      .query()
+      .orderByComparator((left, right) => right.score - left.score)
+      .first()
+  ).toMatchObject({ id: 'c' })
+})
+
+it('drains unawaited each callbacks and admits invalid terminals under the original transaction owner', async () => {
+  const store = await memoryBackend()
+  const repo = rows.connect(store)
+  await repo.put({ id: 'a', group: 'one', score: 1 })
+  const entered = deferred<void>()
+  const release = deferred<void>()
+  let accepted!: Promise<number>
+  let saved!: ReturnType<ReturnType<typeof repo.in>['query']>
+  const pending = store.transaction((scope) => {
+    saved = repo.in(scope).query()
+    accepted = saved.each(async () => {
+      entered.resolve()
+      await release.promise
+    })
+  })
+  await entered.promise
+  let done = false
+  void pending.then(() => {
+    done = true
+  })
+  await Promise.resolve()
+  expect(done).toBe(false)
+  release.resolve()
+  await expect(accepted).resolves.toBe(1)
+  await pending
+  await expect(saved.chunk(0, () => {})).rejects.toMatchObject({ code: 'TRANSACTION_FAILED' })
+  const failed = await store
+    .transaction(async (scope) => {
+      const bound = repo.in(scope)
+      await expect(bound.query().chunk(0, () => {})).rejects.toMatchObject({
+        code: 'INVALID_ARGUMENT'
+      })
+      await bound.put({ id: 'b', group: 'one', score: 2 }).catch(() => undefined)
+    })
+    .catch((cause) => cause)
+  expect(
+    walkErrorCauses(failed).some(
+      (cause) => (cause as { code?: string }).code === 'INVALID_ARGUMENT'
+    )
+  ).toBe(true)
+  expect(await repo.get('b')).toBeUndefined()
+})
+
 it('keeps a mapped stream advance active until disposal can drain it', async () => {
   const store = await memoryBackend()
   const repo = rows.connect(store)
@@ -193,10 +281,11 @@ it('inherits installed query methods through the same original storage cell', as
 })
 
 it('applies the default bounded comparator before limit and projection', async () => {
+  const compare = vi.fn((left: IRow, right: IRow) => right.score - left.score)
   const repo = defineEntity<IRow>({
     name: 'default-order',
     key: 'id',
-    defaultOrderBy: (left, right) => right.score - left.score
+    defaultOrderBy: compare
   }).connect(await memoryBackend())
   for (const [id, score] of [
     ['a', 1],
@@ -206,6 +295,27 @@ it('applies the default bounded comparator before limit and projection', async (
     await repo.put({ id, score, group: 'one' })
   expect(await repo.query().limit(1).all()).toEqual([{ id: 'c', score: 99, group: 'one' }])
   expect(await repo.query().limit(1).select('id').all()).toEqual([{ id: 'c' }])
+  expect(await repo.query().limit(2).first()).toEqual({ id: 'c', score: 99, group: 'one' })
+  expect(await repo.query().first()).toEqual({ id: 'c', score: 99, group: 'one' })
+  compare.mockClear()
+  expect(await repo.query().count()).toBe(3)
+  expect(await repo.query().limit(1).count()).toBe(1)
+  const mapper = vi.fn((row: IRow) => row.id)
+  expect(await repo.query().select(mapper).count()).toBe(3)
+  expect(await repo.query().limit(2).select(mapper).count()).toBe(2)
+  expect(await repo.query().orderByComparator(compare).limit(1).select(mapper).count()).toBe(1)
+  expect(compare).not.toHaveBeenCalled()
+  expect(mapper).not.toHaveBeenCalled()
+  expect(() => repo.query().select(mapper).all()).toThrowError(
+    expect.objectContaining({ code: 'INVALID_CONFIG' })
+  )
+  expect(await repo.query().select('id').first()).toEqual({ id: 'c' })
+  await expect(repo.query().limit(1).select('id').requirePushdown().count()).rejects.toMatchObject({
+    code: 'QUERY_NOT_PUSHABLE'
+  })
+  expect(() => repo.query().select(4 as never)).toThrowError(
+    expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+  )
 })
 
 it('observes a rejected comparator thenable before rejecting its synchronous contract', async () => {
@@ -269,4 +379,10 @@ it('applies one invalid-record policy to index projection failures in root and t
     )
     .catch((cause) => cause)
   expect(walkErrorCauses(failed)).toContain(original)
+  const terminalFailure = await store
+    .transaction((scope) =>
+      repo.in(scope).query().index('selected', 'one').onInvalid('throw').select('id').first()
+    )
+    .catch((cause) => cause)
+  expect(walkErrorCauses(terminalFailure)).toContain(original)
 })

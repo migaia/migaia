@@ -19,6 +19,7 @@ export { isStorageKeyInRange } from '../core/query.js'
 export { safeJsonPayloadByteLength } from '../core/json.js'
 export { createStorageToken } from '../core/storage-token.js'
 export { resolveStorageNamespace } from '../core/namespace.js'
+export { observeStorageBatch } from '../core/batch-observation.js'
 export { planChannelWrite } from '../core/channel-write.js'
 export type {
   IChannelPresence,

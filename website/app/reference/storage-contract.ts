@@ -1373,6 +1373,69 @@ export const storageContractReference: ILibraryReference = {
       example: storageContractCases.createRecordQuery![0]!.example,
       cases: storageContractCases.createRecordQuery
     },
+    createVectorQuery: {
+      role: 'factory',
+      purpose: t(
+        'Create an immutable pre-topK vector builder over the native ranking cursor.',
+        '在原生排名游标上创建 topK 前的不可变向量 builder。'
+      ),
+      params: {
+        source: t(
+          'IVectorQuerySource captures native support, execute, optional exact/groupBy and the original resource key.',
+          'IVectorQuerySource 捕获原生支持、execute、可选 exact/groupBy 与原资源键。'
+        ),
+        methods: t(
+          'Optional original pure Feature functions; reserved names reject before I/O.',
+          '可选的原 Feature 纯函数；保留名冲突在 I/O 前拒绝。'
+        )
+      },
+      returns: t(
+        'IVectorQueryBuilder; topK enables shared reads. Native filters cross payload callbacks before ranking; callbacks never refill hits.',
+        '返回 IVectorQueryBuilder；topK 开启共享读取。原生过滤跨 payload 回调在排名前执行；回调不补搜命中。'
+      ),
+      example: storageContractCases.createVectorQuery![0]!.example,
+      cases: storageContractCases.createVectorQuery
+    },
+    createRdfQuery: {
+      role: 'factory',
+      purpose: t(
+        'Create a ground RDF read query with ordered native traversal steps.',
+        '创建带有序原生遍历步骤的 ground RDF 读取查询。'
+      ),
+      params: {
+        source: t(
+          'IRdfQuerySource returns its original storage iterator from the ordered safe native prefix.',
+          'IRdfQuerySource 按有序安全原生前缀返回原 storage iterator。'
+        ),
+        pattern: t(
+          'Canonical partial ground quad; omitted graph matches all graphs.',
+          '规范部分 ground quad；省略 graph 匹配所有 graph。'
+        ),
+        methods: t('Optional original pure Feature functions.', '可选的原 Feature 纯函数。')
+      },
+      returns: t(
+        'IRdfQuery with common reads, projection, limit and native follow/inverse. Client traversal, pages and writes remain subsequent units.',
+        '返回 IRdfQuery，支持共享读取、投影、limit 与原生 follow/inverse；客户端遍历、分页与写入仍待后续单元。'
+      ),
+      example: storageContractCases.createRdfQuery![0]!.example,
+      cases: storageContractCases.createRdfQuery
+    },
+    VectorQueryMethod: {
+      role: 'constant',
+      purpose: t(
+        'Canonical reserved shared and vector query methods.',
+        '共享与向量查询的规范保留方法。'
+      ),
+      example: 'console.log(VectorQueryMethod.topK, VectorQueryMethod.withVector)'
+    },
+    RdfQueryMethod: {
+      role: 'constant',
+      purpose: t(
+        'Canonical reserved shared and RDF traversal methods.',
+        '共享与 RDF 遍历的规范保留方法。'
+      ),
+      example: 'console.log(RdfQueryMethod.follow, RdfQueryMethod.inverse)'
+    },
     RecordQueryMethod: {
       role: 'constant',
       purpose: t(
@@ -2956,6 +3019,240 @@ console.log(candidate.name, candidate.output)`
         operations: { summary: t('Supported native operations.', '支持的原生操作。') },
         source: { summary: t('Stable source label.', '稳定数据源标签。') },
         index: { summary: t('Optional native index label.', '可选原生索引标签。') }
+      }
+    },
+    IVectorHit: {
+      summary: t(
+        'Native score/id/payload hit; withVector conditionally adds its vector.',
+        '原生 score/id/payload 命中；withVector 条件加入 vector。'
+      ),
+      members: {
+        id: { summary: t('Original point identifier.', '原点标识。') },
+        score: { summary: t('Native score in engine result order.', '引擎结果顺序中的原生分数。') },
+        payload: { summary: t('Optional original point payload.', '可选原点 payload。') },
+        vector: {
+          summary: t('Present in the type only after withVector.', '仅 withVector 后出现在类型中。')
+        }
+      }
+    },
+    IVectorQueryBuilderCore: {
+      summary: t(
+        'Pre-topK condition, threshold and vector-return controls.',
+        'topK 前的条件、阈值与向量返回控制。'
+      ),
+      members: {
+        where: {
+          summary: t('Append payload conditions without I/O.', '无 I/O 追加 payload 条件。')
+        },
+        minScore: {
+          summary: t('Declare the final finite native threshold.', '声明最终有限原生阈值。')
+        },
+        withVector: { summary: t('Enable vector-return result typing.', '开启向量返回结果类型。') },
+        requirePushdown: {
+          summary: t('Require a fully native plan before execution.', '执行前要求全原生计划。')
+        },
+        topK: {
+          summary: t(
+            'Declare a positive safe bound and enable reads.',
+            '声明正安全上限并开启读取。'
+          )
+        }
+      }
+    },
+    IVectorQueryBuilder: {
+      summary: t(
+        'Pre-topK core intersected with original Feature methods.',
+        'topK 前核心与原 Feature 方法的交集。'
+      ),
+      members: {
+        topK: {
+          summary: t(
+            'Transition to a bounded query while retaining Feature methods.',
+            '转入有界查询并保留 Feature 方法。'
+          )
+        }
+      }
+    },
+    IVectorQueryBase: {
+      summary: t(
+        'Bounded shared reads without record statistics or arbitrary ordering.',
+        '有界共享读取，不含记录统计或任意排序。'
+      ),
+      members: {
+        all: {
+          summary: t(
+            'Read bounded native hits with original cursor cleanup.',
+            '读取有界原生命中并清理原游标。'
+          )
+        },
+        where: {
+          summary: t(
+            'Filter payload through the shared condition dispatcher.',
+            '通过共享条件分派过滤 payload。'
+          )
+        },
+        select: {
+          summary: t(
+            'Project hits once; record statistics remain absent.',
+            '一次投影命中，仍无记录统计。'
+          )
+        },
+        topK: {
+          summary: t('Refine the final native bound immutably.', '不可变细化最终原生上限。')
+        },
+        minScore: { summary: t('Refine the native score threshold.', '细化原生分数阈值。') },
+        withVector: { summary: t('Enable vector-bearing hit types.', '开启带 vector 的命中类型。') }
+      }
+    },
+    IVectorQuery: {
+      summary: t(
+        'Bounded vector query with grouping only when explicitly declared.',
+        '有界向量查询，仅显式声明时提供分组。'
+      ),
+      members: {
+        groupBy: {
+          summary: t(
+            'Conditionally group original topK hits by own scalar payload fields.',
+            '条件提供按 payload 自有标量字段对原 topK 命中分组。'
+          )
+        }
+      }
+    },
+    IVectorQueryInput: {
+      summary: t(
+        'Native pre-ranking conditions, topK, minScore, withVector and captured context.',
+        '原生排名前条件、topK、minScore、withVector 与捕获上下文。'
+      ),
+      members: {
+        conditions: {
+          summary: t(
+            'All translatable pre-ranking payload conditions.',
+            '全部可译排名前 payload 条件。'
+          )
+        },
+        topK: {
+          summary: t('Final positive safe native ranking bound.', '最终正安全原生排名上限。')
+        },
+        minScore: {
+          summary: t('Optional final native score threshold.', '可选最终原生分数阈值。')
+        },
+        withVector: {
+          summary: t('Whether native hits include vectors.', '原生命中是否包含向量。')
+        },
+        ctx: { summary: t('Captured original operation context.', '捕获的原操作上下文。') }
+      }
+    },
+    IVectorQuerySource: {
+      summary: t(
+        'Native ranking callback and captured support/resource facts.',
+        '原生排名回调与捕获的支持、资源事实。'
+      ),
+      members: {
+        pushdown: {
+          summary: t('Original native operation/operator support.', '原生操作及操作符支持。')
+        },
+        execute: {
+          summary: t('Open the original ranked storage iterator.', '打开原排名 storage iterator。')
+        },
+        asyncDisposeKey: {
+          summary: t('Optional original resource cleanup key.', '可选原资源清理键。')
+        },
+        exact: { summary: t('Explicit full-scan explanation fact.', '显式 fullScan 解释事实。') },
+        groupBy: {
+          summary: t(
+            'Declare standard topK scalar grouping support.',
+            '声明标准 topK 标量分组支持。'
+          )
+        }
+      }
+    },
+    IRdfQueryCore: {
+      summary: t(
+        'Ground quad reads, one projection, limit and native traversal.',
+        'ground quad 读取、一次投影、limit 与原生遍历。'
+      ),
+      members: {
+        where: { summary: t('Append shared quad binding conditions.', '追加共享 quad 绑定条件。') },
+        select: { summary: t('Project quad bindings once.', '一次投影 quad 绑定。') },
+        limit: {
+          summary: t('Declare a nonnegative safe streaming bound.', '声明非负安全流式上限。')
+        },
+        follow: {
+          summary: t(
+            'Append a ground forward predicate/target step.',
+            '追加 ground 正向 predicate/target 步骤。'
+          )
+        },
+        inverse: {
+          summary: t('Append a ground inverse predicate step.', '追加 ground 反向 predicate 步骤。')
+        }
+      }
+    },
+    IRdfQuery: {
+      summary: t(
+        'Ground RDF core intersected with original Feature methods.',
+        'ground RDF 核心与原 Feature 方法的交集。'
+      ),
+      members: {
+        follow: {
+          summary: t(
+            'Retain the RDF query and original Feature extension.',
+            '保留 RDF 查询与原 Feature 扩展。'
+          )
+        }
+      }
+    },
+    IRdfQueryTraversal: {
+      summary: t(
+        'Ordered ground forward/inverse predicate and optional target.',
+        '有序 ground 正向或反向 predicate 与可选目标。'
+      ),
+      members: {
+        operation: {
+          summary: t('Canonical follow or inverse operation.', '规范 follow 或 inverse 操作。')
+        },
+        predicate: {
+          summary: t('Captured ground named predicate.', '捕获的 ground named predicate。')
+        },
+        target: {
+          summary: t('Optional captured ground forward target.', '可选捕获的 ground 正向目标。')
+        }
+      }
+    },
+    IRdfQueryInput: {
+      summary: t(
+        'Ground pattern, ordered native prefix steps and captured context.',
+        'ground pattern、有序原生前缀步骤与捕获上下文。'
+      ),
+      members: {
+        pattern: {
+          summary: t(
+            'Captured partial ground match; omitted graph matches all graphs.',
+            '捕获的部分 ground 匹配，省略 graph 匹配所有 graph。'
+          )
+        },
+        steps: {
+          summary: t(
+            'Safe native prefix in original declaration order.',
+            '原声明顺序的安全原生前缀。'
+          )
+        },
+        ctx: { summary: t('Captured original operation context.', '捕获的原操作上下文。') }
+      }
+    },
+    IRdfQuerySource: {
+      summary: t(
+        'Original native RDF iterator callback and support/resource facts.',
+        '原生 RDF 原迭代器回调与支持、资源事实。'
+      ),
+      members: {
+        pushdown: {
+          summary: t('Original native traversal/operator support.', '原生遍历及操作符支持。')
+        },
+        execute: {
+          summary: t('Open the original quad storage iterator.', '打开原 quad storage iterator。')
+        },
+        asyncDisposeKey: { summary: t('Optional original cleanup key.', '可选原清理键。') }
       }
     },
     IQueryRead: {

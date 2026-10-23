@@ -955,6 +955,40 @@ console.log([...encodeOrderedStorageKey([''], 'memory')].join(','))
       )
     }
   ],
+  createVectorQuery: [
+    {
+      title: t('Bind a native ranked source to the shared query', '把原生排名数据源接入共享查询'),
+      problem: t(
+        'Keep filtering before native ranking while using one shared client reader.',
+        '原生排名前过滤，并复用同一个客户端读取器。'
+      ),
+      example: t(
+        "import { createVectorQuery, type IVectorQuerySource } from '@migaia/storage-contract'\nfunction ranked(execute: IVectorQuerySource<{ enabled: boolean }>['execute']) {\n  const builder = createVectorQuery({ pushdown: { source: 'engine', index: 'ann', operators: ['eq'], operations: ['where', 'topK', 'minScore'] }, execute })\n  return [builder.topK(1), builder.where({ enabled: true }).topK(5), builder.withVector().minScore(0.5).topK(3)]\n}\n// Each result uses the supplied native cursor; construction performs no I/O.",
+        "import { createVectorQuery, type IVectorQuerySource } from '@migaia/storage-contract'\nfunction ranked(execute: IVectorQuerySource<{ enabled: boolean }>['execute']) {\n  const builder = createVectorQuery({ pushdown: { source: 'engine', index: 'ann', operators: ['eq'], operations: ['where', 'topK', 'minScore'] }, execute })\n  return [builder.topK(1), builder.where({ enabled: true }).topK(5), builder.withVector().minScore(0.5).topK(3)]\n}\n// 每个结果复用提供的原生游标；构建不执行 I/O。"
+      ),
+      result: t(
+        'Returns three independent bounded queries; only withVector adds vector to its hit type.',
+        '返回三条独立有界查询，只有 withVector 在命中类型中加入 vector。'
+      )
+    }
+  ],
+  createRdfQuery: [
+    {
+      title: t('Bind ground RDF traversal to its original cursor', '把 ground RDF 遍历接入原游标'),
+      problem: t(
+        'Capture ground patterns and pass ordered native traversal steps without another query runner.',
+        '捕获 ground pattern，传递有序原生遍历步骤，不建立另一查询执行器。'
+      ),
+      example: t(
+        "import { createRdfQuery, term, type IRdfQuerySource } from '@migaia/storage-contract'\nfunction linked(execute: IRdfQuerySource['execute']) {\n  const source = { pushdown: { source: 'rdf', operators: [], operations: ['follow', 'inverse'] as const }, execute }\n  return [createRdfQuery(source, {}), createRdfQuery(source, { subject: term.iri('urn:a') }).follow(term.iri('urn:knows')), createRdfQuery(source, { graph: term.defaultGraph }).inverse(term.iri('urn:parent'))]\n}\n// Construction only captures immutable patterns and steps.",
+        "import { createRdfQuery, term, type IRdfQuerySource } from '@migaia/storage-contract'\nfunction linked(execute: IRdfQuerySource['execute']) {\n  const source = { pushdown: { source: 'rdf', operators: [], operations: ['follow', 'inverse'] as const }, execute }\n  return [createRdfQuery(source, {}), createRdfQuery(source, { subject: term.iri('urn:a') }).follow(term.iri('urn:knows')), createRdfQuery(source, { graph: term.defaultGraph }).inverse(term.iri('urn:parent'))]\n}\n// 构建仅捕获不可变 pattern 与步骤。"
+      ),
+      result: t(
+        'Returns match, forward and inverse queries with the original native resource owner.',
+        '返回 match、正向与反向查询，保留原生资源 owner。'
+      )
+    }
+  ],
   fromValueCodec: [
     {
       title: t('Adapt the shared collection codec for storage', '把共享集合 codec 适配到存储'),

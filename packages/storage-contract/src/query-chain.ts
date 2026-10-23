@@ -24,6 +24,7 @@ import { createStorageIteratorLifetime, type IStorageIterator } from './resource
 import { snapshotOperationContext } from './operation-context.js'
 import { runTransactionIteratorOperation, deriveTransactionIterator } from './transaction.js'
 import { compareStorageKeys, snapshotStorageKey } from './key.js'
+import { snapshotStorageRdfPattern, type IQuad, type IRdfNamedNode } from './capabilities/rdf.js'
 
 /** Declarative field operators are shared by condition admission, native plans and client execution. */
 export const QueryOperator = Object.freeze({
@@ -535,6 +536,96 @@ export type IRecordQuery<
   TContext extends IOperationContext | undefined = IOperationContext,
   TAugmentMethods extends object = Record<never, never>
 > = IRecordQueryCore<T, TContext, TAugmentMethods> & TAugmentMethods
+/** Ranked hits omit their potentially large vector until the chain explicitly requests it. */
+export type IVectorHit<TPayload, TWithVector extends boolean = false> = {
+  readonly id: string
+  readonly score: number
+  readonly payload?: TPayload
+} & (TWithVector extends true ? { readonly vector: readonly number[] } : Record<never, never>)
+/** Vector builders expose no read terminal until a finite topK has been declared. */
+export interface IVectorQueryBuilderCore<
+  TPayload,
+  TGroupable extends boolean = false,
+  TWithVector extends boolean = false,
+  TAugmentMethods extends object = Record<never, never>
+> {
+  where(condition: IWhere<TPayload>): this
+  where<P extends IObjectPath<TPayload>, O extends keyof IFieldOps<IObjectPathValue<TPayload, P>>>(
+    path: P,
+    operator: O,
+    value: IQueryOperand<IObjectPathValue<TPayload, P>, NoInfer<O>>
+  ): this
+  where(predicate: (payload: TPayload) => boolean): this
+  minScore(score: number): this
+  withVector(): IVectorQueryBuilder<TPayload, TGroupable, true, TAugmentMethods>
+  requirePushdown(): this
+  topK(count: number): IVectorQuery<TPayload, TGroupable, TWithVector, TAugmentMethods>
+}
+/** A bounded vector query retains score ordering and deliberately has no record statistics. */
+export interface IVectorQueryBase<
+  TPayload,
+  TGroupable extends boolean,
+  TWithVector extends boolean,
+  TAugmentMethods extends object = Record<never, never>
+> extends IQueryChain<
+  IVectorHit<TPayload, TWithVector>,
+  IOperationContext,
+  TPayload,
+  false,
+  TAugmentMethods
+> {
+  topK(count: number): this
+  minScore(score: number): this
+  withVector(): IVectorQuery<TPayload, TGroupable, true, TAugmentMethods>
+}
+/** Backend augmentation remains available during the pre-topK type state. */
+export type IVectorQueryBuilder<
+  TPayload,
+  TGroupable extends boolean = false,
+  TWithVector extends boolean = false,
+  TAugmentMethods extends object = Record<never, never>
+> = IVectorQueryBuilderCore<TPayload, TGroupable, TWithVector, TAugmentMethods> & TAugmentMethods
+/** Grouping is available only when the source explicitly declares the standard grouping contract. */
+export type IVectorQuery<
+  TPayload,
+  TGroupable extends boolean = false,
+  TWithVector extends boolean = false,
+  TAugmentMethods extends object = Record<never, never>
+> = IVectorQueryBase<TPayload, TGroupable, TWithVector, TAugmentMethods> &
+  TAugmentMethods &
+  (TGroupable extends true
+    ? {
+        groupBy<K extends Extract<keyof TPayload, string>>(
+          field: K,
+          options: { readonly perGroup: number }
+        ): IQueryResult<
+          {
+            readonly group: TPayload[K]
+            readonly hits: readonly IVectorHit<TPayload, TWithVector>[]
+          },
+          IOperationContext,
+          false,
+          TAugmentMethods
+        >
+      }
+    : Record<never, never>)
+/** Ground RDF traversals keep quad bindings and reuse the ordinary projection/read terminals. */
+export interface IRdfQueryCore<
+  TContext extends IOperationContext | undefined = IOperationContext,
+  TAugmentMethods extends object = Record<never, never>
+>
+  extends
+    IQueryChain<IQuad, TContext, IQuad, true, TAugmentMethods>,
+    IQueryStatistics<IQuad, TContext> {
+  limit(count: number): this
+  follow(predicate: IRdfNamedNode, target?: IRdfNamedNode): this
+  inverse(predicate: IRdfNamedNode): this
+}
+/** RDF Feature extensions preserve their original function identity across every branch. */
+export type IRdfQuery<
+  TContext extends IOperationContext | undefined = IOperationContext,
+  TAugmentMethods extends object = Record<never, never>
+> = IRdfQueryCore<TContext, TAugmentMethods> & TAugmentMethods
 /** Implemented record methods are reserved by the original owner before Feature admission. */
 export const RecordQueryMethod = Object.freeze({
   where: 'where',
@@ -558,8 +649,25 @@ export const RecordQueryMethod = Object.freeze({
   limit: 'limit',
   orderByComparator: 'orderByComparator'
 } as const)
+/** Vector Feature admission reserves the same shared terminals plus its family refinements. */
+export const VectorQueryMethod = Object.freeze({
+  ...RecordQueryMethod,
+  topK: 'topK',
+  minScore: 'minScore',
+  withVector: 'withVector',
+  groupBy: 'groupBy'
+} as const)
+/** RDF Feature admission reserves traversal methods before returning any native source. */
+export const RdfQueryMethod = Object.freeze({
+  ...RecordQueryMethod,
+  follow: 'follow',
+  inverse: 'inverse'
+} as const)
 /** Captures only pure Feature methods and rejects collisions before source or cursor admission. */
-function snapshotRecordQueryMethods<T extends object>(methods: T | undefined): T | undefined {
+function snapshotRecordQueryMethods<T extends object>(
+  methods: T | undefined,
+  reserved: object = RecordQueryMethod
+): T | undefined {
   if (methods === undefined) return undefined
   try {
     if (
@@ -571,7 +679,7 @@ function snapshotRecordQueryMethods<T extends object>(methods: T | undefined): T
     const captured = { ...methods } as T
     for (const key of Reflect.ownKeys(captured))
       if (
-        (typeof key === 'string' && Object.hasOwn(RecordQueryMethod, key)) ||
+        (typeof key === 'string' && Object.hasOwn(reserved, key)) ||
         typeof Reflect.get(captured, key) !== 'function'
       )
         throw new TypeError(StorageContractErrorText.queryArgument)
@@ -593,6 +701,57 @@ export type IRecordQuerySource = {
     readonly ctx: IOperationContext | undefined
   }) => IStorageIterator<readonly [IStorageKey, unknown]>
 }
+/** Native vector ranking receives declarative payload filters before it chooses its bounded hits. */
+export type IVectorQueryInput = {
+  readonly conditions: readonly IQueryCondition[]
+  readonly topK: number
+  readonly minScore: number | undefined
+  readonly withVector: boolean
+  readonly ctx: IOperationContext | undefined
+}
+/** Backend vector engines own scoring, organization/TTL filtering and score/id ranking. */
+export type IVectorQuerySource<TPayload, TGroupable extends boolean = false> = {
+  readonly pushdown: IQueryPushdown
+  readonly asyncDisposeKey?: typeof Symbol.asyncDispose
+  readonly exact?: boolean
+  readonly groupBy?: TGroupable
+  readonly execute: (
+    input: IVectorQueryInput
+  ) => IStorageIterator<readonly [IStorageKey, IVectorHit<TPayload, boolean>]>
+}
+/**
+ * A forward step matches the current named object to the next subject in the same graph, then
+ * applies its predicate and optional named object target. An inverse step matches the current
+ * subject to the preceding object's identity in the same graph. Literal objects have no forward
+ * step. Each step returns the matching ground quads and retains its ordered safe-prefix position.
+ */
+export type IRdfQueryTraversal = {
+  readonly operation: typeof QueryOperation.follow | typeof QueryOperation.inverse
+  readonly predicate: IRdfNamedNode
+  readonly target?: IRdfNamedNode
+}
+/** Native RDF execution receives only the same safe prefix that explain reports. */
+export type IRdfQueryInput = {
+  readonly pattern: Readonly<Partial<IQuad>>
+  readonly steps: readonly (
+    | IRdfQueryTraversal
+    | {
+        readonly operation: typeof QueryOperation.where
+        readonly condition: IQueryCondition
+      }
+    | {
+        readonly operation: typeof QueryOperation.select
+        readonly fields: readonly string[]
+      }
+  )[]
+  readonly ctx: IOperationContext | undefined
+}
+/** RDF sources keep their original indexed/remote cursor and original operation lifetime. */
+export type IRdfQuerySource = {
+  readonly pushdown: IQueryPushdown
+  readonly asyncDisposeKey?: typeof Symbol.asyncDispose
+  readonly execute: (input: IRdfQueryInput) => IStorageIterator<readonly [IStorageKey, IQuad]>
+}
 /** Nodes retain only their immediate predecessor, so deriving a branch never copies its history. */
 type IQueryNode = {
   readonly previous: IQueryNode | undefined
@@ -612,6 +771,14 @@ type IQueryNode = {
         readonly operation: typeof QueryOperation.mapper
         readonly mapper: (row: unknown) => unknown
       }
+    | { readonly operation: typeof QueryOperation.topK; readonly count: number }
+    | { readonly operation: typeof QueryOperation.minScore; readonly score: number }
+    | IRdfQueryTraversal
+    | {
+        readonly operation: typeof QueryOperation.groupBy
+        readonly field: string
+        readonly perGroup: number
+      }
 }
 /** Captured author facts and methods remain independent of later source getter mutation. */
 type IQuerySourceSnapshot = {
@@ -620,6 +787,12 @@ type IQuerySourceSnapshot = {
   readonly tieBreakByKey: IRecordQuerySource['tieBreakByKey']
   readonly execute: IRecordQuerySource['execute']
   readonly receiver: IRecordQuerySource
+  readonly vector?: {
+    readonly withVector: boolean
+    readonly exact: boolean
+    readonly groupBy: boolean
+  }
+  readonly rdf?: { readonly pattern: Readonly<Partial<IQuad>> }
 }
 /** Canonical key directions apply only to explicit comparator tie resolution. */
 const QueryKeyDirection = { next: 'next', prev: 'prev' } as const
@@ -762,7 +935,8 @@ function queryConditionReason(
 /** Flattens history once and keeps the longest semantically safe native record prefix. */
 function planRecordQuery(
   source: IQuerySourceSnapshot,
-  node: IQueryNode | undefined
+  node: IQueryNode | undefined,
+  countOnly = false
 ): IRecordExecutionPlan {
   /** One reverse traversal avoids repeated prefix allocation during fluent construction. */
   const steps: IQueryNode['step'][] = []
@@ -788,15 +962,34 @@ function planRecordQuery(
   /** A reason is attached to each client step, including later safe-prefix boundaries. */
   const clientSteps: IQueryPlanStep[] = []
   for (const step of steps) {
-    /** A prior client node is a barrier for every subsequent record operation. */
+    /** Cardinality keeps conditions and page controls without evaluating output-only callbacks. */
+    if (
+      countOnly &&
+      (step.operation === QueryOperation.comparator ||
+        step.operation === QueryOperation.select ||
+        step.operation === QueryOperation.mapper)
+    )
+      continue
+    /** Vector filters/ranking cross payload callbacks; record/RDF retain their safe prefix. */
+    const vectorNative =
+      source.vector !== undefined &&
+      (step.operation === QueryOperation.where ||
+        step.operation === QueryOperation.topK ||
+        step.operation === QueryOperation.minScore)
+    /** A prior client node is a barrier for every subsequent record/RDF operation. */
     const reason =
-      client.length > 0
+      client.length > 0 && !vectorNative
         ? StorageContractErrorText.queryPrefix
         : step.operation === QueryOperation.predicate ||
             step.operation === QueryOperation.mapper ||
-            step.operation === QueryOperation.comparator
-          ? StorageContractErrorText.queryFunction
-          : step.operation === QueryOperation.limit || !operations.has(step.operation)
+            step.operation === QueryOperation.comparator ||
+            step.operation === QueryOperation.groupBy
+          ? source.vector !== undefined && step.operation === QueryOperation.predicate
+            ? StorageContractErrorText.queryVectorFunction
+            : StorageContractErrorText.queryFunction
+          : step.operation === QueryOperation.limit ||
+              (source.vector !== undefined && step.operation === QueryOperation.select) ||
+              !operations.has(step.operation)
             ? StorageContractErrorText.queryUnsupported
             : step.operation === QueryOperation.where
               ? queryConditionReason(step.condition, operators)
@@ -821,8 +1014,11 @@ function planRecordQuery(
       pushed: Object.freeze(pushedSteps),
       client: Object.freeze(clientSteps),
       fullScan:
-        source.pushdown.index === undefined ||
-        !pushed.some((step) => step.operation === QueryOperation.where),
+        source.vector !== undefined
+          ? source.vector.exact || source.pushdown.index === undefined
+          : source.pushdown.index === undefined ||
+            ((source.rdf === undefined || Object.keys(source.rdf.pattern).length === 0) &&
+              !pushed.some((step) => step.operation === QueryOperation.where)),
       source: source.pushdown.source,
       ...(source.pushdown.index === undefined ? {} : { index: source.pushdown.index })
     })
@@ -881,7 +1077,8 @@ function queryHeapSiftDown(
 function compileRecordQueryReader(
   steps: readonly IQueryNode['step'][],
   ctx: IOperationContext | undefined,
-  tieBreakByKey: IRecordQuerySource['tieBreakByKey']
+  tieBreakByKey: IRecordQuerySource['tieBreakByKey'],
+  vector = false
 ): IQueryReader {
   /** The leaf borrows the one original backend cursor; no row array is materialized. */
   let read: IQueryReader = async (advance) => {
@@ -913,7 +1110,7 @@ function compileRecordQueryReader(
           /** Filtering discards each rejected row immediately. */
           const next = await upstream(advance)
           if (next.done) return next
-          if (predicate(next.value)) {
+          if (predicate(vector ? (next.value as IVectorHit<unknown>).payload : next.value)) {
             assertQueryActive(ctx)
             return next
           }
@@ -957,7 +1154,53 @@ function compileRecordQueryReader(
       let remaining = step.count
       read = async (advance) =>
         remaining-- > 0 ? upstream(advance) : { done: true, value: undefined }
-    } else {
+    } else if (step.operation === QueryOperation.groupBy) {
+      /** At most the already ranked topK hits enter this single grouping pass. */
+      let groups:
+        | readonly { readonly group: unknown; readonly hits: readonly unknown[] }[]
+        | undefined
+      /** One initialization belongs to the same original accepted reader operation. */
+      let prepared: Promise<void> | undefined
+      /** Emission preserves each group's first best-hit position. */
+      let emitted = 0
+      read = async (advance) => {
+        await (prepared ??= (async () => {
+          /** Map uses SameValueZero, preserving number/string/boolean domains and equal zeroes. */
+          const grouped = new Map<string | number | boolean, unknown[]>()
+          while (true) {
+            /** No candidate outside the original engine topK is requested or scored. */
+            const next = await upstream(advance)
+            if (next.done) break
+            /** Missing or non-scalar own fields do not create a replacement group. */
+            const payload = (next.value as IVectorHit<unknown>).payload
+            if (
+              typeof payload !== 'object' ||
+              payload === null ||
+              !Object.hasOwn(payload, step.field)
+            )
+              continue
+            /** The grouping field is read once from this accepted hit. */
+            const group = Reflect.get(payload, step.field)
+            if (
+              !(
+                typeof group === 'string' ||
+                typeof group === 'boolean' ||
+                (typeof group === 'number' && Number.isFinite(group))
+              )
+            )
+              continue
+            /** Retain only each group's caller-declared bounded prefix. */
+            const hits = grouped.get(group)
+            if (hits === undefined) grouped.set(group, [next.value])
+            else if (hits.length < step.perGroup) hits.push(next.value)
+          }
+          groups = [...grouped].map(([group, hits]) => ({ group, hits }))
+        })())
+        return emitted === groups!.length
+          ? { done: true, value: undefined }
+          : { done: false, value: groups![emitted++] }
+      }
+    } else if (step.operation === QueryOperation.comparator) {
       /** Comparator admission already proved the immediately following bound. */
       const bound = steps[++index] as Extract<
         IQueryNode['step'],
@@ -1028,6 +1271,8 @@ function compileRecordQueryReader(
           ? { done: false, value: entry.value }
           : { done: false, value: entry.value, key: entry.key }
       }
+    } else {
+      throw invalidQueryCondition(undefined, StorageContractErrorText.queryArgument)
     }
   }
   /** Every terminal transition observes cancellation, including a final projection or zero limit. */
@@ -1044,15 +1289,24 @@ function openRecordQuery(
   source: IQuerySourceSnapshot,
   node: IQueryNode | undefined,
   strict: boolean,
-  ctx: IOperationContext | undefined
+  ctx: IOperationContext | undefined,
+  countOnly = false
 ): {
   readonly iterator: IStorageIterator<readonly [IStorageKey, unknown]>
   readonly read: IQueryReader
   readonly ctx: IOperationContext | undefined
 } {
   /** Strictness and missing comparator bounds reject before a source can open. */
-  const plan = planRecordQuery(source, node)
-  if (strict && plan.client.length > 0)
+  const plan = planRecordQuery(source, node, countOnly)
+  /** Ranking and traversal cannot be emulated by the ordinary row reader. */
+  const requiredNative = plan.client.filter(
+    (step) =>
+      step.operation === QueryOperation.topK ||
+      step.operation === QueryOperation.minScore ||
+      step.operation === QueryOperation.follow ||
+      step.operation === QueryOperation.inverse
+  )
+  if ((strict && plan.client.length > 0) || requiredNative.length > 0)
     throw new StorageContractError(
       StorageContractErrorCode.queryNotPushable,
       {},
@@ -1068,12 +1322,36 @@ function openRecordQuery(
   /** Only a fully native prefix can project source rows. */
   const fields = plan.pushed.find((step) => step.operation === QueryOperation.select)?.fields
   /** Node compilation creates no source I/O and retains no materialized row array. */
-  const read = compileRecordQueryReader(plan.client, captured, source.tieBreakByKey)
+  const read = compileRecordQueryReader(
+    plan.client,
+    captured,
+    source.tieBreakByKey,
+    source.vector !== undefined
+  )
   try {
+    /** Each family calls its original native engine inside this same accepted source operation. */
+    let input: IVectorQueryInput | IRdfQueryInput | Parameters<IRecordQuerySource['execute']>[0]
+    if (source.vector !== undefined) {
+      /** The last immutable refinement supplies the one final engine ranking bound/threshold. */
+      const bounds = plan.pushed.filter((step) => step.operation === QueryOperation.topK)
+      /** Score threshold is also a final query option rather than a second client filter. */
+      const scores = plan.pushed.filter((step) => step.operation === QueryOperation.minScore)
+      input = {
+        conditions,
+        topK: bounds.at(-1)!.count,
+        minScore: scores.at(-1)?.score,
+        withVector: source.vector.withVector,
+        ctx: captured
+      }
+    } else if (source.rdf !== undefined) {
+      input = {
+        pattern: source.rdf.pattern,
+        steps: Object.freeze(plan.pushed as IRdfQueryInput['steps'][number][]),
+        ctx: captured
+      }
+    } else input = { conditions, fields, ctx: captured }
     return {
-      iterator: Reflect.apply(source.execute, source.receiver, [
-        { conditions, fields, ctx: captured }
-      ]),
+      iterator: Reflect.apply(source.execute, source.receiver, [input]),
       read,
       ctx: captured
     }
@@ -1107,10 +1385,11 @@ async function consumeRecordQuery<R, TResult>(
   consume: (
     read: () => Promise<IteratorResult<R>>,
     ctx: IOperationContext | undefined
-  ) => Promise<TResult>
+  ) => Promise<TResult>,
+  countOnly = false
 ): Promise<TResult> {
   /** Opening synchronously admits the complete terminal to the original transaction owner. */
-  const { iterator, read, ctx: captured } = openRecordQuery(source, node, strict, ctx)
+  const { iterator, read, ctx: captured } = openRecordQuery(source, node, strict, ctx, countOnly)
   return runTransactionIteratorOperation(iterator, async (advance, fail) => {
     /** The terminal's scalar, bounded chunk or explicit all result stays inside the same operation. */
     let result: TResult
@@ -1238,12 +1517,19 @@ function recordQueryReads<R, TContext extends IOperationContext | undefined>(
     exists: async (ctx) => !(await first(ctx)).done,
     count: async (ctx) => {
       assertClientTerminal()
-      return consumeRecordQuery<R, number>(source, node, strict, ctx, async (read) => {
-        /** Cardinality retains no accepted row. */
-        let count = 0
-        while (!(await read()).done) count++
-        return count
-      })
+      return consumeRecordQuery<R, number>(
+        source,
+        node,
+        strict,
+        ctx,
+        async (read) => {
+          /** Cardinality retains no accepted row and never requests output-only planner nodes. */
+          let count = 0
+          while (!(await read()).done) count++
+          return count
+        },
+        true
+      )
     },
     pluck: async (field, ctx) => {
       assertQueryField(field)
@@ -1401,10 +1687,53 @@ function selectedRecordQuery<
 ): IQueryResult<R, TContext, true, TAugmentMethods> {
   return Object.freeze({
     ...methods,
-    ...recordQueryReads<R, TContext>(source, node, strict),
+    ...familyQueryReads<R, TContext>(source, node, strict),
     requirePushdown: () =>
       selectedRecordQuery<R, TContext, TAugmentMethods>(source, node, true, methods)
   }) as IQueryResult<R, TContext, true, TAugmentMethods>
+}
+/** Vector rows never gain numeric record statistics through a runtime spread or projection. */
+function familyQueryReads<R, TContext extends IOperationContext | undefined>(
+  source: IQuerySourceSnapshot,
+  node: IQueryNode | undefined,
+  strict: boolean
+): IQueryRead<R, TContext> | (IQueryRead<R, TContext> & IQueryStatistics<R, TContext>) {
+  /** The original terminal factory remains the sole terminal execution implementation. */
+  const reads = recordQueryReads<R, TContext>(source, node, strict)
+  if (source.vector === undefined) return reads
+  /** Only the family-inapplicable methods are omitted; every remaining function is the original. */
+  const { min: _min, max: _max, sum: _sum, avg: _avg, ...vectorReads } = reads
+  return vectorReads
+}
+/** Captures one condition node for all three families without copying chain history. */
+function snapshotQueryWhere(args: readonly unknown[]): IQueryNode['step'] {
+  /** Only the added node is captured; previously built condition snapshots are never revisited. */
+  let step: IQueryNode['step']
+  if (args.length === 1 && typeof args[0] === 'function')
+    step = {
+      operation: QueryOperation.predicate,
+      predicate: args[0] as (row: unknown) => boolean
+    }
+  else if (args.length === 1)
+    step = { operation: QueryOperation.where, condition: snapshotStorageWhere(args[0]) }
+  else if (
+    args.length === 3 &&
+    (typeof args[0] === 'string' || Array.isArray(args[0])) &&
+    typeof args[1] === 'string' &&
+    Object.hasOwn(QueryOperator, args[1])
+  ) {
+    try {
+      /** Typed paths use the same canonical path validator as object conditions. */
+      const path = Object.freeze(parseObjectPath(args[0]).map(String))
+      step = {
+        operation: QueryOperation.where,
+        condition: snapshotQueryField(path, args[1] as QueryOperator, args[2])
+      }
+    } catch (cause) {
+      throw invalidQueryCondition(cause)
+    }
+  } else throw invalidQueryCondition()
+  return step
 }
 /** Derivation shares history and captured source facts; each chain owns no I/O or resource lifetime. */
 function recordQuery<
@@ -1427,32 +1756,8 @@ function recordQuery<
     value: IQueryOperand<IObjectPathValue<T, P>, NoInfer<O>>
   ): IRecordQuery<T, TContext, TAugmentMethods>
   function where(...args: readonly unknown[]): IRecordQuery<T, TContext, TAugmentMethods> {
-    /** Only the added node is captured; previously built condition snapshots are never revisited. */
-    let step: IQueryNode['step']
-    if (args.length === 1 && typeof args[0] === 'function')
-      step = {
-        operation: QueryOperation.predicate,
-        predicate: args[0] as (row: unknown) => boolean
-      }
-    else if (args.length === 1)
-      step = { operation: QueryOperation.where, condition: snapshotStorageWhere(args[0]) }
-    else if (
-      args.length === 3 &&
-      (typeof args[0] === 'string' || Array.isArray(args[0])) &&
-      typeof args[1] === 'string' &&
-      Object.hasOwn(QueryOperator, args[1])
-    ) {
-      try {
-        /** Typed paths use the same canonical path validator as object conditions. */
-        const path = Object.freeze(parseObjectPath(args[0]).map(String))
-        step = {
-          operation: QueryOperation.where,
-          condition: snapshotQueryField(path, args[1] as QueryOperator, args[2])
-        }
-      } catch (cause) {
-        throw invalidQueryCondition(cause)
-      }
-    } else throw invalidQueryCondition()
+    /** Family dispatch shares the canonical condition/path snapshot. */
+    const step = snapshotQueryWhere(args)
     return recordQuery(source, { previous: node, step }, strict, methods)
   }
   /** Projection and callback mapping share one state transition that removes select from the result. */
@@ -1532,4 +1837,191 @@ export function createRecordQuery<
     false,
     captured
   )
+}
+
+/** Family refinements retain the same nodes, planner, readers and accepted resource operations. */
+function familyQuery(
+  source: IQuerySourceSnapshot,
+  node: IQueryNode | undefined,
+  strict: boolean,
+  methods: object | undefined,
+  bounded: boolean
+): object {
+  /** Appending one node never copies or scans the existing immutable history. */
+  const append = (step: IQueryNode['step']): object =>
+    familyQuery(
+      source,
+      { previous: node, step },
+      strict,
+      methods,
+      bounded || step.operation === QueryOperation.topK
+    )
+  /** Selection terminates family refinements while retaining the same original read methods. */
+  const select = (...args: readonly unknown[]): object => {
+    /** Field projection and asynchronous mapping use the original one-selection transition. */
+    const step: IQueryNode['step'] =
+      args.length === 1 && typeof args[0] === 'function'
+        ? { operation: QueryOperation.mapper, mapper: args[0] as (row: unknown) => unknown }
+        : { operation: QueryOperation.select, fields: snapshotQueryFields(args) }
+    return selectedRecordQuery(source, { previous: node, step }, strict, methods)
+  }
+  /** Common condition admission is exactly the same shape dispatcher used by records. */
+  const shared = {
+    ...methods,
+    where: (...args: readonly unknown[]) => append(snapshotQueryWhere(args)),
+    requirePushdown: () => familyQuery(source, node, true, methods, bounded)
+  }
+  if (source.vector !== undefined) {
+    /** The captured family facts cannot be changed by later author descriptor mutation. */
+    const vector = source.vector
+    return Object.freeze({
+      ...shared,
+      minScore(score: number) {
+        if (typeof score !== 'number' || !Number.isFinite(score))
+          throw invalidQueryCondition(undefined, StorageContractErrorText.queryArgument)
+        return append({ operation: QueryOperation.minScore, score })
+      },
+      withVector: () =>
+        familyQuery(
+          { ...source, vector: { ...vector, withVector: true } },
+          node,
+          strict,
+          methods,
+          bounded
+        ),
+      topK(count: number) {
+        if (!Number.isSafeInteger(count) || count <= 0)
+          throw invalidQueryCondition(undefined, StorageContractErrorText.queryArgument)
+        return append({ operation: QueryOperation.topK, count })
+      },
+      ...(bounded
+        ? {
+            ...familyQueryReads(source, node, strict),
+            select,
+            ...(vector.groupBy
+              ? {
+                  groupBy(field: string, options: { readonly perGroup: number }) {
+                    assertQueryField(field)
+                    /** Only the declared per-group allocation bound is borrowed once. */
+                    let perGroup: number
+                    try {
+                      perGroup = options.perGroup
+                    } catch (cause) {
+                      throw invalidQueryCondition(cause, StorageContractErrorText.queryArgument)
+                    }
+                    if (!Number.isSafeInteger(perGroup) || perGroup <= 0)
+                      throw invalidQueryCondition(undefined, StorageContractErrorText.queryArgument)
+                    return selectedRecordQuery(
+                      source,
+                      {
+                        previous: node,
+                        step: { operation: QueryOperation.groupBy, field, perGroup }
+                      },
+                      strict,
+                      methods
+                    )
+                  }
+                }
+              : {})
+          }
+        : {})
+    })
+  }
+  return Object.freeze({
+    ...shared,
+    ...familyQueryReads(source, node, strict),
+    select,
+    limit(count: number) {
+      if (!Number.isSafeInteger(count) || count < 0)
+        throw invalidQueryCondition(undefined, StorageContractErrorText.queryLimit)
+      return append({ operation: QueryOperation.limit, count })
+    },
+    follow(predicate: IRdfNamedNode, target?: IRdfNamedNode) {
+      /**
+       * The canonical RDF owner validates both positions as ground named nodes without a codec
+       * copy.
+       */
+      const captured = snapshotStorageRdfPattern(
+        { predicate, ...(target === undefined ? {} : { subject: target }) },
+        undefined
+      )
+      if (captured.predicate === undefined)
+        throw invalidQueryCondition(undefined, StorageContractErrorText.queryArgument)
+      return append({
+        operation: QueryOperation.follow,
+        predicate: captured.predicate!,
+        ...(captured.subject === undefined ? {} : { target: captured.subject })
+      })
+    },
+    inverse(predicate: IRdfNamedNode) {
+      /** Ground predicate admission rejects request-local blank-node identities before source I/O. */
+      const captured = snapshotStorageRdfPattern({ predicate }, undefined)
+      if (captured.predicate === undefined)
+        throw invalidQueryCondition(undefined, StorageContractErrorText.queryArgument)
+      return append({ operation: QueryOperation.inverse, predicate: captured.predicate! })
+    }
+  })
+}
+
+/**
+ * Creates a pre-topK vector builder. The backend keeps native scoring and ranking; the canonical
+ * planner sends all translatable payload conditions before ranking, even across client predicates.
+ * No cursor opens during construction, explanation or immutable refinement.
+ */
+export function createVectorQuery<
+  TPayload,
+  TGroupable extends boolean = false,
+  TAugmentMethods extends object = Record<never, never>
+>(
+  source: IVectorQuerySource<TPayload, TGroupable>,
+  methods?: TAugmentMethods
+): IVectorQueryBuilder<TPayload, TGroupable, false, TAugmentMethods> {
+  /** Original descriptor admission captures every existing support/resource field once. */
+  const captured = snapshotQuerySource(source as unknown as IRecordQuerySource)
+  /** Optional finite source facts are borrowed only after existing descriptor admission finishes. */
+  let exact: boolean | undefined
+  /** Group support is finite author metadata rather than another provider or runtime registry. */
+  let groupBy: boolean | undefined
+  try {
+    ;({ exact, groupBy } = source)
+    if (
+      (exact !== undefined && typeof exact !== 'boolean') ||
+      (groupBy !== undefined && typeof groupBy !== 'boolean')
+    )
+      throw new TypeError(StorageContractErrorText.queryArgument)
+  } catch (cause) {
+    throw invalidQueryCondition(cause, StorageContractErrorText.queryArgument)
+  }
+  return familyQuery(
+    {
+      ...captured,
+      vector: { exact: exact === true, groupBy: groupBy === true, withVector: false }
+    },
+    undefined,
+    false,
+    snapshotRecordQueryMethods(methods, VectorQueryMethod),
+    false
+  ) as IVectorQueryBuilder<TPayload, TGroupable, false, TAugmentMethods>
+}
+
+/** Creates a ground RDF match using the same immutable query and original native resource owner. */
+export function createRdfQuery<
+  TContext extends IOperationContext | undefined = IOperationContext,
+  TAugmentMethods extends object = Record<never, never>
+>(
+  source: IRdfQuerySource,
+  pattern: Partial<IQuad>,
+  methods?: TAugmentMethods
+): IRdfQuery<TContext, TAugmentMethods> {
+  /** Pattern terms detach once; omitting graph retains the canonical all-graphs match semantics. */
+  const capturedPattern = snapshotStorageRdfPattern(pattern, undefined)
+  /** Native callbacks retain their exact original author receiver and original resource key. */
+  const captured = snapshotQuerySource(source as unknown as IRecordQuerySource)
+  return familyQuery(
+    { ...captured, rdf: { pattern: capturedPattern } },
+    undefined,
+    false,
+    snapshotRecordQueryMethods(methods, RdfQueryMethod),
+    true
+  ) as IRdfQuery<TContext, TAugmentMethods>
 }

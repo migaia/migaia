@@ -92,6 +92,19 @@ it('binds codec conversions and whole queries to the actual store and current tr
   expect(decode).toHaveLength(2)
   expect(query).toHaveLength(2)
   expect(query[1]).toMatchObject({ stats: { readCount: 1, returnedCount: 1, completed: true } })
+  query.length = 0
+  expect(await repo.query().select('score').sum('score')).toBe(1)
+  expect(query).toHaveLength(2)
+  expect(query[1]).toMatchObject({ stats: { readCount: 1, returnedCount: 1, completed: true } })
+  query.length = 0
+  expect(await repo.query().first()).toMatchObject({ id: 'a' })
+  expect(query).toHaveLength(2)
+  expect(query[0]).toMatchObject({ plan: { hasLimit: true } })
+  expect(query[1]).toMatchObject({ stats: { readCount: 1, returnedCount: 1, completed: true } })
+  query.length = 0
+  expect(await repo.query().count()).toBe(1)
+  expect(query).toHaveLength(2)
+  expect(query[0]).toMatchObject({ plan: { hasOrder: false } })
   await store.transaction(async (scope) => {
     const id = assertTransactionOwner(store, scope).id
     expect(await repo.in(scope).query().all()).toEqual([{ id: 'a', score: 1 }])
