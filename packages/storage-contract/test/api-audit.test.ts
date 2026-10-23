@@ -28,16 +28,6 @@ const makeStore = (): contract.IRecordStore => ({
   },
   async clearValues() {},
   async clearAll() {},
-  async getMany() {
-    return []
-  },
-  async setMany() {},
-  async removeMany() {
-    return 0
-  },
-  async removeByPrefix() {
-    return 0
-  },
   async dispose() {},
   async [Symbol.asyncDispose]() {},
   async getBytes() {

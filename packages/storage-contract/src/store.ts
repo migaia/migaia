@@ -15,7 +15,7 @@ import type {
 import type { ITransactionScope } from './transaction.js'
 import { isBackendKind } from './backend.js'
 import type { IStorageResource, IStorageIterator } from './resource.js'
-import { STORAGE_KEY_VALUE_METHODS } from './capability-constants.js'
+import { STORAGE_KEY_VALUE_BASE_METHODS } from './capability-constants.js'
 
 /** Runtime-neutral resource identity and facts; specialized stores need no KV methods. */
 export type IStorageBase = IStorageResource & {
@@ -117,30 +117,6 @@ export type ISyncKeyValueStore = {
 
 /** Defines the L0 string key-value channel implemented by every backend. */
 export type IKeyValueStore = IStorageBase & {
-  /** Reads one native text snapshot, retaining input order, duplicates and undefined missing rows. */
-  getMany(
-    keys: readonly IStorageKey[],
-    ctx?: IOperationContext
-  ): Promise<readonly (string | undefined)[]>
-  /** Atomically writes a batch in one native operation; canonical duplicate keys reject before I/O. */
-  setMany(
-    entries: readonly {
-      readonly key: IStorageKey
-      readonly value: string
-      readonly ttlMs?: number
-    }[],
-    ctx?: IOperationContext & IWriteConcurrencyOptions
-  ): Promise<void>
-  /** Atomically removes distinct canonical text keys and returns the actual deleted count. */
-  removeMany(
-    keys: readonly IStorageKey[],
-    ctx?: IOperationContext & IWriteConcurrencyOptions
-  ): Promise<number>
-  /** Removes only matching text keys using the canonical prefix range in the current organization. */
-  removeByPrefix(
-    prefix: IStorageKey,
-    ctx?: IOperationContext & IWriteConcurrencyOptions
-  ): Promise<number>
   /** Reads the string-value channel; a missing key resolves to null. The provider interprets ctx. */
   get(key: string, ctx?: IOperationContext): Promise<string | null>
   /** Writes a string value with optional operation timing and conflict options. */
@@ -279,7 +255,7 @@ export const inspectStoreShape = (store: unknown, records: boolean): IStoreShape
   const candidate = store as Record<string, unknown>
   let methods: unknown[]
   try {
-    methods = STORAGE_KEY_VALUE_METHODS.map((name) => candidate[name])
+    methods = STORAGE_KEY_VALUE_BASE_METHODS.map((name) => candidate[name])
     methods.push(base.dispose)
     if (records)
       methods.push(

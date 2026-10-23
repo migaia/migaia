@@ -13,15 +13,20 @@ export const STORAGE_BATCH_METHODS = [
   StorageCapabilityMethod.removeByPrefix
 ] as const
 
-/** Standard key-value methods validated and published by the canonical capability provider. */
-export const STORAGE_KEY_VALUE_METHODS = [
+/** Ordinary raw KV remains the original seven-method base, independent of native batch support. */
+export const STORAGE_KEY_VALUE_BASE_METHODS = [
   'get',
   'set',
   'remove',
   StorageCapabilityMethod.has,
   'keys',
   'clearValues',
-  'clearAll',
+  'clearAll'
+] as const
+
+/** A published standard KV capability promises the complete native batch surface too. */
+export const STORAGE_KEY_VALUE_METHODS = [
+  ...STORAGE_KEY_VALUE_BASE_METHODS,
   ...STORAGE_BATCH_METHODS
 ] as const
 

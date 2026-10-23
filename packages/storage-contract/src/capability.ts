@@ -61,7 +61,32 @@ export type IStorageStore<TCaps extends IAnyStorageCapability = never> = IStorag
 export type IKeyValueApi = Omit<
   IKeyValueStore,
   'backend' | 'capabilities' | 'dispose' | typeof Symbol.asyncDispose
->
+> & {
+  /** Reads one native text snapshot, retaining input order, duplicates and undefined missing rows. */
+  getMany(
+    keys: readonly IStorageKey[],
+    ctx?: IOperationContext
+  ): Promise<readonly (string | undefined)[]>
+  /** Atomically writes a batch in one native operation; canonical duplicate keys reject before I/O. */
+  setMany(
+    entries: readonly {
+      readonly key: IStorageKey
+      readonly value: string
+      readonly ttlMs?: number
+    }[],
+    ctx?: IOperationContext & IWriteConcurrencyOptions
+  ): Promise<void>
+  /** Atomically removes distinct canonical text keys and returns the actual deleted count. */
+  removeMany(
+    keys: readonly IStorageKey[],
+    ctx?: IOperationContext & IWriteConcurrencyOptions
+  ): Promise<number>
+  /** Removes only matching text keys using the canonical prefix range in the current organization. */
+  removeByPrefix(
+    prefix: IStorageKey,
+    ctx?: IOperationContext & IWriteConcurrencyOptions
+  ): Promise<number>
+}
 
 /**
  * Standard record entry reuses the implemented query core; writes retain the native backend

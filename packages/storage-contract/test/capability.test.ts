@@ -1,6 +1,7 @@
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import {
   defineStorageCapability,
+  snapshotKeyValueStoreDetailed,
   implement,
   provideCapabilities,
   hasStorageCapability,
@@ -373,6 +374,32 @@ describe('capability publication', () => {
 })
 
 describe('standard KV capability forwarding', () => {
+  it('retains ordinary raw KV admission without claiming missing native batch capability', async () => {
+    /** An existing raw backend may reliably provide just the original seven methods. */
+    const pending = Promise.resolve('raw-value')
+    const raw = Object.freeze({
+      ...createBase(),
+      get: () => pending,
+      set: async () => undefined,
+      remove: async () => undefined,
+      has: async () => true,
+      keys: async () => ['saved'],
+      clearValues: async () => undefined,
+      clearAll: async () => undefined
+    })
+    /** Resource/KV admission must not reject a supported ordinary call for absent batch methods. */
+    expect(snapshotKeyValueStoreDetailed(raw)).toMatchObject({ valid: true, store: raw })
+    expect(raw.get()).toBe(pending)
+    await expect(raw.get()).resolves.toBe('raw-value')
+    expect(Object.hasOwn(raw, 'getMany')).toBe(false)
+    /** Publishing the standard token still requires its complete eleven-method contract. */
+    const base = createBase()
+    expect(() => provideCapabilities(base, [implement(kv, raw as never)])).toThrowError(
+      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+    )
+    expect(Object.hasOwn(base, 'use')).toBe(false)
+    expect(base.dispose).not.toHaveBeenCalled()
+  })
   it('captures a transaction binder privately without executing it during provider admission', () => {
     /** Root API remains independent of the transaction-owned projection callback. */
     const api: IKeyValueApi = {

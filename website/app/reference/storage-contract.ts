@@ -155,8 +155,8 @@ const recordKeyParam = t(
   '应用选定的 `IStorageKey`，或同一后端记录写入返回的键；后续操作保留相同逻辑值。'
 )
 
-/** L0 methods describe the contract without promising an implementation supplied by this package. */
-const storeMembers: Readonly<Record<string, IMemberDoc>> = {
+/** Standard native batch methods belong to an installed KV API, beyond ordinary raw KV admission. */
+const batchMembers: Readonly<Record<string, IMemberDoc>> = {
   getMany: {
     summary: t(
       'Read one native text snapshot in input order, including duplicate positions.',
@@ -173,7 +173,7 @@ const storeMembers: Readonly<Record<string, IMemberDoc>> = {
       'Same-length values with undefined for missing keys; any decode failure rejects the batch.',
       '同长度值数组，缺失项为 undefined；任一解码失败拒绝整批。'
     ),
-    example: "const values = await store.getMany(['theme', ['profile', 1]])"
+    example: "const values = await store.use(kv).getMany(['theme', ['profile', 1]])"
   },
   setMany: {
     summary: t(
@@ -191,7 +191,7 @@ const storeMembers: Readonly<Record<string, IMemberDoc>> = {
       'Original native Promise<void>; empty input opens no transaction.',
       '原生 Promise<void>；空输入不打开事务。'
     ),
-    example: "await store.setMany([{ key: 'theme', value: 'dark' }])"
+    example: "await store.use(kv).setMany([{ key: 'theme', value: 'dark' }])"
   },
   removeMany: {
     summary: t(
@@ -209,7 +209,7 @@ const storeMembers: Readonly<Record<string, IMemberDoc>> = {
       'Actual deleted count; an empty batch returns zero without a transaction.',
       '实际删除数；空批返回零且不开事务。'
     ),
-    example: "const removed = await store.removeMany(['theme', 'theme'])"
+    example: "const removed = await store.use(kv).removeMany(['theme', 'theme'])"
   },
   removeByPrefix: {
     summary: t(
@@ -227,8 +227,12 @@ const storeMembers: Readonly<Record<string, IMemberDoc>> = {
       'Actual deleted count from the native prefix range.',
       '原生前缀范围内的实际删除数。'
     ),
-    example: "const removed = await store.removeByPrefix(['profile'])"
-  },
+    example: "const removed = await store.use(kv).removeByPrefix(['profile'])"
+  }
+}
+
+/** L0 methods describe the ordinary raw contract without requiring native batches. */
+const storeMembers: Readonly<Record<string, IMemberDoc>> = {
   backend: {
     summary: t(
       'Implementation family declared by the backend; use capabilities rather than this label to choose optional operations.',
@@ -3008,14 +3012,14 @@ console.log(candidate.name, candidate.output)`
     },
     IKeyValueApi: {
       summary: t(
-        'Public KV methods projected from the canonical store contract.',
-        '由唯一 store 契约投影的公开 KV 方法。'
+        'Standard KV methods: ordinary raw operations plus required native batch and prefix endpoints.',
+        '标准 KV 方法：原 raw 普通操作加必需的原生批量与前缀入口。'
       ),
       members: {
-        getMany: storeMembers.getMany!,
-        setMany: storeMembers.setMany!,
-        removeMany: storeMembers.removeMany!,
-        removeByPrefix: storeMembers.removeByPrefix!
+        getMany: batchMembers.getMany!,
+        setMany: batchMembers.setMany!,
+        removeMany: batchMembers.removeMany!,
+        removeByPrefix: batchMembers.removeByPrefix!
       }
     },
     ICapabilityImpl: {
