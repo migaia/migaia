@@ -42,6 +42,19 @@ try {
         'Prints light dark, then null. The original organization view remains reusable after its target is cleared.',
         '依次输出light dark及null；目标清理后原组织视图仍可复用。'
       )
+    },
+    {
+      title: t('Watch native text invalidations', '观察原生文本失效提示'),
+      problem: t(
+        'Preferences need committed local and cross-document notifications from an admitted native Window source.',
+        '偏好变更需来自已准入 Window 事件源的本实例提交与跨文档提示。'
+      ),
+      example:
+        "import { createStorageHost } from '@migaia/storage-host'\nimport { asChangeFeedStore } from '@migaia/storage-contract'\nimport { localStorageBackendPlugin } from '@migaia/storage-web/local-storage'\nconst host = await createStorageHost({ plugins: [localStorageBackendPlugin({ namespace: 'preferences' })] })\ntry {\n  const preferences = asChangeFeedStore(host.backend('local'))\n  const changes = preferences.watch('theme')\n  try {\n    const changed = changes.next()\n    await preferences.set('theme', 'dark')\n    await changed\n    console.log(await preferences.get('theme'))\n  } finally { await changes.dispose() }\n} finally { await host.dispose() }",
+      result: t(
+        'Prints dark and closes the original iterator. A Storage-like injection without its native event source rejects feed admission. Hints require rereading current data.',
+        '输出 dark 后关闭原迭代器。缺少原生事件源的 Storage-like 注入不能准入变更流；提示需要重新读取当前值。'
+      )
     }
   ],
   indexedDbBackendPlugin: [

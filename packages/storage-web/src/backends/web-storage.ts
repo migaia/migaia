@@ -1,9 +1,19 @@
 import { bindBrowserExecution } from './execution.js'
 import { createTextBatchApi } from './batch.js'
-import { implement, kv, type IStorageChange, type IStorageStore } from '@migaia/storage-contract'
+import {
+  implement,
+  kv,
+  assertStringStorageKey,
+  StorageContractError,
+  StorageContractErrorCode,
+  type ITextChangeFeedApi,
+  type IStorageChange,
+  type IStorageStore
+} from '@migaia/storage-contract'
 import { snapshotSyncWriteOptions } from '@migaia/storage-contract'
 import {
   resolveStorageNamespace,
+  createBackendChangeIterator,
   throwIfAborted,
   withAbort
 } from '@migaia/storage-host/authoring/backend'
@@ -20,7 +30,8 @@ import { probeWebStorage } from '../utils/availability.js'
 import { normalizeStorageException } from '../utils/quota.js'
 import { StorageError, StorageErrorCode, createStorageTypeError } from '../types/errors.js'
 import { StorageErrorText } from '../error-text.js'
-import { StorageBackend, StorageOperation } from '../constants.js'
+import { StorageBackend, StorageOperation, storageBackendOperation } from '../constants.js'
+import { subscribeLocalStorageEvents } from './web-storage-events.js'
 import { assertValueSnapshot, withNativeValueWrite } from './native-value-write.js'
 import type {
   IKeyValueStore,
@@ -126,8 +137,8 @@ const assertWebStorageInjection: (
 
 /**
  * Shares the backend implementation for localStorage and `sessionStorageHost` by injecting
- * different storage instances. Does not expose cross-tab `storage` events at this layer. The state
- * layer owns subscriptions.
+ * different storage instances. Only the same Window's actual localStorage admits native events;
+ * injected Storage-like ports retain ordinary KV without claiming a cross-document source.
  */
 export const createWebStorageBackend = (
   backend: IBackendKind,
@@ -136,7 +147,7 @@ export const createWebStorageBackend = (
   runtime: IBackendRuntime,
   bindOrganizations = true
 ): IBackendConstruction<
-  IKeyValueBackendStore<ISyncCapableStore<IKeyValueStore>>,
+  IKeyValueBackendStore<ISyncCapableStore<IKeyValueStore> & ITextChangeFeedApi>,
   IWebStorageLike
 > => {
   const optionsSnapshot = snapshotWebStorageOptions(options, backend)
@@ -170,11 +181,14 @@ export const createWebStorageBackend = (
 
   const live = storage as IWebStorageLike
 
+  /** The original controller finalizer owns the one admitted native listener. */
+  let releaseNativeEvents: (() => void) | undefined
   /** Private commit-after controller shared by direct and Host-created exact stores. */
   const controller = runtime.createChangeController({
     backend,
     platform: live,
-    options: Object.freeze({ namespace, namespaceCodec })
+    options: Object.freeze({ namespace, namespaceCodec }),
+    finalize: () => releaseNativeEvents?.()
   })
   /** Explicit and language cleanup keep separate stable promises for the same controller cleanup. */
   let symbolicDispose: Promise<void> | undefined
@@ -183,6 +197,36 @@ export const createWebStorageBackend = (
   const publishChange = (change: Omit<IStorageChange, 'sequence' | 'origin' | 'scope'>): void => {
     controller.publish({ ...change, orgId: runtime.defaultOrgId })
   }
+
+  if (backend === StorageBackend.local)
+    releaseNativeEvents = subscribeLocalStorageEvents(live, (event) => {
+      if (controller.closingSignal.aborted) return
+      try {
+        if (event.storageArea !== live) return
+        /** Native origin-wide clear invalidates every namespace; ordinary keys decode exactly. */
+        const key = event.key
+        if (key === null) publishChange({ channel: 'value', kind: 'clear' })
+        else {
+          const logical = stripStorageNamespace(namespace, key, namespaceCodec, backend)
+          if (logical !== undefined)
+            publishChange({
+              channel: 'value',
+              kind: event.newValue === null ? 'remove' : 'put',
+              keys: [logical]
+            })
+        }
+      } catch (cause) {
+        reportCleanupError(
+          createStorageOperationReporter(),
+          normalizeStorageException(cause, backend)
+        )
+      }
+    })
+  /** A native source must actually register before the immutable capability can become true. */
+  const capabilities =
+    releaseNativeEvents === undefined
+      ? CAPABILITIES
+      : Object.freeze({ ...CAPABILITIES, changeFeed: true })
 
   const assertLive = (): void => {
     controller.assertLive()
@@ -352,9 +396,9 @@ export const createWebStorageBackend = (
     }
   }
 
-  const store: ISyncCapableStore<IKeyValueStore> = {
+  const store: ISyncCapableStore<IKeyValueStore> & ITextChangeFeedApi = {
     backend,
-    capabilities: CAPABILITIES,
+    capabilities,
     sync,
     get: (key, ctx) => withAbort(ctx, async () => sync.get(key)),
     set: (key, value, ctx) => withAbort(ctx, async () => sync.set(key, value)),
@@ -371,6 +415,27 @@ export const createWebStorageBackend = (
         assertLive()
         clearNamespacedEntries(clearAllOperation, signal)
       }),
+    watch: (key, ctx) => {
+      assertLive()
+      if (!capabilities.changeFeed)
+        throw new StorageContractError(StorageContractErrorCode.unsupported, { backend })
+      assertStringStorageKey(key, backend)
+      return createBackendChangeIterator(controller, {
+        orgId: runtime.defaultOrgId,
+        channel: 'value',
+        key,
+        ctx,
+        execute: (advance, context) =>
+          runtime.execution.run(
+            { operation: storageBackendOperation(backend, 'watch'), input: key, ctx: context },
+            advance
+          )
+      })
+    },
+    subscribeChanges: (listener) => {
+      assertLive()
+      return controller.subscribe(listener)
+    },
     dispose: () => {
       return controller.dispose()
     },
