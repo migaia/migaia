@@ -864,6 +864,114 @@ export const storageContractReference: ILibraryReference = {
       example: storageContractCases.encodeStorageRdfQuad![0]!.example,
       cases: storageContractCases.encodeStorageRdfQuad
     },
+    snapshotStorageVectorCollection: {
+      role: 'operation',
+      purpose: t(
+        'Capture a collection name and optional declared configuration.',
+        '捕获 collection 名和可选声明配置。'
+      ),
+      params: {
+        name: t('Logical collection name.', '逻辑 collection 名。'),
+        options: t(
+          'Optional positive dimensions and cosine/dot/euclid metric; omission stays absent.',
+          '可选正维度与 cosine/dot/euclid metric；省略仍缺省。'
+        ),
+        backend: t('Optional native diagnostic label.', '可选原生诊断标签。')
+      },
+      returns: t(
+        'Detached input; INVALID_ARGUMENT preserves the original cause.',
+        '独立输入；INVALID_ARGUMENT 保留原始 cause。'
+      ),
+      example: storageContractCases.snapshotStorageVectorCollection![0]!.example,
+      cases: storageContractCases.snapshotStorageVectorCollection
+    },
+    snapshotStorageVector: {
+      role: 'operation',
+      purpose: t(
+        'Detach finite dense components under optional dimension and metric facts.',
+        '按可选维度与 metric 事实独立捕获有限稠密分量。'
+      ),
+      params: {
+        input: t('Readonly numeric component array.', '只读数字分量数组。'),
+        options: t(
+          'Optional dimensions/metric; cosine rejects zero vectors.',
+          '可选 dimensions/metric；cosine 拒绝零向量。'
+        ),
+        backend: t('Optional native diagnostic label.', '可选原生诊断标签。')
+      },
+      returns: t(
+        'Detached input; INVALID_ARGUMENT preserves the original cause.',
+        '独立输入；INVALID_ARGUMENT 保留原始 cause。'
+      ),
+      example: storageContractCases.snapshotStorageVector![0]!.example,
+      cases: storageContractCases.snapshotStorageVector
+    },
+    snapshotStorageVectorUpsert: {
+      role: 'operation',
+      purpose: t(
+        'Prevalidate a complete point batch using the serialize payload owner.',
+        '沿 serialize payload owner 预校验完整点批次。'
+      ),
+      params: {
+        points: t(
+          'Readonly points; every input is checked and duplicate IDs keep the last value.',
+          '只读点；全部输入逐项校验，重复 ID 保留末值。'
+        ),
+        configuration: t('Existing declared dimensions and metric.', '已有声明维度与 metric。'),
+        backend: t('Optional native diagnostic label.', '可选原生诊断标签。')
+      },
+      returns: t(
+        'Detached input; INVALID_ARGUMENT preserves the original cause.',
+        '独立输入；INVALID_ARGUMENT 保留原始 cause。'
+      ),
+      example: storageContractCases.snapshotStorageVectorUpsert![0]!.example,
+      cases: storageContractCases.snapshotStorageVectorUpsert
+    },
+    snapshotStorageVectorFilter: {
+      role: 'operation',
+      purpose: t(
+        'Snapshot a closed native vector filter AST without executing it.',
+        '快照封闭原生向量过滤 AST，不执行过滤。'
+      ),
+      params: {
+        filter: t(
+          'Own-path all/any/not, scalar equality, membership or finite numeric bounds.',
+          '自有路径 all/any/not、标量相等、成员或有限数值边界。'
+        ),
+        backend: t('Optional native diagnostic label.', '可选原生诊断标签。')
+      },
+      returns: t(
+        'Detached input; INVALID_ARGUMENT preserves the original cause.',
+        '独立输入；INVALID_ARGUMENT 保留原始 cause。'
+      ),
+      example: storageContractCases.snapshotStorageVectorFilter![0]!.example,
+      cases: storageContractCases.snapshotStorageVectorFilter
+    },
+    snapshotStorageVectorSearch: {
+      role: 'operation',
+      purpose: t(
+        'Capture direct-search arguments even for k=0 before native retrieval.',
+        '在原生检索前捕获直接搜索参数，包含 k=0。'
+      ),
+      params: {
+        query: t(
+          'Finite numeric query direction matching the collection.',
+          '匹配 collection 的有限数字查询方向。'
+        ),
+        options: t(
+          'Nonnegative safe k, optional filter/withPayload/exact; booleans default false.',
+          '非负安全 k、可选 filter/withPayload/exact；布尔缺省 false。'
+        ),
+        configuration: t('Existing declared dimensions and metric.', '已有声明维度与 metric。'),
+        backend: t('Optional native diagnostic label.', '可选原生诊断标签。')
+      },
+      returns: t(
+        'Detached input; INVALID_ARGUMENT preserves the original cause.',
+        '独立输入；INVALID_ARGUMENT 保留原始 cause。'
+      ),
+      example: storageContractCases.snapshotStorageVectorSearch![0]!.example,
+      cases: storageContractCases.snapshotStorageVectorSearch
+    },
     snapshotStorageBlobPut: {
       role: 'operation',
       purpose: t(
@@ -4318,6 +4426,41 @@ console.log(candidate.name, candidate.output)`
         delete: { summary: t('Delete named point IDs.', '按点 ID 删除。') },
         search: {
           summary: t('Execute the native direct search surface.', '执行原生直接搜索入口。')
+        }
+      }
+    },
+    IStorageVectorConfiguration: {
+      summary: t(
+        'Native collection dimensions and metric, without connection ownership.',
+        '原生 collection 维度与 metric，不持有连接。'
+      ),
+      members: {
+        dimensions: { summary: t('Positive safe integer.', '正安全整数。') },
+        metric: { summary: t('cosine, dot or euclid.', 'cosine、dot 或 euclid。') }
+      }
+    },
+    IStorageVectorValidation: {
+      summary: t(
+        'Optional validation facts for detached vector input.',
+        '独立向量输入的可选校验事实。'
+      ),
+      members: {
+        dimensions: { summary: t('Optional matching positive dimension.', '可选匹配正维度。') },
+        metric: {
+          summary: t('Optional metric; cosine rejects zero.', '可选 metric；cosine 拒绝零向量。')
+        }
+      }
+    },
+    IStorageVectorPoint: {
+      summary: t(
+        'Declared point input with detached portable payload output.',
+        '声明点输入，返回独立便携 payload。'
+      ),
+      members: {
+        id: { summary: t('Logical string point ID.', '逻辑字符串点 ID。') },
+        vector: { summary: t('Readonly finite component array.', '只读有限分量数组。') },
+        payload: {
+          summary: t('Optional caller-declared portable fields.', '可选调用方声明便携字段。')
         }
       }
     },
