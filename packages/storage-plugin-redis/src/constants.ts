@@ -5,6 +5,11 @@ export const RedisCommand = {
   discard: 'DISCARD',
   unwatch: 'UNWATCH'
 } as const
+/**
+ * MULTI acknowledgement words are fixed native protocol replies checked before another command is
+ * queued.
+ */
+export const RedisReply = { ok: 'OK', queued: 'QUEUED' } as const
 /** Native subscription callbacks and fixed reply diagnostics share one owner. */
 export const RedisText = {
   backend: 'redis',
@@ -12,6 +17,7 @@ export const RedisText = {
   decodeFailed: 'Redis reply or persisted value is invalid',
   argument: 'Redis command arguments are invalid',
   transactionFailed: 'Redis transaction failed',
+  connectionChanged: 'Redis connection changed before EXEC',
   message: 'message',
   error: 'error'
 } as const

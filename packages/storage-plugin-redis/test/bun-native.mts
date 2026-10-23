@@ -56,3 +56,43 @@ for (const name of ['MIGAIA_REDIS_URL', 'MIGAIA_VALKEY_URL', 'MIGAIA_REDIS_STACK
     client.close()
   }
 }
+
+/**
+ * Failed subscription setup keeps its primary error even when closing the real duplicate also
+ * fails.
+ */
+{
+  const client = new RedisClient(process.env.MIGAIA_REDIS_URL!),
+    primary = new TypeError('subscription setup failed'),
+    secondary = new RangeError('subscription cleanup failed'),
+    reports: unknown[] = [],
+    previousError = console.error
+  await client.connect()
+  const owned = await client.duplicate(),
+    nativeClose = owned.close
+  owned.subscribe = async () => {
+    throw primary
+  }
+  owned.close = () => {
+    Reflect.apply(nativeClose, owned, [])
+    throw secondary
+  }
+  client.duplicate = async () => owned
+  console.error = (...args: unknown[]) => {
+    reports.push(args.at(-1))
+  }
+  try {
+    await assert.rejects(
+      bunRedisDriver(client).subscribe('setup-failure', () => undefined),
+      (error) => error === primary
+    )
+    assert.equal(reports.length, 1)
+    assert.equal(reports[0], secondary)
+    assert.equal(Reflect.get(primary, 'code'), 'REDIS_FAILED')
+    assert.equal(await client.send('PING', []), 'PONG')
+    console.log('Bun setup cleanup: PASS')
+  } finally {
+    console.error = previousError
+    client.close()
+  }
+}
