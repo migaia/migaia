@@ -1797,6 +1797,18 @@
         "structuredCodec"
       ]
     },
+    "@migaia/storage-plugin-object": {
+      ".": [
+        "ERROR_SOURCE",
+        "ObjectDriverKind",
+        "ObjectErrorCode",
+        "objectBackendKind",
+        "objectBackendPlugin"
+      ],
+      "./fs": ["fsObjectDriver"],
+      "./s3": ["s3ObjectDriver"],
+      "./features/presign": ["objectPresignFeature"]
+    },
     "@migaia/storage-plugin-sqlite": {
       ".": [
         "SqliteErrorCode",
