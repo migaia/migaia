@@ -779,85 +779,116 @@ export function createSqliteStore<TValue>(
   ): Promise<Awaited<R>> => {
     controller.assertLive()
     const finish = controller.beginMutation()
-    return operation(name, input, ctx, undefined, (captured) => {
-      let mutation!: IRootMutation<R>
-      return runWithConcurrency<Awaited<R>>(
-        {
-          store,
-          options: ctx ?? {},
-          lock: () => {
-            mutation = prepare(captured)
-            return mutation.keys
-          }
-        },
-        {
-          attempt: async (context) => {
-            const guard = mutation.guard
-            const ranges = guard ? lockRanges(guard) : []
-            const ids = readConcurrencyLockIdentities(context)
-            /** Logical fail decisions remain observable before entering the physical queue. */
-            const conflict = wal ? conflictingLock(context, ids, '') : undefined
-            const range =
-              wal && guard ? rangeConflict(context.orgId ?? runtime.orgId, guard) : undefined
-            if ((conflict || range) && context.admission === 'try')
-              return {
-                status: 'conflict' as const,
-                phase: 'acquire' as const,
-                keys: conflict ? [conflict.key] : range!.keys,
-                holder: conflict ? holderOf(conflict.row) : range!.holder
-              }
-            while (true) {
+    /** The original loop owns the deadline before the one asynchronous pipeline can begin. */
+    let capturedInput!: I
+    /** Fixed preparation retains only this operation's payload and exact affected keys. */
+    let mutation!: IRootMutation<R>
+    /** A timestamp exists only after the pipeline has reached the actual operation endpoint. */
+    let started: number | undefined
+    return runWithConcurrency<Awaited<R>>(
+      {
+        store,
+        options: ctx ?? {},
+        prepare: (context) =>
+          core.execution.run<I, void>(
+            { operation: name, input, ctx: context },
+            async (captured) => {
               throwIfAborted(context.signal)
-              try {
-                const write = () =>
-                  syncMutation(
-                    mutation.run,
-                    context.lock ?? [],
-                    guard,
-                    context.orgId ?? runtime.orgId,
-                    context
-                  ) as Awaited<R>
-                return wal
-                  ? await physicalRun(context, () =>
-                      walAttempt(context, async () => ({
-                        status: 'committed' as const,
-                        value: write()
-                      }))
-                    )
-                  : await group!.locks.attemptWrite(
-                      context,
-                      {
-                        owner: controller.origin,
-                        ...(label === undefined ? {} : { label }),
-                        since: Date.now(),
-                        status: 'held',
-                        scope: 'local'
-                      },
-                      write,
-                      concurrencyStages,
-                      controller.closingSignal,
-                      ranges,
-                      (commit) => physicalRun(context, commit)
-                    )
-              } catch (error) {
-                if (error instanceof SqliteLogicalConflict) {
-                  if (context.admission === 'try')
-                    return {
-                      status: 'conflict' as const,
-                      phase: 'acquire' as const,
-                      keys: error.keys,
-                      holder: error.holder
-                    }
-                  await context.wait(sleep(SqliteLimits.pollMs, { signal: context.signal }))
-                } else if (!(error instanceof AggregateError) && isBusy(error))
-                  await context.waitPhysical(sleep(SqliteLimits.pollMs, { signal: context.signal }))
-                else throw error
-              }
+              capturedInput = captured
+              started = Date.now()
+              observe(operationStages, 'beforeStorageOperation', name)
+            }
+          ),
+        lock: () => {
+          mutation = prepare(capturedInput)
+          return mutation.keys
+        }
+      },
+      {
+        attempt: async (context) => {
+          const guard = mutation.guard
+          const ranges = guard ? lockRanges(guard) : []
+          const ids = readConcurrencyLockIdentities(context)
+          /** Logical fail decisions remain observable before entering the physical queue. */
+          const conflict = wal ? conflictingLock(context, ids, '') : undefined
+          const range =
+            wal && guard ? rangeConflict(context.orgId ?? runtime.orgId, guard) : undefined
+          if ((conflict || range) && context.admission === 'try')
+            return {
+              status: 'conflict' as const,
+              phase: 'acquire' as const,
+              keys: conflict ? [conflict.key] : range!.keys,
+              holder: conflict ? holderOf(conflict.row) : range!.holder
+            }
+          while (true) {
+            throwIfAborted(context.signal)
+            try {
+              const write = () =>
+                syncMutation(
+                  mutation.run,
+                  context.lock ?? [],
+                  guard,
+                  context.orgId ?? runtime.orgId,
+                  context
+                ) as Awaited<R>
+              return wal
+                ? await physicalRun(context, () =>
+                    walAttempt(context, async () => ({
+                      status: 'committed' as const,
+                      value: write()
+                    }))
+                  )
+                : await group!.locks.attemptWrite(
+                    context,
+                    {
+                      owner: controller.origin,
+                      ...(label === undefined ? {} : { label }),
+                      since: Date.now(),
+                      status: 'held',
+                      scope: 'local'
+                    },
+                    write,
+                    concurrencyStages,
+                    controller.closingSignal,
+                    ranges,
+                    (commit) => physicalRun(context, commit)
+                  )
+            } catch (error) {
+              if (error instanceof SqliteLogicalConflict) {
+                if (context.admission === 'try')
+                  return {
+                    status: 'conflict' as const,
+                    phase: 'acquire' as const,
+                    keys: error.keys,
+                    holder: error.holder
+                  }
+                await context.wait(sleep(SqliteLimits.pollMs, { signal: context.signal }))
+              } else if (!(error instanceof AggregateError) && isBusy(error))
+                await context.waitPhysical(sleep(SqliteLimits.pollMs, { signal: context.signal }))
+              else throw error
             }
           }
         }
+      }
+    )
+      .then(
+        (value) => {
+          if (started !== undefined)
+            observe(operationStages, 'afterStorageOperation', name, Date.now() - started, 1)
+          return value
+        },
+        (error) => {
+          if (started !== undefined)
+            observe(
+              operationStages,
+              'onStorageOperationError',
+              name,
+              (error as { code?: unknown })?.code
+            )
+          throw error
+        }
       )
-    }).finally(finish)
+      .finally(finish)
   }
   /** Standard channel preparation owns payload conversion before the shared lock provider runs. */
   const prepareWrite = (
