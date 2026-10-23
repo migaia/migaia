@@ -1,3 +1,4 @@
+/** Stable error identity for the native RDF and SPARQL backend domain. */
 export const ERROR_SOURCE = 'storage.backend.sparql'
 /** Semantic identities distinguish definite protocol rejection from an unknown modification. */
 export const SparqlErrorCode = {
@@ -8,6 +9,11 @@ export const SparqlErrorCode = {
   /** Native request was explicitly rejected; inspect its status and response body. */
   requestFailed: 'SPARQL_REQUEST_FAILED',
   /** Modification may have committed; verify the dataset before creating another writer. */
-  commitUnknown: 'SPARQL_COMMIT_UNKNOWN'
+  commitUnknown: 'SPARQL_COMMIT_UNKNOWN',
+  /**
+   * A callback or accepted transaction business task failed before native commit; inspect its
+   * cause.
+   */
+  transactionFailed: 'TRANSACTION_FAILED'
 } as const
 export type ISparqlErrorCode = (typeof SparqlErrorCode)[keyof typeof SparqlErrorCode]

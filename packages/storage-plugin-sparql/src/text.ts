@@ -16,6 +16,9 @@ export const SparqlText = {
   add: 'rdf.add',
   delete: 'rdf.delete',
   match: 'rdf.match',
+  queryDelete: 'rdf.query.delete',
+  queryReplace: 'rdf.query.replace',
+  dropOrg: 'rdf.dropOrg',
   select: 'sparql.select',
   ask: 'sparql.ask',
   construct: 'sparql.construct',
@@ -27,5 +30,8 @@ export const SparqlText = {
   graphRemove: 'graphStore.removeGraph',
   graphHas: 'graphStore.hasGraph',
   ontologyImport: 'ontology.importOntology',
-  ontologyExport: 'ontology.exportOntology'
+  ontologyExport: 'ontology.exportOntology',
+  onHttpRequest: 'onHttpRequest',
+  beforeSparqlUpdate: 'beforeSparqlUpdate',
+  onPreconditionFailed: 'onPreconditionFailed'
 } as const

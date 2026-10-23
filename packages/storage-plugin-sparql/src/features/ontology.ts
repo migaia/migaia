@@ -1,0 +1,101 @@
+import { defineFeature, type IStorageFeatureOutput } from '@migaia/storage-host'
+import type { IOperationContext } from '@migaia/storage-contract'
+import { sparqlBackendKind } from '../plugin.js'
+import {
+  snapshotGraphTarget,
+  snapshotGraphFormat,
+  snapshotGraphDocument,
+  requireGraphStore
+} from '../graph-store.js'
+import { parseRdfDocument, writeRdfDocument } from '../ntriples.js'
+import { readNativeFeaturePort } from '../native-feature.js'
+import { capture, invalidArgument } from '../errors.js'
+import { SparqlText } from '../text.js'
+import type { IRdfGraphTarget, IRdfGraphFormat, IRdfGraphDocument } from '../endpoint.js'
+/** Import mode selects the existing native per-graph merge or replace operation. */
+export type IOntologyImportOptions = { readonly mode?: 'merge' | 'replace' }
+export type IOntologyApi = {
+  importOntology(
+    target: IRdfGraphTarget,
+    document: IRdfGraphDocument,
+    options?: IOntologyImportOptions,
+    ctx?: IOperationContext
+  ): Promise<number>
+  exportOntology(
+    target: IRdfGraphTarget,
+    format?: IRdfGraphFormat,
+    ctx?: IOperationContext
+  ): Promise<IRdfGraphDocument>
+}
+export type IOntologyOutput = IStorageFeatureOutput<
+  readonly [],
+  {},
+  { readonly store: { readonly ontology: IOntologyApi }; readonly transaction: {} }
+>
+/** Ontology uses only the same RDF parser/writer and the endpoint's original Graph Store port. */
+export function ontologyFeature() {
+  return defineFeature<typeof sparqlBackendKind, {}, IOntologyOutput>(sparqlBackendKind, (core) => {
+    core.featureExpose.registerDetect(async () => {
+      requireGraphStore(core.featureExpose.getClient())
+    })
+    return {
+      capabilities: [] as const,
+      chain: {},
+      api: {
+        store: {
+          ontology: {
+            async importOntology(
+              target: IRdfGraphTarget,
+              document: IRdfGraphDocument,
+              options?: IOntologyImportOptions,
+              ctx?: IOperationContext
+            ): Promise<number> {
+              const captured = snapshotGraphTarget(target),
+                doc = snapshotGraphDocument(document),
+                mode = capture(() => {
+                  const value = options?.mode
+                  return value === undefined ? 'merge' : value
+                })
+              if (mode !== 'merge' && mode !== 'replace') throw invalidArgument()
+              const quads = parseRdfDocument(doc),
+                text = await writeRdfDocument(quads, doc.format)
+              return readNativeFeaturePort(this.store).run(
+                SparqlText.ontologyImport,
+                ctx,
+                true,
+                mode === 'merge' ? SparqlText.post : SparqlText.put,
+                async (endpoint, signal, map) => {
+                  const port = requireGraphStore(endpoint)
+                  if (mode === 'merge')
+                    await port.post(map(captured), { format: doc.format, text }, signal)
+                  else await port.put(map(captured), { format: doc.format, text }, signal)
+                  return quads.length
+                }
+              )
+            },
+            async exportOntology(
+              target: IRdfGraphTarget,
+              format?: IRdfGraphFormat,
+              ctx?: IOperationContext
+            ): Promise<IRdfGraphDocument> {
+              const captured = snapshotGraphTarget(target),
+                type = snapshotGraphFormat(format)
+              return readNativeFeaturePort(this.store).run(
+                SparqlText.ontologyExport,
+                ctx,
+                false,
+                SparqlText.get,
+                async (endpoint, signal, map) => {
+                  const text = await requireGraphStore(endpoint).get(map(captured), type, signal),
+                    quads = parseRdfDocument({ format: type, text })
+                  return Object.freeze({ format: type, text: await writeRdfDocument(quads, type) })
+                }
+              )
+            }
+          }
+        },
+        transaction: {}
+      }
+    }
+  })
+}

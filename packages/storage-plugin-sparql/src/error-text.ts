@@ -9,5 +9,7 @@ export const SparqlErrorText = {
   /** A native endpoint explicitly rejected a request. */
   requestFailed: 'sparql request failed',
   /** The caller must verify an already-sent modification before reopening writing. */
-  commitUnknown: 'sparql commit outcome is unknown'
+  commitUnknown: 'sparql commit outcome is unknown',
+  /** An accepted transaction callback or business task failed without a native protocol failure. */
+  transactionFailed: 'sparql transaction failed'
 } as const
