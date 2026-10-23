@@ -11,6 +11,8 @@ export type IStorageChange = {
   readonly sequence: number
   /** Provider-supplied identity of the change's origin. */
   readonly origin: string
+  /** Optional organization identity supplied by the original host context; never a routing grant. */
+  readonly orgId?: string
   /** Affected public channel: value, bytes, record, or all for a broad invalidation. */
   readonly channel: 'value' | 'bytes' | 'record' | 'all'
   /** Operation category: put, remove, clear, batch, or migrate. */

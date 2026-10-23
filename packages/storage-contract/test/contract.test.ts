@@ -20,6 +20,7 @@ describe('StorageContractError 家族', () => {
   it('公开码表 + source 恒为 @migaia/storage-contract', () => {
     expect(Object.keys(StorageContractErrorCode).sort()).toEqual([
       'aborted',
+      'changeCursorExpired',
       'concurrencyPolicyFailed',
       'disposed',
       'envelopeInvalid',
