@@ -317,7 +317,6 @@ const expectedRetainedModules = [
   '@migaia/plugin-host/dist/_virtual/_@oxc-project_runtime@0.139.0/helpers/esm/typeof.js',
   '@migaia/plugin-host/dist/admission-runtime.js',
   '@migaia/plugin-host/dist/cleanup-runtime.js',
-  '@migaia/plugin-host/dist/composition-runtime.js',
   '@migaia/plugin-host/dist/composition.js',
   '@migaia/plugin-host/dist/config-runtime.js',
   '@migaia/plugin-host/dist/config.js',
