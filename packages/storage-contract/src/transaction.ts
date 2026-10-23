@@ -5,6 +5,7 @@ import {
   type ITransactionCapabilityApi
 } from './capability.js'
 import { StorageCapabilityMethod } from './capability-constants.js'
+import { readCapabilityTokenFacts } from './capability-token.js'
 import type { kv } from './capabilities/kv.js'
 import type { records } from './capabilities/records.js'
 import type { ICodecValue } from '@migaia/serialize/codec'
@@ -949,7 +950,9 @@ export function useTransactionCapability<
       : ITransactionCapabilityApi<TCap>
   /** Complete finite methods delegate to the original binder only when an operation actually runs. */
   const api: Record<string, unknown> = {}
-  if (binding.transaction.query) {
+  /** Projection facts remain on the authentic token row, outside the backend binder receiver. */
+  const transaction = readCapabilityTokenFacts(capability)!.transaction!
+  if (transaction.query) {
     /**
      * Queries bind the current user/check/operation view without opening a cursor during
      * construction.
@@ -978,7 +981,7 @@ export function useTransactionCapability<
       ])
   }
   /** Standard scalar methods use the original fresh-view operation path, without token imports. */
-  for (const method of binding.transaction.methods)
+  for (const method of transaction.methods)
     api[method] = (...args: readonly unknown[]) =>
       runTransactionCapabilityMethod(scope, capability, method, args)
   /** Only the projection object is frozen; the backend scope/API and original base are not patched. */

@@ -25,8 +25,7 @@ import {
 import {
   invalidCapability,
   isCapabilityToken as isToken,
-  readCapabilityTokenFacts,
-  type ICapabilityTransactionFacts
+  readCapabilityTokenFacts
 } from './capability-token.js'
 import type { kv } from './capabilities/kv.js'
 import type { records } from './capabilities/records.js'
@@ -273,7 +272,6 @@ export type ICapabilityInstallPort = {
 type IImplementationRecord = {
   readonly implementation: ICapabilityImpl
   readonly forTransaction?: (scope: ITransactionScope) => unknown
-  readonly transaction?: ICapabilityTransactionFacts
 }
 /** Authentic immutable descriptors; public symbols and lookalike fields do not authorize them. */
 const implementations = new WeakMap<object, IImplementationRecord>()
@@ -353,7 +351,6 @@ export function readTransactionImplementation(
   capability: IAnyStorageCapability
 ): IImplementationRecord & {
   readonly forTransaction: (scope: ITransactionScope) => unknown
-  readonly transaction: ICapabilityTransactionFacts
 } {
   /** Root membership and forged-token diagnostics use the exact canonical lookup first. */
   const record = stores.get(store)
@@ -361,7 +358,10 @@ export function readTransactionImplementation(
   /** Published implementation identity remains the authority for transaction binding. */
   const binding = implementations.get(descriptor)!
   /** Only the implemented finite standard projections can be requested from this owner. */
-  if (binding.transaction === undefined || binding.forTransaction === undefined)
+  if (
+    readCapabilityTokenFacts(capability)?.transaction === undefined ||
+    binding.forTransaction === undefined
+  )
     throw new StorageContractError(
       StorageContractErrorCode.unsupported,
       { backend: record!.backend },
@@ -369,7 +369,6 @@ export function readTransactionImplementation(
     )
   return binding as IImplementationRecord & {
     readonly forTransaction: (scope: ITransactionScope) => unknown
-    readonly transaction: ICapabilityTransactionFacts
   }
 }
 /** Creates a frozen authentic implementation descriptor without taking ownership of its API. */
@@ -410,7 +409,7 @@ export function implement<
   }
   /** API shape admission for standard tokens happens again at the atomic provider boundary. */
   const descriptor = Object.freeze({ capability, api }) as ICapabilityImpl<TCap, TApi>
-  implementations.set(descriptor, { implementation: descriptor, forTransaction, transaction })
+  implementations.set(descriptor, { implementation: descriptor, forTransaction })
   return descriptor
 }
 
