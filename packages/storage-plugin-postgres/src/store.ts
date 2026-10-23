@@ -1369,7 +1369,9 @@ export async function createPostgresStore<T>(
         const client = await configuration.driver.connect()
         try {
           await client.query('BEGIN', [])
-          for (const table of Object.values(tables))
+          for (const table of Object.values(tables).filter(
+            (table) => table !== tables.vectorConfiguration
+          ))
             await client.query('DELETE FROM ' + table + ' WHERE org_id=$1', [orgId])
           if (vectorSelected()) {
             let current = organizations.get(orgId)

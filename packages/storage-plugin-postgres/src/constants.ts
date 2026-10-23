@@ -13,7 +13,7 @@ export const PgNames = {
   markers: 'commit_markers',
   vectorConfiguration: 'vector_config',
   /** Global physical collection schema is not a business org and cannot be deleted by dropOrg. */
-  vectorConfigurationOwner: 'storage.backend.postgres/vector-config',
+  vectorConfigurationOwner: '00000000-0000-0000-0000-000000000000',
   notify: 'changes'
 } as const
 /** Only physical serialization/deadlock states enter the original revision classification path. */

@@ -97,6 +97,7 @@ it('shares one native collection across hosts with different defaults and preser
   })
   const orgId = randomUUID()
   const otherOrg = randomUUID()
+  const zeroOrg = '00000000-0000-0000-0000-000000000000'
   const left = first.org(orgId).backend('postgres')
   const right = second.org(orgId).backend('postgres')
   await left
@@ -123,6 +124,16 @@ it('shares one native collection across hosts with different defaults and preser
     (await pool.query('SELECT count(*)::int4 AS count FROM ' + prefix + '_vector_config')).rows[0]
       ?.count
   ).toBe(1)
+  await first
+    .org(zeroOrg)
+    .backend('postgres')
+    .use(vector)
+    .collection('shared')
+    .upsert([{ id: 'zero', vector: [1] }])
+  await second.dropOrg(zeroOrg)
+  expect((await pool.query('SELECT org_id FROM ' + prefix + '_vector_config')).rows).toEqual([
+    { org_id: zeroOrg }
+  ])
   await first.dropOrg(orgId)
   expect(
     await right.use(vector).collection('shared').near([1], { exact: true }).topK(1).all()
