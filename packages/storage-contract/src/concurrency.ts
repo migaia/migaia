@@ -1,3 +1,6 @@
+import { snapshotStorageKey, assertStringStorageKey } from './key.js'
+import { encodeOrderedStorageKey } from './key-order.js'
+import type { IBackendKind } from './capabilities.js'
 import { StorageContractError, StorageContractErrorCode } from './errors.js'
 import { StorageContractErrorText } from './error-text.js'
 import type { StorageStageKind } from './stage-kind.js'
@@ -271,3 +274,175 @@ export const ConcurrencyPolicy = Object.freeze({
     })
   }
 })
+
+/** Existing physical channel order precedes the canonical key encoding, never its own key tags. */
+const LockChannel = { text: 'text', bytes: 'bytes', record: 'record' } as const
+/** Disjoint channel markers prevent equal user keys in different channels from colliding. */
+const LockChannelRank = { text: 1, bytes: 2, record: 3 } as const
+/** Internal snapshots retain independently owned canonical bytes across all actual attempts. */
+export type INormalizedLockKey = { readonly key: ILockKey; readonly encoded: Uint8Array }
+/** Explicit stack frames visit only still-shared suffixes rather than maximum-length padding. */
+type ILockRadixFrame = { readonly start: number; readonly end: number; readonly depth: number }
+/** Byte values occupy 1..256; bucket zero is reserved for a genuinely ended encoding. */
+const LOCK_RADIX_BUCKETS = 257
+
+/** Builds the existing coded lock-argument boundary with an optional actual backend diagnostic. */
+function invalidLockArgument(
+  backend: IBackendKind | undefined,
+  cause?: unknown
+): StorageContractError {
+  return new StorageContractError(
+    StorageContractErrorCode.invalidArgument,
+    { backend, cause },
+    StorageContractErrorText.lockArgument
+  )
+}
+/** Captures one lock container and reuses the canonical key-domain snapshot, never object identity. */
+export function snapshotLockKey(value: unknown, backend: IBackendKind | undefined): ILockKey {
+  if (typeof value !== 'object' || value === null || Array.isArray(value))
+    throw invalidLockArgument(backend)
+  /** Channel and key accessors are borrowed once before validation or copying. */
+  let channel: unknown
+  /** Key failures remain distinct from malformed lock-container failures. */
+  let key: unknown
+  try {
+    channel = (value as { channel?: unknown }).channel
+    key = (value as { key?: unknown }).key
+  } catch (cause) {
+    throw invalidLockArgument(backend, cause)
+  }
+  if (channel === LockChannel.bytes) {
+    assertStringStorageKey(key, backend)
+    return Object.freeze({ channel, key })
+  }
+  if (channel === LockChannel.text || channel === LockChannel.record)
+    return Object.freeze({ channel, key: snapshotStorageKey(key, backend) })
+  throw invalidLockArgument(backend)
+}
+/** Public factories snapshot immediately without inventing a backend when no store exists yet. */
+export const lockKey = Object.freeze({
+  /** Text locks use the same typed key domain as single and batch text identity. */
+  text(key: IStorageKey): Extract<ILockKey, { readonly channel: 'text' }> {
+    return snapshotLockKey({ channel: LockChannel.text, key }, undefined) as Extract<
+      ILockKey,
+      { readonly channel: 'text' }
+    >
+  },
+  /** Byte locks retain their existing string-only physical channel. */
+  bytes(key: string): Extract<ILockKey, { readonly channel: 'bytes' }> {
+    return snapshotLockKey({ channel: LockChannel.bytes, key }, undefined) as Extract<
+      ILockKey,
+      { readonly channel: 'bytes' }
+    >
+  },
+  /** Record locks detach Dates, buffers and nested arrays through the existing validator. */
+  record(key: IStorageKey): Extract<ILockKey, { readonly channel: 'record' }> {
+    return snapshotLockKey({ channel: LockChannel.record, key }, undefined) as Extract<
+      ILockKey,
+      { readonly channel: 'record' }
+    >
+  }
+})
+/** Adds only channel identity around the sole canonical ordered-key encoder. */
+function encodeLockIdentity(key: ILockKey, backend: IBackendKind): Uint8Array {
+  /** Key-order owns every key tag and self-delimiting scalar/array representation. */
+  const ordered = encodeOrderedStorageKey(key.key, backend)
+  /** One channel marker keeps the original text < bytes < record order. */
+  const encoded = new Uint8Array(ordered.length + 1)
+  encoded[0] = LockChannelRank[key.channel]
+  encoded.set(ordered, 1)
+  return encoded
+}
+/** Stable MSD buckets process each present suffix byte a constant number of times. */
+function sortLockIdentities(entries: INormalizedLockKey[]): void {
+  if (entries.length < 2) return
+  /** One shared scratch array serves every disjoint frame, without copying prefixes. */
+  const scratch: INormalizedLockKey[] = []
+  scratch.length = entries.length
+  /** Fixed alphabet state is reused for every frame instead of retained per depth. */
+  const counts = new Uint32Array(LOCK_RADIX_BUCKETS)
+  /** Write positions are independently advanced while stable scattering fills the scratch region. */
+  const positions = new Uint32Array(LOCK_RADIX_BUCKETS)
+  /** LIFO suffix work avoids call-stack growth for long equal prefixes. */
+  const frames: ILockRadixFrame[] = [{ start: 0, end: entries.length, depth: 0 }]
+  while (frames.length > 0) {
+    /** Frames are disjoint at this depth and never include an already ended key. */
+    const { start, end, depth } = frames.pop()!
+    counts.fill(0)
+    for (let index = start; index < end; index += 1) {
+      /** Actual zero bytes stay ordinary content; only absence enters the terminator bucket. */
+      const encoded = entries[index]!.encoded
+      counts[depth < encoded.length ? encoded[depth]! + 1 : 0] += 1
+    }
+    /** Bucket boundaries use absolute array positions, independent of key length. */
+    let boundary = start
+    for (let bucket = 0; bucket < LOCK_RADIX_BUCKETS; bucket += 1) {
+      positions[bucket] = boundary
+      boundary += counts[bucket]!
+    }
+    for (let index = start; index < end; index += 1) {
+      /** Stable movement retains the first snapshot when duplicate identities later collapse. */
+      const entry = entries[index]!
+      /** End-of-key has its own bucket and cannot be confused with embedded binary zero. */
+      const bucket = depth < entry.encoded.length ? entry.encoded[depth]! + 1 : 0
+      scratch[positions[bucket]!] = entry
+      positions[bucket] += 1
+    }
+    for (let index = start; index < end; index += 1) entries[index] = scratch[index]!
+    boundary = start + counts[0]!
+    for (let bucket = 1; bucket < LOCK_RADIX_BUCKETS; bucket += 1) {
+      /** Singleton and terminated ranges need no further byte inspection. */
+      const size = counts[bucket]!
+      if (size > 1) frames.push({ start: boundary, end: boundary + size, depth: depth + 1 })
+      boundary += size
+    }
+  }
+}
+/** Adjacent deduplication charges each compared encoding at most twice. */
+function equalLockIdentity(left: Uint8Array, right: Uint8Array): boolean {
+  if (left.length !== right.length) return false
+  for (let index = 0; index < left.length; index += 1)
+    if (left[index] !== right[index]) return false
+  return true
+}
+/**
+ * Internal owner/builder normalization snapshots once, encodes once and sorts by actual byte
+ * suffixes. The immutable result has independent keys and no comparison sort or global cache.
+ */
+export function normalizeLockKeys(
+  keys: unknown,
+  backend: IBackendKind
+): readonly INormalizedLockKey[] {
+  if (!Array.isArray(keys)) throw invalidLockArgument(backend)
+  /** Normalization keeps only this input's independent key snapshots and encodings. */
+  const entries: INormalizedLockKey[] = []
+  /** Capture array length once so accessor side effects cannot extend this admission loop. */
+  let length: number
+  try {
+    length = keys.length
+  } catch (cause) {
+    throw invalidLockArgument(backend, cause)
+  }
+  if (!Number.isSafeInteger(length) || length < 0) throw invalidLockArgument(backend)
+  for (let index = 0; index < length; index += 1) {
+    /** Array getters can fail separately from a lock's channel/key fields. */
+    let value: unknown
+    try {
+      value = keys[index]
+    } catch (cause) {
+      throw invalidLockArgument(backend, cause)
+    }
+    /** Invalid or sparse entries fail through the same lock-container admission. */
+    const key = snapshotLockKey(value, backend)
+    entries.push(Object.freeze({ key, encoded: encodeLockIdentity(key, backend) }))
+  }
+  sortLockIdentities(entries)
+  /** Only adjacent canonical identities are compared; mutable object identity never deduplicates. */
+  const unique: INormalizedLockKey[] = []
+  for (const entry of entries) {
+    /** The last retained item is already in canonical order. */
+    const previous = unique[unique.length - 1]
+    if (!previous || !equalLockIdentity(previous.encoded, entry.encoded)) unique.push(entry)
+  }
+  return Object.freeze(unique)
+}

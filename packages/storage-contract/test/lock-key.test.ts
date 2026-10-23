@@ -1,0 +1,177 @@
+import { describe, expect, expectTypeOf, it } from 'vitest'
+import { lockKey, compareStorageKeys, type ILockKey, type IStorageKey } from '../src/index.js'
+import { normalizeLockKeys, snapshotLockKey } from '../src/concurrency.js'
+
+/** Oracle compares established key meanings and fixed channel order, independent of new encoding. */
+function compareLockKeys(left: ILockKey, right: ILockKey): number {
+  /** This small table is independent test data, not a production lock identity owner. */
+  const channel = { text: 0, bytes: 1, record: 2 }
+  return channel[left.channel] - channel[right.channel] || compareStorageKeys(left.key, right.key)
+}
+
+describe('canonical lock identities', () => {
+  it('snapshots factory inputs and preserves exact channel types without a fabricated backend', () => {
+    /** Caller-owned mutable key components must detach immediately at factory invocation. */
+    const date = new Date(1)
+    const bytes = new Uint8Array([0, 255])
+    const source: IStorageKey[] = ['profile', date, bytes.buffer]
+    const text = lockKey.text(source)
+    const record = lockKey.record(source)
+    const binary = lockKey.bytes('blob')
+    expectTypeOf(text.channel).toEqualTypeOf<'text'>()
+    expectTypeOf(record.channel).toEqualTypeOf<'record'>()
+    expectTypeOf(binary.key).toEqualTypeOf<string>()
+    date.setTime(2)
+    bytes.fill(7)
+    source.push('changed')
+    expect(text.key).toEqual(['profile', new Date(1), new Uint8Array([0, 255]).buffer])
+    expect(record.key).toEqual(text.key)
+    expect(Object.isFrozen(text)).toBe(true)
+    expect(() => lockKey.record({} as IStorageKey)).toThrowError(
+      expect.objectContaining({ code: 'INVALID_KEY', backend: undefined })
+    )
+    expect(() => lockKey.bytes(1 as unknown as string)).toThrowError(
+      expect.objectContaining({ code: 'INVALID_ARGUMENT', backend: undefined })
+    )
+  })
+
+  it('sorts three channels by established key order and deduplicates equivalent mutable identities', () => {
+    /** Independent equal Date/buffer/tuple objects represent the same physical lock. */
+    const inputs: ILockKey[] = [
+      lockKey.record(['x', new Date(1)]),
+      lockKey.text('z'),
+      lockKey.bytes('z'),
+      lockKey.text(1),
+      lockKey.text('1'),
+      lockKey.record(-0),
+      lockKey.record(0),
+      lockKey.record(new Uint8Array([0, 255]).buffer),
+      lockKey.record(new Uint8Array([0, 255]).buffer),
+      lockKey.record(['x', new Date(1)]),
+      lockKey.text(new Date(-1)),
+      lockKey.text('a')
+    ]
+    /** A small comparison oracle is allowed in the test, never in the production normalization. */
+    const expected = inputs
+      .slice()
+      .sort(compareLockKeys)
+      .filter((key, index, sorted) => index === 0 || compareLockKeys(sorted[index - 1]!, key) !== 0)
+    const normalized = normalizeLockKeys(inputs, 'memory')
+    expect(normalized.map((item) => item.key)).toEqual(expected)
+    expect(normalized).toHaveLength(9)
+    expect(Object.isFrozen(normalized)).toBe(true)
+    expect(normalizeLockKeys([], 'memory')).toEqual([])
+    /** Actual strings and typed batch keys keep different canonical identities. */
+    const text = normalized.filter((item) => item.key.channel === 'text')
+    expect(text.map((item) => item.key.key)).toContain(1)
+    expect(text.map((item) => item.key.key)).toContain('1')
+  })
+
+  it('keeps encoded internal identity independent of all caller-owned key components', () => {
+    /** Public factory snapshots can remain mutable internally without mutating normalized identity. */
+    const date = new Date(1)
+    const source = lockKey.record([date, new Uint8Array([1]).buffer])
+    const normalized = normalizeLockKeys([source], 'catalog')
+    const before = normalized[0]!.encoded.slice()
+    const sourceKey = source.key as readonly [Date, ArrayBuffer]
+    sourceKey[0].setTime(50)
+    new Uint8Array(sourceKey[1]).fill(99)
+    expect(normalized[0]!.encoded).toEqual(before)
+    expect(normalized[0]!.key.key).toEqual([new Date(1), new Uint8Array([1]).buffer])
+    normalized[0]!.encoded.fill(0)
+    expect(sourceKey[0].getTime()).toBe(50)
+    expect(new Uint8Array(sourceKey[1])[0]).toBe(99)
+  })
+
+  it('reads lock container and array accessors once and preserves exact getter failures', () => {
+    /** Channel/key getters belong to the caller and are captured before validation. */
+    const reads = { channel: 0, key: 0, item: 0 }
+    const candidate = {
+      get channel() {
+        reads.channel += 1
+        return 'record' as const
+      },
+      get key() {
+        reads.key += 1
+        return ['x', 1]
+      }
+    }
+    const inputs: ILockKey[] = []
+    Object.defineProperty(inputs, 0, {
+      configurable: true,
+      get() {
+        reads.item += 1
+        return candidate
+      }
+    })
+    expect(normalizeLockKeys(inputs, 'actual-backend')).toHaveLength(1)
+    expect(reads).toEqual({ channel: 1, key: 1, item: 1 })
+    const original = new Error('lock getter failed')
+    expect(() =>
+      snapshotLockKey(
+        {
+          get channel(): never {
+            throw original
+          }
+        },
+        'actual-backend'
+      )
+    ).toThrowError(
+      expect.objectContaining({
+        code: 'INVALID_ARGUMENT',
+        backend: 'actual-backend',
+        cause: original
+      })
+    )
+    Object.defineProperty(inputs, 0, {
+      configurable: true,
+      get() {
+        throw original
+      }
+    })
+    expect(() => normalizeLockKeys(inputs, 'actual-backend')).toThrowError(
+      expect.objectContaining({ cause: original })
+    )
+  })
+
+  it.each([null, [], {}, { channel: 'other', key: 'x' }, { channel: 'bytes', key: 1 }])(
+    'rejects invalid lock containers %#',
+    (key) => {
+      expect(() => snapshotLockKey(key, 'catalog')).toThrowError(
+        expect.objectContaining({ code: 'INVALID_ARGUMENT', backend: 'catalog' })
+      )
+    }
+  )
+
+  it('rejects sparse/nonarray lock sets before execution and preserves canonical key-domain errors', () => {
+    /** A sparse actual array has no valid lock at its sole declared position. */
+    const sparse: ILockKey[] = []
+    sparse.length = 1
+    for (const keys of [null, {}, sparse])
+      expect(() => normalizeLockKeys(keys, 'catalog')).toThrowError(
+        expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+      )
+    expect(() => normalizeLockKeys([{ channel: 'record', key: {} }], 'catalog')).toThrowError(
+      expect.objectContaining({ code: 'INVALID_KEY', backend: 'catalog' })
+    )
+  })
+
+  it('handles a long key with many short keys using an explicit suffix stack and no comparison sort', () => {
+    /** One unusually long key must not pad every shorter key to this length. */
+    const long = 'a'.repeat(20_000)
+    const keys = [
+      lockKey.record(long),
+      ...Array.from({ length: 512 }, (_, index) => lockKey.record(index))
+    ].reverse()
+    const normalized = normalizeLockKeys(keys, 'memory')
+    expect(normalized).toHaveLength(513)
+    expect(normalized.slice(0, 512).map((item) => item.key.key)).toEqual(
+      Array.from({ length: 512 }, (_, index) => index)
+    )
+    expect(normalized[512]!.key.key).toBe(long)
+    /** Known simple keys reveal only the channel prefix followed by the original canonical bytes. */
+    expect(normalizeLockKeys([lockKey.text('a')], 'memory')[0]!.encoded).toEqual(
+      new Uint8Array([1, 3, 1, 0, 97, 0])
+    )
+  })
+})

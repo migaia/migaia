@@ -1045,6 +1045,7 @@
         "isStorageCapabilities",
         "isStorageContractError",
         "kv",
+        "lockKey",
         "migrateEnvelope",
         "migrateEnvelopeSync",
         "nextTransactionIterator",

@@ -601,15 +601,21 @@ const codecMembers: Readonly<Record<string, IMemberDoc>> = {
   }
 }
 
-/** Parameters shared by neutral key validation helpers. */
+/** Lock factories validate keys before a real backend exists to supply a diagnostic label. */
+const optionalKeyBackend = t(
+  'Actual backend diagnostic label, or undefined before a store exists. This argument remains required; it never changes the accepted key domain.',
+  '真实 backend 诊断名，尚无 store 时可传 undefined；此参数仍必填，不改变可接纳键域。'
+)
+
+/** Shared diagnostics remain separate from the canonical ordered encoder’s actual backend label. */
 const keyValidationParams = {
   value: t(
     'Required unknown candidate from application input. Record keys accept strings, finite numbers, valid `Date`, `ArrayBuffer` up to 1048576 bytes each, or nonempty dense acyclic arrays of these values. Root depth is 0; maximum depth is 32 and maximum visited node count is 4096. The string-only helper accepts only strings. Values are validated without coercion.',
     '必填的应用未知输入。记录键接纳字符串、有限数字、有效 `Date`、逐个最多 `1048576` 字节的 `ArrayBuffer`，或这些值组成的非空、稠密、无环数组。根深度为 0，最大深度 32，最多访问 4096 个节点。纯字符串键工具只接纳字符串。执行校验，不强制转换。'
   ),
   backend: t(
-    'Required caller-selected `IBackendKind`: `local`, `session`, `cookie`, `indexeddb` or `memory`, normally from `store.backend`. It labels errors without choosing an implementation or narrowing the record-key domain.',
-    '调用方必填的 `IBackendKind`：`local`、`session`、`cookie`、`indexeddb` 或 `memory`，通常来自 `store.backend`。只标注错误，不选择实现或缩窄记录键域。'
+    'Required caller-selected open `IBackendKind`, normally from the actual `store.backend`. It labels errors without choosing an implementation or narrowing the record-key domain.',
+    '调用方必填的开放 `IBackendKind`，通常来自真实 `store.backend`；只标注错误，不选择实现或缩窄记录键域。'
   ),
   label: t(
     'Optional caller-selected diagnostic field name, default `key`; affects only error text, not validation or copying.',
@@ -658,6 +664,15 @@ export const storageContractReference: ILibraryReference = {
     }
   },
   symbols: {
+    lockKey: {
+      role: 'constant',
+      purpose: t(
+        'Canonical text, bytes and record lock factories validate and snapshot immediately without acquiring locks.',
+        '规范文本、字节与记录锁工厂立即校验和快照，不取得锁。'
+      ),
+      example: storageContractCases.lockKey![0]!.example,
+      cases: storageContractCases.lockKey
+    },
     defineConcurrencyPolicy: {
       role: 'operation',
       purpose: t(
@@ -1254,7 +1269,7 @@ if (snapshot) console.log(await snapshot.store.getRecord('profile'))`
         'Validates the IndexedDB-compatible record-key domain without coercion. It rejects invalid dates, nonfinite numbers, oversized binary keys, cyclic or empty/sparse arrays, excessive depth and excessive node count.',
         '不强制转换地校验兼容结构化数据库的记录键域。拒绝无效日期、非有限数字、过大二进制键、循环或空及稀疏数组，以及超出深度和节点上限的值。'
       ),
-      params: keyValidationParams,
+      params: { ...keyValidationParams, backend: optionalKeyBackend },
       returns: t(
         'No result; narrows value to `IStorageKey`, or throws `INVALID_KEY` with backend, original key and cause.',
         '没有结果；把值收窄为 `IStorageKey`，否则抛包含后端、原始键和原因的 `INVALID_KEY`。'
@@ -1267,7 +1282,7 @@ if (snapshot) console.log(await snapshot.store.getRecord('profile'))`
         'Validates and detaches one record key before asynchronous work can observe later caller mutation. Arrays, dates and binary buffers are copied recursively, then the copy is validated again.',
         '在异步工作观察到调用方后续修改前，校验并分离一个记录键。递归复制数组、日期和二进制缓冲区，再次校验复制结果。'
       ),
-      params: keyValidationParams,
+      params: { ...keyValidationParams, backend: optionalKeyBackend },
       returns: t(
         'An independent valid `IStorageKey`, recursively copied but not frozen. Invalid input or failed copying throws `INVALID_KEY` while retaining its cause.',
         '独立有效的 `IStorageKey`，递归复制但不冻结。输入无效或复制失败抛 `INVALID_KEY` 并保留原因。'
@@ -1283,7 +1298,7 @@ if (snapshot) console.log(await snapshot.store.getRecord('profile'))`
         'Validates the string-only key contract used by value, byte and metadata channels. It does not accept numeric or structured keys and never converts them to strings.',
         '校验值、字节和元数据通道要求的纯字符串键契约。不接受数字或结构化键，也不会把它们转换为字符串。'
       ),
-      params: keyValidationParams,
+      params: { ...keyValidationParams, backend: optionalKeyBackend },
       returns: t(
         'No result; narrows value to string, or throws `INVALID_ARGUMENT` with a typed cause.',
         '没有结果；把值收窄为字符串，否则抛带类型原因的 `INVALID_ARGUMENT`。'
@@ -1615,6 +1630,35 @@ console.log(candidate.name, candidate.output)`
     }
   },
   types: {
+    lockKey: {
+      summary: t(
+        'Factories preserve the exact physical channel while detaching caller-owned key components.',
+        '工厂在分离调用方键组件的同时保留精确物理通道。'
+      ),
+      members: {
+        text: {
+          summary: t(
+            'Snapshot the existing typed text key domain, including batch tuples.',
+            '快照原 typed text 键域，包含批量 tuple。'
+          ),
+          example: `const key = lockKey.text(['orders', 1])`
+        },
+        bytes: {
+          summary: t(
+            'Snapshot a string-only byte-channel lock identity.',
+            '快照仅字符串的字节通道锁身份。'
+          ),
+          example: `const key = lockKey.bytes('image')`
+        },
+        record: {
+          summary: t(
+            'Snapshot the existing record-key domain; Date/buffer/array values detach.',
+            '快照原记录键域，分离 Date、buffer 与数组值。'
+          ),
+          example: `const key = lockKey.record(new Date(0))`
+        }
+      }
+    },
     ConcurrencyPolicy: {
       summary: t(
         'Preset factories validate numeric configuration before execution.',
@@ -2007,7 +2051,20 @@ console.log(candidate.name, candidate.output)`
         'Physical text, bytes or record channel and key identity.',
         'text、bytes 或 record 物理通道及键身份。'
       ),
-      members: {}
+      members: {
+        channel: {
+          summary: t(
+            'Physical text, bytes or record channel; identical user keys in different channels never collide.',
+            '物理 text、bytes 或 record 通道；不同通道的相同用户键不碰撞。'
+          )
+        },
+        key: {
+          summary: t(
+            'Existing typed storage key for text/records, or string for bytes; factory snapshots mutable components.',
+            'text/record 为原 typed storage key，bytes 为字符串；工厂快照可变组件。'
+          )
+        }
+      }
     },
     IConcurrencyPolicy: {
       summary: t(

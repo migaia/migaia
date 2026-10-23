@@ -57,6 +57,36 @@ catch (error) { if (!(error instanceof StorageContractError)) throw error; conso
       )
     }
   ],
+  lockKey: [
+    {
+      title: t(
+        'Capture mutable lock identity before the caller changes it',
+        '在调用方修改前捕获可变锁身份'
+      ),
+      problem: t(
+        'A transaction may be configured before it starts. A changed Date must not silently select a different physical lock.',
+        '事务可先配置再开始；Date 被修改后不能悄然选择另一把物理锁。'
+      ),
+      example: t(
+        `import { lockKey } from '@migaia/storage-contract'
+const original = new Date(0)
+const saved = lockKey.record(original)
+original.setTime(1_000)
+console.log(saved.channel, saved.key instanceof Date && saved.key.getTime())
+// record 0`,
+        `import { lockKey } from '@migaia/storage-contract'
+const original = new Date(0)
+const saved = lockKey.record(original)
+original.setTime(1_000)
+console.log(saved.channel, saved.key instanceof Date && saved.key.getTime())
+// record 0`
+      ),
+      result: t(
+        'Prints record 0; the original Date remains caller-owned and no lock is acquired.',
+        '输出 record 0；原 Date 仍由调用方持有，没有取得锁。'
+      )
+    }
+  ],
   defineConcurrencyPolicy: [
     {
       title: t('Capture a genuine policy without executing it', '捕获真实策略而不执行'),
