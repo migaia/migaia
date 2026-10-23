@@ -1284,6 +1284,7 @@
         "createStorePersistError",
         "createStorePersistTypeError",
         "defaultJsonCodec",
+        "persistTransaction",
         "persistUnit",
         "readEnvelope",
         "removeEnvelope",

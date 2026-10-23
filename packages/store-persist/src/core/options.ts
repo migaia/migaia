@@ -2,12 +2,46 @@ import { StorePersistErrorCode } from '../error-code.js'
 import { createStorePersistTypeError } from '../errors.js'
 import { StorePersistErrorText } from '../error-text.js'
 import { snapshotOwnDescriptors } from '@migaia/utils/object'
+import { observeThenableRejection } from '@migaia/utils/function'
 import {
   createMigrationPlan,
   type IMigrationPlan,
   type IMigrationStep,
   type IMigrationReset
 } from '@migaia/storage-contract'
+
+/** Binds observations without allowing a public observer's accessor or callback to veto work. */
+export function bindPersistStages<
+  T extends {
+    readonly forTransaction: (scope: object) => T
+    readonly report: (error: unknown) => undefined
+  }
+>(observer: T | undefined, scope: object): T | undefined {
+  if (observer === undefined) return undefined
+  try {
+    return observer.forTransaction(scope)
+  } catch (cause) {
+    observeThenableRejection(undefined, { error: cause }, (error) => observer.report(error))
+    return undefined
+  }
+}
+
+/** Reads one observer kind at configuration admission and retains an accessor failure on cause. */
+export function assertPersistStageKind(
+  observer: { readonly kind: unknown } | undefined,
+  expected: string,
+  message: string
+): void {
+  /** Metadata is never re-read while a codec or transaction is in progress. */
+  let kind: unknown
+  try {
+    kind = observer?.kind
+  } catch (cause) {
+    throw createStorePersistTypeError(StorePersistErrorCode.invalidOption, message, { cause })
+  }
+  if (observer !== undefined && kind !== expected)
+    throw createStorePersistTypeError(StorePersistErrorCode.invalidOption, message)
+}
 
 /**
  * Captures one canonical plan before status allocation or subscription; contract failures remain on

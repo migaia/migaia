@@ -43,7 +43,7 @@ export type IPersistableStore = {
 /** Store attachment options; Runtime and restoration merge come from the Store adapter. */
 export type IPersistOptions = Pick<
   IPersistUnitOptions<Record<string, unknown>>,
-  'debounceMs' | 'maxWaitMs' | 'scheduler' | 'codecStages'
+  'debounceMs' | 'maxWaitMs' | 'scheduler' | 'codecStages' | 'transactionStages'
 > & {
   /** Required storage key, passed unchanged; empty strings are not rejected by this adapter. */
   key: string
@@ -95,6 +95,7 @@ export function persist(store: IPersistableStore, options: IPersistOptions): IPe
     version: snapshot.version,
     migrations: snapshot.migrations,
     codecStages: snapshot.codecStages,
+    transactionStages: snapshot.transactionStages,
     partialize: snapshot.partialize,
     debounceMs: snapshot.debounceMs,
     maxWaitMs: snapshot.maxWaitMs,

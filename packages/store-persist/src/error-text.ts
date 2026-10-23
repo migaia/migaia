@@ -20,6 +20,18 @@ export const StorePersistErrorText = {
   migrationsInvalid: (key: string): string => `[store] persist "${key}" migrations are invalid`,
   /** Codec observers must belong to the codec stage family before attachment begins. */
   codecStagesInvalid: '[store] persist codecStages must be a codec observer',
+  /** Transactional attachments reject wrong-kind observers before subscription or I/O. */
+  transactionStagesInvalid: '[store] persist transactionStages must be a transaction observer',
+  /** Atomic participation needs the original complete transaction-capable store. */
+  transactionBackend: '[store] persistTransaction requires a complete transaction-capable store',
+  /** Only privately registered active handles of one exact store may enlist or flush its scope. */
+  transactionParticipation:
+    '[store] persistTransaction requires active handles from the same store',
+  /** Direct operations cannot overtake an enlisted snapshot or wait behind its own transaction. */
+  transactionDirectOperation:
+    '[store] persistence is participating in a transaction; use flush(tx)',
+  /** Snapshot and partialize failures enter the existing encoding boundary before any tx request. */
+  transactionSnapshot: '[store] persist transaction snapshot cannot be encoded',
   aborted: '[store] persist operation was aborted by dispose',
   noCodec: (key: string): string => `[store] persist "${key}" resolved no codec`,
   invalidVersion: (key: string): string =>
