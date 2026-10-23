@@ -364,6 +364,23 @@ export const storageContractCases: Readonly<Record<string, readonly ICaseDoc[]>>
   snapshotStorageVectorUpsert: [vectorInputCase],
   snapshotStorageVectorFilter: [vectorInputCase],
   snapshotStorageVectorSearch: [vectorInputCase],
+  decodeOrderedStorageKey: [
+    {
+      title: t('Read an enumerated physical key', '读取枚举的物理键'),
+      problem: t(
+        'Native enumeration returns ordered key bytes; the original owner must read its own format.',
+        '原生枚举返回保序键字节，应由原拥有者读取自身格式。'
+      ),
+      example: t(
+        "import { encodeOrderedStorageKey, decodeOrderedStorageKey } from '@migaia/storage-contract'\nconsole.log(decodeOrderedStorageKey(encodeOrderedStorageKey(['files', 1], 'object'), 'object'))",
+        "import { encodeOrderedStorageKey, decodeOrderedStorageKey } from '@migaia/storage-contract'\nconsole.log(decodeOrderedStorageKey(encodeOrderedStorageKey(['files', 1], 'object'), 'object'))"
+      ),
+      result: t(
+        'Prints the original files/1 tuple without adding another key codec.',
+        '输出原 files/1 元组，不增加另一套键编码。'
+      )
+    }
+  ],
   snapshotStorageBlobPut: [
     {
       title: t('snapshotStorageBlobPut', 'snapshotStorageBlobPut'),

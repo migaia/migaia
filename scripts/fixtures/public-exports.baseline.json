@@ -1065,6 +1065,7 @@
         "createTransactionBuilder",
         "createTransactionOwner",
         "createVectorQuery",
+        "decodeOrderedStorageKey",
         "defineConcurrencyPolicy",
         "defineStorageCapability",
         "deriveStorageSqlQuery",

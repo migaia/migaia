@@ -669,7 +669,7 @@ RDF add/delete/match 沿同一规范 ground IQuad owner。支持事务的 provid
 
 ### Blob 作者接点
 
-后端在原生 I/O 前共用 `snapshotStorageBlobPut`、`snapshotStorageBlobGet` 与 `snapshotStorageBlobList`，独立捕获输入字节和元数据、校验互斥条件与闭区间范围，不消费上传流。`createStorageBlobObject(info, source, { close, report, backend? })` 将一次 stream 或 bytes 消费权接到原资源拥有者；EOF、cancel 与 dispose 释放同一原生内容。主清理保留可拒绝的缓存 Promise，符号清理使用独立缓存 Promise 并报告清理失败。
+后端在原生 I/O 前共用 `snapshotStorageBlobPut`、`snapshotStorageBlobGet` 与 `snapshotStorageBlobList`，独立捕获输入字节和元数据、校验互斥条件与闭区间范围，不消费上传流。`createStorageBlobObject(info, source, { close, report, backend? })` 将一次 stream 或 bytes 消费权接到原资源拥有者；EOF、cancel 与 dispose 释放同一原生内容。主清理保留可拒绝的缓存 Promise，符号清理使用独立缓存 Promise 并报告清理失败。可选 `normalizeFailure(error)` 把原生 read/cancel/close 错误分类交给后端，不改变资源拥有权。
 
 ## 记录与 RDF 的行控制
 

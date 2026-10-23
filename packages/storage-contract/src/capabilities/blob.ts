@@ -243,10 +243,13 @@ export function createStorageBlobObject(
     readonly report: (error: unknown) => void | PromiseLike<void>
     readonly backend?: IBackendKind
     readonly onSettled?: () => void
+    readonly normalizeFailure?: (error: unknown) => unknown
   }
 ): IBlobObject {
   /** The backend already captured one native data/metadata snapshot; detach its public metadata. */
   const capturedInfo = Object.freeze({ ...info, metadata: Object.freeze({ ...info.metadata }) })
+  /** Native backend classification remains with its owner while resource state stays shared. */
+  const normalize = options.normalizeFailure ?? ((error: unknown): unknown => error)
   /** One native reader exists only after a caller claims stream or bytes. */
   let reader: ReadableStreamDefaultReader<Uint8Array> | undefined
   /** Stream and bytes share exactly one successful content claim. */
@@ -264,24 +267,24 @@ export function createStorageBlobObject(
         await cancellation
       } catch (error) {
         failed = true
-        primary = error
+        primary = normalize(error)
       }
       try {
         reader?.releaseLock()
       } catch (error) {
-        if (failed) options.report(error)
+        if (failed) options.report(normalize(error))
         else {
           failed = true
-          primary = error
+          primary = normalize(error)
         }
       }
       try {
         await options.close()
       } catch (error) {
-        if (failed) options.report(error)
+        if (failed) options.report(normalize(error))
         else {
           failed = true
-          primary = error
+          primary = normalize(error)
         }
       }
       if (failed) throw primary
@@ -310,7 +313,9 @@ export function createStorageBlobObject(
         async pull(controller) {
           try {
             const item = await lifetime.advance(async () => {
-              const next = await reader!.read()
+              const next = await reader!.read().catch((error: unknown) => {
+                throw normalize(error)
+              })
               return next.done
                 ? { done: true, value: undefined }
                 : { done: false, value: next.value }

@@ -995,6 +995,23 @@ export const storageContractReference: ILibraryReference = {
       example: storageContractCases.snapshotStorageVectorSearch![0]!.example,
       cases: storageContractCases.snapshotStorageVectorSearch
     },
+    decodeOrderedStorageKey: {
+      role: 'operation',
+      purpose: t('Read the original ordered physical key wire format.', '读取原保序物理键格式。'),
+      params: {
+        encoded: t(
+          'Complete canonical key bytes from encodeOrderedStorageKey.',
+          'encodeOrderedStorageKey 返回的完整规范键字节。'
+        ),
+        backend: t('Actual backend diagnostic or undefined.', '真实后端标签或 undefined。')
+      },
+      returns: t(
+        'Detached IStorageKey; incomplete, noncanonical or out-of-domain bytes throw INVALID_KEY.',
+        '独立 IStorageKey；不完整、非规范或超域字节抛 INVALID_KEY。'
+      ),
+      example: storageContractCases.decodeOrderedStorageKey![0]!.example,
+      cases: storageContractCases.decodeOrderedStorageKey
+    },
     snapshotStorageBlobPut: {
       role: 'operation',
       purpose: t(
@@ -1075,8 +1092,8 @@ export const storageContractReference: ILibraryReference = {
         ),
         source: t('The already-open native WHATWG byte stream.', '已打开的原生 WHATWG 字节流。'),
         options: t(
-          'Native close, report, optional backend and onSettled callbacks.',
-          '原生 close、report 及可选 backend、onSettled 回调。'
+          'Native close, report, optional backend/onSettled, and optional normalizeFailure for backend-owned native error classification.',
+          '原生 close、report、可选 backend/onSettled，以及供后端分类原生错误的 normalizeFailure。'
         )
       },
       returns: t(

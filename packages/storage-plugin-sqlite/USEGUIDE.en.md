@@ -163,3 +163,8 @@ lazily reclaim expired rows through the original native mutation path without a 
 The standard `counter.increment` validates canonical decimal text and safe integers before an
 atomic native text update. Missing values start at 0; malformed text, invalid deltas and overflow
 reject before writing. Both capabilities support tx.use on the original native scope.
+
+Transactions retain the first live value and deadline in their native snapshot. If an observed
+deadline expires, the original commit check returns the conflict to the existing concurrency
+policy. Iteration skips rows that expire before their first return; close counts include only
+rows actually returned.

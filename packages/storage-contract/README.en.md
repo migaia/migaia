@@ -669,7 +669,7 @@ RDF add/delete/match use the same canonical ground IQuad owner. Transaction-enab
 
 ### Blob author helpers
 
-Backend authors share `snapshotStorageBlobPut`, `snapshotStorageBlobGet` and `snapshotStorageBlobList` before native I/O. They detach input bytes and metadata, validate mutually exclusive conditions and inclusive ranges, and leave upload streams unconsumed. `createStorageBlobObject(info, source, { close, report, backend? })` attaches one stream-or-bytes consumption right to the original resource owner; EOF, cancel and disposal release the same native content. Main disposal keeps its rejecting cached Promise; symbolic disposal has a separate cached Promise that reports cleanup failure.
+Backend authors share `snapshotStorageBlobPut`, `snapshotStorageBlobGet` and `snapshotStorageBlobList` before native I/O. They detach input bytes and metadata, validate mutually exclusive conditions and inclusive ranges, and leave upload streams unconsumed. `createStorageBlobObject(info, source, { close, report, backend? })` attaches one stream-or-bytes consumption right to the original resource owner; EOF, cancel and disposal release the same native content. Main disposal keeps its rejecting cached Promise; symbolic disposal has a separate cached Promise that reports cleanup failure. Optional `normalizeFailure(error)` delegates native read/cancel/close classification to the backend without changing resource ownership.
 
 ## Record and RDF row controls
 
