@@ -863,3 +863,5 @@ RDF 的客户端 `follow`/`inverse` 现在沿同一 reader 逐前驱调用原 `s
 `snapshotStorageVectorUpsert(points, configuration?)` 可省略配置以在原生 schema 查询前完整捕获 batch。此时仍沿原有限分量、稠密数组与 serialize payload 规则，不推断维度或 metric；取得真实 schema 后，对已脱离的 vector 调同一 `snapshotStorageVector` 校验再写入。显式配置的语义、错误与读取顺序不变。
 
 `snapshotStorageVectorSearch(query, options, configuration?)` 同样可在 schema 查询前捕获原查询、全部 options 与 filter；取得真实 schema 后只用原 `snapshotStorageVector` 复核已脱离的 query。显式配置仍先于 option getter 校验。五个原 helper 已统一核对：collection/vector/upsert/search 的 schema 均可省，filter 不依赖 schema；都不推断或查询原生配置。
+
+原生后端用 encodeStorageOrgKey(orgId, key, backend) 编码组织物理键，用 decodeStorageOrgKey(orgId, bytes, backend) 取回逻辑键。两者复用原保序线格式，组织封装不占逻辑键的深度或节点预算。无效或其它组织的头部及无效结束字节报 INVALID_ARGUMENT，截断或无效逻辑字节仍报 INVALID_KEY。prefixStorageOrgKey 可选第三参数 backend 只补逻辑键错误上下文，省略时原行为不变。

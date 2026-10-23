@@ -2,6 +2,10 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   compareStorageKeys,
   encodeOrderedStorageKey,
+  encodeStorageOrgKey,
+  decodeStorageOrgKey,
+  prefixStorageOrgKey,
+  encodeStorageOrgStringPrefix,
   orderStorageKeysByBytes,
   snapshotStorageBatchKeys,
   createStorageBatchKeyCapture,
@@ -51,6 +55,69 @@ const keys: readonly IStorageKey[] = [
   [[0], 1],
   [1]
 ]
+
+describe('organization ordered wire keys', () => {
+  /** Fixed caller identities let the original organization owner distinguish foreign envelopes. */
+  const orgId = '11111111-1111-1111-1111-111111111111'
+  const otherOrgId = '22222222-2222-2222-2222-222222222222'
+
+  it('retains maximum logical depth and node budgets without changing the original wire format', () => {
+    /** Only the logical key consumes the original depth and node limits. */
+    let deep: IStorageKey = 'leaf'
+    for (let depth = 0; depth < 32; depth++) deep = [deep]
+    /** Root plus 4095 children exactly fills the original logical node budget. */
+    const wide: IStorageKey = Array.from({ length: 4095 }, () => '')
+    for (const key of [deep, wide, ...keys]) {
+      const encoded = encodeStorageOrgKey(orgId, key, 'redis')
+      expect(compareStorageKeys(decodeStorageOrgKey(orgId, encoded, 'redis'), key)).toBe(0)
+    }
+    expect(encodeStorageOrgKey(orgId, ['orders', 1], 'redis')).toEqual(
+      encodeOrderedStorageKey(prefixStorageOrgKey(orgId, ['orders', 1]), 'redis')
+    )
+    expect(() => encodeStorageOrgKey(orgId, [deep], 'redis')).toThrowError(
+      expect.objectContaining({ code: 'INVALID_KEY', backend: 'redis' })
+    )
+    expect(() =>
+      encodeStorageOrgKey(
+        orgId,
+        Array.from({ length: 4096 }, () => ''),
+        'redis'
+      )
+    ).toThrowError(expect.objectContaining({ code: 'INVALID_KEY' }))
+  })
+
+  it('checks tenant and wire boundaries while retaining the original logical decoder limits', () => {
+    const encoded = encodeStorageOrgKey(orgId, 'user/\ud800', 'redis')
+    const prefix = encodeStorageOrgStringPrefix(orgId, 'user/', 'redis')
+    expect(encoded.subarray(0, prefix.byteLength)).toEqual(prefix)
+    expect(() => decodeStorageOrgKey(otherOrgId, encoded, 'redis')).toThrowError(
+      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+    )
+    expect(() => decodeStorageOrgKey(orgId, encoded.subarray(0, -1), 'redis')).toThrowError(
+      expect.objectContaining({ code: 'INVALID_KEY' })
+    )
+    /** An invalid outer terminator fails before the logical decoder receives any bytes. */
+    const brokenBoundary = encoded.slice()
+    brokenBoundary[brokenBoundary.byteLength - 1] = 255
+    expect(() => decodeStorageOrgKey(orgId, brokenBoundary, 'redis')).toThrowError(
+      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+    )
+    /** Duplicate one logical component before its tuple end to exceed only the original node limit. */
+    const full = encodeStorageOrgKey(
+      orgId,
+      Array.from({ length: 4095 }, () => ''),
+      'redis'
+    )
+    const extra = encodeOrderedStorageKey('', 'redis')
+    const hostile = new Uint8Array(full.byteLength + extra.byteLength)
+    hostile.set(full.subarray(0, -2))
+    hostile.set(extra, full.byteLength - 2)
+    hostile.set(full.subarray(-2), full.byteLength - 2 + extra.byteLength)
+    expect(() => decodeStorageOrgKey(orgId, hostile, 'redis')).toThrowError(
+      expect.objectContaining({ code: 'INVALID_KEY' })
+    )
+  })
+})
 
 describe('ordered storage key encoding', () => {
   it('orders captured selector bytes stably through the same canonical radix', () => {

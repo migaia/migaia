@@ -1,4 +1,5 @@
 import type { IStorageKey } from './context.js'
+import type { IBackendKind } from './capabilities.js'
 import { StorageContractError, StorageContractErrorCode } from './errors.js'
 import { StorageContractErrorText } from './error-text.js'
 import { snapshotStorageKey } from './key.js'
@@ -22,9 +23,13 @@ export function assertStorageOrgId(value: unknown): asserts value is string {
  * slot so scalar and tuple identities stay distinct. The internal envelope does not consume the
  * logical key's depth or node budget.
  */
-export const prefixStorageOrgKey = (orgId: string, key: IStorageKey): IStorageKey => {
+export const prefixStorageOrgKey = (
+  orgId: string,
+  key: IStorageKey,
+  backend?: IBackendKind
+): IStorageKey => {
   assertStorageOrgId(orgId)
-  return [storageOrgKeyMarker, orgId, snapshotStorageKey(key, undefined)]
+  return [storageOrgKeyMarker, orgId, snapshotStorageKey(key, backend)]
 }
 
 /**
