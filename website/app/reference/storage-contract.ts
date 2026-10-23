@@ -2010,6 +2010,10 @@ await codec.encode(value, context)`
         api: t(
           'Backend-owned API satisfying the token contract; its exact type is retained.',
           '满足令牌契约的后端 API，保留具体类型。'
+        ),
+        options: t(
+          'Optional forTransaction(scope) sees ITransactionScope<ICodecValue,TCap>, so the actual implemented standard token is available through the original use. Existing KV members and original callback declarations remain compatible; no native API is cast or fabricated.',
+          '可选 forTransaction(scope) 接收 ITransactionScope<ICodecValue,TCap>，可经原 use 使用实际实现的标准令牌；既有 KV 成员及原回调声明保持兼容，不强转或虚构原生 API。'
         )
       },
       returns: t(
