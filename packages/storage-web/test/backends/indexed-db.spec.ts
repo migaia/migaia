@@ -3965,6 +3965,9 @@ describe('indexedDbHost backend change feed (record channel + clearAll only)', (
     const reader = await createIndexedDbTestStore({ factory, keyRange: IDBKeyRange, dbName })
     expect(writer.capabilities.changeFeed).toBe(false)
     expect(reader.capabilities.changeFeed).toBe(false)
+    expect(() => reader.watch('k')).toThrowError(
+      expect.objectContaining({ code: 'UNSUPPORTED_CAPABILITY' })
+    )
     expect(isChangeFeedStore(writer)).toBe(false)
     expect(isChangeFeedStore(reader)).toBe(false)
     const writerEvents: IStorageChange[] = []
@@ -4010,11 +4013,21 @@ describe('indexedDbHost backend change feed (record channel + clearAll only)', (
       expect(TestBroadcastChannel.instances).toHaveLength(1)
       const readerEvents: IStorageChange[] = []
       reader.subscribeChanges((change) => readerEvents.push(change))
+      const localWatch = reader.watch('wire-key')
+      const localNext = localWatch.next()
+      const remoteWatch = reader.watch('remote-key')
+      const remoteNext = remoteWatch.next()
 
       await writer.set('wire-key', 'value')
       await new Promise<void>((resolve) => queueMicrotask(resolve))
       expect(readerEvents).toHaveLength(1)
       expect(readerEvents[0]).toMatchObject({ channel: 'value', kind: 'put', keys: ['wire-key'] })
+      expect((await localNext).value).toBe(readerEvents[0])
+      expect(readerEvents[0]!.orgId).toMatch(/^[0-9a-f-]{36}$/)
+      const disposed = localWatch.dispose()
+      expect(localWatch.dispose()).toBe(disposed)
+      await disposed
+      await expect(localWatch.next()).resolves.toMatchObject({ done: true })
 
       rogue = new TestBroadcastChannel(TestBroadcastChannel.instances[0]!.name)
       rogue.postMessage({
@@ -4084,6 +4097,9 @@ describe('indexedDbHost backend change feed (record channel + clearAll only)', (
       expect(readerEvents[1]).toMatchObject({ keys: ['remote-key'] })
       expect(readerEvents[2]).toMatchObject({ keys: ['remote-newer-key'], sequence: 3 })
       expect(readerEvents[3]).toMatchObject({ keys: ['stateful-key'], sequence: 10 })
+      const remote = (await remoteNext).value
+      expect(remote).toMatchObject({ keys: ['remote-key'], orgId: readerEvents[0]!.orgId })
+      await remoteWatch.dispose()
 
       await writer.dispose()
       expect(TestBroadcastChannel.closedCount).toBe(0)

@@ -127,3 +127,5 @@ try {
 - 按 `(source, code)` 分支。浏览器错误来源为 `@migaia/storage-web`，共享并发、取消与所有权错误保留原包身份。
 
 选项、原生活跃窗口与生命周期详见[使用指南](./USEGUIDE.md)。
+
+IndexedDB 通过 `store.watch(key, ctx?)` 提供原生文本失效迭代器。仅当实例已准入当前 realm 的 IndexedDB 与 BroadcastChannel 时 `capabilities.changeFeed` 为 `true`；未准入时调用报 `UNSUPPORTED_CAPABILITY`。提示携带原宿主的组织 UUID，收到提示后重新读取已提交的原生值；这不提供历史重放或每次写入一条事件的保证。迭代器复用原资源清理，使用后调用 `dispose()`。

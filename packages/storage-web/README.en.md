@@ -127,3 +127,5 @@ Browser sources retain eventual visibility: local storage is document-eventual, 
 - Branch on `(source, code)`. Web errors use `@migaia/storage-web`; shared concurrency, cancellation, and owner errors retain their package identity.
 
 See [the usage guide](./USEGUIDE.en.md) for options, native activity, and lifecycle details.
+
+IndexedDB exposes native text invalidation through `store.watch(key, ctx?)`. Its `capabilities.changeFeed` is `true` only after the instance admits this realm's IndexedDB and BroadcastChannel; an unadmitted watch throws `UNSUPPORTED_CAPABILITY`. Hints carry the original host organization UUID and tell the consumer to reread committed native data. They provide neither historical replay nor one event per write. Dispose the iterator after use through its original `dispose()` method.
