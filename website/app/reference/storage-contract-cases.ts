@@ -173,9 +173,28 @@ async function replay(store: IStorageStore<typeof durableChangeFeed>, after: str
   )
 }
 
+/** Organization prefix and native ordering consumers share the original byte identity owner. */
+const orgByteOrderCase: ICaseDoc = {
+  title: t('Order physical keys within one organization', '在同一组织中排列物理键'),
+  problem: t(
+    'Backends need ordered object pages without a second organization codec or sorting rule.',
+    '后端需要有序对象页，不能复制组织 codec 或排序规则。'
+  ),
+  example: `import { prefixStorageOrgKey, encodeStorageOrgStringPrefix, encodeOrderedStorageKey, orderStorageKeysByBytes } from '@migaia/storage-contract'
+const org = '12345678-1234-1234-1234-123456789abc'
+const prefix = encodeStorageOrgStringPrefix(org, 'user/', 'memory')
+const ordered = orderStorageKeysByBytes(['user/z', 'user/a'], key => encodeOrderedStorageKey(prefixStorageOrgKey(org, key), 'memory'))`,
+  result: t(
+    'ordered is user/a then user/z. The byte prefix matches only string keys under user/ in the exact organization.',
+    'ordered 为 user/a 后 user/z；字节前缀只匹配精确组织内 user/ 下的 string key。'
+  )
+}
+
 /** Exercises public contract tools without supplying a fictional storage implementation. */
 export const storageContractCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
   sql: [sqlCapabilityCase],
+  orderStorageKeysByBytes: [orgByteOrderCase],
+  encodeStorageOrgStringPrefix: [orgByteOrderCase],
   blob: [blobCase],
   durableChangeFeed: [durableChangeCase],
   deriveStorageSqlQuery: [deriveSqlCase],

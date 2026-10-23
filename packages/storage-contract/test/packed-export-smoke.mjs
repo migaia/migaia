@@ -79,7 +79,7 @@ function main() {
     writeFileSync(join(consumerDirectory, 'package.json'), '{"type":"module"}\n', 'utf8')
     writeFileSync(
       join(consumerDirectory, 'identity.mjs'),
-      `import { fromValueCodec, defineStorageCapability, implement, provideCapabilities, hasStorageCapability, useStorageCapability, sql, createSqlTag, deriveStorageSqlQuery, blob, durableChangeFeed } from '@migaia/storage-contract'
+      `import { fromValueCodec, defineStorageCapability, implement, provideCapabilities, hasStorageCapability, useStorageCapability, sql, createSqlTag, deriveStorageSqlQuery, blob, durableChangeFeed, orderStorageKeysByBytes, encodeStorageOrgStringPrefix, encodeOrderedStorageKey, prefixStorageOrgKey } from '@migaia/storage-contract'
 import { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'
 import { isArrayBuffer as utilsBuffer, isUint8Array as utilsBytes } from '@migaia/utils/bytes'
 /** Independent resource bases exercise package-root capability reads without acquiring external clients. */
@@ -103,6 +103,12 @@ if (hasStorageCapability(raw, token) || Object.hasOwn(raw, 'use')) throw new Err
 let missing
 try { useStorageCapability(raw, token) } catch (error) { missing = error }
 if (missing?.source !== '@migaia/storage-contract' || missing.code !== 'UNSUPPORTED_CAPABILITY' || missing.backend !== 'packed-fixture' || Object.hasOwn(raw, 'use')) throw new Error('packed missing capability identity mismatch')
+/** Both organization byte helpers reuse canonical packed-root identities. */
+const packedOrg = '12345678-1234-1234-1234-123456789abc'
+const packedPrefix = encodeStorageOrgStringPrefix(packedOrg, 'a', 'packed-fixture')
+const packedFullKey = encodeOrderedStorageKey(prefixStorageOrgKey(packedOrg, 'ab'), 'packed-fixture')
+if (packedPrefix.some((byte, index) => byte !== packedFullKey[index])) throw new Error('packed organization prefix mismatch')
+if (orderStorageKeysByBytes([2, 1], key => new Uint8Array([key])).join(',') !== '1,2') throw new Error('packed byte ordering mismatch')
 /** Optional object/feed tokens expose only their own original native APIs after packing. */
 const noAdmissionIo = () => { throw new Error('capability admission performed I/O') }
 const objectApi = { put: noAdmissionIo, get: noAdmissionIo, head: noAdmissionIo, remove: noAdmissionIo, list: noAdmissionIo, removeByPrefix: noAdmissionIo }

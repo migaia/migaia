@@ -1,7 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   compareStorageKeys,
   encodeOrderedStorageKey,
+  orderStorageKeysByBytes,
   snapshotStorageBatchKeys,
   createStorageBatchKeyCapture,
   snapshotStorageKeyPrefix,
@@ -52,6 +53,44 @@ const keys: readonly IStorageKey[] = [
 ]
 
 describe('ordered storage key encoding', () => {
+  it('orders captured selector bytes stably through the same canonical radix', () => {
+    const bytes = new Uint8Array([2])
+    const rows = [
+      { id: 'first', key: bytes },
+      { id: 'prefix', key: new Uint8Array() },
+      { id: 'second', key: new Uint8Array([2]) },
+      { id: 'long', key: new Uint8Array([2, 0]) },
+      { id: 'one', key: new Uint8Array([1]) }
+    ]
+    const select = vi.fn((row: (typeof rows)[number]) => {
+      if (row.id === 'second') bytes.fill(0)
+      return row.key
+    })
+    const sorted = orderStorageKeysByBytes(rows, select)
+    expect(sorted.map((row) => row.id)).toEqual(['prefix', 'one', 'first', 'second', 'long'])
+    expect(sorted[2]).toBe(rows[0])
+    expect(select).toHaveBeenCalledTimes(rows.length)
+    expect(Object.isFrozen(sorted)).toBe(true)
+    expect(orderStorageKeysByBytes([], select)).toEqual([])
+    const invalidLength = new Proxy([], {
+      get: (_target, name) => (name === 'length' ? Infinity : undefined)
+    })
+    expect(() => orderStorageKeysByBytes(invalidLength, select)).toThrowError(
+      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+    )
+    expect(select).toHaveBeenCalledTimes(rows.length)
+
+    const cause = new Error('selector failed')
+    expect(() =>
+      orderStorageKeysByBytes(rows, () => {
+        throw cause
+      })
+    ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT', cause }))
+    expect(() => orderStorageKeysByBytes(rows, () => [] as never)).toThrowError(
+      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+    )
+  })
+
   it('captures native entries at their original per-item validation boundary', () => {
     /** The original native owner decides when to inspect values or reject canonical duplicates. */
     const capture = createStorageBatchKeyCapture('memory')

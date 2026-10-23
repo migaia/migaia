@@ -1,4 +1,6 @@
-import { snapshotStorageKey } from './key.js'
+import { isUint8Array } from '@migaia/utils/bytes'
+import { prefixStorageOrgKey } from './org.js'
+import { snapshotStorageKey, assertStringStorageKey } from './key.js'
 import type { IBackendKind } from './capabilities.js'
 import type { IStorageKey } from './context.js'
 import { StorageContractError, StorageContractErrorCode } from './errors.js'
@@ -216,4 +218,126 @@ export function snapshotStorageKeyPrefix(
       return true
     }
   })
+}
+
+/** Explicit stack frames visit only still-shared suffixes rather than maximum-length padding. */
+type IStorageByteRadixFrame = {
+  readonly start: number
+  readonly end: number
+  readonly depth: number
+}
+/** Byte values occupy 1..256; bucket zero is reserved for a genuinely ended encoding. */
+const STORAGE_BYTE_RADIX_BUCKETS = 257
+
+/** Stable MSD buckets process each present suffix byte a constant number of times. */
+export function sortStorageByteIdentities<T extends { readonly encoded: Uint8Array }>(
+  entries: T[]
+): void {
+  if (entries.length < 2) return
+  /** One shared scratch array serves every disjoint frame, without copying prefixes. */
+  const scratch: T[] = []
+  scratch.length = entries.length
+  /** Fixed alphabet state is reused for every frame instead of retained per depth. */
+  const counts = new Uint32Array(STORAGE_BYTE_RADIX_BUCKETS)
+  /** Write positions are independently advanced while stable scattering fills the scratch region. */
+  const positions = new Uint32Array(STORAGE_BYTE_RADIX_BUCKETS)
+  /** LIFO suffix work avoids call-stack growth for long equal prefixes. */
+  const frames: IStorageByteRadixFrame[] = [{ start: 0, end: entries.length, depth: 0 }]
+  while (frames.length > 0) {
+    /** Frames are disjoint at this depth and never include an already ended key. */
+    const { start, end, depth } = frames.pop()!
+    counts.fill(0)
+    for (let index = start; index < end; index += 1) {
+      /** Actual zero bytes stay ordinary content; only absence enters the terminator bucket. */
+      const encoded = entries[index]!.encoded
+      counts[depth < encoded.length ? encoded[depth]! + 1 : 0] += 1
+    }
+    /** Bucket boundaries use absolute array positions, independent of key length. */
+    let boundary = start
+    for (let bucket = 0; bucket < STORAGE_BYTE_RADIX_BUCKETS; bucket += 1) {
+      positions[bucket] = boundary
+      boundary += counts[bucket]!
+    }
+    for (let index = start; index < end; index += 1) {
+      /** Stable movement retains the first snapshot when duplicate identities later collapse. */
+      const entry = entries[index]!
+      /** End-of-key has its own bucket and cannot be confused with embedded binary zero. */
+      const bucket = depth < entry.encoded.length ? entry.encoded[depth]! + 1 : 0
+      scratch[positions[bucket]!] = entry
+      positions[bucket] += 1
+    }
+    for (let index = start; index < end; index += 1) entries[index] = scratch[index]!
+    boundary = start + counts[0]!
+    for (let bucket = 1; bucket < STORAGE_BYTE_RADIX_BUCKETS; bucket += 1) {
+      /** Singleton and terminated ranges need no further byte inspection. */
+      const size = counts[bucket]!
+      if (size > 1) frames.push({ start: boundary, end: boundary + size, depth: depth + 1 })
+      boundary += size
+    }
+  }
+}
+
+/**
+ * Stable byte order shares the original lock radix. Each selector is invoked once and its bytes are
+ * detached immediately, so later callback mutation cannot alter an earlier row's identity.
+ */
+export function orderStorageKeysByBytes<T>(
+  entries: readonly T[],
+  key: (entry: T) => Uint8Array
+): readonly T[] {
+  try {
+    if (!Array.isArray(entries) || typeof key !== 'function')
+      throw new StorageContractError(
+        StorageContractErrorCode.invalidArgument,
+        {},
+        StorageContractErrorText.keyByteOrder
+      )
+    /** Only this operation's detached ordering facts exist; no persistent index is created. */
+    const captured: { readonly encoded: Uint8Array; readonly entry: T }[] = []
+    /** Input length cannot grow while a borrowed selector executes. */
+    const length = entries.length
+    if (!Number.isSafeInteger(length) || length < 0)
+      throw new StorageContractError(
+        StorageContractErrorCode.invalidArgument,
+        {},
+        StorageContractErrorText.keyByteOrder
+      )
+    for (let index = 0; index < length; index++) {
+      /** Each original row and selector result is captured once in input order. */
+      const entry = entries[index]!
+      /** The existing byte-domain guard admits actual cross-realm Uint8Array values. */
+      const bytes = key(entry)
+      if (!isUint8Array(bytes))
+        throw new StorageContractError(
+          StorageContractErrorCode.invalidArgument,
+          {},
+          StorageContractErrorText.keyByteOrder
+        )
+      captured.push({ encoded: new Uint8Array(bytes), entry })
+    }
+    sortStorageByteIdentities(captured)
+    return Object.freeze(captured.map((row) => row.entry))
+  } catch (cause) {
+    if (cause instanceof StorageContractError) throw cause
+    throw new StorageContractError(
+      StorageContractErrorCode.invalidArgument,
+      { cause },
+      StorageContractErrorText.keyByteOrder
+    )
+  }
+}
+/**
+ * Encodes one logical string prefix inside the original three-part organization envelope. Only the
+ * final string and enclosing tuple terminators are omitted; all tags and preceding components come
+ * from the original writer, including UTF-16 and empty-string semantics.
+ */
+export function encodeStorageOrgStringPrefix(
+  orgId: string,
+  prefix: string,
+  backend: IBackendKind
+): Uint8Array {
+  assertStringStorageKey(prefix, backend)
+  /** This exact envelope is shared with Redis/blob physical key composition. */
+  const key = prefixStorageOrgKey(orgId, prefix)
+  return encodeKeySnapshot(key, false).slice(0, -2)
 }

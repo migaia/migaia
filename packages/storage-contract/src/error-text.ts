@@ -8,6 +8,8 @@ export const StorageContractErrorText = {
   batchKeys: 'storage batch keys or options are invalid',
   /** Atomic batches cannot write the same canonical typed key more than once. */
   batchDuplicate: 'storage batch contains duplicate keys',
+  /** Public byte ordering admits real selector bytes and retains callback/reflection causes. */
+  keyByteOrder: 'storage byte ordering inputs are invalid',
   /** TTL deadlines accept finite nonnegative milliseconds, including zero and fractions. */
   ttlDuration: 'storage TTL duration must be finite and nonnegative',
   /** Counter deltas must remain exactly representable integers before the native operation starts. */
