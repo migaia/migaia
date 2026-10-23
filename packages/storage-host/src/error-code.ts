@@ -49,7 +49,13 @@ export const StorageErrorCode = {
   /** Encoding rejects the value before backend I/O; inspect the codec failure on cause. */
   serializeFailed: 'SERIALIZE_FAILED',
   /** Decoding rejects a stored representation; retain the original data and inspect cause. */
-  deserializeFailed: 'DESERIALIZE_FAILED'
+  deserializeFailed: 'DESERIALIZE_FAILED',
+  /** A different channel already owns this logical key; select replace to remove that owner. */
+  duplicateKey: 'DUPLICATE_KEY',
+  /** A projected unique index key belongs to a different record; repair the proposed commit. */
+  indexUniqueConflict: 'INDEX_UNIQUE_CONFLICT',
+  /** A user extension failed; inspect its original cause and operation context before retrying. */
+  extensionFailed: 'EXTENSION_FAILED'
 } as const
 
 export type IStorageErrorCode = (typeof StorageErrorCode)[keyof typeof StorageErrorCode]

@@ -1,5 +1,8 @@
 /** Canonical host boundary messages. */
 export const StorageErrorText = {
+  /** Unique-index conflicts preserve the original public constraint diagnostic. */
+  indexUniqueConflict: (indexName: string) =>
+    `indexed record conflicts with unique index "${indexName}"`,
   /** Flat-wire decoding preserves the original bounded key-domain messages. */
   storageKeyDecodeLimitExceeded: 'storage key exceeds decode limits',
   /** Flat-wire tuples retain exactly their registered tag and payload slots. */
