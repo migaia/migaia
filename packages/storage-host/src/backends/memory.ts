@@ -86,7 +86,7 @@ import {
 import { parseObjectPath } from '@migaia/utils/object-path'
 import { rankMemoryVectors, recommendStorageVector } from './vector-core.js'
 import { detectServerRuntime } from '@migaia/utils'
-import { isUint8Array } from '@migaia/utils/bytes'
+import { isUint8Array, utf8ByteLength } from '@migaia/utils/bytes'
 import { StorageError, StorageErrorCode, type IStorageChannel } from '../errors.js'
 import { StorageErrorText } from '../error-text.js'
 import type { IStoragePluginCore } from '../types.js'
@@ -105,10 +105,20 @@ import { resolveStorageNamespace } from '../core/namespace.js'
 import { throwIfAborted, mergeSignals, withAbort } from '../core/operation.js'
 import { createStorageOperationReporter, reportCleanupError } from '../core/operation-reporter.js'
 import { observeStorageBatch } from '../core/batch-observation.js'
+import { StorageHookName } from '../hook-names.js'
+import {
+  snapshotMemoryCapacity,
+  createMemoryCapacityIndex,
+  memoryCapacityValueBytes,
+  type IMemoryCapacity,
+  type IMemoryCapacityOptions,
+  type IMemoryCapacityChange
+} from './memory-capacity.js'
 
 /** Memory options retain one private data universe for this concrete plugin instance. */
 export type IMemoryOptions = {
   readonly namespace?: string
+  readonly capacity?: IMemoryCapacityOptions
   readonly concurrency?: IConcurrencyPolicy
   readonly owner?: { readonly label?: string }
 }
@@ -146,6 +156,7 @@ type IMemoryEntry = {
   readonly key: IStorageKey
   readonly value: unknown
   readonly ordered: Uint8Array
+  readonly bytes?: number
 }
 /** Vector metadata shares the native maps and draft without becoming a legacy logical channel. */
 type IMemoryChannel = IStorageChannel | 'vector'
@@ -168,6 +179,7 @@ type IMemoryRootMutation<R> = {
     readonly lower: string
     readonly upper: string
   }[]
+  readonly capacityChanges?: () => readonly IMemoryCapacityChange[]
   run(): R
 }
 /** Text batches retain detached canonical keys and prepared values before lock admission. */
@@ -192,7 +204,8 @@ type IMemoryAtomicWork<T, R> = {
 /** Create the real native backend only from its original installed core. */
 export function createMemoryBackend<T = unknown>(
   core: IStoragePluginCore,
-  options: IMemoryOptions
+  options: IMemoryOptions,
+  capacity: IMemoryCapacity | undefined = snapshotMemoryCapacity(options)
 ) {
   /** Validate the configured target before allocating data or acquiring any native resource. */
   const namespace = resolveStorageNamespace(
@@ -223,7 +236,8 @@ export function createMemoryBackend<T = unknown>(
       options,
       controller,
       orgId,
-      orgId === core.defaultOrgId
+      orgId === core.defaultOrgId,
+      capacity
     )
     namespaces.set(target, physical)
     return physical
@@ -263,7 +277,8 @@ function createMemoryNamespace<T>(
   options: IMemoryOptions,
   controller: IBackendChangeController,
   orgId: string,
-  root: boolean
+  root: boolean,
+  capacity: IMemoryCapacity | undefined
 ) {
   /** Physical membership, ordered ranges, deadline facts and lock admission share this namespace. */
   const data = {
@@ -278,6 +293,16 @@ function createMemoryNamespace<T>(
   const physicalChannels = [...MemoryState.channels, 'vector'] as const
   /** Only live expiring identities retain deadline metadata. */
   const deadlines = new Map<string, number>()
+  /** Optional policy metadata belongs only to this namespace's original physical rows. */
+  const capacityIndex = capacity === undefined ? undefined : createMemoryCapacityIndex(capacity)
+  /** Capacity can reclaim actual elapsed deadlines through the same compressed radix owner. */
+  const expiring =
+    capacity === undefined
+      ? undefined
+      : createOrderedRecordIndex<{
+          readonly channel: IMemoryChannel
+          readonly encoded: string
+        }>()
   /** Ordered leaves index the same native data entries. */
   const ordered = {
     value: createOrderedRecordIndex<IMemoryEntry>(),
@@ -308,6 +333,8 @@ function createMemoryNamespace<T>(
       revisions.clear(channel === 'value' ? 'text' : channel)
     }
     deadlines.clear()
+    expiring?.clear()
+    capacityIndex?.clear()
     vectorCollections.clear()
   }
   /** Unknown backend callback failures gain their original memory transaction boundary. */
@@ -350,6 +377,96 @@ function createMemoryNamespace<T>(
   /** Every successful physical change advances only its own channel's original revision. */
   const bump = (channel: IMemoryChannel, encoded: string): void => {
     revisions.write(channel === 'value' ? 'text' : channel, encoded)
+  }
+  /** One deadline mutation keeps the original Map and optional candidate index synchronized. */
+  const setDeadline = (
+    channel: IMemoryChannel,
+    encoded: string,
+    deadline: number | undefined
+  ): void => {
+    /** Existing canonical identity and old clock fact identify the exact expiry leaf to replace. */
+    const id = identity(channel, encoded)
+    /** No secondary expiry structure exists on the original unbounded path. */
+    const previous = deadlines.get(id)
+    if (expiring !== undefined && previous !== undefined)
+      expiring.delete(encodeOrderedStorageKey([previous, channel, encoded], STORAGE_MEMORY_BACKEND))
+    if (deadline === undefined) deadlines.delete(id)
+    else {
+      deadlines.set(id, deadline)
+      expiring?.set(encodeOrderedStorageKey([deadline, channel, encoded], STORAGE_MEMORY_BACKEND), {
+        channel,
+        encoded
+      })
+    }
+  }
+  /** Accounting never inspects record values unless the explicit byte limit needs their encoding. */
+  const entryBytes = (channel: IMemoryChannel, value: unknown): number => {
+    if (capacity?.maxBytes === undefined) return 0
+    if (channel === 'value') return utf8ByteLength(value as string)
+    if (channel === 'bytes') return (value as Uint8Array).byteLength
+    if (channel === 'vector') {
+      /** Native JS number components are binary64; this is accounting, not a portable vector wire. */
+      const point = value as IStorageVectorPoint<unknown>
+      return (
+        point.vector.length * Float64Array.BYTES_PER_ELEMENT +
+        (point.payload === undefined ? 0 : memoryCapacityValueBytes(point.payload))
+      )
+    }
+    return memoryCapacityValueBytes(value)
+  }
+  /** One already owned physical identity is shared by the native entry and its policy metadata. */
+  const capacityFact = (
+    channel: IMemoryChannel,
+    key: IStorageKey,
+    bytes?: number
+  ): IMemoryCapacityChange => {
+    /** Encoding follows the original flat-key owner, not a capacity-specific key format. */
+    const encoded = encodeFlatStorageKey(key)
+    return { id: identity(channel, encoded), channel, encoded, key, bytes }
+  }
+  /** Capacity uses only native physical channels already known to this namespace. */
+  const capacityLock = (entry: IMemoryCapacityChange): ILockKey => {
+    if (entry.channel === 'value') return lockKey.text(entry.key)
+    if (entry.channel === 'bytes') return lockKey.bytes(entry.key as string)
+    if (entry.channel === 'vector') {
+      /** Vector rows already own the canonical collection/id tuple used by their lock owner. */
+      const key = entry.key as readonly [string, string]
+      return lockKey.vector(key[0], key[1])
+    }
+    return lockKey.record(entry.key)
+  }
+  /** Derive only elapsed deadline leaves, followed by actual policy victims of proposed writes. */
+  const planCapacity = (changes: readonly IMemoryCapacityChange[]) => {
+    /** An omitted capacity never allocates accounting or candidate work. */
+    if (capacityIndex === undefined || expiring === undefined) return undefined
+    /** Inclusive now is expressed through the original tuple-prefix upper bound. */
+    const upper = snapshotStorageKeyPrefix([scheduler.now()], STORAGE_MEMORY_BACKEND).upper
+    /** Actual expired rows alone enter the removal plan; no live-key table scan occurs. */
+    const expired: IMemoryCapacityChange[] = []
+    for (const leaf of expiring.range({ upper, upperOpen: true })) {
+      const { channel, encoded } = leaf.value
+      const entry = data[channel].get(encoded)
+      if (entry !== undefined) expired.push(capacityFact(channel, entry.key))
+    }
+    /** Preview restores the exact policy links before any lock wait or user callback can happen. */
+    const victims = capacityIndex.preview([...expired, ...changes])
+    /** Canonical point identities feed only the existing physical lock owner and its original FIFO. */
+    const identities = snapshotConcurrencyLockKeys(
+      [...expired, ...victims].map(capacityLock),
+      STORAGE_MEMORY_BACKEND
+    ).identities
+    return { expired, victims, identities }
+  }
+  /** Native metadata deletion is shared by expiry, explicit removal and committed capacity victims. */
+  const deletePhysical = (channel: IMemoryChannel, encoded: string): IMemoryEntry | undefined => {
+    const entry = data[channel].get(encoded)
+    if (entry === undefined) return undefined
+    data[channel].delete(encoded)
+    ordered[channel].delete(entry.ordered)
+    setDeadline(channel, encoded, undefined)
+    capacityIndex?.remove(identity(channel, encoded))
+    bump(channel, encoded)
+    return entry
   }
   /** Records and bytes detach ownership before an eviction or committed mutation occurs. */
   const clone = <V>(value: V, key?: IStorageKey): V => {
@@ -398,18 +515,69 @@ function createMemoryNamespace<T>(
       })
     return copyValue(channel, value, key)
   }
+  /**
+   * Explicit capacity holds only this native turn's events until all data and victims are
+   * committed.
+   */
+  let pendingChanges:
+    | {
+        readonly channel: IMemoryChannel
+        readonly kind: IStorageChange['kind']
+        readonly keys?: readonly IStorageKey[]
+      }[]
+    | undefined
   /** Notifications retain original commit-after eviction order. */
   const publish = (
     channel: IMemoryChannel,
     kind: IStorageChange['kind'],
     keys?: readonly IStorageKey[]
   ): void => {
+    if (pendingChanges !== undefined) {
+      pendingChanges.push({ channel, kind, keys })
+      return
+    }
     controller.publish({
       channel: channel === 'vector' ? 'all' : channel,
       kind,
       orgId,
       ...(keys === undefined ? {} : { keys })
     })
+  }
+  /** Capacity mutations and their events share the original final synchronous native turn. */
+  const commitCapacity = <R>(plan: ReturnType<typeof planCapacity>, run: () => R): R => {
+    if (plan === undefined) return run()
+    pendingChanges = []
+    /** Counts retain only actual capacity removals, never ordinary expiry or user values. */
+    const counts = new Map<IMemoryChannel, number>()
+    try {
+      for (const entry of plan.expired) {
+        const removed = deletePhysical(entry.channel as IMemoryChannel, entry.encoded)
+        if (removed !== undefined) publish(entry.channel as IMemoryChannel, 'remove', [removed.key])
+      }
+      /** Input preparation and final lock checks have already completed before this callback. */
+      const result = run()
+      for (const entry of plan.victims) {
+        const channel = entry.channel as IMemoryChannel
+        const removed = deletePhysical(channel, entry.encoded)
+        if (removed === undefined) continue
+        publish(channel, 'remove', [removed.key])
+        counts.set(channel, (counts.get(channel) ?? 0) + 1)
+      }
+      return result
+    } finally {
+      /** Clear the native event buffer before observers can synchronously reenter this store. */
+      const changes = pendingChanges
+      pendingChanges = undefined
+      for (const change of changes) publish(change.channel, change.kind, change.keys)
+      for (const [channel, count] of counts)
+        core.emit(StorageHookName.onEvict, () => ({
+          backendId: core.getBackendId(),
+          backend: STORAGE_MEMORY_BACKEND,
+          orgId,
+          channel,
+          count
+        }))
+    }
   }
   /** Every physical access shares one deadline check and the original removal/revision path. */
   const liveEntry = (channel: IMemoryChannel, encoded: string): IMemoryEntry | undefined => {
@@ -420,10 +588,7 @@ function createMemoryNamespace<T>(
     /** The original monotonic clock is consulted once for this physical access. */
     const deadline = deadlines.get(id)
     if (entry !== undefined && deadline !== undefined && deadline <= scheduler.now()) {
-      data[channel].delete(encoded)
-      ordered[channel].delete(entry.ordered)
-      deadlines.delete(id)
-      bump(channel, encoded)
+      deletePhysical(channel, encoded)
       publish(channel, 'remove', [entry.key])
       return undefined
     }
@@ -434,7 +599,8 @@ function createMemoryNamespace<T>(
     channel: IStorageChannel,
     key: IStorageKey,
     value: unknown,
-    policy: IConflictPolicy = 'conflict'
+    policy: IConflictPolicy = 'conflict',
+    bytes = entryBytes(channel, value)
   ): void => {
     controller.assertLive()
     /** Snapshot and prepare before touching any conflicting channel. */
@@ -454,15 +620,13 @@ function createMemoryNamespace<T>(
     /** Shared conflict policy owns one removal order for all backends. */
     const plan = planChannelWrite(captured, channel, existing, policy, STORAGE_MEMORY_BACKEND)
     for (const previous of plan.remove) {
-      data[previous].delete(encoded)
-      ordered[previous].delete(keyBytes)
-      deadlines.delete(identity(previous, encoded))
-      bump(previous, encoded)
+      deletePhysical(previous, encoded)
     }
     /** The hash and radix owners share this exact committed entry reference. */
-    const entry = { key: captured, value: prepared, ordered: keyBytes }
+    const entry = { key: captured, value: prepared, ordered: keyBytes, bytes }
     data[channel].set(encoded, entry)
     ordered[channel].set(keyBytes, entry)
+    capacityIndex?.put({ ...capacityFact(channel, captured), bytes })
     bump(channel, encoded)
     for (const previous of plan.remove) publish(previous, 'remove', [captured])
     publish(channel, 'put', [captured])
@@ -477,10 +641,7 @@ function createMemoryNamespace<T>(
     /** The actual entry already owns the canonical ordered bytes needed for removal. */
     const entry = liveEntry(channel, encoded)
     if (!entry) return
-    data[channel].delete(encoded)
-    ordered[channel].delete(entry.ordered)
-    deadlines.delete(identity(channel, encoded))
-    bump(channel, encoded)
+    deletePhysical(channel, encoded)
     publish(channel, 'remove', [captured])
   }
   /** Clear invalidates the actual channel snapshot even when membership was already empty. */
@@ -488,7 +649,10 @@ function createMemoryNamespace<T>(
     controller.assertLive()
     /** Preserve the original rule that an empty clear emits no notification. */
     const changed = data[channel].size !== 0
-    for (const encoded of data[channel].keys()) deadlines.delete(identity(channel, encoded))
+    for (const encoded of data[channel].keys()) {
+      setDeadline(channel, encoded, undefined)
+      capacityIndex?.remove(identity(channel, encoded))
+    }
     data[channel].clear()
     ordered[channel].clear()
     revisions.clear(channel === 'value' ? 'text' : channel)
@@ -501,6 +665,7 @@ function createMemoryNamespace<T>(
     const captured = snapshotStorageKey(key, STORAGE_MEMORY_BACKEND)
     /** Reading never allocates a revision or changes physical membership. */
     const entry = liveEntry(channel, encodeFlatStorageKey(captured))
+    if (entry !== undefined) capacityIndex?.touch(identity(channel, encodeFlatStorageKey(captured)))
     return entry === undefined ? undefined : copyValue(channel, entry.value, captured)
   }
   /** Replace admits every possible displaced channel in the same fixed canonical order. */
@@ -555,9 +720,25 @@ function createMemoryNamespace<T>(
     const captured = snapshotStorageKey(key, STORAGE_MEMORY_BACKEND)
     /** A clone failure cannot remove a displaced row or acquire a logical key. */
     const prepared = prepare(channel, value, captured)
+    /** Byte-domain admission precedes every possible displaced channel or draft mutation. */
+    const bytes = entryBytes(channel, prepared)
     return {
       keys: mutationKeys(channel, captured, policy),
-      run: () => write(channel, captured, prepared, policy)
+      capacityChanges:
+        capacity === undefined
+          ? undefined
+          : () => {
+              /** Only the same logical key's original conflict channels participate in replacement. */
+              const changes: IMemoryCapacityChange[] =
+                policy === 'replace'
+                  ? MemoryState.channels
+                      .filter((current) => current !== channel)
+                      .map((current) => capacityFact(current, captured))
+                  : []
+              changes.push(capacityFact(channel, captured, bytes))
+              return changes
+            },
+      run: () => write(channel, captured, prepared, policy, bytes)
     }
   }
   /** Root writes reuse the original execution list, policy loop, member lease and lock provider. */
@@ -571,6 +752,8 @@ function createMemoryNamespace<T>(
     let capturedInput = input
     /** The sole derivation captures inputs and affected keys once, before any native attempt. */
     let mutation!: IMemoryRootMutation<R>
+    /** The last readonly preflight is consumed immediately by the same native synchronous terminal. */
+    let capacityPlan: ReturnType<typeof planCapacity>
     return runWithConcurrency(
       {
         store: base,
@@ -599,10 +782,20 @@ function createMemoryNamespace<T>(
           locks.attemptWrite(
             attempt,
             holding(),
-            mutation.run,
+            () => commitCapacity(capacityPlan, mutation.run),
             core.stageBindings.concurrencyStages(store),
             controller.closingSignal,
-            mutation.ranges
+            mutation.ranges,
+            undefined,
+            capacity === undefined
+              ? undefined
+              : () => {
+                  capacityPlan =
+                    mutation.capacityChanges === undefined
+                      ? undefined
+                      : planCapacity(mutation.capacityChanges())
+                  return capacityPlan?.identities ?? []
+                }
           )
       }
     )
@@ -618,6 +811,8 @@ function createMemoryNamespace<T>(
       revisions.clear(channel === 'value' ? 'text' : channel)
     }
     deadlines.clear()
+    expiring?.clear()
+    capacityIndex?.clear()
     if (changed) controller.publish({ channel: 'all', kind: 'clear', orgId })
   }
   /** Channel selection is captured before the shared provider's final synchronous range check. */
@@ -726,6 +921,8 @@ function createMemoryNamespace<T>(
     }
     /** Each pipeline fixes this attempt's original callback or detached native batch. */
     let work: IMemoryAtomicWork<T, R>
+    /** Only actual previous-attempt victim identities feed the original policy's waiting admission. */
+    let capacityIdentities: readonly string[] = []
     return runWithConcurrency<Awaited<R>>(
       {
         store: base,
@@ -744,10 +941,16 @@ function createMemoryNamespace<T>(
           locks.attempt(
             attempt,
             holding(),
-            { attempt: () => transact(work.invoke, attempt, work.ranges) },
+            {
+              attempt: () =>
+                transact(work.invoke, attempt, work.ranges, (identities) => {
+                  capacityIdentities = identities
+                })
+            },
             core.stageBindings.concurrencyStages(store),
             controller.closingSignal,
-            work.ranges
+            work.ranges,
+            capacity === undefined ? undefined : () => capacityIdentities
           )
       }
     ).finally(() => release?.())
@@ -788,7 +991,22 @@ function createMemoryNamespace<T>(
               options.conflictPolicy
             )
             assertUnlocked(mutation.keys)
-            mutation.run()
+            /**
+             * Synchronous writes share exact victim planning but reject a busy victim without
+             * waiting.
+             */
+            const plan =
+              mutation.capacityChanges === undefined
+                ? undefined
+                : planCapacity(mutation.capacityChanges())
+            const held = plan === undefined ? undefined : locks.probe(plan.identities)
+            if (held !== undefined)
+              throw new StorageContractError(StorageContractErrorCode.lockRejected, {
+                backend: STORAGE_MEMORY_BACKEND,
+                keys: [held.key],
+                holder: held.holder
+              })
+            commitCapacity(plan, mutation.run)
           }
         ),
       remove: (key) =>
@@ -961,7 +1179,12 @@ function createMemoryNamespace<T>(
       ctx,
       () =>
         [...ordered.record.range(captured)]
-          .map((leaf) => liveEntry('record', encodeFlatStorageKey(leaf.value.key)))
+          .map((leaf) => {
+            const encoded = encodeFlatStorageKey(leaf.value.key)
+            const entry = liveEntry('record', encoded)
+            if (entry !== undefined) capacityIndex?.touch(identity('record', encoded))
+            return entry
+          })
           .filter((entry): entry is IMemoryEntry => entry !== undefined),
       (row): [IStorageKey, T] => [clone(row.key), clone(row.value) as T]
     )
@@ -1044,10 +1267,12 @@ function createMemoryNamespace<T>(
   async function transact<R>(
     run: (scope: IMemoryScope<T>, draft: IMemoryTextDraft) => R,
     ctx: IConcurrencyAttemptContext,
-    protectedRanges?: IMemoryRootMutation<unknown>['ranges']
+    protectedRanges?: IMemoryRootMutation<unknown>['ranges'],
+    setCapacityIdentities?: (identities: readonly string[]) => void
   ): Promise<IConcurrencyAttempt<Awaited<R>>> {
     controller.assertLive()
     throwIfAborted(ctx.signal)
+    setCapacityIdentities?.([])
     /** Only touched identities retain draft entries; rollback never rewrites committed maps. */
     const draft = new Map<string, IMemoryDraft>()
     /** Each channel draft reuses the same compressed radix implementation, including tombstones. */
@@ -1098,6 +1323,7 @@ function createMemoryNamespace<T>(
                 key,
                 value: copyValue(channel, current.value, key),
                 ordered: current.ordered,
+                bytes: current.bytes,
                 deadline: deadlines.get(id)
               }
         )
@@ -1122,6 +1348,8 @@ function createMemoryNamespace<T>(
     const txRead = (channel: IMemoryChannel, key: IStorageKey): unknown => {
       /** Membership and an undefined-valued record remain separate facts. */
       const current = txEntry(channel, key)
+      if (current !== undefined)
+        capacityIndex?.touch(identity(channel, encodeFlatStorageKey(current.key)))
       return current === undefined ? undefined : copyValue(channel, current.value, current.key)
     }
     /** Membership shares the same first snapshot, including undefined-valued records. */
@@ -1154,6 +1382,8 @@ function createMemoryNamespace<T>(
       const encoded = encodeFlatStorageKey(captured)
       /** Clone caller-owned payload before mutating the draft. */
       const prepared = prepare(channel, value, captured)
+      /** Explicit byte-domain failure happens before staging any replacement or native victim. */
+      const bytes = entryBytes(channel, prepared)
       /** Channel conflict semantics are owned by the same shared plan as root writes. */
       const existing = new Set(
         MemoryState.channels.filter((current) => txHas(current, encoded, captured))
@@ -1177,6 +1407,7 @@ function createMemoryNamespace<T>(
         channel,
         key: captured,
         value: prepared,
+        bytes,
         remove: false,
         encoded,
         ordered: keyBytes,
@@ -1620,6 +1851,36 @@ function createMemoryNamespace<T>(
           )
         }
       }
+      /** Final capacity admission shares the same original attempt, locks and no-await commit turn. */
+      const capacityPlan =
+        capacity === undefined
+          ? undefined
+          : planCapacity(
+              [...draft.values()].map((proposed) =>
+                capacityFact(
+                  proposed.channel,
+                  proposed.key,
+                  proposed.remove ||
+                    (proposed.deadline !== undefined && proposed.deadline <= scheduler.now())
+                    ? undefined
+                    : (proposed.bytes ?? 0)
+                )
+              )
+            )
+      setCapacityIdentities?.(capacityPlan?.identities ?? [])
+      const capacityHeld =
+        capacityPlan === undefined
+          ? undefined
+          : locks.probe(capacityPlan.identities, undefined, ctx)
+      if (capacityHeld !== undefined) {
+        void stage.afterRollback?.(StorageContractErrorCode.lockRejected)
+        return {
+          status: 'conflict',
+          phase: 'acquire',
+          keys: [capacityHeld.key],
+          holder: capacityHeld.holder
+        }
+      }
       /** Each channel reports one batch after all physical draft rows have committed. */
       const changed = {
         value: [] as IStorageKey[],
@@ -1627,36 +1888,50 @@ function createMemoryNamespace<T>(
         record: [] as IStorageKey[],
         vector: [] as IStorageKey[]
       }
-      for (const proposed of draft.values()) {
-        /** Existing draft identities retain their already captured logical key. */
-        const encoded = proposed.encoded
-        /** New deadlines that elapsed within this draft commit as immediate absence. */
-        if (
-          proposed.remove ||
-          (proposed.deadline !== undefined && proposed.deadline <= scheduler.now())
-        ) {
-          deadlines.delete(identity(proposed.channel, encoded))
-          if (!data[proposed.channel].delete(encoded)) continue
-          ordered[proposed.channel].delete(proposed.ordered)
-        } else {
-          /**
-           * An overwrite retains its original live ordered encoding instead of keeping duplicate
-           * key bytes.
-           */
-          const keyBytes = ordered[proposed.channel].get(proposed.ordered)?.key ?? proposed.ordered
-          const entry = { key: proposed.key, value: proposed.value, ordered: keyBytes }
-          data[proposed.channel].set(encoded, entry)
-          ordered[proposed.channel].set(keyBytes, entry)
-          if (proposed.deadline === undefined) deadlines.delete(identity(proposed.channel, encoded))
-          else deadlines.set(identity(proposed.channel, encoded), proposed.deadline)
+      commitCapacity(capacityPlan, () => {
+        for (const proposed of draft.values()) {
+          /** Existing draft identities retain their already captured logical key. */
+          const encoded = proposed.encoded
+          /** New deadlines that elapsed within this draft commit as immediate absence. */
+          if (
+            proposed.remove ||
+            (proposed.deadline !== undefined && proposed.deadline <= scheduler.now())
+          ) {
+            setDeadline(proposed.channel, encoded, undefined)
+            capacityIndex?.remove(identity(proposed.channel, encoded))
+            if (!data[proposed.channel].delete(encoded)) continue
+            ordered[proposed.channel].delete(proposed.ordered)
+          } else {
+            /**
+             * An overwrite retains its original live ordered encoding instead of keeping duplicate
+             * key bytes.
+             */
+            const keyBytes =
+              ordered[proposed.channel].get(proposed.ordered)?.key ?? proposed.ordered
+            const entry = {
+              key: proposed.key,
+              value: proposed.value,
+              ordered: keyBytes,
+              bytes: proposed.bytes
+            }
+            data[proposed.channel].set(encoded, entry)
+            ordered[proposed.channel].set(keyBytes, entry)
+            setDeadline(proposed.channel, encoded, proposed.deadline)
+            capacityIndex?.put({
+              ...capacityFact(proposed.channel, proposed.key),
+              bytes: proposed.bytes ?? 0
+            })
+          }
+          bump(proposed.channel, encoded)
+          changed[proposed.channel].push(proposed.key)
         }
-        bump(proposed.channel, encoded)
-        changed[proposed.channel].push(proposed.key)
-      }
-      for (const channel of physicalChannels)
-        if (changed[channel].length !== 0) publish(channel, 'batch', changed[channel])
+        for (const channel of physicalChannels)
+          if (changed[channel].length !== 0) publish(channel, 'batch', changed[channel])
+      })
       void stage.afterCommit?.(
-        physicalChannels.reduce((count, channel) => count + changed[channel].length, 0)
+        physicalChannels.reduce((count, channel) => count + changed[channel].length, 0) +
+          (capacityPlan?.expired.length ?? 0) +
+          (capacityPlan?.victims.length ?? 0)
       )
       return { status: 'committed', value }
     } catch (cause) {
@@ -1810,8 +2085,7 @@ function createMemoryNamespace<T>(
     const current = liveEntry(channel, encoded)
     const id = identity(channel, encoded)
     if (current === undefined || (persist && !deadlines.has(id))) return false
-    if (persist) deadlines.delete(id)
-    else deadlines.set(id, scheduler.now() + ms!)
+    setDeadline(channel, encoded, persist ? undefined : scheduler.now() + ms!)
     if (ms === 0) liveEntry(channel, encoded)
     else {
       bump(channel, encoded)
@@ -1853,11 +2127,29 @@ function createMemoryNamespace<T>(
         assertStringStorageKey(key, STORAGE_MEMORY_BACKEND)
         /** Decimal and overflow validation stays with the original contract helper. */
         const increment = snapshotStorageCounterIncrement(input.by, STORAGE_MEMORY_BACKEND)
+        /**
+         * The capacity preflight retains this attempt's exact native calculation for its final
+         * turn.
+         */
+        let capacityResult: ReturnType<typeof increment> | undefined
         return {
           keys: [lockKey.text(key)],
+          capacityChanges:
+            capacity === undefined
+              ? undefined
+              : () => {
+                  const encoded = encodeFlatStorageKey(key)
+                  const deadline = deadlines.get(identity('value', encoded))
+                  const current =
+                    deadline !== undefined && deadline <= scheduler.now()
+                      ? undefined
+                      : (data.value.get(encoded)?.value as string | undefined)
+                  capacityResult = increment(current)
+                  return [capacityFact('value', key, entryBytes('value', String(capacityResult)))]
+                },
           run: () => {
             /** This calculation and its write share one synchronous admitted native turn. */
-            const result = increment(read('value', key) as string | undefined)
+            const result = capacityResult ?? increment(read('value', key) as string | undefined)
             write('value', key, String(result))
             return result
           }
@@ -1919,10 +2211,7 @@ function createMemoryNamespace<T>(
     /** The actual physical row determines whether this delete contributes to the result. */
     const current = data.vector.get(encoded)
     if (current === undefined) return false
-    data.vector.delete(encoded)
-    ordered.vector.delete(current.ordered)
-    deadlines.delete(identity('vector', encoded))
-    bump('vector', encoded)
+    deletePhysical('vector', encoded)
     return true
   }
   /** Each collection borrows this namespace's original execution, data and resource lifetime. */
@@ -1950,10 +2239,12 @@ function createMemoryNamespace<T>(
       /** Prefix bytes localize only this collection in the existing physical vector radix. */
       const bounds = snapshotStorageKeyPrefix([captured.name], STORAGE_MEMORY_BACKEND)
       /** Stored point values are canonical snapshots and remain inaccessible to application code. */
-      const point = (id: string): IStorageVectorPoint<TPayload> | undefined =>
-        liveEntry('vector', encodeFlatStorageKey(vectorKey(captured.name, id)))?.value as
-          | IStorageVectorPoint<TPayload>
-          | undefined
+      const point = (id: string): IStorageVectorPoint<TPayload> | undefined => {
+        const encoded = encodeFlatStorageKey(vectorKey(captured.name, id))
+        const entry = liveEntry('vector', encoded)
+        if (entry !== undefined) capacityIndex?.touch(identity('vector', encoded))
+        return entry?.value as IStorageVectorPoint<TPayload> | undefined
+      }
       /** Search removes expired rows before filtering/scoring; physical deleteWhere retains them. */
       const points = function* (physical = false): IterableIterator<IStorageVectorPoint<TPayload>> {
         /** The original radix locates this collection without retaining all candidate references. */
@@ -1965,7 +2256,10 @@ function createMemoryNamespace<T>(
           const entry = physical
             ? leaf.value
             : liveEntry('vector', encodeFlatStorageKey(leaf.value.key))
-          if (entry !== undefined) yield entry.value as IStorageVectorPoint<TPayload>
+          if (entry !== undefined) {
+            if (!physical) capacityIndex?.touch(identity('vector', encodeFlatStorageKey(entry.key)))
+            yield entry.value as IStorageVectorPoint<TPayload>
+          }
           leaf = next
         }
       }
@@ -2114,6 +2408,8 @@ function createMemoryNamespace<T>(
                 configuration,
                 STORAGE_MEMORY_BACKEND
               )
+              /** Complete canonical payload encoding also finishes before the first native put. */
+              const sizes = prepared.map((point) => entryBytes('vector', point))
               /**
                * Extension fields came from the original concurrency snapshot, never a second raw
                * read.
@@ -2122,10 +2418,30 @@ function createMemoryNamespace<T>(
               if (ttlMs !== undefined) assertStorageTtlDuration(ttlMs, STORAGE_MEMORY_BACKEND)
               return {
                 keys: prepared.map((point) => lockKey.vector(captured.name, point.id)),
+                capacityChanges:
+                  capacity === undefined
+                    ? undefined
+                    : () =>
+                        prepared.map((point, index) => {
+                          const key = vectorKey(captured.name, point.id)
+                          const deadline =
+                            ttlMs === undefined
+                              ? deadlines.get(identity('vector', encodeFlatStorageKey(key)))
+                              : scheduler.now() + ttlMs
+                          return capacityFact(
+                            'vector',
+                            key,
+                            ttlMs !== undefined &&
+                              deadline !== undefined &&
+                              deadline <= scheduler.now()
+                              ? undefined
+                              : sizes[index]
+                          )
+                        }),
                 run: () => {
                   /** One monotonic clock observation applies to this synchronous admitted batch. */
                   const now = scheduler.now()
-                  for (const point of prepared) {
+                  for (const [index, point] of prepared.entries()) {
                     const key = vectorKey(captured.name, point.id)
                     const encoded = encodeFlatStorageKey(key)
                     const current = liveEntry('vector', encoded)
@@ -2137,11 +2453,11 @@ function createMemoryNamespace<T>(
                       removeVector(captured.name, point.id)
                       continue
                     }
-                    const entry = { key, ordered: orderedKey, value: point }
+                    const entry = { key, ordered: orderedKey, value: point, bytes: sizes[index] }
                     data.vector.set(encoded, entry)
                     ordered.vector.set(orderedKey, entry)
-                    if (deadline === undefined) deadlines.delete(identity('vector', encoded))
-                    else deadlines.set(identity('vector', encoded), deadline)
+                    setDeadline('vector', encoded, deadline)
+                    capacityIndex?.put({ ...capacityFact('vector', key), bytes: sizes[index]! })
                     bump('vector', encoded)
                   }
                   if (prepared.length > 0) publish('vector', 'batch')
@@ -2277,10 +2593,7 @@ function createMemoryNamespace<T>(
                   for (const row of rows) {
                     /** Every selected live row shares the original hash/radix/revision identity. */
                     const encoded = encodeFlatStorageKey(row.key)
-                    data.record.delete(encoded)
-                    deadlines.delete(identity('record', encoded))
-                    ordered.record.delete(row.ordered)
-                    bump('record', encoded)
+                    deletePhysical('record', encoded)
                   }
                   if (rows.length > 0)
                     publish(

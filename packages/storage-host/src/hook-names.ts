@@ -1,5 +1,7 @@
 /** Stable event keys connect the original observers to the single host hook registry. */
 export const StorageHookName = {
+  /** Capacity reports only native committed victim counts, once per physical channel. */
+  onEvict: 'onEvict',
   /** Shared by the stage adapter and typed listener registrations; changing it breaks observation. */
   beforeHostInstall: 'beforeHostInstall',
   /** Shared by the stage adapter and typed listener registrations; changing it breaks observation. */

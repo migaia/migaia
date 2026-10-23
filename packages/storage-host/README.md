@@ -145,3 +145,9 @@ memory 原生发布 `ttl` 与 `counter`。`expire`、`remaining`、`persist` 指
 memory 原生提供 `vector`：`store.use(vector).collection('docs', { dimensions: 2, metric: 'cosine' })` 建立同 namespace 的集合描述，后续可省略一致配置。`upsert` 全批先快照，重复 ID 保留末值；`near(...).topK(k)`、`similarTo`、`recommend` 共用 contract 查询链。memory 始终精确，分数从高到低，同分按 ID 的 UTF-16 顺序；不提供原生 groupBy。声明式 payload 条件与组织/TTL 在排名前处理，函数谓词只作用于原 topK 命中且不补搜。`search` 的 `k: 0` 校验后不扫描；链式 `topK` 保留正安全整数契约。
 
 向量期限沿原物理行与原事务 draft；`tx.use(ttl)` 可为向量目标设置期限并与 KV 同提交或回滚，vector 能力本身没有通用事务投影。`deleteWhere` 不过滤物理过期匹配点，返回实际删除数；两种 count 策略在 memory 等价。组织集合、提取的查询和原生迭代器绑定原 namespace，drop 清空该目标，根关闭统一失效。所有写仍经过同一 pipeline、concurrency attempt、vector 锁桶与 controller；原三通道之间的 replace 规则保持。
+
+可选 `capacity: { maxEntries?, maxBytes?, eviction? }` 按原生 namespace 限制公开物理条目；省略容量保持无上限。两个上限须为正安全整数，`eviction` 为 `lru`（缺省）或 `lfu`，创建插件时单次捕获，非法项在分配原生状态前报 `INVALID_ARGUMENT`。LRU 与 LFU 以双向节点和频次桶维护，不扫描历史；LFU 写入也记一次命中，新增低频项可能成为自身淘汰目标。命中读更新策略，过期项通过原 deadline 与压缩 radix 索引先惰性回收，再选择容量目标，无 timer。事务和批量驱逐只随原 draft 提交；等待或回滚不先删数据，忙目标沿原锁预算等待或拒绝。`onEvict` 每个受影响通道只发一次 `{ backendId, backend, orgId, count, channel }`，普通删除、过期不发，监听失败仅报告。
+
+`maxBytes` 使用实际 canonical 编码长度：文本为 UTF-8，bytes 为 byteLength，record 与 vector payload 为 serialize 的 collections-json 编码，vector 另计每分量 8 字节；键、容量索引和 TTL 元数据不重复计入。单条超限也按相同策略驱逐，不保证仍保留。原 memory record 的 structuredClone 域更宽；仅显式 maxBytes 下，现有 codec 无法编码的值（如 Date、循环、undefined与非有限数）在任何修改前报 `UNSUPPORTED_CAPABILITY`，原错经 cause 可达。默认无上限及仅 maxEntries 保留原值域；Map、Set 和 codec 可编码的 Uint8Array 继续可用。
+
+这是 canonical 编码预算，不是 JavaScript 堆占用估算。原 codec 的 own-field 投影同样适用：raw record 中的 ArrayBuffer 按 `{}` 编码计费，原生读取仍保留其真实 structured-clone 值。

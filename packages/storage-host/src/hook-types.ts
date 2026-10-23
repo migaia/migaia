@@ -71,6 +71,7 @@ export type IStorageHttpHookPayload = IStorageHookIdentity &
   }>
 /** Interface semantics permit backend packages to augment the single host event map. */
 export interface IStorageHookMap {
+  onEvict: IStorageHookIdentity & Readonly<{ count: number; channel: string }>
   beforeHostInstall: IStorageHostInstallHookPayload
   afterHostInstall: IStorageHostInstallHookPayload
   onHostInstallError: IStorageHostInstallHookPayload & IStorageHookFailure

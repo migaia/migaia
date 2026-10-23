@@ -156,8 +156,8 @@ console.log(host.extensions.label('draft'))`
     memoryBackendPlugin: {
       role: 'factory',
       purpose: t(
-        'Define an isolated memory backend without acquiring data before installation. Native transactions and root writes share the original owner, policy budget and local lock/revision facts. Native value backends register a prepared compare/write endpoint with core.registerValueCommit only inside installation. Replace protects displaced channels; synchronous busy keys reject immediately, while clear/prefix mutation rechecks only affected channels before its uninterrupted native turn.',
-        '定义独立内存后端，安装前不获取数据；原生事务共用原owner与本地锁/修订事实。'
+        'Define an isolated memory backend without acquiring data before installation. Optional namespace-local capacity captures positive maxEntries/maxBytes and lru (default) or lfu once. Linked policy nodes and the original deadline radix select committed victims; native transactions and root writes share the original owner, budget and victim locks. onEvict reports only per-channel counts after commit. Explicit maxBytes requires a real canonical encoding; unsupported records reject before mutation. Omitted capacity and maxEntries preserve the original structuredClone domain.',
+        '定义独立内存后端，安装前不获取数据。可选 namespace 容量单次捕获正 maxEntries/maxBytes 与 lru（缺省）或 lfu。策略双链节点和原 deadline radix 选择提交后的驱逐项，原生事务、根写共用原 owner、预算与目标锁。onEvict 只在提交后报告逐通道数量。显式 maxBytes 必须有真实 canonical 编码，不能编码的 record 修改前拒绝；省略容量及 maxEntries 保留原 structuredClone 值域。'
       ),
       returns: t(
         'A literal-id memory plugin retaining selected Features from the separate final argument memoryBackendPlugin(options, features). The default id is memory; where/select/all run through the shared records query core.',
