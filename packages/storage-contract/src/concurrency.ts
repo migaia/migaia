@@ -1,3 +1,18 @@
+import {
+  createAbortTimeoutSignal,
+  raceWithAbort,
+  sleep,
+  withTimeout,
+  hostRethrowReporter,
+  type IAbortTimeoutSignal,
+  type IUtilsReporter
+} from '@migaia/utils/promise'
+import { isUtilsAbortError, isUtilsTimeoutError } from '@migaia/utils/error'
+import { inspectThenable, observeThenableRejection } from '@migaia/utils/function'
+import { systemScheduler } from '@migaia/utils/scheduler'
+import { snapshotOperationContext } from './operation-context.js'
+import { readTransactionConcurrency } from './transaction.js'
+import type { IStorageBase } from './store.js'
 import { snapshotStorageKey, assertStringStorageKey } from './key.js'
 import { encodeOrderedStorageKey } from './key-order.js'
 import type { IBackendKind } from './capabilities.js'
@@ -134,7 +149,7 @@ type IConcurrencyDecide = (
 ) => IConcurrencyDecision | Promise<IConcurrencyDecision>
 /** The sole policy registry proves identity and captures its original callback in the same lookup. */
 const concurrencyPolicies = new WeakMap<IConcurrencyPolicy, IConcurrencyDecide>()
-/** Canonical locking values are shared by policy validation and the forthcoming decision loop. */
+/** Canonical locking values are shared by policy validation and the original decision loop. */
 const ConcurrencyLocking = { pessimistic: 'pessimistic', optimistic: 'optimistic' } as const
 /** Stable decision values stay in the original concurrency owner. */
 const ConcurrencyAction = { wait: 'wait', reject: 'reject', retry: 'retry' } as const
@@ -445,4 +460,530 @@ export function normalizeLockKeys(
     if (!previous || !equalLockIdentity(previous.encoded, entry.encoded)) unique.push(entry)
   }
   return Object.freeze(unique)
+}
+
+/** Fixed fields have already been captured by the original option/context admission path. */
+const capturedConcurrencyFields = Object.freeze({
+  lock: true,
+  concurrency: true,
+  signal: true,
+  timeoutMs: true,
+  pageSize: true,
+  conflictPolicy: true,
+  orgId: true
+})
+/** Captures backend extension fields once without re-reading any admitted fixed-field getter. */
+function snapshotConcurrencyExtensions(options: ITransactionOptions): object {
+  /** Plain owned properties preserve native option values and symbol fields on every attempt. */
+  const extensions = {}
+  try {
+    for (const key of Reflect.ownKeys(options)) {
+      if (Object.hasOwn(capturedConcurrencyFields, key)) continue
+      Object.defineProperty(extensions, key, { value: Reflect.get(options, key), enumerable: true })
+    }
+  } catch (cause) {
+    throw invalidConcurrencyArgument(cause)
+  }
+  return extensions
+}
+
+/** A conflict can escape a backend only after its native work, rollback and resources have ended. */
+export type IConcurrencyAttempt<TResult> =
+  | { readonly status: 'committed'; readonly value: TResult }
+  | {
+      readonly status: 'conflict'
+      readonly phase: 'acquire' | 'commit'
+      readonly keys: readonly ILockKey[]
+      readonly holder: IConcurrencyHolder | undefined
+      readonly cause?: unknown
+    }
+/** Each backend attempt borrows the same operation signal and records only real admission waits. */
+export type IConcurrencyAttemptContext = ITransactionOptions & {
+  readonly admission: 'try' | 'wait'
+  readonly locking: IConcurrencyPolicy['locking']
+  readonly waitTimeoutMs?: number
+  wait<T>(pendingAdmission: Promise<T>): Promise<T>
+  waitPhysical<T>(pendingAdmission: Promise<T>): Promise<T>
+}
+/** The backend retains ownership of native attempt termination and resource cleanup. */
+export type IConcurrencyPort<TResult> = {
+  attempt(context: IConcurrencyAttemptContext): Promise<IConcurrencyAttempt<TResult>>
+}
+/** Canonical attempt states stay with the original concurrency loop. */
+const ConcurrencyAttemptStatus = { committed: 'committed', conflict: 'conflict' } as const
+/** Only an actual policy decision can change a subsequent attempt to waiting admission. */
+const ConcurrencyAdmission = { try: 'try', wait: 'wait' } as const
+/** Acquisition refusal and completed-rollback conflicts have distinct public failure codes. */
+const ConcurrencyPhase = { acquire: 'acquire', commit: 'commit' } as const
+/** One logical operation owns timing and conflict counters, including nested persist admission. */
+type IConcurrencyBudget = {
+  readonly cancellation: IAbortTimeoutSignal
+  readonly deadlineFailure: StorageContractError
+  readonly backend: IBackendKind
+  readonly report: IUtilsReporter
+  waitedMs: number
+  logicalWaitedMs: number
+  conflicts: number
+}
+/** Attempt contexts connect inner store calls to the original budget without granting authority. */
+const concurrencyAttemptBudgets = new WeakMap<
+  IConcurrencyAttemptContext,
+  {
+    readonly budget: IConcurrencyBudget
+    readonly locks: readonly INormalizedLockKey[] | undefined
+  }
+>()
+/** Internal managed waits distinguish logical policy budgets from physical database scheduling. */
+const ConcurrencyWaitKind = { logical: 'logical', physical: 'physical' } as const
+/** An observation failure never replaces an operation result, even if the configured reporter fails. */
+function reportConcurrencyFailure(
+  stages: IConcurrencyStageObserver | undefined,
+  error: unknown
+): void {
+  observeThenableRejection(undefined, { error }, (failure) => {
+    if (stages) stages.report(failure)
+    else hostRethrowReporter(failure, { operation: 'raceWithAbort', phase: 'late-rejection' })
+  })
+}
+/** Invokes one already-selected observation with its original receiver and captured then semantics. */
+function observeConcurrencyResult(
+  stages: IConcurrencyStageObserver,
+  handler: (...args: never[]) => unknown,
+  args: readonly unknown[]
+): void {
+  try {
+    /** Callback invocation and captured then admission share the same report-only failure boundary. */
+    const result = Reflect.apply(handler, stages, args)
+    observeThenableRejection(result, inspectThenable(result), (error) => stages.report(error))
+  } catch (error) {
+    reportConcurrencyFailure(stages, error)
+  }
+}
+/** Live stage selection returns undefined without constructing an argument array or payload. */
+function readConcurrencyStage<
+  TName extends Exclude<keyof IConcurrencyStageObserver, 'kind' | 'report'>
+>(stages: IConcurrencyStageObserver | undefined, name: TName): IConcurrencyStageObserver[TName] {
+  if (!stages) return undefined
+  try {
+    return stages[name]
+  } catch (error) {
+    reportConcurrencyFailure(stages, error)
+    return undefined
+  }
+}
+/** Constructs lock diagnostics once at failure, detached from mutable policy/backend key views. */
+function concurrencyLockFailure(
+  code: typeof StorageContractErrorCode.lockRejected | typeof StorageContractErrorCode.lockTimeout,
+  backend: IBackendKind,
+  keys: readonly ILockKey[],
+  holder: IConcurrencyHolder | undefined,
+  cause?: unknown
+): StorageContractError {
+  /** Error keys own their mutable components and cannot change a later attempt's physical identity. */
+  const snapshot = Object.freeze(keys.map((key) => snapshotLockKey(key, backend)))
+  /** Canonical bytes retain binary identity while JSON keeps ordinary logical keys readable. */
+  const keyDescription =
+    holder === undefined
+      ? undefined
+      : JSON.stringify(
+          snapshot.map((key) => ({
+            ...key,
+            encoded: Array.from(encodeOrderedStorageKey(key.key, backend), (byte) =>
+              byte.toString(16).padStart(2, '0')
+            ).join('')
+          }))
+        )
+  /** Handoff is a real identity gap, never a substituted old label. */
+  const holderDescription =
+    holder?.status === ConcurrencyHolderState.held
+      ? (holder.label ?? holder.owner)
+      : ConcurrencyHolderState.handingOff
+  return new StorageContractError(
+    code,
+    { backend, keys: snapshot, holder, cause },
+    keyDescription === undefined
+      ? undefined
+      : StorageContractErrorText.lockFailure(code, keyDescription, holderDescription)
+  )
+}
+/**
+ * Maps only cancellation owned by this operation; backend failures otherwise pass through
+ * unchanged.
+ */
+function concurrencyAbort(
+  budget: IConcurrencyBudget,
+  physical: boolean,
+  keys: readonly ILockKey[] = []
+): StorageContractError | undefined {
+  /** The single merged signal owns first-abort identity and preserves an external reason. */
+  const signal = budget.cancellation.signal
+  if (!signal?.aborted) return undefined
+  /** Reason getter failures remain the exact externally supplied reason failure. */
+  let reason: unknown
+  try {
+    reason = signal.reason
+  } catch (cause) {
+    reason = cause
+  }
+  if (reason === budget.deadlineFailure)
+    return physical
+      ? concurrencyLockFailure(
+          StorageContractErrorCode.lockTimeout,
+          budget.backend,
+          keys,
+          undefined,
+          reason
+        )
+      : budget.deadlineFailure
+  return new StorageContractError(StorageContractErrorCode.aborted, {
+    backend: budget.backend,
+    cause: reason
+  })
+}
+/**
+ * Uses utils waiting primitives only. Timeout ends this wait, never an accepted native attempt; the
+ * backend must remove its queued waiter and finish cleanup before its attempt settles.
+ */
+async function waitForConcurrency<T>(
+  budget: IConcurrencyBudget,
+  pending: Promise<T>,
+  kind: (typeof ConcurrencyWaitKind)[keyof typeof ConcurrencyWaitKind],
+  logicalTimeoutMs: number | undefined,
+  keys: readonly ILockKey[],
+  holder: IConcurrencyHolder | undefined
+): Promise<T> {
+  /**
+   * The pending Promise already exists; observe it even if utils rejects before starting its lazy
+   * operation.
+   */
+  let started = false
+  void pending.catch((error) => {
+    if (!started) {
+      /** Structural reason getters may fail; the original late rejection must still be reported. */
+      let acknowledgement = false
+      try {
+        acknowledgement = error === budget.cancellation.signal?.reason
+      } catch {
+        /* A failed reason read cannot acknowledge this rejection. */
+      }
+      if (!acknowledgement)
+        budget.report(error, { operation: 'raceWithAbort', phase: 'late-rejection' })
+    }
+  })
+  /** Only this actual blocking interval contributes to cumulative admission statistics. */
+  const start = systemScheduler.now()
+  try {
+    /** The lazy operation transfers rejection observation to the canonical utils implementation. */
+    const operation = (): Promise<T> => {
+      started = true
+      return pending
+    }
+    if (kind === ConcurrencyWaitKind.logical && logicalTimeoutMs !== undefined)
+      return await withTimeout(operation, {
+        timeoutMs: Math.max(0, logicalTimeoutMs - budget.logicalWaitedMs),
+        signal: budget.cancellation.signal,
+        report: budget.report
+      })
+    return await raceWithAbort(operation, {
+      signal: budget.cancellation.signal,
+      report: budget.report
+    })
+  } catch (error) {
+    /**
+     * Physical deadlines have their own public classification; external cancellation keeps its
+     * reason.
+     */
+    const aborted = concurrencyAbort(budget, kind === ConcurrencyWaitKind.physical, keys)
+    if (aborted) throw aborted
+    if (kind === ConcurrencyWaitKind.logical && isUtilsTimeoutError(error))
+      throw concurrencyLockFailure(
+        StorageContractErrorCode.lockTimeout,
+        budget.backend,
+        keys,
+        holder,
+        error
+      )
+    if (isUtilsAbortError(error))
+      throw new StorageContractError(StorageContractErrorCode.aborted, {
+        backend: budget.backend,
+        cause: error.cause
+      })
+    throw error
+  } finally {
+    /** Callback and cleanup execution are deliberately outside these measured waiting intervals. */
+    const elapsed = Math.max(0, systemScheduler.now() - start)
+    budget.waitedMs += elapsed
+    if (kind === ConcurrencyWaitKind.logical) budget.logicalWaitedMs += elapsed
+  }
+}
+/**
+ * Captures policy fields once and rejects inapplicable combinations after the old attempt is
+ * closed.
+ */
+function snapshotConcurrencyDecision(
+  value: unknown,
+  phase: IConcurrencyConflict['phase']
+): IConcurrencyDecision {
+  if (typeof value !== 'object' || value === null || Array.isArray(value))
+    throw new TypeError(StorageContractErrorText.concurrencyDecision)
+  /** A changing result cannot supply different action/budget fields during validation and use. */
+  const { action, timeoutMs, delayMs } = value as IConcurrencyDecision
+  if (action === ConcurrencyAction.reject && timeoutMs === undefined && delayMs === undefined)
+    return { action }
+  if (
+    action === ConcurrencyAction.wait &&
+    phase === ConcurrencyPhase.acquire &&
+    delayMs === undefined &&
+    (timeoutMs === undefined || (Number.isFinite(timeoutMs) && timeoutMs >= 0))
+  )
+    return { action, timeoutMs }
+  if (
+    action === ConcurrencyAction.retry &&
+    timeoutMs === undefined &&
+    (delayMs === undefined || (Number.isFinite(delayMs) && delayMs >= 0))
+  )
+    return { action, delayMs }
+  throw new TypeError(StorageContractErrorText.concurrencyDecision)
+}
+/**
+ * Runs the only logical decision/retry loop. A port attempt is always awaited to its actual native
+ * terminal and cleanup before cancellation, a policy decision, or another attempt can finish. The
+ * supplied genuine policy is the sole effective policy; callers resolve captured overrides through
+ * the original transaction owner. Nested calls receiving the exact attempt context borrow its
+ * budget and signal; only the outermost call releases that signal.
+ */
+export async function runWithConcurrency<TResult>(
+  request: {
+    readonly store: IStorageBase
+    readonly options: ITransactionOptions
+    readonly policy: IConcurrencyPolicy
+  },
+  port: IConcurrencyPort<TResult>
+): Promise<Awaited<TResult>> {
+  /** Overall deadlines start at public entry, including synchronous argument admission work. */
+  const startedAt = systemScheduler.now()
+  /** The original registration supplies immutable diagnostics and the host's sole stage binding. */
+  const { backend, stages } = readTransactionConcurrency(request.store)
+  assertConcurrencyPolicy(request.policy)
+  if (
+    typeof request.options !== 'object' ||
+    request.options === null ||
+    Array.isArray(request.options)
+  )
+    throw invalidConcurrencyArgument()
+  /** Lock and override reflection admission occurs before any cancellation/timing fields are read. */
+  let capturedLocks: readonly ILockKey[] | undefined
+  /** The override is validated but cannot silently replace the already resolved request policy. */
+  let capturedOverride: IConcurrencyPolicy | undefined
+  try {
+    capturedLocks = request.options.lock
+    capturedOverride = request.options.concurrency
+  } catch (cause) {
+    throw invalidConcurrencyArgument(cause)
+  }
+  if (capturedOverride !== undefined) assertConcurrencyPolicy(capturedOverride)
+  /** The exact outer attempt context carries the one shared budget and encoded lock set. */
+  const inherited = concurrencyAttemptBudgets.get(request.options as IConcurrencyAttemptContext)
+  /** The original logical identities are encoded/sorted once, not again on nested entries or retry. */
+  const locks = inherited
+    ? inherited.locks
+    : capturedLocks === undefined
+      ? undefined
+      : normalizeLockKeys(capturedLocks, backend)
+  /** Context snapshots preserve original signal identity, field causes, org identity and omission. */
+  const context = snapshotOperationContext(request.options)
+  /** Native options remain available to a backend while fixed fields keep their single capture. */
+  const extensions = snapshotConcurrencyExtensions(request.options)
+  /** Only the original operation creates a diagnostic deadline reason and utils signal owner. */
+  const deadlineFailure =
+    inherited?.budget.deadlineFailure ??
+    new StorageContractError(StorageContractErrorCode.aborted, { backend })
+  /** The existing reporter contains cleanup and late-rejection failures without changing outcomes. */
+  const report: IUtilsReporter =
+    inherited?.budget.report ?? ((error) => reportConcurrencyFailure(stages, error))
+  /** Remaining overall time includes admission work and is never reset by nested attempts. */
+  const budget: IConcurrencyBudget = inherited?.budget ?? {
+    cancellation: createAbortTimeoutSignal({
+      signal: context?.signal,
+      timeoutMs:
+        context?.timeoutMs === undefined
+          ? undefined
+          : Math.max(0, context.timeoutMs - (systemScheduler.now() - startedAt)),
+      timeoutReason: () => deadlineFailure,
+      report
+    }),
+    deadlineFailure,
+    backend,
+    report,
+    waitedMs: 0,
+    logicalWaitedMs: 0,
+    conflicts: 0
+  }
+  /** Try remains the first admission regardless of a preset's later waiting decision. */
+  let admission: IConcurrencyAttemptContext['admission'] = ConcurrencyAdmission.try
+  /** Policy-selected total logical budget is separate from the overall call deadline. */
+  let logicalTimeoutMs: number | undefined
+  /**
+   * Last actual acquisition conflict supplies logical-timeout diagnostics, separate from policy
+   * mutation.
+   */
+  let lastConflict: Pick<IConcurrencyConflict, 'keys' | 'holder'> | undefined
+  try {
+    while (true) {
+      /** Cancellation before resource admission starts no native attempt. */
+      const aborted = concurrencyAbort(budget, false)
+      if (aborted) throw aborted
+      /** Captured native fields are forwarded while the original deadline remains owned here. */
+      const { timeoutMs: _originalTimeout, ...fields } = context ?? {}
+      /**
+       * Every real attempt gets detached keys so a previous borrowed view cannot mutate future
+       * identity.
+       */
+      const attemptContext: IConcurrencyAttemptContext = {
+        ...extensions,
+        ...fields,
+        signal: budget.cancellation.signal,
+        lock: locks?.map((entry) => snapshotLockKey(entry.key, backend)),
+        concurrency: capturedOverride,
+        admission,
+        locking: request.policy.locking,
+        waitTimeoutMs:
+          logicalTimeoutMs === undefined
+            ? undefined
+            : Math.max(0, logicalTimeoutMs - budget.logicalWaitedMs),
+        wait: (pending) =>
+          waitForConcurrency(
+            budget,
+            pending,
+            ConcurrencyWaitKind.logical,
+            logicalTimeoutMs,
+            lastConflict?.keys ?? attemptContext.lock ?? [],
+            lastConflict?.holder
+          ),
+        waitPhysical: (pending) =>
+          waitForConcurrency(
+            budget,
+            pending,
+            ConcurrencyWaitKind.physical,
+            undefined,
+            attemptContext.lock ?? [],
+            undefined
+          )
+      }
+      concurrencyAttemptBudgets.set(attemptContext, { budget, locks })
+      /** No handler means no argument array or event payload is created. */
+      const beforeAcquire = readConcurrencyStage(stages, 'beforeLockAcquire')
+      if (beforeAcquire)
+        observeConcurrencyResult(stages!, beforeAcquire, [request.policy.name, locks?.length ?? 0])
+      /**
+       * Cleanup completion precedes every policy decision; abort never detaches accepted native
+       * work.
+       */
+      let result: IConcurrencyAttempt<TResult>
+      try {
+        result = await port.attempt(attemptContext)
+      } finally {
+        concurrencyAttemptBudgets.delete(attemptContext)
+      }
+      if (result.status === ConcurrencyAttemptStatus.committed) return await result.value
+      /** A backend can report conflict only after finishing rollback and resource cleanup. */
+      const afterAttemptAbort = concurrencyAbort(budget, false)
+      if (afterAttemptAbort) throw afterAttemptAbort
+      budget.conflicts += 1
+      lastConflict = {
+        keys: result.keys.map((key) => snapshotLockKey(key, backend)),
+        holder: result.holder
+      }
+      /** Conflict observations run after the complete backend attempt has ended. */
+      const onConflict = readConcurrencyStage(stages, 'onLockConflict')
+      if (onConflict)
+        observeConcurrencyResult(stages!, onConflict, [
+          result.phase,
+          budget.conflicts,
+          result.keys.length,
+          result.holder
+        ])
+      /**
+       * Each callback receives independent key components; policy mutation grants no lock
+       * authority.
+       */
+      const conflict: IConcurrencyConflict = {
+        phase: result.phase,
+        keys: lastConflict.keys.map((key) => snapshotLockKey(key, backend)),
+        attempt: budget.conflicts,
+        waitedMs: budget.waitedMs,
+        holder: result.holder,
+        signal: budget.cancellation.signal
+      }
+      /** Policy callbacks run only after real conflicts and outside every active native attempt. */
+      let decision: IConcurrencyDecision
+      try {
+        decision = snapshotConcurrencyDecision(
+          await raceWithAbort(() => concurrencyPolicies.get(request.policy)!(conflict), {
+            signal: budget.cancellation.signal,
+            report
+          }),
+          result.phase
+        )
+      } catch (cause) {
+        /** Cancellation is distinct from a failed user policy and preserves the first abort reason. */
+        const policyAbort = concurrencyAbort(budget, false)
+        if (policyAbort) throw policyAbort
+        throw new StorageContractError(StorageContractErrorCode.concurrencyPolicyFailed, {
+          backend,
+          cause
+        })
+      }
+      /** Decision observations cannot veto, delay or rewrite the captured action. */
+      const onDecision = readConcurrencyStage(stages, 'onConcurrencyDecision')
+      if (onDecision)
+        observeConcurrencyResult(stages!, onDecision, [decision.action, budget.conflicts])
+      if (decision.action === ConcurrencyAction.reject) {
+        if (result.phase === ConcurrencyPhase.acquire)
+          throw concurrencyLockFailure(
+            StorageContractErrorCode.lockRejected,
+            backend,
+            lastConflict.keys,
+            lastConflict.holder,
+            result.cause
+          )
+        throw new StorageContractError(StorageContractErrorCode.writeConflict, {
+          backend,
+          cause: result.cause
+        })
+      }
+      if (decision.action === ConcurrencyAction.wait) {
+        logicalTimeoutMs = decision.timeoutMs
+        if (logicalTimeoutMs !== undefined && budget.logicalWaitedMs >= logicalTimeoutMs)
+          throw concurrencyLockFailure(
+            StorageContractErrorCode.lockTimeout,
+            backend,
+            lastConflict.keys,
+            lastConflict.holder,
+            result.cause
+          )
+        admission = ConcurrencyAdmission.wait
+        /** Waiting statistics refer only to the shared measured admission intervals. */
+        const onWait = readConcurrencyStage(stages, 'onLockWait')
+        if (onWait) observeConcurrencyResult(stages!, onWait, [budget.conflicts, budget.waitedMs])
+      } else {
+        admission = ConcurrencyAdmission.try
+        /** Retry observation happens after rollback/cleanup and before the original utils delay. */
+        const onRetry = readConcurrencyStage(stages, 'onRetry')
+        if (onRetry)
+          observeConcurrencyResult(stages!, onRetry, [
+            budget.conflicts,
+            decision.delayMs ?? 0,
+            result.phase === ConcurrencyPhase.commit ? 'write-conflict' : undefined
+          ])
+        try {
+          await sleep(decision.delayMs ?? 0, { signal: budget.cancellation.signal })
+        } catch (cause) {
+          throw concurrencyAbort(budget, false) ?? cause
+        }
+      }
+    }
+  } finally {
+    if (!inherited) budget.cancellation.dispose()
+  }
 }

@@ -803,3 +803,14 @@ export function resolveConcurrencyPolicy(
   }
   return owner.defaultPolicy
 }
+
+/** Internal loop wiring reads captured backend/stages from the same authentic store registration. */
+export function readTransactionConcurrency(store: IStorageBase): {
+  readonly backend: IBackendKind
+  readonly stages: IConcurrencyStageObserver | undefined
+} {
+  /** This lookup cannot admit a structurally copied store or a transaction view as an owner. */
+  const owner = transactionRegistrations.get(store)
+  if (owner?.kind !== RegistrationKind.owner) throw invalidTransaction()
+  return { backend: owner.backend, stages: owner.concurrencyStages }
+}
