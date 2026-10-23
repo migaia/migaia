@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { intrinsicConstructorName } from '../../src/core/brand'
-import { isUint8Array } from '../../src/core/bytes'
+import { intrinsicConstructorName } from '@migaia/storage-contract'
+import { isUint8Array } from '@migaia/utils/bytes'
 
 describe('cross-realm brand helpers', () => {
   it('rejects a forged constructor name for byte values', () => {

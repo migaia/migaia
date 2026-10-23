@@ -1,2 +1,5 @@
-export { cookiesHost } from './backends/cookie.js'
+export { cookieBackendPlugin } from './plugins/cookies.js'
+export { cookieBackendKind } from './host/builtin-kinds.js'
+export type { ICookieBackendStore } from './host/builtin-kinds.js'
 export type { ICookiesOptions, ICookieDocument } from './backends/cookie.js'
+export type { ICookieWriteContext, ICookieRemoveContext, ISyncCookieStore } from './types/cookie.js'

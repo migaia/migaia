@@ -1,10 +1,7 @@
-import { type IStorageChange } from '@migaia/storage-contract'
-import {
-  snapshotOperationContext,
-  snapshotSyncWriteOptions,
-  throwIfAborted,
-  withAbort
-} from '../core/operation.js'
+import { bindBrowserExecution } from './execution.js'
+import { implement, kv, type IStorageChange } from '@migaia/storage-contract'
+import { snapshotOperationContext, snapshotSyncWriteOptions } from '@migaia/storage-contract'
+import { throwIfAborted, withAbort } from '@migaia/storage-host/authoring/backend'
 import {
   lengthPrefixedNamespaceCodec,
   namespacedKey,
@@ -21,6 +18,7 @@ import { StorageError, StorageErrorCode, createStorageTypeError } from '../types
 import { StorageErrorText } from '../error-text.js'
 import { normalizeStorageException } from '../utils/quota.js'
 import { StorageBackend, StorageOperation } from '../constants.js'
+import { assertValueSnapshot, withNativeValueWrite } from './native-value-write.js'
 import type {
   ICookieRemoveContext,
   ICookieScope,
@@ -31,10 +29,19 @@ import type {
 import type { IStorageCapabilities } from '../types/capabilities.js'
 import type { IOperationContext } from '../types/context.js'
 import type { ISyncCapableStore } from '../types/storage.js'
+import { asyncDisposeKey } from '@migaia/plugin-host'
 import {
-  createBackendReactiveController,
-  registerBackendReactiveController
-} from './reactive-controller.js'
+  reportCleanupError,
+  createStorageOperationReporter,
+  type IBackendValueCommit
+} from '@migaia/storage-host/authoring/backend'
+import {
+  provideBackendConstruction,
+  browserKeyValueApi,
+  type IBackendConstruction,
+  type IBackendRuntime,
+  type IKeyValueBackendStore
+} from './construction.js'
 
 const CAPABILITIES: IStorageCapabilities = Object.freeze({
   syncRead: true,
@@ -185,7 +192,13 @@ function snapshotCookieScope(scope: unknown): ICookieScope {
  * fail a write, while hidden HttpOnly or differently scoped cookies remain outside read/removal
  * guarantees. Dispose retires this Store without clearing the caller-owned document.
  */
-export const cookiesHost = (options: ICookiesOptions = {}): ISyncCapableStore<ICookieStore> => {
+export const cookiesHost = (
+  options: ICookiesOptions,
+  runtime: IBackendRuntime
+): IBackendConstruction<
+  IKeyValueBackendStore<ISyncCapableStore<ICookieStore>>,
+  ICookieDocument
+> => {
   if (options === null || typeof options !== 'object' || Array.isArray(options))
     throw new StorageError(StorageErrorCode.invalidConfig, {
       backend: StorageBackend.cookie,
@@ -248,11 +261,13 @@ export const cookiesHost = (options: ICookiesOptions = {}): ISyncCapableStore<IC
   const doc = documentCandidate as ICookieDocument
 
   /** Private commit-after controller shared by direct and Host-created exact stores. */
-  const controller = createBackendReactiveController({
+  const controller = runtime.createChangeController({
     backend: StorageBackend.cookie,
     platform: doc,
     options: Object.freeze({ namespace, namespaceCodec, scope })
   })
+  /** Symbol cleanup reports failure while explicit disposal retains the primary rejection. */
+  let symbolicDispose: Promise<void> | undefined
 
   /** Publish only after a visible cookie mutation has completed successfully. */
   const publishChange = (change: Omit<IStorageChange, 'sequence' | 'origin' | 'scope'>): void => {
@@ -422,8 +437,7 @@ export const cookiesHost = (options: ICookiesOptions = {}): ISyncCapableStore<IC
           cause: new RangeError('cookie expires must be a valid Date')
         })
       const expiresNow =
-        (maxAge !== undefined && maxAge <= 0) ||
-        (expiresTime !== undefined && expiresTime <= Date.now())
+        maxAge !== undefined ? maxAge <= 0 : expiresTime !== undefined && expiresTime <= Date.now()
       const visibleBefore = readVisibleCookie(physicalKey, StorageOperation.cookieSet, key)
       writeCookie(
         expiresNow
@@ -487,6 +501,46 @@ export const cookiesHost = (options: ICookiesOptions = {}): ISyncCapableStore<IC
     }
   }
 
+  /** Cookie entities retain their fixed scope and the original visibility/quota checks. */
+  const commitValueWrite: IBackendValueCommit = async (input, ctx) => {
+    const release = controller.beginMutation()
+    try {
+      await runtime.execution.run(
+        { operation: StorageOperation.entityUniqueWrite, input, ctx },
+        (captured) =>
+          withAbort(ctx, async (signal, _context, operationRuntime) => {
+            await withNativeValueWrite(
+              () => {
+                assertLive()
+                /**
+                 * Snapshot verification and the original private native write share one synchronous
+                 * turn.
+                 */
+                const actual = namespacedEntries(StorageOperation.entityUniqueWrite)
+                  .filter((entry) => entry.logicalKey.startsWith(captured.prefix))
+                  .flatMap((entry) => {
+                    const value = readVisibleCookie(
+                      entry.physicalKey,
+                      StorageOperation.entityUniqueWrite,
+                      entry.logicalKey
+                    )
+                    return value === undefined ? [] : [[entry.logicalKey, value] as const]
+                  })
+                assertValueSnapshot(actual, captured.expected, StorageBackend.cookie)
+                sync.set(captured.key, captured.value)
+              },
+              StorageBackend.cookie,
+              signal,
+              operationRuntime,
+              controller.closingSignal
+            )
+          })
+      )
+    } finally {
+      release()
+    }
+  }
+
   const store: ISyncCapableStore<ICookieStore> = {
     backend: StorageBackend.cookie,
     capabilities: CAPABILITIES,
@@ -516,8 +570,17 @@ export const cookiesHost = (options: ICookiesOptions = {}): ISyncCapableStore<IC
       }),
     dispose: () => {
       return controller.dispose()
-    }
+    },
+    [asyncDisposeKey]: () =>
+      (symbolicDispose ??= store
+        .dispose()
+        .catch((error) => reportCleanupError(createStorageOperationReporter(), error)))
   }
-  registerBackendReactiveController(store, controller)
-  return store
+  const construction = provideBackendConstruction(
+    bindBrowserExecution(store, runtime),
+    [implement(kv, browserKeyValueApi(store))],
+    controller,
+    () => doc
+  )
+  return { ...construction, commitValueWrite }
 }

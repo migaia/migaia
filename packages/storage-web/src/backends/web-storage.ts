@@ -1,5 +1,7 @@
-import { type IStorageChange } from '@migaia/storage-contract'
-import { snapshotSyncWriteOptions, throwIfAborted, withAbort } from '../core/operation.js'
+import { bindBrowserExecution } from './execution.js'
+import { implement, kv, type IStorageChange } from '@migaia/storage-contract'
+import { snapshotSyncWriteOptions } from '@migaia/storage-contract'
+import { throwIfAborted, withAbort } from '@migaia/storage-host/authoring/backend'
 import {
   lengthPrefixedNamespaceCodec,
   namespacedKey,
@@ -11,12 +13,28 @@ import { probeWebStorage } from '../utils/availability.js'
 import { normalizeStorageException } from '../utils/quota.js'
 import { StorageError, StorageErrorCode, createStorageTypeError } from '../types/errors.js'
 import { StorageErrorText } from '../error-text.js'
-import type { IKeyValueStore, ISyncKeyValueStore, IWebStorageLike } from '../types/storage.js'
+import { StorageBackend, StorageOperation } from '../constants.js'
+import { assertValueSnapshot, withNativeValueWrite } from './native-value-write.js'
+import type {
+  IKeyValueStore,
+  ISyncCapableStore,
+  ISyncKeyValueStore,
+  IWebStorageLike
+} from '../types/storage.js'
 import type { IBackendKind, IStorageCapabilities } from '../types/capabilities.js'
+import { asyncDisposeKey } from '@migaia/plugin-host'
 import {
-  createBackendReactiveController,
-  registerBackendReactiveController
-} from './reactive-controller.js'
+  reportCleanupError,
+  createStorageOperationReporter,
+  type IBackendValueCommit
+} from '@migaia/storage-host/authoring/backend'
+import {
+  provideBackendConstruction,
+  browserKeyValueApi,
+  type IBackendConstruction,
+  type IBackendRuntime,
+  type IKeyValueBackendStore
+} from './construction.js'
 
 const CAPABILITIES: IStorageCapabilities = Object.freeze({
   syncRead: true,
@@ -106,8 +124,12 @@ const assertWebStorageInjection: (
 export const createWebStorageBackend = (
   backend: IBackendKind,
   storage: IWebStorageLike | undefined,
-  options: IWebStorageOptions = {}
-): IKeyValueStore => {
+  options: IWebStorageOptions,
+  runtime: IBackendRuntime
+): IBackendConstruction<
+  IKeyValueBackendStore<ISyncCapableStore<IKeyValueStore>>,
+  IWebStorageLike
+> => {
   const optionsSnapshot = snapshotWebStorageOptions(options, backend)
   const namespace = optionsSnapshot.namespace === undefined ? 'default' : optionsSnapshot.namespace
   const namespaceCodecCandidate =
@@ -138,11 +160,13 @@ export const createWebStorageBackend = (
   const live = storage as IWebStorageLike
 
   /** Private commit-after controller shared by direct and Host-created exact stores. */
-  const controller = createBackendReactiveController({
+  const controller = runtime.createChangeController({
     backend,
     platform: live,
     options: Object.freeze({ namespace, namespaceCodec })
   })
+  /** Explicit and language cleanup keep separate stable promises for the same controller cleanup. */
+  let symbolicDispose: Promise<void> | undefined
 
   /** Publish only after the underlying Web Storage operation has returned successfully. */
   const publishChange = (change: Omit<IStorageChange, 'sequence' | 'origin' | 'scope'>): void => {
@@ -184,6 +208,17 @@ export const createWebStorageBackend = (
     }
     return collected
   }
+
+  /** Native diagnostics retain their original labels independently from the installed kind. */
+  const clearValuesOperation =
+    backend === StorageBackend.local
+      ? StorageOperation.localClearValues
+      : StorageOperation.sessionClearValues
+  /** Complete namespace cleanup keeps the same public operation protocol. */
+  const clearAllOperation =
+    backend === StorageBackend.local
+      ? StorageOperation.localClearAll
+      : StorageOperation.sessionClearAll
 
   /** Delete a stable physical snapshot while reporting the exact partial-failure boundary. */
   const clearNamespacedEntries = (operation: string, signal?: AbortSignal): void => {
@@ -263,11 +298,45 @@ export const createWebStorageBackend = (
     },
     clearValues: () => {
       assertLive()
-      clearNamespacedEntries(`${backend}.clearValues`)
+      clearNamespacedEntries(clearValuesOperation)
     }
   }
 
-  const store: IKeyValueStore = {
+  /** Entity preparation ends before this backend's original native snapshot/write boundary. */
+  const commitValueWrite: IBackendValueCommit = async (input, ctx) => {
+    /** Hold only the existing controller lease across intervention and native physical admission. */
+    const release = controller.beginMutation()
+    try {
+      await runtime.execution.run(
+        { operation: StorageOperation.entityUniqueWrite, input, ctx },
+        (captured) =>
+          withAbort(ctx, async (signal, _context, operationRuntime) => {
+            await withNativeValueWrite(
+              () => {
+                assertLive()
+                /** Both reads and the private sync write execute without an intervening await. */
+                const actual = namespacedEntries()
+                  .filter((entry) => entry.logicalKey.startsWith(captured.prefix))
+                  .flatMap((entry) => {
+                    const value = live.getItem(entry.physicalKey)
+                    return value === null ? [] : [[entry.logicalKey, value] as const]
+                  })
+                assertValueSnapshot(actual, captured.expected, backend)
+                sync.set(captured.key, captured.value)
+              },
+              backend,
+              signal,
+              operationRuntime,
+              controller.closingSignal
+            )
+          })
+      )
+    } finally {
+      release()
+    }
+  }
+
+  const store: ISyncCapableStore<IKeyValueStore> = {
     backend,
     capabilities: CAPABILITIES,
     sync,
@@ -279,17 +348,26 @@ export const createWebStorageBackend = (
     clearValues: (ctx) =>
       withAbort(ctx, async (signal) => {
         assertLive()
-        clearNamespacedEntries(`${backend}.clearValues`, signal)
+        clearNamespacedEntries(clearValuesOperation, signal)
       }),
     clearAll: (ctx) =>
       withAbort(ctx, async (signal) => {
         assertLive()
-        clearNamespacedEntries(`${backend}.clearAll`, signal)
+        clearNamespacedEntries(clearAllOperation, signal)
       }),
     dispose: () => {
       return controller.dispose()
-    }
+    },
+    [asyncDisposeKey]: () =>
+      (symbolicDispose ??= store
+        .dispose()
+        .catch((error) => reportCleanupError(createStorageOperationReporter(), error)))
   }
-  registerBackendReactiveController(store, controller)
-  return store
+  const construction = provideBackendConstruction(
+    bindBrowserExecution(store, runtime),
+    [implement(kv, browserKeyValueApi(store))],
+    controller,
+    () => live
+  )
+  return { ...construction, commitValueWrite }
 }

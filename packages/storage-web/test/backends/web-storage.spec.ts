@@ -1,8 +1,27 @@
+import { createLocalTestStore, createSessionTestStore } from '../helpers/installed-backends.js'
+import { STORAGE_HOST_SOURCE } from '@migaia/storage-host'
+import { walkErrorCauses } from '@migaia/utils/error'
 import { describe, expect, it, vi } from 'vitest'
-import { createWebStorageBackend } from '../../src/backends/web-storage'
-import { localStorageHost } from '../../src/backends/local-storage'
-import { sessionStorageHost } from '../../src/backends/session-storage'
-import { fakeWebStorage } from '../../src/testing/fake-web-storage'
+import { STORAGE_WEB_SOURCE } from '../../src/index.js'
+import { fakeWebStorage } from '../../src/testing/fake-web-storage.js'
+
+/** Installation wrappers retain the browser failure and its original native cause. */
+const expectNativeInstallationFailure = async (
+  pending: Promise<unknown>,
+  expected: Record<string, unknown>
+): Promise<unknown> => {
+  /** Capture the original rejection once so native error identity can also be asserted. */
+  const failure: unknown = await pending.then(
+    () => undefined,
+    (cause: unknown) => cause
+  )
+  if ((failure as { readonly source?: unknown })?.source !== STORAGE_WEB_SOURCE)
+    expect(failure).toMatchObject({ source: STORAGE_HOST_SOURCE, code: 'BACKEND_INSTALL_FAILED' })
+  expect(walkErrorCauses(failure)).toContainEqual(
+    expect.objectContaining({ source: STORAGE_WEB_SOURCE, ...expected })
+  )
+  return failure
+}
 
 const unavailableStorage: Storage = {
   get length() {
@@ -19,8 +38,16 @@ const unavailableStorage: Storage = {
 
 describe('createWebStorageBackend', () => {
   it.each([
-    { storageName: 'localStorage' as const, backend: 'local', factory: localStorageHost },
-    { storageName: 'sessionStorage' as const, backend: 'session', factory: sessionStorageHost }
+    {
+      storageName: 'localStorage' as const,
+      backend: 'local-storage',
+      factory: createLocalTestStore
+    },
+    {
+      storageName: 'sessionStorage' as const,
+      backend: 'session-storage',
+      factory: createSessionTestStore
+    }
   ])(
     '$storageName access denied by the host keeps the original cause',
     async ({ storageName, backend, factory }) => {
@@ -32,20 +59,13 @@ describe('createWebStorageBackend', () => {
       })
       try {
         /** Capture the public failure once so cause identity is asserted, not just deep equality. */
-        let failure: unknown
-        try {
-          factory()
-        } catch (error) {
-          failure = error
-        }
-        expect(failure).toMatchObject({
-          source: '@migaia/storage-web',
+        const failure = await expectNativeInstallationFailure(factory(), {
           code: 'BACKEND_UNAVAILABLE',
           backend
         })
-        expect((failure as Error).cause).toBe(original)
+        expect(walkErrorCauses(failure)).toContain(original)
         /** An explicit usable port must continue to bypass a denied ambient host getter. */
-        const store = factory({ storage: fakeWebStorage() })
+        const store = await factory({ storage: fakeWebStorage() })
         store.sync.set('theme', 'dark')
         expect(store.sync.get('theme')).toBe('dark')
         await store.dispose()
@@ -55,36 +75,35 @@ describe('createWebStorageBackend', () => {
     }
   )
 
-  it('构造期拒绝 null、数组和 primitive options', () => {
+  it('构造期拒绝 null、数组和 primitive options', async () => {
     for (const options of [null, [], 'options', 1])
-      expect(() =>
-        createWebStorageBackend('local', fakeWebStorage(), options as never)
-      ).toThrowError(expect.objectContaining({ code: 'INVALID_CONFIG' }))
+      await expectNativeInstallationFailure(createLocalTestStore(options as never), {
+        code: 'INVALID_CONFIG'
+      })
   })
 
-  it('local/session wrapper 在解构前拒绝非法 options', () => {
-    for (const factory of [localStorageHost, sessionStorageHost])
+  it('local/session wrapper 在解构前拒绝非法 options', async () => {
+    for (const factory of [createLocalTestStore, createSessionTestStore])
       for (const options of [null, [], 'options', 1])
-        expect(() => factory(options as never)).toThrowError(
-          expect.objectContaining({ code: 'INVALID_CONFIG' })
-        )
+        await expectNativeInstallationFailure(factory(options as never), { code: 'INVALID_CONFIG' })
   })
 
-  it('local/session wrapper 归一化 storage getter 异常', () => {
-    for (const factory of [localStorageHost, sessionStorageHost])
-      expect(() =>
+  it('local/session wrapper 归一化 storage getter 异常', async () => {
+    for (const factory of [createLocalTestStore, createSessionTestStore])
+      await expectNativeInstallationFailure(
         factory({
           get storage(): ReturnType<typeof fakeWebStorage> {
             throw new Error('hostile storage getter')
           }
-        })
-      ).toThrowError(expect.objectContaining({ code: 'INVALID_CONFIG' }))
+        }),
+        { code: 'INVALID_CONFIG' }
+      )
   })
 
-  it('local/session wrapper 对三个构造字段各读取一次', () => {
-    for (const factory of [localStorageHost, sessionStorageHost]) {
+  it('local/session wrapper 对三个构造字段各读取一次', async () => {
+    for (const factory of [createLocalTestStore, createSessionTestStore]) {
       let reads = 0
-      const store = factory({
+      const store = await factory({
         get namespace() {
           reads += 1
           return 'getter-options'
@@ -103,14 +122,15 @@ describe('createWebStorageBackend', () => {
     }
   })
 
-  it('namespace getter 异常统一返回 INVALID_CONFIG', () => {
-    expect(() =>
-      localStorageHost({
+  it('namespace getter 异常统一返回 INVALID_CONFIG', async () => {
+    await expectNativeInstallationFailure(
+      createLocalTestStore({
         get namespace(): string {
           throw new Error('hostile namespace')
         }
-      })
-    ).toThrowError(expect.objectContaining({ code: 'INVALID_CONFIG' }))
+      }),
+      { code: 'INVALID_CONFIG' }
+    )
   })
 
   it('namespace codec 描述符只读取一次并固定后续行为', async () => {
@@ -128,7 +148,8 @@ describe('createWebStorageBackend', () => {
             : undefined
       }
     }
-    const store = createWebStorageBackend('local', fakeWebStorage(), {
+    const store = await createLocalTestStore({
+      storage: fakeWebStorage(),
       namespace: 'codec-snapshot',
       namespaceCodec: codec
     })
@@ -137,59 +158,60 @@ describe('createWebStorageBackend', () => {
     expect(reads).toBe(2)
   })
 
-  it('namespace codec getter 异常统一返回 INVALID_CONFIG', () => {
-    expect(() =>
-      createWebStorageBackend('local', fakeWebStorage(), {
+  it('namespace codec getter 异常统一返回 INVALID_CONFIG', async () => {
+    await expectNativeInstallationFailure(
+      createLocalTestStore({
+        storage: fakeWebStorage(),
         namespaceCodec: {
           get encode(): never {
             throw new Error('hostile codec getter')
           },
           decode: () => undefined
         }
-      })
-    ).toThrowError(expect.objectContaining({ code: 'INVALID_CONFIG', backend: 'local' }))
+      }),
+      { code: 'INVALID_CONFIG', backend: 'local-storage' }
+    )
   })
 
-  it('构造期拒绝非法 namespace 与 namespace codec 形状', () => {
-    expect(() =>
-      createWebStorageBackend('local', fakeWebStorage(), { namespace: '' })
-    ).toThrowError(expect.objectContaining({ code: 'INVALID_CONFIG' }))
-    expect(() =>
-      createWebStorageBackend('local', fakeWebStorage(), {
-        namespace: null as unknown as string
-      })
-    ).toThrowError(expect.objectContaining({ code: 'INVALID_CONFIG' }))
-    expect(() =>
-      createWebStorageBackend('local', fakeWebStorage(), {
-        namespaceCodec: [] as never
-      })
-    ).toThrowError(expect.objectContaining({ code: 'INVALID_CONFIG' }))
+  it('构造期拒绝非法 namespace 与 namespace codec 形状', async () => {
+    await expectNativeInstallationFailure(
+      createLocalTestStore({ storage: fakeWebStorage(), namespace: '' }),
+      { code: 'INVALID_CONFIG' }
+    )
+    await expectNativeInstallationFailure(
+      createLocalTestStore({ storage: fakeWebStorage(), namespace: null as unknown as string }),
+      { code: 'INVALID_CONFIG' }
+    )
+    await expectNativeInstallationFailure(
+      createLocalTestStore({ storage: fakeWebStorage(), namespaceCodec: [] as never }),
+      { code: 'INVALID_CONFIG' }
+    )
   })
 
-  it('backend 与 capabilities 正确声明', () => {
-    const store = createWebStorageBackend('local', fakeWebStorage(), { namespace: 'ns' })
-    expect(store.backend).toBe('local')
+  it('backend 与 capabilities 正确声明', async () => {
+    const store = await createLocalTestStore({ storage: fakeWebStorage(), namespace: 'ns' })
+    expect(store.backend).toBe('local-storage')
     expect(store.capabilities.binary).toBe(false)
     expect(store.capabilities.records).toBe(false)
     expect(store.capabilities.maxValueBytes).toBe(5 * 1024 * 1024)
   })
-  it('拒绝 malformed storage 注入而不误报为 unavailable', () => {
-    expect(() => createWebStorageBackend('local', {} as never)).toThrowError(
-      expect.objectContaining({ code: 'INVALID_CONFIG' })
-    )
+  it('拒绝 malformed storage 注入而不误报为 unavailable', async () => {
+    await expectNativeInstallationFailure(createLocalTestStore({ storage: {} as never }), {
+      code: 'INVALID_CONFIG'
+    })
   })
-  it('拒绝非法 storage length', () => {
+  it('拒绝非法 storage length', async () => {
     for (const length of [NaN, Infinity, -1, 1.5]) {
       const storage = {
         ...fakeWebStorage(),
         length
       }
-      expect(() => createWebStorageBackend('local', storage as never)).toThrowError(
-        expect.objectContaining({ code: 'INVALID_CONFIG' })
-      )
+      await expectNativeInstallationFailure(createLocalTestStore({ storage: storage as never }), {
+        code: 'INVALID_CONFIG'
+      })
     }
   })
-  it('构造校验只读取 storage length 一次', () => {
+  it('构造校验只读取 storage length 一次', async () => {
     const storage = fakeWebStorage()
     let reads = 0
     Object.defineProperty(storage, 'length', {
@@ -199,39 +221,44 @@ describe('createWebStorageBackend', () => {
         return 0
       }
     })
-    const store = createWebStorageBackend('local', storage)
+    const store = await createLocalTestStore({ storage: storage })
     expect(store.sync!.get('missing')).toBeNull()
     expect(reads).toBe(1)
   })
-  it('storage surface getter 异常统一返回 INVALID_CONFIG', () => {
+  it('storage surface getter 异常统一返回 INVALID_CONFIG', async () => {
     const storage = fakeWebStorage()
     Object.defineProperty(storage, 'getItem', {
       get: () => {
         throw new Error('hostile storage method getter')
       }
     })
-    expect(() => createWebStorageBackend('local', storage)).toThrowError(
-      expect.objectContaining({ code: 'INVALID_CONFIG' })
-    )
+    await expectNativeInstallationFailure(createLocalTestStore({ storage: storage }), {
+      code: 'INVALID_CONFIG'
+    })
   })
-  it('不可用时始终抛 BACKEND_UNAVAILABLE', () => {
-    expect(() => createWebStorageBackend('local', unavailableStorage)).toThrow(
-      expect.objectContaining({ code: 'BACKEND_UNAVAILABLE' })
-    )
+  it('不可用时始终抛 BACKEND_UNAVAILABLE', async () => {
+    await expectNativeInstallationFailure(createLocalTestStore({ storage: unavailableStorage }), {
+      code: 'BACKEND_UNAVAILABLE'
+    })
   })
-  it('探测原始异常保留在 StorageError.cause', () => {
+  it('探测原始异常保留在 StorageError.cause', async () => {
     const cause = new Error('security')
     const storage = fakeWebStorage()
     storage.getItem = () => {
       throw cause
     }
-    expect(() => createWebStorageBackend('local', storage)).toThrow(
-      expect.objectContaining({ code: 'BACKEND_UNAVAILABLE', cause })
+    const failure = await expectNativeInstallationFailure(
+      createLocalTestStore({ storage: storage }),
+      {
+        code: 'BACKEND_UNAVAILABLE',
+        cause
+      }
     )
+    expect(walkErrorCauses(failure)).toContain(cause)
   })
   it('运行时 get/remove/keys 异常统一归一化', async () => {
     const storage = fakeWebStorage()
-    const store = createWebStorageBackend('local', storage)
+    const store = await createLocalTestStore({ storage: storage })
     storage.getItem = () => {
       throw new Error('runtime get')
     }
@@ -251,7 +278,7 @@ describe('createWebStorageBackend', () => {
   })
   it('keys 对运行期 length 只读取一次，扫描边界不会漂移', async () => {
     const storage = fakeWebStorage()
-    const store = createWebStorageBackend('local', storage, { namespace: 'bounded-keys' })
+    const store = await createLocalTestStore({ storage: storage, namespace: 'bounded-keys' })
     await store.set('key', 'value')
     let reads = 0
     Object.defineProperty(storage, 'length', {
@@ -275,7 +302,8 @@ describe('createWebStorageBackend', () => {
           : undefined
       }
     }
-    const store = createWebStorageBackend('local', storage, {
+    const store = await createLocalTestStore({
+      storage: storage,
       namespace: 'codec-clear',
       namespaceCodec: codec
     })
@@ -286,7 +314,7 @@ describe('createWebStorageBackend', () => {
   })
   it('clearAll 中途失败报告 operation/key 且不伪报完整回滚', async () => {
     const storage = fakeWebStorage()
-    const store = createWebStorageBackend('local', storage, { namespace: 'partial-clear' })
+    const store = await createLocalTestStore({ storage: storage, namespace: 'partial-clear' })
     await store.set('first', 'one')
     await store.set('second', 'two')
     const removeItem = storage.removeItem
@@ -296,8 +324,8 @@ describe('createWebStorageBackend', () => {
     }
     await expect(store.clearAll()).rejects.toMatchObject({
       code: 'BACKEND_UNAVAILABLE',
-      backend: 'local',
-      operation: 'local.clearAll',
+      backend: 'local-storage',
+      operation: 'local-storage.clearAll',
       key: 'second'
     })
     await expect(store.get('first')).resolves.toBeNull()
@@ -305,7 +333,7 @@ describe('createWebStorageBackend', () => {
   })
   it('clearAll 快照失败归属公开 operation，不泄漏裸宿主异常', async () => {
     const storage = fakeWebStorage()
-    const store = createWebStorageBackend('local', storage, { namespace: 'snapshot-failure' })
+    const store = await createLocalTestStore({ storage: storage, namespace: 'snapshot-failure' })
     Object.defineProperty(storage, 'length', {
       get: () => {
         throw new Error('hostile clear snapshot')
@@ -313,8 +341,8 @@ describe('createWebStorageBackend', () => {
     })
     await expect(store.clearAll()).rejects.toMatchObject({
       code: 'BACKEND_UNAVAILABLE',
-      backend: 'local',
-      operation: 'local.clearAll',
+      backend: 'local-storage',
+      operation: 'local-storage.clearAll',
       cause: expect.objectContaining({ message: 'hostile clear snapshot' })
     })
   })
@@ -328,7 +356,7 @@ describe('createWebStorageBackend', () => {
       removeItem(key)
       if (armed) controller.abort(reason)
     }
-    const store = createWebStorageBackend('local', storage, { namespace: 'reentrant-abort' })
+    const store = await createLocalTestStore({ storage: storage, namespace: 'reentrant-abort' })
     await store.set('first', 'one')
     await store.set('second', 'two')
     armed = true
@@ -344,27 +372,27 @@ describe('createWebStorageBackend', () => {
     ['非法类型', (index: number, firstKey: string) => (index === 0 ? firstKey : 42)]
   ] as const)('clearAll 拒绝%s枚举，不把不完整快照伪报为清理成功', async (_label, keyAt) => {
     const storage = fakeWebStorage()
-    const store = createWebStorageBackend('local', storage, { namespace: 'incoherent-scan' })
+    const store = await createLocalTestStore({ storage: storage, namespace: 'incoherent-scan' })
     await store.set('first', 'one')
     await store.set('second', 'two')
     const firstKey = storage.key(0) as string
     storage.key = (index: number) => keyAt(index, firstKey) as string | null
     await expect(store.clearAll()).rejects.toMatchObject({
       code: 'BACKEND_UNAVAILABLE',
-      backend: 'local',
-      operation: 'local.clearAll',
+      backend: 'local-storage',
+      operation: 'local-storage.clearAll',
       cause: expect.any(TypeError)
     })
     expect(storage.length).toBe(2)
   })
   it('keys 拒绝运行期非法 length 并归一为 BACKEND_UNAVAILABLE', async () => {
     const storage = fakeWebStorage()
-    const store = createWebStorageBackend('local', storage)
+    const store = await createLocalTestStore({ storage: storage })
     Object.defineProperty(storage, 'length', { get: () => Infinity })
     await expect(store.keys()).rejects.toMatchObject({ code: 'BACKEND_UNAVAILABLE' })
   })
   it('拒绝运行时非字符串 key，不把它隐式编码为物理键', async () => {
-    const store = createWebStorageBackend('local', fakeWebStorage())
+    const store = await createLocalTestStore({ storage: fakeWebStorage() })
     await expect(store.set(42 as unknown as string, 'value')).rejects.toMatchObject({
       code: 'INVALID_CONFIG'
     })
@@ -382,9 +410,10 @@ describe('createWebStorageBackend', () => {
       },
       decode: () => undefined
     }
-    expect(() =>
-      createWebStorageBackend('local', fakeWebStorage(), { namespaceCodec: encodeCodec })
-    ).toThrow(expect.objectContaining({ code: 'EXTENSION_FAILED', cause: expect.any(Error) }))
+    await expectNativeInstallationFailure(
+      createLocalTestStore({ storage: fakeWebStorage(), namespaceCodec: encodeCodec }),
+      { code: 'EXTENSION_FAILED', cause: expect.any(Error) }
+    )
     const storage = fakeWebStorage()
     const decodeCodec = {
       encode: (namespace: string, key: string) => `physical:${namespace}:${key}`,
@@ -392,18 +421,21 @@ describe('createWebStorageBackend', () => {
         throw new Error('decode failure')
       }
     }
-    const store = createWebStorageBackend('local', storage, { namespaceCodec: decodeCodec })
+    const store = await createLocalTestStore({ storage: storage, namespaceCodec: decodeCodec })
     storage.setItem('physical:ns:key', 'value')
     await expect(store.keys()).rejects.toMatchObject({ code: 'EXTENSION_FAILED' })
   })
   it('拒绝 namespace codec 的非法输出类型', async () => {
-    expect(() =>
-      createWebStorageBackend('local', fakeWebStorage(), {
+    await expectNativeInstallationFailure(
+      createLocalTestStore({
+        storage: fakeWebStorage(),
         namespaceCodec: { encode: () => 42, decode: () => undefined } as never
-      })
-    ).toThrowError(expect.objectContaining({ code: 'EXTENSION_FAILED' }))
+      }),
+      { code: 'EXTENSION_FAILED' }
+    )
     const storage = fakeWebStorage()
-    const store = createWebStorageBackend('local', storage, {
+    const store = await createLocalTestStore({
+      storage: storage,
       namespaceCodec: {
         encode: (namespace: string, key: string) => `${namespace}:${key}`,
         decode: () => 42
@@ -412,15 +444,20 @@ describe('createWebStorageBackend', () => {
     storage.setItem('default:key', 'value')
     await expect(store.keys()).rejects.toMatchObject({ code: 'EXTENSION_FAILED' })
   })
-  it('storage 为 undefined 时抛 BACKEND_UNAVAILABLE', () => {
-    expect(() => createWebStorageBackend('local', undefined)).toThrow(
-      expect.objectContaining({ code: 'BACKEND_UNAVAILABLE' })
-    )
+  it('storage 为 undefined 时抛 BACKEND_UNAVAILABLE', async () => {
+    vi.stubGlobal('localStorage', undefined)
+    try {
+      await expectNativeInstallationFailure(createLocalTestStore({ storage: undefined }), {
+        code: 'BACKEND_UNAVAILABLE'
+      })
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
   it('多命名空间互相隔离', async () => {
     const shared = fakeWebStorage()
-    const storeA = createWebStorageBackend('local', shared, { namespace: 'a' })
-    const storeB = createWebStorageBackend('local', shared, { namespace: 'b' })
+    const storeA = await createLocalTestStore({ storage: shared, namespace: 'a' })
+    const storeB = await createLocalTestStore({ storage: shared, namespace: 'b' })
     await storeA.set('k', 'from-a')
     await storeB.set('k', 'from-b')
     await expect(storeA.get('k')).resolves.toBe('from-a')
@@ -446,7 +483,7 @@ describe('createWebStorageBackend', () => {
         }
       }
     })()
-    const store = createWebStorageBackend('local', throwsOnSecondWrite, { namespace: 'q' })
+    const store = await createLocalTestStore({ storage: throwsOnSecondWrite, namespace: 'q' })
     await expect(store.set('k', 'v')).rejects.toMatchObject({ code: 'QUOTA_EXCEEDED' })
   })
 })
