@@ -72,8 +72,39 @@ const nextText = String(increment('41'))`,
   )
 }
 
+/** Pure ground RDF preparation is shared by actual native backends, without a fictional store. */
+const rdfTermCase: ICaseDoc = {
+  title: t('Prepare ground RDF identity once', '一次准备 ground RDF 身份'),
+  problem: t(
+    'Native writes and query patterns must agree on normalized literals and portable ground positions.',
+    '原生写入与查询模式须统一规范 literal 和便携 ground 位置。'
+  ),
+  example: `import {
+  term, snapshotStorageRdfTerm, snapshotStorageRdfPattern,
+  snapshotStorageRdfQuad, encodeStorageRdfQuad
+} from '@migaia/storage-contract'
+const quad = snapshotStorageRdfQuad({
+  subject: term.iri('urn:user:1'),
+  predicate: term.iri('urn:label'),
+  object: term.literal('Ada', { language: 'EN' }),
+  graph: term.defaultGraph
+}, 'memory')
+const pattern = snapshotStorageRdfPattern({ subject: quad.subject }, 'memory')
+const identityBytes = encodeStorageRdfQuad(quad, 'memory')
+const responseLocalBlank = snapshotStorageRdfTerm(term.blank('response-local'), undefined)`,
+  result: t(
+    'Language becomes lowercase, IRI spelling stays exact, and omitted pattern graph covers all graphs. Identity bytes are self-delimiting; raw blank terms cannot enter ground quad positions.',
+    'language 变为小写、IRI 拼写保持精确，模式省略 graph 时涵盖所有图。身份字节自定界；raw blank 项不能进入 ground quad 位置。'
+  )
+}
+
 /** Exercises public contract tools without supplying a fictional storage implementation. */
 export const storageContractCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
+  term: [rdfTermCase],
+  snapshotStorageRdfTerm: [rdfTermCase],
+  snapshotStorageRdfPattern: [rdfTermCase],
+  snapshotStorageRdfQuad: [rdfTermCase],
+  encodeStorageRdfQuad: [rdfTermCase],
   ttl: [ttlCase],
   snapshotStorageTtlTarget: [ttlCase],
   assertStorageTtlDuration: [ttlCase],

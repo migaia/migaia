@@ -254,3 +254,20 @@ export type {
   ITransactionCounterApi,
   IStorageCounterIncrement
 } from './capabilities/counter.js'
+export {
+  term,
+  snapshotStorageRdfTerm,
+  snapshotStorageRdfPattern,
+  snapshotStorageRdfQuad,
+  encodeStorageRdfQuad
+} from './capabilities/rdf.js'
+export type {
+  IRdfNamedNode,
+  IRdfBlankNode,
+  IRdfLiteral,
+  IRdfDefaultGraph,
+  IRdfBindingTerm,
+  IRdfTerm,
+  IRawQuad,
+  IQuad
+} from './capabilities/rdf.js'
