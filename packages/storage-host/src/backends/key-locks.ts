@@ -37,7 +37,8 @@ export type IBackendKeyLockPort = IStorageResource & {
       readonly channel: ILockKey['channel']
       readonly lower: string
       readonly upper: string
-    }[]
+    }[],
+    current?: IConcurrencyAttemptContext
   ): ILockHolding | undefined
   /** Final conflict admission and this synchronous native mutation share one uninterrupted turn. */
   attemptWrite<R>(
@@ -57,6 +58,8 @@ export type IBackendKeyLockPort = IStorageResource & {
 
 /** All entries acquired atomically by one attempt share one original release signal. */
 type IKeyLease = IStorageResource & {
+  /** Exact authentic attempt identity excludes only its own held rows during native range checks. */
+  readonly context: IConcurrencyAttemptContext
   readonly released: Promise<void>
 }
 /** One canonical identity owns its detached logical key and actual holder until native termination. */
@@ -126,17 +129,17 @@ export function createBackendKeyLockPort(): IBackendKeyLockPort {
       readonly lower: string
       readonly upper: string
     }[] = [],
-    ownLease?: IKeyLease
+    current?: IConcurrencyAttemptContext
   ): IKeyEntry | undefined => {
     for (const identity of identities) {
       /** Lookup never re-encodes or sorts the logical key. */
       const held = readEntry(identity)
-      if (held !== undefined && held.lease !== ownLease) return held
+      if (held !== undefined && held.lease.context !== current) return held
     }
     /** At most the affected physical channels are inspected; no range index or range lock exists. */
     for (const range of ranges)
       for (const [identity, held] of entries[range.channel])
-        if (held.lease !== ownLease && range.lower <= identity && identity < range.upper)
+        if (held.lease.context !== current && range.lower <= identity && identity < range.upper)
           return held
     return undefined
   }
@@ -170,6 +173,7 @@ export function createBackendKeyLockPort(): IBackendKeyLockPort {
     }
     /** The lease owns only entries bearing its exact identity, never a replacement's entries. */
     const lease: IKeyLease = {
+      context: ctx,
       released: released.promise,
       dispose,
       [Symbol.asyncDispose]: () =>
@@ -318,7 +322,7 @@ export function createBackendKeyLockPort(): IBackendKeyLockPort {
       throwIfAborted(admissionSignal)
       if (write !== undefined) {
         /** A waiting continuation or observation may have admitted a new intersecting holder. */
-        const held = conflict(identities, ranges, lease)
+        const held = conflict(identities, ranges, lease?.context)
         if (held !== undefined)
           return { status: 'conflict', phase: 'acquire', keys: [held.key], holder: held.holder }
         /** An acquisition observer may have cancelled the original operation synchronously. */
@@ -351,10 +355,12 @@ export function createBackendKeyLockPort(): IBackendKeyLockPort {
       runAttempt(ctx, holder, native, stages, admissionSignal),
     attemptWrite: (ctx, holder, write, stages, admissionSignal, ranges) =>
       runAttempt(ctx, holder, undefined, stages, admissionSignal, write, ranges),
-    probe: (identities, ranges) => {
+    probe: (identities, ranges, current) => {
       assertOpen()
+      /** Only the original live attempt can identify its own lease; key lists grant no exemption. */
+      if (current !== undefined) readConcurrencyLockIdentities(current)
       /** Only the first actual holder is copied; point probing never sorts or scans other keys. */
-      const held = conflict(identities, ranges)
+      const held = conflict(identities, ranges, current)
       if (held === undefined) return undefined
       return Object.freeze({
         key:

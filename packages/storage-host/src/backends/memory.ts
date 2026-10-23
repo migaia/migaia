@@ -9,6 +9,8 @@ import {
   runTransactionOperation,
   useTransactionCapability,
   snapshotStorageKeyPrefix,
+  snapshotConcurrencyLockKeys,
+  snapshotConcurrencyLockRange,
   lockKey,
   type ITransactionRecordsApi,
   assertTransactionCallback,
@@ -26,6 +28,9 @@ import {
   type ITransactionScope,
   type ITransactionOptions,
   type IWriteConcurrencyOptions,
+  type IWriteOptions,
+  type IOperationContextSnapshot,
+  type ILockKey,
   type ITransactionBuilder,
   type IRecordStore,
   type ISyncCapableStore,
@@ -101,6 +106,17 @@ type IMemoryDraft = IMemoryEntry & {
   readonly channel: IStorageChannel
   readonly remove: boolean
   readonly encoded: string
+}
+
+/** Prepared root work owns detached inputs while borrowing the original admission and budget. */
+type IMemoryRootMutation<R> = {
+  readonly keys: readonly ILockKey[]
+  readonly ranges?: readonly {
+    readonly channel: ILockKey['channel']
+    readonly lower: string
+    readonly upper: string
+  }[]
+  run(): R
 }
 
 /** Create the real native backend only from its original installed core. */
@@ -256,11 +272,11 @@ export function createMemoryBackend<T = unknown>(
   ): void => {
     controller.assertLive()
     /** Snapshot and prepare before touching any conflicting channel. */
-    const captured = snapshotStorageKey(key, STORAGE_MEMORY_BACKEND)
+    const captured = key
     /** All data channels share the same existing flat logical-key identity. */
     const encoded = encodeFlatStorageKey(captured)
-    /** Clone failure cannot delete a previous channel. */
-    const prepared = prepare(channel, value, captured)
+    /** Cloning completed before lock admission, so no borrowed getter can reopen this final turn. */
+    const prepared = value
     /** One canonical ordered encoding is retained by the live entry and affected native indexes. */
     const encodedBytes = encodeOrderedStorageKey(captured, STORAGE_MEMORY_BACKEND)
     /** Overwrite keeps the already retained live bytes for the exact canonical identity. */
@@ -316,6 +332,122 @@ export function createMemoryBackend<T = unknown>(
     const entry = data[channel].get(encodeFlatStorageKey(captured))
     return entry === undefined ? undefined : copyValue(channel, entry.value, captured)
   }
+  /** Replace admits every possible displaced channel in the same fixed canonical order. */
+  const mutationKeys = (
+    channel: IStorageChannel,
+    key: IStorageKey,
+    policy?: IConflictPolicy
+  ): readonly ILockKey[] =>
+    (policy === 'replace' ? MemoryState.channels : [channel]).flatMap<ILockKey>((current) =>
+      current === 'value'
+        ? [lockKey.text(key)]
+        : current === 'record'
+          ? [lockKey.record(key)]
+          : typeof key === 'string'
+            ? [lockKey.bytes(key)]
+            : []
+    )
+  /** One finite range per affected channel uses the original contract's encoded identity bounds. */
+  const mutationRanges = (channels: readonly IStorageChannel[]) =>
+    channels.map((channel) => {
+      /** Physical text identity is shared by scalar and typed transaction text keys. */
+      const target: ILockKey['channel'] = channel === 'value' ? 'text' : channel
+      return {
+        channel: target,
+        ...snapshotConcurrencyLockRange({ channel: target }, STORAGE_MEMORY_BACKEND)
+      }
+    })
+  /** Busy synchronous writes cannot run a policy or wait; diagnostics identify the actual holder. */
+  const assertUnlocked = (
+    keys: readonly ILockKey[],
+    ranges?: IMemoryRootMutation<unknown>['ranges']
+  ): void => {
+    /** Canonical admission pairs detached keys with the sole original identity representation. */
+    const captured = snapshotConcurrencyLockKeys(keys, STORAGE_MEMORY_BACKEND)
+    /** Point checks perform only fixed-channel Map lookups; clear examines its affected bucket. */
+    const held = locks.probe(captured.identities, ranges)
+    if (held !== undefined)
+      throw new StorageContractError(StorageContractErrorCode.lockRejected, {
+        backend: STORAGE_MEMORY_BACKEND,
+        keys: [held.key],
+        holder: held.holder
+      })
+  }
+  /** Capture borrowed payload before admission; the eventual physical mutation never calls it again. */
+  const prepareWrite = (
+    channel: IStorageChannel,
+    key: IStorageKey,
+    value: unknown,
+    policy?: IConflictPolicy
+  ): IMemoryRootMutation<void> => {
+    /** Caller-owned key segments and record/byte values detach before waiting can begin. */
+    const captured = snapshotStorageKey(key, STORAGE_MEMORY_BACKEND)
+    /** A clone failure cannot remove a displaced row or acquire a logical key. */
+    const prepared = prepare(channel, value, captured)
+    return {
+      keys: mutationKeys(channel, captured, policy),
+      run: () => write(channel, captured, prepared, policy)
+    }
+  }
+  /** Root writes reuse the original execution list, policy loop, member lease and lock provider. */
+  const mutationEntry = <I, R>(
+    operation: string,
+    input: I,
+    ctx: IWriteOptions | undefined,
+    prepareMutation: (captured: I, context: IOperationContextSnapshot) => IMemoryRootMutation<R>
+  ): Promise<R> =>
+    core.execution.run({ operation, input, ctx }, (captured) => {
+      controller.assertLive()
+      /** Direct closure retains accepted work until its queued/native admission truly finishes. */
+      const release = controller.beginMutation()
+      /** The sole derivation captures inputs and affected keys once, before any native attempt. */
+      let mutation!: IMemoryRootMutation<R>
+      return runWithConcurrency(
+        {
+          store: base,
+          options: ctx ?? {},
+          lock: (context) => {
+            mutation = prepareMutation(captured, context)
+            return mutation.keys
+          }
+        },
+        {
+          attempt: (attempt) =>
+            locks.attemptWrite(
+              attempt,
+              holding(),
+              mutation.run,
+              core.stageBindings.concurrencyStages(store),
+              controller.closingSignal,
+              mutation.ranges
+            )
+        }
+      ).finally(release)
+    })
+  /** All-channel clearing retains its original one coarse event after one synchronous merge. */
+  const clearAll = (): void => {
+    controller.assertLive()
+    /** Empty physical channels still advance epochs without manufacturing change notifications. */
+    const changed = MemoryState.channels.some((channel) => data[channel].size !== 0)
+    for (const channel of MemoryState.channels) {
+      data[channel].clear()
+      ordered[channel].clear()
+      revisions.clear(channel === 'value' ? 'text' : channel)
+    }
+    if (changed) controller.publish({ channel: 'all', kind: 'clear' })
+  }
+  /** Channel selection is captured before the shared provider's final synchronous range check. */
+  const clearEntry = (
+    operation: string,
+    channel: IStorageChannel | undefined,
+    ctx: IWriteOptions | undefined
+  ): Promise<void> =>
+    mutationEntry(operation, channel, ctx, (captured) => ({
+      keys: [],
+      ranges: mutationRanges(captured === undefined ? MemoryState.channels : [captured]),
+      run: () => (captured === undefined ? clearAll() : clear(captured))
+    }))
+
   /** One existing runner owns every asynchronous public endpoint. */
   const asyncEntry = <I, R>(
     operation: string,
@@ -352,17 +484,23 @@ export function createMemoryBackend<T = unknown>(
           { operation: MemoryOperation.set, input: { key, value, options } },
           (captured) => {
             assertStringStorageKey(captured.key, STORAGE_MEMORY_BACKEND)
-            write(
+            /** Sync policy capture never calls the asynchronous concurrency callback. */
+            const options = snapshotSyncWriteOptions(captured.options)
+            /** Payload preparation precedes the final active-key probe. */
+            const mutation = prepareWrite(
               'value',
               captured.key,
               captured.value,
-              snapshotSyncWriteOptions(captured.options).conflictPolicy
+              options.conflictPolicy
             )
+            assertUnlocked(mutation.keys)
+            mutation.run()
           }
         ),
       remove: (key) =>
         core.execution.runSync({ operation: MemoryOperation.remove, input: key }, (captured) => {
           assertStringStorageKey(captured, STORAGE_MEMORY_BACKEND)
+          assertUnlocked([lockKey.text(captured)])
           remove('value', captured)
         }),
       has: (key) =>
@@ -378,9 +516,11 @@ export function createMemoryBackend<T = unknown>(
             .filter((key): key is string => typeof key === 'string')
         }),
       clearValues: () =>
-        core.execution.runSync({ operation: MemoryOperation.clearValues, input: undefined }, () =>
+        core.execution.runSync({ operation: MemoryOperation.clearValues, input: undefined }, () => {
+          controller.assertLive()
+          assertUnlocked([], mutationRanges(['value']))
           clear('value')
-        )
+        })
     },
     get: (key, ctx) =>
       asyncEntry(MemoryOperation.get, key, ctx, (captured) => {
@@ -388,18 +528,14 @@ export function createMemoryBackend<T = unknown>(
         return (read('value', captured) as string | undefined) ?? null
       }),
     set: (key, value, ctx) =>
-      core.execution.run(
-        { operation: MemoryOperation.set, input: { key, value }, ctx },
-        (captured) =>
-          withAbort(ctx, async (_signal, context) => {
-            assertStringStorageKey(captured.key, STORAGE_MEMORY_BACKEND)
-            write('value', captured.key, captured.value, context?.conflictPolicy)
-          })
-      ),
+      mutationEntry(MemoryOperation.set, { key, value }, ctx, (captured, context) => {
+        assertStringStorageKey(captured.key, STORAGE_MEMORY_BACKEND)
+        return prepareWrite('value', captured.key, captured.value, context.conflictPolicy)
+      }),
     remove: (key, ctx) =>
-      asyncEntry(MemoryOperation.remove, key, ctx, (captured) => {
+      mutationEntry(MemoryOperation.remove, key, ctx, (captured) => {
         assertStringStorageKey(captured, STORAGE_MEMORY_BACKEND)
-        remove('value', captured)
+        return { keys: [lockKey.text(captured)], run: () => remove('value', captured) }
       }),
     has: (key, ctx) =>
       asyncEntry(MemoryOperation.has, key, ctx, (captured) => {
@@ -413,41 +549,24 @@ export function createMemoryBackend<T = unknown>(
           .map((entry) => entry.key)
           .filter((key): key is string => typeof key === 'string')
       }),
-    clearValues: (ctx) =>
-      asyncEntry(MemoryOperation.clearValues, undefined, ctx, () => clear('value')),
-    clearAll: (ctx) =>
-      asyncEntry(MemoryOperation.clearAll, undefined, ctx, () => {
-        controller.assertLive()
-        /** Clear all channels atomically, retaining the original one coarse event. */
-        const changed = MemoryState.channels.some((channel) => data[channel].size !== 0)
-        for (const channel of MemoryState.channels) {
-          data[channel].clear()
-          ordered[channel].clear()
-          revisions.clear(channel === 'value' ? 'text' : channel)
-        }
-        if (changed) controller.publish({ channel: 'all', kind: 'clear' })
-      }),
+    clearValues: (ctx) => clearEntry(MemoryOperation.clearValues, 'value', ctx),
+    clearAll: (ctx) => clearEntry(MemoryOperation.clearAll, undefined, ctx),
     getBytes: (key, ctx) =>
       asyncEntry(MemoryOperation.getBytes, key, ctx, (captured) => {
         assertStringStorageKey(captured, STORAGE_MEMORY_BACKEND)
         return (read('bytes', captured) as Uint8Array | undefined) ?? null
       }),
     setBytes: (key, value, ctx) =>
-      core.execution.run(
-        { operation: MemoryOperation.setBytes, input: { key, value }, ctx },
-        (captured) =>
-          withAbort(ctx, async (_signal, context) => {
-            assertStringStorageKey(captured.key, STORAGE_MEMORY_BACKEND)
-            write('bytes', captured.key, captured.value, context?.conflictPolicy)
-          })
-      ),
-    removeBytes: (key, ctx) =>
-      asyncEntry(MemoryOperation.removeBytes, key, ctx, (captured) => {
-        assertStringStorageKey(captured, STORAGE_MEMORY_BACKEND)
-        remove('bytes', captured)
+      mutationEntry(MemoryOperation.setBytes, { key, value }, ctx, (captured, context) => {
+        assertStringStorageKey(captured.key, STORAGE_MEMORY_BACKEND)
+        return prepareWrite('bytes', captured.key, captured.value, context.conflictPolicy)
       }),
-    clearBytes: (ctx) =>
-      asyncEntry(MemoryOperation.clearBytes, undefined, ctx, () => clear('bytes')),
+    removeBytes: (key, ctx) =>
+      mutationEntry(MemoryOperation.removeBytes, key, ctx, (captured) => {
+        assertStringStorageKey(captured, STORAGE_MEMORY_BACKEND)
+        return { keys: [lockKey.bytes(captured)], run: () => remove('bytes', captured) }
+      }),
+    clearBytes: (ctx) => clearEntry(MemoryOperation.clearBytes, 'bytes', ctx),
     getRecord: (key, ctx) =>
       asyncEntry(
         MemoryOperation.getRecord,
@@ -456,23 +575,29 @@ export function createMemoryBackend<T = unknown>(
         (captured) => read('record', captured) as T | undefined
       ),
     putRecord: (value, key, ctx) =>
-      core.execution.run(
-        { operation: MemoryOperation.putRecord, input: { value, key }, ctx },
-        (captured) =>
-          withAbort(ctx, async (_signal, context) => {
-            /**
-             * Generated keys retain the original unique opaque sequence, even with repeated
-             * entropy.
-             */
-            const resolved = captured.key ?? createStorageToken()
-            write('record', resolved, captured.value, context?.conflictPolicy)
+      mutationEntry(MemoryOperation.putRecord, { value, key }, ctx, (captured, context) => {
+        /** Generated identity is fixed once for the logical write, including retries and waiting. */
+        const resolved = snapshotStorageKey(
+          captured.key ?? createStorageToken(),
+          STORAGE_MEMORY_BACKEND
+        )
+        /** The mutation retains the same detached identity that its implicit locks protect. */
+        const mutation = prepareWrite('record', resolved, captured.value, context.conflictPolicy)
+        return {
+          ...mutation,
+          run: () => {
+            mutation.run()
             return resolved
-          })
-      ),
+          }
+        }
+      }),
     deleteRecord: (key, ctx) =>
-      asyncEntry(MemoryOperation.deleteRecord, key, ctx, (captured) => remove('record', captured)),
-    clearRecords: (ctx) =>
-      asyncEntry(MemoryOperation.clearRecords, undefined, ctx, () => clear('record')),
+      mutationEntry(MemoryOperation.deleteRecord, key, ctx, (captured) => {
+        /** Mutable record identity detaches before the original policy can wait. */
+        const key = snapshotStorageKey(captured, STORAGE_MEMORY_BACKEND)
+        return { keys: [lockKey.record(key)], run: () => remove('record', key) }
+      }),
+    clearRecords: (ctx) => clearEntry(MemoryOperation.clearRecords, 'record', ctx),
     iterateRecords: (range, ctx) => rootIterator(range, ctx),
     transaction: (run, ctx) =>
       core.execution.run(
@@ -1125,7 +1250,47 @@ export function createMemoryBackend<T = unknown>(
               execute: ({ ctx }) => base.iterateRecords(undefined, ctx)
             }),
           removeByPrefix: (prefix, ctx?: IOperationContext & IWriteConcurrencyOptions) =>
-            base.transaction((scope) => scope.use(records).removeByPrefix(prefix), ctx)
+            mutationEntry(MemoryOperation.recordRemoveByPrefix, prefix, ctx, (input) => {
+              /** Native membership is localized by the same canonical prefix bounds as queries. */
+              const captured = snapshotStorageKeyPrefix(input, STORAGE_MEMORY_BACKEND)
+              return {
+                keys: [],
+                ranges: [
+                  {
+                    channel: 'record',
+                    ...snapshotConcurrencyLockRange(
+                      { channel: 'record', prefix: captured.key },
+                      STORAGE_MEMORY_BACKEND
+                    )
+                  }
+                ],
+                run: () => {
+                  controller.assertLive()
+                  /** Capture only matching native leaves before unlinking their adjacency links. */
+                  const rows = [
+                    ...ordered.record.range({
+                      lower: captured.lower,
+                      upper: captured.upper,
+                      upperOpen: true
+                    })
+                  ].map((leaf) => leaf.value)
+                  for (const row of rows) {
+                    /** Every selected live row shares the original hash/radix/revision identity. */
+                    const encoded = encodeFlatStorageKey(row.key)
+                    data.record.delete(encoded)
+                    ordered.record.delete(row.ordered)
+                    bump('record', encoded)
+                  }
+                  if (rows.length > 0)
+                    publish(
+                      'record',
+                      'batch',
+                      rows.map((row) => row.key)
+                    )
+                  return rows.length
+                }
+              }
+            })
         },
         { forTransaction: bindRecords }
       )
