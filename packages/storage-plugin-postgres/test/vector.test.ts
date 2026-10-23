@@ -16,7 +16,25 @@ if (!connectionString)
 async function installed(adapter: 'pg' | 'postgres-js') {
   const pool = new Pool({ connectionString })
   const client = postgres(connectionString!, { max: 8 })
-  const driver = adapter === 'pg' ? pgDriver(pool) : postgresJsDriver(client)
+  const native = adapter === 'pg' ? pgDriver(pool) : postgresJsDriver(client)
+  const statements: string[] = []
+  const driver = {
+    ...native,
+    query: (...args: Parameters<typeof native.query>) => {
+      statements.push(args[0])
+      return native.query(...args)
+    },
+    connect: async (...args: Parameters<typeof native.connect>) => {
+      const connection = await native.connect(...args)
+      return {
+        ...connection,
+        query: (...query: Parameters<typeof connection.query>) => {
+          statements.push(query[0])
+          return connection.query(...query)
+        }
+      }
+    }
+  }
   const host = await createStorageHost({
     plugins: [
       postgresBackendPlugin(
@@ -30,7 +48,7 @@ async function installed(adapter: 'pg' | 'postgres-js') {
     await pool.end()
     await client.end()
   })
-  return { host, store: host.backend('postgres') }
+  return { host, store: host.backend('postgres'), statements }
 }
 describe.each(['pg', 'postgres-js'] as const)('%s real pgvector', (adapter) => {
   it('ranks in the engine after native payload filtering and keeps exact settings local', async () => {
@@ -136,5 +154,59 @@ describe.each(['pg', 'postgres-js'] as const)('%s real pgvector', (adapter) => {
       })
     )
     expect(result).toEqual([{ id: 1n, score: 1, payload: '{"kind": "wanted"}' }])
+  })
+  it('maps all three exact native operators and preserves physical deletion counts for every mode', async () => {
+    const { host, store, statements } = await installed(adapter)
+    for (const metric of ['cosine', 'dot', 'euclid'] as const) {
+      const points = store.use(vector).collection('metric-' + metric, { dimensions: 2, metric })
+      await points.upsert([
+        { id: 'same', vector: [1, 0] },
+        { id: 'other', vector: [0, 1] }
+      ])
+      const hits = await points.near([1, 0], { exact: true }).topK(2).withVector().all()
+      expect(hits.map((hit) => hit.id)).toEqual(['same', 'other'])
+      expect(hits[0]!.score).toBeCloseTo(metric === 'euclid' ? 0 : 1, 6)
+      expect(hits[1]!.score).toBeCloseTo(metric === 'euclid' ? -Math.SQRT2 : 0, 6)
+      expect(hits[0]!.vector).toEqual([1, 0])
+      expect(
+        statements.some((text) =>
+          text.includes(metric === 'cosine' ? '<=>' : metric === 'dot' ? '<#>' : '<->')
+        )
+      ).toBe(true)
+    }
+    const other = host.org(randomUUID()).backend('postgres')
+    for (const [index, count] of ([undefined, 'precount', 'scroll'] as const).entries()) {
+      const name = 'count-mode-' + index
+      const points = store
+        .use(vector)
+        .collection<{ match: boolean }>(name, { dimensions: 2, metric: 'dot' })
+      await points.upsert([
+        { id: 'live', vector: [1, 0], payload: { match: true } },
+        { id: 'expired', vector: [1, 0], payload: { match: true } },
+        { id: 'permanent', vector: [1, 0], payload: { match: true } }
+      ])
+      await store.use(ttl).expire(lockKey.vector(name, 'live'), 10000)
+      await store.use(ttl).expire(lockKey.vector(name, 'expired'), 0)
+      await other
+        .use(vector)
+        .collection(name)
+        .upsert([{ id: 'other-org', vector: [1, 0], payload: { match: true } }])
+      expect(await points.near([1, 0], { exact: true }).topK(10).count()).toBe(2)
+      statements.length = 0
+      expect(await points.deleteWhere({ match: true }, { count })).toBe(3)
+      const deletion = statements.filter(
+        (text) =>
+          text.startsWith('DELETE FROM') &&
+          text.includes('RETURNING key') &&
+          !text.includes('_commit_markers')
+      )
+      expect(deletion).toHaveLength(1)
+      expect(deletion[0]).toContain('org_id=$1')
+      expect(deletion[0]).not.toContain('expires_at')
+      expect(statements.some((text) => /SELECT\s+count\s*\(|FETCH/i.test(text))).toBe(false)
+      expect(
+        await other.use(vector).collection(name).near([1, 0], { exact: true }).topK(10).count()
+      ).toBe(1)
+    }
   })
 })
