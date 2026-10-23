@@ -1,4 +1,5 @@
 export type IStorageV2InstalledRoot = {
+  /** Exact canonical package root admitted by packed lockfile and content provenance. */
   readonly root: string
 }
 
