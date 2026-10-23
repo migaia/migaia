@@ -277,12 +277,17 @@ describe('immutable storage organizations', () => {
     const left = users.connect(leftStore)
     const right = users.connect(rightStore)
     /**
-     * Installation-borrowed identity uses the same resource-free admission without a type
-     * assertion.
+     * A dynamic dependency ID has no statically known channel; this fixture explicitly declares its
+     * installed memory dependency and tests the original runtime admission.
      */
     const borrowed = definePlugin('borrowed-entity', (core) => {
       const store = core.getPublishedBackend('memory')
-      const repository = users.connect(store)
+      const repository = users.connect(
+        store as typeof store &
+          import('../src/types.js').IStorageBorrowedBackend<
+            import('@migaia/storage-contract').IKeyValueStore
+          >
+      )
       return { install: () => ({ readBorrowed: (id: string) => repository.get(id) }) }
     })
     const composed = await host.use(borrowed)
