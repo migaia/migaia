@@ -3537,6 +3537,12 @@ console.log(candidate.name, candidate.output)`
         '原生排名回调与捕获的支持、资源事实。'
       ),
       members: {
+        watch: {
+          summary: t(
+            'Optional native subscription callback; accepts the same complete native input and returns the original change iterator. Client steps reject before subscription; no shared event queue or lifetime wrapper is added.',
+            '可选原生订阅回调，接收同一完整原生输入并返回原 change iterator；客户端步骤在订阅前拒绝，不新增共享事件队列或生命周期包装。'
+          )
+        },
         mutate: {
           summary: t(
             'Optional original write pipeline/transaction callback. Supply transaction-bound execute and accept(key,row); only unique selected rows accepted with true count. Root completion must await native commit; ctx is the original snapshot and concurrency is separate original policy metadata.',
@@ -3665,6 +3671,12 @@ console.log(candidate.name, candidate.output)`
         '原生 RDF 原迭代器回调及 unknown 投影行、支持与资源事实。'
       ),
       members: {
+        watch: {
+          summary: t(
+            'Optional native subscription callback; accepts the same complete native input and returns the original change iterator. Client steps reject before subscription; no shared event queue or lifetime wrapper is added.',
+            '可选原生订阅回调，接收同一完整原生输入并返回原 change iterator；客户端步骤在订阅前拒绝，不新增共享事件队列或生命周期包装。'
+          )
+        },
         mutate: {
           summary: t(
             'Optional original write pipeline/transaction callback. Supply transaction-bound execute and accept(key,row); only unique selected rows accepted with true count. Root completion must await native commit; ctx is the original snapshot and concurrency is separate original policy metadata.',
@@ -3751,6 +3763,20 @@ console.log(candidate.name, candidate.output)`
         }
       }
     },
+    IQueryWatch: {
+      summary: t(
+        'Native watch terminal constrained by this:IQueryShape; a pre-topK vector builder cannot call it. Declared change-feed APIs expose it, while transaction APIs do not.',
+        '以 this:IQueryShape 约束的原生 watch 终点，topK 前向量 builder 不能调用；声明 changeFeed 的 API 才提供，事务 API 不提供。'
+      ),
+      members: {}
+    },
+    IQueryWatcher: {
+      summary: t(
+        'Backend author callback from the same native query input to the original IStorageIterator<IStorageChange>.',
+        '后端作者回调，从同一原生查询输入返回原 IStorageIterator<IStorageChange>。'
+      ),
+      members: {}
+    },
     IQueryWriteContext: {
       summary: t(
         'Conditional write context: transaction chains accept only undefined; root chains accept operation context and the original concurrency policy.',
@@ -3767,8 +3793,8 @@ console.log(candidate.name, candidate.output)`
     },
     IRecordQueryMutation: {
       summary: t(
-        'Record delete/update request with one detached portable patch for update.',
-        '记录 delete/update 请求，update 包含一份已分离的可移植 patch。'
+        'Record delete/update request with one detached patch for update; the original backend codec validates its value domain.',
+        '记录 delete/update 请求，update 包含一份已分离的 patch，值域由原后端 codec 验证。'
       ),
       members: {}
     },
@@ -3981,6 +4007,12 @@ console.log(candidate.name, candidate.output)`
         '作者接点：一个 execute 回调返回原 unknown 行 IStorageIterator，不新增资源 owner。'
       ),
       members: {
+        watch: {
+          summary: t(
+            'Optional native subscription callback; accepts the same complete native input and returns the original change iterator. Client steps reject before subscription; no shared event queue or lifetime wrapper is added.',
+            '可选原生订阅回调，接收同一完整原生输入并返回原 change iterator；客户端步骤在订阅前拒绝，不新增共享事件队列或生命周期包装。'
+          )
+        },
         mutate: {
           summary: t(
             'Optional original write pipeline/transaction callback. Supply transaction-bound execute and accept(key,row); only unique selected rows accepted with true count. Root completion must await native commit; ctx is the original snapshot and concurrency is separate original policy metadata.',
@@ -5026,6 +5058,10 @@ console.log(candidate.name, candidate.output)`
       summary: t(
         'Preserves original builder scope and augmentation while projecting host method groups.',
         '投影宿主方法分组时保留原构建器视图与增强。'
+      ),
+      example: t(
+        'Root records, vector and RDF lookups retain native API/collection methods, generic payload constraints, original and selected methods, and actual feed/grouping availability. Only the corresponding Feature group is added.',
+        '根 records/vector/RDF lookup 保留原生 API/collection 方法、generic payload 约束、原方法与 select 后方法，以及真实 feed/groupBy 能力；仅加入对应 Feature 组。'
       ),
       members: {}
     },
