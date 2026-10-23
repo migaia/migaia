@@ -8,7 +8,7 @@ import {
 } from './capability.js'
 import { TRANSACTION_KEY_VALUE_METHODS, StorageCapabilityMethod } from './capability-constants.js'
 import type { ICodecValue } from '@migaia/serialize/codec'
-import type { IQueryChain, IQueryResult } from './query-chain.js'
+import type { IRecordQuery, IQueryResult } from './query-chain.js'
 import {
   ConcurrencyPolicy,
   assertConcurrencyPolicy,
@@ -19,7 +19,7 @@ import { StorageStageKind } from './stage-kind.js'
 import type { IConflictPolicy, IStorageKey, IKeyRange } from './context.js'
 import type { IStorageBase } from './store.js'
 import { snapshotStorageBaseDetailed } from './store.js'
-import type { IStorageIterator } from './resource.js'
+import { createStorageIteratorLifetime, type IStorageIterator } from './resource.js'
 import type {
   IRecordIndexHandle,
   IRecordIndexProjection,
@@ -62,8 +62,11 @@ export type ITransactionKeyValueApi = {
 }
 
 /** Transaction record queries share the real executor while refusing ordinary operation contexts. */
-export type ITransactionRecordsApi<TValue = ICodecValue> = {
-  query<R = TValue>(): IQueryChain<R, undefined>
+export type ITransactionRecordsApi<
+  TValue = ICodecValue,
+  TAugmentMethods extends object = Record<never, never>
+> = {
+  query<R = TValue>(): IRecordQuery<R, undefined, TAugmentMethods>
   removeByPrefix(prefix: IStorageKey): Promise<number>
 }
 /** Complete backend-owned transaction view; all methods use the same physical transaction. */
@@ -214,6 +217,13 @@ type IIteratorRegistration = {
   readonly compose: <TResult>(
     run: (scope: object | undefined) => Promise<TResult>
   ) => Promise<TResult>
+  /** Query projection reuses this exact owner's iterator registration and cleanup implementation. */
+  readonly derive: <TResult>(
+    read: (
+      next: () => Promise<IteratorResult<unknown>>,
+      fail: (error: unknown) => unknown
+    ) => Promise<IteratorResult<TResult>>
+  ) => IStorageIterator<TResult>
   readonly fail: (error: unknown) => unknown
 }
 /** Only active work and resources are retained; completed history is removed at settlement. */
@@ -579,7 +589,7 @@ export function createTransactionOwner<
           throw invalidTransaction(cause)
         }
       },
-      registerIterator<TScope extends TBaseScope, T>(
+      registerIterator: function registerIterator<TScope extends TBaseScope, T>(
         scope: TScope,
         port: {
           readonly next: (currentScope: NoInfer<TScope>) => PromiseLike<IteratorResult<T>>
@@ -605,23 +615,13 @@ export function createTransactionOwner<
         if (typeof next !== 'function' || typeof close !== 'function') throw invalidTransaction()
         /** The live transaction reference is detached after cleanup, leaving only immutable facts. */
         let iteratorState: ITransactionState | undefined = state
-        /** Existing advances must actually finish before their native cursor is released. */
-        const advances = new Set<Promise<unknown>>()
-        /** Cleanup stops admission synchronously and has one cached rejecting main Promise. */
-        let main: Promise<void> | undefined
-        /** Symbolic cleanup reports once through a separately cached successful Promise. */
-        let symbolic: Promise<void> | undefined
-        /** Iterator return shares cleanup and caches its first result. */
-        let returned: Promise<IteratorResult<T>> | undefined
         /** Creation-scope authority is discarded after cleanup. */
         let originalScope: object | undefined = scope
         /** Actual registration is assigned before any resource method can run. */
         let resource: IIteratorRegistration
-        /** One native close, after accepted advances, with no data permission requirements. */
-        const cleanup = (): Promise<void> => {
-          if (main) return main
-          main = Promise.resolve().then(async () => {
-            await Promise.allSettled(advances)
+        /** The canonical resource lifetime waits complete accepted advances before native close. */
+        const lifetime = createStorageIteratorLifetime<T>({
+          close: async () => {
             /** Capture before awaiting so reentrant cleanup cannot invoke the port again. */
             const release = close
             close = undefined
@@ -632,46 +632,26 @@ export function createTransactionOwner<
                 throw failTransaction(iteratorState!, error)
               }
             }
-          })
-          void main.then(
-            () => {
-              iteratorState?.iterators.delete(resource)
-              iteratorState = undefined
-              next = undefined
-              originalScope = undefined
-            },
-            () => {
-              iteratorState?.iterators.delete(resource)
-              iteratorState = undefined
-              next = undefined
-              originalScope = undefined
-            }
+          },
+          report: reportTransactionFailure,
+          onSettled: () => {
+            iteratorState?.iterators.delete(resource)
+            iteratorState = undefined
+            next = undefined
+            originalScope = undefined
+          }
+        })
+        /** One original scope still authorizes each complete advance and its operation view. */
+        const advance = (currentScope: object): Promise<IteratorResult<T>> =>
+          lifetime.advance(() =>
+            runTransactionOperation(currentScope, (operationScope) => {
+              if (lifetime.isClosing() || !next)
+                return { done: true, value: undefined } as IteratorResult<T>
+              return next(operationScope as typeof scope)
+            })
           )
-          return main
-        }
-        /** Each next is independently authorized and occupies only its own operation interval. */
-        const advance = (currentScope: object): Promise<IteratorResult<T>> => {
-          /** Closed resources still reject expired data views through the original operation owner. */
-          const pending = runTransactionOperation(currentScope, (operationScope) => {
-            if (main || !next) return { done: true, value: undefined } as IteratorResult<T>
-            return next(operationScope as typeof scope)
-          })
-          advances.add(pending)
-          /** The public advance can outlive an unawaited caller; its owner still observes failure. */
-          const advancement = pending.then(
-            async (result) => {
-              advances.delete(pending)
-              if (result.done) await cleanup()
-              return result
-            },
-            (error) => {
-              advances.delete(pending)
-              throw error
-            }
-          )
-          void advancement.then(undefined, () => undefined)
-          return advancement
-        }
+        /** All existing cleanup paths retain the canonical cached main Promise. */
+        const cleanup = lifetime.dispose
         resource = {
           kind: RegistrationKind.iterator,
           info: state.info,
@@ -680,6 +660,15 @@ export function createTransactionOwner<
           /** A complete query borrows its own real operation view rather than the expired user view. */
           compose: (run) =>
             originalScope ? runTransactionOperation(originalScope, run) : run(undefined),
+          /** A mapped stream remains a real resource in the original scope after native exhaustion. */
+          derive: (read) => {
+            if (!originalScope) throw invalidTransaction()
+            return registerIterator(originalScope as TScope, {
+              next: (currentScope) =>
+                read(() => nextTransactionIterator(currentScope, iterator), resource.fail),
+              close: cleanup
+            })
+          },
           /** Primary query failure reaches the original owner before cursor cleanup can fail. */
           fail: (error) =>
             iteratorState
@@ -694,18 +683,9 @@ export function createTransactionOwner<
               : creationView.state
                 ? Promise.resolve({ done: true, value: undefined })
                 : rejectedTransactionResult(creationView.expiredFailure),
-          return: (value?: unknown) => {
-            if (!returned) {
-              returned = cleanup().then(() => ({ done: true, value }))
-              void returned.then(undefined, () => undefined)
-            }
-            return returned
-          },
+          return: lifetime.returned,
           dispose: cleanup,
-          [owner.asyncDisposeKey]: () =>
-            (symbolic ??= cleanup().then(undefined, (error) => {
-              reportTransactionFailure(error)
-            })),
+          [owner.asyncDisposeKey]: lifetime.symbolic,
           [Symbol.asyncIterator]() {
             return this
           }
@@ -748,6 +728,29 @@ export function runTransactionIteratorOperation<T, TResult>(
       scope === undefined ? () => iterator.next() : () => nextTransactionIterator(scope, iterator),
       resource.fail
     )
+  )
+}
+
+/**
+ * Projects one query read through the original iterator owner. The existing registration alone
+ * supplies scope admission, accepted-next draining and cached cleanup; no second lifecycle exists.
+ * Unregistered source resources retain their own native iterator contract and return undefined.
+ */
+export function deriveTransactionIterator<T, TResult>(
+  iterator: IStorageIterator<T>,
+  read: (
+    next: () => Promise<IteratorResult<T>>,
+    fail: (error: unknown) => unknown
+  ) => Promise<IteratorResult<TResult>>
+): IStorageIterator<TResult> | undefined {
+  /** Only an original actual registration can create a resource in that same scope. */
+  const resource = transactionRegistrations.get(iterator)
+  if (resource?.kind !== RegistrationKind.iterator) return undefined
+  return resource.derive(
+    read as (
+      next: () => Promise<IteratorResult<unknown>>,
+      fail: (error: unknown) => unknown
+    ) => Promise<IteratorResult<TResult>>
   )
 }
 
@@ -813,6 +816,7 @@ function transactionRecordQueryResult<R>(
   query: IQueryResult<R, undefined>
 ): IQueryResult<R, undefined> {
   return Object.freeze({
+    ...query,
     all: () => runTransactionOperation(scope, () => query.all()),
     explain: () => query.explain(),
     requirePushdown: () => transactionRecordQueryResult(scope, query.requirePushdown())
@@ -821,27 +825,37 @@ function transactionRecordQueryResult<R>(
 /** Preserves the actual immutable query and every typed branch; only terminal admission is added. */
 function transactionRecordQuery<R>(
   scope: object,
-  query: IQueryChain<R, undefined>
-): IQueryChain<R, undefined> {
+  query: IRecordQuery<R, undefined>
+): IRecordQuery<R, undefined> {
   /** Forwarding retains the original overloads, row inference and one-time condition capture. */
   const where = ((...args: readonly unknown[]) =>
-    transactionRecordQuery(scope, Reflect.apply(query.where, query, args))) as IQueryChain<
+    transactionRecordQuery(scope, Reflect.apply(query.where, query, args))) as IRecordQuery<
     R,
     undefined
   >['where']
   /** Selection remains the original shared node constructor and never gains a second executor. */
   const select = ((...args: readonly unknown[]) =>
-    transactionRecordQueryResult(scope, Reflect.apply(query.select, query, args))) as IQueryChain<
+    transactionRecordQueryResult(scope, Reflect.apply(query.select, query, args))) as IRecordQuery<
     R,
     undefined
   >['select']
   return Object.freeze({
+    ...query,
     where,
     select,
+    limit: (count: number) => transactionRecordQuery(scope, query.limit(count)),
+    orderByComparator: (compare: (left: R, right: R) => number) => {
+      /** Original argument admission stays at the comparator call, before any terminal. */
+      const pending = query.orderByComparator(compare)
+      return {
+        limit: (count: number) =>
+          transactionRecordQuery(scope, pending.limit(count) as IRecordQuery<R, undefined>)
+      }
+    },
     all: () => runTransactionOperation(scope, () => query.all()),
     explain: () => query.explain(),
     requirePushdown: () => transactionRecordQuery(scope, query.requirePushdown())
-  })
+  }) as IRecordQuery<R, undefined>
 }
 /**
  * Reads the original store capability table from an authentic view. Pure lookup invokes no binder

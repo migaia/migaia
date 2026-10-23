@@ -19,9 +19,9 @@ import {
 } from './errors.js'
 import { StorageContractErrorText } from './error-text.js'
 import type { IOperationContext, IStorageKey } from './context.js'
-import type { IStorageIterator } from './resource.js'
+import { createStorageIteratorLifetime, type IStorageIterator } from './resource.js'
 import { snapshotOperationContext } from './operation-context.js'
-import { runTransactionIteratorOperation } from './transaction.js'
+import { runTransactionIteratorOperation, deriveTransactionIterator } from './transaction.js'
 
 /** Declarative field operators are shared by condition admission, native plans and client execution. */
 export const QueryOperator = Object.freeze({
@@ -431,6 +431,7 @@ type IQueryOperand<V, O> = O extends 'eq' | 'ne'
 /** Implemented read terminals share the same source and client executor. */
 export type IQueryRead<R, TContext extends IOperationContext | undefined = IOperationContext> = {
   all(ctx?: TContext): Promise<R[]>
+  stream(ctx?: TContext): IStorageIterator<R>
   explain(): IQueryPlan
 }
 /** A minimal structural terminal shape preserves complete result types in generic consumers. */
@@ -448,42 +449,79 @@ export type IQueryResult<
   TAugmentMethods & {
     requirePushdown(): IQueryResult<R, TContext, TStatistics, TAugmentMethods>
   }
-/** The implemented immutable record slice; later terminals extend this same canonical owner. */
-export type IQueryChain<
+/** Interface semantics retain the real record or Feature extension after a common condition step. */
+export interface IQueryChain<
   T,
   TContext extends IOperationContext | undefined = IOperationContext,
   TWhere = T,
   TStatistics extends boolean = true,
   TAugmentMethods extends object = Record<never, never>
-> = IQueryRead<T, TContext> &
-  TAugmentMethods & {
-    where(condition: IWhere<TWhere>): IQueryChain<T, TContext, TWhere, TStatistics, TAugmentMethods>
-    where<P extends IObjectPath<TWhere>, O extends keyof IFieldOps<IObjectPathValue<TWhere, P>>>(
-      path: P,
-      operator: O,
-      value: IQueryOperand<IObjectPathValue<TWhere, P>, NoInfer<O>>
-    ): IQueryChain<T, TContext, TWhere, TStatistics, TAugmentMethods>
-    where(
-      predicate: (row: TWhere) => boolean
-    ): IQueryChain<T, TContext, TWhere, TStatistics, TAugmentMethods>
-    select<const K extends Extract<keyof T, string>>(
-      ...fields: readonly [K, ...K[]]
-    ): IQueryResult<Pick<T, K>, TContext, TStatistics, TAugmentMethods>
-    select<N>(
-      mapper: (row: T) => N
-    ): IQueryResult<Awaited<N>, TContext, TStatistics, TAugmentMethods>
-    requirePushdown(): IQueryChain<T, TContext, TWhere, TStatistics, TAugmentMethods>
-  }
+> extends IQueryRead<T, TContext> {
+  where(condition: IWhere<TWhere>): this
+  where<P extends IObjectPath<TWhere>, O extends keyof IFieldOps<IObjectPathValue<TWhere, P>>>(
+    path: P,
+    operator: O,
+    value: IQueryOperand<IObjectPathValue<TWhere, P>, NoInfer<O>>
+  ): this
+  where(predicate: (row: TWhere) => boolean): this
+  select<const K extends Extract<keyof T, string>>(
+    ...fields: readonly [K, ...K[]]
+  ): IQueryResult<Pick<T, K>, TContext, TStatistics, TAugmentMethods>
+  select<N>(mapper: (row: T) => N): IQueryResult<Awaited<N>, TContext, TStatistics, TAugmentMethods>
+  requirePushdown(): this
+}
+/** Interface semantics preserve the current record state and Feature methods after limit. */
+export interface IRecordQueryBaseCore<
+  T,
+  TContext extends IOperationContext | undefined = IOperationContext,
+  TAugmentMethods extends object = Record<never, never>
+> extends IQueryChain<T, TContext, T, true, TAugmentMethods> {
+  limit(count: number): this
+}
+/** The comparator transition requires an explicit finite limit before any read terminal exists. */
+export interface IRecordQueryCore<
+  T,
+  TContext extends IOperationContext | undefined = IOperationContext,
+  TAugmentMethods extends object = Record<never, never>
+> extends IRecordQueryBaseCore<T, TContext, TAugmentMethods> {
+  orderByComparator(
+    compare: (left: T, right: T) => number
+  ): IRecordQueryNeedsLimit<T, TContext, TAugmentMethods>
+}
+/** Comparator queries expose only the bound declaration until their retained heap size is known. */
+export type IRecordQueryNeedsLimit<
+  T,
+  TContext extends IOperationContext | undefined,
+  TAugmentMethods extends object = Record<never, never>
+> = {
+  limit(count: number): IRecordQueryBase<T, TContext, TAugmentMethods>
+}
+/** A bounded comparator cannot introduce another ordering mode. */
+export type IRecordQueryBase<
+  T,
+  TContext extends IOperationContext | undefined = IOperationContext,
+  TAugmentMethods extends object = Record<never, never>
+> = IRecordQueryBaseCore<T, TContext, TAugmentMethods> & TAugmentMethods
+/** The original record query includes only implemented ordering and read controls. */
+export type IRecordQuery<
+  T,
+  TContext extends IOperationContext | undefined = IOperationContext,
+  TAugmentMethods extends object = Record<never, never>
+> = IRecordQueryCore<T, TContext, TAugmentMethods> & TAugmentMethods
 /** Implemented record methods are reserved by the original owner before Feature admission. */
 export const RecordQueryMethod = Object.freeze({
   where: 'where',
   select: 'select',
   all: 'all',
   explain: 'explain',
-  requirePushdown: 'requirePushdown'
+  requirePushdown: 'requirePushdown',
+  stream: 'stream',
+  limit: 'limit',
+  orderByComparator: 'orderByComparator'
 } as const)
 /** Captures only pure Feature methods and rejects collisions before source or cursor admission. */
-function snapshotRecordQueryMethods<T extends object>(methods: T | undefined): T {
+function snapshotRecordQueryMethods<T extends object>(methods: T | undefined): T | undefined {
+  if (methods === undefined) return undefined
   try {
     if (
       methods !== undefined &&
@@ -520,6 +558,11 @@ export type IRecordQuerySource = {
 type IQueryNode = {
   readonly previous: IQueryNode | undefined
   readonly step:
+    | { readonly operation: typeof QueryOperation.limit; readonly count: number }
+    | {
+        readonly operation: typeof QueryOperation.comparator
+        readonly compare: (left: unknown, right: unknown) => number
+      }
     | { readonly operation: typeof QueryOperation.where; readonly condition: IQueryCondition }
     | {
         readonly operation: typeof QueryOperation.predicate
@@ -661,6 +704,16 @@ function planRecordQuery(
   for (let current = node; current !== undefined; current = current.previous)
     steps.push(current.step)
   steps.reverse()
+  for (let index = 0; index < steps.length; index++)
+    if (
+      steps[index]!.operation === QueryOperation.comparator &&
+      steps[index + 1]?.operation !== QueryOperation.limit
+    )
+      throw new StorageContractError(
+        StorageContractErrorCode.invalidArgument,
+        {},
+        StorageContractErrorText.queryComparatorLimit
+      )
   /** Membership lookups are compiled once per plan, never once per row. */
   const operations = new Set(source.pushdown.operations)
   /** Field support has the same lifetime as this single execution plan. */
@@ -678,9 +731,11 @@ function planRecordQuery(
     const reason =
       client.length > 0
         ? StorageContractErrorText.queryPrefix
-        : step.operation === QueryOperation.predicate || step.operation === QueryOperation.mapper
+        : step.operation === QueryOperation.predicate ||
+            step.operation === QueryOperation.mapper ||
+            step.operation === QueryOperation.comparator
           ? StorageContractErrorText.queryFunction
-          : !operations.has(step.operation)
+          : step.operation === QueryOperation.limit || !operations.has(step.operation)
             ? StorageContractErrorText.queryUnsupported
             : step.operation === QueryOperation.where
               ? queryConditionReason(step.condition, operators)
@@ -717,17 +772,176 @@ function assertQueryActive(ctx: IOperationContext | undefined): void {
   if (ctx?.signal?.aborted)
     throw new StorageContractError(StorageContractErrorCode.aborted, { cause: ctx.signal.reason })
 }
-/**
- * Executes one terminal while leaving iterator creation, transaction ownership and cleanup with its
- * source.
- */
-async function executeRecordQuery<R>(
+/** One pull stays inside the original source operation view supplied for this accepted read. */
+type IQueryAdvance = () => Promise<IteratorResult<readonly [IStorageKey, unknown]>>
+/** Each compiled node transforms one upstream pull without owning another cursor or queue. */
+type IQueryReader = (advance: IQueryAdvance) => Promise<IteratorResult<unknown>>
+/** Stable candidate order resolves comparator ties without retaining discarded source rows. */
+type IQueryHeapEntry = { readonly value: unknown; readonly position: number }
+/** The largest retained candidate sits at the root, allowing one bounded replacement per source row. */
+function queryHeapSiftDown(
+  heap: IQueryHeapEntry[],
+  size: number,
+  compare: (left: IQueryHeapEntry, right: IQueryHeapEntry) => number
+): void {
+  /** Only the root can violate heap order after replacement or extraction. */
+  let position = 0
+  while (position * 2 + 1 < size) {
+    /** The larger child belongs above its sibling in this maximum heap. */
+    let child = position * 2 + 1
+    if (child + 1 < size && compare(heap[child + 1]!, heap[child]!) > 0) child++
+    if (compare(heap[position]!, heap[child]!) >= 0) break
+    ;[heap[position], heap[child]] = [heap[child]!, heap[position]!]
+    position = child
+  }
+}
+/** Compiles the existing client plan once; comparator buffering is bounded by its explicit limit. */
+function compileRecordQueryReader(
+  steps: readonly IQueryNode['step'][],
+  ctx: IOperationContext | undefined
+): IQueryReader {
+  /** The leaf borrows the one original backend cursor; no row array is materialized. */
+  let read: IQueryReader = async (advance) => {
+    assertQueryActive(ctx)
+    /** Native next settles before any client node or cleanup starts. */
+    const next = await advance()
+    assertQueryActive(ctx)
+    return next.done ? { done: true, value: undefined } : { done: false, value: next.value[1] }
+  }
+  for (let index = 0; index < steps.length; index++) {
+    /** A node captures its direct upstream reader rather than copying preceding history. */
+    const upstream = read
+    /** The original planned node determines execution and explain together. */
+    const step = steps[index]!
+    if (step.operation === QueryOperation.where || step.operation === QueryOperation.predicate) {
+      /** Declarative membership Sets are compiled once before any candidate read. */
+      const predicate =
+        step.operation === QueryOperation.where
+          ? compileQueryCondition<unknown>(step.condition)
+          : step.predicate
+      read = async (advance) => {
+        while (true) {
+          /** Filtering discards each rejected row immediately. */
+          const next = await upstream(advance)
+          if (next.done) return next
+          if (predicate(next.value)) {
+            assertQueryActive(ctx)
+            return next
+          }
+          assertQueryActive(ctx)
+        }
+      }
+    } else if (
+      step.operation === QueryOperation.mapper ||
+      step.operation === QueryOperation.select
+    ) {
+      read = async (advance) => {
+        /** Projection consumes exactly one accepted upstream row. */
+        const next = await upstream(advance)
+        if (next.done) return next
+        if (step.operation === QueryOperation.mapper) {
+          /** Awaited mapping remains part of the original accepted read. */
+          const value = await step.mapper(next.value)
+          assertQueryActive(ctx)
+          return { done: false, value }
+        }
+        /** Own data properties cannot mutate a row prototype, including a selected **proto**. */
+        const value: Record<string, unknown> = {}
+        for (const field of step.fields)
+          Object.defineProperty(value, field, {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value:
+              next.value === null || next.value === undefined
+                ? undefined
+                : Reflect.get(Object(next.value), field)
+          })
+        return { done: false, value }
+      }
+    } else if (step.operation === QueryOperation.limit) {
+      /** Admission reserves one remaining position before awaiting the upstream read. */
+      let remaining = step.count
+      read = async (advance) =>
+        remaining-- > 0 ? upstream(advance) : { done: true, value: undefined }
+    } else {
+      /** Comparator admission already proved the immediately following bound. */
+      const bound = steps[++index] as Extract<
+        IQueryNode['step'],
+        { readonly operation: typeof QueryOperation.limit }
+      >
+      /** At most bound.count entries survive; source positions preserve stable ties. */
+      const heap: IQueryHeapEntry[] = []
+      /** One shared initialization prevents concurrent next calls from scanning the source twice. */
+      let prepared: Promise<void> | undefined
+      /** Emission advances only through the bounded retained result. */
+      let emitted = 0
+      /** Borrowed callbacks keep their original plain invocation receiver. */
+      const compareRows = step.compare
+      /** JavaScript comparator NaN and zero both retain the original source order. */
+      const compare = (left: IQueryHeapEntry, right: IQueryHeapEntry): number =>
+        compareRows(left.value, right.value) || left.position - right.position
+      /** Scans each upstream candidate once and sorts only the retained bounded heap. */
+      async function prepare(advance: IQueryAdvance): Promise<void> {
+        if (bound.count === 0) return
+        /** Source order is stable even when equal candidates arrive far apart. */
+        let position = 0
+        while (true) {
+          /** Discarded rows become unreachable after this iteration. */
+          const next = await upstream(advance)
+          if (next.done) break
+          /** Only this candidate and the retained heap are live during selection. */
+          const entry = { value: next.value, position: position++ }
+          if (heap.length < bound.count) {
+            heap.push(entry)
+            /** Appending can violate only this new leaf's ancestor path. */
+            let child = heap.length - 1
+            while (child > 0) {
+              /** Integer parent indexing keeps each insertion logarithmic in the explicit bound. */
+              const parent = Math.floor((child - 1) / 2)
+              if (compare(heap[parent]!, heap[child]!) >= 0) break
+              ;[heap[parent], heap[child]] = [heap[child]!, heap[parent]!]
+              child = parent
+            }
+          } else if (compare(entry, heap[0]!) < 0) {
+            heap[0] = entry
+            queryHeapSiftDown(heap, heap.length, compare)
+          }
+          assertQueryActive(ctx)
+        }
+        for (let end = heap.length - 1; end > 0; end--) {
+          ;[heap[0], heap[end]] = [heap[end]!, heap[0]!]
+          queryHeapSiftDown(heap, end, compare)
+        }
+      }
+      read = async (advance) => {
+        await (prepared ??= prepare(advance))
+        return emitted < heap.length
+          ? { done: false, value: heap[emitted++]!.value }
+          : { done: true, value: undefined }
+      }
+    }
+  }
+  /** Every terminal transition observes cancellation, including a final projection or zero limit. */
+  return async (advance) => {
+    assertQueryActive(ctx)
+    /** The compiled node chain retains no operation view beyond this accepted read. */
+    const next = await read(advance)
+    assertQueryActive(ctx)
+    return next
+  }
+}
+/** Plans once and opens only the original native prefix; terminal adapters share this execution. */
+function openRecordQuery(
   source: IQuerySourceSnapshot,
   node: IQueryNode | undefined,
   strict: boolean,
   ctx: IOperationContext | undefined
-): Promise<R[]> {
-  /** Strictness is checked before context resources or a native cursor can be created. */
+): {
+  readonly iterator: IStorageIterator<readonly [IStorageKey, unknown]>
+  readonly read: IQueryReader
+} {
+  /** Strictness and missing comparator bounds reject before a source can open. */
   const plan = planRecordQuery(source, node)
   if (strict && plan.client.length > 0)
     throw new StorageContractError(
@@ -735,96 +949,123 @@ async function executeRecordQuery<R>(
       {},
       StorageContractErrorText.queryNotPushable(plan.explanation.client.map((step) => step.reason!))
     )
-  /** Base operation fields are captured once and delegated to the original iterator owner. */
+  /** Captured intent is shared by the source and every client node. */
   const captured = snapshotOperationContext(ctx)
   assertQueryActive(captured)
-  /** The source consumes only the actual native prefix, never an independently recompiled condition. */
+  /** Native execution receives exactly the safe prefix represented by explain. */
   const conditions = Object.freeze(
     plan.pushed.flatMap((step) => (step.operation === QueryOperation.where ? [step.condition] : []))
   )
-  /** Field projection can be native only after all preceding steps are native. */
+  /** Only a fully native prefix can project source rows. */
   const fields = plan.pushed.find((step) => step.operation === QueryOperation.select)?.fields
-  /** Client declarative predicates are compiled once, including their membership Sets. */
-  const client = plan.client.map((step) =>
-    step.operation === QueryOperation.where
-      ? { ...step, predicate: compileQueryCondition<unknown>(step.condition) }
-      : step
-  )
-  /** The source creates its actual iterator before the complete terminal is admitted to that owner. */
-  let iterator: IStorageIterator<readonly [IStorageKey, unknown]>
+  /** Node compilation creates no source I/O and retains no materialized row array. */
+  const read = compileRecordQueryReader(plan.client, captured)
   try {
-    iterator = Reflect.apply(source.execute, source.receiver, [
-      { conditions, fields, ctx: captured }
-    ])
+    return {
+      iterator: Reflect.apply(source.execute, source.receiver, [
+        { conditions, fields, ctx: captured }
+      ]),
+      read
+    }
   } catch (cause) {
     throw queryExecutionFailure(cause)
   }
-  /**
-   * The whole terminal, including mapping and cleanup, remains one accepted original-owner
-   * operation.
-   */
+}
+/** Records the original primary before awaiting original cursor cleanup on every read failure. */
+async function failedRecordQuery(
+  iterator: IStorageIterator<unknown>,
+  fail: (error: unknown) => unknown,
+  cause: unknown
+): Promise<never> {
+  /** Cleanup cannot replace an earlier predicate, mapper, comparator or native failure. */
+  let primary = queryExecutionFailure(fail(queryExecutionFailure(cause)))
+  try {
+    await iterator.dispose()
+  } catch (cleanup) {
+    primary = queryExecutionFailure(
+      attachSecondaryErrors(primary, [queryExecutionFailure(cleanup)])
+    )
+  }
+  throw primary
+}
+/** All and stream consume the same compiled reader and original source resource. */
+async function executeRecordQuery<R>(
+  source: IQuerySourceSnapshot,
+  node: IQueryNode | undefined,
+  strict: boolean,
+  ctx: IOperationContext | undefined
+): Promise<R[]> {
+  /** Opening synchronously admits the complete terminal to the original transaction owner. */
+  const { iterator, read } = openRecordQuery(source, node, strict, ctx)
   return runTransactionIteratorOperation(iterator, async (advance, fail) => {
-    /** Only accepted output is retained; every native candidate is consumed once. */
+    /** Only the explicit all terminal materializes its accepted output. */
     const rows: R[] = []
-    /** The original primary is recorded before cleanup can fail or expire the operation view. */
-    let primary: Error | undefined
     try {
       while (true) {
-        assertQueryActive(captured)
-        /** Native next is always awaited to settlement before any cleanup is requested. */
-        const next = await advance()
-        assertQueryActive(captured)
+        /** Each result follows the exact same transitions exposed by stream. */
+        const next = await read(advance)
         if (next.done) break
-        /** Mapping is local to this row and never mutates a backend-owned candidate. */
-        let value = next.value[1]
-        /** Short-circuit filtering preserves callback order and avoids unnecessary mapping. */
-        let accepted = true
-        for (const step of client) {
-          if (
-            step.operation === QueryOperation.where ||
-            step.operation === QueryOperation.predicate
-          ) {
-            if (!step.predicate(value)) {
-              accepted = false
-              break
-            }
-          } else if (step.operation === QueryOperation.mapper) value = await step.mapper(value)
-          else {
-            /** Projection copies only requested own fields and cannot trigger prototype mutation. */
-            const selected: Record<string, unknown> = {}
-            for (const field of step.fields)
-              Object.defineProperty(selected, field, {
-                enumerable: true,
-                configurable: true,
-                writable: true,
-                value:
-                  value === null || value === undefined
-                    ? undefined
-                    : Reflect.get(Object(value), field)
-              })
-            value = selected
-          }
-          assertQueryActive(captured)
-        }
-        if (accepted) rows.push(value as R)
+        rows.push(next.value as R)
       }
     } catch (cause) {
-      primary = queryExecutionFailure(fail(queryExecutionFailure(cause)))
-    } finally {
-      try {
-        await iterator.dispose()
-      } catch (cause) {
-        /** Cleanup remains reachable after the original first error rather than replacing it. */
-        const cleanup = queryExecutionFailure(cause)
-        primary =
-          primary === undefined
-            ? cleanup
-            : queryExecutionFailure(attachSecondaryErrors(primary, [cleanup]))
-      }
+      return failedRecordQuery(iterator, fail, cause)
     }
-    if (primary !== undefined) throw primary
+    try {
+      await iterator.dispose()
+    } catch (cause) {
+      throw queryExecutionFailure(fail(queryExecutionFailure(cause)))
+    }
     return rows
   })
+}
+
+/**
+ * Streams the same compiled reader over the original source resource. Each accepted next borrows
+ * its original transaction operation. Root and transaction streams share the canonical resource
+ * lifetime, so cleanup waits the complete accepted read, including an asynchronous mapper.
+ */
+function streamRecordQuery<R>(
+  source: IQuerySourceSnapshot,
+  node: IQueryNode | undefined,
+  strict: boolean,
+  ctx: IOperationContext | undefined
+): IStorageIterator<R> {
+  /** The source resource, including both cleanup Promises, remains the sole native cursor owner. */
+  const { iterator, read } = openRecordQuery(source, node, strict, ctx)
+  /** Registered sources retain full mapped-next and buffered-result scope ownership. */
+  const derived = deriveTransactionIterator(iterator, async (advance, fail) => {
+    try {
+      return (await read(advance)) as IteratorResult<R>
+    } catch (cause) {
+      return failedRecordQuery(iterator, fail, cause)
+    }
+  })
+  if (derived) return derived
+  /** Root mapped reads share the canonical accepted-advance drain with transaction resources. */
+  const lifetime = createStorageIteratorLifetime<R>({
+    close: () => iterator.dispose(),
+    // The original source owns cleanup diagnostics and its cached report-and-resolve Promise.
+    report: () => iterator[Symbol.asyncDispose]()
+  })
+  return {
+    next: () =>
+      lifetime.advance(() =>
+        runTransactionIteratorOperation(iterator, async (advance, fail) => {
+          if (lifetime.isClosing()) return { done: true, value: undefined }
+          try {
+            return (await read(advance)) as IteratorResult<R>
+          } catch (cause) {
+            return failedRecordQuery(iterator, fail, cause)
+          }
+        })
+      ),
+    return: lifetime.returned,
+    dispose: lifetime.dispose,
+    [Symbol.asyncDispose]: lifetime.symbolic,
+    [Symbol.asyncIterator]() {
+      return this
+    }
+  }
 }
 
 /** Captures an immutable string projection before creating another chain node. */
@@ -846,15 +1087,16 @@ function selectedRecordQuery<
   source: IQuerySourceSnapshot,
   node: IQueryNode,
   strict: boolean,
-  methods: TAugmentMethods
+  methods: TAugmentMethods | undefined
 ): IQueryResult<R, TContext, true, TAugmentMethods> {
   return Object.freeze({
     ...methods,
     all: (ctx?: TContext) => executeRecordQuery<R>(source, node, strict, ctx),
+    stream: (ctx?: TContext) => streamRecordQuery<R>(source, node, strict, ctx),
     explain: () => planRecordQuery(source, node).explanation,
     requirePushdown: () =>
       selectedRecordQuery<R, TContext, TAugmentMethods>(source, node, true, methods)
-  })
+  }) as IQueryResult<R, TContext, true, TAugmentMethods>
 }
 /** Derivation shares history and captured source facts; each chain owns no I/O or resource lifetime. */
 function recordQuery<
@@ -865,18 +1107,18 @@ function recordQuery<
   source: IQuerySourceSnapshot,
   node: IQueryNode | undefined,
   strict: boolean,
-  methods: TAugmentMethods
-): IQueryChain<T, TContext, T, true, TAugmentMethods> {
+  methods: TAugmentMethods | undefined
+): IRecordQuery<T, TContext, TAugmentMethods> {
   /** Overloads are implemented through one explicit runtime argument-shape dispatcher. */
   function where(
     condition: IWhere<T> | ((row: T) => boolean)
-  ): IQueryChain<T, TContext, T, true, TAugmentMethods>
+  ): IRecordQuery<T, TContext, TAugmentMethods>
   function where<P extends IObjectPath<T>, O extends keyof IFieldOps<IObjectPathValue<T, P>>>(
     path: P,
     operator: O,
     value: IQueryOperand<IObjectPathValue<T, P>, NoInfer<O>>
-  ): IQueryChain<T, TContext, T, true, TAugmentMethods>
-  function where(...args: readonly unknown[]): IQueryChain<T, TContext, T, true, TAugmentMethods> {
+  ): IRecordQuery<T, TContext, TAugmentMethods>
+  function where(...args: readonly unknown[]): IRecordQuery<T, TContext, TAugmentMethods> {
     /** Only the added node is captured; previously built condition snapshots are never revisited. */
     let step: IQueryNode['step']
     if (args.length === 1 && typeof args[0] === 'function')
@@ -924,19 +1166,57 @@ function recordQuery<
   }
   return Object.freeze({
     ...methods,
+    /** Limit is an immutable streaming node; zero requires no candidate advance. */
+    limit(count: number) {
+      if (!Number.isSafeInteger(count) || count < 0)
+        throw new StorageContractError(
+          StorageContractErrorCode.invalidArgument,
+          {},
+          StorageContractErrorText.queryLimit
+        )
+      return recordQuery<T, TContext, TAugmentMethods>(
+        source,
+        { previous: node, step: { operation: QueryOperation.limit, count } },
+        strict,
+        methods
+      )
+    },
+    /** Comparator state cannot execute until the next node supplies its bounded heap size. */
+    orderByComparator(compare: (left: T, right: T) => number) {
+      if (typeof compare !== 'function')
+        throw new StorageContractError(
+          StorageContractErrorCode.invalidArgument,
+          {},
+          StorageContractErrorText.queryComparatorLimit
+        )
+      return recordQuery<T, TContext, TAugmentMethods>(
+        source,
+        {
+          previous: node,
+          step: {
+            operation: QueryOperation.comparator,
+            compare: compare as (left: unknown, right: unknown) => number
+          }
+        },
+        strict,
+        methods
+      )
+    },
     where,
     select,
     all: (ctx?: TContext) => executeRecordQuery<T>(source, node, strict, ctx),
+    stream: (ctx?: TContext) => streamRecordQuery<T>(source, node, strict, ctx),
     explain: () => planRecordQuery(source, node).explanation,
     requirePushdown: () => recordQuery<T, TContext, TAugmentMethods>(source, node, true, methods)
-  })
+  }) as IRecordQuery<T, TContext, TAugmentMethods>
 }
 /**
- * Creates the shared record where/select/all executor from one backend author callback. Native
- * projection rows are intentionally unknown; T declares the complete pre-projection row domain.
- * Construction performs no I/O. Every all invocation plans once, passes only the safe native
- * prefix, preserves callback order and awaits the original storage iterator's disposal on success
- * or failure. The original source owns operation timing and transaction lifetime.
+ * Creates the shared record condition/projection/limit/comparator read executor from one backend
+ * author callback. Native projection rows are intentionally unknown; T declares the complete
+ * pre-projection row domain. Construction performs no I/O. Every all invocation plans once, passes
+ * only the safe native prefix, preserves callback order and awaits the original storage iterator's
+ * disposal on success or failure. The original source owns operation timing and transaction
+ * lifetime.
  */
 export function createRecordQuery<
   T,
@@ -945,7 +1225,7 @@ export function createRecordQuery<
 >(
   source: IRecordQuerySource,
   methods?: TAugmentMethods
-): IQueryChain<T, TContext, T, true, TAugmentMethods> {
+): IRecordQuery<T, TContext, TAugmentMethods> {
   /** Feature-owned pure functions are captured once and retained by reference on every branch. */
   const captured = snapshotRecordQueryMethods(methods)
   return recordQuery<T, TContext, TAugmentMethods>(

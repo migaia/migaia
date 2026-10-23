@@ -212,7 +212,8 @@ function normalizeQueryFixtureFailure(cause: unknown): IQueryFixtureFailure {
 function ownedRows(
   rows: readonly unknown[],
   close: () => PromiseLike<void> | void = () => undefined,
-  nextFailure?: Error
+  nextFailure?: Error,
+  options?: { readonly onNext?: () => void; readonly onStopAdmission?: (stop: () => void) => void }
 ): IStorageIterator<readonly [string, unknown]> {
   /** A specialized backend needs no fabricated KV methods to own the native cursor. */
   const base: IStorageBase = {
@@ -235,11 +236,16 @@ function ownedRows(
   const owner = createTransactionOwner<unknown, object>(base, normalizeQueryFixtureFailure)
   /** One root belongs to the callback interval of the original transaction owner. */
   const scope = {}
-  owner.register(scope, { createScope: () => ({}), onFailure: () => undefined })
+  const registration = owner.register(scope, {
+    createScope: () => ({}),
+    onFailure: () => undefined
+  })
+  options?.onStopAdmission?.(() => registration.stopAdmission())
   /** The port advances its original source once for every native next. */
   let index = 0
   return owner.registerIterator(scope, {
     next: async (): Promise<IteratorResult<readonly [string, unknown]>> => {
+      options?.onNext?.()
       if (nextFailure !== undefined) throw nextFailure
       return index < rows.length
         ? { done: false, value: [String(index), rows[index++]] as const }
@@ -729,7 +735,9 @@ describe('record query Feature methods', () => {
       query.where({ status: 'paid' }),
       query.select('total'),
       query.select((row) => row.total),
-      query.requirePushdown()
+      query.requirePushdown(),
+      query.limit(1),
+      query.orderByComparator((left, right) => left.total - right.total).limit(1)
     ]
     for (const branch of branches) {
       expect(branch.feature).toBe(methods.feature)
@@ -753,4 +761,360 @@ describe('record query Feature methods', () => {
     )
     expect(execute).not.toHaveBeenCalled()
   })
+})
+
+describe('bounded record execution', () => {
+  it('streams from the original source lazily and stops ordinary limit without reading another candidate', async () => {
+    /** Source advancement is observable independently of construction and terminal materialization. */
+    let advanced = 0
+    let closed = 0
+    const query = createRecordQuery<number>({
+      pushdown: noPushdown,
+      execute: () =>
+        ownedRows(
+          [3, 2, 1],
+          () => {
+            closed++
+          },
+          undefined,
+          {
+            onNext: () => {
+              advanced++
+            }
+          }
+        )
+    })
+    const stream = query.limit(2).stream()
+    expect(advanced).toBe(0)
+    await expect(stream.next()).resolves.toEqual({ done: false, value: 3 })
+    expect(advanced).toBe(1)
+    await expect(stream.next()).resolves.toEqual({ done: false, value: 2 })
+    await expect(stream.next()).resolves.toEqual({ done: true, value: undefined })
+    expect(advanced).toBe(2)
+    expect(closed).toBe(1)
+    expect(stream.dispose()).toBe(stream.dispose())
+    expect(stream[Symbol.asyncDispose]()).toBe(stream[Symbol.asyncDispose]())
+  })
+
+  it('retains only the bounded comparator winners with stable ties and the same all and stream results', async () => {
+    /** A fixed permutation defeats a full-input sort while a three-entry heap stays linear here. */
+    const rows = Array.from({ length: 257 }, (_, index) => ({
+      value: (index * 37) % 257,
+      id: index
+    }))
+    let comparisons = 0
+    const query = createRecordQuery<{ value: number; id: number }>({
+      pushdown: noPushdown,
+      execute: () => ownedRows(rows)
+    })
+    const bounded = query
+      .orderByComparator((left, right) => {
+        comparisons++
+        return left.value - right.value
+      })
+      .limit(3)
+    expect((await bounded.all()).map((row) => row.value)).toEqual([0, 1, 2])
+    expect(comparisons).toBeLessThan(rows.length * 3)
+    const streamed: number[] = []
+    for await (const row of bounded.stream()) streamed.push(row.value)
+    expect(streamed).toEqual([0, 1, 2])
+    const ties = createRecordQuery<{ value: number; id: string }>({
+      pushdown: noPushdown,
+      execute: () =>
+        ownedRows([
+          { value: 1, id: 'a' },
+          { value: 0, id: 'b' },
+          { value: 1, id: 'c' },
+          { value: 1, id: 'd' }
+        ])
+    })
+    expect(
+      await ties
+        .orderByComparator((left, right) => left.value - right.value)
+        .limit(3)
+        .select('id')
+        .all()
+    ).toEqual([{ id: 'b' }, { id: 'a' }, { id: 'c' }])
+  })
+
+  it('rejects missing bounds and invalid limits before source execution, including bypassed static states', async () => {
+    const execute = vi.fn(() => ownedRows([1, 2]))
+    const query = createRecordQuery<number, undefined>({ pushdown: noPushdown, execute })
+    for (const count of [-1, 1.5, Infinity, NaN])
+      expect(() => query.limit(count)).toThrowError(
+        expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+      )
+    const pending = query.orderByComparator((left, right) => left - right)
+    /** Static bypass still reaches the original planner's admission boundary. */
+    const bypassed = pending as unknown as {
+      all(): Promise<unknown>
+      stream(): IStorageIterator<number>
+    }
+    await expect(bypassed.all()).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' })
+    expect(() => bypassed.stream()).toThrowError(
+      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+    )
+    expect(execute).not.toHaveBeenCalled()
+    function invalidTypes(): void {
+      // @ts-expect-error Comparator results expose no terminal until an explicit limit.
+      pending.all()
+      // @ts-expect-error Comparator results expose no stream until an explicit limit.
+      pending.stream()
+      // @ts-expect-error No selector ordering is advertised by this implementation slice.
+      query.orderBy((value: number) => value)
+      // @ts-expect-error Transaction record queries cannot receive a new context.
+      query.limit(1).stream({ timeoutMs: 1 })
+    }
+    void invalidTypes
+  })
+
+  it('executes zero limit without scanning and reports client-only bounded controls honestly', async () => {
+    let advanced = 0
+    let closed = 0
+    const query = createRecordQuery<number>({
+      pushdown: noPushdown,
+      execute: () =>
+        ownedRows(
+          [1],
+          () => {
+            closed++
+          },
+          undefined,
+          {
+            onNext: () => {
+              advanced++
+            }
+          }
+        )
+    })
+    await expect(
+      query
+        .orderByComparator((left, right) => left - right)
+        .limit(0)
+        .all()
+    ).resolves.toEqual([])
+    expect(advanced).toBe(0)
+    expect(closed).toBe(1)
+    expect(
+      query
+        .limit(1)
+        .explain()
+        .client.map((step) => step.operation)
+    ).toEqual(['limit'])
+    await expect(query.limit(1).requirePushdown().all()).rejects.toMatchObject({
+      code: 'QUERY_NOT_PUSHABLE'
+    })
+  })
+
+  it('keeps mapped next accepted through concurrent disposal using the original resource owner', async () => {
+    const entered = Promise.withResolvers<void>()
+    const mapping = Promise.withResolvers<number>()
+    let closed = 0
+    const query = createRecordQuery<number>({
+      pushdown: noPushdown,
+      execute: () =>
+        ownedRows([1], () => {
+          closed++
+        })
+    })
+    const stream = query
+      .select(async () => {
+        entered.resolve()
+        return mapping.promise
+      })
+      .stream()
+    const pending = stream.next()
+    await entered.promise
+    const cleanup = stream.dispose()
+    expect(cleanup).toBe(stream.dispose())
+    await Promise.resolve()
+    expect(closed).toBe(0)
+    mapping.resolve(7)
+    await expect(pending).resolves.toEqual({ done: false, value: 7 })
+    await cleanup
+    expect(closed).toBe(1)
+  })
+
+  it('retains original scope admission for buffered comparator results after native exhaustion', async () => {
+    let stop: (() => void) | undefined
+    let closed = 0
+    const query = createRecordQuery<number, undefined>({
+      pushdown: noPushdown,
+      execute: () =>
+        ownedRows(
+          [3, 1, 2],
+          () => {
+            closed++
+          },
+          undefined,
+          {
+            onStopAdmission: (current) => {
+              stop = current
+            }
+          }
+        )
+    })
+    const stream = query
+      .orderByComparator((left, right) => left - right)
+      .limit(3)
+      .stream()
+    await expect(stream.next()).resolves.toEqual({ done: false, value: 1 })
+    expect(closed).toBe(1)
+    stop!()
+    await expect(stream.next()).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' })
+    await stream.dispose()
+  })
+
+  it('records comparator failure before cleanup and preserves native identity', async () => {
+    const original = new RangeError('comparator failed')
+    let closed = 0
+    const query = createRecordQuery<number>({
+      pushdown: noPushdown,
+      execute: () =>
+        ownedRows([3, 2, 1], () => {
+          closed++
+        })
+    })
+    await expect(
+      query
+        .orderByComparator(() => {
+          throw original
+        })
+        .limit(2)
+        .all()
+    ).rejects.toBe(original)
+    expect(original).toMatchObject({ source: '@migaia/storage-contract', code: 'INVALID_ARGUMENT' })
+    expect(closed).toBe(1)
+  })
+})
+
+describe('unregistered source resource streaming', () => {
+  it('closes the original native resource once without materializing all rows', async () => {
+    let advanced = 0
+    let closed = 0
+    /** A root backend resource need not be registered as a transaction iterator. */
+    const native = ownedRows(
+      [1, 2, 3],
+      () => {
+        closed++
+      },
+      undefined,
+      {
+        onNext: () => {
+          advanced++
+        }
+      }
+    )
+    const forwarded: IStorageIterator<readonly [string, unknown]> = {
+      next: () => native.next(),
+      dispose: () => native.dispose(),
+      [Symbol.asyncDispose]: () => native[Symbol.asyncDispose](),
+      [Symbol.asyncIterator]() {
+        return this
+      }
+    }
+    const query = createRecordQuery<number>({ pushdown: noPushdown, execute: () => forwarded })
+    const stream = query
+      .limit(1)
+      .select((value) => value + 1)
+      .stream()
+    expect(advanced).toBe(0)
+    await expect(stream.next()).resolves.toEqual({ done: false, value: 2 })
+    expect(advanced).toBe(1)
+    expect(stream.dispose()).toBe(stream.dispose())
+    await stream.dispose()
+    expect(closed).toBe(1)
+  })
+})
+
+describe('bounded query operation context', () => {
+  it('observes cancellation triggered by the final selected getter even when limit prevents another native next', async () => {
+    const controller = new AbortController()
+    let closed = 0
+    const row = {
+      get total() {
+        controller.abort('selected getter')
+        return 1
+      }
+    }
+    const query = createRecordQuery<{ total: number }>({
+      pushdown: noPushdown,
+      execute: () =>
+        ownedRows([row], () => {
+          closed++
+        })
+    })
+    await expect(
+      query.limit(1).select('total').all({ signal: controller.signal })
+    ).rejects.toMatchObject({ code: 'ABORTED', cause: 'selected getter' })
+    expect(closed).toBe(1)
+  })
+})
+
+describe('root mapped read cleanup', () => {
+  it.each(['resolve', 'reject'] as const)(
+    'drains accepted async mapping before main or symbolic cleanup can settle: %s',
+    async (outcome) => {
+      /** This legitimate source wrapper has native ownership but no transaction registration itself. */
+      let closed = 0
+      const native = ownedRows([1], () => {
+        closed++
+      })
+      const source: IStorageIterator<readonly [string, unknown]> = {
+        next: () => native.next(),
+        dispose: () => native.dispose(),
+        [Symbol.asyncDispose]: () => native[Symbol.asyncDispose](),
+        [Symbol.asyncIterator]() {
+          return this
+        }
+      }
+      /** The mapped read remains accepted work after native next has already returned its row. */
+      const entered = Promise.withResolvers<void>()
+      const mapping = Promise.withResolvers<number>()
+      const query = createRecordQuery<number>({ pushdown: noPushdown, execute: () => source })
+      const stream = query
+        .select(async () => {
+          entered.resolve()
+          return mapping.promise
+        })
+        .stream()
+      const pending = stream.next()
+      await entered.promise
+      const cleanup = stream.dispose()
+      const symbolic = stream[Symbol.asyncDispose]()
+      expect(cleanup).toBe(stream.dispose())
+      expect(symbolic).toBe(stream[Symbol.asyncDispose]())
+      expect(symbolic).not.toBe(cleanup)
+      let mainSettled = false
+      let symbolicSettled = false
+      void cleanup.then(() => {
+        mainSettled = true
+      })
+      void symbolic.then(() => {
+        symbolicSettled = true
+      })
+      await Promise.resolve()
+      await Promise.resolve()
+      expect(mainSettled).toBe(false)
+      expect(symbolicSettled).toBe(false)
+      expect(closed).toBe(0)
+      if (outcome === 'reject') {
+        const original = new RangeError('root mapper failed')
+        mapping.reject(original)
+        await expect(pending).rejects.toBe(original)
+        expect(original).toMatchObject({
+          source: '@migaia/storage-contract',
+          code: 'INVALID_ARGUMENT'
+        })
+      } else {
+        mapping.resolve(7)
+        await expect(pending).resolves.toEqual({ done: false, value: 7 })
+      }
+      await cleanup
+      await symbolic
+      expect(mainSettled).toBe(true)
+      expect(symbolicSettled).toBe(true)
+      expect(closed).toBe(1)
+    }
+  )
 })
