@@ -5,6 +5,7 @@ import {
 } from './hooks.js'
 import type { IStorageHooks } from './hook-types.js'
 import { createStorageObservers, type IStorageObserverSet } from './stages.js'
+import { createStorageEnvelopeStages } from './envelope-stages.js'
 import { StorageHookName as Hook } from './hook-names.js'
 import { STORAGE_DEFAULT_ORG } from './state-constants.js'
 import type { IBackendStageBindings } from '@migaia/storage-contract'
@@ -49,7 +50,8 @@ import type {
   IRejectInstalledOrDuplicateIds,
   IStoragePipelineInput,
   IStorageBackendKind,
-  IStoragePluginCore
+  IStoragePluginCore,
+  IStorageEnvelopeStages
 } from './types.js'
 
 /** Minimal PluginHost domain core; storage materializers do not expose host mutation to plugins. */
@@ -79,6 +81,9 @@ type IStorageNativeRegistrationContext = {
   readonly setRegistrationCore: (core: IStorageInstallCore) => void
   readonly getStageBindings: () => IBackendStageBindings
   readonly getObservers: (store: IStorageBase) => IStorageObserverSet
+  readonly getEnvelopeStages: (
+    operation: Readonly<{ operation: string; targetVersion: number }>
+  ) => IStorageEnvelopeStages
   readonly hooks: IStorageHooks
   readonly emit: IStorageHookEmitter
   readonly scheduler: IScheduler
@@ -567,6 +572,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
           hooks: this.#events.hooks,
           emit: this.#events.emit,
           getObservers: (store) => createStorageObservers(observerBinding, () => store),
+          getEnvelopeStages: (operation) => createStorageEnvelopeStages(observerBinding, operation),
           getStageBindings: () =>
             (stageBindings ??= {
               backendStages: createStorageObservers(observerBinding, storeCell.get).backend,
@@ -848,6 +854,22 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
   /** Bind ordinary operation observations without adding an execution runner. */
   operationStages(store: IStorageBase) {
     return this.#observers(store).operation
+  }
+
+  /** Observe the original envelope plan with one immutable operation and target version. */
+  envelopeStages(
+    store: IStorageBase,
+    operation: Readonly<{ operation: string; targetVersion: number }>
+  ): IStorageEnvelopeStages {
+    this.#assertOpen()
+    /** Lookup points to the original published registration and grants no additional authority. */
+    const context = this.#storeContexts.get(store)
+    if (context === undefined || this.#registry.get(context.id) !== store)
+      throw createStorageTypeError(
+        StorageErrorCode.backendPluginInvalid,
+        StorageErrorText.backendPluginInvalid
+      )
+    return context.getEnvelopeStages(operation)
   }
 
   /** Returns the current immutable extension plane after its corresponding batch has committed. */
