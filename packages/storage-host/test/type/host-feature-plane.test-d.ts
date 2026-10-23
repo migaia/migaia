@@ -14,6 +14,17 @@ import {
   type ICapabilityInstallPort,
   type IKeyValueStore
 } from '@migaia/storage-contract'
+import type { IStorageFeatureClientResolver } from '@migaia/storage-host'
+
+/** The public erased type grants client selection without exposing a store or installer. */
+const resolver: IStorageFeatureClientResolver<
+  Readonly<{ orgId: string }>,
+  Readonly<{ scope: object }>
+> = {
+  getClient: (orgId) => ({ orgId }),
+  getTransactionClient: (scope) => ({ scope })
+}
+void resolver
 
 /** The backend kind and installer retain this native surface without lifecycle authority. */
 type IExactStore = IKeyValueStore & { readonly custom: <TValue>(value: TValue) => TValue }
@@ -29,6 +40,8 @@ const reservedFeature = defineFeature(exactKind, (core, dependencies) => {
   void core.registerStore
   // @ts-expect-error resource ownership belongs to Plugin install, not Feature factories.
   void core.onDispose
+  // @ts-expect-error native client selection belongs to the original backend installation.
+  void core.registerFeatureClientResolver
   // @ts-expect-error undeclared dependencies do not confer capability authority.
   void dependencies.missing
   const store: IExactStore = core.featureExpose.getStore()
@@ -105,6 +118,8 @@ apiOrg.use(apiPlugin)
 apiOrg.dropOrg('00000000-0000-0000-0000-000000000000')
 // @ts-expect-error Organization views cannot close the root owner.
 apiOrg.dispose()
+// @ts-expect-error organization views cannot register native client routing.
+apiOrg.registerFeatureClientResolver(exactStore, resolver)
 // @ts-expect-error Borrowed native backends retain no close ownership.
 apiOrg.backend('with-api').dispose()
 // @ts-expect-error Borrowed native backends retain no symbol close ownership.
