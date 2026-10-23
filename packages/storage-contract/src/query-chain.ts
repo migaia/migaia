@@ -24,6 +24,7 @@ import { createStorageIteratorLifetime, type IStorageIterator } from './resource
 import { snapshotOperationContext } from './operation-context.js'
 import { runTransactionIteratorOperation, deriveTransactionIterator } from './transaction.js'
 import { compareStorageKeys, snapshotStorageKey } from './key.js'
+import { encodeOrderedStorageKey, orderStorageKeysByBytes } from './key-order.js'
 import { snapshotStorageRdfPattern, type IQuad, type IRdfNamedNode } from './capabilities/rdf.js'
 
 /** Declarative field operators are shared by condition admission, native plans and client execution. */
@@ -494,6 +495,7 @@ export interface IQueryChain<
     ...fields: readonly [K, ...K[]]
   ): IQueryResult<Pick<T, K>, TContext, TStatistics, TAugmentMethods>
   select<N>(mapper: (row: T) => N): IQueryResult<Awaited<N>, TContext, TStatistics, TAugmentMethods>
+  distinct<K extends Extract<keyof T, string>>(field: K): this
   requirePushdown(): this
 }
 /** Interface semantics preserve the current record state and Feature methods after limit. */
@@ -504,6 +506,7 @@ export interface IRecordQueryBaseCore<
 >
   extends IQueryChain<T, TContext, T, true, TAugmentMethods>, IQueryStatistics<T, TContext> {
   limit(count: number): this
+  skip(count: number): this
 }
 /** The comparator transition requires an explicit finite limit before any read terminal exists. */
 export interface IRecordQueryCore<
@@ -511,6 +514,10 @@ export interface IRecordQueryCore<
   TContext extends IOperationContext | undefined = IOperationContext,
   TAugmentMethods extends object = Record<never, never>
 > extends IRecordQueryBaseCore<T, TContext, TAugmentMethods> {
+  orderBy(
+    selector: (row: T) => IStorageKey,
+    direction?: 'asc' | 'desc'
+  ): IRecordOrderedQuery<T, TContext, TAugmentMethods>
   orderByComparator(
     compare: (left: T, right: T) => number
   ): IRecordQueryNeedsLimit<T, TContext, TAugmentMethods>
@@ -536,6 +543,20 @@ export type IRecordQuery<
   TContext extends IOperationContext | undefined = IOperationContext,
   TAugmentMethods extends object = Record<never, never>
 > = IRecordQueryCore<T, TContext, TAugmentMethods> & TAugmentMethods
+/** Selector refinements stay in the canonical key domain and cannot switch to opaque comparison. */
+export interface IRecordOrderedQueryCore<
+  T,
+  TContext extends IOperationContext | undefined = IOperationContext,
+  TAugmentMethods extends object = Record<never, never>
+> extends IRecordQueryBaseCore<T, TContext, TAugmentMethods> {
+  orderBy(selector: (row: T) => IStorageKey, direction?: 'asc' | 'desc'): this
+}
+/** Feature methods remain available on every selector-ordered record branch. */
+export type IRecordOrderedQuery<
+  T,
+  TContext extends IOperationContext | undefined = IOperationContext,
+  TAugmentMethods extends object = Record<never, never>
+> = IRecordOrderedQueryCore<T, TContext, TAugmentMethods> & TAugmentMethods
 /** Ranked hits omit their potentially large vector until the chain explicitly requests it. */
 export type IVectorHit<TPayload, TWithVector extends boolean = false> = {
   readonly id: string
@@ -618,6 +639,8 @@ export interface IRdfQueryCore<
     IQueryChain<IQuad, TContext, IQuad, true, TAugmentMethods>,
     IQueryStatistics<IQuad, TContext> {
   limit(count: number): this
+  skip(count: number): this
+  orderBy(selector: (quad: IQuad) => IStorageKey, direction?: 'asc' | 'desc'): this
   follow(predicate: IRdfNamedNode, target?: IRdfNamedNode): this
   inverse(predicate: IRdfNamedNode): this
 }
@@ -647,7 +670,10 @@ export const RecordQueryMethod = Object.freeze({
   requirePushdown: 'requirePushdown',
   stream: 'stream',
   limit: 'limit',
-  orderByComparator: 'orderByComparator'
+  orderByComparator: 'orderByComparator',
+  orderBy: 'orderBy',
+  distinct: 'distinct',
+  skip: 'skip'
 } as const)
 /** Vector Feature admission reserves the same shared terminals plus its family refinements. */
 export const VectorQueryMethod = Object.freeze({
@@ -695,12 +721,24 @@ export type IRecordQuerySource = {
   readonly asyncDisposeKey?: typeof Symbol.asyncDispose
   /** Optional source-key tail order; parts marks an author container of independently valid keys. */
   readonly tieBreakByKey?: Readonly<{ direction: 'next' | 'prev'; parts?: true }>
+  /** Explicit opt-in retains legacy execute argument shapes until the native source accepts steps. */
+  readonly nativeSteps?: true
   readonly execute: (input: {
     readonly conditions: readonly IQueryCondition[]
     readonly fields: readonly string[] | undefined
     readonly ctx: IOperationContext | undefined
+    readonly steps?: readonly IQueryNativeStep[]
   }) => IStorageIterator<readonly [IStorageKey, unknown]>
 }
+/** Serializable safe native steps never contain or attempt to translate JavaScript functions. */
+export type IQueryNativeStep =
+  | { readonly operation: typeof QueryOperation.where; readonly condition: IQueryCondition }
+  | { readonly operation: typeof QueryOperation.select; readonly fields: readonly string[] }
+  | {
+      readonly operation: typeof QueryOperation.limit | typeof QueryOperation.skip
+      readonly count: number
+    }
+  | { readonly operation: typeof QueryOperation.distinct; readonly field: string }
 /** Native vector ranking receives declarative payload filters before it chooses its bounded hits. */
 export type IVectorQueryInput = {
   readonly conditions: readonly IQueryCondition[]
@@ -733,23 +771,14 @@ export type IRdfQueryTraversal = {
 /** Native RDF execution receives only the same safe prefix that explain reports. */
 export type IRdfQueryInput = {
   readonly pattern: Readonly<Partial<IQuad>>
-  readonly steps: readonly (
-    | IRdfQueryTraversal
-    | {
-        readonly operation: typeof QueryOperation.where
-        readonly condition: IQueryCondition
-      }
-    | {
-        readonly operation: typeof QueryOperation.select
-        readonly fields: readonly string[]
-      }
-  )[]
+  readonly steps: readonly (IRdfQueryTraversal | IQueryNativeStep)[]
   readonly ctx: IOperationContext | undefined
 }
 /** RDF sources retain their native cursor and actual projected row shape, owned by the plan. */
 export type IRdfQuerySource = {
   readonly pushdown: IQueryPushdown
   readonly asyncDisposeKey?: typeof Symbol.asyncDispose
+  readonly nativeSteps?: true
   readonly execute: (input: IRdfQueryInput) => IStorageIterator<readonly [IStorageKey, unknown]>
 }
 /** Nodes retain only their immediate predecessor, so deriving a branch never copies its history. */
@@ -757,6 +786,13 @@ type IQueryNode = {
   readonly previous: IQueryNode | undefined
   readonly step:
     | { readonly operation: typeof QueryOperation.limit; readonly count: number }
+    | { readonly operation: typeof QueryOperation.skip; readonly count: number }
+    | { readonly operation: typeof QueryOperation.distinct; readonly field: string }
+    | {
+        readonly operation: typeof QueryOperation.order
+        readonly selector: (row: unknown) => IStorageKey
+        readonly direction: 'asc' | 'desc'
+      }
     | {
         readonly operation: typeof QueryOperation.comparator
         readonly compare: (left: unknown, right: unknown) => number
@@ -787,6 +823,7 @@ type IQuerySourceSnapshot = {
   readonly tieBreakByKey: IRecordQuerySource['tieBreakByKey']
   readonly execute: IRecordQuerySource['execute']
   readonly receiver: IRecordQuerySource
+  readonly nativeSteps: boolean
   readonly vector?: {
     readonly withVector: boolean
     readonly exact: boolean
@@ -796,6 +833,10 @@ type IQuerySourceSnapshot = {
 }
 /** Canonical key directions apply only to explicit comparator tie resolution. */
 const QueryKeyDirection = { next: 'next', prev: 'prev' } as const
+/** Selector direction is shared by admission and byte reversal without a second ordering domain. */
+const QueryOrderDirection = { asc: 'asc', desc: 'desc' } as const
+/** Pure chain shape controls which mutually exclusive ordering refinement remains available. */
+const QueryOrderMode = { selector: 'selector', comparator: QueryOperation.comparator } as const
 /** Planning retains the actual nodes so native and client execution cannot diverge from explain. */
 type IRecordExecutionPlan = {
   readonly explanation: IQueryPlan
@@ -890,11 +931,16 @@ function snapshotQuerySource(source: IRecordQuerySource): IQuerySourceSnapshot {
     const configuredAsyncDisposeKey = source.asyncDisposeKey
     if (configuredAsyncDisposeKey !== undefined && typeof configuredAsyncDisposeKey !== 'symbol')
       throw new TypeError(StorageContractErrorText.queryArgument)
+    /** Extended native controls are never inferred from legacy support arrays alone. */
+    const nativeSteps = source.nativeSteps
+    if (nativeSteps !== undefined && nativeSteps !== true)
+      throw new TypeError(StorageContractErrorText.queryArgument)
     return {
       receiver: source,
       execute,
       pushdown: capturedPushdown,
       tieBreakByKey,
+      nativeSteps: nativeSteps === true,
       asyncDisposeKey: configuredAsyncDisposeKey ?? Symbol.asyncDispose
     }
   } catch (cause) {
@@ -961,11 +1007,40 @@ function planRecordQuery(
   const pushedSteps: IQueryPlanStep[] = []
   /** A reason is attached to each client step, including later safe-prefix boundaries. */
   const clientSteps: IQueryPlanStep[] = []
+  /** Count drops only selector ordering that cannot change a later row-selection result. */
+  const countOrders = countOnly ? new Set<IQueryNode['step']>() : undefined
+  if (countOrders !== undefined) {
+    /** A later value-sensitive step observes which row a bound or distinct operation retained. */
+    let observesIdentity = false
+    /** Once selection can affect cardinality, preceding selector orders must remain in the reader. */
+    let selectionMatters = false
+    for (let index = steps.length - 1; index >= 0; index--) {
+      /** Reverse planning inspects each immutable operation once without running any callback. */
+      const step = steps[index]!
+      if (step.operation === QueryOperation.order && selectionMatters) countOrders.add(step)
+      if (
+        observesIdentity &&
+        (step.operation === QueryOperation.limit ||
+          step.operation === QueryOperation.skip ||
+          step.operation === QueryOperation.distinct)
+      )
+        selectionMatters = true
+      if (
+        step.operation === QueryOperation.where ||
+        step.operation === QueryOperation.predicate ||
+        step.operation === QueryOperation.distinct ||
+        step.operation === QueryOperation.follow ||
+        step.operation === QueryOperation.inverse
+      )
+        observesIdentity = true
+    }
+  }
   for (const step of steps) {
     /** Cardinality keeps conditions and page controls without evaluating output-only callbacks. */
     if (
       countOnly &&
       (step.operation === QueryOperation.comparator ||
+        (step.operation === QueryOperation.order && !countOrders!.has(step)) ||
         step.operation === QueryOperation.select ||
         step.operation === QueryOperation.mapper)
     )
@@ -983,11 +1058,15 @@ function planRecordQuery(
         : step.operation === QueryOperation.predicate ||
             step.operation === QueryOperation.mapper ||
             step.operation === QueryOperation.comparator ||
+            step.operation === QueryOperation.order ||
             step.operation === QueryOperation.groupBy
           ? source.vector !== undefined && step.operation === QueryOperation.predicate
             ? StorageContractErrorText.queryVectorFunction
             : StorageContractErrorText.queryFunction
-          : step.operation === QueryOperation.limit ||
+          : (!source.nativeSteps &&
+                (step.operation === QueryOperation.limit ||
+                  step.operation === QueryOperation.skip ||
+                  step.operation === QueryOperation.distinct)) ||
               (source.vector !== undefined && step.operation === QueryOperation.select) ||
               !operations.has(step.operation)
             ? StorageContractErrorText.queryUnsupported
@@ -999,12 +1078,21 @@ function planRecordQuery(
       pushedSteps.push(
         Object.freeze({
           operation: step.operation,
+          ...(step.operation === QueryOperation.skip
+            ? { reason: StorageContractErrorText.querySkip }
+            : {}),
           ...(source.pushdown.index === undefined ? {} : { index: source.pushdown.index })
         })
       )
     } else {
       client.push(step)
-      clientSteps.push(Object.freeze({ operation: step.operation, reason }))
+      clientSteps.push(
+        Object.freeze({
+          operation: step.operation,
+          reason:
+            step.operation === QueryOperation.skip ? StorageContractErrorText.querySkip : reason
+        })
+      )
     }
   }
   return {
@@ -1032,9 +1120,13 @@ function assertQueryActive(ctx: IOperationContext | undefined): void {
 /** One pull stays inside the original source operation view supplied for this accepted read. */
 type IQueryAdvance = () => Promise<IteratorResult<readonly [IStorageKey, unknown]>>
 /** Each compiled node transforms one upstream pull without owning another cursor or queue. */
-type IQueryReader = (
-  advance: IQueryAdvance
-) => Promise<IteratorResult<unknown> & { readonly key?: IStorageKey }>
+type IQueryReader = (advance: IQueryAdvance) => Promise<
+  IteratorResult<unknown> & {
+    readonly key?: IStorageKey
+    readonly keyBytes?: Uint8Array
+    readonly ordering?: readonly Uint8Array[]
+  }
+>
 /** Stable candidate order resolves comparator ties without retaining discarded source rows. */
 type IQueryHeapEntry = {
   readonly value: unknown
@@ -1073,6 +1165,44 @@ function queryHeapSiftDown(
     position = child
   }
 }
+/** Concatenates complete self-delimiting canonical keys without another encoding domain. */
+function queryOrderingBytes(parts: readonly Uint8Array[]): Uint8Array {
+  /** Every complete encoded component contributes its actual byte length once. */
+  let length = 0
+  for (const part of parts) length += part.length
+  /** Only this query candidate owns the combined ordering bytes. */
+  const bytes = new Uint8Array(length)
+  /** The write position advances through complete canonical components. */
+  let position = 0
+  for (const part of parts) {
+    bytes.set(part, position)
+    position += part.length
+  }
+  return bytes
+}
+/** Reverses a detached complete key's byte order without changing canonical encoding itself. */
+function queryDescendingBytes(bytes: Uint8Array): Uint8Array {
+  for (let index = 0; index < bytes.length; index++) bytes[index] = 255 - bytes[index]!
+  return bytes
+}
+/** Selector callbacks stay opaque and borrow the canonical key snapshot/byte encoder exactly once. */
+function snapshotQueryOrder(
+  selector: unknown,
+  direction: unknown
+): Extract<IQueryNode['step'], { readonly operation: typeof QueryOperation.order }> {
+  if (
+    typeof selector !== 'function' ||
+    (direction !== undefined &&
+      direction !== QueryOrderDirection.asc &&
+      direction !== QueryOrderDirection.desc)
+  )
+    throw invalidQueryCondition(undefined, StorageContractErrorText.queryArgument)
+  return {
+    operation: QueryOperation.order,
+    selector: selector as (row: unknown) => IStorageKey,
+    direction: direction ?? QueryOrderDirection.asc
+  }
+}
 /** Compiles the existing client plan once; comparator buffering is bounded by its explicit limit. */
 function compileRecordQueryReader(
   steps: readonly IQueryNode['step'][],
@@ -1080,6 +1210,13 @@ function compileRecordQueryReader(
   tieBreakByKey: IRecordQuerySource['tieBreakByKey'],
   vector = false
 ): IQueryReader {
+  /**
+   * New selector ordering needs the same original primary-key tail even without comparator
+   * metadata.
+   */
+  const selectorOrdering = steps.some((step) => step.operation === QueryOperation.order)
+  /** Existing comparator-only and ordinary reads keep their original key-admission path. */
+  const retainKeys = selectorOrdering || tieBreakByKey !== undefined
   /** The leaf borrows the one original backend cursor; no row array is materialized. */
   let read: IQueryReader = async (advance) => {
     assertQueryActive(ctx)
@@ -1087,12 +1224,31 @@ function compileRecordQueryReader(
     const next = await advance()
     assertQueryActive(ctx)
     if (next.done) return { done: true, value: undefined }
-    if (tieBreakByKey === undefined) return { done: false, value: next.value[1] }
+    if (!retainKeys) return { done: false, value: next.value[1] }
     /** Capture the native tuple once; only explicit key ordering owns a detached key snapshot. */
     const row = next.value
     /** Retained keys detach before projected value access can mutate any borrowed source objects. */
-    const key = snapshotQuerySourceKey(row[0], tieBreakByKey)
-    return { done: false, value: row[1], key }
+    const key =
+      tieBreakByKey === undefined
+        ? snapshotStorageKey(row[0], undefined)
+        : snapshotQuerySourceKey(row[0], tieBreakByKey)
+    if (!selectorOrdering) return { done: false, value: row[1], key }
+    /** Author-only key parts retain their independent logical budgets when making a sort tail. */
+    const encoded =
+      tieBreakByKey?.parts === true
+        ? queryOrderingBytes(
+            (key as readonly IStorageKey[]).map((part) => encodeOrderedStorageKey(part, undefined))
+          )
+        : encodeOrderedStorageKey(key, undefined)
+    return {
+      done: false,
+      value: row[1],
+      key,
+      keyBytes:
+        tieBreakByKey?.direction === QueryKeyDirection.prev
+          ? queryDescendingBytes(encoded)
+          : encoded
+    }
   }
   for (let index = 0; index < steps.length; index++) {
     /** A node captures its direct upstream reader rather than copying preceding history. */
@@ -1129,9 +1285,7 @@ function compileRecordQueryReader(
           /** Awaited mapping remains part of the original accepted read. */
           const value = await step.mapper(next.value)
           assertQueryActive(ctx)
-          return tieBreakByKey === undefined
-            ? { done: false, value }
-            : { done: false, value, key: next.key }
+          return !retainKeys ? { done: false, value } : { ...next, value }
         }
         /** Own data properties cannot mutate a row prototype, including a selected **proto**. */
         const value: Record<string, unknown> = {}
@@ -1145,9 +1299,112 @@ function compileRecordQueryReader(
                 ? undefined
                 : Reflect.get(Object(next.value), field)
           })
-        return tieBreakByKey === undefined
-          ? { done: false, value }
-          : { done: false, value, key: next.key }
+        return !retainKeys ? { done: false, value } : { ...next, value }
+      }
+    } else if (step.operation === QueryOperation.skip) {
+      /** Offset reads advance only through the original cursor; no skipped result is retained. */
+      let remaining = step.count
+      read = async (advance) => {
+        while (remaining > 0) {
+          remaining--
+          /** EOF stops skipping immediately rather than repeatedly touching an exhausted source. */
+          const next = await upstream(advance)
+          if (next.done) return next
+        }
+        return upstream(advance)
+      }
+    } else if (step.operation === QueryOperation.distinct) {
+      /**
+       * SameValueZero keeps primitive domains and opaque object identity without deep
+       * serialization.
+       */
+      const seen = new Set<unknown>()
+      read = async (advance) => {
+        while (true) {
+          /** Only accepted distinct values survive downstream bounds and projections. */
+          const next = await upstream(advance)
+          if (next.done) return next
+          /**
+           * Each candidate's selected field is read once; missing and present undefined share a
+           * value.
+           */
+          const value = next.value == null ? undefined : Reflect.get(Object(next.value), step.field)
+          if (!seen.has(value)) {
+            seen.add(value)
+            return next
+          }
+        }
+      }
+    } else if (step.operation === QueryOperation.order) {
+      /** Consecutive refinements form one lexicographic key and one canonical radix pass. */
+      const selectors = [step]
+      while (steps[index + 1]?.operation === QueryOperation.order)
+        selectors.push(steps[++index] as typeof step)
+      /** Ordering retains source keys only internally; public rows and iterator results omit them. */
+      type IOrderedEntry = {
+        readonly value: unknown
+        readonly key: IStorageKey
+        readonly keyBytes: Uint8Array
+        readonly ordering: readonly Uint8Array[]
+        readonly bytes: Uint8Array
+      }
+      /**
+       * The same accepted initialization is shared by concurrent reads through the original
+       * lifetime.
+       */
+      let prepared: Promise<void> | undefined
+      /** Native or earlier client filtering determines the actual candidates in this radix pass. */
+      let ordered: readonly IOrderedEntry[] = []
+      /** Emission advances through the one ordered result without rerunning selectors. */
+      let emitted = 0
+      read = async (advance) => {
+        await (prepared ??= (async () => {
+          /**
+           * Retained rows are required by this unbounded selector order, never by scalar
+           * reductions.
+           */
+          const entries: IOrderedEntry[] = []
+          while (true) {
+            /** Each native row enters this ordering stage once. */
+            const next = await upstream(advance)
+            if (next.done) break
+            /** Prior selector stages retain their original keys across filters and bounds. */
+            const ordering = [...(next.ordering ?? [])]
+            for (const order of selectors) {
+              /**
+               * Invoke the user's opaque selector once, before any later selector can mutate its
+               * key.
+               */
+              const selector = order.selector
+              /** Canonical snapshot/encoding owns all supported key domain validation and ordering. */
+              const encoded = encodeOrderedStorageKey(selector(next.value), undefined)
+              ordering.push(
+                order.direction === QueryOrderDirection.desc
+                  ? queryDescendingBytes(encoded)
+                  : encoded
+              )
+            }
+            entries.push({
+              value: next.value,
+              key: next.key!,
+              keyBytes: next.keyBytes!,
+              ordering,
+              bytes: queryOrderingBytes([...ordering, next.keyBytes!])
+            })
+            assertQueryActive(ctx)
+          }
+          ordered = orderStorageKeysByBytes(entries, (entry) => entry.bytes)
+        })())
+        if (emitted === ordered.length) return { done: true, value: undefined }
+        /** Selector/primary-key metadata remains inside the existing compiled reader. */
+        const entry = ordered[emitted++]!
+        return {
+          done: false,
+          value: entry.value,
+          key: entry.key,
+          keyBytes: entry.keyBytes,
+          ordering: entry.ordering
+        }
       }
     } else if (step.operation === QueryOperation.limit) {
       /** Admission reserves one remaining position before awaiting the upstream read. */
@@ -1281,7 +1538,7 @@ function compileRecordQueryReader(
     /** The compiled node chain retains no operation view beyond this accepted read. */
     const next = await read(advance)
     assertQueryActive(ctx)
-    return tieBreakByKey === undefined || next.done ? next : { done: false, value: next.value }
+    return !retainKeys || next.done ? next : { done: false, value: next.value }
   }
 }
 /** Plans once and opens only the original native prefix; terminal adapters share this execution. */
@@ -1349,7 +1606,13 @@ function openRecordQuery(
         steps: Object.freeze(plan.pushed as IRdfQueryInput['steps'][number][]),
         ctx: captured
       }
-    } else input = { conditions, fields, ctx: captured }
+    } else
+      input = {
+        conditions,
+        fields,
+        ctx: captured,
+        ...(source.nativeSteps ? { steps: Object.freeze(plan.pushed as IQueryNativeStep[]) } : {})
+      }
     return {
       iterator: Reflect.apply(source.execute, source.receiver, [input]),
       read,
@@ -1744,7 +2007,8 @@ function recordQuery<
   source: IQuerySourceSnapshot,
   node: IQueryNode | undefined,
   strict: boolean,
-  methods: TAugmentMethods | undefined
+  methods: TAugmentMethods | undefined,
+  ordering?: 'selector' | 'comparator'
 ): IRecordQuery<T, TContext, TAugmentMethods> {
   /** Overloads are implemented through one explicit runtime argument-shape dispatcher. */
   function where(
@@ -1758,7 +2022,7 @@ function recordQuery<
   function where(...args: readonly unknown[]): IRecordQuery<T, TContext, TAugmentMethods> {
     /** Family dispatch shares the canonical condition/path snapshot. */
     const step = snapshotQueryWhere(args)
-    return recordQuery(source, { previous: node, step }, strict, methods)
+    return recordQuery(source, { previous: node, step }, strict, methods, ordering)
   }
   /** Projection and callback mapping share one state transition that removes select from the result. */
   function select<const K extends Extract<keyof T, string>>(
@@ -1787,31 +2051,73 @@ function recordQuery<
         source,
         { previous: node, step: { operation: QueryOperation.limit, count } },
         strict,
-        methods
+        methods,
+        ordering
+      )
+    },
+    /** Distinct values retain the first row in this stage's current order. */
+    distinct(field: string) {
+      assertQueryField(field)
+      return recordQuery<T, TContext, TAugmentMethods>(
+        source,
+        { previous: node, step: { operation: QueryOperation.distinct, field } },
+        strict,
+        methods,
+        ordering
+      )
+    },
+    /** Offset is explicit linear work; native execution requires the source's finite opt-in. */
+    skip(count: number) {
+      if (!Number.isSafeInteger(count) || count < 0)
+        throw invalidQueryCondition(undefined, StorageContractErrorText.queryLimit)
+      return recordQuery<T, TContext, TAugmentMethods>(
+        source,
+        { previous: node, step: { operation: QueryOperation.skip, count } },
+        strict,
+        methods,
+        ordering
+      )
+    },
+    /** Selector refinements use canonical byte ordering and preserve the original primary-key tail. */
+    orderBy(selector: (row: T) => IStorageKey, direction?: 'asc' | 'desc') {
+      if (ordering === QueryOrderMode.comparator)
+        throw invalidQueryCondition(undefined, StorageContractErrorText.queryArgument)
+      return recordQuery<T, TContext, TAugmentMethods>(
+        source,
+        { previous: node, step: snapshotQueryOrder(selector, direction) },
+        strict,
+        methods,
+        QueryOrderMode.selector
       )
     },
     /** Comparator state cannot execute until the next node supplies its bounded heap size. */
-    orderByComparator(compare: (left: T, right: T) => number) {
-      if (typeof compare !== 'function')
-        throw invalidQueryCondition(undefined, StorageContractErrorText.queryComparatorLimit)
-      return recordQuery<T, TContext, TAugmentMethods>(
-        source,
-        {
-          previous: node,
-          step: {
-            operation: QueryOperation.comparator,
-            compare: compare as (left: unknown, right: unknown) => number
+    ...(ordering === QueryOrderMode.selector
+      ? {}
+      : {
+          orderByComparator(compare: (left: T, right: T) => number) {
+            if (typeof compare !== 'function')
+              throw invalidQueryCondition(undefined, StorageContractErrorText.queryComparatorLimit)
+            return recordQuery<T, TContext, TAugmentMethods>(
+              source,
+              {
+                previous: node,
+                step: {
+                  operation: QueryOperation.comparator,
+                  compare: compare as (left: unknown, right: unknown) => number
+                }
+              },
+              strict,
+              methods,
+              QueryOrderMode.comparator
+            )
           }
-        },
-        strict,
-        methods
-      )
-    },
+        }),
     where,
     select,
     ...recordQueryReads<T, TContext>(source, node, strict),
-    requirePushdown: () => recordQuery<T, TContext, TAugmentMethods>(source, node, true, methods)
-  }) as IRecordQuery<T, TContext, TAugmentMethods>
+    requirePushdown: () =>
+      recordQuery<T, TContext, TAugmentMethods>(source, node, true, methods, ordering)
+  }) as unknown as IRecordQuery<T, TContext, TAugmentMethods>
 }
 /**
  * Creates the shared record condition/projection/limit/comparator read executor from one backend
@@ -1898,6 +2204,10 @@ function familyQuery(
         ? {
             ...familyQueryReads(source, node, strict),
             select,
+            distinct(field: string) {
+              assertQueryField(field)
+              return append({ operation: QueryOperation.distinct, field })
+            },
             ...(vector.groupBy
               ? {
                   groupBy(field: string, options: { readonly perGroup: number }) {
@@ -1931,6 +2241,18 @@ function familyQuery(
     ...shared,
     ...familyQueryReads(source, node, strict),
     select,
+    distinct(field: string) {
+      assertQueryField(field)
+      return append({ operation: QueryOperation.distinct, field })
+    },
+    skip(count: number) {
+      if (!Number.isSafeInteger(count) || count < 0)
+        throw invalidQueryCondition(undefined, StorageContractErrorText.queryLimit)
+      return append({ operation: QueryOperation.skip, count })
+    },
+    orderBy(selector: (quad: IQuad) => IStorageKey, direction?: 'asc' | 'desc') {
+      return append(snapshotQueryOrder(selector, direction))
+    },
     limit(count: number) {
       if (!Number.isSafeInteger(count) || count < 0)
         throw invalidQueryCondition(undefined, StorageContractErrorText.queryLimit)

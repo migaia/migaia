@@ -789,3 +789,11 @@ SPARQL 通过纯 sparqlFragment 与原生 sparql 能力复用规范 RDF 项。�
 vector 与 rdf 现发布各自精确标准原生 API。向量 collection 返回共享 IVectorQueryBuilder/IVectorHit family，保留 topK 前类型状态与可选原生分组；借用 store 生命周期，不获得通用事务投影。payload 声明支持 readonly/optional 便携字段，拒绝 Date/function schema。DeleteCountMode 为 precount 或 scroll；返回真实删除数的引擎保留该计数，Qdrant 依其明确原生策略。发布令牌本身不实现搜索引擎。
 
 RDF add/delete/match 沿同一规范 ground IQuad owner。支持事务的 provider 提供 forTransaction：写入绑定新原 operation view；match 保留真实 family query 与原 iterator 登记。全部完整读终端，包括选择结果、回调与数值终端，均在参数、strict 或空结果失败前进入同一事务 owner；保存查询在到期后拒绝。Feature 方法保持精确泛型投影。change-feed 类型参数先预留，直到共享 watch 契约实现；这些声明不虚称已有 watch 或持久投递。
+
+## 记录与 RDF 的行控制
+
+`orderBy(selector, direction?)` 按规范 IStorageKey 排序，direction 缺省 asc；连续调用追加次级键。每个候选的每个 selector 只执行一次并立即编码快照，最终以原逻辑主键决胜，显式原 source 尾序仍保留。排序复用规范字节 radix，不执行比较排序；只有 selector 排序需要保留实际候选行，count 跳过不影响基数的排序回调；若其后 distinct/skip/limit 的选行会被后续条件或遍历观察，则保留决定行身份的 selector 排序，统计自身仍只保留标量累加器。selector 与 comparator 类型状态互斥，selector 函数不被解析或伪下推。
+
+`distinct(field)` 保留当前顺序中的首行，用 Set 的 SameValueZero 字段身份单遍去重：0/-0 同值，NaN 同值，缺失与 undefined 同值，对象（含 Date）按原身份区分。`skip(count)` 接受非负安全整数，客户端显式逐行推进并在 explain 标出 O(n)，下游 limit 达到后不再读取。记录与 RDF 共用这些节点及 reader；向量仅提供保持排名的 distinct。
+
+原生数据源显式提供 `nativeSteps:true` 后，原 execute 才接收有序 `IQueryNativeStep`（where/select/limit/skip/distinct），并按原声明顺序执行其真实支持的前缀；steps 是执行顺序的依据，兼容保留的 conditions/fields 不可再次乱序应用。未选择此端口的旧源保持原 execute 三字段参数及原客户端 limit 行为。原生 distinct 声明须兑现相同字段身份语义，不能把结构等值冒充对象身份。RDF 也显式选择扩展原生控制，原有遍历 steps 形状不变。事务的这些派生分支沿原包装投影，仍复用完整终端的同一 operation 准入。
