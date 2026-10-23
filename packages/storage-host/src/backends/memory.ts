@@ -404,7 +404,7 @@ export function createMemoryBackend<T = unknown>(
     return runWithConcurrency(
       {
         store: base,
-        options: ctx ?? {},
+        options: ctx === undefined ? {} : ctx,
         execute: (context, invoke) =>
           core.execution.run({ operation, input, ctx: context }, (captured) => {
             controller.assertLive()
@@ -623,7 +623,7 @@ export function createMemoryBackend<T = unknown>(
       return runWithConcurrency<Awaited<R>>(
         {
           store: base,
-          options: ctx ?? {},
+          options: ctx === undefined ? {} : ctx,
           executeAttempt: (context, invoke) =>
             core.execution.run(
               {
