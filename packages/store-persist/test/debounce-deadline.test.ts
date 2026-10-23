@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { createRuntime } from '@migaia/reactive'
 import { createStore } from '@migaia/store-light'
-import { memoryStorageHost } from '@migaia/storage-web/memory'
+import { createMemoryTestStore } from './helpers/memory.js'
 import { persist } from '../src/light-index.js'
 import { StorePersistErrorCode } from '../src/error-code.js'
 import { persistUnit } from '../src/index.js'
@@ -14,7 +14,7 @@ describe('bounded persistence debounce', () => {
     /** Existing runtime flush supplies real store notifications. */
     const runtime = createRuntime()
     /** Writes carry real encoded envelopes through the memory storage adapter. */
-    const storage = memoryStorageHost()
+    const storage = await createMemoryTestStore()
     /** Captures the actual values delivered, not only timer counts. */
     const written: unknown[] = []
     /** Original storage method remains the underlying delivery owner. */
@@ -67,7 +67,7 @@ describe('bounded persistence debounce', () => {
       /** Local graph makes the subscription notification explicit. */
       const runtime = createRuntime()
       /** Successful final writes use the same real storage as normal writes. */
-      const storage = memoryStorageHost()
+      const storage = await createMemoryTestStore()
       /** The exact adapter error remains the public writeError. */
       const failure = new Error('final storage write fixture')
       if (reject)
@@ -108,7 +108,7 @@ describe('bounded persistence debounce', () => {
       /** Borrowed graph drives the real store subscription. */
       const runtime = createRuntime()
       /** Archive inspection still uses the real memory backend. */
-      const storage = memoryStorageHost()
+      const storage = await createMemoryTestStore()
       /** Original adapter operation preserves successful envelope encoding. */
       const set = storage.set
       /** Storage admission and completion are independently controlled. */
@@ -172,7 +172,7 @@ describe('bounded persistence debounce', () => {
     /** Registered callback drives the existing debounce scheduling seam. */
     let changed!: () => void
     /** Backend blocks the final write after it was admitted. */
-    const storage = memoryStorageHost()
+    const storage = await createMemoryTestStore()
     /** Original operation keeps the archive assertions grounded in the real backend. */
     const set = storage.set
     storage.set = async (key, value, context) => {
@@ -232,7 +232,7 @@ describe('bounded persistence debounce', () => {
     /** No persistence timer can be created before option validation. */
     const scheduler = createManualScheduler()
     /** Existing storage proves validation needs no host timer or special test backend. */
-    const storage = memoryStorageHost()
+    const storage = await createMemoryTestStore()
     try {
       for (const maxWaitMs of [-1, Number.NaN, Number.POSITIVE_INFINITY, 2147483648]) {
         expect(() =>
