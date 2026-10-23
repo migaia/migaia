@@ -9,6 +9,23 @@ const t = (en: string, zh: string): IText => ({ en, zh })
  * output is quoted in `result`.
  */
 export const utilsCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
+  mapMaybe: [
+    {
+      title: t('Distinguish absence from a present undefined', '区分缺失与存在的 undefined'),
+      problem: t(
+        'A query result can legitimately contain undefined. A discriminant preserves presence, and mapping must not run on missing values.',
+        '查询结果可能合法地为 undefined；判别字段保留存在性，缺失时不能运行映射。'
+      ),
+      example: t(
+        "import { isSome, isNone, unwrapOr, mapMaybe, toUndefined, type IMaybe } from '@migaia/utils'\nconst present: IMaybe<number | undefined> = { some: true, value: undefined }\nconst missing: IMaybe<number> = { some: false }\nconst mapped = mapMaybe({ some: true, value: 3 }, value => value * 2)\nconsole.log(isSome(present), isNone(missing))\nconsole.log(unwrapOr(mapped, 0), toUndefined(missing))\n// true true\n// 6 undefined",
+        "import { isSome, isNone, unwrapOr, mapMaybe, toUndefined, type IMaybe } from '@migaia/utils'\nconst present: IMaybe<number | undefined> = { some: true, value: undefined }\nconst missing: IMaybe<number> = { some: false }\nconst mapped = mapMaybe({ some: true, value: 3 }, value => value * 2)\nconsole.log(isSome(present), isNone(missing))\nconsole.log(unwrapOr(mapped, 0), toUndefined(missing))\n// true true\n// 6 undefined"
+      ),
+      result: t(
+        'Prints true true, then 6 undefined. mapMaybe maps one present value and preserves missing values without calling its mapper.',
+        '先输出 true true，再输出 6 undefined；mapMaybe 仅映射存在值，缺失时保留 None 且不运行 mapper。'
+      )
+    }
+  ],
   jitter: [
     {
       title: t('Spread cache expiration times', '分散缓存到期时间'),
