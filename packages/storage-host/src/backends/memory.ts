@@ -611,31 +611,42 @@ export function createMemoryBackend<T = unknown>(
       }),
     clearRecords: (ctx) => clearEntry(MemoryOperation.clearRecords, 'record', ctx),
     iterateRecords: (range, ctx) => rootIterator(range, ctx),
-    transaction: (run, ctx) => {
-      /** One accepted lifetime spans every actual attempt and all original pipeline settlement. */
+    transaction: <R>(
+      run: (scope: IMemoryScope<T>) => R,
+      ctx?: ITransactionOptions
+    ): Promise<Awaited<R>> => {
+      /** One accepted lifetime spans every real attempt and all original pipeline settlement. */
       let release: (() => void) | undefined
-      return runWithConcurrency(
-        { store: base, options: ctx ?? {} },
+      /** Each stage terminal supplies its callback before the original loop enters native work. */
+      let callback = run
+      return runWithConcurrency<Awaited<R>>(
         {
-          attempt: (attempt) =>
+          store: base,
+          options: ctx ?? {},
+          executeAttempt: (context, invoke) =>
             core.execution.run(
               {
                 operation: MemoryOperation.transaction,
-                input: { run, ctx: attempt },
-                ctx: attempt
+                input: { run, ctx: context },
+                ctx: context
               },
               (captured) => {
                 controller.assertLive()
                 assertTransactionCallback(captured.run, STORAGE_MEMORY_BACKEND)
                 release ??= controller.beginMutation()
-                return locks.attempt(
-                  attempt,
-                  holding(),
-                  { attempt: () => transact(captured.run, attempt) },
-                  core.stageBindings.concurrencyStages(store),
-                  controller.closingSignal
-                )
+                callback = captured.run
+                return invoke()
               }
+            )
+        },
+        {
+          attempt: (attempt) =>
+            locks.attempt(
+              attempt,
+              holding(),
+              { attempt: () => transact(callback, attempt) },
+              core.stageBindings.concurrencyStages(store),
+              controller.closingSignal
             )
         }
       ).finally(() => release?.())
@@ -1121,6 +1132,7 @@ export function createMemoryBackend<T = unknown>(
     const scope = createScope()
     /** Final checks receive fresh complete native views under the same transaction identity. */
     const control = owner.register(scope, {
+      context: ctx,
       createScope,
       onFailure: (error) => {
         failure ??= error

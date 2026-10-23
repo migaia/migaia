@@ -782,7 +782,8 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
             core.onDispose(() => releaseEnvelope?.())
             releaseEnvelope = registerBackendEnvelopeStages(
               snapshot.store,
-              context.getEnvelopeStages
+              context.getEnvelopeStages,
+              () => context.storeCell.getChainMethods('query')
             )
             storeCell.set(snapshot.store)
             this.#events.emit(Hook.afterBackendCreate, observerBinding.identity)

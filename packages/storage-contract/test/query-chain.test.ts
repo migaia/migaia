@@ -1,6 +1,8 @@
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import {
   compileStorageWhere,
+  assertStorageKey,
+  KEY_DOMAIN_LIMITS,
   createRecordQuery,
   createTransactionOwner,
   records,
@@ -13,6 +15,7 @@ import {
   QueryOperation,
   QueryOperator,
   type IStorageBase,
+  type IStorageKey,
   type IStorageIterator,
   type IQueryPushdown,
   type IRecordsApi,
@@ -209,12 +212,16 @@ function normalizeQueryFixtureFailure(cause: unknown): IQueryFixtureFailure {
     : new StorageContractError(StorageContractErrorCode.invalidArgument, { cause })
 }
 /** Original resource ownership is exercised rather than a second iterator implementation. */
-function ownedRows(
+function ownedRows<TKey extends IStorageKey = string>(
   rows: readonly unknown[],
   close: () => PromiseLike<void> | void = () => undefined,
   nextFailure?: Error,
-  options?: { readonly onNext?: () => void; readonly onStopAdmission?: (stop: () => void) => void }
-): IStorageIterator<readonly [string, unknown]> {
+  options?: {
+    readonly onNext?: () => void
+    readonly onStopAdmission?: (stop: () => void) => void
+    readonly key?: (row: unknown, position: number) => TKey
+  }
+): IStorageIterator<readonly [TKey | string, unknown]> {
   /** A specialized backend needs no fabricated KV methods to own the native cursor. */
   const base: IStorageBase = {
     backend: 'query-fixture',
@@ -244,12 +251,15 @@ function ownedRows(
   /** The port advances its original source once for every native next. */
   let index = 0
   return owner.registerIterator(scope, {
-    next: async (): Promise<IteratorResult<readonly [string, unknown]>> => {
+    next: async (): Promise<IteratorResult<readonly [TKey | string, unknown]>> => {
       options?.onNext?.()
       if (nextFailure !== undefined) throw nextFailure
-      return index < rows.length
-        ? { done: false, value: [String(index), rows[index++]] as const }
-        : { done: true, value: undefined }
+      if (index >= rows.length) return { done: true, value: undefined }
+      /** One source projection supplies the existing canonical key, never a client-side re-sort. */
+      const position = index++
+      /** The native row and its once-projected key remain paired for this source advance. */
+      const row = rows[position]
+      return { done: false, value: [options?.key?.(row, position) ?? String(position), row] }
     },
     close
   })
@@ -764,6 +774,157 @@ describe('record query Feature methods', () => {
 })
 
 describe('bounded record execution', () => {
+  it.each([
+    [undefined, ['a', 'b']],
+    ['next', ['b', 'c']],
+    ['prev', ['a', 'c']]
+  ] as const)(
+    'resolves comparator ties by optional source key direction %s',
+    async (direction, ids) => {
+      /** Source positions deliberately differ from the compound index-key/id order. */
+      const rows = [
+        { id: 'a', email: 'z' },
+        { id: 'b', email: 'a' },
+        { id: 'c', email: 'a' }
+      ]
+      /** Each original cursor advance supplies its compound key exactly once. */
+      const project = vi.fn((value: unknown) => {
+        /** The actual indexed source knows its row shape and supplies canonical key components. */
+        const row = value as (typeof rows)[number]
+        return [row.email, row.id]
+      })
+      /** The shared query owns bounded ordering while the source owns the actual compound key. */
+      const query = createRecordQuery<(typeof rows)[number]>({
+        pushdown: noPushdown,
+        tieBreakByKey: direction === undefined ? undefined : { direction, parts: true },
+        execute: () => ownedRows(rows, undefined, undefined, { key: project })
+      })
+        .where((row) => row.email.length > 0)
+        .orderByComparator(() => 0)
+        .limit(2)
+      expect(await query.select('id').all()).toEqual(ids.map((id) => ({ id })))
+      /** Public iterator results contain no internal key metadata after projection. */
+      const stream = query.select((row) => row.id).stream()
+      for (const id of ids) await expect(stream.next()).resolves.toEqual({ done: false, value: id })
+      await expect(stream.next()).resolves.toEqual({ done: true, value: undefined })
+      expect(project).toHaveBeenCalledTimes(rows.length * 2)
+    }
+  )
+
+  it('captures key direction once and detaches mutable compound keys without replaying source projection', async () => {
+    /** The source reuses one mutable key buffer while the heap retains only three winners. */
+    const rows = Array.from({ length: 257 }, (_, id) => ({ id, rank: (id * 37) % 257 }))
+    /** A native source may reuse mutable key components between distinct advances. */
+    const key: IStorageKey[] = [new Date(0), '']
+    /** Direction is captured during source admission rather than read during comparisons. */
+    let direction: 'next' | 'prev' = 'next'
+    /** Borrowed source metadata must be read once even across every heap comparison. */
+    let directionReads = 0
+    /** Comparing values never repeats the original source's index projection. */
+    let comparisons = 0
+    /** The source owns one projection per candidate, before the original client reader sees it. */
+    const project = vi.fn((value: unknown) => {
+      /** This physical source retains its actual row-to-index-key calculation. */
+      const row = value as (typeof rows)[number]
+      ;(key[0] as Date).setTime(row.rank)
+      key[1] = String(row.id)
+      return key
+    })
+    /** Bounded ordering consumes the canonical source key rather than retaining the full input. */
+    const query = createRecordQuery<(typeof rows)[number]>({
+      pushdown: noPushdown,
+      get tieBreakByKey() {
+        directionReads++
+        return { direction, parts: true as const }
+      },
+      execute: () => ownedRows(rows, undefined, undefined, { key: project })
+    })
+    direction = 'prev'
+    expect(
+      (
+        await query
+          .orderByComparator(() => {
+            comparisons++
+            return 0
+          })
+          .limit(3)
+          .all()
+      ).map((row) => row.rank)
+    ).toEqual([0, 1, 2])
+    expect(directionReads).toBe(1)
+    expect(project).toHaveBeenCalledTimes(rows.length)
+    expect(comparisons).toBeLessThan(rows.length * 4)
+  })
+
+  it('preserves each logical key budget inside an author-only compound tie key', async () => {
+    /** An existing legal index key can already use the complete recursive depth budget. */
+    function deepest(leaf: string): IStorageKey {
+      /** The original key owner measures the first value at depth zero. */
+      let key: IStorageKey = leaf
+      for (let depth = 0; depth < KEY_DOMAIN_LIMITS.maxDepth; depth++) key = [key]
+      return key
+    }
+    /** An existing legal record id can independently use the complete visited-node budget. */
+    const id = Array.from({ length: KEY_DOMAIN_LIMITS.maxNodes - 1 }, () => 'id')
+    /** The source's extra container is sorting metadata, not a newly authored user key. */
+    const rows = [
+      { value: 'z', key: [deepest('z'), id] },
+      { value: 'a', key: [deepest('a'), id] }
+    ]
+    for (const row of rows) for (const part of row.key) assertStorageKey(part, undefined)
+    /** The same physical source provides already-validated logical components to the owner. */
+    const execute = () =>
+      ownedRows(rows, undefined, undefined, {
+        key: (value) => (value as (typeof rows)[number]).key
+      })
+    /** Explicit parts mode preserves each prior logical key's existing limits. */
+    const query = createRecordQuery<(typeof rows)[number]>({
+      pushdown: noPushdown,
+      execute,
+      tieBreakByKey: { direction: 'next', parts: true }
+    })
+    expect(
+      (
+        await query
+          .orderByComparator(() => 0)
+          .limit(1)
+          .all()
+      ).map((row) => row.value)
+    ).toEqual(['a'])
+    /** Omitted parts still treats an array as one user key with the unchanged total limits. */
+    const ordinary = createRecordQuery({
+      pushdown: noPushdown,
+      execute,
+      tieBreakByKey: { direction: 'next' }
+    })
+    await expect(
+      ordinary
+        .orderByComparator(() => 0)
+        .limit(1)
+        .all()
+    ).rejects.toMatchObject({ code: 'INVALID_KEY' })
+  })
+
+  it('rejects an invalid key tie direction before opening a source and preserves its getter cause', () => {
+    /** New optional metadata uses the existing source-admission error boundary. */
+    const execute = vi.fn(() => ownedRows([]))
+    expect(() =>
+      createRecordQuery({ pushdown: noPushdown, execute, tieBreakByKey: 'sideways' as never })
+    ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT' }))
+    /** Reflection failures preserve the original object rather than a regenerated message. */
+    const cause = new Error('source key direction getter')
+    expect(() =>
+      createRecordQuery({
+        pushdown: noPushdown,
+        execute,
+        get tieBreakByKey(): never {
+          throw cause
+        }
+      })
+    ).toThrowError(expect.objectContaining({ cause }))
+    expect(execute).not.toHaveBeenCalled()
+  })
+
   it('streams from the original source lazily and stops ordinary limit without reading another candidate', async () => {
     /** Source advancement is observable independently of construction and terminal materialization. */
     let advanced = 0
