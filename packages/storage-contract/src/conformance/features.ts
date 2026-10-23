@@ -84,32 +84,38 @@ export function indexConformance(
     const handle = await api.ensureRecordIndexes('conformance', [
       { name: 'value', unique: false, multiEntry: false, revision: 1 }
     ])
-    await prepare?.(store, handle)
+    const projectKey = await prepare?.(store, handle)
+    const firstKey = typeof projectKey === 'function' ? projectKey('a') : 'a'
+    const secondKey = typeof projectKey === 'function' ? projectKey('b') : 'b'
     await expect(api.getRecordIndexReadiness(handle)).resolves.toMatchObject({ status: 'complete' })
-    await api.putIndexedRecord({ value: 1 }, 'a', handle, { value: { kind: 'single', key: 1 } })
-    await api.putIndexedRecord({ value: 2 }, 'b', handle, { value: { kind: 'single', key: 2 } })
+    await api.putIndexedRecord({ value: 1 }, firstKey, handle, {
+      value: { kind: 'single', key: 1 }
+    })
+    await api.putIndexedRecord({ value: 2 }, secondKey, handle, {
+      value: { kind: 'single', key: 2 }
+    })
     expect(
       (
         await conformanceRows(
           api.iterateRecordIndex({ handle, index: 'value', range: { lower: 2, upper: 2 } })
         )
       ).map(([key]) => key)
-    ).toEqual(['b'])
+    ).toEqual([secondKey])
     expect(
       (
         await conformanceRows(api.iterateRecordIndex({ handle, index: 'value', direction: 'next' }))
       ).map(([key]) => key)
-    ).toEqual(['a', 'b'])
+    ).toEqual([firstKey, secondKey])
     expect(
       (
         await conformanceRows(
           api.iterateRecordIndex({ handle, index: 'value', direction: 'prev', limit: 1 })
         )
       ).map(([key]) => key)
-    ).toEqual(['b'])
+    ).toEqual([secondKey])
     await api.putIndexedRecord(
       { value: 3 },
-      'a',
+      firstKey,
       handle,
       { value: { kind: 'single', key: 3 } },
       { conflictPolicy: 'replace' }
@@ -120,14 +126,14 @@ export function indexConformance(
       )
     ).toEqual([])
     await api.transactionIndexed(handle, async (tx) => {
-      await tx.deleteRecord('b')
+      await tx.deleteRecord(secondKey)
     })
     expect(
       await conformanceRows(
         api.iterateRecordIndex({ handle, index: 'value', range: { lower: 2, upper: 2 } })
       )
     ).toEqual([])
-    await expect(api.getRecord('a')).resolves.toEqual({ value: 3 })
+    await expect(api.getRecord(firstKey)).resolves.toEqual({ value: 3 })
   })
   check('secondaryIndexes · unique rollback and multiEntry projections', async (store) => {
     const api = asSecondaryIndexRecordStore(store as unknown as IRecordStore)
@@ -135,18 +141,22 @@ export function indexConformance(
       { name: 'unique', unique: true, multiEntry: false, revision: 1 },
       { name: 'tags', unique: false, multiEntry: true, revision: 1 }
     ])
-    await prepare?.(store, handle)
+    const projectKey = await prepare?.(store, handle)
+    const firstKey = typeof projectKey === 'function' ? projectKey('a') : 'a'
+    const secondKey = typeof projectKey === 'function' ? projectKey('b') : 'b'
     await expect(api.getRecordIndexReadiness(handle)).resolves.toMatchObject({ status: 'complete' })
     await api.transactionIndexed(handle, (tx) =>
-      tx.putIndexedRecord({ id: 'a' }, 'a', handle, {
+      tx.putIndexedRecord({ id: 'a' }, firstKey, handle, {
         unique: { kind: 'single', key: 'one' },
         tags: { kind: 'multiple', keys: ['x', 'y'] }
       })
     )
     await expect(
-      api.putIndexedRecord({ id: 'b' }, 'b', handle, { unique: { kind: 'single', key: 'one' } })
+      api.putIndexedRecord({ id: 'b' }, secondKey, handle, {
+        unique: { kind: 'single', key: 'one' }
+      })
     ).rejects.toMatchObject({ code: 'INDEX_UNIQUE_CONFLICT' })
-    await expect(api.getRecord('b')).resolves.toBeUndefined()
+    await expect(api.getRecord(secondKey)).resolves.toBeUndefined()
     for (const key of ['x', 'y'])
       expect(
         (
@@ -154,7 +164,7 @@ export function indexConformance(
             api.iterateRecordIndex({ handle, index: 'tags', range: { lower: key, upper: key } })
           )
         ).map(([id]) => id)
-      ).toEqual(['a'])
+      ).toEqual([firstKey])
   })
 }
 

@@ -806,6 +806,7 @@ describe('public consumer-owned conformance', () => {
         expect(original).toBe(item.store)
         expect(handle).toBe(await item.native.ensureRecordIndexes())
         prepared = true
+        return (key: string) => ['fixture', key] as const
       }
     )
     const select = (ready?: Parameters<typeof runConformance>[1]['prepareSecondaryIndexes']) =>
