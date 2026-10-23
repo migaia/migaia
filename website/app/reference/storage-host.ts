@@ -88,8 +88,8 @@ console.log(host.extensions.label('draft'))`
         '定义独立内存后端，安装前不获取数据；原生事务共用原owner与本地锁/修订事实。'
       ),
       returns: t(
-        'A literal-id memory plugin retaining selected Features. The default id is memory; where/select/all run through the shared records query core.',
-        '保留所选Feature的字面量id内存插件；缺省id为memory，where/select/all复用records查询核心。'
+        'A literal-id memory plugin retaining selected Features from the separate final argument memoryBackendPlugin(options, features). The default id is memory; where/select/all run through the shared records query core.',
+        '通过独立最后参数memoryBackendPlugin(options, features)保留所选Feature的字面量id内存插件；缺省id为memory，where/select/all复用records查询核心。'
       ),
       cases: storageHostCases.memoryBackendPlugin
     },
