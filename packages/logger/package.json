@@ -32,6 +32,18 @@
       "deno": "./dist/plugins/file.js",
       "browser": "./dist/plugins/file.browser.js",
       "default": "./dist/plugins/file.browser.js"
+    },
+    "./plugins/durable": {
+      "types": "./dist/plugins/durable/index.d.ts",
+      "default": "./dist/plugins/durable/index.js"
+    },
+    "./plugins/durable/file": {
+      "types": "./dist/plugins/durable/file.d.ts",
+      "node": "./dist/plugins/durable/file.js",
+      "bun": "./dist/plugins/durable/file.js",
+      "deno": "./dist/plugins/durable/file.js",
+      "browser": "./dist/plugins/durable/file.browser.js",
+      "default": "./dist/plugins/durable/file.browser.js"
     }
   },
   "publishConfig": {
