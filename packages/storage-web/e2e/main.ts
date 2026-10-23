@@ -25,6 +25,9 @@ import { deferred } from '@migaia/utils/promise'
 import { isKeyValueStore, isRecordStore } from '../src/types/storage'
 import type { IStorageKey } from '../src/types/context'
 import { isArrayBuffer, isUint8Array } from '@migaia/utils/bytes'
+import { asyncDisposeKey } from '@migaia/plugin-host'
+import { records, StorageStageKind } from '@migaia/storage-contract'
+import type { IQueryStageObserver, IStorageIterator } from '@migaia/storage-contract'
 import {
   runPersistNativeConsumerScenario,
   runPersistCrossTaskCodecScenario
@@ -171,6 +174,15 @@ const browserCoordinationWriters = new Map<
   { host: { dispose(): Promise<void> }; store: IIndexedDbBackendStore }
 >()
 
+/** Resource identities are compared in the browser realm before evidence crosses Playwright. */
+type IQueryStreamEvidence = {
+  canonicalKey: boolean
+  mainCached: boolean
+  symbolicCached: boolean
+  distinct: boolean
+  value: unknown
+}
+
 declare global {
   interface Window {
     runLocalStorageQuotaScenario(): Promise<{
@@ -278,6 +290,17 @@ declare global {
       prematureCompletionCode: string | undefined
       entryFailureCodes: Array<string | undefined>
       requestSetterCode: string | undefined
+      queryStreams: {
+        nativeSymbolAvailable: boolean
+        records: IQueryStreamEvidence
+        entity: IQueryStreamEvidence
+        transactionRecords: IQueryStreamEvidence
+        transactionEntity: IQueryStreamEvidence
+        beforeQueries: number
+        afterQueries: number
+        transactionQueries: number
+        diagnostics: number
+      }
     }>
     runIndexedDbDualTransactionScenario(): Promise<{
       committed: number
@@ -3569,6 +3592,103 @@ window.runIndexedDbPagedScanScenario = async () => {
       if (String(key) === 'record-004') break
     }
     stoppedEarly = consumedAfterStop === 5
+    /** Compare both original cleanup projections without requiring a native well-known Symbol. */
+    const inspectQueryStream = async <T>(
+      iterator: IStorageIterator<T>
+    ): Promise<IQueryStreamEvidence> => {
+      /** The key comes from the same original plugin-host owner as the native iterator. */
+      const symbolic = Reflect.get(iterator, asyncDisposeKey)
+      /** An actual mapped advance opens the real cursor before either projection closes it. */
+      const first = await iterator.next()
+      /** Explicit and symbolic cleanup share work while retaining separate cached Promises. */
+      const main = iterator.dispose()
+      /** The same captured method is invoked with its original iterator receiver. */
+      const derived =
+        typeof symbolic === 'function'
+          ? (Reflect.apply(symbolic, iterator, []) as Promise<void>)
+          : undefined
+      await main
+      await derived
+      return {
+        canonicalKey: typeof symbolic === 'function',
+        mainCached: main === iterator.dispose(),
+        symbolicCached: derived !== undefined && derived === Reflect.apply(symbolic, iterator, []),
+        distinct: derived !== undefined && main !== derived,
+        value: first.value
+      }
+    }
+    /** The observer wrapper must retain the same canonical resource key as its native source. */
+    let beforeQueries = 0
+    /** Completed advances prove the observer still invokes its original after stage. */
+    let afterQueries = 0
+    /** A scoped query obtains its observer from the original transaction projection. */
+    let transactionQueries = 0
+    /** Every unexpected observer diagnostic stays observable in the returned evidence. */
+    const streamDiagnostics: unknown[] = []
+    /** Enable observation without creating another query execution owner. */
+    const queryStages: IQueryStageObserver = {
+      kind: StorageStageKind.query,
+      forTransaction: () => {
+        transactionQueries += 1
+        return queryStages
+      },
+      beforeQuery: () => {
+        beforeQueries += 1
+      },
+      afterQuery: () => {
+        afterQueries += 1
+      },
+      report: (error) => {
+        streamDiagnostics.push(error)
+        return undefined
+      }
+    }
+    /** This repository uses the same public store and its authentic transaction scopes. */
+    const streamed = defineEntity<{ id: string; index: number }>({
+      name: 'query-stream-resources',
+      key: 'id'
+    }).connect(store, { queryStages })
+    await streamed.put({ id: 'one', index: 7 })
+    /** One asynchronous mapper is shared by the four actual root and scoped stream paths. */
+    const mapStreamRow = async (value: { index: number }) => {
+      await Promise.resolve()
+      return { index: value.index }
+    }
+    /** The records projection exercises the shared root mapped-stream implementation. */
+    const recordStream = await inspectQueryStream(
+      store
+        .use(records)
+        .query<{ index: number }>()
+        .where({ index: 0 })
+        .select(mapStreamRow)
+        .stream()
+    )
+    /** Entity decoding and observation must forward that same canonical cleanup protocol. */
+    const entityStream = await inspectQueryStream(streamed.query().select(mapStreamRow).stream())
+    /** Scoped derivation must keep the original transaction owner rather than a root lifetime. */
+    const scopedStreams = await store.transaction(async (scope) => ({
+      records: await inspectQueryStream(
+        scope
+          .use(records)
+          .query<{ index: number }>()
+          .where({ index: 0 })
+          .select(mapStreamRow)
+          .stream()
+      ),
+      entity: await inspectQueryStream(streamed.in(scope).query().select(mapStreamRow).stream())
+    }))
+    /** Preserve all identity comparisons before crossing the browser automation boundary. */
+    const queryStreams = {
+      nativeSymbolAvailable: typeof Symbol.asyncDispose === 'symbol',
+      records: recordStream,
+      entity: entityStream,
+      transactionRecords: scopedStreams.records,
+      transactionEntity: scopedStreams.entity,
+      beforeQueries,
+      afterQueries,
+      transactionQueries,
+      diagnostics: streamDiagnostics.length
+    }
     let listenerSetupCode: string | undefined
     try {
       await store
@@ -3693,7 +3813,8 @@ window.runIndexedDbPagedScanScenario = async () => {
       resultGetterCode,
       prematureCompletionCode,
       entryFailureCodes,
-      requestSetterCode
+      requestSetterCode,
+      queryStreams
     }
   } finally {
     await storeHost.dispose()
