@@ -542,6 +542,13 @@ const transactionMembers: Readonly<Record<string, IMemberDoc>> = {
       '原事务索引的可选资源迭代器。'
     ),
     example: `await using cursor = tx.iterateRecordIndex!({ handle, index: 'byName' }); console.log(await cursor.next())`
+  },
+  isRecordIndexReady: {
+    summary: t(
+      'Optional read of the current native transaction snapshot. Missing, pending or stale handles return false; complete metadata must match the generation and fingerprint. No index is built or refreshed.',
+      '可选读取当前原生事务快照。缺失、待就绪或失效句柄返回 false；完整元数据须匹配 generation 与 fingerprint，不建立或刷新索引。'
+    ),
+    example: `const ready = await tx.isRecordIndexReady?.(handle)`
   }
 }
 
@@ -1179,8 +1186,8 @@ export const storageContractReference: ILibraryReference = {
         )
       },
       returns: t(
-        'Backend-held register and registerIterator ports. Registration returns stopAdmission, runFinalizers, closeIterators and terminal close.',
-        '后端私持的 register 与 registerIterator；登记返回 stopAdmission、runFinalizers、closeIterators 与终态 close。'
+        'Backend-held register and registerIterator ports. Register accepts an optional captured context without a second budget and returns stopAdmission, runFinalizers, closeIterators and terminal close.',
+        '后端私持的 register 与 registerIterator；register 可接收已捕获 context，不创建第二预算，并返回 stopAdmission、runFinalizers、closeIterators 与终态 close。'
       ),
       example: `const owner = createTransactionOwner(store, normalizeFailure)
 const control = owner.register(scope, { createScope, onFailure })`
@@ -1200,6 +1207,25 @@ const control = owner.register(scope, { createScope, onFailure })`
         '每个有效视图共用的不可变 ITransactionInfo；无效身份抛 INVALID_ARGUMENT。'
       ),
       example: `const info = assertTransactionOwner(store, scope)`
+    },
+    readTransactionOperationContext: {
+      role: 'operation',
+      purpose: t(
+        'Read the original backend attempt context through the same authentic live view registration.',
+        '通过同一真实有效视图登记读取原后端 attempt 上下文。'
+      ),
+      params: {
+        scope: t(
+          'Actual live user, operation or finalizer view.',
+          '真实有效的用户、操作或最终检查视图。'
+        )
+      },
+      returns: t(
+        'The same frozen IOperationContext snapshot and original signal, or undefined when omitted at registration. Forged or expired views throw INVALID_ARGUMENT. No new budget or lifecycle authority is created.',
+        '同一冻结 IOperationContext 快照与原 signal；登记省略上下文时返回 undefined。伪造或过期视图抛 INVALID_ARGUMENT，不创建新预算或生命周期权限。'
+      ),
+      example: `const context = readTransactionOperationContext(operationScope)
+await codec.encode(value, context)`
     },
     runTransactionOperation: {
       role: 'operation',

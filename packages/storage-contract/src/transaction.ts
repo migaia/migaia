@@ -16,7 +16,8 @@ import {
   type IConcurrencyStageObserver
 } from './concurrency.js'
 import { StorageStageKind } from './stage-kind.js'
-import type { IConflictPolicy, IStorageKey, IKeyRange } from './context.js'
+import type { IConflictPolicy, IStorageKey, IKeyRange, IOperationContext } from './context.js'
+import { snapshotOperationContext } from './operation-context.js'
 import type { IStorageBase } from './store.js'
 import { snapshotStorageBaseDetailed } from './store.js'
 import { createStorageIteratorLifetime, type IStorageIterator } from './resource.js'
@@ -93,6 +94,12 @@ export type ITransactionScope<
       projection: IRecordIndexProjection,
       options?: ITransactionWriteOptions
     ): Promise<IStorageKey>
+    /**
+     * Reads only this transaction's native index snapshot. Missing, pending or stale handles return
+     * false; complete metadata must match the handle's generation and fingerprint. No index is
+     * refreshed or created.
+     */
+    isRecordIndexReady?(handle: IRecordIndexHandle): Promise<boolean>
     iterateRecordIndex?(query: IRecordIndexQuery): IStorageIterator<[IStorageKey, TValue]>
   }
 
@@ -235,6 +242,7 @@ type ITransactionState = {
   readonly iterators: Set<IIteratorRegistration>
   userView: IViewRegistration | undefined
   createScope: (() => object) | undefined
+  context: IOperationContext | undefined
   onFailure: ((error: ITransactionFailure) => void) | undefined
   beforeCommit: ((scope: object) => void | PromiseLike<void>) | undefined
   checks: ((scope: object) => void | PromiseLike<void>)[]
@@ -431,6 +439,8 @@ export function createTransactionOwner<
       readonly createScope: () => NoInfer<TScope>
       readonly onFailure: (error: ITransactionFailure) => void
       readonly beforeCommit?: (checkScope: NoInfer<TScope>) => void | PromiseLike<void>
+      /** The backend's original attempt fields; this owner never starts another budget. */
+      readonly context?: IOperationContext
     }
   ): {
     stopAdmission(): void
@@ -488,7 +498,7 @@ export function createTransactionOwner<
       register(scope, registrationOptions) {
         try {
           /** Capture callbacks before changing registration state. */
-          const { createScope, onFailure, beforeCommit } = registrationOptions
+          const { createScope, onFailure, beforeCommit, context } = registrationOptions
           if (
             typeof scope !== 'object' ||
             scope === null ||
@@ -498,6 +508,8 @@ export function createTransactionOwner<
             (beforeCommit !== undefined && typeof beforeCommit !== 'function')
           )
             throw invalidTransaction()
+          /** Reuse the original single-read snapshotter, retaining only data and the live signal. */
+          const operationContext = snapshotOperationContext(context)
           /** All views share one immutable identity, independent of their object lifetime. */
           const info: ITransactionInfo = Object.freeze({
             id: String(++nextTransactionId),
@@ -512,6 +524,7 @@ export function createTransactionOwner<
             iterators: new Set(),
             userView: undefined,
             createScope,
+            context: operationContext,
             onFailure,
             beforeCommit: beforeCommit as ITransactionState['beforeCommit'],
             checks: [],
@@ -577,6 +590,7 @@ export function createTransactionOwner<
               for (const current of state.views) invalidateView(current)
               state.userView = undefined
               state.createScope = undefined
+              state.context = undefined
               state.onFailure = undefined
               state.beforeCommit = undefined
               state.checks = []
@@ -768,6 +782,19 @@ export function assertTransactionOwner(store: IStorageBase, scope: object): ITra
   )
     throw invalidTransaction()
   return view.info
+}
+
+/**
+ * Reads the original backend attempt's frozen context from an authentic live view. Every user,
+ * operation and finalizer view shares the same snapshot and original signal. Omitted registration
+ * context returns undefined; forged or expired views throw INVALID_ARGUMENT. This grants no
+ * registration, cancellation-controller, budget or close authority.
+ */
+export function readTransactionOperationContext(scope: object): IOperationContext | undefined {
+  /** Identity and lifetime use the same private view record as transaction composition. */
+  const state = transactionView(scope).state
+  if (!state || state.closed || state.firstFailure) throw invalidTransaction()
+  return state.context
 }
 
 /** Actual record projection values follow the original full backend scope. */

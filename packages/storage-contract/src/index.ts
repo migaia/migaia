@@ -178,6 +178,7 @@ export {
   TransactionBeforeStage,
   TransactionObservedStage,
   createTransactionOwner,
+  readTransactionOperationContext,
   assertTransactionOwner,
   runTransactionOperation,
   registerTransactionFinalizer,
