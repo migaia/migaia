@@ -131,6 +131,24 @@ console.log(await repo.query().where({ name: 'Ada' }).orderByComparator((left, r
   ],
   memoryBackendPlugin: [
     {
+      title: t('Update selected native records', '更新选中的原生记录'),
+      problem: t(
+        'Change matching records with one real commit and an actual count.',
+        '通过一次真实提交修改匹配记录并返回实际数量。'
+      ),
+      example: `import { records } from '@migaia/storage-contract'
+import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+
+await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+const store = host.backend('memory')
+await store.putRecord({ active: true }, 'one')
+console.log(await store.use(records).query<{ active: boolean }>().where({ active: true }).update({ active: false }))`,
+      result: t(
+        'Prints 1 after commit. Records/RDF scoped writes share the original draft; vector delete keeps its bounded ranking.',
+        '提交后输出1。records/RDF事务内写入共用原draft，vector删除保留原有界排名。'
+      )
+    },
+    {
       title: t('Read an immutable native object range', '读取原生对象的不可变范围快照'),
       problem: t(
         'An application needs opaque objects without projecting them into KV or a transaction.',

@@ -175,3 +175,21 @@ await objects.put('images/sample', new Uint8Array([1, 2, 3]), { ifNoneMatch: tru
 await using object = (await objects.get('images/sample', { range: { start: 1, end: 1 } }))!
 console.log((await object.bytes())[0]) // 2
 ```
+
+Memory supports records query delete/update, bounded vector query delete after topK, and RDF query delete/replace. Counts include distinct rows actually accepted by the native draft. Root terminals wait for real commit; transaction terminals change only the current draft and rollback exposes no writes. Record patches modify actual stored rows and preserve memory's Date/Map value domain; selected projections remain read-only. RDF replacement affects only an old quad actually selected by the query. Replacing the same quad returns 0; an existing new quad is not duplicated. Vector deletion retains the original topK without refilling after client filtering. Writes retain the original concurrency policy, cancellation and one high-level pipeline; selection failures and conflicts stay with the original transaction.
+
+```ts
+import { records } from '@migaia/storage-contract'
+import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+
+await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+const store = host.backend('memory')
+await store.putRecord({ active: true }, 'one')
+console.log(
+  await store
+    .use(records)
+    .query<{ active: boolean }>()
+    .where({ active: true })
+    .update({ active: false })
+) // 1
+```

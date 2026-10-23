@@ -175,3 +175,21 @@ await objects.put('images/sample', new Uint8Array([1, 2, 3]), { ifNoneMatch: tru
 await using object = (await objects.get('images/sample', { range: { start: 1, end: 1 } }))!
 console.log((await object.bytes())[0]) // 2
 ```
+
+memory 的 records 查询 `delete/update`、完成 topK 的 vector 查询 `delete`、RDF 查询 `delete/replace` 均可直接写入；返回实际接受的去重条目数。根终点等待真实提交，事务内终点只修改当前 draft，回滚不泄露写入。记录 patch 修改实际原行并保留 memory 的 Date/Map 等值域；选出的投影仍只读。RDF replace 只作用于查询实际选中的 old quad，同 quad 替换返回 0；new quad 已存在时移除 old 而不重复插入。向量删除保持原 topK，客户端过滤不会补搜。写入保留原并发策略、取消与一次高层 pipeline，查询失败或冲突交原事务处理。
+
+```ts
+import { records } from '@migaia/storage-contract'
+import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+
+await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+const store = host.backend('memory')
+await store.putRecord({ active: true }, 'one')
+console.log(
+  await store
+    .use(records)
+    .query<{ active: boolean }>()
+    .where({ active: true })
+    .update({ active: false })
+) // 1
+```

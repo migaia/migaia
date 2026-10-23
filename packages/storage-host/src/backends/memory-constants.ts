@@ -28,6 +28,8 @@ export const MemoryOperation = {
   removeMany: 'removeMany',
   removeByPrefix: 'removeByPrefix',
   recordRemoveByPrefix: 'records.removeByPrefix',
+  recordQueryDelete: 'records.query.delete',
+  recordQueryUpdate: 'records.query.update',
   ttlExpire: 'ttl.expire',
   ttlRemaining: 'ttl.remaining',
   ttlPersist: 'ttl.persist',
@@ -35,6 +37,8 @@ export const MemoryOperation = {
   rdfAdd: 'rdf.add',
   rdfDelete: 'rdf.delete',
   rdfMatch: 'rdf.match',
+  rdfQueryDelete: 'rdf.query.delete',
+  rdfQueryReplace: 'rdf.query.replace',
   blobPut: 'blob.put',
   blobGet: 'blob.get',
   blobHead: 'blob.head',
@@ -44,7 +48,8 @@ export const MemoryOperation = {
   vectorSearch: 'vector.search',
   vectorUpsert: 'vector.upsert',
   vectorDelete: 'vector.delete',
-  vectorDeleteWhere: 'vector.deleteWhere'
+  vectorDeleteWhere: 'vector.deleteWhere',
+  vectorQueryDelete: 'vector.query.delete'
 } as const
 
 /** Physical memory identity and diagnostic names remain private to this native backend. */
