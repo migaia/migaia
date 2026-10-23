@@ -232,6 +232,7 @@ export function createPgTransactions<TScope extends Omit<ITransactionScope, 'use
           })
           if (journaled) journalAttempt = runtime.journal?.begin(scope)
           terminal = transactionStages.forTransaction(scope)
+          observePg(terminal, 'beforeTransaction')
           observePg(terminal, 'onTransactionStart')
           marker = assertTransactionOwner(store, scope).id
           try {

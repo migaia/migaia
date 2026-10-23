@@ -267,10 +267,18 @@ export async function createPostgresStore<T>(
       ): Promise<Awaited<R>> => {
         const stages = operationStages()
         const observer = scope === undefined ? stages : stages.forTransaction(scope)
+        const transactionObserver =
+          scope === undefined
+            ? undefined
+            : runtime.stageBindings.transactionStages(store).forTransaction(scope)
         const started = Date.now()
+        if (transactionObserver !== undefined)
+          observePg(transactionObserver, 'beforeTxOperation', operation)
         observePg(observer, 'beforeStorageOperation', operation, count)
         try {
           const value = await run()
+          if (transactionObserver !== undefined)
+            observePg(transactionObserver, 'afterTxOperation', operation)
           observePg(observer, 'afterStorageOperation', operation, Date.now() - started, count)
           return value
         } catch (cause) {
