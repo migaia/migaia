@@ -1657,8 +1657,8 @@ export const storageContractReference: ILibraryReference = {
         methods: t('Optional original pure Feature functions.', '可选的原 Feature 纯函数。')
       },
       returns: t(
-        'IRdfQuery with common reads, projection, limit and native follow/inverse. Client traversal, pages and writes remain subsequent units.',
-        '返回 IRdfQuery，支持共享读取、投影、limit 与原生 follow/inverse；客户端遍历与写入仍待后续单元；支持共享键集分页。'
+        'IRdfQuery with common reads, projections, keyset pages and native/client ground follow/inverse. Write terminals remain a subsequent unit.',
+        '返回 IRdfQuery，支持共享读取、投影、limit 与原生 follow/inverse；写入仍待后续单元；支持共享键集分页与客户端 ground 遍历。'
       ),
       example: storageContractCases.createRdfQuery![0]!.example,
       cases: storageContractCases.createRdfQuery
@@ -3459,8 +3459,8 @@ console.log(candidate.name, candidate.output)`
         },
         follow: {
           summary: t(
-            'Append a ground forward predicate/target step.',
-            '追加 ground 正向 predicate/target 步骤。'
+            'Follow through original same-graph ground matches, natively or through the shared client reader.',
+            '通过同 graph ground match 正向跟随，可由原生或共享客户端 reader 执行。'
           )
         },
         inverse: {
@@ -3505,6 +3505,12 @@ console.log(candidate.name, candidate.output)`
         'ground pattern、有序原生前缀步骤与捕获上下文。'
       ),
       members: {
+        operationScope: {
+          summary: t(
+            'Optional readonly exact backend operation view for nested ground matches, valid only within the accepted operation; original owner checks remain authoritative.',
+            '嵌套 ground match 可选借用的只读精确后端 operation view，仅在 accepted 操作内有效，仍以原 owner 校验为准。'
+          )
+        },
         pattern: {
           summary: t(
             'Captured partial ground match; omitted graph matches all graphs.',

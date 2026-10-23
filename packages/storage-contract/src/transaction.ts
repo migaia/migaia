@@ -772,20 +772,30 @@ export function runTransactionIteratorOperation<T, TResult>(
   iterator: IStorageIterator<T>,
   run: (
     next: () => Promise<IteratorResult<T>>,
-    fail: (error: unknown) => unknown
-  ) => Promise<TResult>
+    fail: (error: unknown) => unknown,
+    currentScope: object | undefined
+  ) => Promise<TResult>,
+  currentScope?: object
 ): Promise<TResult> {
   /** Only the existing actual iterator record can provide original transaction authority. */
   const resource = transactionRegistrations.get(iterator)
   if (resource?.kind !== RegistrationKind.iterator)
     return run(
       () => iterator.next(),
-      (error) => error
+      (error) => error,
+      currentScope
     )
+  /**
+   * A nested reader borrows its already active parent view; original identity checks stay
+   * authoritative.
+   */
+  if (currentScope !== undefined)
+    return run(() => nextTransactionIterator(currentScope, iterator), resource.fail, currentScope)
   return resource.compose((scope) =>
     run(
       scope === undefined ? () => iterator.next() : () => nextTransactionIterator(scope, iterator),
-      resource.fail
+      resource.fail,
+      scope
     )
   )
 }

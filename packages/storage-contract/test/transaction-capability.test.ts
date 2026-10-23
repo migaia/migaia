@@ -15,6 +15,7 @@ import {
   term,
   type IQuad,
   type ITransactionRdfApi,
+  type IRdfQuerySource,
   sql,
   createSqlTag,
   sqlFragment,
@@ -274,6 +275,128 @@ function setup() {
 }
 
 describe('original transaction capability projections', () => {
+  it('borrows the original accepted view for RDF matches after callback expiry and across stream advances', async () => {
+    const knows = term.iri('urn:knows')
+    const quad = (subject: string, object: string): IQuad => ({
+      subject: term.iri('urn:' + subject),
+      predicate: knows,
+      object: term.iri('urn:' + object),
+      graph: term.defaultGraph
+    })
+    const data = [quad('a', 'b'), quad('b', 'c'), quad('b', 'd')]
+    const closed = vi.fn()
+    const views: Readonly<IScope>[] = []
+    const makeSource = (
+      fixture: ReturnType<typeof setup>,
+      wait?: Promise<void>
+    ): IRdfQuerySource<IScope> => ({
+      pushdown: { source: 'rdf-original-view', operators: [], operations: [] },
+      execute(input) {
+        expectTypeOf(input.operationScope).toEqualTypeOf<Readonly<IScope> | undefined>()
+        const scope = input.operationScope ?? fixture.scope
+        assertTransactionOwner(fixture.store, scope)
+        if (input.operationScope !== undefined) views.push(input.operationScope)
+        const matching = data.filter((quad) => quad.subject.value === input.pattern.subject?.value)
+        let position = 0
+        return fixture.owner.registerIterator(scope, {
+          next: async (current): Promise<IteratorResult<readonly [IStorageKey, IQuad]>> => {
+            assertTransactionOwner(fixture.store, current)
+            if (input.operationScope === undefined) await wait
+            return position === matching.length
+              ? { done: true, value: undefined }
+              : { done: false, value: [String(position), matching[position++]!] as const }
+          },
+          close: closed
+        })
+      }
+    })
+    const fixture = setup()
+    let resume!: () => void
+    const gate = new Promise<void>((resolve) => {
+      resume = resolve
+    })
+    const query = createRdfQuery<undefined, Record<never, never>, IScope>(
+      makeSource(fixture, gate),
+      { subject: term.iri('urn:a') }
+    ).follow(knows)
+    const pending = query.all()
+    fixture.controller.stopAdmission()
+    resume()
+    expect(await pending).toEqual(data.slice(1))
+    expect(views).toHaveLength(1)
+    expect(views[0]).not.toBe(fixture.scope)
+    expect(closed).toHaveBeenCalledTimes(2)
+    await fixture.controller.runFinalizers()
+    fixture.controller.close()
+
+    const streaming = setup()
+    const stream = createRdfQuery<undefined, Record<never, never>, IScope>(makeSource(streaming), {
+      subject: term.iri('urn:a')
+    })
+      .follow(knows)
+      .stream()
+    const first = await stream.next()
+    expect(first).toEqual({ done: false, value: data[1] })
+    expect(await stream.next()).toEqual({ done: false, value: data[2] })
+    await stream.dispose()
+    expect(closed).toHaveBeenCalledTimes(4)
+    const concurrent = createRdfQuery<undefined, Record<never, never>, IScope>(
+      makeSource(streaming),
+      { subject: term.iri('urn:a') }
+    )
+      .follow(knows)
+      .stream()
+    expect(await Promise.all([concurrent.next(), concurrent.next()])).toEqual([
+      { done: false, value: data[1] },
+      { done: false, value: data[2] }
+    ])
+    await concurrent.dispose()
+    expect(closed).toHaveBeenCalledTimes(6)
+    streaming.controller.stopAdmission()
+    await streaming.controller.runFinalizers()
+    streaming.controller.close()
+  })
+
+  it('rejects a traversal cursor from another original owner before its native advance', async () => {
+    const fixture = setup()
+    const other = setup()
+    const advances = vi.fn()
+    const close = vi.fn()
+    const knows = term.iri('urn:knows')
+    const quad: IQuad = {
+      subject: term.iri('urn:a'),
+      predicate: knows,
+      object: term.iri('urn:b'),
+      graph: term.defaultGraph
+    }
+    const source: IRdfQuerySource<IScope> = {
+      pushdown: { source: 'rdf-owner-mismatch', operators: [], operations: [] },
+      execute(input) {
+        const child = input.operationScope !== undefined
+        let emitted = false
+        return (child ? other : fixture).owner.registerIterator(
+          child ? other.scope : fixture.scope,
+          {
+            next: async (): Promise<IteratorResult<readonly [IStorageKey, IQuad]>> => {
+              if (child) advances()
+              if (emitted) return { done: true, value: undefined }
+              emitted = true
+              return { done: false, value: ['quad', quad] as const }
+            },
+            close
+          }
+        )
+      }
+    }
+    await expect(
+      createRdfQuery<undefined, Record<never, never>, IScope>(source, { subject: quad.subject })
+        .follow(knows)
+        .all()
+    ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' })
+    expect(advances).not.toHaveBeenCalled()
+    expect(close).toHaveBeenCalledTimes(2)
+  })
+
   it('binds RDF writes to fresh native views and admits every complete read before expiry or argument failure', async () => {
     const fixture = setup()
     const quad: IQuad = {

@@ -26,7 +26,12 @@ import { snapshotOperationContext } from './operation-context.js'
 import { runTransactionIteratorOperation, deriveTransactionIterator } from './transaction.js'
 import { compareStorageKeys, snapshotStorageKey } from './key.js'
 import { encodeOrderedStorageKey, orderStorageKeysByBytes } from './key-order.js'
-import { snapshotStorageRdfPattern, type IQuad, type IRdfNamedNode } from './capabilities/rdf.js'
+import {
+  snapshotStorageRdfPattern,
+  RdfTermType,
+  type IQuad,
+  type IRdfNamedNode
+} from './capabilities/rdf.js'
 
 /** Declarative field operators are shared by condition admission, native plans and client execution. */
 export const QueryOperator = Object.freeze({
@@ -839,20 +844,24 @@ export type IRdfQueryTraversal = {
   readonly target?: IRdfNamedNode
 }
 /** Native RDF execution receives only the same safe prefix that explain reports. */
-export type IRdfQueryInput = {
+export type IRdfQueryInput<TOperationScope extends object = object> = {
   readonly pattern: Readonly<Partial<IQuad>>
   readonly steps: readonly (IRdfQueryTraversal | IQueryNativeStep)[]
   readonly ctx: IOperationContext | undefined
+  /** A nested match borrows the exact original accepted view, never the expired user callback scope. */
+  readonly operationScope?: Readonly<TOperationScope>
 }
 /** RDF sources retain their native cursor and actual projected row shape, owned by the plan. */
-export type IRdfQuerySource = {
+export type IRdfQuerySource<TOperationScope extends object = object> = {
   readonly pushdown: IQueryPushdown
   readonly asyncDisposeKey?: typeof Symbol.asyncDispose
   readonly nativeSteps?: true
   readonly cursorSource?: object
   /** Native scalar terminals keep the same native query and original cursor owner. */
-  readonly reduce?: IQueryReducer<IRdfQueryInput>
-  readonly execute: (input: IRdfQueryInput) => IStorageIterator<readonly [IStorageKey, unknown]>
+  readonly reduce?: IQueryReducer<IRdfQueryInput<TOperationScope>>
+  readonly execute: (
+    input: IRdfQueryInput<TOperationScope>
+  ) => IStorageIterator<readonly [IStorageKey, unknown]>
 }
 /** Nodes retain only their immediate predecessor, so deriving a branch never copies its history. */
 type IQueryNode = {
@@ -1464,7 +1473,10 @@ function assertQueryActive(ctx: IOperationContext | undefined): void {
 /** One pull stays inside the original source operation view supplied for this accepted read. */
 type IQueryAdvance = () => Promise<IteratorResult<readonly [IStorageKey, unknown]>>
 /** Each compiled node transforms one upstream pull without owning another cursor or queue. */
-type IQueryReader = (advance: IQueryAdvance) => Promise<
+type IQueryReader = (
+  advance: IQueryAdvance,
+  currentScope?: object
+) => Promise<
   IteratorResult<unknown> & {
     readonly key?: IStorageKey
     readonly keyBytes?: Uint8Array
@@ -1472,6 +1484,38 @@ type IQueryReader = (advance: IQueryAdvance) => Promise<
     readonly anchor?: unknown
   }
 >
+/** Compiled traversal nodes borrow cleanup callbacks, without another resource lifetime or registry. */
+type ICompiledQueryReader = {
+  readonly read: IQueryReader
+  readonly close: (() => Promise<void>) | undefined
+  readonly report: (() => Promise<void>) | undefined
+}
+/**
+ * Attempts later-created source cleanup first and retains both failures through the same error
+ * owner.
+ */
+function completeQueryCleanup(
+  first: (() => Promise<void>) | undefined,
+  second: () => Promise<void>
+): Promise<void> {
+  if (first === undefined) return second()
+  return (async () => {
+    /** Only actual source cleanup failures are retained, in disposal order. */
+    let failure: Error | undefined
+    try {
+      await first()
+    } catch (cause) {
+      failure = queryExecutionFailure(cause)
+    }
+    try {
+      await second()
+    } catch (cause) {
+      if (failure === undefined) throw cause
+      throw attachSecondaryErrors(failure, [queryExecutionFailure(cause)])
+    }
+    if (failure !== undefined) throw failure
+  })()
+}
 /** Stable candidate order resolves comparator ties without retaining discarded source rows. */
 type IQueryHeapEntry = {
   readonly value: unknown
@@ -1558,8 +1602,13 @@ function compileRecordQueryReader(
   tieBreakByKey: IRecordQuerySource['tieBreakByKey'],
   vector = false,
   metadata = false,
-  comparator?: (left: unknown, right: unknown) => number
-): IQueryReader {
+  comparator?: (left: unknown, right: unknown) => number,
+  source?: IQuerySourceSnapshot
+): ICompiledQueryReader {
+  /** Only active original traversal cursors contribute borrowed close/report callbacks. */
+  let close: ICompiledQueryReader['close']
+  /** Symbolic cleanup delegates diagnostics to those same original source owners. */
+  let report: ICompiledQueryReader['report']
   /**
    * New selector ordering needs the same original primary-key tail even without comparator
    * metadata.
@@ -1574,16 +1623,9 @@ function compileRecordQueryReader(
   /** Encoded tuples are prepared once per candidate, never rediscovered by scanning the plan. */
   const encodeKeys =
     selectorOrdering || metadata || steps.some((step) => step.operation === QueryOperation.after)
-  /** The leaf borrows the one original backend cursor; no row array is materialized. */
-  let read: IQueryReader = async (advance) => {
-    assertQueryActive(ctx)
-    /** Native next settles before any client node or cleanup starts. */
-    const next = await advance()
-    assertQueryActive(ctx)
-    if (next.done) return { done: true, value: undefined }
-    if (!retainKeys) return { done: false, value: next.value[1] }
-    /** Capture the native tuple once; only explicit key ordering owns a detached key snapshot. */
-    const row = next.value
+  /** Initial and traversal rows share one canonical key snapshot/encoding path. */
+  const captureRow = (row: readonly [IStorageKey, unknown]): Awaited<ReturnType<IQueryReader>> => {
+    if (!retainKeys) return { done: false, value: row[1] }
     /** Retained keys detach before projected value access can mutate any borrowed source objects. */
     const key =
       tieBreakByKey === undefined
@@ -1608,6 +1650,14 @@ function compileRecordQueryReader(
           : encoded
     }
   }
+  /** The leaf borrows the one original backend cursor; no row array is materialized. */
+  let read: IQueryReader = async (advance) => {
+    assertQueryActive(ctx)
+    /** Native next settles before any client node or cleanup starts. */
+    const next = await advance()
+    assertQueryActive(ctx)
+    return next.done ? { done: true, value: undefined } : captureRow(next.value)
+  }
   for (let index = 0; index < steps.length; index++) {
     /** A node captures its direct upstream reader rather than copying preceding history. */
     const upstream = read
@@ -1619,10 +1669,10 @@ function compileRecordQueryReader(
         step.operation === QueryOperation.where
           ? compileQueryCondition<unknown>(step.condition)
           : step.predicate
-      read = async (advance) => {
+      read = async (advance, currentScope) => {
         while (true) {
           /** Filtering discards each rejected row immediately. */
-          const next = await upstream(advance)
+          const next = await upstream(advance, currentScope)
           if (next.done) return next
           if (predicate(vector ? (next.value as IVectorHit<unknown>).payload : next.value)) {
             assertQueryActive(ctx)
@@ -1635,9 +1685,9 @@ function compileRecordQueryReader(
       step.operation === QueryOperation.mapper ||
       step.operation === QueryOperation.select
     ) {
-      read = async (advance) => {
+      read = async (advance, currentScope) => {
         /** Projection consumes exactly one accepted upstream row. */
-        const next = await upstream(advance)
+        const next = await upstream(advance, currentScope)
         if (next.done) return next
         if (step.operation === QueryOperation.mapper) {
           /** Awaited mapping remains part of the original accepted read. */
@@ -1659,11 +1709,110 @@ function compileRecordQueryReader(
           })
         return !retainKeys ? { done: false, value } : { ...next, value }
       }
+    } else if (
+      step.operation === QueryOperation.follow ||
+      step.operation === QueryOperation.inverse
+    ) {
+      if (source?.rdf === undefined)
+        throw invalidQueryCondition(undefined, StorageContractErrorText.queryArgument)
+      /** One active child cursor is borrowed until exhausted or the containing query closes. */
+      let current: IStorageIterator<readonly [IStorageKey, unknown]> | undefined
+      /** Later traversal stages close before the upstream stages that produced their rows. */
+      const upstreamClose = close
+      /** Each native source retains its own separately cached symbolic diagnostics. */
+      const upstreamReport = report
+      close = () =>
+        completeQueryCleanup(
+          current === undefined ? undefined : () => current!.dispose(),
+          upstreamClose ?? (() => Promise.resolve())
+        )
+      report = () =>
+        completeQueryCleanup(
+          current === undefined ? undefined : () => current![source.asyncDisposeKey!](),
+          upstreamReport ?? (() => Promise.resolve())
+        )
+      /** Concurrent accepted pulls share one lazy predecessor lookup, without a queue or scheduler. */
+      let opening: Promise<void> | undefined
+      /** Upstream EOF is a query-reader fact, not an additional resource lifecycle. */
+      let exhausted = false
+      /** Immutable narrowed plan facts remain precise inside the lazy match callback. */
+      const traversal = step
+      /** The original source was admitted as an RDF native match provider. */
+      const rdfSource = source
+      /**
+       * Opens at most one child for the next eligible predecessor and captures no view beyond this
+       * pull.
+       */
+      async function openMatch(
+        advance: IQueryAdvance,
+        currentScope: object | undefined
+      ): Promise<void> {
+        while (true) {
+          const next = await upstream(advance, currentScope)
+          if (next.done) {
+            exhausted = true
+            return
+          }
+          /** Canonical quad positions are read once before another match can start. */
+          const { subject, object, graph } = next.value as IQuad
+          assertQueryActive(ctx)
+          if (
+            traversal.operation === QueryOperation.follow &&
+            object.termType !== RdfTermType.namedNode
+          )
+            continue
+          /**
+           * The original RDF snapshot owner validates each ground pattern without another term
+           * codec.
+           */
+          const pattern = snapshotStorageRdfPattern(
+            {
+              predicate: traversal.predicate,
+              graph,
+              ...(traversal.operation === QueryOperation.follow
+                ? {
+                    subject: object as IRdfNamedNode,
+                    ...(traversal.target === undefined ? {} : { object: traversal.target })
+                  }
+                : { object: subject })
+            },
+            undefined
+          )
+          assertQueryActive(ctx)
+          current = Reflect.apply(rdfSource.execute, rdfSource.receiver, [
+            {
+              pattern,
+              steps: [],
+              ctx,
+              ...(currentScope === undefined ? {} : { operationScope: currentScope })
+            }
+          ])
+          return
+        }
+      }
+      read = async (advance, currentScope) => {
+        while (true) {
+          if (current === undefined) {
+            if (exhausted) return { done: true, value: undefined }
+            await (opening ??= openMatch(advance, currentScope).finally(() => {
+              opening = undefined
+            }))
+            continue
+          }
+          /** A settled concurrent EOF cannot close a different later-created child cursor. */
+          const child = current
+          const next = await runTransactionIteratorOperation(child, (next) => next(), currentScope)
+          assertQueryActive(ctx)
+          if (!next.done) return captureRow(next.value)
+          await child.dispose()
+          if (current === child) current = undefined
+        }
+      }
     } else if (step.operation === QueryOperation.after) {
-      read = async (advance) => {
+      read = async (advance, currentScope) => {
         while (true) {
           /** Keyset filtering seeks by the original full ordering tuple, never an offset counter. */
-          const next = await upstream(advance)
+          const next = await upstream(advance, currentScope)
           if (next.done) return next
           /**
            * Comparator callbacks remain opaque; their anchor was detached before page items
@@ -1687,14 +1836,14 @@ function compileRecordQueryReader(
     } else if (step.operation === QueryOperation.skip) {
       /** Offset reads advance only through the original cursor; no skipped result is retained. */
       let remaining = step.count
-      read = async (advance) => {
+      read = async (advance, currentScope) => {
         while (remaining > 0) {
           remaining--
           /** EOF stops skipping immediately rather than repeatedly touching an exhausted source. */
-          const next = await upstream(advance)
+          const next = await upstream(advance, currentScope)
           if (next.done) return next
         }
-        return upstream(advance)
+        return upstream(advance, currentScope)
       }
     } else if (step.operation === QueryOperation.distinct) {
       /**
@@ -1702,10 +1851,10 @@ function compileRecordQueryReader(
        * serialization.
        */
       const seen = new Set<unknown>()
-      read = async (advance) => {
+      read = async (advance, currentScope) => {
         while (true) {
           /** Only accepted distinct values survive downstream bounds and projections. */
-          const next = await upstream(advance)
+          const next = await upstream(advance, currentScope)
           if (next.done) return next
           /**
            * Each candidate's selected field is read once; missing and present undefined share a
@@ -1741,7 +1890,7 @@ function compileRecordQueryReader(
       let ordered: readonly IOrderedEntry[] = []
       /** Emission advances through the one ordered result without rerunning selectors. */
       let emitted = 0
-      read = async (advance) => {
+      read = async (advance, currentScope) => {
         await (prepared ??= (async () => {
           /**
            * Retained rows are required by this unbounded selector order, never by scalar
@@ -1750,7 +1899,7 @@ function compileRecordQueryReader(
           const entries: IOrderedEntry[] = []
           while (true) {
             /** Each native row enters this ordering stage once. */
-            const next = await upstream(advance)
+            const next = await upstream(advance, currentScope)
             if (next.done) break
             /** Prior selector stages retain their original keys across filters and bounds. */
             const ordering = [...(next.ordering ?? [])]
@@ -1796,8 +1945,8 @@ function compileRecordQueryReader(
     } else if (step.operation === QueryOperation.limit) {
       /** Admission reserves one remaining position before awaiting the upstream read. */
       let remaining = step.count
-      read = async (advance) =>
-        remaining-- > 0 ? upstream(advance) : { done: true, value: undefined }
+      read = async (advance, currentScope) =>
+        remaining-- > 0 ? upstream(advance, currentScope) : { done: true, value: undefined }
     } else if (step.operation === QueryOperation.groupBy) {
       /** At most the already ranked topK hits enter this single grouping pass. */
       let groups:
@@ -1807,13 +1956,13 @@ function compileRecordQueryReader(
       let prepared: Promise<void> | undefined
       /** Emission preserves each group's first best-hit position. */
       let emitted = 0
-      read = async (advance) => {
+      read = async (advance, currentScope) => {
         await (prepared ??= (async () => {
           /** Map uses SameValueZero, preserving number/string/boolean domains and equal zeroes. */
           const grouped = new Map<string | number | boolean, unknown[]>()
           while (true) {
             /** No candidate outside the original engine topK is requested or scored. */
-            const next = await upstream(advance)
+            const next = await upstream(advance, currentScope)
             if (next.done) break
             /** Missing or non-scalar own fields do not create a replacement group. */
             const payload = (next.value as IVectorHit<unknown>).payload
@@ -1871,13 +2020,13 @@ function compileRecordQueryReader(
         )
       }
       /** Scans each upstream candidate once and sorts only the retained bounded heap. */
-      async function prepare(advance: IQueryAdvance): Promise<void> {
+      async function prepare(advance: IQueryAdvance, currentScope?: object): Promise<void> {
         if (bound.count === 0) return
         /** Source order is stable even when equal candidates arrive far apart. */
         let position = 0
         while (true) {
           /** Discarded rows become unreachable after this iteration. */
-          const next = await upstream(advance)
+          const next = await upstream(advance, currentScope)
           if (next.done) break
           /** Only this candidate and the retained heap are live during selection. */
           const entry: IQueryHeapEntry = !retainKeys
@@ -1912,8 +2061,8 @@ function compileRecordQueryReader(
           queryHeapSiftDown(heap, end, compare)
         }
       }
-      read = async (advance) => {
-        await (prepared ??= prepare(advance))
+      read = async (advance, currentScope) => {
+        await (prepared ??= prepare(advance, currentScope))
         if (emitted >= heap.length) return { done: true, value: undefined }
         /** A bounded winner keeps its key available to later compiled reader nodes. */
         const entry = heap[emitted++]!
@@ -1933,12 +2082,16 @@ function compileRecordQueryReader(
     }
   }
   /** Every terminal transition observes cancellation, including a final projection or zero limit. */
-  return async (advance) => {
-    assertQueryActive(ctx)
-    /** The compiled node chain retains no operation view beyond this accepted read. */
-    const next = await read(advance)
-    assertQueryActive(ctx)
-    return metadata || !retainKeys || next.done ? next : { done: false, value: next.value }
+  return {
+    close,
+    report,
+    read: async (advance, currentScope) => {
+      assertQueryActive(ctx)
+      /** The compiled node chain retains no operation view beyond this accepted read. */
+      const next = await read(advance, currentScope)
+      assertQueryActive(ctx)
+      return metadata || !retainKeys || next.done ? next : { done: false, value: next.value }
+    }
   }
 }
 /** Plans once and opens only the original native prefix; terminal adapters share this execution. */
@@ -1978,6 +2131,8 @@ function openRecordQuery(
 ): {
   readonly iterator: IStorageIterator<readonly [IStorageKey, unknown]>
   readonly read: IQueryReader
+  readonly close: ICompiledQueryReader['close']
+  readonly report: ICompiledQueryReader['report']
   readonly ctx: IOperationContext | undefined
   readonly signature: readonly IQueryNode['step'][]
   readonly mapper: ((row: unknown) => unknown) | undefined
@@ -1995,11 +2150,7 @@ function openRecordQuery(
       throw invalidQueryCondition(undefined, StorageContractErrorText.queryArgument)
   /** Ranking and traversal cannot be emulated by the ordinary row reader. */
   const requiredNative = plan.client.filter(
-    (step) =>
-      step.operation === QueryOperation.topK ||
-      step.operation === QueryOperation.minScore ||
-      step.operation === QueryOperation.follow ||
-      step.operation === QueryOperation.inverse
+    (step) => step.operation === QueryOperation.topK || step.operation === QueryOperation.minScore
   )
   if ((strict && plan.client.length > 0) || requiredNative.length > 0)
     throw new StorageContractError(
@@ -2030,13 +2181,14 @@ function openRecordQuery(
   const comparator = plan.signature.find(
     (step) => step.operation === QueryOperation.comparator
   )?.compare
-  const read = compileRecordQueryReader(
+  const { read, close, report } = compileRecordQueryReader(
     reduction === undefined ? client : [],
     captured,
     reduction === undefined ? source.tieBreakByKey : undefined,
     source.vector !== undefined,
     pageSize !== undefined,
-    comparator
+    comparator,
+    source
   )
   try {
     /** Each family calls its original native engine inside this same accepted source operation. */
@@ -2076,6 +2228,8 @@ function openRecordQuery(
               { ...input, reduction: reduction.request }
             ]),
       read,
+      close,
+      report,
       ctx: captured,
       signature: plan.signature,
       mapper
@@ -2088,12 +2242,13 @@ function openRecordQuery(
 async function failedRecordQuery(
   iterator: IStorageIterator<unknown>,
   fail: (error: unknown) => unknown,
-  cause: unknown
+  cause: unknown,
+  close?: () => Promise<void>
 ): Promise<never> {
   /** Cleanup cannot replace an earlier predicate, mapper, comparator or native failure. */
   let primary = queryExecutionFailure(fail(queryExecutionFailure(cause)))
   try {
-    await iterator.dispose()
+    await completeQueryCleanup(close, () => iterator.dispose())
   } catch (cleanup) {
     primary = queryExecutionFailure(
       attachSecondaryErrors(primary, [queryExecutionFailure(cleanup)])
@@ -2125,24 +2280,25 @@ async function consumeRecordQuery<R, TResult>(
   const {
     iterator,
     read,
+    close,
     ctx: captured,
     signature,
     mapper
   } = openRecordQuery(source, node, strict, ctx, countOnly, pageSize, reduction)
-  return runTransactionIteratorOperation(iterator, async (advance, fail) => {
+  return runTransactionIteratorOperation(iterator, async (advance, fail, currentScope) => {
     /** The terminal's scalar, bounded chunk or explicit all result stays inside the same operation. */
     let result: TResult
     try {
       result = await consume(
-        async () => (await read(advance)) as IteratorResult<R>,
+        async () => (await read(advance, currentScope)) as IteratorResult<R>,
         captured,
         pageSize === undefined ? undefined : { signature, mapper }
       )
     } catch (cause) {
-      return failedRecordQuery(iterator, fail, cause)
+      return failedRecordQuery(iterator, fail, cause, close)
     }
     try {
-      await iterator.dispose()
+      await completeQueryCleanup(close, () => iterator.dispose())
     } catch (cause) {
       throw queryExecutionFailure(fail(queryExecutionFailure(cause)))
     }
@@ -2484,33 +2640,37 @@ function streamRecordQuery<R>(
   ctx: IOperationContext | undefined
 ): IStorageIterator<R> {
   /** The source resource, including both cleanup Promises, remains the sole native cursor owner. */
-  const { iterator, read } = openRecordQuery(source, node, strict, ctx)
+  const { iterator, read, close, report } = openRecordQuery(source, node, strict, ctx)
   /** Registered sources retain full mapped-next and buffered-result scope ownership. */
-  const derived = deriveTransactionIterator(iterator, async (advance, fail) => {
-    try {
-      return (await read(advance)) as IteratorResult<R>
-    } catch (cause) {
-      return failedRecordQuery(iterator, fail, cause)
-    }
-  })
+  const derived = deriveTransactionIterator(
+    iterator,
+    async (advance, fail, currentScope) => {
+      try {
+        return (await read(advance, currentScope)) as IteratorResult<R>
+      } catch (cause) {
+        return failedRecordQuery(iterator, fail, cause, close)
+      }
+    },
+    close
+  )
   if (derived) return derived
   /** The mapped root and its diagnostic forwarding use the same original source resource key. */
   const asyncDisposeKey: typeof Symbol.asyncDispose = source.asyncDisposeKey!
   /** Root mapped reads share the canonical accepted-advance drain with transaction resources. */
   const lifetime = createStorageIteratorLifetime<R>({
-    close: () => iterator.dispose(),
-    // The original source owns cleanup diagnostics and its cached report-and-resolve Promise.
-    report: () => iterator[asyncDisposeKey]()
+    close: () => completeQueryCleanup(close, () => iterator.dispose()),
+    // Every original source owns its own cached report-and-resolve Promise.
+    report: () => completeQueryCleanup(report, () => iterator[asyncDisposeKey]())
   })
   return {
     next: () =>
       lifetime.advance(() =>
-        runTransactionIteratorOperation(iterator, async (advance, fail) => {
+        runTransactionIteratorOperation(iterator, async (advance, fail, currentScope) => {
           if (lifetime.isClosing()) return { done: true, value: undefined }
           try {
-            return (await read(advance)) as IteratorResult<R>
+            return (await read(advance, currentScope)) as IteratorResult<R>
           } catch (cause) {
-            return failedRecordQuery(iterator, fail, cause)
+            return failedRecordQuery(iterator, fail, cause, close)
           }
         })
       ),
@@ -2936,9 +3096,10 @@ export function createVectorQuery<
 /** Creates a ground RDF match using the same immutable query and original native resource owner. */
 export function createRdfQuery<
   TContext extends IOperationContext | undefined = IOperationContext,
-  TAugmentMethods extends object = Record<never, never>
+  TAugmentMethods extends object = Record<never, never>,
+  TOperationScope extends object = object
 >(
-  source: IRdfQuerySource,
+  source: IRdfQuerySource<TOperationScope>,
   pattern: Partial<IQuad>,
   methods?: TAugmentMethods
 ): IRdfQuery<TContext, TAugmentMethods> {

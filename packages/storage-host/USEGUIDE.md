@@ -142,3 +142,7 @@ memory 原生发布 `ttl` 与 `counter`。`expire`、`remaining`、`persist` 指
 `store.use(counter).increment('visits', 1)` 在原单键原子写路径修改规范十进制文本。缺失从 0 开始；非规范文本、非安全整数增量与溢出在修改前拒绝 `INVALID_ARGUMENT`。`tx.use(ttl)` 与 `tx.use(counter)` 使用当前原生草稿和原事务预算。
 
 `@migaia/storage-host/authoring/vector` 只导出 `recommendStorageVector(positive, negative?)`，按输入次序计算正样本均值减负样本均值，返回独立只读向量。正样本非空，负样本可空，维度须一致且分量有限；非法输入沿共享 contract 报 `INVALID_ARGUMENT`，getter 原错保留在 cause。函数不创建 collection、查询或连接；原 collection 查询校验 cosine 零范数，再由原生引擎检索。memory 的评分、过滤执行和排名不从作者入口导出。
+
+memory 原生提供 `vector`：`store.use(vector).collection('docs', { dimensions: 2, metric: 'cosine' })` 建立同 namespace 的集合描述，后续可省略一致配置。`upsert` 全批先快照，重复 ID 保留末值；`near(...).topK(k)`、`similarTo`、`recommend` 共用 contract 查询链。memory 始终精确，分数从高到低，同分按 ID 的 UTF-16 顺序；不提供原生 groupBy。声明式 payload 条件与组织/TTL 在排名前处理，函数谓词只作用于原 topK 命中且不补搜。`search` 的 `k: 0` 校验后不扫描；链式 `topK` 保留正安全整数契约。
+
+向量期限沿原物理行与原事务 draft；`tx.use(ttl)` 可为向量目标设置期限并与 KV 同提交或回滚，vector 能力本身没有通用事务投影。`deleteWhere` 不过滤物理过期匹配点，返回实际删除数；两种 count 策略在 memory 等价。组织集合、提取的查询和原生迭代器绑定原 namespace，drop 清空该目标，根关闭统一失效。所有写仍经过同一 pipeline、concurrency attempt、vector 锁桶与 controller；原三通道之间的 replace 规则保持。

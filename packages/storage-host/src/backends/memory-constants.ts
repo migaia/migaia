@@ -30,7 +30,11 @@ export const MemoryOperation = {
   ttlExpire: 'ttl.expire',
   ttlRemaining: 'ttl.remaining',
   ttlPersist: 'ttl.persist',
-  counterIncrement: 'counter.increment'
+  counterIncrement: 'counter.increment',
+  vectorSearch: 'vector.search',
+  vectorUpsert: 'vector.upsert',
+  vectorDelete: 'vector.delete',
+  vectorDeleteWhere: 'vector.deleteWhere'
 } as const
 
 /** Physical memory identity and diagnostic names remain private to this native backend. */
@@ -38,7 +42,8 @@ export const MemoryState = {
   defaultNamespace: 'default',
   querySource: 'memory',
   channels: ['value', 'bytes', 'record'] as const,
-  identity: (channel: IStorageChannel, encoded: string): string => `${channel}:${encoded}`,
+  identity: (channel: IStorageChannel | 'vector', encoded: string): string =>
+    `${channel}:${encoded}`,
   ownerLabel: (runtime: string | undefined, pid: number | undefined): string =>
     runtime === undefined ? 'browser' : `${runtime}:${pid}`
 } as const

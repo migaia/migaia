@@ -1217,6 +1217,31 @@ console.log([...encodeOrderedStorageKey([''], 'memory')].join(','))
   ],
   createRdfQuery: [
     {
+      title: t('Traverse after a client predicate', '在客户端谓词之后遍历'),
+      problem: t(
+        'Keep one original ground-match backend while a function predicate creates a client boundary.',
+        '函数谓词形成客户端边界时，继续复用原 ground-match 后端。'
+      ),
+      example: t(
+        `import { createRdfQuery, term, type IRdfQuerySource } from '@migaia/storage-contract'
+function next(source: IRdfQuerySource) {
+  return createRdfQuery(source, { subject: term.iri('urn:a') })
+    .where((quad) => quad.object.termType === 'NamedNode')
+    .follow(term.iri('urn:knows'), term.iri('urn:c')).limit(1).all()
+}`,
+        `import { createRdfQuery, term, type IRdfQuerySource } from '@migaia/storage-contract'
+function next(source: IRdfQuerySource) {
+  return createRdfQuery(source, { subject: term.iri('urn:a') })
+    .where((quad) => quad.object.termType === 'NamedNode')
+    .follow(term.iri('urn:knows'), term.iri('urn:c')).limit(1).all()
+}`
+      ),
+      result: t(
+        'Uses the supplied native ground matcher for the next subject and same graph, closing the child cursor before the root cursor.',
+        '用所提供的原生 ground matcher 匹配下一 subject 与同 graph，先关闭子游标，再关闭根游标。'
+      )
+    },
+    {
       title: t('Bind ground RDF traversal to its original cursor', '把 ground RDF 遍历接入原游标'),
       problem: t(
         'Capture ground patterns and pass ordered native traversal steps without another query runner.',
