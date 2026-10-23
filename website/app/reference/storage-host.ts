@@ -121,7 +121,54 @@ console.log(host.extensions.label('draft'))`,
       )
     }
   },
-  types: {},
+  types: {
+    IStorageHooks: {
+      summary: t(
+        'One synchronous registry shared by constructor hooks, host listeners and original plugin installation scopes.',
+        '构造hooks、宿主监听器与原插件安装scope共用的同步注册表。'
+      ),
+      example: `import { createStorageHost } from '@migaia/storage-host'
+
+await using host = await createStorageHost()
+const off = host.hooks.on('beforeHostClose', ({ backendCount }) => console.log(backendCount))
+await host.dispose()
+off()`,
+      scenarios: [
+        t(
+          'Observe cleanup or storage stage counts while retaining the original lifecycle owner.',
+          '观察清理或存储阶段数量，保留原生命周期owner。'
+        )
+      ],
+      members: {
+        on: {
+          summary: t(
+            'Register one synchronous observer on the original host channel. Listener failures are reported without changing storage results.',
+            '在原宿主通道登记同步observer。监听失败只报告，不改变存储结果。'
+          ),
+          params: {
+            name: t(
+              'An event key from the single augmentable hook map.',
+              '唯一可扩充hook map中的事件键。'
+            ),
+            handler: t(
+              'Receives the exact payload for that event; its return value is not awaited.',
+              '接收该事件的精确载荷；不等待其返回值。'
+            )
+          },
+          returns: t(
+            'The original idempotent unsubscribe handle. Registration after host closure rejects.',
+            '原幂等取消句柄。宿主关闭后登记会被拒绝。'
+          ),
+          example: `import { createStorageHost } from '@migaia/storage-host'
+
+await using host = await createStorageHost()
+const off = host.hooks.on('beforeHostClose', ({ backendCount }) => console.log(backendCount))
+await host.dispose()
+off()`
+        }
+      }
+    }
+  },
   enums: {},
   enhancers: {}
 }

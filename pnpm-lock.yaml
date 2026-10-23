@@ -776,6 +776,9 @@ importers:
       '@migaia/lifecycle':
         specifier: workspace:^
         version: link:../lifecycle
+      '@migaia/logger':
+        specifier: workspace:^
+        version: link:../logger
       '@migaia/plugin-host':
         specifier: workspace:^
         version: link:../plugin-host

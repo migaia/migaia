@@ -13,7 +13,11 @@ export const STORAGE_RESERVED_EXPOSE = [
   'getBackendId',
   'getLifecycle',
   'onDispose',
-  'getScheduler'
+  'getScheduler',
+  'emit'
 ] as const
 /** Public backend ids are encoded into PluginHost's stricter registration namespace. */
 export const STORAGE_PLUGIN_NAME_PREFIX = 'storage-backend:'
+
+/** Ordinary host operations share the existing zero-UUID default organization. */
+export const STORAGE_DEFAULT_ORG = '00000000-0000-0000-0000-000000000000'

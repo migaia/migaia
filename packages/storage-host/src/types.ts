@@ -1,3 +1,5 @@
+import type { IStorageHooks, IStorageHookMap } from './hook-types.js'
+import type { IStorageHookEmitter } from './hooks.js'
 import type {
   IPluginHostCore,
   IPluginRegistrationContext,
@@ -23,7 +25,15 @@ import type {
   IAnyStorageCapability,
   ICapabilityApi,
   ITransactionBuilder,
-  ICapabilityInstallPort
+  ICapabilityInstallPort,
+  IBackendStageBindings,
+  ICodecStageObserver,
+  IQueryStageObserver,
+  ITransactionStageObserver,
+  IConcurrencyStageObserver,
+  IBackendStageObserver,
+  ISqlStageObserver,
+  IStorageOperationStageObserver
 } from '@migaia/storage-contract'
 /** Requests forward typed inputs to the original pipeline without owning its stages. */
 export type IStorageExecutionRequest<TInput> = Readonly<{
@@ -99,6 +109,7 @@ export type IStorageFeatureExpose<K extends IStorageBackendKind> = K extends ISt
       getLifecycle(): IPluginRegistrationContext
       onDispose: IPluginHostCore['onDispose']
       getScheduler(): IScheduler
+      emit: IStorageHookEmitter
     }> &
       IStorageKindExpose<K>
   : never
@@ -117,6 +128,7 @@ export type IStorageDescriptorFeatureExpose<K extends IStorageBackendKind> = Rea
   getLifecycle?: never
   onDispose?: never
   getScheduler?: never
+  emit?: never
 }> &
   IStorageKindExpose<K> &
   IStorageMethodExpose<IStorageKindExpose<K>>
@@ -262,6 +274,9 @@ export type IStoragePluginCore<F extends IStorageFeatureRecord = {}> = Pick<
   'operation' | 'lifecycle' | 'onDispose' | 'usePipeline' | 'useAsyncPipeline'
 > & {
   readonly execution: IStorageExecutionPort
+  readonly hooks: IStorageHooks
+  readonly stageBindings: IBackendStageBindings
+  readonly emit: IStorageHookEmitter
   registerStore<S extends IStorageBase>(store: S): void
   getStore(): IStorageBase
   getBackendId(): string
@@ -434,6 +449,7 @@ export type IStorageHostOptions = {
   readonly installTimeoutMs?: number
   readonly scheduler?: IScheduler
   readonly report?: (error: unknown) => void | PromiseLike<void>
+  readonly hooks?: { readonly [K in keyof IStorageHookMap]?: (payload: IStorageHookMap[K]) => void }
 }
 /** Exact initial tuple participates in duplicate admission and store inference. */
 export type IStorageHostCreateOptions<P extends readonly IStorageBackendPluginHandle[]> =
@@ -441,6 +457,14 @@ export type IStorageHostCreateOptions<P extends readonly IStorageBackendPluginHa
 /** Neutral host registry and lifetime; backend implementations remain separate from installation. */
 export type IStorageHost<P extends readonly IStorageBackendPluginHandle[]> =
   import('@migaia/storage-contract').IStorageResource & {
+    readonly hooks: IStorageHooks
+    codecStages(store: IStorageBase): ICodecStageObserver
+    queryStages(store: IStorageBase): IQueryStageObserver
+    transactionStages(store: IStorageBase): ITransactionStageObserver
+    concurrencyStages(store: IStorageBase): IConcurrencyStageObserver
+    backendStages(store: IStorageBase): IBackendStageObserver
+    sqlStages(store: IStorageBase): ISqlStageObserver
+    operationStages(store: IStorageBase): IStorageOperationStageObserver
     readonly extensions: Readonly<IStoragePluginExtensions<P[number]>>
     use<const Next extends readonly IStorageBackendPluginHandle[]>(
       ...plugins: IRejectInstalledOrDuplicateIds<{ [N in IStoragePluginId<P[number]>]: true }, Next>
@@ -486,7 +510,14 @@ export type IStorageDefinePlugin = {
     const Factory extends (
       core: Pick<
         IStoragePluginCore,
-        'operation' | 'lifecycle' | 'onDispose' | 'usePipeline' | 'useAsyncPipeline' | 'execution'
+        | 'operation'
+        | 'lifecycle'
+        | 'onDispose'
+        | 'usePipeline'
+        | 'useAsyncPipeline'
+        | 'execution'
+        | 'hooks'
+        | 'emit'
       > & { readonly features: IFeatureOutputs<F> }
     ) => IStorageNativePluginDescriptor & { readonly kind?: never },
     const F extends IFeatureRecord = {}

@@ -1,5 +1,9 @@
 /** Canonical host boundary messages. */
 export const StorageErrorText = {
+  /** Constructor hooks must be a keyed listener record before installation starts. */
+  invalidHooks: 'storage hooks must be an object',
+  /** Hook listeners must be callable before acquiring a subscriber registration. */
+  invalidHookHandler: 'storage hook handler must be a function',
   /**
    * Preserve the original fallback diagnostic text while the package source transfers to its
    * neutral owner.
