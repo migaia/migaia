@@ -54,6 +54,15 @@ console.log(host.extensions.label('draft'))`
     }
   },
   symbols: {
+    asyncDisposeKey: {
+      role: 'constant',
+      purpose: t(
+        'The original plugin-host disposal symbol, re-exported through the backend authoring entry. It preserves the same identity on runtimes with or without native Symbol.asyncDispose.',
+        '通过后端作者入口重导出的原plugin-host释放symbol；无论运行时是否提供原生Symbol.asyncDispose，都保留同一身份。'
+      ),
+      example: storageHostCases.asyncDisposeKey![0]!.example,
+      cases: storageHostCases.asyncDisposeKey
+    },
     storageLogStore: {
       role: 'factory',
       purpose: t(
