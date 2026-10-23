@@ -2,6 +2,7 @@ import type { IAbortSignal } from '@migaia/utils/promise'
 import { StorageContractError, StorageContractErrorCode } from './errors.js'
 import type { IConflictPolicy, IOperationContext } from './context.js'
 import { ConflictPolicy } from './context.js'
+import { assertStorageOrgId } from './org.js'
 import { StorageContractErrorText } from './error-text.js'
 
 type IOperationValidationContext = IOperationContext & {
@@ -23,12 +24,13 @@ const operationContextSnapshots = new WeakSet<object>()
 /**
  * Captures operation fields before a backend starts I/O, timers, or cancellation handling.
  * undefined stays undefined; a snapshot previously produced here is returned by identity. Otherwise
- * reads signal, timeoutMs, pageSize, and conflictPolicy once into a frozen record.
+ * reads signal, timeoutMs, pageSize, conflictPolicy, and orgId once into a frozen record.
  *
  * TimeoutMs must be a non-negative safe integer; pageSize an integer from 1 through 4096;
- * conflictPolicy is conflict or replace. A signal must expose boolean aborted and callable
- * add/remove methods. Invalid fields/getters throw INVALID_ARGUMENT with the original cause. No
- * timer or listener is installed, and an already-aborted valid signal is not rejected here.
+ * conflictPolicy is conflict or replace; a supplied orgId is a canonical lowercase UUID. A signal
+ * must expose boolean aborted and callable add/remove methods. Invalid fields/getters throw
+ * INVALID_ARGUMENT with the original cause. No timer or listener is installed, and an
+ * already-aborted valid signal is not rejected here.
  */
 export const snapshotOperationContext = (
   ctx: IOperationValidationContext | undefined
@@ -43,11 +45,14 @@ export const snapshotOperationContext = (
   let timeoutMs: unknown
   let pageSize: unknown
   let conflictPolicy: unknown
+  /** Optional captured identity stays omitted unless supplied by the outer host. */
+  let orgId: unknown
   try {
     signal = ctx.signal
     timeoutMs = ctx.timeoutMs
     pageSize = ctx.pageSize
     conflictPolicy = ctx.conflictPolicy
+    orgId = ctx.orgId
   } catch (cause) {
     throw new StorageContractError(StorageContractErrorCode.invalidArgument, { cause })
   }
@@ -93,11 +98,14 @@ export const snapshotOperationContext = (
     throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
       cause: new TypeError(StorageContractErrorText.conflictPolicy)
     })
+  if (orgId !== undefined) assertStorageOrgId(orgId)
+  /** Layered consumers share one immutable record without re-reading caller getters. */
   const snapshot: IOperationContextSnapshot = Object.freeze({
     signal: signal as IAbortSignal | undefined,
     timeoutMs: timeoutMs as number | undefined,
     pageSize: pageSize as number | undefined,
-    conflictPolicy: conflictPolicy as IConflictPolicy | undefined
+    conflictPolicy: conflictPolicy as IConflictPolicy | undefined,
+    ...(orgId === undefined ? {} : { orgId: orgId as string })
   })
   operationContextSnapshots.add(snapshot)
   return snapshot

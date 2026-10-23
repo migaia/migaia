@@ -5,6 +5,65 @@ const t = (en: string, zh: string): IText => ({ en, zh })
 
 /** Exercises public contract tools without supplying a fictional storage implementation. */
 export const storageContractCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
+  prefixStorageOrgKey: [
+    {
+      title: t('Preserve tuple keys inside an organization segment', '在组织段内保留元组键'),
+      problem: t(
+        'Scalar and tuple keys must retain distinct identities when a physical backend adds organization isolation.',
+        '物理后端添加组织隔离时，标量与元组键必须保持不同身份。'
+      ),
+      example: t(
+        `import { prefixStorageOrgKey, unprefixStorageOrgKey } from '@migaia/storage-contract'
+const orgId = '00000000-0000-0000-0000-000000000000'
+const wrapped = prefixStorageOrgKey(orgId, ['orders', 1])
+console.log(JSON.stringify(wrapped))
+console.log(JSON.stringify(unprefixStorageOrgKey(orgId, wrapped)))
+// ["$o","00000000-0000-0000-0000-000000000000",["orders",1]]
+// ["orders",1]`,
+        `import { prefixStorageOrgKey, unprefixStorageOrgKey } from '@migaia/storage-contract'
+const orgId = '00000000-0000-0000-0000-000000000000'
+const wrapped = prefixStorageOrgKey(orgId, ['orders', 1])
+console.log(JSON.stringify(wrapped))
+console.log(JSON.stringify(unprefixStorageOrgKey(orgId, wrapped)))
+// ["$o","00000000-0000-0000-0000-000000000000",["orders",1]]
+// ["orders",1]`
+      ),
+      result: t(
+        'Prints the three-part physical envelope followed by the original tuple; no backend runs.',
+        '先输出三项物理封装，再输出原元组；不运行后端。'
+      )
+    }
+  ],
+  unprefixStorageOrgKey: [
+    {
+      title: t(
+        'Reject another organization before returning a logical key',
+        '返回逻辑键前拒绝其他组织'
+      ),
+      problem: t(
+        'Reading a physical key from another organization must not expose its logical key through this boundary.',
+        '从其他组织取得的物理键不能经此边界暴露逻辑键。'
+      ),
+      example: t(
+        `import { prefixStorageOrgKey, unprefixStorageOrgKey, StorageContractError } from '@migaia/storage-contract'
+const first = '12345678-1234-1234-1234-123456789abc'
+const second = '12345678-1234-1234-1234-123456789abd'
+try { unprefixStorageOrgKey(second, prefixStorageOrgKey(first, 'orders')) }
+catch (error) { if (!(error instanceof StorageContractError)) throw error; console.log(error.code) }
+// INVALID_ARGUMENT`,
+        `import { prefixStorageOrgKey, unprefixStorageOrgKey, StorageContractError } from '@migaia/storage-contract'
+const first = '12345678-1234-1234-1234-123456789abc'
+const second = '12345678-1234-1234-1234-123456789abd'
+try { unprefixStorageOrgKey(second, prefixStorageOrgKey(first, 'orders')) }
+catch (error) { if (!(error instanceof StorageContractError)) throw error; console.log(error.code) }
+// INVALID_ARGUMENT`
+      ),
+      result: t(
+        'Prints INVALID_ARGUMENT; the original envelope is not changed.',
+        '输出 INVALID_ARGUMENT；原封装不变。'
+      )
+    }
+  ],
   snapshotStorageBaseDetailed: [
     {
       title: t('Keep failed base admission inspectable', '基础准入失败仍可检查原错'),
@@ -246,8 +305,8 @@ console.log([...encodeOrderedStorageKey([''], 'memory')].join(','))
         '只读取一次操作选项，把取消执行留给后端'
       ),
       problem: t(
-        'Options supplied through getters can change between validation and use. One storage layer may validate a timeout while another later reads a different timeout or write policy.\n\nRe-reading the original object at each layer repeats those getters. Copying selected fields in several places also leaves no shared indication that admission has already captured the values.\n\nPass `snapshotOperationContext()` the original options once, then pass its result inward. It captures the four fields and freezes their record; passing that snapshot back reuses its identity. An already-aborted signal is accepted because the helper validates intent only; the backend implements cancellation and timeouts.',
-        '通过访问器提供的选项可能在校验和使用之间变化。存储的一层校验了某个超时，另一层稍后却可能读到不同的超时或写入策略。\n\n各层继续读取原对象，就会重复触发访问器。各自复制几个字段也无法共同识别这些值是否已经在接纳操作时捕获。\n\n先把原选项交给 `snapshotOperationContext()`，再向内传递返回值。它只读取一次四个字段并冻结记录，再次传入该快照会复用同一对象；已取消的信号也可接纳，因为工具只校验意图，实际取消和超时由后端执行。'
+        'Options supplied through getters can change between validation and use. One storage layer may validate a timeout while another later reads a different timeout or write policy.\n\nRe-reading the original object at each layer repeats those getters. Copying selected fields in several places also leaves no shared indication that admission has already captured the values.\n\nPass `snapshotOperationContext()` the original options once, then pass its result inward. It captures the operation fields, including optional orgId, and freezes their record; passing that snapshot back reuses its identity. An already-aborted signal is accepted because the helper validates intent only; the backend implements cancellation and timeouts.',
+        '通过访问器提供的选项可能在校验和使用之间变化。存储的一层校验了某个超时，另一层稍后却可能读到不同的超时或写入策略。\n\n各层继续读取原对象，就会重复触发访问器。各自复制几个字段也无法共同识别这些值是否已经在接纳操作时捕获。\n\n先把原选项交给 `snapshotOperationContext()`，再向内传递返回值。它只读取一次操作字段（包括可选 orgId）并冻结记录，再次传入该快照会复用同一对象；已取消的信号也可接纳，因为工具只校验意图，实际取消和超时由后端执行。'
       ),
       example: t(
         "import { snapshotOperationContext } from '@migaia/storage-contract'\n\nconst controller = new AbortController()\ncontroller.abort()\nlet reads = 0\nconst options = {\n  get signal() { reads += 1; return controller.signal },\n  get timeoutMs() { reads += 1; return 0 },\n  get pageSize() { reads += 1; return 100 },\n  get conflictPolicy() { reads += 1; return 'replace' as const }\n}\nconst snapshot = snapshotOperationContext(options)\nconsole.log('frozen:', Object.isFrozen(snapshot))\nconsole.log('same snapshot:', snapshotOperationContext(snapshot) === snapshot)\nconsole.log('field reads:', reads)\nconsole.log('signal aborted:', snapshot?.signal?.aborted)\nconsole.log('options:', snapshot?.timeoutMs, snapshot?.pageSize, snapshot?.conflictPolicy)",

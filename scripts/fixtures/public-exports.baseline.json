@@ -1049,6 +1049,7 @@
         "migrateEnvelope",
         "migrateEnvelopeSync",
         "nextTransactionIterator",
+        "prefixStorageOrgKey",
         "provideCapabilities",
         "readTransactionConflictPolicy",
         "registerTransactionFinalizer",
@@ -1061,7 +1062,8 @@
         "snapshotStorageBaseDetailed",
         "snapshotStorageCapabilities",
         "snapshotStorageKey",
-        "snapshotSyncWriteOptions"
+        "snapshotSyncWriteOptions",
+        "unprefixStorageOrgKey"
       ]
     },
     "@migaia/storage-web": {

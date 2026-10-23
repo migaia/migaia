@@ -171,3 +171,5 @@ export { defineConcurrencyPolicy, ConcurrencyPolicy } from './concurrency.js'
 export type { IConcurrencyConflict, ILockHolding } from './concurrency.js'
 
 export { lockKey } from './concurrency.js'
+
+export { prefixStorageOrgKey, unprefixStorageOrgKey } from './org.js'

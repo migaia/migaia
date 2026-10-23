@@ -324,7 +324,7 @@ metadata 供可恢复维护迁移使用，与 values、bytes、records 独立，
 
 `ConflictPolicy.conflict` 的值为 `'conflict'`，表示已存在则失败；`ConflictPolicy.replace` 的值为 `'replace'`，表示覆盖。使用该常量和 IConflictPolicy，不另造重复常量或别名。
 
-`snapshotOperationContext(ctx)` 接受上下文或 undefined。undefined 原样返回；合法对象的 signal、timeoutMs、pageSize、conflictPolicy 各读一次，返回冻结快照。再次传入本函数产物会返回同一个对象，不重复读取原 getter。非法对象、字段、信号结构或 getter 失败抛 INVALID_ARGUMENT，原始原因通过 cause 保留。`assertOperationContext(ctx)` 调用相同校验，只丢弃返回值。
+`snapshotOperationContext(ctx)` 接受上下文或 undefined。undefined 原样返回；合法对象的 signal、timeoutMs、pageSize、conflictPolicy、orgId 各读一次，返回冻结快照。再次传入本函数产物会返回同一个对象，不重复读取原 getter。非法对象、字段、信号结构或 getter 失败抛 INVALID_ARGUMENT，原始原因通过 cause 保留。`assertOperationContext(ctx)` 调用相同校验，只丢弃返回值。
 
 冻结的是上下文字段，不是信号状态。已经 aborted 的有效信号也能通过形状校验；本包不等待操作、不启动计时器、不创建取消引擎。取消感知后端用 ABORTED 结束等待，不保证原生 AbortError；已经进入原子提交的写应报告真实提交结果，不伪报回滚。
 
@@ -562,3 +562,9 @@ console.log(saved.channel, saved.key instanceof Date && saved.key.getTime())
 lockKey.text 与 lockKey.record 接收原有 typed storage-key 域，lockKey.bytes 只接收字符串。工厂立即校验并分离 Date、ArrayBuffer 与嵌套数组，只冻结通道/键容器。此时尚无 store，失败的 backend 诊断为 undefined；既有 assertStorageKey、snapshotStorageKey 与 assertStringStorageKey 的第二参数因此接纳 IBackendKind | undefined，函数 arity 与业务键域不变。
 
 原并发 owner 的内部规范化传入真实 backend，锁字段只读一次，只添加物理通道前缀，并调用唯一保序键编码器。显式 MSD 后缀栈使用固定字节/结束桶与一份 scratch 数组，相邻规范字节去重等值 Date、buffer、tuple 与正负零。text、bytes、record 保持分离，typed text 数值 1 与字符串 '1' 也不同。工作与空间随总键字节及键数增长，不使用比较排序、最长键填充或全局身份缓存。实际取锁仍由后端执行边界负责。
+
+### 组织键与上下文
+
+`IOperationContext.orgId` 可选，接收规范小写、36 字符 UUID（包括全零 UUID）。`assertOperationContext({ orgId })` 复用同一准入；`snapshotOperationContext` 单次读取并捕获身份，省略或显式 undefined 均不新增 orgId 属性。默认组织与 UUID 生成由外层 host 负责。
+
+`prefixStorageOrgKey(orgId, key)` 返回独立快照 `['$o', orgId, key]`，数组逻辑键保持嵌套在第三项。`unprefixStorageOrgKey(orgId, key)` 只接纳相同组织的精确三项封装，返回独立逻辑键快照。错误组织、大小写错误或无效封装为 INVALID_ARGUMENT；内部无效逻辑键仍为 INVALID_KEY。外层封装不占用逻辑键的深度与节点预算。这些纯函数不创建存储、不选择 namespace，也不执行跨组织 I/O。

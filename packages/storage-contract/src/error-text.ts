@@ -1,5 +1,9 @@
 /** Stable validation causes used by codec and synchronous-option admission boundaries. */
 export const StorageContractErrorText = {
+  /** Organization identity is exact lowercase UUID syntax; outer hosts own defaults and generation. */
+  orgId: 'orgId must be a canonical lowercase UUID',
+  /** Unwrapping requires one complete physical envelope from the requested organization. */
+  orgKeyEnvelope: 'organization key must contain the exact marker, orgId, and logical key',
   /** Locks must identify a supported physical channel and a valid independently owned key. */
   lockArgument: 'lock key must identify a supported channel and valid key',
   /** Policy definitions and options must be valid before any backend or decision callback runs. */
