@@ -5,6 +5,7 @@ import {
 } from './hooks.js'
 import type { IStorageHooks } from './hook-types.js'
 import { createStorageObservers, type IStorageObserverSet } from './stages.js'
+import { createBackendRevisionPort } from './backends/revisions.js'
 import { createStorageEnvelopeStages } from './envelope-stages.js'
 import {
   createBackendChangeController,
@@ -80,6 +81,7 @@ type IStorageDetectCheck = {
 /** One native registration's single-assignment store bridge into its PluginHost core. */
 type IStorageNativeRegistrationContext = {
   readonly id: string
+  readonly defaultOrgId: string
   readonly assertCurrent: () => void
   readonly assertExecution: () => void
   readonly getPublishedBackend: IStoragePluginCore['getPublishedBackend']
@@ -143,6 +145,7 @@ export function createStoragePluginHost(options: IPluginHostOptions): IStoragePl
         },
         getStore: context.storeCell.get,
         getBackendId: () => context.id,
+        defaultOrgId: context.defaultOrgId,
         getScheduler: () => context.scheduler,
         getStageBindings: context.getStageBindings,
         createKeyLockPort: (() => {
@@ -150,6 +153,11 @@ export function createStoragePluginHost(options: IPluginHostOptions): IStoragePl
           registrationCore!.onDispose(() => undefined)
           return createBackendKeyLockPort()
         }) satisfies IStoragePluginCore['createKeyLockPort'],
+        createRevisionPort: (() => {
+          /** Window admission belongs to the original owner; physical backends retain the facts. */
+          registrationCore!.onDispose(() => undefined)
+          return createBackendRevisionPort()
+        }) satisfies IStoragePluginCore['createRevisionPort'],
         createChangeController: ((options) => {
           /** Original resource admission owns partial-construction cleanup and the install window. */
           let controller: IBackendChangeController | undefined
@@ -548,6 +556,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
         /** Bind the next domain core to its matching entry in this install batch. */
         const context: IStorageNativeRegistrationContext = {
           id: native.id,
+          defaultOrgId: this.#orgId,
           assertCurrent: assertRegistration,
           assertExecution: () => {
             assertRegistration()
