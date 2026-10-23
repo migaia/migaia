@@ -1,5 +1,9 @@
 /** Canonical host boundary messages. */
 export const StorageErrorText = {
+  /** Backfill registration attaches only to an actual backend object captured by its native factory. */
+  backfillBackendObject: 'record index backfill backend must be an object',
+  /** Only the original coded native contention error can be marked for safe scan fallback. */
+  backfillFailureObject: 'record index backfill failure must be an object',
   /** Memory plugin construction captures a structural options record before resource acquisition. */
   memoryOptions: 'memory options must be an object',
   /** Native holder labels are optional stable strings captured once per physical memory instance. */
