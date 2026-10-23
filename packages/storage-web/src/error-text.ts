@@ -4,8 +4,6 @@ export const StorageErrorText = Object.freeze({
   entityUniqueSnapshotChanged: 'entity unique-write snapshot changed before commit',
   /** Entity construction requires every upgrade step, including when the graph is omitted. */
   entityMigrationGraphIncomplete: 'entity migration graph must contain every version step',
-  /** Standard Schema issue arrays must contain object entries with string messages. */
-  standardSchemaIssuesInvalid: 'Standard Schema returned invalid issues',
   /** Namespace codecs must encode a physical key as a string. */
   namespaceCodecEncodeInvalid: 'namespace codec encode must return a string',
   /** Namespace codecs may decode only a string key or an absent foreign namespace. */

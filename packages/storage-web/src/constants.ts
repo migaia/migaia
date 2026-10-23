@@ -58,13 +58,6 @@ export const StorageMigrationStatus = { running: 'running', complete: 'complete'
 /** Physical-key migration phases, ordered from current layout to legacy layout. */
 export const StorageMigrationPhase = { v2: 'v2', legacy: 'legacy' } as const
 
-/** Codec output labels selected by storage backend capabilities. */
-export const StorageCodecOutput = {
-  text: 'text',
-  structured: 'structured',
-  binary: 'binary'
-} as const
-
 export type IStorageBackend = (typeof StorageBackend)[keyof typeof StorageBackend]
 export type IStorageConflictPolicy =
   (typeof StorageConflictPolicy)[keyof typeof StorageConflictPolicy]
@@ -77,4 +70,3 @@ export type IStorageMigrationStatus =
   (typeof StorageMigrationStatus)[keyof typeof StorageMigrationStatus]
 export type IStorageMigrationPhase =
   (typeof StorageMigrationPhase)[keyof typeof StorageMigrationPhase]
-export type IStorageCodecOutput = (typeof StorageCodecOutput)[keyof typeof StorageCodecOutput]

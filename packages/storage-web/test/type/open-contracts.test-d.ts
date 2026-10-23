@@ -11,8 +11,8 @@ expectTypeOf<IExtensionStage>().toEqualTypeOf<
 >()
 type IMemoryStore = ReturnType<typeof memoryStorageHost>
 expectTypeOf(memoryStorageHost()).toMatchTypeOf<ISyncCapableStore<IMemoryStore>>()
-import type { ICodec } from '../../src/serialize/index.js'
-import type { ISchemaAdapter } from '../../src/schema/index.js'
+import type { ICodec } from '@migaia/storage-contract'
+import type { ISchemaAdapter } from '@migaia/storage-host/entity'
 
 /** Schema/codec 是面向开发者的开放契约：任何手写实现（不 import 任何第三方库） 都应该能被类型系统接受，不需要绕过 as any。 */
 const customCodec: ICodec<{ n: number }, string> = {

@@ -1,7 +1,7 @@
-import { passthrough } from '../schema/passthrough.js'
+import { passthrough } from '@migaia/storage-host/entity'
 import { createRepository } from './repository.js'
 import type { IKeyValueStore } from '../types/storage.js'
-import type { ISchemaAdapter } from '../schema/types.js'
+import type { ISchemaAdapter } from '@migaia/storage-host/entity'
 import type { IMigration } from '../schema/migrate.js'
 import type {
   IEntityDefinition,
@@ -12,7 +12,7 @@ import type {
 } from './types.js'
 import { StorageError, StorageErrorCode } from '../types/errors.js'
 import { StorageErrorText } from '../error-text.js'
-import { snapshotCodec } from '../serialize/registry.js'
+import { snapshotCodec } from '@migaia/storage-contract'
 import { snapshotEntityIndexes } from './index-projection.js'
 
 type IEntityOptionsWithoutIndexes<TDomain, TStored> = Omit<

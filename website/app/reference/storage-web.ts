@@ -421,8 +421,8 @@ const entityOptionCases: readonly IOptionCaseDoc[] = [
       '表单复制的姓名可能带首尾空格。编码前先归一化，并保持读取校验，让通讯录显示整洁的已保存姓名。'
     ),
     example: `import { defineEntity } from '@migaia/storage-web/entity'
-import { passthrough } from '@migaia/storage-web/schema'
-import { structuredCodec } from '@migaia/storage-web/serialize'
+import { passthrough } from '@migaia/storage-host/entity'
+import { structuredCodec } from '@migaia/storage-host/entity'
 
 type IUser = { id: string; name: string }
 const users = defineEntity<IUser>()({
@@ -996,14 +996,14 @@ try {
         'Adapt record validation and version changes without creating a store or repository. Import this subpath for these data-shape tools; the package root does not export them.\n\nStart with `fromStandardSchema()` to wrap a validator implementing Standard Schema, a shared interface used by validation libraries. Use `runMigrations()` to apply declared conversions between saved versions in order; `passthrough()` is available when validation is deliberately omitted.',
         '为记录接入数据校验和版本转换，而不在此创建存储或记录读写接口。需要这些数据结构工具时导入本子路径，根入口不导出它们。\n\n从 `fromStandardSchema()` 开始，适配支持标准校验协议的校验器；该协议让不同校验库通过同一接口工作。用 `runMigrations()` 按顺序执行保存版本之间的转换；明确不需要校验时可选 `passthrough()`。'
       ),
-      example: `import { fromStandardSchema } from '@migaia/storage-web/schema'\n\nconst schema = fromStandardSchema(UserSchema)`
+      example: `import { fromStandardSchema } from '@migaia/storage-host/entity'\n\nconst schema = fromStandardSchema(UserSchema)`
     },
     serialize: {
       summary: t(
         'Choose how application values become storage data and how they are read back. Import this subpath for storage codecs, the paired encode and decode operations; the package root only exposes shared utilities.\n\nStart with `jsonCodec` for JSON text and `selectCodec()` to match a codec to the store capabilities. A byte codec can use a text encoding on a text-only store, but structured values are rejected there rather than silently converted to JSON.',
         '决定应用值如何转成可保存的数据，以及如何读回原值。此子路径提供编解码器，也就是成对的编码和解码操作；包的根入口只提供共享工具。\n\n从处理 JSON 文本的 `jsonCodec` 开始，再用 `selectCodec()` 根据存储能力选择写入方式。字节编解码器可在纯文本存储上转成文本保存，但结构化值不能在此被悄悄改成 JSON，而会被拒绝。'
       ),
-      example: `import { jsonCodec } from '@migaia/storage-web/serialize'\n\nawait jsonCodec.encode({ a: 1 })`
+      example: `import { jsonCodec } from '@migaia/storage-host/entity'\n\nawait jsonCodec.encode({ a: 1 })`
     },
     host: {
       summary: t(

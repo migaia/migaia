@@ -1,4 +1,4 @@
-import type { IOperationContext } from '../types/context.js'
+import type { IOperationContext } from '@migaia/storage-contract'
 
 /**
  * Defines an optional schema contract without depending on a validation library. `encode` and

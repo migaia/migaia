@@ -1,5 +1,6 @@
+import { runInNewContext } from 'node:vm'
 import { describe, expect, it } from 'vitest'
-import { jsonCodec, structuredCodec, binaryCodec } from '../../src/serialize'
+import { jsonCodec, structuredCodec, binaryCodec } from '../../src/entity.js'
 
 describe('jsonCodec', () => {
   it('对象往返', async () => {
@@ -9,8 +10,17 @@ describe('jsonCodec', () => {
     await expect(jsonCodec.decode(encoded)).resolves.toEqual(value)
   })
 
-  it('undefined 编码为 "null" 字符串', async () => {
-    await expect(jsonCodec.encode(undefined)).resolves.toBe('null')
+  it('rejects non-portable values with the original codec failure chain', async () => {
+    for (const value of [undefined, NaN, Infinity, () => undefined, Symbol('value')])
+      await expect(jsonCodec.encode(value)).rejects.toMatchObject({
+        source: '@migaia/storage-host',
+        code: 'SERIALIZE_FAILED',
+        cause: {
+          source: '@migaia/storage-contract',
+          code: 'INVALID_ARGUMENT',
+          cause: { source: '@migaia/serialize' }
+        }
+      })
   })
 
   it('不可序列化的值（BigInt）编码抛 SERIALIZE_FAILED', async () => {
@@ -51,15 +61,10 @@ describe('binaryCodec', () => {
   })
 
   it('接受来自另一个 realm 的 Uint8Array', async () => {
-    const iframe = document.createElement('iframe')
-    document.body.appendChild(iframe)
-    const ForeignUint8Array = (
-      iframe.contentWindow as Window & { readonly Uint8Array: typeof Uint8Array }
-    ).Uint8Array
-    const bytes = new ForeignUint8Array([4, 5, 6])
+    /** A native second realm proves byte admission without browser globals. */
+    const bytes = runInNewContext('new Uint8Array([4, 5, 6])') as Uint8Array
     await expect(binaryCodec.encode(bytes)).resolves.toBe(bytes)
     await expect(binaryCodec.decode(bytes)).resolves.toBe(bytes)
-    iframe.remove()
   })
 
   it('encode 拒绝非 Uint8Array', async () => {

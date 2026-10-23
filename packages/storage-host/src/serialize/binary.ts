@@ -1,7 +1,8 @@
-import { StorageError, StorageErrorCode } from '../types/errors.js'
-import { isUint8Array } from '../core/bytes.js'
+import { StorageError, StorageErrorCode } from '../errors.js'
+import { isUint8Array } from '@migaia/utils/bytes'
+import { StorageErrorText } from '../error-text.js'
 import type { ICodec } from './types.js'
-import { StorageCodecOutput } from '../constants.js'
+import { StorageCodecOutput, EntityAdapterName } from '../adapter-constants.js'
 
 /**
  * Frozen Uint8Array codec retaining the original valid view on encode/decode; invalid values reject
@@ -9,19 +10,19 @@ import { StorageCodecOutput } from '../constants.js'
  * base64 wrapping on text-only backends, whose encoded length is four times ceil(byteLength / 3).
  */
 export const binaryCodec: ICodec<Uint8Array, Uint8Array> = Object.freeze({
-  name: 'binary',
+  name: EntityAdapterName.binary,
   output: StorageCodecOutput.binary,
   encode: async (value) => {
     if (!isUint8Array(value))
       throw new StorageError(StorageErrorCode.serializeFailed, {
-        cause: new TypeError('binaryCodec.encode expects a Uint8Array')
+        cause: new TypeError(StorageErrorText.binaryCodecEncode)
       })
     return value
   },
   decode: async (raw) => {
     if (!isUint8Array(raw))
       throw new StorageError(StorageErrorCode.deserializeFailed, {
-        cause: new TypeError('binaryCodec.decode expects a Uint8Array')
+        cause: new TypeError(StorageErrorText.binaryCodecDecode)
       })
     return raw
   }
