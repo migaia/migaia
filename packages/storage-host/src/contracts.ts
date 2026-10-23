@@ -220,6 +220,7 @@ export const defineFeature: IStorageDefineFeature = ((
 }) as unknown as IStorageDefineFeature
 /** Installation-local native additions come from the original facade, never public object fields. */
 type IStorageNativeCore = IPluginHostCore<IStoragePipelineInput> & {
+  readonly journal: IStoragePluginCore['journal']
   setStorageRegistrationCore(core: object): void
   runStorageInstall<T>(operation: () => Promise<T>): Promise<T>
   isStorageInstallExpired(): boolean
@@ -295,6 +296,7 @@ export const definePlugin: IStorageDefinePlugin = ((
           return nativeCore.defaultOrgId
         },
         execution: nativeCore.execution,
+        journal: nativeCore.journal,
         get hooks() {
           return nativeCore.getStorageHooks()
         },

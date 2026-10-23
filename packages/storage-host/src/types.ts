@@ -134,6 +134,7 @@ export type IStorageFeatureClientResolver<TClient = unknown, TTransactionClient 
 }
 /** Read-only invocation ports retain one immutable organization without installation authority. */
 export type IStorageBackendOrgContext = {
+  readonly journal?: import('./journal/types.js').IStorageJournalExecutionPort
   readonly orgId: string
   readonly execution: IStorageExecutionPort
   readonly stageBindings: IBackendStageBindings
@@ -335,6 +336,7 @@ export type IStoragePluginCore<F extends IStorageFeatureRecord = {}> = Pick<
   'operation' | 'lifecycle' | 'onDispose' | 'usePipeline' | 'useAsyncPipeline'
 > &
   IStorageBorrowPort & {
+    readonly journal?: import('./journal/types.js').IStorageJournalExecutionPort
     readonly defaultOrgId: string
     readonly execution: IStorageExecutionPort
     readonly hooks: IStorageHooks
@@ -561,6 +563,7 @@ export type IRejectInstalledOrDuplicateIds<
     : never
 /** Construction captures timing and diagnostic ownership before a plugin runs. */
 export type IStorageHostOptions = {
+  readonly journal?: import('./journal/types.js').IStorageJournalConfiguration
   readonly org?: string
   readonly autoDetect?: boolean
   readonly installTimeoutMs?: number
