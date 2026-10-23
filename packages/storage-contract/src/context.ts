@@ -19,6 +19,11 @@ export type IOperationContext = {
   readonly timeoutMs?: number
   /** Optional iterator page-size hint: an integer from 1 through 4096. No default is inserted here. */
   readonly pageSize?: number
+  /**
+   * Optional canonical lowercase UUID supplied by an outer host. The contract preserves omission;
+   * the host chooses the default organization and owns namespace mapping.
+   */
+  readonly orgId?: string
 }
 
 /** Frozen write-conflict choices shared by asynchronous, synchronous, and transaction contracts. */
