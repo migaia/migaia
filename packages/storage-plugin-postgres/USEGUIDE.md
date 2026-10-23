@@ -112,4 +112,4 @@ const tail = await feed.tailChanges({
 
 部署方设置 wal_level=logical、REPLICATION 角色、持久 pgoutput slot 与 FOR ALL TABLES publication。包只探测，不执行部署 DDL。一个提交按 org 首次 WAL 顺序合并有界失效摘要，不保存业务行。cursor 不透明，包含 store/slot/组织路由、COMMIT 的 commitEndLsn 与已处理组织前缀。部分提交绝不确认该 end，恢复时从原 slot 未确认位置重解并跳过已处理前缀；末项才允许后续 after 或成功 tail 确认。peer 使用 auto:false、timeoutSeconds:0、flowControl:true，绝不确认 row LSN/commitLsn，也不加减1。只允许一个活跃 slot 消费者。
 
-回调失败停止且不上报成功位置；dispose 只释放复制连接，不删 slot、不关 pool。slot lost 或已确认的部分 cursor 报 CHANGE_CURSOR_EXPIRED。当前 root 的多组织 TRUNCATE 无法从 WAL 推导全部持久 org，安全停止该提交且不确认；组织视图可对自身宽失效。普通 INSERT/UPDATE/DELETE 路径不受影响；该 TRUNCATE 边界待用户复核。
+回调失败停止且不上报成功位置；dispose 只释放复制连接，不删 slot、不关 pool。首次空读返回绑定原 native confirmed 位置的完整 cursor；slot lost、已落后于 slot confirmed 的完整 cursor，或已确认到本提交 end 的部分 cursor，均报 CHANGE_CURSOR_EXPIRED，不跳过无法证明的缺口。启动中取消或 native ready 查询失败会拒绝并排空原复制资源。当前 root 的多组织 TRUNCATE 无法从 WAL 推导全部持久 org，安全停止该提交且不确认；组织视图可对自身宽失效。普通 INSERT/UPDATE/DELETE 路径不受影响；该 TRUNCATE 边界待用户复核。

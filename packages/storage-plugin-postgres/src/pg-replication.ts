@@ -2,6 +2,7 @@ import type { Pool, PoolClient } from 'pg'
 import type { Pgoutput } from 'pg-logical-replication'
 import { deferred, sleep } from '@migaia/utils/promise'
 import { attachSecondaryErrors } from '@migaia/utils/error'
+import { inspectThenable, observeThenableRejection } from '@migaia/utils/function'
 import {
   StorageContractError,
   StorageContractErrorCode,
@@ -43,7 +44,7 @@ function encode(cursor: IPgCursor): string {
 }
 /** Cursor syntax is rejected before any native query; route matching follows native store identity. */
 function decode(value: string | undefined): IPgCursor | undefined {
-  if (value === undefined || value === 'now' || value === '') return undefined
+  if (value === undefined) return undefined
   try {
     if (typeof value !== 'string' || !/^[A-Za-z0-9_-]+$/.test(value)) throw invalidArgument()
     const parsed: unknown = JSON.parse(Buffer.from(value, 'base64url').toString('utf8'))
@@ -193,8 +194,8 @@ export function createPgReplication(
     if (cursor !== undefined && cursor.identity !== identity) throw invalidArgument()
     if (
       cursor !== undefined &&
-      cursor.ordinal > 0 &&
-      position(cursor.end) <= position(row.confirmed)
+      (position(cursor.end) < position(row.confirmed) ||
+        (cursor.ordinal > 0 && position(cursor.end) === position(row.confirmed)))
     )
       throw expired()
     return { identity, confirmed: row.confirmed, maxSlotWalKeepSize: String(row.max_keep) }
@@ -261,7 +262,13 @@ export function createPgReplication(
         for (;;) {
           throwIfAborted(ctx?.signal)
           const rows = (await query(client, 'FETCH FORWARD 128 FROM storage_wal_read', [])).rows
-          if (rows.length === 0) return { changes: [], cursor: options.after ?? '' }
+          if (rows.length === 0)
+            return {
+              changes: [],
+              cursor:
+                options.after ??
+                encode({ version: 1, identity: facts.identity, end: facts.confirmed, ordinal: 0 })
+            }
           for (const row of rows) {
             if (!(row.data instanceof Uint8Array)) throw unsupported()
             const commit = commits.accept(decoder.parse(Buffer.from(row.data)))
@@ -301,7 +308,7 @@ export function createPgReplication(
       return outcome.value
     },
     open: async (options, ctx) => {
-      const cursor = decode(options.from)
+      const cursor = options.from === 'now' ? undefined : decode(options.from)
       throwIfAborted(ctx?.signal)
       const facts = await inspect(options, cursor)
       await confirm(options.slot, facts.confirmed, cursor)
@@ -315,7 +322,6 @@ export function createPgReplication(
       /** A partial item position applies once, then the live stream follows later commits normally. */
       let resume = cursor
       let failed = false
-      let started = false
       let stopAbort = () => {}
       let streaming: Promise<unknown> | undefined
       /**
@@ -343,25 +349,31 @@ export function createPgReplication(
         if (failed) return
         failed = true
         const error = normalizePostgresError(cause)
-        if (!started) ready.reject(error)
+        ready.reject(error)
         try {
           if (options.onError === undefined) reportCleanupError(report, error)
-          else options.onError(error)
+          else {
+            const result = options.onError(error)
+            observeThenableRejection(result, inspectThenable(result), (secondary) =>
+              reportCleanupError(report, secondary)
+            )
+          }
         } catch (secondary) {
           reportCleanupError(report, secondary)
         }
         void resource.dispose().catch((secondary) => reportCleanupError(report, secondary))
       }
       service.on('error', fail)
-      service.on('start', async () => {
-        started = true
-        const row = (
-          await query(pool, 'SELECT active_pid FROM pg_replication_slots WHERE slot_name=$1', [
-            options.slot
-          ])
-        ).rows[0]
-        if (typeof row?.active_pid === 'number') nativePid = row.active_pid
-        ready.resolve()
+      service.on('start', () => {
+        void (async () => {
+          const row = (
+            await query(pool, 'SELECT active_pid FROM pg_replication_slots WHERE slot_name=$1', [
+              options.slot
+            ])
+          ).rows[0]
+          if (typeof row?.active_pid === 'number') nativePid = row.active_pid
+          ready.resolve()
+        })().catch(fail)
       })
       service.on('data', (_lsn: string, message: Pgoutput.Message) => {
         if (failed) return
@@ -409,14 +421,27 @@ export function createPgReplication(
           from
         )
         .catch(fail)
-      stopAbort = subscribeToAbort(
-        ctx?.signal,
-        () => {
-          void resource.dispose().catch(fail)
-        },
-        report
-      )
-      await ready.promise
+      try {
+        stopAbort = subscribeToAbort(
+          ctx?.signal,
+          () => {
+            try {
+              throwIfAborted(ctx?.signal)
+            } catch (cause) {
+              fail(cause)
+            }
+          },
+          report
+        )
+        await ready.promise
+      } catch (cause) {
+        try {
+          await resource.dispose()
+        } catch (secondary) {
+          throw normalizePostgresError(attachSecondaryErrors(cause, [secondary]))
+        }
+        throw cause
+      }
       return {
         dispose: resource.dispose,
         [Symbol.asyncDispose]: resource[Symbol.asyncDispose],
