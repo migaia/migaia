@@ -39,6 +39,8 @@ export const indexedDbBackendPlugin = <
         construction = indexedDbHost(options, core, [...objectStores])
         core.registerStore(construction.store)
         core.registerChangeController(construction.store, construction.controller)
+        if (construction.orgBinding !== undefined)
+          core.registerOrgBinding(construction.store, construction.orgBinding)
         return construction.prepare!().then(() => ({}))
       },
       featureExpose: () => ({

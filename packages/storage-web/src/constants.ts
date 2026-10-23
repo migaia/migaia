@@ -34,6 +34,8 @@ export const StorageOperation = {
   indexedDbTransaction: 'indexeddb.transaction',
   indexedDbRead: 'indexeddb.read',
   indexedDbClose: 'indexeddb.close',
+  /** Physical organization deletion belongs to the same native database opener. */
+  indexedDbDelete: 'indexeddb.delete',
   indexedDbLegacyMigration: 'indexeddb.legacy.migration',
   indexedDbSchema: 'indexeddb.schema',
   indexedDbCursor: 'indexeddb.cursor',

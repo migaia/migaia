@@ -98,6 +98,19 @@ try {
         'Prints null. A zero duration removes the target in the same native transaction; text, bytes and records share the TTL capability.',
         '输出 null。零期限在同一原生事务删除目标，文本、字节和记录均支持 TTL 能力。'
       )
+    },
+    {
+      title: t('Delete one organization database', '删除单个组织数据库'),
+      problem: t(
+        'Organization deletion must remove its physical IndexedDB target while preserving other organizations and reusable views.',
+        '删除组织时需移除其物理 IndexedDB 目标，保留其它组织及可复用视图。'
+      ),
+      example:
+        "import { createStorageHost, createOrgId } from '@migaia/storage-host'\nimport { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'\nconst host = await createStorageHost({ plugins: [indexedDbBackendPlugin({ dbName: 'preferences' })] })\ntry {\n  const org = createOrgId()\n  const settings = host.org(org).backend('indexed-db')\n  await host.backend('indexed-db').set('theme', 'light')\n  await settings.set('theme', 'dark')\n  await host.dropOrg(org)\n  console.log(await settings.get('theme'), await host.backend('indexed-db').get('theme'))\n} finally { await host.dispose() }",
+      result: t(
+        'Prints null light. The deleted organization reopens through the original native layout; the configured default remains intact.',
+        '输出 null light；删除的组织通过原生布局重新打开，配置的缺省目标保持不变。'
+      )
     }
   ],
   cookieBackendPlugin: [
