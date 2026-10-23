@@ -3,6 +3,41 @@ import type { ICaseDoc, IText } from './contract.js'
 const t = (en: string, zh: string): IText => ({ en, zh })
 /** Application extensions retain their exact inputs while the host owns installation and cleanup. */
 export const storageHostCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
+  asyncDisposeKey: [
+    {
+      title: t('Use the original disposal key', '使用原释放键'),
+      problem: t(
+        'Keep native and fallback resource cleanup on the same identity.',
+        '原生与替代资源清理使用同一身份。'
+      ),
+      example:
+        "import { asyncDisposeKey } from '@migaia/storage-host/authoring/backend'\nconsole.log(typeof asyncDisposeKey === 'symbol')",
+      result: t('Prints true.', '输出true。')
+    }
+  ],
+
+  storageLogStore: [
+    {
+      title: t('Open an isolated private log', '打开隔离的私有日志'),
+      problem: t(
+        'Keep committed history outside business clear and preserve watermarks on reopen.',
+        '提交历史不受业务 clear 影响，重开保留水位。'
+      ),
+      example: `import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { storageLogStore } from '@migaia/storage-host/journal'
+import { LogRecordState } from '@migaia/logger/plugins/durable'
+
+await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+await using log = await storageLogStore(host, 'memory', { prefix: 'history' })
+await log.append([{ kind: 'order.created', payload: { id: 'o1' } }])
+await log.setState(1, LogRecordState.done)
+console.log(await log.lastSeq(), await log.states(LogRecordState.pending))`,
+      result: t(
+        'Prints 1 []. The original registration owns cleanup; opening does not enable global journaling.',
+        '输出 1 []。原登记拥有清理；打开日志不自动启用全局 journal。'
+      )
+    }
+  ],
   createBackendChangeIterator: [
     {
       title: t('Borrow the installed invalidation owner', '借用已安装的失效提示拥有者'),

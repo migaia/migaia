@@ -39,6 +39,10 @@ Schema 与 codec 适配位于 `@migaia/storage-host/entity`：`passthrough`、`f
 
 `host.org(orgId)` 返回不可变的业务视图，保留同一插件、Feature API 与事务推断；提取的方法仍绑定原组织。视图及其后端不暴露安装、drop 或关闭权。原生后端通过原安装窗口的 `core.registerOrgBinding(store, { backend, drop })` 提供实际组织目标；`core.getOrgContext(orgId)` 只返回同一执行器、观察、调用上下文与事务 API 投影。它不提供登记或关闭句柄。普通扩展及 Feature API 的 `this.orgId` 是固定身份，`this.backend(borrowed)` 只投影该插件安装时已经借用的依赖。
 
+需要按需创建物理组织后端的作者，在原安装窗口捕获 core.createOrgAuthoringPort()，只把端口保存在后端闭包。安装后它仍复用原 controller、本地键锁与精确 store 的 controller/value-commit 登记函数；子资源由同一 registration 清理，撤销后拒绝使用。业务视图和 getOrgContext 不暴露该权限。组织借用优先使用其物理后端已登记的原 controller，保留资源生命周期与组织通知过滤。
+
+作者入口还从原 plugin-host 拥有者重导出 asyncDisposeKey；支持环境缺少原生 Symbol.asyncDispose 时，后端仍使用同一 symbol，不新建符号或生命周期拥有者。
+
 实体可直接使用 `defineEntity(...).connect(host.org(orgId).backend(id))`，具备 KV 声明的安装期 `core.getPublishedBackend(id)` 借用视图也可连接；动态 ID 的缺省类型不声明 KV 渠道，调用方需明确已知依赖的渠道类型。只有原宿主 registry 认证的精确视图能复用 KV/record 方法事实；复制对象或再包一层 Proxy 不继承认证。实体不取得关闭权，事务校验仍由原生 owner 执行；任意 raw 输入继续要求原资源准入。记录 metadata 仍通过同一业务视图读取。
 
 memory 缺省组织和普通根后端共用配置 namespace；其它组织使用 `namespace + "/" + orgId`，每个插件实例仍独立。各 namespace 的数据、期限、修订和锁独立，关闭共用原 controller。根变更订阅接收全部组织事件；org 后端与 org hooks 仅接收本组织。`host.dropOrg(orgId)` 尝试全部已发布后端，成功目标不回滚；失败抛原生 `AggregateError`，code 为 `ORG_DELETE_FAILED`，`errors` 和首个 `cause` 保留原错误。
@@ -199,3 +203,21 @@ console.log(
 memory 已提供该私有 namespace 接点。私有字符串行与原业务 draft 一起稀疏暂存、原子提交，提交前与回滚后均不可见。业务 keys、clear、capacity 和 change-feed 不包含这些元数据行；dropOrg 删除目标组织的私有行。显式组织绑定拒绝其它组织的 scope，提取出的私有 view 随原操作失效。该作者接点本身不增加自动 binlog、undo/redo 或公开 storageLogStore 工厂。
 
 memory 日志 namespace 在整个资源期持有原规范 resource-owner 文本 lease；同组织、同 prefix 再次打开报 `LOCK_REJECTED`。普通私有事务在最初的原生锁集合中取得另一个固定 head 键。原后端关闭信号也会关闭部分构造的 namespace 资源。`transactionInfo(scope)` 返回精确 store/org 的原认证事务身份，同事务追加归并不信任调用方 id。后端作者仅对私有元数据 lease 使用 `IBackendKeyLockPort.attemptMetadata`：规范点身份冲突和原 acquire/release/wait 拥有者不变，业务 clear 范围跳过其本就不能触及的私有行；普通业务锁保持原范围行为。
+
+### 私有日志资源
+
+`storageLogStore(host, id, { prefix })` 仅从 `@migaia/storage-host/journal` 导出。传入真实宿主或固定组织视图及其已安装后端 ID；它不接受 public KV、raw store 或伪造宿主。后端必须提供原私有 journal binding 与可靠独占，打开先完成恢复。同组织与 prefix 同时只允许一个日志句柄；不同组织相互隔离。句柄由原宿主登记接管，调用方也可提前释放。显式日志关闭排空已入 FIFO 的工作；宿主关闭保留原 pipeline 准入，尚未进入后端的工作可能以原 HOST_DISPOSING cause 拒绝，全部已接纳 Promise 仍排空；业务枚举、clear 与容量不触及私有日志。
+
+追加先捕获原 logger JSON，再沿既有 FIFO 写入记录并最终提交唯一 head；只有真实非空 commit 才更新原 logger 索引并发布一次冻结通知。状态只从 pending 前进到 done/aborted；截断先提交水位再回收物理行，重开保留最高序号与时间，不复用序号。未确认写入使句柄停止准入，必须关闭并重开；恢复忽略未提交记录及状态候选并清理残留，原错误留在 cause。私有记录或载荷损坏统一报 `JOURNAL_RECORD_INVALID`，原 logger 校验错误仍在 cause。无原生事务的私有 namespace 仍可沿同协议工作，但必须由后端提供可靠独占与单键原子 head 写入。当前内置绑定为 memory；host 内部原生追加端口已接同一日志对象与准确组织，复用原 native scope/terminal，绕过普通日志 FIFO；同一事务并发批次分配不同序号，真实 commit 才一次发布，rollback 不发布。后端还须提供可选 `runCommitted(work, committed)`，在原 head lease 释放前将实际结果交给同步发布回调；缺此接点仅不支持该原生追加组合，普通日志照常。其 callback 是提交后观察，错误仅 report，不能假回滚。该端口不从公开 entry 导出；全局 journal 配置仍需后续接线，不因打开日志自动启用。
+
+```ts
+import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { storageLogStore } from '@migaia/storage-host/journal'
+import { LogRecordState } from '@migaia/logger/plugins/durable'
+
+await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+await using log = await storageLogStore(host, 'memory', { prefix: 'history' })
+await log.append([{ kind: 'order.created', payload: { id: 'o1' } }])
+await log.setState(1, LogRecordState.done)
+console.log(await log.lastSeq(), await log.states(LogRecordState.pending)) // 1 []
+```

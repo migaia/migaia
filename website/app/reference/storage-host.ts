@@ -5,6 +5,13 @@ const t = (en: string, zh: string): IText => ({ en, zh })
 /** Neutral host and authoring entry, with no browser or native driver import. */
 export const storageHostReference: ILibraryReference = {
   modules: {
+    journal: {
+      summary: t(
+        'Open a fixed-organization private log through its original admitted backend binding.',
+        '沿原已准入后端绑定打开固定组织私有日志。'
+      ),
+      example: storageHostCases.storageLogStore![0]!.example
+    },
     'authoring/vector': {
       summary: t(
         'Expose only standard query vector synthesis; memory scoring and ranking remain private.',
@@ -47,6 +54,42 @@ console.log(host.extensions.label('draft'))`
     }
   },
   symbols: {
+    asyncDisposeKey: {
+      role: 'constant',
+      purpose: t(
+        'The original plugin-host disposal symbol, re-exported through the backend authoring entry. It preserves the same identity on runtimes with or without native Symbol.asyncDispose.',
+        '通过后端作者入口重导出的原plugin-host释放symbol；无论运行时是否提供原生Symbol.asyncDispose，都保留同一身份。'
+      ),
+      example: storageHostCases.asyncDisposeKey![0]!.example,
+      cases: storageHostCases.asyncDisposeKey
+    },
+    storageLogStore: {
+      role: 'factory',
+      purpose: t(
+        'Recover a caller-closeable private ILogStore without granting raw backend or host authority.',
+        '恢复可由调用方释放的私有 ILogStore，不授予 raw 后端或宿主权。'
+      ),
+      params: {
+        host: t(
+          'The original host or its immutable organization view.',
+          '原宿主或不可变组织视图。'
+        ),
+        id: t(
+          'An exact installed backend ID with an authentic private journal binding.',
+          '具备真实私有 journal binding 的准确已安装后端 ID。'
+        ),
+        options: t(
+          'A nonempty private prefix, exclusive within this backend and organization.',
+          '在该后端与组织中独占的非空私有 prefix。'
+        )
+      },
+      returns: t(
+        'Promise<ILogStore> after recovery; uncertain writes seal the handle, and reopening reads the durable head.',
+        '恢复后的 Promise<ILogStore>；未确认写入停止句柄准入，重开读取持久 head。'
+      ),
+      example: storageHostCases.storageLogStore![0]!.example,
+      cases: storageHostCases.storageLogStore
+    },
     recommendStorageVector: {
       role: 'operation',
       purpose: t(
@@ -349,6 +392,12 @@ console.log(host.extensions.label('draft'))`,
         '私有原生 run、真实 commit/rollback 回调和已接纳工作清理，不关闭其后端。'
       ),
       members: {
+        runCommitted: {
+          summary: t(
+            'Optionally publish an ordinary result inside the original actual commit terminal, before its head lease ends. Native append composition requires this port; ordinary logs do not.',
+            '可选地在原真实提交 terminal 内、head lease 释放前发布普通操作结果；原生追加组合需要此接点，普通日志不需要。'
+          )
+        },
         transactionInfo: {
           summary: t(
             'Read the original authenticated transaction identity for this exact native namespace.',
@@ -600,6 +649,38 @@ console.log(host.extensions.label('draft'))`,
           returns: t(
             'Completion of that native target deletion; failures retain the original error.',
             '返回该原生目标删除的完成结果，失败保留原错误。'
+          )
+        }
+      }
+    },
+    IStorageOrgAuthoringPort: {
+      summary: t(
+        'Backend-only authority captured by core.createOrgAuthoringPort during installation. Lazy physical children share the original controller, key-lock and exact-store registry implementations and existing registration cleanup. Revocation seals this port; business views never receive it.',
+        '后端作者在安装窗口通过core.createOrgAuthoringPort捕获的有限权限；按需物理子后端复用原controller、键锁、精确store登记及原registration清理。撤销后拒绝，业务视图不接收此端口。'
+      ),
+      members: {
+        createChangeController: {
+          summary: t(
+            'Construct the original controller under this registration cleanup.',
+            '由本registration清理拥有原controller构造。'
+          )
+        },
+        createKeyLockPort: {
+          summary: t(
+            'Construct the original shared key-lock port; its physical backend retains final ownership.',
+            '构造原共享键锁接点，最终关闭权仍归物理后端。'
+          )
+        },
+        registerChangeController: {
+          summary: t(
+            'Register the exact child store in the original controller registry.',
+            '将精确子store登记到原controller登记表。'
+          )
+        },
+        registerValueCommit: {
+          summary: t(
+            'Register the child native atomic value writer in the same exact-store row.',
+            '在同一精确store行登记子后端原子value写端点。'
           )
         }
       }

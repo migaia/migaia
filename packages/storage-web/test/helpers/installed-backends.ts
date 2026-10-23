@@ -1,4 +1,6 @@
-import { onTestFinished } from 'vitest'
+import { onTestFinished, vi } from 'vitest'
+import * as entityOwner from '@migaia/storage-host/entity'
+import type { IRecordIndexBackfillStore } from '@migaia/storage-host/entity'
 import {
   createStorageHost,
   memoryBackendPlugin,
@@ -74,4 +76,26 @@ export async function createMemoryTestStore(
   const host = await createStorageHost({ plugins: [memoryBackendPlugin(options)] })
   onTestFinished(() => host.dispose())
   return host.backend('memory')
+}
+
+/** Capture the actual private provider during the original public plugin installation. */
+export async function createIndexedDbBackfillTestStore(options: IIndexedDbOptions): Promise<{
+  readonly store: IIndexedDbBackendStore
+  readonly capability: IRecordIndexBackfillStore<unknown>
+}> {
+  const register = entityOwner.registerRecordIndexBackfillStore
+  let capability: IRecordIndexBackfillStore<unknown> | undefined
+  const capture = vi
+    .spyOn(entityOwner, 'registerRecordIndexBackfillStore')
+    .mockImplementation((store, provider) => {
+      register(store, provider)
+      capability = provider
+    })
+  try {
+    const store = await createIndexedDbTestStore(options)
+    if (capability === undefined) throw new Error('native backfill provider was not registered')
+    return { store, capability }
+  } finally {
+    capture.mockRestore()
+  }
 }

@@ -742,3 +742,5 @@ RDF 的客户端 `follow`/`inverse` 现在沿同一 reader 逐前驱调用原 `s
 原生入口验证可以同步抛出或异步拒绝；conformance 观察同一原错误。原生事务包装须在原 cause 链保留预期语义码；memory 与 IndexedDB 保持更严格的外层错误断言。subject 可提供 `prepareSecondaryIndexes(originalStore, originalHandle)`，为全新空索引 fixture 调用既有原生 backfill 拥有者。准备后套件仍要求 complete 就绪，并验证真实范围、投影与唯一性行为。
 
 snapshotStorageOrgKeyPrefix(orgId, prefix, backend) 返回独立的原生半开字节界。prefix 为 undefined 时选择该组织内全部逻辑键；指定前缀沿原 string/binary/array 前缀或 number/Date 精确语义，不缩小逻辑深度和节点预算。
+
+索引准备可返回既有原生 record-key 投影，转换 fixture 的逻辑 id a/b；所有索引读写及期望行沿该原键，省略仍使用原字符串键，避免将未归属范围的 raw 修改当作规范索引修改。

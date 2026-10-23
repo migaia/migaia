@@ -1,5 +1,9 @@
 /** Canonical host boundary messages. */
 export const StorageErrorText = {
+  /** Corruption diagnostics never include private journal records or business payloads. */
+  journalRecordInvalid: 'storage journal record is invalid',
+  /** An uncertain commit seals the handle until recovery reads its original durable head. */
+  journalRecoveryFailed: 'storage journal recovery or commit failed',
   /** Native memory limits are captured before allocating its original physical namespace. */
   memoryCapacityArgument: 'memory capacity limits or eviction policy are invalid',
   /** Explicit byte accounting requires an actual existing canonical encoding rather than estimates. */

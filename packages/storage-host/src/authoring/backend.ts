@@ -1,3 +1,5 @@
+/** Reuse the original runtime-compatible disposal identity; authors never create another symbol. */
+export { asyncDisposeKey } from '@migaia/plugin-host'
 export type {
   IBackendChangeController,
   IBackendChangeControllerOptions,
