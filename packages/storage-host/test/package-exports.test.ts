@@ -16,6 +16,7 @@ describe('storage host package exports', () => {
     )
     expect(runtime).not.toHaveProperty('createBackendChangeController')
     expect(runtime).not.toHaveProperty('getBackendChangeController')
+    expect(runtime).not.toHaveProperty('createBackendKeyLockPort')
   })
   it('loads the actual neutral package root with the declared public runtime surface', async () => {
     /** Dynamic self-import exercises the built package entry rather than an internal source alias. */
