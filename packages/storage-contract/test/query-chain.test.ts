@@ -1638,6 +1638,200 @@ describe('shared selector ordering and row controls', () => {
   })
 })
 
+describe('shared keyset pages', () => {
+  it('keeps canonical keyset continuity across insertions and deletions with fresh equivalent chains', async () => {
+    /** A shared native collection identity survives new query descriptor objects. */
+    const identity = Object.freeze({})
+    const values = new Map(['d', 'a', 'c', 'b'].map((id) => [id, { id, enabled: true }]))
+    const execute = vi.fn(() =>
+      ownedRows([...values.values()], undefined, undefined, {
+        key: (row) => (row as { id: string }).id
+      })
+    )
+    const query = () =>
+      createRecordQuery<{ id: string; enabled: boolean }>({
+        pushdown: noPushdown,
+        cursorSource: identity,
+        execute
+      }).where({ enabled: true })
+    const first = await query().page(2)
+    expect(first.items.map((row) => row.id)).toEqual(['a', 'b'])
+    expect(first.next).toBeDefined()
+    expect((await query().after(first.next!).limit(2).all()).map((row) => row.id)).toEqual([
+      'c',
+      'd'
+    ])
+    values.delete('a')
+    values.delete('b')
+    values.set('aa', { id: 'aa', enabled: true })
+    values.set('e', { id: 'e', enabled: true })
+    const second = await query().after(first.next!).page(2)
+    expect(second.items.map((row) => row.id)).toEqual(['c', 'd'])
+    expect((await query().after(second.next!).page(2)).items.map((row) => row.id)).toEqual(['e'])
+  })
+
+  it('maps only returned page items and keeps lookup, callbacks and cleanup in the original resource operation', async () => {
+    const close = vi.fn()
+    const mapper = vi.fn(async (row: { id: number }) => row.id * 10)
+    const query = createRecordQuery<{ id: number }>({
+      pushdown: noPushdown,
+      execute: () =>
+        ownedRows([{ id: 3 }, { id: 1 }, { id: 2 }], close, undefined, {
+          key: (row) => (row as { id: number }).id
+        })
+    })
+    const first = await query.select(mapper).page(2)
+    expect(first.items).toEqual([10, 20])
+    expect(mapper).toHaveBeenCalledTimes(2)
+    expect(close).toHaveBeenCalledTimes(1)
+    expect((await query.after(first.next!).select(mapper).page(2)).items).toEqual([30])
+    expect(mapper).toHaveBeenCalledTimes(3)
+    expect(close).toHaveBeenCalledTimes(2)
+  })
+
+  it('passes indexed native key seeks and bounded lookahead through the original execute callback', async () => {
+    const values = Array.from({ length: 128 }, (_, id) => ({ id }))
+    let comparisons = 0
+    let advances = 0
+    const execute: IRecordQuerySource['execute'] = vi.fn(
+      (input: Parameters<IRecordQuerySource['execute']>[0]) => {
+        const after = input.steps?.find((step) => step.operation === 'after')
+        const limit = input.steps?.find((step) => step.operation === 'limit')
+        expect(input.steps?.[0]).toEqual({ operation: 'order', by: 'key', direction: 'asc' })
+        let lower = 0
+        let upper = values.length
+        while (lower < upper) {
+          const middle = Math.floor((lower + upper) / 2)
+          comparisons++
+          if (after !== undefined && values[middle]!.id <= (after.key as number)) lower = middle + 1
+          else upper = middle
+        }
+        return ownedRows(
+          values.slice(lower, lower + (limit?.operation === 'limit' ? limit.count : values.length)),
+          undefined,
+          undefined,
+          {
+            key: (row) => (row as { id: number }).id,
+            onNext: () => advances++
+          }
+        )
+      }
+    )
+    const query = createRecordQuery<{ id: number }>({
+      pushdown: {
+        source: 'indexed-keyset',
+        index: 'primary',
+        operators: [],
+        operations: ['order', 'after', 'limit']
+      },
+      nativeSteps: true,
+      execute
+    }).requirePushdown()
+    const first = await query.page(2)
+    expect(first.items).toEqual([{ id: 0 }, { id: 1 }])
+    comparisons = 0
+    advances = 0
+    expect((await query.after(first.next!).page(2)).items).toEqual([{ id: 2 }, { id: 3 }])
+    expect(comparisons).toBeLessThanOrEqual(8)
+    expect(advances).toBe(3)
+  })
+
+  it('rejects condition, order, source and organization cursor mismatches before any new I/O', async () => {
+    const execute = vi.fn(() =>
+      ownedRows([{ id: 1 }, { id: 2 }], undefined, undefined, {
+        key: (row) => (row as { id: number }).id
+      })
+    )
+    const identity = Object.freeze({})
+    const order = (row: { id: number }) => row.id
+    const query = createRecordQuery<{ id: number }>({
+      pushdown: noPushdown,
+      cursorSource: identity,
+      execute
+    })
+      .where({ id: { gt: 0 } })
+      .orderBy(order)
+    const first = await query.page(1)
+    expect(
+      (
+        await createRecordQuery<{ id: number }>({
+          pushdown: noPushdown,
+          cursorSource: identity,
+          execute
+        })
+          .after(first.next!)
+          .where({ id: { gt: 0 } })
+          .orderBy(order)
+          .page(1)
+      ).items
+    ).toEqual([{ id: 2 }])
+    await expect(query.orderBy(order, 'desc').after(first.next!).page(1)).rejects.toMatchObject({
+      code: 'INVALID_ARGUMENT'
+    })
+    await expect(query.where({ id: 2 }).after(first.next!).page(1)).rejects.toMatchObject({
+      code: 'INVALID_ARGUMENT'
+    })
+    await expect(
+      createRecordQuery<{ id: number }>({ pushdown: noPushdown, execute })
+        .where({ id: { gt: 0 } })
+        .orderBy(order)
+        .after(first.next!)
+        .page(1)
+    ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' })
+    await expect(
+      query.after(first.next!).page(1, { orgId: '12345678-1234-1234-1234-123456789abc' })
+    ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' })
+    await expect(query.page(0)).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' })
+    expect(() => query.after({} as never)).toThrowError(
+      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+    )
+    const reflected = Object.create(
+      Object.getPrototypeOf(first.next),
+      Object.getOwnPropertyDescriptors(first.next!)
+    )
+    expect(() => query.after(reflected)).toThrowError(
+      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+    )
+    const read = vi.fn()
+    const unknown = Object.defineProperty({}, 'read', { get: read })
+    expect(() => query.after(unknown as never)).toThrowError(
+      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+    )
+    expect(read).not.toHaveBeenCalled()
+    expect(execute).toHaveBeenCalledTimes(2)
+  })
+
+  it('detaches an opaque comparator anchor before mutable page items leave the operation', async () => {
+    const values = [
+      { id: 'b', value: 2 },
+      { id: 'a', value: 1 },
+      { id: 'c', value: 3 }
+    ]
+    const compare = (left: (typeof values)[number], right: (typeof values)[number]) =>
+      left.value - right.value
+    const query = createRecordQuery<(typeof values)[number]>({
+      pushdown: noPushdown,
+      execute: () =>
+        ownedRows(values, undefined, undefined, {
+          key: (row) => (row as (typeof values)[number]).id
+        })
+    })
+      .orderByComparator(compare)
+      .limit(3)
+    const first = await query.page(1)
+    expect(first.items[0]?.id).toBe('a')
+    expect(
+      query
+        .after(first.next!)
+        .explain()
+        .client.map((step) => step.operation)
+    ).toEqual(['after', 'comparator', 'limit'])
+    first.items[0]!.value = 99
+    expect((await query.after(first.next!).limit(2).all()).map((row) => row.id)).toEqual(['b', 'c'])
+    expect((await query.after(first.next!).page(1)).items[0]?.id).toBe('b')
+  })
+})
+
 describe('unregistered source resource streaming', () => {
   it('closes the original native resource once without materializing all rows', async () => {
     let advanced = 0
