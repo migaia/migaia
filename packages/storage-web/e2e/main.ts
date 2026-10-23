@@ -157,6 +157,8 @@ const leaseFailures = (error: unknown): ILeaseFailure[] => {
   return failures
 }
 
+/** A nonzero default organization proves the transport carries the actual original host identity. */
+const browserCoordinationOrgId = '11111111-1111-1111-1111-111111111111'
 /** Keeps cross-page coordination receiver stores and their first transport hint waiters alive. */
 const browserCoordinationReceivers = new Map<
   string,
@@ -164,6 +166,8 @@ const browserCoordinationReceivers = new Map<
     host: { dispose(): Promise<void> }
     store: IIndexedDbBackendStore
     hint: Promise<IStorageChange>
+    watch: IStorageIterator<IStorageChange>
+    watched: Promise<IteratorResult<IStorageChange>>
   }
 >()
 /**
@@ -409,6 +413,7 @@ declare global {
     startIndexedDbCoordinationReceiver(dbName: string): Promise<{ changeFeed: boolean }>
     awaitIndexedDbCoordinationHint(dbName: string): Promise<{
       hint: IStorageChange
+      watched: IStorageChange | undefined
       value: string | null
     }>
     startIndexedDbCoordinationWriter(dbName: string): Promise<{ changeFeed: boolean }>
@@ -4338,7 +4343,10 @@ window.startIndexedDbCoordinationReceiver = async (dbName) => {
   const existing = browserCoordinationReceivers.get(dbName)
   if (existing !== undefined) await existing.host.dispose()
   /** The actual host owns this scenario registration and its original native cleanup. */
-  const storeHost = await createStorageHost({ plugins: [indexedDbBackendPlugin({ dbName })] })
+  const storeHost = await createStorageHost({
+    org: browserCoordinationOrgId,
+    plugins: [indexedDbBackendPlugin({ dbName })]
+  })
   const store = storeHost.backend('indexed-db')
   let resolveHint!: (change: IStorageChange) => void
   const hint = new Promise<IStorageChange>((resolve) => {
@@ -4347,7 +4355,9 @@ window.startIndexedDbCoordinationReceiver = async (dbName) => {
   store.subscribeChanges((change) => {
     if (change.channel === 'value' && change.kind === 'put') resolveHint(change)
   })
-  browserCoordinationReceivers.set(dbName, { host: storeHost, store, hint })
+  const watch = store.watch('r09-cross-page-key')
+  const watched = watch.next()
+  browserCoordinationReceivers.set(dbName, { host: storeHost, store, hint, watch, watched })
   return { changeFeed: store.capabilities.changeFeed }
 }
 
@@ -4361,16 +4371,21 @@ window.awaitIndexedDbCoordinationHint = async (dbName) => {
       window.setTimeout(() => reject(new Error('IndexedDB coordination hint timed out')), 5_000)
     })
   ])
+  const watched = await entry.watched
   const value = await entry.store.get('r09-cross-page-key')
+  await entry.watch.dispose()
   await entry.host.dispose()
   browserCoordinationReceivers.delete(dbName)
-  return { hint, value }
+  return { hint, watched: watched.value, value }
 }
 
 /** Commit one value from a separate browser page while retaining the transport until observation. */
 window.startIndexedDbCoordinationWriter = async (dbName) => {
   /** The actual host owns this scenario registration and its original native cleanup. */
-  const storeHost = await createStorageHost({ plugins: [indexedDbBackendPlugin({ dbName })] })
+  const storeHost = await createStorageHost({
+    org: browserCoordinationOrgId,
+    plugins: [indexedDbBackendPlugin({ dbName })]
+  })
   const store = storeHost.backend('indexed-db')
   await store.set('r09-cross-page-key', 'committed-by-writer')
   browserCoordinationWriters.set(dbName, { host: storeHost, store })

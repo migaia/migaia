@@ -117,8 +117,10 @@ test('distinct pages receive a BroadcastChannel hint then reread authoritative I
     expect(result.hint).toMatchObject({
       channel: 'value',
       kind: 'put',
-      keys: ['r09-cross-page-key']
+      keys: ['r09-cross-page-key'],
+      orgId: '11111111-1111-1111-1111-111111111111'
     })
+    expect(result.watched).toEqual(result.hint)
     expect(result.value).toBe('committed-by-writer')
   } finally {
     await writerPage
