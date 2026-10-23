@@ -1,7 +1,14 @@
 import { expectTypeOf } from 'vitest'
 import { defineEntity } from '../../src/entity.js'
 import { memoryBackend } from '../helpers/memory.js'
-import type { IStorageKey } from '@migaia/storage-contract'
+import type { ICapabilityInstallPort, IStorageBase, IStorageKey } from '@migaia/storage-contract'
+import {
+  createStorageHost,
+  definePlugin,
+  defineStorageBackendKind,
+  memoryBackendPlugin,
+  type IStoragePluginCore
+} from '../../src/index.js'
 import type { IMigrateOptions, IMigrateResult, IRepository } from '../../src/entity/types.js'
 
 type IUser = {
@@ -83,3 +90,30 @@ defineEntity<IUser>({
 // key 必须是领域对象上真实存在的属性名（编译期约束）。
 // @ts-expect-error "missing" 不是 IUser 的属性
 defineEntity<IUser>({ name: 'bad', key: 'missing' })
+
+/** Certified borrowed views retain their exact data channels without taking root ownership. */
+const memoryHost = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })
+const memoryOrg = memoryHost.org('00000000-0000-0000-0000-000000000001')
+const orgRepository = users.connect(memoryOrg.backend('memory'))
+expectTypeOf(orgRepository.get).returns.toEqualTypeOf<Promise<IUser | undefined>>()
+
+/** A base-only plugin carries no key-value channel for entity connection. */
+declare const baseOnlyStore: IStorageBase
+/** The existing installer is only a declaration fixture and grants no runtime data channel. */
+declare const baseOnlyInstaller: ICapabilityInstallPort
+/** Exact kind inference must not widen a base-only organization backend to key-value. */
+const baseOnlyKind = defineStorageBackendKind<IStorageBase, undefined>()('base-only')
+/** Public plugin installation preserves the source store shape in the organization projection. */
+const baseOnlyPlugin = definePlugin('base-only', (core: IStoragePluginCore) => ({
+  kind: baseOnlyKind,
+  featureExpose: () => ({ getClient: () => undefined }),
+  capabilityInstaller: () => baseOnlyInstaller,
+  install: () => {
+    core.registerStore(baseOnlyStore)
+    return {}
+  }
+}))
+/** The organization view is genuine host output rather than a cast borrowed type. */
+const baseOnlyHost = await createStorageHost({ plugins: [baseOnlyPlugin] as const })
+// @ts-expect-error a precise base-only backend does not provide entity key-value channels.
+users.connect(baseOnlyHost.org('00000000-0000-0000-0000-000000000001').backend('base-only'))
