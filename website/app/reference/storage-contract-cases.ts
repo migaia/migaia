@@ -713,6 +713,61 @@ function smallest(execute: IRecordQuerySource['execute']) {
         'Given totals 8, 2, 5 and 1, the returned real storage iterator yields 1, 2 and 5. Equal totals retain source order; iterator cleanup stays with the original source owner.',
         '源金额为 8、2、5、1 时，返回的真实存储迭代器依次产出 1、2、5；同金额保留源顺序，清理仍由原数据源 owner 负责。'
       )
+    },
+    {
+      title: t('Continue a keyset page without an offset', '通过键集继续分页'),
+      problem: t(
+        'Keep continuity after deleting prior-page rows using the original query and source identity.',
+        '删除前页记录后，通过原查询与数据源身份保持连续。'
+      ),
+      example: t(
+        `import { createRecordQuery, type IRecordQuerySource } from '@migaia/storage-contract'
+async function pages(source: IRecordQuerySource) {
+  const query = createRecordQuery<{ id: string }>(source)
+  const first = await query.page(2)
+  const second = first.next ? await query.after(first.next).limit(2).all() : []
+  return [first.items, second]
+}`,
+        `import { createRecordQuery, type IRecordQuerySource } from '@migaia/storage-contract'
+async function pages(source: IRecordQuerySource) {
+  const query = createRecordQuery<{ id: string }>(source)
+  const first = await query.page(2)
+  const second = first.next ? await query.after(first.next).limit(2).all() : []
+  return [first.items, second]
+}`
+      ),
+      result: t(
+        'With canonical keys a,b,c,d, returns pages a,b and c,d. A different source, condition or ordering rejects before new I/O.',
+        '规范键为 a,b,c,d 时返回 a,b 与 c,d 两页；源、条件或排序不匹配在新 I/O 前拒绝。'
+      )
+    }
+  ],
+  compileStorageQueryCondition: [
+    {
+      title: t(
+        'Filter native candidates with the original canonical AST',
+        '用原规范 AST 过滤原生候选'
+      ),
+      problem: t(
+        'A native source receives canonical conditions and must not duplicate query operators.',
+        '原生数据源收到规范条件，不应复制查询操作符。'
+      ),
+      example: t(
+        `import { compileStorageQueryCondition, type IQueryCondition } from '@migaia/storage-contract'
+function matching(conditions: readonly IQueryCondition[], rows: readonly { total: number }[]) {
+  const tests = conditions.map((condition) => compileStorageQueryCondition<{ total: number }>(condition))
+  return rows.filter((row) => tests.every((test) => test(row)))
+}`,
+        `import { compileStorageQueryCondition, type IQueryCondition } from '@migaia/storage-contract'
+function matching(conditions: readonly IQueryCondition[], rows: readonly { total: number }[]) {
+  const tests = conditions.map((condition) => compileStorageQueryCondition<{ total: number }>(condition))
+  return rows.filter((row) => tests.every((test) => test(row)))
+}`
+      ),
+      result: t(
+        'Uses only the source-supplied canonical conditions and the existing predicate compiler.',
+        '仅使用 source 已提供的规范条件与现有谓词 compiler。'
+      )
     }
   ],
   compileStorageWhere: [

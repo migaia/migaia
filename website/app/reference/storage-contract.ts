@@ -1641,7 +1641,7 @@ export const storageContractReference: ILibraryReference = {
       },
       returns: t(
         'IRdfQuery with common reads, projection, limit and native follow/inverse. Client traversal, pages and writes remain subsequent units.',
-        '返回 IRdfQuery，支持共享读取、投影、limit 与原生 follow/inverse；客户端遍历、分页与写入仍待后续单元。'
+        '返回 IRdfQuery，支持共享读取、投影、limit 与原生 follow/inverse；客户端遍历与写入仍待后续单元；支持共享键集分页。'
       ),
       example: storageContractCases.createRdfQuery![0]!.example,
       cases: storageContractCases.createRdfQuery
@@ -1686,6 +1686,25 @@ export const storageContractReference: ILibraryReference = {
         '规范规划词汇；后端声明真实支持的子集，名称本身不安装查询方法。'
       ),
       example: 'console.log(QueryOperation.where, QueryOperation.select) // where select'
+    },
+    compileStorageQueryCondition: {
+      role: 'operation',
+      purpose: t(
+        'Compile an already canonical source AST using the original condition compiler.',
+        '使用原条件 compiler 编译 source 已收到的规范 AST。'
+      ),
+      params: {
+        condition: t(
+          'Canonical AST from the original native execute callback, without another IWhere snapshot.',
+          '原生 execute 回调的规范 AST，不再捕获 IWhere。'
+        )
+      },
+      returns: t(
+        'The original stateless predicate with unchanged operator and error semantics.',
+        '操作符及错误语义保持的原无状态谓词。'
+      ),
+      example: storageContractCases.compileStorageQueryCondition![0]!.example,
+      cases: storageContractCases.compileStorageQueryCondition
     },
     compileStorageWhere: {
       role: 'operation',
@@ -3484,6 +3503,12 @@ console.log(candidate.name, candidate.output)`
         '原生 RDF 原迭代器回调及 unknown 投影行、支持与资源事实。'
       ),
       members: {
+        cursorSource: {
+          summary: t(
+            'Optional single-read private collection identity, reused by equivalent query descriptors; never exposed by a cursor.',
+            '可选单读的私有 collection 身份，等价描述器复用，游标不暴露此对象。'
+          )
+        },
         nativeSteps: {
           summary: t(
             'Explicitly opt into extended native row controls while retaining ordered traversal steps.',
@@ -3513,10 +3538,31 @@ console.log(candidate.name, candidate.output)`
         }
       }
     },
+    IQueryCursor: {
+      summary: t(
+        'Opaque readonly in-process keyset anchor, privately scoped to the original source, conditions and ordering.',
+        '不透明只读进程内键集锚点，私有约束原数据源、条件与排序。'
+      ),
+      members: {}
+    },
+    IQueryPages: {
+      summary: t(
+        'Original-reader pages with one lookahead and mapping only for actual returned items.',
+        '原读取器的分页；仅保留一条前瞻，对实际返回项映射。'
+      ),
+      members: {
+        page: {
+          summary: t(
+            'Read a positive safe page size and an optional next cursor; await original cleanup.',
+            '读取正安全页大小与可选 next 游标，等待原清理。'
+          )
+        }
+      }
+    },
     IQueryNativeStep: {
       summary: t(
-        'Ordered serializable native where/select/limit/skip/distinct steps; no JavaScript callback translation.',
-        '有序可序列化原生 where/select/limit/skip/distinct 步骤，不翻译 JavaScript 回调。'
+        'Ordered native where/select/limit/skip/distinct/primary-order/keyset-after steps; no JavaScript callback translation.',
+        '有序原生 where/select/limit/skip/distinct/主键order/键集after 步骤，不翻译 JavaScript 回调。'
       ),
       members: {
         operation: {
@@ -3667,6 +3713,12 @@ console.log(candidate.name, candidate.output)`
         '作者接点：一个 execute 回调返回原 unknown 行 IStorageIterator，不新增资源 owner。'
       ),
       members: {
+        cursorSource: {
+          summary: t(
+            'Optional single-read private collection identity, reused by equivalent query descriptors; never exposed by a cursor.',
+            '可选单读的私有 collection 身份，等价描述器复用，游标不暴露此对象。'
+          )
+        },
         nativeSteps: {
           summary: t(
             'Opt in to authoritative ordered native steps; omission preserves legacy execute arguments.',

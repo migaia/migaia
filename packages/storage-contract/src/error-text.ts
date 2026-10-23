@@ -41,6 +41,8 @@ export const StorageContractErrorText = {
   queryEmptyResult: 'storage query has no result',
   /** Chunk callbacks require a positive finite allocation bound before cursor admission. */
   queryChunk: 'storage query chunk size must be a positive safe integer',
+  /** Keyset pages reserve a positive safe bound before opening their original native cursor. */
+  queryPage: 'storage query page size must be a positive safe integer',
   /** Statistics accept present finite numbers and skip only null or undefined fields. */
   queryNumericField: 'storage query numeric field must contain a finite number',
   /**

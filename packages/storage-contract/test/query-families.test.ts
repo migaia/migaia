@@ -161,6 +161,34 @@ describe('shared vector query family', () => {
 })
 
 describe('shared RDF query family', () => {
+  it('pages the same RDF reader and rejects a different captured ground pattern before I/O', async () => {
+    const predicate = term.iri('urn:predicate')
+    const values: IQuad[] = ['a', 'b', 'c'].map((id) => ({
+      subject: term.iri('urn:' + id),
+      predicate,
+      object: term.iri('urn:object'),
+      graph: term.defaultGraph
+    }))
+    const execute = vi.fn(() => rows(values))
+    const identity = Object.freeze({})
+    const source: IRdfQuerySource = {
+      pushdown: { source: 'rdf-pages', operators: [], operations: [] },
+      cursorSource: identity,
+      execute
+    }
+    const query = createRdfQuery(source, { predicate })
+    const first = await query.select('subject').page(2)
+    expect(first.items).toEqual(values.slice(0, 2).map(({ subject }) => ({ subject })))
+    expect((await query.after(first.next!).page(2)).items).toEqual([values[2]])
+    expect(execute).toHaveBeenCalledTimes(2)
+    await expect(
+      createRdfQuery(source, { subject: term.iri('urn:different') })
+        .after(first.next!)
+        .page(2)
+    ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' })
+    expect(execute).toHaveBeenCalledTimes(2)
+  })
+
   it('shares selector ordering and offset controls with records without exposing key metadata', async () => {
     /** Each quad retains its original native key while only real quad fields leave the reader. */
     const quads = ['c', 'a', 'b'].map((id): IQuad => ({
