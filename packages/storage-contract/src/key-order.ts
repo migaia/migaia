@@ -1,6 +1,6 @@
 import { isUint8Array } from '@migaia/utils/bytes'
 import { prefixStorageOrgKey } from './org.js'
-import { snapshotStorageKey, assertStringStorageKey } from './key.js'
+import { snapshotStorageKey, assertStringStorageKey, KEY_DOMAIN_LIMITS } from './key.js'
 import type { IBackendKind } from './capabilities.js'
 import type { IStorageKey } from './context.js'
 import { StorageContractError, StorageContractErrorCode } from './errors.js'
@@ -86,6 +86,99 @@ export function encodeOrderedStorageKey(
   backend: IBackendKind | undefined
 ): Uint8Array {
   return encodeKeySnapshot(snapshotStorageKey(key, backend), false)
+}
+
+/**
+ * Read the exact existing ordered-key wire format for native backends that enumerate physical keys.
+ * No alternate encoding is introduced. Bounds are checked before allocation and the original key
+ * owner validates the resulting domain; malformed or noncanonical bytes throw INVALID_KEY.
+ */
+export function decodeOrderedStorageKey(
+  encoded: Uint8Array,
+  backend: IBackendKind | undefined
+): IStorageKey {
+  /** One reader cursor advances through the original self-delimiting scalar and tuple tags. */
+  let offset = 0
+  /** Original node and depth budgets bound hostile persisted wire input before recursion. */
+  let nodes = 0
+  /** Every malformed wire failure uses the existing key-domain family and original caller bytes. */
+  const invalid = (): never => {
+    throw new StorageContractError(
+      StorageContractErrorCode.invalidKey,
+      { backend },
+      StorageContractErrorText.orderedKeyInvalid
+    )
+  }
+  if (!isUint8Array(encoded)) invalid()
+  /** Require remaining bytes before fixed-width reads or data-dependent allocations. */
+  const requireBytes = (count: number): void => {
+    if (offset + count > encoded.byteLength) invalid()
+  }
+  /** Parse one complete component using the same tag table as the canonical writer. */
+  const read = (depth: number): IStorageKey => {
+    if (++nodes > KEY_DOMAIN_LIMITS.maxNodes || depth > KEY_DOMAIN_LIMITS.maxDepth) invalid()
+    requireBytes(1)
+    const tag = encoded[offset++]
+    if (tag === OrderedKeyTag.number || tag === OrderedKeyTag.date) {
+      requireBytes(8)
+      const bytes = encoded.slice(offset, offset + 8)
+      offset += 8
+      if (bytes[0]! & 128) bytes[0]! ^= 128
+      else for (let index = 0; index < 8; index++) bytes[index]! ^= 255
+      const value = new DataView(bytes.buffer).getFloat64(0, false)
+      if (!Number.isFinite(value) || Object.is(value, -0)) invalid()
+      if (tag === OrderedKeyTag.number) return value
+      const date = new Date(value)
+      if (date.getTime() !== value) invalid()
+      return date
+    }
+    if (tag === OrderedKeyTag.string) {
+      /** Bounded chunks avoid spread argument limits without normalizing UTF-16 surrogate units. */
+      let result = ''
+      const units: number[] = []
+      for (;;) {
+        requireBytes(1)
+        const marker = encoded[offset++]
+        if (marker === 0) break
+        if (marker !== 1) invalid()
+        requireBytes(2)
+        units.push((encoded[offset++]! << 8) | encoded[offset++]!)
+        if (units.length === 1024) {
+          result += String.fromCharCode(...units)
+          units.length = 0
+        }
+      }
+      return result + String.fromCharCode(...units)
+    }
+    if (tag === OrderedKeyTag.bytes) {
+      const bytes: number[] = []
+      for (;;) {
+        requireBytes(1)
+        const marker = encoded[offset++]
+        if (marker === 0) break
+        if (marker !== 1 || bytes.length >= KEY_DOMAIN_LIMITS.maxBinaryBytes) invalid()
+        requireBytes(1)
+        bytes.push(encoded[offset++]!)
+      }
+      return new Uint8Array(bytes).buffer
+    }
+    if (tag === OrderedKeyTag.array) {
+      const children: IStorageKey[] = []
+      for (;;) {
+        requireBytes(1)
+        if (encoded[offset] === 0) {
+          offset++
+          break
+        }
+        children.push(read(depth + 1))
+      }
+      return children
+    }
+    return invalid()
+  }
+  const key = read(0)
+  if (offset !== encoded.byteLength) invalid()
+  return snapshotStorageKey(key, backend)
 }
 /** Converts already canonical bytes without another logical-key traversal or representation. */
 export function storageKeyBytesIdentity(encoded: Uint8Array): string {
