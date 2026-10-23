@@ -215,6 +215,8 @@ primary value/release 只由 Graph 拥有一次，节点内先释放 primary 再
 
 ### 纯拓扑与增量索引
 
+静态建图只读取一次节点和边，以迭代 DFS 和 ordinal/level 桶在线性 O(v + e + p) 成本内构造，p 为捕获输入大小。多闭环按根 ordinal 与声明依赖顺序报告遇到的首个闭环。动态增删保留原算法。
+
 buildCapabilityTopology(nodes, onUnknownProvider, onCycle, onInvalid) 只计算，不调用 start 或 release。四个参数均必填。节点为 { id, dependencies, ordinal }；ordinal 必须是唯一安全整数，连续覆盖 [0, nodeCount)，不静默重排或重写坏输入。边的 provider 非空、required 为 boolean；缺席 required provider 交 onUnknownProvider(nodeId, provider)，存在的 optional 边也参与层级和环检测。
 
 结果 ICapabilityTopology 深冻结，包含 ordered，以及只读 providers、consumers、indegree、level、ordinal 映射。顺序为 (level, ordinal)：先依赖层级，同层再登记顺序。providers 为提供者到消费者，consumers 为消费者到依赖；indegree 是接纳时的依赖数。ReadonlyMap/ReadonlySet facade 不提供 mutation；forEach(callback, thisArg?) 保留标准接收者语义。

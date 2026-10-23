@@ -507,6 +507,8 @@ Synchronous lifecycle callbacks that reenter the same Graph operation produce GR
 
 ### Pure topology and incremental indexes
 
+Static construction reads each node and edge once, then uses iterative DFS and ordinal/level buckets in O(v + e + p), where p is the captured input size. Multiple cycles report the first closed path reached by root ordinal and declared provider order. Incremental edits retain their existing algorithm.
+
 buildCapabilityTopology(nodes, onUnknownProvider, onCycle, onInvalid) computes a plan without calling start or release. All four arguments are required. Nodes contain id, dependencies and ordinal. Ordinals must be unique safe integers covering [0, nodeCount) without gaps. Invalid input is not silently sorted or rewritten. Edges require a nonempty provider and boolean required. Missing required providers go to onUnknownProvider(nodeId, provider); present optional edges also affect levels and cycle checks.
 
 The deeply frozen ICapabilityTopology contains ordered plus read-only providers, consumers, indegree, level and ordinal maps. Scheduling is by (level, ordinal): dependency depth first, registration order within a level. providers maps providers to consumers, while consumers maps consumers to their dependencies. indegree captures admission-time dependency counts. ReadonlyMap/ReadonlySet facades expose no mutation, and forEach(callback, thisArg?) follows the standard receiver semantics.
@@ -527,7 +529,7 @@ createTopologyIndex(adapter) requires onCycle and onInvalid without creating ser
 | snapshot()                                          | Deeply frozen static topology projection.                                                                |
 | begin()                                             | Isolated transaction with the same reader/writer operations and commit/rollback.                         |
 
-Base readers retain the original snapshot until commit; base writes and nested begin calls are rejected. Commit publishes the working view, while rollback discards it and preserves observable facts. Settled transactions reject reads as well as writes. Static topology and indexes share one private structural/edge admission owner; the trusted construction helper is not exported.
+Base readers retain the original snapshot until commit; base writes and nested begin calls are rejected. Commit publishes the working view, while rollback discards it and preserves observable facts. Settled transactions reject reads as well as writes. Static topology and indexes share one private structural/edge admission owner; static construction does not replay incremental edits.
 
 ### Pure dependency plans
 
