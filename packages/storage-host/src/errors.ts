@@ -139,7 +139,15 @@ export const createStorageTypeError = (
 /** Value, bytes or structured-record channel sharing one logical key conflict domain. */
 export type IStorageChannel = 'value' | 'bytes' | 'record'
 /** Extension phase used to locate a schema, codec, migration, comparator or diagnostic failure. */
-export type IExtensionStage = 'schema' | 'codec' | 'migration' | 'comparator' | 'diagnostic'
+export type IExtensionStage =
+  | 'schema'
+  | 'codec'
+  | 'migration'
+  | 'comparator'
+  | 'diagnostic'
+  | 'where'
+  | 'select'
+  | 'selector'
 
 /**
  * Frozen storage diagnostic retaining the original failure on cause. The top-level message defaults

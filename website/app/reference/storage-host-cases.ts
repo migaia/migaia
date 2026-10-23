@@ -3,10 +3,39 @@ import type { ICaseDoc, IText } from './contract.js'
 const t = (en: string, zh: string): IText => ({ en, zh })
 /** Application extensions retain their exact inputs while the host owns installation and cleanup. */
 export const storageHostCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
+  defineEntity: [
+    {
+      title: t('Commit entities beside native values', '实体与原生键值一起提交'),
+      problem: t(
+        'Two repository writes and a status value must share one real transaction.',
+        '两个仓储写入与状态值需要共享同一个真实事务。'
+      ),
+      example: `import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { defineEntity } from '@migaia/storage-host/entity'
+
+const users = defineEntity<{ id: string; name: string }>({ name: 'users', key: 'id' })
+await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+const store = host.backend('memory')
+const repo = users.connect(store)
+await store.transaction(async (scope) => {
+  await repo.in(scope).put({ id: 'a', name: 'Ada' })
+  await repo.in(scope).put({ id: 'b', name: 'Grace' })
+  await scope.set('status', 'ready')
+})
+console.log(await repo.query().where({ name: 'Ada' }).orderByComparator((left, right) => left.name.localeCompare(right.name)).limit(1).select('id', 'name').all())`,
+      result: t(
+        'Prints Ada after all three changes commit atomically.',
+        '三个变更原子提交后输出Ada。'
+      )
+    }
+  ],
   memoryBackendPlugin: [
     {
       title: t('Commit three native memory channels', '提交内存的三个原生通道'),
-      problem: t('One isolated backend needs text, bytes and queried records within the original transaction owner.', '一个隔离后端需要沿原事务owner提交文本、字节与可查询记录。'),
+      problem: t(
+        'One isolated backend needs text, bytes and queried records within the original transaction owner.',
+        '一个隔离后端需要沿原事务owner提交文本、字节与可查询记录。'
+      ),
       example: `import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
 import { records } from '@migaia/storage-contract'
 
@@ -19,7 +48,10 @@ await memory.transaction(async (tx) => {
   await tx.putRecord({ state: 'paid', total: 20 }, 'order-1')
 })
 console.log(await memory.use(records).query<Order>().where({ state: 'paid' }).select('total').all())`,
-      result: t('Prints [{ total: 20 }] after the native transaction commits.', '原生事务提交后输出[{ total: 20 }]。')
+      result: t(
+        'Prints [{ total: 20 }] after the native transaction commits.',
+        '原生事务提交后输出[{ total: 20 }]。'
+      )
     }
   ],
   resolveStorageNamespace: [
