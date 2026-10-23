@@ -5,6 +5,16 @@ const t = (en: string, zh: string): IText => ({ en, zh })
 /** Neutral host and authoring entry, with no browser or native driver import. */
 export const storageHostReference: ILibraryReference = {
   modules: {
+    'authoring/backend': {
+      summary: t(
+        'Consume finite neutral backend functions and controller types. Controller creation, registration and lookup remain guarded by the original core and Feature ports.',
+        '消费有限中立后端函数与controller类型。controller构造、登记和读取仍由原core与Feature接点约束。'
+      ),
+      example: `import { createStorageOperationReporter, reportCleanupError } from '@migaia/storage-host/authoring/backend'
+
+const report = createStorageOperationReporter()
+reportCleanupError(report, new Error('cleanup failed'))`
+    },
     entity: {
       summary: t(
         'Use neutral schema adapters and strict portable codecs through one entity entry.',

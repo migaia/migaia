@@ -13,6 +13,10 @@ import type {
 import type { IScheduler } from '@migaia/utils/scheduler'
 import type { INativeAbortSignal } from '@migaia/utils/promise'
 import type {
+  IBackendChangeController,
+  IBackendChangeControllerOptions
+} from './core/change-controller.js'
+import type {
   IOperationContext,
   IStorageBase,
   IStorageStore,
@@ -115,6 +119,7 @@ export type IStorageFeatureExpose<K extends IStorageBackendKind> = K extends ISt
       getKind(): K
       getStore(): IStorageKindStore<K>
       getClient(): IStorageKindClient<K>
+      getChangeController(): IBackendChangeController | undefined
       getBackendId(): string
       getLifecycle(): IPluginRegistrationContext
       onDispose: IPluginHostCore['onDispose']
@@ -133,6 +138,7 @@ type IStorageMethodExpose<E extends object> = {
 }
 export type IStorageDescriptorFeatureExpose<K extends IStorageBackendKind> = Readonly<{
   getClient(): IStorageKindClient<K>
+  getChangeController?: never
   getKind?: never
   getStore?: never
   getBackendId?: never
@@ -289,6 +295,8 @@ export type IStoragePluginCore<F extends IStorageFeatureRecord = {}> = Pick<
   readonly hooks: IStorageHooks
   readonly stageBindings: IBackendStageBindings
   readonly emit: IStorageHookEmitter
+  createChangeController(options: IBackendChangeControllerOptions): IBackendChangeController
+  registerChangeController(store: IStorageBase, controller: IBackendChangeController): void
   registerDetect(check: (signal: INativeAbortSignal) => Promise<void>): void
   registerStore<S extends IStorageBase>(store: S): void
   getStore(): IStorageBase
