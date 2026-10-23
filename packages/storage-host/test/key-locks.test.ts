@@ -371,6 +371,66 @@ describe('the shared local key-lock provider', () => {
     }
   })
 
+  it('excludes only the current authentic held lease while still finding another range holder', async () => {
+    const current = await fixture()
+    await using _host = current.host
+    await using port = current.port
+    /** Two independent native attempts own separate entries in the same physical text bucket. */
+    const firstEntered = deferred<void>()
+    const otherEntered = deferred<void>()
+    const inspect = deferred<void>()
+    const finish = deferred<void>()
+    const ranges = [
+      { channel: 'text' as const, ...snapshotConcurrencyLockRange({ channel: 'text' }, 'catalog') }
+    ]
+    const firstId = snapshotConcurrencyLockKeys([lockKey.text('first')], 'catalog').identities
+    const otherId = snapshotConcurrencyLockKeys([lockKey.text('other')], 'catalog').identities
+    let expired!: IConcurrencyAttemptContext
+    const first = run(current, 'first', { lock: [lockKey.text('first')] }, async (ctx) => {
+      expired = ctx
+      firstEntered.resolve()
+      await inspect.promise
+      expect(port.probe(firstId, undefined, ctx)).toBeUndefined()
+      expect(port.probe([], ranges, ctx)).toMatchObject({ holder: { owner: 'other' } })
+      expect(() => port.probe([], ranges, {} as IConcurrencyAttemptContext)).toThrowError(
+        expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+      )
+      return { status: 'committed', value: 'first' }
+    })
+    await firstEntered.promise
+    const other = run(current, 'other', { lock: [lockKey.text('other')] }, async () => {
+      otherEntered.resolve()
+      await finish.promise
+      return { status: 'committed', value: 'other' }
+    })
+    await otherEntered.promise
+    try {
+      /** An optimistic declaration grants no held-key exemption from a different attempt. */
+      await expect(
+        run(
+          current,
+          'optimistic',
+          { lock: [lockKey.text('other')], concurrency: ConcurrencyPolicy.optimistic() },
+          async (ctx) => {
+            expect(port.probe(otherId, undefined, ctx)).toMatchObject({
+              holder: { owner: 'other' }
+            })
+            return { status: 'committed', value: 'optimistic' }
+          }
+        )
+      ).resolves.toBe('optimistic')
+      inspect.resolve()
+      await expect(first).resolves.toBe('first')
+      expect(() => port.probe([], ranges, expired)).toThrowError(
+        expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+      )
+    } finally {
+      inspect.resolve()
+      finish.resolve()
+      await Promise.allSettled([first, other])
+    }
+  })
+
   it('does not start a root mutation when its acquired observer aborts the original operation', async () => {
     const current = await fixture()
     await using _host = current.host
