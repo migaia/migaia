@@ -18,6 +18,9 @@ import {
   type ICapabilityImpl,
   type IRecordsApi,
   type ITransactionBuilder,
+  type ITransactionCapabilityView,
+  type IWithTransactionQueryMethods,
+  type IStorageKey,
   type IWithChainMethods
 } from '../src/index.js'
 
@@ -589,6 +592,47 @@ describe('record query Feature type projection', () => {
       expectTypeOf(store.use(native).extra).toEqualTypeOf<7>()
       // @ts-expect-error Zero-Feature queries have no selected Feature method.
       original.use(records).query().tag()
+    }
+    void validTypes
+  })
+})
+
+describe('transaction query Feature type projection', () => {
+  it('keeps transaction query context absent while preserving builder methods, native scope members and standard token availability', () => {
+    /** Native top-level members and the original standard transaction lookup remain authoritative. */
+    type IScope = ITransactionCapabilityView<typeof kv | typeof records, string> & {
+      readonly native: 'same-connection'
+      getRecord(key: IStorageKey): Promise<string | undefined>
+    }
+    /** The same finite helper serves host scope projection without reading a private host brand. */
+    type IProjected = IWithTransactionQueryMethods<IScope, { mark(): 'marked' }>
+    type IEnhanced = IWithChainMethods<
+      { tx(): ITransactionBuilder<IScope, { existing(): string }> },
+      {
+        readonly query: { mark(): 'marked' }
+        readonly tx: { added(): number }
+      }
+    >
+    function validTypes(scope: IProjected, builder: ReturnType<IEnhanced['tx']>): void {
+      expectTypeOf(scope.native).toEqualTypeOf<'same-connection'>()
+      const selected = scope
+        .use(records)
+        .query<{ id: string; active: boolean }>()
+        .where({ active: true })
+        .limit(2)
+        .select('id')
+      expectTypeOf(selected.mark()).toEqualTypeOf<'marked'>()
+      expectTypeOf(selected.all()).toEqualTypeOf<Promise<{ id: string }[]>>()
+      expectTypeOf(scope.use(kv).getMany).toBeFunction()
+      // @ts-expect-error Transaction reads cannot acquire a separate operation context.
+      selected.all({ timeoutMs: 1 })
+      // @ts-expect-error Root-only KV iteration does not appear on transaction capabilities.
+      scope.use(kv).keys()
+      builder.existing()
+      builder.added()
+      builder
+        .lock({ channel: 'text', key: 'record' })
+        .run((tx) => tx.use(records).query<{ id: string }>().select('id').mark())
     }
     void validTypes
   })

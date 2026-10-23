@@ -63,7 +63,7 @@ describe('Feature transaction methods on original native views', () => {
       .backend('memory')
       .transaction((scope) => expect(Object.hasOwn(scope, 'api')).toBe(false))
     await using host = await createStorageHost({
-      plugins: [memoryBackendPlugin({ features: { scoped: scopedFeature() } })]
+      plugins: [memoryBackendPlugin(undefined, { scoped: scopedFeature() })]
     })
     const store = host.backend('memory')
     expect(await store.api.identity()).toBe(store)
@@ -74,6 +74,13 @@ describe('Feature transaction methods on original native views', () => {
       expect(await scope.api.identity()).toBe(true)
       await scope.set('key', 'value')
       expect(await scope.api.nested.read('key')).toBe('value')
+      const query = scope
+        .use(records)
+        .query<{ id: string }>()
+        .where({ id: 'one' })
+        .limit(1)
+        .select('id')
+      expect(query.mark()).toBe(query)
       saved = scope.api.identity
     })
     await expect(saved()).rejects.toMatchObject({
@@ -83,12 +90,16 @@ describe('Feature transaction methods on original native views', () => {
     await store
       .tx()
       .lock({ channel: 'text', key: 'key' })
-      .run(async (scope) => expect(await scope.api.identity()).toBe(true))
+      .run(async (scope) => {
+        expect(await scope.api.identity()).toBe(true)
+        const query = scope.use(records).query<{ id: string }>().where({ id: 'one' }).select('id')
+        expect(query.mark()).toBe(query)
+      })
   })
 
   it('drains unawaited Feature operations and keeps a caught method failure as the original first failure', async () => {
     await using host = await createStorageHost({
-      plugins: [memoryBackendPlugin({ features: { scoped: scopedFeature() } })]
+      plugins: [memoryBackendPlugin(undefined, { scoped: scopedFeature() })]
     })
     const store = host.backend('memory')
     /** The original operation owner admits the entire async method before the callback returns. */
@@ -123,7 +134,7 @@ describe('Feature transaction methods on original native views', () => {
 
   it('mixes selected fluent methods into original branches and guards saved endpoints after disposal', async () => {
     const host = await createStorageHost({
-      plugins: [memoryBackendPlugin({ features: { scoped: scopedFeature() } })]
+      plugins: [memoryBackendPlugin(undefined, { scoped: scopedFeature() })]
     })
     const store = host.backend('memory')
     const builder = store.tx()
@@ -159,7 +170,7 @@ describe('Feature transaction methods on original native views', () => {
         api: { store: {}, transaction: {} }
       }))
     const failure = await createStorageHost({
-      plugins: [memoryBackendPlugin({ features: { duplicate: duplicate() } })]
+      plugins: [memoryBackendPlugin(undefined, { duplicate: duplicate() })]
     }).catch((error: unknown) => error)
     expect(failure).toMatchObject({ code: 'BACKEND_INSTALL_FAILED' })
     /** Native installation adds finite original wrapper boundaries around the semantic rejection. */
@@ -184,7 +195,7 @@ describe('Feature transaction methods on original native views', () => {
       }
     }))
     await using host = await createStorageHost({
-      plugins: [memoryBackendPlugin({ features: { scoped: scopedFeature() } }), intervention]
+      plugins: [memoryBackendPlugin(undefined, { scoped: scopedFeature() }), intervention]
     })
     const builder = host.backend('memory').tx()
     expect(builder.mark()).toBe(builder)
@@ -208,7 +219,7 @@ describe('Feature transaction methods on original native views', () => {
       )
     }))
     const failure = await createStorageHost({
-      plugins: [memoryBackendPlugin({ features: { feature } })]
+      plugins: [memoryBackendPlugin(undefined, { feature })]
     }).catch((error: unknown) => error)
     const seen: unknown[] = []
     let cursor = failure
@@ -268,5 +279,50 @@ describe('Feature transaction methods on original native views', () => {
       })
     ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' })
     expect(stages).toBe(0)
+  })
+
+  it('keeps query methods on both transaction entry points without adding an empty transaction API', async () => {
+    const feature = defineFeature(memoryBackendKind, () => ({
+      capabilities: [],
+      api: { store: {}, transaction: {} },
+      chain: {
+        query: {
+          mark<T>(this: T): T {
+            return this
+          }
+        }
+      }
+    }))
+    await using host = await createStorageHost({
+      plugins: [memoryBackendPlugin(undefined, { feature })]
+    })
+    const store = host.backend('memory')
+    await store.transaction(async (scope) => {
+      expect(Object.hasOwn(scope, 'api')).toBe(false)
+      const query = scope.use(records).query<{ id: string }>().where({ id: 'one' }).select('id')
+      expect(query.mark()).toBe(query)
+      await query.all()
+      /** Type-only negative calls are never executed against the actual native scope. */
+      const invalidCalls = () => {
+        // @ts-expect-error Transaction reads cannot start a separate operation context.
+        query.all({ timeoutMs: 1 })
+        // @ts-expect-error No selected transaction API exists.
+        void scope.api
+      }
+      expectTypeOf(invalidCalls).toEqualTypeOf<() => void>()
+    })
+    await store
+      .tx()
+      .lock({ channel: 'record', key: 'one' })
+      .run(async (scope) => {
+        const query = scope
+          .use(records)
+          .query<{ id: string }>()
+          .where({ id: 'one' })
+          .limit(1)
+          .select('id')
+        expect(query.mark()).toBe(query)
+        await query.all()
+      })
   })
 })

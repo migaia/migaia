@@ -60,7 +60,7 @@ export function sqliteBackendPlugin<
       capabilityInstaller: (_store: ISqliteStore<TValue>): ICapabilityInstallPort =>
         construction.installer,
       featureExpose: () => ({
-        getClient: () => captured.driver,
+        getClient: () => construction.client,
         getTransactionClient: (scope: ISqliteTransactionScope) =>
           construction.getTransactionClient(scope)
       })
