@@ -104,6 +104,8 @@ export type IStorageJournalChange = Readonly<{
 }>
 /** One admitted descriptor closes over its original native transaction and immutable org projection. */
 export type IStorageJournalBackendBinding = {
+  /** Original native owner can await external intent I/O after producing final business images. */
+  readonly externalWal?: true
   forOrg(orgId: string): IStorageJournalBackendBinding
   openNamespace(prefix: string): Promise<IStorageJournalNamespace>
   changes?(scope: Omit<ITransactionScope, 'use'>): readonly IStorageJournalChange[]
