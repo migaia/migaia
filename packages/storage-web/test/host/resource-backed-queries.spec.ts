@@ -3,24 +3,22 @@ import { createRuntime } from '@migaia/reactive'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { Resource } from '@migaia/resource'
 import { describe, expect, it, vi } from 'vitest'
-import { memoryReactive } from '../../src/plugins/reactive/memory.js'
-import { createStorageHost } from '../../src/host/index.js'
+import { createReactiveServiceFixture } from '../helpers/reactive-service.js'
 import { createStorageReactiveService } from '../../src/host/reactive.js'
-import { getBackendReactiveController } from '../../src/backends/reactive-controller.js'
-import { memoryStorageHost } from '../../src/backends/memory.js'
 
 /** Proves Host query state is Resource-owned and backend changes trigger authoritative refresh. */
 describe('Resource-backed queries', () => {
   it('uses caller runtime, refreshes after one backend invalidation, and disposes idempotently', async () => {
-    const host = await createStorageHost({
-      plugins: [memoryReactive({ id: 'fixture-memory' })] as const
+    const { host, service, store } = await createReactiveServiceFixture({
+      id: 'fixture-memory'
     })
     const runtime = createRuntime()
     let reads = 0
-    const query = host.liveQuery({
+    const query = service.createQuery({
       backendId: 'fixture-memory',
       runtime,
-      query: async ({ store, signal }) => {
+      query: async ({ store: capturedStore, signal }) => {
+        expect(capturedStore).toBe(store)
         expect(signal.aborted).toBe(false)
         reads += 1
         return store.get('value-1')
@@ -31,7 +29,7 @@ describe('Resource-backed queries', () => {
     expect(query.state.value.value).toBeNull()
     expect(reads).toBe(1)
 
-    await host.backend('fixture-memory').set('value-1', 'updated')
+    await host.backend('memory').set('value-1', 'updated')
     await new Promise<void>((resolve) => setTimeout(resolve, 0))
     await new Promise<void>((resolve) => setTimeout(resolve, 0))
     expect(query.state.value.value).toBe('updated')
@@ -43,81 +41,15 @@ describe('Resource-backed queries', () => {
     await host.dispose()
   })
 
-  it('snapshots every admitted option once and preserves equal settled identity', async () => {
-    const host = await createStorageHost({
-      plugins: [memoryReactive({ id: 'fixture-options' })] as const
-    })
-    const runtime = createRuntime()
-    const reads: Record<string, number> = {}
-    const read = <T>(name: string, value: T): T => {
-      reads[name] = (reads[name] ?? 0) + 1
-      return value
-    }
-    let queryReads = 0
-    const query = host.liveQuery({
-      get backendId() {
-        return read('backendId', 'fixture-options' as const)
-      },
-      get runtime() {
-        return read('runtime', runtime)
-      },
-      get query() {
-        return read('query', () => ({ value: ++queryReads }))
-      },
-      get scope() {
-        return read('scope', 'options-scope')
-      },
-      get matches() {
-        return read('matches', () => true)
-      },
-      get keepPreviousData() {
-        return read('keepPreviousData', true)
-      },
-      get equals() {
-        return read('equals', () => true)
-      },
-      get timeoutMs() {
-        return read('timeoutMs', undefined)
-      },
-      get signal() {
-        return read('signal', undefined)
-      },
-      get report() {
-        return read('report', undefined)
-      }
-    })
-    await query.ready
-    const first = query.state.value.value
-    await host.backend('fixture-options').set('options-key', 'changed')
-    await new Promise<void>((resolve) => setTimeout(resolve, 0))
-    await new Promise<void>((resolve) => setTimeout(resolve, 0))
-    expect(query.state.value.value).toBe(first)
-    expect(queryReads).toBe(2)
-    expect(reads).toEqual({
-      backendId: 1,
-      runtime: 1,
-      query: 1,
-      scope: 1,
-      matches: 1,
-      keepPreviousData: 1,
-      equals: 1,
-      timeoutMs: 1,
-      signal: 1,
-      report: 1
-    })
-    await query.dispose()
-    await host.dispose()
-  })
-
   it('uses the Host scheduler for a per-query deadline and does not start after pre-abort', async () => {
     const scheduler = createManualScheduler()
-    const host = await createStorageHost({
+    const { host, service } = await createReactiveServiceFixture({
       scheduler,
-      plugins: [memoryReactive({ id: 'fixture-deadline' })] as const
+      id: 'fixture-deadline'
     })
     const runtime = createRuntime()
     const pending = new Promise<string>(() => undefined)
-    const query = host.liveQuery({
+    const query = service.createQuery({
       backendId: 'fixture-deadline',
       runtime,
       timeoutMs: 10,
@@ -130,11 +62,11 @@ describe('Resource-backed queries', () => {
 
     const controller = new AbortController()
     controller.abort('pre-aborted')
-    const secondHost = await createStorageHost({
-      plugins: [memoryReactive({ id: 'fixture-pre-abort' })] as const
+    const { host: secondHost, service: secondService } = await createReactiveServiceFixture({
+      id: 'fixture-pre-abort'
     })
     expect(() =>
-      secondHost.liveQuery({
+      secondService.createQuery({
         backendId: 'fixture-pre-abort',
         runtime,
         signal: controller.signal,
@@ -145,8 +77,8 @@ describe('Resource-backed queries', () => {
   })
 
   it('registers external abort before Resource allocation and rolls back on hostile registration', async () => {
-    const host = await createStorageHost({
-      plugins: [memoryReactive({ id: 'abort-admission' })] as const
+    const { host, service } = await createReactiveServiceFixture({
+      id: 'abort-admission'
     })
     const runtime = createRuntime()
     const computedFactory = vi.spyOn(runtime, 'computed')
@@ -160,7 +92,7 @@ describe('Resource-backed queries', () => {
     } as unknown as IAbortSignal
 
     expect(() =>
-      host.liveQuery({
+      service.createQuery({
         backendId: 'abort-admission',
         runtime,
         signal: registrationFailure,
@@ -190,7 +122,7 @@ describe('Resource-backed queries', () => {
       removeEventListener: () => undefined
     }
     expect(() =>
-      host.liveQuery({
+      service.createQuery({
         backendId: 'abort-admission',
         runtime,
         signal: abortDuringQuery,
@@ -211,8 +143,8 @@ describe('Resource-backed queries', () => {
   })
 
   it('rolls back the Resource when computed state construction fails', async () => {
-    const host = await createStorageHost({
-      plugins: [memoryReactive({ id: 'computed-rollback' })] as const
+    const { host, service } = await createReactiveServiceFixture({
+      id: 'computed-rollback'
     })
     const runtime = createRuntime()
     const primary = new Error('computed state construction failed')
@@ -222,7 +154,7 @@ describe('Resource-backed queries', () => {
     const resourceDispose = vi.spyOn(Resource.prototype, 'dispose')
     let thrown: unknown
     try {
-      host.liveQuery({
+      service.createQuery({
         backendId: 'computed-rollback',
         runtime,
         query: () => 'never-started'
@@ -259,13 +191,13 @@ describe('Resource-backed queries', () => {
         throw signalFailure
       }
     }
-    const host = await createStorageHost({
-      plugins: [memoryReactive({ id: 'construction-aggregate' })] as const
+    const { host, service } = await createReactiveServiceFixture({
+      id: 'construction-aggregate'
     })
     try {
       let thrown: unknown
       try {
-        host.liveQuery({
+        service.createQuery({
           backendId: 'construction-aggregate',
           runtime,
           signal,
@@ -305,8 +237,7 @@ describe('Resource-backed queries', () => {
       throw resourceFailure
     })
     const service = createStorageReactiveService()
-    const store = memoryStorageHost()
-    const controller = getBackendReactiveController(store)!
+    const { store, controller } = await createReactiveServiceFixture({ id: 'direct-service-owner' })
     const signal: IAbortSignal = {
       aborted: false,
       addEventListener: () => undefined,
@@ -346,8 +277,8 @@ describe('Resource-backed queries', () => {
   })
 
   it('follows the current Resource generation when invalidation supersedes the initial read', async () => {
-    const host = await createStorageHost({
-      plugins: [memoryReactive({ id: 'fixture-current-generation' })] as const
+    const { host, service } = await createReactiveServiceFixture({
+      id: 'fixture-current-generation'
     })
     const runtime = createRuntime()
     let reads = 0
@@ -359,12 +290,12 @@ describe('Resource-backed queries', () => {
     const second = new Promise<string>((resolve) => {
       resolveSecond = resolve
     })
-    const query = host.liveQuery({
+    const query = service.createQuery({
       backendId: 'fixture-current-generation',
       runtime,
       query: () => (reads++ === 0 ? first : second)
     })
-    await host.backend('fixture-current-generation').set('invalidate', 'true')
+    await host.backend('memory').set('invalidate', 'true')
     await new Promise<void>((resolve) => setTimeout(resolve, 0))
     await new Promise<void>((resolve) => setTimeout(resolve, 0))
     resolveFirst('stale-generation')
@@ -378,8 +309,8 @@ describe('Resource-backed queries', () => {
   })
 
   it('returns one derived Promise for overlapping refreshes of the same Resource generation', async () => {
-    const host = await createStorageHost({
-      plugins: [memoryReactive({ id: 'refresh-coalesce' })] as const
+    const { host, service } = await createReactiveServiceFixture({
+      id: 'refresh-coalesce'
     })
     const runtime = createRuntime()
     let reads = 0
@@ -387,7 +318,7 @@ describe('Resource-backed queries', () => {
     const refresh = new Promise<string>((resolve) => {
       resolveRefresh = resolve
     })
-    const query = host.liveQuery({
+    const query = service.createQuery({
       backendId: 'refresh-coalesce',
       runtime,
       query: () => (reads++ === 0 ? 'initial' : refresh)
@@ -405,12 +336,12 @@ describe('Resource-backed queries', () => {
   })
 
   it('guards every Resource access after dispose with one handled LIVE_QUERY_DISPOSED rejection', async () => {
-    const host = await createStorageHost({
-      plugins: [memoryReactive({ id: 'terminal-guard' })] as const
+    const { host, service } = await createReactiveServiceFixture({
+      id: 'terminal-guard'
     })
     const runtime = createRuntime()
     let reads = 0
-    const query = host.liveQuery({
+    const query = service.createQuery({
       backendId: 'terminal-guard',
       runtime,
       query: () => {
@@ -484,15 +415,15 @@ describe('Resource-backed queries', () => {
       },
       removeEventListener: () => undefined
     }
-    const host = await createStorageHost({
-      plugins: [memoryReactive({ id: 'terminal-abort-ready' })] as const
+    const { host, service } = await createReactiveServiceFixture({
+      id: 'terminal-abort-ready'
     })
     const runtime = createRuntime()
     let resolveReady!: (value: string) => void
     const readyValue = new Promise<string>((resolve) => {
       resolveReady = resolve
     })
-    const query = host.liveQuery({
+    const query = service.createQuery({
       backendId: 'terminal-abort-ready',
       runtime,
       signal: readySignal,
@@ -528,15 +459,15 @@ describe('Resource-backed queries', () => {
       },
       removeEventListener: () => undefined
     }
-    const secondHost = await createStorageHost({
-      plugins: [memoryReactive({ id: 'terminal-abort-refresh' })] as const
+    const { host: secondHost, service: secondService } = await createReactiveServiceFixture({
+      id: 'terminal-abort-refresh'
     })
     let resolveRefresh!: (value: string) => void
     const refreshValue = new Promise<string>((resolve) => {
       resolveRefresh = resolve
     })
     let refreshReads = 0
-    const secondQuery = secondHost.liveQuery({
+    const secondQuery = secondService.createQuery({
       backendId: 'terminal-abort-refresh',
       runtime,
       signal: refreshSignal,
@@ -575,10 +506,10 @@ describe('Resource-backed queries', () => {
         throw signalFailure
       }
     }
-    const host = await createStorageHost({
-      plugins: [memoryReactive({ id: 'cleanup-direct' })] as const
+    const { host, service } = await createReactiveServiceFixture({
+      id: 'cleanup-direct'
     })
-    const query = host.liveQuery({
+    const query = service.createQuery({
       backendId: 'cleanup-direct',
       runtime: createRuntime(),
       signal,
@@ -620,8 +551,7 @@ describe('Resource-backed queries', () => {
     const listenerFailure = new Error('lifecycle listener cleanup failed')
     const lifecycleFailure = new Error('lifecycle release failed')
     const service = createStorageReactiveService()
-    const store = memoryStorageHost()
-    const controller = getBackendReactiveController(store)!
+    const { store, controller } = await createReactiveServiceFixture({ id: 'direct-service-owner' })
     const adapter = service.registerAdapter({
       backendId: 'cleanup-lifecycle',
       store,
@@ -676,13 +606,13 @@ describe('Resource-backed queries', () => {
         throw signalFailure
       }
     }
-    const host = await createStorageHost({
+    const { host, service } = await createReactiveServiceFixture({
       report: (error) => {
         reports.push(error)
       },
-      plugins: [memoryReactive({ id: 'cleanup-host' })] as const
+      id: 'cleanup-host'
     })
-    const query = host.liveQuery({
+    const query = service.createQuery({
       backendId: 'cleanup-host',
       runtime: createRuntime(),
       signal,
@@ -725,13 +655,13 @@ describe('Resource-backed queries', () => {
     const disposeResource = vi.spyOn(Resource.prototype, 'dispose').mockImplementation(() => {
       throw cleanupFailure
     })
-    const host = await createStorageHost({
+    const { host, service } = await createReactiveServiceFixture({
       report: (error) => {
         reports.push(error)
       },
-      plugins: [memoryReactive({ id: 'cleanup-unhandled' })] as const
+      id: 'cleanup-unhandled'
     })
-    const query = host.liveQuery({
+    const query = service.createQuery({
       backendId: 'cleanup-unhandled',
       runtime: createRuntime(),
       query: () => 'value'

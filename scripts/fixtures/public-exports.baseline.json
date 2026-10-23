@@ -1107,72 +1107,15 @@
         "StorageErrorText",
         "lengthPrefixedNamespaceCodec"
       ],
-      "./memory": [
-        "memoryStorageHost"
-      ],
-      "./local-storage": [
-        "localStorageHost"
-      ],
-      "./session-storage": [
-        "sessionStorageHost"
-      ],
-      "./cookies": [
-        "cookiesHost"
-      ],
-      "./indexed-db": [
-        "indexedDbHost"
-      ],
-      "./host": [
-        "StorageHostFacade",
-        "assertStorageBackendId",
-        "createStorageHost",
-        "defineFeature",
-        "definePlugin"
-      ],
-      "./plugins/memory": [
-        "memoryBackendPlugin"
-      ],
-      "./plugins/local-storage": [
-        "localStorageBackendPlugin"
-      ],
-      "./plugins/session-storage": [
-        "sessionStorageBackendPlugin"
-      ],
-      "./plugins/cookies": [
-        "cookieBackendPlugin"
-      ],
-      "./plugins/indexed-db": [
-        "indexedDbBackendPlugin",
-        "prepareIndexedDbStore"
-      ],
-      "./entity": [
-        "defineEntity"
-      ],
-      "./reactive-adapter": [
-        "defineReactiveAdapterFeature"
-      ],
-      "./plugins/reactive": [
-        "cookiesReactive",
-        "indexedDbReactive",
-        "localStorageReactive",
-        "memoryReactive",
-        "sessionStorageReactive"
-      ],
-      "./plugins/reactive/memory": [
-        "memoryReactive"
-      ],
-      "./plugins/reactive/local-storage": [
-        "localStorageReactive"
-      ],
-      "./plugins/reactive/session-storage": [
-        "sessionStorageReactive"
-      ],
-      "./plugins/reactive/cookies": [
-        "cookiesReactive"
-      ],
-      "./plugins/reactive/indexed-db": [
-        "indexedDbReactive"
-      ]
+      "./local-storage": ["localStorageBackendKind", "localStorageBackendPlugin"],
+      "./session-storage": ["sessionStorageBackendKind", "sessionStorageBackendPlugin"],
+      "./cookies": ["cookieBackendKind", "cookieBackendPlugin"],
+      "./indexed-db": ["indexedDbBackendKind", "indexedDbBackendPlugin"],
+      "./plugins/local-storage": ["localStorageBackendPlugin"],
+      "./plugins/session-storage": ["sessionStorageBackendPlugin"],
+      "./plugins/cookies": ["cookieBackendPlugin"],
+      "./plugins/indexed-db": ["indexedDbBackendPlugin"],
+      "./features/reactive": ["reactiveFeature"]
     },
     "@migaia/store-devtools": {
       ".": [

@@ -1,4 +1,34 @@
 import { test, expect } from '@playwright/test'
+import { NativeTransactionActivity } from './native-transaction-cases.js'
+
+for (const mode of Object.values(NativeTransactionActivity))
+  test(`真实原生事务活跃窗口 ${mode}`, async ({ page }) => {
+    await page.goto('/')
+    const result = await page.evaluate(
+      (mode) => window.runIndexedDbNativeActivityScenario(mode),
+      mode
+    )
+    if (mode === NativeTransactionActivity.microtask) {
+      expect(result.failed).toBe(false)
+      expect(result.text).toBe('after')
+      expect(result.bytes).toEqual([2])
+      expect(result.record).toEqual({ value: 'during' })
+      expect(result.changes).toEqual(['value', 'bytes', 'record'])
+    } else {
+      expect(result).toMatchObject({
+        failed: true,
+        source: '@migaia/storage-web',
+        code: 'TRANSACTION_FAILED',
+        causeName: 'TransactionInactiveError',
+        text: 'before',
+        bytes: [1],
+        record: { value: 'before' },
+        changes: []
+      })
+      if (mode !== NativeTransactionActivity.timerReturn)
+        expect(result.operationAndOuterSame).toBe(true)
+    }
+  })
 
 test('真实 IndexedDB 的基本 put/get 冒烟测试', async ({ page }) => {
   await page.goto('/')
@@ -6,6 +36,62 @@ test('真实 IndexedDB 的基本 put/get 冒烟测试', async ({ page }) => {
   expect(result.ok).toBe(true)
   expect(result.value).toEqual({ a: 1 })
   expect(result.metadata).toEqual({ ready: true })
+})
+
+test('persistTransaction commits native entity and snapshot together and restores mirroring after rollback', async ({
+  page
+}) => {
+  await page.goto('/')
+  const result = await page.evaluate(() => window.runIndexedDbPersistNativeScenario())
+  expect(result.committed).toEqual({
+    result: 'committed',
+    envelope: { version: 0, state: { count: 1 } },
+    entity: { id: 'committed', email: 'one' },
+    business: 'committed'
+  })
+  expect(result.rolledBack).toEqual({
+    primaryReachable: true,
+    envelope: { version: 0, state: { count: 1 } },
+    entity: undefined,
+    business: null,
+    memory: 2,
+    writeErrorSame: true
+  })
+  expect(result.mirrored).toEqual({ version: 0, state: { count: 2 } })
+  expect(result.unique).toEqual({
+    code: 'INDEX_UNIQUE_CONFLICT',
+    envelope: { version: 0, state: { count: 2 } },
+    entity: undefined,
+    memory: 3
+  })
+  expect(result.cancelled).toEqual({
+    reasonReachable: true,
+    envelope: { version: 0, state: { count: 3 } },
+    entity: undefined,
+    memory: 4
+  })
+  expect(result.restored).toEqual({
+    primaryReachable: true,
+    envelope: { version: 0, state: { count: 4 } },
+    entity: undefined,
+    memory: 4
+  })
+})
+
+test('persistTransaction rolls back the native snapshot when its codec crosses a task boundary', async ({
+  page
+}) => {
+  await page.goto('/')
+  const result = await page.evaluate(() => window.runIndexedDbPersistCrossTaskCodecScenario())
+  expect(result).toEqual({
+    failed: true,
+    code: 'TRANSACTION_FAILED',
+    causeName: 'TransactionInactiveError',
+    operationAndOuterSame: true,
+    envelope: { version: 0, state: { count: 0 } },
+    business: null,
+    memory: 1
+  })
 })
 
 test('distinct pages receive a BroadcastChannel hint then reread authoritative IndexedDB state', async ({
@@ -63,7 +149,7 @@ test('版本升级被另一个存活连接阻塞时 onblocked 触发，连接关
   await page.goto('/')
   const result = await page.evaluate(() => window.runIndexedDbBlockedScenario())
   expect(result.blockedErrorCode).toBe('BACKEND_UNAVAILABLE')
-  expect(result.sameStoreRetrySucceeded).toBe(true)
+  expect(result.freshInstallationRetrySucceeded).toBe(true)
   expect(result.secondOpenSucceededAfterClose).toBe(true)
   expect(result.hostileCloseRetrySucceeded).toBe(true)
   expect(result.transitionCloseCode).toBe('BACKEND_UNAVAILABLE')
@@ -74,10 +160,10 @@ test('版本升级被另一个存活连接阻塞时 onblocked 触发，连接关
   expect(result.connectionSetterRecovered).toBe(true)
 })
 
-test('跨 IndexedDB connection 的 transaction revision 冲突不会覆盖新写入', async ({ page }) => {
+test('跨 IndexedDB connection 的原生 transaction 串行后保留独立写入', async ({ page }) => {
   await page.goto('/')
   const result = await page.evaluate(() => window.runIndexedDbTransactionConflictScenario())
-  expect(result.code).toBe('TRANSACTION_CONFLICT')
+  expect(result.code).toBeUndefined()
   expect(result.value).toEqual({ value: 2 })
 })
 
@@ -109,12 +195,12 @@ test('真实 IndexedDB 小页分页扫描完整且提前停止', async ({ page }
   expect(result.requestSetterCode).toBe('TRANSACTION_FAILED')
 })
 
-test('三个连接的双 transaction 竞争只允许一个提交', async ({ page }) => {
+test('三个连接的双原生 transaction 串行提交全部递增', async ({ page }) => {
   await page.goto('/')
   const result = await page.evaluate(() => window.runIndexedDbDualTransactionScenario())
-  expect(result.committed).toBe(1)
-  expect(result.conflicts).toBe(1)
-  expect([1, 2]).toContain((result.value as { value: number }).value)
+  expect(result.committed).toBe(2)
+  expect(result.conflicts).toBe(0)
+  expect(result.value).toEqual({ value: 2 })
 })
 
 test('真实浏览器升级会迁移 legacy documents record 并写入 checkpoint', async ({ page }) => {
@@ -134,11 +220,12 @@ test('真实浏览器升级会迁移 legacy documents record 并写入 checkpoin
   ])
 })
 
-test('四个连接同时 transaction 竞争只允许一次提交', async ({ page }) => {
+test('四个连接同时原生 transaction 保留全部递增', async ({ page }) => {
   await page.goto('/')
   const result = await page.evaluate(() => window.runIndexedDbFourWayTransactionScenario())
-  expect(result.committed).toBe(1)
-  expect(result.conflicts).toBe(3)
+  expect(result.committed).toBe(4)
+  expect(result.conflicts).toBe(0)
+  expect(result.value).toEqual({ value: 4 })
 })
 
 test('真实 IndexedDB 失败 transaction 回滚且 pre-abort 不写入', async ({ page }) => {
@@ -258,39 +345,59 @@ test('真实浏览器 raw index firewall 覆盖所有 key 域并保留 rollback 
 test('真实浏览器跨 connection backfill lease 忽略 wall-clock 跳变并支持 heartbeat takeover', async ({
   page
 }) => {
+  test.setTimeout(60_000)
   await page.goto('/')
   const result = await page.evaluate(() => window.runIndexedDbBackfillLeaseScenario())
-  expect(result.initialContentionCode).toBe('BACKEND_UNAVAILABLE')
-  expect(result.forwardJumpContentionCode).toBe('BACKEND_UNAVAILABLE')
-  expect(result.backwardJumpContentionCode).toBe('BACKEND_UNAVAILABLE')
-  expect(result.takeoverSucceeded).toBe(true)
-  expect(result.staleOwnerRenewCode).toBe('BACKEND_UNAVAILABLE')
+  const contended = { rows: [{ id: 'seed', value: 1 }], readiness: 'running' }
+  expect(result.initial).toEqual(contended)
+  expect(result.forwardJump).toEqual(contended)
+  expect(result.backwardJump).toEqual(contended)
+  expect(result.takeover).toEqual({ rows: [{ id: 'seed', value: 1 }], readiness: 'complete' })
+  expect(result.owner.readiness).toBe('complete')
+  expect(result.owner.indexed).toBe(1)
+  expect(result.owner.failures).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ code: 'INDEX_BACKFILL_FAILED' }),
+      expect.objectContaining({ code: 'BACKEND_UNAVAILABLE' })
+    ])
+  )
 })
 
 test('真实浏览器跨 page/reload 不复用 monotonic takeover observation', async ({
   page,
   context
 }) => {
+  test.setTimeout(60_000)
   const ownerPage = page
   const contenderPage = await context.newPage()
   const dbName = `lease-pages-${Date.now()}-${Math.random().toString(36).slice(2)}`
   try {
     await Promise.all([ownerPage.goto('/'), contenderPage.goto('/')])
     await ownerPage.evaluate((name) => window.startIndexedDbBackfillLeaseOwner(name), dbName)
+    const contended = { rows: [{ id: 'seed', value: 1 }], readiness: 'running' }
     await expect(
       contenderPage.evaluate((name) => window.contendIndexedDbBackfillLease(name), dbName)
-    ).resolves.toBe('BACKEND_UNAVAILABLE')
+    ).resolves.toEqual(contended)
     await contenderPage.reload()
     await expect(
       contenderPage.evaluate((name) => window.contendIndexedDbBackfillLease(name), dbName)
-    ).resolves.toBe('BACKEND_UNAVAILABLE')
-    await contenderPage.waitForTimeout(5_100)
+    ).resolves.toEqual(contended)
+    await contenderPage.waitForTimeout(30_100)
     await expect(
       contenderPage.evaluate((name) => window.contendIndexedDbBackfillLease(name), dbName)
-    ).resolves.toBe(undefined)
-    await expect(
-      ownerPage.evaluate((name) => window.finishIndexedDbBackfillLeaseOwner(name), dbName)
-    ).resolves.toBe('BACKEND_UNAVAILABLE')
+    ).resolves.toEqual({ rows: [{ id: 'seed', value: 1 }], readiness: 'complete' })
+    const owner = await ownerPage.evaluate(
+      (name) => window.finishIndexedDbBackfillLeaseOwner(name),
+      dbName
+    )
+    expect(owner.readiness).toBe('complete')
+    expect(owner.indexed).toBe(1)
+    expect(owner.failures).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: 'INDEX_BACKFILL_FAILED' }),
+        expect.objectContaining({ code: 'BACKEND_UNAVAILABLE' })
+      ])
+    )
   } finally {
     await ownerPage.close()
     await contenderPage.close()
@@ -375,7 +482,7 @@ test('真实 IndexedDB 旧 entity 客户端拒绝 future version 且不覆盖原
   expect(result.skippedCount).toBe(0)
   expect(result.throwCode).toBe('VERSION_UNSUPPORTED')
   expect(result.invalidHandlerCode).toBe('INVALID_CONFIG')
-  expect(result.rawValue).toEqual({ __v: 2, data: { id: 'future', name: 'New' } })
+  expect(result.rawValue).toEqual({ version: 2, state: { id: 'future', name: 'New' } })
 })
 
 test('真实 IndexedDB hanging codec 在 abort 后结束等待且不写入', async ({ page }) => {
@@ -390,7 +497,7 @@ test('真实 IndexedDB hanging migration 在 abort 后结束等待且不改写 l
   const result = await page.evaluate(() => window.runIndexedDbHangingMigrationAbortScenario())
   expect(result.code).toBe('ABORTED')
   expect(result.receivedSignal).toBe(true)
-  expect(result.rawValue).toEqual({ __v: 1, data: { id: 'hanging', name: 'Ada' } })
+  expect(result.rawValue).toEqual({ version: 1, state: { id: 'hanging', name: 'Ada' } })
 })
 
 test('真实 IndexedDB pre-abort 不调用 custom codec', async ({ page }) => {
@@ -454,7 +561,7 @@ test('真实浏览器 entity definition 非对象入口统一返回 INVALID_CONF
   ])
   expect(result.versionCodes).toEqual(['INVALID_CONFIG'])
   expect(result.migrationVersionCodes).toEqual(['INVALID_CONFIG'])
-  expect(result.prototypeMigrationCodes).toEqual(['INVALID_CONFIG'])
+  expect(result.prototypeMigrationCodes).toEqual([])
   expect(result.nullVersionCodes).toEqual(['INVALID_CONFIG'])
   expect(result.backendCodes).toEqual(['INVALID_CONFIG'])
   expect(result.capabilityCodes).toEqual(['INVALID_CONFIG', 'INVALID_CONFIG', 'INVALID_CONFIG'])
@@ -475,11 +582,12 @@ test('真实浏览器 entity definition 非对象入口统一返回 INVALID_CONF
   expect(result.standardSchemaContractReads).toBe(4)
   expect(result.standardSchemaResultReads).toBe(2)
   expect(result.migrationHelperCodes).toEqual([
-    'INVALID_CONFIG',
-    'INVALID_CONFIG',
-    'INVALID_CONFIG'
+    'ENVELOPE_INVALID',
+    'INVALID_ARGUMENT',
+    'INVALID_ARGUMENT'
   ])
   expect(result.inheritedMigrationCalls).toBe(0)
+  expect(result.inheritedMigrationCode).toBe('VERSION_UNSUPPORTED')
   expect(result.migrationRaceCode).toBe('ABORTED')
   expect(result.codecSelectionCodes).toEqual([
     'INVALID_ARGUMENT',

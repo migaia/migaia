@@ -25,7 +25,7 @@ export {
   type ISyncCapableStore,
   type IWebStorageLike
 } from './storage.js'
-export type { ITransactionScope, ITransactionWriteOptions } from '../core/transaction.js'
+export type { ITransactionScope, ITransactionWriteOptions } from '@migaia/storage-contract'
 export type {
   ICookieStore,
   ISyncCookieStore,

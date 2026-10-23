@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import { invokeExtension } from '../../src/core/errors'
-import { createStorageOperationRuntime } from '../../src/core/operation-reporter.js'
+import { invokeExtension } from '../../src/backends/errors.js'
+import { createStorageOperationRuntime } from '@migaia/storage-host/authoring/backend'
 import { captureOperationCleanup } from '../helpers/operation-reporter.js'
 
 describe('invokeExtension abort lifecycle', () => {

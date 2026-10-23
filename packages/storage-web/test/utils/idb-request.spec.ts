@@ -143,7 +143,7 @@ describe('fromIdbRequest', () => {
       fromIdbRequest(successRequest, undefined, createStorageOperationRuntime())
     ).rejects.toMatchObject({
       code: 'TRANSACTION_FAILED',
-      backend: 'indexeddb',
+      backend: 'indexed-db',
       cause: resultCause
     })
 
@@ -161,7 +161,7 @@ describe('fromIdbRequest', () => {
       fromIdbRequest(errorRequest, undefined, createStorageOperationRuntime())
     ).rejects.toMatchObject({
       code: 'TRANSACTION_FAILED',
-      backend: 'indexeddb',
+      backend: 'indexed-db',
       cause: errorCause
     })
   })
@@ -181,7 +181,7 @@ describe('fromIdbRequest', () => {
         fromIdbRequest(request, undefined, createStorageOperationRuntime())
       ).rejects.toMatchObject({
         code: 'TRANSACTION_FAILED',
-        backend: 'indexeddb',
+        backend: 'indexed-db',
         cause
       })
     }
@@ -401,7 +401,7 @@ describe('idbTransactionCommit', () => {
       idbTransactionCommit(transaction, undefined, createStorageOperationRuntime())
     ).rejects.toMatchObject({
       code: 'TRANSACTION_FAILED',
-      backend: 'indexeddb',
+      backend: 'indexed-db',
       cause
     })
   })
@@ -428,7 +428,7 @@ describe('idbTransactionCommit', () => {
         idbTransactionCommit(transaction, undefined, createStorageOperationRuntime())
       ).rejects.toMatchObject({
         code: 'TRANSACTION_FAILED',
-        backend: 'indexeddb',
+        backend: 'indexed-db',
         cause
       })
       expect(abortCalls).toBe(1)

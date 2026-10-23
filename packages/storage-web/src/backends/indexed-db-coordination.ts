@@ -5,8 +5,9 @@ import {
   type IEventChannel
 } from '@migaia/event-subscriber'
 import { isPlainObject } from '@migaia/utils/object'
-import { decodeFlatStorageKey, encodeFlatStorageKey } from '../core/key-domain.js'
-import { safeJsonPayloadByteLength } from '../utils/json.js'
+import { decodeFlatStorageKey, encodeFlatStorageKey } from '@migaia/storage-host/authoring/backend'
+import { safeJsonPayloadByteLength } from '@migaia/storage-host/authoring/backend'
+import type { IBackendKeyLockPort } from '@migaia/storage-host/authoring/backend'
 import { StorageErrorText } from '../error-text.js'
 import { StorageErrorCode, createStorageTypeError } from '../types/errors.js'
 
@@ -41,6 +42,12 @@ type IIndexedDbCoordinationEntry = {
   disposed: boolean
 }
 
+/** One physical database shares logical locks while its existing layouts keep separate transports. */
+type IIndexedDbCoordinationGroup = {
+  readonly keyPort: IBackendKeyLockPort
+  readonly layouts: Map<string, IIndexedDbCoordinationEntry>
+}
+
 type IIndexedDbCoordinationOptions = {
   readonly factory: IDBFactory
   readonly realmDefaultFactory: IDBFactory | undefined
@@ -50,6 +57,7 @@ type IIndexedDbCoordinationOptions = {
   readonly ownOrigin: string
   readonly onChange: (change: IStorageChange) => void
   readonly report: (error: unknown) => void
+  readonly createKeyLockPort: () => IBackendKeyLockPort
 }
 
 /** Maximum encoded wire payload; larger hints degrade to coarse invalidation. */
@@ -68,7 +76,7 @@ const MAX_PENDING_SCOPES = 256
 /** One realm-local identity token per factory; the token never enters persistence or wire data. */
 const factoryTokens = new WeakMap<object, symbol>()
 /** One coordination registry per factory data universe. */
-const factoryRegistries = new WeakMap<object, Map<string, IIndexedDbCoordinationEntry>>()
+const factoryRegistries = new WeakMap<object, Map<string, IIndexedDbCoordinationGroup>>()
 
 /** Return a stable opaque token for one factory object without exposing it to callers. */
 const factoryTokenOf = (factory: IDBFactory): symbol => {
@@ -358,8 +366,9 @@ export const acquireIndexedDbCoordination = (
   options: IIndexedDbCoordinationOptions
 ): {
   readonly admitted: boolean
+  readonly keyPort: IBackendKeyLockPort
   readonly publish: (change: IStorageChange) => void
-  readonly dispose: () => void
+  readonly dispose: () => Promise<void>
 } => {
   const factoryObject = options.factory as unknown as object
   let registry = factoryRegistries.get(factoryObject)
@@ -368,11 +377,18 @@ export const acquireIndexedDbCoordination = (
     factoryRegistries.set(factoryObject, registry)
   }
   factoryTokenOf(options.factory)
-  const registryKey = `${options.dbName}\u0000${options.layoutFingerprint}`
-  let entry = registry.get(registryKey)
+  /** Database identity governs locks even when two layouts share only some native stores. */
+  let group = registry.get(options.dbName)
+  if (group === undefined) {
+    group = { keyPort: options.createKeyLockPort(), layouts: new Map() }
+    registry.set(options.dbName, group)
+  }
+  /** Notification isolation retains the original layout fingerprint unchanged. */
+  const registryKey = options.layoutFingerprint
+  let entry = group.layouts.get(registryKey)
   if (entry === undefined) {
     entry = createEntry(options, registryKey)
-    registry.set(registryKey, entry)
+    group.layouts.set(registryKey, entry)
   }
   const memberId = Symbol('indexed-db-coordination-member')
   /** Exact event-subscriber handle retained by this coordination member until its own disposal. */
@@ -383,7 +399,10 @@ export const acquireIndexedDbCoordination = (
   })
   entry.memberCount += 1
   let released = false
+  /** Each member waits for its original cleanup without closing a still-shared physical port. */
+  let disposal: Promise<void> | undefined
   return {
+    keyPort: group.keyPort,
     admitted: entry.channel !== undefined && options.factory === options.realmDefaultFactory,
     publish: (change) => {
       if (released || entry!.disposed || !rememberHint(entry!, change)) return
@@ -397,11 +416,11 @@ export const acquireIndexedDbCoordination = (
       }
     },
     dispose: () => {
-      if (released) return
+      if (disposal !== undefined) return disposal
       released = true
       subscription()
       entry!.memberCount -= 1
-      if (entry!.memberCount > 0) return
+      if (entry!.memberCount > 0) return (disposal = Promise.resolve())
       entry!.disposed = true
       entry!.pending.length = 0
       entry!.pendingScopes.clear()
@@ -416,7 +435,10 @@ export const acquireIndexedDbCoordination = (
           options.report(error)
         }
       }
-      registry!.delete(entry!.registryKey)
+      group!.layouts.delete(entry!.registryKey)
+      if (group!.layouts.size > 0) return (disposal = Promise.resolve())
+      registry!.delete(options.dbName)
+      return (disposal = group!.keyPort.dispose())
     }
   }
 }

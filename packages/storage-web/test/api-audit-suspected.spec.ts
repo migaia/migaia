@@ -1,11 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
 import { IDBFactory, IDBKeyRange, IDBObjectStore } from 'fake-indexeddb'
 import { createRuntime } from '@migaia/reactive'
-import { indexedDbHost } from '../src/indexed-db.js'
-import { memoryStorageHost } from '../src/memory.js'
-import { defineEntity } from '../src/entity.js'
-import { createStorageHost, definePlugin } from '../src/host.js'
-import { defineReactiveAdapterFeature } from '../src/reactive-adapter.js'
+import { createIndexedDbTestStore } from './helpers/installed-backends.js'
+import { defineEntity } from '@migaia/storage-host/entity'
+import { createReactiveServiceFixture } from './helpers/reactive-service.js'
 
 /** A complete injected IDB factory delays only delivery of its real open-success event. */
 class DelayedFactory extends IDBFactory {
@@ -38,7 +36,7 @@ class DelayedFactory extends IDBFactory {
 describe('storage-web confirmed audit suspicions', () => {
   it('identifies the owned backfill aggregate and retains both original failures', async () => {
     /** Real simulation owns all transactions and backend admission. */
-    const store = indexedDbHost({
+    const store = await createIndexedDbTestStore({
       factory: new IDBFactory(),
       keyRange: IDBKeyRange,
       dbName: 'audit-double-failure'
@@ -81,9 +79,9 @@ describe('storage-web confirmed audit suspicions', () => {
         onDiagnostic: () => {}
       }).connect(store)
       await expect(
-        repo.findManyBy('byValue', { lower: 'saved', upper: 'saved' })
+        repo.query().index('byValue', { lower: 'saved', upper: 'saved' }).all()
       ).rejects.toMatchObject({
-        source: '@migaia/storage-web',
+        source: '@migaia/storage-host',
         code: 'INDEX_BACKFILL_FAILED',
         cause: primary,
         errors: [primary, secondary]
@@ -94,15 +92,33 @@ describe('storage-web confirmed audit suspicions', () => {
     }
   })
 
-  it('ensureRecordIndexes obeys the requested deadline during a slow open', async () => {
+  it('ensureRecordIndexes obeys its deadline while reopening after versionchange', async () => {
     /** Opening crosses 2ms while preserving the real factory/database implementation. */
     const factory = new DelayedFactory()
     /** Preparation remains owned by the backend after the caller stops waiting. */
-    const store = indexedDbHost({
+    const store = await createIndexedDbTestStore({
       factory,
       keyRange: IDBKeyRange,
       dbName: 'audit-deadline'
     })
+    /** A native version transition closes the installed store's original connection. */
+    const connection = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = factory.open('audit-deadline')
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    })
+    /** Reopening after the upgrade exercises the original lazy recovery path under this deadline. */
+    const version = connection.version + 1
+    connection.close()
+    await new Promise<void>((resolve, reject) => {
+      const request = factory.open('audit-deadline', version)
+      request.onsuccess = () => {
+        request.result.close()
+        resolve()
+      }
+      request.onerror = () => reject(request.error)
+    })
+    factory.delivered = false
     try {
       await expect(
         store.ensureRecordIndexes(
@@ -119,7 +135,7 @@ describe('storage-web confirmed audit suspicions', () => {
 
   it('index iteration applies one deadline across buffered yields', async () => {
     /** Real IDB transactions and backfill create the sidecar rows consumed by the public iterator. */
-    const store = indexedDbHost({
+    const store = await createIndexedDbTestStore({
       factory: new IDBFactory(),
       keyRange: IDBKeyRange,
       dbName: 'audit-iterator-deadline'
@@ -135,7 +151,7 @@ describe('storage-web confirmed audit suspicions', () => {
       await repo.put({ id: 'first', value: 'a' })
       await repo.put({ id: 'second', value: 'b' })
       await repo.migrate()
-      await repo.findManyBy('byValue')
+      await repo.query().index('byValue').all()
       /** Acquire the ordinary public handle for the exact same declared index set. */
       const handle = await store.ensureRecordIndexes('audit-iterator', [
         { name: 'byValue', unique: false, multiEntry: false, revision: 1 }
@@ -160,32 +176,26 @@ describe('storage-web confirmed audit suspicions', () => {
     let value = 'before'
     /** Count actual requests, not private invalidation bookkeeping. */
     let calls = 0
-    /** Custom plugin still registers a genuine backend through its public core boundary. */
-    const store = memoryStorageHost()
-    /** Capture the documented optional-argument API. */
-    const reactive = defineReactiveAdapterFeature({
-      mode: 'push',
-      visibility: 'instance',
-      subscribe(context) {
-        invalidate = () => context.invalidate()
-        return () => {}
-      }
+    /** The original service borrows an actual Feature-owned store and controller. */
+    const { host, store, controller, service } = await createReactiveServiceFixture({
+      id: 'audit-coarse',
+      attach: false
     })
-    /** No provider/kind brands or private registrations are forged. */
-    const plugin = definePlugin(
-      'audit-coarse',
-      (core) => ({
-        install() {
-          core.registerStore(store)
-          return {}
-        }
-      }),
-      { reactive }
-    )
-    /** The Host composes the actual plugin, adapter, Resource and reactive runtime. */
-    const host = await createStorageHost({ plugins: [plugin] as const })
+    const adapter = service.registerAdapter({
+      backendId: 'audit-coarse',
+      store,
+      controller,
+      consistency: { mode: 'push', visibility: 'instance' },
+      subscribe: (context) => {
+        invalidate = () => context.onChange()
+        return () => {}
+      },
+      report: () => {}
+    })
+    adapter.startSource()
     /** Unknown changes must invalidate even when a known change would be filtered out. */
-    const query = host.reactiveBackend('audit-coarse')!.liveQuery({
+    const query = service.createQuery({
+      backendId: 'audit-coarse',
       runtime: createRuntime(),
       scope: 'scoped',
       matches: () => false,

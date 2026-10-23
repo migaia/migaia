@@ -1,8 +1,7 @@
 import { createRuntime } from '@migaia/reactive'
 import { describe, expect, it } from 'vitest'
-import { readAbortReason } from '../src/core/operation.js'
-import { createStorageHost } from '../src/host/index.js'
-import { memoryReactive } from '../src/plugins/reactive/memory.js'
+import { readAbortReason } from '@migaia/storage-host/authoring/backend'
+import { createReactiveServiceFixture } from './helpers/reactive-service.js'
 
 describe('storage operation abort reason policy', () => {
   it('returns undefined, the original reason, or the original getter failure', () => {
@@ -26,9 +25,7 @@ describe('storage operation abort reason policy', () => {
 
 describe('reactive query abort reason policy', () => {
   it('wraps a pre-aborted getter failure once at admission', async () => {
-    const host = await createStorageHost({
-      plugins: [memoryReactive({ id: 'reason-pre' })] as const
-    })
+    const { host, service } = await createReactiveServiceFixture({ id: 'reason-pre' })
     const cause = new Error('reason getter')
     let reads = 0
     const signal = {
@@ -42,7 +39,7 @@ describe('reactive query abort reason policy', () => {
     }
     try {
       expect(() =>
-        host.liveQuery({
+        service.createQuery({
           backendId: 'reason-pre',
           runtime: createRuntime(),
           signal,
@@ -56,9 +53,7 @@ describe('reactive query abort reason policy', () => {
   })
 
   it('reports a getter failure once when cancellation occurs during query', async () => {
-    const host = await createStorageHost({
-      plugins: [memoryReactive({ id: 'reason-during' })] as const
-    })
+    const { host, service } = await createReactiveServiceFixture({ id: 'reason-during' })
     const cause = new Error('reason getter')
     const reports: unknown[] = []
     let aborted = false
@@ -79,7 +74,7 @@ describe('reactive query abort reason policy', () => {
     }
     try {
       expect(() =>
-        host.liveQuery({
+        service.createQuery({
           backendId: 'reason-during',
           runtime: createRuntime(),
           signal,
@@ -101,9 +96,7 @@ describe('reactive query abort reason policy', () => {
   })
 
   it('reports a getter failure once after registration discovers an abort', async () => {
-    const host = await createStorageHost({
-      plugins: [memoryReactive({ id: 'reason-race' })] as const
-    })
+    const { host, service } = await createReactiveServiceFixture({ id: 'reason-race' })
     const cause = new Error('reason getter')
     const reports: unknown[] = []
     let aborted = false
@@ -123,7 +116,7 @@ describe('reactive query abort reason policy', () => {
     }
     try {
       expect(() =>
-        host.liveQuery({
+        service.createQuery({
           backendId: 'reason-race',
           runtime: createRuntime(),
           signal,

@@ -14,6 +14,7 @@ type IFixtureSlot = Readonly<{
 }>
 /** Only a package-minted original core can supply this integration in the new implementation. */
 type IFixtureIntegration = Readonly<{
+  matchesHost(host: object): boolean
   acquireSharedSlot(
     key: PropertyKey,
     family: object,
@@ -77,6 +78,8 @@ for (const kind of ['class', 'frozen'] as const) {
               return { runtimeSource: firstFacade }
             }
             const integration = integrationFactory(core)
+            assert.equal(integration.matchesHost(host), true)
+            assert.equal(integration.matchesHost({}), false)
             const snapshot = integration.readFeatureOutputs('service')
             const output = snapshot.outputs.data as IFixtureContribution
             const slot = integration.acquireSharedSlot('runtimeSource', family, (owner) =>

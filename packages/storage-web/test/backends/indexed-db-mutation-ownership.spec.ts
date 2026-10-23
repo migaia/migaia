@@ -1,17 +1,53 @@
+import { walkErrorCauses } from '@migaia/utils/error'
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb'
-import { describe, expect, it } from 'vitest'
-import { indexedDbHost } from '../../src/backends/indexed-db.js'
-import { getBackendReactiveController } from '../../src/backends/reactive-controller.js'
+import { describe, expect, it, onTestFinished } from 'vitest'
+import { createStorageHost, defineFeature } from '@migaia/storage-host'
+import { deferred } from '@migaia/utils/promise'
+import {
+  indexedDbBackendKind,
+  indexedDbBackendPlugin,
+  type IIndexedDbOptions
+} from '../../src/indexed-db.js'
 
-/** Opens a database with one deliberately forgeable public metadata record. */
-const createStore = (dbName: string) => {
-  const factory = new IDBFactory()
-  return indexedDbHost({ factory, keyRange: IDBKeyRange, dbName })
+/** Failed installation retains the native validation failure below the actual host wrapper. */
+const expectInvalidInstallation = async (pending: Promise<unknown>): Promise<void> => {
+  const failure: unknown = await pending.catch((cause: unknown) => cause)
+  expect(failure).toMatchObject({ source: '@migaia/storage-host', code: 'BACKEND_INSTALL_FAILED' })
+  expect(walkErrorCauses(failure)).toContainEqual(
+    expect.objectContaining({
+      source: '@migaia/storage-web',
+      code: 'INVALID_CONFIG'
+    })
+  )
 }
 
+/** This selected Feature borrows the same controller registered for the native backend. */
+const controllerFeature = defineFeature(indexedDbBackendKind, ({ featureExpose }) => ({
+  capabilities: [],
+  chain: {},
+  api: {
+    store: { controller: async () => featureExpose.getChangeController() },
+    transaction: {}
+  }
+}))
+
+/** Lifecycle cases install the public plugin and retain its original host for cleanup. */
+const createInstalledStore = async (options: IIndexedDbOptions) => {
+  /** The fixture borrows the installed backend while its original host owns cleanup. */
+  const host = await createStorageHost({
+    plugins: [indexedDbBackendPlugin(options, { ownership: controllerFeature })]
+  })
+  onTestFinished(() => host.dispose())
+  return host.backend('indexed-db')
+}
+
+/** Opens a database with one deliberately forgeable public metadata record. */
+const createStore = (dbName: string, factory = new IDBFactory()) =>
+  createInstalledStore({ factory, keyRange: IDBKeyRange, dbName })
+
 /** Counts lifecycle admissions and releases without changing the controller's behavior. */
-const trackMutationLeases = (store: ReturnType<typeof createStore>) => {
-  const controller = getBackendReactiveController(store)!
+const trackMutationLeases = async (store: Awaited<ReturnType<typeof createStore>>) => {
+  const controller = (await store.api.controller())!
   let admissions = 0
   let releases = 0
   const beginMutation = controller.beginMutation
@@ -54,7 +90,7 @@ const createMalformedSidecarStore = async (
     }
     request.onerror = () => reject(request.error)
   })
-  return indexedDbHost({ factory, keyRange: IDBKeyRange, dbName })
+  return createInstalledStore({ factory, keyRange: IDBKeyRange, dbName })
 }
 
 /** Creates two complete production handles, then appends a mixed legacy batch for ordering checks. */
@@ -97,7 +133,7 @@ const createMixedLegacyStore = async (dbName: string, keys: readonly IDBValidKey
     { scope: 'a', generation: 'ga', fingerprint: '[]' },
     { scope: 'b', generation: 'gb', fingerprint: '[]' }
   ] as const
-  const preflightStore = indexedDbHost({ factory, keyRange: IDBKeyRange, dbName })
+  const preflightStore = await createInstalledStore({ factory, keyRange: IDBKeyRange, dbName })
   const initialReadiness = await Promise.all(
     handles.map((handle) => preflightStore.getRecordIndexReadiness(handle))
   )
@@ -115,7 +151,7 @@ const createMixedLegacyStore = async (dbName: string, keys: readonly IDBValidKey
     request.onerror = () => reject(request.error)
   })
   return {
-    store: indexedDbHost({ factory, keyRange: IDBKeyRange, dbName }),
+    store: await createInstalledStore({ factory, keyRange: IDBKeyRange, dbName }),
     handles,
     initialReadiness
   }
@@ -123,7 +159,9 @@ const createMixedLegacyStore = async (dbName: string, keys: readonly IDBValidKey
 
 describe('IndexedDB preparation and mutation ownership', () => {
   it('ignores public schema and index strings as backend authority', async () => {
-    const store = createStore('r05-public-forge')
+    /** Both registrations reopen the same native data rather than independent factory maps. */
+    const factory = new IDBFactory()
+    const store = await createStore('r05-public-forge', factory)
     await store.get('probe')
     await store.metadata!.set('schema', { version: 999, migration: 'forged' })
     await store.metadata!.set('index:users', {
@@ -131,7 +169,7 @@ describe('IndexedDB preparation and mutation ownership', () => {
       readiness: { status: 'complete', scanned: 99, indexed: 99 }
     })
 
-    const reopened = createStore('r05-public-forge')
+    const reopened = await createStore('r05-public-forge', factory)
     await expect(reopened.get('still-usable')).resolves.toBeNull()
     await expect(
       reopened
@@ -145,19 +183,22 @@ describe('IndexedDB preparation and mutation ownership', () => {
     await reopened.dispose()
   })
 
-  it('waits for an admitted record write before closing and rejects late writes', async () => {
-    const store = createStore('r05-dispose-race')
-    const tracker = trackMutationLeases(store)
+  it('cancels a write before native admission and rejects late writes', async () => {
+    const store = await createStore('r05-dispose-race')
+    const tracker = await trackMutationLeases(store)
     const write = store.putRecord({ value: 1 }, 'record-1')
     await store.dispose()
-    await expect(write).resolves.toBe('record-1')
+    await expect(write).rejects.toMatchObject({
+      code: 'ABORTED',
+      cause: expect.objectContaining({ code: 'STORE_DISPOSED' })
+    })
     expect(tracker.counts()).toEqual({ admissions: 1, releases: 1 })
     await expect(store.putRecord({ value: 2 }, 'record-2')).rejects.toMatchObject({
       code: 'STORE_DISPOSED'
     })
   })
 
-  it('latches an incompatible native layout as a terminal preparation failure', async () => {
+  it('rejects an incompatible native layout before publishing the store', async () => {
     const factory = new IDBFactory()
     const dbName = 'r05-layout-conflict'
     await new Promise<void>((resolve, reject) => {
@@ -174,10 +215,9 @@ describe('IndexedDB preparation and mutation ownership', () => {
       }
       request.onerror = () => reject(request.error)
     })
-    const store = indexedDbHost({ factory, keyRange: IDBKeyRange, dbName })
-    await expect(store.get('probe')).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
-    await expect(store.get('probe-again')).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
-    await store.dispose()
+    await expectInvalidInstallation(
+      createInstalledStore({ factory, keyRange: IDBKeyRange, dbName })
+    )
   })
 
   it.each([
@@ -201,21 +241,17 @@ describe('IndexedDB preparation and mutation ownership', () => {
       }
     ]
   ])('rejects an owned sidecar with %s', async (_label, configure) => {
-    const store = await createMalformedSidecarStore(`r05-sidecar-${_label}`, configure)
-    await expect(store.get('probe')).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
-    await expect(store.get('probe-again')).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
-    await store.dispose()
+    await expectInvalidInstallation(createMalformedSidecarStore(`r05-sidecar-${_label}`, configure))
   })
 
   it('rejects a valid sidecar with an extra owned index', async () => {
-    const store = await createMalformedSidecarStore('r05-sidecar-rogue', (sidecar) => {
-      sidecar.createIndex('lookup', ['scope', 'indexName', 'generation', 'indexValue'])
-      sidecar.createIndex('record', ['scope', 'generation', 'recordKey'])
-      sidecar.createIndex('rogue', ['scope'])
-    })
-    await expect(store.get('probe')).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
-    await expect(store.get('probe-again')).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
-    await store.dispose()
+    await expectInvalidInstallation(
+      createMalformedSidecarStore('r05-sidecar-rogue', (sidecar) => {
+        sidecar.createIndex('lookup', ['scope', 'indexName', 'generation', 'indexValue'])
+        sidecar.createIndex('record', ['scope', 'generation', 'recordKey'])
+        sidecar.createIndex('rogue', ['scope'])
+      })
+    )
   })
 
   it('invalidates every migrated canonical scope in one legacy batch', async () => {
@@ -277,7 +313,7 @@ describe('IndexedDB preparation and mutation ownership', () => {
       }
       request.onerror = () => reject(request.error)
     })
-    const store = indexedDbHost({ factory, keyRange: IDBKeyRange, dbName })
+    const store = await createInstalledStore({ factory, keyRange: IDBKeyRange, dbName })
     await expect(store.get('probe')).resolves.toBeNull()
     for (const scope of ['a', 'b'])
       await expect(
@@ -319,8 +355,8 @@ describe('IndexedDB preparation and mutation ownership', () => {
   })
 
   it('leases index preparation through dispose', async () => {
-    const store = createStore('r05-prepare-dispose-race')
-    const tracker = trackMutationLeases(store)
+    const store = await createStore('r05-prepare-dispose-race')
+    const tracker = await trackMutationLeases(store)
     const preparation = store.ensureRecordIndexes('users', [
       { name: 'value', unique: false, multiEntry: false, revision: 1 }
     ])
@@ -329,22 +365,34 @@ describe('IndexedDB preparation and mutation ownership', () => {
     expect(tracker.counts()).toEqual({ admissions: 1, releases: 1 })
   })
 
-  it('bounds a non-cooperative transaction callback so dispose can finish', async () => {
-    const store = createStore('r05-transaction-deadline')
-    const tracker = trackMutationLeases(store)
-    const transaction = store.transaction(async () => new Promise<never>(() => {}), {
-      timeoutMs: 25
+  it('drains an accepted non-cooperative callback before releasing disposal', async () => {
+    const store = await createStore('r05-transaction-deadline')
+    const tracker = await trackMutationLeases(store)
+    const controller = (await store.api.controller())!
+    const entered = deferred<void>()
+    const release = deferred<void>()
+    let callbackEnded = false
+    const transaction = store.transaction(async () => {
+      entered.resolve()
+      await release.promise
+      callbackEnded = true
     })
+    const result = transaction.catch((cause: unknown) => cause)
+    await entered.promise
     const firstDispose = store.dispose()
-    const secondDispose = store.dispose()
-    expect(firstDispose).toBe(secondDispose)
-    await expect(transaction).rejects.toMatchObject({ code: 'ABORTED' })
+    expect(store.dispose()).toBe(firstDispose)
+    let disposed = false
+    void firstDispose.then(() => {
+      disposed = true
+    })
+    expect(controller.closingSignal.aborted).toBe(true)
+    expect(callbackEnded).toBe(false)
+    expect(disposed).toBe(false)
+    expect(tracker.counts()).toEqual({ admissions: 1, releases: 0 })
+    release.resolve()
+    await expect(result).resolves.toMatchObject({ code: 'STORE_DISPOSED' })
+    await firstDispose
+    expect(callbackEnded).toBe(true)
     expect(tracker.counts()).toEqual({ admissions: 1, releases: 1 })
-    await expect(
-      Promise.race([
-        firstDispose,
-        new Promise((_, reject) => setTimeout(() => reject(new Error('dispose timeout')), 250))
-      ])
-    ).resolves.toBeUndefined()
   })
 })

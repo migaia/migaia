@@ -11,6 +11,7 @@ import type {
 } from './typing.js'
 import { createPluginHostExtensionPublication } from './publication.js'
 import { PluginHostErrorCode } from './error-code.js'
+import type { IPluginHostCompositionRuntimePort } from './composition-runtime.js'
 
 /** Validates a publication-ordered request list and resolves its Host-owned definition snapshots. */
 export const resolveAdmissionDefinitions = <TDefinition>(
@@ -249,14 +250,28 @@ export const emptyPhysicalCleanupResult = (): IPluginHostPhysicalCleanupResult =
   Object.freeze({ cleanupErrors: Object.freeze([]) })
 
 /**
- * Hosts this package constructed, mapped to their managed-protocol port.
+ * Hosts this package constructed, mapped to their original managed-protocol authority and cache.
  *
  * Module-private and deliberately separate from the disposal-provenance map in `host-runtime`: the
  * two answer different questions about the same objects, and one map answering both would make
  * either owner unable to change its own key set. A `WeakMap` means a host that goes out of scope
  * takes its entry with it, so there is no registration to undo and nothing to leak.
  */
-const managedHosts = new WeakMap<object, IPluginHostCompositionIntegration<object>>()
+const managedHosts = new WeakMap<object, IManagedHostRecord>()
+
+/** Original runtime ports and one composition facade, shared by a class and its frozen handle. */
+type IManagedHostRecord = {
+  readonly runtimePort: IPluginHostCompositionRuntimePort<any, any>
+  readonly readRevision: () => number
+  readonly readCurrentSnapshot: () => unknown
+  port?: IPluginHostCompositionIntegration<object>
+}
+
+/** Runtime methods supplied by composition; revision and snapshot reads stay with the Host. */
+type IManagedHostRuntime = Omit<
+  IPluginHostCompositionIntegration<object>,
+  'revision' | 'getCurrentSnapshot'
+>
 
 /**
  * Builds the managed-protocol port over a host's composition runtime.
@@ -265,7 +280,7 @@ const managedHosts = new WeakMap<object, IPluginHostCompositionIntegration<objec
  * the host only owns the runtime the port delegates to, and a literal spelled out in the
  * constructor put the shape of a composition-only surface in the middle of ordinary host wiring.
  */
-export const buildManagedPort = <TRuntime extends IPluginHostCompositionIntegration<object>>(
+export const buildManagedPort = <TRuntime extends IManagedHostRuntime>(
   runtime: TRuntime,
   readRevision: () => number,
   readCurrentSnapshot: () => unknown
@@ -290,12 +305,38 @@ export const buildManagedPort = <TRuntime extends IPluginHostCompositionIntegrat
       >
   })
 
-/** Records a host's managed-protocol port. Called once, at the end of host construction. */
+/** Records the original runtime authority without constructing the optional composition facade. */
 export const registerManagedHost = (
   target: object,
-  port: IPluginHostCompositionIntegration<object>
+  runtimePort: IPluginHostCompositionRuntimePort<any, any>,
+  readRevision: () => number,
+  readCurrentSnapshot: () => unknown
 ): void => {
-  managedHosts.set(target, port)
+  managedHosts.set(target, { runtimePort, readRevision, readCurrentSnapshot })
+}
+
+/** Gives a frozen owner handle the exact provenance record already owned by its runtime. */
+export const aliasManagedHost = (target: object, source: object): void => {
+  managedHosts.set(target, readManagedHost(source))
+}
+
+/** Compares original managed records without acquiring optional composition authority. */
+export const matchesManagedHost = (left: object, right: object): boolean => {
+  /** Missing records never establish shared ownership, including two structural lookalikes. */
+  const record = managedHosts.get(left)
+  return record !== undefined && record === managedHosts.get(right)
+}
+
+/** Reads trusted provenance while preserving the public unmanaged-target error. */
+const readManagedHost = (target: object): IManagedHostRecord => {
+  /** The same record binds both class and functional entries to their original runtime. */
+  const record = managedHosts.get(target)
+  if (!record)
+    throw new PluginHostError(
+      PluginHostErrorCode.compositionTargetUnmanaged,
+      ERROR_TEXT.COMPOSITION_TARGET_UNMANAGED
+    )
+  return record
 }
 
 /**
@@ -316,12 +357,17 @@ export const isManagedHost = (target: unknown): boolean =>
  * plugin handles. Unknown targets throw COMPOSITION_TARGET_UNMANAGED. Opening the port does not
  * reactivate a closing or disposed Host; individual operations keep their lifecycle checks.
  */
-export const openComposition = (target: object): IPluginHostCompositionIntegration<object> => {
-  const port = managedHosts.get(target)
-  if (!port)
-    throw new PluginHostError(
-      PluginHostErrorCode.compositionTargetUnmanaged,
-      ERROR_TEXT.COMPOSITION_TARGET_UNMANAGED
+export const openComposition = (
+  target: object,
+  createRuntime: (port: IPluginHostCompositionRuntimePort<any, any>) => IManagedHostRuntime
+): IPluginHostCompositionIntegration<object> => {
+  /** Optional implementation enters only through the dedicated public composition entry. */
+  const record = readManagedHost(target)
+  if (record.port === undefined)
+    record.port = buildManagedPort(
+      createRuntime(record.runtimePort),
+      record.readRevision,
+      record.readCurrentSnapshot
     )
-  return port
+  return record.port
 }

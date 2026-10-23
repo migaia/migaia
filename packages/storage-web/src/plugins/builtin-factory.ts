@@ -1,65 +1,59 @@
 import type { IKeyValueStore } from '@migaia/storage-contract'
-import type { IFeatureRecord } from '@migaia/plugin-host'
 import {
-  defineBuiltInPlugin,
-  defineBuiltInReactivePlugin,
+  definePlugin,
+  type IStorageBackendKind,
+  type IStorageBackendPlugin,
+  type IStorageFeatureRecord,
+  type IStorageFeatureStoreCompatibility,
   type IStoragePluginCore
-} from '../host/contracts.js'
-import type { IStorageBackendKind, IStorageBackendPlugin } from '../host/types.js'
+} from '@migaia/storage-host'
+import type { IBackendConstruction } from '../backends/construction.js'
+import { StorageError, StorageErrorCode } from '../types/errors.js'
+import type { IBackendKind } from '@migaia/storage-contract'
 
-type IPluginPreparation<TStore extends IKeyValueStore> = (store: TStore) => Promise<void>
-
-/** Defines an ordinary first-party backend without introducing a reactive Feature. */
-export function createBuiltInBackendPlugin<
-  TStore extends IKeyValueStore,
-  TKind extends IStorageBackendKind<string, TStore>,
-  const TId extends string
->(
-  kind: TKind,
-  id: TId,
-  createStore: () => TStore,
-  options?: { readonly prepare?: IPluginPreparation<TStore> }
-): IStorageBackendPlugin<TStore, TKind, TId, false>
-
-/** Defines a reactive first-party backend while preserving its exact Feature metadata. */
-export function createBuiltInBackendPlugin<
-  TStore extends IKeyValueStore,
-  TKind extends IStorageBackendKind<string, TStore>,
-  const TId extends string
->(
-  kind: TKind,
-  id: TId,
-  createStore: () => TStore,
-  options: {
-    readonly reactive: IFeatureRecord[string]
-    readonly prepare?: IPluginPreparation<TStore>
+/** Read the optional factory id without allowing an options accessor to leave the Web boundary. */
+export function readBuiltInPluginId<TId extends string>(
+  options: { readonly id?: TId },
+  fallback: string,
+  backend: IBackendKind
+): TId {
+  try {
+    return (options.id ?? fallback) as TId
+  } catch (cause) {
+    throw new StorageError(StorageErrorCode.invalidConfig, { backend, cause })
   }
-): IStorageBackendPlugin<TStore, TKind, TId, true>
+}
 
-/** Registers the Store before optional async preparation so Host owns rollback disposal. */
+/** Preserve the original create, admission, controller registration and preparation order. */
 export function createBuiltInBackendPlugin<
-  TStore extends IKeyValueStore,
-  TKind extends IStorageBackendKind<string, TStore>,
-  const TId extends string
+  const TName extends string,
+  S extends IKeyValueStore,
+  C,
+  const TId extends string,
+  const F extends IStorageFeatureRecord = {}
 >(
-  kind: TKind,
+  kind: IStorageBackendKind<TName, S, C>,
   id: TId,
-  createStore: () => TStore,
-  options?: {
-    readonly reactive?: IFeatureRecord[string]
-    readonly prepare?: IPluginPreparation<TStore>
-  }
-): IStorageBackendPlugin<TStore, TKind, TId, boolean> {
-  const descriptor = (core: IStoragePluginCore<TStore>) => ({
-    install: () => {
-      const store = createStore()
-      core.registerStore(store)
-      return options?.prepare ? options.prepare(store).then(() => ({})) : {}
+  createStore: (core: IStoragePluginCore) => IBackendConstruction<S, C>,
+  features?: F & IStorageFeatureStoreCompatibility<IStorageBackendKind<TName, S, C>, NoInfer<F>>
+): IStorageBackendPlugin<IStorageBackendKind<TName, S, C>, TId, F> {
+  /** The descriptor borrows this exact construction; only the host owns its lifetime. */
+  const descriptor = (core: IStoragePluginCore<F>) => {
+    /** Installation initializes the original native client before lazy Feature getters run. */
+    let construction: IBackendConstruction<S, C>
+    return {
+      kind,
+      install: () => {
+        construction = createStore(core)
+        core.registerStore(construction.store)
+        core.registerChangeController(construction.store, construction.controller)
+        if (construction.commitValueWrite !== undefined)
+          core.registerValueCommit(construction.store, construction.commitValueWrite)
+        return construction.prepare ? construction.prepare().then(() => ({})) : {}
+      },
+      featureExpose: () => ({ getClient: () => construction.getClient() }),
+      capabilityInstaller: (_store: S) => construction.installer
     }
-  })
-  if (options?.reactive)
-    return defineBuiltInReactivePlugin(kind, id, descriptor, {
-      reactive: options.reactive
-    })
-  return defineBuiltInPlugin(kind, id, descriptor)
+  }
+  return definePlugin<TId, typeof descriptor, F>(id, descriptor, features)
 }

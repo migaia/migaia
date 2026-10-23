@@ -135,6 +135,16 @@ it('retains concrete transaction scopes, backend options and Awaited callback re
       return 'saved' as const
     })
     expectTypeOf(asynchronous).toEqualTypeOf<Promise<'saved'>>()
+    /** Mutable, readonly and dynamically returned handle arrays retain the same original scope. */
+    const variable = [handle]
+    /** Readonly callers do not need to cast back to the coordinator's original handles. */
+    const readonlyHandles: readonly IPersistHandle[] = variable
+    /** A dynamic producer still returns genuine attachment handles rather than a tuple-only API. */
+    const handlesFromFunction = (): IPersistHandle[] => variable
+    for (const handles of [variable, readonlyHandles, handlesFromFunction()])
+      expectTypeOf(persistTransaction(storage, handles, (tx) => tx.sql('select 1'))).toEqualTypeOf<
+        Promise<number>
+      >()
     const thenable: PromiseLike<number> = Promise.resolve(9)
     expectTypeOf(persistTransaction(storage, [handle], () => thenable)).toEqualTypeOf<
       Promise<number>
