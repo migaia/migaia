@@ -60,6 +60,8 @@ export const StorageContractErrorText = {
   queryUnsupported: 'backend does not declare this operation or operator',
   /** A record operation following a client step cannot cross the longest safe native prefix. */
   queryPrefix: 'operation follows a client execution boundary',
+  /** Offset pagination advances through every skipped source row rather than seeking a key. */
+  querySkip: 'skip advances through rows with O(n) cost',
   /**
    * Confirmed lock diagnostics expose declared identity and holder without inventing a remote
    * owner.

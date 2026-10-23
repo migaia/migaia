@@ -1374,8 +1374,8 @@ describe('bounded record execution', () => {
       pending.all()
       // @ts-expect-error Comparator results expose no stream until an explicit limit.
       pending.stream()
-      // @ts-expect-error No selector ordering is advertised by this implementation slice.
-      query.orderBy((value: number) => value)
+      // @ts-expect-error Comparator ordering cannot switch to selector ordering.
+      pending.orderBy((value: number) => value)
       // @ts-expect-error Transaction record queries cannot receive a new context.
       query.limit(1).stream({ timeoutMs: 1 })
     }
@@ -1499,6 +1499,142 @@ describe('bounded record execution', () => {
     ).rejects.toBe(original)
     expect(original).toMatchObject({ source: '@migaia/storage-contract', code: 'INVALID_ARGUMENT' })
     expect(closed).toBe(1)
+  })
+})
+
+describe('shared selector ordering and row controls', () => {
+  it('uses canonical lexicographic selector keys once with a primary-key tail and no comparator state', async () => {
+    /** Deliberately shuffled equal-selector rows must use their original logical primary key. */
+    const values = [
+      { id: 'c', group: 'a', value: 2 },
+      { id: 'b', group: 'a', value: 1 },
+      { id: 'a', group: 'a', value: 1 },
+      { id: 'd', group: 'b', value: 99 }
+    ]
+    const group = vi.fn((row: (typeof values)[number]) => row.group)
+    const value = vi.fn((row: (typeof values)[number]) => row.value)
+    const close = vi.fn()
+    const execute = vi.fn(() =>
+      ownedRows(values, close, undefined, { key: (row) => (row as (typeof values)[number]).id })
+    )
+    const query = createRecordQuery<(typeof values)[number]>({ pushdown: noPushdown, execute })
+      .orderBy(group)
+      .orderBy(value, 'desc')
+    expect(execute).not.toHaveBeenCalled()
+    expect(await query.limit(3).select('id').all()).toEqual([{ id: 'c' }, { id: 'a' }, { id: 'b' }])
+    expect(group).toHaveBeenCalledTimes(4)
+    expect(value).toHaveBeenCalledTimes(4)
+    /** A downstream first-row choice makes selector ordering relevant to cardinality itself. */
+    const chosen = createRecordQuery<{ group: string; priority: number }>({
+      pushdown: noPushdown,
+      execute: () =>
+        ownedRows([
+          { group: 'same', priority: 0 },
+          { group: 'same', priority: 1 }
+        ])
+    })
+      .orderBy((row) => row.priority, 'desc')
+      .distinct('group')
+      .where({ priority: { gt: 0 } })
+    expect(await chosen.all()).toEqual([{ group: 'same', priority: 1 }])
+    expect(await chosen.count()).toBe(1)
+    expect(close).toHaveBeenCalledTimes(1)
+    expect('orderByComparator' in query).toBe(false)
+    expect(await query.count()).toBe(4)
+    expect(group).toHaveBeenCalledTimes(4)
+    expect(value).toHaveBeenCalledTimes(4)
+    function invalidTypes(): void {
+      // @ts-expect-error Selector ordering cannot acquire arbitrary comparator ordering.
+      query.orderByComparator(() => 0)
+    }
+    void invalidTypes
+  })
+
+  it('streams SameValueZero distinct values and explicit skips without reading beyond the bound', async () => {
+    /** Repeated NaN/zero values exercise Set identity without an alternate value codec. */
+    const values = [1, 1, 0, -0, NaN, NaN, 2].map((value) => ({ value }))
+    let advanced = 0
+    const query = createRecordQuery<{ value: number }>({
+      pushdown: noPushdown,
+      execute: () => ownedRows(values, undefined, undefined, { onNext: () => advanced++ })
+    })
+      .distinct('value')
+      .skip(1)
+      .limit(2)
+    expect(await query.pluck('value')).toEqual([0, NaN])
+    expect(advanced).toBe(5)
+    expect(query.explain().client.find((step) => step.operation === 'skip')?.reason).toContain(
+      'O(n)'
+    )
+    expect(() => query.skip(-1)).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT' }))
+    expect(() => query.skip(1.5)).toThrowError(
+      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+    )
+  })
+
+  it('sends native controls only to explicitly opted-in sources and preserves legacy execute arguments', async () => {
+    /** Native engines accept the canonical steps, without their own fluent query implementation. */
+    const execute = vi.fn(() => ownedRows([{ value: 2 }]))
+    const query = createRecordQuery<{ value: number }>({
+      pushdown: {
+        source: 'native-controls',
+        operators: [],
+        operations: ['distinct', 'skip', 'limit']
+      },
+      nativeSteps: true,
+      execute
+    })
+      .distinct('value')
+      .skip(1)
+      .limit(1)
+      .requirePushdown()
+    expect(query.explain().pushed.find((step) => step.operation === 'skip')?.reason).toContain(
+      'O(n)'
+    )
+    expect(await query.all()).toEqual([{ value: 2 }])
+    expect(execute.mock.calls[0]).toEqual([
+      {
+        conditions: [],
+        fields: undefined,
+        ctx: undefined,
+        steps: [
+          { operation: 'distinct', field: 'value' },
+          { operation: 'skip', count: 1 },
+          { operation: 'limit', count: 1 }
+        ]
+      }
+    ])
+    const legacy = vi.fn(() => ownedRows([{ value: 1 }, { value: 1 }, { value: 2 }]))
+    const client = createRecordQuery<{ value: number }>({
+      pushdown: {
+        source: 'legacy-controls',
+        operators: [],
+        operations: ['distinct', 'skip', 'limit']
+      },
+      execute: legacy
+    })
+      .distinct('value')
+      .skip(1)
+      .limit(1)
+    expect(await client.all()).toEqual([{ value: 2 }])
+    expect(legacy.mock.calls[0]).toEqual([{ conditions: [], fields: undefined, ctx: undefined }])
+    await expect(client.requirePushdown().all()).rejects.toMatchObject({
+      code: 'QUERY_NOT_PUSHABLE'
+    })
+    expect(legacy).toHaveBeenCalledTimes(1)
+  })
+
+  it('preserves selector failure identity and closes the original accepted cursor once', async () => {
+    const original = new TypeError('selector failed')
+    const close = vi.fn()
+    const query = createRecordQuery<number>({
+      pushdown: noPushdown,
+      execute: () => ownedRows([1], close)
+    }).orderBy(() => {
+      throw original
+    })
+    await expect(query.all()).rejects.toBe(original)
+    expect(close).toHaveBeenCalledTimes(1)
   })
 })
 
