@@ -1,4 +1,4 @@
-import { createRecordQuery } from '../authoring/query.js'
+import type { createRecordQueryWithoutKeyset } from '../authoring/query.js'
 import {
   type IOperationContext,
   type IRecordQuery,
@@ -40,6 +40,8 @@ type IEntityQueryInput<
 > = {
   /** Keyset methods require their independent explicit assembly before preparing a source. */
   readonly keyset: <R>(invoke: () => R) => R
+  /** Query-only construction omits the actual keyset owner; its unit supplies the full creator. */
+  readonly query: typeof createRecordQueryWithoutKeyset
   readonly source: (selection: IEntityQuerySourceSelection<T>) => IRecordQuerySource
   readonly index: (name: string, match: unknown) => IEntityQuerySourceSelection<T>
   readonly range: (range: IKeyRange) => IKeyRange
@@ -826,7 +828,7 @@ export function createEntityQuery<
   }
   return wrapEntityQuery(
     context,
-    createRecordQuery<T, TContext, TMethods>(input.source(selection), input.methods),
+    input.query<T, TContext, TMethods>(input.source(selection), input.methods),
     undefined,
     false,
     undefined,
