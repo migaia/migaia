@@ -461,17 +461,8 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
     if (hooks !== undefined) {
       if (typeof hooks !== 'object' || hooks === null || Array.isArray(hooks))
         throw createStorageTypeError(StorageErrorCode.invalidConfig, StorageErrorText.invalidHooks)
-      /** Snapshot own enumerable handlers once before acquiring any listener registration. */
-      let hookEntries: Array<[string, unknown]>
-      try {
-        hookEntries = Object.entries(hooks)
-      } catch (cause) {
-        throw createStorageTypeError(
-          StorageErrorCode.invalidConfig,
-          StorageErrorText.invalidHooks,
-          cause
-        )
-      }
+      /** Capture declared ordinary handlers before acquiring any listener registration. */
+      const hookEntries = Object.entries(hooks)
       for (const [name, handler] of hookEntries) {
         if (handler !== undefined)
           this.#events.hooks.on(name as keyof typeof hooks, handler as never)

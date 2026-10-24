@@ -87,29 +87,7 @@ describe('the shared storage observation owner', () => {
     })
   })
 
-  it('codes hook option reflection failures while preserving their exact original cause', async () => {
-    /** Getter and own-key failures are configuration input failures, before any backend is opened. */
-    const primary = new Error('hook descriptor failed')
-    for (const hooks of [
-      {
-        get beforeHostClose() {
-          throw primary
-        }
-      },
-      new Proxy(
-        {},
-        {
-          ownKeys() {
-            throw primary
-          }
-        }
-      )
-    ])
-      await expect(createStorageHost({ hooks })).rejects.toMatchObject({
-        source: '@migaia/storage-host',
-        code: 'INVALID_CONFIG',
-        cause: primary
-      })
+  it('rejects a malformed hook before any backend is opened', async () => {
     await expect(
       createStorageHost({ hooks: { beforeHostClose: 42 as never } })
     ).rejects.toMatchObject({ source: '@migaia/storage-host', code: 'INVALID_CONFIG' })
