@@ -76,7 +76,19 @@ function sequenceOf(key: string, prefix: string): number | undefined {
 export async function readStorageLogHead(
   view: IStorageJournalNamespaceView
 ): Promise<IStorageLogHead> {
-  const raw = await view.get(StorageLogWire.head)
+  const raw =
+    view.getOrInsert === undefined
+      ? await view.get(StorageLogWire.head)
+      : await view.getOrInsert(
+          StorageLogWire.head,
+          JSON.stringify({
+            format: StorageLogWire.format,
+            generation: 0,
+            lastSeq: 0,
+            time: 0,
+            floor: 1
+          })
+        )
   if (raw === null)
     return { format: StorageLogWire.format, generation: 0, lastSeq: 0, time: 0, floor: 1 }
   const value = parse(raw)

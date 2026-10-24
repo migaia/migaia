@@ -9,6 +9,7 @@ import {
   memoryBackendPlugin,
   type IStoragePluginCore,
   type IStorageJournalBackendBinding,
+  type IStorageJournalNamespace,
   type IStorageJournalNamespaceView
 } from '../src/index.js'
 import { storageLogStore } from '../src/journal.js'
@@ -18,6 +19,7 @@ import { resolveStorageJournalBinding } from '../src/journal/binding.js'
 /** Faults surround real private memory I/O admitted through the original descriptor boundary. */
 function nonAtomicPrivatePlugin(fault: {
   indexExclusive?: false
+  opened?: (namespace: IStorageJournalNamespace) => void
   beforeRun?: () => void
   disposed?: () => void
   beforeSet?: (key: string) => void | Promise<void>
@@ -31,6 +33,7 @@ function nonAtomicPrivatePlugin(fault: {
       forOrg: (orgId) => project(binding.forOrg(orgId)),
       openNamespace: async (prefix) => {
         const namespace = await binding.openNamespace(prefix)
+        fault.opened?.(namespace)
         return {
           ...namespace,
           nativeAtomic: false,
@@ -89,18 +92,48 @@ function nonAtomicPrivatePlugin(fault: {
 }
 
 describe('private storage log resource', () => {
-  it('rejects a nonexclusive namespace before recovery I/O and releases its original resource', async () => {
+  it('reads a nonexclusive namespace current head and states inside each original operation', async () => {
+    let original: IStorageJournalNamespace | undefined
     const beforeRun = vi.fn()
-    const disposed = vi.fn()
     await using host = await createStorageHost({
-      plugins: [nonAtomicPrivatePlugin({ indexExclusive: false, beforeRun, disposed })]
+      plugins: [
+        nonAtomicPrivatePlugin({
+          indexExclusive: false,
+          beforeRun,
+          opened: (namespace) => {
+            original = namespace
+          }
+        })
+      ]
     })
-    await expect(
-      storageLogStore(host, 'history', { prefix: 'no-exclusive-index' })
-    ).rejects.toMatchObject({ code: 'UNSUPPORTED_CAPABILITY' })
-    expect(beforeRun).not.toHaveBeenCalled()
-    expect(disposed).toHaveBeenCalledOnce()
-    expect(await host.backend('history').get('business')).toBeNull()
+    await using log = await storageLogStore(host, 'history', { prefix: 'current-index' })
+    expect(await log.append([{ kind: 'first', payload: null }])).toEqual([1])
+    await original!.run(async (view) => {
+      await view.set(
+        'record:0000000000000002',
+        JSON.stringify({
+          generation: 2,
+          record: { seq: 2, time: Date.now(), kind: 'external', payload: null }
+        })
+      )
+      await view.set(
+        'head',
+        JSON.stringify({
+          format: 1,
+          generation: 2,
+          lastSeq: 2,
+          time: Date.now(),
+          floor: 1
+        })
+      )
+    })
+    expect(await log.lastSeq()).toBe(2)
+    expect(await log.states(LogRecordState.pending)).toEqual([1, 2])
+    await log.setState(2, LogRecordState.done)
+    expect(await log.states(LogRecordState.pending)).toEqual([1])
+    expect(await log.append([{ kind: 'third', payload: null }])).toEqual([3])
+    expect((await log.read(1, 10)).map((row) => row.seq)).toEqual([1, 2, 3])
+    expect(beforeRun.mock.calls.length).toBeGreaterThan(6)
   })
   it('attributes malformed owned payloads to the journal wire while retaining the canonical validator cause', async () => {
     await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })

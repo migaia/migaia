@@ -526,7 +526,14 @@ console.log(host.extensions.label('draft'))`,
         'Six original string KV methods plus actual private keys; business bulk and TTL capabilities are absent.',
         '原六个字符串 KV 方法与真实私有 keys，不继承业务批量和 TTL。'
       ),
-      members: {}
+      members: {
+        getOrInsert: {
+          summary: t(
+            'Optional original native row initialization and lock in the current transaction. PostgreSQL uses its existing primary key and SELECT FOR UPDATE; no table, lifetime lock or commit authority is added.',
+            '可选的原生行初始化与当前事务内锁定；PostgreSQL 复用现有主键和 SELECT FOR UPDATE，不新增表、资源期锁或提交权限。'
+          )
+        }
+      }
     },
     IStorageJournalNamespace: {
       summary: t(
@@ -542,8 +549,8 @@ console.log(host.extensions.label('draft'))`,
         },
         indexExclusive: {
           summary: t(
-            'Optional false fact rejects storageLogStore before recovery I/O or cached index construction. Native transaction/terminal authority remains available to the commit bridge; omission preserves existing binding semantics.',
-            '可选 false 事实使 storageLogStore 在恢复 I/O 或缓存索引建立前拒绝；提交桥仍可借用原生事务/terminal 权限，省略时保持原有绑定语义。'
+            'Optional false selects current state reads in each original native transaction without a cross-operation index. Omission preserves the exclusive cached path; nativeAtomic remains independent.',
+            '可选 false 使每次日志操作在原生事务内读取当前状态，不保留跨操作索引；省略时保留独占缓存路径，nativeAtomic 仍独立。'
           )
         },
         assertLive: {

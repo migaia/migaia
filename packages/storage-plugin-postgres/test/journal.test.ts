@@ -3,8 +3,15 @@ import { Pool } from 'pg'
 import postgres from 'postgres'
 import { it, expect, onTestFinished, describe } from 'vitest'
 import { createStorageHost } from '@migaia/storage-host'
+import { storageLogStore } from '@migaia/storage-host/journal'
 import { Logger } from '@migaia/logger'
-import { binlog, wal, undoLog, memoryLogStore } from '@migaia/logger/plugins/durable'
+import {
+  binlog,
+  wal,
+  undoLog,
+  memoryLogStore,
+  LogRecordState
+} from '@migaia/logger/plugins/durable'
 import { kv, vector, ttl, lockKey } from '@migaia/storage-contract'
 import { deferred } from '@migaia/utils/promise'
 import { walkErrorCauses } from '@migaia/utils/error'
@@ -549,42 +556,52 @@ it('awaits original external append settlement without replacing a committed res
   expect(reports).toEqual([original])
 })
 
-it('rejects cached native log stores before private I/O when no reliable namespace lifetime lock exists', async () => {
-  const pool = new Pool({ connectionString })
-  const native = pgDriver(pool)
-  const statements: string[] = []
-  const driver = {
-    ...native,
-    query: (...args: Parameters<typeof native.query>) => {
-      statements.push(args[0])
-      return native.query(...args)
-    }
-  }
-  onTestFinished(async () => {
-    await pool.end()
+it('serializes independent native journal instances and recovers current records and states', async () => {
+  const prefix = 'pg_current_log_' + randomUUID().slice(0, 8)
+  const org = randomUUID()
+  const firstPool = new Pool({ connectionString })
+  const secondPool = new Pool({ connectionString })
+  const oneHost = await createStorageHost({
+    org,
+    plugins: [postgresBackendPlugin({ driver: pgDriver(firstPool), prefix })]
   })
-  const failure = await createStorageHost({
-    plugins: [
-      postgresBackendPlugin({ driver, prefix: 'pg_log_owner_' + randomUUID().slice(0, 8) })
-    ] as const,
-    journal: async ({ storageLogStore }) => {
-      await storageLogStore('postgres', { prefix: 'native' })
-      throw new Error('unreachable')
+  const twoHost = await createStorageHost({
+    org,
+    plugins: [postgresBackendPlugin({ driver: pgDriver(secondPool), prefix })]
+  })
+  try {
+    const [one, two] = await Promise.all([
+      storageLogStore(oneHost, 'postgres', { prefix: 'shared' }),
+      storageLogStore(twoHost, 'postgres', { prefix: 'shared' })
+    ])
+    try {
+      const sequences = await Promise.all(
+        Array.from({ length: 16 }, (_, index) =>
+          (index % 2 === 0 ? one : two).append([{ kind: 'shared', payload: index }])
+        )
+      )
+      expect(sequences.flat().sort((a, b) => a - b)).toEqual(
+        Array.from({ length: 16 }, (_, index) => index + 1)
+      )
+      expect(await one.lastSeq()).toBe(16)
+      expect(await two.lastSeq()).toBe(16)
+      await one.setState(1, LogRecordState.done)
+      expect(await two.states(LogRecordState.pending)).toEqual(
+        Array.from({ length: 15 }, (_, index) => index + 2)
+      )
+    } finally {
+      await Promise.all([one.dispose(), two.dispose()])
     }
-  }).then(
-    () => undefined,
-    (cause: unknown) => cause
-  )
-  expect(
-    walkErrorCauses(failure).some(
-      (error) =>
-        error !== null &&
-        typeof error === 'object' &&
-        'code' in error &&
-        error.code === 'UNSUPPORTED_CAPABILITY'
+    await using reopened = await storageLogStore(twoHost, 'postgres', { prefix: 'shared' })
+    expect((await reopened.read(1, 30)).map((row) => row.seq)).toEqual(
+      Array.from({ length: 16 }, (_, index) => index + 1)
     )
-  ).toBe(true)
-  expect(statements.some((text) => text.startsWith('SELECT') && text.includes('_journal'))).toBe(
-    false
-  )
+    expect(await reopened.states(LogRecordState.pending)).toEqual(
+      Array.from({ length: 15 }, (_, index) => index + 2)
+    )
+    expect(await reopened.append([{ kind: 'recovered', payload: null }])).toEqual([17])
+  } finally {
+    await Promise.all([oneHost.dispose(), twoHost.dispose()])
+    await Promise.all([firstPool.end(), secondPool.end()])
+  }
 })

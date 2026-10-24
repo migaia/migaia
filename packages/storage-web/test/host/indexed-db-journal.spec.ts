@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { IDBDatabase, IDBFactory, IDBKeyRange, IDBObjectStore } from 'fake-indexeddb'
+import { IDBFactory, IDBKeyRange, IDBObjectStore } from 'fake-indexeddb'
 import { describe, expect, it, vi } from 'vitest'
 import { createOrgId, createStorageHost } from '@migaia/storage-host'
 import { storageLogStore } from '@migaia/storage-host/journal'
@@ -8,41 +8,60 @@ import { walkErrorCauses } from '@migaia/utils/error'
 import { indexedDbBackendPlugin } from '../../src/indexed-db.js'
 
 describe('native IndexedDB private journal namespaces', () => {
-  it('rejects a persistent cached index without native lifetime exclusion before recovery I/O', async () => {
+  it('uses native readwrite transactions for independent nonexclusive persistent handles', async () => {
     const factory = new IDBFactory()
     vi.stubGlobal('indexedDB', factory)
     vi.stubGlobal('navigator', {})
     vi.stubGlobal('BroadcastChannel', undefined)
     try {
-      /** Two valid factory objects can address the same underlying persistent data universe. */
       const wrapper: IDBFactory = {
         open: (name, version) => factory.open(name, version),
         deleteDatabase: (name) => factory.deleteDatabase(name),
         databases: () => factory.databases(),
         cmp: (first, second) => factory.cmp(first, second)
       }
-      for (const injected of [undefined, wrapper]) {
-        await using host = await createStorageHost({
-          plugins: [
-            indexedDbBackendPlugin({
-              factory: injected,
-              keyRange: IDBKeyRange,
-              dbName: 'no-web-locks'
-            })
-          ]
-        })
-        const requests = vi.spyOn(IDBDatabase.prototype, 'transaction')
-        try {
-          await expect(
-            storageLogStore(host, 'indexed-db', { prefix: 'history' })
-          ).rejects.toMatchObject({ code: 'UNSUPPORTED_CAPABILITY' })
-          expect(requests).not.toHaveBeenCalled()
-        } finally {
-          requests.mockRestore()
-        }
-        await host.backend('indexed-db').set('business', 'available')
-        expect(await host.backend('indexed-db').get('business')).toBe('available')
+      await using host = await createStorageHost({
+        plugins: [indexedDbBackendPlugin({ keyRange: IDBKeyRange, dbName: 'no-web-locks' })]
+      })
+      await using peer = await createStorageHost({
+        plugins: [
+          indexedDbBackendPlugin({
+            factory: wrapper,
+            keyRange: IDBKeyRange,
+            dbName: 'no-web-locks'
+          })
+        ]
+      })
+      const one = await storageLogStore(host, 'indexed-db', { prefix: 'history' })
+      const two = await storageLogStore(peer, 'indexed-db', { prefix: 'history' })
+      try {
+        const batches = await Promise.all(
+          Array.from({ length: 10 }, (_, index) =>
+            (index % 2 === 0 ? one : two).append([{ kind: 'shared', payload: index }])
+          )
+        )
+        expect(batches.flat().sort((a, b) => a - b)).toEqual(
+          Array.from({ length: 10 }, (_, index) => index + 1)
+        )
+        expect(await one.lastSeq()).toBe(10)
+        expect(await two.states(LogRecordState.pending)).toEqual(
+          Array.from({ length: 10 }, (_, index) => index + 1)
+        )
+        await one.setState(1, LogRecordState.done)
+        expect(await two.states(LogRecordState.pending)).toEqual(
+          Array.from({ length: 9 }, (_, index) => index + 2)
+        )
+        expect(await host.backend('indexed-db').keys()).toEqual([])
+      } finally {
+        await Promise.all([one.dispose(), two.dispose()])
       }
+      await using reopened = await storageLogStore(peer, 'indexed-db', { prefix: 'history' })
+      expect((await reopened.read(1, 20)).map((row) => row.seq)).toEqual(
+        Array.from({ length: 10 }, (_, index) => index + 1)
+      )
+      expect(await reopened.states(LogRecordState.pending)).toEqual(
+        Array.from({ length: 9 }, (_, index) => index + 2)
+      )
     } finally {
       vi.unstubAllGlobals()
     }

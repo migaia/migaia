@@ -436,6 +436,34 @@ export function createPgJournalBinding(options: {
                       throw postgresError(PostgresErrorCode.decodeFailed)
                     return value
                   }),
+                /**
+                 * The existing PK bootstraps first-open races, then the row lock serializes all
+                 * heads.
+                 */
+                getOrInsert: (input, initial) =>
+                  execute(async (state) => {
+                    const encoded = key(input)
+                    await state.client.query(
+                      'INSERT INTO ' +
+                        tables.journal +
+                        ' (org_id,key,value) VALUES($1,$2,$3) ON CONFLICT(org_id,key) DO NOTHING',
+                      [orgId, encoded, encodePgRecord(initial)],
+                      state.ctx
+                    )
+                    const row = (
+                      await state.client.query(
+                        'SELECT value FROM ' +
+                          tables.journal +
+                          ' WHERE org_id=$1 AND key=$2 FOR UPDATE',
+                        [orgId, encoded],
+                        state.ctx
+                      )
+                    ).rows[0]
+                    const value = decodePgRecord(row?.value)
+                    if (typeof value !== 'string')
+                      throw postgresError(PostgresErrorCode.decodeFailed)
+                    return value
+                  }),
                 has: (input) =>
                   execute(
                     async (state) =>
@@ -516,6 +544,15 @@ export function createPgJournalBinding(options: {
           return options.infoFor(scope)
         },
         run,
+        runCommitted: <R>(
+          work: (view: IStorageJournalNamespaceView) => Promise<R>,
+          committed: (value: R) => void
+        ) =>
+          options.transaction(async (scope) => {
+            const value = await run(work, scope)
+            listen(scope, () => committed(value), true)
+            return value
+          }),
         onCommit: (scope: Omit<ITransactionScope, 'use'>, effect: () => void) =>
           listen(scope, effect, true),
         onRollback: (scope: Omit<ITransactionScope, 'use'>, effect: () => void) =>
