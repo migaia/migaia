@@ -1,4 +1,10 @@
-import type { ILogFilter, IOff, ILoggerPluginCore, ILoggerPlugin } from '../typing.js'
+import type {
+  ILogFilter,
+  IOff,
+  ILoggerPluginCore,
+  ILoggerPlugin,
+  IRawEntryInput
+} from '../typing.js'
 import { LoggerLevel, type ILoggerLevel } from '../plugin-constants.js'
 
 /** Level/filter policy captured for this installation; core tags remain general labels. */
@@ -23,6 +29,8 @@ export type ILevelPluginExt = {
   error(...args: unknown[]): void
   /** Dispatch a fatal entry; this method does not itself exit the process. */
   fatal(...args: unknown[]): void
+  /** Dispatch a normal entry with its own category tag through this installation's level policy. */
+  atLevel(level: ILoggerLevel, entry: IRawEntryInput): void
   /** Change this installation's live threshold without changing the host config snapshot. */
   setLevel(level: ILoggerLevel): void
   /** Adds a filter and returns an idempotent removal handle. */
@@ -30,6 +38,9 @@ export type ILevelPluginExt = {
   /** Remove all registrations of this exact predicate reference. */
   removeFilter(filter: ILogFilter): void
 }
+
+/** An explicit category keeps its level through the original data snapshot without a registry. */
+const explicitLevel = Symbol('logger.level')
 
 /**
  * Canonical level plugin name used by its `readonly name` property. The exported constant avoids
@@ -68,9 +79,9 @@ class LevelPlugin implements ILoggerPlugin<ILevelPluginExt, ILevelPluginConfig> 
 
     core.usePipeline((entry, next) => {
       const order = LevelPlugin.#LEVEL_ORDER
-      const lvl = entry.tag as ILoggerLevel
-      // tag 不是标准级别名时（比如 reasoning 插件的 "thinking:start"），
-      // 不受级别阈值约束，直接放行，只有真正的级别 tag 才会被拦截
+      const lvl = (Reflect.get(entry.data, explicitLevel) ?? entry.tag) as ILoggerLevel
+      // Explicit category entries retain their level in the original data snapshot. Ordinary
+      // unknown tags, such as reasoning entries, keep their existing filter-only policy.
       if (lvl in order && order[lvl] < order[minLevel]) return
       if (!filters.every((f) => f(entry))) return
       next(entry)
@@ -99,6 +110,11 @@ class LevelPlugin implements ILoggerPlugin<ILevelPluginExt, ILevelPluginConfig> 
       warn: call(LoggerLevel.warn),
       error: call(LoggerLevel.error),
       fatal: call(LoggerLevel.fatal),
+      atLevel: (level, entry) =>
+        core.dispatchRaw(
+          { ...entry, data: { ...entry.data, [explicitLevel]: level } },
+          { asyncOutput: config.asyncOutput }
+        ),
       setLevel: (level) => {
         minLevel = level
       },
