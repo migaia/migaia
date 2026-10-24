@@ -19,6 +19,7 @@ import type {
   IDurableStorageChange
 } from '@migaia/storage-contract'
 import { kv, records, ttl, counter, sql } from '@migaia/storage-contract'
+import type { PgTruncatePolicy } from './constants.js'
 /** Native results retain only the canonical SQL scalar domain. */
 export type IPgResult = { readonly rows: readonly ISqlRow[]; readonly rowCount: number }
 /** Native COPY uses only structured identifiers and a client-provided byte stream. */
@@ -66,7 +67,7 @@ export type IPgLogicalReplicationPort = {
   detect(
     options: IPgLogicalReplicationOptions & IPgLogicalReplicationRoute,
     ctx?: IOperationContext
-  ): Promise<{ readonly maxSlotWalKeepSize: string }>
+  ): Promise<IPgReplicationHealth>
   read(
     options: IPgLogicalReplicationOptions &
       IPgLogicalReplicationRoute & {
@@ -87,7 +88,18 @@ export type IPgLogicalReplicationPort = {
   dropSlot(slot: string, ctx?: IOperationContext): Promise<void>
 }
 /** Deployment creates the persistent slot and FOR ALL TABLES publication before installation. */
-export type IPgLogicalReplicationOptions = { readonly slot: string; readonly publication: string }
+export type IPgLogicalReplicationOptions = {
+  readonly slot: string
+  readonly publication: string
+  /** Reset invalidates the complete route; block leaves a TRUNCATE commit unacknowledged. */
+  readonly truncate?: PgTruncatePolicy
+}
+/** Decimal byte counts preserve PostgreSQL numeric precision for operational diagnostics. */
+export type IPgReplicationHealth = {
+  readonly maxSlotWalKeepSize: string
+  readonly confirmedFlushLagBytes: string
+  readonly retainedWalBytes: string
+}
 /** The injected driver remains caller-owned and deliberately exposes no close method. */
 export type IPgDriver = {
   readonly logicalReplication?: IPgLogicalReplicationPort

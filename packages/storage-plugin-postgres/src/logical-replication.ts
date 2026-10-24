@@ -11,7 +11,7 @@ import type {
   IPgLogicalReplicationRoute
 } from './types.js'
 import { invalidArgument } from './errors.js'
-import { PgNames, PgOperation } from './constants.js'
+import { PgNames, PgOperation, PgTruncatePolicy } from './constants.js'
 /** Original Feature ownership is captured once; child APIs retain only their own immutable route. */
 export type IPgReplicationSelection = IPgLogicalReplicationOptions & {
   own(resource: IStorageResource): IStorageResource
@@ -22,6 +22,8 @@ export function snapshotPgReplication(
 ): IPgLogicalReplicationOptions {
   const slot = options.slot
   const publication = options.publication
+  /** The selected policy is stable across every native read and subscription. */
+  const truncate = options.truncate ?? PgTruncatePolicy.reset
   if (
     typeof slot !== 'string' ||
     !/^[a-z0-9_]{1,63}$/.test(slot) ||
@@ -29,10 +31,11 @@ export function snapshotPgReplication(
     publication.length === 0 ||
     !publication.isWellFormed() ||
     publication.includes('\0') ||
-    new TextEncoder().encode(publication).length > 63
+    new TextEncoder().encode(publication).length > 63 ||
+    (truncate !== PgTruncatePolicy.reset && truncate !== PgTruncatePolicy.block)
   )
     throw invalidArgument()
-  return Object.freeze({ slot, publication })
+  return { slot, publication, truncate }
 }
 /**
  * Durable methods use the same original host execution owner without opening a business
@@ -63,6 +66,7 @@ export function createPgDurableApi(input: {
             ...input.route,
             slot: input.selection.slot,
             publication: input.selection.publication,
+            truncate: input.selection.truncate,
             after,
             limit
           },
@@ -87,6 +91,7 @@ export function createPgDurableApi(input: {
               ...input.route,
               slot: input.selection.slot,
               publication: input.selection.publication,
+              truncate: input.selection.truncate,
               from,
               onChange: async (change) => {
                 await onChange(change)

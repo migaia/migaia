@@ -132,7 +132,7 @@ export type IPostgresConstruction<T> = {
   createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>
   createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi
   dropVectorOrg(client: IPgConnection, orgId: string): Promise<void>
-  reportReplication(maxSlotWalKeepSize: string): void
+  reportReplication(facts: import('./types.js').IPgReplicationHealth): void
   releaseOrgCapabilities(): void
   getTransactionClient(scope: IPostgresTransactionScope): IPgConnection
   assertNativeRoot(value: object): void
@@ -1132,7 +1132,11 @@ export async function createPostgresStore<T>(
               subscribeChanges: (listener: (change: IStorageChange) => void) => {
                 controller.assertLive()
                 return controller.subscribe((change) => {
-                  if (change.orgId === runtime.orgId) return listener(change)
+                  if (
+                    change.orgId === runtime.orgId ||
+                    (change.kind === 'reset' && change.orgId === undefined)
+                  )
+                    return listener(change)
                 })
               },
               watch: (key: string, ctx?: IOperationContext) =>
@@ -1368,7 +1372,9 @@ export async function createPostgresStore<T>(
           await nativeVectors().dropOrg(client, orgId)
         },
         createDurableApi,
-        reportReplication: (maxSlotWalKeepSize) =>
+        reportReplication: (facts) => {
+          if (facts.maxSlotWalKeepSize === '-1')
+            core.stageBindings.backendStages.report(PostgresErrorText.unlimitedSlotWal)
           core.emit('onCapabilityProbe', () => ({
             backend: PgNames.backend,
             backendId: core.getBackendId(),
@@ -1376,8 +1382,9 @@ export async function createPostgresStore<T>(
             version: probe.version,
             isolationLevel: probe.isolationLevel,
             capabilities: store.capabilities,
-            maxSlotWalKeepSize
-          })),
+            ...facts
+          }))
+        },
         releaseOrgCapabilities: () => {
           vectorPublication?.release()
           durablePublication?.release()

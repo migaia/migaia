@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
-import { it, expect, onTestFinished } from 'vitest'
+import { it, expect, onTestFinished, vi } from 'vitest'
 import { createStorageHost } from '@migaia/storage-host'
 import { durableChangeFeed } from '@migaia/storage-contract'
 import { deferred } from '@migaia/utils/promise'
@@ -8,6 +8,178 @@ import { postgresBackendPlugin } from '../src/index.js'
 import { pgDriver } from '../src/pg.js'
 import { pgLogicalReplicationFeature } from '../src/features/logical-replication.js'
 import { pgKey, encodePgText } from '../src/codec.js'
+
+/** TRUNCATE invalidates all organizations and confirms only after the consumer finishes. */
+it('resets root and routed consumers on TRUNCATE and exposes read-only WAL health', async () => {
+  const connectionString = process.env.MIGAIA_PG_URL
+  const publication = process.env.MIGAIA_PG_PUBLICATION
+  if (!connectionString || !publication)
+    throw new Error('PostgreSQL replication service is required')
+  const pool = new Pool({ connectionString })
+  const slot = 'pg_reset_' + randomUUID().replaceAll('-', '')
+  const prefix = 'pg_reset_' + randomUUID().slice(0, 8)
+  /** Deployment warnings use the host's existing report callback. */
+  const reports: unknown[] = []
+  await pool.query('SELECT pg_create_logical_replication_slot($1,$2)', [slot, 'pgoutput'])
+  const host = await createStorageHost({
+    report: (warning) => {
+      reports.push(warning)
+    },
+    plugins: [
+      postgresBackendPlugin(
+        { driver: pgDriver(pool), prefix },
+        {
+          replication: pgLogicalReplicationFeature({ slot, publication })
+        }
+      )
+    ] as const
+  })
+  onTestFinished(async () => {
+    await host.dispose()
+    await pool.query('SELECT pg_drop_replication_slot($1)', [slot])
+    await pool.end()
+  })
+  const store = host.backend('postgres')
+  const feed = store.use(durableChangeFeed)
+  const initial = await feed.readChanges()
+  await store.transaction(async (scope) => {
+    await scope.set('before-truncate', 'discarded')
+    await scope.sql`TRUNCATE ${scope.sql.id('public', prefix + '_kv')}, ${scope.sql.id('public', prefix + '_records')}`.run()
+  })
+  const batch = await feed.readChanges({ after: initial.cursor })
+  expect(batch.changes).toHaveLength(1)
+  expect(batch.changes[0]).toMatchObject({ kind: 'reset', channel: 'all' })
+  expect(batch.changes[0]).not.toHaveProperty('orgId')
+  const pending = await pool.query(
+    'SELECT confirmed_flush_lsn::text AS lsn FROM pg_replication_slots WHERE slot_name=$1',
+    [slot]
+  )
+  await feed.readChanges({ after: batch.cursor })
+  const confirmed = await pool.query(
+    'SELECT confirmed_flush_lsn::text AS lsn FROM pg_replication_slots WHERE slot_name=$1',
+    [slot]
+  )
+  expect(confirmed.rows[0].lsn).not.toBe(pending.rows[0].lsn)
+
+  const orgId = randomUUID()
+  const routed = host.org(orgId).backend('postgres').use(durableChangeFeed)
+  await store.sql`TRUNCATE ${store.sql.id('public', prefix + '_kv')}`.run()
+  const routedReset = await routed.readChanges()
+  expect(routedReset.changes).toHaveLength(1)
+  expect(routedReset.changes[0]).toMatchObject({ kind: 'reset', orgId })
+  await routed.readChanges({ after: routedReset.cursor })
+
+  const received = deferred<string>()
+  const finish = deferred<void>()
+  const tail = await feed.tailChanges({
+    from: 'now',
+    onChange: async (change) => {
+      expect(change.kind).toBe('reset')
+      expect(change).not.toHaveProperty('orgId')
+      received.resolve(
+        (
+          await pool.query(
+            'SELECT confirmed_flush_lsn::text AS lsn FROM pg_replication_slots WHERE slot_name=$1',
+            [slot]
+          )
+        ).rows[0].lsn
+      )
+      await finish.promise
+    }
+  })
+  await store.sql`TRUNCATE ${store.sql.id('public', prefix + '_kv')}`.run()
+  const before = await received.promise
+  expect(
+    (
+      await pool.query(
+        'SELECT confirmed_flush_lsn::text AS lsn FROM pg_replication_slots WHERE slot_name=$1',
+        [slot]
+      )
+    ).rows[0].lsn
+  ).toBe(before)
+  finish.resolve()
+  await vi.waitFor(async () => {
+    expect(
+      (
+        await pool.query(
+          'SELECT confirmed_flush_lsn::text AS lsn FROM pg_replication_slots WHERE slot_name=$1',
+          [slot]
+        )
+      ).rows[0].lsn
+    ).not.toBe(before)
+  })
+  await tail.dispose()
+  const facts = await pgDriver(pool).logicalReplication!.detect({
+    slot,
+    publication,
+    prefix,
+    schema: 'public'
+  })
+  expect(facts.confirmedFlushLagBytes).toMatch(/^\d+$/)
+  expect(facts.retainedWalBytes).toMatch(/^\d+$/)
+  expect(BigInt(facts.retainedWalBytes)).toBeGreaterThanOrEqual(
+    BigInt(facts.confirmedFlushLagBytes)
+  )
+  if (facts.maxSlotWalKeepSize === '-1')
+    expect(reports).toContain(
+      'PostgreSQL replication slot has unlimited WAL retention (max_slot_wal_keep_size=-1)'
+    )
+})
+
+/** Explicit block policy keeps both polling and live commits available for manual intervention. */
+it('blocks TRUNCATE without acknowledging when the selected policy is block', async () => {
+  const connectionString = process.env.MIGAIA_PG_URL
+  const publication = process.env.MIGAIA_PG_PUBLICATION
+  if (!connectionString || !publication)
+    throw new Error('PostgreSQL replication service is required')
+  const pool = new Pool({ connectionString })
+  const slot = 'pg_block_' + randomUUID().replaceAll('-', '')
+  const prefix = 'pg_block_' + randomUUID().slice(0, 8)
+  await pool.query('SELECT pg_create_logical_replication_slot($1,$2)', [slot, 'pgoutput'])
+  const host = await createStorageHost({
+    plugins: [
+      postgresBackendPlugin(
+        { driver: pgDriver(pool), prefix },
+        {
+          replication: pgLogicalReplicationFeature({ slot, publication, truncate: 'block' })
+        }
+      )
+    ] as const
+  })
+  onTestFinished(async () => {
+    await host.dispose()
+    await pool.query('SELECT pg_drop_replication_slot($1)', [slot])
+    await pool.end()
+  })
+  const store = host.backend('postgres')
+  const feed = store.use(durableChangeFeed)
+  const failure = deferred<unknown>()
+  const tail = await feed.tailChanges({
+    from: 'now',
+    onChange: () => {
+      throw new Error('Blocked TRUNCATE must not reach its consumer')
+    },
+    onError: (error) => failure.resolve(error)
+  })
+  await store.sql`TRUNCATE ${store.sql.id('public', prefix + '_kv')}`.run()
+  expect(await failure.promise).toMatchObject({ code: 'UNSUPPORTED_CAPABILITY' })
+  await tail.dispose()
+  const before = (
+    await pool.query(
+      'SELECT confirmed_flush_lsn::text AS lsn FROM pg_replication_slots WHERE slot_name=$1',
+      [slot]
+    )
+  ).rows[0].lsn
+  await expect(feed.readChanges()).rejects.toMatchObject({ code: 'UNSUPPORTED_CAPABILITY' })
+  expect(
+    (
+      await pool.query(
+        'SELECT confirmed_flush_lsn::text AS lsn FROM pg_replication_slots WHERE slot_name=$1',
+        [slot]
+      )
+    ).rows[0].lsn
+  ).toBe(before)
+})
 
 /** Deployment owns a unique fixture slot; the Feature never creates it or removes it on disposal. */
 it('replays partial multi-org commits and confirms only complete caller-processed positions', async () => {

@@ -14,6 +14,28 @@ import { createBackendChangeIterator } from '../../src/authoring/backend.js'
 
 /** Native watch streams are invalidation hints from the same original commit controller. */
 describe('memory native text watch', () => {
+  it('delivers a global reset to every org watcher while preserving ordinary org filtering', async () => {
+    const controller = createBackendChangeController({ backend: 'memory' })
+    const orgId = createOrgId()
+    await using first = createBackendChangeIterator(controller, {
+      orgId,
+      channel: 'value',
+      key: 'one'
+    })
+    await using second = createBackendChangeIterator(controller, {
+      orgId: createOrgId(),
+      channel: 'record'
+    })
+    controller.publish({ channel: 'all', kind: 'batch' })
+    controller.publish({ orgId: createOrgId(), channel: 'all', kind: 'reset' })
+    controller.publish({ channel: 'all', kind: 'reset' })
+    expect((await first.next()).value).toMatchObject({ kind: 'reset', channel: 'all' })
+    expect((await second.next()).value).toMatchObject({ kind: 'reset', channel: 'all' })
+    controller.publish({ orgId, channel: 'value', kind: 'put', keys: ['one'] })
+    expect((await first.next()).value).toMatchObject({ kind: 'put', orgId })
+    await controller.dispose()
+  })
+
   it('reports late observer rejection once while preserving root and organization commits', async () => {
     await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
     const root = host.backend('memory')

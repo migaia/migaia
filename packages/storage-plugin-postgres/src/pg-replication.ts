@@ -17,12 +17,13 @@ import {
 import type {
   IPgLogicalReplicationPort,
   IPgLogicalReplicationRoute,
+  IPgLogicalReplicationOptions,
   IPgNativeParameter,
   IPgResult
 } from './types.js'
 import { pgResource } from './driver-resource.js'
 import { invalidArgument, normalizePostgresError } from './errors.js'
-import { PgNames } from './constants.js'
+import { PgNames, PgTruncatePolicy } from './constants.js'
 import { quotePgIdentifier } from './copy-command.js'
 
 /** Durable positions contain no row values and are scoped to one original store/slot/route. */
@@ -79,61 +80,87 @@ function unsupported(): StorageContractError {
     backend: PgNames.backend
   })
 }
-/** The original decoder emits business rows transiently; this owner retains only ordered org IDs. */
-function accumulator(route: IPgLogicalReplicationRoute) {
-  /** A Map retains the first native WAL occurrence of each organization within one COMMIT. */
-  const organizations = new Map<string, true>()
-  /** Only public store tables and managed native vector tables contribute invalidations. */
-  const accepted = (schema: string, name: string) =>
-    schema === route.schema &&
-    (name === route.prefix + '_kv' ||
-      name === route.prefix + '_bytes' ||
-      name === route.prefix + '_records' ||
-      (name.startsWith(route.prefix + '_v') && name !== route.prefix + '_vector_config'))
-  /** Copy only the routing scalar and discard the decoder's row object immediately. */
-  const add = (row: unknown) => {
+/** A commit carries either ordered org summaries or one route-wide reset. */
+type IPgCommit = {
+  readonly end: string
+  readonly orgs: readonly (string | undefined)[]
+  readonly reset: boolean
+}
+/** The decoder retains routing scalars only, never caller values or another checkpoint. */
+class PgCommitAccumulator {
+  /** Immutable route and policy determine the scope of every decoded invalidation. */
+  readonly #route: IPgLogicalReplicationRoute & IPgLogicalReplicationOptions
+  /** Insertion order preserves each organization's first WAL occurrence in this commit. */
+  readonly #organizations = new Set<string>()
+  /** TRUNCATE supersedes row summaries because every row in the route becomes invalid. */
+  #reset = false
+
+  /** Bind one decoder to its selected store, organization and TRUNCATE policy. */
+  constructor(route: IPgLogicalReplicationRoute & IPgLogicalReplicationOptions) {
+    this.#route = route
+  }
+
+  /** Ignore internal bookkeeping tables and unrelated stores before copying route identities. */
+  #accepted(schema: string, name: string): boolean {
+    return (
+      schema === this.#route.schema &&
+      (name === this.#route.prefix + '_kv' ||
+        name === this.#route.prefix + '_bytes' ||
+        name === this.#route.prefix + '_records' ||
+        (name.startsWith(this.#route.prefix + '_v') &&
+          name !== this.#route.prefix + '_vector_config'))
+    )
+  }
+
+  /** Copy only the routing scalar and immediately discard the peer's row object. */
+  #add(row: unknown): void {
     if (row === null || typeof row !== 'object') return
     const orgId: unknown = Reflect.get(row, 'org_id')
     if (typeof orgId !== 'string') throw unsupported()
-    organizations.set(orgId, true)
+    this.#organizations.add(orgId)
   }
-  return {
-    accept(
-      message: Pgoutput.Message
-    ): { readonly end: string; readonly orgs: readonly string[] } | undefined {
-      if (message.tag === 'begin') organizations.clear()
-      else if (message.tag === 'insert' && accepted(message.relation.schema, message.relation.name))
-        add(message.new)
-      else if (
-        message.tag === 'update' &&
-        accepted(message.relation.schema, message.relation.name)
-      ) {
-        add(message.key ?? message.old)
-        add(message.new)
-      } else if (
-        message.tag === 'delete' &&
-        accepted(message.relation.schema, message.relation.name)
-      )
-        add(message.key ?? message.old)
-      else if (
-        message.tag === 'truncate' &&
-        message.relations.some((relation) => accepted(relation.schema, relation.name))
-      ) {
-        // TRUNCATE has no row identities. A routed view can invalidate only its own known org.
-        if (route.orgId !== undefined) organizations.set(route.orgId, true)
-        else throw unsupported()
-      } else if (message.tag === 'commit') {
-        if (message.commitEndLsn === null) throw unsupported()
-        position(message.commitEndLsn)
-        return {
-          end: message.commitEndLsn,
-          orgs: [...organizations.keys()].filter(
-            (orgId) => route.orgId === undefined || orgId === route.orgId
-          )
-        }
+
+  /** Emit only complete commits, keeping reset on the same acknowledgement path as DML. */
+  accept(message: Pgoutput.Message): IPgCommit | undefined {
+    if (message.tag === 'begin') {
+      this.#organizations.clear()
+      this.#reset = false
+    } else if (
+      message.tag === 'insert' &&
+      this.#accepted(message.relation.schema, message.relation.name)
+    )
+      this.#add(message.new)
+    else if (
+      message.tag === 'update' &&
+      this.#accepted(message.relation.schema, message.relation.name)
+    ) {
+      this.#add(message.key ?? message.old)
+      this.#add(message.new)
+    } else if (
+      message.tag === 'delete' &&
+      this.#accepted(message.relation.schema, message.relation.name)
+    )
+      this.#add(message.key ?? message.old)
+    else if (
+      message.tag === 'truncate' &&
+      message.relations.some((relation) => this.#accepted(relation.schema, relation.name))
+    ) {
+      if (this.#route.truncate === PgTruncatePolicy.block) throw unsupported()
+      this.#reset = true
+    } else if (message.tag === 'commit') {
+      if (message.commitEndLsn === null) throw unsupported()
+      position(message.commitEndLsn)
+      return {
+        end: message.commitEndLsn,
+        reset: this.#reset,
+        orgs: this.#reset
+          ? [this.#route.orgId]
+          : [...this.#organizations].filter(
+              (orgId) => this.#route.orgId === undefined || orgId === this.#route.orgId
+            )
       }
-      return undefined
     }
+    return undefined
   }
 }
 /** Only the pg adapter loads this peer; ordinary backend imports stay independent from replication. */
@@ -156,6 +183,8 @@ export function createPgReplication(
       `SELECT current_database() AS database,d.oid::text AS database_oid,
       inet_server_addr()::text AS address,inet_server_port()::text AS port,
       s.confirmed_flush_lsn::text AS confirmed,s.restart_lsn::text AS restart,s.wal_status,
+      pg_wal_lsn_diff(pg_current_wal_lsn(),s.confirmed_flush_lsn)::text AS flush_lag,
+      pg_wal_lsn_diff(pg_current_wal_lsn(),s.restart_lsn)::text AS retained_wal,
       s.plugin,s.temporary,s.database AS slot_database,p.puballtables,
       current_setting('wal_level') AS wal_level,current_setting('max_slot_wal_keep_size') AS max_keep,
       r.rolreplication OR r.rolsuper AS replication
@@ -198,7 +227,13 @@ export function createPgReplication(
         (cursor.ordinal > 0 && position(cursor.end) === position(row.confirmed)))
     )
       throw expired()
-    return { identity, confirmed: row.confirmed, maxSlotWalKeepSize: String(row.max_keep) }
+    return {
+      identity,
+      confirmed: row.confirmed,
+      maxSlotWalKeepSize: String(row.max_keep),
+      confirmedFlushLagBytes: String(row.flush_lag),
+      retainedWalBytes: String(row.retained_wal)
+    }
   }
   /** Caller-persisted complete positions alone may advance the original native slot. */
   const confirm = async (slot: string, confirmed: string, cursor: IPgCursor | undefined) => {
@@ -212,15 +247,16 @@ export function createPgReplication(
   const changes = (
     identity: string,
     end: string,
-    orgs: readonly string[],
-    start: number
+    orgs: readonly (string | undefined)[],
+    start: number,
+    reset: boolean
   ): readonly IDurableStorageChange[] =>
     orgs.slice(start).map((orgId, index) => ({
       sequence: start + index + 1,
       origin: PgNames.backend + ':wal',
-      orgId,
+      ...(orgId === undefined ? {} : { orgId }),
       channel: 'all',
-      kind: 'batch',
+      kind: reset ? 'reset' : 'batch',
       cursor: encode({
         version: 1,
         identity,
@@ -231,7 +267,13 @@ export function createPgReplication(
   return {
     detect: async (options, ctx) => {
       throwIfAborted(ctx?.signal)
-      return inspect(options)
+      /** Public diagnostics omit the cursor's private store and native slot identity. */
+      const facts = await inspect(options)
+      return {
+        maxSlotWalKeepSize: facts.maxSlotWalKeepSize,
+        confirmedFlushLagBytes: facts.confirmedFlushLagBytes,
+        retainedWalBytes: facts.retainedWalBytes
+      }
     },
     read: async (options, ctx) => {
       const cursor = decode(options.after)
@@ -245,7 +287,7 @@ export function createPgReplication(
         protoVersion: 1,
         publicationNames: [quotePgIdentifier(options.publication).replaceAll("'", "''")]
       })
-      const commits = accumulator(options)
+      const commits = new PgCommitAccumulator(options)
       const client = await pool.connect()
       let begun = false
       const outcome = await (async () => {
@@ -287,7 +329,13 @@ export function createPgReplication(
             )
               throw expired()
             if (start >= commit.orgs.length) throw invalidArgument()
-            const selected = changes(facts.identity, commit.end, commit.orgs, start).slice(0, limit)
+            const selected = changes(
+              facts.identity,
+              commit.end,
+              commit.orgs,
+              start,
+              commit.reset
+            ).slice(0, limit)
             return { changes: selected, cursor: selected.at(-1)!.cursor }
           }
         }
@@ -318,7 +366,7 @@ export function createPgReplication(
         flowControl: { enabled: true }
       })
       const ready = deferred<void>()
-      const commits = accumulator(options)
+      const commits = new PgCommitAccumulator(options)
       /** A partial item position applies once, then the live stream follows later commits normally. */
       let resume = cursor
       let failed = false
@@ -395,7 +443,13 @@ export function createPgReplication(
             )
               throw expired()
             if (start > commit.orgs.length) throw invalidArgument()
-            for (const change of changes(facts.identity, commit.end, commit.orgs, start))
+            for (const change of changes(
+              facts.identity,
+              commit.end,
+              commit.orgs,
+              start,
+              commit.reset
+            ))
               await options.onChange(change)
             await service.acknowledge(commit.end)
             resume = undefined

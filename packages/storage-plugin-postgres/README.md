@@ -58,7 +58,7 @@ const driver = bunSqlDriver(client)
 - `/features/pgvector`：`pgvectorFeature()` 发布标准 vector，另有 `api.pgvector.search(target, query, options)` 查询调用方自有表。未选不发布 vector；扩展经 registerDetect 检查。`autoDetect:false` 时仍在首次真实向量终点写前核对扩展。
 - `/features/listen`：`pgListenFeature()` 发布根 `api.notifications.listen/notify`；事务只有 notify。提示只在真实提交后出现，不保证断线重放。
 - `/features/copy`：`pgCopyFeature()` 发布根/事务 `api.copy.from`。只支持结构化目标与客户端 STDIN；每次实际尝试调用新的 sourceFactory，保留背压与原生排空。
-- `/features/logical-replication`：`pgLogicalReplicationFeature({slot,publication})` 发布 durableChangeFeed。部署方预建持久 pgoutput slot、FOR ALL TABLES publication 与 REPLICATION 权限；只支持 postgres preset 与 `/pg`。dispose 不删除 slot。
+- `/features/logical-replication`：`pgLogicalReplicationFeature({slot,publication})` 发布 durableChangeFeed。部署方预建持久 pgoutput slot、FOR ALL TABLES publication 与 REPLICATION 权限；只支持 postgres preset 与 `/pg`。dispose 不删除 slot。`truncate` 默认为 `reset`：root 的 TRUNCATE 发一条不带 orgId 的 reset，使所有组织失效；`block` 停止且不确认。detect 报告 confirmedFlushLagBytes、retainedWalBytes；WAL 保留无限制时发出警告。不需要实时流的部署不要保留 slot，可用 TTL 或定时同步。
 
 向量为真实 `vector(d)`，默认使用数据库计划及已有 ANN 索引；`exact:true` 仅在当前读事务禁用 ANN。可忠实下推的 where、org、期限先过滤再 topK。函数条件只处理命中，不补搜；requirePushdown 在 I/O 前拒绝客户端条件。deleteWhere 三种 count 模式均使用 DELETE RETURNING 的实际数，包括物理仍存在的过期匹配点。
 

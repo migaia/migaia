@@ -1407,12 +1407,14 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
           if (controller.closingSignal.aborted) return
           const release = controller.beginMutation()
           try {
-            if (needsReset) await reset()
-            await bind(change.orgId ?? core.defaultOrgId).propagation(change, index)
+            if (needsReset || (change.kind === 'reset' && change.orgId === undefined)) await reset()
+            else await bind(change.orgId ?? core.defaultOrgId).propagation(change, index)
             await upper.set(configuration.prefix + CacheText.cursor, change.cursor)
             needsReset = false
           } catch (error) {
             needsReset = true
+            // A reset must finish every org invalidation before its source confirms the commit.
+            if (change.kind === 'reset') throw error
             report(error)
           } finally {
             release()

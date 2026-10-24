@@ -17,8 +17,8 @@ export type IStorageChange = {
   readonly orgId?: string
   /** Affected public channel: value, bytes, record, or all for a broad invalidation. */
   readonly channel: 'value' | 'bytes' | 'record' | 'all'
-  /** Operation category: put, remove, clear, batch, or migrate. */
-  readonly kind: 'put' | 'remove' | 'clear' | 'batch' | 'migrate'
+  /** A reset without orgId invalidates every organization; routed resets affect that org only. */
+  readonly kind: 'put' | 'remove' | 'clear' | 'batch' | 'migrate' | 'reset'
   /** Optional provider-defined scope associated with this invalidation. */
   readonly scope?: string
   /** Optional affected keys; omission supplies no exact key list. */

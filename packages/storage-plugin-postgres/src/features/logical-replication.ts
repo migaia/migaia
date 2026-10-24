@@ -56,7 +56,7 @@ export function pgLogicalReplicationFeature(options: IPgLogicalReplicationOption
           backend: PgNames.backend
         })
       const facts = await port.detect({ ...captured, ...core.getReplicationRoute() }, { signal })
-      core.reportReplication(facts.maxSlotWalKeepSize)
+      core.reportReplication(facts)
     })
     const api: IDurableChangeFeedApi = {
       readChanges: (...args) => core.createDurableApi().readChanges(...args),

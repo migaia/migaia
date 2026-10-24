@@ -78,3 +78,6 @@ export const PgOperation = {
 export const PgQuantizedMode = { halfvec: 'halfvec', binary: 'binary_quantize' } as const
 /** Stable native layout prefix keeps expression index identities within PostgreSQL's name limit. */
 export const PgQuantizedIndexPrefix = 'storage_q_'
+/** The replication policy either invalidates the route or leaves TRUNCATE for manual handling. */
+export const PgTruncatePolicy = { reset: 'reset', block: 'block' } as const
+export type PgTruncatePolicy = keyof typeof PgTruncatePolicy

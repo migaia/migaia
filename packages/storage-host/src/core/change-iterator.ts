@@ -131,7 +131,12 @@ export function createBackendChangeIterator(
   }
   try {
     off = controller.subscribe((change) => {
-      if (lifetime.isClosing() || change.orgId !== captured.orgId) return
+      if (
+        lifetime.isClosing() ||
+        (change.orgId !== captured.orgId &&
+          !(change.kind === 'reset' && change.orgId === undefined))
+      )
+        return
       if (
         captured.channel !== broadChannel &&
         change.channel !== broadChannel &&

@@ -33,7 +33,7 @@ export const postgresBackendKind = defineStorageBackendKind<
     getReplicationRoute(): import('./types.js').IPgLogicalReplicationRoute
     getServer(): IPgServer
     createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi
-    reportReplication(maxSlotWalKeepSize: string): void
+    reportReplication(facts: import('./types.js').IPgReplicationHealth): void
     assertNativeRoot(value: object): void
     createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>
   }
@@ -118,8 +118,8 @@ export function postgresBackendPlugin<
           prefix: construction.configuration.prefix
         }),
         createDurableApi: () => construction.createDurableApi(),
-        reportReplication: (maxSlotWalKeepSize: string) =>
-          construction.reportReplication(maxSlotWalKeepSize),
+        reportReplication: (facts: import('./types.js').IPgReplicationHealth) =>
+          construction.reportReplication(facts),
         assertNativeRoot: (value: object) => construction.assertNativeRoot(value),
         createVectorApi: () => construction.createVectorApi()
       })

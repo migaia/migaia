@@ -7,6 +7,9 @@ export type IPgCapabilityProbeHookPayload = IStorageHookIdentity &
     isolationLevel: string
     capabilities: IStorageCapabilities
     maxSlotWalKeepSize?: string
+    /** PostgreSQL numeric byte counts remain decimal strings rather than rounded JS numbers. */
+    confirmedFlushLagBytes?: string
+    retainedWalBytes?: string
   }>
 /** Notifications report only their channel identity and never copy the application payload. */
 export type IPgNotifyHookPayload = IStorageHookIdentity & Readonly<{ channel: string }>

@@ -7,6 +7,7 @@ import {
   sql,
   sparql,
   type IStorageBase,
+  type IStorageChange,
   type IAnyStorageCapability
 } from '@migaia/storage-contract'
 import type { IStorageBorrowedBackend } from './types.js'
@@ -65,10 +66,14 @@ export function borrowStorageBackend(
       assertCurrent()
       if (projection !== undefined && key === 'subscribeChanges') {
         /** The original controller owns delivery; this view filters its immutable organization only. */
-        const listener = args[0] as (change: { readonly orgId?: string }) => void
+        const listener = args[0] as (change: IStorageChange) => void
         return Reflect.apply(value, store, [
-          (change: { readonly orgId?: string }) => {
-            if (change.orgId === projection.orgId) return listener(change)
+          (change: IStorageChange) => {
+            if (
+              change.orgId === projection.orgId ||
+              (change.kind === 'reset' && change.orgId === undefined)
+            )
+              return listener(change)
           }
         ])
       }

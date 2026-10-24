@@ -13,5 +13,8 @@ export const PostgresErrorText = {
   unsupported: 'PostgreSQL capability is unavailable',
   commitUnknown: 'PostgreSQL commit result is unknown',
   invalidCursor: 'Invalid PostgreSQL change cursor',
-  expiredCursor: 'PostgreSQL change cursor is no longer retained'
+  expiredCursor: 'PostgreSQL change cursor is no longer retained',
+  /** A selected persistent slot can retain unbounded WAL until its consumer confirms progress. */
+  unlimitedSlotWal:
+    'PostgreSQL replication slot has unlimited WAL retention (max_slot_wal_keep_size=-1)'
 } as const
