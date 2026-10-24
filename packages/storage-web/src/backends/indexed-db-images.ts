@@ -2,6 +2,7 @@ import {
   StorageContractError,
   StorageContractErrorCode,
   snapshotConcurrencyLockKeys,
+  assertLockKey,
   type ILockKey,
   type IStorageKey
 } from '@migaia/storage-contract'
@@ -40,7 +41,10 @@ const revisionTag = 'journal-point'
 /** Stable persisted deadline target tag maps images back to the original data point lock. */
 const deadlineTag = 'indexed-db.journal.deadline'
 
-/** Snapshot native identities through the original contract and flat-key owners. */
+/**
+ * Validate and map native identities synchronously through the original contract and flat-key
+ * owners.
+ */
 export function indexedDbJournalTarget(target: IStorageJournalTarget): {
   readonly channel: IIndexedDbImageChannel
   readonly key: IStorageKey
@@ -62,7 +66,9 @@ export function indexedDbJournalTarget(target: IStorageJournalTarget): {
     if (key === undefined) throw invalid()
     input = { channel: decoded[1], key } as ILockKey
   }
-  const lock = snapshotConcurrencyLockKeys([input as ILockKey], StorageBackend.indexedDb).keys[0]!
+  assertLockKey(input, StorageBackend.indexedDb)
+  /** This mapping finishes synchronously; no retained mutable key needs a detached copy. */
+  const lock = input
   if (lock.channel === 'rdf' || lock.channel === 'vector')
     throw new StorageContractError(StorageContractErrorCode.unsupported)
   if (metadata && indexedDbDeadlineTarget(lock).key !== target.key) throw invalid()
@@ -175,6 +181,7 @@ function observe(
   channel: IIndexedDbImageChannel,
   key: IStorageKey
 ): Promise<IIndexedDbImageEntry> {
+  /** Journal targets survive native request awaits; detach mutable compound lock keys once. */
   const lock = snapshotConcurrencyLockKeys(
     [{ channel: channel === 'value' ? 'text' : channel, key } as ILockKey],
     StorageBackend.indexedDb

@@ -1,7 +1,7 @@
 import {
   StorageContractError,
   StorageContractErrorCode,
-  snapshotConcurrencyLockKeys,
+  assertLockKey,
   type ILockKey
 } from '@migaia/storage-contract'
 import { decodeFlatStorageKey, encodeFlatStorageKey } from '../core/key-domain.js'
@@ -29,7 +29,7 @@ export function memoryJournalDeadlineTarget(
   }
 }
 
-/** Resolve one finite metadata mapping or borrow the original canonical lock snapshot unchanged. */
+/** Resolve finite metadata synchronously without copying an already-owned canonical lock. */
 export function snapshotMemoryJournalTarget(target: IStorageJournalTarget): {
   readonly target: IStorageJournalTarget
   readonly lock: ILockKey
@@ -37,7 +37,9 @@ export function snapshotMemoryJournalTarget(target: IStorageJournalTarget): {
 } {
   try {
     if (target.channel !== 'metadata') {
-      const lock = snapshotConcurrencyLockKeys([target], STORAGE_MEMORY_BACKEND).keys[0]!
+      assertLockKey(target, STORAGE_MEMORY_BACKEND)
+      /** No await separates admission from native journal target mapping. */
+      const lock = target
       return { target: lock, lock, metadata: false }
     }
     const key = target.key
@@ -55,7 +57,9 @@ export function snapshotMemoryJournalTarget(target: IStorageJournalTarget): {
       wire[1] === 'vector' && Array.isArray(decoded) && decoded.length === 2
         ? { channel: wire[1], collection: decoded[0], id: decoded[1] }
         : { channel: wire[1], key: decoded }
-    const lock = snapshotConcurrencyLockKeys([candidate], STORAGE_MEMORY_BACKEND).keys[0]!
+    assertLockKey(candidate, STORAGE_MEMORY_BACKEND)
+    /** Decoded metadata already belongs to this synchronous mapping. */
+    const lock = candidate
     if (lock.channel === 'rdf' || memoryJournalDeadlineTarget(lock).key !== key) throw invalid()
     return { target: { channel: 'metadata', key }, lock, metadata: true }
   } catch (cause) {
