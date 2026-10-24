@@ -2,7 +2,14 @@ import { afterAll, describe, expect, it, vi } from 'vitest'
 import { createClientPool } from 'redis'
 import { Logger, type ILogEntry } from '@migaia/logger'
 import { level } from '@migaia/logger/plugins'
-import { binlog, memoryLogStore, undoLog, wal } from '@migaia/logger/plugins/durable'
+import {
+  binlog,
+  memoryLogStore,
+  undoLog,
+  wal,
+  LogRecordState,
+  type ILogStore
+} from '@migaia/logger/plugins/durable'
 import { walkErrorCauses } from '@migaia/utils/error'
 import { deferred } from '@migaia/utils/promise'
 import { createStorageHost, createOrgId } from '@migaia/storage-host'
@@ -43,6 +50,82 @@ for (const service of [
     const connect = async () => {
       if (!pool.isOpen) await pool.connect()
     }
+    it('shares the current private log head across independent handles and reopen', async () => {
+      await connect()
+      const { redisBackendPlugin: backend } = await import('@migaia/storage-plugin-redis')
+      const prefix = crypto.randomUUID(),
+        org = createOrgId()
+      namespaces.push(prefix)
+      const first = await createStorageHost({ org, plugins: [backend({ driver, prefix })] }),
+        second = await createStorageHost({ org, plugins: [backend({ driver, prefix })] })
+      await Promise.all([first.detect(), second.detect()])
+      const opened: ILogStore[] = []
+      try {
+        const a = await storageLogStore(first, 'redis', { prefix: 'shared-native' })
+        opened.push(a)
+        const b = await storageLogStore(second, 'redis', { prefix: 'shared-native' })
+        opened.push(b)
+        const notices: { lastSeq: number; count: number }[] = []
+        a.onAppend((notice) => {
+          notices.push(notice)
+        })
+        const [one, two] = await Promise.all([
+          a.append(
+            Array.from({ length: 10 }, (_, index) => ({ kind: 'first', payload: { index } }))
+          ),
+          b.append(
+            Array.from({ length: 10 }, (_, index) => ({ kind: 'second', payload: { index } }))
+          )
+        ])
+        expect([...one, ...two].sort((left, right) => left - right)).toEqual(
+          Array.from({ length: 20 }, (_, index) => index + 1)
+        )
+        expect(notices).toEqual([{ lastSeq: one.at(-1)!, count: 10 }])
+        expect(await a.lastSeq()).toBe(20)
+        expect(await b.lastSeq()).toBe(20)
+        expect(await a.read(1, 100)).toEqual(await b.read(1, 100))
+        await a.setState(1, LogRecordState.done)
+        await b.setState(2, LogRecordState.aborted)
+        expect(await a.states(LogRecordState.pending)).toEqual(
+          Array.from({ length: 18 }, (_, index) => index + 3)
+        )
+        expect(await b.states(LogRecordState.pending)).toEqual(
+          await a.states(LogRecordState.pending)
+        )
+        await first.backend('redis').set('business', 'separate')
+        expect(await first.backend('redis').keys()).toEqual(['business'])
+        await first.backend('redis').clearAll()
+        expect(await a.read(1, 100)).toHaveLength(20)
+        await a.dispose()
+        expect(await b.append([{ kind: 'after-close', payload: null }])).toEqual([21])
+        const reopened = await storageLogStore(first, 'redis', { prefix: 'shared-native' })
+        try {
+          expect(await reopened.lastSeq()).toBe(21)
+          expect(await reopened.states(LogRecordState.pending)).toEqual(
+            Array.from({ length: 19 }, (_, index) => index + 3)
+          )
+          await b.truncate(6)
+          expect((await reopened.read(1, 100)).map((record) => record.seq)).toEqual(
+            Array.from({ length: 16 }, (_, index) => index + 6)
+          )
+        } finally {
+          await reopened.dispose()
+        }
+        const organization = await storageLogStore(first.org(createOrgId()), 'redis', {
+          prefix: 'shared-native'
+        })
+        try {
+          expect(await organization.lastSeq()).toBe(0)
+          expect(await organization.append([{ kind: 'org', payload: null }])).toEqual([1])
+          expect(await b.lastSeq()).toBe(21)
+        } finally {
+          await organization.dispose()
+        }
+      } finally {
+        await Promise.all(opened.map((log) => log.dispose()))
+        await Promise.all([first.dispose(), second.dispose()])
+      }
+    })
     afterAll(async () => {
       if (pool.isOpen) {
         for (const prefix of namespaces) {
@@ -356,11 +439,14 @@ for (const service of [
         const command = vi.spyOn(driver, 'command'),
           lease = vi.spyOn(driver, 'withConnection')
         try {
-          await expect(storageLogStore(host, 'redis', { prefix: 'cached' })).rejects.toMatchObject({
-            code: 'UNSUPPORTED_CAPABILITY'
-          })
-          expect(command).not.toHaveBeenCalled()
-          expect(lease).not.toHaveBeenCalled()
+          const native = await storageLogStore(host, 'redis', { prefix: 'current-index' })
+          try {
+            expect(await native.lastSeq()).toBe(0)
+            expect(await native.append([{ kind: 'ordinary', payload: null }])).toEqual([1])
+          } finally {
+            await native.dispose()
+          }
+          expect(lease).toHaveBeenCalled()
         } finally {
           command.mockRestore()
           lease.mockRestore()

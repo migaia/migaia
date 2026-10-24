@@ -108,8 +108,8 @@ export const storagePluginRedisReference: ILibraryReference = {
     redisBackendPlugin: {
       role: 'factory',
       purpose: t(
-        'Install native storage and WATCH transactions; commit-only external binlog uses the original host journal.',
-        '安装原生存储及 WATCH 事务；提交后外置 binlog 使用原宿主 journal。'
+        'Install native storage and WATCH transactions. Private storageLogStore operations read current native state on each call; strong journal composition remains unavailable.',
+        '安装原生存储及 WATCH 事务。私有 storageLogStore 每次操作读取当前原生状态；强日志组合仍不可用。'
       ),
       cases: storagePluginRedisCases.redisBackendPlugin
     },

@@ -187,7 +187,7 @@ try {
 
 该终端如实声明 `nativeAtomic:false`，不把 Redis 执行隔离冒充失败回滚。标准值、字节、记录和向量的 image 使用原便携 codec，保留实际 wire 与绝对期限；仅日志启用时额外读取原生 PEXPIRETIME。历史向量删除的完整 before image 需要原二进制端口；缺少时该新增日志组合在修改前 `UNSUPPORTED_CAPABILITY`，普通历史删除不受影响。
 
-`storageLogStore` 的资源期缓存索引由 `indexExclusive:false` 单独隔离；同 EXEC 强原子 binlog、undo 与 WAL intent/marker 组合在准备阶段拒绝，等待用户复核。原本未交付的这些强保证不被伪装实现。后续可由原拥有者提供真实所需保证后撤销隔离；本包没有第二日志或事务平台。原生 Streams/PubSub/sorted-set/rate-limit API 保持原调用行为，不冒充标准业务通道的 journal 来源。
+`storageLogStore` 在 `indexExclusive:false` 时每次操作从原生私有命名空间读取当前索引，不保留跨操作缓存。原 WATCH/MULTI/EXEC 同时提交私有 HEAD 与记录；同 namespace 的独立实例共享连续序号、当前状态和重开恢复，不新增资源期租约或协调器。Redis 的 `nativeAtomic:false` 保持不变：EXEC 逐项错误可能部分提交，未知结果不自动重放。同 EXEC 强原子 binlog、undo 与 WAL intent/marker 组合仍在准备阶段拒绝并等待用户复核。原生 Streams/PubSub/sorted-set/rate-limit API 保持原调用行为，不冒充标准业务通道的 journal 来源。
 
 `host.dropOrg(orgId)` 也通过原 WATCH/draft/EXEC 删除该组织既定 Streams、有序集合及限流物理键；重启后未选择这些 Feature 仍生效。只匹配原 layout 的合法字符串名称，保留其它组织与调用方非托管键。PubSub 无持久业务值；共享可靠变更历史保留原 retention/cursor，不按组织改写。普通 `clearAll()` 保留原标准通道范围。删除成本包含原生 SCAN 实际候选。
 

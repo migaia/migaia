@@ -1,4 +1,9 @@
-import { type ITransactionScope, type IStorageKey, type ILockKey } from '@migaia/storage-contract'
+import {
+  assertStringStorageKey,
+  type ITransactionScope,
+  type IStorageKey,
+  type ILockKey
+} from '@migaia/storage-contract'
 import type {
   IStorageJournalBackendBinding,
   IStorageJournalChange,
@@ -6,9 +11,14 @@ import type {
   IStorageJournalNamespace,
   IStorageJournalNamespaceView
 } from '@migaia/storage-host'
-import { subscriptionResource } from './native.js'
-import { encodeRedisValue, type IRedisChannel } from './layout.js'
-import { invalidArgument, unsupported } from './errors.js'
+import {
+  createBackendJournalNamespace,
+  type IBackendJournalTransaction,
+  type IBackendChangeController
+} from '@migaia/storage-host/authoring/backend'
+import { encodeRedisValue, decodeRedisValue, type IRedisChannel } from './layout.js'
+import { invalidArgument } from './errors.js'
+import { RedisText } from './constants.js'
 import type { RedisDraft } from './transaction.js'
 
 /** Original portable wire and native absolute TTL form one opaque diagnostic journal image. */
@@ -65,6 +75,9 @@ export function captureRedisJournalStage(input: {
 export function createRedisJournalBinding(input: {
   readonly forOrg: (orgId: string) => IStorageJournalBackendBinding
   readonly assertLive: () => void
+  readonly controller: Pick<IBackendChangeController, 'beginMutation' | 'closingSignal'>
+  readonly report: (error: unknown) => void
+  readonly run: <R>(work: (draft: RedisDraft) => Promise<R>) => Promise<R>
   readonly state: (scope: Omit<ITransactionScope, 'use'>) => {
     readonly draft: RedisDraft
     readonly info: ReturnType<typeof import('@migaia/storage-contract').assertTransactionOwner>
@@ -75,41 +88,99 @@ export function createRedisJournalBinding(input: {
     openNamespace: async (prefix): Promise<IStorageJournalNamespace> => {
       input.assertLive()
       if (typeof prefix !== 'string' || prefix.length === 0) throw invalidArgument()
-      const lifetime = subscriptionResource(async () => undefined)
-      const live = (): void => {
-        input.assertLive()
-        if (lifetime.isClosing()) unsupported()
-      }
-      return {
-        ...lifetime.resource,
-        nativeAtomic: false,
-        indexExclusive: false,
-        assertLive: live,
-        transactionInfo: (scope) => {
-          live()
-          return input.state(scope).info
-        },
-        run: async <R>(_work: (view: IStorageJournalNamespaceView) => Promise<R>): Promise<R> =>
-          unsupported(),
-        onCommit: (scope, effect) => {
-          live()
-          if (typeof effect !== 'function') throw invalidArgument()
-          const callbacks = input.state(scope).draft.terminal.committed
-          callbacks.add(effect)
+      const port = (draft: RedisDraft): IBackendJournalTransaction => {
+        const listen = (effects: Set<() => void>, effect: () => void) => {
+          effects.add(effect)
           return () => {
-            callbacks.delete(effect)
-          }
-        },
-        onRollback: (scope, effect) => {
-          live()
-          if (typeof effect !== 'function') throw invalidArgument()
-          const callbacks = input.state(scope).draft.terminal.rolledBack
-          callbacks.add(effect)
-          return () => {
-            callbacks.delete(effect)
+            effects.delete(effect)
           }
         }
+        const key = (value: unknown): string => {
+          assertStringStorageKey(value, RedisText.backend)
+          return draft.layout.encode(value)
+        }
+        const execute = async <R>(run: () => Promise<R>): Promise<R> => {
+          if (draft.terminal.settled) throw invalidArgument()
+          return run()
+        }
+        const clear = () =>
+          execute(async () => {
+            const entry = await draft.journalHash(prefix)
+            entry.fields = new Map()
+            entry.changed = true
+          })
+        const view: IStorageJournalNamespaceView = Object.freeze({
+          get: (name) =>
+            execute(async () => {
+              const field = key(name),
+                value = (await draft.journalHash(prefix)).fields.get(field)
+              return value === undefined
+                ? null
+                : (decodeRedisValue('text', new TextDecoder().decode(value)) as string)
+            }),
+          has: (name) =>
+            execute(async () => (await draft.journalHash(prefix)).fields.has(key(name))),
+          set: (name, value) =>
+            execute(async () => {
+              const field = key(name),
+                wire = new TextEncoder().encode(encodeRedisValue('text', value)),
+                entry = await draft.journalHash(prefix)
+              const fields = new Map(entry.fields)
+              fields.set(field, wire)
+              entry.fields = fields
+              entry.changed = true
+            }),
+          remove: (name) =>
+            execute(async () => {
+              const field = key(name),
+                entry = await draft.journalHash(prefix),
+                fields = new Map(entry.fields)
+              if (fields.delete(field)) {
+                entry.fields = fields
+                entry.changed = true
+              }
+            }),
+          keys: () =>
+            execute(async () =>
+              [...(await draft.journalHash(prefix)).fields.keys()].sort().map((field) => {
+                const name = draft.layout.decode(field)
+                if (typeof name !== 'string') throw invalidArgument()
+                return name
+              })
+            ),
+          clearValues: clear,
+          clearAll: clear
+        })
+        return {
+          run: async (work) => {
+            await draft.journalHash(prefix)
+            return work(view)
+          },
+          onCommit: (effect) => listen(draft.terminal.committed, effect),
+          onRollback: (effect) => listen(draft.terminal.rolledBack, effect),
+          onEnd: (effect) => listen(draft.terminal.ended, effect)
+        }
       }
+      return createBackendJournalNamespace({
+        assertLive: input.assertLive,
+        closingSignal: input.controller.closingSignal,
+        report: input.report,
+        nativeAtomic: false,
+        indexExclusive: false,
+        reserve: async (hold) => {
+          const release = input.controller.beginMutation()
+          try {
+            await hold()
+          } finally {
+            release()
+          }
+        },
+        authenticate: (scope) => {
+          const state = input.state(scope)
+          return { info: state.info, port: port(state.draft) }
+        },
+        transaction: (work) => input.run((draft) => work(port(draft)))
+      })
     },
     changes: (scope): readonly IStorageJournalChange[] => {
       const { draft } = input.state(scope)
