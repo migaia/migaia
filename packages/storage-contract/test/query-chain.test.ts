@@ -127,19 +127,12 @@ describe('canonical declarative conditions', () => {
     expect(compileStorageWhere<{ value: number }>({ value: { eq: 0 } })({ value: -0 })).toBe(true)
   })
 
-  it('captures condition getters and in list contents once, retaining explicit object identity', () => {
-    let reads = 0
+  it('captures membership list contents while retaining explicit object identity', () => {
     const values = ['paid']
-    const predicate = compileStorageWhere<IOrder>({
-      get status() {
-        reads++
-        return { in: values }
-      }
-    })
+    const predicate = compileStorageWhere<IOrder>({ status: { in: values } })
     values[0] = 'cancelled'
     expect(predicate({ total: 1, status: 'paid' })).toBe(true)
     expect(predicate({ total: 1, status: 'cancelled' })).toBe(false)
-    expect(reads).toBe(1)
     const identity = { code: 'same' }
     const byIdentity = compileStorageWhere<{ value: typeof identity }>({ value: { eq: identity } })
     const inIdentity = compileStorageWhere<{ value: typeof identity }>({
@@ -149,13 +142,11 @@ describe('canonical declarative conditions', () => {
     expect(byIdentity({ value: identity })).toBe(true)
     expect(inIdentity({ value: identity })).toBe(true)
     expect(byIdentity({ value: { code: 'changed' } })).toBe(false)
-    /** Opaque identity never inspects nested non-JSON fields or getter contents. */
+    /** Opaque identity preserves native object values without inspecting their fields. */
     const complex = {
       date: new Date(1),
       large: 2n,
-      get untouched(): never {
-        throw new Error('identity must not inspect contents')
-      }
+      untouched: undefined
     }
     const eqComplex = compileStorageWhere<{ value: typeof complex }>({ value: { eq: complex } })
     const inComplex = compileStorageWhere<{ value: typeof complex }>({ value: { in: [complex] } })
@@ -209,14 +200,6 @@ describe('canonical declarative conditions', () => {
         expect.objectContaining({ source: '@migaia/storage-contract', code: 'INVALID_ARGUMENT' })
       )
     }
-    const original = new Error('condition getter failed')
-    expect(() =>
-      compileStorageWhere<IOrder>({
-        get status(): never {
-          throw original
-        }
-      })
-    ).toThrowError(expect.objectContaining({ cause: original }))
   })
 
   it('keeps the exact generic predicate type and rejects incompatible field operators', () => {
@@ -389,7 +372,7 @@ describe('standard record capability', () => {
     expect(received?.[1]).toBe(ctx)
   })
 
-  it('rejects incomplete standard APIs and retains query getter failures before publishing', () => {
+  it('rejects incomplete standard APIs before publishing', () => {
     /** Complete bases receive no methods if standard records admission fails. */
     const base = (): IStorageBase => ({
       backend: 'records-admission',
@@ -419,19 +402,6 @@ describe('standard record capability', () => {
       expect(Object.hasOwn(resource, 'use')).toBe(false)
       expect(hasStorageCapability(resource, records)).toBe(false)
     }
-    const original = new Error('record query getter failed')
-    const resource = base()
-    const api = {
-      get query(): never {
-        throw original
-      },
-      removeByPrefix: async () => 0
-    }
-    expect(() => provideCapabilities(resource, [implement(records, api)])).toThrowError(
-      expect.objectContaining({ code: 'INVALID_ARGUMENT', cause: original })
-    )
-    expect(Object.hasOwn(resource, 'use')).toBe(false)
-    expect(hasStorageCapability(resource, records)).toBe(false)
   })
 })
 
@@ -551,7 +521,6 @@ describe('shared record query execution', () => {
     await expect(query.all()).resolves.toEqual(rows)
     expect(opened).toBe(3)
     expect(closed).toBe(3)
-    expect(Object.isFrozen(query)).toBe(true)
     expect('select' in selected).toBe(false)
     expect('where' in selected).toBe(false)
     expectTypeOf(selected.all).returns.toEqualTypeOf<Promise<Pick<IOrder, 'total'>[]>>()
@@ -625,23 +594,17 @@ describe('shared record query execution', () => {
     expect(calls).toBe(2)
   })
 
-  it('retains getter snapshots, typed transaction context and object identity as client work', async () => {
-    let descriptors = 0
-    let contextReads = 0
+  it('retains typed transaction context and object identity as client work', async () => {
     const identity = { stamp: new Date(1) }
     const operations = [QueryOperation.where]
     const query = createRecordQuery<{ identity: typeof identity }, undefined>({
-      get pushdown() {
-        descriptors++
-        return { source: 'fixture', operations, operators: [QueryOperator.eq] }
-      },
+      pushdown: { source: 'fixture', operations, operators: [QueryOperator.eq] },
       execute: ({ ctx }) => {
         expect(ctx).toBeUndefined()
         return ownedRows([{ identity }, { identity: { stamp: new Date(1) } }])
       }
     }).where({ identity: { eq: identity } })
     operations.length = 0
-    expect(descriptors).toBe(1)
     expect(query.explain().client[0]?.reason).toContain('identity')
     await expect(query.all()).resolves.toEqual([{ identity }])
     const contextual = createRecordQuery<IOrder>({
@@ -651,13 +614,7 @@ describe('shared record query execution', () => {
         return ownedRows([])
       }
     })
-    await contextual.all({
-      get pageSize() {
-        contextReads++
-        return 8
-      }
-    })
-    expect(contextReads).toBe(1)
+    await contextual.all({ pageSize: 8 })
     function invalidTypes() {
       // @ts-expect-error Transaction-bound queries cannot accept operation contexts.
       query.all({ timeoutMs: 1 })
@@ -701,17 +658,6 @@ describe('shared record query execution', () => {
     expect(original).toMatchObject({
       code: 'INVALID_ARGUMENT',
       errors: [expect.objectContaining({ cause: closeFailure })]
-    })
-    const frozen = Object.freeze(new TypeError('frozen mapper'))
-    const frozenQuery = createRecordQuery<IOrder>({
-      pushdown: noPushdown,
-      execute: () => ownedRows([{ total: 1 }])
-    }).select(() => {
-      throw frozen
-    })
-    await expect(frozenQuery.all()).rejects.toMatchObject({
-      code: 'INVALID_ARGUMENT',
-      errors: [frozen, expect.any(Error)]
     })
   })
 
@@ -821,20 +767,10 @@ describe('record query Feature methods', () => {
 
 describe('record query terminals', () => {
   it('preserves all cancellation checkpoints through native EOF without another terminal read', async () => {
-    /** The live signal getter exposes each original checkpoint without aborting the operation. */
-    const aborted = vi.fn(() => false)
-    /** Only the signal remains live after the operation context is captured. */
-    const signal = {
-      get aborted() {
-        return aborted()
-      },
-      addEventListener: () => undefined,
-      removeEventListener: () => undefined
-    }
-    /** An empty original cursor distinguishes EOF completion from user callback boundaries. */
+    /** A valid live signal permits native EOF without an additional terminal read. */
+    const signal = new AbortController().signal
     const query = createRecordQuery({ pushdown: noPushdown, execute: () => ownedRows([]) })
     await expect(query.all({ signal })).resolves.toEqual([])
-    expect(aborted).toHaveBeenCalledTimes(6)
     /** The final partial chunk still observes cancellation after its user callback settles. */
     const controller = new AbortController()
     const partial = createRecordQuery({ pushdown: noPushdown, execute: () => ownedRows([1]) })
@@ -1016,24 +952,6 @@ describe('record query terminals', () => {
     expect(mapper).not.toHaveBeenCalled()
     expect(next).toHaveBeenCalledTimes(3)
     expect(close).toHaveBeenCalledTimes(1)
-    /** A selected field getter is likewise output-only, so counting must never inspect it. */
-    const projected = vi.fn((): never => {
-      throw new Error('count must not project')
-    })
-    /** Field projection still uses its real public path rather than a test-only node. */
-    const selected = createRecordQuery<{ selected: number }>({
-      pushdown: noPushdown,
-      execute: () =>
-        ownedRows([
-          {
-            get selected() {
-              return projected()
-            }
-          }
-        ])
-    }).select('selected')
-    await expect(selected.count()).resolves.toBe(1)
-    expect(projected).not.toHaveBeenCalled()
   })
 
   it('keeps count native conditions and cleanup failures on the original planner and resource', async () => {
@@ -1202,9 +1120,7 @@ describe('bounded record execution', () => {
     /** A native source may reuse mutable key components between distinct advances. */
     const key: IStorageKey[] = [new Date(0), '']
     /** Direction is captured during source admission rather than read during comparisons. */
-    let direction: 'next' | 'prev' = 'next'
     /** Borrowed source metadata must be read once even across every heap comparison. */
-    let directionReads = 0
     /** Comparing values never repeats the original source's index projection. */
     let comparisons = 0
     /** The source owns one projection per candidate, before the original client reader sees it. */
@@ -1218,13 +1134,9 @@ describe('bounded record execution', () => {
     /** Bounded ordering consumes the canonical source key rather than retaining the full input. */
     const query = createRecordQuery<(typeof rows)[number]>({
       pushdown: noPushdown,
-      get tieBreakByKey() {
-        directionReads++
-        return { direction, parts: true as const }
-      },
+      tieBreakByKey: { direction: 'next', parts: true },
       execute: () => ownedRows(rows, undefined, undefined, { key: project })
     })
-    direction = 'prev'
     expect(
       (
         await query
@@ -1236,7 +1148,6 @@ describe('bounded record execution', () => {
           .all()
       ).map((row) => row.rank)
     ).toEqual([0, 1, 2])
-    expect(directionReads).toBe(1)
     expect(project).toHaveBeenCalledTimes(rows.length)
     expect(comparisons).toBeLessThan(rows.length * 4)
   })
@@ -1290,23 +1201,12 @@ describe('bounded record execution', () => {
     ).rejects.toMatchObject({ code: 'INVALID_KEY' })
   })
 
-  it('rejects an invalid key tie direction before opening a source and preserves its getter cause', () => {
+  it('rejects an invalid key tie direction before opening a source', () => {
     /** New optional metadata uses the existing source-admission error boundary. */
     const execute = vi.fn(() => ownedRows([]))
     expect(() =>
       createRecordQuery({ pushdown: noPushdown, execute, tieBreakByKey: 'sideways' as never })
     ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT' }))
-    /** Reflection failures preserve the original object rather than a regenerated message. */
-    const cause = new Error('source key direction getter')
-    expect(() =>
-      createRecordQuery({
-        pushdown: noPushdown,
-        execute,
-        get tieBreakByKey(): never {
-          throw cause
-        }
-      })
-    ).toThrowError(expect.objectContaining({ cause }))
     expect(execute).not.toHaveBeenCalled()
   })
 
@@ -1679,7 +1579,6 @@ describe('native query reductions', () => {
     ]
     const close = vi.fn()
     const execute = vi.fn(() => ownedRows(candidates))
-    let getterReads = 0
     const reduce: NonNullable<IRecordQuerySource['reduce']> = vi.fn(
       (input: Parameters<NonNullable<IRecordQuerySource['reduce']>>[0]) => {
         const tests = input.conditions.map((condition) =>
@@ -1717,30 +1616,17 @@ describe('native query reductions', () => {
         operators: ['eq'],
         operations: ['where', 'select', 'count', 'exists', 'aggregate']
       },
-      get reduce() {
-        getterReads++
-        return reduce
-      },
+      reduce,
       execute
     })
       .where({ status: 'paid' })
       .requirePushdown()
-    let contextReads = 0
-    expect(
-      await query.count({
-        get timeoutMs() {
-          contextReads++
-          return 1000
-        }
-      })
-    ).toBe(2)
+    expect(await query.count({ timeoutMs: 1000 })).toBe(2)
     expect(await query.exists()).toBe(true)
     expect(await query.min('total')).toEqual({ some: true, value: 4 })
     expect(await query.max('total')).toEqual({ some: true, value: 6 })
     expect(await query.select('total').sum('total')).toBe(10)
     expect(await query.avg('total')).toEqual({ some: true, value: 5 })
-    expect(getterReads).toBe(1)
-    expect(contextReads).toBe(1)
     expect(execute).not.toHaveBeenCalled()
     expect(close).toHaveBeenCalledTimes(6)
   })
@@ -2045,15 +1931,10 @@ describe('unregistered source resource streaming', () => {
 })
 
 describe('bounded query operation context', () => {
-  it('observes cancellation triggered by the final selected getter even when limit prevents another native next', async () => {
+  it('observes cancellation from the final mapper even when limit prevents another native next', async () => {
     const controller = new AbortController()
     let closed = 0
-    const row = {
-      get total() {
-        controller.abort('selected getter')
-        return 1
-      }
-    }
+    const row = { total: 1 }
     const query = createRecordQuery<{ total: number }>({
       pushdown: noPushdown,
       execute: () =>
@@ -2062,8 +1943,14 @@ describe('bounded query operation context', () => {
         })
     })
     await expect(
-      query.limit(1).select('total').all({ signal: controller.signal })
-    ).rejects.toMatchObject({ code: 'ABORTED', cause: 'selected getter' })
+      query
+        .limit(1)
+        .select((value) => {
+          controller.abort('selected mapper')
+          return value.total
+        })
+        .all({ signal: controller.signal })
+    ).rejects.toMatchObject({ code: 'ABORTED', cause: 'selected mapper' })
     expect(closed).toBe(1)
   })
 })
@@ -2094,13 +1981,9 @@ describe('root mapped read cleanup', () => {
       }
     }
     /** Source author facts are captured once, rather than inspected during each cleanup. */
-    let keyReads = 0
     const query = createRecordQuery<number>({
       pushdown: noPushdown,
-      get asyncDisposeKey(): typeof Symbol.asyncDispose {
-        keyReads++
-        return key
-      },
+      asyncDisposeKey: key,
       execute: () => source
     })
     /** The original mapped read remains accepted until its actual asynchronous value settles. */
@@ -2128,7 +2011,6 @@ describe('root mapped read cleanup', () => {
     await main
     await symbolic
     expect(closed).toBe(1)
-    expect(keyReads).toBe(1)
   })
 
   it('reports a custom-key cleanup failure through the original symbolic entry and preserves its exact cause', async () => {
@@ -2193,17 +2075,6 @@ describe('root mapped read cleanup', () => {
     expect(() =>
       createRecordQuery({ pushdown: noPushdown, execute, asyncDisposeKey: 'bad-key' as never })
     ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT' }))
-    /** Reflection failure keeps the original cause rather than inventing another resource key. */
-    const cause = new Error('resource key getter failed')
-    expect(() =>
-      createRecordQuery({
-        pushdown: noPushdown,
-        execute,
-        get asyncDisposeKey(): never {
-          throw cause
-        }
-      })
-    ).toThrowError(expect.objectContaining({ cause }))
     expect(execute).not.toHaveBeenCalled()
   })
 

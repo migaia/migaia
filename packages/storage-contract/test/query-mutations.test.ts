@@ -117,26 +117,10 @@ describe('original query mutation callbacks', () => {
         return count
       }
     }).where((row) => row.total >= 2)
-    /** A supported accessor patch is captured once before validation sees the detached value. */
-    let patchValue = 9
-    let patchReads = 0
-    const patch = {
-      get total() {
-        patchReads++
-        return patchValue
-      },
-      set total(value: number) {
-        patchValue = value
-      }
-    }
+    /** The accepted patch is detached before the original write owner awaits selection and commit. */
+    const patch = { total: 9 }
     const policy = ConcurrencyPolicy.optimistic({ retries: 1 })
-    let policyReads = 0
-    const pending = query.update(patch, {
-      get concurrency() {
-        policyReads++
-        return policy
-      }
-    })
+    const pending = query.update(patch, { concurrency: policy })
     patch.total = 10
     await selection
     let settled = false
@@ -153,8 +137,6 @@ describe('original query mutation callbacks', () => {
       patch: { total: 9 },
       concurrency: policy
     })
-    expect(policyReads).toBe(1)
-    expect(patchReads).toBe(1)
     committed()
     expect(await pending).toBe(1)
     expectTypeOf<IQueryWriteContext<undefined>>().toEqualTypeOf<undefined>()

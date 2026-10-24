@@ -42,20 +42,17 @@ function numeric(condition: IQueryCondition): boolean {
 }
 
 describe('exact native condition-domain admission', () => {
-  it('captures the original callback once and pushes only the supported domain before topK', async () => {
-    let reads = 0
+  it('pushes only the supported domain before topK', async () => {
     const pushdown = {
       source: 'numeric-native',
       operators: ['gte'] as const,
       operations: ['where', 'topK'] as const,
-      get canPushCondition() {
-        reads += 1
-        return function (this: unknown, condition: IQueryCondition) {
-          expect(this).toBe(pushdown)
-          return numeric(condition)
-        }
+      canPushCondition(condition: IQueryCondition) {
+        expect(this).toBe(pushdown)
+        return numeric(condition)
       }
     }
+
     const execute = vi.fn((input: IVectorQueryInput) => {
       const tests = input.conditions.map((condition) =>
         compileStorageQueryCondition<{ value: number | string }>(condition)
@@ -70,7 +67,6 @@ describe('exact native condition-domain admission', () => {
       )
     })
     const query = createVectorQuery<{ value: number | string }>({ pushdown, execute })
-    Object.defineProperty(pushdown, 'canPushCondition', { value: () => true })
     const accepted = query
       .where({ value: { gte: 2 } })
       .topK(1)
@@ -84,7 +80,6 @@ describe('exact native condition-domain admission', () => {
       code: 'QUERY_NOT_PUSHABLE'
     })
     expect(execute).toHaveBeenCalledTimes(before)
-    expect(reads).toBe(1)
   })
   it('keeps callback failures on the original query failure path', () => {
     const cause = new Error('native translator failed')

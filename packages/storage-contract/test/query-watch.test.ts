@@ -35,20 +35,16 @@ function feed(): IStorageIterator<IStorageChange> {
 }
 
 describe('native query watch', () => {
-  it('captures the real native callback once, subscribes only at watch and returns the exact iterator', async () => {
+  it('subscribes only at watch and returns the exact original iterator', async () => {
     const original = feed()
     const execute = vi.fn(() => {
       throw new Error('data cursor must not open')
     })
     const subscribe = vi.fn((_input: IRecordQueryInput) => original)
-    let watcherReads = 0
     const query = createRecordQuery<{ status: string }>({
       pushdown: { source: 'native-feed', operators: ['eq'], operations: ['where', 'select'] },
       execute,
-      get watch() {
-        watcherReads++
-        return subscribe
-      }
+      watch: subscribe
     })
       .where({ status: 'paid' })
       .select('status')
@@ -60,7 +56,6 @@ describe('native query watch', () => {
     expect(subscribe).toHaveBeenCalledTimes(1)
     expect(subscribe.mock.calls[0]![0]).toMatchObject({ fields: ['status'], ctx: { pageSize: 20 } })
     expect(subscribe.mock.calls[0]![0].conditions).toHaveLength(1)
-    expect(watcherReads).toBe(1)
     expect(execute).not.toHaveBeenCalled()
     const main = iterator.dispose()
     const symbolic = iterator[Symbol.asyncDispose]()

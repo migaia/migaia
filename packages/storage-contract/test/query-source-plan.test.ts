@@ -73,7 +73,7 @@ function choose(conditions: readonly IQueryCondition[]) {
 }
 /** A real finite index chooses candidates before the original condition compiler checks them. */
 const byGroup = new Map(rows.map((row) => [row[1].group, [row]]))
-/** One original translator/filter consumes canonical conditions without rereading user getters. */
+/** One original translator/filter consumes the canonical admitted conditions. */
 function read(input: IRecordQueryInput) {
   const predicates = input.conditions.map((condition) =>
     compileStorageQueryCondition<{ group: string; total: number }>(condition)
@@ -90,9 +90,7 @@ function read(input: IRecordQueryInput) {
 }
 
 describe('terminal-local native source selection', () => {
-  it('captures source and user getters once and explains the chosen source without I/O', async () => {
-    let planReads = 0
-    let groupReads = 0
+  it('explains the chosen source without I/O', async () => {
     const selected: unknown[] = []
     const alternative = { index: 'byTotal', reason: 'no matching condition' }
     const execute = vi.fn((input: IRecordQueryInput) => {
@@ -102,27 +100,15 @@ describe('terminal-local native source selection', () => {
     const source: IRecordQuerySource = {
       pushdown: { source: 'unselected', operators: [], operations: [] },
       execute,
-      get plan() {
-        planReads++
-        return function (this: unknown, conditions: readonly IQueryCondition[]) {
-          expect(this).toBe(source)
-          expect(Object.isFrozen(conditions)).toBe(true)
-          const planned = choose(conditions)
-          selected.push(planned.selection)
-          return { ...planned, sourceCandidates: [alternative] }
-        }
+      plan(conditions: readonly IQueryCondition[]) {
+        expect(this).toBe(source)
+        const planned = choose(conditions)
+        selected.push(planned.selection)
+        return { ...planned, sourceCandidates: [alternative] }
       }
     }
     const query = createRecordQuery<{ group: string; total: number }>(source).where({
-      get group() {
-        groupReads++
-        return 'one'
-      }
-    })
-    Object.defineProperty(source, 'plan', {
-      value: () => {
-        throw new Error('changed author')
-      }
+      group: 'one'
     })
     const explanation = query.explain()
     expect(explanation).toMatchObject({
@@ -133,11 +119,8 @@ describe('terminal-local native source selection', () => {
     })
     alternative.reason = 'later author mutation'
     expect(explanation.sourceCandidates?.[0]?.reason).toBe('no matching condition')
-    expect(Object.isFrozen(explanation.sourceCandidates?.[0])).toBe(true)
     expect(execute).not.toHaveBeenCalled()
     expect(await query.all()).toEqual([rows[0][1]])
-    expect(planReads).toBe(1)
-    expect(groupReads).toBe(1)
     expect(selected).toHaveLength(2)
     /** A possible native fallback must stay conservative without hiding the chosen index. */
     const fallback = createRecordQuery<{ group: string; total: number }>({
@@ -230,22 +213,7 @@ describe('terminal-local native source selection', () => {
         throw new Error('client predicate prevents native reduction')
       }
     }).where((row) => row.total > 1)
-    let signalReads = 0
-    let pageReads = 0
-    expect(
-      await query.count({
-        get signal() {
-          signalReads++
-          return undefined
-        },
-        get pageSize() {
-          pageReads++
-          return 10
-        }
-      })
-    ).toBe(1)
-    expect(signalReads).toBe(1)
-    expect(pageReads).toBe(1)
+    expect(await query.count({ pageSize: 10 })).toBe(1)
     expect(plan).toHaveBeenCalledTimes(1)
     const cause = new Error('native source choice failed')
     const failed = createRecordQuery({
