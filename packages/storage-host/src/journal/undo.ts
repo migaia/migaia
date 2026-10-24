@@ -19,7 +19,11 @@ import type {
   IStorageJournalTarget,
   IStorageJournalUndoRunner
 } from './types.js'
-import { invalidStorageJournalRecord, readStorageJournalTarget } from './targets.js'
+import {
+  invalidStorageJournalRecord,
+  readStorageJournalTarget,
+  storageJournalTargetIdentity
+} from './targets.js'
 import { StorageJournalKind } from './constants.js'
 
 /** Persisted target and images are detached before waiting for any business lock. */
@@ -101,6 +105,8 @@ export function createStorageJournalUndo(options: {
         { kind: StorageJournalKind.commit, payload: stored }
       ])[0]!.payload
       if (!Array.isArray(captured) || captured.length === 0) invalidStorageJournalRecord()
+      /** Only this decoded record is deduplicated; value and deadline remain distinct image rows. */
+      const seen = new Set<string>()
       rows = captured.map((entry) => {
         if (entry === null || typeof entry !== 'object' || Array.isArray(entry))
           invalidStorageJournalRecord()
@@ -121,8 +127,14 @@ export function createStorageJournalUndo(options: {
           !Object.hasOwn(target, 'afterRevision')
         )
           invalidStorageJournalRecord()
+        /** The original target codec distinguishes image identity from its potentially shared lock. */
+        const decoded = readStorageJournalTarget(target.identity, options.backend)
+        /** Repeated persisted rows could otherwise restore two different before images in sequence. */
+        const key = storageJournalTargetIdentity(decoded, options.backend)
+        if (seen.has(key)) invalidStorageJournalRecord()
+        seen.add(key)
         return {
-          target: readStorageJournalTarget(target.identity, options.backend),
+          target: decoded,
           before: image(record.before),
           after: image(record.after),
           afterRevision: target.afterRevision!

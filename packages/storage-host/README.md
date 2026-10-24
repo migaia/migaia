@@ -239,7 +239,7 @@ console.log(await log.lastSeq(), await log.states(LogRecordState.pending)) // 1 
 
 选中实际 logger.undo 的全局配置为已接线 memory 提供 `store.undo(txId, ctx?)`，返回本次撤销的新 txId；未选 journal、只有 binlog 或宽化为旧单参数 Host 类型时不静态声称存在该方法。直接配置与 initializer 保留所选 logger 的真实类型，组织借用视图的提取方法仍固定原组织且没有关闭权。全局准备要求原 physical backend 自己提供 callable undo，缺少时在业务准入前拒绝该组合，宿主不改 frozen/raw base 或替换 root store。
 
-undo 从原 logger 读取已提交镜像，使用后端的原 tx().lock(...).run 一次取得全部锁。私有 deadline 目标由 binding.lockTarget 映射回原点锁；不建锁表。先比较全部完整 afterRevision（含 clear epoch/墓碑）及当前编码值和存在性，再写任一 before；冲突报 UNDO_CONFLICT、无记录报 UNDO_NOT_FOUND，foreign target 报 JOURNAL_RECORD_INVALID。撤销继续沿原 draft/修订/容量/单 pipeline 提交，生成一条新 storage.commit 与新的 undo 镜像；并发或净零事务不能双重撤销，原 ctx getter 单读并继承原预算。当前已验证 memory 的 text/bytes/record/null/缺失/TTL/vector/RDF 与原组织隔离；外置 undo 镜像、其它后端接线和 redo 仍待完成。
+undo 从原 logger 读取已提交镜像，使用后端的原 tx().lock(...).run 一次取得全部锁。私有 deadline 目标由 binding.lockTarget 映射回原点锁；不建锁表。先比较全部完整 afterRevision（含 clear epoch/墓碑）及当前编码值和存在性，再写任一 before；冲突报 UNDO_CONFLICT、无记录报 UNDO_NOT_FOUND，foreign target 或重复的规范镜像身份报 JOURNAL_RECORD_INVALID；合法 value/deadline 两镜像仍保持不同身份并共享原点锁。撤销继续沿原 draft/修订/容量/单 pipeline 提交，生成一条新 storage.commit 与新的 undo 镜像；并发或净零事务不能双重撤销，原 ctx getter 单读并继承原预算。当前已验证 memory 的 text/bytes/record/null/缺失/TTL/vector/RDF 与原组织隔离；外置 undo 镜像、其它后端接线和 redo 仍待完成。
 
 PENDING-USER-REVIEW：dropOrg 遇到存活的全局 journal 时，原私有 namespace generation 失效；storageLogStore 缓存读取与旧 native port 均报 STORE_DISPOSED，后续选中 journal 的写入在修改前拒绝，普通未选 journal 的 org 视图仍可复用。同一借用 logger 在 drop 后继续，需要原 logger 的正式 reset 契约；宿主不重跑一次性 initializer、不替换或关闭 logger。比较隐式复用缓存、重跑 initializer 与安全隔离后选择安全隔离，保数据/日志一致；回退只能撤回新增全局组合，或由原 owner 显式 reset 协议替换隔离。
 

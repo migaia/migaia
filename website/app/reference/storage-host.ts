@@ -388,8 +388,8 @@ console.log(host.extensions.label('draft'))`,
     },
     IUndoableStore: {
       summary: t(
-        'undo(txId, ctx?) returns a new committed txId after all original afterRevision/value checks. Selected logger inference adds it only to journal-enabled backend and borrowed org results.',
-        'undo(txId, ctx?) 在全部原 afterRevision/值检查后返回新的已提交 txId；仅真实所选 logger 推断向启用 journal 的后端和组织借用结果增加该类型。'
+        'undo(txId, ctx?) returns a new committed txId after all original afterRevision/value checks; duplicate persisted image identities reject as damaged owned records. Selected logger inference adds it only to journal-enabled backend and borrowed org results.',
+        'undo(txId, ctx?) 在全部原 afterRevision/值检查后返回新的已提交 txId，重复持久镜像身份按自有记录损坏拒绝；仅真实所选 logger 推断向启用 journal 的后端和组织借用结果增加该类型。'
       ),
       members: {}
     },

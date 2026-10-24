@@ -97,6 +97,12 @@ describe('original native storage undo', () => {
       expect(await store.use(ttl).remaining({ channel: 'text', key: 'text' })).toBeUndefined()
       expect(await logger.binlog.lastSeq()).toBe(previous + 1)
       expect(await logger.undo.get(result.txId)).toBeDefined()
+      const restoredImages = (await logger.undo.get(result.txId))!
+      await logger.undo.record('duplicate-owned-target', [restoredImages[0]!, restoredImages[0]!])
+      await expect(store.undo('duplicate-owned-target')).rejects.toMatchObject({
+        code: 'JOURNAL_RECORD_INVALID'
+      })
+      expect(await store.get('text')).toBe('before')
       await expect(store.undo(txId)).rejects.toMatchObject({ code: 'UNDO_CONFLICT' })
       await expect(store.undo('unknown')).rejects.toMatchObject({ code: 'UNDO_NOT_FOUND' })
       const vectors = store.use(vector).collection('undo-vectors', { dimensions: 1, metric: 'dot' })
