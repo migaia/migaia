@@ -46279,6 +46279,33 @@
                   "text": "`IRecordQuerySourcePlan.fullScan?: true` 只允许保守地将解释结果标为可能全扫描，适用于原生索引仍可能回退的来源；不能传 `false` 伪造无扫描证据。条件下推、实际选源与资源路径不受该说明字段干预。"
                 }
               ]
+            },
+            {
+              "id": "向量候选重排",
+              "heading": "向量候选重排",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "只有 `topK(k)` 后可调用 `rerank(scorer, { topN? })`。评分器取得原请求的 `origin`、引擎实际候选 `hits` 与同一个调用方取消信号，返回按候选顺序的一组有限数字。结果按 `rerankScore` 降序排列，同分保留引擎顺序；原 `score` 保持不变。`topN` 缺省为 k，必须是正安全整数且不大于 k，否则在 I/O 前报 `INVALID_ARGUMENT`。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "const hits = await collection\n  .near([1, 0], { exact: true })\n  .topK(20)\n  .rerank(({ hits }) => hits.map((hit) => hit.payload?.priority ?? 0), { topN: 5 })\n  .all()"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "评分器抛出或拒绝报 `RERANK_FAILED`，首层 `cause` 保留原错；非数组、长度不符、稀疏或非有限分数报 `RERANK_RESULT_INVALID`。取消仍使用 `ABORTED`。需要向量的评分器必须先 `withVector()`，不会隐式读取向量。重排后的链及投影、分组分支均无 `delete`、`watch`、`requirePushdown`；仅原生支持 `groupBy` 的来源可在重排后分组，分组只观察 topN。未发布 vector token 的后端不会因此获得向量引擎。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "原生作者在原 `IVectorQuerySource.origin` 提供已经捕获的 near 向量、similarTo ID 或 recommend 正负 ID。选择原生重评分的来源可声明 `native: true`，Feature 用 `refineStorageVectorQuery(query, k => ({ native: capturedOptions, topN }))` 派生同一个有界查询。仅该分支的原执行输入附带不透明 `native` 事实；原条件、k、上下文、源和资源拥有者不变。Feature 验证自己的参数，公共核只验证 topN 并维持只读链；原生结果仍可接通用 `rerank`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "来源可省的 `beginOperation()` 作者接点只借用原 provider 的工作租约，返回原 release；构造、explain、读前错误及旧未重排路径不取租约。新重排终点持有至评分器和原清理实际完成后释放；stream 在首个实际 next 才接纳，后续缓冲读取不延长原生存活。接点单次捕获，不提供源、store 或关闭权限，也不增加生命周期拥有者。"
+                }
+              ]
             }
           ]
         },
@@ -47618,6 +47645,33 @@
                 {
                   "type": "paragraph",
                   "text": "`IRecordQuerySourcePlan.fullScan?: true` 只允许保守地将解释结果标为可能全扫描，适用于原生索引仍可能回退的来源；不能传 `false` 伪造无扫描证据。条件下推、实际选源与资源路径不受该说明字段干预。"
+                }
+              ]
+            },
+            {
+              "id": "向量候选重排",
+              "heading": "向量候选重排",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "只有 `topK(k)` 后可调用 `rerank(scorer, { topN? })`。评分器取得原请求的 `origin`、引擎实际候选 `hits` 与同一个调用方取消信号，返回按候选顺序的一组有限数字。结果按 `rerankScore` 降序排列，同分保留引擎顺序；原 `score` 保持不变。`topN` 缺省为 k，必须是正安全整数且不大于 k，否则在 I/O 前报 `INVALID_ARGUMENT`。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "const hits = await collection\n  .near([1, 0], { exact: true })\n  .topK(20)\n  .rerank(({ hits }) => hits.map((hit) => hit.payload?.priority ?? 0), { topN: 5 })\n  .all()"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "评分器抛出或拒绝报 `RERANK_FAILED`，首层 `cause` 保留原错；非数组、长度不符、稀疏或非有限分数报 `RERANK_RESULT_INVALID`。取消仍使用 `ABORTED`。需要向量的评分器必须先 `withVector()`，不会隐式读取向量。重排后的链及投影、分组分支均无 `delete`、`watch`、`requirePushdown`；仅原生支持 `groupBy` 的来源可在重排后分组，分组只观察 topN。未发布 vector token 的后端不会因此获得向量引擎。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "原生作者在原 `IVectorQuerySource.origin` 提供已经捕获的 near 向量、similarTo ID 或 recommend 正负 ID。选择原生重评分的来源可声明 `native: true`，Feature 用 `refineStorageVectorQuery(query, k => ({ native: capturedOptions, topN }))` 派生同一个有界查询。仅该分支的原执行输入附带不透明 `native` 事实；原条件、k、上下文、源和资源拥有者不变。Feature 验证自己的参数，公共核只验证 topN 并维持只读链；原生结果仍可接通用 `rerank`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "来源可省的 `beginOperation()` 作者接点只借用原 provider 的工作租约，返回原 release；构造、explain、读前错误及旧未重排路径不取租约。新重排终点持有至评分器和原清理实际完成后释放；stream 在首个实际 next 才接纳，后续缓冲读取不延长原生存活。接点单次捕获，不提供源、store 或关闭权限，也不增加生命周期拥有者。"
                 }
               ]
             }
@@ -48965,6 +49019,33 @@
                   {
                     "type": "paragraph",
                     "text": "`IRecordQuerySourcePlan.fullScan?: true` can only conservatively mark a possible full scan, for example when an indexed source can still fall back. It cannot accept `false` to invent evidence. This metadata does not change condition pushdown, source execution or resource ownership."
+                  }
+                ]
+              },
+              {
+                "id": "rerank-vector-candidates",
+                "heading": "Rerank vector candidates",
+                "blocks": [
+                  {
+                    "type": "paragraph",
+                    "text": "`rerank(scorer, { topN? })` is available only after `topK(k)`. The scorer receives the original request `origin`, the engine's actual candidate `hits`, and the same caller abort signal. It returns one finite number per candidate. Results order by descending `rerankScore`, retaining engine order for ties and preserving the engine `score`. `topN` defaults to k and must be a positive safe integer no greater than k; invalid bounds reject with `INVALID_ARGUMENT` before I/O."
+                  },
+                  {
+                    "type": "code",
+                    "language": "ts",
+                    "code": "const hits = await collection\n  .near([1, 0], { exact: true })\n  .topK(20)\n  .rerank(({ hits }) => hits.map((hit) => hit.payload?.priority ?? 0), { topN: 5 })\n  .all()"
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "A thrown or rejected scorer produces `RERANK_FAILED` with the original error as its immediate `cause`. Non-arrays, length mismatches, sparse results and non-finite scores produce `RERANK_RESULT_INVALID`; cancellation retains `ABORTED`. A scorer needing vectors requires explicit `withVector()`, with no implicit vector reads. Reranked, selected and grouped branches have no `delete`, `watch` or `requirePushdown`. Sources already supporting `groupBy` may group the retained topN. Backends without the vector token acquire no vector engine."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Native authors supply the already captured near vector, similarTo ID or recommend ID sets through `IVectorQuerySource.origin`. A source opting into native refinement declares `native: true`; its Feature derives the same bounded query with `refineStorageVectorQuery(query, k => ({ native: capturedOptions, topN }))`. Only that branch adds the opaque `native` fact to the original execution input. Conditions, original k, context, source and resource ownership remain unchanged. Features validate their own options; the common core validates topN and retains the read-only chain. Native results remain eligible for portable `rerank`."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "The optional source author hook `beginOperation()` borrows only the provider's existing work lease and returns its original release. Construction, explain, pre-I/O rejection and old non-reranked paths acquire no lease. A new reranked terminal releases after the scorer and original cleanup actually settle; a stream accepts only its first real next, without retaining native liveness for later buffered reads. The hook is captured once and exposes no source, store or close authority, with no additional lifecycle owner."
                   }
                 ]
               }
@@ -50349,6 +50430,33 @@
                   {
                     "type": "paragraph",
                     "text": "`IRecordQuerySourcePlan.fullScan?: true` can only conservatively mark a possible full scan, for example when an indexed source can still fall back. It cannot accept `false` to invent evidence. This metadata does not change condition pushdown, source execution or resource ownership."
+                  }
+                ]
+              },
+              {
+                "id": "rerank-vector-candidates",
+                "heading": "Rerank vector candidates",
+                "blocks": [
+                  {
+                    "type": "paragraph",
+                    "text": "`rerank(scorer, { topN? })` is available only after `topK(k)`. The scorer receives the original request `origin`, the engine's actual candidate `hits`, and the same caller abort signal. It returns one finite number per candidate. Results order by descending `rerankScore`, retaining engine order for ties and preserving the engine `score`. `topN` defaults to k and must be a positive safe integer no greater than k; invalid bounds reject with `INVALID_ARGUMENT` before I/O."
+                  },
+                  {
+                    "type": "code",
+                    "language": "ts",
+                    "code": "const hits = await collection\n  .near([1, 0], { exact: true })\n  .topK(20)\n  .rerank(({ hits }) => hits.map((hit) => hit.payload?.priority ?? 0), { topN: 5 })\n  .all()"
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "A thrown or rejected scorer produces `RERANK_FAILED` with the original error as its immediate `cause`. Non-arrays, length mismatches, sparse results and non-finite scores produce `RERANK_RESULT_INVALID`; cancellation retains `ABORTED`. A scorer needing vectors requires explicit `withVector()`, with no implicit vector reads. Reranked, selected and grouped branches have no `delete`, `watch` or `requirePushdown`. Sources already supporting `groupBy` may group the retained topN. Backends without the vector token acquire no vector engine."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Native authors supply the already captured near vector, similarTo ID or recommend ID sets through `IVectorQuerySource.origin`. A source opting into native refinement declares `native: true`; its Feature derives the same bounded query with `refineStorageVectorQuery(query, k => ({ native: capturedOptions, topN }))`. Only that branch adds the opaque `native` fact to the original execution input. Conditions, original k, context, source and resource ownership remain unchanged. Features validate their own options; the common core validates topN and retains the read-only chain. Native results remain eligible for portable `rerank`."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "The optional source author hook `beginOperation()` borrows only the provider's existing work lease and returns its original release. Construction, explain, pre-I/O rejection and old non-reranked paths acquire no lease. A new reranked terminal releases after the scorer and original cleanup actually settle; a stream accepts only its first real next, without retaining native liveness for later buffered reads. The hook is captured once and exposes no source, store or close authority, with no additional lifecycle owner."
                   }
                 ]
               }
@@ -93354,7 +93462,14 @@
       "slug": "storage-host",
       "description": "Runtime-neutral storage host and typed backend authoring",
       "version": "0.0.0",
-      "exports": [".", "./authoring/backend", "./authoring/vector", "./entity", "./journal"],
+      "exports": [
+        ".",
+        "./authoring/backend",
+        "./authoring/vector",
+        "./entity",
+        "./journal",
+        "./vector/mmr"
+      ],
       "readmeLocales": ["zh", "en"],
       "documentation": {
         "readme": {
@@ -93542,6 +93657,10 @@
                   "text": "实体查询复用原不可变核心：`repo.query().index(name, keyOrRange).where(...).select(...).all()` 替代 `findManyBy`，`.stream()` 替代 `streamBy`。根查询与事务查询保留已安装的 query Feature 方法。此源的对象与字段条件在客户端执行；显式索引查询仍使用原生索引准备或权威扫描回退。比较器必须指定有限上限，候选由原有界堆保留。事务查询继承原 signal 和期限，终点不接另一个 context。"
                 },
                 {
+                  "type": "paragraph",
+                  "text": "实体查询的 `delete()` 与 `update(patch)` 使用同一共享选择与分页执行器。根仓储只开启一次原记录事务，`repo.in(tx)` 合入当前事务；计数表示本草稿实际接受的记录数，根调用在原生提交确认后才完成。补丁仍走仓储原校验、规范化、编码与唯一索引检查；校验、编码或唯一约束失败时，不提交这些修改；原生提交失败或结果未知仍沿所属后端报告，不自动重放。查询更新不能移动主键：补丁或规范化改变所选物理身份时，在写入前报 `INVALID_CONFIG`，不会覆盖另一个实体。删除按实际所选物理记录处理，即使迁移后的逻辑主键已经不同。缺少真实记录事务的自定义纯 KV 后端在修改前报 `UNSUPPORTED_CAPABILITY`，不退回非原子逐项写。"
+                },
+                {
                   "type": "code",
                   "language": "ts",
                   "code": "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { defineEntity } from '@migaia/storage-host/entity'\n\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })\nconst memory = host.backend('memory')\nconst orders = defineEntity<{ id: string; state: string; total: number }>()({\n  name: 'orders',\n  key: 'id',\n  indexes: { byState: { path: 'state' } }\n}).connect(memory)\nconst paid = await orders\n  .query()\n  .index('byState', 'paid')\n  .where('total', 'gt', 100)\n  .orderByComparator((left, right) => right.total - left.total)\n  .limit(20)\n  .select('id', 'total')\n  .all()\nawait using stream = orders.query().limit(20).stream()\nfor await (const order of stream) console.log(order)\nawait memory.transaction(async (tx) => {\n  await orders.in(tx).put({ id: 'next', state: 'paid', total: 200 })\n  console.log(await orders.in(tx).query().where({ state: 'paid' }).select('id').all())\n})"
@@ -93762,6 +93881,37 @@
                 {
                   "type": "paragraph",
                   "text": "没有原 native changes 或 redo 接点的后端不能仅因 WAL 插件存在而准入；该组合在配置准备阶段报 UNSUPPORTED_CAPABILITY，避免原普通写绕过所选恢复。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "实体查询的 `skip`、`limit`、`distinct`、`after` 和排序分支保留 `onInvalid` 与原 Feature 方法。选源必须先于其它链式步骤，且 `index` / `range` 只能选一次；selector 排序可以继续追加 selector，不能切换 comparator，comparator 必须先用 `limit` 给出有限页或调用 `first`。绕过类型的结构违规在读取前报 `INVALID_CONFIG`。默认 comparator 与显式 comparator 均由原共享查询按 `skip + limit` 保留有界候选，然后分页；重复 `skip` / `limit` 取最后值，`limit(0)` 不读取候选。`count` 保留分页但不执行排序或投影。selector 的同步键校验复用原 portable key owner；用户 selector 抛错保存在 `EXTENSION_FAILED` 的首层 `cause`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "声明式条件会在原 planner 的首段 `where` 内静态选择匹配的已声明索引：唯一 `eq`、其它 `eq` / 较短 `in`、双侧范围、单侧范围 / `startsWith` 依次优先，同级沿声明顺序；显式 `index` / `range` 优先。`explain()` 零 I/O 返回选中规则及未选候选，保守保留 `fullScan: true`，因为实际打开仍可能执行原索引准备或权威回退；`in` / 字符串前缀的宽候选用原条件编译器精确复核。显式 selector 与后续 `where` 保留共享核心的声明顺序；要先过滤，请把 `where` 放在 `orderBy` 前。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "原生记录 feed 可用且 `changeFeed` 的类型事实为 `true` 时，根实体查询提供原 `watch()` 失效通知；它不是结果行流，也不提供可靠重放。组织借用转发其原生组织 iterator，冻结 raw store 不会被修改。事务查询不暴露 watch；客户端 lambda、排序或分页等无法完整下推的链在订阅前沿原核心报 `QUERY_NOT_PUSHABLE`。订阅和释放均由原生后端及既有 iterator 生命周期负责。"
+                }
+              ]
+            },
+            {
+              "id": "纯-mmr-重排",
+              "heading": "纯 MMR 重排",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`@migaia/storage-host/vector/mmr` 独立导出 `mmr` 与 `IStorageMmrOptions`，宿主根入口不重导。它不访问网络，不增加依赖；复用原向量余弦数值实现，为通用 `rerank` 生成确定性评分器。相关性使用引擎 `score`，多样性使用候选向量间的余弦相似度，所以必须显式 `withVector()`。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { mmr } from '@migaia/storage-host/vector/mmr'\nconst hits = await collection\n  .near([1, 0], { exact: true })\n  .withVector()\n  .topK(20)\n  .rerank(mmr({ lambda: 0.5, topN: 5 }), { topN: 5 })\n  .all()"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`lambda` 是 [0,1] 内的有限数字；1 只按引擎相关性选择，0 在第一项后只选择多样性，目标相同保留引擎顺序。helper 的 `topN` 仅限制贪心前缀的计算，仍为全部候选返回等长有限分数，剩余项保留引擎顺序；真正截断只归 `rerank` 的 topN。缺省计算全部候选，保留 O(n) 状态，最坏 O(n²d) 时间。向量须维度一致；零向量的余弦多样性按 0 处理，同分保留引擎顺序。评分器取消继续使用原信号，不创建预算、资源或后台任务。"
                 }
               ]
             }
@@ -93948,6 +94098,10 @@
                   "text": "实体查询复用原不可变核心：`repo.query().index(name, keyOrRange).where(...).select(...).all()` 替代 `findManyBy`，`.stream()` 替代 `streamBy`。根查询与事务查询保留已安装的 query Feature 方法。此源的对象与字段条件在客户端执行；显式索引查询仍使用原生索引准备或权威扫描回退。比较器必须指定有限上限，候选由原有界堆保留。事务查询继承原 signal 和期限，终点不接另一个 context。"
                 },
                 {
+                  "type": "paragraph",
+                  "text": "实体查询的 `delete()` 与 `update(patch)` 使用同一共享选择与分页执行器。根仓储只开启一次原记录事务，`repo.in(tx)` 合入当前事务；计数表示本草稿实际接受的记录数，根调用在原生提交确认后才完成。补丁仍走仓储原校验、规范化、编码与唯一索引检查；校验、编码或唯一约束失败时，不提交这些修改；原生提交失败或结果未知仍沿所属后端报告，不自动重放。查询更新不能移动主键：补丁或规范化改变所选物理身份时，在写入前报 `INVALID_CONFIG`，不会覆盖另一个实体。删除按实际所选物理记录处理，即使迁移后的逻辑主键已经不同。缺少真实记录事务的自定义纯 KV 后端在修改前报 `UNSUPPORTED_CAPABILITY`，不退回非原子逐项写。"
+                },
+                {
                   "type": "code",
                   "language": "ts",
                   "code": "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { defineEntity } from '@migaia/storage-host/entity'\n\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })\nconst memory = host.backend('memory')\nconst orders = defineEntity<{ id: string; state: string; total: number }>()({\n  name: 'orders',\n  key: 'id',\n  indexes: { byState: { path: 'state' } }\n}).connect(memory)\nconst paid = await orders\n  .query()\n  .index('byState', 'paid')\n  .where('total', 'gt', 100)\n  .orderByComparator((left, right) => right.total - left.total)\n  .limit(20)\n  .select('id', 'total')\n  .all()\nawait using stream = orders.query().limit(20).stream()\nfor await (const order of stream) console.log(order)\nawait memory.transaction(async (tx) => {\n  await orders.in(tx).put({ id: 'next', state: 'paid', total: 200 })\n  console.log(await orders.in(tx).query().where({ state: 'paid' }).select('id').all())\n})"
@@ -94168,6 +94322,37 @@
                 {
                   "type": "paragraph",
                   "text": "没有原 native changes 或 redo 接点的后端不能仅因 WAL 插件存在而准入；该组合在配置准备阶段报 UNSUPPORTED_CAPABILITY，避免原普通写绕过所选恢复。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "实体查询的 `skip`、`limit`、`distinct`、`after` 和排序分支保留 `onInvalid` 与原 Feature 方法。选源必须先于其它链式步骤，且 `index` / `range` 只能选一次；selector 排序可以继续追加 selector，不能切换 comparator，comparator 必须先用 `limit` 给出有限页或调用 `first`。绕过类型的结构违规在读取前报 `INVALID_CONFIG`。默认 comparator 与显式 comparator 均由原共享查询按 `skip + limit` 保留有界候选，然后分页；重复 `skip` / `limit` 取最后值，`limit(0)` 不读取候选。`count` 保留分页但不执行排序或投影。selector 的同步键校验复用原 portable key owner；用户 selector 抛错保存在 `EXTENSION_FAILED` 的首层 `cause`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "声明式条件会在原 planner 的首段 `where` 内静态选择匹配的已声明索引：唯一 `eq`、其它 `eq` / 较短 `in`、双侧范围、单侧范围 / `startsWith` 依次优先，同级沿声明顺序；显式 `index` / `range` 优先。`explain()` 零 I/O 返回选中规则及未选候选，保守保留 `fullScan: true`，因为实际打开仍可能执行原索引准备或权威回退；`in` / 字符串前缀的宽候选用原条件编译器精确复核。显式 selector 与后续 `where` 保留共享核心的声明顺序；要先过滤，请把 `where` 放在 `orderBy` 前。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "原生记录 feed 可用且 `changeFeed` 的类型事实为 `true` 时，根实体查询提供原 `watch()` 失效通知；它不是结果行流，也不提供可靠重放。组织借用转发其原生组织 iterator，冻结 raw store 不会被修改。事务查询不暴露 watch；客户端 lambda、排序或分页等无法完整下推的链在订阅前沿原核心报 `QUERY_NOT_PUSHABLE`。订阅和释放均由原生后端及既有 iterator 生命周期负责。"
+                }
+              ]
+            },
+            {
+              "id": "纯-mmr-重排",
+              "heading": "纯 MMR 重排",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`@migaia/storage-host/vector/mmr` 独立导出 `mmr` 与 `IStorageMmrOptions`，宿主根入口不重导。它不访问网络，不增加依赖；复用原向量余弦数值实现，为通用 `rerank` 生成确定性评分器。相关性使用引擎 `score`，多样性使用候选向量间的余弦相似度，所以必须显式 `withVector()`。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { mmr } from '@migaia/storage-host/vector/mmr'\nconst hits = await collection\n  .near([1, 0], { exact: true })\n  .withVector()\n  .topK(20)\n  .rerank(mmr({ lambda: 0.5, topN: 5 }), { topN: 5 })\n  .all()"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`lambda` 是 [0,1] 内的有限数字；1 只按引擎相关性选择，0 在第一项后只选择多样性，目标相同保留引擎顺序。helper 的 `topN` 仅限制贪心前缀的计算，仍为全部候选返回等长有限分数，剩余项保留引擎顺序；真正截断只归 `rerank` 的 topN。缺省计算全部候选，保留 O(n) 状态，最坏 O(n²d) 时间。向量须维度一致；零向量的余弦多样性按 0 处理，同分保留引擎顺序。评分器取消继续使用原信号，不创建预算、资源或后台任务。"
                 }
               ]
             }
@@ -94359,6 +94544,10 @@
                     "text": "Entity queries use the shared immutable core: `repo.query().index(name, keyOrRange).where(...).select(...).all()` replaces `findManyBy`; use `.stream()` in place of `streamBy`. Root and transaction queries preserve installed query Feature methods. Object and field conditions execute on the client for this source; explicit indexed queries retain native index preparation or the authoritative fallback. Comparator queries require a finite bound and retain only the selected candidates in the original heap. Transaction queries inherit the original signal and deadline; their terminals accept no separate context."
                   },
                   {
+                    "type": "paragraph",
+                    "text": "Entity query `delete()` and `update(patch)` use the same shared selection and page executor. A root repository opens one original record transaction; `repo.in(tx)` joins the current transaction. Counts describe records accepted by that draft, and root calls settle only after native commit confirmation. Patches retain repository validation, normalization, encoding and unique-index checks; validation, encoding or uniqueness failure prevents those writes from committing. Native commit failure or an unknown outcome retains the backend error without automatic replay. Query updates cannot move a primary key: a patch or normalizer that changes the selected physical identity rejects with `INVALID_CONFIG` before writing and cannot replace another entity. Deletion targets the actual selected physical record even when migration changes its logical id. A custom pure KV backend without real record transactions rejects with `UNSUPPORTED_CAPABILITY` before modification, rather than performing non-atomic item writes."
+                  },
+                  {
                     "type": "code",
                     "language": "ts",
                     "code": "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { defineEntity } from '@migaia/storage-host/entity'\n\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })\nconst memory = host.backend('memory')\nconst orders = defineEntity<{ id: string; state: string; total: number }>()({\n  name: 'orders',\n  key: 'id',\n  indexes: { byState: { path: 'state' } }\n}).connect(memory)\nconst paid = await orders\n  .query()\n  .index('byState', 'paid')\n  .where('total', 'gt', 100)\n  .orderByComparator((left, right) => right.total - left.total)\n  .limit(20)\n  .select('id', 'total')\n  .all()\nawait using stream = orders.query().limit(20).stream()\nfor await (const order of stream) console.log(order)\nawait memory.transaction(async (tx) => {\n  await orders.in(tx).put({ id: 'next', state: 'paid', total: 200 })\n  console.log(await orders.in(tx).query().where({ state: 'paid' }).select('id').all())\n})"
@@ -94579,6 +94768,37 @@
                   {
                     "type": "paragraph",
                     "text": "A backend without original native changes or redo cannot accept a WAL plugin alone: configuration preparation rejects UNSUPPORTED_CAPABILITY before ordinary writes could bypass the selected recovery."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Entity `skip`, `limit`, `distinct`, `after`, and ordering branches retain `onInvalid` and original Feature methods. Select `index` or `range` once, before other chain steps. Selector ordering can append selectors but cannot switch to a comparator; a comparator requires `limit` before general terminals, or `first`. Runtime structure violations reject with `INVALID_CONFIG` before reading. Default and explicit comparators use the original shared query's bounded `skip + limit` candidates, followed by pagination. Repeated `skip` and `limit` keep their last values; `limit(0)` reads no candidate. `count` retains pagination without evaluating ordering or projection. Selector key validation reuses the portable key owner, and a thrown selector error remains the immediate `cause` of `EXTENSION_FAILED`."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "The original planner's leading declarative `where` prefix selects a declared index using static priority: unique `eq`, other `eq` / shorter `in`, bounded ranges, then one-sided ranges / `startsWith`, with declaration order breaking ties. Explicit `index` / `range` wins. `explain()` performs no I/O and names the selected rule and other candidates, conservatively retaining `fullScan: true` because opening can still prepare indexes or use the authoritative fallback. Broad membership and string-prefix candidates are rechecked by the original condition compiler. Explicit selectors and later `where` steps retain shared-core declaration order; place `where` before `orderBy` to filter first."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "When the original native record feed exists and the type carries `changeFeed: true`, root entity queries expose the original `watch()` invalidations. This is neither a row stream nor reliable replay. Organization borrows forward their original native organization iterator, without modifying frozen raw stores. Transaction queries expose no watcher. Client lambdas, ordering, or pagination that cannot be fully pushed reject with the original core's `QUERY_NOT_PUSHABLE` before subscription. Native backend and iterator owners retain subscription cleanup."
+                  }
+                ]
+              },
+              {
+                "id": "pure-mmr-reranking",
+                "heading": "Pure MMR reranking",
+                "blocks": [
+                  {
+                    "type": "paragraph",
+                    "text": "`@migaia/storage-host/vector/mmr` independently exports `mmr` and `IStorageMmrOptions`; the host root does not re-export them. It performs no network calls and adds no dependencies. The scorer reuses the original cosine arithmetic, taking relevance from the engine `score` and diversity from cosine similarity between hit vectors. Call `withVector()` explicitly."
+                  },
+                  {
+                    "type": "code",
+                    "language": "ts",
+                    "code": "import { mmr } from '@migaia/storage-host/vector/mmr'\nconst hits = await collection\n  .near([1, 0], { exact: true })\n  .withVector()\n  .topK(20)\n  .rerank(mmr({ lambda: 0.5, topN: 5 }), { topN: 5 })\n  .all()"
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "`lambda` must be finite and in [0,1]. At 1 selection follows engine relevance; at 0 selection after the first candidate uses diversity alone. Equal objectives retain engine order. The helper's `topN` bounds only the computed greedy prefix: it still returns one finite rank per candidate, placing the unselected tail in engine order. Only `rerank` owns truncation. Omitted topN computes every candidate, using O(n) state and worst-case O(n²d) time. Vectors must share dimensions; zero directions contribute zero cosine similarity, retaining engine order for ties. Cancellation uses the original signal without another budget, resource or background task."
                   }
                 ]
               }
@@ -94765,6 +94985,10 @@
                     "text": "Entity queries use the shared immutable core: `repo.query().index(name, keyOrRange).where(...).select(...).all()` replaces `findManyBy`; use `.stream()` in place of `streamBy`. Root and transaction queries preserve installed query Feature methods. Object and field conditions execute on the client for this source; explicit indexed queries retain native index preparation or the authoritative fallback. Comparator queries require a finite bound and retain only the selected candidates in the original heap. Transaction queries inherit the original signal and deadline; their terminals accept no separate context."
                   },
                   {
+                    "type": "paragraph",
+                    "text": "Entity query `delete()` and `update(patch)` use the same shared selection and page executor. A root repository opens one original record transaction; `repo.in(tx)` joins the current transaction. Counts describe records accepted by that draft, and root calls settle only after native commit confirmation. Patches retain repository validation, normalization, encoding and unique-index checks; validation, encoding or uniqueness failure prevents those writes from committing. Native commit failure or an unknown outcome retains the backend error without automatic replay. Query updates cannot move a primary key: a patch or normalizer that changes the selected physical identity rejects with `INVALID_CONFIG` before writing and cannot replace another entity. Deletion targets the actual selected physical record even when migration changes its logical id. A custom pure KV backend without real record transactions rejects with `UNSUPPORTED_CAPABILITY` before modification, rather than performing non-atomic item writes."
+                  },
+                  {
                     "type": "code",
                     "language": "ts",
                     "code": "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { defineEntity } from '@migaia/storage-host/entity'\n\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })\nconst memory = host.backend('memory')\nconst orders = defineEntity<{ id: string; state: string; total: number }>()({\n  name: 'orders',\n  key: 'id',\n  indexes: { byState: { path: 'state' } }\n}).connect(memory)\nconst paid = await orders\n  .query()\n  .index('byState', 'paid')\n  .where('total', 'gt', 100)\n  .orderByComparator((left, right) => right.total - left.total)\n  .limit(20)\n  .select('id', 'total')\n  .all()\nawait using stream = orders.query().limit(20).stream()\nfor await (const order of stream) console.log(order)\nawait memory.transaction(async (tx) => {\n  await orders.in(tx).put({ id: 'next', state: 'paid', total: 200 })\n  console.log(await orders.in(tx).query().where({ state: 'paid' }).select('id').all())\n})"
@@ -94985,6 +95209,37 @@
                   {
                     "type": "paragraph",
                     "text": "A backend without original native changes or redo cannot accept a WAL plugin alone: configuration preparation rejects UNSUPPORTED_CAPABILITY before ordinary writes could bypass the selected recovery."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Entity `skip`, `limit`, `distinct`, `after`, and ordering branches retain `onInvalid` and original Feature methods. Select `index` or `range` once, before other chain steps. Selector ordering can append selectors but cannot switch to a comparator; a comparator requires `limit` before general terminals, or `first`. Runtime structure violations reject with `INVALID_CONFIG` before reading. Default and explicit comparators use the original shared query's bounded `skip + limit` candidates, followed by pagination. Repeated `skip` and `limit` keep their last values; `limit(0)` reads no candidate. `count` retains pagination without evaluating ordering or projection. Selector key validation reuses the portable key owner, and a thrown selector error remains the immediate `cause` of `EXTENSION_FAILED`."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "The original planner's leading declarative `where` prefix selects a declared index using static priority: unique `eq`, other `eq` / shorter `in`, bounded ranges, then one-sided ranges / `startsWith`, with declaration order breaking ties. Explicit `index` / `range` wins. `explain()` performs no I/O and names the selected rule and other candidates, conservatively retaining `fullScan: true` because opening can still prepare indexes or use the authoritative fallback. Broad membership and string-prefix candidates are rechecked by the original condition compiler. Explicit selectors and later `where` steps retain shared-core declaration order; place `where` before `orderBy` to filter first."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "When the original native record feed exists and the type carries `changeFeed: true`, root entity queries expose the original `watch()` invalidations. This is neither a row stream nor reliable replay. Organization borrows forward their original native organization iterator, without modifying frozen raw stores. Transaction queries expose no watcher. Client lambdas, ordering, or pagination that cannot be fully pushed reject with the original core's `QUERY_NOT_PUSHABLE` before subscription. Native backend and iterator owners retain subscription cleanup."
+                  }
+                ]
+              },
+              {
+                "id": "pure-mmr-reranking",
+                "heading": "Pure MMR reranking",
+                "blocks": [
+                  {
+                    "type": "paragraph",
+                    "text": "`@migaia/storage-host/vector/mmr` independently exports `mmr` and `IStorageMmrOptions`; the host root does not re-export them. It performs no network calls and adds no dependencies. The scorer reuses the original cosine arithmetic, taking relevance from the engine `score` and diversity from cosine similarity between hit vectors. Call `withVector()` explicitly."
+                  },
+                  {
+                    "type": "code",
+                    "language": "ts",
+                    "code": "import { mmr } from '@migaia/storage-host/vector/mmr'\nconst hits = await collection\n  .near([1, 0], { exact: true })\n  .withVector()\n  .topK(20)\n  .rerank(mmr({ lambda: 0.5, topN: 5 }), { topN: 5 })\n  .all()"
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "`lambda` must be finite and in [0,1]. At 1 selection follows engine relevance; at 0 selection after the first candidate uses diversity alone. Equal objectives retain engine order. The helper's `topN` bounds only the computed greedy prefix: it still returns one finite rank per candidate, placing the unselected tail in engine order. Only `rerank` owns truncation. Omitted topN computes every candidate, using O(n) state and worst-case O(n²d) time. Vectors must share dimensions; zero directions contribute zero cosine similarity, retaining engine order for ties. Cancellation uses the original signal without another budget, resource or background task."
                   }
                 ]
               }
@@ -95818,6 +96073,7 @@
         "./features/listen",
         "./features/logical-replication",
         "./features/pgvector",
+        "./features/quantized",
         "./pg",
         "./postgres-js"
       ],
@@ -95884,6 +96140,7 @@
                 {
                   "type": "list",
                   "items": [
+                    "`/features/quantized`：同批选择 `pgvectorFeature()` 与 `pgQuantizedFeature({mode:'halfvec'|'binary_quantize'})`，只增强有界向量链的 `rescore({topN?})`，量化表达式 HNSW 召回后按原向量精排，不发布第二个 vector provider。",
                     "`/features/pgvector`：`pgvectorFeature()` 发布标准 vector，另有 `api.pgvector.search(target, query, options)` 查询调用方自有表。未选不发布 vector；扩展经 registerDetect 检查。`autoDetect:false` 时仍在首次真实向量终点写前核对扩展。",
                     "`/features/listen`：`pgListenFeature()` 发布根 `api.notifications.listen/notify`；事务只有 notify。提示只在真实提交后出现，不保证断线重放。",
                     "`/features/copy`：`pgCopyFeature()` 发布根/事务 `api.copy.from`。只支持结构化目标与客户端 STDIN；每次实际尝试调用新的 sourceFactory，保留背压与原生排空。",
@@ -95935,6 +96192,29 @@
                 {
                   "type": "paragraph",
                   "text": "选中日志时按执行顺序保留每次实际原生变更，包含同目标多写与中间值。原 SQL 的 RETURNING 行直接提供每次完整 raw 新值与绝对期限，不以后读的最终值替代。undo 仍由 host 原实现合并首次 before、最终 after 并复核完整最终修订；未选日志的操作保原 SQL 与原生路径。"
+                }
+              ]
+            },
+            {
+              "id": "量化召回与原生精排",
+              "heading": "量化召回与原生精排",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { pgQuantizedFeature } from '@migaia/storage-plugin-postgres/features/quantized'\n// postgresBackendPlugin({ driver }, {\n//   vector: pgvectorFeature(), quantized: pgQuantizedFeature({ mode: 'halfvec' })\n// })\nconst selected = await embeddings\n  .near([1, 0, 0])\n  .where({ category: 'guide' })\n  .topK(20)\n  .rescore({ topN: 5 })\n  .rerank(({ hits }) => hits.map((hit) => hit.score))\n  .all()"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "安装时选择 halfvec 或 binary_quantize。topN 缺省为 k，必须是正安全整数且不超过 k，非法值在 I/O 前拒绝。只读结果保留 withVector、选择、分组与通用 rerank，引擎 score 不变；不能删除、监听或再次接原生 rescore，不会隐式补读向量。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "原 schema owner 按 metric 建 halfvec opclass 或 bit_hamming_ops 表达式 HNSW；原事务锁住既有集合配置行，两个 host 可安全准备同一个索引。布局检查与索引准备是独立原生语句，业务查询则只用一条 MATERIALIZED SQL 召回 k 个候选，再按原向量精确排序取 topN。临时 metric 会准备相应索引；样本来源仍先沿原拥有者读取样本，再执行召回与精排语句。显式 rescore 即选择量化召回，即使 near 指定 exact；未接 rescore 的 near({exact:true}) 保持原行为。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "org、期限与可推 payload 条件均留在 recall WHERE。HNSW 不保证物理先过滤，也不保证过滤后足 k；JS 谓词只处理 outer 命中且不补搜，后接 rerank 收到这些实际命中。显式量化 ANN 是普通 org 领先索引规则的例外。原向量仍为 float32，halfvec 索引最多 4000 维，binary 索引最多 64000 维但原 vector 列最多 16000 维；量化可能损失精度，超出 halfvec 范围的原生 cast 以 SQL_FAILED 保留原 cause，不假称无损。未新增依赖或后台任务。"
                 }
               ]
             }
@@ -95997,7 +96277,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "cosine、dot、euclid 使用原生 `<=>`、`<#>`、`<->`；score 分别为 1-distance、-distance、-distance。原生 vector(d) 使用 float32，容许相应数值精度与同分换序。先建一次逻辑集合，其它 org 可 `collection('documents')` 使用同一物理配置。`api.pgvector.search({table:['app_vectors'],idColumn:'id',vectorColumn:'embedding',payloadColumn:'payload'}, q, {metric:'cosine',limit:10,efSearch:64})` 只查询调用方已有表；本包不自动建立 ANN 索引。"
+                  "text": "cosine、dot、euclid 使用原生 `<=>`、`<#>`、`<->`；score 分别为 1-distance、-distance、-distance。原生 vector(d) 使用 float32，容许相应数值精度与同分换序。先建一次逻辑集合，其它 org 可 `collection('documents')` 使用同一物理配置。`api.pgvector.search({table:['app_vectors'],idColumn:'id',vectorColumn:'embedding',payloadColumn:'payload'}, q, {metric:'cosine',limit:10,efSearch:64})` 只查询调用方已有表；未选 quantized Feature 时，本包不自动建立 ANN 索引。"
                 }
               ]
             },
@@ -96052,6 +96332,29 @@
                 {
                   "type": "paragraph",
                   "text": "选中日志时按执行顺序保留每次实际原生变更，包含同目标多写与中间值。原 SQL 的 RETURNING 行直接提供每次完整 raw 新值与绝对期限，不以后读的最终值替代。undo 仍由 host 原实现合并首次 before、最终 after 并复核完整最终修订；未选日志的操作保原 SQL 与原生路径。"
+                }
+              ]
+            },
+            {
+              "id": "量化召回与原生精排",
+              "heading": "量化召回与原生精排",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { pgQuantizedFeature } from '@migaia/storage-plugin-postgres/features/quantized'\n// postgresBackendPlugin({ driver }, {\n//   vector: pgvectorFeature(), quantized: pgQuantizedFeature({ mode: 'halfvec' })\n// })\nconst selected = await embeddings\n  .near([1, 0, 0])\n  .where({ category: 'guide' })\n  .topK(20)\n  .rescore({ topN: 5 })\n  .rerank(({ hits }) => hits.map((hit) => hit.score))\n  .all()"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "安装时选择 halfvec 或 binary_quantize。topN 缺省为 k，必须是正安全整数且不超过 k，非法值在 I/O 前拒绝。只读结果保留 withVector、选择、分组与通用 rerank，引擎 score 不变；不能删除、监听或再次接原生 rescore，不会隐式补读向量。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "原 schema owner 按 metric 建 halfvec opclass 或 bit_hamming_ops 表达式 HNSW；原事务锁住既有集合配置行，两个 host 可安全准备同一个索引。布局检查与索引准备是独立原生语句，业务查询则只用一条 MATERIALIZED SQL 召回 k 个候选，再按原向量精确排序取 topN。临时 metric 会准备相应索引；样本来源仍先沿原拥有者读取样本，再执行召回与精排语句。显式 rescore 即选择量化召回，即使 near 指定 exact；未接 rescore 的 near({exact:true}) 保持原行为。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "org、期限与可推 payload 条件均留在 recall WHERE。HNSW 不保证物理先过滤，也不保证过滤后足 k；JS 谓词只处理 outer 命中且不补搜，后接 rerank 收到这些实际命中。显式量化 ANN 是普通 org 领先索引规则的例外。原向量仍为 float32，halfvec 索引最多 4000 维，binary 索引最多 64000 维但原 vector 列最多 16000 维；量化可能损失精度，超出 halfvec 范围的原生 cast 以 SQL_FAILED 保留原 cause，不假称无损。未新增依赖或后台任务。"
                 }
               ]
             }
@@ -96127,6 +96430,7 @@
                   {
                     "type": "list",
                     "items": [
+                      "`/features/quantized`: `pgQuantizedFeature({mode:'halfvec'|'binary_quantize'})` accompanies `pgvectorFeature()` in the same Feature batch. Its bounded `rescore({topN?})` stage uses a quantized expression HNSW index and exactly reorders the recalled candidates by their original vectors. It publishes no second vector provider.",
                       "`/features/pgvector`: `pgvectorFeature()` publishes standard vector and `api.pgvector.search(target, query, options)` for caller-owned native tables. Unselected stores have no vector. registerDetect checks the extension; with autoDetect:false, the first actual vector endpoint still checks before writing.",
                       "`/features/listen`: `pgListenFeature()` provides root `api.notifications.listen/notify`; transactions expose notify only. Hints appear after real commit and do not promise reconnect replay.",
                       "`/features/copy`: `pgCopyFeature()` provides root/transaction `api.copy.from`. It accepts structured identifiers and client STDIN only. Each actual attempt invokes a fresh sourceFactory and retains native backpressure/drain.",
@@ -96178,6 +96482,29 @@
                   {
                     "type": "paragraph",
                     "text": "Selected journals retain every actual native mutation in execution order, including repeated writes to one target and intermediate values. The original SQL RETURNING row supplies each exact raw after value and absolute deadline; no later read substitutes the final value. Undo keeps the host's existing first-before/final-after merge and complete final revision checks. Unselected operations keep their original SQL and native path."
+                  }
+                ]
+              },
+              {
+                "id": "quantized-recall-and-native-exact-rescoring",
+                "heading": "Quantized recall and native exact rescoring",
+                "blocks": [
+                  {
+                    "type": "code",
+                    "language": "ts",
+                    "code": "import { pgQuantizedFeature } from '@migaia/storage-plugin-postgres/features/quantized'\n// postgresBackendPlugin({ driver }, {\n//   vector: pgvectorFeature(), quantized: pgQuantizedFeature({ mode: 'halfvec' })\n// })\nconst selected = await embeddings\n  .near([1, 0, 0])\n  .where({ category: 'guide' })\n  .topK(20)\n  .rescore({ topN: 5 })\n  .rerank(({ hits }) => hits.map((hit) => hit.score))\n  .all()"
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Choose `halfvec` or `binary_quantize` once at installation. `topN` defaults to k and must be a positive safe integer at most k; invalid bounds reject before I/O. The read-only result supports original `withVector`, selection, grouping and generic rerank, with unchanged engine scores; it cannot delete, watch or acquire a second native rescore. No extra vector retrieval is implicit."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "The original schema owner prepares expression HNSW indexes, using the metric's halfvec opclass or `bit_hamming_ops`. Existing collection metadata is locked in the same native transaction so two hosts prepare one index safely. Layout checks/index preparation are separate native statements; the business query is one `MATERIALIZED` recall of k followed by exact original-vector ordering and topN. A metric override prepares its matching index. Sample-based origins retain their original sample-loading statements before the recall/rescore statement. This explicit quantized stage selects quantized recall even if its near call specified exact; plain `near(...,{exact:true})` keeps its original behavior."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Recall includes organization, expiry and pushed payload conditions. HNSW filters do not promise physical prefiltering or k surviving candidates. JavaScript predicates run on the outer hits without refill; a following generic reranker receives those actual hits. Opt-in expression ANN indexes are the exception to the ordinary org-leading index layout. Original vectors remain float32; halfvec indexing supports at most 4000 dimensions, binary indexing at most 64000 but the original vector column at most 16000. Native casts may lose precision or reject values outside halfvec range with `SQL_FAILED` and the native cause. Quantization is not lossless. No dependencies or background workers are added."
                   }
                 ]
               }
@@ -96240,7 +96567,7 @@
                   },
                   {
                     "type": "paragraph",
-                    "text": "cosine/dot/euclid use `<=>`/`<#>`/`<->` with scores 1-distance/-distance/-distance. Native vector(d) stores float32, with its corresponding precision and tied-order limits. Create a logical collection once; other organizations may use collection('documents') with the shared physical configuration. `api.pgvector.search({table:['app_vectors'],idColumn:'id',vectorColumn:'embedding',payloadColumn:'payload'}, q, {metric:'cosine',limit:10,efSearch:64})` queries caller-owned tables. The module creates no ANN index."
+                    "text": "cosine/dot/euclid use `<=>`/`<#>`/`<->` with scores 1-distance/-distance/-distance. Native vector(d) stores float32, with its corresponding precision and tied-order limits. Create a logical collection once; other organizations may use collection('documents') with the shared physical configuration. `api.pgvector.search({table:['app_vectors'],idColumn:'id',vectorColumn:'embedding',payloadColumn:'payload'}, q, {metric:'cosine',limit:10,efSearch:64})` queries caller-owned tables. Without the quantized Feature the module creates no ANN index."
                   }
                 ]
               },
@@ -96295,6 +96622,29 @@
                   {
                     "type": "paragraph",
                     "text": "Selected journals retain every actual native mutation in execution order, including repeated writes to one target and intermediate values. The original SQL RETURNING row supplies each exact raw after value and absolute deadline; no later read substitutes the final value. Undo keeps the host's existing first-before/final-after merge and complete final revision checks. Unselected operations keep their original SQL and native path."
+                  }
+                ]
+              },
+              {
+                "id": "quantized-recall-and-native-exact-rescoring",
+                "heading": "Quantized recall and native exact rescoring",
+                "blocks": [
+                  {
+                    "type": "code",
+                    "language": "ts",
+                    "code": "import { pgQuantizedFeature } from '@migaia/storage-plugin-postgres/features/quantized'\n// postgresBackendPlugin({ driver }, {\n//   vector: pgvectorFeature(), quantized: pgQuantizedFeature({ mode: 'halfvec' })\n// })\nconst selected = await embeddings\n  .near([1, 0, 0])\n  .where({ category: 'guide' })\n  .topK(20)\n  .rescore({ topN: 5 })\n  .rerank(({ hits }) => hits.map((hit) => hit.score))\n  .all()"
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Choose `halfvec` or `binary_quantize` once at installation. `topN` defaults to k and must be a positive safe integer at most k; invalid bounds reject before I/O. The read-only result supports original `withVector`, selection, grouping and generic rerank, with unchanged engine scores; it cannot delete, watch or acquire a second native rescore. No extra vector retrieval is implicit."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "The original schema owner prepares expression HNSW indexes, using the metric's halfvec opclass or `bit_hamming_ops`. Existing collection metadata is locked in the same native transaction so two hosts prepare one index safely. Layout checks/index preparation are separate native statements; the business query is one `MATERIALIZED` recall of k followed by exact original-vector ordering and topN. A metric override prepares its matching index. Sample-based origins retain their original sample-loading statements before the recall/rescore statement. This explicit quantized stage selects quantized recall even if its near call specified exact; plain `near(...,{exact:true})` keeps its original behavior."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Recall includes organization, expiry and pushed payload conditions. HNSW filters do not promise physical prefiltering or k surviving candidates. JavaScript predicates run on the outer hits without refill; a following generic reranker receives those actual hits. Opt-in expression ANN indexes are the exception to the ordinary org-leading index layout. Original vectors remain float32; halfvec indexing supports at most 4000 dimensions, binary indexing at most 64000 but the original vector column at most 16000. Native casts may lose precision or reject values outside halfvec range with `SQL_FAILED` and the native cause. Quantization is not lossless. No dependencies or background workers are added."
                   }
                 ]
               }
@@ -96945,6 +97295,7 @@
         "./features/hybrid",
         "./features/management",
         "./features/recommend",
+        "./features/rescore",
         "./http"
       ],
       "readmeLocales": ["zh", "en"],
@@ -96996,6 +97347,37 @@
                 {
                   "type": "paragraph",
                   "text": "SDK 请求发出后，取消不会撤销原生修改；即使调用方随后取消，请求仍可能成功返回。后端释放等待该真实结果，响应丢失时保留结果未知且不自动重放。hooks 的同步异常或异步拒绝仅上报，介入操作使用宿主原 pipeline。"
+                }
+              ]
+            },
+            {
+              "id": "原生命名向量重排",
+              "heading": "原生命名向量重排",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`@migaia/storage-plugin-qdrant/features/rescore` 的 `qdrantRescoreFeature` 在安装时按逻辑集合声明一个额外向量槽。`dimensions` 必填，`metric` 默认 `cosine`；`multivector: 'max_sim'` 选择多向量，否则使用 dense。只接受顶层 `collections` 映射中声明的集合。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { vector } from '@migaia/storage-contract'\nimport { qdrantBackendPlugin } from '@migaia/storage-plugin-qdrant'\nimport { qdrantRescoreFeature } from '@migaia/storage-plugin-qdrant/features/rescore'\nawait using host = await createStorageHost({\n  plugins: [\n    qdrantBackendPlugin(\n      { url: 'http://localhost:6333' },\n      {\n        rescore: qdrantRescoreFeature({\n          collections: { articles: { dimensions: 2, metric: 'dot' } }\n        })\n      }\n    )\n  ]\n})\nconst store = host.backend('qdrant')\nconst articles = store.use(vector).collection('articles', { dimensions: 2, metric: 'dot' })\nawait articles.upsert([\n  { id: 'a', vector: [2, 0] },\n  { id: 'b', vector: [1, 0] }\n])\nawait store.api.qdrantRescore.updateVectors('articles', [\n  { id: 'a', vector: [0, 1] },\n  { id: 'b', vector: [3, 0] }\n])\nconst hits = await articles\n  .near([1, 0])\n  .topK(10)\n  .rescore({ query: [1, 0], topN: 2 })\n  .all()\nconsole.log(hits.map((hit) => ({ id: hit.id, score: hit.score })))"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`updateVectors(collection,points,ctx?)` 只更新当前组织已存在点的额外槽，使用 `wait:true`，返回原生 `operation_id/status` 操作记录，不改变 search/source、payload 或 TTL。重复 ID、非稠密数组和非法向量在 I/O 前拒绝。多向量写入与 query 使用非空二维数组，内层维度一致。原生缺点错误及未知写结果沿原错误链，不自动重试。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`rescore` 只可接在 `topK(k)` 后；`topN` 默认 k，必须为不大于 k 的正安全整数。每次终点只发一次 Query API：prefetch 使用原 search 槽、k、可下推 where、组织、期限与原 minScore；outer 使用额外槽并取 topN。`score` 是 outer 引擎分数；prefetch 分数不由协议返回。函数 where 在 outer 命中后由原共享 reader 执行且不补搜，因此可能不足 topN。`withVector()` 仍返回原标准向量，之后可接通用 `rerank`，后者保留当前引擎 score 并新增 rerankScore。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Qdrant 1.15.5 必须在集合首次创建时声明额外槽，不能在线给旧集合补槽。已有缺槽或配置不符集合的新操作报 `UNSUPPORTED_CAPABILITY`，原标准读写保持可用；不会重建集合或迁移数据。标准 upsert 仍整点替换，可能清除额外槽，应用需在其后重写额外向量。移除 Feature 后标准读写仍保留此原替换语义。额外槽检索及分数由 Qdrant 完成，不在 JavaScript 评分。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Qdrant 1.15.5 对首行全为非负整数的两行多向量矩阵存在原生 JSON 歧义：它可能把矩阵解码为 sparse vector 并拒绝。适配器保留原 QDRANT_REQUEST_FAILED 证据，不变形向量或重试；本版本的三行矩阵与 dense 向量已实际验证。"
                 }
               ]
             }
@@ -97104,6 +97486,37 @@
                   "text": "SDK 请求发出后，取消不会撤销原生修改；即使调用方随后取消，请求仍可能成功返回。后端释放等待该真实结果，响应丢失时保留结果未知且不自动重放。hooks 的同步异常或异步拒绝仅上报，介入操作使用宿主原 pipeline。"
                 }
               ]
+            },
+            {
+              "id": "原生命名向量重排",
+              "heading": "原生命名向量重排",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`@migaia/storage-plugin-qdrant/features/rescore` 的 `qdrantRescoreFeature` 在安装时按逻辑集合声明一个额外向量槽。`dimensions` 必填，`metric` 默认 `cosine`；`multivector: 'max_sim'` 选择多向量，否则使用 dense。只接受顶层 `collections` 映射中声明的集合。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { vector } from '@migaia/storage-contract'\nimport { qdrantBackendPlugin } from '@migaia/storage-plugin-qdrant'\nimport { qdrantRescoreFeature } from '@migaia/storage-plugin-qdrant/features/rescore'\nawait using host = await createStorageHost({\n  plugins: [\n    qdrantBackendPlugin(\n      { url: 'http://localhost:6333' },\n      {\n        rescore: qdrantRescoreFeature({\n          collections: { articles: { dimensions: 2, metric: 'dot' } }\n        })\n      }\n    )\n  ]\n})\nconst store = host.backend('qdrant')\nconst articles = store.use(vector).collection('articles', { dimensions: 2, metric: 'dot' })\nawait articles.upsert([\n  { id: 'a', vector: [2, 0] },\n  { id: 'b', vector: [1, 0] }\n])\nawait store.api.qdrantRescore.updateVectors('articles', [\n  { id: 'a', vector: [0, 1] },\n  { id: 'b', vector: [3, 0] }\n])\nconst hits = await articles\n  .near([1, 0])\n  .topK(10)\n  .rescore({ query: [1, 0], topN: 2 })\n  .all()\nconsole.log(hits.map((hit) => ({ id: hit.id, score: hit.score })))"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`updateVectors(collection,points,ctx?)` 只更新当前组织已存在点的额外槽，使用 `wait:true`，返回原生 `operation_id/status` 操作记录，不改变 search/source、payload 或 TTL。重复 ID、非稠密数组和非法向量在 I/O 前拒绝。多向量写入与 query 使用非空二维数组，内层维度一致。原生缺点错误及未知写结果沿原错误链，不自动重试。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`rescore` 只可接在 `topK(k)` 后；`topN` 默认 k，必须为不大于 k 的正安全整数。每次终点只发一次 Query API：prefetch 使用原 search 槽、k、可下推 where、组织、期限与原 minScore；outer 使用额外槽并取 topN。`score` 是 outer 引擎分数；prefetch 分数不由协议返回。函数 where 在 outer 命中后由原共享 reader 执行且不补搜，因此可能不足 topN。`withVector()` 仍返回原标准向量，之后可接通用 `rerank`，后者保留当前引擎 score 并新增 rerankScore。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Qdrant 1.15.5 必须在集合首次创建时声明额外槽，不能在线给旧集合补槽。已有缺槽或配置不符集合的新操作报 `UNSUPPORTED_CAPABILITY`，原标准读写保持可用；不会重建集合或迁移数据。标准 upsert 仍整点替换，可能清除额外槽，应用需在其后重写额外向量。移除 Feature 后标准读写仍保留此原替换语义。额外槽检索及分数由 Qdrant 完成，不在 JavaScript 评分。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Qdrant 1.15.5 对首行全为非负整数的两行多向量矩阵存在原生 JSON 歧义：它可能把矩阵解码为 sparse vector 并拒绝。适配器保留原 QDRANT_REQUEST_FAILED 证据，不变形向量或重试；本版本的三行矩阵与 dense 向量已实际验证。"
+                }
+              ]
             }
           ]
         },
@@ -97164,6 +97577,37 @@
                   {
                     "type": "paragraph",
                     "text": "Cancellation after SDK dispatch does not undo a native modification; the request can still return success. Backend disposal waits for that actual result. A lost response leaves the outcome unknown and is never replayed automatically. Synchronous observer errors and rejected observer Promises are only reported; intervention uses the host's original pipeline."
+                  }
+                ]
+              },
+              {
+                "id": "native-named-vector-rescoring",
+                "heading": "Native named-vector rescoring",
+                "blocks": [
+                  {
+                    "type": "paragraph",
+                    "text": "`qdrantRescoreFeature` from `@migaia/storage-plugin-qdrant/features/rescore` declares one extra vector slot per logical collection at installation. `dimensions` is required, `metric` defaults to `cosine`, and `multivector: 'max_sim'` selects multivectors instead of dense vectors. Only collections declared in the `collections` map are eligible."
+                  },
+                  {
+                    "type": "code",
+                    "language": "ts",
+                    "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { vector } from '@migaia/storage-contract'\nimport { qdrantBackendPlugin } from '@migaia/storage-plugin-qdrant'\nimport { qdrantRescoreFeature } from '@migaia/storage-plugin-qdrant/features/rescore'\nawait using host = await createStorageHost({\n  plugins: [\n    qdrantBackendPlugin(\n      { url: 'http://localhost:6333' },\n      {\n        rescore: qdrantRescoreFeature({\n          collections: { articles: { dimensions: 2, metric: 'dot' } }\n        })\n      }\n    )\n  ]\n})\nconst store = host.backend('qdrant')\nconst articles = store.use(vector).collection('articles', { dimensions: 2, metric: 'dot' })\nawait articles.upsert([\n  { id: 'a', vector: [2, 0] },\n  { id: 'b', vector: [1, 0] }\n])\nawait store.api.qdrantRescore.updateVectors('articles', [\n  { id: 'a', vector: [0, 1] },\n  { id: 'b', vector: [3, 0] }\n])\nconst hits = await articles\n  .near([1, 0])\n  .topK(10)\n  .rescore({ query: [1, 0], topN: 2 })\n  .all()\nconsole.log(hits.map((hit) => ({ id: hit.id, score: hit.score })))"
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "`updateVectors(collection,points,ctx?)` changes only the extra slot of existing points in the current organization, uses `wait:true`, and returns the original native `operation_id/status` record. It leaves search/source, payload and TTL intact. Duplicate IDs, sparse arrays and invalid vectors reject before I/O. Multivector writes and queries use nonempty matrices with consistent inner dimensions. Native missing-point failures and unknown write results retain their original error chain and are never replayed automatically."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "`rescore` is available only after `topK(k)`. `topN` defaults to k and must be a positive safe integer no greater than k. Each terminal sends one Query API call: prefetch retains the original search slot, k, pushed where, organization, expiry and original minScore; the outer query uses the extra slot and retains topN. `score` is the outer engine score; the protocol does not return prefetch scores. Function where predicates run through the shared reader after outer hits, without refilling, so fewer than topN hits may remain. `withVector()` still returns the original standard vector. Portable `rerank` may follow, preserving the current engine score and adding rerankScore."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Qdrant 1.15.5 needs the extra slot at initial collection creation; existing collections cannot acquire it online. New operations on a missing or incompatible slot reject with `UNSUPPORTED_CAPABILITY`, while standard reads and writes remain usable. No collection is recreated and no data is migrated. Standard upsert still replaces the whole point and can clear the extra slot; applications must rewrite extra vectors afterward. Removing the Feature preserves that same standard replacement behavior. Qdrant owns rescoring and its score; JavaScript does not score candidates."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Qdrant 1.15.5 has a native JSON ambiguity for two-row multivectors whose first row consists of nonnegative integers: it may decode the matrix as a sparse vector and reject it. The original QDRANT_REQUEST_FAILED evidence is preserved; the adapter does not reshape vectors or retry. Three-row matrices and dense vectors are verified against this version."
                   }
                 ]
               }
@@ -97270,6 +97714,37 @@
                   {
                     "type": "paragraph",
                     "text": "Cancellation after SDK dispatch does not undo a native modification; the request can still return success. Backend disposal waits for that actual result. A lost response leaves the outcome unknown and is never replayed automatically. Synchronous observer errors and rejected observer Promises are only reported; intervention uses the host's original pipeline."
+                  }
+                ]
+              },
+              {
+                "id": "native-named-vector-rescoring",
+                "heading": "Native named-vector rescoring",
+                "blocks": [
+                  {
+                    "type": "paragraph",
+                    "text": "`qdrantRescoreFeature` from `@migaia/storage-plugin-qdrant/features/rescore` declares one extra vector slot per logical collection at installation. `dimensions` is required, `metric` defaults to `cosine`, and `multivector: 'max_sim'` selects multivectors instead of dense vectors. Only collections declared in the `collections` map are eligible."
+                  },
+                  {
+                    "type": "code",
+                    "language": "ts",
+                    "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { vector } from '@migaia/storage-contract'\nimport { qdrantBackendPlugin } from '@migaia/storage-plugin-qdrant'\nimport { qdrantRescoreFeature } from '@migaia/storage-plugin-qdrant/features/rescore'\nawait using host = await createStorageHost({\n  plugins: [\n    qdrantBackendPlugin(\n      { url: 'http://localhost:6333' },\n      {\n        rescore: qdrantRescoreFeature({\n          collections: { articles: { dimensions: 2, metric: 'dot' } }\n        })\n      }\n    )\n  ]\n})\nconst store = host.backend('qdrant')\nconst articles = store.use(vector).collection('articles', { dimensions: 2, metric: 'dot' })\nawait articles.upsert([\n  { id: 'a', vector: [2, 0] },\n  { id: 'b', vector: [1, 0] }\n])\nawait store.api.qdrantRescore.updateVectors('articles', [\n  { id: 'a', vector: [0, 1] },\n  { id: 'b', vector: [3, 0] }\n])\nconst hits = await articles\n  .near([1, 0])\n  .topK(10)\n  .rescore({ query: [1, 0], topN: 2 })\n  .all()\nconsole.log(hits.map((hit) => ({ id: hit.id, score: hit.score })))"
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "`updateVectors(collection,points,ctx?)` changes only the extra slot of existing points in the current organization, uses `wait:true`, and returns the original native `operation_id/status` record. It leaves search/source, payload and TTL intact. Duplicate IDs, sparse arrays and invalid vectors reject before I/O. Multivector writes and queries use nonempty matrices with consistent inner dimensions. Native missing-point failures and unknown write results retain their original error chain and are never replayed automatically."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "`rescore` is available only after `topK(k)`. `topN` defaults to k and must be a positive safe integer no greater than k. Each terminal sends one Query API call: prefetch retains the original search slot, k, pushed where, organization, expiry and original minScore; the outer query uses the extra slot and retains topN. `score` is the outer engine score; the protocol does not return prefetch scores. Function where predicates run through the shared reader after outer hits, without refilling, so fewer than topN hits may remain. `withVector()` still returns the original standard vector. Portable `rerank` may follow, preserving the current engine score and adding rerankScore."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Qdrant 1.15.5 needs the extra slot at initial collection creation; existing collections cannot acquire it online. New operations on a missing or incompatible slot reject with `UNSUPPORTED_CAPABILITY`, while standard reads and writes remain usable. No collection is recreated and no data is migrated. Standard upsert still replaces the whole point and can clear the extra slot; applications must rewrite extra vectors afterward. Removing the Feature preserves that same standard replacement behavior. Qdrant owns rescoring and its score; JavaScript does not score candidates."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Qdrant 1.15.5 has a native JSON ambiguity for two-row multivectors whose first row consists of nonnegative integers: it may decode the matrix as a sparse vector and reject it. The original QDRANT_REQUEST_FAILED evidence is preserved; the adapter does not reshape vectors or retry. Three-row matrices and dense vectors are verified against this version."
                   }
                 ]
               }

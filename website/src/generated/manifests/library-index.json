@@ -360,7 +360,14 @@
       "slug": "storage-host",
       "description": "Runtime-neutral storage host and typed backend authoring",
       "version": "0.0.0",
-      "exports": [".", "./authoring/backend", "./authoring/vector", "./entity", "./journal"],
+      "exports": [
+        ".",
+        "./authoring/backend",
+        "./authoring/vector",
+        "./entity",
+        "./journal",
+        "./vector/mmr"
+      ],
       "readmeLocales": ["zh", "en"]
     },
     {
@@ -392,6 +399,7 @@
         "./features/listen",
         "./features/logical-replication",
         "./features/pgvector",
+        "./features/quantized",
         "./pg",
         "./postgres-js"
       ],
@@ -415,6 +423,7 @@
         "./features/hybrid",
         "./features/management",
         "./features/recommend",
+        "./features/rescore",
         "./http"
       ],
       "readmeLocales": ["zh", "en"]
