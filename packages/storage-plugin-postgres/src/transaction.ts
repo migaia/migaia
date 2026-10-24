@@ -131,7 +131,8 @@ export function createPgTransactions<TScope extends Omit<ITransactionScope, 'use
     callback: (scope: TScope) => R,
     lease: IPgLockLease | undefined,
     publicTransaction: boolean,
-    journaled: boolean
+    journaled: boolean,
+    observeKeys?: (keys: readonly ILockKey[]) => void
   ): Promise<IConcurrencyAttempt<Awaited<R>>> => {
     const normalize = publicTransaction ? normalizeTransactionFailure : normalizePostgresError
     const baseline = new Map<string, IPgRevision>()
@@ -363,6 +364,7 @@ export function createPgTransactions<TScope extends Omit<ITransactionScope, 'use
       )
       // Only a completed rollback or a never-opened transaction proves that no data committed.
       // Unknown COMMIT outcomes retain their pending WAL intent for the original recovery owner.
+      if (observeKeys !== undefined) observeKeys([...state.observed.values()])
       if (!state.terminal.settled && !begun && !commitSent) complete(false)
       await journalAttempt?.settle?.()
       for (const effect of state.terminal.ended) observePg({ effect }, 'effect')
@@ -423,77 +425,115 @@ export function createPgTransactions<TScope extends Omit<ITransactionScope, 'use
     assertTransactionCallback(callback, PgNames.backend)
     controller.assertLive()
     const release = controller.beginMutation()
-    const result = runWithConcurrency<Awaited<R>>(
-      {
-        store,
-        options,
-        ...(journaled && runtime.journal !== undefined
-          ? { prepare: () => runtime.journal!.prepare() }
-          : {}),
-        lock: () => [
-          ...(execution?.lock?.() ?? []),
-          ...(journaled ? (runtime.journal?.headLocks() ?? []) : [])
-        ],
-        ...(pipeline
-          ? {
-              executeAttempt: (
-                ctx: IOperationContext,
-                invoke: () => Promise<Awaited<Awaited<R>>>
-              ) =>
-                runtime.execution.run(
-                  { operation, input: execution?.input ?? {}, ctx },
-                  (input) => {
-                    execution?.capture(input)
-                    return execution?.observe === undefined ? invoke() : execution.observe(invoke)
-                  }
-                )
-            }
-          : {})
-      },
-      {
-        attempt: async (context) => {
-          if (context.orgId !== undefined && context.orgId !== runtime.orgId)
-            throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
-              backend: PgNames.backend
-            })
-          const lease = await acquirePgLocks(
-            configuration,
-            tables,
-            runtime.orgId,
-            controller.origin,
-            context
-          )
-          if (lease instanceof PgLockConflict)
-            return { status: 'conflict', phase: 'acquire', keys: lease.keys, holder: lease.holder }
-          let primary: unknown
-          let failed = false
-          let result: IConcurrencyAttempt<Awaited<R>> | undefined
-          try {
-            result = await attempt(
-              context,
-              callback,
-              lease,
-              operation === PgOperation.transaction,
-              journaled
+    /** Only enabled observation copies final original native facts across the existing retry loop. */
+    let observing = false
+    let observedKeys: readonly ILockKey[] | undefined
+    let observedInput = execution?.input ?? {}
+    const execute = () =>
+      runWithConcurrency<Awaited<R>>(
+        {
+          store,
+          options,
+          ...(journaled && runtime.journal !== undefined
+            ? { prepare: () => runtime.journal!.prepare() }
+            : {}),
+          lock: () => [
+            ...(execution?.lock?.() ?? []),
+            ...(journaled ? (runtime.journal?.headLocks() ?? []) : [])
+          ],
+          ...(pipeline
+            ? {
+                executeAttempt: (
+                  ctx: IOperationContext,
+                  invoke: () => Promise<Awaited<Awaited<R>>>
+                ) =>
+                  runtime.execution.run(
+                    { operation, input: execution?.input ?? {}, ctx, internal: true },
+                    (input) => {
+                      observedInput = input
+                      execution?.capture(input)
+                      return execution?.observe === undefined ? invoke() : execution.observe(invoke)
+                    }
+                  )
+              }
+            : {})
+        },
+        {
+          attempt: async (context) => {
+            if (observing) observedKeys = context.lock ?? []
+            if (context.orgId !== undefined && context.orgId !== runtime.orgId)
+              throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
+                backend: PgNames.backend
+              })
+            const lease = await acquirePgLocks(
+              configuration,
+              tables,
+              runtime.orgId,
+              controller.origin,
+              context
             )
-          } catch (cause) {
-            primary = cause
-            failed = true
-          }
-          try {
-            await releasePgLocks(configuration, tables, runtime.orgId, lease)
-          } catch (secondary) {
-            if (failed)
-              throw normalizeTransactionFailure(
-                new AggregateError([primary, secondary], PostgresErrorText.transactionFailed)
+            if (lease instanceof PgLockConflict)
+              return {
+                status: 'conflict',
+                phase: 'acquire',
+                keys: lease.keys,
+                holder: lease.holder
+              }
+            let primary: unknown
+            let failed = false
+            let result: IConcurrencyAttempt<Awaited<R>> | undefined
+            try {
+              result = await attempt(
+                context,
+                callback,
+                lease,
+                operation === PgOperation.transaction,
+                journaled,
+                observing
+                  ? (keys) => {
+                      observedKeys = keys
+                    }
+                  : undefined
               )
-            throw normalizeTransactionFailure(secondary)
+            } catch (cause) {
+              primary = cause
+              failed = true
+            }
+            try {
+              await releasePgLocks(configuration, tables, runtime.orgId, lease)
+            } catch (secondary) {
+              if (failed)
+                throw normalizeTransactionFailure(
+                  new AggregateError([primary, secondary], PostgresErrorText.transactionFailed)
+                )
+              throw normalizeTransactionFailure(secondary)
+            }
+            if (failed) throw primary
+            return result!
           }
-          if (failed) throw primary
-          return result!
         }
-      }
-    )
+      )
+    const result =
+      runtime.execution.observe === undefined
+        ? execute()
+        : runtime.execution.observe(
+            () => ({
+              operation,
+              input: observedInput,
+              keys: () => observedKeys ?? [],
+              internal:
+                !journaled ||
+                operation === PgOperation.metadataGet ||
+                operation === PgOperation.metadataSet ||
+                operation === PgOperation.metadataDelete
+                  ? true
+                  : undefined
+            }),
+            (enabled) => {
+              observing = enabled
+              return execute()
+            }
+          )
     void result.then(release, release)
     return result
   }
