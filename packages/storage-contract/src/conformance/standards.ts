@@ -5,7 +5,7 @@ import { ttl, type ITtlTarget } from '../capabilities/ttl.js'
 import { counter } from '../capabilities/counter.js'
 import { sql } from '../capabilities/sql.js'
 import { vector } from '../capabilities/vector.js'
-import { rdf, term } from '../capabilities/rdf.js'
+import { rdf, RdfTermType, RdfDatatype } from '../capabilities/rdf.js'
 import { sparql } from '../capabilities/sparql.js'
 import { blob } from '../capabilities/blob.js'
 import { durableChangeFeed } from '../capabilities/durable-change-feed.js'
@@ -289,14 +289,28 @@ export function standardConformance(
     check('rdf · ground identity, duplicate add and delete', async (store) => {
       const api = conformanceApi(store, rdf)
       const quad = {
-        subject: term.iri('urn:conformance:subject'),
-        predicate: term.iri('urn:conformance:predicate'),
-        object: term.literal('value'),
-        graph: term.defaultGraph
+        subject: { termType: RdfTermType.namedNode, value: 'urn:conformance:subject' } as const,
+        predicate: { termType: RdfTermType.namedNode, value: 'urn:conformance:predicate' } as const,
+        object: {
+          termType: RdfTermType.literal,
+          value: 'value',
+          datatype: RdfDatatype.string
+        } as const,
+        graph: { termType: RdfTermType.defaultGraph } as const
       }
       await api.add([quad, quad])
       await expect(api.match({ subject: quad.subject }).all()).resolves.toEqual([quad])
-      await expect(api.match({ object: term.literal('value') }).count()).resolves.toBe(1)
+      await expect(
+        api
+          .match({
+            object: {
+              termType: RdfTermType.literal,
+              value: 'value',
+              datatype: RdfDatatype.string
+            } as const
+          })
+          .count()
+      ).resolves.toBe(1)
       await api.delete([quad, quad])
       await expect(api.match({}).all()).resolves.toEqual([])
     })
@@ -304,7 +318,11 @@ export function standardConformance(
   if (capabilities.includes(sparql)) {
     check('sparql · native select, ask, construct and update', async (store) => {
       const api = conformanceApi(store, sparql)
-      const value = term.literal('conformance')
+      const value = {
+        termType: RdfTermType.literal,
+        value: 'conformance',
+        datatype: RdfDatatype.string
+      } as const
       await expect(api`SELECT ?value WHERE { BIND(${value} AS ?value) }`.select()).resolves.toEqual(
         [{ value }]
       )
@@ -313,10 +331,10 @@ export function standardConformance(
         api`CONSTRUCT { <urn:conformance:s> <urn:conformance:p> ${value} } WHERE { }`.construct()
       ).resolves.toEqual([
         {
-          subject: term.iri('urn:conformance:s'),
-          predicate: term.iri('urn:conformance:p'),
+          subject: { termType: RdfTermType.namedNode, value: 'urn:conformance:s' } as const,
+          predicate: { termType: RdfTermType.namedNode, value: 'urn:conformance:p' } as const,
           object: value,
-          graph: term.defaultGraph
+          graph: { termType: RdfTermType.defaultGraph } as const
         }
       ])
       await expect(

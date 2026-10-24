@@ -300,3 +300,9 @@ const hits = await collection
 `lambda` 是 [0,1] 内的有限数字；1 只按引擎相关性选择，0 在第一项后只选择多样性，目标相同保留引擎顺序。helper 的 `topN` 仅限制贪心前缀的计算，仍为全部候选返回等长有限分数，剩余项保留引擎顺序；真正截断只归 `rerank` 的 topN。缺省计算全部候选，保留 O(n) 状态，最坏 O(n²d) 时间。向量须维度一致；零向量的余弦多样性按 0 处理，同分保留引擎顺序。评分器取消继续使用原信号，不创建预算、资源或后台任务。
 
 仅在选择 journal 或导入 `/journal` 时加载日志引擎；使用这些功能时需安装可选 peer `@migaia/logger`。未选择 journal 的宿主不会在运行时加载 logger。
+
+## 共享作者运行时
+
+类型、token、定义身份、错误与纯校验留在 `@migaia/storage-contract`。query、并发、事务、键编码、能力发布和资源统一归 host 的 concern `/authoring/*` 入口；完整路径见 [contract 入口表](../storage-contract/README.md#入口与依赖方向)，旧 contract 根不保留运行时别名。
+
+纯 guard 校验而不复制；只有排队、native await 或公开所有权边界需要隔离可变输入时保留快照，包括活动锁诊断的 Date/binary 键。普通 options/query/快照记录不作为冻结协议。`/authoring/codec` 的 `snapshotCodec` 校验后返回同一原实例，合法 class 的转换方法保留 `#private` receiver。

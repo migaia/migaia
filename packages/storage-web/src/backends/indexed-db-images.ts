@@ -1,11 +1,11 @@
 import {
   StorageContractError,
   StorageContractErrorCode,
-  snapshotConcurrencyLockKeys,
   assertLockKey,
   type ILockKey,
   type IStorageKey
 } from '@migaia/storage-contract'
+import { snapshotConcurrencyLockKeys } from '@migaia/storage-host/authoring/concurrency'
 import {
   StorageError as JournalError,
   StorageErrorCode as JournalErrorCode,

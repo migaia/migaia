@@ -1,7 +1,6 @@
 import { PluginHostError, PluginHostErrorCode, ERROR_TEXT } from '@migaia/plugin-host'
+import { assertTransactionOwner, runTransactionOperation } from './authoring/transaction.js'
 import {
-  assertTransactionOwner,
-  runTransactionOperation,
   RecordQueryMethod,
   TransactionBuilderMethod,
   type IChainMethods

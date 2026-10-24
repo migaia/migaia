@@ -1,7 +1,6 @@
 import { asyncDisposeKey } from '@migaia/plugin-host'
+import { hasStorageCapability, useStorageCapability } from './authoring/capability.js'
 import {
-  hasStorageCapability,
-  useStorageCapability,
   StorageContractError,
   StorageContractErrorCode,
   sql,

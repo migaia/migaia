@@ -4,14 +4,12 @@ import { join } from 'node:path'
 import { it, expect, onTestFinished, vi } from 'vitest'
 import { createStorageHost, createOrgId, defineFeature, definePlugin } from '@migaia/storage-host'
 import { deferred, sleep } from '@migaia/utils/promise'
+import { lockKey } from '@migaia/storage-host/authoring/concurrency'
+import { sql, type IOperationContext, type IStorageChange } from '@migaia/storage-contract'
 import {
-  lockKey,
-  sql,
   readTransactionOperationContext,
-  runTransactionOperation,
-  type IOperationContext,
-  type IStorageChange
-} from '@migaia/storage-contract'
+  runTransactionOperation
+} from '@migaia/storage-host/authoring/transaction'
 import { sqliteBackendPlugin, sqliteBackendKind, type ISqliteDriver } from '../src/index.js'
 import { nodeSqliteDriver } from '../src/node.js'
 import { sqliteMaintenanceFeature } from '../src/features/maintenance.js'

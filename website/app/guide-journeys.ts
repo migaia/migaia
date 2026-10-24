@@ -75483,7 +75483,7 @@ class CheckoutElement extends HTMLElement {
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { snapshotKeyValueStore } from '@migaia/storage-contract'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst store = memoryStorageHost()\nconst checked = snapshotKeyValueStore(store)\nif (!checked) throw new TypeError('Preferences store is unavailable')\nawait checked.store.set('theme', 'dark')\nconsole.log('主题设置:', await checked.store.get('theme'))\nconsole.log('未保存的字体:', await checked.store.get('font'))\nawait store.dispose()"
+                code: "import { snapshotKeyValueStore } from '@migaia/storage-host/authoring/store'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst store = memoryStorageHost()\nconst checked = snapshotKeyValueStore(store)\nif (!checked) throw new TypeError('Preferences store is unavailable')\nawait checked.store.set('theme', 'dark')\nconsole.log('主题设置:', await checked.store.get('theme'))\nconsole.log('未保存的字体:', await checked.store.get('font'))\nawait store.dispose()"
               },
               {
                 type: 'code',
@@ -75641,7 +75641,7 @@ class CheckoutElement extends HTMLElement {
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { snapshotKeyValueStore } from '@migaia/storage-contract'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst store = memoryStorageHost()\nconst checked = snapshotKeyValueStore(store)\nif (!checked) throw new TypeError('Preferences store is unavailable')\nawait checked.store.set('theme', 'dark')\nconsole.log('Theme setting:', await checked.store.get('theme'))\nconsole.log('Missing font:', await checked.store.get('font'))\nawait store.dispose()"
+                code: "import { snapshotKeyValueStore } from '@migaia/storage-host/authoring/store'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst store = memoryStorageHost()\nconst checked = snapshotKeyValueStore(store)\nif (!checked) throw new TypeError('Preferences store is unavailable')\nawait checked.store.set('theme', 'dark')\nconsole.log('Theme setting:', await checked.store.get('theme'))\nconsole.log('Missing font:', await checked.store.get('font'))\nawait store.dispose()"
               },
               {
                 type: 'code',
@@ -75862,7 +75862,7 @@ class CheckoutElement extends HTMLElement {
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { snapshotStorageCapabilities } from '@migaia/storage-contract'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst store = memoryStorageHost()\nconst older = { ...store.capabilities }\ndelete (older as Partial<typeof older>).secondaryIndexes\ndelete (older as Partial<typeof older>).changeFeed\nconst checked = snapshotStorageCapabilities(older)\nconsole.log('旧描述的索引能力:', checked?.secondaryIndexes)\nconsole.log('旧描述的变更通知:', checked?.changeFeed)\nawait store.dispose()"
+                code: "import { snapshotStorageCapabilities } from '@migaia/storage-host/authoring/store'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst store = memoryStorageHost()\nconst older = { ...store.capabilities }\ndelete (older as Partial<typeof older>).secondaryIndexes\ndelete (older as Partial<typeof older>).changeFeed\nconst checked = snapshotStorageCapabilities(older)\nconsole.log('旧描述的索引能力:', checked?.secondaryIndexes)\nconsole.log('旧描述的变更通知:', checked?.changeFeed)\nawait store.dispose()"
               },
               {
                 type: 'code',
@@ -76020,7 +76020,7 @@ class CheckoutElement extends HTMLElement {
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { snapshotStorageCapabilities } from '@migaia/storage-contract'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst store = memoryStorageHost()\nconst older = { ...store.capabilities }\ndelete (older as Partial<typeof older>).secondaryIndexes\ndelete (older as Partial<typeof older>).changeFeed\nconst checked = snapshotStorageCapabilities(older)\nconsole.log('Older descriptor indexes:', checked?.secondaryIndexes)\nconsole.log('Older descriptor changes:', checked?.changeFeed)\nawait store.dispose()"
+                code: "import { snapshotStorageCapabilities } from '@migaia/storage-host/authoring/store'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst store = memoryStorageHost()\nconst older = { ...store.capabilities }\ndelete (older as Partial<typeof older>).secondaryIndexes\ndelete (older as Partial<typeof older>).changeFeed\nconst checked = snapshotStorageCapabilities(older)\nconsole.log('Older descriptor indexes:', checked?.secondaryIndexes)\nconsole.log('Older descriptor changes:', checked?.changeFeed)\nawait store.dispose()"
               },
               {
                 type: 'code',
@@ -76096,7 +76096,7 @@ class CheckoutElement extends HTMLElement {
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { snapshotOperationContext, snapshotStorageKey } from '@migaia/storage-contract'\n\nconst key = ['orders', new Date('2026-10-15T00:00:00Z')]\nconst options = { pageSize: 20 }\nconst stableKey = snapshotStorageKey(key, 'memory')\nconst context = snapshotOperationContext(options)\nkey[0] = 'drafts'\noptions.pageSize = 100\nconsole.log('已保存的查询键:', JSON.stringify(stableKey))\nconsole.log('已保存的分页大小:', context?.pageSize)\nconsole.log('查询参数已冻结:', Object.isFrozen(context))"
+                code: "import { snapshotOperationContext } from '@migaia/storage-host/authoring/context'\nimport { snapshotStorageKey } from '@migaia/storage-host/authoring/key'\n\nconst key = ['orders', new Date('2026-10-15T00:00:00Z')]\nconst options = { pageSize: 20 }\nconst stableKey = snapshotStorageKey(key, 'memory')\nconst context = snapshotOperationContext(options)\nkey[0] = 'drafts'\noptions.pageSize = 100\nconsole.log('已保存的查询键:', JSON.stringify(stableKey))\nconsole.log('已保存的分页大小:', context?.pageSize)\nconsole.log('查询参数已冻结:', Object.isFrozen(context))"
               },
               {
                 type: 'code',
@@ -76164,7 +76164,7 @@ class CheckoutElement extends HTMLElement {
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { snapshotSyncWriteOptions } from '@migaia/storage-contract'\n\nconst options = snapshotSyncWriteOptions({\n  signal: undefined,\n  timeoutMs: undefined,\n  conflictPolicy: 'replace'\n})\nconsole.log('同步覆盖策略:', options.conflictPolicy)\nconsole.log('同步选项已冻结:', Object.isFrozen(options))"
+                code: "import { snapshotSyncWriteOptions } from '@migaia/storage-host/authoring/context'\n\nconst options = snapshotSyncWriteOptions({\n  signal: undefined,\n  timeoutMs: undefined,\n  conflictPolicy: 'replace'\n})\nconsole.log('同步覆盖策略:', options.conflictPolicy)\nconsole.log('同步选项已冻结:', Object.isFrozen(options))"
               },
               {
                 type: 'code',
@@ -76286,7 +76286,7 @@ class CheckoutElement extends HTMLElement {
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { snapshotOperationContext, snapshotStorageKey } from '@migaia/storage-contract'\n\nconst key = ['orders', new Date('2026-10-15T00:00:00Z')]\nconst options = { pageSize: 20 }\nconst stableKey = snapshotStorageKey(key, 'memory')\nconst context = snapshotOperationContext(options)\nkey[0] = 'drafts'\noptions.pageSize = 100\nconsole.log('Captured query key:', JSON.stringify(stableKey))\nconsole.log('Captured page size:', context?.pageSize)\nconsole.log('Query options frozen:', Object.isFrozen(context))"
+                code: "import { snapshotOperationContext } from '@migaia/storage-host/authoring/context'\nimport { snapshotStorageKey } from '@migaia/storage-host/authoring/key'\n\nconst key = ['orders', new Date('2026-10-15T00:00:00Z')]\nconst options = { pageSize: 20 }\nconst stableKey = snapshotStorageKey(key, 'memory')\nconst context = snapshotOperationContext(options)\nkey[0] = 'drafts'\noptions.pageSize = 100\nconsole.log('Captured query key:', JSON.stringify(stableKey))\nconsole.log('Captured page size:', context?.pageSize)\nconsole.log('Query options frozen:', Object.isFrozen(context))"
               },
               {
                 type: 'code',
@@ -76354,7 +76354,7 @@ class CheckoutElement extends HTMLElement {
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { snapshotSyncWriteOptions } from '@migaia/storage-contract'\n\nconst options = snapshotSyncWriteOptions({\n  signal: undefined,\n  timeoutMs: undefined,\n  conflictPolicy: 'replace'\n})\nconsole.log('Synchronous overwrite policy:', options.conflictPolicy)\nconsole.log('Synchronous options frozen:', Object.isFrozen(options))"
+                code: "import { snapshotSyncWriteOptions } from '@migaia/storage-host/authoring/context'\n\nconst options = snapshotSyncWriteOptions({\n  signal: undefined,\n  timeoutMs: undefined,\n  conflictPolicy: 'replace'\n})\nconsole.log('Synchronous overwrite policy:', options.conflictPolicy)\nconsole.log('Synchronous options frozen:', Object.isFrozen(options))"
               },
               {
                 type: 'code',
@@ -77288,7 +77288,7 @@ class CheckoutElement extends HTMLElement {
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { snapshotCodec } from '@migaia/storage-contract'\n\nclass SettingsCodec {\n  name = 'settings-json'\n  output = 'text' as const\n  async encode(value: unknown) {\n    return JSON.stringify(value)\n  }\n  async decode(raw: string) {\n    return JSON.parse(raw)\n  }\n}\nconst codec = snapshotCodec(new SettingsCodec())\nconsole.log('通过检查的编解码器:', codec.name)\nconsole.log('设置文件内容:', await codec.encode({ theme: 'dark' }))"
+                code: "import { snapshotCodec } from '@migaia/storage-host/authoring/codec'\n\nclass SettingsCodec {\n  name = 'settings-json'\n  output = 'text' as const\n  async encode(value: unknown) {\n    return JSON.stringify(value)\n  }\n  async decode(raw: string) {\n    return JSON.parse(raw)\n  }\n}\nconst codec = snapshotCodec(new SettingsCodec())\nconsole.log('通过检查的编解码器:', codec.name)\nconsole.log('设置文件内容:', await codec.encode({ theme: 'dark' }))"
               },
               {
                 type: 'code',
@@ -77508,7 +77508,7 @@ class CheckoutElement extends HTMLElement {
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { snapshotCodec } from '@migaia/storage-contract'\n\nclass SettingsCodec {\n  name = 'settings-json'\n  output = 'text' as const\n  async encode(value: unknown) {\n    return JSON.stringify(value)\n  }\n  async decode(raw: string) {\n    return JSON.parse(raw)\n  }\n}\nconst codec = snapshotCodec(new SettingsCodec())\nconsole.log('Validated codec:', codec.name)\nconsole.log('Settings file contents:', await codec.encode({ theme: 'dark' }))"
+                code: "import { snapshotCodec } from '@migaia/storage-host/authoring/codec'\n\nclass SettingsCodec {\n  name = 'settings-json'\n  output = 'text' as const\n  async encode(value: unknown) {\n    return JSON.stringify(value)\n  }\n  async decode(raw: string) {\n    return JSON.parse(raw)\n  }\n}\nconst codec = snapshotCodec(new SettingsCodec())\nconsole.log('Validated codec:', codec.name)\nconsole.log('Settings file contents:', await codec.encode({ theme: 'dark' }))"
               },
               {
                 type: 'code',

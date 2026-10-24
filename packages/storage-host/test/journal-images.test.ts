@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { lockKey, rdf, vector, ttl, term, type IQuad } from '@migaia/storage-contract'
+import { lockKey } from '../src/authoring/concurrency.js'
+import { rdf, vector, ttl, type IQuad } from '@migaia/storage-contract'
+import { term } from '../src/authoring/rdf.js'
 import { createStorageHost, createOrgId, memoryBackendPlugin } from '../src/index.js'
 import { resolveStorageJournalBinding } from '../src/journal/binding.js'
 import { memoryJournalDeadlineTarget } from '../src/backends/memory-journal-image.js'

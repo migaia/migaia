@@ -1,15 +1,17 @@
 import { RedisCommand, RedisReply } from './constants.js'
 import {
   ConcurrencyHolderState,
-  readConcurrencyLockIdentities,
-  snapshotConcurrencyLockKeys,
-  snapshotConcurrencyLockHoldings,
   type IConcurrencyAttemptContext,
   type IConcurrencyHolder,
   type ILockKey,
   type ILockHolding,
   type IStorageKey
 } from '@migaia/storage-contract'
+import {
+  readConcurrencyLockIdentities,
+  snapshotConcurrencyLockKeys,
+  snapshotConcurrencyLockHoldings
+} from '@migaia/storage-host/authoring/concurrency'
 import { defineJsonCodec } from '@migaia/serialize/codecs/json'
 import { sleep } from '@migaia/utils/promise'
 import { throwIfAborted } from '@migaia/storage-host/authoring/backend'

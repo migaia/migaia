@@ -4,13 +4,12 @@ import { deferred } from '@migaia/utils/promise'
 import {
   vector,
   ttl,
-  lockKey,
-  ConcurrencyPolicy,
   defineConcurrencyPolicy,
   type ILockKey,
   DeleteCountMode,
   type IStorageChange
 } from '@migaia/storage-contract'
+import { lockKey, ConcurrencyPolicy } from '../../src/authoring/concurrency.js'
 import { createStorageHost, createOrgId, memoryBackendPlugin } from '../../src/index.js'
 
 /** Payload declarations remain business schemas while serialize owns the actual field snapshot. */

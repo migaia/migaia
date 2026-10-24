@@ -5,7 +5,8 @@ import { defineEntity } from '@migaia/storage-host/entity'
 import { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'
 import { createStore } from '@migaia/store-light'
 import { persist } from '@migaia/store-persist/light'
-import { kv, lockKey, records, sql, ttl, counter } from '@migaia/storage-contract'
+import { kv, records, sql, ttl, counter } from '@migaia/storage-contract'
+import { lockKey } from '@migaia/storage-host/authoring/concurrency'
 
 /** Each invocation performs exactly one real process phase against its runtime-owned test file. */
 const [mode, path] = process.argv.slice(2)

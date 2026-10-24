@@ -3,12 +3,12 @@ import {
   StorageContractErrorCode,
   TransactionBeforeStage,
   TransactionObservedStage,
-  type createTransactionOwner,
   type ITransactionScope,
   type ITransactionStageObserver,
   type IConcurrencyStageObserver,
   type IOperationContext
 } from '@migaia/storage-contract'
+import { type createTransactionOwner } from '@migaia/storage-host/authoring/transaction'
 import { raceWithAbort, type IAbortSignal } from '@migaia/utils/promise'
 import {
   reportCleanupError,

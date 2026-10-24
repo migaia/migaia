@@ -51,7 +51,7 @@ collections codec，保留 Map/Set。不可 portable 的值在改表前拒绝。
 字节均复制；键使用唯一规范保序编码。
 
 ```ts
-import { sqlFragment } from '@migaia/storage-contract'
+import { sqlFragment } from '@migaia/storage-host/authoring/sql'
 
 await storage.sql`CREATE TABLE users(id INTEGER PRIMARY KEY, name TEXT)`.run()
 await storage.transaction(async (tx) => {

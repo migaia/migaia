@@ -2,15 +2,8 @@ import assert from 'node:assert/strict'
 import { createClientPool } from 'redis'
 import Redis from 'ioredis'
 import { createStorageHost, createOrgId } from '@migaia/storage-host'
-import {
-  kv,
-  records,
-  ttl,
-  counter,
-  vector,
-  durableChangeFeed,
-  encodeOrderedStorageKey
-} from '@migaia/storage-contract'
+import { kv, records, ttl, counter, vector, durableChangeFeed } from '@migaia/storage-contract'
+import { encodeOrderedStorageKey } from '@migaia/storage-host/authoring/key'
 import { ERROR_SOURCE, redisBackendPlugin, type IRedisDriver } from '@migaia/storage-plugin-redis'
 import { nodeRedisDriver } from '@migaia/storage-plugin-redis/node-redis'
 import { ioredisDriver } from '@migaia/storage-plugin-redis/ioredis'

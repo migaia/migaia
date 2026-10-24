@@ -26,12 +26,8 @@ import { qdrantBackendPlugin, type IQdrantHttp } from '@migaia/storage-plugin-qd
 import { fetchHttp } from '@migaia/storage-plugin-qdrant/http'
 import { pgDriver } from '@migaia/storage-plugin-postgres/pg'
 import { cachePlugin } from '../src/index.js'
-import {
-  vector,
-  lockKey,
-  type IStorageChange,
-  type IVectorCollection
-} from '@migaia/storage-contract'
+import { vector, type IStorageChange, type IVectorCollection } from '@migaia/storage-contract'
+import { lockKey } from '@migaia/storage-host/authoring/concurrency'
 
 /** Required service fixtures are injected by the repository's sole native-service launcher. */
 const redisUrl = process.env.MIGAIA_REDIS_URL,

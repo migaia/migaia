@@ -1,6 +1,5 @@
 import {
   kv,
-  provideCapabilities,
   type ICapabilityImpl,
   type ICapabilityInstallPort,
   type ICapabilityStore,
@@ -8,6 +7,7 @@ import {
   type IStorageBase,
   type IKeyValueStore
 } from '@migaia/storage-contract'
+import { provideCapabilities } from '@migaia/storage-host/authoring/capability'
 import type {
   IStoragePluginCore,
   IStorageOrgBinding,

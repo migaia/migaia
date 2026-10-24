@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { assertTransactionOwner } from '@migaia/storage-contract'
+import { assertTransactionOwner } from '../src/authoring/transaction.js'
 import { deferred } from '@migaia/utils/promise'
 import {
   createOrgId,

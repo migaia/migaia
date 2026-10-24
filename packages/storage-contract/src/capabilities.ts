@@ -58,31 +58,3 @@ export const isStorageCapabilities = (value: unknown): value is IStorageCapabili
         candidate.maxValueBytes >= 0))
   )
 }
-
-/** Captures scalar capability facts for a later host route decision. */
-export const snapshotStorageCapabilitiesDetailed = (
-  value: unknown
-): IStorageCapabilitiesInspection => ({
-  value: snapshotStorageCapabilities(value),
-  cause: undefined
-})
-
-/**
- * Detaches capability facts before a host consumer awaits. Legacy secondaryIndexes/changeFeed
- * omissions become false; the pure guard above remains the only scalar validation rule.
- */
-export const snapshotStorageCapabilities = (value: unknown): IStorageCapabilities | undefined => {
-  if (!isStorageCapabilities(value)) return undefined
-  return {
-    syncRead: value.syncRead,
-    binary: value.binary,
-    records: value.records,
-    transactions: value.transactions,
-    iteration: value.iteration,
-    maxValueBytes: value.maxValueBytes,
-    opaqueEntries: value.opaqueEntries,
-    secondaryIndexes: value.secondaryIndexes ?? false,
-    changeFeed: value.changeFeed ?? false,
-    ...(value.batch === undefined ? {} : { batch: value.batch })
-  }
-}

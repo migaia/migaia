@@ -3,11 +3,11 @@ import {
   kv,
   ttl,
   records,
-  lockKey,
   defineStorageCapability,
   implement,
   type IStorageChange
 } from '@migaia/storage-contract'
+import { lockKey } from '../src/authoring/concurrency.js'
 import {
   createStorageHost,
   createOrgId,

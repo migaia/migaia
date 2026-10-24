@@ -36,6 +36,10 @@
     {
       "path": "packages/storage-plugin-sqlite/test/runtime-matrix.mjs",
       "reason": "Direct Node, Bun and Deno consumer of the built SQLite package entries, proving native persistent reopen without a TypeScript loader."
+    },
+    {
+      "path": "packages/storage-host/test/authoring-packed-export-smoke.mjs",
+      "reason": "Existing packed authoring consumer moved from storage-contract; Node invokes this plain-JavaScript fixture directly against extracted dist packages."
     }
   ]
 }

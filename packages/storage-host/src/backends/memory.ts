@@ -5,32 +5,11 @@ import type { IBackendChangeController } from '../core/change-controller.js'
 import {
   StorageContractError,
   StorageContractErrorCode,
-  ConcurrencyPolicy,
   assertStringStorageKey,
-  snapshotStorageKey,
-  snapshotStorageBatchKeys,
-  createStorageBatchKeyCapture,
-  snapshotStorageTtlTarget,
   assertStorageTtlDuration,
-  snapshotStorageCounterIncrement,
-  snapshotSyncWriteOptions,
-  encodeOrderedStorageKey,
-  createTransactionOwner,
-  assertTransactionOwner,
-  runTransactionOperation,
-  useTransactionCapability,
-  snapshotStorageKeyPrefix,
-  snapshotConcurrencyLockKeys,
-  snapshotConcurrencyLockRange,
-  readConcurrencyLockIdentities,
-  lockKey,
   type ITransactionRecordsApi,
   assertTransactionCallback,
   readTransactionConflictPolicy,
-  createTransactionBuilder,
-  runWithConcurrency,
-  createRecordQuery,
-  provideCapabilities,
   implement,
   kv,
   records,
@@ -39,39 +18,20 @@ import {
   vector,
   rdf,
   blob,
-  snapshotStorageBlobPut,
-  snapshotStorageBlobGet,
-  snapshotStorageBlobList,
-  createStorageBlobObject,
-  createStorageBlobBodyReader,
-  prefixStorageOrgKey,
   type ICapabilityStore,
   type ICapabilityImpl,
   type IRecordsApi,
   type IBlobApi,
   type IBlobInfo,
   type IBlobObject,
-  createRdfQuery,
-  snapshotStorageRdfQuad,
-  snapshotStorageRdfPattern,
-  prefixStorageOrgGraph,
-  unprefixStorageOrgGraph,
-  encodeStorageRdfQuad,
   type IQuad,
   type IRdfApi,
   type ITransactionRdfApi,
-  createVectorQuery,
-  compileStorageWhere,
-  compileStorageQueryCondition,
   QueryOperator,
   QueryOperation,
   VectorQueryOriginKind,
   type IVectorQueryOrigin,
   DeleteCountMode,
-  snapshotStorageVectorCollection,
-  snapshotStorageVector,
-  snapshotStorageVectorUpsert,
-  snapshotStorageVectorSearch,
   type IStorageVectorPoint,
   type IStorageVectorConfiguration,
   type IVectorApi,
@@ -114,6 +74,60 @@ import {
   type IConflictPolicy,
   type IKeyRange
 } from '@migaia/storage-contract'
+import {
+  ConcurrencyPolicy,
+  snapshotConcurrencyLockKeys,
+  snapshotConcurrencyLockRange,
+  readConcurrencyLockIdentities,
+  lockKey,
+  runWithConcurrency
+} from '../authoring/concurrency.js'
+import {
+  snapshotStorageKey,
+  snapshotStorageBatchKeys,
+  createStorageBatchKeyCapture,
+  encodeOrderedStorageKey,
+  snapshotStorageKeyPrefix,
+  prefixStorageOrgKey
+} from '../authoring/key.js'
+import { snapshotStorageTtlTarget } from '../authoring/ttl.js'
+import { snapshotStorageCounterIncrement } from '../authoring/counter.js'
+import { snapshotSyncWriteOptions } from '../authoring/context.js'
+import {
+  createTransactionOwner,
+  assertTransactionOwner,
+  runTransactionOperation,
+  useTransactionCapability,
+  createTransactionBuilder
+} from '../authoring/transaction.js'
+import {
+  createRecordQuery,
+  createRdfQuery,
+  createVectorQuery,
+  compileStorageWhere,
+  compileStorageQueryCondition
+} from '../authoring/query.js'
+import { provideCapabilities } from '../authoring/capability.js'
+import {
+  snapshotStorageBlobPut,
+  snapshotStorageBlobGet,
+  snapshotStorageBlobList,
+  createStorageBlobObject,
+  createStorageBlobBodyReader
+} from '../authoring/blob.js'
+import {
+  snapshotStorageRdfQuad,
+  snapshotStorageRdfPattern,
+  prefixStorageOrgGraph,
+  unprefixStorageOrgGraph,
+  encodeStorageRdfQuad
+} from '../authoring/rdf.js'
+import {
+  snapshotStorageVectorCollection,
+  snapshotStorageVector,
+  snapshotStorageVectorUpsert,
+  snapshotStorageVectorSearch
+} from '../authoring/vector.js'
 import { parseObjectPath } from '@migaia/utils/object-path'
 import { rankMemoryVectors, recommendStorageVector } from './vector-core.js'
 import { createMemoryRdfIndex, memoryRdfKeys, type IMemoryRdfKeys } from './rdf-core.js'

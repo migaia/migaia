@@ -1578,7 +1578,7 @@ export const storageContractReference: ILibraryReference = {
             '正安全整数维度，已给定向量必须具有精确相同的分量数量。'
           ),
           example:
-            "import { snapshotStorageVectorCollection } from '@migaia/storage-contract'\nconst schema = snapshotStorageVectorCollection('docs', {\n  dimensions: 2, metric: 'cosine'\n})"
+            "import { snapshotStorageVectorCollection } from '@migaia/storage-host/authoring/vector'\nconst schema = snapshotStorageVectorCollection('docs', {\n  dimensions: 2, metric: 'cosine'\n})"
         },
         metric: {
           summary: t(
@@ -1598,7 +1598,7 @@ export const storageContractReference: ILibraryReference = {
             '选择与实际原生集合提供的模式一致的度量。'
           ),
           example:
-            "import { snapshotStorageVectorCollection } from '@migaia/storage-contract'\nconst schema = snapshotStorageVectorCollection('docs', {\n  dimensions: 2, metric: 'cosine'\n})"
+            "import { snapshotStorageVectorCollection } from '@migaia/storage-host/authoring/vector'\nconst schema = snapshotStorageVectorCollection('docs', {\n  dimensions: 2, metric: 'cosine'\n})"
         }
       },
       purpose: t(
@@ -1633,7 +1633,7 @@ export const storageContractReference: ILibraryReference = {
             '省略时捕获有限稠密分量，不比较具体维度。'
           ),
           example:
-            "import { snapshotStorageVector } from '@migaia/storage-contract'\nconst direction = snapshotStorageVector([1, 0], { dimensions: 2, metric: 'cosine' })"
+            "import { snapshotStorageVector } from '@migaia/storage-host/authoring/vector'\nconst direction = snapshotStorageVector([1, 0], { dimensions: 2, metric: 'cosine' })"
         },
         metric: {
           summary: t(
@@ -1654,7 +1654,7 @@ export const storageContractReference: ILibraryReference = {
             '选择与实际原生集合提供的模式一致的度量。'
           ),
           example:
-            "import { snapshotStorageVector } from '@migaia/storage-contract'\nconst direction = snapshotStorageVector([1, 0], { dimensions: 2, metric: 'cosine' })"
+            "import { snapshotStorageVector } from '@migaia/storage-host/authoring/vector'\nconst direction = snapshotStorageVector([1, 0], { dimensions: 2, metric: 'cosine' })"
         }
       },
       purpose: t(
@@ -3823,7 +3823,7 @@ if (snapshot) console.log(await snapshot.store.get('theme'))`
             '可用时缺省使用原生 Symbol.asyncDispose 身份。'
           ),
           example:
-            "import { snapshotStorageBaseDetailed } from '@migaia/storage-contract'\nfunction inspectResource(candidate: unknown, asyncDisposeKey: typeof Symbol.asyncDispose) {\n  return snapshotStorageBaseDetailed(candidate, { asyncDisposeKey })\n}"
+            "import { snapshotStorageBaseDetailed } from '@migaia/storage-host/authoring/store'\nfunction inspectResource(candidate: unknown, asyncDisposeKey: typeof Symbol.asyncDispose) {\n  return snapshotStorageBaseDetailed(candidate, { asyncDisposeKey })\n}"
         }
       },
       purpose: t(
@@ -4446,7 +4446,7 @@ console.log(candidate.name, candidate.output)`
         }
       },
       example:
-        "import { term } from '@migaia/storage-contract'\nexport const subject = term.iri('urn:example:subject')",
+        "import { term } from '@migaia/storage-host/authoring/rdf'\nexport const subject = term.iri('urn:example:subject')",
       scenarios: [
         {
           en: 'Construct a canonical RDF value before passing it to native ground storage.',
@@ -4517,7 +4517,7 @@ console.log(candidate.name, candidate.output)`
         }
       },
       example:
-        "import { term } from '@migaia/storage-contract'\nexport const graph = term.defaultGraph",
+        "import { term } from '@migaia/storage-host/authoring/rdf'\nexport const graph = term.defaultGraph",
       scenarios: [
         {
           en: 'Construct a canonical RDF value before passing it to native ground storage.',
@@ -4565,7 +4565,7 @@ console.log(candidate.name, candidate.output)`
         }
       },
       example:
-        "import { term } from '@migaia/storage-contract'\nexport const value = term.literal('bonjour', { language: 'FR' })",
+        "import { term } from '@migaia/storage-host/authoring/rdf'\nexport const value = term.literal('bonjour', { language: 'FR' })",
       scenarios: [
         {
           en: 'Construct a canonical RDF value before passing it to native ground storage.',
@@ -4605,7 +4605,7 @@ console.log(candidate.name, candidate.output)`
         }
       },
       example:
-        "import { term, snapshotStorageRdfQuad } from '@migaia/storage-contract'\nexport const quad = snapshotStorageRdfQuad({\n  subject: term.iri('urn:example:s'), predicate: term.iri('urn:example:p'),\n  object: term.literal('ready'), graph: term.defaultGraph\n}, undefined)",
+        "import { term, snapshotStorageRdfQuad } from '@migaia/storage-host/authoring/rdf'\nexport const quad = snapshotStorageRdfQuad({\n  subject: term.iri('urn:example:s'), predicate: term.iri('urn:example:p'),\n  object: term.literal('ready'), graph: term.defaultGraph\n}, undefined)",
       scenarios: [
         {
           en: 'Construct a canonical RDF value before passing it to native ground storage.',
@@ -4684,7 +4684,7 @@ console.log(candidate.name, candidate.output)`
         }
       },
       example:
-        "import { lockKey } from '@migaia/storage-contract'\nexport const target = lockKey.vector('documents', 'first')",
+        "import { lockKey } from '@migaia/storage-host/authoring/concurrency'\nexport const target = lockKey.vector('documents', 'first')",
       scenarios: [
         {
           en: 'Address expiry on the same native channel that owns the underlying entry.',
@@ -4868,7 +4868,7 @@ console.log(candidate.name, candidate.output)`
         }
       ],
       example:
-        "import { snapshotStorageBatchKeys } from '@migaia/storage-contract'\nconsole.log(snapshotStorageBatchKeys(['theme', ['users', 1]], undefined))"
+        "import { snapshotStorageBatchKeys } from '@migaia/storage-host/authoring/key'\nconsole.log(snapshotStorageBatchKeys(['theme', ['users', 1]], undefined))"
     },
     IRecordsApi: {
       summary: t(
@@ -5012,7 +5012,7 @@ console.log(candidate.name, candidate.output)`
         }
       },
       example:
-        "import { snapshotStorageWhere } from '@migaia/storage-contract'\nexport const condition = snapshotStorageWhere({ category: 'docs', score: { gte: 3 } })",
+        "import { snapshotStorageWhere } from '@migaia/storage-host/authoring/query'\nexport const condition = snapshotStorageWhere({ category: 'docs', score: { gte: 3 } })",
       scenarios: [
         {
           en: 'Capture a portable payload condition once before deciding faithful native pushdown.',
@@ -6694,7 +6694,7 @@ console.log(candidate.name, candidate.output)`
         }
       },
       example:
-        "import { createStorageIteratorLifetime } from '@migaia/storage-contract'\nconst life = createStorageIteratorLifetime<string>({ close: async () => undefined, report: error => console.error(error) })\nconsole.log(await life.advance(async () => ({ done: false, value: 'ready' })))\nawait life.dispose()",
+        "import { createStorageIteratorLifetime } from '@migaia/storage-host/authoring/resource'\nconst life = createStorageIteratorLifetime<string>({ close: async () => undefined, report: error => console.error(error) })\nconsole.log(await life.advance(async () => ({ done: false, value: 'ready' })))\nawait life.dispose()",
       scenarios: [
         {
           en: 'Backend authors drain accepted iterator work before releasing an existing native cursor.',
@@ -6764,7 +6764,7 @@ console.log(candidate.name, candidate.output)`
         }
       ],
       example:
-        "import { snapshotStorageBaseDetailed } from '@migaia/storage-contract'\nexport function inspect(value: unknown) {\n  const admission = snapshotStorageBaseDetailed(value)\n  if (admission.valid) console.log(admission.backend)\n}"
+        "import { snapshotStorageBaseDetailed } from '@migaia/storage-host/authoring/store'\nexport function inspect(value: unknown) {\n  const admission = snapshotStorageBaseDetailed(value)\n  if (admission.valid) console.log(admission.backend)\n}"
     },
     IBackendStageBindings: {
       summary: t(
@@ -7146,7 +7146,7 @@ console.log(candidate.name, candidate.output)`
             zh: '仅符合原键前缀语义时返回真值。'
           },
           example:
-            "import { snapshotStorageKeyPrefix } from '@migaia/storage-contract'\nconst prefix = snapshotStorageKeyPrefix(['users'], undefined)\nconsole.log(prefix.matches(['users', 1]))"
+            "import { snapshotStorageKeyPrefix } from '@migaia/storage-host/authoring/key'\nconst prefix = snapshotStorageKeyPrefix(['users'], undefined)\nconsole.log(prefix.matches(['users', 1]))"
         }
       },
       scenarios: [
@@ -7156,7 +7156,7 @@ console.log(candidate.name, candidate.output)`
         }
       ],
       example:
-        "import { snapshotStorageKeyPrefix } from '@migaia/storage-contract'\nconst prefix = snapshotStorageKeyPrefix(['users'], undefined)\nconsole.log(prefix.matches(['users', 1]))"
+        "import { snapshotStorageKeyPrefix } from '@migaia/storage-host/authoring/key'\nconst prefix = snapshotStorageKeyPrefix(['users'], undefined)\nconsole.log(prefix.matches(['users', 1]))"
     },
     ITransactionCapabilityView: {
       summary: t(
@@ -7894,7 +7894,7 @@ console.log(candidate.name, candidate.output)`
             zh: '返回由共享编译器拥有的真实变量片段。'
           },
           example:
-            "import { sparqlFragment, term, type ISparqlApi } from '@migaia/storage-contract'\nexport async function read(api: ISparqlApi) {\n  const subject = api.var('subject')\n  const pattern = api.join([sparqlFragment`${subject} ?predicate ?object`], api.empty)\n  console.log(await api`SELECT ?subject WHERE { ${pattern} }`.select())\n  console.log(await api`ASK { ${pattern} }`.ask())\n  console.log(await api`CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }`.construct())\n  await api`INSERT DATA { ${term.iri('urn:example:s')} ${term.iri('urn:example:p')} ${term.literal('ready')} }`.update()\n}"
+            "import { sparqlFragment } from '@migaia/storage-host/authoring/sparql'\nimport { term } from '@migaia/storage-host/authoring/rdf'\nimport { type ISparqlApi } from '@migaia/storage-contract'\nexport async function read(api: ISparqlApi) {\n  const subject = api.var('subject')\n  const pattern = api.join([sparqlFragment`${subject} ?predicate ?object`], api.empty)\n  console.log(await api`SELECT ?subject WHERE { ${pattern} }`.select())\n  console.log(await api`ASK { ${pattern} }`.ask())\n  console.log(await api`CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }`.construct())\n  await api`INSERT DATA { ${term.iri('urn:example:s')} ${term.iri('urn:example:p')} ${term.literal('ready')} }`.update()\n}"
         },
         join: {
           summary: {
@@ -7916,7 +7916,7 @@ console.log(candidate.name, candidate.output)`
             zh: '返回保留原项身份的真实连接片段。'
           },
           example:
-            "import { sparqlFragment, term, type ISparqlApi } from '@migaia/storage-contract'\nexport async function read(api: ISparqlApi) {\n  const subject = api.var('subject')\n  const pattern = api.join([sparqlFragment`${subject} ?predicate ?object`], api.empty)\n  console.log(await api`SELECT ?subject WHERE { ${pattern} }`.select())\n  console.log(await api`ASK { ${pattern} }`.ask())\n  console.log(await api`CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }`.construct())\n  await api`INSERT DATA { ${term.iri('urn:example:s')} ${term.iri('urn:example:p')} ${term.literal('ready')} }`.update()\n}"
+            "import { sparqlFragment } from '@migaia/storage-host/authoring/sparql'\nimport { term } from '@migaia/storage-host/authoring/rdf'\nimport { type ISparqlApi } from '@migaia/storage-contract'\nexport async function read(api: ISparqlApi) {\n  const subject = api.var('subject')\n  const pattern = api.join([sparqlFragment`${subject} ?predicate ?object`], api.empty)\n  console.log(await api`SELECT ?subject WHERE { ${pattern} }`.select())\n  console.log(await api`ASK { ${pattern} }`.ask())\n  console.log(await api`CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }`.construct())\n  await api`INSERT DATA { ${term.iri('urn:example:s')} ${term.iri('urn:example:p')} ${term.literal('ready')} }`.update()\n}"
         },
         empty: {
           summary: {
@@ -7948,7 +7948,7 @@ console.log(candidate.name, candidate.output)`
             zh: '返回由共享编译器拥有的真实变量片段。'
           },
           example:
-            "import { sparqlFragment, term, type ISparqlApi } from '@migaia/storage-contract'\nexport async function read(api: ISparqlApi) {\n  const subject = api.var('subject')\n  const pattern = api.join([sparqlFragment`${subject} ?predicate ?object`], api.empty)\n  console.log(await api`SELECT ?subject WHERE { ${pattern} }`.select())\n  console.log(await api`ASK { ${pattern} }`.ask())\n  console.log(await api`CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }`.construct())\n  await api`INSERT DATA { ${term.iri('urn:example:s')} ${term.iri('urn:example:p')} ${term.literal('ready')} }`.update()\n}"
+            "import { sparqlFragment } from '@migaia/storage-host/authoring/sparql'\nimport { term } from '@migaia/storage-host/authoring/rdf'\nimport { type ISparqlApi } from '@migaia/storage-contract'\nexport async function read(api: ISparqlApi) {\n  const subject = api.var('subject')\n  const pattern = api.join([sparqlFragment`${subject} ?predicate ?object`], api.empty)\n  console.log(await api`SELECT ?subject WHERE { ${pattern} }`.select())\n  console.log(await api`ASK { ${pattern} }`.ask())\n  console.log(await api`CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }`.construct())\n  await api`INSERT DATA { ${term.iri('urn:example:s')} ${term.iri('urn:example:p')} ${term.literal('ready')} }`.update()\n}"
         },
         join: {
           summary: {
@@ -7970,7 +7970,7 @@ console.log(candidate.name, candidate.output)`
             zh: '返回保留原项身份的真实连接片段。'
           },
           example:
-            "import { sparqlFragment, term, type ISparqlApi } from '@migaia/storage-contract'\nexport async function read(api: ISparqlApi) {\n  const subject = api.var('subject')\n  const pattern = api.join([sparqlFragment`${subject} ?predicate ?object`], api.empty)\n  console.log(await api`SELECT ?subject WHERE { ${pattern} }`.select())\n  console.log(await api`ASK { ${pattern} }`.ask())\n  console.log(await api`CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }`.construct())\n  await api`INSERT DATA { ${term.iri('urn:example:s')} ${term.iri('urn:example:p')} ${term.literal('ready')} }`.update()\n}"
+            "import { sparqlFragment } from '@migaia/storage-host/authoring/sparql'\nimport { term } from '@migaia/storage-host/authoring/rdf'\nimport { type ISparqlApi } from '@migaia/storage-contract'\nexport async function read(api: ISparqlApi) {\n  const subject = api.var('subject')\n  const pattern = api.join([sparqlFragment`${subject} ?predicate ?object`], api.empty)\n  console.log(await api`SELECT ?subject WHERE { ${pattern} }`.select())\n  console.log(await api`ASK { ${pattern} }`.ask())\n  console.log(await api`CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }`.construct())\n  await api`INSERT DATA { ${term.iri('urn:example:s')} ${term.iri('urn:example:p')} ${term.literal('ready')} }`.update()\n}"
         },
         empty: {
           summary: {
@@ -7980,7 +7980,7 @@ console.log(candidate.name, candidate.output)`
         }
       },
       example:
-        "import { sparqlFragment, term, type ISparqlApi } from '@migaia/storage-contract'\nexport async function read(api: ISparqlApi) {\n  const subject = api.var('subject')\n  const pattern = api.join([sparqlFragment`${subject} ?predicate ?object`], api.empty)\n  console.log(await api`SELECT ?subject WHERE { ${pattern} }`.select())\n  console.log(await api`ASK { ${pattern} }`.ask())\n  console.log(await api`CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }`.construct())\n  await api`INSERT DATA { ${term.iri('urn:example:s')} ${term.iri('urn:example:p')} ${term.literal('ready')} }`.update()\n}",
+        "import { sparqlFragment } from '@migaia/storage-host/authoring/sparql'\nimport { term } from '@migaia/storage-host/authoring/rdf'\nimport { type ISparqlApi } from '@migaia/storage-contract'\nexport async function read(api: ISparqlApi) {\n  const subject = api.var('subject')\n  const pattern = api.join([sparqlFragment`${subject} ?predicate ?object`], api.empty)\n  console.log(await api`SELECT ?subject WHERE { ${pattern} }`.select())\n  console.log(await api`ASK { ${pattern} }`.ask())\n  console.log(await api`CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }`.construct())\n  await api`INSERT DATA { ${term.iri('urn:example:s')} ${term.iri('urn:example:p')} ${term.literal('ready')} }`.update()\n}",
       scenarios: [
         {
           en: 'Compose native queries from RDF terms and authentic fragments without string interpolation of grammar.',
@@ -8264,7 +8264,7 @@ console.log(candidate.name, candidate.output)`
         }
       ],
       example:
-        "import { snapshotStorageVectorUpsert } from '@migaia/storage-contract'\nexport const points = snapshotStorageVectorUpsert([\n  { id: 'first', vector: [1, 0], payload: { category: 'docs' } }\n], { dimensions: 2, metric: 'dot' })"
+        "import { snapshotStorageVectorUpsert } from '@migaia/storage-host/authoring/vector'\nexport const points = snapshotStorageVectorUpsert([\n  { id: 'first', vector: [1, 0], payload: { category: 'docs' } }\n], { dimensions: 2, metric: 'dot' })"
     },
     IVectorFilter: {
       summary: t(
@@ -8328,7 +8328,7 @@ console.log(candidate.name, candidate.output)`
         }
       ],
       example:
-        "import { snapshotStorageVectorFilter } from '@migaia/storage-contract'\nexport const filter = snapshotStorageVectorFilter({ field: 'category', eq: 'docs' })"
+        "import { snapshotStorageVectorFilter } from '@migaia/storage-host/authoring/vector'\nexport const filter = snapshotStorageVectorFilter({ field: 'category', eq: 'docs' })"
     },
     IRdfApi: {
       summary: t(
@@ -9115,7 +9115,7 @@ console.log(candidate.name, candidate.output)`
         }
       ],
       example:
-        "import { ConcurrencyPolicy } from '@migaia/storage-contract'\nexport const policy = ConcurrencyPolicy.wait({ timeoutMs: 1000 })"
+        "import { ConcurrencyPolicy } from '@migaia/storage-host/authoring/concurrency'\nexport const policy = ConcurrencyPolicy.wait({ timeoutMs: 1000 })"
     },
     ITransactionOptions: {
       summary: t(
@@ -9170,7 +9170,7 @@ console.log(candidate.name, candidate.output)`
             zh: '返回新构造器，此时不启动原生操作或计时预算。'
           },
           example:
-            "import { createTransactionBuilder, lockKey, type IRecordStore } from '@migaia/storage-contract'\nexport async function save(store: IRecordStore) {\n  return createTransactionBuilder(store).lock(lockKey.text('theme')).timeout(1000).run(async scope => {\n    await scope.set('theme', 'dark')\n  })\n}"
+            "import { createTransactionBuilder } from '@migaia/storage-host/authoring/transaction'\nimport { lockKey } from '@migaia/storage-host/authoring/concurrency'\nimport { type IRecordStore } from '@migaia/storage-contract'\nexport async function save(store: IRecordStore) {\n  return createTransactionBuilder(store).lock(lockKey.text('theme')).timeout(1000).run(async scope => {\n    await scope.set('theme', 'dark')\n  })\n}"
         },
         signal: {
           summary: {
@@ -9188,7 +9188,7 @@ console.log(candidate.name, candidate.output)`
             zh: '返回保留原作用域与方法增强的新构造器。'
           },
           example:
-            "import { createTransactionBuilder, lockKey, type IRecordStore } from '@migaia/storage-contract'\nexport async function save(store: IRecordStore) {\n  return createTransactionBuilder(store).lock(lockKey.text('theme')).timeout(1000).run(async scope => {\n    await scope.set('theme', 'dark')\n  })\n}"
+            "import { createTransactionBuilder } from '@migaia/storage-host/authoring/transaction'\nimport { lockKey } from '@migaia/storage-host/authoring/concurrency'\nimport { type IRecordStore } from '@migaia/storage-contract'\nexport async function save(store: IRecordStore) {\n  return createTransactionBuilder(store).lock(lockKey.text('theme')).timeout(1000).run(async scope => {\n    await scope.set('theme', 'dark')\n  })\n}"
         },
         timeout: {
           summary: {
@@ -9206,7 +9206,7 @@ console.log(candidate.name, candidate.output)`
             zh: '返回新构造器，配置本身不消耗执行预算。'
           },
           example:
-            "import { createTransactionBuilder, lockKey, type IRecordStore } from '@migaia/storage-contract'\nexport async function save(store: IRecordStore) {\n  return createTransactionBuilder(store).lock(lockKey.text('theme')).timeout(1000).run(async scope => {\n    await scope.set('theme', 'dark')\n  })\n}"
+            "import { createTransactionBuilder } from '@migaia/storage-host/authoring/transaction'\nimport { lockKey } from '@migaia/storage-host/authoring/concurrency'\nimport { type IRecordStore } from '@migaia/storage-contract'\nexport async function save(store: IRecordStore) {\n  return createTransactionBuilder(store).lock(lockKey.text('theme')).timeout(1000).run(async scope => {\n    await scope.set('theme', 'dark')\n  })\n}"
         },
         lock: {
           summary: {
@@ -9228,11 +9228,11 @@ console.log(candidate.name, candidate.output)`
             zh: '返回保留精确原生作用域的已声明锁不可变构造器。'
           },
           example:
-            "import { createTransactionBuilder, lockKey, type IRecordStore } from '@migaia/storage-contract'\nexport async function save(store: IRecordStore) {\n  return createTransactionBuilder(store).lock(lockKey.text('theme')).timeout(1000).run(async scope => {\n    await scope.set('theme', 'dark')\n  })\n}"
+            "import { createTransactionBuilder } from '@migaia/storage-host/authoring/transaction'\nimport { lockKey } from '@migaia/storage-host/authoring/concurrency'\nimport { type IRecordStore } from '@migaia/storage-contract'\nexport async function save(store: IRecordStore) {\n  return createTransactionBuilder(store).lock(lockKey.text('theme')).timeout(1000).run(async scope => {\n    await scope.set('theme', 'dark')\n  })\n}"
         }
       },
       example:
-        "import { createTransactionBuilder, lockKey, type IRecordStore } from '@migaia/storage-contract'\nexport async function save(store: IRecordStore) {\n  return createTransactionBuilder(store).lock(lockKey.text('theme')).timeout(1000).run(async scope => {\n    await scope.set('theme', 'dark')\n  })\n}",
+        "import { createTransactionBuilder } from '@migaia/storage-host/authoring/transaction'\nimport { lockKey } from '@migaia/storage-host/authoring/concurrency'\nimport { type IRecordStore } from '@migaia/storage-contract'\nexport async function save(store: IRecordStore) {\n  return createTransactionBuilder(store).lock(lockKey.text('theme')).timeout(1000).run(async scope => {\n    await scope.set('theme', 'dark')\n  })\n}",
       scenarios: [
         {
           en: 'Declare the application lock identities before starting the original native transaction.',
@@ -9262,7 +9262,7 @@ console.log(candidate.name, candidate.output)`
             zh: '返回新构造器，此时不启动原生操作或计时预算。'
           },
           example:
-            "import { createTransactionBuilder, lockKey, type IRecordStore } from '@migaia/storage-contract'\nexport async function save(store: IRecordStore) {\n  return createTransactionBuilder(store).lock(lockKey.text('theme')).timeout(1000).run(async scope => {\n    await scope.set('theme', 'dark')\n  })\n}"
+            "import { createTransactionBuilder } from '@migaia/storage-host/authoring/transaction'\nimport { lockKey } from '@migaia/storage-host/authoring/concurrency'\nimport { type IRecordStore } from '@migaia/storage-contract'\nexport async function save(store: IRecordStore) {\n  return createTransactionBuilder(store).lock(lockKey.text('theme')).timeout(1000).run(async scope => {\n    await scope.set('theme', 'dark')\n  })\n}"
         },
         signal: {
           summary: {
@@ -9280,7 +9280,7 @@ console.log(candidate.name, candidate.output)`
             zh: '返回保留原作用域与方法增强的新构造器。'
           },
           example:
-            "import { createTransactionBuilder, lockKey, type IRecordStore } from '@migaia/storage-contract'\nexport async function save(store: IRecordStore) {\n  return createTransactionBuilder(store).lock(lockKey.text('theme')).timeout(1000).run(async scope => {\n    await scope.set('theme', 'dark')\n  })\n}"
+            "import { createTransactionBuilder } from '@migaia/storage-host/authoring/transaction'\nimport { lockKey } from '@migaia/storage-host/authoring/concurrency'\nimport { type IRecordStore } from '@migaia/storage-contract'\nexport async function save(store: IRecordStore) {\n  return createTransactionBuilder(store).lock(lockKey.text('theme')).timeout(1000).run(async scope => {\n    await scope.set('theme', 'dark')\n  })\n}"
         },
         timeout: {
           summary: {
@@ -9298,7 +9298,7 @@ console.log(candidate.name, candidate.output)`
             zh: '返回新构造器，配置本身不消耗执行预算。'
           },
           example:
-            "import { createTransactionBuilder, lockKey, type IRecordStore } from '@migaia/storage-contract'\nexport async function save(store: IRecordStore) {\n  return createTransactionBuilder(store).lock(lockKey.text('theme')).timeout(1000).run(async scope => {\n    await scope.set('theme', 'dark')\n  })\n}"
+            "import { createTransactionBuilder } from '@migaia/storage-host/authoring/transaction'\nimport { lockKey } from '@migaia/storage-host/authoring/concurrency'\nimport { type IRecordStore } from '@migaia/storage-contract'\nexport async function save(store: IRecordStore) {\n  return createTransactionBuilder(store).lock(lockKey.text('theme')).timeout(1000).run(async scope => {\n    await scope.set('theme', 'dark')\n  })\n}"
         },
         lock: {
           summary: {
@@ -9320,7 +9320,7 @@ console.log(candidate.name, candidate.output)`
             zh: '返回保留精确原生作用域的已声明锁不可变构造器。'
           },
           example:
-            "import { createTransactionBuilder, lockKey, type IRecordStore } from '@migaia/storage-contract'\nexport async function save(store: IRecordStore) {\n  return createTransactionBuilder(store).lock(lockKey.text('theme')).timeout(1000).run(async scope => {\n    await scope.set('theme', 'dark')\n  })\n}"
+            "import { createTransactionBuilder } from '@migaia/storage-host/authoring/transaction'\nimport { lockKey } from '@migaia/storage-host/authoring/concurrency'\nimport { type IRecordStore } from '@migaia/storage-contract'\nexport async function save(store: IRecordStore) {\n  return createTransactionBuilder(store).lock(lockKey.text('theme')).timeout(1000).run(async scope => {\n    await scope.set('theme', 'dark')\n  })\n}"
         },
         run: {
           summary: {
@@ -9338,11 +9338,11 @@ console.log(candidate.name, candidate.output)`
             zh: '返回原事务结果及等待后的回调值，均在原生工作真实结算后完成。'
           },
           example:
-            "import { createTransactionBuilder, lockKey, type IRecordStore } from '@migaia/storage-contract'\nexport async function save(store: IRecordStore) {\n  return createTransactionBuilder(store).lock(lockKey.text('theme')).timeout(1000).run(async scope => {\n    await scope.set('theme', 'dark')\n  })\n}"
+            "import { createTransactionBuilder } from '@migaia/storage-host/authoring/transaction'\nimport { lockKey } from '@migaia/storage-host/authoring/concurrency'\nimport { type IRecordStore } from '@migaia/storage-contract'\nexport async function save(store: IRecordStore) {\n  return createTransactionBuilder(store).lock(lockKey.text('theme')).timeout(1000).run(async scope => {\n    await scope.set('theme', 'dark')\n  })\n}"
         }
       },
       example:
-        "import { createTransactionBuilder, lockKey, type IRecordStore } from '@migaia/storage-contract'\nexport async function save(store: IRecordStore) {\n  return createTransactionBuilder(store).lock(lockKey.text('theme')).timeout(1000).run(async scope => {\n    await scope.set('theme', 'dark')\n  })\n}",
+        "import { createTransactionBuilder } from '@migaia/storage-host/authoring/transaction'\nimport { lockKey } from '@migaia/storage-host/authoring/concurrency'\nimport { type IRecordStore } from '@migaia/storage-contract'\nexport async function save(store: IRecordStore) {\n  return createTransactionBuilder(store).lock(lockKey.text('theme')).timeout(1000).run(async scope => {\n    await scope.set('theme', 'dark')\n  })\n}",
       scenarios: [
         {
           en: 'Declare the application lock identities before starting the original native transaction.',
@@ -9372,7 +9372,7 @@ console.log(candidate.name, candidate.output)`
             zh: '返回新构造器，此时不启动原生操作或计时预算。'
           },
           example:
-            "import { createTransactionBuilder, type IRecordStore } from '@migaia/storage-contract'\nexport async function save(store: IRecordStore) {\n  return createTransactionBuilder(store, undefined, undefined, { mode: 'optimistic' })\n    .timeout(1000).run(scope => scope.set('theme', 'dark'))\n}"
+            "import { createTransactionBuilder } from '@migaia/storage-host/authoring/transaction'\nimport { type IRecordStore } from '@migaia/storage-contract'\nexport async function save(store: IRecordStore) {\n  return createTransactionBuilder(store, undefined, undefined, { mode: 'optimistic' })\n    .timeout(1000).run(scope => scope.set('theme', 'dark'))\n}"
         },
         signal: {
           summary: {
@@ -9390,7 +9390,7 @@ console.log(candidate.name, candidate.output)`
             zh: '返回保留原作用域与方法增强的新构造器。'
           },
           example:
-            "import { createTransactionBuilder, type IRecordStore } from '@migaia/storage-contract'\nexport async function save(store: IRecordStore) {\n  return createTransactionBuilder(store, undefined, undefined, { mode: 'optimistic' })\n    .timeout(1000).run(scope => scope.set('theme', 'dark'))\n}"
+            "import { createTransactionBuilder } from '@migaia/storage-host/authoring/transaction'\nimport { type IRecordStore } from '@migaia/storage-contract'\nexport async function save(store: IRecordStore) {\n  return createTransactionBuilder(store, undefined, undefined, { mode: 'optimistic' })\n    .timeout(1000).run(scope => scope.set('theme', 'dark'))\n}"
         },
         timeout: {
           summary: {
@@ -9408,7 +9408,7 @@ console.log(candidate.name, candidate.output)`
             zh: '返回新构造器，配置本身不消耗执行预算。'
           },
           example:
-            "import { createTransactionBuilder, type IRecordStore } from '@migaia/storage-contract'\nexport async function save(store: IRecordStore) {\n  return createTransactionBuilder(store, undefined, undefined, { mode: 'optimistic' })\n    .timeout(1000).run(scope => scope.set('theme', 'dark'))\n}"
+            "import { createTransactionBuilder } from '@migaia/storage-host/authoring/transaction'\nimport { type IRecordStore } from '@migaia/storage-contract'\nexport async function save(store: IRecordStore) {\n  return createTransactionBuilder(store, undefined, undefined, { mode: 'optimistic' })\n    .timeout(1000).run(scope => scope.set('theme', 'dark'))\n}"
         },
         run: {
           summary: {
@@ -9426,11 +9426,11 @@ console.log(candidate.name, candidate.output)`
             zh: '返回原事务结果及等待后的回调值，均在原生工作真实结算后完成。'
           },
           example:
-            "import { createTransactionBuilder, type IRecordStore } from '@migaia/storage-contract'\nexport async function save(store: IRecordStore) {\n  return createTransactionBuilder(store, undefined, undefined, { mode: 'optimistic' })\n    .timeout(1000).run(scope => scope.set('theme', 'dark'))\n}"
+            "import { createTransactionBuilder } from '@migaia/storage-host/authoring/transaction'\nimport { type IRecordStore } from '@migaia/storage-contract'\nexport async function save(store: IRecordStore) {\n  return createTransactionBuilder(store, undefined, undefined, { mode: 'optimistic' })\n    .timeout(1000).run(scope => scope.set('theme', 'dark'))\n}"
         }
       },
       example:
-        "import { createTransactionBuilder, type IRecordStore } from '@migaia/storage-contract'\nexport async function save(store: IRecordStore) {\n  return createTransactionBuilder(store, undefined, undefined, { mode: 'optimistic' })\n    .timeout(1000).run(scope => scope.set('theme', 'dark'))\n}",
+        "import { createTransactionBuilder } from '@migaia/storage-host/authoring/transaction'\nimport { type IRecordStore } from '@migaia/storage-contract'\nexport async function save(store: IRecordStore) {\n  return createTransactionBuilder(store, undefined, undefined, { mode: 'optimistic' })\n    .timeout(1000).run(scope => scope.set('theme', 'dark'))\n}",
       scenarios: [
         {
           en: 'Execute a native atomic optimistic backend without inventing a key-lock domain.',
@@ -10406,7 +10406,7 @@ if (admission.valid) await Reflect.apply(admission.dispose, admission.receiver, 
         }
       ],
       example:
-        "import { snapshotOperationContext } from '@migaia/storage-contract'\nexport const context = snapshotOperationContext({ timeoutMs: 1000, pageSize: 64 })"
+        "import { snapshotOperationContext } from '@migaia/storage-host/authoring/context'\nexport const context = snapshotOperationContext({ timeoutMs: 1000, pageSize: 64 })"
     },
     IOperationContextSnapshot: {
       summary: t(

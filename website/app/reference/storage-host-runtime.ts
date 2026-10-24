@@ -198,7 +198,8 @@ const memoryOptions: Readonly<Record<string, IMemberDoc>> = {
       'Omitted: resolve the original owner policy, ultimately the contract default.',
       '省略时沿原拥有者解析策略，最终使用契约缺省策略。'
     ),
-    example: `import { ConcurrencyPolicy } from '@migaia/storage-contract'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nawait using host = await createStorageHost({\n  plugins: [memoryBackendPlugin({ concurrency: ConcurrencyPolicy.wait() })]\n})\nawait host.backend('memory').set('theme', 'dark')`
+    example:
+      "import { ConcurrencyPolicy } from '@migaia/storage-host/authoring/concurrency'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nawait using host = await createStorageHost({\n  plugins: [memoryBackendPlugin({ concurrency: ConcurrencyPolicy.wait() })]\n})\nawait host.backend('memory').set('theme', 'dark')"
   },
   owner: {
     summary: t(

@@ -1,4 +1,5 @@
-import { encodeStorageRdfTerm, type IQuad } from '@migaia/storage-contract'
+import { encodeStorageRdfTerm } from '../authoring/rdf.js'
+import { type IQuad } from '@migaia/storage-contract'
 import { STORAGE_MEMORY_BACKEND } from '../state-constants.js'
 import { createOrderedRecordIndex, type IOrderedRecordIndex } from '../core/ordered-record-index.js'
 

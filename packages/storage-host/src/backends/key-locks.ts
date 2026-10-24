@@ -3,9 +3,6 @@ import { createAbortController, createQuiescenceTracker } from '@migaia/lifecycl
 import {
   StorageContractError,
   StorageContractErrorCode,
-  readConcurrencyLockIdentities,
-  snapshotConcurrencyLockHoldings,
-  snapshotStorageKey,
   type IConcurrencyAttempt,
   type IConcurrencyAttemptContext,
   type IConcurrencyHolder,
@@ -15,6 +12,11 @@ import {
   type ILockKey,
   type IStorageResource
 } from '@migaia/storage-contract'
+import {
+  readConcurrencyLockIdentities,
+  snapshotConcurrencyLockHoldings
+} from '../authoring/concurrency.js'
+import { snapshotStorageKey } from '../authoring/key.js'
 import { walkErrorCauses } from '@migaia/utils/error'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { createConcurrencyLimiter, deferred, raceWithAbort } from '@migaia/utils/promise'

@@ -2,14 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import {
   rdf,
-  term,
-  lockKey,
-  ConcurrencyPolicy,
   defineConcurrencyPolicy,
   type ILockKey,
   type IStorageChange,
   type IQuad
 } from '@migaia/storage-contract'
+import { term } from '../../src/authoring/rdf.js'
+import { lockKey, ConcurrencyPolicy } from '../../src/authoring/concurrency.js'
 import { createStorageHost, createOrgId, memoryBackendPlugin } from '../../src/index.js'
 
 /** Ground fixtures use the same public term factories as applications and server authors. */

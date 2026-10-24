@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { counter, ttl, lockKey, rdf, records, term } from '@migaia/storage-contract'
+import { counter, ttl, rdf, records } from '@migaia/storage-contract'
+import { lockKey } from '../src/authoring/concurrency.js'
+import { term } from '../src/authoring/rdf.js'
 import {
   createStorageHost,
   createOrgId,

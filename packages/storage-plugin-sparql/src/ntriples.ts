@@ -1,12 +1,7 @@
 import { Parser, Writer, DataFactory } from 'n3'
 import type { Term, Quad } from '@rdfjs/types'
-import {
-  term,
-  snapshotStorageRdfTerm,
-  RdfTermType,
-  type IRdfTerm,
-  type IRawQuad
-} from '@migaia/storage-contract'
+import { term, snapshotStorageRdfTerm } from '@migaia/storage-host/authoring/rdf'
+import { RdfTermType, type IRdfTerm, type IRawQuad } from '@migaia/storage-contract'
 import { sparqlError } from './errors.js'
 import { SparqlErrorCode } from './error-code.js'
 import { SparqlErrorText } from './error-text.js'

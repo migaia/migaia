@@ -1,6 +1,6 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import { recommendStorageVector } from '../src/authoring/vector.js'
-import { snapshotStorageVector } from '@migaia/storage-contract'
+import { snapshotStorageVector } from '../src/authoring/vector.js'
 import { mmr } from '../src/vector/mmr.js'
 
 describe('pure vector MMR reranker', () => {

@@ -2,12 +2,13 @@ import { StorageError, StorageErrorCode } from '../errors.js'
 import {
   StorageContractError,
   StorageContractErrorCode,
-  snapshotCodec,
   type ICodec,
   type IOperationContext
 } from '@migaia/storage-contract'
+import { snapshotCodec } from '../authoring/codec.js'
 import { bytesToBase64, base64ToBytes } from '@migaia/utils/bytes'
-import { snapshotStorageCapabilities, type IStorageCapabilities } from '@migaia/storage-contract'
+import { snapshotStorageCapabilities } from '../authoring/store.js'
+import { type IStorageCapabilities } from '@migaia/storage-contract'
 import { isUint8Array } from '@migaia/utils/bytes'
 import { inspectThenable, observeThenableRejection } from '@migaia/utils/function'
 import { StorageErrorText } from '../error-text.js'

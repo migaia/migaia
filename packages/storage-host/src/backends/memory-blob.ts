@@ -1,13 +1,15 @@
 import {
   StorageContractError,
   StorageContractErrorCode,
-  prefixStorageOrgKey,
-  encodeStorageOrgStringPrefix,
-  encodeOrderedStorageKey,
-  decodeOrderedStorageKey,
   type IBlobInfo,
   type IStorageKey
 } from '@migaia/storage-contract'
+import {
+  prefixStorageOrgKey,
+  encodeStorageOrgStringPrefix,
+  encodeOrderedStorageKey,
+  decodeOrderedStorageKey
+} from '../authoring/key.js'
 import { bytesToBase64, base64ToBytes } from '@migaia/utils/bytes'
 import { createOrderedRecordIndex } from '../core/ordered-record-index.js'
 import { encodeFlatStorageKey } from '../core/key-domain.js'

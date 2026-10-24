@@ -11,7 +11,8 @@ import {
   STORAGE_HOST_SOURCE,
   StorageError
 } from '@migaia/storage-host'
-import { vector, ttl, lockKey, DeleteCountMode, ConcurrencyPolicy } from '@migaia/storage-contract'
+import { vector, ttl, DeleteCountMode } from '@migaia/storage-contract'
+import { lockKey, ConcurrencyPolicy } from '@migaia/storage-host/authoring/concurrency'
 import { qdrantBackendPlugin } from '../src/index.js'
 import { fetchHttp } from '../src/http.js'
 import { qdrantManagementFeature } from '../src/features/management.js'

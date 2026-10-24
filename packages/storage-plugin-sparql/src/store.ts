@@ -3,29 +3,9 @@ import {
   rdf,
   sparql,
   implement,
-  provideCapabilities,
-  createSparqlTag,
-  createRdfQuery,
-  readTransactionOperationContext,
-  runTransactionOperation,
   assertTransactionCallback,
-  assertTransactionOwner,
-  createTransactionOwner,
-  createTransactionBuilder,
-  createStorageIteratorLifetime,
-  runWithConcurrency,
-  resolveConcurrencyPolicy,
-  ConcurrencyPolicy,
   StorageContractError,
   StorageContractErrorCode,
-  snapshotOperationContext,
-  snapshotStorageRdfPattern,
-  snapshotStorageRdfQuad,
-  getStorageOrgGraphPrefix,
-  prefixStorageOrgGraph,
-  unprefixStorageOrgGraph,
-  sparqlFragment,
-  term,
   type IQuad,
   type IRdfApi,
   type IOperationContext,
@@ -39,6 +19,28 @@ import {
   type IRdfQuery,
   type IConcurrencyPolicy
 } from '@migaia/storage-contract'
+import { provideCapabilities } from '@migaia/storage-host/authoring/capability'
+import { createSparqlTag, sparqlFragment } from '@migaia/storage-host/authoring/sparql'
+import { createRdfQuery } from '@migaia/storage-host/authoring/query'
+import {
+  readTransactionOperationContext,
+  runTransactionOperation,
+  assertTransactionOwner,
+  createTransactionOwner,
+  createTransactionBuilder,
+  resolveConcurrencyPolicy
+} from '@migaia/storage-host/authoring/transaction'
+import { createStorageIteratorLifetime } from '@migaia/storage-host/authoring/resource'
+import { runWithConcurrency, ConcurrencyPolicy } from '@migaia/storage-host/authoring/concurrency'
+import { snapshotOperationContext } from '@migaia/storage-host/authoring/context'
+import {
+  snapshotStorageRdfPattern,
+  snapshotStorageRdfQuad,
+  getStorageOrgGraphPrefix,
+  prefixStorageOrgGraph,
+  unprefixStorageOrgGraph,
+  term
+} from '@migaia/storage-host/authoring/rdf'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { walkErrorCauses } from '@migaia/utils/error'
 import {

@@ -2,9 +2,9 @@ import {
   encodeOrderedStorageKey,
   encodeStorageOrgKey,
   decodeStorageOrgKey,
-  snapshotStorageOrgKeyPrefix,
-  type IStorageKey
-} from '@migaia/storage-contract'
+  snapshotStorageOrgKeyPrefix
+} from '@migaia/storage-host/authoring/key'
+import { type IStorageKey } from '@migaia/storage-contract'
 import { asCodecValue, type ICodecValue } from '@migaia/serialize/codec'
 import { bytesToBase64, base64ToBytes } from '@migaia/serialize/core'
 import { defineJsonCodec } from '@migaia/serialize/codecs/json'

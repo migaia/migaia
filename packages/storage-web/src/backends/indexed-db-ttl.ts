@@ -1,5 +1,5 @@
+import { compareStorageKeys } from '@migaia/storage-host/authoring/key'
 import {
-  compareStorageKeys,
   StorageContractError,
   StorageContractErrorCode,
   type IStorageKey

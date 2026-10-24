@@ -6,14 +6,17 @@ import { createTextBatchApi, BrowserBatchMethod } from './batch.js'
 import {
   implement,
   kv,
-  lockKey,
-  snapshotStorageBatchKeys,
   StorageContractError,
   StorageContractErrorCode,
   type IStorageChange,
   type IStorageStore
 } from '@migaia/storage-contract'
-import { snapshotOperationContext, snapshotSyncWriteOptions } from '@migaia/storage-contract'
+import { lockKey } from '@migaia/storage-host/authoring/concurrency'
+import { snapshotStorageBatchKeys } from '@migaia/storage-host/authoring/key'
+import {
+  snapshotOperationContext,
+  snapshotSyncWriteOptions
+} from '@migaia/storage-host/authoring/context'
 import { throwIfAborted, withAbort } from '@migaia/storage-host/authoring/backend'
 import {
   lengthPrefixedNamespaceCodec,

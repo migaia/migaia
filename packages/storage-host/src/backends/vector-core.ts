@@ -1,11 +1,11 @@
+import { snapshotStorageVector } from '../authoring/vector.js'
 import {
-  snapshotStorageVector,
   StorageContractError,
   StorageContractErrorCode,
-  encodeOrderedStorageKey,
   type IStorageVectorConfiguration,
   type IStorageVectorPoint
 } from '@migaia/storage-contract'
+import { encodeOrderedStorageKey } from '../authoring/key.js'
 import { createOrderedRecordIndex } from '../core/ordered-record-index.js'
 import { STORAGE_MEMORY_BACKEND } from '../state-constants.js'
 import { StorageErrorText } from '../error-text.js'

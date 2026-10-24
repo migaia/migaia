@@ -1,4 +1,4 @@
-import { compareStorageKeys } from '@migaia/storage-contract'
+import { compareStorageKeys } from '../authoring/key.js'
 import type { IKeyRange, IStorageKey } from '@migaia/storage-contract'
 
 /** Apply the shared inclusive/exclusive storage-key range contract. */

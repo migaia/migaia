@@ -6,7 +6,8 @@ import {
   defineFeature,
   createOrgId
 } from '@migaia/storage-host'
-import { rdf, sparql, term, type IQuad, type IRdfApi } from '@migaia/storage-contract'
+import { rdf, sparql, type IQuad, type IRdfApi } from '@migaia/storage-contract'
+import { term } from '@migaia/storage-host/authoring/rdf'
 import { runConformance } from '@migaia/storage-contract/conformance'
 import { sparqlBackendPlugin, sparqlBackendKind } from '../src/index.js'
 import { oxigraphEndpoint } from '../src/oxigraph.js'

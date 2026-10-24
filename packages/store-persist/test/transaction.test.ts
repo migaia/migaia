@@ -9,11 +9,13 @@ import { createAtomStore, familyDef } from '@migaia/store-keyed'
 import { walkErrorCauses } from '@migaia/utils/error'
 import {
   createTransactionOwner,
-  ConcurrencyPolicy,
-  defineConcurrencyPolicy,
   runTransactionOperation,
   readTransactionOperationContext,
-  useTransactionCapability,
+  useTransactionCapability
+} from '@migaia/storage-host/authoring/transaction'
+import { ConcurrencyPolicy } from '@migaia/storage-host/authoring/concurrency'
+import {
+  defineConcurrencyPolicy,
   StorageContractError,
   StorageContractErrorCode,
   TransactionActivityMode,

@@ -300,3 +300,9 @@ const hits = await collection
 `lambda` must be finite and in [0,1]. At 1 selection follows engine relevance; at 0 selection after the first candidate uses diversity alone. Equal objectives retain engine order. The helper's `topN` bounds only the computed greedy prefix: it still returns one finite rank per candidate, placing the unselected tail in engine order. Only `rerank` owns truncation. Omitted topN computes every candidate, using O(n) state and worst-case O(n²d) time. Vectors must share dimensions; zero directions contribute zero cosine similarity, retaining engine order for ties. Cancellation uses the original signal without another budget, resource or background task.
 
 Journal engines load only when journal is selected or the `/journal` entry is imported. Install the optional `@migaia/logger` peer when using these features. Hosts without journal do not load logger at runtime.
+
+## Shared authoring runtime
+
+Contract types, tokens, definition identity, errors and pure validators remain in `@migaia/storage-contract`. Host owns query, concurrency, transaction, key encoding, publication and resources through concern-specific `/authoring/*` entries. The [contract entry table](../storage-contract/README.en.md#entries-and-dependency-direction) lists the migration paths; no old contract runtime alias remains.
+
+Pure guards validate without copying. Retain mutable-input snapshots only across queued/native awaits or public ownership boundaries, including live lock diagnostics. Ordinary options, query records and returned snapshots are not a freezing protocol. `snapshotCodec` on `/authoring/codec` validates and returns the original instance so class-private conversion methods retain their receiver.

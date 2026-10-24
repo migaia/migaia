@@ -1,12 +1,7 @@
 import {
   StorageContractError,
   StorageContractErrorCode,
-  snapshotRecordStore,
-  snapshotKeyValueStoreDetailed,
   isSecondaryIndexRecordStore,
-  assertTransactionOwner,
-  hasStorageCapability,
-  useStorageCapability,
   records,
   type IOperationContext,
   type IStorageIterator,
@@ -20,6 +15,9 @@ import {
   type ISecondaryIndexRecordStore,
   type ITransactionInfo
 } from '@migaia/storage-contract'
+import { snapshotRecordStore, snapshotKeyValueStoreDetailed } from '../authoring/store.js'
+import { assertTransactionOwner } from '../authoring/transaction.js'
+import { hasStorageCapability, useStorageCapability } from '../authoring/capability.js'
 import { createEventChannel, EventDispatchPolicy } from '@migaia/event-subscriber'
 import { createStringLeaseRegistry, createAbortController } from '@migaia/lifecycle'
 import type { INativeAbortSignal } from '@migaia/utils/promise'

@@ -1,6 +1,7 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
-import { assertTransactionOwner, records, type ITransactionScope } from '@migaia/storage-contract'
+import { assertTransactionOwner } from '../src/authoring/transaction.js'
+import { records, type ITransactionScope } from '@migaia/storage-contract'
 import { createMemoryBackend } from '../src/backends/memory.js'
 import type { IStoragePluginCore } from '../src/index.js'
 import {

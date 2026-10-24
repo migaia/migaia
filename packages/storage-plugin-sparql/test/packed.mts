@@ -94,32 +94,7 @@ try {
   writeFileSync(join(consumer, 'package.json'), '{"type":"module"}\n')
   writeFileSync(
     join(consumer, 'native.mjs'),
-    `import assert from 'node:assert/strict'
-import { Store } from 'oxigraph'
-import { createStorageHost } from '@migaia/storage-host'
-import { rdf, sparql, term } from '@migaia/storage-contract'
-import { sparqlBackendPlugin, ERROR_SOURCE } from '@migaia/storage-plugin-sparql'
-import { httpEndpoint } from '@migaia/storage-plugin-sparql/http'
-import { oxigraphEndpoint } from '@migaia/storage-plugin-sparql/oxigraph'
-import { graphStoreFeature } from '@migaia/storage-plugin-sparql/features/graph-store'
-import { ontologyFeature } from '@migaia/storage-plugin-sparql/features/ontology'
-assert.equal(ERROR_SOURCE,'storage.backend.sparql')
-assert.equal(typeof httpEndpoint({queryUrl:'http://localhost/query',updateUrl:'http://localhost/update'}).query,'function')
-const native=new Store()
-const host=await createStorageHost({plugins:[sparqlBackendPlugin({endpoint:oxigraphEndpoint(native)},{graphs:graphStoreFeature(),ontology:ontologyFeature()})]})
-try {
- const store=host.backend('sparql'),quad={subject:term.iri('urn:a'),predicate:term.iri('urn:p'),object:term.literal('value'),graph:term.defaultGraph}
- await store.use(rdf).add([quad])
- await store.transaction(async scope => {scope.use(rdf).expect([quad]);await scope.use(rdf).delete([quad]);await scope.use(rdf).add([{...quad,object:term.literal('new')}])})
- assert.equal(await store.use(rdf).match({}).count(),1)
- assert.equal(await store.use(rdf).match({}).replace({...quad,object:term.literal('new')},quad),1)
- assert.equal(await store.api.ontology.importOntology({default:true},{format:'text/turtle',text:'_:a <urn:p> "blank" .'}),1)
- assert.equal(await store.api.graphStore.hasGraph({default:true}),true)
- assert.equal((await store.use(sparql)\`SELECT ?o WHERE {GRAPH ?g {?s ?p ?o}}\`.select()).length,2)
-} finally {await host.dispose()}
-assert.equal(native.query('ASK {}'),true)
-console.log('sparql packed consumer PASS')
-`
+    "import assert from 'node:assert/strict'\nimport { Store } from 'oxigraph'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { rdf, sparql } from '@migaia/storage-contract'\nimport { term } from '@migaia/storage-host/authoring/rdf'\nimport { sparqlBackendPlugin, ERROR_SOURCE } from '@migaia/storage-plugin-sparql'\nimport { httpEndpoint } from '@migaia/storage-plugin-sparql/http'\nimport { oxigraphEndpoint } from '@migaia/storage-plugin-sparql/oxigraph'\nimport { graphStoreFeature } from '@migaia/storage-plugin-sparql/features/graph-store'\nimport { ontologyFeature } from '@migaia/storage-plugin-sparql/features/ontology'\nassert.equal(ERROR_SOURCE,'storage.backend.sparql')\nassert.equal(typeof httpEndpoint({queryUrl:'http://localhost/query',updateUrl:'http://localhost/update'}).query,'function')\nconst native=new Store()\nconst host=await createStorageHost({plugins:[sparqlBackendPlugin({endpoint:oxigraphEndpoint(native)},{graphs:graphStoreFeature(),ontology:ontologyFeature()})]})\ntry {\n const store=host.backend('sparql'),quad={subject:term.iri('urn:a'),predicate:term.iri('urn:p'),object:term.literal('value'),graph:term.defaultGraph}\n await store.use(rdf).add([quad])\n await store.transaction(async scope => {scope.use(rdf).expect([quad]);await scope.use(rdf).delete([quad]);await scope.use(rdf).add([{...quad,object:term.literal('new')}])})\n assert.equal(await store.use(rdf).match({}).count(),1)\n assert.equal(await store.use(rdf).match({}).replace({...quad,object:term.literal('new')},quad),1)\n assert.equal(await store.api.ontology.importOntology({default:true},{format:'text/turtle',text:'_:a <urn:p> \"blank\" .'}),1)\n assert.equal(await store.api.graphStore.hasGraph({default:true}),true)\n assert.equal((await store.use(sparql)`SELECT ?o WHERE {GRAPH ?g {?s ?p ?o}}`.select()).length,2)\n} finally {await host.dispose()}\nassert.equal(native.query('ASK {}'),true)\nconsole.log('sparql packed consumer PASS')\n"
   )
   execFileSync('rtk', ['proxy', 'node', 'native.mjs'], { cwd: consumer, stdio: 'inherit' })
   console.log(

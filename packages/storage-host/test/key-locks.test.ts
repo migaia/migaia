@@ -1,21 +1,23 @@
 import { asyncDisposeKey } from '@migaia/plugin-host'
 import { describe, expect, it, vi } from 'vitest'
 import { deferred, type IAbortSignal } from '@migaia/utils/promise'
+import { createTransactionOwner } from '../src/authoring/transaction.js'
 import {
-  createTransactionOwner,
   defineConcurrencyPolicy,
-  ConcurrencyPolicy,
-  lockKey,
-  runWithConcurrency,
   StorageStageKind,
-  snapshotConcurrencyLockKeys,
-  snapshotConcurrencyLockRange,
   type IConcurrencyAttempt,
   type IConcurrencyAttemptContext,
   type IConcurrencyHolder,
   type IConcurrencyStageObserver,
   type ITransactionOptions
 } from '@migaia/storage-contract'
+import {
+  ConcurrencyPolicy,
+  lockKey,
+  runWithConcurrency,
+  snapshotConcurrencyLockKeys,
+  snapshotConcurrencyLockRange
+} from '../src/authoring/concurrency.js'
 import {
   createStorageHost,
   definePlugin,

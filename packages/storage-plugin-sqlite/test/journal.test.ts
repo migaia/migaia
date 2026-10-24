@@ -10,7 +10,8 @@ import {
   LogRecordState,
   type ILogStore
 } from '@migaia/logger/plugins/durable'
-import { lockKey, ttl } from '@migaia/storage-contract'
+import { lockKey } from '@migaia/storage-host/authoring/concurrency'
+import { ttl } from '@migaia/storage-contract'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'

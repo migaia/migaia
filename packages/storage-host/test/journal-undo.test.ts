@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { Logger } from '@migaia/logger'
 import { binlog, undoLog, type ILogStore } from '@migaia/logger/plugins/durable'
-import { lockKey, ttl, vector, rdf, term } from '@migaia/storage-contract'
+import { lockKey } from '../src/authoring/concurrency.js'
+import { ttl, vector, rdf } from '@migaia/storage-contract'
+import { term } from '../src/authoring/rdf.js'
 import { createOrgId, createStorageHost, memoryBackendPlugin } from '../src/index.js'
 
 /** Actual durable plugins retain their existing scheduler and committed indexes. */

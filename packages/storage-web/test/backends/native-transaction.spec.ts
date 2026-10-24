@@ -10,12 +10,13 @@ import { asyncDisposeKey } from '@migaia/plugin-host'
 import { createStorageHost, definePlugin } from '@migaia/storage-host'
 import {
   assertTransactionOwner,
-  ConcurrencyPolicy,
+  registerTransactionFinalizer
+} from '@migaia/storage-host/authoring/transaction'
+import { ConcurrencyPolicy, lockKey } from '@migaia/storage-host/authoring/concurrency'
+import {
   defineConcurrencyPolicy,
   kv,
   records,
-  lockKey,
-  registerTransactionFinalizer,
   type ITransactionScope
 } from '@migaia/storage-contract'
 import { indexedDbBackendPlugin } from '../../src/indexed-db.js'

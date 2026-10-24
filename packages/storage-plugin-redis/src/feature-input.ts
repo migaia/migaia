@@ -1,10 +1,10 @@
 import { throwIfAborted } from '@migaia/storage-host/authoring/backend'
 import type { IRedisNativeFeaturePort } from './native-feature.js'
+import { assertStringStorageKey } from '@migaia/storage-contract'
 import {
-  assertStringStorageKey,
   encodeOrderedStorageKey,
   decodeOrderedStorageKey
-} from '@migaia/storage-contract'
+} from '@migaia/storage-host/authoring/key'
 import { base64ToBytes, bytesToBase64 } from '@migaia/serialize/core'
 import { isUint8Array } from '@migaia/utils/bytes'
 import { invalidArgument, redisError } from './errors.js'

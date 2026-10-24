@@ -2,7 +2,6 @@ import { asyncDisposeKey } from '@migaia/plugin-host'
 import {
   StorageContractError,
   StorageContractErrorCode,
-  createStorageIteratorLifetime,
   assertOperationContext,
   assertStringStorageKey,
   type IStorageChange,
@@ -10,6 +9,7 @@ import {
   type IOperationContext,
   type IOperationContextSnapshot
 } from '@migaia/storage-contract'
+import { createStorageIteratorLifetime } from '../authoring/resource.js'
 import { deferred, type IDeferred } from '@migaia/utils/promise'
 import type { IBackendChangeController } from './change-controller.js'
 import { mergeSignals, subscribeToAbort, throwIfAborted } from './operation.js'

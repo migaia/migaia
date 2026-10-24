@@ -26,7 +26,7 @@ import {
   withAbort,
   createStorageOperationRuntime
 } from '@migaia/storage-host/authoring/backend'
-import { snapshotOperationContext } from '@migaia/storage-contract'
+import { snapshotOperationContext } from '@migaia/storage-host/authoring/context'
 import { deferred } from '@migaia/utils/promise'
 import { isKeyValueStore, isRecordStore } from '../src/types/storage'
 import type { IStorageKey } from '../src/types/context'

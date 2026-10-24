@@ -1,5 +1,5 @@
+import { assertTransactionOwner } from './authoring/transaction.js'
 import {
-  assertTransactionOwner,
   StorageStageKind,
   type IStorageBase,
   type ICodecStageObserver,

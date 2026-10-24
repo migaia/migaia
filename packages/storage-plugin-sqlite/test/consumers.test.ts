@@ -9,7 +9,8 @@ import { deferred } from '@migaia/utils/promise'
 import { createStore } from '@migaia/store-light'
 import { persist } from '@migaia/store-persist/light'
 import { persistTransaction } from '@migaia/store-persist'
-import { kv, records, sql, lockKey, type ISqlExecutor } from '@migaia/storage-contract'
+import { kv, records, sql, type ISqlExecutor } from '@migaia/storage-contract'
+import { lockKey } from '@migaia/storage-host/authoring/concurrency'
 import {
   sqliteBackendPlugin,
   sqliteBackendKind,

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { Logger } from '@migaia/logger'
 import { binlog, undoLog, memoryLogStore } from '@migaia/logger/plugins/durable'
-import { lockKey } from '@migaia/storage-contract'
+import { lockKey } from '../src/authoring/concurrency.js'
 import { createStorageHost, createOrgId, memoryBackendPlugin } from '../src/index.js'
 import { storageLogStore } from '../src/journal.js'
 import { resolveStorageJournalBinding } from '../src/journal/binding.js'

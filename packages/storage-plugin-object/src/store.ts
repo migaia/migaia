@@ -2,22 +2,8 @@ import { createLifecycleScope, createAbortController } from '@migaia/lifecycle'
 import {
   blob,
   implement,
-  provideCapabilities,
-  createTransactionOwner,
-  runWithConcurrency,
-  lockKey,
-  encodeOrderedStorageKey,
-  decodeOrderedStorageKey,
-  prefixStorageOrgKey,
-  unprefixStorageOrgKey,
-  encodeStorageOrgStringPrefix,
-  snapshotStorageBlobPut,
-  snapshotStorageBlobGet,
-  snapshotStorageBlobList,
-  createStorageBlobObject,
   assertStringStorageKey,
   assertOperationContext,
-  snapshotOperationContext,
   type IBlobApi,
   type ICapabilityInstallPort,
   type IOperationContext,
@@ -25,6 +11,23 @@ import {
   type IStorageStore,
   type ITransactionOptions
 } from '@migaia/storage-contract'
+import { provideCapabilities } from '@migaia/storage-host/authoring/capability'
+import { createTransactionOwner } from '@migaia/storage-host/authoring/transaction'
+import { runWithConcurrency, lockKey } from '@migaia/storage-host/authoring/concurrency'
+import {
+  encodeOrderedStorageKey,
+  decodeOrderedStorageKey,
+  prefixStorageOrgKey,
+  unprefixStorageOrgKey,
+  encodeStorageOrgStringPrefix
+} from '@migaia/storage-host/authoring/key'
+import {
+  snapshotStorageBlobPut,
+  snapshotStorageBlobGet,
+  snapshotStorageBlobList,
+  createStorageBlobObject
+} from '@migaia/storage-host/authoring/blob'
+import { snapshotOperationContext } from '@migaia/storage-host/authoring/context'
 import type { IStoragePluginCore } from '@migaia/storage-host'
 import {
   observeStorageBatch,

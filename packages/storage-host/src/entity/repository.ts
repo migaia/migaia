@@ -19,28 +19,14 @@ import {
   type IVersionedEnvelope,
   type IMigrationPlan,
   StorageContractErrorCode,
-  snapshotKeyValueStoreDetailed,
   assertStorageKey,
-  compareStorageKeys,
-  createRecordQuery,
   RecordQueryMethod,
   QueryOperation,
-  compileStorageQueryCondition,
   type IQueryCondition,
-  deriveTransactionIterator,
-  nextTransactionIterator,
   type IRecordQuerySource,
   StorageStageKind,
   type ICodecStageObserver,
   type IQueryStageObserver,
-  snapshotRecordStore,
-  snapshotStorageKey,
-  assertTransactionOwner,
-  runTransactionOperation,
-  readTransactionOperationContext,
-  registerTransactionFinalizer,
-  lockKey,
-  encodeOrderedStorageKey,
   type ITransactionScope,
   type IStorageIterator,
   type ITransactionInfo,
@@ -54,6 +40,22 @@ import {
   type IKeyRange,
   type ISecondaryIndexRecordStore
 } from '@migaia/storage-contract'
+import { snapshotKeyValueStoreDetailed, snapshotRecordStore } from '../authoring/store.js'
+import {
+  compareStorageKeys,
+  snapshotStorageKey,
+  encodeOrderedStorageKey
+} from '../authoring/key.js'
+import { createRecordQuery, compileStorageQueryCondition } from '../authoring/query.js'
+import {
+  deriveTransactionIterator,
+  nextTransactionIterator,
+  assertTransactionOwner,
+  runTransactionOperation,
+  readTransactionOperationContext,
+  registerTransactionFinalizer
+} from '../authoring/transaction.js'
+import { lockKey } from '../authoring/concurrency.js'
 import { migrateEnvelope } from '../authoring/migration.js'
 import { isStorageErrorFamily } from '../core/error-family.js'
 import {
@@ -92,7 +94,7 @@ import {
   type IEntityQueryPlan,
   type IEntityQuerySourceSelection
 } from './query.js'
-import { snapshotOperationContext } from '@migaia/storage-contract'
+import { snapshotOperationContext } from '../authoring/context.js'
 import type { IOperationContext, IStorageKey } from '@migaia/storage-contract'
 import type { IRecordStore, IKeyValueStore } from '@migaia/storage-contract'
 import type { ISchemaAdapter } from '../entity.js'

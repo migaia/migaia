@@ -5,9 +5,9 @@ import {
   records,
   vector,
   rdf,
-  term,
   type IStorageChange
 } from '@migaia/storage-contract'
+import { term } from '../../src/authoring/rdf.js'
 import { createOrgId, createStorageHost, memoryBackendPlugin } from '../../src/index.js'
 import { createBackendChangeController } from '../../src/core/change-controller.js'
 import { createBackendChangeIterator } from '../../src/authoring/backend.js'

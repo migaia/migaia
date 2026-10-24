@@ -3,12 +3,11 @@ import { deferred } from '@migaia/utils/promise'
 import {
   kv,
   records,
-  lockKey,
-  ConcurrencyPolicy,
-  registerTransactionFinalizer,
   type ITransactionKeyValueApi,
   type ITransactionScope
 } from '@migaia/storage-contract'
+import { lockKey, ConcurrencyPolicy } from '../../src/authoring/concurrency.js'
+import { registerTransactionFinalizer } from '../../src/authoring/transaction.js'
 import {
   createStorageHost,
   definePlugin,

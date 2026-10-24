@@ -13,7 +13,8 @@ import {
   LogRecordState,
   type ILogStore
 } from '@migaia/logger/plugins/durable'
-import { kv, vector, ttl, lockKey } from '@migaia/storage-contract'
+import { kv, vector, ttl } from '@migaia/storage-contract'
+import { lockKey } from '@migaia/storage-host/authoring/concurrency'
 import { deferred } from '@migaia/utils/promise'
 import { walkErrorCauses } from '@migaia/utils/error'
 import { postgresBackendPlugin } from '../src/index.js'

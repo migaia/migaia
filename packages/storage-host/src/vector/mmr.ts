@@ -1,5 +1,5 @@
+import { snapshotStorageVector } from '../authoring/vector.js'
 import {
-  snapshotStorageVector,
   StorageContractError,
   StorageContractErrorCode,
   type IVectorReranker

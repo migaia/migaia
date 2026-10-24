@@ -1,7 +1,9 @@
 import { asCodecValue, toPortableValue } from '@migaia/serialize/codec'
 import {
   snapshotStorageVector,
-  snapshotStorageVectorCollection,
+  snapshotStorageVectorCollection
+} from '@migaia/storage-host/authoring/vector'
+import {
   assertStorageVectorIds,
   assertStorageVector,
   assertStringStorageKey

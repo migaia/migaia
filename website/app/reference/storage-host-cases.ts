@@ -147,16 +147,8 @@ console.log((await next).value?.kind)`,
         'Use native vector search while sharing original TTL and organization ownership.',
         '使用原生向量检索并共享原 TTL 与组织拥有者。'
       ),
-      example: `import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
-import { vector, ttl, lockKey } from '@migaia/storage-contract'
-await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
-const store = host.backend('memory')
-const collection = store.use(vector).collection<{ group: string }>('docs', { dimensions: 2, metric: 'dot' })
-await collection.upsert([{ id: 'a', vector: [1, 0], payload: { group: 'docs' } }])
-console.log((await collection.near([1, 0]).where({ group: 'docs' }).topK(1).all())[0]?.id)
-await store.transaction(async (scope) => { await scope.use(ttl).expire(lockKey.vector('docs', 'a'), 0) })
-console.log(await collection.search([1, 0], { k: 1 }))
-// a, []`,
+      example:
+        "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { vector, ttl } from '@migaia/storage-contract'\nimport { lockKey } from '@migaia/storage-host/authoring/concurrency'\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })\nconst store = host.backend('memory')\nconst collection = store.use(vector).collection<{ group: string }>('docs', { dimensions: 2, metric: 'dot' })\nawait collection.upsert([{ id: 'a', vector: [1, 0], payload: { group: 'docs' } }])\nconsole.log((await collection.near([1, 0]).where({ group: 'docs' }).topK(1).all())[0]?.id)\nawait store.transaction(async (scope) => { await scope.use(ttl).expire(lockKey.vector('docs', 'a'), 0) })\nconsole.log(await collection.search([1, 0], { k: 1 }))\n// a, []",
       result: t(
         'Returns a, then no hits after the original transaction expires the vector.',
         '返回 a，原事务设置向量立即到期后无命中。'
@@ -279,19 +271,8 @@ console.log((await object.bytes())[0])`,
         'Ground graph data must share namespace and transaction ownership with KV.',
         'Ground 图数据需要与 KV 共用 namespace 和事务 owner。'
       ),
-      example: `import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
-import { rdf, term } from '@migaia/storage-contract'
-
-await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
-const memory = host.backend('memory')
-await memory.transaction(async tx => {
-  await tx.set('status', 'ready')
-  await tx.use(rdf).add([{
-    subject: term.iri('urn:alice'), predicate: term.iri('urn:knows'),
-    object: term.iri('urn:bob'), graph: term.defaultGraph
-  }])
-})
-console.log(await memory.use(rdf).match({ subject: term.iri('urn:alice') }).count())`,
+      example:
+        "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { rdf } from '@migaia/storage-contract'\nimport { term } from '@migaia/storage-host/authoring/rdf'\n\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })\nconst memory = host.backend('memory')\nawait memory.transaction(async tx => {\n  await tx.set('status', 'ready')\n  await tx.use(rdf).add([{\n    subject: term.iri('urn:alice'), predicate: term.iri('urn:knows'),\n    object: term.iri('urn:bob'), graph: term.defaultGraph\n  }])\n})\nconsole.log(await memory.use(rdf).match({ subject: term.iri('urn:alice') }).count())",
       result: t(
         'Prints 1 after KV and the logical default graph commit together.',
         'KV 与逻辑 default graph 同提交后输出 1。'

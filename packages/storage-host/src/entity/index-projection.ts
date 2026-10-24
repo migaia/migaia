@@ -8,12 +8,8 @@ import type {
   IStorageKey,
   IKeyRange
 } from '@migaia/storage-contract'
-import {
-  assertStorageKey,
-  snapshotStorageKey,
-  compareStorageKeys,
-  QueryOperator
-} from '@migaia/storage-contract'
+import { assertStorageKey, QueryOperator } from '@migaia/storage-contract'
+import { snapshotStorageKey, compareStorageKeys } from '../authoring/key.js'
 import { StorageError, StorageErrorCode } from '../errors.js'
 import type { IKeyValueStore } from '@migaia/storage-contract'
 

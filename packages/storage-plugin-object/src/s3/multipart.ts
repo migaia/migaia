@@ -9,11 +9,8 @@ import {
   type CompleteMultipartUploadCommandOutput,
   type PutObjectCommandOutput
 } from '@aws-sdk/client-s3'
-import {
-  StorageContractError,
-  createStorageBlobBodyReader,
-  type IBlobApi
-} from '@migaia/storage-contract'
+import { StorageContractError, type IBlobApi } from '@migaia/storage-contract'
+import { createStorageBlobBodyReader } from '@migaia/storage-host/authoring/blob'
 import {
   subscribeToAbort,
   readAbortReason,

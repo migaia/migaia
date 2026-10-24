@@ -6,7 +6,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Logger, type ILogEntry } from '@migaia/logger'
 import { level } from '@migaia/logger/plugins'
 import { binlog, memoryLogStore, wal } from '@migaia/logger/plugins/durable'
-import { ConcurrencyPolicy, kv, lockKey } from '@migaia/storage-contract'
+import { ConcurrencyPolicy, lockKey } from '@migaia/storage-host/authoring/concurrency'
+import { kv } from '@migaia/storage-contract'
 import { createStorageHost, createOrgId, definePlugin } from '@migaia/storage-host'
 import {
   decodeStorageJournalImage,

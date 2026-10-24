@@ -6,7 +6,6 @@ import { asyncDisposeKey, throwIfAborted } from '@migaia/storage-host/authoring/
 import {
   durableChangeFeed,
   implement,
-  createStorageIteratorLifetime,
   StorageContractError,
   StorageContractErrorCode,
   type IDurableChangeFeedApi,
@@ -14,6 +13,7 @@ import {
   type ICapabilityImpl,
   type IStorageResource
 } from '@migaia/storage-contract'
+import { createStorageIteratorLifetime } from '@migaia/storage-host/authoring/resource'
 import { redisBackendKind } from '../plugin.js'
 import { readNativeFeaturePort, type IRedisNativeFeaturePort } from '../native-feature.js'
 import { featureInteger, readStreamRows } from '../feature-input.js'

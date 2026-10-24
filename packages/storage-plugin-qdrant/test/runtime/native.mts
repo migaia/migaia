@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { createStorageHost, createOrgId } from '@migaia/storage-host'
-import { vector, ttl, lockKey, DeleteCountMode } from '@migaia/storage-contract'
+import { vector, ttl, DeleteCountMode } from '@migaia/storage-contract'
+import { lockKey } from '@migaia/storage-host/authoring/concurrency'
 import { qdrantBackendPlugin, ERROR_SOURCE, type IQdrantHttp } from '@migaia/storage-plugin-qdrant'
 import { fetchHttp } from '@migaia/storage-plugin-qdrant/http'
 import { qdrantClientHttp } from '@migaia/storage-plugin-qdrant/client'

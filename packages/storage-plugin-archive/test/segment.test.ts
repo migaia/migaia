@@ -1,5 +1,5 @@
 import { it, expect } from 'vitest'
-import { createStorageBlobObject } from '@migaia/storage-contract'
+import { createStorageBlobObject } from '@migaia/storage-host/authoring/blob'
 import { deferred } from '@migaia/utils/promise'
 import { readSegment } from '../src/segment.js'
 

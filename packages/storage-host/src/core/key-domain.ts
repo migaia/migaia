@@ -4,12 +4,11 @@ import {
   StorageContractError,
   StorageContractErrorCode,
   assertStorageKey,
-  compareStorageKeys,
-  snapshotStorageKey,
   type IBackendKind,
   type IKeyRange,
   type IStorageKey
 } from '@migaia/storage-contract'
+import { compareStorageKeys, snapshotStorageKey } from '../authoring/key.js'
 
 import { STORAGE_MEMORY_BACKEND } from '../state-constants.js'
 import { isArrayBuffer } from '@migaia/utils/bytes'

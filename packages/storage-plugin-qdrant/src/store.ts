@@ -3,27 +3,12 @@ import {
   vector,
   ttl,
   implement,
-  provideCapabilities,
-  createTransactionOwner,
-  runWithConcurrency,
-  resolveConcurrencyPolicy,
-  snapshotOperationContext,
-  snapshotStorageVectorCollection,
-  snapshotStorageVector,
   assertStorageVector,
-  snapshotStorageVectorUpsert,
-  snapshotStorageVectorSearch,
   assertStorageVectorIds,
-  snapshotStorageDeleteCountMode,
   assertStringStorageKey,
-  snapshotStorageTtlTarget,
   assertStorageTtlDuration,
-  createVectorQuery,
   VectorQueryOriginKind,
   type IVectorQueryOrigin,
-  createStorageIteratorLifetime,
-  compileStorageQueryCondition,
-  snapshotStorageWhere,
   QueryOperation,
   QueryOperator,
   DeleteCountMode,
@@ -42,6 +27,27 @@ import {
   type ITtlApi,
   type IQueryCondition
 } from '@migaia/storage-contract'
+import { provideCapabilities } from '@migaia/storage-host/authoring/capability'
+import {
+  createTransactionOwner,
+  resolveConcurrencyPolicy
+} from '@migaia/storage-host/authoring/transaction'
+import { runWithConcurrency } from '@migaia/storage-host/authoring/concurrency'
+import { snapshotOperationContext } from '@migaia/storage-host/authoring/context'
+import {
+  snapshotStorageVectorCollection,
+  snapshotStorageVector,
+  snapshotStorageVectorUpsert,
+  snapshotStorageVectorSearch,
+  snapshotStorageDeleteCountMode
+} from '@migaia/storage-host/authoring/vector'
+import { snapshotStorageTtlTarget } from '@migaia/storage-host/authoring/ttl'
+import {
+  createVectorQuery,
+  compileStorageQueryCondition,
+  snapshotStorageWhere
+} from '@migaia/storage-host/authoring/query'
+import { createStorageIteratorLifetime } from '@migaia/storage-host/authoring/resource'
 import { parseObjectPath } from '@migaia/utils/object'
 import type { ICodecValue } from '@migaia/serialize/codec'
 import type { Schemas } from '@qdrant/js-client-rest'

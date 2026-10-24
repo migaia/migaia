@@ -59,7 +59,7 @@ describe('storage host package exports', () => {
     )
     expect(runtime.asyncDisposeKey).toBe((await import('@migaia/plugin-host')).asyncDisposeKey)
   })
-  it('publishes only query vector synthesis from the dedicated vector authoring entry', async () => {
+  it('publishes shared vector snapshots and query synthesis through the vector authoring entry', async () => {
     /** Actual package resolution excludes private memory scoring, filtering and ranking. */
     const runtime = await import('@migaia/storage-host/authoring/vector')
     expect(Object.keys(runtime)).toEqual(

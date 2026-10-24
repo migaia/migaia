@@ -257,7 +257,7 @@ export const storagePluginRedisReference: ILibraryReference = {
             zh: '存在争用的写入需要真实的等待策略，同时保留有限的原生锁租期。'
           },
           example:
-            "import { ConcurrencyPolicy } from '@migaia/storage-contract'\nimport { redisBackendPlugin, type IRedisDriver } from '@migaia/storage-plugin-redis'\nexport const writes = (driver: IRedisDriver) => redisBackendPlugin({\n  driver,\n  concurrency: ConcurrencyPolicy.wait(),\n  owner: { label: 'session-worker' },\n  maxLockMs: 30000\n})",
+            "import { ConcurrencyPolicy } from '@migaia/storage-host/authoring/concurrency'\nimport { redisBackendPlugin, type IRedisDriver } from '@migaia/storage-plugin-redis'\nexport const writes = (driver: IRedisDriver) => redisBackendPlugin({\n  driver,\n  concurrency: ConcurrencyPolicy.wait(),\n  owner: { label: 'session-worker' },\n  maxLockMs: 30000\n})",
           result: {
             en: 'The original concurrency owner applies waiting and reports the selected diagnostic label.',
             zh: '原并发拥有者应用等待策略，并通过原诊断通道展示指定标签。'

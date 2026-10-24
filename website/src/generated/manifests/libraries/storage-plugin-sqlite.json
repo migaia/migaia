@@ -61,7 +61,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { sqlFragment } from '@migaia/storage-contract'\n\nawait storage.sql`CREATE TABLE users(id INTEGER PRIMARY KEY, name TEXT)`.run()\nawait storage.transaction(async (tx) => {\n  await tx.sql`INSERT INTO users VALUES(${1}, ${'Ada'})`.run()\n  await tx.set('user-count', '1')\n})\nconst rows = await storage.sql<{ id: number; name: string }>`\n  SELECT id, name FROM ${sqlFragment.id('users')} WHERE id = ${1}\n`.all()"
+                "code": "import { sqlFragment } from '@migaia/storage-host/authoring/sql'\n\nawait storage.sql`CREATE TABLE users(id INTEGER PRIMARY KEY, name TEXT)`.run()\nawait storage.transaction(async (tx) => {\n  await tx.sql`INSERT INTO users VALUES(${1}, ${'Ada'})`.run()\n  await tx.set('user-count', '1')\n})\nconst rows = await storage.sql<{ id: number; name: string }>`\n  SELECT id, name FROM ${sqlFragment.id('users')} WHERE id = ${1}\n`.all()"
               },
               {
                 "type": "paragraph",
@@ -213,7 +213,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { sqlFragment } from '@migaia/storage-contract'\n\nawait storage.sql`CREATE TABLE users(id INTEGER PRIMARY KEY, name TEXT)`.run()\nawait storage.transaction(async (tx) => {\n  await tx.sql`INSERT INTO users VALUES(${1}, ${'Ada'})`.run()\n  await tx.set('user-count', '1')\n})\nconst rows = await storage.sql<{ id: number; name: string }>`\n  SELECT id, name FROM ${sqlFragment.id('users')} WHERE id = ${1}\n`.all()"
+                "code": "import { sqlFragment } from '@migaia/storage-host/authoring/sql'\n\nawait storage.sql`CREATE TABLE users(id INTEGER PRIMARY KEY, name TEXT)`.run()\nawait storage.transaction(async (tx) => {\n  await tx.sql`INSERT INTO users VALUES(${1}, ${'Ada'})`.run()\n  await tx.set('user-count', '1')\n})\nconst rows = await storage.sql<{ id: number; name: string }>`\n  SELECT id, name FROM ${sqlFragment.id('users')} WHERE id = ${1}\n`.all()"
               },
               {
                 "type": "paragraph",
@@ -366,7 +366,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { sqlFragment } from '@migaia/storage-contract'\n\nawait storage.sql`CREATE TABLE users(id INTEGER PRIMARY KEY, name TEXT)`.run()\nawait storage.transaction(async (tx) => {\n  await tx.sql`INSERT INTO users VALUES(${1}, ${'Ada'})`.run()\n  await tx.set('user-count', '1')\n})\nconst rows = await storage.sql<{ id: number; name: string }>`\n  SELECT id, name FROM ${sqlFragment.id('users')} WHERE id = ${1}\n`.all()"
+                  "code": "import { sqlFragment } from '@migaia/storage-host/authoring/sql'\n\nawait storage.sql`CREATE TABLE users(id INTEGER PRIMARY KEY, name TEXT)`.run()\nawait storage.transaction(async (tx) => {\n  await tx.sql`INSERT INTO users VALUES(${1}, ${'Ada'})`.run()\n  await tx.set('user-count', '1')\n})\nconst rows = await storage.sql<{ id: number; name: string }>`\n  SELECT id, name FROM ${sqlFragment.id('users')} WHERE id = ${1}\n`.all()"
                 },
                 {
                   "type": "paragraph",
@@ -524,7 +524,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { sqlFragment } from '@migaia/storage-contract'\n\nawait storage.sql`CREATE TABLE users(id INTEGER PRIMARY KEY, name TEXT)`.run()\nawait storage.transaction(async (tx) => {\n  await tx.sql`INSERT INTO users VALUES(${1}, ${'Ada'})`.run()\n  await tx.set('user-count', '1')\n})\nconst rows = await storage.sql<{ id: number; name: string }>`\n  SELECT id, name FROM ${sqlFragment.id('users')} WHERE id = ${1}\n`.all()"
+                  "code": "import { sqlFragment } from '@migaia/storage-host/authoring/sql'\n\nawait storage.sql`CREATE TABLE users(id INTEGER PRIMARY KEY, name TEXT)`.run()\nawait storage.transaction(async (tx) => {\n  await tx.sql`INSERT INTO users VALUES(${1}, ${'Ada'})`.run()\n  await tx.set('user-count', '1')\n})\nconst rows = await storage.sql<{ id: number; name: string }>`\n  SELECT id, name FROM ${sqlFragment.id('users')} WHERE id = ${1}\n`.all()"
                 },
                 {
                   "type": "paragraph",

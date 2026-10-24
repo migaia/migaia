@@ -1,9 +1,8 @@
 import {
   encodeOrderedStorageKey,
-  decodeOrderedStorageKey,
-  type IStorageKey,
-  type ICodecStageObserver
-} from '@migaia/storage-contract'
+  decodeOrderedStorageKey
+} from '@migaia/storage-host/authoring/key'
+import { type IStorageKey, type ICodecStageObserver } from '@migaia/storage-contract'
 import { defineJsonCodec } from '@migaia/serialize/codecs/json'
 import {
   defineCollectionsJsonCodec,

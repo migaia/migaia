@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
-import { lockKey, runTransactionOperation } from '@migaia/storage-contract'
+import { lockKey } from '../src/authoring/concurrency.js'
+import { runTransactionOperation } from '../src/authoring/transaction.js'
 import {
   LogRecordState,
   binlog,

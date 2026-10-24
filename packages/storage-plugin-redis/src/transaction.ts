@@ -3,12 +3,12 @@ import { RedisCommand } from './constants.js'
 import {
   StorageContractError,
   StorageContractErrorCode,
-  snapshotStorageCounterIncrement,
   type IConcurrencyAttemptContext,
   type IConflictPolicy,
   type IStorageKey,
   type ILockKey
 } from '@migaia/storage-contract'
+import { snapshotStorageCounterIncrement } from '@migaia/storage-host/authoring/counter'
 import {
   createStorageOperationReporter,
   reportCleanupError

@@ -5,8 +5,8 @@ import {
   defineStorageBackendKind,
   type IStoragePluginCore
 } from '../../src/index.js'
+import { ConcurrencyPolicy } from '../../src/authoring/concurrency.js'
 import {
-  ConcurrencyPolicy,
   rdf,
   type IStorageStore,
   type ITransactionRdfApi,

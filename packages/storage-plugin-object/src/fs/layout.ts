@@ -3,11 +3,11 @@ import { join, basename } from 'node:path'
 import {
   StorageContractError,
   StorageContractErrorCode,
-  createStorageBlobBodyReader,
-  orderStorageKeysByBytes,
   type IBlobInfo,
   type IOperationContext
 } from '@migaia/storage-contract'
+import { createStorageBlobBodyReader } from '@migaia/storage-host/authoring/blob'
+import { orderStorageKeysByBytes } from '@migaia/storage-host/authoring/key'
 import {
   subscribeToAbort,
   throwIfAborted,

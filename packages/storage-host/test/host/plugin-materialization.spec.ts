@@ -1,5 +1,6 @@
 import { createManualScheduler } from '@migaia/utils/testing'
-import { snapshotStorageBaseDetailed, type IKeyValueStore } from '@migaia/storage-contract'
+import { snapshotStorageBaseDetailed } from '../../src/authoring/store.js'
+import { type IKeyValueStore } from '@migaia/storage-contract'
 import { describe, expect, it } from 'vitest'
 import {
   assertStorageBackendId,

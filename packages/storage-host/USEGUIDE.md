@@ -301,3 +301,25 @@ const hits = await collection
 `lambda` 是 [0,1] 内的有限数字；1 只按引擎相关性选择，0 在第一项后只选择多样性，目标相同保留引擎顺序。helper 的 `topN` 仅限制贪心前缀的计算，仍为全部候选返回等长有限分数，剩余项保留引擎顺序；真正截断只归 `rerank` 的 topN。缺省计算全部候选，保留 O(n) 状态，最坏 O(n²d) 时间。向量须维度一致；零向量的余弦多样性按 0 处理，同分保留引擎顺序。评分器取消继续使用原信号，不创建预算、资源或后台任务。
 
 仅在选择 journal 或导入 `/journal` 时加载日志引擎；使用这些功能时需安装可选 peer `@migaia/logger`。未选择 journal 的宿主不会在运行时加载 logger。
+
+## 共享作者边界
+
+类型、token 与纯 guard 从 `@migaia/storage-contract` 导入；执行 helper 按 [入口表](../storage-contract/README.md#入口与依赖方向) 从 host 导入。query、transaction、concurrency 和 publication 身份表只在 host 中存在，后端不重复实现键 codec、锁循环或资源生命周期。
+
+```ts
+import { assertStorageKey, type IOperationContext } from '@migaia/storage-contract'
+import { snapshotStorageKey } from '@migaia/storage-host/authoring/key'
+import { snapshotOperationContext } from '@migaia/storage-host/authoring/context'
+
+const input = ['order', new Date(0)] as const
+assertStorageKey(input, 'memory')
+const key = snapshotStorageKey(input, 'memory')
+const context: IOperationContext | undefined = snapshotOperationContext({ timeoutMs: 100 })
+// 将 key/context 交给原生拥有者，覆盖其首次实际 await。
+```
+
+已私有捕获的值只需校验时，不再复制。同步原生 terminal 的 `projectStorageBatchKeys` 借用键，重算规范 identity/firstIndex；异步入口的 `snapshotStorageBatchKeys` 分离调用方键。两者复用同一 canonical projector 和有序编码器。
+
+`/authoring/resource` 的 `createStorageIteratorLifetime` 保留 accepted-read drain、原 close、main/symbolic/return Promise 缓存与错误身份。SQL/SPARQL 标签分别从 `/authoring/sql`、`/authoring/sparql` 导入，共享 template 只是内部模块。`/authoring/capability` 的 publication 与 has/use 使用唯一原表。
+
+codec 方法在原对象上直接调用；`snapshotCodec(codec) === codec`，不复制 metadata/methods，也不执行转换。只需同步校验用 `assertCodec`；需要既有格式适配时才使用 `fromValueCodec`。

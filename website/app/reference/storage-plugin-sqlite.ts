@@ -18,19 +18,8 @@ await host.backend('application').set('theme', 'dark')
 console.log(await host.backend('application').get('theme'))`
 
 /** Policy selection remains in the shared concurrency owner, not the native driver. */
-const sqliteConcurrencyExample = `import { ConcurrencyPolicy } from '@migaia/storage-contract'
-import { createStorageHost } from '@migaia/storage-host'
-import { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'
-import { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'
-
-await using connection = nodeSqliteDriver(':memory:')
-await using host = await createStorageHost({
-  plugins: [sqliteBackendPlugin({
-    driver: connection, concurrency: ConcurrencyPolicy.wait({ timeoutMs: 200 })
-  })] as const
-})
-await host.backend('sqlite').set('theme', 'dark')
-console.log(await host.backend('sqlite').get('theme'))`
+const sqliteConcurrencyExample =
+  "import { ConcurrencyPolicy } from '@migaia/storage-host/authoring/concurrency'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'\nimport { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'\n\nawait using connection = nodeSqliteDriver(':memory:')\nawait using host = await createStorageHost({\n  plugins: [sqliteBackendPlugin({\n    driver: connection, concurrency: ConcurrencyPolicy.wait({ timeoutMs: 200 })\n  })] as const\n})\nawait host.backend('sqlite').set('theme', 'dark')\nconsole.log(await host.backend('sqlite').get('theme'))"
 
 /** One canonical option table serves the public options type and its anonymous id extension. */
 const sqliteOptionMembers: Readonly<Record<string, IMemberDoc>> = {

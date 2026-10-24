@@ -2,14 +2,9 @@ import { describe, it, expect, onTestFinished } from 'vitest'
 import { Store } from 'oxigraph'
 import { walkErrorCauses } from '@migaia/utils/error'
 import { createStorageHost, createOrgId, definePlugin, defineFeature } from '@migaia/storage-host'
-import {
-  rdf,
-  sparql,
-  term,
-  ConcurrencyPolicy,
-  prefixStorageOrgGraph,
-  type IQuad
-} from '@migaia/storage-contract'
+import { rdf, sparql, type IQuad } from '@migaia/storage-contract'
+import { term, prefixStorageOrgGraph } from '@migaia/storage-host/authoring/rdf'
+import { ConcurrencyPolicy } from '@migaia/storage-host/authoring/concurrency'
 import { sparqlBackendPlugin, sparqlBackendKind } from '../src/index.js'
 import { oxigraphEndpoint } from '../src/oxigraph.js'
 import { graphStoreFeature } from '../src/features/graph-store.js'

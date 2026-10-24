@@ -9,9 +9,6 @@ import {
 import {
   vector,
   ttl,
-  snapshotStorageVectorCollection,
-  snapshotStorageVector,
-  snapshotStorageWhere,
   assertStorageTtlDuration,
   isStorageContractError,
   StorageContractError,
@@ -23,6 +20,11 @@ import {
   type IVectorCollection,
   type IStorageVectorConfiguration
 } from '@migaia/storage-contract'
+import {
+  snapshotStorageVectorCollection,
+  snapshotStorageVector
+} from '@migaia/storage-host/authoring/vector'
+import { snapshotStorageWhere } from '@migaia/storage-host/authoring/query'
 import { defineJsonCodec } from '@migaia/serialize/codecs/json'
 import type { ICodecValue } from '@migaia/serialize/codec'
 import { raceWithAbort, UtilsAbortError } from '@migaia/utils/promise'

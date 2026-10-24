@@ -5,7 +5,7 @@ import type { IStorageOperationRuntime } from '@migaia/storage-host/authoring/ba
 import { StorageError, StorageErrorCode } from '../types/errors.js'
 import { normalizeStorageException } from './quota.js'
 import { readAbortReason } from '@migaia/storage-host/authoring/backend'
-import { snapshotOperationContext } from '@migaia/storage-contract'
+import { snapshotOperationContext } from '@migaia/storage-host/authoring/context'
 import { subscribeToAbort } from '../backends/errors.js'
 import { StorageBackend } from '../constants.js'
 

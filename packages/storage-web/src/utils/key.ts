@@ -6,9 +6,9 @@ import { utf8ByteLength } from '@migaia/utils/bytes'
 import {
   StorageContractError,
   StorageContractErrorCode,
-  snapshotStorageKey,
   type IStorageKey
 } from '@migaia/storage-contract'
+import { snapshotStorageKey } from '@migaia/storage-host/authoring/key'
 import { encodeFlatStorageKey, decodeFlatStorageKey } from '@migaia/storage-host/authoring/backend'
 
 /** Namespace/key codec boundary. Custom codecs own migration and collision safety. */

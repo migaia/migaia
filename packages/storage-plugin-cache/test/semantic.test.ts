@@ -1,12 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
-import {
-  vector,
-  ttl,
-  lockKey,
-  DeleteCountMode,
-  type IVectorCollection
-} from '@migaia/storage-contract'
+import { vector, ttl, DeleteCountMode, type IVectorCollection } from '@migaia/storage-contract'
+import { lockKey } from '@migaia/storage-host/authoring/concurrency'
 import { deferred } from '@migaia/utils/promise'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { cachePlugin } from '../src/plugin.js'

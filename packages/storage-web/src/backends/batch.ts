@@ -2,12 +2,14 @@ import {
   StorageContractError,
   StorageContractErrorCode,
   assertStorageTtlDuration,
-  snapshotStorageBatchKeys,
-  createStorageBatchKeyCapture,
-  snapshotStorageKeyPrefix,
   type IStorageBatchKey,
   type IStorageStore
 } from '@migaia/storage-contract'
+import {
+  snapshotStorageBatchKeys,
+  createStorageBatchKeyCapture,
+  snapshotStorageKeyPrefix
+} from '@migaia/storage-host/authoring/key'
 import { observeStorageBatch, withAbort } from '@migaia/storage-host/authoring/backend'
 import { storageBackendOperation } from '../constants.js'
 import { StorageErrorText } from '../error-text.js'

@@ -5,7 +5,8 @@ Choose `/pg`, `/postgres-js`, or Bun 1.4.4+ `/bun` as shown in README. Pass the 
 ## Batches, expiry and organizations
 
 ```ts
-import { kv, ttl, counter, records, lockKey } from '@migaia/storage-contract'
+import { kv, ttl, counter, records } from '@migaia/storage-contract'
+import { lockKey } from '@migaia/storage-host/authoring/concurrency'
 await store.use(kv).setMany([
   { key: ['items', 1], value: 'first', ttlMs: 10000 },
   { key: ['items', 2], value: 'second' }
@@ -28,7 +29,8 @@ Reads retain input order, duplicates and missing entries; duplicate write keys r
 ## Transactions, queries and native SQL
 
 ```ts
-import { ConcurrencyPolicy, lockKey, sql } from '@migaia/storage-contract'
+import { ConcurrencyPolicy, lockKey } from '@migaia/storage-host/authoring/concurrency'
+import { sql } from '@migaia/storage-contract'
 await store
   .tx()
   .lock(lockKey.text('balance'))

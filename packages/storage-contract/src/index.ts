@@ -21,7 +21,7 @@ export type {
 export { ConflictPolicy } from './context.js'
 
 export type { IBackendKind, IStorageCapabilities } from './capabilities.js'
-export { snapshotStorageCapabilities, isStorageCapabilities } from './capabilities.js'
+export { isStorageCapabilities } from './capabilities.js'
 
 export { type ICodec, type ICodecOutput, type ICodecStageObserver } from './codec.js'
 export { StorageStageKind } from './stage-kind.js'
@@ -34,15 +34,7 @@ export type {
   IRecordStore,
   ISyncCapableStore
 } from './store.js'
-export {
-  isKeyValueStore,
-  asRecordStore,
-  isRecordStore,
-  snapshotKeyValueStore,
-  snapshotStorageBaseDetailed,
-  snapshotKeyValueStoreDetailed,
-  snapshotRecordStore
-} from './store.js'
+export { isKeyValueStore, asRecordStore, isRecordStore } from './store.js'
 
 export type {
   IRecordIndexDefinition,
@@ -74,27 +66,16 @@ export type {
 } from './transaction.js'
 export { assertTransactionCallback, readTransactionConflictPolicy } from './transaction.js'
 
-export {
-  KEY_DOMAIN_LIMITS,
-  assertStorageKey,
-  snapshotStorageKey,
-  assertStringStorageKey,
-  compareStorageKeys
-} from './key.js'
+export { KEY_DOMAIN_LIMITS, assertStorageKey, assertStringStorageKey } from './key.js'
 
-export { snapshotCodec, assertCodec } from './codec-guard.js'
+export { assertCodec } from './codec-guard.js'
 
 export {
-  snapshotOperationContext,
   assertOperationContext,
-  snapshotSyncWriteOptions,
   assertSyncWriteOptions,
   type IOperationContextSnapshot
 } from './operation-context.js'
 
-export { intrinsicConstructorName } from './bytes.js'
-
-export { createStorageIteratorLifetime } from './resource.js'
 export type { IStorageResource, IStorageIterator, IStorageIteratorLifetime } from './resource.js'
 export {
   BACKEND_KIND_PATTERN,
@@ -121,9 +102,6 @@ export type {
 export {
   defineStorageCapability,
   implement,
-  provideCapabilities,
-  hasStorageCapability,
-  useStorageCapability,
   kv,
   records,
   type IStorageCapability,
@@ -171,73 +149,36 @@ export type {
   ICompiledStorageSql,
   IStorageSqlQueryTerminals
 } from './sql.js'
-export { sqlFragment, createSqlTag, deriveStorageSqlQuery } from './sql.js'
+
 export type { IQueryStageObserver } from './query.js'
 
-export {
-  encodeOrderedStorageKey,
-  decodeOrderedStorageKey,
-  encodeStorageOrgKey,
-  decodeStorageOrgKey,
-  snapshotStorageOrgKeyPrefix
-} from './key-order.js'
-export {
-  snapshotStorageBatchKeys,
-  createStorageBatchKeyCapture,
-  projectStorageBatchKeys,
-  createStorageBatchKeyProjection
-} from './key-order.js'
 export type { IStorageBatchKey, IStorageBatchKeyCapture } from './key-order.js'
 
 export {
   TransactionActivityMode,
   TransactionBeforeStage,
-  TransactionObservedStage,
-  createTransactionOwner,
-  deriveTransactionIterator,
-  readTransactionOperationContext,
-  assertTransactionOwner,
-  runTransactionOperation,
-  registerTransactionFinalizer,
-  nextTransactionIterator
+  TransactionObservedStage
 } from './transaction.js'
 export type { ITransactionInfo } from './transaction.js'
 
-export { defineConcurrencyPolicy, ConcurrencyPolicy } from './concurrency.js'
+export { defineConcurrencyPolicy } from './concurrency.js'
 export type { IConcurrencyConflict, ILockHolding } from './concurrency.js'
 
-export { lockKey, assertLockKey } from './concurrency.js'
+export { assertLockKey } from './concurrency.js'
 
-export { prefixStorageOrgKey, unprefixStorageOrgKey } from './org.js'
-
-export {
-  runWithConcurrency,
-  readConcurrencyLockIdentities,
-  snapshotConcurrencyLockHoldings,
-  snapshotConcurrencyLockKeys,
-  snapshotConcurrencyLockRange
-} from './concurrency.js'
 export type {
   IConcurrencyAttempt,
   IConcurrencyAttemptContext,
   IConcurrencyPort
 } from './concurrency.js'
-export { resolveConcurrencyPolicy } from './transaction.js'
 
-export { createTransactionBuilder, TransactionBuilderMethod } from './transaction-builder.js'
+export { TransactionBuilderMethod } from './transaction-builder.js'
 export type { IOptimisticTransactionBuilderMode } from './transaction-builder.js'
 
 export {
   QueryOperator,
   QueryOperation,
-  compileStorageWhere,
-  snapshotStorageWhere,
-  compileStorageQueryCondition,
-  createRecordQuery,
-  createVectorQuery,
-  refineStorageVectorQuery,
   VectorQueryOriginKind,
-  createRdfQuery,
   RecordQueryMethod,
   VectorQueryMethod,
   RdfQueryMethod
@@ -304,19 +245,12 @@ export type {
   IRdfQuerySource
 } from './query-chain.js'
 
-export { useTransactionCapability } from './transaction.js'
 export type { ITransactionCapabilityView, IWithTransactionQueryMethods } from './capability.js'
 
-export { snapshotStorageKeyPrefix } from './key-order.js'
 export type { IStorageKeyPrefix } from './key-order.js'
-export {
-  ttl,
-  assertStorageTtlTarget,
-  snapshotStorageTtlTarget,
-  assertStorageTtlDuration
-} from './capabilities/ttl.js'
+export { ttl, assertStorageTtlTarget, assertStorageTtlDuration } from './capabilities/ttl.js'
 export type { ITtlTarget, ITtlApi, ITransactionTtlApi } from './capabilities/ttl.js'
-export { counter, snapshotStorageCounterIncrement } from './capabilities/counter.js'
+export { counter } from './capabilities/counter.js'
 export type {
   ICounterApi,
   ITransactionCounterApi,
@@ -325,18 +259,9 @@ export type {
 export {
   RdfTermType,
   RdfDatatype,
-  term,
   assertStorageRdfTerm,
   assertStorageRdfPattern,
-  assertStorageRdfQuad,
-  snapshotStorageRdfTerm,
-  snapshotStorageRdfPattern,
-  snapshotStorageRdfQuad,
-  encodeStorageRdfTerm,
-  encodeStorageRdfQuad,
-  getStorageOrgGraphPrefix,
-  prefixStorageOrgGraph,
-  unprefixStorageOrgGraph
+  assertStorageRdfQuad
 } from './capabilities/rdf.js'
 export type {
   IRdfNamedNode,
@@ -351,14 +276,7 @@ export type {
 
 export { sql } from './capabilities/sql.js'
 
-export {
-  blob,
-  snapshotStorageBlobPut,
-  snapshotStorageBlobGet,
-  snapshotStorageBlobList,
-  createStorageBlobObject,
-  createStorageBlobBodyReader
-} from './capabilities/blob.js'
+export { blob } from './capabilities/blob.js'
 export type { IBlobInfo, IBlobObject, IBlobApi } from './capabilities/blob.js'
 export { durableChangeFeed } from './capabilities/durable-change-feed.js'
 export type {
@@ -366,9 +284,7 @@ export type {
   IDurableChangeFeedApi
 } from './capabilities/durable-change-feed.js'
 
-export { orderStorageKeysByBytes, encodeStorageOrgStringPrefix } from './key-order.js'
-
-export { sparql, sparqlFragment, createSparqlTag } from './capabilities/sparql.js'
+export { sparql } from './capabilities/sparql.js'
 export type {
   ISparqlFragment,
   ISparqlInput,
@@ -383,14 +299,7 @@ export {
   DeleteCountMode,
   assertStorageVectorCollection,
   assertStorageVector,
-  assertStorageVectorIds,
-  snapshotStorageVectorCollection,
-  snapshotStorageVector,
-  snapshotStorageVectorUpsert,
-  snapshotStorageVectorFilter,
-  snapshotStorageVectorSearch,
-  snapshotStorageVectorIds,
-  snapshotStorageDeleteCountMode
+  assertStorageVectorIds
 } from './capabilities/vector.js'
 export type {
   IVectorApi,
@@ -402,3 +311,58 @@ export type {
 } from './capabilities/vector.js'
 export { rdf } from './capabilities/rdf.js'
 export type { IRdfApi, ITransactionRdfApi } from './capabilities/rdf.js'
+
+export {
+  ConcurrencyLocking,
+  invalidConcurrencyArgument,
+  assertConcurrencyPolicy,
+  readConcurrencyPolicy,
+  LockChannel,
+  type INormalizedLockKey,
+  invalidLockArgument,
+  type IConcurrencyRequest
+} from './concurrency.js'
+
+export { RdfQuadPosition, invalidRdf, assertRdfIri, assertRdfLiteral } from './capabilities/rdf.js'
+
+export { type IStorageCapabilitiesInspection } from './capabilities.js'
+
+export { readStorageImplementation, type IStorageImplementationRecord } from './capability.js'
+
+export {
+  StorageCapabilityMethod,
+  STORAGE_CAPABILITY_METHODS,
+  STORAGE_KEY_VALUE_METHODS,
+  STORAGE_KEY_VALUE_PROPERTIES
+} from './capability-constants.js'
+
+export {
+  readCapabilityTokenFacts,
+  isCapabilityToken,
+  invalidCapability,
+  type ICapabilityTokenFacts,
+  type ICapabilityTransactionFacts
+} from './capability-token.js'
+
+export { SqlQueryMethod } from './sql.js'
+
+export { type IQueryOperandValue } from './query-chain.js'
+
+export { isStorageBase, inspectStoreShape } from './store.js'
+
+export { type IStorageIteratorLifetimeOptions } from './resource.js'
+
+export { type IOperationValidationContext } from './operation-context.js'
+
+export { assertStorageOrgId } from './org.js'
+
+export { invalidVector, assertVectorObject } from './capabilities/vector.js'
+
+export {
+  invalidBlobInput,
+  assertStorageBlobPut,
+  assertStorageBlobGet,
+  assertStorageBlobList
+} from './capabilities/blob.js'
+
+export type { IVectorCollectionOptions } from './capabilities/vector.js'

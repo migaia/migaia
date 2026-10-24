@@ -3,15 +3,8 @@ import { Pool } from 'pg'
 import postgres from 'postgres'
 import { describe, it, expect, onTestFinished } from 'vitest'
 import { createStorageHost, definePlugin } from '@migaia/storage-host'
-import {
-  kv,
-  records,
-  ttl,
-  counter,
-  sql,
-  lockKey,
-  ConcurrencyPolicy
-} from '@migaia/storage-contract'
+import { kv, records, ttl, counter, sql } from '@migaia/storage-contract'
+import { lockKey, ConcurrencyPolicy } from '@migaia/storage-host/authoring/concurrency'
 import { postgresBackendPlugin } from '../src/index.js'
 import { pgDriver } from '../src/pg.js'
 import { postgresJsDriver } from '../src/postgres-js.js'

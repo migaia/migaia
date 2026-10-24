@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createStorageHost, memoryBackendPlugin, definePlugin } from '@migaia/storage-host'
-import { blob, records, ttl, lockKey } from '@migaia/storage-contract'
+import { blob, records, ttl } from '@migaia/storage-contract'
+import { lockKey } from '@migaia/storage-host/authoring/concurrency'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { cachePlugin } from '../src/index.js'
 

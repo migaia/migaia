@@ -9759,7 +9759,7 @@
       "library": "storage-contract"
     },
     {
-      "path": "/en/docs/storage-contract/api/ConcurrencyPolicy",
+      "path": "/en/docs/storage-contract/api/ConcurrencyLocking",
       "locale": "en",
       "domain": "docs",
       "library": "storage-contract"
@@ -9849,6 +9849,18 @@
       "library": "storage-contract"
     },
     {
+      "path": "/en/docs/storage-contract/api/ICapabilityTokenFacts",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/en/docs/storage-contract/api/ICapabilityTransactionFacts",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
       "path": "/en/docs/storage-contract/api/IChainMethods",
       "locale": "en",
       "domain": "docs",
@@ -9928,6 +9940,12 @@
     },
     {
       "path": "/en/docs/storage-contract/api/IConcurrencyPort",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/en/docs/storage-contract/api/IConcurrencyRequest",
       "locale": "en",
       "domain": "docs",
       "library": "storage-contract"
@@ -10047,6 +10065,12 @@
       "library": "storage-contract"
     },
     {
+      "path": "/en/docs/storage-contract/api/INormalizedLockKey",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
       "path": "/en/docs/storage-contract/api/INumericKeys",
       "locale": "en",
       "domain": "docs",
@@ -10060,6 +10084,12 @@
     },
     {
       "path": "/en/docs/storage-contract/api/IOperationContextSnapshot",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/en/docs/storage-contract/api/IOperationValidationContext",
       "locale": "en",
       "domain": "docs",
       "library": "storage-contract"
@@ -10131,37 +10161,7 @@
       "library": "storage-contract"
     },
     {
-      "path": "/en/docs/storage-contract/api/IQueryPages",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/IQueryPlan",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/IQueryPlanStep",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/IQueryPushdown",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/IQueryRead",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/IQueryReducer",
+      "path": "/en/docs/storage-contract/api/IQueryOperandValue",
       "locale": "en",
       "domain": "docs",
       "library": "storage-contract"
@@ -26271,6 +26271,42 @@
       "library": "serialize"
     },
     {
+      "path": "/en/docs/storage-contract/api/IQueryPages",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/en/docs/storage-contract/api/IQueryPlan",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/en/docs/storage-contract/api/IQueryPlanStep",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/en/docs/storage-contract/api/IQueryPushdown",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/en/docs/storage-contract/api/IQueryRead",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/en/docs/storage-contract/api/IQueryReducer",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
       "path": "/en/docs/storage-contract/api/IQueryReduction",
       "locale": "en",
       "domain": "docs",
@@ -26661,43 +26697,7 @@
       "library": "storage-contract"
     },
     {
-      "path": "/en/docs/storage-contract/api/IStorageCapability",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/IStorageCapabilityApiOf",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/IStorageCapabilitySet",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/IStorageChange",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/IStorageContractErrorCode",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/IStorageContractErrorDetails",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/IStorageCounterIncrement",
+      "path": "/en/docs/storage-contract/api/IStorageCapabilitiesInspection",
       "locale": "en",
       "domain": "docs",
       "library": "storage-contract"
@@ -32349,6 +32349,54 @@
       "library": "wasm"
     },
     {
+      "path": "/en/docs/storage-contract/api/IStorageCapability",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/en/docs/storage-contract/api/IStorageCapabilityApiOf",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/en/docs/storage-contract/api/IStorageCapabilitySet",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/en/docs/storage-contract/api/IStorageChange",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/en/docs/storage-contract/api/IStorageContractErrorCode",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/en/docs/storage-contract/api/IStorageContractErrorDetails",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/en/docs/storage-contract/api/IStorageCounterIncrement",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/en/docs/storage-contract/api/IStorageImplementationRecord",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
       "path": "/en/docs/storage-contract/api/IStorageImplementationsOf",
       "locale": "en",
       "domain": "docs",
@@ -32362,6 +32410,12 @@
     },
     {
       "path": "/en/docs/storage-contract/api/IStorageIteratorLifetime",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/en/docs/storage-contract/api/IStorageIteratorLifetimeOptions",
       "locale": "en",
       "domain": "docs",
       "library": "storage-contract"
@@ -32428,6 +32482,12 @@
     },
     {
       "path": "/en/docs/storage-contract/api/ISyncKeyValueStore",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/en/docs/storage-contract/api/ISyncMigrationCheck",
       "locale": "en",
       "domain": "docs",
       "library": "storage-contract"
@@ -32560,6 +32620,12 @@
     },
     {
       "path": "/en/docs/storage-contract/api/IVectorCollection",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/en/docs/storage-contract/api/IVectorCollectionOptions",
       "locale": "en",
       "domain": "docs",
       "library": "storage-contract"
@@ -32715,6 +32781,12 @@
       "library": "storage-contract"
     },
     {
+      "path": "/en/docs/storage-contract/api/LockChannel",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
       "path": "/en/docs/storage-contract/api/QueryOperation",
       "locale": "en",
       "domain": "docs",
@@ -32728,6 +32800,12 @@
     },
     {
       "path": "/en/docs/storage-contract/api/RdfDatatype",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/en/docs/storage-contract/api/RdfQuadPosition",
       "locale": "en",
       "domain": "docs",
       "library": "storage-contract"
@@ -32751,7 +32829,37 @@
       "library": "storage-contract"
     },
     {
+      "path": "/en/docs/storage-contract/api/STORAGE_CAPABILITY_METHODS",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
       "path": "/en/docs/storage-contract/api/STORAGE_CONTRACT_SOURCE",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/en/docs/storage-contract/api/STORAGE_KEY_VALUE_METHODS",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/en/docs/storage-contract/api/STORAGE_KEY_VALUE_PROPERTIES",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/en/docs/storage-contract/api/SqlQueryMethod",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/en/docs/storage-contract/api/StorageCapabilityMethod",
       "locale": "en",
       "domain": "docs",
       "library": "storage-contract"
@@ -32764,6 +32872,12 @@
     },
     {
       "path": "/en/docs/storage-contract/api/StorageContractErrorCode",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/en/docs/storage-contract/api/StorageContractErrorText",
       "locale": "en",
       "domain": "docs",
       "library": "storage-contract"
@@ -32835,7 +32949,49 @@
       "library": "storage-contract"
     },
     {
+      "path": "/en/docs/storage-contract/api/assertConcurrencyPolicy",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/en/docs/storage-contract/api/assertLockKey",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
       "path": "/en/docs/storage-contract/api/assertOperationContext",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/en/docs/storage-contract/api/assertRdfIri",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/en/docs/storage-contract/api/assertRdfLiteral",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/en/docs/storage-contract/api/assertStorageBlobGet",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/en/docs/storage-contract/api/assertStorageBlobList",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/en/docs/storage-contract/api/assertStorageBlobPut",
       "locale": "en",
       "domain": "docs",
       "library": "storage-contract"
@@ -32847,7 +33003,55 @@
       "library": "storage-contract"
     },
     {
+      "path": "/en/docs/storage-contract/api/assertStorageOrgId",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/en/docs/storage-contract/api/assertStorageRdfPattern",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/en/docs/storage-contract/api/assertStorageRdfQuad",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/en/docs/storage-contract/api/assertStorageRdfTerm",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
       "path": "/en/docs/storage-contract/api/assertStorageTtlDuration",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/en/docs/storage-contract/api/assertStorageTtlTarget",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/en/docs/storage-contract/api/assertStorageVector",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/en/docs/storage-contract/api/assertStorageVectorCollection",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/en/docs/storage-contract/api/assertStorageVectorIds",
       "locale": "en",
       "domain": "docs",
       "library": "storage-contract"
@@ -32871,7 +33075,7 @@
       "library": "storage-contract"
     },
     {
-      "path": "/en/docs/storage-contract/api/assertTransactionOwner",
+      "path": "/en/docs/storage-contract/api/assertVectorObject",
       "locale": "en",
       "domain": "docs",
       "library": "storage-contract"
@@ -32884,24 +33088,6 @@
     },
     {
       "path": "/en/docs/storage-contract/api/blob",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/compareStorageKeys",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/compileStorageQueryCondition",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/compileStorageWhere",
       "locale": "en",
       "domain": "docs",
       "library": "storage-contract"
@@ -32943,90 +33129,6 @@
       "library": "storage-contract"
     },
     {
-      "path": "/en/docs/storage-contract/api/createMigrationPlan",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/createRdfQuery",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/createRecordQuery",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/createSparqlTag",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/createSqlTag",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/createStorageBatchKeyCapture",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/createStorageBlobBodyReader",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/createStorageBlobObject",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/createStorageIteratorLifetime",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/createTransactionBuilder",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/createTransactionOwner",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/createVectorQuery",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/decodeOrderedStorageKey",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/decodeStorageOrgKey",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
       "path": "/en/docs/storage-contract/api/defineConcurrencyPolicy",
       "locale": "en",
       "domain": "docs",
@@ -33039,67 +33141,7 @@
       "library": "storage-contract"
     },
     {
-      "path": "/en/docs/storage-contract/api/deriveStorageSqlQuery",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/deriveTransactionIterator",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
       "path": "/en/docs/storage-contract/api/durableChangeFeed",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/encodeOrderedStorageKey",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/encodeStorageOrgKey",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/encodeStorageOrgStringPrefix",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/encodeStorageRdfQuad",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/encodeStorageRdfTerm",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/fromValueCodec",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/getStorageOrgGraphPrefix",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/hasStorageCapability",
       "locale": "en",
       "domain": "docs",
       "library": "storage-contract"
@@ -33111,13 +33153,55 @@
       "library": "storage-contract"
     },
     {
-      "path": "/en/docs/storage-contract/api/intrinsicConstructorName",
+      "path": "/en/docs/storage-contract/api/inspectStoreShape",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/en/docs/storage-contract/api/invalidBlobInput",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/en/docs/storage-contract/api/invalidCapability",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/en/docs/storage-contract/api/invalidConcurrencyArgument",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/en/docs/storage-contract/api/invalidLockArgument",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/en/docs/storage-contract/api/invalidRdf",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/en/docs/storage-contract/api/invalidVector",
       "locale": "en",
       "domain": "docs",
       "library": "storage-contract"
     },
     {
       "path": "/en/docs/storage-contract/api/isBackendKind",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/en/docs/storage-contract/api/isCapabilityToken",
       "locale": "en",
       "domain": "docs",
       "library": "storage-contract"
@@ -33147,6 +33231,12 @@
       "library": "storage-contract"
     },
     {
+      "path": "/en/docs/storage-contract/api/isStorageBase",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
       "path": "/en/docs/storage-contract/api/isStorageCapabilities",
       "locale": "en",
       "domain": "docs",
@@ -33165,61 +33255,25 @@
       "library": "storage-contract"
     },
     {
-      "path": "/en/docs/storage-contract/api/lockKey",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/migrateEnvelope",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/migrateEnvelopeSync",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/nextTransactionIterator",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/orderStorageKeysByBytes",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/prefixStorageOrgGraph",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/prefixStorageOrgKey",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/provideCapabilities",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
       "path": "/en/docs/storage-contract/api/rdf",
       "locale": "en",
       "domain": "docs",
       "library": "storage-contract"
     },
     {
-      "path": "/en/docs/storage-contract/api/readConcurrencyLockIdentities",
+      "path": "/en/docs/storage-contract/api/readCapabilityTokenFacts",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/en/docs/storage-contract/api/readConcurrencyPolicy",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/en/docs/storage-contract/api/readStorageImplementation",
       "locale": "en",
       "domain": "docs",
       "library": "storage-contract"
@@ -33231,229 +33285,7 @@
       "library": "storage-contract"
     },
     {
-      "path": "/en/docs/storage-contract/api/readTransactionOperationContext",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
       "path": "/en/docs/storage-contract/api/records",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/refineStorageVectorQuery",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/registerTransactionFinalizer",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/resolveConcurrencyPolicy",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/runTransactionOperation",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/runWithConcurrency",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/snapshotCodec",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/snapshotConcurrencyLockHoldings",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/snapshotConcurrencyLockKeys",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/snapshotConcurrencyLockRange",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/snapshotKeyValueStore",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/snapshotKeyValueStoreDetailed",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/snapshotOperationContext",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/snapshotRecordStore",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/snapshotStorageBaseDetailed",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/snapshotStorageBatchKeys",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/snapshotStorageBlobGet",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/snapshotStorageBlobList",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/snapshotStorageBlobPut",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/snapshotStorageCapabilities",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/snapshotStorageCounterIncrement",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/snapshotStorageDeleteCountMode",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/snapshotStorageKey",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/snapshotStorageKeyPrefix",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/snapshotStorageOrgKeyPrefix",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/snapshotStorageRdfPattern",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/snapshotStorageRdfQuad",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/snapshotStorageRdfTerm",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/snapshotStorageTtlTarget",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/snapshotStorageVector",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/snapshotStorageVectorCollection",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/snapshotStorageVectorFilter",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/snapshotStorageVectorIds",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/snapshotStorageVectorSearch",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/snapshotStorageVectorUpsert",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/snapshotStorageWhere",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/snapshotSyncWriteOptions",
       "locale": "en",
       "domain": "docs",
       "library": "storage-contract"
@@ -33465,55 +33297,13 @@
       "library": "storage-contract"
     },
     {
-      "path": "/en/docs/storage-contract/api/sparqlFragment",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
       "path": "/en/docs/storage-contract/api/sql",
       "locale": "en",
       "domain": "docs",
       "library": "storage-contract"
     },
     {
-      "path": "/en/docs/storage-contract/api/sqlFragment",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/term",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
       "path": "/en/docs/storage-contract/api/ttl",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/unprefixStorageOrgGraph",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/unprefixStorageOrgKey",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/useStorageCapability",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/useTransactionCapability",
       "locale": "en",
       "domain": "docs",
       "library": "storage-contract"
@@ -33591,7 +33381,7 @@
       "library": "storage-contract"
     },
     {
-      "path": "/zh/docs/storage-contract/api/ConcurrencyPolicy",
+      "path": "/zh/docs/storage-contract/api/ConcurrencyLocking",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-contract"
@@ -33681,6 +33471,18 @@
       "library": "storage-contract"
     },
     {
+      "path": "/zh/docs/storage-contract/api/ICapabilityTokenFacts",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/zh/docs/storage-contract/api/ICapabilityTransactionFacts",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
       "path": "/zh/docs/storage-contract/api/IChainMethods",
       "locale": "zh",
       "domain": "docs",
@@ -33760,6 +33562,12 @@
     },
     {
       "path": "/zh/docs/storage-contract/api/IConcurrencyPort",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/zh/docs/storage-contract/api/IConcurrencyRequest",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-contract"
@@ -33879,6 +33687,12 @@
       "library": "storage-contract"
     },
     {
+      "path": "/zh/docs/storage-contract/api/INormalizedLockKey",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
       "path": "/zh/docs/storage-contract/api/INumericKeys",
       "locale": "zh",
       "domain": "docs",
@@ -33892,6 +33706,12 @@
     },
     {
       "path": "/zh/docs/storage-contract/api/IOperationContextSnapshot",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/zh/docs/storage-contract/api/IOperationValidationContext",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-contract"
@@ -33958,6 +33778,12 @@
     },
     {
       "path": "/zh/docs/storage-contract/api/IQueryNativeStep",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/zh/docs/storage-contract/api/IQueryOperandValue",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-contract"
@@ -34389,6 +34215,12 @@
       "library": "storage-contract"
     },
     {
+      "path": "/zh/docs/storage-contract/api/IStorageCapabilitiesInspection",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
       "path": "/zh/docs/storage-contract/api/IStorageCapability",
       "locale": "zh",
       "domain": "docs",
@@ -34431,6 +34263,12 @@
       "library": "storage-contract"
     },
     {
+      "path": "/zh/docs/storage-contract/api/IStorageImplementationRecord",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
       "path": "/zh/docs/storage-contract/api/IStorageImplementationsOf",
       "locale": "zh",
       "domain": "docs",
@@ -34444,6 +34282,12 @@
     },
     {
       "path": "/zh/docs/storage-contract/api/IStorageIteratorLifetime",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/zh/docs/storage-contract/api/IStorageIteratorLifetimeOptions",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-contract"
@@ -34510,6 +34354,12 @@
     },
     {
       "path": "/zh/docs/storage-contract/api/ISyncKeyValueStore",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/zh/docs/storage-contract/api/ISyncMigrationCheck",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-contract"
@@ -34642,6 +34492,12 @@
     },
     {
       "path": "/zh/docs/storage-contract/api/IVectorCollection",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/zh/docs/storage-contract/api/IVectorCollectionOptions",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-contract"
@@ -34797,6 +34653,12 @@
       "library": "storage-contract"
     },
     {
+      "path": "/zh/docs/storage-contract/api/LockChannel",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
       "path": "/zh/docs/storage-contract/api/QueryOperation",
       "locale": "zh",
       "domain": "docs",
@@ -34810,6 +34672,12 @@
     },
     {
       "path": "/zh/docs/storage-contract/api/RdfDatatype",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/zh/docs/storage-contract/api/RdfQuadPosition",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-contract"
@@ -34833,7 +34701,37 @@
       "library": "storage-contract"
     },
     {
+      "path": "/zh/docs/storage-contract/api/STORAGE_CAPABILITY_METHODS",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
       "path": "/zh/docs/storage-contract/api/STORAGE_CONTRACT_SOURCE",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/zh/docs/storage-contract/api/STORAGE_KEY_VALUE_METHODS",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/zh/docs/storage-contract/api/STORAGE_KEY_VALUE_PROPERTIES",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/zh/docs/storage-contract/api/SqlQueryMethod",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/zh/docs/storage-contract/api/StorageCapabilityMethod",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-contract"
@@ -34846,6 +34744,12 @@
     },
     {
       "path": "/zh/docs/storage-contract/api/StorageContractErrorCode",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/zh/docs/storage-contract/api/StorageContractErrorText",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-contract"
@@ -34917,7 +34821,49 @@
       "library": "storage-contract"
     },
     {
+      "path": "/zh/docs/storage-contract/api/assertConcurrencyPolicy",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/zh/docs/storage-contract/api/assertLockKey",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
       "path": "/zh/docs/storage-contract/api/assertOperationContext",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/zh/docs/storage-contract/api/assertRdfIri",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/zh/docs/storage-contract/api/assertRdfLiteral",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/zh/docs/storage-contract/api/assertStorageBlobGet",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/zh/docs/storage-contract/api/assertStorageBlobList",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/zh/docs/storage-contract/api/assertStorageBlobPut",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-contract"
@@ -34929,7 +34875,55 @@
       "library": "storage-contract"
     },
     {
+      "path": "/zh/docs/storage-contract/api/assertStorageOrgId",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/zh/docs/storage-contract/api/assertStorageRdfPattern",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/zh/docs/storage-contract/api/assertStorageRdfQuad",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/zh/docs/storage-contract/api/assertStorageRdfTerm",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
       "path": "/zh/docs/storage-contract/api/assertStorageTtlDuration",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/zh/docs/storage-contract/api/assertStorageTtlTarget",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/zh/docs/storage-contract/api/assertStorageVector",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/zh/docs/storage-contract/api/assertStorageVectorCollection",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/zh/docs/storage-contract/api/assertStorageVectorIds",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-contract"
@@ -34953,7 +34947,7 @@
       "library": "storage-contract"
     },
     {
-      "path": "/zh/docs/storage-contract/api/assertTransactionOwner",
+      "path": "/zh/docs/storage-contract/api/assertVectorObject",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-contract"
@@ -34966,24 +34960,6 @@
     },
     {
       "path": "/zh/docs/storage-contract/api/blob",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/compareStorageKeys",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/compileStorageQueryCondition",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/compileStorageWhere",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-contract"
@@ -35025,90 +35001,6 @@
       "library": "storage-contract"
     },
     {
-      "path": "/zh/docs/storage-contract/api/createMigrationPlan",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/createRdfQuery",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/createRecordQuery",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/createSparqlTag",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/createSqlTag",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/createStorageBatchKeyCapture",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/createStorageBlobBodyReader",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/createStorageBlobObject",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/createStorageIteratorLifetime",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/createTransactionBuilder",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/createTransactionOwner",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/createVectorQuery",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/decodeOrderedStorageKey",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/decodeStorageOrgKey",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
       "path": "/zh/docs/storage-contract/api/defineConcurrencyPolicy",
       "locale": "zh",
       "domain": "docs",
@@ -35121,67 +35013,7 @@
       "library": "storage-contract"
     },
     {
-      "path": "/zh/docs/storage-contract/api/deriveStorageSqlQuery",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/deriveTransactionIterator",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
       "path": "/zh/docs/storage-contract/api/durableChangeFeed",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/encodeOrderedStorageKey",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/encodeStorageOrgKey",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/encodeStorageOrgStringPrefix",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/encodeStorageRdfQuad",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/encodeStorageRdfTerm",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/fromValueCodec",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/getStorageOrgGraphPrefix",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/hasStorageCapability",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-contract"
@@ -35193,13 +35025,55 @@
       "library": "storage-contract"
     },
     {
-      "path": "/zh/docs/storage-contract/api/intrinsicConstructorName",
+      "path": "/zh/docs/storage-contract/api/inspectStoreShape",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/zh/docs/storage-contract/api/invalidBlobInput",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/zh/docs/storage-contract/api/invalidCapability",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/zh/docs/storage-contract/api/invalidConcurrencyArgument",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/zh/docs/storage-contract/api/invalidLockArgument",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/zh/docs/storage-contract/api/invalidRdf",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/zh/docs/storage-contract/api/invalidVector",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-contract"
     },
     {
       "path": "/zh/docs/storage-contract/api/isBackendKind",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/zh/docs/storage-contract/api/isCapabilityToken",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-contract"
@@ -35229,6 +35103,12 @@
       "library": "storage-contract"
     },
     {
+      "path": "/zh/docs/storage-contract/api/isStorageBase",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
       "path": "/zh/docs/storage-contract/api/isStorageCapabilities",
       "locale": "zh",
       "domain": "docs",
@@ -35247,61 +35127,25 @@
       "library": "storage-contract"
     },
     {
-      "path": "/zh/docs/storage-contract/api/lockKey",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/migrateEnvelope",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/migrateEnvelopeSync",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/nextTransactionIterator",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/orderStorageKeysByBytes",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/prefixStorageOrgGraph",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/prefixStorageOrgKey",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/provideCapabilities",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
       "path": "/zh/docs/storage-contract/api/rdf",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-contract"
     },
     {
-      "path": "/zh/docs/storage-contract/api/readConcurrencyLockIdentities",
+      "path": "/zh/docs/storage-contract/api/readCapabilityTokenFacts",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/zh/docs/storage-contract/api/readConcurrencyPolicy",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/zh/docs/storage-contract/api/readStorageImplementation",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-contract"
@@ -35313,181 +35157,73 @@
       "library": "storage-contract"
     },
     {
-      "path": "/zh/docs/storage-contract/api/readTransactionOperationContext",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
       "path": "/zh/docs/storage-contract/api/records",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-contract"
     },
     {
-      "path": "/zh/docs/storage-contract/api/refineStorageVectorQuery",
+      "path": "/zh/docs/storage-contract/api/sparql",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-contract"
     },
     {
-      "path": "/zh/docs/storage-contract/api/registerTransactionFinalizer",
+      "path": "/zh/docs/storage-contract/api/sql",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-contract"
     },
     {
-      "path": "/zh/docs/storage-contract/api/resolveConcurrencyPolicy",
+      "path": "/zh/docs/storage-contract/api/ttl",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-contract"
     },
     {
-      "path": "/zh/docs/storage-contract/api/runTransactionOperation",
+      "path": "/zh/docs/storage-contract/api/vector",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-contract"
     },
     {
-      "path": "/zh/docs/storage-contract/api/runWithConcurrency",
+      "path": "/zh/docs/storage-contract/capability-narrowing",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-contract"
     },
     {
-      "path": "/zh/docs/storage-contract/api/snapshotCodec",
+      "path": "/zh/docs/storage-contract/change-feed-and-subscription-ownership",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-contract"
     },
     {
-      "path": "/zh/docs/storage-contract/api/snapshotConcurrencyLockHoldings",
+      "path": "/zh/docs/storage-contract/codecs-and-errors",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-contract"
     },
     {
-      "path": "/zh/docs/storage-contract/api/snapshotConcurrencyLockKeys",
+      "path": "/zh/docs/storage-contract/getting-started",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-contract"
     },
     {
-      "path": "/zh/docs/storage-contract/api/snapshotConcurrencyLockRange",
+      "path": "/zh/docs/storage-contract/readme",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-contract"
     },
     {
-      "path": "/zh/docs/storage-contract/api/snapshotKeyValueStore",
+      "path": "/zh/docs/storage-contract/records-indexes-and-transactions",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-contract"
     },
     {
-      "path": "/zh/docs/storage-contract/api/snapshotKeyValueStoreDetailed",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/snapshotOperationContext",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/snapshotRecordStore",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/snapshotStorageBaseDetailed",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/snapshotStorageBatchKeys",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/snapshotStorageBlobGet",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/snapshotStorageBlobList",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/snapshotStorageBlobPut",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/snapshotStorageCapabilities",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/snapshotStorageCounterIncrement",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/snapshotStorageDeleteCountMode",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/snapshotStorageKey",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/snapshotStorageKeyPrefix",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/snapshotStorageOrgKeyPrefix",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/snapshotStorageRdfPattern",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/snapshotStorageRdfQuad",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/snapshotStorageRdfTerm",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/snapshotStorageTtlTarget",
+      "path": "/zh/docs/storage-contract/safe-operations-and-keys",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-contract"
@@ -36189,6 +35925,12 @@
       "library": "storage-host"
     },
     {
+      "path": "/en/docs/storage-host/api/authoring/backend/intrinsicConstructorName",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
       "path": "/en/docs/storage-host/api/authoring/backend/invokeExtension",
       "locale": "en",
       "domain": "docs",
@@ -36285,6 +36027,624 @@
       "library": "storage-host"
     },
     {
+      "path": "/en/docs/storage-host/api/authoring/blob",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/blob/createStorageBlobBodyReader",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/blob/createStorageBlobObject",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/blob/snapshotStorageBlobGet",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/blob/snapshotStorageBlobList",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/blob/snapshotStorageBlobPut",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/capability",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/capability/hasStorageCapability",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/capability/provideCapabilities",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/capability/readTransactionImplementation",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/capability/useStorageCapability",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/codec",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/codec/fromValueCodec",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/codec/snapshotCodec",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/concurrency",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/concurrency/ConcurrencyPolicy",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/concurrency/associateNormalizedLockKeys",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/concurrency/lockKey",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/concurrency/normalizeLockKeys",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/concurrency/readConcurrencyLockIdentities",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/concurrency/runWithConcurrency",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/concurrency/snapshotConcurrencyLockHoldings",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/concurrency/snapshotConcurrencyLockKeys",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/concurrency/snapshotConcurrencyLockRange",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/concurrency/snapshotLockKey",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/context",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/context/snapshotOperationContext",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/context/snapshotSyncWriteOptions",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/counter",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/counter/snapshotStorageCounterIncrement",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/key",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/key/compareStorageKeys",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/key/createStorageBatchKeyCapture",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/key/createStorageBatchKeyProjection",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/key/decodeOrderedStorageKey",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/key/decodeStorageOrgKey",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/key/encodeOrderedStorageKey",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/key/encodeStorageOrgKey",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/key/encodeStorageOrgStringPrefix",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/key/orderStorageKeysByBytes",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/key/prefixStorageOrgKey",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/key/projectStorageBatchKeys",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/key/snapshotStorageBatchKeys",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/key/snapshotStorageKey",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/key/snapshotStorageKeyPrefix",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/key/snapshotStorageOrgKeyPrefix",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/key/sortStorageByteIdentities",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/key/storageKeyBytesIdentity",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/key/unprefixStorageOrgKey",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/migration",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/migration/createMigrationPlan",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/migration/migrateEnvelope",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/migration/migrateEnvelopeSync",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/query",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/query/compileStorageQueryCondition",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/query/compileStorageWhere",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/query/createRdfQuery",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/query/createRecordQuery",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/query/createVectorQuery",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/query/refineStorageVectorQuery",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/query/snapshotStorageWhere",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/rdf",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/rdf/encodeRdfQuadSnapshot",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/rdf/encodeStorageRdfQuad",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/rdf/encodeStorageRdfTerm",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/rdf/getStorageOrgGraphPrefix",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/rdf/prefixStorageOrgGraph",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/rdf/snapshotStorageRdfPattern",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/rdf/snapshotStorageRdfQuad",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/rdf/snapshotStorageRdfTerm",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/rdf/term",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/rdf/unprefixStorageOrgGraph",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/resource",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/resource/createStorageIteratorLifetime",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/sparql",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/sparql/createSparqlTag",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/sparql/sparqlFragment",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/sql",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/sql/createSqlTag",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/sql/deriveStorageSqlQuery",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/sql/sqlFragment",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/store",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/store/snapshotKeyValueStore",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/store/snapshotKeyValueStoreDetailed",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/store/snapshotRecordStore",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/store/snapshotStorageBaseDetailed",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/store/snapshotStorageCapabilities",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/store/snapshotStorageCapabilitiesDetailed",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/transaction",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/transaction/assertTransactionOwner",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/transaction/createTransactionBuilder",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/transaction/createTransactionOwner",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/transaction/deriveTransactionIterator",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/transaction/nextTransactionIterator",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/transaction/readTransactionConcurrency",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/transaction/readTransactionOperationContext",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/transaction/registerTransactionFinalizer",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/transaction/resolveConcurrencyPolicy",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/transaction/runTransactionIteratorOperation",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/transaction/runTransactionOperation",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/transaction/useTransactionCapability",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/ttl",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/ttl/snapshotStorageTtlTarget",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
       "path": "/en/docs/storage-host/api/authoring/vector",
       "locale": "en",
       "domain": "docs",
@@ -36292,6 +36652,48 @@
     },
     {
       "path": "/en/docs/storage-host/api/authoring/vector/recommendStorageVector",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/vector/snapshotStorageDeleteCountMode",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/vector/snapshotStorageVector",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/vector/snapshotStorageVectorCollection",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/vector/snapshotStorageVectorFilter",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/vector/snapshotStorageVectorIds",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/vector/snapshotStorageVectorSearch",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/en/docs/storage-host/api/authoring/vector/snapshotStorageVectorUpsert",
       "locale": "en",
       "domain": "docs",
       "library": "storage-host"
@@ -37150,672 +37552,6 @@
     },
     {
       "path": "/zh/docs/storage-host/api/IStorageOrgView",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/IStoragePipelineInput",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/IStoragePluginCallContext",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/IStoragePluginCore",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/IStoragePluginExtensions",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/IStoragePluginId",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/IStorageQueryHookPayload",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/IStorageStoreWithFeatures",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/IUndoableStore",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/STORAGE_HOST_SOURCE",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/StorageError",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/StorageErrorCode",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/StorageErrorText",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/StorageHostFacade",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/assertStorageBackendId",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/authoring/backend",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/authoring/backend/IBackendChangeController",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/authoring/backend/IBackendChangeControllerOptions",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/authoring/backend/IBackendChangeSnapshot",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/authoring/backend/IBackendJournalNamespaceOptions",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/authoring/backend/IBackendJournalTransaction",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/authoring/backend/IBackendKeyLockPort",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/authoring/backend/IBackendRevisionPort",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/authoring/backend/IBackendValueCommit",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/authoring/backend/IChannelConflictDetails",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/authoring/backend/IChannelMutationPlan",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/authoring/backend/IChannelPresence",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/authoring/backend/IStorageErrorFamily",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/authoring/backend/IStorageOperationReporter",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/authoring/backend/IStorageOperationRuntime",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/authoring/backend/IUniqueIndexErrorFactory",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/authoring/backend/IUniqueIndexOwner",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/authoring/backend/StorageJournalLock",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/authoring/backend/assertKeyRange",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/authoring/backend/asyncDisposeKey",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/authoring/backend/collectUniqueIndexOwners",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/authoring/backend/createBackendChangeIterator",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/authoring/backend/createBackendJournalNamespace",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/authoring/backend/createStorageOperationReporter",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/authoring/backend/createStorageOperationRuntime",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/authoring/backend/createStorageToken",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/authoring/backend/decodeFlatStorageKey",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/authoring/backend/decodeStorageJournalImage",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/authoring/backend/encodeFlatStorageKey",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/authoring/backend/encodeStorageJournalImage",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/authoring/backend/invokeExtension",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/authoring/backend/isStorageErrorFamily",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/authoring/backend/isStorageKeyInRange",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/authoring/backend/mergeSignals",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/authoring/backend/normalizeError",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/authoring/backend/observeStorageBatch",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/authoring/backend/planChannelWrite",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/authoring/backend/readAbortReason",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/authoring/backend/reportCleanupError",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/authoring/backend/resolveStorageNamespace",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/authoring/backend/safeJsonPayloadByteLength",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/authoring/backend/snapshotKeyRange",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/authoring/backend/storageJournalLockKey",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/authoring/backend/subscribeToAbort",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/authoring/backend/throwIfAborted",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/authoring/backend/withAbort",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/authoring/vector",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/authoring/vector/recommendStorageVector",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/createOrgId",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/createStorageHost",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/defineFeature",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/definePlugin",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/defineStorageBackendKind",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/entity",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/entity/ICodec",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/entity/ICodecOutput",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/entity/IEntityConnectOptions",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/entity/IEntityConnectStore",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/entity/IEntityDefinition",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/entity/IEntityIndex",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/entity/IEntityIndexMap",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/entity/IEntityIndexOptions",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/entity/IEntityListOrder",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/entity/IEntityOptions",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/entity/IEntityQuery",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/entity/IEntityQueryAccess",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/entity/IEntityQueryCompared",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/entity/IEntityQueryComparedCore",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/entity/IEntityQueryFinal",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/entity/IEntityQueryNarrowed",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/entity/IEntityQueryNarrowedCore",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/entity/IEntityQueryNeedsLimit",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/entity/IEntityQueryOrdered",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/entity/IEntityQueryOrderedCore",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/entity/IEntityStoreQueryMethods",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/entity/IEntityTransactionScope",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/entity/IIndexedListOptions",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/entity/IInvalidRecordAction",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/entity/IInvalidRecordHandler",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/entity/IInvalidRecordIssue",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/entity/IListOptions",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/entity/IMigrateOptions",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/entity/IMigrateResult",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/entity/IRecordComparator",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/entity/IRecordIndexBackfillBatch",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/entity/IRecordIndexBackfillCandidate",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/entity/IRecordIndexBackfillPhase",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/entity/IRecordIndexBackfillPreparation",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/entity/IRecordIndexBackfillProjection",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/entity/IRecordIndexBackfillReadOptions",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/entity/IRecordIndexBackfillRetryReceipt",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/entity/IRecordIndexBackfillSession",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/entity/IRecordIndexBackfillStore",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/entity/IRepository",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/entity/ISchemaAdapter",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/entity/ISelectedCodec",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-host"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/entity/IStandardSchemaV1",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-host"
@@ -41805,289 +41541,133 @@
       "library": "utils"
     },
     {
-      "path": "/zh/docs/storage-contract/api/snapshotStorageVector",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/snapshotStorageVectorCollection",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/snapshotStorageVectorFilter",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/snapshotStorageVectorIds",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/snapshotStorageVectorSearch",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/snapshotStorageVectorUpsert",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/snapshotStorageWhere",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/snapshotSyncWriteOptions",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/sparql",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/sparqlFragment",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/sql",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/sqlFragment",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/term",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/ttl",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/unprefixStorageOrgGraph",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/unprefixStorageOrgKey",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/useStorageCapability",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/useTransactionCapability",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/api/vector",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/capability-narrowing",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/change-feed-and-subscription-ownership",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/codecs-and-errors",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/getting-started",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/readme",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/records-indexes-and-transactions",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/safe-operations-and-keys",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-host/api/entity/REPOSITORY_KEY_PREFIX",
+      "path": "/zh/docs/storage-host/api/IStoragePipelineInput",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-host"
     },
     {
-      "path": "/zh/docs/storage-host/api/entity/RecordIndexBackfillPhase",
+      "path": "/zh/docs/storage-host/api/IStoragePluginCallContext",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-host"
     },
     {
-      "path": "/zh/docs/storage-host/api/entity/binaryCodec",
+      "path": "/zh/docs/storage-host/api/IStoragePluginCore",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-host"
     },
     {
-      "path": "/zh/docs/storage-host/api/entity/defineEntity",
+      "path": "/zh/docs/storage-host/api/IStoragePluginExtensions",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-host"
     },
     {
-      "path": "/zh/docs/storage-host/api/entity/fromStandardSchema",
+      "path": "/zh/docs/storage-host/api/IStoragePluginId",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-host"
     },
     {
-      "path": "/zh/docs/storage-host/api/entity/jsonCodec",
+      "path": "/zh/docs/storage-host/api/IStorageQueryHookPayload",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-host"
     },
     {
-      "path": "/zh/docs/storage-host/api/entity/markRecordIndexBackfillContentionFailure",
+      "path": "/zh/docs/storage-host/api/IStorageStoreWithFeatures",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-host"
     },
     {
-      "path": "/zh/docs/storage-host/api/entity/passthrough",
+      "path": "/zh/docs/storage-host/api/IUndoableStore",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-host"
     },
     {
-      "path": "/zh/docs/storage-host/api/entity/registerRecordIndexBackfillStore",
+      "path": "/zh/docs/storage-host/api/STORAGE_HOST_SOURCE",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-host"
     },
     {
-      "path": "/zh/docs/storage-host/api/entity/repositoryMigrationKey",
+      "path": "/zh/docs/storage-host/api/StorageError",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-host"
     },
     {
-      "path": "/zh/docs/storage-host/api/entity/selectCodec",
+      "path": "/zh/docs/storage-host/api/StorageErrorCode",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-host"
     },
     {
-      "path": "/zh/docs/storage-host/api/entity/structuredCodec",
+      "path": "/zh/docs/storage-host/api/StorageErrorText",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-host"
     },
     {
-      "path": "/zh/docs/storage-host/api/journal",
+      "path": "/zh/docs/storage-host/api/StorageHostFacade",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-host"
     },
     {
-      "path": "/zh/docs/storage-host/api/journal/storageLogStore",
+      "path": "/zh/docs/storage-host/api/assertStorageBackendId",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-host"
     },
     {
-      "path": "/zh/docs/storage-host/api/memoryBackendKind",
+      "path": "/zh/docs/storage-host/api/authoring/backend",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-host"
     },
     {
-      "path": "/zh/docs/storage-host/api/memoryBackendPlugin",
+      "path": "/zh/docs/storage-host/api/authoring/backend/IBackendChangeController",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-host"
     },
     {
-      "path": "/zh/docs/storage-host/api/storageBackendPluginExtensionsBrand",
+      "path": "/zh/docs/storage-host/api/authoring/backend/IBackendChangeControllerOptions",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-host"
     },
     {
-      "path": "/zh/docs/storage-host/api/vector/mmr",
+      "path": "/zh/docs/storage-host/api/authoring/backend/IBackendChangeSnapshot",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-host"
     },
     {
-      "path": "/zh/docs/storage-host/api/vector/mmr/IStorageMmrOptions",
+      "path": "/zh/docs/storage-host/api/authoring/backend/IBackendJournalNamespaceOptions",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-host"
     },
     {
-      "path": "/zh/docs/storage-host/api/vector/mmr/mmr",
+      "path": "/zh/docs/storage-host/api/authoring/backend/IBackendJournalTransaction",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-host"
     },
     {
-      "path": "/zh/docs/storage-host/getting-started",
+      "path": "/zh/docs/storage-host/api/authoring/backend/IBackendKeyLockPort",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-host"
     },
     {
-      "path": "/zh/docs/storage-host/readme",
+      "path": "/zh/docs/storage-host/api/authoring/backend/IBackendRevisionPort",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-host"
@@ -42271,6 +41851,1338 @@
       "locale": "zh",
       "domain": "docs",
       "library": "storage-plugin-postgres"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/backend/IBackendValueCommit",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/backend/IChannelConflictDetails",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/backend/IChannelMutationPlan",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/backend/IChannelPresence",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/backend/IStorageErrorFamily",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/backend/IStorageOperationReporter",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/backend/IStorageOperationRuntime",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/backend/IUniqueIndexErrorFactory",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/backend/IUniqueIndexOwner",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/backend/StorageJournalLock",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/backend/assertKeyRange",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/backend/asyncDisposeKey",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/backend/collectUniqueIndexOwners",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/backend/createBackendChangeIterator",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/backend/createBackendJournalNamespace",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/backend/createStorageOperationReporter",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/backend/createStorageOperationRuntime",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/backend/createStorageToken",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/backend/decodeFlatStorageKey",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/backend/decodeStorageJournalImage",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/backend/encodeFlatStorageKey",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/backend/encodeStorageJournalImage",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/backend/intrinsicConstructorName",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/backend/invokeExtension",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/backend/isStorageErrorFamily",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/backend/isStorageKeyInRange",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/backend/mergeSignals",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/backend/normalizeError",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/backend/observeStorageBatch",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/backend/planChannelWrite",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/backend/readAbortReason",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/backend/reportCleanupError",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/backend/resolveStorageNamespace",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/backend/safeJsonPayloadByteLength",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/backend/snapshotKeyRange",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/backend/storageJournalLockKey",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/backend/subscribeToAbort",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/backend/throwIfAborted",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/backend/withAbort",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/blob",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/blob/createStorageBlobBodyReader",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/blob/createStorageBlobObject",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/blob/snapshotStorageBlobGet",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/blob/snapshotStorageBlobList",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/blob/snapshotStorageBlobPut",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/capability",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/capability/hasStorageCapability",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/capability/provideCapabilities",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/capability/readTransactionImplementation",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/capability/useStorageCapability",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/codec",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/codec/fromValueCodec",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/codec/snapshotCodec",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/concurrency",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/concurrency/ConcurrencyPolicy",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/concurrency/associateNormalizedLockKeys",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/concurrency/lockKey",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/concurrency/normalizeLockKeys",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/concurrency/readConcurrencyLockIdentities",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/concurrency/runWithConcurrency",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/concurrency/snapshotConcurrencyLockHoldings",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/concurrency/snapshotConcurrencyLockKeys",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/concurrency/snapshotConcurrencyLockRange",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/concurrency/snapshotLockKey",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/context",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/context/snapshotOperationContext",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/context/snapshotSyncWriteOptions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/counter",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/counter/snapshotStorageCounterIncrement",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/key",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/key/compareStorageKeys",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/key/createStorageBatchKeyCapture",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/key/createStorageBatchKeyProjection",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/key/decodeOrderedStorageKey",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/key/decodeStorageOrgKey",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/key/encodeOrderedStorageKey",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/key/encodeStorageOrgKey",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/key/encodeStorageOrgStringPrefix",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/key/orderStorageKeysByBytes",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/key/prefixStorageOrgKey",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/key/projectStorageBatchKeys",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/key/snapshotStorageBatchKeys",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/key/snapshotStorageKey",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/key/snapshotStorageKeyPrefix",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/key/snapshotStorageOrgKeyPrefix",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/key/sortStorageByteIdentities",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/key/storageKeyBytesIdentity",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/key/unprefixStorageOrgKey",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/migration",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/migration/createMigrationPlan",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/migration/migrateEnvelope",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/migration/migrateEnvelopeSync",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/query",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/query/compileStorageQueryCondition",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/query/compileStorageWhere",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/query/createRdfQuery",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/query/createRecordQuery",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/query/createVectorQuery",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/query/refineStorageVectorQuery",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/query/snapshotStorageWhere",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/rdf",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/rdf/encodeRdfQuadSnapshot",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/rdf/encodeStorageRdfQuad",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/rdf/encodeStorageRdfTerm",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/rdf/getStorageOrgGraphPrefix",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/rdf/prefixStorageOrgGraph",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/rdf/snapshotStorageRdfPattern",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/rdf/snapshotStorageRdfQuad",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/rdf/snapshotStorageRdfTerm",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/rdf/term",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/rdf/unprefixStorageOrgGraph",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/resource",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/resource/createStorageIteratorLifetime",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/sparql",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/sparql/createSparqlTag",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/sparql/sparqlFragment",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/sql",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/sql/createSqlTag",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/sql/deriveStorageSqlQuery",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/sql/sqlFragment",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/store",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/store/snapshotKeyValueStore",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/store/snapshotKeyValueStoreDetailed",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/store/snapshotRecordStore",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/store/snapshotStorageBaseDetailed",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/store/snapshotStorageCapabilities",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/store/snapshotStorageCapabilitiesDetailed",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/transaction",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/transaction/assertTransactionOwner",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/transaction/createTransactionBuilder",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/transaction/createTransactionOwner",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/transaction/deriveTransactionIterator",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/transaction/nextTransactionIterator",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/transaction/readTransactionConcurrency",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/transaction/readTransactionOperationContext",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/transaction/registerTransactionFinalizer",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/transaction/resolveConcurrencyPolicy",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/transaction/runTransactionIteratorOperation",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/transaction/runTransactionOperation",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/transaction/useTransactionCapability",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/ttl",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/ttl/snapshotStorageTtlTarget",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/vector",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/vector/recommendStorageVector",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/vector/snapshotStorageDeleteCountMode",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/vector/snapshotStorageVector",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/vector/snapshotStorageVectorCollection",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/vector/snapshotStorageVectorFilter",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/vector/snapshotStorageVectorIds",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/vector/snapshotStorageVectorSearch",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/authoring/vector/snapshotStorageVectorUpsert",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/createOrgId",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/createStorageHost",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/defineFeature",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/definePlugin",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/defineStorageBackendKind",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/entity",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/entity/ICodec",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/entity/ICodecOutput",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/entity/IEntityConnectOptions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/entity/IEntityConnectStore",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/entity/IEntityDefinition",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/entity/IEntityIndex",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/entity/IEntityIndexMap",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/entity/IEntityIndexOptions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/entity/IEntityListOrder",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/entity/IEntityOptions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/entity/IEntityQuery",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/entity/IEntityQueryAccess",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/entity/IEntityQueryCompared",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/entity/IEntityQueryComparedCore",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/entity/IEntityQueryFinal",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/entity/IEntityQueryNarrowed",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/entity/IEntityQueryNarrowedCore",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/entity/IEntityQueryNeedsLimit",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/entity/IEntityQueryOrdered",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/entity/IEntityQueryOrderedCore",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/entity/IEntityStoreQueryMethods",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/entity/IEntityTransactionScope",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/entity/IIndexedListOptions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/entity/IInvalidRecordAction",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/entity/IInvalidRecordHandler",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/entity/IInvalidRecordIssue",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/entity/IListOptions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/entity/IMigrateOptions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/entity/IMigrateResult",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/entity/IRecordComparator",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/entity/IRecordIndexBackfillBatch",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/entity/IRecordIndexBackfillCandidate",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/entity/IRecordIndexBackfillPhase",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/entity/IRecordIndexBackfillPreparation",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/entity/IRecordIndexBackfillProjection",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/entity/IRecordIndexBackfillReadOptions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/entity/IRecordIndexBackfillRetryReceipt",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/entity/IRecordIndexBackfillSession",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/entity/IRecordIndexBackfillStore",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/entity/IRepository",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/entity/ISchemaAdapter",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/entity/ISelectedCodec",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/entity/IStandardSchemaV1",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/entity/REPOSITORY_KEY_PREFIX",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/entity/RecordIndexBackfillPhase",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/entity/binaryCodec",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/entity/defineEntity",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/entity/fromStandardSchema",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/entity/jsonCodec",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/entity/markRecordIndexBackfillContentionFailure",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/entity/passthrough",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/entity/registerRecordIndexBackfillStore",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/entity/repositoryMigrationKey",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/entity/selectCodec",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/entity/structuredCodec",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/journal",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/journal/storageLogStore",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/memoryBackendKind",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/memoryBackendPlugin",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/storageBackendPluginExtensionsBrand",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/vector/mmr",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/vector/mmr/IStorageMmrOptions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/api/vector/mmr/mmr",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/getting-started",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
+    },
+    {
+      "path": "/zh/docs/storage-host/readme",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-host"
     }
   ]
 }

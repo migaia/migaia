@@ -5,7 +5,8 @@ Install `sparqlBackendPlugin({ endpoint }, features?)` in `createStorageHost`. T
 ```ts
 import { Store } from 'oxigraph'
 import { createStorageHost } from '@migaia/storage-host'
-import { rdf, sparql, term } from '@migaia/storage-contract'
+import { rdf, sparql } from '@migaia/storage-contract'
+import { term } from '@migaia/storage-host/authoring/rdf'
 import { sparqlBackendPlugin } from '@migaia/storage-plugin-sparql'
 import { oxigraphEndpoint } from '@migaia/storage-plugin-sparql/oxigraph'
 import { graphStoreFeature } from '@migaia/storage-plugin-sparql/features/graph-store'

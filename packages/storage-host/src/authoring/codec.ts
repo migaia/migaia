@@ -1,10 +1,12 @@
-import type { IOperationContext } from '@migaia/storage-contract'
 import {
+  assertCodec,
+  type ICodec,
+  type IOperationContext,
   StorageContractError,
   StorageContractErrorCode,
   StorageContractErrorText
 } from '@migaia/storage-contract'
-import type { ICodecEncodedType } from '@migaia/serialize/codec'
+import { type ICodecEncodedType } from '@migaia/serialize/codec'
 
 /** Structural source contract keeps each concrete callback's own input and output types. */
 type IValueCodecDescriptor = Readonly<{
@@ -111,4 +113,13 @@ export function fromValueCodec<const TCodec extends IValueCodecDescriptor>(
 ): IAdaptedValueCodec<TCodec> {
   /** The public conditional type preserves source-union correlations beyond a generic class. */
   return new ValueCodecAdapter(codec) as unknown as IAdaptedValueCodec<TCodec>
+}
+
+/**
+ * Borrows the admitted original codec so class methods retain their private-state receiver.
+ * Ordinary readonly descriptors are not copied or frozen; no conversion runs during admission.
+ */
+export function snapshotCodec(codec: unknown): ICodec {
+  assertCodec(codec)
+  return codec
 }

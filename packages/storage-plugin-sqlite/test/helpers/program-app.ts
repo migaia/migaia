@@ -6,13 +6,9 @@ import {
   type IBinlogExt
 } from '@migaia/logger/plugins/durable'
 import { defineEntity } from '@migaia/storage-host/entity'
-import {
-  asRecordStore,
-  lockKey,
-  useStorageCapability,
-  kv,
-  type IKeyValueStore
-} from '@migaia/storage-contract'
+import { asRecordStore, kv, type IKeyValueStore } from '@migaia/storage-contract'
+import { lockKey } from '@migaia/storage-host/authoring/concurrency'
+import { useStorageCapability } from '@migaia/storage-host/authoring/capability'
 import { createStore } from '@migaia/store-light'
 import { persist } from '@migaia/store-persist/light'
 import { persistTransaction } from '@migaia/store-persist'

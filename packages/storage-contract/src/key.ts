@@ -1,7 +1,7 @@
 import { StorageContractError, StorageContractErrorCode } from './errors.js'
 import { isArrayBuffer } from '@migaia/utils/bytes'
-import type { IBackendKind } from './capabilities.js'
-import type { IKeyRange, IStorageKey } from './context.js'
+import { type IBackendKind } from './capabilities.js'
+import { type IStorageKey } from './context.js'
 import { StorageContractErrorText } from './error-text.js'
 
 /** Hard limits protect flat-key decoding from pathological persisted input. */
@@ -112,80 +112,3 @@ export function assertStorageKey(
       cause: new TypeError(StorageContractErrorText.invalidStorageKey(label))
     })
 }
-
-/** Copies admitted mutable components once before backend work can await caller changes. */
-function cloneStorageKey(candidate: IStorageKey): IStorageKey {
-  if (typeof candidate === 'string' || typeof candidate === 'number') return candidate
-  if (Array.isArray(candidate)) return candidate.map(cloneStorageKey)
-  if (isArrayBuffer(candidate)) return new Uint8Array(candidate).slice().buffer
-  return new Date(Reflect.apply(Date.prototype.getTime, candidate, []) as number)
-}
-
-/**
- * Validates the original key then copies its mutable Date, binary and array components once before
- * asynchronous work. Validation owns all key-domain rules; the private copy does not revalidate
- * independently owned data.
- */
-export function snapshotStorageKey(
-  value: unknown,
-  backend: IBackendKind | undefined,
-  label = 'key'
-): IStorageKey {
-  assertStorageKey(value, backend, label)
-  try {
-    return cloneStorageKey(value)
-  } catch (cause) {
-    if (cause instanceof StorageContractError) throw cause
-    throw new StorageContractError(StorageContractErrorCode.invalidKey, {
-      backend,
-      key: value,
-      cause
-    })
-  }
-}
-
-/** Orders admitted key kinds without probing or cloning mutable component data. */
-function storageKeyRank(value: IStorageKey): number {
-  if (typeof value === 'number') return 0
-  if (typeof value === 'string') return 2
-  if (Array.isArray(value)) return 4
-  return isArrayBuffer(value) ? 3 : 1
-}
-
-/**
- * Compares already-valid storage keys for sorting or range work without touching a provider.
- * Returns a negative, zero, or positive number; it is not restricted to -1/0/1. Cross-type order is
- * number, Date, string, ArrayBuffer, then array. Binary values compare bytewise and arrays compare
- * componentwise, with a shorter equal prefix first. Use assertStorageKey before unknown inputs.
- */
-export const compareStorageKeys = (a: IStorageKey, b: IStorageKey): number => {
-  const rankA = storageKeyRank(a)
-  const rankB = storageKeyRank(b)
-  if (rankA !== rankB) return rankA - rankB
-  if (typeof a === 'number' && typeof b === 'number') return a - b
-  const dateA = dateValue(a)
-  const dateB = dateValue(b)
-  if (dateA !== undefined && dateB !== undefined) return dateA - dateB
-  if (typeof a === 'string' && typeof b === 'string') return a < b ? -1 : a > b ? 1 : 0
-  const bytesA = bufferValue(a)
-  const bytesB = bufferValue(b)
-  if (bytesA !== undefined && bytesB !== undefined) {
-    const viewA = bytesA
-    const viewB = bytesB
-    const length = Math.min(viewA.length, viewB.length)
-    for (let index = 0; index < length; index += 1) {
-      if (viewA[index] !== viewB[index]) return viewA[index]! - viewB[index]!
-    }
-    return viewA.length - viewB.length
-  }
-  const arrayA = a as readonly IStorageKey[]
-  const arrayB = b as readonly IStorageKey[]
-  const length = Math.min(arrayA.length, arrayB.length)
-  for (let index = 0; index < length; index += 1) {
-    const comparison = compareStorageKeys(arrayA[index]!, arrayB[index]!)
-    if (comparison !== 0) return comparison
-  }
-  return arrayA.length - arrayB.length
-}
-
-export type { IKeyRange, IStorageKey }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { compareStorageKeys } from '@migaia/storage-contract'
+import { compareStorageKeys } from '@migaia/storage-host/authoring/key'
 
 const sign = (n: number): number => Math.sign(n)
 

@@ -2,18 +2,9 @@ import { defineFeature, type IStorageFeatureOutput } from '@migaia/storage-host'
 import {
   vector,
   implement,
-  createVectorQuery,
-  createStorageIteratorLifetime,
-  snapshotStorageVector,
   assertStorageVector,
   assertOperationContext,
-  snapshotStorageVectorCollection,
-  snapshotStorageVectorUpsert,
-  snapshotStorageVectorIds,
   assertStorageVectorIds,
-  snapshotStorageVectorSearch,
-  snapshotStorageWhere,
-  snapshotStorageDeleteCountMode,
   assertStorageTtlDuration,
   QueryOperator,
   QueryOperation,
@@ -32,8 +23,18 @@ import {
   type IVectorFilter,
   type ILockKey
 } from '@migaia/storage-contract'
+import { createVectorQuery, snapshotStorageWhere } from '@migaia/storage-host/authoring/query'
+import { createStorageIteratorLifetime } from '@migaia/storage-host/authoring/resource'
 import { asyncDisposeKey, throwIfAborted } from '@migaia/storage-host/authoring/backend'
-import { recommendStorageVector } from '@migaia/storage-host/authoring/vector'
+import {
+  recommendStorageVector,
+  snapshotStorageVector,
+  snapshotStorageVectorCollection,
+  snapshotStorageVectorUpsert,
+  snapshotStorageVectorIds,
+  snapshotStorageVectorSearch,
+  snapshotStorageDeleteCountMode
+} from '@migaia/storage-host/authoring/vector'
 import { parseObjectPath } from '@migaia/utils/object'
 import type { ICodecValue } from '@migaia/serialize/codec'
 import { redisBackendKind } from '../plugin.js'

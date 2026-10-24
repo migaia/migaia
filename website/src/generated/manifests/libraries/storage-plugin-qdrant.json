@@ -94,6 +94,10 @@
               {
                 "type": "paragraph",
                 "text": "Qdrant 1.15.5 对首行全为非负整数的两行多向量矩阵存在原生 JSON 歧义：它可能把矩阵解码为 sparse vector 并拒绝。适配器保留原 QDRANT_REQUEST_FAILED 证据，不变形向量或重试；本版本的三行矩阵与 dense 向量已实际验证。"
+              },
+              {
+                "type": "paragraph",
+                "text": "原生 filter 无法精确表达的条件在 precount 或 management `deleteByFilter` 前以 source `@migaia/storage-contract`、code `UNSUPPORTED_CAPABILITY` 拒绝。显式 `count: 'scroll'` 通过扫描当前组织支持共享条件；`requirePushdown()` 对客户端条件仍报 `QUERY_NOT_PUSHABLE`。"
               }
             ]
           }
@@ -130,7 +134,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { ttl, lockKey, DeleteCountMode } from '@migaia/storage-contract'\n\nawait documents.upsert([{ id: 'temporary', vector: [1, 0], payload: { category: 'guide' } }], {\n  ttlMs: 5000\n})\nconst target = lockKey.vector('documents', 'temporary')\nawait host.backend('qdrant').use(ttl).expire(target, 10000)\nconsole.log(await host.backend('qdrant').use(ttl).remaining(target))\nawait host.backend('qdrant').use(ttl).persist(target)\nconst deleted = await documents.deleteWhere(\n  { category: 'guide' },\n  { count: DeleteCountMode.scroll }\n)"
+                "code": "import { ttl, DeleteCountMode } from '@migaia/storage-contract'\nimport { lockKey } from '@migaia/storage-host/authoring/concurrency'\n\nawait documents.upsert([{ id: 'temporary', vector: [1, 0], payload: { category: 'guide' } }], {\n  ttlMs: 5000\n})\nconst target = lockKey.vector('documents', 'temporary')\nawait host.backend('qdrant').use(ttl).expire(target, 10000)\nconsole.log(await host.backend('qdrant').use(ttl).remaining(target))\nawait host.backend('qdrant').use(ttl).persist(target)\nconst deleted = await documents.deleteWhere(\n  { category: 'guide' },\n  { count: DeleteCountMode.scroll }\n)"
               },
               {
                 "type": "paragraph",
@@ -324,6 +328,10 @@
                 {
                   "type": "paragraph",
                   "text": "Qdrant 1.15.5 has a native JSON ambiguity for two-row multivectors whose first row consists of nonnegative integers: it may decode the matrix as a sparse vector and reject it. The original QDRANT_REQUEST_FAILED evidence is preserved; the adapter does not reshape vectors or retry. Three-row matrices and dense vectors are verified against this version."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Conditions that native filters cannot express exactly reject before precount or management `deleteByFilter`, with source `@migaia/storage-contract`, code `UNSUPPORTED_CAPABILITY`. Explicit `count: 'scroll'` supports the shared conditions by scanning the current organization. `requirePushdown()` still rejects client-only conditions with `QUERY_NOT_PUSHABLE`."
                 }
               ]
             }
@@ -360,7 +368,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { ttl, lockKey, DeleteCountMode } from '@migaia/storage-contract'\n\nawait documents.upsert([{ id: 'temporary', vector: [1, 0], payload: { category: 'guide' } }], {\n  ttlMs: 5000\n})\nconst target = lockKey.vector('documents', 'temporary')\nawait host.backend('qdrant').use(ttl).expire(target, 10000)\nconsole.log(await host.backend('qdrant').use(ttl).remaining(target))\nawait host.backend('qdrant').use(ttl).persist(target)\nconst deleted = await documents.deleteWhere(\n  { category: 'guide' },\n  { count: DeleteCountMode.scroll }\n)"
+                  "code": "import { ttl, DeleteCountMode } from '@migaia/storage-contract'\nimport { lockKey } from '@migaia/storage-host/authoring/concurrency'\n\nawait documents.upsert([{ id: 'temporary', vector: [1, 0], payload: { category: 'guide' } }], {\n  ttlMs: 5000\n})\nconst target = lockKey.vector('documents', 'temporary')\nawait host.backend('qdrant').use(ttl).expire(target, 10000)\nconsole.log(await host.backend('qdrant').use(ttl).remaining(target))\nawait host.backend('qdrant').use(ttl).persist(target)\nconst deleted = await documents.deleteWhere(\n  { category: 'guide' },\n  { count: DeleteCountMode.scroll }\n)"
                 },
                 {
                   "type": "paragraph",

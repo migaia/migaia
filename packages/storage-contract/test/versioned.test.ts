@@ -1,5 +1,5 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
-import { assertVersionedEnvelope, StorageContractErrorCode } from '../src/index.js'
+import { assertVersionedEnvelope, StorageContractErrorCode } from '@migaia/storage-contract'
 
 describe('versioned envelope admission', () => {
   it('preserves caller-owned state and inferred value types', () => {

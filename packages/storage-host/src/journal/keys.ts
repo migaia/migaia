@@ -1,5 +1,5 @@
+import { lockKey } from '../authoring/concurrency.js'
 import {
-  lockKey,
   StorageContractError,
   StorageContractErrorCode,
   type ILockKey

@@ -1,11 +1,6 @@
-import type { IOperationContext } from '../context.js'
-import {
-  assertLockKey,
-  snapshotLockKey,
-  type ILockKey,
-  type IWriteConcurrencyOptions
-} from '../concurrency.js'
-import type { IBackendKind } from '../capabilities.js'
+import { type IOperationContext } from '../context.js'
+import { assertLockKey, type ILockKey, type IWriteConcurrencyOptions } from '../concurrency.js'
+import { type IBackendKind } from '../capabilities.js'
 import { StorageContractError, StorageContractErrorCode } from '../errors.js'
 import { StorageContractErrorText } from '../error-text.js'
 import { STORAGE_TTL_METHODS } from '../capability-constants.js'
@@ -16,6 +11,7 @@ export type ITtlTarget = Extract<
   ILockKey,
   { readonly channel: 'text' | 'bytes' | 'record' | 'vector' }
 >
+
 /** Root TTL operations share their backend's original key, write strategy and deadline state. */
 export type ITtlApi = {
   expire(
@@ -26,6 +22,7 @@ export type ITtlApi = {
   remaining(target: ITtlTarget, ctx?: IOperationContext): Promise<number | undefined>
   persist(target: ITtlTarget, ctx?: IOperationContext & IWriteConcurrencyOptions): Promise<boolean>
 }
+
 /** Transaction TTL uses the current native draft and the transaction's original operation budget. */
 export type ITransactionTtlApi = {
   expire(target: ITtlTarget, ms: number): Promise<boolean>
@@ -46,14 +43,7 @@ export function assertStorageTtlTarget(
       StorageContractErrorText.lockArgument
     )
 }
-/** Capture the original lock target only when middleware or native admission can await. */
-export function snapshotStorageTtlTarget(
-  target: ITtlTarget,
-  backend: IBackendKind | undefined
-): ITtlTarget {
-  assertStorageTtlTarget(target, backend)
-  return snapshotLockKey(target, backend) as ITtlTarget
-}
+
 /** Finite nonnegative durations include fractional milliseconds and immediate expiry at zero. */
 export function assertStorageTtlDuration(ms: number, backend: IBackendKind | undefined): void {
   if (typeof ms !== 'number' || !Number.isFinite(ms) || ms < 0)

@@ -7,9 +7,9 @@ import {
 import {
   StorageContractError,
   StorageContractErrorCode,
-  snapshotOperationContext,
   type IOperationContextSnapshot
 } from '@migaia/storage-contract'
+import { snapshotOperationContext } from '../authoring/context.js'
 import { isStorageErrorFamily } from './error-family.js'
 import {
   createStorageOperationRuntime,

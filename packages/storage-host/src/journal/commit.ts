@@ -1,11 +1,11 @@
 import {
   StorageContractError,
   StorageContractErrorCode,
-  snapshotConcurrencyLockKeys,
   type IBackendKind,
   type ILockKey,
   type ITransactionScope
 } from '@migaia/storage-contract'
+import { snapshotConcurrencyLockKeys } from '../authoring/concurrency.js'
 import {
   snapshotLogRecords,
   type IBinlogExt,

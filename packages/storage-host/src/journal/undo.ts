@@ -1,10 +1,10 @@
 import {
   assertOperationContext,
-  snapshotConcurrencyLockKeys,
   StorageContractError,
   StorageContractErrorCode,
   type IBackendKind
 } from '@migaia/storage-contract'
+import { snapshotConcurrencyLockKeys } from '../authoring/concurrency.js'
 import {
   snapshotLogRecords,
   type IUndoLogExt,

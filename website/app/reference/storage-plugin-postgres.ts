@@ -118,7 +118,7 @@ export const storagePluginPostgresReference: ILibraryReference = {
             zh: '持有锁的写入需要使用原并发策略，并保留有限的持锁期限上界。'
           },
           example:
-            "import { ConcurrencyPolicy } from '@migaia/storage-contract'\nimport { postgresBackendPlugin, type IPgDriver } from '@migaia/storage-plugin-postgres'\nexport const writes = (driver: IPgDriver) => postgresBackendPlugin({\n  driver, concurrency: ConcurrencyPolicy.wait(), owner: { label: 'worker' }, maxLockMs: 60000\n})",
+            "import { ConcurrencyPolicy } from '@migaia/storage-host/authoring/concurrency'\nimport { postgresBackendPlugin, type IPgDriver } from '@migaia/storage-plugin-postgres'\nexport const writes = (driver: IPgDriver) => postgresBackendPlugin({\n  driver, concurrency: ConcurrencyPolicy.wait(), owner: { label: 'worker' }, maxLockMs: 60000\n})",
           result: {
             en: 'The native operation owner applies the policy without a second lock coordinator.',
             zh: '由原生操作拥有者应用所选策略，不再增加第二套锁协调器。'

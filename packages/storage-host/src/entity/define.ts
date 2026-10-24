@@ -16,7 +16,7 @@ import type {
 } from './types.js'
 import { StorageError, StorageErrorCode } from '../errors.js'
 import { StorageErrorText } from '../error-text.js'
-import { snapshotCodec } from '@migaia/storage-contract'
+import { snapshotCodec } from '../authoring/codec.js'
 import { snapshotEntityIndexes } from './index-projection.js'
 
 type IEntityOptionsWithoutIndexes<TDomain, TStored> = Omit<

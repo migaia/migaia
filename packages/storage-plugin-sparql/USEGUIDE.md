@@ -42,7 +42,7 @@ const replaced = await store
 ## 乐观事务与提交确认
 
 ```ts
-import { ConcurrencyPolicy } from '@migaia/storage-contract'
+import { ConcurrencyPolicy } from '@migaia/storage-host/authoring/concurrency'
 await store
   .tx()
   .concurrency(ConcurrencyPolicy.optimistic({ retries: 1 }))

@@ -49,6 +49,62 @@
     "./authoring/codec": {
       "types": "./dist/authoring/codec.d.ts",
       "default": "./dist/authoring/codec.js"
+    },
+    "./authoring/concurrency": {
+      "types": "./dist/authoring/concurrency.d.ts",
+      "default": "./dist/authoring/concurrency.js"
+    },
+    "./authoring/transaction": {
+      "types": "./dist/authoring/transaction.d.ts",
+      "default": "./dist/authoring/transaction.js"
+    },
+    "./authoring/query": {
+      "types": "./dist/authoring/query.d.ts",
+      "default": "./dist/authoring/query.js"
+    },
+    "./authoring/sql": {
+      "types": "./dist/authoring/sql.d.ts",
+      "default": "./dist/authoring/sql.js"
+    },
+    "./authoring/key": {
+      "types": "./dist/authoring/key.d.ts",
+      "default": "./dist/authoring/key.js"
+    },
+    "./authoring/resource": {
+      "types": "./dist/authoring/resource.d.ts",
+      "default": "./dist/authoring/resource.js"
+    },
+    "./authoring/context": {
+      "types": "./dist/authoring/context.d.ts",
+      "default": "./dist/authoring/context.js"
+    },
+    "./authoring/rdf": {
+      "types": "./dist/authoring/rdf.d.ts",
+      "default": "./dist/authoring/rdf.js"
+    },
+    "./authoring/sparql": {
+      "types": "./dist/authoring/sparql.d.ts",
+      "default": "./dist/authoring/sparql.js"
+    },
+    "./authoring/ttl": {
+      "types": "./dist/authoring/ttl.d.ts",
+      "default": "./dist/authoring/ttl.js"
+    },
+    "./authoring/counter": {
+      "types": "./dist/authoring/counter.d.ts",
+      "default": "./dist/authoring/counter.js"
+    },
+    "./authoring/blob": {
+      "types": "./dist/authoring/blob.d.ts",
+      "default": "./dist/authoring/blob.js"
+    },
+    "./authoring/store": {
+      "types": "./dist/authoring/store.d.ts",
+      "default": "./dist/authoring/store.js"
+    },
+    "./authoring/capability": {
+      "types": "./dist/authoring/capability.d.ts",
+      "default": "./dist/authoring/capability.js"
     }
   },
   "publishConfig": {
@@ -63,7 +119,8 @@
     "test": "pnpm run build && vitest run",
     "release:patch": "pnpm version patch --no-git-tag-version",
     "release:pack": "pnpm pack --pack-destination /tmp",
-    "release:publish": "pnpm publish --access restricted --ignore-scripts --no-git-checks"
+    "release:publish": "pnpm publish --access restricted --ignore-scripts --no-git-checks",
+    "test:packed": "pnpm run build && node test/authoring-packed-export-smoke.mjs"
   },
   "dependencies": {
     "@migaia/event-subscriber": "workspace:^",

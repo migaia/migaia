@@ -17,16 +17,15 @@ import {
 import {
   blob,
   records,
-  compileStorageWhere,
-  ConcurrencyPolicy,
   ConflictPolicy,
-  lockKey,
   type IRecordStore,
   type ITransactionBuilder,
   type ITransactionScope,
   type IOperationContext,
   type IBlobApi
 } from '@migaia/storage-contract'
+import { compileStorageWhere } from '@migaia/storage-host/authoring/query'
+import { ConcurrencyPolicy, lockKey } from '@migaia/storage-host/authoring/concurrency'
 import type { ICollectionsCodecValue } from '@migaia/serialize/codecs/collections-json'
 import { Archive } from './constants.js'
 import { tryReadProperty } from '@migaia/utils/error'

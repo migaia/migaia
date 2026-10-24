@@ -8,7 +8,9 @@ import {
   LogRecordState,
   type ILogStore
 } from '@migaia/logger/plugins/durable'
-import { blob, counter, kv, lockKey, rdf, term, ttl, vector } from '@migaia/storage-contract'
+import { blob, counter, kv, rdf, ttl, vector } from '@migaia/storage-contract'
+import { lockKey } from '../src/authoring/concurrency.js'
+import { term } from '../src/authoring/rdf.js'
 import { createOrgId, createStorageHost, memoryBackendPlugin } from '../src/index.js'
 
 /** Real durable scheduling keeps failures observable without writing test diagnostics to stdout. */

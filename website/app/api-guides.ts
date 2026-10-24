@@ -9907,20 +9907,19 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
       }
     ]
   }),
-  'storage-contract:index:snapshotCodec': createStorageContractGuide({
+  'storage-host:authoring/codec:snapshotCodec': createStorageContractGuide({
     purposeEn:
-      'Reads a codec descriptor once, validates its non-empty name, output channel, encode, and decode functions, then returns the captured surface. Throwing accessors and malformed descriptors become INVALID_ARGUMENT with their cause retained.',
+      'Validates and returns the original codec instance so class-private methods retain their receiver. It performs no conversion, descriptor clone or freezing.',
     purposeZh:
-      '一次读取 codec descriptor，验证非空 name、output channel、encode 与 decode function，再返回 captured surface。throwing accessor 与 malformed descriptor 会成为 INVALID_ARGUMENT，并保留 cause。',
-    quickStart: `import { snapshotCodec } from '@migaia/storage-contract'\n\nconst candidateCodec = { name: 'json', output: 'text' as const, encode: async (value: unknown) => JSON.stringify(value), decode: async (text: string) => JSON.parse(text) }\nconst value = { id: 1, name: 'Ada' }\nconst stableCodec = snapshotCodec(candidateCodec)\nconst encoded = await stableCodec.encode(value)\nconsole.log(encoded)`,
+      '校验后返回同一 codec 实例，使合法 class 的方法保留原 receiver；不执行转换、不复制 descriptor、不冻结。',
+    quickStart:
+      "import { snapshotCodec } from '@migaia/storage-host/authoring/codec'\n\nconst candidateCodec = { name: 'json', output: 'text' as const, encode: async (value: unknown) => JSON.stringify(value), decode: async (text: string) => JSON.parse(text) }\nconst value = { id: 1, name: 'Ada' }\nconst stableCodec = snapshotCodec(candidateCodec)\nconst encoded = await stableCodec.encode(value)\nconsole.log(encoded)",
     scenariosEn: [
       'A codec crosses a plugin or configuration boundary.',
-      'Routing by output must not reread mutable getters.',
       'Encoding and decoding must use one admitted descriptor.'
     ],
     scenariosZh: [
       'codec 穿过 plugin 或 configuration boundary。',
-      '按 output routing 时不得重复读取 mutable getter。',
       'encode 与 decode 必须使用同一个 admitted descriptor。'
     ],
     avoidEn: [
@@ -9958,9 +9957,9 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
   }),
   'storage-contract:index:assertCodec': createStorageContractGuide({
     purposeEn:
-      'Assertion form of the shared codec contract. It narrows an unknown value to ICodec while preserving the same one-read validation and INVALID_ARGUMENT semantics as snapshotCodec.',
+      'Pure assertion form of the shared codec contract. It narrows an unknown value to ICodec without copying or executing the original codec; invalid ordinary shapes retain INVALID_ARGUMENT.',
     purposeZh:
-      'shared codec contract 的 assertion 形式。它把 unknown value 收窄为 ICodec，并保持与 snapshotCodec 相同的 one-read validation 与 INVALID_ARGUMENT semantics。',
+      'shared codec contract 的纯 assertion 形式；把 unknown 收窄为 ICodec，不复制或执行原 codec，普通无效 shape 保留 INVALID_ARGUMENT。',
     quickStart: `import { assertCodec } from '@migaia/storage-contract'\n\nconst options = { codec: { name: 'json', output: 'text', encode: JSON.stringify, decode: JSON.parse } }\nconst installCodec = (codec: typeof options.codec) => console.log('installed', codec.name)\nassertCodec(options.codec)\ninstallCodec(options.codec) // 先验证 descriptor，再把 codec 交给注册流程`,
     scenariosEn: [
       'A public API only needs entry validation.',
@@ -10087,16 +10086,12 @@ await records.putRecord({ id: 1 }, 'user:1', { conflictPolicy: ConflictPolicy.co
       '继续增加 alias。'
     ]
   }),
-  'storage-contract:index:intrinsicConstructorName': createStorageContractGuide({
+  'storage-host:authoring/backend:intrinsicConstructorName': createStorageContractGuide({
     purposeEn:
-      'Best-effort diagnostic helper that reads an object prototype constructor name and returns undefined when access fails. Because prototype, constructor, and name are mutable, the result must never drive security, protocol, or capability decisions.',
-    purposeZh:
-      'best-effort diagnostic helper：读取 object prototype constructor name，访问失败时返回 undefined。由于 prototype、constructor 与 name 都可 mutation，该结果绝不能驱动 security、protocol 或 capability decision。',
-    quickStart: `import { intrinsicConstructorName } from '@migaia/storage-contract'
-
-const value: unknown = new Uint8Array([1, 2, 3])
-const diagnostic = { receivedType: intrinsicConstructorName(value) ?? typeof value }
-console.log(diagnostic) // 仅用于诊断，不参与协议或权限判断`,
+      'Reads ordinary prototype constructor metadata for diagnostics. The mutable name must never select a protocol or grant a capability.',
+    purposeZh: '读取普通 prototype constructor 元数据作诊断；可变名称不能选择协议或授予能力。',
+    quickStart:
+      "import { intrinsicConstructorName } from '@migaia/storage-host/authoring/backend'\n\nconst value: unknown = new Uint8Array([1, 2, 3])\nconst diagnostic = { receivedType: intrinsicConstructorName(value) ?? typeof value }\nconsole.log(diagnostic) // 仅用于诊断，不参与协议或权限判断",
     scenariosEn: [
       'Improving an invalid-value diagnostic.',
       'Logging an unexpected cross-realm object.',
@@ -10330,20 +10325,19 @@ console.log(diagnostic) // 仅用于诊断，不参与协议或权限判断`,
       }
     ]
   }),
-  'storage-contract:index:snapshotOperationContext': createStorageContractGuide({
+  'storage-host:authoring/context:snapshotOperationContext': createStorageContractGuide({
     purposeEn:
-      'Reads cancellation, timeout, page size, and conflict policy once, validates their bounds, and freezes a reusable operation snapshot. Reusing a snapshot does not touch caller getters again.',
+      'Captures scalar operation choices before native asynchronous work while borrowing the original live signal. Results are ordinary records without repeated-call identity or accessor-read guarantees.',
     purposeZh:
-      '一次读取 cancellation、timeout、page size 与 conflict policy，验证边界并冻结可复用 operation snapshot。再次传入该 snapshot 时不会重复访问 caller getter。',
-    quickStart: `import { snapshotOperationContext } from '@migaia/storage-contract'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nconst host = await createStorageHost({ plugins: [memoryBackendPlugin()] })\nconst storage = host.backend('memory')\nconst ctx = snapshotOperationContext({ timeoutMs: 2_000, pageSize: 128 })\nconsole.log(await storage.keys(ctx))\nawait host.dispose()`,
+      '在原生异步工作前保存标量操作意图，借用同一 live signal；结果为普通记录，不承诺重复调用身份或属性读取次数。',
+    quickStart:
+      "import { snapshotOperationContext } from '@migaia/storage-host/authoring/context'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nconst host = await createStorageHost({ plugins: [memoryBackendPlugin()] })\nconst storage = host.backend('memory')\nconst ctx = snapshotOperationContext({ timeoutMs: 2_000, pageSize: 128 })\nconsole.log(await storage.keys(ctx))\nawait host.dispose()",
     scenariosEn: [
       'An asynchronous operation crosses several internal layers.',
-      'Hostile or mutable option getters must be observed once.',
       'Pagination and cancellation need one validated context.'
     ],
     scenariosZh: [
       'asynchronous operation 会穿过多个内部 layer。',
-      'hostile 或 mutable option getter 必须只观察一次。',
       'pagination 与 cancellation 需要同一个 validated context。'
     ],
     avoidEn: [
@@ -10427,9 +10421,9 @@ console.log(diagnostic) // 仅用于诊断，不参与协议或权限判断`,
   }),
   'storage-contract:index:assertOperationContext': createStorageContractGuide({
     purposeEn:
-      'Validates the asynchronous operation context without returning its snapshot. Invalid signals, timeouts, page sizes, policies, or throwing accessors become INVALID_ARGUMENT with the original cause retained.',
+      'Validates ordinary asynchronous context fields without allocating a snapshot, timer or subscription. Invalid signal shapes, timeouts, page sizes and policies retain INVALID_ARGUMENT.',
     purposeZh:
-      '验证 asynchronous operation context，但不返回 snapshot。无效 signal、timeout、page size、policy 或 throwing accessor 会成为 INVALID_ARGUMENT，并保留 original cause。',
+      '纯校验普通 asynchronous context 字段，不分配 snapshot、timer 或 subscription；无效 signal shape、timeout、page size 与 policy 保留 INVALID_ARGUMENT。',
     quickStart: `import { assertOperationContext } from '@migaia/storage-contract'\n\nconst options = { signal: undefined, timeoutMs: 2_000, pageSize: 50 }\nconst runBackendOperation = (context: typeof options) => ({ acceptedTimeout: context.timeoutMs })\nassertOperationContext(options)\nconst result = runBackendOperation(options)\nconsole.log(result) // { acceptedTimeout: 2000 }：资源分配前先拒绝无效上下文`,
     scenariosEn: [
       'A public method validates before allocating backend resources.',
@@ -10472,12 +10466,13 @@ console.log(diagnostic) // 仅用于诊断，不参与协议或权限判断`,
       }
     ]
   }),
-  'storage-contract:index:snapshotSyncWriteOptions': createStorageContractGuide({
+  'storage-host:authoring/context:snapshotSyncWriteOptions': createStorageContractGuide({
     purposeEn:
       'Validates the reduced synchronous-write contract and returns only conflictPolicy. signal and timeoutMs are rejected because a synchronous channel cannot honor cancellation after execution begins.',
     purposeZh:
       '验证精简的 synchronous-write contract，并只返回 conflictPolicy。signal 与 timeoutMs 会被拒绝，因为同步通道在执行开始后无法兑现 cancellation。',
-    quickStart: `import { ConflictPolicy, snapshotSyncWriteOptions } from '@migaia/storage-contract'\n\nconst options = snapshotSyncWriteOptions({ conflictPolicy: ConflictPolicy.replace })\nconst storage = { sync: { set: (key: string, value: string, writeOptions: unknown) => console.log(key, value, writeOptions) } }\nstorage.sync.set('theme', 'dark', options)`,
+    quickStart:
+      "import { ConflictPolicy } from '@migaia/storage-contract'\nimport { snapshotSyncWriteOptions } from '@migaia/storage-host/authoring/context'\n\nconst options = snapshotSyncWriteOptions({ conflictPolicy: ConflictPolicy.replace })\nconst storage = { sync: { set: (key: string, value: string, writeOptions: unknown) => console.log(key, value, writeOptions) } }\nstorage.sync.set('theme', 'dark', options)",
     scenariosEn: [
       'A synchronous adapter snapshots write policy.',
       'One validation path is shared by local, session, cookie, and memory stores.',
@@ -10732,12 +10727,13 @@ console.log(diagnostic) // 仅用于诊断，不参与协议或权限判断`,
       }
     ]
   }),
-  'storage-contract:index:snapshotStorageKey': createStorageContractGuide({
+  'storage-host:authoring/key:snapshotStorageKey': createStorageContractGuide({
     purposeEn:
       'Validates and detaches a structured key so later asynchronous work cannot observe caller mutation. Compound arrays and Dates are copied; ArrayBuffers are normalized through the cross-realm key classifier.',
     purposeZh:
       '验证并 detach structured key，使后续 asynchronous work 无法观察 caller mutation。compound array 与 Date 会复制；ArrayBuffer 通过 cross-realm key classifier 规范化。',
-    quickStart: `import { snapshotStorageKey } from '@migaia/storage-contract'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nconst host = await createStorageHost({ plugins: [memoryBackendPlugin()] })\nconst storage = host.backend('memory')\nconst records = storage\nconst tenantId = 'tenant-42'\nconst cursor = new Date('2026-01-01')\nconst stableKey = snapshotStorageKey([tenantId, cursor], storage.backend)\nconsole.log(await records.getRecord(stableKey))\nawait host.dispose()`,
+    quickStart:
+      "import { snapshotStorageKey } from '@migaia/storage-host/authoring/key'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nconst host = await createStorageHost({ plugins: [memoryBackendPlugin()] })\nconst storage = host.backend('memory')\nconst records = storage\nconst tenantId = 'tenant-42'\nconst cursor = new Date('2026-01-01')\nconst stableKey = snapshotStorageKey([tenantId, cursor], storage.backend)\nconsole.log(await records.getRecord(stableKey))\nawait host.dispose()",
     scenariosEn: [
       'A key crosses an async scheduling boundary.',
       'Caller-owned compound arrays may mutate.',
@@ -10815,12 +10811,13 @@ console.log(diagnostic) // 仅用于诊断，不参与协议或权限判断`,
       }
     ]
   }),
-  'storage-contract:index:compareStorageKeys': createStorageContractGuide({
+  'storage-host:authoring/key:compareStorageKeys': createStorageContractGuide({
     purposeEn:
       'Provides the canonical total ordering for valid storage keys: number, Date, string, ArrayBuffer, then compound array, with lexicographic comparison inside each domain. It matches validation and cross-realm classification.',
     purposeZh:
       '提供 valid storage key 的 canonical total ordering：number、Date、string、ArrayBuffer、compound array；每个 domain 内按 lexicographic rule 比较，并与 validation/cross-realm classification 一致。',
-    quickStart: `import { compareStorageKeys } from '@migaia/storage-contract'\n\nconst keys = ['b', 2, 'a']\nconst ordered = keys.toSorted(compareStorageKeys)\nconst first = ordered.at(0)\nconsole.log(first) // 按 storage key 规范取得稳定的第一个 key`,
+    quickStart:
+      "import { compareStorageKeys } from '@migaia/storage-host/authoring/key'\n\nconst keys = ['b', 2, 'a']\nconst ordered = keys.toSorted(compareStorageKeys)\nconst first = ordered.at(0)\nconsole.log(first) // 按 storage key 规范取得稳定的第一个 key",
     scenariosEn: [
       'Producing deterministic snapshots.',
       'Sorting mixed valid key domains.',
@@ -11043,12 +11040,13 @@ console.log(diagnostic) // 仅用于诊断，不参与协议或权限判断`,
       }
     ]
   }),
-  'storage-contract:index:snapshotStorageCapabilities': createStorageContractGuide({
+  'storage-host:authoring/store:snapshotStorageCapabilities': createStorageContractGuide({
     purposeEn:
-      'Reads a backend capability descriptor exactly once and returns a detached fact object. Invalid shapes and hostile getters produce undefined instead of escaping an exception, so feature routing can fail closed.',
+      'Validates and detaches scalar capability facts for deferred host admission. Legacy secondary-index and change-feed omissions normalize to false.',
     purposeZh:
-      '只读取一次 backend capability descriptor，并返回独立的事实对象。无效 shape 或 hostile getter 返回 undefined，不让异常逃逸，使 feature routing 可以 fail closed。',
-    quickStart: `import { snapshotStorageCapabilities } from '@migaia/storage-contract'\n\nconst candidate = { capabilities: { transactions: true, records: true } }\nconst useNonTransactionalPath = () => console.log('fallback path')\nconst capabilities = snapshotStorageCapabilities(candidate.capabilities)\nif (!capabilities?.transactions) useNonTransactionalPath()\nelse console.log('transaction path')`,
+      '为异步宿主准入校验并分离标量能力事实；旧 secondary-index 与 change-feed 省略形状补 false。',
+    quickStart:
+      "import { snapshotStorageCapabilities } from '@migaia/storage-host/authoring/store'\n\nconst candidate = { capabilities: { transactions: true, records: true } }\nconst useNonTransactionalPath = () => console.log('fallback path')\nconst capabilities = snapshotStorageCapabilities(candidate.capabilities)\nif (!capabilities?.transactions) useNonTransactionalPath()\nelse console.log('transaction path')",
     scenariosEn: [
       'Routing work before touching an optional backend channel.',
       'Admitting a plugin-supplied capability object.',
@@ -11142,15 +11140,15 @@ console.log(diagnostic) // 仅用于诊断，不参与协议或权限判断`,
       }
     ]
   }),
-  'storage-contract:index:snapshotKeyValueStoreDetailed': createStorageContractGuide({
+  'storage-host:authoring/store:snapshotKeyValueStoreDetailed': createStorageContractGuide({
     purposeEn:
-      'Performs one-read admission for the complete base key-value store surface. Success returns the store, normalized backend and capabilities, plus the original dispose function and receiver; failure retains an accessor cause when one exists.',
+      'Checks the original KV shape and retains its resource receiver plus detached capability facts for later host admission. Ordinary invalid shapes return a failed admission record.',
     purposeZh:
-      '对完整 base key-value store surface 执行 one-read admission。成功时返回 store、normalized backend/capabilities，以及原始 dispose function 与 receiver；失败时保留可用的 accessor cause。',
-    quickStart: `import { snapshotKeyValueStoreDetailed } from '@migaia/storage-contract'\n\nexport async function closeCandidate(candidate: unknown): Promise<void> {\n  const admission = snapshotKeyValueStoreDetailed(candidate)\n  if (!admission.valid) throw new Error('Store admission failed', { cause: admission.cause })\n  await admission.dispose()\n}`,
+      '检查原 KV shape，保存原资源 receiver 与独立能力事实供后续宿主准入；普通无效形状返回失败记录。',
+    quickStart:
+      "import { snapshotKeyValueStoreDetailed } from '@migaia/storage-host/authoring/store'\n\nexport async function closeCandidate(candidate: unknown): Promise<void> {\n  const admission = snapshotKeyValueStoreDetailed(candidate)\n  if (!admission.valid) throw new Error('Store admission failed', { cause: admission.cause })\n  await admission.dispose()\n}",
     scenariosEn: [
       'A lifecycle owner must capture callable identity once.',
-      'A failed hostile getter must remain diagnosable.',
       'Installation must validate before registering cleanup.'
     ],
     scenariosZh: [
@@ -11192,12 +11190,12 @@ console.log(diagnostic) // 仅用于诊断，不参与协议或权限判断`,
       }
     ]
   }),
-  'storage-contract:index:snapshotKeyValueStore': createStorageContractGuide({
+  'storage-host:authoring/store:snapshotKeyValueStore': createStorageContractGuide({
     purposeEn:
-      'Returns a stable base-store snapshot containing the admitted store, backend kind, and capability facts. It avoids re-reading public accessors while composing higher-level capability checks.',
-    purposeZh:
-      '返回包含 admitted store、backend kind 与 capability facts 的稳定 base-store snapshot。在组合高阶 capability check 时避免重复读取 public accessor。',
-    quickStart: `import { snapshotKeyValueStore } from '@migaia/storage-contract'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nconst host = await createStorageHost({ plugins: [memoryBackendPlugin()] })\nconst candidate = host.backend('memory')\nconst snapshot = snapshotKeyValueStore(candidate)\nif (snapshot) console.log(snapshot.backend, snapshot.store)\nawait host.dispose()`,
+      'Retains the original admitted KV object and an independent capability descriptor before deferred host routing.',
+    purposeZh: '在宿主异步路由前保留准入后的原 KV 对象及独立能力说明。',
+    quickStart:
+      "import { snapshotKeyValueStore } from '@migaia/storage-host/authoring/store'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nconst host = await createStorageHost({ plugins: [memoryBackendPlugin()] })\nconst candidate = host.backend('memory')\nconst snapshot = snapshotKeyValueStore(candidate)\nif (snapshot) console.log(snapshot.backend, snapshot.store)\nawait host.dispose()",
     scenariosEn: [
       'Composing a change-feed or adapter guard.',
       'Selecting a backend path after a single admission.',
@@ -11241,12 +11239,12 @@ console.log(diagnostic) // 仅用于诊断，不参与协议或权限判断`,
       }
     ]
   }),
-  'storage-contract:index:snapshotRecordStore': createStorageContractGuide({
+  'storage-host:authoring/store:snapshotRecordStore': createStorageContractGuide({
     purposeEn:
-      'Admits the complete structured-record surface and requires records, binary, transactions, and iteration capabilities together. The snapshot is the safe starting point for record and secondary-index composition.',
-    purposeZh:
-      '接纳完整 structured-record surface，并同时要求 records、binary、transactions 与 iteration capability。该 snapshot 是组合 record 与 secondary-index 能力的安全起点。',
-    quickStart: `import { snapshotRecordStore } from '@migaia/storage-contract'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\ntype User = { id: number; name: string }\nconst host = await createStorageHost({ plugins: [memoryBackendPlugin()] })\nconst candidate = host.backend('memory')\nawait candidate.putRecord({ id: 1, name: 'Ada' }, 1)\nconst snapshot = snapshotRecordStore<User>(candidate)\nif (snapshot) console.log(await snapshot.store.getRecord(1))\nawait host.dispose()`,
+      'Admits the complete structured-record surface and retains the original provider with independent capability facts for deferred consumption.',
+    purposeZh: '检查完整结构化记录接口，为异步消费保留原 provider 与独立能力事实。',
+    quickStart:
+      "import { snapshotRecordStore } from '@migaia/storage-host/authoring/store'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\ntype User = { id: number; name: string }\nconst host = await createStorageHost({ plugins: [memoryBackendPlugin()] })\nconst candidate = host.backend('memory')\nawait candidate.putRecord({ id: 1, name: 'Ada' }, 1)\nconst snapshot = snapshotRecordStore<User>(candidate)\nif (snapshot) console.log(await snapshot.store.getRecord(1))\nawait host.dispose()",
     scenariosEn: [
       'An adapter requires all L1 record operations.',
       'A secondary-index guard needs an admitted record base.',

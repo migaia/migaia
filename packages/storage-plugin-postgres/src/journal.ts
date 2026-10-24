@@ -1,13 +1,13 @@
 import {
   StorageContractError,
   StorageContractErrorCode,
-  runTransactionOperation,
-  snapshotStorageKeyPrefix,
   type IStorageKey,
   type ITransactionScope,
   type ITransactionInfo,
   type ISqlRow
 } from '@migaia/storage-contract'
+import { runTransactionOperation } from '@migaia/storage-host/authoring/transaction'
+import { snapshotStorageKeyPrefix } from '@migaia/storage-host/authoring/key'
 import type {
   IStorageJournalNamespace,
   IStorageJournalNamespaceView,

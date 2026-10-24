@@ -1,4 +1,5 @@
-import { createStorageIteratorLifetime, type IStorageResource } from '@migaia/storage-contract'
+import { type IStorageResource } from '@migaia/storage-contract'
+import { createStorageIteratorLifetime } from '@migaia/storage-host/authoring/resource'
 import {
   asyncDisposeKey,
   createStorageOperationReporter,

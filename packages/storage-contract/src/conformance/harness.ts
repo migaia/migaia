@@ -3,7 +3,7 @@ import type { IRecordIndexHandle } from '../secondary-index.js'
 import type { IStorageCapabilities } from '../capabilities.js'
 import type { IAnyStorageCapability, ICapabilityApi, IStorageStore } from '../capability.js'
 import type { IStorageIterator, IStorageResource } from '../resource.js'
-import { snapshotStorageBaseDetailed } from '../store.js'
+import { isStorageBase } from '../store.js'
 import { isCapabilityToken, readCapabilityTokenFacts } from '../capability-token.js'
 import { attachSecondaryErrors } from '@migaia/utils/error'
 import { kv } from '../capabilities/kv.js'
@@ -91,7 +91,7 @@ export function conformanceApi<TCap extends IAnyStorageCapability>(
   store: IStorageStore<never>,
   capability: TCap
 ): ICapabilityApi<TCap> {
-  return Reflect.apply(store.use, store, [capability]) as ICapabilityApi<TCap>
+  return (store as IStorageStore<TCap>).use(capability) as ICapabilityApi<TCap>
 }
 
 /** Assert the complete declared snapshots and authentic token shape for every fresh fixture. */
@@ -100,10 +100,10 @@ export function inspectConformanceSubject<TStore extends IStorageStore<never>>(
   subject: IConformanceSubject<TStore>,
   store: TStore
 ): void {
-  /** Original admission owns resource, backend and capability descriptor validation. */
-  const admitted = snapshotStorageBaseDetailed(store, { asyncDisposeKey: Symbol.asyncDispose })
-  harness.expect(admitted.valid).toBe(true)
-  harness.expect(admitted.valid ? admitted.capabilities : undefined).toEqual(subject.features)
+  /** Pure foundation admission borrows facts; the conformance runner owns no host runtime. */
+  const admitted = isStorageBase(store, { asyncDisposeKey: Symbol.asyncDispose })
+  harness.expect(admitted).toBe(true)
+  harness.expect(admitted ? store.capabilities : undefined).toEqual(subject.features)
   harness.expect(typeof store.has).toBe('function')
   harness.expect(typeof store.use).toBe('function')
   for (const capability of STANDARD_CAPABILITIES)

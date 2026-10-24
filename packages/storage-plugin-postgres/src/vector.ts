@@ -4,19 +4,9 @@ import {
   assertStorageVectorCollection,
   assertStorageVector,
   assertStorageVectorIds,
-  snapshotStorageVectorCollection,
-  snapshotStorageVector,
-  snapshotStorageVectorUpsert,
-  snapshotStorageVectorSearch,
-  snapshotStorageVectorIds,
-  snapshotStorageDeleteCountMode,
-  snapshotStorageWhere,
-  createVectorQuery,
   VectorQueryOriginKind,
   type IVectorQueryOrigin,
-  createStorageIteratorLifetime,
   assertStorageTtlDuration,
-  lockKey,
   type IVectorApi,
   type IVectorCollection,
   type IStorageVectorConfiguration,
@@ -29,7 +19,18 @@ import {
   type ITtlTarget,
   type IStorageChange
 } from '@migaia/storage-contract'
-import { recommendStorageVector } from '@migaia/storage-host/authoring/vector'
+import { snapshotStorageWhere, createVectorQuery } from '@migaia/storage-host/authoring/query'
+import { createStorageIteratorLifetime } from '@migaia/storage-host/authoring/resource'
+import { lockKey } from '@migaia/storage-host/authoring/concurrency'
+import {
+  recommendStorageVector,
+  snapshotStorageVectorCollection,
+  snapshotStorageVector,
+  snapshotStorageVectorUpsert,
+  snapshotStorageVectorSearch,
+  snapshotStorageVectorIds,
+  snapshotStorageDeleteCountMode
+} from '@migaia/storage-host/authoring/vector'
 import {
   asyncDisposeKey,
   createStorageOperationReporter

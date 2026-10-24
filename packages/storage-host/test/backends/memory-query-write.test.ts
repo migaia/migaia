@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { records, rdf, vector, term, ConcurrencyPolicy, type IQuad } from '@migaia/storage-contract'
+import { records, rdf, vector, type IQuad } from '@migaia/storage-contract'
+import { term } from '../../src/authoring/rdf.js'
+import { ConcurrencyPolicy } from '../../src/authoring/concurrency.js'
 import {
   createOrgId,
   createStorageHost,

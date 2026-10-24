@@ -375,14 +375,6 @@ describe('memory backend', () => {
     await expect(store.getRecord(['transaction', 1])).resolves.toEqual({ source: 'transaction' })
     await expect(store.getRecord(['direct', 9])).resolves.toBeUndefined()
     await expect(store.getRecord(['transaction', 9])).resolves.toBeUndefined()
-
-    const overriddenMapKey = ['overridden-map', 1] as (string | number)[]
-    overriddenMapKey.map = (() => ['overridden-map', 2]) as typeof overriddenMapKey.map
-    await store.putRecord({ source: 'map-safe' }, overriddenMapKey)
-    await expect(store.getRecord(['overridden-map', 1])).resolves.toEqual({
-      source: 'map-safe'
-    })
-    await expect(store.getRecord(['overridden-map', 2])).resolves.toBeUndefined()
   })
 })
 

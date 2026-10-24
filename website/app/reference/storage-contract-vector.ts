@@ -21,16 +21,8 @@ console.log(hits.map(hit => ({
 })))`
 
 /** This native author function accepts an existing query and captured native options only. */
-const nativeExample = `import {
-  refineStorageVectorQuery, type IVectorQuery
-} from '@migaia/storage-contract'
-function chooseNativeStage<P, G extends boolean, V extends boolean, M extends object>(
-  query: IVectorQuery<P, G, V, M>, capturedNativeOptions: object
-) {
-  return refineStorageVectorQuery(query, k => ({
-    native: capturedNativeOptions, topN: Math.min(2, k)
-  }))
-}`
+const nativeExample =
+  "import { refineStorageVectorQuery } from '@migaia/storage-host/authoring/query'\nimport { type IVectorQuery } from '@migaia/storage-contract'\nfunction chooseNativeStage<P, G extends boolean, V extends boolean, M extends object>(\n  query: IVectorQuery<P, G, V, M>, capturedNativeOptions: object\n) {\n  return refineStorageVectorQuery(query, k => ({\n    native: capturedNativeOptions, topN: Math.min(2, k)\n  }))\n}"
 
 /** Rerank's new member can also be reused by the existing bounded vector type documentation. */
 export const storageVectorRerankMember: IMemberDoc = {

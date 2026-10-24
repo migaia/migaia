@@ -3,18 +3,9 @@
   "compilerOptions": {
     "noEmit": true,
     "rootDir": ".",
-    "types": [
-      "vitest/globals",
-      "node"
-    ],
-    "lib": [
-      "ES2024",
-      "ESNext.Disposable"
-    ]
+    "types": ["vitest/globals", "node"],
+    "lib": ["ES2024", "ESNext.Disposable", "DOM"]
   },
-  "include": [
-    "src",
-    "test"
-  ],
+  "include": ["src", "test"],
   "exclude": []
 }

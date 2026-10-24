@@ -1,11 +1,8 @@
 import { expect, it, vi } from 'vitest'
 import { asyncDisposeKey } from '@migaia/plugin-host'
 import { deferred } from '@migaia/utils/promise'
-import {
-  assertTransactionOwner,
-  type ICodecStageObserver,
-  type IQueryStageObserver
-} from '@migaia/storage-contract'
+import { assertTransactionOwner } from '../../src/authoring/transaction.js'
+import { type ICodecStageObserver, type IQueryStageObserver } from '@migaia/storage-contract'
 import {
   createStorageHost,
   definePlugin,

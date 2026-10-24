@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { Logger, type ILogEntry } from '@migaia/logger'
 import { level } from '@migaia/logger/plugins'
-import { ConcurrencyPolicy, lockKey } from '@migaia/storage-contract'
+import { ConcurrencyPolicy, lockKey } from '../src/authoring/concurrency.js'
 import { deferred } from '@migaia/utils/promise'
 import { createOrgId, createStorageHost, memoryBackendPlugin } from '../src/index.js'
 

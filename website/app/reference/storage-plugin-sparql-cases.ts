@@ -10,24 +10,8 @@ export const storagePluginSparqlCases: Readonly<Record<string, readonly ICaseDoc
         'An application needs an atomic ground-quad change without inventing HTTP sessions.',
         '应用需要原子修改 ground quad，不应虚构 HTTP 会话。'
       ),
-      example: `import { Store } from 'oxigraph'
-import { createStorageHost } from '@migaia/storage-host'
-import { rdf, term } from '@migaia/storage-contract'
-import { sparqlBackendPlugin } from '@migaia/storage-plugin-sparql'
-import { oxigraphEndpoint } from '@migaia/storage-plugin-sparql/oxigraph'
-
-const native = new Store()
-await using host = await createStorageHost({ plugins: [
-  sparqlBackendPlugin({ endpoint: oxigraphEndpoint(native) })
-] as const })
-const store = host.backend('sparql')
-const quad = { subject: term.iri('urn:a'), predicate: term.iri('urn:p'),
-  object: term.literal('Alice'), graph: term.defaultGraph }
-await store.transaction(async scope => {
-  scope.use(rdf).expectAbsent([quad])
-  await scope.use(rdf).add([quad])
-})
-console.log(await store.use(rdf).match({}).count())`,
+      example:
+        "import { Store } from 'oxigraph'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { rdf } from '@migaia/storage-contract'\nimport { term } from '@migaia/storage-host/authoring/rdf'\nimport { sparqlBackendPlugin } from '@migaia/storage-plugin-sparql'\nimport { oxigraphEndpoint } from '@migaia/storage-plugin-sparql/oxigraph'\n\nconst native = new Store()\nawait using host = await createStorageHost({ plugins: [\n  sparqlBackendPlugin({ endpoint: oxigraphEndpoint(native) })\n] as const })\nconst store = host.backend('sparql')\nconst quad = { subject: term.iri('urn:a'), predicate: term.iri('urn:p'),\n  object: term.literal('Alice'), graph: term.defaultGraph }\nawait store.transaction(async scope => {\n  scope.use(rdf).expectAbsent([quad])\n  await scope.use(rdf).add([quad])\n})\nconsole.log(await store.use(rdf).match({}).count())",
       result: t(
         'Prints 1 after one native conditional Modify and marker ASK. The borrowed Store remains caller-owned.',
         '一次原生条件 Modify 与 marker ASK 后输出 1，借用 Store 仍归调用方。'
@@ -77,20 +61,8 @@ const endpoint = oxigraphEndpoint(native)`,
         'Native graph documents need per-graph HTTP semantics without transaction claims.',
         '原生图文档需要 per-graph HTTP 语义，不声称交互事务。'
       ),
-      example: `import { Store } from 'oxigraph'
-import { createStorageHost } from '@migaia/storage-host'
-import { term } from '@migaia/storage-contract'
-import { sparqlBackendPlugin } from '@migaia/storage-plugin-sparql'
-import { oxigraphEndpoint } from '@migaia/storage-plugin-sparql/oxigraph'
-import { graphStoreFeature } from '@migaia/storage-plugin-sparql/features/graph-store'
-await using host = await createStorageHost({ plugins: [sparqlBackendPlugin({
-  endpoint: oxigraphEndpoint(new Store())
-}, { graphs: graphStoreFeature() })] as const })
-const graphs = host.backend('sparql').api.graphStore
-const target = { graph: term.iri('https://example/schema') }
-await graphs.putGraph(target, { format: 'text/turtle', text: '<urn:a> <urn:p> "hello" .' })
-console.log((await graphs.getGraph(target, 'application/n-triples')).text)
-await graphs.removeGraph(target)`,
+      example:
+        "import { Store } from 'oxigraph'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { term } from '@migaia/storage-host/authoring/rdf'\nimport { sparqlBackendPlugin } from '@migaia/storage-plugin-sparql'\nimport { oxigraphEndpoint } from '@migaia/storage-plugin-sparql/oxigraph'\nimport { graphStoreFeature } from '@migaia/storage-plugin-sparql/features/graph-store'\nawait using host = await createStorageHost({ plugins: [sparqlBackendPlugin({\n  endpoint: oxigraphEndpoint(new Store())\n}, { graphs: graphStoreFeature() })] as const })\nconst graphs = host.backend('sparql').api.graphStore\nconst target = { graph: term.iri('https://example/schema') }\nawait graphs.putGraph(target, { format: 'text/turtle', text: '<urn:a> <urn:p> \"hello\" .' })\nconsole.log((await graphs.getGraph(target, 'application/n-triples')).text)\nawait graphs.removeGraph(target)",
       result: t(
         'Uses root-only graph methods; HEAD404 is false and GET404 rejects.',
         '使用根 graph 方法，HEAD404 为 false，GET404 拒绝。'

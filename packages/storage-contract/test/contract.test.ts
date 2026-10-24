@@ -12,7 +12,7 @@ import {
   isSecondaryIndexRecordStore,
   asChangeFeedStore,
   isChangeFeedStore
-} from '../src/index.js'
+} from '@migaia/storage-contract'
 
 describe('StorageContractError 家族', () => {
   it('公开码表 + source 恒为 @migaia/storage-contract', () => {

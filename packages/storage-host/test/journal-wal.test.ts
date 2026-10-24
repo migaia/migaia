@@ -7,7 +7,8 @@ import {
   memoryLogStore,
   type ILogPayloadInput
 } from '@migaia/logger/plugins/durable'
-import { lockKey, ttl, type IStorageResource } from '@migaia/storage-contract'
+import { lockKey } from '../src/authoring/concurrency.js'
+import { ttl, type IStorageResource } from '@migaia/storage-contract'
 import { createStorageHost, createOrgId, memoryBackendPlugin } from '../src/index.js'
 import { resolveStorageJournalBinding } from '../src/journal/binding.js'
 import { snapshotStorageJournalConfiguration } from '../src/journal/configuration-options.js'

@@ -13,7 +13,8 @@ Portable payloads and arbitrary UTF-16 IDs round-trip through the original codec
 ## Expiration and numeric deletion
 
 ```ts
-import { ttl, lockKey, DeleteCountMode } from '@migaia/storage-contract'
+import { ttl, DeleteCountMode } from '@migaia/storage-contract'
+import { lockKey } from '@migaia/storage-host/authoring/concurrency'
 
 await documents.upsert([{ id: 'temporary', vector: [1, 0], payload: { category: 'guide' } }], {
   ttlMs: 5000

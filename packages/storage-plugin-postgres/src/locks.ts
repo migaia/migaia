@@ -1,10 +1,6 @@
 import {
   StorageContractError,
   StorageContractErrorCode,
-  readConcurrencyLockIdentities,
-  snapshotConcurrencyLockKeys,
-  snapshotConcurrencyLockRange,
-  snapshotConcurrencyLockHoldings,
   type IConcurrencyAttemptContext,
   type IConcurrencyHolder,
   type ILockKey,
@@ -12,6 +8,12 @@ import {
   type IStorageKey,
   type ISqlRow
 } from '@migaia/storage-contract'
+import {
+  readConcurrencyLockIdentities,
+  snapshotConcurrencyLockKeys,
+  snapshotConcurrencyLockRange,
+  snapshotConcurrencyLockHoldings
+} from '@migaia/storage-host/authoring/concurrency'
 import { sleep } from '@migaia/utils/promise'
 import { throwIfAborted } from '@migaia/storage-host/authoring/backend'
 import type { IPgConfiguration, IPgTables } from './schema.js'

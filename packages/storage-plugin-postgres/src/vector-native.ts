@@ -1,6 +1,8 @@
 import {
   snapshotStorageVector,
-  snapshotStorageVectorFilter,
+  snapshotStorageVectorFilter
+} from '@migaia/storage-host/authoring/vector'
+import {
   StorageContractError,
   StorageContractErrorCode,
   type IOperationContext

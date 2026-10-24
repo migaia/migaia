@@ -97,44 +97,7 @@ try {
   writeFileSync(join(consumer, 'package.json'), '{"type":"module"}\n')
   writeFileSync(
     join(consumer, 'native.mjs'),
-    `import assert from 'node:assert/strict'
-import {createStorageHost,createOrgId} from '@migaia/storage-host'
-import {vector,ttl,lockKey,DeleteCountMode} from '@migaia/storage-contract'
-import {qdrantBackendPlugin,ERROR_SOURCE} from '@migaia/storage-plugin-qdrant'
-import {fetchHttp} from '@migaia/storage-plugin-qdrant/http'
-import {qdrantClientHttp} from '@migaia/storage-plugin-qdrant/client'
-import {qdrantManagementFeature} from '@migaia/storage-plugin-qdrant/features/management'
-import {qdrantHybridFeature} from '@migaia/storage-plugin-qdrant/features/hybrid'
-import {qdrantRecommendFeature} from '@migaia/storage-plugin-qdrant/features/recommend'
-import {qdrantGroupByFeature} from '@migaia/storage-plugin-qdrant/features/group-by'
-import {qdrantRescoreFeature} from '@migaia/storage-plugin-qdrant/features/rescore'
-import {QdrantClient} from '@qdrant/js-client-rest'
-/** The shared service launcher supplies every runtime's identical native endpoint. */
-const url=process.env.MIGAIA_QDRANT_URL
-assert.ok(url,'configured native Qdrant service required')
-assert.equal(ERROR_SOURCE,'storage.backend.qdrant')
-for(const native of [fetchHttp(url),qdrantClientHttp(new QdrantClient({url}))]){
- const created=[],http={...native,createCollection:async(...args)=>{const result=await native.createCollection(...args);created.push(args[0]);return result}},org=createOrgId(),host=await createStorageHost({org,plugins:[qdrantBackendPlugin({url,http,collectionPrefix:crypto.randomUUID()},{management:qdrantManagementFeature(),hybrid:qdrantHybridFeature(),recommend:qdrantRecommendFeature(),groups:qdrantGroupByFeature(),rescore:qdrantRescoreFeature({collections:{runtime:{dimensions:2,metric:'dot'}}})})]})
- try{
-  const store=host.backend('qdrant'),collection=store.use(vector).collection('runtime',{dimensions:2,metric:'cosine'})
-  await collection.upsert([{id:'one\\ud800',vector:[100,0],payload:{kind:'same'}},{id:'two',vector:[0,1],payload:{kind:'same'}}])
-  const hits=await collection.near([1,0],{exact:true}).topK(2).withVector().all()
-  assert.equal(hits[0].id,'one\\ud800');assert.deepEqual(hits[0].vector,[100,0])
-  await store.api.qdrantRescore.updateVectors('runtime',[{id:'one\\ud800',vector:[1,0]},{id:'two',vector:[4,0]}])
-  const rescored=await collection.near([1,0]).topK(2).rescore({query:[1,0],topN:1}).rerank(()=>[9]).first()
-  assert.equal(rescored.id,'two');assert.equal(rescored.score,4);assert.equal(rescored.rerankScore,9)
-  assert.equal(await store.use(ttl).expire(lockKey.vector('runtime','two'),0),true)
-  assert.equal((await collection.near([1,0]).topK(2).all()).length,1)
-  assert.equal(await collection.deleteWhere({kind:'same'},{count:DeleteCountMode.scroll}),2)
-  assert.equal(typeof store.api.qdrantManagement.purgeExpired,'function')
-  assert.equal('transaction'in store,false);assert.equal('deleteByFilter'in store,false)
-  await host.dropOrg(org)
- }finally{await host.dispose();for(const name of created)await native.deleteCollection(name)}
- assert.match(await native.getVersion(),/^1\\./)
-}
-console.log('qdrant native runtime PASS: HTTP + borrowed SDK')
-
-`
+    "import assert from 'node:assert/strict'\nimport {createStorageHost,createOrgId} from '@migaia/storage-host'\nimport { vector, ttl, DeleteCountMode } from '@migaia/storage-contract'\nimport { lockKey } from '@migaia/storage-host/authoring/concurrency'\nimport {qdrantBackendPlugin,ERROR_SOURCE} from '@migaia/storage-plugin-qdrant'\nimport {fetchHttp} from '@migaia/storage-plugin-qdrant/http'\nimport {qdrantClientHttp} from '@migaia/storage-plugin-qdrant/client'\nimport {qdrantManagementFeature} from '@migaia/storage-plugin-qdrant/features/management'\nimport {qdrantHybridFeature} from '@migaia/storage-plugin-qdrant/features/hybrid'\nimport {qdrantRecommendFeature} from '@migaia/storage-plugin-qdrant/features/recommend'\nimport {qdrantGroupByFeature} from '@migaia/storage-plugin-qdrant/features/group-by'\nimport {qdrantRescoreFeature} from '@migaia/storage-plugin-qdrant/features/rescore'\nimport {QdrantClient} from '@qdrant/js-client-rest'\n/** The shared service launcher supplies every runtime's identical native endpoint. */\nconst url=process.env.MIGAIA_QDRANT_URL\nassert.ok(url,'configured native Qdrant service required')\nassert.equal(ERROR_SOURCE,'storage.backend.qdrant')\nfor(const native of [fetchHttp(url),qdrantClientHttp(new QdrantClient({url}))]){\n const created=[],http={...native,createCollection:async(...args)=>{const result=await native.createCollection(...args);created.push(args[0]);return result}},org=createOrgId(),host=await createStorageHost({org,plugins:[qdrantBackendPlugin({url,http,collectionPrefix:crypto.randomUUID()},{management:qdrantManagementFeature(),hybrid:qdrantHybridFeature(),recommend:qdrantRecommendFeature(),groups:qdrantGroupByFeature(),rescore:qdrantRescoreFeature({collections:{runtime:{dimensions:2,metric:'dot'}}})})]})\n try{\n  const store=host.backend('qdrant'),collection=store.use(vector).collection('runtime',{dimensions:2,metric:'cosine'})\n  await collection.upsert([{id:'one\\ud800',vector:[100,0],payload:{kind:'same'}},{id:'two',vector:[0,1],payload:{kind:'same'}}])\n  const hits=await collection.near([1,0],{exact:true}).topK(2).withVector().all()\n  assert.equal(hits[0].id,'one\\ud800');assert.deepEqual(hits[0].vector,[100,0])\n  await store.api.qdrantRescore.updateVectors('runtime',[{id:'one\\ud800',vector:[1,0]},{id:'two',vector:[4,0]}])\n  const rescored=await collection.near([1,0]).topK(2).rescore({query:[1,0],topN:1}).rerank(()=>[9]).first()\n  assert.equal(rescored.id,'two');assert.equal(rescored.score,4);assert.equal(rescored.rerankScore,9)\n  assert.equal(await store.use(ttl).expire(lockKey.vector('runtime','two'),0),true)\n  assert.equal((await collection.near([1,0]).topK(2).all()).length,1)\n  assert.equal(await collection.deleteWhere({kind:'same'},{count:DeleteCountMode.scroll}),2)\n  assert.equal(typeof store.api.qdrantManagement.purgeExpired,'function')\n  assert.equal('transaction'in store,false);assert.equal('deleteByFilter'in store,false)\n  await host.dropOrg(org)\n }finally{await host.dispose();for(const name of created)await native.deleteCollection(name)}\n assert.match(await native.getVersion(),/^1\\./)\n}\nconsole.log('qdrant native runtime PASS: HTTP + borrowed SDK')\n\n"
   )
   execFileSync('rtk', ['proxy', 'node', 'native.mjs'], { cwd: consumer, stdio: 'inherit' })
   console.log(

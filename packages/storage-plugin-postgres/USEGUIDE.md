@@ -5,7 +5,8 @@
 ## 标准批量、期限与组织
 
 ```ts
-import { kv, ttl, counter, records, lockKey } from '@migaia/storage-contract'
+import { kv, ttl, counter, records } from '@migaia/storage-contract'
+import { lockKey } from '@migaia/storage-host/authoring/concurrency'
 
 await store.use(kv).setMany([
   { key: ['items', 1], value: 'first', ttlMs: 10000 },
@@ -29,7 +30,8 @@ const rows = await store.use(records).query().all()
 ## 事务、查询与原生 SQL
 
 ```ts
-import { ConcurrencyPolicy, lockKey, sql } from '@migaia/storage-contract'
+import { ConcurrencyPolicy, lockKey } from '@migaia/storage-host/authoring/concurrency'
+import { sql } from '@migaia/storage-contract'
 
 await store
   .tx()

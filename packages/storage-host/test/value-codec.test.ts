@@ -1,4 +1,4 @@
-import { fromValueCodec } from '@migaia/storage-host/authoring/codec'
+import { fromValueCodec } from '../src/authoring/codec.js'
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import { defineJsonCodec } from '@migaia/serialize/codecs/json'
 import { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'

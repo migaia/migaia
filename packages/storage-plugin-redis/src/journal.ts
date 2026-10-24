@@ -198,7 +198,9 @@ export function createRedisJournalBinding(input: {
   readonly run: <R>(work: (draft: RedisDraft) => Promise<R>) => Promise<R>
   readonly state: (scope: Omit<ITransactionScope, 'use'>) => {
     readonly draft: RedisDraft
-    readonly info: ReturnType<typeof import('@migaia/storage-contract').assertTransactionOwner>
+    readonly info: ReturnType<
+      typeof import('@migaia/storage-host/authoring/transaction').assertTransactionOwner
+    >
   }
 }): IStorageJournalBackendBinding {
   return {

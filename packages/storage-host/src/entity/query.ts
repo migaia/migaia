@@ -1,5 +1,5 @@
+import { createRecordQuery } from '../authoring/query.js'
 import {
-  createRecordQuery,
   type IOperationContext,
   type IRecordQuery,
   type IRecordQueryBase,

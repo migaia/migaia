@@ -60,7 +60,7 @@ and Sets. Unsupported portable values fail before table changes. Binary
 inputs and outputs are detached. Keys use the canonical ordered key codec.
 
 ```ts
-import { sqlFragment } from '@migaia/storage-contract'
+import { sqlFragment } from '@migaia/storage-host/authoring/sql'
 
 await storage.sql`CREATE TABLE users(id INTEGER PRIMARY KEY, name TEXT)`.run()
 await storage.transaction(async (tx) => {

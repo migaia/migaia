@@ -1,7 +1,7 @@
 import type { IAnyStorageCapability, IStorageStore } from '../capability.js'
 import { kv } from '../capabilities/kv.js'
 import type { ITransactionKeyValueApi } from '../transaction.js'
-import { rdf, term, type ITransactionRdfApi } from '../capabilities/rdf.js'
+import { rdf, RdfTermType, RdfDatatype, type ITransactionRdfApi } from '../capabilities/rdf.js'
 import type { IOperationContext } from '../context.js'
 import type { IConformanceCase, IConformanceHarness } from './harness.js'
 import { conformanceApi } from './harness.js'
@@ -23,9 +23,11 @@ function nativeTransaction(
   ctx?: IOperationContext
 ): Promise<unknown> {
   /** A declared transaction without its native entry is an assertion failure, never a skipped case. */
-  const transaction = Reflect.get(store, 'transaction')
-  harness.expect(typeof transaction).toBe('function')
-  return Reflect.apply(transaction, store, [run, ctx])
+  const native = store as unknown as {
+    transaction(run: (scope: object) => unknown, ctx?: IOperationContext): Promise<unknown>
+  }
+  harness.expect(typeof native.transaction).toBe('function')
+  return native.transaction(run, ctx)
 }
 
 /** Normalize only this suite's finite writes, without adding a store, runner or transaction owner. */
@@ -39,18 +41,28 @@ function nativeValues(
   const capability = capabilities.includes(rdf) ? rdf : kv
   harness.expect(capabilities.includes(capability)).toBe(true)
   /** Scope use is checked rather than casting the native base into a generic KV transaction. */
-  const use = scope === undefined ? undefined : Reflect.get(scope, 'use')
-  if (scope !== undefined) harness.expect(typeof use).toBe('function')
+  const native = scope as { use(capability: IAnyStorageCapability): unknown } | undefined
+  if (native !== undefined) harness.expect(typeof native.use).toBe('function')
   if (capability === rdf) {
     /** Quad identity is native ground RDF identity, so rollback is observable without any text key. */
     const api: ITransactionRdfApi =
-      scope === undefined ? conformanceApi(store, rdf) : Reflect.apply(use, scope, [rdf])
+      native === undefined ? conformanceApi(store, rdf) : (native.use(rdf) as ITransactionRdfApi)
     /** Each case owns fresh deterministic quads in the subject's isolated logical fixture. */
     const quad = (name: string) => ({
-      subject: term.iri(`urn:conformance:transaction:${name}`),
-      predicate: term.iri('urn:conformance:transaction:value'),
-      object: term.literal(name),
-      graph: term.defaultGraph
+      subject: {
+        termType: RdfTermType.namedNode,
+        value: `urn:conformance:transaction:${name}`
+      } as const,
+      predicate: {
+        termType: RdfTermType.namedNode,
+        value: 'urn:conformance:transaction:value'
+      } as const,
+      object: {
+        termType: RdfTermType.literal,
+        value: name,
+        datatype: RdfDatatype.string
+      } as const,
+      graph: { termType: RdfTermType.defaultGraph } as const
     })
     return {
       write: (name) => api.add([quad(name)]),
@@ -60,7 +72,7 @@ function nativeValues(
   }
   /** The original root KV API is a structural superset of the native zero-context short view. */
   const api: ITransactionKeyValueApi =
-    scope === undefined ? conformanceApi(store, kv) : Reflect.apply(use, scope, [kv])
+    native === undefined ? conformanceApi(store, kv) : (native.use(kv) as ITransactionKeyValueApi)
   return {
     write: (name) => api.set(name, name),
     remove: (name) => api.remove(name),

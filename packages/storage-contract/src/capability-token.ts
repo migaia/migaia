@@ -35,14 +35,14 @@ export function validateCapabilityMethods(value: unknown, methods: readonly stri
   )
     throw invalidCapability()
 }
-/** Issues one frozen token; names remain diagnostics and never authorize another same-name token. */
+/** Issues one authentic token; names remain diagnostics and never authorize another same-name token. */
 function createCapabilityToken<TApi, TName extends string>(
   name: TName,
   facts?: ICapabilityTokenFacts
 ): IStorageCapability<TName, TApi> {
   if (typeof name !== 'string' || name.length === 0) throw invalidCapability()
   /** The exact original object is the only identity admitted by every capability lookup. */
-  const token = Object.freeze({ name }) as IStorageCapability<TName, TApi>
+  const token = { name } as IStorageCapability<TName, TApi>
   tokens.set(token, facts)
   return token
 }
@@ -57,7 +57,7 @@ export function defineStandardStorageCapability<TApi, TName extends string>(
   name: TName,
   facts: ICapabilityTokenFacts
 ): IStorageCapability<TName, TApi> {
-  return createCapabilityToken<TApi, TName>(name, Object.freeze(facts))
+  return createCapabilityToken<TApi, TName>(name, facts)
 }
 /** Authenticity never reads user names, brands or accessors. */
 export function isCapabilityToken(value: unknown): value is IAnyStorageCapability {

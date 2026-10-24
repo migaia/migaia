@@ -36,8 +36,8 @@ import {
 } from '@migaia/plugin-host'
 import { createAbortController, snapshotScheduler, mergeCleanupResults } from '@migaia/lifecycle'
 import { systemScheduler, type IScheduler } from '@migaia/utils/scheduler'
+import { snapshotStorageBaseDetailed } from './authoring/store.js'
 import {
-  snapshotStorageBaseDetailed,
   assertOperationContext,
   StorageContractError,
   StorageContractErrorCode

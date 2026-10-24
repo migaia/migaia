@@ -2,7 +2,8 @@
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb'
 import { describe, expect, it, vi } from 'vitest'
 import { createStorageHost, createOrgId } from '@migaia/storage-host'
-import { lockKey, ttl, STORAGE_CONTRACT_SOURCE } from '@migaia/storage-contract'
+import { lockKey } from '@migaia/storage-host/authoring/concurrency'
+import { ttl, STORAGE_CONTRACT_SOURCE } from '@migaia/storage-contract'
 import { walkErrorCauses } from '@migaia/utils/error'
 import { indexedDbBackendPlugin } from '../../src/indexed-db.js'
 

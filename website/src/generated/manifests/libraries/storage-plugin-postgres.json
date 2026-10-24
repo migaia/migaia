@@ -177,7 +177,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { kv, ttl, counter, records, lockKey } from '@migaia/storage-contract'\n\nawait store.use(kv).setMany([\n  { key: ['items', 1], value: 'first', ttlMs: 10000 },\n  { key: ['items', 2], value: 'second' }\n])\nconst values = await store.use(kv).getMany([['items', 2], ['items', 1], ['items', 2], 'missing'])\n// ['second', 'first', 'second', undefined]\nconst removed = await store.use(kv).removeByPrefix(['items'])\nawait store.set('count', '0')\nconst next = await store.use(counter).increment('count', 1)\nawait store.use(ttl).expire(lockKey.text('count'), 1000)\nconst remaining = await store.use(ttl).remaining(lockKey.text('count'))\nawait store.use(ttl).persist(lockKey.text('count'))\nconst rows = await store.use(records).query().all()"
+                "code": "import { kv, ttl, counter, records } from '@migaia/storage-contract'\nimport { lockKey } from '@migaia/storage-host/authoring/concurrency'\n\nawait store.use(kv).setMany([\n  { key: ['items', 1], value: 'first', ttlMs: 10000 },\n  { key: ['items', 2], value: 'second' }\n])\nconst values = await store.use(kv).getMany([['items', 2], ['items', 1], ['items', 2], 'missing'])\n// ['second', 'first', 'second', undefined]\nconst removed = await store.use(kv).removeByPrefix(['items'])\nawait store.set('count', '0')\nconst next = await store.use(counter).increment('count', 1)\nawait store.use(ttl).expire(lockKey.text('count'), 1000)\nconst remaining = await store.use(ttl).remaining(lockKey.text('count'))\nawait store.use(ttl).persist(lockKey.text('count'))\nconst rows = await store.use(records).query().all()"
               },
               {
                 "type": "paragraph",
@@ -196,7 +196,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { ConcurrencyPolicy, lockKey, sql } from '@migaia/storage-contract'\n\nawait store\n  .tx()\n  .lock(lockKey.text('balance'))\n  .concurrency(ConcurrencyPolicy.wait())\n  .run(async (tx) => {\n    const current = Number((await tx.get('balance')) ?? '0')\n    await tx.set('balance', String(current + 1))\n    await tx.use(sql).sql`SELECT 1`.get()\n  })\nconst json = await store.sql`SELECT ${'{\"ready\":true}'}::jsonb AS payload`.get()\nconst search =\n  await store.sql`SELECT to_tsvector('simple', ${'hello storage'}) @@ plainto_tsquery('simple', ${'storage'}) AS matches`.get()"
+                "code": "import { ConcurrencyPolicy, lockKey } from '@migaia/storage-host/authoring/concurrency'\nimport { sql } from '@migaia/storage-contract'\n\nawait store\n  .tx()\n  .lock(lockKey.text('balance'))\n  .concurrency(ConcurrencyPolicy.wait())\n  .run(async (tx) => {\n    const current = Number((await tx.get('balance')) ?? '0')\n    await tx.set('balance', String(current + 1))\n    await tx.use(sql).sql`SELECT 1`.get()\n  })\nconst json = await store.sql`SELECT ${'{\"ready\":true}'}::jsonb AS payload`.get()\nconst search =\n  await store.sql`SELECT to_tsvector('simple', ${'hello storage'}) @@ plainto_tsquery('simple', ${'storage'}) AS matches`.get()"
               },
               {
                 "type": "paragraph",
@@ -467,7 +467,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { kv, ttl, counter, records, lockKey } from '@migaia/storage-contract'\nawait store.use(kv).setMany([\n  { key: ['items', 1], value: 'first', ttlMs: 10000 },\n  { key: ['items', 2], value: 'second' }\n])\nconst values = await store.use(kv).getMany([['items', 2], ['items', 1], ['items', 2], 'missing'])\n// ['second', 'first', 'second', undefined]\nconst removed = await store.use(kv).removeByPrefix(['items'])\nawait store.set('count', '0')\nconst next = await store.use(counter).increment('count', 1)\nawait store.use(ttl).expire(lockKey.text('count'), 1000)\nconst remaining = await store.use(ttl).remaining(lockKey.text('count'))\nawait store.use(ttl).persist(lockKey.text('count'))\nconst rows = await store.use(records).query().all()"
+                  "code": "import { kv, ttl, counter, records } from '@migaia/storage-contract'\nimport { lockKey } from '@migaia/storage-host/authoring/concurrency'\nawait store.use(kv).setMany([\n  { key: ['items', 1], value: 'first', ttlMs: 10000 },\n  { key: ['items', 2], value: 'second' }\n])\nconst values = await store.use(kv).getMany([['items', 2], ['items', 1], ['items', 2], 'missing'])\n// ['second', 'first', 'second', undefined]\nconst removed = await store.use(kv).removeByPrefix(['items'])\nawait store.set('count', '0')\nconst next = await store.use(counter).increment('count', 1)\nawait store.use(ttl).expire(lockKey.text('count'), 1000)\nconst remaining = await store.use(ttl).remaining(lockKey.text('count'))\nawait store.use(ttl).persist(lockKey.text('count'))\nconst rows = await store.use(records).query().all()"
                 },
                 {
                   "type": "paragraph",
@@ -486,7 +486,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { ConcurrencyPolicy, lockKey, sql } from '@migaia/storage-contract'\nawait store\n  .tx()\n  .lock(lockKey.text('balance'))\n  .concurrency(ConcurrencyPolicy.wait())\n  .run(async (tx) => {\n    const current = Number((await tx.get('balance')) ?? '0')\n    await tx.set('balance', String(current + 1))\n    await tx.use(sql).sql`SELECT 1`.get()\n  })\nconst json = await store.sql`SELECT ${'{\"ready\":true}'}::jsonb AS payload`.get()\nconst search =\n  await store.sql`SELECT to_tsvector('simple', ${'hello storage'}) @@ plainto_tsquery('simple', ${'storage'}) AS matches`.get()"
+                  "code": "import { ConcurrencyPolicy, lockKey } from '@migaia/storage-host/authoring/concurrency'\nimport { sql } from '@migaia/storage-contract'\nawait store\n  .tx()\n  .lock(lockKey.text('balance'))\n  .concurrency(ConcurrencyPolicy.wait())\n  .run(async (tx) => {\n    const current = Number((await tx.get('balance')) ?? '0')\n    await tx.set('balance', String(current + 1))\n    await tx.use(sql).sql`SELECT 1`.get()\n  })\nconst json = await store.sql`SELECT ${'{\"ready\":true}'}::jsonb AS payload`.get()\nconst search =\n  await store.sql`SELECT to_tsvector('simple', ${'hello storage'}) @@ plainto_tsquery('simple', ${'storage'}) AS matches`.get()"
                 },
                 {
                   "type": "paragraph",

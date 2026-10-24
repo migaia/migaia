@@ -301,3 +301,25 @@ const hits = await collection
 `lambda` must be finite and in [0,1]. At 1 selection follows engine relevance; at 0 selection after the first candidate uses diversity alone. Equal objectives retain engine order. The helper's `topN` bounds only the computed greedy prefix: it still returns one finite rank per candidate, placing the unselected tail in engine order. Only `rerank` owns truncation. Omitted topN computes every candidate, using O(n) state and worst-case O(n²d) time. Vectors must share dimensions; zero directions contribute zero cosine similarity, retaining engine order for ties. Cancellation uses the original signal without another budget, resource or background task.
 
 Journal engines load only when journal is selected or the `/journal` entry is imported. Install the optional `@migaia/logger` peer when using these features. Hosts without journal do not load logger at runtime.
+
+## Shared authoring ownership
+
+Import interfaces, tokens and pure validators from `@migaia/storage-contract`; use the [entry table](../storage-contract/README.en.md#entries-and-dependency-direction) for execution helpers. Query, transaction, concurrency and publication identity maps live only in host. Native adapters use these entries rather than reimplementing key codecs, locking or resource lifetimes.
+
+```ts
+import { assertStorageKey, type IOperationContext } from '@migaia/storage-contract'
+import { snapshotStorageKey } from '@migaia/storage-host/authoring/key'
+import { snapshotOperationContext } from '@migaia/storage-host/authoring/context'
+
+const input = ['order', new Date(0)] as const
+assertStorageKey(input, 'memory')
+const key = snapshotStorageKey(input, 'memory')
+const context: IOperationContext | undefined = snapshotOperationContext({ timeoutMs: 100 })
+// Pass key/context to the original native owner before its first real await.
+```
+
+Do not snapshot again solely to validate private captured values. `projectStorageBatchKeys` recomputes canonical identity/firstIndex metadata while borrowing keys in a synchronous native terminal. `snapshotStorageBatchKeys` detaches caller keys before asynchronous work. Both use the same canonical projector and ordered encoder.
+
+`createStorageIteratorLifetime` remains on `/authoring/resource`, with the same accepted-read drain, close callback, main/symbolic/return Promise caches and original failure identity. SQL/SPARQL tags use `/authoring/sql` and `/authoring/sparql`; the shared template module is private. `provideCapabilities` and has/use helpers share the single publication table on `/authoring/capability`.
+
+Codec methods are called on their original object. `snapshotCodec(codec) === codec` after admission; it does not clone metadata/methods or run conversions. Use `assertCodec` when only synchronous validation is required, and `fromValueCodec` only when the existing format adapter is required.

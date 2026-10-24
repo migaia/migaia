@@ -1,10 +1,10 @@
 import {
   assertStringStorageKey,
-  runTransactionOperation,
   StorageContractError,
   StorageContractErrorCode,
   type IOperationContext
 } from '@migaia/storage-contract'
+import { runTransactionOperation } from '@migaia/storage-host/authoring/transaction'
 import {
   defineFeature,
   type IStorageFeature,

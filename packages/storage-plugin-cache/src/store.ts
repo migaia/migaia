@@ -5,12 +5,8 @@ import {
   records,
   durableChangeFeed,
   implement,
-  provideCapabilities,
   assertStringStorageKey,
   assertStorageTtlDuration,
-  snapshotOperationContext,
-  lockKey,
-  ConcurrencyPolicy,
   StorageContractError,
   StorageContractErrorCode,
   type IKeyValueApi,
@@ -23,6 +19,9 @@ import {
   type IRecordStore,
   type IStorageChange
 } from '@migaia/storage-contract'
+import { provideCapabilities } from '@migaia/storage-host/authoring/capability'
+import { snapshotOperationContext } from '@migaia/storage-host/authoring/context'
+import { lockKey, ConcurrencyPolicy } from '@migaia/storage-host/authoring/concurrency'
 import type { ICodecValue } from '@migaia/serialize/codec'
 import type { IStoragePluginCore, IStorageBorrowedBackend } from '@migaia/storage-host'
 import { asyncDisposeKey, withAbort } from '@migaia/storage-host/authoring/backend'

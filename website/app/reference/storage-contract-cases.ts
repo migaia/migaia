@@ -14,26 +14,8 @@ const orgGraphCase: ICaseDoc = {
     '原生 RDF 后端需要图隔离，不能另建 IRI codec 或默认图身份。'
   ),
   example: t(
-    `import { getStorageOrgGraphPrefix, prefixStorageOrgGraph, unprefixStorageOrgGraph, term, RdfTermType, RdfDatatype } from '@migaia/storage-contract'
-const orgId = '00000000-0000-0000-0000-000000000000'
-const logical = term.iri('https://[::1]/图?x=%aB')
-const physical = prefixStorageOrgGraph(orgId, logical)
-console.log(prefixStorageOrgGraph(orgId, term.defaultGraph).value === getStorageOrgGraphPrefix(orgId) + 'd')
-console.log(unprefixStorageOrgGraph(orgId, physical))
-console.log(RdfTermType.namedNode, RdfDatatype.string)
-// true
-// { termType: 'NamedNode', value: 'https://[::1]/图?x=%aB' }
-// NamedNode http://www.w3.org/2001/XMLSchema#string`,
-    `import { getStorageOrgGraphPrefix, prefixStorageOrgGraph, unprefixStorageOrgGraph, term, RdfTermType, RdfDatatype } from '@migaia/storage-contract'
-const orgId = '00000000-0000-0000-0000-000000000000'
-const logical = term.iri('https://[::1]/图?x=%aB')
-const physical = prefixStorageOrgGraph(orgId, logical)
-console.log(prefixStorageOrgGraph(orgId, term.defaultGraph).value === getStorageOrgGraphPrefix(orgId) + 'd')
-console.log(unprefixStorageOrgGraph(orgId, physical))
-console.log(RdfTermType.namedNode, RdfDatatype.string)
-// true
-// { termType: 'NamedNode', value: 'https://[::1]/图?x=%aB' }
-// NamedNode http://www.w3.org/2001/XMLSchema#string`
+    "import { getStorageOrgGraphPrefix, prefixStorageOrgGraph, unprefixStorageOrgGraph, term } from '@migaia/storage-host/authoring/rdf'\nimport { RdfTermType, RdfDatatype } from '@migaia/storage-contract'\nconst orgId = '00000000-0000-0000-0000-000000000000'\nconst logical = term.iri('https://[::1]/图?x=%aB')\nconst physical = prefixStorageOrgGraph(orgId, logical)\nconsole.log(prefixStorageOrgGraph(orgId, term.defaultGraph).value === getStorageOrgGraphPrefix(orgId) + 'd')\nconsole.log(unprefixStorageOrgGraph(orgId, physical))\nconsole.log(RdfTermType.namedNode, RdfDatatype.string)\n// true\n// { termType: 'NamedNode', value: 'https://[::1]/图?x=%aB' }\n// NamedNode http://www.w3.org/2001/XMLSchema#string",
+    "import { getStorageOrgGraphPrefix, prefixStorageOrgGraph, unprefixStorageOrgGraph, term } from '@migaia/storage-host/authoring/rdf'\nimport { RdfTermType, RdfDatatype } from '@migaia/storage-contract'\nconst orgId = '00000000-0000-0000-0000-000000000000'\nconst logical = term.iri('https://[::1]/图?x=%aB')\nconst physical = prefixStorageOrgGraph(orgId, logical)\nconsole.log(prefixStorageOrgGraph(orgId, term.defaultGraph).value === getStorageOrgGraphPrefix(orgId) + 'd')\nconsole.log(unprefixStorageOrgGraph(orgId, physical))\nconsole.log(RdfTermType.namedNode, RdfDatatype.string)\n// true\n// { termType: 'NamedNode', value: 'https://[::1]/图?x=%aB' }\n// NamedNode http://www.w3.org/2001/XMLSchema#string"
   ),
   result: t(
     'The default graph has its own native named identity. The logical IRI returns with exact spelling; foreign or malformed physical graphs throw INVALID_ARGUMENT.',
@@ -52,16 +34,8 @@ const capabilityReadCase: ICaseDoc = {
     '消费者需要访问能力，不应修改传入 base 或取得安装、关闭控制。'
   ),
   example: t(
-    `import { hasStorageCapability, useStorageCapability, kv, type IStorageBase } from '@migaia/storage-contract'
-async function readGreeting(store: IStorageBase) {
-  if (!hasStorageCapability(store, kv)) return undefined
-  return useStorageCapability(store, kv).get('greeting')
-}`,
-    `import { hasStorageCapability, useStorageCapability, kv, type IStorageBase } from '@migaia/storage-contract'
-async function readGreeting(store: IStorageBase) {
-  if (!hasStorageCapability(store, kv)) return undefined
-  return useStorageCapability(store, kv).get('greeting')
-}`
+    "import { hasStorageCapability, useStorageCapability } from '@migaia/storage-host/authoring/capability'\nimport { kv, type IStorageBase } from '@migaia/storage-contract'\nasync function readGreeting(store: IStorageBase) {\n  if (!hasStorageCapability(store, kv)) return undefined\n  return useStorageCapability(store, kv).get('greeting')\n}",
+    "import { hasStorageCapability, useStorageCapability } from '@migaia/storage-host/authoring/capability'\nimport { kv, type IStorageBase } from '@migaia/storage-contract'\nasync function readGreeting(store: IStorageBase) {\n  if (!hasStorageCapability(store, kv)) return undefined\n  return useStorageCapability(store, kv).get('greeting')\n}"
   ),
   result: t(
     'A provided KV store reads its original API. A raw/frozen resource without KV returns undefined without mutation or disposal. Published Feature APIs are read through the same provider table.',
@@ -77,7 +51,7 @@ const vectorInputCase: ICaseDoc = {
     '原生后端在自己的 I/O 前需要同一输入契约。'
   ),
   example:
-    "import { snapshotStorageVectorCollection, snapshotStorageVector, snapshotStorageVectorUpsert, snapshotStorageVectorFilter, snapshotStorageVectorSearch } from '@migaia/storage-contract'\nconst configuration = snapshotStorageVectorCollection('docs', { dimensions: 2, metric: 'cosine' }).options!\nconst query = snapshotStorageVector([1, 0], configuration)\nconst points = snapshotStorageVectorUpsert([{ id: 'a', vector: [1, 0], payload: { tag: 'docs' } }], configuration)\nconst filter = snapshotStorageVectorFilter({ field: 'tag', in: ['docs'] })\nconst search = snapshotStorageVectorSearch(query, { k: 0, filter }, configuration)\nconsole.log(points[0]?.id, search.options.k, search.options.withPayload)\n// a 0 false",
+    "import { snapshotStorageVectorCollection, snapshotStorageVector, snapshotStorageVectorUpsert, snapshotStorageVectorFilter, snapshotStorageVectorSearch } from '@migaia/storage-host/authoring/vector'\nconst configuration = snapshotStorageVectorCollection('docs', { dimensions: 2, metric: 'cosine' }).options!\nconst query = snapshotStorageVector([1, 0], configuration)\nconst points = snapshotStorageVectorUpsert([{ id: 'a', vector: [1, 0], payload: { tag: 'docs' } }], configuration)\nconst filter = snapshotStorageVectorFilter({ field: 'tag', in: ['docs'] })\nconst search = snapshotStorageVectorSearch(query, { k: 0, filter }, configuration)\nconsole.log(points[0]?.id, search.options.k, search.options.withPayload)\n// a 0 false",
   result: t(
     'Prints a 0 false. Capture creates no collection or operation and validates zero-result searches.',
     '输出 a 0 false；捕获不创建 collection 或操作，零结果搜索也先校验。'
@@ -91,11 +65,8 @@ const vectorBatchInputCase: ICaseDoc = {
     'Native operations need detached IDs and one declared count strategy.',
     '原生操作需要已脱离的 ID 与明确计数策略。'
   ),
-  example: `import { snapshotStorageVectorIds, snapshotStorageDeleteCountMode } from '@migaia/storage-contract'
-const ids = snapshotStorageVectorIds(['a', 'a'])
-const mode = snapshotStorageDeleteCountMode(undefined)
-console.log(ids.join(','), mode)
-// a,a precount`,
+  example:
+    "import { snapshotStorageVectorIds, snapshotStorageDeleteCountMode } from '@migaia/storage-host/authoring/vector'\nconst ids = snapshotStorageVectorIds(['a', 'a'])\nconst mode = snapshotStorageDeleteCountMode(undefined)\nconsole.log(ids.join(','), mode)\n// a,a precount",
   result: t(
     'Preserves duplicate IDs and defaults to precount without native I/O.',
     '保留重复 ID，缺省 precount，不做原生 I/O。'
@@ -109,15 +80,8 @@ const ttlCase: ICaseDoc = {
     'TTL must identify the actual channel and use its backend’s original deadline owner.',
     'TTL 须标识实际通道，并沿后端原期限 owner 执行。'
   ),
-  example: `import {
-  ttl, snapshotStorageTtlTarget, assertStorageTtlDuration, type IStorageStore
-} from '@migaia/storage-contract'
-async function expireSession(store: IStorageStore<typeof ttl>) {
-  const target = snapshotStorageTtlTarget({ channel: 'text', key: 'session' }, store.backend)
-  assertStorageTtlDuration(1000, store.backend)
-  await store.use(ttl).expire(target, 1000)
-  return store.use(ttl).remaining(target)
-}`,
+  example:
+    "import { ttl, assertStorageTtlDuration, type IStorageStore } from '@migaia/storage-contract'\nimport { snapshotStorageTtlTarget } from '@migaia/storage-host/authoring/ttl'\nasync function expireSession(store: IStorageStore<typeof ttl>) {\n  const target = snapshotStorageTtlTarget({ channel: 'text', key: 'session' }, store.backend)\n  assertStorageTtlDuration(1000, store.backend)\n  await store.use(ttl).expire(target, 1000)\n  return store.use(ttl).remaining(target)\n}",
   result: t(
     'An actual backend controls expiry. Missing or expired entries are not recreated; target capture starts no clock or operation budget.',
     '实际后端控制到期；不重建缺失或已过期条目；目标捕获不启动时钟或操作预算。'
@@ -130,12 +94,8 @@ const counterCase: ICaseDoc = {
     'Native backends must validate canonical decimal arithmetic without copying a second counter rule.',
     '原生后端须校验规范十进制运算，不能复制第二套计数规则。'
   ),
-  example: `import { counter, snapshotStorageCounterIncrement, type IStorageStore } from '@migaia/storage-contract'
-async function recordVisit(store: IStorageStore<typeof counter>) {
-  return store.use(counter).increment('visits')
-}
-const increment = snapshotStorageCounterIncrement(undefined, 'memory')
-const nextText = String(increment('41'))`,
+  example:
+    "import { counter, type IStorageStore } from '@migaia/storage-contract'\nimport { snapshotStorageCounterIncrement } from '@migaia/storage-host/authoring/counter'\nasync function recordVisit(store: IStorageStore<typeof counter>) {\n  return store.use(counter).increment('visits')\n}\nconst increment = snapshotStorageCounterIncrement(undefined, 'memory')\nconst nextText = String(increment('41'))",
   result: t(
     'The actual native increment is atomic. The pure captured calculation validates safe integers and canonical text but opens no transaction or resource.',
     '实际原生递增具原子性；纯捕获计算校验安全整数与规范文本，不打开事务或资源。'
@@ -149,20 +109,8 @@ const rdfTermCase: ICaseDoc = {
     'Native writes and query patterns must agree on normalized literals and portable ground positions.',
     '原生写入与查询模式须统一规范 literal 和便携 ground 位置。'
   ),
-  example: `import {
-  term, snapshotStorageRdfTerm, snapshotStorageRdfPattern,
-  snapshotStorageRdfQuad, encodeStorageRdfQuad, encodeStorageRdfTerm
-} from '@migaia/storage-contract'
-const quad = snapshotStorageRdfQuad({
-  subject: term.iri('urn:user:1'),
-  predicate: term.iri('urn:label'),
-  object: term.literal('Ada', { language: 'EN' }),
-  graph: term.defaultGraph
-}, 'memory')
-const pattern = snapshotStorageRdfPattern({ subject: quad.subject }, 'memory')
-const identityBytes = encodeStorageRdfQuad(quad, 'memory')
-const termBytes = encodeStorageRdfTerm(quad.object, 'memory')
-const responseLocalBlank = snapshotStorageRdfTerm(term.blank('response-local'), undefined)`,
+  example:
+    "import { term, snapshotStorageRdfTerm, snapshotStorageRdfPattern, snapshotStorageRdfQuad, encodeStorageRdfQuad, encodeStorageRdfTerm } from '@migaia/storage-host/authoring/rdf'\nconst quad = snapshotStorageRdfQuad({\n  subject: term.iri('urn:user:1'),\n  predicate: term.iri('urn:label'),\n  object: term.literal('Ada', { language: 'EN' }),\n  graph: term.defaultGraph\n}, 'memory')\nconst pattern = snapshotStorageRdfPattern({ subject: quad.subject }, 'memory')\nconst identityBytes = encodeStorageRdfQuad(quad, 'memory')\nconst termBytes = encodeStorageRdfTerm(quad.object, 'memory')\nconst responseLocalBlank = snapshotStorageRdfTerm(term.blank('response-local'), undefined)",
   result: t(
     'Language becomes lowercase, IRI spelling stays exact, and omitted pattern graph covers all graphs. Identity bytes are self-delimiting; raw blank terms cannot enter ground quad positions.',
     'language 变为小写、IRI 拼写保持精确，模式省略 graph 时涵盖所有图。身份字节自定界；raw blank 项不能进入 ground quad 位置。'
@@ -192,14 +140,8 @@ const deriveSqlCase: ICaseDoc = {
     'A transaction wrapper must retain captured fragment identity without a second compiler.',
     '事务包装须保留已捕获片段身份，不能复制 compiler。'
   ),
-  example: `import { deriveStorageSqlQuery, type ISqlQuery } from '@migaia/storage-contract'
-function observe(query: ISqlQuery) {
-  return deriveStorageSqlQuery(query, {
-    all: ctx => query.all(ctx),
-    get: ctx => query.get(ctx),
-    run: ctx => query.run(ctx)
-  })
-}`,
+  example:
+    "import { deriveStorageSqlQuery } from '@migaia/storage-host/authoring/sql'\nimport { type ISqlQuery } from '@migaia/storage-contract'\nfunction observe(query: ISqlQuery) {\n  return deriveStorageSqlQuery(query, {\n    all: ctx => query.all(ctx),\n    get: ctx => query.get(ctx),\n    run: ctx => query.run(ctx)\n  })\n}",
   result: t(
     'Construction performs no I/O. The derived query shares its original node and forwards original terminal Promises.',
     '构造不做 I/O；派生查询共享原节点并转发原终端 Promise。'
@@ -251,10 +193,8 @@ const orgByteOrderCase: ICaseDoc = {
     'Backends need ordered object pages without a second organization codec or sorting rule.',
     '后端需要有序对象页，不能复制组织 codec 或排序规则。'
   ),
-  example: `import { encodeStorageOrgKey, encodeStorageOrgStringPrefix, orderStorageKeysByBytes } from '@migaia/storage-contract'
-const org = '12345678-1234-1234-1234-123456789abc'
-const prefix = encodeStorageOrgStringPrefix(org, 'user/', 'memory')
-const ordered = orderStorageKeysByBytes(['user/z', 'user/a'], key => encodeStorageOrgKey(org, key, 'memory'))`,
+  example:
+    "import { encodeStorageOrgKey, encodeStorageOrgStringPrefix, orderStorageKeysByBytes } from '@migaia/storage-host/authoring/key'\nconst org = '12345678-1234-1234-1234-123456789abc'\nconst prefix = encodeStorageOrgStringPrefix(org, 'user/', 'memory')\nconst ordered = orderStorageKeysByBytes(['user/z', 'user/a'], key => encodeStorageOrgKey(org, key, 'memory'))",
   result: t(
     'ordered is user/a then user/z. The byte prefix matches only string keys under user/ in the exact organization.',
     'ordered 为 user/a 后 user/z；字节前缀只匹配精确组织内 user/ 下的 string key。'
@@ -268,11 +208,8 @@ const sparqlCase: ICaseDoc = {
     'RDF values must not become unescaped query grammar.',
     'RDF 值不能变成未转义查询语法。'
   ),
-  example: `import { sparql, sparqlFragment, term, type IStorageStore } from '@migaia/storage-contract'
-async function readLabel(store: IStorageStore<typeof sparql>) {
-  const condition = sparqlFragment\`FILTER (?label = \${term.literal('A"B')})\`
-  return store.use(sparql)\`SELECT ?label WHERE { ?s ?p ?label . \${condition} }\`.select()
-}`,
+  example:
+    "import { sparql, type IStorageStore } from '@migaia/storage-contract'\nimport { sparqlFragment } from '@migaia/storage-host/authoring/sparql'\nimport { term } from '@migaia/storage-host/authoring/rdf'\nasync function readLabel(store: IStorageStore<typeof sparql>) {\n  const condition = sparqlFragment`FILTER (?label = ${term.literal('A\"B')})`\n  return store.use(sparql)`SELECT ?label WHERE { ?s ?p ?label . ${condition} }`.select()\n}",
   result: t(
     'Only the native select terminal executes. The literal quote is escaped by the shared renderer before endpoint execution.',
     '只有原生 select 终端执行；literal 引号在 endpoint 执行前由同一 renderer 转义。'
@@ -285,15 +222,8 @@ const sparqlAuthorCase: ICaseDoc = {
     'A native backend must reuse one fragment renderer without acquiring another executor.',
     '原生后端须复用同一片段 renderer，不能获得另一套 executor。'
   ),
-  example: `import { createSparqlTag } from '@migaia/storage-contract'
-function bindNative(original: Parameters<typeof createSparqlTag>[0]) {
-  return createSparqlTag({
-    select: (prepare, ctx) => original.select(prepare, ctx),
-    ask: (prepare, ctx) => original.ask(prepare, ctx),
-    construct: (prepare, ctx) => original.construct(prepare, ctx),
-    update: (prepare, ctx) => original.update(prepare, ctx)
-  })
-}`,
+  example:
+    "import { createSparqlTag } from '@migaia/storage-host/authoring/sparql'\nfunction bindNative(original: Parameters<typeof createSparqlTag>[0]) {\n  return createSparqlTag({\n    select: (prepare, ctx) => original.select(prepare, ctx),\n    ask: (prepare, ctx) => original.ask(prepare, ctx),\n    construct: (prepare, ctx) => original.construct(prepare, ctx),\n    update: (prepare, ctx) => original.update(prepare, ctx)\n  })\n}",
   result: t(
     'Callbacks own native admission and invoke lazy prepare afterward. Receiver, context and Promise identity remain exact.',
     '回调拥有原生准入并在准入后调用 lazy prepare；receiver、context 与 Promise 身份保持精确。'
@@ -325,12 +255,8 @@ const rdfCapabilityCase: ICaseDoc = {
     'Native backends must share exact ground-term identity.',
     '原生后端须共享精确 ground term 身份。'
   ),
-  example: `import { rdf, term, type IStorageStore } from '@migaia/storage-contract'
-async function writeLabel(store: IStorageStore<typeof rdf>) {
-  const subject = term.iri('urn:user:1')
-  await store.use(rdf).add([{ subject, predicate: term.iri('urn:label'), object: term.literal('Ada'), graph: term.defaultGraph }])
-  return store.use(rdf).match({ subject }).all()
-}`,
+  example:
+    "import { rdf, type IStorageStore } from '@migaia/storage-contract'\nimport { term } from '@migaia/storage-host/authoring/rdf'\nasync function writeLabel(store: IStorageStore<typeof rdf>) {\n  const subject = term.iri('urn:user:1')\n  await store.use(rdf).add([{ subject, predicate: term.iri('urn:label'), object: term.literal('Ada'), graph: term.defaultGraph }])\n  return store.use(rdf).match({ subject }).all()\n}",
   result: t(
     'The native backend writes atomically and the shared RDF family reads matching ground quads.',
     '原生后端原子写入，共享 RDF family 读取匹配 ground quad。'
@@ -368,7 +294,7 @@ export const storageContractCases: Readonly<Record<string, readonly ICaseDoc[]>>
         '已有写入端在检查写入条件后，需要一个读取器及所属后端的失败分类。'
       ),
       example:
-        "import { createStorageBlobBodyReader } from '@migaia/storage-contract'\nawait using body = createStorageBlobBodyReader(new Uint8Array([1, 2]), {\n  backend: 'object',\n  report: error => console.error(error),\n  normalizeFailure: error => error\n})\nconst part = await body.next()\nconsole.log(part.value)",
+        "import { createStorageBlobBodyReader } from '@migaia/storage-host/authoring/blob'\nawait using body = createStorageBlobBodyReader(new Uint8Array([1, 2]), {\n  backend: 'object',\n  report: error => console.error(error),\n  normalizeFailure: error => error\n})\nconst part = await body.next()\nconsole.log(part.value)",
       result: t(
         'The admitted bytes use the original reader lifecycle; the backend can substitute its registered normalizer and reporter.',
         '已准入字节使用原读取器生命周期；后端可传入自己已登记的规范化与报告函数。'
@@ -383,7 +309,7 @@ export const storageContractCases: Readonly<Record<string, readonly ICaseDoc[]>>
         '原生下载须在一次消费后释放原内容，并完成所属拥有者的记账。'
       ),
       example:
-        "import { createStorageBlobObject } from '@migaia/storage-contract'\nconst source = new ReadableStream<Uint8Array>({\n  start(controller) {\n    controller.enqueue(new Uint8Array([7]))\n    controller.close()\n  }\n})\nconst object = createStorageBlobObject(\n  { key: 'file', size: 1, etag: 'native', updatedAt: 1, metadata: {} },\n  source,\n  {\n    close: async () => undefined,\n    report: error => console.error(error),\n    backend: 'object',\n    onSettled: () => console.info('content settled'),\n    normalizeFailure: error => error\n  }\n)\ntry { console.log((await object.bytes())[0]) }\nfinally { await object.dispose() }",
+        "import { createStorageBlobObject } from '@migaia/storage-host/authoring/blob'\nconst source = new ReadableStream<Uint8Array>({\n  start(controller) {\n    controller.enqueue(new Uint8Array([7]))\n    controller.close()\n  }\n})\nconst object = createStorageBlobObject(\n  { key: 'file', size: 1, etag: 'native', updatedAt: 1, metadata: {} },\n  source,\n  {\n    close: async () => undefined,\n    report: error => console.error(error),\n    backend: 'object',\n    onSettled: () => console.info('content settled'),\n    normalizeFailure: error => error\n  }\n)\ntry { console.log((await object.bytes())[0]) }\nfinally { await object.dispose() }",
       result: t(
         'Prints the single content byte; EOF and explicit cleanup reuse the same resource settlement.',
         '输出唯一内容字节，完整读取与显式清理复用同一资源结算。'
@@ -398,7 +324,7 @@ export const storageContractCases: Readonly<Record<string, readonly ICaseDoc[]>>
         '原生游标已有关闭方法，共享生命周期只应排空推进并释放原资源。'
       ),
       example:
-        "import { createStorageIteratorLifetime } from '@migaia/storage-contract'\nasync function releaseCursor(cursor: { close(): Promise<void> }) {\n  const lifetime = createStorageIteratorLifetime<unknown>({\n    close: () => cursor.close(),\n    report: error => console.error(error),\n    onSettled: () => console.info('cursor settled')\n  })\n  await lifetime.dispose()\n}",
+        "import { createStorageIteratorLifetime } from '@migaia/storage-host/authoring/resource'\nasync function releaseCursor(cursor: { close(): Promise<void> }) {\n  const lifetime = createStorageIteratorLifetime<unknown>({\n    close: () => cursor.close(),\n    report: error => console.error(error),\n    onSettled: () => console.info('cursor settled')\n  })\n  await lifetime.dispose()\n}",
       result: t(
         'The caller supplies the real cursor. Disposal awaits its native close and the original reporter observes symbolic cleanup failures.',
         '调用方提供真实游标；释放等待原生关闭，原报告函数观察符号清理失败。'
@@ -413,7 +339,7 @@ export const storageContractCases: Readonly<Record<string, readonly ICaseDoc[]>>
         '已有后端需要中立拥有者保留真实模式、资源符号及并发观察接点。'
       ),
       example:
-        "import {\n  createTransactionOwner, ConcurrencyPolicy, TransactionActivityMode,\n  type IStorageBase, type IConcurrencyStageObserver\n} from '@migaia/storage-contract'\nfunction ownTransactions(\n  store: IStorageBase,\n  normalize: Parameters<typeof createTransactionOwner>[1],\n  concurrencyStages: IConcurrencyStageObserver\n) {\n  return createTransactionOwner(store, normalize, {\n    activityMode: TransactionActivityMode.managed,\n    asyncDisposeKey: Symbol.asyncDispose,\n    defaultPolicy: ConcurrencyPolicy.wait(),\n    concurrencyStages\n  })\n}",
+        "import { createTransactionOwner } from '@migaia/storage-host/authoring/transaction'\nimport { ConcurrencyPolicy } from '@migaia/storage-host/authoring/concurrency'\nimport { TransactionActivityMode, type IStorageBase, type IConcurrencyStageObserver } from '@migaia/storage-contract'\nfunction ownTransactions(\n  store: IStorageBase,\n  normalize: Parameters<typeof createTransactionOwner>[1],\n  concurrencyStages: IConcurrencyStageObserver\n) {\n  return createTransactionOwner(store, normalize, {\n    activityMode: TransactionActivityMode.managed,\n    asyncDisposeKey: Symbol.asyncDispose,\n    defaultPolicy: ConcurrencyPolicy.wait(),\n    concurrencyStages\n  })\n}",
       result: t(
         'The backend passes its existing resource and observers. Registration supplies no native transaction or connection.',
         '后端传入原资源与观察接点，此登记本身不提供原生事务或连接。'
@@ -428,7 +354,7 @@ export const storageContractCases: Readonly<Record<string, readonly ICaseDoc[]>>
         '原生图实现需要真实事务投影，不能借用根接口闭包。'
       ),
       example:
-        "import {\n  implement, rdf, assertTransactionOwner,\n  type IStorageBase, type IRdfApi, type ITransactionRdfApi\n} from '@migaia/storage-contract'\nfunction describeRdf(\n  store: IStorageBase,\n  api: IRdfApi,\n  readNativeDraft: (scope: object) => ITransactionRdfApi\n) {\n  return implement(rdf, api, {\n    forTransaction: scope => {\n      assertTransactionOwner(store, scope)\n      return readNativeDraft(scope)\n    }\n  })\n}",
+        "import { implement, rdf, type IStorageBase, type IRdfApi, type ITransactionRdfApi } from '@migaia/storage-contract'\nimport { assertTransactionOwner } from '@migaia/storage-host/authoring/transaction'\nfunction describeRdf(\n  store: IStorageBase,\n  api: IRdfApi,\n  readNativeDraft: (scope: object) => ITransactionRdfApi\n) {\n  return implement(rdf, api, {\n    forTransaction: scope => {\n      assertTransactionOwner(store, scope)\n      return readNativeDraft(scope)\n    }\n  })\n}",
       result: t(
         'The supplied native draft reader runs only for the same live original store scope; descriptor creation executes no binder.',
         '传入的原生草稿读取器只接受同一活跃原存储视图，创建描述时不会执行绑定器。'
@@ -443,7 +369,7 @@ export const storageContractCases: Readonly<Record<string, readonly ICaseDoc[]>>
         '作者需要存储唯一发布接点，同时保留原基础资源。'
       ),
       example:
-        "import {\n  defineStorageCapability, implement, provideCapabilities,\n  type IStorageBase, type ICapabilityInstallPort\n} from '@migaia/storage-contract'\nfunction describeCatalog(\n  base: IStorageBase,\n  onInstaller: (port: ICapabilityInstallPort) => void\n) {\n  const catalog = defineStorageCapability<{ read(): string }>()('catalog')\n  return provideCapabilities(base, [implement(catalog, { read: () => 'value' })], {\n    onInstaller\n  })\n}",
+        "import { defineStorageCapability, implement, type IStorageBase, type ICapabilityInstallPort } from '@migaia/storage-contract'\nimport { provideCapabilities } from '@migaia/storage-host/authoring/capability'\nfunction describeCatalog(\n  base: IStorageBase,\n  onInstaller: (port: ICapabilityInstallPort) => void\n) {\n  const catalog = defineStorageCapability<{ read(): string }>()('catalog')\n  return provideCapabilities(base, [implement(catalog, { read: () => 'value' })], {\n    onInstaller\n  })\n}",
       result: t(
         'The callback receives the original finite prepare/publish/release port; the caller still owns the supplied base.',
         '回调取得原有有限准备、发布与释放接点，传入基础资源仍由调用方拥有。'
@@ -511,8 +437,8 @@ export function verifyKvBackend(
         '原生 sink 需要独立 chunk，同时保留自己的缓冲与 backpressure。'
       ),
       example: t(
-        "import { createStorageBlobBodyReader } from '@migaia/storage-contract'\nawait using body = createStorageBlobBodyReader(new Uint8Array([1, 2]), { report: error => console.error(error) })\nconsole.log(Array.from((await body.next()).value ?? []))",
-        "import { createStorageBlobBodyReader } from '@migaia/storage-contract'\nawait using body = createStorageBlobBodyReader(new Uint8Array([1, 2]), { report: error => console.error(error) })\nconsole.log(Array.from((await body.next()).value ?? []))"
+        "import { createStorageBlobBodyReader } from '@migaia/storage-host/authoring/blob'\nawait using body = createStorageBlobBodyReader(new Uint8Array([1, 2]), { report: error => console.error(error) })\nconsole.log(Array.from((await body.next()).value ?? []))",
+        "import { createStorageBlobBodyReader } from '@migaia/storage-host/authoring/blob'\nawait using body = createStorageBlobBodyReader(new Uint8Array([1, 2]), { report: error => console.error(error) })\nconsole.log(Array.from((await body.next()).value ?? []))"
       ),
       result: t(
         'Prints [1, 2]; disposal cancels unfinished input and releases the one original reader.',
@@ -552,8 +478,8 @@ export function verifyKvBackend(
         '原生枚举返回保序键字节，应由原拥有者读取自身格式。'
       ),
       example: t(
-        "import { encodeOrderedStorageKey, decodeOrderedStorageKey } from '@migaia/storage-contract'\nconsole.log(decodeOrderedStorageKey(encodeOrderedStorageKey(['files', 1], 'object'), 'object'))",
-        "import { encodeOrderedStorageKey, decodeOrderedStorageKey } from '@migaia/storage-contract'\nconsole.log(decodeOrderedStorageKey(encodeOrderedStorageKey(['files', 1], 'object'), 'object'))"
+        "import { encodeOrderedStorageKey, decodeOrderedStorageKey } from '@migaia/storage-host/authoring/key'\nconsole.log(decodeOrderedStorageKey(encodeOrderedStorageKey(['files', 1], 'object'), 'object'))",
+        "import { encodeOrderedStorageKey, decodeOrderedStorageKey } from '@migaia/storage-host/authoring/key'\nconsole.log(decodeOrderedStorageKey(encodeOrderedStorageKey(['files', 1], 'object'), 'object'))"
       ),
       result: t(
         'Prints the original files/1 tuple without adding another key codec.',
@@ -576,8 +502,8 @@ export function verifyKvBackend(
         '后端作者需要原共享 blob 输入与资源语义。'
       ),
       example: t(
-        "import { snapshotStorageBlobPut } from '@migaia/storage-contract'\nconst body = new Uint8Array([1, 2])\nconst input = snapshotStorageBlobPut('file', body, { metadata: { owner: 'Ada' } }, 'object')\nbody[0] = 9\nconsole.log(input.body instanceof Uint8Array && input.body[0], input.options.metadata?.owner)",
-        "import { snapshotStorageBlobPut } from '@migaia/storage-contract'\nconst body = new Uint8Array([1, 2])\nconst input = snapshotStorageBlobPut('file', body, { metadata: { owner: 'Ada' } }, 'object')\nbody[0] = 9\nconsole.log(input.body instanceof Uint8Array && input.body[0], input.options.metadata?.owner)"
+        "import { snapshotStorageBlobPut } from '@migaia/storage-host/authoring/blob'\nconst body = new Uint8Array([1, 2])\nconst input = snapshotStorageBlobPut('file', body, { metadata: { owner: 'Ada' } }, 'object')\nbody[0] = 9\nconsole.log(input.body instanceof Uint8Array && input.body[0], input.options.metadata?.owner)",
+        "import { snapshotStorageBlobPut } from '@migaia/storage-host/authoring/blob'\nconst body = new Uint8Array([1, 2])\nconst input = snapshotStorageBlobPut('file', body, { metadata: { owner: 'Ada' } }, 'object')\nbody[0] = 9\nconsole.log(input.body instanceof Uint8Array && input.body[0], input.options.metadata?.owner)"
       ),
       result: t(
         'Prints 1 Ada; input bytes and metadata are detached without I/O.',
@@ -593,8 +519,8 @@ export function verifyKvBackend(
         '后端作者需要原共享 blob 输入与资源语义。'
       ),
       example: t(
-        "import { snapshotStorageBlobGet } from '@migaia/storage-contract'\nconst input = snapshotStorageBlobGet('file', { range: { start: 2, end: 4 } }, 'object')\nconsole.log(input.options.range?.start, input.options.range?.end)",
-        "import { snapshotStorageBlobGet } from '@migaia/storage-contract'\nconst input = snapshotStorageBlobGet('file', { range: { start: 2, end: 4 } }, 'object')\nconsole.log(input.options.range?.start, input.options.range?.end)"
+        "import { snapshotStorageBlobGet } from '@migaia/storage-host/authoring/blob'\nconst input = snapshotStorageBlobGet('file', { range: { start: 2, end: 4 } }, 'object')\nconsole.log(input.options.range?.start, input.options.range?.end)",
+        "import { snapshotStorageBlobGet } from '@migaia/storage-host/authoring/blob'\nconst input = snapshotStorageBlobGet('file', { range: { start: 2, end: 4 } }, 'object')\nconsole.log(input.options.range?.start, input.options.range?.end)"
       ),
       result: t(
         'Prints 2 4; end is inclusive and native content remains unopened.',
@@ -610,8 +536,8 @@ export function verifyKvBackend(
         '后端作者需要原共享 blob 输入与资源语义。'
       ),
       example: t(
-        "import { snapshotStorageBlobList } from '@migaia/storage-contract'\nconst input = snapshotStorageBlobList({ prefix: 'files/' }, undefined, 'object')\nconsole.log(input.prefix, input.limit)",
-        "import { snapshotStorageBlobList } from '@migaia/storage-contract'\nconst input = snapshotStorageBlobList({ prefix: 'files/' }, undefined, 'object')\nconsole.log(input.prefix, input.limit)"
+        "import { snapshotStorageBlobList } from '@migaia/storage-host/authoring/blob'\nconst input = snapshotStorageBlobList({ prefix: 'files/' }, undefined, 'object')\nconsole.log(input.prefix, input.limit)",
+        "import { snapshotStorageBlobList } from '@migaia/storage-host/authoring/blob'\nconst input = snapshotStorageBlobList({ prefix: 'files/' }, undefined, 'object')\nconsole.log(input.prefix, input.limit)"
       ),
       result: t(
         'Prints files/ 100; the backend still owns actual pagination and cursor binding.',
@@ -627,8 +553,8 @@ export function verifyKvBackend(
         '后端作者需要原共享 blob 输入与资源语义。'
       ),
       example: t(
-        "import { createStorageBlobObject } from '@migaia/storage-contract'\nconst object = createStorageBlobObject(\n  { key: 'file', size: 1, etag: 'native', updatedAt: 1, metadata: {} },\n  new ReadableStream<Uint8Array>({ start(controller) { controller.enqueue(new Uint8Array([7])); controller.close() } }),\n  { close: async () => undefined, report: console.error, backend: 'object' }\n)\ntry { console.log((await object.bytes())[0]) } finally { await object.dispose() }",
-        "import { createStorageBlobObject } from '@migaia/storage-contract'\nconst object = createStorageBlobObject(\n  { key: 'file', size: 1, etag: 'native', updatedAt: 1, metadata: {} },\n  new ReadableStream<Uint8Array>({ start(controller) { controller.enqueue(new Uint8Array([7])); controller.close() } }),\n  { close: async () => undefined, report: console.error, backend: 'object' }\n)\ntry { console.log((await object.bytes())[0]) } finally { await object.dispose() }"
+        "import { createStorageBlobObject } from '@migaia/storage-host/authoring/blob'\nconst object = createStorageBlobObject(\n  { key: 'file', size: 1, etag: 'native', updatedAt: 1, metadata: {} },\n  new ReadableStream<Uint8Array>({ start(controller) { controller.enqueue(new Uint8Array([7])); controller.close() } }),\n  { close: async () => undefined, report: console.error, backend: 'object' }\n)\ntry { console.log((await object.bytes())[0]) } finally { await object.dispose() }",
+        "import { createStorageBlobObject } from '@migaia/storage-host/authoring/blob'\nconst object = createStorageBlobObject(\n  { key: 'file', size: 1, etag: 'native', updatedAt: 1, metadata: {} },\n  new ReadableStream<Uint8Array>({ start(controller) { controller.enqueue(new Uint8Array([7])); controller.close() } }),\n  { close: async () => undefined, report: console.error, backend: 'object' }\n)\ntry { console.log((await object.bytes())[0]) } finally { await object.dispose() }"
       ),
       result: t(
         'Prints 7; bytes consumes the single content right and EOF releases the original resource.',
@@ -647,11 +573,8 @@ export function verifyKvBackend(
         'Existing backends validate key, duplicate, value and TTL at different original points.',
         '已有后端在各自原校验点处理 key、重复、value 与 TTL。'
       ),
-      example: `import { createStorageBatchKeyCapture } from '@migaia/storage-contract'
-const capture = createStorageBatchKeyCapture('memory')
-const first = capture(['users', 1])
-const second = capture(['users', 1])
-console.log(first.firstIndex, second.firstIndex)`,
+      example:
+        "import { createStorageBatchKeyCapture } from '@migaia/storage-host/authoring/key'\nconst capture = createStorageBatchKeyCapture('memory')\nconst first = capture(['users', 1])\nconst second = capture(['users', 1])\nconsole.log(first.firstIndex, second.firstIndex)",
       result: t(
         'Each call captures one key and retains the shared canonical identity. No later entry, value, TTL or consumer callback is read by the helper.',
         '每次调用捕获一个键并保留共享规范身份；helper 不读取后项、value、TTL 或消费者回调。'
@@ -665,13 +588,8 @@ console.log(first.firstIndex, second.firstIndex)`,
         'Native readers preserve duplicate positions while removals count each canonical key once.',
         '原生读取保留重复位置，删除则每个规范键只计一次。'
       ),
-      example: `import { snapshotStorageBatchKeys } from '@migaia/storage-contract'
-const reads = snapshotStorageBatchKeys([0, -0, ['users', 1]], 'memory')
-const removals = reads.filter((entry, index) => entry.firstIndex === index)
-const writes = snapshotStorageBatchKeys(['first', 'second'], 'memory', {
-  rejectDuplicates: true
-})
-console.log(removals.map(entry => entry.key), writes.map(entry => entry.key))`,
+      example:
+        "import { snapshotStorageBatchKeys } from '@migaia/storage-host/authoring/key'\nconst reads = snapshotStorageBatchKeys([0, -0, ['users', 1]], 'memory')\nconst removals = reads.filter((entry, index) => entry.firstIndex === index)\nconst writes = snapshotStorageBatchKeys(['first', 'second'], 'memory', {\n  rejectDuplicates: true\n})\nconsole.log(removals.map(entry => entry.key), writes.map(entry => entry.key))",
       result: t(
         'The first two read positions share one identity. Duplicate write keys reject INVALID_ARGUMENT before native work; malformed logical keys retain INVALID_KEY.',
         '前两个读取位置共享同一身份。重复写键在原生操作前抛 INVALID_ARGUMENT；非法逻辑键保留 INVALID_KEY。'
@@ -686,18 +604,8 @@ console.log(removals.map(entry => entry.key), writes.map(entry => entry.key))`,
         '后端需要一致前缀规则与有序边界，不能复制验证器或扫描无关数据。'
       ),
       example: t(
-        `import { snapshotStorageKeyPrefix } from '@migaia/storage-contract'
-const prefix = snapshotStorageKeyPrefix(['cache', 'users'], 'memory')
-const included = prefix.matches(['cache', 'users', 1])
-const excluded = prefix.matches(['cache', 'users-extra'])
-// included === true; excluded === false
-// Native ordered stores use prefix.lower <= encodedKey < prefix.upper.`,
-        `import { snapshotStorageKeyPrefix } from '@migaia/storage-contract'
-const prefix = snapshotStorageKeyPrefix(['cache', 'users'], 'memory')
-const included = prefix.matches(['cache', 'users', 1])
-const excluded = prefix.matches(['cache', 'users-extra'])
-// included === true; excluded === false
-// 原生有序存储使用包含 lower、不包含 upper 的字节区间。`
+        "import { snapshotStorageKeyPrefix } from '@migaia/storage-host/authoring/key'\nconst prefix = snapshotStorageKeyPrefix(['cache', 'users'], 'memory')\nconst included = prefix.matches(['cache', 'users', 1])\nconst excluded = prefix.matches(['cache', 'users-extra'])\n// included === true; excluded === false\n// Native ordered stores use prefix.lower <= encodedKey < prefix.upper.",
+        "import { snapshotStorageKeyPrefix } from '@migaia/storage-host/authoring/key'\nconst prefix = snapshotStorageKeyPrefix(['cache', 'users'], 'memory')\nconst included = prefix.matches(['cache', 'users', 1])\nconst excluded = prefix.matches(['cache', 'users-extra'])\n// included === true; excluded === false\n// 原生有序存储使用包含 lower、不包含 upper 的字节区间。"
       ),
       result: t(
         'The complete child sequence matches the extended tuple but excludes a different last child. lower/upper bound the same canonical byte range; the matcher is independent of exposed mutable copies.',
@@ -744,16 +652,8 @@ async function paidValues(tx: ITransactionScope<{ state: string; value: number }
         'SQL 组合必须保留参数身份，不能给纯片段连接权限或反复复制历史前缀。'
       ),
       example: t(
-        `import { sqlFragment, type ISqlExecutor } from '@migaia/storage-contract'
-async function readUser(executor: ISqlExecutor, id: number) {
-  const columns = sqlFragment.join([sqlFragment.id('id'), sqlFragment.id('name')])
-  return executor.sql<{ id: number; name?: string }>\`SELECT \${columns} FROM \${sqlFragment.id('users')} WHERE id = \${id}\`.get()
-}`,
-        `import { sqlFragment, type ISqlExecutor } from '@migaia/storage-contract'
-async function readUser(executor: ISqlExecutor, id: number) {
-  const columns = sqlFragment.join([sqlFragment.id('id'), sqlFragment.id('name')])
-  return executor.sql<{ id: number; name?: string }>\`SELECT \${columns} FROM \${sqlFragment.id('users')} WHERE id = \${id}\`.get()
-}`
+        "import { sqlFragment } from '@migaia/storage-host/authoring/sql'\nimport { type ISqlExecutor } from '@migaia/storage-contract'\nasync function readUser(executor: ISqlExecutor, id: number) {\n  const columns = sqlFragment.join([sqlFragment.id('id'), sqlFragment.id('name')])\n  return executor.sql<{ id: number; name?: string }>`SELECT ${columns} FROM ${sqlFragment.id('users')} WHERE id = ${id}`.get()\n}",
+        "import { sqlFragment } from '@migaia/storage-host/authoring/sql'\nimport { type ISqlExecutor } from '@migaia/storage-contract'\nasync function readUser(executor: ISqlExecutor, id: number) {\n  const columns = sqlFragment.join([sqlFragment.id('id'), sqlFragment.id('name')])\n  return executor.sql<{ id: number; name?: string }>`SELECT ${columns} FROM ${sqlFragment.id('users')} WHERE id = ${id}`.get()\n}"
       ),
       result: t(
         'The original injected executor runs one statement with bound id. Pure fragments own no terminals; byte inputs are snapshotted and each prepare supplies fresh copies.',
@@ -769,28 +669,8 @@ async function readUser(executor: ISqlExecutor, id: number) {
         '后端作者需要共用 scanner 与绑定，不能新增连接、事务或资源拥有者。'
       ),
       example: t(
-        `import { createSqlTag } from '@migaia/storage-contract'
-function bindNative(
-  original: Omit<Parameters<typeof createSqlTag>[0], 'dialect'>
-) {
-  return createSqlTag({
-    dialect: 'postgres',
-    all: (prepare, ctx) => original.all(prepare, ctx),
-    get: (prepare, ctx) => original.get(prepare, ctx),
-    run: (prepare, ctx) => original.run(prepare, ctx)
-  })
-}`,
-        `import { createSqlTag } from '@migaia/storage-contract'
-function bindNative(
-  original: Omit<Parameters<typeof createSqlTag>[0], 'dialect'>
-) {
-  return createSqlTag({
-    dialect: 'postgres',
-    all: (prepare, ctx) => original.all(prepare, ctx),
-    get: (prepare, ctx) => original.get(prepare, ctx),
-    run: (prepare, ctx) => original.run(prepare, ctx)
-  })
-}`
+        "import { createSqlTag } from '@migaia/storage-host/authoring/sql'\nfunction bindNative(\n  original: Omit<Parameters<typeof createSqlTag>[0], 'dialect'>\n) {\n  return createSqlTag({\n    dialect: 'postgres',\n    all: (prepare, ctx) => original.all(prepare, ctx),\n    get: (prepare, ctx) => original.get(prepare, ctx),\n    run: (prepare, ctx) => original.run(prepare, ctx)\n  })\n}",
+        "import { createSqlTag } from '@migaia/storage-host/authoring/sql'\nfunction bindNative(\n  original: Omit<Parameters<typeof createSqlTag>[0], 'dialect'>\n) {\n  return createSqlTag({\n    dialect: 'postgres',\n    all: (prepare, ctx) => original.all(prepare, ctx),\n    get: (prepare, ctx) => original.get(prepare, ctx),\n    run: (prepare, ctx) => original.run(prepare, ctx)\n  })\n}"
       ),
       result: t(
         'execute must own original admission and call prepare before its native driver. The factory returns each supplied callback Promise directly, adds no I/O and keeps lexical failure in the original owner.',
@@ -806,12 +686,8 @@ function bindNative(
         '同步键探测不能复制通道顺序或再编码另一键域。'
       ),
       example: t(
-        `import { lockKey, snapshotConcurrencyLockKeys } from '@migaia/storage-contract'
-const snapshot = snapshotConcurrencyLockKeys([lockKey.text('a'), lockKey.text('a')], 'memory')
-console.log(snapshot.keys.length, snapshot.identities.length)`,
-        `import { lockKey, snapshotConcurrencyLockKeys } from '@migaia/storage-contract'
-const snapshot = snapshotConcurrencyLockKeys([lockKey.text('a'), lockKey.text('a')], 'memory')
-console.log(snapshot.keys.length, snapshot.identities.length)`
+        "import { lockKey, snapshotConcurrencyLockKeys } from '@migaia/storage-host/authoring/concurrency'\nconst snapshot = snapshotConcurrencyLockKeys([lockKey.text('a'), lockKey.text('a')], 'memory')\nconsole.log(snapshot.keys.length, snapshot.identities.length)",
+        "import { lockKey, snapshotConcurrencyLockKeys } from '@migaia/storage-host/authoring/concurrency'\nconst snapshot = snapshotConcurrencyLockKeys([lockKey.text('a'), lockKey.text('a')], 'memory')\nconsole.log(snapshot.keys.length, snapshot.identities.length)"
       ),
       result: t(
         'Both counts are 1; paired frozen identity data grants no acquisition authority.',
@@ -827,14 +703,8 @@ console.log(snapshot.keys.length, snapshot.identities.length)`
         '原生范围检查需要精确规范锁边界，不能扫描或复制编码。'
       ),
       example: t(
-        `import { lockKey, snapshotConcurrencyLockKeys, snapshotConcurrencyLockRange } from '@migaia/storage-contract'
-const bounds = snapshotConcurrencyLockRange({ channel: 'text', prefix: 'users/' }, 'memory')
-const id = snapshotConcurrencyLockKeys([lockKey.text('users/1')], 'memory').identities[0]!
-console.log(bounds.lower <= id && id < bounds.upper)`,
-        `import { lockKey, snapshotConcurrencyLockKeys, snapshotConcurrencyLockRange } from '@migaia/storage-contract'
-const bounds = snapshotConcurrencyLockRange({ channel: 'text', prefix: 'users/' }, 'memory')
-const id = snapshotConcurrencyLockKeys([lockKey.text('users/1')], 'memory').identities[0]!
-console.log(bounds.lower <= id && id < bounds.upper)`
+        "import { lockKey, snapshotConcurrencyLockKeys, snapshotConcurrencyLockRange } from '@migaia/storage-host/authoring/concurrency'\nconst bounds = snapshotConcurrencyLockRange({ channel: 'text', prefix: 'users/' }, 'memory')\nconst id = snapshotConcurrencyLockKeys([lockKey.text('users/1')], 'memory').identities[0]!\nconsole.log(bounds.lower <= id && id < bounds.upper)",
+        "import { lockKey, snapshotConcurrencyLockKeys, snapshotConcurrencyLockRange } from '@migaia/storage-host/authoring/concurrency'\nconst bounds = snapshotConcurrencyLockRange({ channel: 'text', prefix: 'users/' }, 'memory')\nconst id = snapshotConcurrencyLockKeys([lockKey.text('users/1')], 'memory').identities[0]!\nconsole.log(bounds.lower <= id && id < bounds.upper)"
       ),
       result: t(
         'true; the half-open range includes the text prefix and excludes other channels.',
@@ -850,14 +720,8 @@ console.log(bounds.lower <= id && id < bounds.upper)`
         '原生锁表保留插入顺序，不能复制规范排序实现。'
       ),
       example: t(
-        `import { snapshotConcurrencyLockHoldings, type ILockHolding } from '@migaia/storage-contract'
-function inspect(rows: readonly ILockHolding[]) {
-  return snapshotConcurrencyLockHoldings(rows)
-}`,
-        `import { snapshotConcurrencyLockHoldings, type ILockHolding } from '@migaia/storage-contract'
-function inspect(rows: readonly ILockHolding[]) {
-  return snapshotConcurrencyLockHoldings(rows)
-}`
+        "import { snapshotConcurrencyLockHoldings } from '@migaia/storage-host/authoring/concurrency'\nimport { type ILockHolding } from '@migaia/storage-contract'\nfunction inspect(rows: readonly ILockHolding[]) {\n  return snapshotConcurrencyLockHoldings(rows)\n}",
+        "import { snapshotConcurrencyLockHoldings } from '@migaia/storage-host/authoring/concurrency'\nimport { type ILockHolding } from '@migaia/storage-contract'\nfunction inspect(rows: readonly ILockHolding[]) {\n  return snapshotConcurrencyLockHoldings(rows)\n}"
       ),
       result: t(
         'Returns frozen independent key/holder rows in stable channel/key order, retaining expired and expiresAt and separate equal-key rows. No internal lock table or authority is exposed.',
@@ -876,14 +740,8 @@ function inspect(rows: readonly ILockHolding[]) {
         '原生键锁 provider 必须使用与原活跃 attempt 相同的规范身份。'
       ),
       example: t(
-        `import { readConcurrencyLockIdentities, type IConcurrencyAttemptContext } from '@migaia/storage-contract'
-function lockIdentities(ctx: IConcurrencyAttemptContext) {
-  return readConcurrencyLockIdentities(ctx)
-}`,
-        `import { readConcurrencyLockIdentities, type IConcurrencyAttemptContext } from '@migaia/storage-contract'
-function lockIdentities(ctx: IConcurrencyAttemptContext) {
-  return readConcurrencyLockIdentities(ctx)
-}`
+        "import { readConcurrencyLockIdentities } from '@migaia/storage-host/authoring/concurrency'\nimport { type IConcurrencyAttemptContext } from '@migaia/storage-contract'\nfunction lockIdentities(ctx: IConcurrencyAttemptContext) {\n  return readConcurrencyLockIdentities(ctx)\n}",
+        "import { readConcurrencyLockIdentities } from '@migaia/storage-host/authoring/concurrency'\nimport { type IConcurrencyAttemptContext } from '@migaia/storage-contract'\nfunction lockIdentities(ctx: IConcurrencyAttemptContext) {\n  return readConcurrencyLockIdentities(ctx)\n}"
       ),
       result: t(
         'The active original attempt supplies one frozen sorted/deduplicated hex string list, reused by nested attempts. Forged or settled contexts throw INVALID_ARGUMENT; no mutable bytes or control handles are returned.',
@@ -899,16 +757,8 @@ function lockIdentities(ctx: IConcurrencyAttemptContext) {
         '原生记录后端与 records Feature 必须共用 typed 查询执行器，不能把旧支持标记解释成权限。'
       ),
       example: t(
-        `import { records, useStorageCapability, type IStorageBase } from '@migaia/storage-contract'
-async function paidTotals(store: IStorageBase) {
-  return useStorageCapability(store, records).query<{ status: string; total: number }>()
-    .where({ status: 'paid' }).select('total').all()
-}`,
-        `import { records, useStorageCapability, type IStorageBase } from '@migaia/storage-contract'
-async function paidTotals(store: IStorageBase) {
-  return useStorageCapability(store, records).query<{ status: string; total: number }>()
-    .where({ status: 'paid' }).select('total').all()
-}`
+        "import { records, type IStorageBase } from '@migaia/storage-contract'\nimport { useStorageCapability } from '@migaia/storage-host/authoring/capability'\nasync function paidTotals(store: IStorageBase) {\n  return useStorageCapability(store, records).query<{ status: string; total: number }>()\n    .where({ status: 'paid' }).select('total').all()\n}",
+        "import { records, type IStorageBase } from '@migaia/storage-contract'\nimport { useStorageCapability } from '@migaia/storage-host/authoring/capability'\nasync function paidTotals(store: IStorageBase) {\n  return useStorageCapability(store, records).query<{ status: string; total: number }>()\n    .where({ status: 'paid' }).select('total').all()\n}"
       ),
       result: t(
         'An actual provided records API executes the shared query and returns selected paid totals. Missing tokens throw UNSUPPORTED_CAPABILITY; admission alone performs no query. Other terminals are not advertised by this slice.',
@@ -926,18 +776,8 @@ async function paidTotals(store: IStorageBase) {
         '原生过滤后计数，无须返回记录。'
       ),
       example: t(
-        `import { createRecordQuery, type IRecordQuerySource } from '@migaia/storage-contract'
-function count(execute: IRecordQuerySource['execute'], reduce: NonNullable<IRecordQuerySource['reduce']>) {
-  return createRecordQuery<{ enabled: boolean }>({
-    pushdown: { source: 'indexed', operators: ['eq'], operations: ['where', 'count'] }, execute, reduce
-  }).where({ enabled: true }).requirePushdown().count()
-}`,
-        `import { createRecordQuery, type IRecordQuerySource } from '@migaia/storage-contract'
-function count(execute: IRecordQuerySource['execute'], reduce: NonNullable<IRecordQuerySource['reduce']>) {
-  return createRecordQuery<{ enabled: boolean }>({
-    pushdown: { source: 'indexed', operators: ['eq'], operations: ['where', 'count'] }, execute, reduce
-  }).where({ enabled: true }).requirePushdown().count()
-}`
+        "import { createRecordQuery } from '@migaia/storage-host/authoring/query'\nimport { type IRecordQuerySource } from '@migaia/storage-contract'\nfunction count(execute: IRecordQuerySource['execute'], reduce: NonNullable<IRecordQuerySource['reduce']>) {\n  return createRecordQuery<{ enabled: boolean }>({\n    pushdown: { source: 'indexed', operators: ['eq'], operations: ['where', 'count'] }, execute, reduce\n  }).where({ enabled: true }).requirePushdown().count()\n}",
+        "import { createRecordQuery } from '@migaia/storage-host/authoring/query'\nimport { type IRecordQuerySource } from '@migaia/storage-contract'\nfunction count(execute: IRecordQuerySource['execute'], reduce: NonNullable<IRecordQuerySource['reduce']>) {\n  return createRecordQuery<{ enabled: boolean }>({\n    pushdown: { source: 'indexed', operators: ['eq'], operations: ['where', 'count'] }, execute, reduce\n  }).where({ enabled: true }).requirePushdown().count()\n}"
       ),
       result: t(
         'Consumes one scalar from the provided original native cursor and awaits its cleanup. No matching records cross the boundary.',
@@ -951,18 +791,8 @@ function count(execute: IRecordQuerySource['execute'], reduce: NonNullable<IReco
         '后端需要声明式条件与 typed 投影，不应另建查询链或资源 owner。'
       ),
       example: t(
-        `import { createRecordQuery, type IRecordQuerySource } from '@migaia/storage-contract'
-function totals(execute: IRecordQuerySource['execute']) {
-  return createRecordQuery<{ status: string; total: number }>({
-    pushdown: { source: 'supplied-cursor', operations: [], operators: [] }, execute
-  }).where({ status: 'paid' }).where('total', 'gte', 100).select('total').all()
-}`,
-        `import { createRecordQuery, type IRecordQuerySource } from '@migaia/storage-contract'
-function totals(execute: IRecordQuerySource['execute']) {
-  return createRecordQuery<{ status: string; total: number }>({
-    pushdown: { source: 'supplied-cursor', operations: [], operators: [] }, execute
-  }).where({ status: 'paid' }).where('total', 'gte', 100).select('total').all()
-}`
+        "import { createRecordQuery } from '@migaia/storage-host/authoring/query'\nimport { type IRecordQuerySource } from '@migaia/storage-contract'\nfunction totals(execute: IRecordQuerySource['execute']) {\n  return createRecordQuery<{ status: string; total: number }>({\n    pushdown: { source: 'supplied-cursor', operations: [], operators: [] }, execute\n  }).where({ status: 'paid' }).where('total', 'gte', 100).select('total').all()\n}",
+        "import { createRecordQuery } from '@migaia/storage-host/authoring/query'\nimport { type IRecordQuerySource } from '@migaia/storage-contract'\nfunction totals(execute: IRecordQuerySource['execute']) {\n  return createRecordQuery<{ status: string; total: number }>({\n    pushdown: { source: 'supplied-cursor', operations: [], operators: [] }, execute\n  }).where({ status: 'paid' }).where('total', 'gte', 100).select('total').all()\n}"
       ),
       result: t(
         'Given an original cursor over paid totals 120 and 50, totals returns [{total:120}]. all awaits its actual disposal on success or failure. The empty support declaration keeps all steps client-side.',
@@ -979,18 +809,8 @@ function totals(execute: IRecordQuerySource['execute']) {
         '实体列表需要比较器排序，却不应物化全部源记录；显式上限约束保留的候选数量。'
       ),
       example: t(
-        `import { createRecordQuery, type IRecordQuerySource } from '@migaia/storage-contract'
-function smallest(execute: IRecordQuerySource['execute']) {
-  return createRecordQuery<{ total: number }>({
-    pushdown: { source: 'supplied-cursor', operations: [], operators: [] }, execute
-  }).orderByComparator((left, right) => left.total - right.total).limit(3).stream()
-}`,
-        `import { createRecordQuery, type IRecordQuerySource } from '@migaia/storage-contract'
-function smallest(execute: IRecordQuerySource['execute']) {
-  return createRecordQuery<{ total: number }>({
-    pushdown: { source: 'supplied-cursor', operations: [], operators: [] }, execute
-  }).orderByComparator((left, right) => left.total - right.total).limit(3).stream()
-}`
+        "import { createRecordQuery } from '@migaia/storage-host/authoring/query'\nimport { type IRecordQuerySource } from '@migaia/storage-contract'\nfunction smallest(execute: IRecordQuerySource['execute']) {\n  return createRecordQuery<{ total: number }>({\n    pushdown: { source: 'supplied-cursor', operations: [], operators: [] }, execute\n  }).orderByComparator((left, right) => left.total - right.total).limit(3).stream()\n}",
+        "import { createRecordQuery } from '@migaia/storage-host/authoring/query'\nimport { type IRecordQuerySource } from '@migaia/storage-contract'\nfunction smallest(execute: IRecordQuerySource['execute']) {\n  return createRecordQuery<{ total: number }>({\n    pushdown: { source: 'supplied-cursor', operations: [], operators: [] }, execute\n  }).orderByComparator((left, right) => left.total - right.total).limit(3).stream()\n}"
       ),
       result: t(
         'Given totals 8, 2, 5 and 1, the returned real storage iterator yields 1, 2 and 5. Equal totals retain source order; iterator cleanup stays with the original source owner.',
@@ -1004,20 +824,8 @@ function smallest(execute: IRecordQuerySource['execute']) {
         '删除前页记录后，通过原查询与数据源身份保持连续。'
       ),
       example: t(
-        `import { createRecordQuery, type IRecordQuerySource } from '@migaia/storage-contract'
-async function pages(source: IRecordQuerySource) {
-  const query = createRecordQuery<{ id: string }>(source)
-  const first = await query.page(2)
-  const second = first.next ? await query.after(first.next).limit(2).all() : []
-  return [first.items, second]
-}`,
-        `import { createRecordQuery, type IRecordQuerySource } from '@migaia/storage-contract'
-async function pages(source: IRecordQuerySource) {
-  const query = createRecordQuery<{ id: string }>(source)
-  const first = await query.page(2)
-  const second = first.next ? await query.after(first.next).limit(2).all() : []
-  return [first.items, second]
-}`
+        "import { createRecordQuery } from '@migaia/storage-host/authoring/query'\nimport { type IRecordQuerySource } from '@migaia/storage-contract'\nasync function pages(source: IRecordQuerySource) {\n  const query = createRecordQuery<{ id: string }>(source)\n  const first = await query.page(2)\n  const second = first.next ? await query.after(first.next).limit(2).all() : []\n  return [first.items, second]\n}",
+        "import { createRecordQuery } from '@migaia/storage-host/authoring/query'\nimport { type IRecordQuerySource } from '@migaia/storage-contract'\nasync function pages(source: IRecordQuerySource) {\n  const query = createRecordQuery<{ id: string }>(source)\n  const first = await query.page(2)\n  const second = first.next ? await query.after(first.next).limit(2).all() : []\n  return [first.items, second]\n}"
       ),
       result: t(
         'With canonical keys a,b,c,d, returns pages a,b and c,d. A different source, condition or ordering rejects before new I/O.',
@@ -1032,11 +840,8 @@ async function pages(source: IRecordQuerySource) {
         'A native backend must translate the same query AST without repeating operator or getter rules.',
         '原生后端须翻译相同查询 AST，不能重复操作符或 getter 规则。'
       ),
-      example: `import { snapshotStorageWhere, compileStorageQueryCondition } from '@migaia/storage-contract'
-const condition = snapshotStorageWhere({ total: { gte: 2 } })
-const matches = compileStorageQueryCondition<{ total: number }>(condition)
-console.log(matches({ total: 3 }), matches({ total: 1 }))
-// true false`,
+      example:
+        "import { snapshotStorageWhere, compileStorageQueryCondition } from '@migaia/storage-host/authoring/query'\nconst condition = snapshotStorageWhere({ total: { gte: 2 } })\nconst matches = compileStorageQueryCondition<{ total: number }>(condition)\nconsole.log(matches({ total: 3 }), matches({ total: 1 }))\n// true false",
       result: t(
         'One immutable AST serves native translation and the original predicate compiler.',
         '一个不可变 AST 同时供原生翻译与原谓词 compiler 使用。'
@@ -1054,16 +859,8 @@ console.log(matches({ total: 3 }), matches({ total: 1 }))
         '原生数据源收到规范条件，不应复制查询操作符。'
       ),
       example: t(
-        `import { compileStorageQueryCondition, type IQueryCondition } from '@migaia/storage-contract'
-function matching(conditions: readonly IQueryCondition[], rows: readonly { total: number }[]) {
-  const tests = conditions.map((condition) => compileStorageQueryCondition<{ total: number }>(condition))
-  return rows.filter((row) => tests.every((test) => test(row)))
-}`,
-        `import { compileStorageQueryCondition, type IQueryCondition } from '@migaia/storage-contract'
-function matching(conditions: readonly IQueryCondition[], rows: readonly { total: number }[]) {
-  const tests = conditions.map((condition) => compileStorageQueryCondition<{ total: number }>(condition))
-  return rows.filter((row) => tests.every((test) => test(row)))
-}`
+        "import { compileStorageQueryCondition } from '@migaia/storage-host/authoring/query'\nimport { type IQueryCondition } from '@migaia/storage-contract'\nfunction matching(conditions: readonly IQueryCondition[], rows: readonly { total: number }[]) {\n  const tests = conditions.map((condition) => compileStorageQueryCondition<{ total: number }>(condition))\n  return rows.filter((row) => tests.every((test) => test(row)))\n}",
+        "import { compileStorageQueryCondition } from '@migaia/storage-host/authoring/query'\nimport { type IQueryCondition } from '@migaia/storage-contract'\nfunction matching(conditions: readonly IQueryCondition[], rows: readonly { total: number }[]) {\n  const tests = conditions.map((condition) => compileStorageQueryCondition<{ total: number }>(condition))\n  return rows.filter((row) => tests.every((test) => test(row)))\n}"
       ),
       result: t(
         'Uses only the source-supplied canonical conditions and the existing predicate compiler.',
@@ -1082,8 +879,8 @@ function matching(conditions: readonly IQueryCondition[], rows: readonly { total
         '有序前缀候选流需要相同声明语义，不应另建查询或逐行重建成员列表。'
       ),
       example: t(
-        "import { compileStorageWhere } from '@migaia/storage-contract'\nconst accepts = compileStorageWhere<{ status: string; total: number }>({\n  status: 'paid', total: { gte: 100 }\n})\nconst rows = [{ status: 'paid', total: 120 }, { status: 'paid', total: 50 }]\nconsole.log(rows.filter(accepts).length) // 1",
-        "import { compileStorageWhere } from '@migaia/storage-contract'\nconst accepts = compileStorageWhere<{ status: string; total: number }>({\n  status: 'paid', total: { gte: 100 }\n})\nconst rows = [{ status: 'paid', total: 120 }, { status: 'paid', total: 50 }]\nconsole.log(rows.filter(accepts).length) // 1"
+        "import { compileStorageWhere } from '@migaia/storage-host/authoring/query'\nconst accepts = compileStorageWhere<{ status: string; total: number }>({\n  status: 'paid', total: { gte: 100 }\n})\nconst rows = [{ status: 'paid', total: 120 }, { status: 'paid', total: 50 }]\nconsole.log(rows.filter(accepts).length) // 1",
+        "import { compileStorageWhere } from '@migaia/storage-host/authoring/query'\nconst accepts = compileStorageWhere<{ status: string; total: number }>({\n  status: 'paid', total: { gte: 100 }\n})\nconst rows = [{ status: 'paid', total: 120 }, { status: 'paid', total: 50 }]\nconsole.log(rows.filter(accepts).length) // 1"
       ),
       result: t(
         'Prints 1. Only the paid row with total at least 100 matches; compilation reads no storage.',
@@ -1099,18 +896,8 @@ function matching(conditions: readonly IQueryCondition[], rows: readonly { total
         '独立 builder 分支不能反复复制旧锁前缀，也不能在配置期间启动操作期限。'
       ),
       example: t(
-        `import { createTransactionBuilder, lockKey, type IRecordStore } from '@migaia/storage-contract'
-function readLocked(store: IRecordStore<{ count: number }>) {
-  return createTransactionBuilder(store, { pageSize: 50 })
-    .lock(lockKey.record('counter')).timeout(2_000)
-    .run(tx => tx.getRecord('counter'))
-}`,
-        `import { createTransactionBuilder, lockKey, type IRecordStore } from '@migaia/storage-contract'
-function readLocked(store: IRecordStore<{ count: number }>) {
-  return createTransactionBuilder(store, { pageSize: 50 })
-    .lock(lockKey.record('counter')).timeout(2_000)
-    .run(tx => tx.getRecord('counter'))
-}`
+        "import { createTransactionBuilder } from '@migaia/storage-host/authoring/transaction'\nimport { lockKey } from '@migaia/storage-host/authoring/concurrency'\nimport { type IRecordStore } from '@migaia/storage-contract'\nfunction readLocked(store: IRecordStore<{ count: number }>) {\n  return createTransactionBuilder(store, { pageSize: 50 })\n    .lock(lockKey.record('counter')).timeout(2_000)\n    .run(tx => tx.getRecord('counter'))\n}",
+        "import { createTransactionBuilder } from '@migaia/storage-host/authoring/transaction'\nimport { lockKey } from '@migaia/storage-host/authoring/concurrency'\nimport { type IRecordStore } from '@migaia/storage-contract'\nfunction readLocked(store: IRecordStore<{ count: number }>) {\n  return createTransactionBuilder(store, { pageSize: 50 })\n    .lock(lockKey.record('counter')).timeout(2_000)\n    .run(tx => tx.getRecord('counter'))\n}"
       ),
       result: t(
         'The supplied registered store starts one transaction at run, returning its original Promise. The scope remains that store’s complete native scope.',
@@ -1124,22 +911,8 @@ function readLocked(store: IRecordStore<{ count: number }>) {
         '没有物理键锁的原生后端须复用原 builder，不公开 lock，也不创建第二策略循环。'
       ),
       example: t(
-        `import {
-  createTransactionBuilder, ConcurrencyPolicy, type IRecordStore
-} from '@migaia/storage-contract'
-function readNative(store: IRecordStore<{ count: number }>) {
-  return createTransactionBuilder(store, undefined, undefined, { mode: 'optimistic' })
-    .concurrency(ConcurrencyPolicy.optimistic({ retries: 1 })).timeout(2_000)
-    .run(tx => tx.getRecord('counter'))
-}`,
-        `import {
-  createTransactionBuilder, ConcurrencyPolicy, type IRecordStore
-} from '@migaia/storage-contract'
-function readNative(store: IRecordStore<{ count: number }>) {
-  return createTransactionBuilder(store, undefined, undefined, { mode: 'optimistic' })
-    .concurrency(ConcurrencyPolicy.optimistic({ retries: 1 })).timeout(2_000)
-    .run(tx => tx.getRecord('counter'))
-}`
+        "import { createTransactionBuilder } from '@migaia/storage-host/authoring/transaction'\nimport { ConcurrencyPolicy } from '@migaia/storage-host/authoring/concurrency'\nimport { type IRecordStore } from '@migaia/storage-contract'\nfunction readNative(store: IRecordStore<{ count: number }>) {\n  return createTransactionBuilder(store, undefined, undefined, { mode: 'optimistic' })\n    .concurrency(ConcurrencyPolicy.optimistic({ retries: 1 })).timeout(2_000)\n    .run(tx => tx.getRecord('counter'))\n}",
+        "import { createTransactionBuilder } from '@migaia/storage-host/authoring/transaction'\nimport { ConcurrencyPolicy } from '@migaia/storage-host/authoring/concurrency'\nimport { type IRecordStore } from '@migaia/storage-contract'\nfunction readNative(store: IRecordStore<{ count: number }>) {\n  return createTransactionBuilder(store, undefined, undefined, { mode: 'optimistic' })\n    .concurrency(ConcurrencyPolicy.optimistic({ retries: 1 })).timeout(2_000)\n    .run(tx => tx.getRecord('counter'))\n}"
       ),
       result: t(
         'Run receives the original scope and returns the original Promise. Native fields are preserved, no lock option is injected, and wait/fail policies reject synchronously with UNSUPPORTED_CAPABILITY.',
@@ -1155,26 +928,8 @@ function readNative(store: IRecordStore<{ count: number }>) {
         '原生后端需要既有接纳推进排空与双清理 Promise，不能另建资源 owner。'
       ),
       example: t(
-        `import { createStorageIteratorLifetime } from '@migaia/storage-contract'
-let closed = 0
-const lifetime = createStorageIteratorLifetime<number>({
-  close: async () => { closed += 1 }, report: console.error
-})
-await lifetime.advance(async () => ({ done: false, value: 1 }))
-const cleanup = lifetime.dispose()
-console.log(cleanup === lifetime.dispose()) // true
-await cleanup
-console.log(closed) // 1`,
-        `import { createStorageIteratorLifetime } from '@migaia/storage-contract'
-let closed = 0
-const lifetime = createStorageIteratorLifetime<number>({
-  close: async () => { closed += 1 }, report: console.error
-})
-await lifetime.advance(async () => ({ done: false, value: 1 }))
-const cleanup = lifetime.dispose()
-console.log(cleanup === lifetime.dispose()) // true
-await cleanup
-console.log(closed) // 1`
+        "import { createStorageIteratorLifetime } from '@migaia/storage-host/authoring/resource'\nlet closed = 0\nconst lifetime = createStorageIteratorLifetime<number>({\n  close: async () => { closed += 1 }, report: console.error\n})\nawait lifetime.advance(async () => ({ done: false, value: 1 }))\nconst cleanup = lifetime.dispose()\nconsole.log(cleanup === lifetime.dispose()) // true\nawait cleanup\nconsole.log(closed) // 1",
+        "import { createStorageIteratorLifetime } from '@migaia/storage-host/authoring/resource'\nlet closed = 0\nconst lifetime = createStorageIteratorLifetime<number>({\n  close: async () => { closed += 1 }, report: console.error\n})\nawait lifetime.advance(async () => ({ done: false, value: 1 }))\nconst cleanup = lifetime.dispose()\nconsole.log(cleanup === lifetime.dispose()) // true\nawait cleanup\nconsole.log(closed) // 1"
       ),
       result: t(
         'Prints true and 1. The original backend must still check admission before advance and register native transaction iterators with its original scope.',
@@ -1193,14 +948,8 @@ console.log(closed) // 1`
         '后端与 persist 组合须保留原生选项字段，不能另建重试循环或重开操作期限。'
       ),
       example: t(
-        `import { runWithConcurrency, type IStorageBase, type ITransactionOptions, type IConcurrencyPort } from '@migaia/storage-contract'
-async function execute(store: IStorageBase, options: ITransactionOptions, port: IConcurrencyPort<boolean>) {
-  return runWithConcurrency({ store, options }, port)
-}`,
-        `import { runWithConcurrency, type IStorageBase, type ITransactionOptions, type IConcurrencyPort } from '@migaia/storage-contract'
-async function execute(store: IStorageBase, options: ITransactionOptions, port: IConcurrencyPort<boolean>) {
-  return runWithConcurrency({ store, options }, port)
-}`
+        "import { runWithConcurrency } from '@migaia/storage-host/authoring/concurrency'\nimport { type IStorageBase, type ITransactionOptions, type IConcurrencyPort } from '@migaia/storage-contract'\nasync function execute(store: IStorageBase, options: ITransactionOptions, port: IConcurrencyPort<boolean>) {\n  return runWithConcurrency({ store, options }, port)\n}",
+        "import { runWithConcurrency } from '@migaia/storage-host/authoring/concurrency'\nimport { type IStorageBase, type ITransactionOptions, type IConcurrencyPort } from '@migaia/storage-contract'\nasync function execute(store: IStorageBase, options: ITransactionOptions, port: IConcurrencyPort<boolean>) {\n  return runWithConcurrency({ store, options }, port)\n}"
       ),
       result: t(
         'The function returns the real port’s committed boolean. The caller supplies the registered original store and original options or exact outer attempt; the loop captures policy once.',
@@ -1216,20 +965,8 @@ async function execute(store: IStorageBase, options: ITransactionOptions, port: 
         '物理后端添加组织隔离时，标量与元组键必须保持不同身份。'
       ),
       example: t(
-        `import { prefixStorageOrgKey, unprefixStorageOrgKey } from '@migaia/storage-contract'
-const orgId = '00000000-0000-0000-0000-000000000000'
-const wrapped = prefixStorageOrgKey(orgId, ['orders', 1])
-console.log(JSON.stringify(wrapped))
-console.log(JSON.stringify(unprefixStorageOrgKey(orgId, wrapped)))
-// ["$o","00000000-0000-0000-0000-000000000000",["orders",1]]
-// ["orders",1]`,
-        `import { prefixStorageOrgKey, unprefixStorageOrgKey } from '@migaia/storage-contract'
-const orgId = '00000000-0000-0000-0000-000000000000'
-const wrapped = prefixStorageOrgKey(orgId, ['orders', 1])
-console.log(JSON.stringify(wrapped))
-console.log(JSON.stringify(unprefixStorageOrgKey(orgId, wrapped)))
-// ["$o","00000000-0000-0000-0000-000000000000",["orders",1]]
-// ["orders",1]`
+        'import { prefixStorageOrgKey, unprefixStorageOrgKey } from \'@migaia/storage-host/authoring/key\'\nconst orgId = \'00000000-0000-0000-0000-000000000000\'\nconst wrapped = prefixStorageOrgKey(orgId, [\'orders\', 1])\nconsole.log(JSON.stringify(wrapped))\nconsole.log(JSON.stringify(unprefixStorageOrgKey(orgId, wrapped)))\n// ["$o","00000000-0000-0000-0000-000000000000",["orders",1]]\n// ["orders",1]',
+        'import { prefixStorageOrgKey, unprefixStorageOrgKey } from \'@migaia/storage-host/authoring/key\'\nconst orgId = \'00000000-0000-0000-0000-000000000000\'\nconst wrapped = prefixStorageOrgKey(orgId, [\'orders\', 1])\nconsole.log(JSON.stringify(wrapped))\nconsole.log(JSON.stringify(unprefixStorageOrgKey(orgId, wrapped)))\n// ["$o","00000000-0000-0000-0000-000000000000",["orders",1]]\n// ["orders",1]'
       ),
       result: t(
         'Prints the three-part physical envelope followed by the original tuple; no backend runs.',
@@ -1248,18 +985,8 @@ console.log(JSON.stringify(unprefixStorageOrgKey(orgId, wrapped)))
         '从其他组织取得的物理键不能经此边界暴露逻辑键。'
       ),
       example: t(
-        `import { prefixStorageOrgKey, unprefixStorageOrgKey, StorageContractError } from '@migaia/storage-contract'
-const first = '12345678-1234-1234-1234-123456789abc'
-const second = '12345678-1234-1234-1234-123456789abd'
-try { unprefixStorageOrgKey(second, prefixStorageOrgKey(first, 'orders')) }
-catch (error) { if (!(error instanceof StorageContractError)) throw error; console.log(error.code) }
-// INVALID_ARGUMENT`,
-        `import { prefixStorageOrgKey, unprefixStorageOrgKey, StorageContractError } from '@migaia/storage-contract'
-const first = '12345678-1234-1234-1234-123456789abc'
-const second = '12345678-1234-1234-1234-123456789abd'
-try { unprefixStorageOrgKey(second, prefixStorageOrgKey(first, 'orders')) }
-catch (error) { if (!(error instanceof StorageContractError)) throw error; console.log(error.code) }
-// INVALID_ARGUMENT`
+        "import { prefixStorageOrgKey, unprefixStorageOrgKey } from '@migaia/storage-host/authoring/key'\nimport { StorageContractError } from '@migaia/storage-contract'\nconst first = '12345678-1234-1234-1234-123456789abc'\nconst second = '12345678-1234-1234-1234-123456789abd'\ntry { unprefixStorageOrgKey(second, prefixStorageOrgKey(first, 'orders')) }\ncatch (error) { if (!(error instanceof StorageContractError)) throw error; console.log(error.code) }\n// INVALID_ARGUMENT",
+        "import { prefixStorageOrgKey, unprefixStorageOrgKey } from '@migaia/storage-host/authoring/key'\nimport { StorageContractError } from '@migaia/storage-contract'\nconst first = '12345678-1234-1234-1234-123456789abc'\nconst second = '12345678-1234-1234-1234-123456789abd'\ntry { unprefixStorageOrgKey(second, prefixStorageOrgKey(first, 'orders')) }\ncatch (error) { if (!(error instanceof StorageContractError)) throw error; console.log(error.code) }\n// INVALID_ARGUMENT"
       ),
       result: t(
         'Prints INVALID_ARGUMENT; the original envelope is not changed.',
@@ -1275,18 +1002,8 @@ catch (error) { if (!(error instanceof StorageContractError)) throw error; conso
         '插件 getter 可在资源所有权转移前失败。准入必须保留精确原错，不尝试清理。'
       ),
       example: t(
-        `import { snapshotStorageBaseDetailed } from '@migaia/storage-contract'
-const original = new Error('backend getter failed')
-const candidate = { get backend(): never { throw original } }
-const result = snapshotStorageBaseDetailed(candidate)
-console.log(result.valid, !result.valid && result.cause === original)
-// false true`,
-        `import { snapshotStorageBaseDetailed } from '@migaia/storage-contract'
-const original = new Error('backend getter failed')
-const candidate = { get backend(): never { throw original } }
-const result = snapshotStorageBaseDetailed(candidate)
-console.log(result.valid, !result.valid && result.cause === original)
-// false true`
+        "import { snapshotStorageBaseDetailed } from '@migaia/storage-host/authoring/store'\nconst original = new Error('backend getter failed')\nconst candidate = { get backend(): never { throw original } }\nconst result = snapshotStorageBaseDetailed(candidate)\nconsole.log(result.valid, !result.valid && result.cause === original)\n// false true",
+        "import { snapshotStorageBaseDetailed } from '@migaia/storage-host/authoring/store'\nconst original = new Error('backend getter failed')\nconst candidate = { get backend(): never { throw original } }\nconst result = snapshotStorageBaseDetailed(candidate)\nconsole.log(result.valid, !result.valid && result.cause === original)\n// false true"
       ),
       result: t(
         'Prints false true; no resource method is called.',
@@ -1302,16 +1019,8 @@ console.log(result.valid, !result.valid && result.cause === original)
         '复制方法名不是事务权限；组合操作必须由原私有拥有者接纳。'
       ),
       example: t(
-        `import { runTransactionOperation, StorageContractError } from '@migaia/storage-contract'
-let calls = 0
-try { runTransactionOperation({}, () => { calls += 1 }) }
-catch (error) { if (!(error instanceof StorageContractError)) throw error; console.log(error.code, calls) }
-// INVALID_ARGUMENT 0`,
-        `import { runTransactionOperation, StorageContractError } from '@migaia/storage-contract'
-let calls = 0
-try { runTransactionOperation({}, () => { calls += 1 }) }
-catch (error) { if (!(error instanceof StorageContractError)) throw error; console.log(error.code, calls) }
-// INVALID_ARGUMENT 0`
+        "import { runTransactionOperation } from '@migaia/storage-host/authoring/transaction'\nimport { StorageContractError } from '@migaia/storage-contract'\nlet calls = 0\ntry { runTransactionOperation({}, () => { calls += 1 }) }\ncatch (error) { if (!(error instanceof StorageContractError)) throw error; console.log(error.code, calls) }\n// INVALID_ARGUMENT 0",
+        "import { runTransactionOperation } from '@migaia/storage-host/authoring/transaction'\nimport { StorageContractError } from '@migaia/storage-contract'\nlet calls = 0\ntry { runTransactionOperation({}, () => { calls += 1 }) }\ncatch (error) { if (!(error instanceof StorageContractError)) throw error; console.log(error.code, calls) }\n// INVALID_ARGUMENT 0"
       ),
       result: t(
         'Prints INVALID_ARGUMENT 0; the callback never starts.',
@@ -1330,18 +1039,8 @@ catch (error) { if (!(error instanceof StorageContractError)) throw error; conso
         '事务可先配置再开始；Date 被修改后不能悄然选择另一把物理锁。'
       ),
       example: t(
-        `import { lockKey } from '@migaia/storage-contract'
-const original = new Date(0)
-const saved = lockKey.record(original)
-original.setTime(1_000)
-console.log(saved.channel, saved.key instanceof Date && saved.key.getTime())
-// record 0`,
-        `import { lockKey } from '@migaia/storage-contract'
-const original = new Date(0)
-const saved = lockKey.record(original)
-original.setTime(1_000)
-console.log(saved.channel, saved.key instanceof Date && saved.key.getTime())
-// record 0`
+        "import { lockKey } from '@migaia/storage-host/authoring/concurrency'\nconst original = new Date(0)\nconst saved = lockKey.record(original)\noriginal.setTime(1_000)\nconsole.log(saved.channel, saved.key instanceof Date && saved.key.getTime())\n// record 0",
+        "import { lockKey } from '@migaia/storage-host/authoring/concurrency'\nconst original = new Date(0)\nconst saved = lockKey.record(original)\noriginal.setTime(1_000)\nconsole.log(saved.channel, saved.key instanceof Date && saved.key.getTime())\n// record 0"
       ),
       result: t(
         'Prints record 0; the original Date remains caller-owned and no lock is acquired.',
@@ -1357,16 +1056,8 @@ console.log(saved.channel, saved.key instanceof Date && saved.key.getTime())
         '后端须在打开资源前捕获不可变策略身份；复制元数据不能复制决策权限。'
       ),
       example: t(
-        `import { defineConcurrencyPolicy, ConcurrencyPolicy } from '@migaia/storage-contract'
-let calls = 0
-const custom = defineConcurrencyPolicy({ name: 'custom', locking: 'pessimistic', decide: () => { calls += 1; return { action: 'reject' } } })
-console.log(custom.name, Object.isFrozen(custom), calls, ConcurrencyPolicy.optimistic().locking)
-// custom true 0 optimistic`,
-        `import { defineConcurrencyPolicy, ConcurrencyPolicy } from '@migaia/storage-contract'
-let calls = 0
-const custom = defineConcurrencyPolicy({ name: 'custom', locking: 'pessimistic', decide: () => { calls += 1; return { action: 'reject' } } })
-console.log(custom.name, Object.isFrozen(custom), calls, ConcurrencyPolicy.optimistic().locking)
-// custom true 0 optimistic`
+        "import { defineConcurrencyPolicy } from '@migaia/storage-contract'\nimport { ConcurrencyPolicy } from '@migaia/storage-host/authoring/concurrency'\nlet calls = 0\nconst custom = defineConcurrencyPolicy({ name: 'custom', locking: 'pessimistic', decide: () => { calls += 1; return { action: 'reject' } } })\nconsole.log(custom.name, Object.isFrozen(custom), calls, ConcurrencyPolicy.optimistic().locking)\n// custom true 0 optimistic",
+        "import { defineConcurrencyPolicy } from '@migaia/storage-contract'\nimport { ConcurrencyPolicy } from '@migaia/storage-host/authoring/concurrency'\nlet calls = 0\nconst custom = defineConcurrencyPolicy({ name: 'custom', locking: 'pessimistic', decide: () => { calls += 1; return { action: 'reject' } } })\nconsole.log(custom.name, Object.isFrozen(custom), calls, ConcurrencyPolicy.optimistic().locking)\n// custom true 0 optimistic"
       ),
       result: t(
         'Prints custom true 0 optimistic. No callback, transaction or lock is executed.',
@@ -1430,12 +1121,8 @@ console.log(first !== second, Object.isFrozen(first), Object.isFrozen(descriptor
         'Reuse complete typed-key limits without a second tenant codec.',
         '保完整typed键限制，不加第二组织codec。'
       ),
-      example: `import { snapshotStorageOrgKeyPrefix, encodeStorageOrgKey, orderStorageKeysByBytes } from '@migaia/storage-contract'
-const org = '11111111-1111-1111-1111-111111111111'
-const bounds = snapshotStorageOrgKeyPrefix(org, 'order/', 'redis')
-const key = encodeStorageOrgKey(org, 'order/1', 'redis')
-const sorted = orderStorageKeysByBytes([bounds.lower, key, bounds.upper], value => value)
-console.log(sorted[1] === key)`,
+      example:
+        "import { snapshotStorageOrgKeyPrefix, encodeStorageOrgKey, orderStorageKeysByBytes } from '@migaia/storage-host/authoring/key'\nconst org = '11111111-1111-1111-1111-111111111111'\nconst bounds = snapshotStorageOrgKeyPrefix(org, 'order/', 'redis')\nconst key = encodeStorageOrgKey(org, 'order/1', 'redis')\nconst sorted = orderStorageKeysByBytes([bounds.lower, key, bounds.upper], value => value)\nconsole.log(sorted[1] === key)",
       result: t(
         'Prints true. Undefined prefix selects all logical key types in this organization.',
         '输出true；undefined前缀选择该组织内全部逻辑键类型。'
@@ -1450,8 +1137,8 @@ console.log(sorted[1] === key)`,
         '原生组织封装不能缩小支持的逻辑键深度或节点数。'
       ),
       example: t(
-        "import { encodeStorageOrgKey, decodeStorageOrgKey, compareStorageKeys } from '@migaia/storage-contract'\nconst orgId = '11111111-1111-1111-1111-111111111111'\nconst logical = ['orders', new Date(0)] as const\nconst encoded = encodeStorageOrgKey(orgId, logical, 'redis')\nconsole.log(compareStorageKeys(decodeStorageOrgKey(orgId, encoded, 'redis'), logical))",
-        "import { encodeStorageOrgKey, decodeStorageOrgKey, compareStorageKeys } from '@migaia/storage-contract'\nconst orgId = '11111111-1111-1111-1111-111111111111'\nconst logical = ['orders', new Date(0)] as const\nconst encoded = encodeStorageOrgKey(orgId, logical, 'redis')\nconsole.log(compareStorageKeys(decodeStorageOrgKey(orgId, encoded, 'redis'), logical))"
+        "import { encodeStorageOrgKey, decodeStorageOrgKey, compareStorageKeys } from '@migaia/storage-host/authoring/key'\nconst orgId = '11111111-1111-1111-1111-111111111111'\nconst logical = ['orders', new Date(0)] as const\nconst encoded = encodeStorageOrgKey(orgId, logical, 'redis')\nconsole.log(compareStorageKeys(decodeStorageOrgKey(orgId, encoded, 'redis'), logical))",
+        "import { encodeStorageOrgKey, decodeStorageOrgKey, compareStorageKeys } from '@migaia/storage-host/authoring/key'\nconst orgId = '11111111-1111-1111-1111-111111111111'\nconst logical = ['orders', new Date(0)] as const\nconst encoded = encodeStorageOrgKey(orgId, logical, 'redis')\nconsole.log(compareStorageKeys(decodeStorageOrgKey(orgId, encoded, 'redis'), logical))"
       ),
       result: t(
         'Prints 0; physical bytes use the original ordered format.',
@@ -1467,8 +1154,8 @@ console.log(sorted[1] === key)`,
         '返回独立逻辑键，不准入其它组织。'
       ),
       example: t(
-        "import { encodeStorageOrgKey, decodeStorageOrgKey, compareStorageKeys } from '@migaia/storage-contract'\nconst orgId = '11111111-1111-1111-1111-111111111111'\nconst logical = ['orders', new Date(0)] as const\nconst encoded = encodeStorageOrgKey(orgId, logical, 'redis')\nconsole.log(compareStorageKeys(decodeStorageOrgKey(orgId, encoded, 'redis'), logical))",
-        "import { encodeStorageOrgKey, decodeStorageOrgKey, compareStorageKeys } from '@migaia/storage-contract'\nconst orgId = '11111111-1111-1111-1111-111111111111'\nconst logical = ['orders', new Date(0)] as const\nconst encoded = encodeStorageOrgKey(orgId, logical, 'redis')\nconsole.log(compareStorageKeys(decodeStorageOrgKey(orgId, encoded, 'redis'), logical))"
+        "import { encodeStorageOrgKey, decodeStorageOrgKey, compareStorageKeys } from '@migaia/storage-host/authoring/key'\nconst orgId = '11111111-1111-1111-1111-111111111111'\nconst logical = ['orders', new Date(0)] as const\nconst encoded = encodeStorageOrgKey(orgId, logical, 'redis')\nconsole.log(compareStorageKeys(decodeStorageOrgKey(orgId, encoded, 'redis'), logical))",
+        "import { encodeStorageOrgKey, decodeStorageOrgKey, compareStorageKeys } from '@migaia/storage-host/authoring/key'\nconst orgId = '11111111-1111-1111-1111-111111111111'\nconst logical = ['orders', new Date(0)] as const\nconst encoded = encodeStorageOrgKey(orgId, logical, 'redis')\nconsole.log(compareStorageKeys(decodeStorageOrgKey(orgId, encoded, 'redis'), logical))"
       ),
       result: t(
         'Prints 0; foreign boundaries reject with INVALID_ARGUMENT.',
@@ -1484,12 +1171,8 @@ console.log(sorted[1] === key)`,
         '记录索引与锁须共用现有键顺序，包含 UTF-16 与嵌套前缀。'
       ),
       example: t(
-        `import { encodeOrderedStorageKey } from '@migaia/storage-contract'
-console.log([...encodeOrderedStorageKey([''], 'memory')].join(','))
-// 5,3,0,0`,
-        `import { encodeOrderedStorageKey } from '@migaia/storage-contract'
-console.log([...encodeOrderedStorageKey([''], 'memory')].join(','))
-// 5,3,0,0`
+        "import { encodeOrderedStorageKey } from '@migaia/storage-host/authoring/key'\nconsole.log([...encodeOrderedStorageKey([''], 'memory')].join(','))\n// 5,3,0,0",
+        "import { encodeOrderedStorageKey } from '@migaia/storage-host/authoring/key'\nconsole.log([...encodeOrderedStorageKey([''], 'memory')].join(','))\n// 5,3,0,0"
       ),
       result: t(
         'Prints 5,3,0,0; the output has its own buffer.',
@@ -1505,8 +1188,8 @@ console.log([...encodeOrderedStorageKey([''], 'memory')].join(','))
         '异步操作仍引用调用方的数组、日期和缓冲区。操作尚未使用键时，应用的另一部分已经修改日期与字节，后续操作可能指向另一条记录。\n\n浅拷贝只会创建外层数组，日期和缓冲区仍与原键共享。因此，保存一份数组并没有捕获接纳操作时的完整逻辑键。\n\n把键交给异步操作之前调用 `snapshotStorageKey()`。它先校验，再递归复制这些组件，最后校验副本；结果与原键分离，但没有冻结，操作结束前应自行保管副本。'
       ),
       example: t(
-        "import { snapshotStorageKey } from '@migaia/storage-contract'\n\nconst date = new Date(0)\nconst bytes = new Uint8Array([7, 8])\nconst original: [string, Date, ArrayBuffer] = ['orders', date, bytes.buffer]\nconst saved = snapshotStorageKey(original, 'memory') as readonly [string, Date, ArrayBuffer]\noriginal[0] = 'changed'\ndate.setTime(1000)\nbytes[0] = 99\nconsole.log('original:', original[0], date.getTime(), bytes[0])\nconsole.log('snapshot:', saved[0], saved[1].getTime(), new Uint8Array(saved[2])[0])\nconsole.log('separate array:', saved !== original)",
-        "import { snapshotStorageKey } from '@migaia/storage-contract'\n\nconst date = new Date(0)\nconst bytes = new Uint8Array([7, 8])\nconst original: [string, Date, ArrayBuffer] = ['orders', date, bytes.buffer]\nconst saved = snapshotStorageKey(original, 'memory') as readonly [string, Date, ArrayBuffer]\noriginal[0] = 'changed'\ndate.setTime(1000)\nbytes[0] = 99\nconsole.log('原键:', original[0], date.getTime(), bytes[0])\nconsole.log('快照:', saved[0], saved[1].getTime(), new Uint8Array(saved[2])[0])\nconsole.log('独立数组:', saved !== original)"
+        "import { snapshotStorageKey } from '@migaia/storage-host/authoring/key'\n\nconst date = new Date(0)\nconst bytes = new Uint8Array([7, 8])\nconst original: [string, Date, ArrayBuffer] = ['orders', date, bytes.buffer]\nconst saved = snapshotStorageKey(original, 'memory') as readonly [string, Date, ArrayBuffer]\noriginal[0] = 'changed'\ndate.setTime(1000)\nbytes[0] = 99\nconsole.log('original:', original[0], date.getTime(), bytes[0])\nconsole.log('snapshot:', saved[0], saved[1].getTime(), new Uint8Array(saved[2])[0])\nconsole.log('separate array:', saved !== original)",
+        "import { snapshotStorageKey } from '@migaia/storage-host/authoring/key'\n\nconst date = new Date(0)\nconst bytes = new Uint8Array([7, 8])\nconst original: [string, Date, ArrayBuffer] = ['orders', date, bytes.buffer]\nconst saved = snapshotStorageKey(original, 'memory') as readonly [string, Date, ArrayBuffer]\noriginal[0] = 'changed'\ndate.setTime(1000)\nbytes[0] = 99\nconsole.log('原键:', original[0], date.getTime(), bytes[0])\nconsole.log('快照:', saved[0], saved[1].getTime(), new Uint8Array(saved[2])[0])\nconsole.log('独立数组:', saved !== original)"
       ),
       result: t(
         'Prints `original: changed 1000 99`, `snapshot: orders 0 7`, then `separate array: true`.\n\nMutation of the original array, Date and bytes does not change the captured key. The caller still owns the mutable snapshot; keep it private for the duration of the operation. This helper captures a key and does not submit a storage operation.',
@@ -1523,8 +1206,8 @@ console.log([...encodeOrderedStorageKey([''], 'memory')].join(','))
         '应用把普通对象当作记录键，直到后端开始工作才发现错误。失败位置因此远离最初选择键的代码。\n\n把任意对象转成字符串不能替代键校验：不同对象可能得到相同字符串，最终指向同一条记录。记录键需要符合约定的键类型。\n\n在入口调用 `snapshotStorageKey()`。它以 `INVALID_KEY` 拒绝这个对象，并保留后端标签、原值与类型错误原因；应改用由标量字段组成的数组等有效键。'
       ),
       example: t(
-        "import { snapshotStorageKey, StorageContractError } from '@migaia/storage-contract'\n\nconst candidate = { orderId: 1 }\ntry {\n  snapshotStorageKey(candidate, 'memory', 'orderKey')\n} catch (error) {\n  if (!(error instanceof StorageContractError)) throw error\n  console.log('code:', error.code)\n  console.log('backend:', error.backend)\n  console.log('original key:', (error.key as unknown) === candidate)\n  console.log('typed cause:', error.cause instanceof TypeError)\n}",
-        "import { snapshotStorageKey, StorageContractError } from '@migaia/storage-contract'\n\nconst candidate = { orderId: 1 }\ntry {\n  snapshotStorageKey(candidate, 'memory', 'orderKey')\n} catch (error) {\n  if (!(error instanceof StorageContractError)) throw error\n  console.log('错误码:', error.code)\n  console.log('后端:', error.backend)\n  console.log('原始键:', (error.key as unknown) === candidate)\n  console.log('类型原因:', error.cause instanceof TypeError)\n}"
+        "import { snapshotStorageKey } from '@migaia/storage-host/authoring/key'\nimport { StorageContractError } from '@migaia/storage-contract'\n\nconst candidate = { orderId: 1 }\ntry {\n  snapshotStorageKey(candidate, 'memory', 'orderKey')\n} catch (error) {\n  if (!(error instanceof StorageContractError)) throw error\n  console.log('code:', error.code)\n  console.log('backend:', error.backend)\n  console.log('original key:', (error.key as unknown) === candidate)\n  console.log('typed cause:', error.cause instanceof TypeError)\n}",
+        "import { snapshotStorageKey } from '@migaia/storage-host/authoring/key'\nimport { StorageContractError } from '@migaia/storage-contract'\n\nconst candidate = { orderId: 1 }\ntry {\n  snapshotStorageKey(candidate, 'memory', 'orderKey')\n} catch (error) {\n  if (!(error instanceof StorageContractError)) throw error\n  console.log('错误码:', error.code)\n  console.log('后端:', error.backend)\n  console.log('原始键:', (error.key as unknown) === candidate)\n  console.log('类型原因:', error.cause instanceof TypeError)\n}"
       ),
       result: t(
         'Prints `code: INVALID_KEY`, `backend: memory`, `original key: true`, then `typed cause: true`.\n\nThis invalid object is rejected synchronously and remains reachable as `error.key`; this helper does not call a storage backend. For a channel whose keys must be strings, use `assertStringStorageKey()` instead of accepting the wider record-key domain.',
@@ -1543,8 +1226,8 @@ console.log([...encodeOrderedStorageKey([''], 'memory')].join(','))
         '通过访问器提供的选项可能在校验和使用之间变化。存储的一层校验了某个超时，另一层稍后却可能读到不同的超时或写入策略。\n\n各层继续读取原对象，就会重复触发访问器。各自复制几个字段也无法共同识别这些值是否已经在接纳操作时捕获。\n\n先把原选项交给 `snapshotOperationContext()`，再向内传递返回值。它只读取一次操作字段（包括可选 orgId）并冻结记录，再次传入该快照会复用同一对象；已取消的信号也可接纳，因为工具只校验意图，实际取消和超时由后端执行。'
       ),
       example: t(
-        "import { snapshotOperationContext } from '@migaia/storage-contract'\n\nconst controller = new AbortController()\ncontroller.abort()\nlet reads = 0\nconst options = {\n  get signal() { reads += 1; return controller.signal },\n  get timeoutMs() { reads += 1; return 0 },\n  get pageSize() { reads += 1; return 100 },\n  get conflictPolicy() { reads += 1; return 'replace' as const }\n}\nconst snapshot = snapshotOperationContext(options)\nconsole.log('frozen:', Object.isFrozen(snapshot))\nconsole.log('same snapshot:', snapshotOperationContext(snapshot) === snapshot)\nconsole.log('field reads:', reads)\nconsole.log('signal aborted:', snapshot?.signal?.aborted)\nconsole.log('options:', snapshot?.timeoutMs, snapshot?.pageSize, snapshot?.conflictPolicy)",
-        "import { snapshotOperationContext } from '@migaia/storage-contract'\n\nconst controller = new AbortController()\ncontroller.abort()\nlet reads = 0\nconst options = {\n  get signal() { reads += 1; return controller.signal },\n  get timeoutMs() { reads += 1; return 0 },\n  get pageSize() { reads += 1; return 100 },\n  get conflictPolicy() { reads += 1; return 'replace' as const }\n}\nconst snapshot = snapshotOperationContext(options)\nconsole.log('冻结:', Object.isFrozen(snapshot))\nconsole.log('复用快照:', snapshotOperationContext(snapshot) === snapshot)\nconsole.log('字段读取次数:', reads)\nconsole.log('信号已取消:', snapshot?.signal?.aborted)\nconsole.log('选项:', snapshot?.timeoutMs, snapshot?.pageSize, snapshot?.conflictPolicy)"
+        "import { snapshotOperationContext } from '@migaia/storage-host/authoring/context'\n\nconst controller = new AbortController()\ncontroller.abort()\nlet reads = 0\nconst options = {\n  get signal() { reads += 1; return controller.signal },\n  get timeoutMs() { reads += 1; return 0 },\n  get pageSize() { reads += 1; return 100 },\n  get conflictPolicy() { reads += 1; return 'replace' as const }\n}\nconst snapshot = snapshotOperationContext(options)\nconsole.log('frozen:', Object.isFrozen(snapshot))\nconsole.log('same snapshot:', snapshotOperationContext(snapshot) === snapshot)\nconsole.log('field reads:', reads)\nconsole.log('signal aborted:', snapshot?.signal?.aborted)\nconsole.log('options:', snapshot?.timeoutMs, snapshot?.pageSize, snapshot?.conflictPolicy)",
+        "import { snapshotOperationContext } from '@migaia/storage-host/authoring/context'\n\nconst controller = new AbortController()\ncontroller.abort()\nlet reads = 0\nconst options = {\n  get signal() { reads += 1; return controller.signal },\n  get timeoutMs() { reads += 1; return 0 },\n  get pageSize() { reads += 1; return 100 },\n  get conflictPolicy() { reads += 1; return 'replace' as const }\n}\nconst snapshot = snapshotOperationContext(options)\nconsole.log('冻结:', Object.isFrozen(snapshot))\nconsole.log('复用快照:', snapshotOperationContext(snapshot) === snapshot)\nconsole.log('字段读取次数:', reads)\nconsole.log('信号已取消:', snapshot?.signal?.aborted)\nconsole.log('选项:', snapshot?.timeoutMs, snapshot?.pageSize, snapshot?.conflictPolicy)"
       ),
       result: t(
         'Prints `frozen: true`, `same snapshot: true`, `field reads: 4`, `signal aborted: true`, then `options: 0 100 replace`.\n\nEach field is read once across both calls; validation preserves the original signal and accepts zero timeout. No timer or abort subscription is created. Omitted fields remain `undefined`; freezing the record does not freeze or replace the live signal.',
@@ -1560,8 +1243,8 @@ console.log([...encodeOrderedStorageKey([''], 'memory')].join(','))
         '原生排名前过滤，并复用同一个客户端读取器。'
       ),
       example: t(
-        "import { createVectorQuery, type IVectorQuerySource } from '@migaia/storage-contract'\nfunction ranked(execute: IVectorQuerySource<{ enabled: boolean }>['execute']) {\n  const builder = createVectorQuery({ pushdown: { source: 'engine', index: 'ann', operators: ['eq'], operations: ['where', 'topK', 'minScore'] }, execute })\n  return [builder.topK(1), builder.where({ enabled: true }).topK(5), builder.withVector().minScore(0.5).topK(3)]\n}\n// Each result uses the supplied native cursor; construction performs no I/O.",
-        "import { createVectorQuery, type IVectorQuerySource } from '@migaia/storage-contract'\nfunction ranked(execute: IVectorQuerySource<{ enabled: boolean }>['execute']) {\n  const builder = createVectorQuery({ pushdown: { source: 'engine', index: 'ann', operators: ['eq'], operations: ['where', 'topK', 'minScore'] }, execute })\n  return [builder.topK(1), builder.where({ enabled: true }).topK(5), builder.withVector().minScore(0.5).topK(3)]\n}\n// 每个结果复用提供的原生游标；构建不执行 I/O。"
+        "import { createVectorQuery } from '@migaia/storage-host/authoring/query'\nimport { type IVectorQuerySource } from '@migaia/storage-contract'\nfunction ranked(execute: IVectorQuerySource<{ enabled: boolean }>['execute']) {\n  const builder = createVectorQuery({ pushdown: { source: 'engine', index: 'ann', operators: ['eq'], operations: ['where', 'topK', 'minScore'] }, execute })\n  return [builder.topK(1), builder.where({ enabled: true }).topK(5), builder.withVector().minScore(0.5).topK(3)]\n}\n// Each result uses the supplied native cursor; construction performs no I/O.",
+        "import { createVectorQuery } from '@migaia/storage-host/authoring/query'\nimport { type IVectorQuerySource } from '@migaia/storage-contract'\nfunction ranked(execute: IVectorQuerySource<{ enabled: boolean }>['execute']) {\n  const builder = createVectorQuery({ pushdown: { source: 'engine', index: 'ann', operators: ['eq'], operations: ['where', 'topK', 'minScore'] }, execute })\n  return [builder.topK(1), builder.where({ enabled: true }).topK(5), builder.withVector().minScore(0.5).topK(3)]\n}\n// 每个结果复用提供的原生游标；构建不执行 I/O。"
       ),
       result: t(
         'Returns three independent bounded queries; only withVector adds vector to its hit type.',
@@ -1577,18 +1260,8 @@ console.log([...encodeOrderedStorageKey([''], 'memory')].join(','))
         '函数谓词形成客户端边界时，继续复用原 ground-match 后端。'
       ),
       example: t(
-        `import { createRdfQuery, term, type IRdfQuerySource } from '@migaia/storage-contract'
-function next(source: IRdfQuerySource) {
-  return createRdfQuery(source, { subject: term.iri('urn:a') })
-    .where((quad) => quad.object.termType === 'NamedNode')
-    .follow(term.iri('urn:knows'), term.iri('urn:c')).limit(1).all()
-}`,
-        `import { createRdfQuery, term, type IRdfQuerySource } from '@migaia/storage-contract'
-function next(source: IRdfQuerySource) {
-  return createRdfQuery(source, { subject: term.iri('urn:a') })
-    .where((quad) => quad.object.termType === 'NamedNode')
-    .follow(term.iri('urn:knows'), term.iri('urn:c')).limit(1).all()
-}`
+        "import { createRdfQuery } from '@migaia/storage-host/authoring/query'\nimport { term } from '@migaia/storage-host/authoring/rdf'\nimport { type IRdfQuerySource } from '@migaia/storage-contract'\nfunction next(source: IRdfQuerySource) {\n  return createRdfQuery(source, { subject: term.iri('urn:a') })\n    .where((quad) => quad.object.termType === 'NamedNode')\n    .follow(term.iri('urn:knows'), term.iri('urn:c')).limit(1).all()\n}",
+        "import { createRdfQuery } from '@migaia/storage-host/authoring/query'\nimport { term } from '@migaia/storage-host/authoring/rdf'\nimport { type IRdfQuerySource } from '@migaia/storage-contract'\nfunction next(source: IRdfQuerySource) {\n  return createRdfQuery(source, { subject: term.iri('urn:a') })\n    .where((quad) => quad.object.termType === 'NamedNode')\n    .follow(term.iri('urn:knows'), term.iri('urn:c')).limit(1).all()\n}"
       ),
       result: t(
         'Uses the supplied native ground matcher for the next subject and same graph, closing the child cursor before the root cursor.',
@@ -1602,8 +1275,8 @@ function next(source: IRdfQuerySource) {
         '捕获 ground pattern，传递有序原生遍历步骤，不建立另一查询执行器。'
       ),
       example: t(
-        "import { createRdfQuery, term, type IRdfQuerySource } from '@migaia/storage-contract'\nfunction linked(execute: IRdfQuerySource['execute']) {\n  const source = { pushdown: { source: 'rdf', operators: [], operations: ['follow', 'inverse'] as const }, execute }\n  return [createRdfQuery(source, {}), createRdfQuery(source, { subject: term.iri('urn:a') }).follow(term.iri('urn:knows')), createRdfQuery(source, { graph: term.defaultGraph }).inverse(term.iri('urn:parent'))]\n}\n// Construction only captures immutable patterns and steps.",
-        "import { createRdfQuery, term, type IRdfQuerySource } from '@migaia/storage-contract'\nfunction linked(execute: IRdfQuerySource['execute']) {\n  const source = { pushdown: { source: 'rdf', operators: [], operations: ['follow', 'inverse'] as const }, execute }\n  return [createRdfQuery(source, {}), createRdfQuery(source, { subject: term.iri('urn:a') }).follow(term.iri('urn:knows')), createRdfQuery(source, { graph: term.defaultGraph }).inverse(term.iri('urn:parent'))]\n}\n// 构建仅捕获不可变 pattern 与步骤。"
+        "import { createRdfQuery } from '@migaia/storage-host/authoring/query'\nimport { term } from '@migaia/storage-host/authoring/rdf'\nimport { type IRdfQuerySource } from '@migaia/storage-contract'\nfunction linked(execute: IRdfQuerySource['execute']) {\n  const source = { pushdown: { source: 'rdf', operators: [], operations: ['follow', 'inverse'] as const }, execute }\n  return [createRdfQuery(source, {}), createRdfQuery(source, { subject: term.iri('urn:a') }).follow(term.iri('urn:knows')), createRdfQuery(source, { graph: term.defaultGraph }).inverse(term.iri('urn:parent'))]\n}\n// Construction only captures immutable patterns and steps.",
+        "import { createRdfQuery } from '@migaia/storage-host/authoring/query'\nimport { term } from '@migaia/storage-host/authoring/rdf'\nimport { type IRdfQuerySource } from '@migaia/storage-contract'\nfunction linked(execute: IRdfQuerySource['execute']) {\n  const source = { pushdown: { source: 'rdf', operators: [], operations: ['follow', 'inverse'] as const }, execute }\n  return [createRdfQuery(source, {}), createRdfQuery(source, { subject: term.iri('urn:a') }).follow(term.iri('urn:knows')), createRdfQuery(source, { graph: term.defaultGraph }).inverse(term.iri('urn:parent'))]\n}\n// 构建仅捕获不可变 pattern 与步骤。"
       ),
       result: t(
         'Returns match, forward and inverse queries with the original native resource owner.',
@@ -1639,8 +1312,8 @@ function next(source: IRdfQuerySource) {
         '二级索引和变更流加入之前创建的提供方没有这两个能力标志。应用选择通道时，仍需要明确知道是否支持这些操作。\n\n只检查真假会把非法字段类型也当成布尔能力。继续持有原描述，又会让后续修改改变先前接纳操作时使用的事实。\n\n选择可选操作前调用 `snapshotStorageCapabilities()`。它校验完整描述，只把这两个旧版缺失标志补为 `false`，并返回独立记录，使捕获的值不受原描述后续修改影响。'
       ),
       example: t(
-        "import { snapshotStorageCapabilities } from '@migaia/storage-contract'\n\nconst legacy = {\n  syncRead: true, binary: false, records: false, transactions: false,\n  iteration: false, opaqueEntries: false, maxValueBytes: undefined\n}\nconst snapshot = snapshotStorageCapabilities(legacy)\nlegacy.records = true\nconsole.log('new flags:', snapshot?.secondaryIndexes, snapshot?.changeFeed)\nconsole.log('record capability:', legacy.records, snapshot?.records)\nconsole.log('separate record:', snapshot !== legacy)\nconsole.log('frozen:', Object.isFrozen(snapshot))",
-        "import { snapshotStorageCapabilities } from '@migaia/storage-contract'\n\nconst legacy = {\n  syncRead: true, binary: false, records: false, transactions: false,\n  iteration: false, opaqueEntries: false, maxValueBytes: undefined\n}\nconst snapshot = snapshotStorageCapabilities(legacy)\nlegacy.records = true\nconsole.log('新增标志:', snapshot?.secondaryIndexes, snapshot?.changeFeed)\nconsole.log('记录能力:', legacy.records, snapshot?.records)\nconsole.log('独立记录:', snapshot !== legacy)\nconsole.log('冻结:', Object.isFrozen(snapshot))"
+        "import { snapshotStorageCapabilities } from '@migaia/storage-host/authoring/store'\n\nconst legacy = {\n  syncRead: true, binary: false, records: false, transactions: false,\n  iteration: false, opaqueEntries: false, maxValueBytes: undefined\n}\nconst snapshot = snapshotStorageCapabilities(legacy)\nlegacy.records = true\nconsole.log('new flags:', snapshot?.secondaryIndexes, snapshot?.changeFeed)\nconsole.log('record capability:', legacy.records, snapshot?.records)\nconsole.log('separate record:', snapshot !== legacy)\nconsole.log('frozen:', Object.isFrozen(snapshot))",
+        "import { snapshotStorageCapabilities } from '@migaia/storage-host/authoring/store'\n\nconst legacy = {\n  syncRead: true, binary: false, records: false, transactions: false,\n  iteration: false, opaqueEntries: false, maxValueBytes: undefined\n}\nconst snapshot = snapshotStorageCapabilities(legacy)\nlegacy.records = true\nconsole.log('新增标志:', snapshot?.secondaryIndexes, snapshot?.changeFeed)\nconsole.log('记录能力:', legacy.records, snapshot?.records)\nconsole.log('独立记录:', snapshot !== legacy)\nconsole.log('冻结:', Object.isFrozen(snapshot))"
       ),
       result: t(
         'Prints `new flags: false false`, `record capability: true false`, `separate record: true`, then `frozen: false`.\n\nThe captured flags retain their admission-time values after the original descriptor changes. Only secondaryIndexes and changeFeed default to false when absent. Invalid shapes or accessor failures return `undefined`; a successful snapshot remains mutable and does not create the declared capabilities.',

@@ -9,10 +9,10 @@ import {
   StorageContractErrorCode,
   type ITextChangeFeedApi,
   type IStorageChange,
-  type IStorageStore,
-  lockKey
+  type IStorageStore
 } from '@migaia/storage-contract'
-import { snapshotSyncWriteOptions } from '@migaia/storage-contract'
+import { lockKey } from '@migaia/storage-host/authoring/concurrency'
+import { snapshotSyncWriteOptions } from '@migaia/storage-host/authoring/context'
 import {
   resolveStorageNamespace,
   createBackendChangeIterator,

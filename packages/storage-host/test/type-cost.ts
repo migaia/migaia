@@ -5,14 +5,8 @@ import {
   memoryBackendPlugin
 } from '@migaia/storage-host'
 import { defineEntity } from '@migaia/storage-host/entity'
-import {
-  lockKey,
-  records,
-  rdf,
-  vector,
-  type IQuad,
-  type IVectorHit
-} from '@migaia/storage-contract'
+import { lockKey } from '../src/authoring/concurrency.js'
+import { records, rdf, vector, type IQuad, type IVectorHit } from '@migaia/storage-contract'
 
 /** A domain row retains exact field names through each public query family. */
 type ITypeCostRow = { id: string; name: string; active: boolean }

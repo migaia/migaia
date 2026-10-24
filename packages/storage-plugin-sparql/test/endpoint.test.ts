@@ -1,7 +1,7 @@
 import { createServer } from 'node:http'
 import { describe, it, expect } from 'vitest'
 import { Store } from 'oxigraph'
-import { term } from '@migaia/storage-contract'
+import { term } from '@migaia/storage-host/authoring/rdf'
 import { httpEndpoint } from '../src/http.js'
 import { oxigraphEndpoint } from '../src/oxigraph.js'
 describe('native endpoint adapters', () => {

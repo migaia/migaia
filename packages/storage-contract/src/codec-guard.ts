@@ -1,5 +1,5 @@
 import { StorageContractError, StorageContractErrorCode } from './errors.js'
-import type { ICodec } from './codec.js'
+import { type ICodec } from './codec.js'
 import { StorageContractErrorText } from './error-text.js'
 
 /** Validates codec metadata and callable conversion ports without copying or running the codec. */
@@ -20,14 +20,4 @@ export function assertCodec(codec: unknown): asserts codec is ICodec {
     throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
       cause: new TypeError(StorageContractErrorText.codecDescriptor)
     })
-}
-
-/**
- * Captures codec metadata and conversion function identities before callers retain a selected codec
- * across asynchronous work. Conversion remains with those original functions and no method runs
- * during admission.
- */
-export function snapshotCodec(codec: unknown): ICodec {
-  assertCodec(codec)
-  return { name: codec.name, output: codec.output, encode: codec.encode, decode: codec.decode }
 }
