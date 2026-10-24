@@ -1,3 +1,4 @@
+import type { IBackendValueCommit } from './core/backend-registry.js'
 import type { IBackendRevisionPort } from './backends/revisions.js'
 import type { IBackendKeyLockPort } from './backends/key-locks.js'
 import type { IStorageHooks, IStorageHookMap } from './hook-types.js'
@@ -16,9 +17,8 @@ import type { IScheduler } from '@migaia/utils/scheduler'
 import type { INativeAbortSignal } from '@migaia/utils/promise'
 import type {
   IBackendChangeController,
-  IBackendChangeControllerOptions,
-  IBackendValueCommit
-} from './core/change-controller.js'
+  IBackendChangeControllerOptions
+} from './core/change-types.js'
 import type {
   IOperationContext,
   ILockKey,
@@ -347,6 +347,8 @@ export type IStoragePluginCore<F extends IStorageFeatureRecord = {}> = Pick<
   'operation' | 'lifecycle' | 'onDispose' | 'usePipeline' | 'useAsyncPipeline'
 > &
   IStorageBorrowPort & {
+    /** Select journal code only from the explicit journal plugin in its original install scope. */
+    registerJournalRuntime(runtime: import('./journal/loader.js').IStorageJournalRuntime): void
     readonly journal?: import('./journal/types.js').IStorageJournalExecutionPort
     readonly defaultOrgId: string
     readonly execution: IStorageExecutionPort
@@ -361,8 +363,14 @@ export type IStoragePluginCore<F extends IStorageFeatureRecord = {}> = Pick<
     createOrgAuthoringPort(): IStorageOrgAuthoringPort
     /** Construct revision facts for one physical data universe during this installation window. */
     createRevisionPort(): IBackendRevisionPort
-    createChangeController(options: IBackendChangeControllerOptions): IBackendChangeController
-    registerChangeController(store: IStorageBase, controller: IBackendChangeController): void
+    createChangeController(
+      options: IBackendChangeControllerOptions,
+      factory: import('./core/change-types.js').IBackendChangeControllerFactory
+    ): IBackendChangeController
+    registerChangeController(
+      store: IStorageBase,
+      controller: import('./core/change-types.js').IBackendLifecycleController
+    ): void
     registerValueCommit(store: IStorageBase, commit: IBackendValueCommit): void
     /** Register immutable physical-org lookup and deletion only for this exact admitted store. */
     registerOrgBinding(store: IStorageBase, binding: IStorageOrgBinding): void
@@ -712,6 +720,7 @@ export type IStorageDefinePlugin = {
         | 'registerDetect'
         | 'getPublishedBackend'
         | 'createChangeController'
+        | 'registerJournalRuntime'
         | 'getOrgContext'
       > & { readonly features: IFeatureOutputs<F> }
     ) => IStorageNativePluginDescriptor & { readonly kind?: never },

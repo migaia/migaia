@@ -10,6 +10,7 @@ import type {
   IStorageFeatureStoreCompatibility
 } from '../types.js'
 import { createMemoryBackend, type IMemoryBackendStore, type IMemoryOptions } from './memory.js'
+import { readMemoryAssembly } from './memory-assembly.js'
 import { snapshotMemoryCapacity } from './memory-capacity.js'
 
 /** Exact memory token keeps native data and the original transaction owner in the neutral host. */
@@ -72,6 +73,7 @@ export function memoryBackendPlugin<
         id,
         features,
         capacity,
+        assembly: readMemoryAssembly(features),
         options: { namespace, concurrency, owner: label === undefined ? undefined : { label } }
       }
     } catch (cause) {
@@ -95,9 +97,15 @@ export function memoryBackendPlugin<
       capabilityInstaller: (_store: IMemoryBackendStore) => constructed!.installer,
       journalBinding: (_store: IMemoryBackendStore) => constructed!.journalBinding,
       install: () => {
-        constructed = createMemoryBackend(core, captured.options, captured.capacity)
+        constructed = createMemoryBackend(
+          core,
+          captured.options,
+          captured.capacity,
+          captured.assembly
+        )
         core.registerStore(constructed.store)
-        core.registerChangeController(constructed.store, constructed.controller)
+        if (captured.assembly.controller !== undefined)
+          core.registerChangeController(constructed.store, constructed.controller)
         core.registerOrgBinding(constructed.store, constructed.orgBinding)
         return {}
       }

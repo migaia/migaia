@@ -5,7 +5,7 @@ export type {
   IBackendChangeControllerOptions,
   IBackendChangeSnapshot,
   IBackendValueCommit
-} from '../core/change-controller.js'
+} from '../core/backend-registry.js'
 export {
   createStorageOperationReporter,
   createStorageOperationRuntime,

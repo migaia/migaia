@@ -16,6 +16,10 @@ export default defineConfig({
     lib: {
       entry: {
         index: 'src/index.ts',
+        'features/memory-notifications': 'src/features/memory-notifications.ts',
+        'features/memory-change-feed': 'src/features/memory-change-feed.ts',
+        'authoring/change-controller': 'src/authoring/change-controller.ts',
+        'authoring/change-iterator': 'src/authoring/change-iterator.ts',
         'authoring/capability': 'src/authoring/capability.ts',
         'authoring/store': 'src/authoring/store.ts',
         'authoring/blob': 'src/authoring/blob.ts',
