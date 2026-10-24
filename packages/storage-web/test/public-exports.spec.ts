@@ -81,11 +81,29 @@ describe('native Blob subpath', () => {
 describe('package-owner bundle boundary', () => {
   it('keeps canonical owner roots and subpaths external instead of bundling duplicate code', () => {
     const source = readBuiltJavaScript()
+    /** Explicit notifications borrow the host controller instead of embedding another owner. */
+    const notifications = readFileSync(
+      resolve(import.meta.dirname, '../dist/features/indexed-db-notifications.js'),
+      'utf8'
+    )
+    /** The host's stable authoring entry exposes the actual change-controller implementation. */
+    const controllerEntry = readFileSync(
+      resolve(import.meta.dirname, '../../storage-host/src/authoring/change-controller.ts'),
+      'utf8'
+    )
     expect(source).toContain('from "@migaia/utils/promise"')
     expect(source).toContain('from "@migaia/utils/bytes"')
-    expect(source).toContain('from "@migaia/event-subscriber"')
+    expect(source).toContain('from "@migaia/storage-host/authoring/change-controller"')
+    expect(notifications).toContain('from "@migaia/storage-host/authoring/change-controller"')
+    expect(notifications).toContain('from "@migaia/event-subscriber"')
+    expect(controllerEntry).toContain(
+      "export { createBackendChangeController } from '../core/change-controller.js'"
+    )
     expect(source).not.toContain('//#region ../utils/')
     expect(source).not.toContain('//#region ../event-subscriber/')
+    expect(source).not.toContain('//#region ../storage-host/')
+    expect(notifications).not.toContain('//#region ../event-subscriber/')
+    expect(notifications).not.toContain('//#region ../storage-host/')
     expect(source).not.toContain('[utils] operation aborted')
   })
 
