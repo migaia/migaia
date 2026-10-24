@@ -1,3 +1,6 @@
+import { memoryNotificationsFeature } from '../../src/features/memory-notifications.js'
+import { memoryChangeFeedFeature } from '../../src/features/memory-change-feed.js'
+import { createBackendChangeController } from '../../src/core/change-controller.js'
 import {
   createStorageHost,
   defineFeature,
@@ -10,7 +13,15 @@ import type { ICapabilityInstallPort, IKeyValueStore } from '@migaia/storage-con
 
 /** Built-in installation retains memory's record and synchronous native surface. */
 const builtInHost = await createStorageHost({
-  plugins: [memoryBackendPlugin({ id: 'cache' })] as const
+  plugins: [
+    memoryBackendPlugin(
+      { id: 'cache' },
+      {
+        notifications: memoryNotificationsFeature(),
+        changeFeed: memoryChangeFeedFeature()
+      }
+    )
+  ] as const
 })
 const builtInMemory = builtInHost.backend('cache')
 void builtInMemory.getRecord
@@ -78,7 +89,7 @@ definePlugin<
 /** Only the original backend installation can capture late physical-child construction authority. */
 declare const authorCore: IStoragePluginCore
 const childAuthoring = authorCore.createOrgAuthoringPort()
-childAuthoring.createChangeController({ backend: 'native' })
+childAuthoring.createChangeController({ backend: 'native' }, createBackendChangeController)
 childAuthoring.createKeyLockPort()
 // @ts-expect-error organization authoring grants no capability provider or installer.
 childAuthoring.registerStore(store)

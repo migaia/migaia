@@ -1,3 +1,5 @@
+import { memoryNotificationsFeature } from '../../src/features/memory-notifications.js'
+import { memoryChangeFeedFeature } from '../../src/features/memory-change-feed.js'
 import { describe, expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import {
@@ -10,7 +12,7 @@ import {
 import { term } from '../../src/authoring/rdf.js'
 import { createOrgId, createStorageHost, memoryBackendPlugin } from '../../src/index.js'
 import { createBackendChangeController } from '../../src/core/change-controller.js'
-import { createBackendChangeIterator } from '../../src/authoring/backend.js'
+import { createBackendChangeIterator } from '../../src/authoring/change-iterator.js'
 
 /** Native watch streams are invalidation hints from the same original commit controller. */
 describe('memory native text watch', () => {
@@ -37,7 +39,14 @@ describe('memory native text watch', () => {
   })
 
   it('reports late observer rejection once while preserving root and organization commits', async () => {
-    await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+    await using host = await createStorageHost({
+      plugins: [
+        memoryBackendPlugin(undefined, {
+          notifications: memoryNotificationsFeature(),
+          changeFeed: memoryChangeFeedFeature()
+        })
+      ]
+    })
     const root = host.backend('memory')
     const org = host.org(createOrgId()).backend('memory')
     const failures = [
@@ -63,7 +72,14 @@ describe('memory native text watch', () => {
   })
 
   it('exposes genuine text watch and coalesces only unconsumed matching invalidations', async () => {
-    await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+    await using host = await createStorageHost({
+      plugins: [
+        memoryBackendPlugin(undefined, {
+          notifications: memoryNotificationsFeature(),
+          changeFeed: memoryChangeFeedFeature()
+        })
+      ]
+    })
     const store = host.backend('memory')
     expect(asChangeFeedStore(store)).toBe(store)
     const events: IStorageChange[] = []
@@ -90,7 +106,12 @@ describe('memory native text watch', () => {
     const defaultOrg = createOrgId()
     await using host = await createStorageHost({
       org: defaultOrg,
-      plugins: [memoryBackendPlugin()]
+      plugins: [
+        memoryBackendPlugin(undefined, {
+          notifications: memoryNotificationsFeature(),
+          changeFeed: memoryChangeFeedFeature()
+        })
+      ]
     })
     const root = host.backend('memory')
     const other = host.org(org).backend('memory')
@@ -113,7 +134,14 @@ describe('memory native text watch', () => {
   })
 
   it('binds all three native query watches and rejects client predicates before subscribing', async () => {
-    await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+    await using host = await createStorageHost({
+      plugins: [
+        memoryBackendPlugin(undefined, {
+          notifications: memoryNotificationsFeature(),
+          changeFeed: memoryChangeFeedFeature()
+        })
+      ]
+    })
     const store = host.backend('memory')
     const feed = asChangeFeedStore(store)
     await using recordWatch = feed.use(records).query().watch()
@@ -146,7 +174,14 @@ describe('memory native text watch', () => {
   })
 
   it('wakes concurrent pending next calls on disposal and preserves main and symbolic promise identities', async () => {
-    await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+    await using host = await createStorageHost({
+      plugins: [
+        memoryBackendPlugin(undefined, {
+          notifications: memoryNotificationsFeature(),
+          changeFeed: memoryChangeFeedFeature()
+        })
+      ]
+    })
     const stream = host.backend('memory').watch('same')
     const first = stream.next()
     const second = stream.next()
@@ -162,7 +197,14 @@ describe('memory native text watch', () => {
   })
 
   it('retains original cancellation reasons, timeout and root-close failures without leaving reads pending', async () => {
-    await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+    await using host = await createStorageHost({
+      plugins: [
+        memoryBackendPlugin(undefined, {
+          notifications: memoryNotificationsFeature(),
+          changeFeed: memoryChangeFeedFeature()
+        })
+      ]
+    })
     const store = host.backend('memory')
     const cancellation = new AbortController()
     const reason = new Error('watch cancelled')

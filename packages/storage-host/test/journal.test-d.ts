@@ -1,3 +1,4 @@
+import { storageJournalPlugin } from '@migaia/storage-host/journal'
 import type {
   IStorageJournalBackendBinding,
   IStorageJournalNamespace,
@@ -16,7 +17,9 @@ import { storageLogStore } from '@migaia/storage-host/journal'
 
 /** Only actual admitted backend ids can select a private resource; org views grant no host close. */
 export async function compileStorageLogStore(): Promise<void> {
-  await using host = await createStorageHost({ plugins: [memoryBackendPlugin({ id: 'data' })] })
+  await using host = await createStorageHost({
+    plugins: [storageJournalPlugin(), memoryBackendPlugin({ id: 'data' })]
+  })
   await using log = await storageLogStore(host, 'data', { prefix: 'history' })
   const view = host.org(createOrgId())
   await using projected = await storageLogStore(view, 'data', { prefix: 'other' })

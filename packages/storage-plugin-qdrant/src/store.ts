@@ -1,3 +1,4 @@
+import { createBackendChangeController } from '@migaia/storage-host/authoring/change-controller'
 import { createLifecycleScope, createAbortController } from '@migaia/lifecycle'
 import {
   vector,
@@ -211,7 +212,7 @@ export function createQdrantBackend(
         backendContext.collections.clear()
       }
     }
-  })
+  }, createBackendChangeController)
   backendContext.root = forOrg(backendContext, backendContext.core.defaultOrgId)
   return {
     ...backendContext.root,

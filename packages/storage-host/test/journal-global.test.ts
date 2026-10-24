@@ -1,3 +1,6 @@
+import { storageJournalPlugin } from '../src/journal.js'
+import { memoryNotificationsFeature } from '../src/features/memory-notifications.js'
+import { memoryChangeFeedFeature } from '../src/features/memory-change-feed.js'
 import { describe, expect, it } from 'vitest'
 import { Logger } from '@migaia/logger'
 import { deferred } from '@migaia/utils/promise'
@@ -35,7 +38,13 @@ describe('global native storage journal', () => {
     const logs = new Map<string, ILogStore>()
     const initialized: string[] = []
     await using host = await createStorageHost({
-      plugins: [memoryBackendPlugin()],
+      plugins: [
+        storageJournalPlugin(),
+        memoryBackendPlugin(undefined, {
+          notifications: memoryNotificationsFeature(),
+          changeFeed: memoryChangeFeedFeature()
+        })
+      ],
       journal: async ({ orgId, storageLogStore }) => {
         initialized.push(orgId)
         const records = await storageLogStore('memory', { prefix: 'binlog' })
@@ -138,7 +147,16 @@ describe('global native storage journal', () => {
     const resume = deferred<void>()
     let pause = false
     await using host = await createStorageHost({
-      plugins: [memoryBackendPlugin({ capacity: { maxEntries: 2, eviction: 'lru' } })],
+      plugins: [
+        storageJournalPlugin(),
+        memoryBackendPlugin(
+          { capacity: { maxEntries: 2, eviction: 'lru' } },
+          {
+            notifications: memoryNotificationsFeature(),
+            changeFeed: memoryChangeFeedFeature()
+          }
+        )
+      ],
       journal: async ({ storageLogStore }) => {
         const records = await storageLogStore('memory', { prefix: 'capacity-binlog' })
         const images = await storageLogStore('memory', { prefix: 'capacity-undo' })
@@ -214,7 +232,13 @@ describe('global native storage journal', () => {
     const original = new RangeError('global initializer failed after opening its private namespace')
     await expect(
       createStorageHost({
-        plugins: [memoryBackendPlugin()],
+        plugins: [
+          storageJournalPlugin(),
+          memoryBackendPlugin(undefined, {
+            notifications: memoryNotificationsFeature(),
+            changeFeed: memoryChangeFeedFeature()
+          })
+        ],
         journal: async ({ storageLogStore }) => {
           acquired = await storageLogStore('memory', { prefix: 'failed-initializer' })
           throw original
@@ -227,7 +251,13 @@ describe('global native storage journal', () => {
   it('captures each native clear image while retaining original channel epochs and one clear event', async () => {
     let logger: ReturnType<typeof createJournalLogger> | undefined
     await using host = await createStorageHost({
-      plugins: [memoryBackendPlugin()],
+      plugins: [
+        storageJournalPlugin(),
+        memoryBackendPlugin(undefined, {
+          notifications: memoryNotificationsFeature(),
+          changeFeed: memoryChangeFeedFeature()
+        })
+      ],
       journal: async ({ storageLogStore }) => {
         const records = await storageLogStore('memory', { prefix: 'clear-binlog' })
         const images = await storageLogStore('memory', { prefix: 'clear-undo' })
@@ -324,7 +354,13 @@ describe('external storage binlog', () => {
       }
     }
     await using host = await createStorageHost({
-      plugins: [memoryBackendPlugin()],
+      plugins: [
+        storageJournalPlugin(),
+        memoryBackendPlugin(undefined, {
+          notifications: memoryNotificationsFeature(),
+          changeFeed: memoryChangeFeedFeature()
+        })
+      ],
       journal: { logger: borrowed, namespace: 'external' },
       report: (error) => {
         reports.push(error)

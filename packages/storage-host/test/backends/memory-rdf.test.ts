@@ -1,3 +1,5 @@
+import { memoryNotificationsFeature } from '../../src/features/memory-notifications.js'
+import { memoryChangeFeedFeature } from '../../src/features/memory-change-feed.js'
 import { describe, expect, it } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import {
@@ -24,7 +26,14 @@ function quad(subject: string, object: string, graph = term.defaultGraph): IQuad
 /** Actual installed native stores exercise RDF identity, namespace, draft and lock ownership. */
 describe('memory native RDF', () => {
   it('matches every bound-position subset through real fixed native indexes and preserves ground identity', async () => {
-    await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+    await using host = await createStorageHost({
+      plugins: [
+        memoryBackendPlugin(undefined, {
+          notifications: memoryNotificationsFeature(),
+          changeFeed: memoryChangeFeedFeature()
+        })
+      ]
+    })
     const api = host.backend('memory').use(rdf)
     const target = quad('a', 'b')
     const named: IQuad = { ...target, graph: term.iri('urn:graph') }
@@ -53,7 +62,14 @@ describe('memory native RDF', () => {
   })
 
   it('accepts legal large RDF literals through native query and deletion', async () => {
-    await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+    await using host = await createStorageHost({
+      plugins: [
+        memoryBackendPlugin(undefined, {
+          notifications: memoryNotificationsFeature(),
+          changeFeed: memoryChangeFeedFeature()
+        })
+      ]
+    })
     const api = host.backend('memory').use(rdf)
     const large: IQuad = { ...quad('large', 'unused'), object: term.literal('x'.repeat(1_048_577)) }
     await api.add([large])
@@ -68,7 +84,15 @@ describe('memory native RDF', () => {
     const defaultOrg = createOrgId()
     await using host = await createStorageHost({
       org: defaultOrg,
-      plugins: [memoryBackendPlugin({ namespace: 'configured' })]
+      plugins: [
+        memoryBackendPlugin(
+          { namespace: 'configured' },
+          {
+            notifications: memoryNotificationsFeature(),
+            changeFeed: memoryChangeFeedFeature()
+          }
+        )
+      ]
     })
     const orgA = createOrgId()
     const orgB = createOrgId()
@@ -97,7 +121,14 @@ describe('memory native RDF', () => {
   })
 
   it('shares the original transaction draft, rollback, conflict revisions and expired scope admission', async () => {
-    await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+    await using host = await createStorageHost({
+      plugins: [
+        memoryBackendPlugin(undefined, {
+          notifications: memoryNotificationsFeature(),
+          changeFeed: memoryChangeFeedFeature()
+        })
+      ]
+    })
     const store = host.backend('memory')
     const api = store.use(rdf)
     const a = quad('a', 'b')
@@ -152,7 +183,14 @@ describe('memory native RDF', () => {
   })
 
   it('reuses same-graph client traversal and canonical page cursors without claiming native traversal', async () => {
-    await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+    await using host = await createStorageHost({
+      plugins: [
+        memoryBackendPlugin(undefined, {
+          notifications: memoryNotificationsFeature(),
+          changeFeed: memoryChangeFeedFeature()
+        })
+      ]
+    })
     const api = host.backend('memory').use(rdf)
     const a = quad('a', 'b')
     const b = quad('b', 'c')
@@ -179,7 +217,15 @@ describe('memory native RDF', () => {
 
   it('uses the original logical RDF lock for root mutation and capacity victims', async () => {
     await using host = await createStorageHost({
-      plugins: [memoryBackendPlugin({ capacity: { maxEntries: 1 } })]
+      plugins: [
+        memoryBackendPlugin(
+          { capacity: { maxEntries: 1 } },
+          {
+            notifications: memoryNotificationsFeature(),
+            changeFeed: memoryChangeFeedFeature()
+          }
+        )
+      ]
     })
     const store = host.backend('memory')
     const changes: IStorageChange[] = []

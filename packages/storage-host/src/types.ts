@@ -400,7 +400,7 @@ export type IStorageNativePluginDescriptor<
   featureExpose?(): object
   capabilityInstaller?(store: S): ICapabilityInstallPort
   /** Capture original private journal I/O once after this exact store is admitted. */
-  journalBinding?(store: S): import('./journal/types.js').IStorageJournalBackendBinding
+  journalBinding?(store: S): import('./journal/types.js').IStorageJournalBackendBinding | undefined
 }
 export declare const storageBackendPluginExtensionsBrand: unique symbol
 /** Extensions are flat functions; the host supplies their organization call context. */

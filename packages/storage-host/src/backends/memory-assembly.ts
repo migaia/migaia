@@ -1,3 +1,4 @@
+import { inspectFeatures } from '@migaia/plugin-host/composition'
 import type { IStorageFeatureRecord } from '../types.js'
 import type { IBackendChangeControllerFactory } from '../core/change-types.js'
 import type { createBackendChangeIterator } from '../core/change-iterator.js'
@@ -21,7 +22,7 @@ export function readMemoryAssembly(features: IStorageFeatureRecord | undefined):
     controller?: IBackendChangeControllerFactory
     iterator?: typeof createBackendChangeIterator
   } = {}
-  for (const feature of Object.values(features ?? {})) {
+  for (const feature of inspectFeatures(features ?? {}).ordered) {
     /** Each explicit root contributes its single owning construction function. */
     const selected = memoryAssemblies.get(feature)
     if (selected?.controller !== undefined) assembly.controller = selected.controller

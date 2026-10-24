@@ -1,3 +1,4 @@
+import { createBackendChangeController } from '@migaia/storage-host/authoring/change-controller'
 import { createLifecycleScope, createAbortController } from '@migaia/lifecycle'
 import {
   rdf,
@@ -134,7 +135,7 @@ export function createSparqlBackend(endpoint: ISparqlEndpoint, core: IStoragePlu
         backendContext.stores.clear()
       }
     }
-  })
+  }, createBackendChangeController)
   backendContext.root = forOrg(backendContext, backendContext.core.defaultOrgId)
   return {
     ...backendContext.root,
