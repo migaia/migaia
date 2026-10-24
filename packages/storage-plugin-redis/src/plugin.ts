@@ -47,6 +47,7 @@ export function redisBackendPlugin<
         })
         return {}
       },
+      journalBinding: (_store: IRedisStore) => construction.journalBinding,
       capabilityInstaller: (_store: IRedisStore): ICapabilityInstallPort => construction.installer,
       featureExpose: () => ({ getClient: () => captured.driver })
     }

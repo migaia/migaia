@@ -1,3 +1,15 @@
+import type { ISqliteValue } from '../src/types.js'
+import { decodeFlatStorageKey } from '@migaia/storage-host/authoring/backend'
+import { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'
+import { Logger } from '@migaia/logger'
+import {
+  binlog,
+  undoLog,
+  wal,
+  memoryLogStore,
+  type ILogStore
+} from '@migaia/logger/plugins/durable'
+import { lockKey, ttl } from '@migaia/storage-contract'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -103,4 +115,284 @@ it('invalidates cached private indexes at org drop while keeping original busine
   } finally {
     await reopened.dispose()
   }
+})
+
+it.each([false, true])(
+  'restores external images, deadlines and revisions through native SQLite (wal:%s)',
+  async (walMode) => {
+    const directory = mkdtempSync(join(tmpdir(), 'migaia-sqlite-undo-'))
+    const connection = nodeSqliteDriver(join(directory, 'data.sqlite'))
+    const logger = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+      plugins: [
+        binlog({ store: memoryLogStore() }),
+        wal({ store: memoryLogStore() }),
+        undoLog({ store: memoryLogStore() })
+      ]
+    })
+    const host = await createStorageHost({
+      plugins: [sqliteBackendPlugin({ driver: connection, wal: walMode })] as const,
+      journal: { logger, namespace: 'external-native' }
+    })
+    onTestFinished(async () => {
+      await host.dispose()
+      await logger.shutdown('manual')
+      await connection.dispose()
+      rmSync(directory, { recursive: true, force: true })
+    })
+    const store = host.backend('sqlite')
+    const lastTx = async () =>
+      ((await logger.binlog.read(await logger.binlog.lastSeq()))[0]!.payload as { txId: string })
+        .txId
+    await store.set('text', 'before')
+    await store.setBytes('bytes', new Uint8Array([1]))
+    await store.putRecord(null, 'nullable')
+    await store.use(ttl).expire(lockKey.text('text'), 60000)
+    await store.transaction(async (scope) => {
+      await scope.set('text', 'middle')
+      await scope.set('text', 'after')
+      await scope.setBytes('bytes', new Uint8Array([2]))
+      await scope.set('created', 'new')
+      await scope.deleteRecord('nullable')
+      await scope.use(ttl).expire(lockKey.text('text'), 120000)
+    })
+    const txId = await lastTx()
+    let reads = 0
+    const undone = await store.undo(txId, {
+      get timeoutMs() {
+        reads++
+        return 60000
+      }
+    })
+    expect(reads).toBe(1)
+    expect(undone.txId).not.toBe(txId)
+    expect(await store.get('text')).toBe('before')
+    expect(await store.getBytes('bytes')).toEqual(new Uint8Array([1]))
+    expect(await store.get('created')).toBeNull()
+    expect(await store.getRecord('nullable')).toBeNull()
+    expect(await store.use(ttl).remaining(lockKey.text('text'))).toBeGreaterThan(0)
+    expect(await store.use(ttl).remaining(lockKey.text('text'))).toBeLessThan(60000)
+    expect(await logger.undo.get(undone.txId)).toBeDefined()
+    await expect(store.undo(txId)).rejects.toMatchObject({ code: 'UNDO_CONFLICT' })
+    await store.set('aba', 'one')
+    await store.set('aba', 'two')
+    const old = await lastTx()
+    await store.set('aba', 'three')
+    await store.set('aba', 'two')
+    await expect(store.undo(old)).rejects.toMatchObject({ code: 'UNDO_CONFLICT' })
+    expect(await store.get('aba')).toBe('two')
+    expect(connection.prepare('SELECT count(*) AS n FROM migaia_commit_markers').get()!.n).toBe(0)
+  }
+)
+
+it('keeps data and native binlog/undo indexes at the same actual memory commit', async () => {
+  const connection = nodeSqliteDriver(':memory:')
+  const logs: Array<{ dispose(): Promise<void> }> = []
+  const makeLogger = (changes: ILogStore, images: ILogStore) =>
+    new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+      plugins: [binlog({ store: changes }), undoLog({ store: images })]
+    })
+  let logger: ReturnType<typeof makeLogger> | undefined
+  const host = await createStorageHost({
+    plugins: [sqliteBackendPlugin({ driver: connection })] as const,
+    journal: async ({ storageLogStore: openNativeLog }) => {
+      const changes = await openNativeLog('sqlite', { prefix: 'native-binlog' })
+      const images = await openNativeLog('sqlite', { prefix: 'native-undo' })
+      logs.push(changes, images)
+      const current = new Logger({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+        plugins: [binlog({ store: changes }), undoLog({ store: images })]
+      })
+      logger = current
+      return {
+        logger: current,
+        namespace: 'same-native',
+        binlogValues: true,
+        atomicBinlog: { sqlite: changes },
+        atomicUndo: { sqlite: images }
+      }
+    }
+  })
+  onTestFinished(async () => {
+    await host.dispose()
+    await logger?.shutdown('manual')
+    await Promise.all(logs.map((store) => store.dispose()))
+    await connection.dispose()
+  })
+  const store = host.backend('sqlite')
+  const current = logger!
+  await store.set('point', 'before')
+  const before = await current.binlog.lastSeq()
+  await store.transaction(async (scope) => {
+    await scope.set('point', 'after')
+    expect(await current.binlog.lastSeq()).toBe(before)
+    expect(await current.undo.list()).toHaveLength(before)
+  })
+  expect(await current.binlog.lastSeq()).toBe(before + 1)
+  const txId = ((await current.binlog.read(before + 1))[0]!.payload as { txId: string }).txId
+  await store.undo(txId)
+  expect(await store.get('point')).toBe('before')
+  const committed = await current.binlog.lastSeq()
+  await expect(
+    store.transaction(async (scope) => {
+      await scope.set('point', 'rolled-back')
+      throw new RangeError('native rollback')
+    })
+  ).rejects.toMatchObject({ code: 'TRANSACTION_FAILED' })
+  expect(await store.get('point')).toBe('before')
+  expect(await current.binlog.lastSeq()).toBe(committed)
+  expect(() => store.sync!.set('sync-bypass', 'never')).toThrowError(
+    expect.objectContaining({ code: 'ASYNC_STAGE_IN_SYNC_ENTRY' })
+  )
+  expect(await store.get('sync-bypass')).toBeNull()
+  expect(await current.binlog.lastSeq()).toBe(committed)
+  await store.transaction(async (scope) => {
+    await scope.set('ordered', 'first')
+    await scope.putRecord({ value: 'record' }, 'ordered-record')
+    await scope.set('tail', 'third')
+    await scope.set('ordered', 'last')
+  })
+  const ordered = (await current.binlog.read(await current.binlog.lastSeq()))[0]!.payload as {
+    txId: string
+    changes: Array<{ target: { channel: string; key: string }; value: string }>
+  }
+  expect(
+    ordered.changes.map((change) => [
+      change.target.channel,
+      decodeFlatStorageKey(change.target.key)
+    ])
+  ).toEqual([
+    ['text', 'ordered'],
+    ['record', 'ordered-record'],
+    ['text', 'tail'],
+    ['text', 'ordered']
+  ])
+  const wire = defineCollectionsJsonCodec({ version: 1 })
+  expect(
+    ordered.changes
+      .filter((change) => change.target.channel === 'text')
+      .map((change) => JSON.parse((wire.decode(change.value) as { value: string }).value))
+  ).toEqual(['first', 'third', 'last'])
+  await store.undo(ordered.txId)
+  expect(await store.get('ordered')).toBeNull()
+  expect(await store.getRecord('ordered-record')).toBeUndefined()
+  expect(await store.get('tail')).toBeNull()
+})
+
+it('keeps revision births unique after upgrading an old private layout and dropping its org', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'migaia-sqlite-revision-birth-'))
+  const connection = nodeSqliteDriver(join(directory, 'data.sqlite'))
+  connection.exec(
+    'CREATE TABLE migaia_revisions(org_id TEXT NOT NULL,key TEXT NOT NULL,revision INTEGER NOT NULL,PRIMARY KEY(org_id,key))'
+  )
+  const orgId = createOrgId()
+  const logger = new Logger({
+    execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+    plugins: [
+      binlog({ store: memoryLogStore() }),
+      wal({ store: memoryLogStore() }),
+      undoLog({ store: memoryLogStore() })
+    ]
+  })
+  const host = await createStorageHost({
+    org: orgId,
+    plugins: [sqliteBackendPlugin({ driver: connection })] as const,
+    journal: { logger, namespace: 'old-native-layout' }
+  })
+  onTestFinished(async () => {
+    await host.dispose()
+    await logger.shutdown('manual')
+    await connection.dispose()
+    rmSync(directory, { recursive: true, force: true })
+  })
+  const store = host.backend('sqlite')
+  await store.set('point', 'old-before')
+  await store.set('point', 'after')
+  const txId = (
+    (await logger.binlog.read(await logger.binlog.lastSeq()))[0]!.payload as { txId: string }
+  ).txId
+  const first = connection
+    .prepare('SELECT birth FROM migaia_revisions WHERE org_id=?')
+    .all(orgId)
+    .map((row) => row.birth)
+  expect(first.every((birth) => typeof birth === 'string' && birth.length > 0)).toBe(true)
+  await host.dropOrg(orgId)
+  await store.set('point', 'new-before')
+  await store.set('point', 'after')
+  const next = connection
+    .prepare('SELECT birth FROM migaia_revisions WHERE org_id=?')
+    .all(orgId)
+    .map((row) => row.birth)
+  expect(
+    next.every((birth) => typeof birth === 'string' && birth.length > 0 && !first.includes(birth))
+  ).toBe(true)
+  await expect(store.undo(txId)).rejects.toMatchObject({ code: 'UNDO_CONFLICT' })
+  expect(await store.get('point')).toBe('after')
+})
+
+it('recovers a committed marker after a lost native COMMIT acknowledgement without replaying data', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'migaia-sqlite-wal-recovery-'))
+  const connection = nodeSqliteDriver(join(directory, 'data.sqlite'))
+  let failCommit = false
+  const original = new RangeError('lost native COMMIT reply')
+  const driver = {
+    exec: (sql: string) => connection.exec(sql),
+    prepare: (sql: string) => {
+      const statement = connection.prepare(sql)
+      return sql !== 'COMMIT'
+        ? statement
+        : {
+            ...statement,
+            run: (...values: readonly ISqliteValue[]) => {
+              const result = statement.run(...values)
+              if (
+                failCommit &&
+                connection.prepare('SELECT count(*) AS n FROM migaia_commit_markers').get()!.n !== 0
+              ) {
+                failCommit = false
+                throw original
+              }
+              return result
+            }
+          }
+    }
+  }
+  const logger = new Logger({
+    execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+    plugins: [
+      binlog({ store: memoryLogStore() }),
+      wal({ store: memoryLogStore() }),
+      undoLog({ store: memoryLogStore() })
+    ]
+  })
+  const open = () =>
+    createStorageHost({
+      plugins: [sqliteBackendPlugin({ driver })] as const,
+      journal: { logger, namespace: 'native-marker-recovery' }
+    })
+  let host = await open()
+  onTestFinished(async () => {
+    await host.dispose()
+    await logger.shutdown('manual')
+    await connection.dispose()
+    rmSync(directory, { recursive: true, force: true })
+  })
+  await host.backend('sqlite').set('point', 'before')
+  failCommit = true
+  await expect(host.backend('sqlite').set('point', 'after')).rejects.toMatchObject({
+    code: 'TRANSACTION_FAILED'
+  })
+  expect(await logger.wal.pending()).toHaveLength(1)
+  const markerCount = connection.prepare('SELECT count(*) AS n FROM migaia_commit_markers').get()!.n
+  expect(markerCount).toBe(1)
+  await host.dispose()
+  host = await open()
+  expect(await host.backend('sqlite').get('point')).toBe('after')
+  expect(await logger.wal.pending()).toHaveLength(0)
+  expect(await logger.binlog.lastSeq()).toBe(2)
+  expect(connection.prepare('SELECT count(*) AS n FROM migaia_commit_markers').get()!.n).toBe(0)
+  const txId = ((await logger.binlog.read(2))[0]!.payload as { txId: string }).txId
+  await host.backend('sqlite').undo(txId)
+  expect(await host.backend('sqlite').get('point')).toBe('before')
 })

@@ -117,6 +117,8 @@ export type IStorageJournalChange = Readonly<{
 }>
 /** One admitted descriptor closes over its original native transaction and immutable org projection. */
 export type IStorageJournalBackendBinding = {
+  /** This original native owner requires the existing explicit indexedDbUndo configuration. */
+  readonly requiresIndexedDbUndo?: true
   /** Original native owner can await external intent I/O after producing final business images. */
   readonly externalWal?: true
   /** Map private image identities onto their original canonical point lock, without granting locks. */

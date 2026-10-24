@@ -5,7 +5,7 @@ import type { IOperationContext } from '@migaia/storage-contract'
 import { redisBackendKind } from '../plugin.js'
 import { readNativeFeaturePort } from '../native-feature.js'
 import { featureName, featureInteger, featureMember, readFeatureMember } from '../feature-input.js'
-import { replyInteger, replyString } from '../layout.js'
+import { RedisSuffix, replyInteger, replyString } from '../layout.js'
 import { invalidArgument, redisError } from '../errors.js'
 import { RedisErrorCode } from '../error-code.js'
 /** Native equal-score ordering follows the original canonical UTF-16 member encoding. */
@@ -65,7 +65,7 @@ export function redisSortedSetsFeature() {
                   replyInteger(
                     await connection.command([
                       RedisCommand.zadd,
-                      layout.tag + ':sorted:' + layout.encode(featureName(input.name)),
+                      layout.feature(RedisSuffix.sorted, featureName(input.name)),
                       ...input.entries.flatMap((entry) => {
                         if (!Number.isFinite(entry.score)) throw invalidArgument()
                         return [String(entry.score), featureMember(entry.member)]
@@ -84,7 +84,7 @@ export function redisSortedSetsFeature() {
                 async (input, connection, layout) => {
                   const result = await connection.command([
                     RedisCommand.zrank,
-                    layout.tag + ':sorted:' + layout.encode(featureName(input.name)),
+                    layout.feature(RedisSuffix.sorted, featureName(input.name)),
                     featureMember(input.member)
                   ])
                   return result === null ? undefined : replyInteger(result)
@@ -102,7 +102,7 @@ export function redisSortedSetsFeature() {
                 async (actual, connection, layout) => {
                   const result = await connection.command([
                     RedisCommand.zrange,
-                    layout.tag + ':sorted:' + layout.encode(featureName(actual.name)),
+                    layout.feature(RedisSuffix.sorted, featureName(actual.name)),
                     '0',
                     String(featureInteger(actual.count) - 1),
                     RedisCommand.withscores

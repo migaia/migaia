@@ -213,3 +213,7 @@ try {
   await host.dispose()
 }
 ```
+
+IndexedDB supports `storageLogStore(hostOrOrg, 'indexed-db', { prefix })` from `@migaia/storage-host/journal`. Its private rows use an array-key namespace in the existing META store. Business `clearAll` leaves history intact; organization deletion invalidates old cached log handles, while the original business view can reopen. Dispose a log before opening the same physical organization and prefix again. Native transactions commit head/state/records together and publish the cached index from the actual complete event.
+
+For the realm's persistent IndexedDB factory, native Web Locks keep that resource exclusive across participating pages for its whole lifetime. A conflicting open rejects with LOCK_REJECTED. Without Web Locks, the cached log combination rejects with UNSUPPORTED_CAPABILITY before recovery I/O; ordinary IndexedDB operations remain available. An injected factory also uses native Web Locks when available. Without them, it requires an explicit `journalFactoryIsPrivate: true` declaration that the data universe is confined to this realm and does not forward a shared persistent database; only that supported private combination uses the original logical lock owner. Object identity alone never proves isolation. This namespace support does not enable automatic global capture or opt-in undo by itself.

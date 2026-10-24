@@ -57,6 +57,7 @@
     "@migaia/utils": "workspace:^"
   },
   "devDependencies": {
+    "@migaia/logger": "workspace:^",
     "@migaia/store-light": "workspace:^",
     "@migaia/store-persist": "workspace:^"
   },

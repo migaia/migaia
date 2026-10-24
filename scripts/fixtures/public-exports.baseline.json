@@ -1777,6 +1777,7 @@
         "memoryBackendPlugin"
       ],
       "./authoring/backend": [
+        "StorageJournalLock",
         "assertKeyRange",
         "asyncDisposeKey",
         "collectUniqueIndexOwners",
@@ -1786,7 +1787,9 @@
         "createStorageOperationRuntime",
         "createStorageToken",
         "decodeFlatStorageKey",
+        "decodeStorageJournalImage",
         "encodeFlatStorageKey",
+        "encodeStorageJournalImage",
         "invokeExtension",
         "isStorageErrorFamily",
         "isStorageKeyInRange",
@@ -1799,6 +1802,7 @@
         "resolveStorageNamespace",
         "safeJsonPayloadByteLength",
         "snapshotKeyRange",
+        "storageJournalLockKey",
         "subscribeToAbort",
         "throwIfAborted",
         "withAbort"
@@ -1821,6 +1825,9 @@
         "selectCodec",
         "structuredCodec"
       ]
+    },
+    "@migaia/storage-plugin-cache": {
+      ".": ["CacheErrorCode", "CacheWriteMode", "ERROR_SOURCE", "cacheBackendKind", "cacheKey"]
     },
     "@migaia/storage-plugin-qdrant": {
       ".": ["ERROR_SOURCE", "QdrantErrorCode", "qdrantBackendKind", "qdrantBackendPlugin"],

@@ -22,6 +22,13 @@ export function snapshotStorageJournalBinding(
 ): IStorageJournalBackendBinding {
   try {
     const result = Object.create(null) as Record<string, unknown>
+    /** Native authors declare this finite opt-in fact; backend names do not imply it. */
+    const requiresIndexedDbUndo = input?.requiresIndexedDbUndo
+    if (requiresIndexedDbUndo !== undefined) {
+      if (requiresIndexedDbUndo !== true)
+        throw new StorageContractError(StorageContractErrorCode.invalidArgument)
+      result.requiresIndexedDbUndo = true
+    }
     /** This fact belongs to the original factory, not the backend name or nativeAtomic flag. */
     const externalWal = input?.externalWal
     if (externalWal !== undefined) {

@@ -75,6 +75,87 @@ for (const url of [
         await host.dispose()
       }
     })
+    it('drops historical native business keys without selecting their Features after reopening', async () => {
+      if (!pool.isOpen) await pool.connect()
+      const prefix = crypto.randomUUID(),
+        a = createOrgId(),
+        b = createOrgId(),
+        layoutA = createRedisLayout(prefix, a),
+        layoutB = createRedisLayout(prefix, b)
+      const host = await createStorageHost({
+        plugins: [
+          redisBackendPlugin(
+            { driver, prefix },
+            {
+              streams: redisStreamsFeature(),
+              sorted: redisSortedSetsFeature(),
+              rate: redisRateLimitFeature({ limit: 3, windowMs: 60000 }),
+              history: redisChangeStreamFeature({ maxLen: 1000 })
+            }
+          )
+        ] as const
+      })
+      try {
+        for (const org of [a, b]) {
+          const store = host.org(org).backend('redis')
+          await store.api.streams.add('jobs', { body: new Uint8Array([1]) })
+          await store.api.sortedSets.add('scores', [{ member: 'one', score: 1 }])
+          await store.api.rateLimit.consume('quota')
+          await store.set('standard', 'history')
+        }
+        for (const layout of [layoutA, layoutB])
+          for (const [channel, name] of [
+            ['streams', 'jobs'],
+            ['sorted', 'scores'],
+            ['rate', 'quota']
+          ] as const)
+            expect(await driver.command(['EXISTS', layout.feature(channel, name)])).toBe(1)
+        await driver.command(['SET', layoutA.tag + ':caller:keep', 'unmanaged'])
+        await driver.command([
+          'SET',
+          layoutA.feature('streams', ['not-a-feature-name']),
+          'unmanaged'
+        ])
+        const length = await driver.command(['XLEN', layoutA.durableChanges])
+        await host.dispose()
+        const reopened = await createStorageHost({
+          plugins: [redisBackendPlugin({ driver, prefix })] as const
+        })
+        try {
+          await reopened.dropOrg(a)
+        } finally {
+          await reopened.dispose()
+        }
+        for (const [channel, name] of [
+          ['streams', 'jobs'],
+          ['sorted', 'scores'],
+          ['rate', 'quota']
+        ] as const) {
+          expect(await driver.command(['EXISTS', layoutA.feature(channel, name)])).toBe(0)
+          expect(await driver.command(['EXISTS', layoutB.feature(channel, name)])).toBe(1)
+        }
+        expect(await driver.command(['GET', layoutA.tag + ':caller:keep'])).toBe('unmanaged')
+        expect(
+          await driver.command(['GET', layoutA.feature('streams', ['not-a-feature-name'])])
+        ).toBe('unmanaged')
+        expect(await driver.command(['XLEN', layoutA.durableChanges])).toBe(length)
+      } finally {
+        await host.dispose()
+        let cursor = '0'
+        do {
+          const reply = (await driver.command([
+            'SCAN',
+            cursor,
+            'MATCH',
+            layoutA.tag + ':*',
+            'COUNT',
+            '256'
+          ])) as [string, string[]]
+          cursor = reply[0]
+          if (reply[1].length) await driver.command(['DEL', ...reply[1]])
+        } while (cursor !== '0')
+      }
+    })
     it('runs real streams, group claim/ack, PubSub, UTF16 sorted ties and atomic fixed windows', async () => {
       if (!pool.isOpen) await pool.connect()
       const commands: import('../src/hooks.js').IRedisCommandHookPayload[] = [],

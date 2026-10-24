@@ -253,3 +253,13 @@ PENDING-USER-REVIEW：dropOrg 遇到存活的全局 journal 时，原私有 name
 后端作者的原 `execution` 接点可用 `keys?:()=>readonly ILockKey[]` 提供已规范的原生身份，`internal?:true` 排除私有日志及已由外层覆盖的执行；orgId 由原不可变闭包补入。需要多次原 attempt 的终点用可选 `execution.observe(describe, invoke)` 包住原完整循环，invoke 的 boolean 仅表示是否需要采集观察事实，未启用时直接调用原工作；内层原 pipeline 保持且标 internal。memory 已验证一次真实重试只输出一个事务条目、无子操作重复。其它后端继续由各自原 owner 提供完整事实。
 
 `@migaia/storage-host/authoring/backend` 的 `createBackendJournalNamespace(options)` 复用原 namespace 资源 reservation、quiescence 排空和双释放 Promise；memory 的私有 namespace 已直接消费。`IBackendJournalNamespaceOptions` 只借用原 assertLive/closingSignal/report、nativeAtomic/indexExclusive、reserve、authenticate(scope) 和原 transaction。`IBackendJournalTransaction` 仅有私有 run(viewWork) 与 onCommit/onRollback/onEnd 观察，无原生句柄、commit 或后端关闭权；onEnd 在结果未知时也仅排空，不冒充 rollback。数据、代际、跨实例独占和实际终态仍归原后端。
+
+同作者入口重导原 `storageJournalLockKey(prefix, part)` 与 `StorageJournalLock`（head/resource）。后端把这一个规范身份交给原并发 provider，普通私有事务和同原生 append 共用相同 head，资源持有另用 resource；函数只产生只读逻辑 key，不授予获取锁、安装或关闭权限。空 prefix 或非法 part 按原 INVALID_ARGUMENT 拒绝，不复制锁元组编码。
+
+首个显式组织终点的 telemetry 等原操作内的 journal prepare 完成后，读取同一 org cell 的配置；观察本身不额外 prepare、不开新预算，首事务也不漏记。已经明确关闭时仍直接进入原工作且不生成普通日志条目。
+
+选择全局 `journal` 后，既有 bootstrap 会安装异步 stage。公开 `sync.set`、`sync.remove`、`sync.clearValues` 在修改数据或历史前报原 ASYNC_STAGE_IN_SYNC_ENTRY。同一 stage 目前也拒绝同步读取，包括仅启用遥测的配置。此组合使用异步方法；未选 journal 的宿主保留原同步方法。同步日志写入需要既有 logger 拥有者提供真实同步 append 完成接点。
+
+`/authoring/backend` 的 `encodeStorageJournalImage(present, value?, bytes?)` 与 `decodeStorageJournalImage(image, bytes?)` 为原生 adapter 复用原 memory 可移植镜像 codec。缺失与存在的 null 保持区分；字节镜像沿既有 base64 拥有者处理。codec id/version 与原 serialize 错误均不变。Memory 消费同一实现；调用方不获得原生、提交或安装权限。
+
+原生 binding 可声明 `requiresIndexedDbUndo?: true`，原 descriptor 快照单读并冻结该事实。当借用 logger 含 undo 时，同一配置拥有者要求 `indexedDbUndo: true`，缺省或 false 在打开原生终点前报 UNSUPPORTED_CAPABILITY。其它后端 binding 保持原缺省语义，仅 binlog 或仅遥测的配置不要求 undo 选择。

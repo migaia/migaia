@@ -1,8 +1,27 @@
 import type { ICaseDoc, IText } from './contract.js'
 /** Keep the two languages attached to one runnable public-entry scenario. */
 const t = (en: string, zh: string): IText => ({ en, zh })
+/** Both author functions share one actual portable image round-trip scenario. */
+const portableImageCases: readonly ICaseDoc[] = [
+  {
+    title: t('Round-trip a portable native image', '往返可移植原生镜像'),
+    problem: t(
+      'Native adapters need the original durable codec without copying a memory implementation.',
+      '原生 adapter 需要原持久 codec，无需复制 memory 实现。'
+    ),
+    example: `import { encodeStorageJournalImage, decodeStorageJournalImage } from '@migaia/storage-host/authoring/backend'
+const image = encodeStorageJournalImage(true, { value: null })
+console.log(decodeStorageJournalImage(image).value)`,
+    result: t(
+      'Prints { value: null }; absence, bytes, codec identity/version and original codec errors retain their existing semantics.',
+      '输出 { value: null }；缺失、字节、codec 身份/版本及原 codec 错误保持原语义。'
+    )
+  }
+]
 /** Application extensions retain their exact inputs while the host owns installation and cleanup. */
 export const storageHostCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
+  encodeStorageJournalImage: portableImageCases,
+  decodeStorageJournalImage: portableImageCases,
   IStorageFeatureClientResolver: [
     {
       title: t('Declare a finite native client resolver', '声明有限原生客户端选择'),
@@ -432,8 +451,8 @@ await using host = await createStorageHost({
 try { await host.backend('memory').set('status', 'ready') }
 finally { for (const logger of borrowed) await logger.shutdown('manual') }`,
       result: t(
-        'The value and one storage.commit share the original native commit. Host owns private handles; the application still closes borrowed loggers. The memory namespace uses the same createBackendJournalNamespace resource owner as native adapters. A namespace declaring indexExclusive:false rejects cached log construction before recovery I/O. Native clear retains per-row images, original epochs and one clear event. Without atomicBinlog the external append starts only after COMMIT; a false-atomic terminal is accepted only for this pure commit-only combination; failure reports without changing committed success. External WAL persists intent before data/marker commit and recovers only the complete fixed target. Native memory undo validates all full revisions and values before one new original commit. External undo requires WAL and original marker ports, preserving pending intent until complete mirror publication; exact repeated mirrors are idempotent. Telemetry uses the actual level plugin, preserves payload/Error references and observes one complete public retry loop. Blob capture and redo remain unfinished.',
-        '值与一条 storage.commit 共用原 native 提交；宿主拥有私有句柄，应用仍关闭借用 logger。memory namespace 与 native adapter 复用同 createBackendJournalNamespace 资源拥有者；namespace 声明 indexExclusive:false 时在恢复 I/O 前拒绝缓存日志构造。原生 clear 保留逐项镜像、原 epoch 与一次 clear 事件。未选 atomicBinlog 时仅 COMMIT 后外置追加；false-atomic terminal 只准入此纯提交后组合，失败报告且不改变已提交成功。外置 WAL 在业务/marker 提交前持久化 intent，恢复只处理完整固定目标。memory 原生 undo 在一次新原提交前比较全部完整修订和值；外置 undo 要求 WAL 与原 marker 端口，完整镜像发布前保 pending，重复镜像仅内容相等时幂等略过；telemetry 复用真实 level 插件，保留 payload/原 Error 并观察一次完整公开重试循环；blob 捕获与 redo 尚未完成。'
+        'The value and one storage.commit share the original native commit. Host owns private handles; the application still closes borrowed loggers. The memory namespace uses the same createBackendJournalNamespace resource owner and canonical storageJournalLockKey head/resource identities as native adapters. A namespace declaring indexExclusive:false rejects cached log construction before recovery I/O. Native clear retains per-row images, original epochs and one clear event. Without atomicBinlog the external append starts only after COMMIT; a false-atomic terminal is accepted only for this pure commit-only combination; failure reports without changing committed success. External WAL persists intent before data/marker commit and recovers only the complete fixed target. Native memory undo validates all full revisions and values before one new original commit. External undo requires WAL and original marker ports, preserving pending intent until complete mirror publication; exact repeated mirrors are idempotent. Telemetry uses the actual level plugin, preserves payload/Error references and observes one complete public retry loop. Blob capture and redo remain unfinished.',
+        '值与一条 storage.commit 共用原 native 提交；宿主拥有私有句柄，应用仍关闭借用 logger。memory namespace 与 native adapter 复用同 createBackendJournalNamespace 资源拥有者和 storageJournalLockKey head/resource 规范身份；namespace 声明 indexExclusive:false 时在恢复 I/O 前拒绝缓存日志构造。原生 clear 保留逐项镜像、原 epoch 与一次 clear 事件。未选 atomicBinlog 时仅 COMMIT 后外置追加；false-atomic terminal 只准入此纯提交后组合，失败报告且不改变已提交成功。外置 WAL 在业务/marker 提交前持久化 intent，恢复只处理完整固定目标。memory 原生 undo 在一次新原提交前比较全部完整修订和值；外置 undo 要求 WAL 与原 marker 端口，完整镜像发布前保 pending，重复镜像仅内容相等时幂等略过；telemetry 复用真实 level 插件，保留 payload/原 Error 并观察一次完整公开重试循环；blob 捕获与 redo 尚未完成。'
       )
     },
 

@@ -47,7 +47,12 @@ export const RedisSuffix = {
   vectorCollection: 'collection',
   vectorOrg: 'org',
   vector: 'v',
-  vectorIndex: 'vi'
+  vectorIndex: 'vi',
+  /** Native Feature channels share this physical layout with historical org removal. */
+  streams: 'streams',
+  sorted: 'sorted',
+  rate: 'rate',
+  pubsub: 'pubsub'
 } as const
 /**
  * Original portable JSON bytes have one physical presentation for collection, ID and scalar path
@@ -83,6 +88,8 @@ export function createRedisLayout(prefix: string, orgId: string) {
       const encoded = physical.slice(physical.lastIndexOf(':') + 1)
       return encoded >= lower && encoded < upper
     },
+    feature: (channel: 'streams' | 'sorted' | 'rate' | 'pubsub', name: IStorageKey): string =>
+      tag + ':' + channel + ':' + encode(name),
     vectorPrefix: (collection: string): string =>
       tag + ':' + RedisSuffix.vector + ':' + redisPortableIdentity(collection) + ':',
     vectorPoint: (collection: string, id: string): string =>

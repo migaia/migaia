@@ -114,12 +114,7 @@ import { rankMemoryVectors, recommendStorageVector } from './vector-core.js'
 import { createMemoryRdfIndex, memoryRdfKeys, type IMemoryRdfKeys } from './rdf-core.js'
 import { createMemoryBlobData } from './memory-blob.js'
 import { createMemoryJournalData, type IMemoryJournalTransaction } from './memory-journal.js'
-import {
-  decodeMemoryJournalImage,
-  encodeMemoryJournalImage,
-  memoryJournalDeadlineTarget,
-  snapshotMemoryJournalTarget
-} from './memory-journal-image.js'
+import { memoryJournalDeadlineTarget, snapshotMemoryJournalTarget } from './memory-journal-image.js'
 import type {
   IStorageJournalBackendBinding,
   IStorageJournalChange,
@@ -128,6 +123,7 @@ import type {
 } from '../journal/types.js'
 import type { ILogPayload } from '@migaia/logger/plugins/durable'
 import { storageJournalLockKey, StorageJournalLock } from '../journal/keys.js'
+import { encodeStorageJournalImage, decodeStorageJournalImage } from '../journal/image.js'
 import { detectServerRuntime } from '@migaia/utils'
 import { isUint8Array, utf8ByteLength } from '@migaia/utils/bytes'
 import { StorageError, StorageErrorCode, type IStorageChannel } from '../errors.js'
@@ -2303,8 +2299,8 @@ function createMemoryNamespace<T>(
         current !== undefined &&
         (current.deadline === undefined || current.deadline > scheduler.now())
       return row.metadata
-        ? encodeMemoryJournalImage(present && current!.deadline !== undefined, current?.deadline)
-        : encodeMemoryJournalImage(
+        ? encodeStorageJournalImage(present && current!.deadline !== undefined, current?.deadline)
+        : encodeStorageJournalImage(
             present,
             row.channel === 'rdf' ? true : current?.value,
             row.channel === 'bytes'
@@ -2313,7 +2309,7 @@ function createMemoryNamespace<T>(
     /** Restore through original staging, cloning, channel-conflict, TTL and RDF admission owners. */
     const writeJournalImage = (input: IStorageJournalTarget, image: IStorageJournalImage): void => {
       const row = journalRow(input)
-      const captured = decodeMemoryJournalImage(image, row.channel === 'bytes' && !row.metadata)
+      const captured = decodeStorageJournalImage(image, row.channel === 'bytes' && !row.metadata)
       const value = captured.value
       if (row.metadata) {
         if (value !== undefined && (typeof value !== 'number' || !Number.isFinite(value)))
@@ -2413,12 +2409,12 @@ function createMemoryNamespace<T>(
       /** All image encoding finishes before either a draft row or the ordered fact list changes. */
       const proposed: Array<Omit<IStorageJournalChange, 'afterRevision'>> = []
       if (!metadataOnly || entry.remove) {
-        const beforeImage = encodeMemoryJournalImage(
+        const beforeImage = encodeStorageJournalImage(
           before !== undefined,
           entry.channel === 'rdf' ? true : before?.value,
           entry.channel === 'bytes'
         )
-        const afterImage = encodeMemoryJournalImage(
+        const afterImage = encodeStorageJournalImage(
           after !== undefined,
           entry.channel === 'rdf' ? true : after?.value,
           entry.channel === 'bytes'
@@ -2430,8 +2426,8 @@ function createMemoryNamespace<T>(
         proposed.push(
           Object.freeze({
             target: memoryJournalDeadlineTarget(target),
-            before: encodeMemoryJournalImage(before?.deadline !== undefined, before?.deadline),
-            after: encodeMemoryJournalImage(after?.deadline !== undefined, after?.deadline)
+            before: encodeStorageJournalImage(before?.deadline !== undefined, before?.deadline),
+            after: encodeStorageJournalImage(after?.deadline !== undefined, after?.deadline)
           })
         )
       journalChanges.push(...proposed)
