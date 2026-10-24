@@ -1,13 +1,23 @@
 import { entityMigrationFeature } from '@migaia/storage-host/entity/migration'
-import { describe, expect, it } from 'vitest'
-import { defineEntity } from '../../src/entity.js'
+import { afterEach, describe, expect, it } from 'vitest'
+import { defineEntity } from '@migaia/storage-host/entity'
 import { entityUniqueFeature } from '@migaia/storage-host/entity/unique'
 import { entityQueryFeature } from '@migaia/storage-host/entity/query'
 import { entityIndexesFeature } from '@migaia/storage-host/entity/indexes'
 import { entityKeysetFeature } from '@migaia/storage-host/entity/keyset'
 import { StorageErrorCode } from '../../src/error-code.js'
-import { STORAGE_HOST_SOURCE } from '../../src/errors.js'
-import { memoryBackend } from '../helpers/memory.js'
+import { createStorageHost, memoryBackendPlugin, STORAGE_HOST_SOURCE } from '@migaia/storage-host'
+/** These public-entry cases keep one emitted package identity for host, transactions and entities. */
+const hosts: Array<{ dispose(): Promise<void> }> = []
+afterEach(async () => {
+  for (const host of hosts.splice(0).reverse()) await host.dispose()
+})
+/** Exercise actual package exports without mixing their transaction identity with source fixtures. */
+async function memoryBackend() {
+  const host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+  hosts.push(host)
+  return host.backend('memory')
+}
 
 /** Business records keep the same fixture across basic and explicitly assembled repositories. */
 type IRow = { id: string; group: string }
@@ -84,9 +94,10 @@ describe('explicit entity assembly', () => {
     }).connect(await memoryBackend())
     await repository.put({ id: 'a', group: 'one' })
     await repository.put({ id: 'b', group: 'two' })
-    const first = await repository.query().page(1)
+    const query = repository.query()
+    const first = await query.page(1)
     expect(first.items).toEqual([{ id: 'a', group: 'one' }])
-    expect(await repository.query().after(first.next!).all()).toEqual([{ id: 'b', group: 'two' }])
+    expect(await query.after(first.next!).all()).toEqual([{ id: 'b', group: 'two' }])
   })
 
   it('enforces unique writes without installing index planning', async () => {

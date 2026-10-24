@@ -63,6 +63,46 @@ try {
 
 写选项接受有效的 `expires: Date` 或整数 `maxAge`，已到期写入删除 Cookie。4096 字节上限覆盖包括属性的完整赋值。同名 Cookie 在多个 scope 同时可见时报 `COOKIE_SCOPE_AMBIGUOUS`，普通写入后不可见时报 `WRITE_FAILED`。JS 无法观察 HttpOnly 条目，也不能保证删除服务端 Cookie。
 
+## IndexedDB 显式装配与迁移
+
+`indexedDbBackendPlugin` 默认只安装基础文本、字节、记录及原生事务。以前自动启用的原生索引/backfill、TTL、批量 KV、journal 镜像与 undo、提交后通知、变更流，现在各有独立 Feature；业务没有导入并声明的实现不会因这个后端的基础入口进入构建。这是有意的行为变更，用于让应用控制浏览器产物。迁移现有应用时，为实际使用的能力逐项增加下列声明；普通存读不需要增加声明。
+
+```ts
+import { createStorageHost } from '@migaia/storage-host'
+import { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'
+import { indexedDbIndexesFeature } from '@migaia/storage-web/features/indexed-db-indexes'
+import { indexedDbTtlFeature } from '@migaia/storage-web/features/indexed-db-ttl'
+import { indexedDbBatchFeature } from '@migaia/storage-web/features/indexed-db-batch'
+import { indexedDbJournalFeature } from '@migaia/storage-web/features/indexed-db-journal'
+import { indexedDbNotificationsFeature } from '@migaia/storage-web/features/indexed-db-notifications'
+import { indexedDbChangeFeedFeature } from '@migaia/storage-web/features/indexed-db-change-feed'
+
+const host = await createStorageHost({
+  plugins: [
+    indexedDbBackendPlugin(
+      { dbName: 'my-app' },
+      {
+        indexes: indexedDbIndexesFeature(),
+        ttl: indexedDbTtlFeature(),
+        batch: indexedDbBatchFeature(),
+        journal: indexedDbJournalFeature(),
+        notifications: indexedDbNotificationsFeature(),
+        changeFeed: indexedDbChangeFeedFeature()
+      }
+    )
+  ]
+})
+try {
+  await host.backend('indexed-db').set('theme', 'dark')
+} finally {
+  await host.dispose()
+}
+```
+
+只选择需要的条目。`changeFeed` 需要同时显式选择 `notifications`，但不会替调用方安装；选择 `reactiveFeature(indexedDbBackendKind)` 后的 `.live()` 也需要 `notifications`，缺少时编码拒绝，不切换为轮询。缺少批量、journal、通知或变更流装配时调用对应入口，报 `@migaia/storage-web / INDEXED_DB_FEATURE_NOT_INSTALLED` 并指出所需 Feature；缺少 TTL 时 `store.use(ttl)` 由规范 capability owner 报 `@migaia/storage-contract / UNSUPPORTED_CAPABILITY`，消息指出 `ttl`。基础 `capabilities.secondaryIndexes`、`capabilities.batch`、`capabilities.changeFeed` 均为 false。已选择变更流仍须通过原生 realm/BroadcastChannel 准入。重新打开曾使用 TTL 的数据库时保留 TTL Feature 声明；基础读取不解释到期元数据。
+
+`indexedDbJournalFeature()` 提供原生镜像、私有日志 namespace 和 undo 端点；全局记录还须在同一插件列表的后端之前显式安装 `storageJournalPlugin()`（来自 `@migaia/storage-host/journal`），并保留原 `journal` 配置。TTL 镜像只随 TTL Feature 维护。物理写入版本与墓碑保留在基础写路径，使已装 journal 的其他实例仍可识别修改、删除和重建冲突；基础路径不捕获镜像或创建日志。
+
 ## 批量 KV 与结构键
 
 通过 `store.use(kv)` 调用 `getMany(keys)`、`setMany(entries)`、`removeMany(keys)` 和 `removeByPrefix(prefix)`。IndexedDB 的每次非空批量调用只进入一次管线并使用一个原生事务；中途通道冲突使整批回滚。`getMany` 保留重复位置与缺失的 `undefined`；`removeMany` 对规范等价键只计一次。`setMany` 的重复规范键在任何 I/O 前报 `INVALID_ARGUMENT`；携带 `ttlMs` 还要求后端声明 TTL 能力。空批直接返回，不触发管线、hooks 或原生请求。
@@ -77,9 +117,10 @@ try {
 import { createStorageHost } from '@migaia/storage-host'
 import { kv, records } from '@migaia/storage-contract'
 import { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'
+import { indexedDbBatchFeature } from '@migaia/storage-web/features/indexed-db-batch'
 
 const host = await createStorageHost({
-  plugins: [indexedDbBackendPlugin({ dbName: 'my-app' })]
+  plugins: [indexedDbBackendPlugin({ dbName: 'my-app' }, { batch: indexedDbBatchFeature() })]
 })
 try {
   const store = host.backend('indexed-db')
@@ -108,6 +149,8 @@ try {
 `setBytes` 快照输入字节，记录写入使用结构化克隆，不支持的值报 `SERIALIZE_FAILED`。原生提交完成后才发布通知，监听器失败会被报告，不撤销已提交写入。
 
 ## 实体仓储
+
+基础 `defineEntity` 只定义、连接和读写。查询在实体配置的 `features` 中选择 `entityQueryFeature()`（`@migaia/storage-host/entity/query`）；唯一约束选择 `/entity/unique` 的 `entityUniqueFeature()`；迁移选择 `/entity/migration` 的 `entityMigrationFeature()`；索引规划选择 `/entity/indexes` 的 `entityIndexesFeature()`；keyset 分页选择 `/entity/keyset` 的 `entityKeysetFeature()`。索引查询组合 query 与 indexes，分页组合 query 与 keyset；IndexedDB 原生索引还需后端的 `indexedDbIndexesFeature()`。各项独立声明，不会自动安装。
 
 从 `@migaia/storage-host/entity` 导入中立仓储定义，并连接实际已安装的 IndexedDB 存储。
 
@@ -182,9 +225,9 @@ try {
 
 用四个后端插件代替直接工厂，通过 `@migaia/storage-host` 安装。内存与宿主原语从该包导入，实体、结构适配与存储编解码器从其 `entity` 入口导入。旧响应式包装与宿主实时查询调用改为显式 `reactiveFeature(targetKind)` 和 `query.live()`。不提供历史工厂别名。
 
-IndexedDB 通过 `store.watch(key, ctx?)` 提供原生文本失效迭代器。仅当实例已准入当前 realm 的 IndexedDB 与 BroadcastChannel 时 `capabilities.changeFeed` 为 `true`；未准入时调用报 `UNSUPPORTED_CAPABILITY`。提示携带原宿主的组织 UUID，收到提示后重新读取已提交的原生值；这不提供历史重放或每次写入一条事件的保证。迭代器复用原资源清理，使用后调用 `dispose()`。
+显式选择 `indexedDbNotificationsFeature()` 与 `indexedDbChangeFeedFeature()` 后，IndexedDB 通过 `store.watch(key, ctx?)` 提供原生文本失效迭代器。仅当实例已准入当前 realm 的 IndexedDB 与 BroadcastChannel 时 `capabilities.changeFeed` 为 `true`；未准入时调用报 `UNSUPPORTED_CAPABILITY`。提示携带原宿主的组织 UUID，收到提示后重新读取已提交的原生值；这不提供历史重放或每次写入一条事件的保证。迭代器复用原资源清理，使用后调用 `dispose()`。
 
-IndexedDB 原生提供 `ttl`：`store.use(ttl)` 的 `expire`、`remaining`、`persist` 支持文本、字节和记录目标，事务内用 `scope.use(ttl)`。`setMany` 的 `ttlMs` 与值在同一个原生事务提交或回滚。缺省不设期限，到期的点读、枚举和索引查询视为缺失，并在原事务中惰性删除、更新修订与变更提示；不启动清理定时器。期限按安装时捕获的本地时钟锚点与原 scheduler 推进，使用缺省时钟时跨页面和重开保持可比较。IndexedDB 没有向量通道，向量 TTL 目标在 I/O 前报 `UNSUPPORTED_CAPABILITY`。
+显式选择 `indexedDbTtlFeature()` 后，IndexedDB 提供 `ttl`：`store.use(ttl)` 的 `expire`、`remaining`、`persist` 支持文本、字节和记录目标，事务内用 `scope.use(ttl)`。`setMany` 的 `ttlMs` 与值在同一个原生事务提交或回滚。缺省不设期限，到期的点读、枚举和索引查询视为缺失，并在原事务中惰性删除、更新修订与变更提示；不启动清理定时器。期限按安装时捕获的本地时钟锚点与原 scheduler 推进，使用缺省时钟时跨页面和重开保持可比较。IndexedDB 没有向量通道，向量 TTL 目标在 I/O 前报 `UNSUPPORTED_CAPABILITY`。
 
 文本组织视图的宿主缺省组织使用配置 namespace，其它组织使用 namespace + "/" + orgId，继续复用捕获的原生客户端、namespace codec 与 Cookie scope。配置目标以 "/" 加规范 UUID 结尾时在原生 I/O 前拒绝，单独 UUID 合法。dropOrg 只清该目标，保留其它组织及插件前缀，既有视图仍可复用；借用实体保留原生原子唯一写入端点。IndexedDB 使用相同规则映射 dbName；dropOrg 先让目标连接进入原生 close-pending 并排空其事务，再等待该目标的 deleteDatabase 完成。删除期间新打开等待同一原生请求；完成后原视图可重新打开。其它实例沿原 versionchange 关闭；拒绝关闭的外部连接会使原生删除继续等待，宿主不会提前恢复打开并让迟到删除损坏新数据。
 
@@ -214,7 +257,7 @@ try {
 }
 ```
 
-IndexedDB 支持从 `@migaia/storage-host/journal` 调用 `storageLogStore(hostOrOrg, 'indexed-db', { prefix })`。私有行使用既有 META 对象仓库内的数组键命名空间。业务 `clearAll` 保留历史；删除组织使旧日志句柄失效，原业务视图仍可重新打开。缓存模式下，重新打开同一物理组织和前缀前须释放原日志。head、state 与记录随原生事务一同提交，缓存索引在真实 complete 事件内发布。
+显式选择 `indexedDbJournalFeature()` 后，IndexedDB 支持从 `@migaia/storage-host/journal` 调用 `storageLogStore(hostOrOrg, 'indexed-db', { prefix })`。私有行使用既有 META 对象仓库内的数组键命名空间。业务 `clearAll` 保留历史；删除组织使旧日志句柄失效，原业务视图仍可重新打开。缓存模式下，重新打开同一物理组织和前缀前须释放原日志。head、state 与记录随原生事务一同提交，缓存索引在真实 complete 事件内发布。
 
 有原生 Web Locks 时，原资源期间独占与缓存路径保持，冲突打开报 LOCK_REJECTED。缺少 Web Locks、又未声明实际私有 factory 时，原 namespace 声明 `indexExclusive:false`：storageLogStore 不再拒绝，而是在每个操作的原 journal-store readwrite 事务内恢复/读取最新 lastSeq、state 与记录，不跨操作保留索引。注入 factory 有 Web Locks 时同样使用原缓存路径；`journalFactoryIsPrivate:true` 仅适用于数据宇宙局限当前 realm 且不转发共享持久库的真实私有 factory，继续复用原逻辑锁与缓存拥有者。对象身份本身不证明隔离。此命名空间支持本身不启用全局自动捕获或显式选择的 undo。
 

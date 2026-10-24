@@ -1,3 +1,7 @@
+import { indexedDbIndexesFeature } from '../../src/features/indexed-db-indexes.js'
+import { indexedDbJournalFeature } from '../../src/features/indexed-db-journal.js'
+import { storageJournalPlugin, storageLogStore } from '@migaia/storage-host/journal'
+import { walkErrorCauses } from '@migaia/utils/error'
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb'
 import { describe, expect, it } from 'vitest'
 import { createStorageHost } from '@migaia/storage-host'
@@ -110,5 +114,78 @@ describe('explicit IndexedDB assembly', () => {
     } finally {
       await host.dispose()
     }
+  })
+})
+
+/** Independent assemblies keep their original native owners without selecting unrelated Features. */
+describe('independent IndexedDB native owners', () => {
+  it('uses native index projection and cursor with only its indexes Feature', async () => {
+    await using host = await createStorageHost({
+      plugins: [indexedDbBackendPlugin(options(), { indexes: indexedDbIndexesFeature() })]
+    })
+    const store = host.backend('indexed-db')
+    expect(store.capabilities.secondaryIndexes).toBe(true)
+    expect(store.capabilities.batch).toBe(false)
+    expect(store.has(ttl)).toBe(false)
+    const handle = await store.ensureRecordIndexes('users', [
+      { name: 'email', unique: false, multiEntry: false, revision: 1 }
+    ])
+    const rows = await store.transactionIndexed(handle, async (scope) => {
+      await scope.putIndexedRecord({ id: 'u1', email: 'a@example.test' }, 'u1', handle, {
+        email: { kind: 'single', key: 'a@example.test' }
+      })
+      const rows: unknown[] = []
+      for await (const row of scope.iterateRecordIndex({
+        handle,
+        index: 'email',
+        range: { lower: 'a@example.test', upper: 'a@example.test' }
+      }))
+        rows.push(row)
+      return rows
+    })
+    expect(rows).toEqual([['u1', { id: 'u1', email: 'a@example.test' }]])
+  })
+
+  it('opens native log namespaces with only the journal Feature', async () => {
+    await using host = await createStorageHost({
+      plugins: [
+        storageJournalPlugin(),
+        indexedDbBackendPlugin(options(), { journal: indexedDbJournalFeature() })
+      ]
+    })
+    const store = host.backend('indexed-db')
+    expect(store.capabilities.batch).toBe(false)
+    expect(store.capabilities.secondaryIndexes).toBe(false)
+    expect(store.has(ttl)).toBe(false)
+    await using log = await storageLogStore(host, 'indexed-db', { prefix: 'explicit-journal' })
+    await log.append([{ kind: 'created', payload: { id: 'one' } }])
+    expect((await log.read(1, 1))[0]?.kind).toBe('created')
+  })
+
+  it('identifies the missing backend journal Feature before configured global journal preparation', async () => {
+    const failure = await createStorageHost({
+      plugins: [storageJournalPlugin(), indexedDbBackendPlugin(options())],
+      journal: () => {
+        throw new RangeError('journal initializer must not run without the native Feature')
+      }
+    }).catch((error: unknown) => error)
+    expect([...walkErrorCauses(failure)]).toContainEqual(
+      expect.objectContaining({
+        source: STORAGE_WEB_SOURCE,
+        code: StorageErrorCode.indexedDbFeatureNotInstalled,
+        message: expect.stringContaining('indexedDbJournalFeature')
+      })
+    )
+  })
+
+  it('identifies the missing backend journal Feature on standalone namespace calls', async () => {
+    await using host = await createStorageHost({
+      plugins: [storageJournalPlugin(), indexedDbBackendPlugin(options())]
+    })
+    await expect(storageLogStore(host, 'indexed-db', { prefix: 'missing' })).rejects.toMatchObject({
+      source: STORAGE_WEB_SOURCE,
+      code: StorageErrorCode.indexedDbFeatureNotInstalled,
+      message: expect.stringContaining('indexedDbJournalFeature')
+    })
   })
 })

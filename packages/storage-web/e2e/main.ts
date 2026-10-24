@@ -1,3 +1,5 @@
+import { memoryTestFeatures } from '../test/helpers/memory-features.js'
+import { entityTestFeatures } from '../test/helpers/entity-features.js'
 import { indexedDbTestFeatures } from '../test/helpers/indexed-db-features.js'
 import '../test/helpers/browser-program-app.js'
 import { walkErrorCauses } from '@migaia/utils/error'
@@ -92,6 +94,7 @@ const indexedLeaseRepository = (
   decode?: () => Promise<void>
 ) =>
   defineEntity<ILeaseRow>()({
+    features: entityTestFeatures,
     name,
     key: 'id',
     schema: {
@@ -108,6 +111,7 @@ const indexedLeaseRepository = (
 /** Seed through an unindexed public repository so its later query must perform real backfill. */
 const seedLeaseRepository = async (store: IIndexedDbBackendStore, name: string): Promise<void> => {
   const baseline = defineEntity<ILeaseRow>({
+    features: entityTestFeatures,
     name,
     key: 'id',
     schema: {
@@ -2124,6 +2128,7 @@ window.runIndexedDbEntityMigrationScenario = async () => {
   try {
     const store = storeHost.backend('indexed-db')
     const entity = defineEntity<{ id: string; displayName: string }>({
+      features: entityTestFeatures,
       name: 'browser-migrate',
       key: 'id',
       version: 2,
@@ -2220,6 +2225,7 @@ window.runIndexedDbConcurrentEntityMigrationScenario = async () => {
         const second = secondHost.backend('indexed-db')
         const createEntity = () =>
           defineEntity<{ id: string; displayName: string }>({
+            features: entityTestFeatures,
             name: 'browser-concurrent-migrate',
             key: 'id',
             version: 2,
@@ -2521,7 +2527,9 @@ window.finishIndexedDbBackfillLeaseOwner = async (dbName) => {
 /** 真实浏览器验证 Memory 对复合 record key 的输入与输出所有权隔离。 */
 window.runMemoryCompositeKeyOwnershipScenario = async () => {
   /** The actual host owns this scenario registration and its original native cleanup. */
-  const storeHost = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+  const storeHost = await createStorageHost({
+    plugins: [memoryBackendPlugin({}, memoryTestFeatures)]
+  })
   try {
     const store = storeHost.backend('memory')
     const directKey: Array<string | number> = ['direct', 1]
@@ -2556,7 +2564,9 @@ window.runMemoryCompositeKeyOwnershipScenario = async () => {
 
     /** The actual host owns this scenario registration and its original native cleanup. */
 
-    const rangeStoreHost = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+    const rangeStoreHost = await createStorageHost({
+      plugins: [memoryBackendPlugin({}, memoryTestFeatures)]
+    })
     try {
       const rangeStore = rangeStoreHost.backend('memory')
       await rangeStore.putRecord({ value: 1 }, ['range', 1])
@@ -2585,7 +2595,9 @@ window.runMemoryCompositeKeyOwnershipScenario = async () => {
 window.runOperationLifecycleScenario = async () => {
   const operationRuntime = createStorageOperationRuntime()
   /** The actual host owns this scenario registration and its original native cleanup. */
-  const memoryHost = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+  const memoryHost = await createStorageHost({
+    plugins: [memoryBackendPlugin({}, memoryTestFeatures)]
+  })
   try {
     const memory = memoryHost.backend('memory')
     const contextController = new AbortController()
@@ -2596,6 +2608,7 @@ window.runOperationLifecycleScenario = async () => {
     }
     await memory.set('context-snapshot', 'value', context)
     const lifecycleEntity = defineEntity<{ id: string }>({
+      features: entityTestFeatures,
       name: 'operation-lifecycle',
       key: 'id'
     })
@@ -3096,6 +3109,7 @@ window.runIndexedDbExtensionFailureScenario = async () => {
   try {
     const store = storeHost.backend('indexed-db')
     const entity = defineEntity<{ id: string; value: string }>({
+      features: entityTestFeatures,
       name: 'browser-extension-failure',
       key: 'id',
       codec: {
@@ -3137,6 +3151,7 @@ window.runIndexedDbFutureVersionScenario = async () => {
       'future'
     ])
     const repo = defineEntity<{ id: string; name: string }>({
+      features: entityTestFeatures,
       name: 'browser-future-version',
       key: 'id',
       version: 1
@@ -3179,6 +3194,7 @@ window.runIndexedDbHangingExtensionAbortScenario = async () => {
   try {
     const store = storeHost.backend('indexed-db')
     const entity = defineEntity<{ id: string; name: string }>({
+      features: entityTestFeatures,
       name: 'browser-hanging-extension',
       key: 'id',
       codec: {
@@ -3223,6 +3239,7 @@ window.runIndexedDbHangingMigrationAbortScenario = async () => {
       'hanging'
     ])
     const entity = defineEntity<{ id: string; displayName: string }>({
+      features: entityTestFeatures,
       name: 'browser-hanging-migration',
       key: 'id',
       version: 2,
@@ -3266,6 +3283,7 @@ window.runIndexedDbPreAbortExtensionScenario = async () => {
     const store = storeHost.backend('indexed-db')
     let calls = 0
     const entity = defineEntity<{ id: string; name: string }>({
+      features: entityTestFeatures,
       name: 'browser-pre-abort-extension',
       key: 'id',
       codec: {
@@ -3304,6 +3322,7 @@ window.runIndexedDbPreAbortMigrationScenario = async () => {
   try {
     const store = storeHost.backend('indexed-db')
     const entity = defineEntity<{ id: string; name: string }>({
+      features: entityTestFeatures,
       name: 'browser-pre-abort-migration',
       key: 'id',
       version: 1
@@ -3334,6 +3353,7 @@ window.runIndexedDbSchemaFailureScenario = async () => {
   try {
     const store = storeHost.backend('indexed-db')
     const entity = defineEntity<{ id: string; name: string }>({
+      features: entityTestFeatures,
       name: 'browser-schema-failure',
       key: 'id',
       schema: {
@@ -3434,6 +3454,7 @@ window.runIndexedDbPagedScanScenario = async () => {
     }
     /** This repository uses the same public store and its authentic transaction scopes. */
     const streamed = defineEntity<{ id: string; index: number }>({
+      features: entityTestFeatures,
       name: 'query-stream-resources',
       key: 'id'
     }).connect(store, { queryStages })
@@ -4288,6 +4309,7 @@ window.runIndexedDbOptionsGuardScenario = async () => {
 /** 真实浏览器验证 JS 边界传入非法 entity definition 时仍返回统一错误码。 */
 window.runEntityDefinitionGuardScenario = async () => {
   const definition = defineEntity<{ id: string }>({
+    features: entityTestFeatures,
     name: 'browser-definition',
     key: 'id',
     schema: {
@@ -4298,7 +4320,9 @@ window.runEntityDefinitionGuardScenario = async () => {
     validateOnRead: true
   })
   /** The actual host owns this scenario registration and its original native cleanup. */
-  const definitionMemoryHost = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+  const definitionMemoryHost = await createStorageHost({
+    plugins: [memoryBackendPlugin({}, memoryTestFeatures)]
+  })
   try {
     await definition.connect(definitionMemoryHost.backend('memory')).put({ id: 'stable' })
     const malformedStore = { backend: 'memory' }
@@ -4314,7 +4338,11 @@ window.runEntityDefinitionGuardScenario = async () => {
         codes.push((error as { code?: string }).code)
       }
     }
-    const entity = defineEntity<{ id: string }>({ name: 'browser-store-guard', key: 'id' })
+    const entity = defineEntity<{ id: string }>({
+      features: entityTestFeatures,
+      name: 'browser-store-guard',
+      key: 'id'
+    })
     const storeCodes: Array<string | undefined> = []
     for (const store of [null, undefined, [], {}, { backend: 'memory' }]) {
       try {
@@ -4324,13 +4352,20 @@ window.runEntityDefinitionGuardScenario = async () => {
       }
     }
     /** The actual host owns this scenario registration and its original native cleanup. */
-    const entityMemoryHost = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+    const entityMemoryHost = await createStorageHost({
+      plugins: [memoryBackendPlugin({}, memoryTestFeatures)]
+    })
     try {
       entity.connect(entityMemoryHost.backend('memory'))
       const codecCodes: Array<string | undefined> = []
       for (const codec of [null, [], {}, { name: 'codec' }, { name: 'codec', output: 'unknown' }]) {
         try {
-          defineEntity({ name: 'browser-codec-guard', key: 'id', codec } as never)
+          defineEntity({
+            features: entityTestFeatures,
+            name: 'browser-codec-guard',
+            key: 'id',
+            codec
+          } as never)
         } catch (error) {
           codecCodes.push((error as { code?: string }).code)
         }
@@ -4338,7 +4373,12 @@ window.runEntityDefinitionGuardScenario = async () => {
       const schemaCodes: Array<string | undefined> = []
       for (const schema of [null, [], {}, { name: 'schema' }, { name: 'schema', validate: true }]) {
         try {
-          defineEntity({ name: 'browser-schema-guard', key: 'id', schema } as never)
+          defineEntity({
+            features: entityTestFeatures,
+            name: 'browser-schema-guard',
+            key: 'id',
+            schema
+          } as never)
         } catch (error) {
           schemaCodes.push((error as { code?: string }).code)
         }
@@ -4347,6 +4387,7 @@ window.runEntityDefinitionGuardScenario = async () => {
       for (const migrations of [null, [], 'migrations', 42]) {
         try {
           defineEntity({
+            features: entityTestFeatures,
             name: 'browser-migration-guard',
             key: 'id',
             version: 1,
@@ -4359,6 +4400,7 @@ window.runEntityDefinitionGuardScenario = async () => {
       const versionCodes: Array<string | undefined> = []
       try {
         defineEntity({
+          features: entityTestFeatures,
           name: 'browser-unsafe-version',
           key: 'id',
           version: Number.MAX_SAFE_INTEGER + 1
@@ -4369,6 +4411,7 @@ window.runEntityDefinitionGuardScenario = async () => {
       const migrationVersionCodes: Array<string | undefined> = []
       try {
         defineEntity({
+          features: entityTestFeatures,
           name: 'browser-unsafe-migration-version',
           key: 'id',
           version: Number.MAX_SAFE_INTEGER,
@@ -4381,6 +4424,7 @@ window.runEntityDefinitionGuardScenario = async () => {
       try {
         const migrations = Object.create({ 2: async (value: unknown) => value })
         defineEntity({
+          features: entityTestFeatures,
           name: 'browser-prototype-migration',
           key: 'id',
           version: 2,
@@ -4391,7 +4435,12 @@ window.runEntityDefinitionGuardScenario = async () => {
       }
       const nullVersionCodes: Array<string | undefined> = []
       try {
-        defineEntity({ name: 'browser-null-version', key: 'id', version: null } as never)
+        defineEntity({
+          features: entityTestFeatures,
+          name: 'browser-null-version',
+          key: 'id',
+          version: null
+        } as never)
       } catch (error) {
         nullVersionCodes.push((error as { code?: string }).code)
       }
@@ -4409,9 +4458,11 @@ window.runEntityDefinitionGuardScenario = async () => {
           clearAll: async () => undefined,
           dispose: async () => undefined
         }
-        defineEntity<{ id: string }>({ name: 'browser-alien-store', key: 'id' }).connect(
-          alienStore as never
-        )
+        defineEntity<{ id: string }>({
+          features: entityTestFeatures,
+          name: 'browser-alien-store',
+          key: 'id'
+        }).connect(alienStore as never)
       } catch (error) {
         backendCodes.push((error as { code?: string }).code)
       }
@@ -4444,9 +4495,11 @@ window.runEntityDefinitionGuardScenario = async () => {
             clearAll: async () => undefined,
             dispose: async () => undefined
           }
-          defineEntity<{ id: string }>({ name: 'browser-capability-guard', key: 'id' }).connect(
-            malformedStore as never
-          )
+          defineEntity<{ id: string }>({
+            features: entityTestFeatures,
+            name: 'browser-capability-guard',
+            key: 'id'
+          }).connect(malformedStore as never)
         } catch (error) {
           capabilityCodes.push((error as { code?: string }).code)
         }
@@ -4454,6 +4507,7 @@ window.runEntityDefinitionGuardScenario = async () => {
       const sparseVersionCodes: Array<string | undefined> = []
       try {
         defineEntity({
+          features: entityTestFeatures,
           name: 'browser-sparse-huge-version',
           key: 'id',
           version: Number.MAX_SAFE_INTEGER,
@@ -4465,7 +4519,12 @@ window.runEntityDefinitionGuardScenario = async () => {
       const validateOnReadCodes: Array<string | undefined> = []
       for (const validateOnRead of [null, 'yes', 1, []]) {
         try {
-          defineEntity({ name: 'browser-validate-on-read', key: 'id', validateOnRead } as never)
+          defineEntity({
+            features: entityTestFeatures,
+            name: 'browser-validate-on-read',
+            key: 'id',
+            validateOnRead
+          } as never)
         } catch (error) {
           validateOnReadCodes.push((error as { code?: string }).code)
         }
@@ -4618,9 +4677,15 @@ window.runEntityDefinitionGuardScenario = async () => {
 
 /** 真实浏览器验证 orderBy comparator 的返回类型不会被 Array.sort 静默转换。 */
 window.runEntityComparatorGuardScenario = async () => {
-  const entity = defineEntity<{ id: string }>({ name: 'browser-comparator-guard', key: 'id' })
+  const entity = defineEntity<{ id: string }>({
+    features: entityTestFeatures,
+    name: 'browser-comparator-guard',
+    key: 'id'
+  })
   /** The actual host owns this scenario registration and its original native cleanup. */
-  const entityMemoryHost = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+  const entityMemoryHost = await createStorageHost({
+    plugins: [memoryBackendPlugin({}, memoryTestFeatures)]
+  })
   try {
     const repo = entity.connect(entityMemoryHost.backend('memory'))
     await repo.put({ id: 'a' })
@@ -4678,7 +4743,9 @@ window.runEntityComparatorGuardScenario = async () => {
     let invalidPolicyCode: string | undefined
     try {
       /** The actual host owns this scenario registration and its original native cleanup. */
-      const policyHost = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+      const policyHost = await createStorageHost({
+        plugins: [memoryBackendPlugin({}, memoryTestFeatures)]
+      })
       try {
         await policyHost
           .backend('memory')

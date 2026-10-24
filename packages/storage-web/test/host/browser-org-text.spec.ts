@@ -1,3 +1,4 @@
+import { entityTestFeatures } from '../helpers/entity-features.js'
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest'
 import { createStorageHost, createOrgId } from '@migaia/storage-host'
@@ -47,6 +48,7 @@ const factories = [
 
 /** Same repository definition exercises the real native value-commit owner in each organization. */
 const users = defineEntity<{ id: string; email: string }>()({
+  features: entityTestFeatures,
   name: 'organization-users',
   key: 'id',
   indexes: { byEmail: { path: 'email', unique: true } },

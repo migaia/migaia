@@ -1,3 +1,4 @@
+import type { IStorageJournalBackendBinding } from '@migaia/storage-host'
 import { IndexedDbFeature } from '../constants.js'
 import type { IStorageKey } from '@migaia/storage-contract'
 import { IndexedDbPointRevisions } from './indexed-db-revisions.js'
@@ -62,6 +63,10 @@ export const indexedDbFeatureMissing = {
       writeImage: () => indexedDbFeatureMissing.fail(IndexedDbFeature.journal),
       readRevision: () => indexedDbFeatureMissing.fail(IndexedDbFeature.journal)
     }
+  },
+  /** Standalone log calls also identify the absent backend Feature without importing its runtime. */
+  binding(): IStorageJournalBackendBinding {
+    return new IndexedDbMissingJournalBinding()
   },
   journal(): Pick<IIndexedDbStore<unknown>, 'undo'> {
     return { undo: () => indexedDbFeatureMissing.fail(IndexedDbFeature.journal) }
@@ -139,6 +144,18 @@ class IndexedDbBasicImageAccess implements ReturnType<typeof createIndexedDbJour
   }
   /** Basic mutations never manufacture a journal history. */
   changes(): never {
+    return indexedDbFeatureMissing.fail(IndexedDbFeature.journal)
+  }
+}
+
+/** Missing native journal assembly is an explicit rejection boundary, never a second log path. */
+class IndexedDbMissingJournalBinding implements IStorageJournalBackendBinding {
+  /** Every org retains the same absence; no native handle or namespace can be acquired. */
+  forOrg(): IStorageJournalBackendBinding {
+    return this
+  }
+  /** Reject before namespace I/O and identify the exact backend Feature the caller must select. */
+  async openNamespace(): Promise<never> {
     return indexedDbFeatureMissing.fail(IndexedDbFeature.journal)
   }
 }

@@ -63,6 +63,46 @@ try {
 
 Write options accept a valid `expires: Date` or integer `maxAge`. Expired writes delete the cookie. The 4096-byte bound covers the complete assignment, including attributes. A same-name cookie visible in several scopes yields `COOKIE_SCOPE_AMBIGUOUS`; a normal write that is not visible afterwards yields `WRITE_FAILED`. JS cannot observe HttpOnly entries or guarantee server-side deletion.
 
+## Explicit IndexedDB assembly and migration
+
+`indexedDbBackendPlugin` installs basic text, bytes, records and native transactions. Native indexes/backfill, TTL, KV batches, journal images and undo, post-commit notifications, and change feeds each require their own Feature. Previously these capabilities were automatic. This intentional behavior change lets applications control browser output: an undeclared Feature is not imported by the basic backend entry. Migrate existing applications by selecting each capability they actually use. Basic reads and writes need no additional declaration.
+
+```ts
+import { createStorageHost } from '@migaia/storage-host'
+import { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'
+import { indexedDbIndexesFeature } from '@migaia/storage-web/features/indexed-db-indexes'
+import { indexedDbTtlFeature } from '@migaia/storage-web/features/indexed-db-ttl'
+import { indexedDbBatchFeature } from '@migaia/storage-web/features/indexed-db-batch'
+import { indexedDbJournalFeature } from '@migaia/storage-web/features/indexed-db-journal'
+import { indexedDbNotificationsFeature } from '@migaia/storage-web/features/indexed-db-notifications'
+import { indexedDbChangeFeedFeature } from '@migaia/storage-web/features/indexed-db-change-feed'
+
+const host = await createStorageHost({
+  plugins: [
+    indexedDbBackendPlugin(
+      { dbName: 'my-app' },
+      {
+        indexes: indexedDbIndexesFeature(),
+        ttl: indexedDbTtlFeature(),
+        batch: indexedDbBatchFeature(),
+        journal: indexedDbJournalFeature(),
+        notifications: indexedDbNotificationsFeature(),
+        changeFeed: indexedDbChangeFeedFeature()
+      }
+    )
+  ]
+})
+try {
+  await host.backend('indexed-db').set('theme', 'dark')
+} finally {
+  await host.dispose()
+}
+```
+
+Select only required entries. Change feeds require an explicitly selected notifications Feature; they never install that prerequisite implicitly. IndexedDB `.live()` through `reactiveFeature` also requires notifications and reports a coded missing-assembly error instead of switching to polling. Calling an undeclared batch, journal, notification or change-feed entry reports `@migaia/storage-web / INDEXED_DB_FEATURE_NOT_INSTALLED` and identifies the required Feature. Without TTL, the canonical capability owner rejects `store.use(ttl)` with `@migaia/storage-contract / UNSUPPORTED_CAPABILITY`, identifying `ttl`. Basic `capabilities.secondaryIndexes`, `capabilities.batch` and `capabilities.changeFeed` are false. Selected change feeds still require the original native realm/BroadcastChannel admission. Keep the TTL Feature when reopening a database that uses deadlines; basic reads do not interpret expiry metadata.
+
+`indexedDbJournalFeature()` supplies native images, private log namespaces and undo. Global capture additionally requires `storageJournalPlugin()` from `@migaia/storage-host/journal`, explicitly installed before the backend in the same plugin list, plus the original `journal` configuration. Deadline images are maintained only with the TTL Feature. Basic writes retain physical mutation versions and tombstones so another journal-enabled instance can detect update/delete/recreate conflicts; they capture no images and create no log.
+
 ## KV batches and typed keys
 
 Use `store.use(kv)` for `getMany(keys)`, `setMany(entries)`, `removeMany(keys)`, and `removeByPrefix(prefix)`. Each nonempty IndexedDB batch enters one pipeline and one native transaction; a later channel conflict rolls back the complete batch. Reads retain duplicate positions and `undefined` missing values. Removal counts a canonical key once. Duplicate canonical write keys reject before any I/O, and `ttlMs` requires the TTL capability. Empty batches return without pipeline, hooks, or native requests.
@@ -77,9 +117,10 @@ The default namespace codec retains the original string `sw1` layout and gives n
 import { createStorageHost } from '@migaia/storage-host'
 import { kv, records } from '@migaia/storage-contract'
 import { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'
+import { indexedDbBatchFeature } from '@migaia/storage-web/features/indexed-db-batch'
 
 const host = await createStorageHost({
-  plugins: [indexedDbBackendPlugin({ dbName: 'my-app' })]
+  plugins: [indexedDbBackendPlugin({ dbName: 'my-app' }, { batch: indexedDbBatchFeature() })]
 })
 try {
   const store = host.backend('indexed-db')
@@ -108,6 +149,8 @@ Await only native operations and activity-preserving microtasks within the callb
 `setBytes` snapshots input bytes. Record writes use structured cloning and reject unsupported values with `SERIALIZE_FAILED`. Native completion precedes notification. A listener failure is reported and cannot undo a committed write.
 
 ## Entity repositories
+
+Basic `defineEntity` supplies definition, connection and reads/writes. Select `entityQueryFeature()` from `@migaia/storage-host/entity/query` in the definition's `features` array for queries; `entityUniqueFeature()` from `/entity/unique` for uniqueness; `entityMigrationFeature()` from `/entity/migration` for migration; `entityIndexesFeature()` from `/entity/indexes` for index planning; and `entityKeysetFeature()` from `/entity/keyset` for keyset pages. Index queries combine query and indexes; pages combine query and keyset. Native IndexedDB indexes also require the backend's `indexedDbIndexesFeature()`. Each selection is explicit.
 
 Import the neutral repository owner from `@migaia/storage-host/entity` and connect it to the actual installed IndexedDB store.
 
@@ -182,9 +225,9 @@ Inspect both `source` and `code`. After host installation starts, failure reject
 
 Replace direct factories with the four backend plugins installed through `@migaia/storage-host`. Import memory and host primitives from that package, entities, schemas, and storage codecs from its `entity` entry. Replace old reactive wrappers and host live-query calls with an explicit `reactiveFeature(targetKind)` and `query.live()`. No legacy factory aliases are exported.
 
-IndexedDB exposes native text invalidation through `store.watch(key, ctx?)`. Its `capabilities.changeFeed` is `true` only after the instance admits this realm's IndexedDB and BroadcastChannel; an unadmitted watch throws `UNSUPPORTED_CAPABILITY`. Hints carry the original host organization UUID and tell the consumer to reread committed native data. They provide neither historical replay nor one event per write. Dispose the iterator after use through its original `dispose()` method.
+With `indexedDbNotificationsFeature()` and `indexedDbChangeFeedFeature()` selected, IndexedDB exposes native text invalidation through `store.watch(key, ctx?)`. Its `capabilities.changeFeed` is `true` only after the instance admits this realm's IndexedDB and BroadcastChannel; an unadmitted watch throws `UNSUPPORTED_CAPABILITY`. Hints carry the original host organization UUID and tell the consumer to reread committed native data. They provide neither historical replay nor one event per write. Dispose the iterator after use through its original `dispose()` method.
 
-IndexedDB natively provides `ttl`: `store.use(ttl)` exposes `expire`, `remaining` and `persist` for text, bytes and record targets; transactions use `scope.use(ttl)`. A `setMany` entry's `ttlMs` commits or rolls back with its value in the same native transaction. Entries have no deadline by default. Expired point reads, enumeration and index queries return absence and lazily remove data through the original transaction, revision and change paths; no cleanup timer runs. Deadlines advance through the installed scheduler from one local epoch anchor captured at installation. Default-clock deadlines remain comparable across pages and reopening. IndexedDB has no vector channel, so vector TTL targets fail before I/O with `UNSUPPORTED_CAPABILITY`.
+With `indexedDbTtlFeature()` selected, IndexedDB provides `ttl`: `store.use(ttl)` exposes `expire`, `remaining` and `persist` for text, bytes and record targets; transactions use `scope.use(ttl)`. A `setMany` entry's `ttlMs` commits or rolls back with its value in the same native transaction. Entries have no deadline by default. Expired point reads, enumeration and index queries return absence and lazily remove data through the original transaction, revision and change paths; no cleanup timer runs. Deadlines advance through the installed scheduler from one local epoch anchor captured at installation. Default-clock deadlines remain comparable across pages and reopening. IndexedDB has no vector channel, so vector TTL targets fail before I/O with `UNSUPPORTED_CAPABILITY`.
 
 Text organization views use the configured namespace for the host default and namespace + "/" + orgId for every other organization. The same captured native client, namespace codec and Cookie scope remain in use. A configured namespace ending in "/" plus a canonical UUID rejects before native I/O; a bare UUID remains valid. dropOrg clears only that target, preserves other organizations and plugin prefixes, and leaves existing views reusable. Borrowed entities retain the original native atomic unique writer. IndexedDB maps dbName by the same rule. dropOrg makes the target connection close-pending, drains native transactions, and waits for that target's deleteDatabase request. New opens wait for the same request; existing views reopen afterward. Other instances close through their original versionchange handler. A foreign connection that refuses to close keeps native deletion pending; the host never resumes opening early and lets a late deletion destroy new data.
 
@@ -214,7 +257,7 @@ try {
 }
 ```
 
-IndexedDB supports `storageLogStore(hostOrOrg, 'indexed-db', { prefix })` from `@migaia/storage-host/journal`. Its private rows use an array-key namespace in the existing META store. Business `clearAll` leaves history intact; organization deletion invalidates old log handles, while the original business view can reopen. In cached mode, dispose a log before opening the same physical organization and prefix again. Native transactions commit head/state/records together and publish the cached index from the actual complete event.
+With `indexedDbJournalFeature()` selected, IndexedDB supports `storageLogStore(hostOrOrg, 'indexed-db', { prefix })` from `@migaia/storage-host/journal`. Its private rows use an array-key namespace in the existing META store. Business `clearAll` leaves history intact; organization deletion invalidates old log handles, while the original business view can reopen. In cached mode, dispose a log before opening the same physical organization and prefix again. Native transactions commit head/state/records together and publish the cached index from the actual complete event.
 
 Native Web Locks retain the original lifetime exclusion and cached path; a conflicting open reports LOCK_REJECTED. Without Web Locks or an actual private-factory declaration, the original namespace declares `indexExclusive:false`. storageLogStore remains available: each operation recovers/reads current lastSeq, state and records inside the original journal-store readwrite transaction, retaining no index across operations. Injected factories use the original cached path when Web Locks are available. `journalFactoryIsPrivate:true` applies only to an actual data universe confined to this realm without forwarding shared persistent storage; that path retains the original logical lock and cached owner. Object identity alone never proves isolation. This namespace support does not enable automatic global capture or opt-in undo by itself.
 

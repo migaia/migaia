@@ -1,3 +1,4 @@
+import { memoryTestFeatures } from '../helpers/memory-features.js'
 import { createRuntime } from '@migaia/reactive'
 import { records, type IStorageIterator, type IStorageChange } from '@migaia/storage-contract'
 import { createStorageHost, memoryBackendKind, memoryBackendPlugin } from '@migaia/storage-host'
@@ -7,7 +8,12 @@ import { localStorageBackendPlugin } from '../../src/local-storage.js'
 
 /** Selecting the Feature adds live only to the existing chain, preserving its selected result. */
 const host = await createStorageHost({
-  plugins: [memoryBackendPlugin({ id: 'live' }, { reactive: reactiveFeature(memoryBackendKind) })]
+  plugins: [
+    memoryBackendPlugin(
+      { id: 'live' },
+      { ...memoryTestFeatures, reactive: reactiveFeature(memoryBackendKind) }
+    )
+  ]
 })
 const query = host
   .backend('live')
@@ -22,7 +28,7 @@ query.state.value = { status: 'ready', value: [] }
 host.backend('live').live({ runtime: createRuntime() })
 
 /** Omitted Features do not manufacture a live terminal or an API result. */
-const ordinary = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+const ordinary = await createStorageHost({ plugins: [memoryBackendPlugin({}, memoryTestFeatures)] })
 // @ts-expect-error no live terminal exists without a selected reactive Feature.
 ordinary.backend('memory').use(records).query().live({ runtime: createRuntime() })
 
