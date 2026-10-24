@@ -299,3 +299,5 @@ const hits = await collection
 ```
 
 `lambda` must be finite and in [0,1]. At 1 selection follows engine relevance; at 0 selection after the first candidate uses diversity alone. Equal objectives retain engine order. The helper's `topN` bounds only the computed greedy prefix: it still returns one finite rank per candidate, placing the unselected tail in engine order. Only `rerank` owns truncation. Omitted topN computes every candidate, using O(n) state and worst-case O(n²d) time. Vectors must share dimensions; zero directions contribute zero cosine similarity, retaining engine order for ties. Cancellation uses the original signal without another budget, resource or background task.
+
+Journal engines load only when journal is selected or the `/journal` entry is imported. Install the optional `@migaia/logger` peer when using these features. Hosts without journal do not load logger at runtime.

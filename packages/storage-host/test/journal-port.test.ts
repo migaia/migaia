@@ -26,10 +26,8 @@ import {
   resolveStorageJournalBinding,
   snapshotStorageJournalBinding
 } from '../src/journal/binding.js'
-import {
-  prepareStorageJournalConfiguration,
-  snapshotStorageJournalConfiguration
-} from '../src/journal/configuration.js'
+import { prepareStorageJournalConfiguration } from '../src/journal/configuration.js'
+import { snapshotStorageJournalConfiguration } from '../src/journal/configuration-options.js'
 import { createStorageNativeJournal } from '../src/journal/commit.js'
 
 /** Delay only an ordinary result after the original owner has actually committed and freed locks. */

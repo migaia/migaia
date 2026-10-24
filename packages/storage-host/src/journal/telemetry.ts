@@ -2,7 +2,7 @@ import { LoggerLevel } from '@migaia/logger'
 import { tryReadProperty } from '@migaia/utils/error'
 import { inspectThenable, observeThenableRejection } from '@migaia/utils/function'
 import type { IStoragePipelineInput } from '../types.js'
-import type { IStorageJournalConfigurationSnapshot } from './configuration.js'
+import type { IStorageJournalConfigurationSnapshot } from './configuration-options.js'
 import { STORAGE_TELEMETRY_TAG } from './constants.js'
 
 /** The original execution owner observes a complete public endpoint without retaining history. */

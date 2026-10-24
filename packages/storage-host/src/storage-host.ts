@@ -73,14 +73,13 @@ import type {
   IStorageOrgBinding
 } from './types.js'
 import { storageJournalAccess, type IStorageJournalBackendAccess } from './journal/binding.js'
-import { openStorageLogStore, snapshotStorageLogPrefix } from './journal/log-store.js'
 import {
-  prepareStorageJournalConfiguration,
   snapshotStorageJournalConfiguration,
   type IStorageJournalConfigurationSnapshot
-} from './journal/configuration.js'
+} from './journal/configuration-options.js'
 import type { IStorageJournalConfiguration, IStorageJournalExecutionPort } from './journal/types.js'
-import { observeStorageTelemetry } from './journal/telemetry.js'
+import { loadStorageJournalRuntime } from './journal/loader.js'
+import type { prepareStorageJournalConfiguration } from './journal/configuration.js'
 
 /** Minimal PluginHost domain core; storage materializers do not expose host mutation to plugins. */
 type IStorageHostCore = object
@@ -785,12 +784,14 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
                   describe: () => IStoragePipelineInput,
                   invoke: (observing: boolean) => Promise<R>
                 ) =>
-                  observeStorageTelemetry(
-                    () => this.#journalOrgs?.get(orgId)?.configuration,
-                    describe,
-                    invoke,
-                    () => this.#scheduler.now(),
-                    this.#report
+                  loadStorageJournalRuntime().then((runtime) =>
+                    runtime.observeStorageTelemetry(
+                      () => this.#journalOrgs?.get(orgId)?.configuration,
+                      describe,
+                      invoke,
+                      () => this.#scheduler.now(),
+                      this.#report
+                    )
                   )
               }),
           getJournal: (orgId) => this.#journalPort(context, orgId),
@@ -1400,6 +1401,8 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
         this.#journalOrgs!.get(orgId)!.configuration = source
         return source
       }
+      /** Load optional logging only when this organization initializes its journal. */
+      const runtime = await loadStorageJournalRuntime()
       const configured = await source(
         Object.freeze({
           orgId,
@@ -1418,9 +1421,9 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
                 {},
                 StorageErrorText.backendNotInstalled
               )
-            return openStorageLogStore(
+            return runtime.openStorageLogStore(
               this.#journalContextAccess(context, orgId),
-              snapshotStorageLogPrefix(options)
+              runtime.snapshotStorageLogPrefix(options)
             )
           }
         })
@@ -1464,7 +1467,9 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
         if (typeof undo !== 'function')
           throw new StorageContractError(StorageContractErrorCode.unsupported)
       }
-      entry.value = await prepareStorageJournalConfiguration(
+      /** Journal preparation is the only runtime dependency on the optional logger peer. */
+      const runtime = await loadStorageJournalRuntime()
+      entry.value = await runtime.prepareStorageJournalConfiguration(
         configured,
         this.#journalContextAccess(context, orgId),
         context.storeCell.get().backend,

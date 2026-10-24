@@ -10,7 +10,7 @@ import {
 import { lockKey, ttl, type IStorageResource } from '@migaia/storage-contract'
 import { createStorageHost, createOrgId, memoryBackendPlugin } from '../src/index.js'
 import { resolveStorageJournalBinding } from '../src/journal/binding.js'
-import { snapshotStorageJournalConfiguration } from '../src/journal/configuration.js'
+import { snapshotStorageJournalConfiguration } from '../src/journal/configuration-options.js'
 import { createStorageNativeJournal } from '../src/journal/commit.js'
 import { StorageJournalKind } from '../src/journal/constants.js'
 

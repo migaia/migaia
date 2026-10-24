@@ -60,11 +60,20 @@
   "dependencies": {
     "@migaia/event-subscriber": "workspace:^",
     "@migaia/lifecycle": "workspace:^",
-    "@migaia/logger": "workspace:^",
     "@migaia/plugin-host": "workspace:^",
     "@migaia/serialize": "workspace:^",
     "@migaia/storage-contract": "workspace:^",
     "@migaia/utils": "workspace:^"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "@migaia/logger": "workspace:^"
+  },
+  "peerDependencies": {
+    "@migaia/logger": "workspace:^"
+  },
+  "peerDependenciesMeta": {
+    "@migaia/logger": {
+      "optional": true
+    }
+  }
 }
