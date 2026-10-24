@@ -2726,11 +2726,12 @@ function ReferenceMemberDetails({
             </dd>
           </div>
         ) : null}
-        {resultType || doc?.returns ? (
+        {(!method && resultType) || doc?.returns ? (
           <div>
             <dt>{resultType && !method ? label('Type', '类型') : label('Returns', '返回')}</dt>
             <dd>
-              {resultType ? (
+              {/* Method signatures already show this exact return type above the contract. */}
+              {resultType && !method ? (
                 <TypeExpression
                   api={api}
                   libraryApis={libraryApis}
@@ -2738,7 +2739,7 @@ function ReferenceMemberDetails({
                   value={resultType}
                 />
               ) : null}
-              {resultType && doc?.returns ? ' — ' : null}
+              {resultType && !method && doc?.returns ? ' — ' : null}
               {doc?.returns ? (
                 <InlineText library={api.library} locale={locale} text={doc.returns} />
               ) : null}
