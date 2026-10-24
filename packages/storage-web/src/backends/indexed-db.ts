@@ -5596,8 +5596,8 @@ export const indexedDbHost = <TValue = unknown>(
                           attempt: async () => {
                             if (webLocks !== undefined) {
                               /**
-                               * Native Web Locks owns lifetime exclusion; no expiring metadata lease is
-                               * substituted.
+                               * Native Web Locks owns lifetime exclusion; no expiring metadata
+                               * lease is substituted.
                                */
                               const name = encodeFlatStorageKey([
                                 IndexedDbJournalLayout.resource,
