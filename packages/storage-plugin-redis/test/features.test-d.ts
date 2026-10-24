@@ -1,3 +1,8 @@
+import {
+  postgresBackendPlugin,
+  postgresBackendKind,
+  type IPgDriver
+} from '@migaia/storage-plugin-postgres'
 import { createStorageHost, memoryBackendKind, type IStorageFeature } from '@migaia/storage-host'
 import {
   durableChangeFeed,
@@ -20,6 +25,8 @@ import { rediSearchVectorFeature } from '@migaia/storage-plugin-redis/features/s
 
 /** Ambient clients make these declaration consumers compile without starting a service. */
 declare const driver: IRedisDriver
+/** PostgreSQL remains an incompatible exact Feature target even when its native driver is valid. */
+declare const pgDriver: IPgDriver
 /** Three independent IDs retain their exact selected native API and capability surfaces. */
 const host = await createStorageHost({
   plugins: [
@@ -118,3 +125,9 @@ for (const key of ['one', 'two', 'three'] as const) {
 defaults.tx().run(() => undefined)
 // @ts-expect-error TTL targets retain the canonical channel-specific shape.
 defaults.use(ttl).expire({ channel: 'vector', key: 'wrong' }, 1000)
+
+// @ts-expect-error A Redis Stream Feature cannot satisfy the PostgreSQL backend kind.
+const wrongPostgres: IStorageFeature<typeof postgresBackendKind> = redisStreamsFeature()
+// @ts-expect-error The public PostgreSQL factory rejects the Redis Stream Feature selection.
+postgresBackendPlugin({ driver: pgDriver }, { streams: redisStreamsFeature() })
+void wrongPostgres

@@ -69,6 +69,7 @@
   },
   "devDependencies": {
     "@migaia/logger": "workspace:^",
+    "@migaia/storage-plugin-postgres": "workspace:^",
     "@types/bun": "1.4.3",
     "ioredis": "6.0.0",
     "redis": "6.3.0"

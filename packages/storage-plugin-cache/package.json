@@ -36,6 +36,7 @@
     "@migaia/utils": "workspace:^"
   },
   "devDependencies": {
+    "@migaia/logger": "workspace:^",
     "@migaia/storage-plugin-postgres": "workspace:^",
     "@migaia/storage-plugin-qdrant": "workspace:^",
     "@migaia/storage-plugin-redis": "workspace:^",

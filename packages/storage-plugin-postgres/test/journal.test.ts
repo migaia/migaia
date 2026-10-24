@@ -10,7 +10,8 @@ import {
   wal,
   undoLog,
   memoryLogStore,
-  LogRecordState
+  LogRecordState,
+  type ILogStore
 } from '@migaia/logger/plugins/durable'
 import { kv, vector, ttl, lockKey } from '@migaia/storage-contract'
 import { deferred } from '@migaia/utils/promise'
@@ -36,6 +37,68 @@ if (!connectionString)
   throw new Error('Run through scripts/storage-services.mts run -- to provide PostgreSQL')
 
 describe.each(['pg', 'postgres-js'] as const)('%s original global journal', (adapter) => {
+  it('commits native binlog and undo stores from the public journal initializer with business data', async () => {
+    const pool = new Pool({ connectionString }),
+      client = postgres(connectionString!, { max: 8 }),
+      driver = adapter === 'pg' ? pgDriver(pool) : postgresJsDriver(client),
+      logs: Array<{ dispose(): Promise<void> }> = []
+    const makeLogger = (changes: ILogStore, images: ILogStore) =>
+      new Logger({
+        ...loggerOptions,
+        plugins: [binlog({ store: changes }), undoLog({ store: images })]
+      })
+    let logger: ReturnType<typeof makeLogger> | undefined
+    const host = await createStorageHost({
+      plugins: [
+        postgresBackendPlugin({ driver, prefix: 'pg_atomic_' + randomUUID().slice(0, 8) })
+      ] as const,
+      journal: async ({ storageLogStore: open }) => {
+        const changes = await open('postgres', { prefix: 'native-binlog' }),
+          images = await open('postgres', { prefix: 'native-undo' }),
+          current = makeLogger(changes, images)
+        logs.push(changes, images)
+        logger = current
+        return {
+          logger: current,
+          namespace: 'native-same-db',
+          atomicBinlog: { postgres: changes },
+          atomicUndo: { postgres: images }
+        }
+      }
+    })
+    onTestFinished(async () => {
+      await host.dispose()
+      await logger?.shutdown('manual')
+      await Promise.all(logs.map((log) => log.dispose()))
+      await pool.end()
+      await client.end()
+    })
+    const store = host.backend('postgres'),
+      current = logger!
+    await store.set('point', 'before')
+    const initial = await current.binlog.lastSeq()
+    await store.transaction(async (scope) => {
+      await scope.set('point', 'after')
+      expect(await current.binlog.lastSeq()).toBe(initial)
+      expect(await current.undo.list()).toHaveLength(initial)
+    })
+    expect(await current.binlog.lastSeq()).toBe(initial + 1)
+    const txId = ((await current.binlog.read(initial + 1))[0]!.payload as { txId: string }).txId
+    expect(await current.undo.get(txId)).toHaveLength(1)
+    await store.undo(txId)
+    expect(await store.get('point')).toBe('before')
+    const committed = await current.binlog.lastSeq(),
+      failure = new RangeError('native journal rollback')
+    await expect(
+      store.transaction(async (scope) => {
+        await scope.set('point', 'rolled-back')
+        throw failure
+      })
+    ).rejects.toMatchObject({ code: 'TRANSACTION_FAILED', cause: failure })
+    expect(await store.get('point')).toBe('before')
+    expect(await current.binlog.lastSeq()).toBe(committed)
+  })
+
   it('rejects an old undo after drop and recreation with the same value and local revision', async () => {
     const pool = new Pool({ connectionString })
     const client = postgres(connectionString!, { max: 8 })
