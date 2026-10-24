@@ -365,6 +365,66 @@ console.log(host.extensions.label('draft'))`,
     }
   },
   types: {
+    IStorageJournalOptions: {
+      summary: t(
+        'Borrow a logger with a stable namespace and explicit same-registration atomicBinlog/atomicUndo handles by backend id. telemetry=true requires the actual level plugin; selected unimplemented guarantees reject.',
+        '借用 logger，固定 namespace，按 backend id 显式选择同 registration 的 atomicBinlog/atomicUndo；telemetry=true 要求真实 level 插件，未实现的已选保证明确拒绝。'
+      ),
+      members: {}
+    },
+    IStorageJournalInitializerContext: {
+      summary: t(
+        'Fixed orgId and original private storageLogStore helper for one-time organization preparation; no raw backend or host mutation rights.',
+        '一次性组织准备所用的固定 orgId 与原私有 storageLogStore helper，不返回 raw 后端或宿主修改权。'
+      ),
+      members: {}
+    },
+    IStorageJournalConfiguration: {
+      summary: t(
+        'Direct borrowed options or an async initializer. The default org prepares in the final original install batch, and later orgs share one preparation Promise before supported asynchronous endpoints.',
+        '直接借用配置或异步 initializer；缺省组织在原安装批次末尾准备，后续组织在受支持异步终点前共享一次准备 Promise。'
+      ),
+      members: {}
+    },
+    IUndoableStore: {
+      summary: t(
+        'undo(txId, ctx?) returns a new committed txId after all original afterRevision/value checks; duplicate persisted image identities reject as damaged owned records. Selected logger inference adds it only to journal-enabled backend and borrowed org results.',
+        'undo(txId, ctx?) 在全部原 afterRevision/值检查后返回新的已提交 txId，重复持久镜像身份按自有记录损坏拒绝；仅真实所选 logger 推断向启用 journal 的后端和组织借用结果增加该类型。'
+      ),
+      members: {}
+    },
+    IStorageJournalUndoRunner: {
+      summary: t(
+        'Backend-author callback invokes the original tx().lock(...).run with all canonical targets and no new transaction owner.',
+        '后端作者回调用全部规范目标调用原 tx().lock(...).run，不增加事务拥有者。'
+      ),
+      members: {}
+    },
+    IStorageJournalAttempt: {
+      summary: t(
+        'Original authenticated txId, pre-commit record(scope), and optional settle() for terminal-started external append. No new transaction or terminal authority.',
+        '原认证 txId、提交前 record(scope)，以及仅排空原 terminal 外置追加的可选 settle()；不授予新事务或终态权。'
+      ),
+      members: {}
+    },
+    IStorageJournalExecutionPort: {
+      summary: t(
+        'Fixed-org preparation plus original first-acquisition head locks, active fact, and native-scope capture. Backends keep their original concurrency, draft, commit and lifecycle owners.',
+        '固定组织准备、原第一次取锁的 head 锁、active 事实与 native scope 捕获；后端保留原并发、draft、提交和生命周期拥有者。'
+      ),
+      members: {}
+    },
+    IStorageHostOptions: {
+      summary: t('Captured host construction options.', '单次捕获的宿主构造选项。'),
+      members: {
+        journal: {
+          summary: t(
+            'Optional global journal configuration; omitted configurations leave the original execution path unchanged. Memory external WAL uses the original intent/marker protocol when its binding explicitly supports external awaits. Native memory undo checks all original revisions and values before restoring through the original locked transaction. Redo, blob capture, external undo and other-backend wiring remain unfinished.',
+            '可选全局 journal；省略时保持原路径。memory 外置 WAL 在原 binding 显式允许外部等待时使用原 intent/marker 协议；memory 原生 undo 比较全部原修订和值，再沿原加锁事务恢复；redo、blob 捕获、外置 undo 和其它后端接线尚未完成。'
+          )
+        }
+      }
+    },
     IBackendKeyLockPort: {
       summary: t(
         'Installation-issued canonical key locks shared by native backends.',
@@ -392,6 +452,24 @@ console.log(host.extensions.label('draft'))`,
         '私有原生 run、真实 commit/rollback 回调和已接纳工作清理，不关闭其后端。'
       ),
       members: {
+        nativeAtomic: {
+          summary: t(
+            'Remains a strict original backend fact. False is admitted only for pure external commit-only binlog without WAL, undo or selected native log stores; their requirements remain true.',
+            '保留原后端严格事实；false 只用于没有 WAL、undo 或所选 native 日志载体的纯外置 commit-only binlog，其它保证仍要求 true。'
+          )
+        },
+        indexExclusive: {
+          summary: t(
+            'Optional false fact rejects storageLogStore before recovery I/O or cached index construction. Native transaction/terminal authority remains available to the commit bridge; omission preserves existing binding semantics.',
+            '可选 false 事实使 storageLogStore 在恢复 I/O 或缓存索引建立前拒绝；提交桥仍可借用原生事务/terminal 权限，省略时保持原有绑定语义。'
+          )
+        },
+        assertLive: {
+          summary: t(
+            'Optional original generation check, captured once by storageLogStore and reused before cached reads and native ports. Memory drop invalidates old handles; it never silently reuses deleted indexes.',
+            '可选原 generation 检查，由 storageLogStore 单次捕获，在缓存读取及 native port 前复用；memory drop 使旧句柄失效，不静默复用已删除索引。'
+          )
+        },
         runCommitted: {
           summary: t(
             'Optionally publish an ordinary result inside the original actual commit terminal, before its head lease ends. Native append composition requires this port; ordinary logs do not.',
@@ -412,6 +490,18 @@ console.log(host.extensions.label('draft'))`,
         'descriptor 捕获的原生 I/O 与不可变 forOrg 投影，不使用公开 KV 前缀。'
       ),
       members: {
+        lockTarget: {
+          summary: t(
+            'Map a private image identity back onto the original canonical point lock. Native undo requires the backend-owned mapping and never builds a parallel lock registry.',
+            '把私有镜像身份映射回原规范点锁；原生 undo 要求后端自己的映射，不建立平行锁登记。'
+          )
+        },
+        externalWal: {
+          summary: t(
+            'Optional true fact from the original backend owner permits external waits after final images, together with its existing native commit-marker ports. It does not change nativeAtomic or certify cached-index exclusivity.',
+            '原后端拥有者可选的 true 事实，配合原 native marker 接点允许最终镜像后等待外部 I/O；不改变 nativeAtomic，也不证明缓存索引独占。'
+          )
+        },
         changes: {
           summary: t(
             'Memory enables ordered draft capture on the first call before business writes. Later reads return immutable images with final per-key revisions; late activation rejects instead of inventing history.',
@@ -719,8 +809,8 @@ console.log(host.extensions.label('draft'))`,
     },
     IStorageOrgAuthoringPort: {
       summary: t(
-        'Backend-only authority captured by core.createOrgAuthoringPort during installation. Lazy physical children share the original controller, key-lock and exact-store registry implementations and existing registration cleanup. Revocation seals this port; business views never receive it.',
-        '后端作者在安装窗口通过core.createOrgAuthoringPort捕获的有限权限；按需物理子后端复用原controller、键锁、精确store登记及原registration清理。撤销后拒绝，业务视图不接收此端口。'
+        'Backend-only authority captured by core.createOrgAuthoringPort during installation. Lazy physical children share the original controller, key-lock, independent createRevisionPort factory and exact-store registry implementations and existing registration cleanup. Revocation seals this port; business views never receive it.',
+        '后端作者在安装窗口通过core.createOrgAuthoringPort捕获的有限权限；按需物理子后端复用原controller、键锁、独立createRevisionPort工厂和精确store登记及原registration清理。撤销后拒绝，业务视图不接收此端口。'
       ),
       members: {
         createChangeController: {
@@ -755,6 +845,12 @@ console.log(host.extensions.label('draft'))`,
         '来自原registration的只读不可变调用接点；不授予store登记、provider安装或关闭权。'
       ),
       members: {
+        journal: {
+          summary: t(
+            'Optional fixed-org journal execution port.',
+            '可选的固定组织 journal 执行接点。'
+          )
+        },
         orgId: {
           summary: t(
             'Canonical organization fixed for every derived invocation.',

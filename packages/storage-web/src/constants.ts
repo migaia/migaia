@@ -118,3 +118,6 @@ export type IStorageMigrationStatus =
   (typeof StorageMigrationStatus)[keyof typeof StorageMigrationStatus]
 export type IStorageMigrationPhase =
   (typeof StorageMigrationPhase)[keyof typeof StorageMigrationPhase]
+
+/** Default native object store owned only by the explicitly selected IndexedDB Blob Feature. */
+export const INDEXED_DB_BLOB_STORE = '__migaia_blobs__'

@@ -38,6 +38,10 @@ export const indexedDbBackendPlugin = <
         schemaSealed = true
         construction = indexedDbHost(options, core, [...objectStores])
         core.registerStore(construction.store)
+        core.registerFeatureClientResolver(construction.store, {
+          getClient: construction.getOrgClient,
+          getTransactionClient: construction.getOrgTransactionClient
+        })
         core.registerChangeController(construction.store, construction.controller)
         if (construction.orgBinding !== undefined)
           core.registerOrgBinding(construction.store, construction.orgBinding)
@@ -47,8 +51,15 @@ export const indexedDbBackendPlugin = <
         getClient: () => construction.getClient(),
         getTransactionClient: (scope: Parameters<typeof construction.getTransactionClient>[0]) =>
           construction.getTransactionClient(scope),
+        getTransactionClientForOrg: (scope: object, orgId: string) =>
+          construction.getOrgTransactionClient(scope, orgId),
         requireObjectStore: (name: string): void => {
-          if (schemaSealed || typeof name !== 'string' || name.length === 0)
+          if (
+            schemaSealed ||
+            typeof name !== 'string' ||
+            name.length === 0 ||
+            objectStores.has(name)
+          )
             throw new StorageError(
               StorageErrorCode.invalidConfig,
               { backend: StorageBackend.indexedDb },

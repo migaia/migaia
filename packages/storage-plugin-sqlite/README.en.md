@@ -123,6 +123,15 @@ caught and unawaited failures still belong to the original transaction owner. Fe
 one frozen `exec`/`prepare` view of the same connection, without `dispose` or symbolic
 cleanup methods. The creating caller retains connection ownership.
 
+Use `host.org(orgId).backend('sqlite')` for a fixed organization. The default and
+other organizations share the same tables; creating an organization runs no DDL
+and opens no connection. One native admission queue serves them all. Data,
+deadlines, locks and revisions remain isolated by `org_id`; `host.dropOrg(orgId)`
+removes only that organization's managed rows. Native Features borrow the same
+frozen client and their factories install once. Explicit organization views reject
+arbitrary SQL and database maintenance, including inside transactions; transaction
+failures retain the original error chain.
+
 Every managed table starts with `org_id` in its primary key. Native root SQL is
 caller-owned schema access; callers must supply their own organization filters
 for custom SQL tables and must not modify internal tables.

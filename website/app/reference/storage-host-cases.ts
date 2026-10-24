@@ -408,6 +408,36 @@ console.log(await jsonCodec.decode(encoded))`,
   ],
   createStorageHost: [
     {
+      title: t('Record a real native memory commit', '记录真实 native memory 提交'),
+      problem: t(
+        'Build the same-registration private carrier before borrowing its logger.',
+        '先建立同 registration 私有载体，再借用其 logger。'
+      ),
+      example: `import { Logger } from '@migaia/logger'
+import { binlog } from '@migaia/logger/plugins/durable'
+import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+const borrowed: Array<{ shutdown(reason: 'manual'): Promise<void> }> = []
+await using host = await createStorageHost({
+  plugins: [memoryBackendPlugin()],
+  journal: async ({storageLogStore}) => {
+    const records = await storageLogStore('memory', { prefix: 'commits' })
+    const logger = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+      plugins: [binlog({ store: records })]
+    })
+    borrowed.push(logger)
+    return { logger, namespace: 'orders', atomicBinlog: { memory: records } }
+  }
+})
+try { await host.backend('memory').set('status', 'ready') }
+finally { for (const logger of borrowed) await logger.shutdown('manual') }`,
+      result: t(
+        'The value and one storage.commit share the original native commit. Host owns private handles; the application still closes borrowed loggers. A namespace declaring indexExclusive:false rejects cached log construction before recovery I/O. Native clear retains per-row images, original epochs and one clear event. Without atomicBinlog the external append starts only after COMMIT; a false-atomic terminal is accepted only for this pure commit-only combination; failure reports without changing committed success. External WAL persists intent before data/marker commit and recovers only the complete fixed target. Native memory undo validates all full revisions and values before one new original commit. Blob capture, external undo and redo remain unfinished.',
+        '值与一条 storage.commit 共用原 native 提交；宿主拥有私有句柄，应用仍关闭借用 logger。namespace 声明 indexExclusive:false 时在恢复 I/O 前拒绝缓存日志构造。原生 clear 保留逐项镜像、原 epoch 与一次 clear 事件。未选 atomicBinlog 时仅 COMMIT 后外置追加；false-atomic terminal 只准入此纯提交后组合，失败报告且不改变已提交成功。外置 WAL 在业务/marker 提交前持久化 intent，恢复只处理完整固定目标。memory 原生 undo 在一次新原提交前比较全部完整修订和值；blob 捕获、外置 undo 与 redo 尚未完成。'
+      )
+    },
+
+    {
       title: t('Run environment checks explicitly', '显式执行环境检查'),
       problem: t(
         'A caller needs to control when environment checks run without triggering probes from a business endpoint.',

@@ -44,6 +44,10 @@ try {
   await host.dispose()
 }`
 
+/** Native Blob requests share the same actual record transaction and original host cleanup. */
+const blobExample =
+  "import { createStorageHost } from '@migaia/storage-host'\nimport { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'\nimport { indexedDbBlobFeature } from '@migaia/storage-web/features/blobs'\n\nconst host = await createStorageHost({\n  plugins: [indexedDbBackendPlugin(\n    { dbName: 'attachments' }, { blobs: indexedDbBlobFeature() }\n  )]\n})\ntry {\n  const store = host.backend('indexed-db')\n  await store.transaction(async (scope) => {\n    await scope.api.blobs.put('avatar', new Blob(['avatar bytes'], { type: 'text/plain' }))\n    await scope.putRecord({ attachment: 'avatar' }, 'profile')\n  })\n  console.log(await (await store.api.blobs.get('avatar'))?.text())\n} finally {\n  await host.dispose()\n}"
+
 /** Backend definitions provide installation recipes rather than independently owned stores. */
 const backends = [
   [
@@ -375,6 +379,13 @@ export const storageWebReference: ILibraryReference = {
         ])
       )
     ),
+    'features/blobs': {
+      summary: t(
+        'Select native Blob/File storage in the original IndexedDB transaction.',
+        '在原 IndexedDB 事务中选择原生 Blob/File 存储。'
+      ),
+      example: blobExample
+    },
     'features/reactive': {
       summary: t(
         'Add live terminals to selected query chains. Each installed Feature owns one lazily attached source and retains native eventual visibility.',
@@ -384,6 +395,25 @@ export const storageWebReference: ILibraryReference = {
     }
   },
   symbols: {
+    indexedDbBlobFeature: {
+      role: 'enhancer',
+      purpose: t(
+        'Declare a native Blob store before opening and share record commit or rollback.',
+        '开库前声明原生 Blob 仓库，与 records 共用提交或回滚。'
+      ),
+      params: {
+        options: t(
+          'Optional storeName; defaults to __migaia_blobs__.',
+          '可选 storeName，默认 __migaia_blobs__。'
+        )
+      },
+      returns: t(
+        'An IndexedDB-only Feature with root and transaction blobs APIs.',
+        '仅用于 IndexedDB 的 Feature，包含根与事务 blobs API。'
+      ),
+      example: blobExample,
+      cases: storageWebCases.indexedDbBlobFeature
+    },
     lengthPrefixedNamespaceCodec: {
       role: 'constant',
       purpose: t(
@@ -464,6 +494,71 @@ export const storageWebReference: ILibraryReference = {
     }
   },
   types: {
+    IIndexedDbBlobApi: {
+      summary: t(
+        'Native Blob/File requests borrow the original database lifetime.',
+        '原生 Blob/File 请求借用原数据库生命周期。'
+      ),
+      members: {
+        put: {
+          summary: t(
+            'Write a Blob/File and wait for actual commit.',
+            '写入 Blob/File，并等待实际提交。'
+          ),
+          params: {
+            key: t('String key.', '字符串键。'),
+            value: t('Native Blob or File.', '原生 Blob 或 File。'),
+            ctx: t('Optional operation context.', '可选操作上下文。')
+          },
+          returns: t('Promise<void>.', 'Promise<void>。'),
+          example: blobExample
+        },
+        get: {
+          summary: t(
+            'Read a detached native clone or undefined.',
+            '读取脱离存储的原生克隆或 undefined。'
+          ),
+          params: {
+            key: t('String key.', '字符串键。'),
+            ctx: t('Optional operation context.', '可选操作上下文。')
+          },
+          returns: t('Promise<Blob | undefined>.', 'Promise<Blob | undefined>。'),
+          example: blobExample
+        },
+        remove: {
+          summary: t('Remove a native Blob row idempotently.', '幂等删除原生 Blob 行。'),
+          params: {
+            key: t('String key.', '字符串键。'),
+            ctx: t('Optional operation context.', '可选操作上下文。')
+          },
+          returns: t('Promise<void>.', 'Promise<void>。'),
+          example: blobExample
+        }
+      }
+    },
+    ITransactionBlobApi: {
+      summary: t(
+        'The same Blob methods use the current native transaction with no extra context.',
+        '相同 Blob 方法使用当前原生事务，不接受额外上下文。'
+      ),
+      members: {
+        put: {
+          summary: t(
+            'Stage a native Blob/File in this transaction.',
+            '在本事务暂存原生 Blob/File。'
+          ),
+          example: blobExample
+        },
+        get: {
+          summary: t('Read this transaction native Blob value.', '读取本事务的原生 Blob 值。'),
+          example: blobExample
+        },
+        remove: {
+          summary: t('Remove this transaction native Blob row.', '删除本事务的原生 Blob 行。'),
+          example: blobExample
+        }
+      }
+    },
     StorageError: {
       summary: t(
         'Error of this package with its detail fields. Entity stage wrappers preserve the complete original StorageError on the cause chain and keep its message, rather than retaining only the leaf cause.',
@@ -889,6 +984,17 @@ console.error(error.source, error.code)`,
           ),
           example: `const transaction = featureExpose.getTransactionClient(scope)`
         },
+        getTransactionClientForOrg: {
+          summary: t(
+            'Validate the exact original scope within its fixed organization.',
+            '校验固定组织中的精确原作用域。'
+          ),
+          params: {
+            scope: t('Current original scope.', '当前原作用域。'),
+            orgId: t('The immutable call organization.', '不可变调用组织。')
+          },
+          returns: t('The original synchronous IDBTransaction.', '原同步 IDBTransaction。')
+        },
         requireObjectStore: {
           summary: t(
             'Declare an additional object store before the original opener is sealed.',
@@ -1219,6 +1325,27 @@ console.error(error.source, error.code)`,
   },
   enhancers: {
     ...backendEnhancers,
+    indexedDbBlobFeature: {
+      kind: 'feature',
+      target: 'IIndexedDbBackendStore',
+      summary: t(
+        'Add Blob/File requests to the original native transaction.',
+        '为原生事务增加 Blob/File 请求。'
+      ),
+      install: blobExample,
+      example: blobExample,
+      grants: [
+        {
+          signature: 'store.api.blobs / scope.api.blobs',
+          summary: t(
+            'Read and write native clones with one rollback boundary.',
+            '在一个回滚边界内读写原生克隆。'
+          ),
+          example: blobExample
+        }
+      ],
+      scenarios: [t('Store attachments with their records.', '随记录存储附件。')]
+    },
     reactiveFeature: {
       kind: 'feature',
       target: 'IQueryChain',
