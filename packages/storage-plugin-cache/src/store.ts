@@ -582,13 +582,16 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
               ConcurrencyPolicy.wait({ timeoutMs: configuration.stampedeLock!.timeoutMs })
             )
             .run(async (tx) => {
-              const cached = await decode(
-                lockIndex,
-                key,
-                await tx.get(physical(key)),
-                policy.staleAfterMs,
-                () => tx.remove(physical(key))
-              )
+              const cached =
+                policy.mode === CacheText.refresh
+                  ? undefined
+                  : await decode(
+                      lockIndex,
+                      key,
+                      await tx.get(physical(key)),
+                      policy.staleAfterMs,
+                      () => tx.remove(physical(key))
+                    )
               if (cached && !cached.info.stale)
                 return {
                   entry: cached.entry,
@@ -612,8 +615,10 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
                     await stored(lockIndex, bounded(entry, expires!, lockIndex))
                   )
                   const ms = remaining(expires!, lockIndex)
-                  if (ms !== undefined && tiers[lockIndex]!.borrowed.has(ttl))
-                    await tx.use(ttl).expire(lockKey.text(physical(key)), ms)
+                  if (tiers[lockIndex]!.borrowed.has(ttl)) {
+                    if (ms !== undefined) await tx.use(ttl).expire(lockKey.text(physical(key)), ms)
+                    else await tx.use(ttl).persist(lockKey.text(physical(key)))
+                  }
                 } else counts.skipped[lockIndex]!++
               }
               return { entry, value, cached: undefined, expires }
@@ -1057,6 +1062,12 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
         if (entries.length)
           try {
             await apiAt(index).setMany(entries)
+            if (tiers[index]!.borrowed.has(ttl))
+              for (const item of entries)
+                if (item.ttlMs === undefined)
+                  await route(tiers[index]!.borrowed)
+                    .use(ttl)
+                    .persist(lockKey.text(item.key as string))
           } catch (error) {
             tierError(index, CacheOperation.setMany, error)
           }
@@ -1203,13 +1214,16 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
                   const existing = new Map<string, ICacheFound>(),
                     absent: string[] = []
                   for (const key of fresh) {
-                    const hit = await decode(
-                      lockIndex,
-                      key,
-                      await tx.get(physical(key)),
-                      policy.staleAfterMs,
-                      () => tx.remove(physical(key))
-                    )
+                    const hit =
+                      policy.mode === CacheText.refresh
+                        ? undefined
+                        : await decode(
+                            lockIndex,
+                            key,
+                            await tx.get(physical(key)),
+                            policy.staleAfterMs,
+                            () => tx.remove(physical(key))
+                          )
                     if (hit && !hit.info.stale) existing.set(key, hit)
                     else absent.push(key)
                   }
@@ -1247,8 +1261,11 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
                       await stored(lockIndex, bounded(item.entry, expires, lockIndex))
                     )
                     const ms = remaining(expires, lockIndex)
-                    if (ms !== undefined && tiers[lockIndex]!.borrowed.has(ttl))
-                      await tx.use(ttl).expire(lockKey.text(physical(item.key)), ms)
+                    if (tiers[lockIndex]!.borrowed.has(ttl)) {
+                      if (ms !== undefined)
+                        await tx.use(ttl).expire(lockKey.text(physical(item.key)), ms)
+                      else await tx.use(ttl).persist(lockKey.text(physical(item.key)))
+                    }
                   }
                   for (const [key, hit] of existing)
                     accepted.push({ key, entry: hit.entry, policy, upto: lockIndex })

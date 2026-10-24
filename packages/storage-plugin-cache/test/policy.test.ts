@@ -459,6 +459,41 @@ describe('cache policy composition', () => {
       await host.dispose()
     }
   })
+  it.each([false, true])(
+    'clears finite deadlines on single and batch refresh with native lock=%s',
+    async (locked) => {
+      const base = await createStorageHost({ plugins: [memoryBackendPlugin({ id: 'tier' })] })
+      const host = await base.use(
+        cachePlugin({
+          propagate: false,
+          tiers: [{ backend: 'tier' }],
+          ...(locked ? { stampedeLock: { backend: 'tier' } } : {})
+        })
+      )
+      await host.detect()
+      try {
+        const cache = host.backend('cache'),
+          native = base.backend('tier').use(ttl)
+        await cache.getOrLoad('single', async () => 'finite', { ttlMs: 10000 })
+        expect(await native.remaining(lockKey.text('cache:cache:single'))).toBeGreaterThan(0)
+        await cache.getOrLoad('single', async () => 'unbounded', { mode: 'refresh' })
+        expect(await native.remaining(lockKey.text('cache:cache:single'))).toBeUndefined()
+        await cache.getOrLoadMany(['batch'], async () => new Map([['batch', 'finite']]), {
+          ttlMs: 10000
+        })
+        expect(await native.remaining(lockKey.text('cache:cache:batch'))).toBeGreaterThan(0)
+        await cache.getOrLoadMany(['batch'], async () => new Map([['batch', 'unbounded']]), {
+          mode: 'refresh'
+        })
+        expect(await native.remaining(lockKey.text('cache:cache:batch'))).toBeUndefined()
+        expect(await cache.getOrLoadMany(['batch'], async () => new Map())).toEqual(
+          new Map([['batch', 'unbounded']])
+        )
+      } finally {
+        await host.dispose()
+      }
+    }
+  )
   it('shares the original native key lock across two cache instances', async () => {
     const base = await createStorageHost({ plugins: [memoryBackendPlugin({ id: 'shared' })] })
     const options = {
