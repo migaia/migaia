@@ -117,7 +117,11 @@ import { subscribeToAbort } from './errors.js'
 import { snapshotOperationContext } from '@migaia/storage-host/authoring/context'
 import { assertStringStorageKey } from '@migaia/storage-contract'
 import { compareStorageKeys, snapshotStorageKey } from '@migaia/storage-host/authoring/key'
-import { encodeFlatStorageKey, snapshotKeyRange } from '@migaia/storage-host/authoring/backend'
+import {
+  encodeFlatStorageKey,
+  snapshotKeyRange,
+  assertKeyRange
+} from '@migaia/storage-host/authoring/backend'
 import { planChannelWrite } from './errors.js'
 /**
  * 's raw-record firewall must distinguish a "canonical entity key" from an unclassifiable/legacy
@@ -559,7 +563,9 @@ const toIdbRange = (
   range: IKeyRange | undefined,
   KeyRange: typeof IDBKeyRange | undefined
 ): IDBKeyRange | undefined => {
-  const rangeSnapshot = snapshotKeyRange(range, StorageBackend.indexedDb)
+  assertKeyRange(range, StorageBackend.indexedDb)
+  /** IDBKeyRange consumes these bounds synchronously before any native request awaits. */
+  const rangeSnapshot = range
   if (!rangeSnapshot) return undefined
   if (!KeyRange)
     throw new StorageError(StorageErrorCode.unavailable, {
