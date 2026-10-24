@@ -2,7 +2,7 @@ import { fromValueCodec, snapshotCodec, type ICodec } from '@migaia/storage-cont
 import { defineJsonCodec } from '@migaia/serialize/codecs/json'
 import type { ICodecValue } from '@migaia/serialize/codec'
 import { jitter } from '@migaia/utils/number'
-import { CacheWriteMode } from './constants.js'
+import { CacheText, CacheWriteMode } from './constants.js'
 import { CacheErrorCode } from './error-code.js'
 import { cacheError, invalidArgument } from './errors.js'
 import type { ICacheOptions, ICacheCallOptions } from './types.js'
@@ -19,9 +19,10 @@ export function duration(value: unknown, tier?: number): number | undefined {
   return value
 }
 /** Capture options before any backend is borrowed or modified. */
-export function snapshotCacheOptions(options: ICacheOptions, id: string) {
+export function snapshotCacheOptions(options: ICacheOptions & { readonly id?: string }) {
   try {
     const {
+      id = CacheText.backend,
       tiers: input,
       prefix = `cache:${id}:`,
       maxAgeMs,
@@ -37,6 +38,8 @@ export function snapshotCacheOptions(options: ICacheOptions, id: string) {
       tagIndex
     } = options
     if (
+      typeof id !== 'string' ||
+      !id ||
       !Array.isArray(input) ||
       !input.length ||
       typeof prefix !== 'string' ||
@@ -103,6 +106,7 @@ export function snapshotCacheOptions(options: ICacheOptions, id: string) {
     if (tags && (typeof tags.backend !== 'string' || !tags.backend))
       throw cacheError(CacheErrorCode.tierInvalid)
     return Object.freeze({
+      id,
       tiers: Object.freeze(tiers),
       prefix,
       maxAgeMs: maximum,

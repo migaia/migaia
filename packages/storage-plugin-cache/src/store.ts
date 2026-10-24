@@ -698,6 +698,26 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
         ? found.info.value
         : null
     }
+    /** JavaScript batch admission detaches every entry before any pipeline or tier operation. */
+    const captureEntries = (entries: unknown): { key: string; value: string; ttlMs?: number }[] => {
+      try {
+        if (!Array.isArray(entries) || Object.keys(entries).length !== entries.length)
+          throw invalidArgument()
+        const seen = new Set<string>()
+        return entries.map((item) => {
+          if (!item || typeof item !== 'object') throw invalidArgument()
+          const { key, value, ttlMs } = item
+          assertStringStorageKey(key, CacheText.backend)
+          if (typeof value !== 'string' || seen.has(key)) throw invalidArgument()
+          snapshotCachePolicy(configuration, { ttlMs })
+          seen.add(key)
+          return { key, value, ttlMs }
+        })
+      } catch (error) {
+        if (error instanceof Error && IdentifyError.identityOf(error)) throw error
+        throw invalidArgument(error)
+      }
+    }
     const api: IKeyValueApi = {
       get: (key, ctx) => {
         physical(key)
@@ -773,17 +793,11 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
         })
       },
       setMany: (entries, ctx) => {
-        const captured = entries.map((item) => {
-          assertStringStorageKey(item.key, CacheText.backend)
-          if (typeof item.value !== 'string') throw invalidArgument()
-          return { key: item.key, value: item.value, ttlMs: item.ttlMs }
-        })
-        if (new Set(captured.map((item) => item.key)).size !== captured.length)
-          throw invalidArgument()
+        const captured = captureEntries(entries)
         return run(CacheOperation.setMany, captured, ctx, async (actual) => {
           const seen = new Set<string>(),
             items: { key: string; entry: ICacheEntry; policy: ICachePolicy }[] = []
-          for (const item of actual) {
+          for (const item of captureEntries(actual)) {
             physical(item.key)
             if (typeof item.value !== 'string' || seen.has(item.key)) throw invalidArgument()
             seen.add(item.key)

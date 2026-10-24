@@ -6,7 +6,6 @@ import {
   type IStoragePluginCore
 } from '@migaia/storage-host'
 import { cacheBackendKind } from './kind.js'
-import { CacheText } from './constants.js'
 import { snapshotCacheOptions } from './policy.js'
 import { createCacheStore } from './store.js'
 import type { ICacheOptions, ICacheStore } from './types.js'
@@ -19,8 +18,8 @@ export function cachePlugin<
   options: ICacheOptions & { readonly id?: TId },
   features?: F & IStorageFeatureStoreCompatibility<typeof cacheBackendKind, NoInfer<F>>
 ): IStorageBackendPlugin<typeof cacheBackendKind, NoInfer<TId>, F> {
-  const id = (options.id ?? CacheText.backend) as TId,
-    captured = snapshotCacheOptions(options, id)
+  const captured = snapshotCacheOptions(options),
+    id = captured.id as TId
   const descriptor = (core: IStoragePluginCore<F>) => {
     let construction: ReturnType<typeof createCacheStore>
     return {

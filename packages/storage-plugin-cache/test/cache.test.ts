@@ -245,11 +245,29 @@ describe('borrowed multi-tier cache', () => {
     }
   })
   it('rejects configuration and non-string shared keys before native writes', async () => {
+    const original = new RangeError('cache identity accessor')
+    expect(() =>
+      cachePlugin({
+        get id(): string {
+          throw original
+        },
+        tiers: [{ backend: 'a' }]
+      })
+    ).toThrowError(expect.objectContaining({ code: 'CACHE_TIER_INVALID', cause: original }))
+    expect(() => cachePlugin(null as never)).toThrowError(
+      expect.objectContaining({ code: 'CACHE_TIER_INVALID' })
+    )
     expect(() => cachePlugin({ tiers: [{ backend: 'a', write: 'back' }] })).toThrowError()
     expect(() => cachePlugin({ tiers: [{ backend: 'a', ttlMs: 0 }] })).toThrowError()
     const { host, cache, fast } = await fixture()
     try {
       expect(() => cache.getMany([['tuple']])).toThrowError()
+      const sparse: unknown[] = []
+      sparse.length = 1
+      for (const input of [null, {}, [null], sparse])
+        expect(() => cache.setMany(input as never)).toThrowError(
+          expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+        )
       expect(await fast.keys()).toEqual([])
       expect(() => cache.getOrLoad('a', async () => 'x', { ttlMs: 20000 })).toThrowError()
     } finally {
