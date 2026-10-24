@@ -54,172 +54,80 @@ export type ISparqlAttemptPorts = {
   ): Promise<boolean>
   hasAtomicUpdate(): boolean
 }
-/** One isolated attempt registers the native scope with the original transaction owner. */
-export async function runSparqlAttempt<R>(
+/** Mutable native draft facts belong to one named attempt; scopes borrow this owner. */
+type ISparqlAttemptContext = {
+  readonly ports: ISparqlAttemptPorts
+  readonly draft: ISparqlDraft
+  readonly present: Map<string, IQuad>
+  readonly absent: Map<string, IQuad>
+  mode: 'rdf' | 'raw' | undefined
+  raw: string | undefined
+  access: ISparqlDraftAccess
+}
+/** One isolated attempt registers its native scope with the original transaction owner. */
+export function runSparqlAttempt<R>(
   ports: ISparqlAttemptPorts,
   run: (scope: ISparqlTransactionScope, draft: ISparqlDraft, access: ISparqlDraftAccess) => R
 ): Promise<IConcurrencyAttempt<Awaited<R>>> {
-  const draft: ISparqlDraft = new Map(),
-    present = new Map<string, IQuad>(),
-    absent = new Map<string, IQuad>()
-  let mode: 'rdf' | 'raw' | undefined, raw: string | undefined
+  /** Initialization preserves the original draft and precondition order before any callback escapes. */
+  const context = {
+    ports,
+    draft: new Map(),
+    present: new Map(),
+    absent: new Map(),
+    mode: undefined,
+    raw: undefined
+  } as ISparqlAttemptContext
+  context.access = createSparqlDraftAccess(context)
+  return executeSparqlAttempt(context, run)
+}
+/** Accepted user work, commit and cleanup remain in the original owner ordering. */
+async function executeSparqlAttempt<R>(
+  context: ISparqlAttemptContext,
+  run: (scope: ISparqlTransactionScope, draft: ISparqlDraft, access: ISparqlDraftAccess) => R
+): Promise<IConcurrencyAttempt<Awaited<R>>> {
   /**
-   * Every invalid native combination reaches the original first-error state before it can be
-   * caught.
+   * One original transaction owner registers the fresh scope, admission and stage observation in
+   * that order.
    */
-  const fail = (scope: ISparqlTransactionScope, error: unknown): never => {
-    void runTransactionOperation(scope, () => {
-      throw error
-    })
-    throw error
-  }
-  const claim = (kind: 'rdf' | 'raw') => {
-    if (mode !== undefined && (mode !== kind || kind === 'raw')) throw invalidArgument()
-    mode = kind
-  }
-  /** Public RDF operations and selected query writes share the same canonical draft writer. */
-  const access: ISparqlDraftAccess = {
-    claim(scope) {
-      assertTransactionOwner(ports.base, scope)
-      throwIfAborted(ports.context.signal)
-      claim('rdf')
-    },
-    write(scope, quads, add) {
-      const captured = captureQuads(quads)
-      access.claim(scope)
-      for (const quad of captured) draft.set(quadIdentity(quad), { quad, add })
-    }
-  }
-  /**
-   * Fresh complete scopes are created only by the original owner for accepted
-   * operations/finalizers.
-   */
-  const createScope = (): ISparqlTransactionScope => {
-    let scope: ISparqlTransactionScope
-    /** Pipeline replacement is captured by the same ground validator before it reaches this draft. */
-    const write = (name: string, quads: readonly IQuad[], add: boolean): Promise<void> =>
-      runTransactionOperation(scope, (current) => {
-        const captured = captureQuads(quads)
-        return ports.ports.execution.run(
-          { operation: name, input: captured, scope: current, ctx: ports.context },
-          async (input) => {
-            const stage = ports.stages(current)
-            void stage.beforeTxOperation?.(name)
-            access.write(current, input, add)
-            void stage.afterTxOperation?.(name)
-          }
-        )
-      })
-    const expect = (quads: readonly IQuad[], target: Map<string, IQuad>): void => {
-      try {
-        assertTransactionOwner(ports.base, scope)
-        const captured = captureQuads(quads)
-        claim('rdf')
-        for (const quad of captured) target.set(quadIdentity(quad), quad)
-      } catch (error) {
-        fail(scope, error)
-      }
-    }
-    const api: ISparqlTxRdf = {
-      add: (quads) => write(SparqlText.add, quads, true),
-      delete: (quads) => write(SparqlText.delete, quads, false),
-      expect: (quads) => expect(quads, present),
-      expectAbsent: (quads) => expect(quads, absent),
-      match: (pattern) => {
-        try {
-          assertTransactionOwner(ports.base, scope)
-          claim('rdf')
-          return ports.query(pattern, scope, draft, access)
-        } catch (error) {
-          return fail(scope, error)
-        }
-      }
-    }
-    const native = createSparqlTag({
-      select: async () => {
-        throw invalidArgument()
-      },
-      ask: async () => {
-        throw invalidArgument()
-      },
-      construct: async () => {
-        throw invalidArgument()
-      },
-      update: (prepare) =>
-        runTransactionOperation(scope, (current) =>
-          ports.ports.execution.run(
-            { operation: SparqlText.rawUpdate, input: prepare, scope: current, ctx: ports.context },
-            async (input) => {
-              if (!ports.hasAtomicUpdate())
-                throw new StorageContractError(StorageContractErrorCode.unsupported, {
-                  backend: SparqlText.backend
-                })
-              claim('raw')
-              raw = input()
-            }
-          )
-        )
-    })
-    /** The actual raw scope exposes only update, while pure tools remain the shared originals. */
-    const tag = Object.assign(
-      (strings: TemplateStringsArray, ...values: readonly ISparqlInput[]) => {
-        try {
-          assertTransactionOwner(ports.base, scope)
-          const query = native(strings, ...values)
-          return Object.freeze({
-            update: (ctx?: never) =>
-              ctx === undefined
-                ? query.update()
-                : runTransactionOperation(scope, () => {
-                    throw invalidArgument()
-                  })
-          })
-        } catch (error) {
-          return fail(scope, error)
-        }
-      },
-      { var: native.var, join: native.join, empty: native.empty }
-    ) as ISparqlTxUpdateApi
-    function use(capability: typeof rdf): ISparqlTxRdf
-    function use(capability: typeof sparql): ISparqlTxUpdateApi
-    function use(capability: typeof rdf | typeof sparql): ISparqlTxRdf | ISparqlTxUpdateApi {
-      assertTransactionOwner(ports.base, scope)
-      if (capability === rdf) return api
-      if (capability === sparql) return tag
-      throw invalidArgument()
-    }
-    scope = { use }
-    const projected = ports.ports.createTransactionApi(scope)
-    if (projected !== undefined)
-      Object.defineProperty(scope, 'api', { value: projected, enumerable: true })
-    return Object.freeze(scope)
-  }
-  const scope = createScope(),
-    control = ports.owner.register(scope, {
-      context: ports.context,
-      createScope,
+  const scope = createSparqlScope(context),
+    control = context.ports.owner.register(scope, {
+      context: context.ports.context,
+      createScope: () => createSparqlScope(context),
       onFailure: () => undefined,
       beforeCommit: (current) => {
-        ports.assertLive()
-        throwIfAborted(ports.context.signal)
-        void ports.stages(current).beforeCommit?.()
+        context.ports.assertLive()
+        throwIfAborted(context.ports.context.signal)
+        void context.ports.stages(current).beforeCommit?.()
       }
     }),
-    stage = ports.stages(scope)
+    stage = context.ports.stages(scope)
   try {
     void stage.beforeTransaction?.()
     void stage.onTransactionStart?.()
-    const value = await runTransactionOperation(scope, (current) => run(current, draft, access))
+    /** The original native or user result is retained until its accepted write/read branch settles. */
+    const value = await runTransactionOperation(scope, (current) =>
+      run(current, context.draft, context.access)
+    )
     control.stopAdmission()
     await control.runFinalizers()
-    const modifying = raw !== undefined || draft.size > 0 || present.size > 0 || absent.size > 0
-    if (modifying && !(await ports.commit(draft, present, absent, raw))) {
+    /** Only an actual draft, raw update or precondition requires a native commit. */
+    const modifying =
+      context.raw !== undefined ||
+      context.draft.size > 0 ||
+      context.present.size > 0 ||
+      context.absent.size > 0
+    if (
+      modifying &&
+      !(await context.ports.commit(context.draft, context.present, context.absent, context.raw))
+    ) {
       void stage.afterRollback?.('WRITE_CONFLICT')
       return { status: 'conflict', phase: 'commit', keys: [], holder: undefined }
     }
-    void stage.afterCommit?.(draft.size)
+    void stage.afterCommit?.(context.draft.size)
     return { status: 'committed', value }
   } catch (error) {
+    /** The original failure remains the primary cause through rollback or terminal writer poisoning. */
     const failure = normalizeTransactionFailure(error)
     void stage.afterRollback?.('code' in failure ? String(failure.code) : undefined)
     throw failure
@@ -229,6 +137,215 @@ export async function runSparqlAttempt<R>(
     } finally {
       control.close()
       void stage.onTransactionClose?.()
+    }
+  }
+}
+/** Records invalid scope work in the original first-error owner. */
+function failSparqlAttempt(
+  context: ISparqlAttemptContext,
+  scope: ISparqlTransactionScope,
+  error: unknown
+): never {
+  void runTransactionOperation(scope, () => {
+    throw error
+  })
+  throw error
+}
+/** One attempt permits one RDF context.draft or one context.raw native update. */
+function claimSparqlAttempt(context: ISparqlAttemptContext, kind: 'rdf' | 'raw'): void {
+  if (context.mode !== undefined && (context.mode !== kind || kind === 'raw'))
+    throw invalidArgument()
+  context.mode = kind
+}
+/** Public RDF operations and selected query writes share the same canonical context.draft writer. */
+/** Fresh complete scopes are created only by the original owner for accepted operations/finalizers. */
+/** Logical organization state is passed to named query, mutation and transaction jobs. */
+type ISparqlScopeContext = {
+  /** Original context belongs to this physical namespace. */
+  readonly context: ISparqlAttemptContext
+
+  scope: ISparqlTransactionScope
+
+  api: ISparqlTxRdf
+
+  native: ReturnType<typeof createSparqlTag>
+
+  /** The actual context.raw scope exposes only update, while pure tools remain the shared originals. */
+  tag: ISparqlTxUpdateApi
+
+  projected: object | undefined
+}
+function createSparqlScope(context: ISparqlAttemptContext): ISparqlTransactionScope {
+  /** Initialize physical owners in original order before a store escapes. */
+  const scopeContext = { context } as ISparqlScopeContext
+  scopeContext.api = {
+    add: (quads) => write(scopeContext, SparqlText.add, quads, true),
+    delete: (quads) => write(scopeContext, SparqlText.delete, quads, false),
+    expect: (quads) => expect(scopeContext, quads, scopeContext.context.present),
+    expectAbsent: (quads) => expect(scopeContext, quads, scopeContext.context.absent),
+    match: (pattern) => {
+      try {
+        assertTransactionOwner(scopeContext.context.ports.base, scopeContext.scope)
+        claimSparqlAttempt(scopeContext.context, 'rdf')
+        return scopeContext.context.ports.query(
+          pattern,
+          scopeContext.scope,
+          scopeContext.context.draft,
+          scopeContext.context.access
+        )
+      } catch (error) {
+        return failSparqlAttempt(scopeContext.context, scopeContext.scope, error)
+      }
+    }
+  }
+  scopeContext.native = createSparqlTag({
+    select: async () => {
+      throw invalidArgument()
+    },
+    ask: async () => {
+      throw invalidArgument()
+    },
+    construct: async () => {
+      throw invalidArgument()
+    },
+    update: (prepare) =>
+      runTransactionOperation(scopeContext.scope, (current) =>
+        scopeContext.context.ports.ports.execution.run(
+          {
+            operation: SparqlText.rawUpdate,
+            input: prepare,
+            scope: current,
+            ctx: scopeContext.context.ports.context
+          },
+          async (input) => {
+            if (!scopeContext.context.ports.hasAtomicUpdate())
+              throw new StorageContractError(StorageContractErrorCode.unsupported, {
+                backend: SparqlText.backend
+              })
+            claimSparqlAttempt(scopeContext.context, 'raw')
+            scopeContext.context.raw = input()
+          }
+        )
+      )
+  })
+  scopeContext.tag = Object.assign(
+    (strings: TemplateStringsArray, ...values: readonly ISparqlInput[]) => {
+      try {
+        assertTransactionOwner(scopeContext.context.ports.base, scopeContext.scope)
+        /** The original tag owns fragment admission and update execution for this accepted scope. */
+        const query = scopeContext.native(strings, ...values)
+        return {
+          update: (ctx?: never) =>
+            ctx === undefined
+              ? query.update()
+              : runTransactionOperation(scopeContext.scope, () => {
+                  throw invalidArgument()
+                })
+        }
+      } catch (error) {
+        return failSparqlAttempt(scopeContext.context, scopeContext.scope, error)
+      }
+    },
+    {
+      var: scopeContext.native.var,
+      join: scopeContext.native.join,
+      empty: scopeContext.native.empty
+    }
+  ) as ISparqlTxUpdateApi
+
+  scopeContext.scope = {
+    use: ((capability: typeof rdf | typeof sparql) =>
+      use(scopeContext, capability)) as ISparqlTransactionScope['use']
+  }
+  scopeContext.projected = scopeContext.context.ports.ports.createTransactionApi(scopeContext.scope)
+
+  if (scopeContext.projected !== undefined)
+    Object.defineProperty(scopeContext.scope, 'api', {
+      value: scopeContext.projected,
+      enumerable: true
+    })
+  return scopeContext.scope
+}
+
+/**
+ * Pipeline replacement is captured by the same ground validator before it reaches this
+ * context.draft.
+ */
+function write(
+  scopeContext: ISparqlScopeContext,
+  name: string,
+  quads: readonly IQuad[],
+  add: boolean
+): Promise<void> {
+  return runTransactionOperation(scopeContext.scope, (current) => {
+    /**
+     * This accepted input is retained across native, pipeline or rendering awaits; caller mutation
+     * must not change that accepted operation.
+     */
+    const captured = captureQuads(quads)
+    return scopeContext.context.ports.ports.execution.run(
+      { operation: name, input: captured, scope: current, ctx: scopeContext.context.ports.context },
+      async (input) => {
+        /** The original transaction stage owner receives callbacks in its established order. */
+        const stage = scopeContext.context.ports.stages(current)
+        void stage.beforeTxOperation?.(name)
+        scopeContext.context.access.write(current, input, add)
+        void stage.afterTxOperation?.(name)
+      }
+    )
+  })
+}
+
+/**
+ * Captures precondition quads before commit and records rejection through the original first-error
+ * owner.
+ */
+function expect(
+  scopeContext: ISparqlScopeContext,
+  quads: readonly IQuad[],
+  target: Map<string, IQuad>
+): void {
+  try {
+    assertTransactionOwner(scopeContext.context.ports.base, scopeContext.scope)
+    /**
+     * This accepted input is retained across native, pipeline or rendering awaits; caller mutation
+     * must not change that accepted operation.
+     */
+    const captured = captureQuads(quads)
+    claimSparqlAttempt(scopeContext.context, 'rdf')
+    for (const quad of captured) target.set(quadIdentity(quad), quad)
+  } catch (error) {
+    failSparqlAttempt(scopeContext.context, scopeContext.scope, error)
+  }
+}
+
+/** Returns only capabilities declared by this existing native transaction scope. */
+function use(
+  scopeContext: ISparqlScopeContext,
+  capability: typeof rdf | typeof sparql
+): ISparqlTxRdf | ISparqlTxUpdateApi {
+  assertTransactionOwner(scopeContext.context.ports.base, scopeContext.scope)
+  if (capability === rdf) return scopeContext.api
+  if (capability === sparql) return scopeContext.tag
+  throw invalidArgument()
+}
+
+/** Creates only adapters to the existing attempt context.draft owner. */
+function createSparqlDraftAccess(context: ISparqlAttemptContext): ISparqlDraftAccess {
+  return {
+    claim(scope) {
+      assertTransactionOwner(context.ports.base, scope)
+      throwIfAborted(context.ports.context.signal)
+      claimSparqlAttempt(context, 'rdf')
+    },
+    write(scope, quads, add) {
+      /**
+       * This accepted input is retained across native, pipeline or rendering awaits; caller
+       * mutation must not change that accepted operation.
+       */
+      const captured = captureQuads(quads)
+      context.access.claim(scope)
+      for (const quad of captured) context.draft.set(quadIdentity(quad), { quad, add })
     }
   }
 }

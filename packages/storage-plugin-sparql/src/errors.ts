@@ -6,6 +6,7 @@ import { SparqlErrorText } from './error-text.js'
 import { SparqlText } from './text.js'
 /** Native errors retain their type and stack, with immutable/conflicting identities on cause. */
 export function sparqlError(code: ISparqlErrorCode, cause?: unknown): Error {
+  /** Stable contract text or a complete native request is selected before crossing its boundary. */
   const text =
     code === SparqlErrorCode.responseInvalid
       ? SparqlErrorText.responseInvalid
@@ -16,7 +17,9 @@ export function sparqlError(code: ISparqlErrorCode, cause?: unknown): Error {
           : code === SparqlErrorCode.transactionFailed
             ? SparqlErrorText.transactionFailed
             : SparqlErrorText.unavailable
+  /** A conflicting native identity remains reachable as the cause of the coded wrapper. */
   const wrap = (): Error => {
+    /** Native error classes are preserved because callers distinguish their failure families. */
     const error =
       cause instanceof TypeError
         ? new TypeError(text, { cause })
@@ -68,13 +71,4 @@ export function invalidArgument(cause?: unknown): StorageContractError {
     { backend: SparqlText.backend, cause },
     SparqlErrorText.argument
   )
-}
-/** Structural option getters are captured at the public entry before native execution. */
-export function capture<T>(read: () => T): T {
-  try {
-    return read()
-  } catch (cause) {
-    if (cause instanceof StorageContractError) throw cause
-    throw invalidArgument(cause)
-  }
 }

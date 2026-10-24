@@ -9,7 +9,7 @@ export function registerHttpRoutes(
   endpoint: ISparqlEndpoint,
   value: { readonly query: string; readonly update: string; readonly graph?: string }
 ): void {
-  routes.set(endpoint, Object.freeze(value))
+  routes.set(endpoint, value)
 }
 /** Native observation omits non-HTTP endpoints and never returns credentials or URL queries. */
 export function readHttpRoute(

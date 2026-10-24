@@ -55,6 +55,10 @@ export function graphStoreFeature() {
                 format?: IRdfGraphFormat,
                 ctx?: IOperationContext
               ): Promise<IRdfGraphDocument> {
+                /**
+                 * The graph target and selected format must remain stable while native document
+                 * work awaits.
+                 */
                 const captured = snapshotGraphTarget(target),
                   type = snapshotGraphFormat(format)
                 return readNativeFeaturePort(this.store).run(
@@ -62,11 +66,10 @@ export function graphStoreFeature() {
                   ctx,
                   false,
                   SparqlText.get,
-                  async (endpoint, signal, map) =>
-                    Object.freeze({
-                      format: type,
-                      text: await requireGraphStore(endpoint).get(map(captured), type, signal)
-                    })
+                  async (endpoint, signal, map) => ({
+                    format: type,
+                    text: await requireGraphStore(endpoint).get(map(captured), type, signal)
+                  })
                 )
               },
               async putGraph(
@@ -74,6 +77,10 @@ export function graphStoreFeature() {
                 document: IRdfGraphDocument,
                 ctx?: IOperationContext
               ): Promise<void> {
+                /**
+                 * The accepted graph and document produce one complete payload before a native
+                 * mutation is sent.
+                 */
                 const captured = snapshotGraphTarget(target),
                   doc = snapshotGraphDocument(document),
                   quads = parseRdfDocument(doc),
@@ -96,6 +103,10 @@ export function graphStoreFeature() {
                 document: IRdfGraphDocument,
                 ctx?: IOperationContext
               ): Promise<void> {
+                /**
+                 * The accepted graph and document produce one complete payload before a native
+                 * mutation is sent.
+                 */
                 const captured = snapshotGraphTarget(target),
                   doc = snapshotGraphDocument(document),
                   quads = parseRdfDocument(doc),
@@ -114,6 +125,10 @@ export function graphStoreFeature() {
                 )
               },
               async removeGraph(target: IRdfGraphTarget, ctx?: IOperationContext): Promise<void> {
+                /**
+                 * This accepted input is retained across native, pipeline or rendering awaits;
+                 * caller mutation must not change that accepted operation.
+                 */
                 const captured = snapshotGraphTarget(target)
                 return readNativeFeaturePort(this.store).run(
                   SparqlText.graphRemove,
@@ -125,6 +140,10 @@ export function graphStoreFeature() {
                 )
               },
               async hasGraph(target: IRdfGraphTarget, ctx?: IOperationContext): Promise<boolean> {
+                /**
+                 * This accepted input is retained across native, pipeline or rendering awaits;
+                 * caller mutation must not change that accepted operation.
+                 */
                 const captured = snapshotGraphTarget(target)
                 return readNativeFeaturePort(this.store).run(
                   SparqlText.graphHas,

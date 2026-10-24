@@ -15,6 +15,7 @@ function malformed(): never {
 /** A JSON binding is one raw RDF term; unbound variables are absent bindings. */
 function binding(value: unknown): IRdfBindingTerm {
   if (!value || typeof value !== 'object') return malformed()
+  /** Only actual native SPARQL binding fields enter canonical term validation. */
   const item = value as {
     type?: unknown
     value?: unknown
@@ -31,6 +32,10 @@ function binding(value: unknown): IRdfBindingTerm {
   if (item.type === 'literal' || item.type === 'typed-literal') {
     if (item['xml:lang'] !== undefined) {
       if (typeof item['xml:lang'] !== 'string') return malformed()
+      /**
+       * A native literal keeps its declared datatype/language combination during canonical
+       * conversion.
+       */
       const literal = term.literal(item.value, { language: item['xml:lang'] })
       return item.datatype === undefined
         ? literal
@@ -55,6 +60,7 @@ export function parseSparqlResults(
   kind: 'select' | 'ask'
 ): readonly ISparqlRow[] | boolean {
   try {
+    /** One real native response is parsed before its public result shape is admitted. */
     const result = JSON.parse(text) as {
       head?: { vars?: unknown }
       results?: { bindings?: unknown }
@@ -65,6 +71,7 @@ export function parseSparqlResults(
       if (typeof result.boolean !== 'boolean') return malformed()
       return result.boolean
     }
+    /** The declared SELECT variables constrain which native bindings become public row properties. */
     const variables = result.head?.vars,
       rows = result.results?.bindings
     if (
@@ -73,19 +80,12 @@ export function parseSparqlResults(
       !Array.isArray(rows)
     )
       return malformed()
-    return Object.freeze(
-      rows.map((row) => {
-        if (!row || typeof row !== 'object' || Array.isArray(row)) return malformed()
-        return Object.freeze(
-          Object.fromEntries(
-            variables.map((name) => [
-              name,
-              Object.hasOwn(row, name) ? binding(row[name]) : undefined
-            ])
-          )
-        )
-      })
-    )
+    return rows.map((row) => {
+      if (!row || typeof row !== 'object' || Array.isArray(row)) return malformed()
+      return Object.fromEntries(
+        variables.map((name) => [name, Object.hasOwn(row, name) ? binding(row[name]) : undefined])
+      )
+    })
   } catch (cause) {
     throw sparqlError(SparqlErrorCode.responseInvalid, cause)
   }

@@ -33,27 +33,27 @@ function fromNative(value: Term): IRdfTerm {
  */
 export function parseRdfDocument(document: IRdfGraphDocument): readonly IRawQuad[] {
   try {
+    /** The real RDF peer parses the complete native document before canonical result conversion. */
     const quads = new Parser({
       format: document.format,
       blankNodePrefix: 'doc' + crypto.randomUUID().replaceAll('-', '') + '_'
     }).parse(document.text)
-    return Object.freeze(
-      quads.map((quad): IRawQuad => {
-        const subject = fromNative(quad.subject),
-          predicate = fromNative(quad.predicate),
-          object = fromNative(quad.object),
-          graph = fromNative(quad.graph)
-        if (
-          (subject.termType !== RdfTermType.namedNode &&
-            subject.termType !== RdfTermType.blankNode) ||
-          predicate.termType !== RdfTermType.namedNode ||
-          object.termType === RdfTermType.defaultGraph ||
-          graph.termType === RdfTermType.literal
-        )
-          throw new TypeError(SparqlErrorText.responseInvalid)
-        return Object.freeze({ subject, predicate, object, graph })
-      })
-    )
+    return quads.map((quad): IRawQuad => {
+      /** The real RDF parser result is converted once into canonical ground quad fields. */
+      const subject = fromNative(quad.subject),
+        predicate = fromNative(quad.predicate),
+        object = fromNative(quad.object),
+        graph = fromNative(quad.graph)
+      if (
+        (subject.termType !== RdfTermType.namedNode &&
+          subject.termType !== RdfTermType.blankNode) ||
+        predicate.termType !== RdfTermType.namedNode ||
+        object.termType === RdfTermType.defaultGraph ||
+        graph.termType === RdfTermType.literal
+      )
+        throw new TypeError(SparqlErrorText.responseInvalid)
+      return { subject, predicate, object, graph }
+    })
   } catch (cause) {
     throw sparqlError(SparqlErrorCode.responseInvalid, cause)
   }
@@ -63,6 +63,7 @@ export function writeRdfDocument(
   quads: readonly IRawQuad[],
   format: IRdfGraphFormat
 ): Promise<string> {
+  /** Only this complete canonical quad is converted to the real RDF writer representation. */
   const native = (value: IRdfTerm): Term =>
     value.termType === RdfTermType.namedNode
       ? DataFactory.namedNode(value.value)
@@ -74,6 +75,7 @@ export function writeRdfDocument(
               value.value,
               value.language ?? DataFactory.namedNode(value.datatype)
             )
+  /** The existing RDF peer owns escaping and complete document serialization. */
   const writer = new Writer({ format })
   for (const quad of quads)
     writer.addQuad(

@@ -6,12 +6,13 @@ import {
   type IStorageFeatureStoreCompatibility,
   type IStoragePluginCore
 } from '@migaia/storage-host'
-import { capture, invalidArgument } from './errors.js'
+import { invalidArgument } from './errors.js'
 import { SparqlText } from './text.js'
 import { captureEndpoint, createSparqlBackend } from './store.js'
 import type { ISparqlEndpoint } from './endpoint.js'
 import type { ISparqlStore } from './types.js'
 /** The kind carries the exact non-KV native store and the unique caller-owned endpoint. */
+/** Backend selection identity remains stable for host installation and matching Features. */
 export const sparqlBackendKind = defineStorageBackendKind<ISparqlStore, ISparqlEndpoint>()(
   SparqlText.backend
 )
@@ -25,10 +26,13 @@ export function sparqlBackendPlugin<
   features?: F &
     IStorageFeatureStoreCompatibility<typeof sparqlBackendKind, NoInfer<F>, ISparqlStore>
 ): IStorageBackendPlugin<typeof sparqlBackendKind, NoInfer<TId>, F, ISparqlStore> {
-  const endpoint = captureEndpoint(capture(() => options.endpoint)),
-    id = capture(() => options.id ?? SparqlText.backend) as TId
+  /** Construction admits the caller endpoint and logical backend identity before installation. */
+  const endpoint = captureEndpoint(options.endpoint),
+    id = (options.id ?? SparqlText.backend) as TId
   if (typeof id !== 'string') throw invalidArgument()
+  /** The existing backend descriptor owns capability installation and physical controller disposal. */
   const descriptor = (core: IStoragePluginCore<F>) => {
+    /** The existing installation registrar owns organization bindings and ready/detect behavior. */
     let construction!: ReturnType<typeof createSparqlBackend>
     return {
       kind: sparqlBackendKind,
