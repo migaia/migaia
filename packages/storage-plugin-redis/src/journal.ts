@@ -30,12 +30,36 @@ function image(
       })
 }
 /** Each already-canonical business key retains its actual channel in the original journal. */
-function target(channel: IRedisChannel, key: IStorageKey): ILockKey {
+export function redisJournalTarget(channel: IRedisChannel, key: IStorageKey): ILockKey {
   if (channel === 'bytes') {
     if (typeof key !== 'string') throw invalidArgument()
     return { channel, key }
   }
   return { channel, key }
+}
+/**
+ * Each ordered fact retains immutable opaque images; final revision remains the original native
+ * owner's fact.
+ */
+export type IRedisJournalStage = Readonly<
+  Omit<IStorageJournalChange, 'afterRevision'> & { revisionField: string }
+>
+/** Capture one actual native draft mutation before another call can replace its intermediate state. */
+export function captureRedisJournalStage(input: {
+  readonly target: ILockKey
+  readonly revisionField: string
+  readonly channel: IRedisChannel | 'vector'
+  readonly before: unknown
+  readonly beforeExpiry?: number
+  readonly after: unknown
+  readonly afterExpiry?: number
+}): IRedisJournalStage {
+  return Object.freeze({
+    target: input.target,
+    revisionField: input.revisionField,
+    before: image(input.channel, input.before, input.beforeExpiry),
+    after: image(input.channel, input.after, input.afterExpiry)
+  })
 }
 /** Fixed-org terminal access has no native rollback or resource-long exclusive index guarantee. */
 export function createRedisJournalBinding(input: {
@@ -88,45 +112,17 @@ export function createRedisJournalBinding(input: {
       }
     },
     changes: (scope): readonly IStorageJournalChange[] => {
-      const { draft } = input.state(scope),
-        changes: IStorageJournalChange[] = []
-      for (const entry of draft.entries.values()) {
-        if (!entry.changed) continue
-        changes.push(
+      const { draft } = input.state(scope)
+      return Object.freeze(
+        (draft.journalStages ?? []).map((stage) =>
           Object.freeze({
-            target: target(entry.channel, entry.key),
-            before: image(entry.channel, entry.original, entry.originalExpiry),
-            after: image(
-              entry.channel,
-              entry.value,
-              entry.expiry === 'keep'
-                ? entry.originalExpiry
-                : entry.expiry === 'persist'
-                  ? undefined
-                  : entry.expiry
-            ),
-            afterRevision: String(
-              BigInt(draft.revisions.get(draft.layout.revision(entry.channel, entry.key)) ?? 0) + 1n
-            )
+            target: stage.target,
+            before: stage.before,
+            after: stage.after,
+            afterRevision: String(BigInt(draft.revisions.get(stage.revisionField) ?? 0) + 1n)
           })
         )
-      }
-      for (const entry of draft.hashes.values()) {
-        if (!entry.changed) continue
-        changes.push(
-          Object.freeze({
-            target: entry.lock,
-            before: image(
-              'vector',
-              entry.original.size ? entry.original : undefined,
-              entry.originalDeadline
-            ),
-            after: image('vector', entry.fields.size ? entry.fields : undefined, entry.deadline),
-            afterRevision: String(BigInt(draft.revisions.get(entry.physical) ?? 0) + 1n)
-          })
-        )
-      }
-      return Object.freeze(changes)
+      )
     }
   }
 }

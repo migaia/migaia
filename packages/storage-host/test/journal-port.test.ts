@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import { lockKey, runTransactionOperation } from '@migaia/storage-contract'
 import {
@@ -22,7 +22,14 @@ import { storageLogStore } from '../src/journal.js'
 import { resolveStorageLogNativeAccess } from '../src/journal/append-port.js'
 import { createMemoryBackend } from '../src/backends/memory.js'
 import { Logger } from '@migaia/logger'
-import { resolveStorageJournalBinding } from '../src/journal/binding.js'
+import {
+  resolveStorageJournalBinding,
+  snapshotStorageJournalBinding
+} from '../src/journal/binding.js'
+import {
+  prepareStorageJournalConfiguration,
+  snapshotStorageJournalConfiguration
+} from '../src/journal/configuration.js'
 import { createStorageNativeJournal } from '../src/journal/commit.js'
 
 /** Delay only an ordinary result after the original owner has actually committed and freed locks. */
@@ -95,6 +102,61 @@ function delayedCommittedPlugin(delay: {
 }
 
 describe('original native log append port', () => {
+  it('requires the original finite undo opt-in before opening a native terminal', async () => {
+    await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+    await using images = await storageLogStore(host, 'memory', { prefix: 'opt-in-images' })
+    const logger = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+      plugins: [undoLog({ store: images })]
+    })
+    try {
+      const access = resolveStorageJournalBinding(host, 'memory')
+      const open = vi.fn(access.binding.openNamespace)
+      let reads = 0
+      const original: IStorageJournalBackendBinding = {
+        ...access.binding,
+        forOrg: () => original,
+        openNamespace: open,
+        get requiresIndexedDbUndo() {
+          reads++
+          return true as const
+        }
+      }
+      const binding = snapshotStorageJournalBinding(original)
+      expect(reads).toBe(1)
+      expect(Object.isFrozen(binding)).toBe(true)
+      for (const indexedDbUndo of [undefined, false])
+        await expect(
+          prepareStorageJournalConfiguration(
+            snapshotStorageJournalConfiguration({
+              logger,
+              namespace: 'opt-in',
+              indexedDbUndo,
+              atomicUndo: { memory: images }
+            }),
+            { ...access, binding },
+            host.backend('memory').backend
+          )
+        ).rejects.toMatchObject({ code: 'UNSUPPORTED_CAPABILITY' })
+      expect(open).not.toHaveBeenCalled()
+      expect(
+        await prepareStorageJournalConfiguration(
+          snapshotStorageJournalConfiguration({
+            logger,
+            namespace: 'opt-in',
+            indexedDbUndo: true,
+            atomicUndo: { memory: images }
+          }),
+          { ...access, binding },
+          host.backend('memory').backend
+        )
+      ).toBeDefined()
+      expect(open).toHaveBeenCalledOnce()
+      expect(reads).toBe(1)
+    } finally {
+      await logger.shutdown('manual')
+    }
+  })
   it('admits a false-atomic terminal only for commit-only external binlog, retaining strict WAL/undo/native-store rejection', async () => {
     const delay = {
       hold: false,

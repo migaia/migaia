@@ -185,7 +185,75 @@ for (const service of [
         await logger.shutdown('manual')
       }
     })
-    it('publishes actual final drafts per org only after full EXEC and awaits external settle', async () => {
+    it('retains ordered staged values and TTL changes in the committed binlog', async () => {
+      await connect()
+      const prefix = crypto.randomUUID(),
+        logger = createJournalLogger()
+      namespaces.push(prefix)
+      const host = await createStorageHost({
+        plugins: [redisBackendPlugin({ driver, prefix })] as const,
+        journal: { logger, namespace: 'ordered', binlogValues: true }
+      })
+      try {
+        const store = host.backend('redis')
+        await store.transaction(async (scope) => {
+          await scope.set('a', 'one')
+          await scope.putRecord({ rank: 2 }, 'b')
+          await scope.set('c', 'three')
+          await scope.set('a', 'again')
+        })
+        const rows = await logger.binlog.read(1),
+          changes = (
+            rows[0]!.payload as {
+              changes: { target: { channel: string; key: string }; value: string }[]
+            }
+          ).changes
+        expect(changes.map((change) => [change.target.channel, change.target.key])).toEqual([
+          ['text', encodeFlatStorageKey('a')],
+          ['record', encodeFlatStorageKey('b')],
+          ['text', encodeFlatStorageKey('c')],
+          ['text', encodeFlatStorageKey('a')]
+        ])
+        expect(
+          changes.map((change) => {
+            const image = decodeRedisValue('record', change.value) as {
+              channel: 'text' | 'record'
+              value: string
+            }
+            return decodeRedisValue(image.channel, image.value)
+          })
+        ).toEqual(['one', { rank: 2 }, 'three', 'again'])
+        expect(await store.get('a')).toBe('again')
+        expect(await store.getRecord('b')).toEqual({ rank: 2 })
+        await store.transaction(async (scope) => {
+          await scope.set('deadline', 'present')
+          await scope.use(ttl).expire({ channel: 'text', key: 'deadline' }, 10000)
+          await scope.use(ttl).persist({ channel: 'text', key: 'deadline' })
+          await scope.remove('deadline')
+        })
+        const ttlChanges = (
+          (await logger.binlog.read(2))[0]!.payload as {
+            changes: { present: boolean; value?: string }[]
+          }
+        ).changes
+        expect(ttlChanges).toHaveLength(4)
+        expect(ttlChanges.map((change) => change.present)).toEqual([true, true, true, false])
+        expect(
+          ttlChanges
+            .slice(0, 3)
+            .map(
+              (change) =>
+                (decodeRedisValue('record', change.value!) as { expiresAt: number | null })
+                  .expiresAt
+            )
+        ).toEqual([null, expect.any(Number), null])
+        expect(await store.get('deadline')).toBeNull()
+      } finally {
+        await host.dispose()
+        await logger.shutdown('manual')
+      }
+    })
+    it('publishes actual ordered drafts per org only after full EXEC and awaits external settle', async () => {
       await connect()
       const prefix = crypto.randomUUID(),
         loggers = new Map<string, ReturnType<typeof createJournalLogger>>(),
@@ -243,7 +311,13 @@ for (const service of [
           txId: string
           changes: { target: { channel: string; key: string }; value: string }[]
         }
-        expect(payload.changes).toHaveLength(1)
+        expect(payload.changes).toHaveLength(2)
+        expect(
+          payload.changes.map((change) => {
+            const image = decodeRedisValue('record', change.value) as { value: string }
+            return decodeRedisValue('text', image.value)
+          })
+        ).toEqual(['second', 'final'])
         expect(payload.changes[0]?.target).toMatchObject({
           channel: 'text',
           key: encodeFlatStorageKey('value')

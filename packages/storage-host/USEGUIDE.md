@@ -261,3 +261,5 @@ PENDING-USER-REVIEW：dropOrg 遇到存活的全局 journal 时，原私有 name
 选择全局 `journal` 后，既有 bootstrap 会安装异步 stage。公开 `sync.set`、`sync.remove`、`sync.clearValues` 在修改数据或历史前报原 ASYNC_STAGE_IN_SYNC_ENTRY。同一 stage 目前也拒绝同步读取，包括仅启用遥测的配置。此组合使用异步方法；未选 journal 的宿主保留原同步方法。同步日志写入需要既有 logger 拥有者提供真实同步 append 完成接点。
 
 `/authoring/backend` 的 `encodeStorageJournalImage(present, value?, bytes?)` 与 `decodeStorageJournalImage(image, bytes?)` 为原生 adapter 复用原 memory 可移植镜像 codec。缺失与存在的 null 保持区分；字节镜像沿既有 base64 拥有者处理。codec id/version 与原 serialize 错误均不变。Memory 消费同一实现；调用方不获得原生、提交或安装权限。
+
+原生 binding 可声明 `requiresIndexedDbUndo?: true`，原 descriptor 快照单读并冻结该事实。当借用 logger 含 undo 时，同一配置拥有者要求 `indexedDbUndo: true`，缺省或 false 在打开原生终点前报 UNSUPPORTED_CAPABILITY。其它后端 binding 保持原缺省语义，仅 binlog 或仅遥测的配置不要求 undo 选择。

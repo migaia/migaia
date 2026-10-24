@@ -590,11 +590,12 @@ export async function createPostgresStore<T>(
             (persist ? 'NULL' : "clock_timestamp()+($3::float8*interval '1 millisecond')") +
             ' WHERE org_id=$1 AND key=$2' +
             (persist ? ' AND expires_at IS NOT NULL' : '') +
-            ' RETURNING key',
+            ' RETURNING key' +
+            (state.journal === undefined ? '' : ',value,expires_at::text AS deadline'),
           [runtime.orgId, encoded, ...(persist ? [] : [ms!])],
           state.ctx
         )
-        if (result.rowCount !== 0) markPgChanged(state, channel, key)
+        if (result.rowCount !== 0) markPgChanged(state, channel, key, result.rows[0])
         return result.rowCount !== 0
       }
       /** Complete original views are built for the user, every accepted operation and commit checks. */
