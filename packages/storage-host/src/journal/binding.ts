@@ -31,6 +31,7 @@ export function snapshotStorageJournalBinding(
     }
     for (const key of [
       'forOrg',
+      'lockTarget',
       'openNamespace',
       'changes',
       'readImage',

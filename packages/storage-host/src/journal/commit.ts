@@ -18,12 +18,14 @@ import {
 import { encodeFlatStorageKey } from '../core/key-domain.js'
 import type { IStorageJournalBackendAccess } from './binding.js'
 import { resolveStorageLogNativeAccess } from './append-port.js'
-import type { IStorageJournalChange, IStorageJournalTarget } from './types.js'
+import type { IStorageJournalChange } from './types.js'
 import { createStorageOperationReporter, reportCleanupError } from '../core/operation-reporter.js'
 import { isStorageErrorFamily } from '../core/error-family.js'
 
 import { StorageJournalKind } from './constants.js'
 import { createStorageExternalWal } from './wal.js'
+import { storageJournalTargetWire, storageJournalTargetIdentity } from './targets.js'
+import { createStorageJournalUndo } from './undo.js'
 /** Private terminal access shares the original namespace resource and never enters business KV. */
 const terminalNamespace = 'storage.journal.terminal'
 /** Complete undo targets survive the original logger's target/before/after projection. */
@@ -35,18 +37,6 @@ export type IStorageUndoTarget = Readonly<{
   identity: ILogPayload
   afterRevision: ILogPayload
 }>
-
-/** Encode only the already canonical original target; storage key codecs retain Date/binary keys. */
-export function storageJournalTargetWire(target: IStorageJournalTarget): ILogPayload {
-  return target.channel === 'rdf'
-    ? snapshotLogRecords([{ kind: StorageJournalKind.commit, payload: target }])[0]!.payload
-    : target.channel === 'vector'
-      ? { channel: target.channel, collection: target.collection, id: target.id }
-      : {
-          channel: target.channel,
-          key: target.channel === 'metadata' ? target.key : encodeFlatStorageKey(target.key)
-        }
-}
 
 /** Repeated writes keep their first before image and last actual after image and full revision. */
 export function storageJournalUndoImages(
@@ -60,14 +50,7 @@ export function storageJournalUndoImages(
     /** The original target codec keeps every persisted business key in its existing domain. */
     const identity = storageJournalTargetWire(change.target)
     /** Metadata and native point identities remain distinct even when their strings coincide. */
-    const key = encodeFlatStorageKey(
-      change.target.channel === 'metadata'
-        ? [change.target.channel, change.target.key]
-        : [
-            change.target.channel,
-            snapshotConcurrencyLockKeys([change.target], backend).identities[0]!
-          ]
-    )
+    const key = storageJournalTargetIdentity(change.target, backend)
     /** First-before ownership survives every later overwrite of this same physical identity. */
     const previous = merged.get(key)
     merged.set(key, {
@@ -142,12 +125,24 @@ export async function createStorageNativeJournal(options: {
   await Promise.all([binlog?.ready(), undo?.ready(), logger.wal?.ready()])
   /** Recovery uses only the original terminal after its native guarantee is admitted. */
   let wal: Awaited<ReturnType<typeof createStorageExternalWal>> | undefined
+  /** The same resource-construction boundary owns rejected undo binding preparation. */
+  let undoExecution: ReturnType<typeof createStorageJournalUndo> | undefined
   /** The existing namespace owns authentication and eventual cleanup, rather than a new scope. */
   const terminal = await access.binding.openNamespace(
     encodeFlatStorageKey([terminalNamespace, namespace, access.backendInstanceId])
   )
   try {
-    if (!terminal.nativeAtomic) throw new StorageContractError(StorageContractErrorCode.unsupported)
+    /** Pure commit-only external binlog needs authentic success, not rollback atomicity. */
+    const commitOnly =
+      binlog !== undefined &&
+      undo === undefined &&
+      logger.wal === undefined &&
+      atomicBinlog === undefined &&
+      atomicUndo === undefined
+    /** This original fact is captured once and never weakened for WAL, undo or native log stores. */
+    const nativeAtomic = terminal.nativeAtomic
+    if (nativeAtomic !== true && !(nativeAtomic === false && commitOnly))
+      throw new StorageContractError(StorageContractErrorCode.unsupported)
     access.retain(terminal)
     if (logger.wal !== undefined && binlogNative === undefined)
       wal = await createStorageExternalWal({
@@ -160,6 +155,14 @@ export async function createStorageNativeJournal(options: {
         beforeRecover: options.beforeRecover,
         afterRecover: options.afterRecover,
         onRecoverError: options.onRecoverError
+      })
+    if (undo !== undefined)
+      undoExecution = createStorageJournalUndo({
+        access,
+        backend: options.backend,
+        target,
+        undo,
+        terminal
       })
   } catch (cause) {
     try {
@@ -177,6 +180,7 @@ export async function createStorageNativeJournal(options: {
   ).keys
   return Object.freeze({
     headLocks,
+    undo: undoExecution,
     /** Only the native owner's authentic callback view may activate capture for this attempt. */
     begin: (scope: Omit<ITransactionScope, 'use'>) => {
       /** Do not trust an arbitrary caller id or an unrelated object with matching fields. */

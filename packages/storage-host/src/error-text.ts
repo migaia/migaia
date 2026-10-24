@@ -4,6 +4,10 @@ export const StorageErrorText = {
   journalRecordInvalid: 'storage journal record is invalid',
   /** An uncertain commit seals the handle until recovery reads its original durable head. */
   journalRecoveryFailed: 'storage journal recovery or commit failed',
+  /** Undo refuses any mismatch before writing a single before image. */
+  undoConflict: 'storage undo value or revision conflicts with the committed image',
+  /** Unknown transaction identities cannot select a restore target. */
+  undoNotFound: 'storage undo transaction was not found',
   /** Native memory limits are captured before allocating its original physical namespace. */
   memoryCapacityArgument: 'memory capacity limits or eviction policy are invalid',
   /** Explicit byte accounting requires an actual existing canonical encoding rather than estimates. */
