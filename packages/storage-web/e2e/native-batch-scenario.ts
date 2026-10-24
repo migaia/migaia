@@ -1,3 +1,4 @@
+import { indexedDbTestFeatures } from '../test/helpers/indexed-db-features.js'
 import { createStorageHost } from '@migaia/storage-host'
 import { kv } from '@migaia/storage-contract'
 import { indexedDbBackendPlugin } from '../src/indexed-db.js'
@@ -21,7 +22,12 @@ declare global {
 window.runIndexedDbNativeBatchScenario = async () => {
   /** Each real host owns its original connection and disposes after the complete scenario. */
   const host = await createStorageHost({
-    plugins: [indexedDbBackendPlugin({ dbName: `native-batch-${crypto.randomUUID()}` })]
+    plugins: [
+      indexedDbBackendPlugin(
+        { dbName: `native-batch-${crypto.randomUUID()}` },
+        indexedDbTestFeatures
+      )
+    ]
   })
   try {
     const store = host.backend('indexed-db')

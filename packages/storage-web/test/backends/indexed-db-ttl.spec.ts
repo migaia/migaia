@@ -1,3 +1,4 @@
+import { indexedDbTestFeatures } from '../helpers/indexed-db-features.js'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb'
 import { ttl, kv } from '@migaia/storage-contract'
@@ -12,11 +13,14 @@ async function setup() {
   const host = await createStorageHost({
     scheduler,
     plugins: [
-      indexedDbBackendPlugin({
-        factory: new IDBFactory(),
-        keyRange: IDBKeyRange,
-        dbName: `ttl-${crypto.randomUUID()}`
-      })
+      indexedDbBackendPlugin(
+        {
+          factory: new IDBFactory(),
+          keyRange: IDBKeyRange,
+          dbName: `ttl-${crypto.randomUUID()}`
+        },
+        indexedDbTestFeatures
+      )
     ]
   })
   onTestFinished(() => host.dispose())
@@ -103,14 +107,18 @@ describe('native IndexedDB TTL', () => {
     const factory = new IDBFactory()
     const dbName = `ttl-reopen-${crypto.randomUUID()}`
     const first = await createStorageHost({
-      plugins: [indexedDbBackendPlugin({ factory, keyRange: IDBKeyRange, dbName })]
+      plugins: [
+        indexedDbBackendPlugin({ factory, keyRange: IDBKeyRange, dbName }, indexedDbTestFeatures)
+      ]
     })
     const firstStore = first.backend('indexed-db')
     await firstStore.set('kept', 'value')
     await firstStore.use(ttl).expire({ channel: 'text', key: 'kept' }, 60_000)
     await first.dispose()
     const second = await createStorageHost({
-      plugins: [indexedDbBackendPlugin({ factory, keyRange: IDBKeyRange, dbName })]
+      plugins: [
+        indexedDbBackendPlugin({ factory, keyRange: IDBKeyRange, dbName }, indexedDbTestFeatures)
+      ]
     })
     onTestFinished(() => second.dispose())
     const secondStore = second.backend('indexed-db')

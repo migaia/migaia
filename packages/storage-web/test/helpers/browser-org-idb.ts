@@ -1,3 +1,4 @@
+import { indexedDbTestFeatures } from './indexed-db-features.js'
 import { createStorageHost, createOrgId } from '@migaia/storage-host'
 import { indexedDbBackendPlugin } from '../../src/indexed-db.js'
 
@@ -17,8 +18,8 @@ export async function runBrowserIndexedDbOrgScenario() {
     const host = await createStorageHost({
       org: defaultOrg,
       plugins: [
-        indexedDbBackendPlugin({ id: 'prefs', dbName: prefix }),
-        indexedDbBackendPlugin({ id: 'cache', dbName: prefix + '-cache' })
+        indexedDbBackendPlugin({ id: 'prefs', dbName: prefix }, indexedDbTestFeatures),
+        indexedDbBackendPlugin({ id: 'cache', dbName: prefix + '-cache' }, indexedDbTestFeatures)
       ]
     })
     try {

@@ -1,3 +1,6 @@
+import { memoryNotificationsFeature } from '@migaia/storage-host/features/memory-notifications'
+import { memoryChangeFeedFeature } from '@migaia/storage-host/features/memory-change-feed'
+import { indexedDbTestFeatures } from './indexed-db-features.js'
 import { onTestFinished, vi } from 'vitest'
 import * as entityOwner from '@migaia/storage-host/entity'
 import type { IRecordIndexBackfillStore } from '@migaia/storage-host/entity'
@@ -63,7 +66,9 @@ export async function createIndexedDbTestStore(
   options: IIndexedDbOptions = {}
 ): Promise<IIndexedDbBackendStore> {
   /** The fixture does not substitute a scope, transaction, controller or resource owner. */
-  const host = await createStorageHost({ plugins: [indexedDbBackendPlugin(options)] })
+  const host = await createStorageHost({
+    plugins: [indexedDbBackendPlugin(options, indexedDbTestFeatures)]
+  })
   onTestFinished(() => host.dispose())
   return host.backend('indexed-db')
 }
@@ -73,7 +78,14 @@ export async function createMemoryTestStore(
   options: IMemoryOptions = {}
 ): Promise<IMemoryBackendStore> {
   /** Preserve the real registration instead of creating a backend with fabricated runtime ports. */
-  const host = await createStorageHost({ plugins: [memoryBackendPlugin(options)] })
+  const host = await createStorageHost({
+    plugins: [
+      memoryBackendPlugin(options, {
+        notifications: memoryNotificationsFeature(),
+        changeFeed: memoryChangeFeedFeature()
+      })
+    ]
+  })
   onTestFinished(() => host.dispose())
   return host.backend('memory')
 }

@@ -1,3 +1,4 @@
+import { indexedDbTestFeatures } from '../helpers/indexed-db-features.js'
 // @vitest-environment node
 import { IDBFactory, IDBKeyRange, IDBObjectStore } from 'fake-indexeddb'
 import { describe, expect, it, vi } from 'vitest'
@@ -21,15 +22,23 @@ describe('native IndexedDB private journal namespaces', () => {
         cmp: (first, second) => factory.cmp(first, second)
       }
       await using host = await createStorageHost({
-        plugins: [indexedDbBackendPlugin({ keyRange: IDBKeyRange, dbName: 'no-web-locks' })]
+        plugins: [
+          indexedDbBackendPlugin(
+            { keyRange: IDBKeyRange, dbName: 'no-web-locks' },
+            indexedDbTestFeatures
+          )
+        ]
       })
       await using peer = await createStorageHost({
         plugins: [
-          indexedDbBackendPlugin({
-            factory: wrapper,
-            keyRange: IDBKeyRange,
-            dbName: 'no-web-locks'
-          })
+          indexedDbBackendPlugin(
+            {
+              factory: wrapper,
+              keyRange: IDBKeyRange,
+              dbName: 'no-web-locks'
+            },
+            indexedDbTestFeatures
+          )
         ]
       })
       const one = await storageLogStore(host, 'indexed-db', { prefix: 'history' })
@@ -71,12 +80,15 @@ describe('native IndexedDB private journal namespaces', () => {
     const factory = new IDBFactory()
     await using host = await createStorageHost({
       plugins: [
-        indexedDbBackendPlugin({
-          factory,
-          keyRange: IDBKeyRange,
-          dbName: 'journal',
-          journalFactoryIsPrivate: true
-        })
+        indexedDbBackendPlugin(
+          {
+            factory,
+            keyRange: IDBKeyRange,
+            dbName: 'journal',
+            journalFactoryIsPrivate: true
+          },
+          indexedDbTestFeatures
+        )
       ]
     })
     const first = host.org(createOrgId())
@@ -116,12 +128,15 @@ describe('native IndexedDB private journal namespaces', () => {
     const factory = new IDBFactory()
     await using host = await createStorageHost({
       plugins: [
-        indexedDbBackendPlugin({
-          factory,
-          keyRange: IDBKeyRange,
-          dbName: 'abort',
-          journalFactoryIsPrivate: true
-        })
+        indexedDbBackendPlugin(
+          {
+            factory,
+            keyRange: IDBKeyRange,
+            dbName: 'abort',
+            journalFactoryIsPrivate: true
+          },
+          indexedDbTestFeatures
+        )
       ]
     })
     const log = await storageLogStore(host, 'indexed-db', { prefix: 'history' })
@@ -167,11 +182,11 @@ describe('native IndexedDB private journal namespaces', () => {
     const orgId = createOrgId()
     await using host = await createStorageHost({
       org: orgId,
-      plugins: [indexedDbBackendPlugin(options)]
+      plugins: [indexedDbBackendPlugin(options, indexedDbTestFeatures)]
     })
     await using peer = await createStorageHost({
       org: orgId,
-      plugins: [indexedDbBackendPlugin(options)]
+      plugins: [indexedDbBackendPlugin(options, indexedDbTestFeatures)]
     })
     const log = await storageLogStore(host, 'indexed-db', { prefix: 'history' })
     await log.append([{ kind: 'old', payload: null }])

@@ -1,3 +1,4 @@
+import { indexedDbTestFeatures } from '../helpers/indexed-db-features.js'
 import { describe, expect, it, vi } from 'vitest'
 import { IDBDatabase, IDBFactory, IDBKeyRange } from 'fake-indexeddb'
 import { createStorageHost, definePlugin } from '@migaia/storage-host'
@@ -17,7 +18,12 @@ import {
 describe('standard native KV batches', () => {
   it('keeps a scoped invalid batch on the original first-failure path', async () => {
     await using host = await createStorageHost({
-      plugins: [indexedDbBackendPlugin({ factory: new IDBFactory(), keyRange: IDBKeyRange })]
+      plugins: [
+        indexedDbBackendPlugin(
+          { factory: new IDBFactory(), keyRange: IDBKeyRange },
+          indexedDbTestFeatures
+        )
+      ]
     })
     const store = host.backend('indexed-db')
     let operationFailure: unknown
@@ -35,7 +41,12 @@ describe('standard native KV batches', () => {
 
   it('preserves scoped entry getter order before unsupported TTL and duplicate failures', async () => {
     await using host = await createStorageHost({
-      plugins: [indexedDbBackendPlugin({ factory: new IDBFactory(), keyRange: IDBKeyRange })]
+      plugins: [
+        indexedDbBackendPlugin(
+          { factory: new IDBFactory(), keyRange: IDBKeyRange },
+          indexedDbTestFeatures
+        )
+      ]
     })
     const store = host.backend('indexed-db')
     /** Invalid keys fail before any value getter; a later duplicate still reads value then TTL. */
@@ -100,7 +111,10 @@ describe('standard native KV batches', () => {
     }))
     await using host = await createStorageHost({
       plugins: [
-        indexedDbBackendPlugin({ factory: new IDBFactory(), keyRange: IDBKeyRange }),
+        indexedDbBackendPlugin(
+          { factory: new IDBFactory(), keyRange: IDBKeyRange },
+          indexedDbTestFeatures
+        ),
         observer
       ]
     })
@@ -212,7 +226,12 @@ describe('standard native KV batches', () => {
 
   it('observes scoped batches once through their original transaction identity', async () => {
     await using host = await createStorageHost({
-      plugins: [indexedDbBackendPlugin({ factory: new IDBFactory(), keyRange: IDBKeyRange })]
+      plugins: [
+        indexedDbBackendPlugin(
+          { factory: new IDBFactory(), keyRange: IDBKeyRange },
+          indexedDbTestFeatures
+        )
+      ]
     })
     const store = host.backend('indexed-db')
     const before = vi.fn()

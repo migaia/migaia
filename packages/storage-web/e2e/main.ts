@@ -1,3 +1,4 @@
+import { indexedDbTestFeatures } from '../test/helpers/indexed-db-features.js'
 import '../test/helpers/browser-program-app.js'
 import { walkErrorCauses } from '@migaia/utils/error'
 import { STORAGE_WEB_SOURCE } from '../src/index.js'
@@ -1579,7 +1580,7 @@ window.runIndexedDbBlockedScenario = async () => {
   let blockedErrorCode: string | undefined
   /** Observe failure immediately while the original native upgrade waits for its blocker to close. */
   const openAttempt = createStorageHost({
-    plugins: [indexedDbBackendPlugin({ factory, dbName })]
+    plugins: [indexedDbBackendPlugin({ factory, dbName }, indexedDbTestFeatures)]
   }).then(
     (host) => host.dispose(),
     (error: { code?: string }) => {
@@ -1591,7 +1592,7 @@ window.runIndexedDbBlockedScenario = async () => {
   await openAttempt
   /** Preparation failure publishes no store; a new original installation owns the retry. */
   const storeHost = await createStorageHost({
-    plugins: [indexedDbBackendPlugin({ factory, dbName })]
+    plugins: [indexedDbBackendPlugin({ factory, dbName }, indexedDbTestFeatures)]
   })
   try {
     const store = storeHost.backend('indexed-db')
@@ -1599,7 +1600,7 @@ window.runIndexedDbBlockedScenario = async () => {
     const freshInstallationRetrySucceeded = (await store.get('k')) === 'fresh-installation-retry'
     /** An independent registration rereads durable state after the blocker has closed. */
     const retryStoreHost = await createStorageHost({
-      plugins: [indexedDbBackendPlugin({ factory, dbName })]
+      plugins: [indexedDbBackendPlugin({ factory, dbName }, indexedDbTestFeatures)]
     })
     try {
       const retryStore = retryStoreHost.backend('indexed-db')
@@ -1609,7 +1610,7 @@ window.runIndexedDbBlockedScenario = async () => {
       const hostileDbName = `${dbName}-hostile-close`
       /** The actual host owns this scenario registration and its original native cleanup. */
       const hostileStoreHost = await createStorageHost({
-        plugins: [indexedDbBackendPlugin({ factory, dbName: hostileDbName })]
+        plugins: [indexedDbBackendPlugin({ factory, dbName: hostileDbName }, indexedDbTestFeatures)]
       })
       try {
         const hostileStore = hostileStoreHost.backend('indexed-db')
@@ -1677,7 +1678,9 @@ window.runIndexedDbBlockedScenario = async () => {
         }
         try {
           const _failedHost = await createStorageHost({
-            plugins: [indexedDbBackendPlugin({ factory, dbName: transitionDbName })]
+            plugins: [
+              indexedDbBackendPlugin({ factory, dbName: transitionDbName }, indexedDbTestFeatures)
+            ]
           })
           await _failedHost.dispose()
         } catch (error) {
@@ -1687,7 +1690,9 @@ window.runIndexedDbBlockedScenario = async () => {
         }
         /** Only the successfully published registration can be used after preparation rollback. */
         const transitionStoreHost = await createStorageHost({
-          plugins: [indexedDbBackendPlugin({ factory, dbName: transitionDbName })]
+          plugins: [
+            indexedDbBackendPlugin({ factory, dbName: transitionDbName }, indexedDbTestFeatures)
+          ]
         })
         try {
           const transitionStore = transitionStoreHost.backend('indexed-db')
@@ -1753,7 +1758,12 @@ window.runIndexedDbBlockedScenario = async () => {
             let code: string | undefined
             try {
               const _failedHost = await createStorageHost({
-                plugins: [indexedDbBackendPlugin({ factory: hostileFactory, dbName: schemaDbName })]
+                plugins: [
+                  indexedDbBackendPlugin(
+                    { factory: hostileFactory, dbName: schemaDbName },
+                    indexedDbTestFeatures
+                  )
+                ]
               })
               await _failedHost.dispose()
             } catch (error) {
@@ -1764,7 +1774,12 @@ window.runIndexedDbBlockedScenario = async () => {
              * back.
              */
             const schemaStoreHost = await createStorageHost({
-              plugins: [indexedDbBackendPlugin({ factory: hostileFactory, dbName: schemaDbName })]
+              plugins: [
+                indexedDbBackendPlugin(
+                  { factory: hostileFactory, dbName: schemaDbName },
+                  indexedDbTestFeatures
+                )
+              ]
             })
             try {
               const schemaStore = schemaStoreHost.backend('indexed-db')
@@ -1793,7 +1808,9 @@ window.runIndexedDbBlockedScenario = async () => {
             const connectionDbName = `${dbName}-connection-${property}`
             /** The actual host owns this scenario registration and its original native cleanup. */
             const seedStoreHost = await createStorageHost({
-              plugins: [indexedDbBackendPlugin({ factory, dbName: connectionDbName })]
+              plugins: [
+                indexedDbBackendPlugin({ factory, dbName: connectionDbName }, indexedDbTestFeatures)
+              ]
             })
             try {
               const seedStore = seedStoreHost.backend('indexed-db')
@@ -1846,7 +1863,10 @@ window.runIndexedDbBlockedScenario = async () => {
               try {
                 const _failedHost = await createStorageHost({
                   plugins: [
-                    indexedDbBackendPlugin({ factory: hostileFactory, dbName: connectionDbName })
+                    indexedDbBackendPlugin(
+                      { factory: hostileFactory, dbName: connectionDbName },
+                      indexedDbTestFeatures
+                    )
                   ]
                 })
                 await _failedHost.dispose()
@@ -1859,7 +1879,10 @@ window.runIndexedDbBlockedScenario = async () => {
                */
               const connectionStoreHost = await createStorageHost({
                 plugins: [
-                  indexedDbBackendPlugin({ factory: hostileFactory, dbName: connectionDbName })
+                  indexedDbBackendPlugin(
+                    { factory: hostileFactory, dbName: connectionDbName },
+                    indexedDbTestFeatures
+                  )
                 ]
               })
               try {
@@ -1917,12 +1940,14 @@ window.runIndexedDbBlockedScenario = async () => {
 window.runIndexedDbTransactionConflictScenario = async () => {
   const dbName = `conflict-${Math.random().toString(36).slice(2)}`
   /** The actual host owns this scenario registration and its original native cleanup. */
-  const firstHost = await createStorageHost({ plugins: [indexedDbBackendPlugin({ dbName })] })
+  const firstHost = await createStorageHost({
+    plugins: [indexedDbBackendPlugin({ dbName }, indexedDbTestFeatures)]
+  })
   try {
     const first = firstHost.backend('indexed-db')
     /** The actual host owns this scenario registration and its original native cleanup. */
     const secondHost = await createStorageHost({
-      plugins: [indexedDbBackendPlugin({ dbName })]
+      plugins: [indexedDbBackendPlugin({ dbName }, indexedDbTestFeatures)]
     })
     try {
       const second = secondHost.backend('indexed-db')
@@ -1958,7 +1983,9 @@ window.runIndexedDbTransactionConflictScenario = async () => {
 window.runIndexedDbEscapedTransactionScopeScenario = async () => {
   const dbName = `escaped-scope-${Math.random().toString(36).slice(2)}`
   /** The actual host owns this scenario registration and its original native cleanup. */
-  const storeHost = await createStorageHost({ plugins: [indexedDbBackendPlugin({ dbName })] })
+  const storeHost = await createStorageHost({
+    plugins: [indexedDbBackendPlugin({ dbName }, indexedDbTestFeatures)]
+  })
   try {
     const store = storeHost.backend('indexed-db')
     let escaped: import('@migaia/storage-contract').ITransactionScope | undefined
@@ -1991,7 +2018,9 @@ window.runIndexedDbEscapedTransactionScopeScenario = async () => {
 window.runIndexedDbClearAbortScenario = async () => {
   const dbName = `clear-abort-${Math.random().toString(36).slice(2)}`
   /** The actual host owns this scenario registration and its original native cleanup. */
-  const storeHost = await createStorageHost({ plugins: [indexedDbBackendPlugin({ dbName })] })
+  const storeHost = await createStorageHost({
+    plugins: [indexedDbBackendPlugin({ dbName }, indexedDbTestFeatures)]
+  })
   try {
     const store = storeHost.backend('indexed-db')
     await store.set('all-value', 'keep')
@@ -2029,7 +2058,9 @@ window.runIndexedDbClearAbortScenario = async () => {
 window.runIndexedDbDeleteAbortScenario = async () => {
   const dbName = `delete-abort-${Math.random().toString(36).slice(2)}`
   /** The actual host owns this scenario registration and its original native cleanup. */
-  const storeHost = await createStorageHost({ plugins: [indexedDbBackendPlugin({ dbName })] })
+  const storeHost = await createStorageHost({
+    plugins: [indexedDbBackendPlugin({ dbName }, indexedDbTestFeatures)]
+  })
   try {
     const store = storeHost.backend('indexed-db')
     await store.putRecord({ keep: true }, 'delete-me')
@@ -2056,7 +2087,9 @@ window.runIndexedDbDeleteAbortScenario = async () => {
 window.runIndexedDbPutAbortScenario = async () => {
   const dbName = `put-abort-${Math.random().toString(36).slice(2)}`
   /** The actual host owns this scenario registration and its original native cleanup. */
-  const storeHost = await createStorageHost({ plugins: [indexedDbBackendPlugin({ dbName })] })
+  const storeHost = await createStorageHost({
+    plugins: [indexedDbBackendPlugin({ dbName }, indexedDbTestFeatures)]
+  })
   try {
     const store = storeHost.backend('indexed-db')
     await store.putRecord({ warm: true }, 'warm')
@@ -2085,7 +2118,9 @@ window.runIndexedDbPutAbortScenario = async () => {
 window.runIndexedDbEntityMigrationScenario = async () => {
   const dbName = `entity-migrate-${Math.random().toString(36).slice(2)}`
   /** The actual host owns this scenario registration and its original native cleanup. */
-  const storeHost = await createStorageHost({ plugins: [indexedDbBackendPlugin({ dbName })] })
+  const storeHost = await createStorageHost({
+    plugins: [indexedDbBackendPlugin({ dbName }, indexedDbTestFeatures)]
+  })
   try {
     const store = storeHost.backend('indexed-db')
     const entity = defineEntity<{ id: string; displayName: string }>({
@@ -2158,7 +2193,9 @@ window.runIndexedDbEntityMigrationScenario = async () => {
 window.runIndexedDbConcurrentEntityMigrationScenario = async () => {
   const dbName = `entity-migrate-concurrent-${Math.random().toString(36).slice(2)}`
   /** The actual host owns this scenario registration and its original native cleanup. */
-  const seedHost = await createStorageHost({ plugins: [indexedDbBackendPlugin({ dbName })] })
+  const seedHost = await createStorageHost({
+    plugins: [indexedDbBackendPlugin({ dbName }, indexedDbTestFeatures)]
+  })
   try {
     const seed = seedHost.backend('indexed-db')
     await seed.putRecord({ version: 1, state: { id: 'a', name: 'Ada' } }, [
@@ -2170,12 +2207,14 @@ window.runIndexedDbConcurrentEntityMigrationScenario = async () => {
       'b'
     ])
     /** The actual host owns this scenario registration and its original native cleanup. */
-    const firstHost = await createStorageHost({ plugins: [indexedDbBackendPlugin({ dbName })] })
+    const firstHost = await createStorageHost({
+      plugins: [indexedDbBackendPlugin({ dbName }, indexedDbTestFeatures)]
+    })
     try {
       const first = firstHost.backend('indexed-db')
       /** The actual host owns this scenario registration and its original native cleanup. */
       const secondHost = await createStorageHost({
-        plugins: [indexedDbBackendPlugin({ dbName })]
+        plugins: [indexedDbBackendPlugin({ dbName }, indexedDbTestFeatures)]
       })
       try {
         const second = secondHost.backend('indexed-db')
@@ -2231,7 +2270,9 @@ window.runIndexedDbCrossRealmKeyScenario = async () => {
   }
   const dbName = `cross-realm-key-${Math.random().toString(36).slice(2)}`
   /** The actual host owns this scenario registration and its original native cleanup. */
-  const storeHost = await createStorageHost({ plugins: [indexedDbBackendPlugin({ dbName })] })
+  const storeHost = await createStorageHost({
+    plugins: [indexedDbBackendPlugin({ dbName }, indexedDbTestFeatures)]
+  })
   try {
     const store = storeHost.backend('indexed-db')
     const dateKey = new realm.Date('2025-01-02T03:04:05.000Z')
@@ -2307,7 +2348,9 @@ window.runByteBrandScenario = async () => {
 /** Real browser raw writes rotate each key domain while rollback preserves the committed sidecar. */
 window.runIndexedDbRawIndexFirewallScenario = async () => {
   const dbName = `raw-index-firewall-${Math.random().toString(36).slice(2)}`
-  const storeHost = await createStorageHost({ plugins: [indexedDbBackendPlugin({ dbName })] })
+  const storeHost = await createStorageHost({
+    plugins: [indexedDbBackendPlugin({ dbName }, indexedDbTestFeatures)]
+  })
   try {
     const store = storeHost.backend('indexed-db')
     const definitions = [{ name: 'value', unique: false, multiEntry: false, revision: 1 }] as const
@@ -2403,7 +2446,9 @@ window.runIndexedDbBackfillLeaseScenario = async () => {
 
 /** Start a real indexed query and retain its public schema gate in the original page fixture. */
 window.startIndexedDbBackfillLeaseOwner = async (dbName) => {
-  const host = await createStorageHost({ plugins: [indexedDbBackendPlugin({ dbName })] })
+  const host = await createStorageHost({
+    plugins: [indexedDbBackendPlugin({ dbName }, indexedDbTestFeatures)]
+  })
   const store = host.backend('indexed-db')
   const name = 'lease-pages'
   await seedLeaseRepository(store, name)
@@ -2435,7 +2480,9 @@ window.startIndexedDbBackfillLeaseOwner = async (dbName) => {
 window.contendIndexedDbBackfillLease = async (dbName) => {
   let contender = browserBackfillLeaseContenders.get(dbName)
   if (contender === undefined) {
-    const host = await createStorageHost({ plugins: [indexedDbBackendPlugin({ dbName })] })
+    const host = await createStorageHost({
+      plugins: [indexedDbBackendPlugin({ dbName }, indexedDbTestFeatures)]
+    })
     const store = host.backend('indexed-db')
     const handle = await store.ensureRecordIndexes('lease-pages', [
       { name: 'value', unique: false, multiEntry: false, revision: 1 }
@@ -2774,7 +2821,7 @@ window.runOperationLifecycleScenario = async () => {
         const dbName = `operation-lifecycle-${Math.random().toString(36).slice(2)}`
         /** The actual host owns this scenario registration and its original native cleanup. */
         const databaseHost = await createStorageHost({
-          plugins: [indexedDbBackendPlugin({ dbName })]
+          plugins: [indexedDbBackendPlugin({ dbName }, indexedDbTestFeatures)]
         })
         try {
           const database = databaseHost.backend('indexed-db')
@@ -2946,7 +2993,7 @@ window.runOperationLifecycleScenario = async () => {
           const destructiveDbName = `idb-destructive-setter-${Math.random().toString(36).slice(2)}`
           /** The actual host owns this scenario registration and its original native cleanup. */
           const destructiveStoreHost = await createStorageHost({
-            plugins: [indexedDbBackendPlugin({ dbName: destructiveDbName })]
+            plugins: [indexedDbBackendPlugin({ dbName: destructiveDbName }, indexedDbTestFeatures)]
           })
           try {
             const destructiveStore = destructiveStoreHost.backend('indexed-db')
@@ -3043,7 +3090,9 @@ window.runOperationLifecycleScenario = async () => {
 window.runIndexedDbExtensionFailureScenario = async () => {
   const dbName = `extension-failure-${Math.random().toString(36).slice(2)}`
   /** The actual host owns this scenario registration and its original native cleanup. */
-  const storeHost = await createStorageHost({ plugins: [indexedDbBackendPlugin({ dbName })] })
+  const storeHost = await createStorageHost({
+    plugins: [indexedDbBackendPlugin({ dbName }, indexedDbTestFeatures)]
+  })
   try {
     const store = storeHost.backend('indexed-db')
     const entity = defineEntity<{ id: string; value: string }>({
@@ -3078,7 +3127,9 @@ window.runIndexedDbExtensionFailureScenario = async () => {
 window.runIndexedDbFutureVersionScenario = async () => {
   const dbName = `future-version-${Math.random().toString(36).slice(2)}`
   /** The actual host owns this scenario registration and its original native cleanup. */
-  const storeHost = await createStorageHost({ plugins: [indexedDbBackendPlugin({ dbName })] })
+  const storeHost = await createStorageHost({
+    plugins: [indexedDbBackendPlugin({ dbName }, indexedDbTestFeatures)]
+  })
   try {
     const store = storeHost.backend('indexed-db')
     await store.putRecord({ version: 2, state: { id: 'future', name: 'New' } }, [
@@ -3122,7 +3173,9 @@ window.runIndexedDbFutureVersionScenario = async () => {
 window.runIndexedDbHangingExtensionAbortScenario = async () => {
   const dbName = `hanging-extension-${Math.random().toString(36).slice(2)}`
   /** The actual host owns this scenario registration and its original native cleanup. */
-  const storeHost = await createStorageHost({ plugins: [indexedDbBackendPlugin({ dbName })] })
+  const storeHost = await createStorageHost({
+    plugins: [indexedDbBackendPlugin({ dbName }, indexedDbTestFeatures)]
+  })
   try {
     const store = storeHost.backend('indexed-db')
     const entity = defineEntity<{ id: string; name: string }>({
@@ -3160,7 +3213,9 @@ window.runIndexedDbHangingExtensionAbortScenario = async () => {
 window.runIndexedDbHangingMigrationAbortScenario = async () => {
   const dbName = `hanging-migration-${Math.random().toString(36).slice(2)}`
   /** The actual host owns this scenario registration and its original native cleanup. */
-  const storeHost = await createStorageHost({ plugins: [indexedDbBackendPlugin({ dbName })] })
+  const storeHost = await createStorageHost({
+    plugins: [indexedDbBackendPlugin({ dbName }, indexedDbTestFeatures)]
+  })
   try {
     const store = storeHost.backend('indexed-db')
     await store.putRecord({ version: 1, state: { id: 'hanging', name: 'Ada' } }, [
@@ -3204,7 +3259,9 @@ window.runIndexedDbHangingMigrationAbortScenario = async () => {
 window.runIndexedDbPreAbortExtensionScenario = async () => {
   const dbName = `pre-abort-extension-${Math.random().toString(36).slice(2)}`
   /** The actual host owns this scenario registration and its original native cleanup. */
-  const storeHost = await createStorageHost({ plugins: [indexedDbBackendPlugin({ dbName })] })
+  const storeHost = await createStorageHost({
+    plugins: [indexedDbBackendPlugin({ dbName }, indexedDbTestFeatures)]
+  })
   try {
     const store = storeHost.backend('indexed-db')
     let calls = 0
@@ -3241,7 +3298,9 @@ window.runIndexedDbPreAbortExtensionScenario = async () => {
 window.runIndexedDbPreAbortMigrationScenario = async () => {
   const dbName = `pre-abort-migration-${Math.random().toString(36).slice(2)}`
   /** The actual host owns this scenario registration and its original native cleanup. */
-  const storeHost = await createStorageHost({ plugins: [indexedDbBackendPlugin({ dbName })] })
+  const storeHost = await createStorageHost({
+    plugins: [indexedDbBackendPlugin({ dbName }, indexedDbTestFeatures)]
+  })
   try {
     const store = storeHost.backend('indexed-db')
     const entity = defineEntity<{ id: string; name: string }>({
@@ -3269,7 +3328,9 @@ window.runIndexedDbPreAbortMigrationScenario = async () => {
 window.runIndexedDbSchemaFailureScenario = async () => {
   const dbName = `schema-failure-${Math.random().toString(36).slice(2)}`
   /** The actual host owns this scenario registration and its original native cleanup. */
-  const storeHost = await createStorageHost({ plugins: [indexedDbBackendPlugin({ dbName })] })
+  const storeHost = await createStorageHost({
+    plugins: [indexedDbBackendPlugin({ dbName }, indexedDbTestFeatures)]
+  })
   try {
     const store = storeHost.backend('indexed-db')
     const entity = defineEntity<{ id: string; name: string }>({
@@ -3301,7 +3362,9 @@ window.runIndexedDbSchemaFailureScenario = async () => {
 window.runIndexedDbPagedScanScenario = async () => {
   const dbName = `paged-${Math.random().toString(36).slice(2)}`
   /** The actual host owns this scenario registration and its original native cleanup. */
-  const storeHost = await createStorageHost({ plugins: [indexedDbBackendPlugin({ dbName })] })
+  const storeHost = await createStorageHost({
+    plugins: [indexedDbBackendPlugin({ dbName }, indexedDbTestFeatures)]
+  })
   try {
     const store = storeHost.backend('indexed-db')
     for (let index = 0; index < 257; index += 1)
@@ -3551,16 +3614,20 @@ window.runIndexedDbPagedScanScenario = async () => {
 window.runIndexedDbDualTransactionScenario = async () => {
   const dbName = `dual-conflict-${Math.random().toString(36).slice(2)}`
   /** The actual host owns this scenario registration and its original native cleanup. */
-  const seedHost = await createStorageHost({ plugins: [indexedDbBackendPlugin({ dbName })] })
+  const seedHost = await createStorageHost({
+    plugins: [indexedDbBackendPlugin({ dbName }, indexedDbTestFeatures)]
+  })
   try {
     const seed = seedHost.backend('indexed-db')
     /** The actual host owns this scenario registration and its original native cleanup. */
-    const firstHost = await createStorageHost({ plugins: [indexedDbBackendPlugin({ dbName })] })
+    const firstHost = await createStorageHost({
+      plugins: [indexedDbBackendPlugin({ dbName }, indexedDbTestFeatures)]
+    })
     try {
       const first = firstHost.backend('indexed-db')
       /** The actual host owns this scenario registration and its original native cleanup. */
       const secondHost = await createStorageHost({
-        plugins: [indexedDbBackendPlugin({ dbName })]
+        plugins: [indexedDbBackendPlugin({ dbName }, indexedDbTestFeatures)]
       })
       try {
         const second = secondHost.backend('indexed-db')
@@ -3613,7 +3680,7 @@ window.runIndexedDbLegacyRecordsMigrationScenario = async () => {
   database.close()
   /** The actual host owns this scenario registration and its original native cleanup. */
   const storeHost = await createStorageHost({
-    plugins: [indexedDbBackendPlugin({ dbName, cleanupLegacyRecords: true })]
+    plugins: [indexedDbBackendPlugin({ dbName, cleanupLegacyRecords: true }, indexedDbTestFeatures)]
   })
   try {
     const store = storeHost.backend('indexed-db')
@@ -3657,7 +3724,7 @@ window.runIndexedDbLegacyRecordsMigrationScenario = async () => {
     try {
       /** Cursor migration fails during preparation, before any store is published. */
       const _failedHost = await createStorageHost({
-        plugins: [indexedDbBackendPlugin({ dbName: hostileDbName })]
+        plugins: [indexedDbBackendPlugin({ dbName: hostileDbName }, indexedDbTestFeatures)]
       })
       await _failedHost.dispose()
     } catch (error) {
@@ -3695,10 +3762,13 @@ window.runIndexedDbLegacyRecordsMigrationScenario = async () => {
         /** The original install window observes the throwing native request getter. */
         const _failedHost = await createStorageHost({
           plugins: [
-            indexedDbBackendPlugin({
-              factory: createHostileFactory(event),
-              dbName: `hostile-${event}`
-            })
+            indexedDbBackendPlugin(
+              {
+                factory: createHostileFactory(event),
+                dbName: `hostile-${event}`
+              },
+              indexedDbTestFeatures
+            )
           ]
         })
         try {
@@ -3718,31 +3788,34 @@ window.runIndexedDbLegacyRecordsMigrationScenario = async () => {
         /** Invalid native request setters fail before backend publication. */
         const _failedHost = await createStorageHost({
           plugins: [
-            indexedDbBackendPlugin({
-              factory: {
-                open: () =>
-                  ({
-                    transaction: { abort: () => {} } as IDBTransaction,
-                    set onupgradeneeded(_handler: unknown) {
-                      if (property === 'onupgradeneeded')
-                        throw new Error('browser hostile open upgrade setter')
-                    },
-                    set onblocked(_handler: unknown) {
-                      if (property === 'onblocked')
-                        throw new Error('browser hostile open blocked setter')
-                    },
-                    set onsuccess(_handler: unknown) {
-                      if (property === 'onsuccess')
-                        throw new Error('browser hostile open success setter')
-                    },
-                    set onerror(_handler: unknown) {
-                      if (property === 'onerror')
-                        throw new Error('browser hostile open error setter')
-                    }
-                  }) as unknown as IDBOpenDBRequest
-              } as unknown as IDBFactory,
-              dbName: `hostile-open-${property}`
-            })
+            indexedDbBackendPlugin(
+              {
+                factory: {
+                  open: () =>
+                    ({
+                      transaction: { abort: () => {} } as IDBTransaction,
+                      set onupgradeneeded(_handler: unknown) {
+                        if (property === 'onupgradeneeded')
+                          throw new Error('browser hostile open upgrade setter')
+                      },
+                      set onblocked(_handler: unknown) {
+                        if (property === 'onblocked')
+                          throw new Error('browser hostile open blocked setter')
+                      },
+                      set onsuccess(_handler: unknown) {
+                        if (property === 'onsuccess')
+                          throw new Error('browser hostile open success setter')
+                      },
+                      set onerror(_handler: unknown) {
+                        if (property === 'onerror')
+                          throw new Error('browser hostile open error setter')
+                      }
+                    }) as unknown as IDBOpenDBRequest
+                } as unknown as IDBFactory,
+                dbName: `hostile-open-${property}`
+              },
+              indexedDbTestFeatures
+            )
           ]
         })
         try {
@@ -3772,16 +3845,18 @@ window.runIndexedDbLegacyRecordsMigrationScenario = async () => {
 window.runIndexedDbFourWayTransactionScenario = async () => {
   const dbName = `four-way-${Math.random().toString(36).slice(2)}`
   /** The actual host owns this scenario registration and its original native cleanup. */
-  const seedHost = await createStorageHost({ plugins: [indexedDbBackendPlugin({ dbName })] })
+  const seedHost = await createStorageHost({
+    plugins: [indexedDbBackendPlugin({ dbName }, indexedDbTestFeatures)]
+  })
   try {
     const seed = seedHost.backend('indexed-db')
     /** Four native clients share the physical database without replacing their separate controllers. */
     const peersHost = await createStorageHost({
       plugins: [
-        indexedDbBackendPlugin({ id: 'one', dbName }),
-        indexedDbBackendPlugin({ id: 'two', dbName }),
-        indexedDbBackendPlugin({ id: 'three', dbName }),
-        indexedDbBackendPlugin({ id: 'four', dbName })
+        indexedDbBackendPlugin({ id: 'one', dbName }, indexedDbTestFeatures),
+        indexedDbBackendPlugin({ id: 'two', dbName }, indexedDbTestFeatures),
+        indexedDbBackendPlugin({ id: 'three', dbName }, indexedDbTestFeatures),
+        indexedDbBackendPlugin({ id: 'four', dbName }, indexedDbTestFeatures)
       ]
     })
     try {
@@ -3820,7 +3895,9 @@ window.runIndexedDbFourWayTransactionScenario = async () => {
 window.runIndexedDbFailureScenario = async () => {
   const dbName = `failure-${Math.random().toString(36).slice(2)}`
   /** The actual host owns this scenario registration and its original native cleanup. */
-  const storeHost = await createStorageHost({ plugins: [indexedDbBackendPlugin({ dbName })] })
+  const storeHost = await createStorageHost({
+    plugins: [indexedDbBackendPlugin({ dbName }, indexedDbTestFeatures)]
+  })
   try {
     const store = storeHost.backend('indexed-db')
     let transactionCode: string | undefined
@@ -3893,9 +3970,12 @@ window.runIndexedDbPostCommitFailureScenario = async () => {
   const makeHost = () =>
     createStorageHost({
       plugins: [
-        indexedDbBackendPlugin({
-          dbName: `post-commit-failure-${Math.random().toString(36).slice(2)}`
-        })
+        indexedDbBackendPlugin(
+          {
+            dbName: `post-commit-failure-${Math.random().toString(36).slice(2)}`
+          },
+          indexedDbTestFeatures
+        )
       ]
     })
   /** The actual host owns this scenario registration and its original native cleanup. */
@@ -4013,7 +4093,12 @@ window.runIndexedDbPostCommitFailureScenario = async () => {
 window.runIndexedDbSmokeScenario = async () => {
   /** The actual host owns this scenario registration and its original native cleanup. */
   const storeHost = await createStorageHost({
-    plugins: [indexedDbBackendPlugin({ dbName: `smoke-${Math.random().toString(36).slice(2)}` })]
+    plugins: [
+      indexedDbBackendPlugin(
+        { dbName: `smoke-${Math.random().toString(36).slice(2)}` },
+        indexedDbTestFeatures
+      )
+    ]
   })
   try {
     const store = storeHost.backend('indexed-db')
@@ -4033,7 +4118,10 @@ window.runIndexedDbPersistNativeScenario = async () => {
   /** The host owns the original connection; the shared fixture owns only its attachment. */
   const host = await createStorageHost({
     plugins: [
-      indexedDbBackendPlugin({ dbName: `persist-native-${Math.random().toString(36).slice(2)}` })
+      indexedDbBackendPlugin(
+        { dbName: `persist-native-${Math.random().toString(36).slice(2)}` },
+        indexedDbTestFeatures
+      )
     ]
   })
   try {
@@ -4048,7 +4136,10 @@ window.runIndexedDbPersistCrossTaskCodecScenario = async () => {
   /** The same public plugin supplies both the participating scope and its final cleanup. */
   const host = await createStorageHost({
     plugins: [
-      indexedDbBackendPlugin({ dbName: `persist-codec-${Math.random().toString(36).slice(2)}` })
+      indexedDbBackendPlugin(
+        { dbName: `persist-codec-${Math.random().toString(36).slice(2)}` },
+        indexedDbTestFeatures
+      )
     ]
   })
   try {
@@ -4065,7 +4156,7 @@ window.startIndexedDbCoordinationReceiver = async (dbName) => {
   /** The actual host owns this scenario registration and its original native cleanup. */
   const storeHost = await createStorageHost({
     org: browserCoordinationOrgId,
-    plugins: [indexedDbBackendPlugin({ dbName })]
+    plugins: [indexedDbBackendPlugin({ dbName }, indexedDbTestFeatures)]
   })
   const store = storeHost.backend('indexed-db')
   let resolveHint!: (change: IStorageChange) => void
@@ -4104,7 +4195,7 @@ window.startIndexedDbCoordinationWriter = async (dbName) => {
   /** The actual host owns this scenario registration and its original native cleanup. */
   const storeHost = await createStorageHost({
     org: browserCoordinationOrgId,
-    plugins: [indexedDbBackendPlugin({ dbName })]
+    plugins: [indexedDbBackendPlugin({ dbName }, indexedDbTestFeatures)]
   })
   const store = storeHost.backend('indexed-db')
   await store.set('r09-cross-page-key', 'committed-by-writer')
@@ -4127,7 +4218,7 @@ window.runIndexedDbOptionsGuardScenario = async () => {
     try {
       /** Invalid input is observed at the same public installation boundary. */
       const _guardedHost17 = await createStorageHost({
-        plugins: [indexedDbBackendPlugin(options as never)]
+        plugins: [indexedDbBackendPlugin(options as never, indexedDbTestFeatures)]
       })
       await _guardedHost17.dispose()
     } catch (error) {
@@ -4137,7 +4228,9 @@ window.runIndexedDbOptionsGuardScenario = async () => {
   try {
     /** Invalid input is observed at the same public installation boundary. */
     const _guardedHost18 = await createStorageHost({
-      plugins: [indexedDbBackendPlugin({ cleanupLegacyRecords: 'yes' as never })]
+      plugins: [
+        indexedDbBackendPlugin({ cleanupLegacyRecords: 'yes' as never }, indexedDbTestFeatures)
+      ]
     })
     await _guardedHost18.dispose()
   } catch (error) {
@@ -4147,11 +4240,14 @@ window.runIndexedDbOptionsGuardScenario = async () => {
     /** Invalid input is observed at the same public installation boundary. */
     const _guardedHost19 = await createStorageHost({
       plugins: [
-        indexedDbBackendPlugin({
-          get dbName(): string {
-            throw new Error('hostile browser dbName')
-          }
-        })
+        indexedDbBackendPlugin(
+          {
+            get dbName(): string {
+              throw new Error('hostile browser dbName')
+            }
+          },
+          indexedDbTestFeatures
+        )
       ]
     })
     await _guardedHost19.dispose()
@@ -4160,7 +4256,12 @@ window.runIndexedDbOptionsGuardScenario = async () => {
   }
   /** The actual host owns this scenario registration and its original native cleanup. */
   const storeHost = await createStorageHost({
-    plugins: [indexedDbBackendPlugin({ dbName: `invalid-string-key-${crypto.randomUUID()}` })]
+    plugins: [
+      indexedDbBackendPlugin(
+        { dbName: `invalid-string-key-${crypto.randomUUID()}` },
+        indexedDbTestFeatures
+      )
+    ]
   })
   try {
     const store = storeHost.backend('indexed-db')
