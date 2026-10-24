@@ -65,7 +65,7 @@ const SparqlStringEscape: Readonly<Record<string, string>> = {
   '\f': '\\f'
 }
 
-/** Shared argument identity retains original reflection causes. */
+/** Invalid SPARQL inputs retain the canonical argument error identity. */
 function invalidSparqlArgument(cause?: unknown): StorageContractError {
   return new StorageContractError(
     StorageContractErrorCode.invalidArgument,
@@ -73,11 +73,11 @@ function invalidSparqlArgument(cause?: unknown): StorageContractError {
     StorageContractErrorText.sparqlArgument
   )
 }
-/** Publishes a frozen identity over already captured node pieces. */
+/** Publish an opaque identity over already captured node pieces. */
 function registerSparqlFragment(pieces: readonly (string | ISparqlNode)[]): ISparqlFragment {
   /** Public objects reveal no forgeable serialized source or native callback. */
-  const fragment = Object.freeze({}) as ISparqlFragment
-  sparqlNodes.set(fragment, Object.freeze({ pieces: Object.freeze(pieces) }))
+  const fragment = {} as ISparqlFragment
+  sparqlNodes.set(fragment, { pieces: pieces })
   return fragment
 }
 /** Empty composition has one canonical pure identity. */
@@ -92,7 +92,10 @@ function sparqlNode(fragment: unknown): ISparqlNode {
   if (!node) throw invalidSparqlArgument()
   return node
 }
-/** Snapshot RDF once; raw blank/default graph terms cannot carry portable query identity. */
+/**
+ * Capture RDF into text before deferred native execution; later caller mutation must not change the
+ * query.
+ */
 function sparqlInputPiece(value: unknown): string | ISparqlNode {
   if (typeof value === 'object' && value !== null && sparqlNodes.has(value))
     return sparqlNodes.get(value)!
@@ -113,7 +116,7 @@ function sparqlInputPiece(value: unknown): string | ISparqlNode {
     (term.language === undefined ? '^^<' + term.datatype + '>' : '@' + term.language)
   )
 }
-/** Frozen template capture preserves the original field and interpolation order. */
+/** Native template capture preserves the original field and interpolation order. */
 function sparqlFragmentTag(
   strings: TemplateStringsArray,
   ...values: readonly ISparqlInput[]
@@ -139,38 +142,33 @@ function joinSparqlFragments(
   fragments: readonly ISparqlFragment[],
   separator: ISparqlFragment = sparqlJoinSeparator
 ): ISparqlFragment {
-  try {
-    if (!Array.isArray(fragments)) throw invalidSparqlArgument()
-    /** Separator authentication remains independent of list length. */
-    const between = sparqlNode(separator)
-    /** The original list length bounds capture even through changing getters. */
-    const length = fragments.length
-    if (!Number.isSafeInteger(length) || length < 0) throw invalidSparqlArgument()
-    /** Only references and separators are retained, never copied prefix text. */
-    const pieces: (string | ISparqlNode)[] = []
-    for (let index = 0; index < length; index++) {
-      if (!Object.hasOwn(fragments, index)) throw invalidSparqlArgument()
-      /** Each borrowed child is read once before any later input can mutate. */
-      const child = sparqlNode(fragments[index])
-      if (index > 0) pieces.push(between)
-      pieces.push(child)
-    }
-    return length === 0 ? emptySparqlFragment : registerSparqlFragment(pieces)
-  } catch (cause) {
-    if (cause instanceof StorageContractError) throw cause
-    throw invalidSparqlArgument(cause)
+  if (!Array.isArray(fragments)) throw invalidSparqlArgument()
+  /** Separator authentication remains independent of list length. */
+  const between = sparqlNode(separator)
+  /** The ordinary dense list determines child order. */
+  const length = fragments.length
+  /** Only references and separators are retained, never copied prefix text. */
+  const pieces: (string | ISparqlNode)[] = []
+  for (let index = 0; index < length; index++) {
+    /** Retain the canonical child node rather than the caller-owned array. */
+    const child = sparqlNode(fragments[index])
+    if (index > 0) pieces.push(between)
+    pieces.push(child)
   }
+  return length === 0 ? emptySparqlFragment : registerSparqlFragment(pieces)
 }
 /** Pure composition grants no endpoint or native operation authority. */
-export const sparqlFragment: ISparqlTagTools & {
-  (strings: TemplateStringsArray, ...values: readonly ISparqlInput[]): ISparqlFragment
-} = /* @__PURE__ */ Object.freeze(
-  Object.assign(sparqlFragmentTag, {
-    var: sparqlVariable,
-    join: joinSparqlFragments,
-    empty: emptySparqlFragment
-  })
-)
+export const sparqlFragment = /* @__PURE__ */ createSparqlFragmentTools()
+
+/** Initialize only the retained authoring channel, without top-level property mutation. */
+function createSparqlFragmentTools(): ISparqlTagTools & typeof sparqlFragmentTag {
+  /** Pure tools share the original node table and never retain a native endpoint. */
+  const tag = sparqlFragmentTag as ISparqlTagTools & typeof sparqlFragmentTag
+  tag.var = sparqlVariable
+  tag.join = joinSparqlFragments
+  Object.defineProperty(tag, 'empty', { value: emptySparqlFragment, enumerable: true })
+  return tag
+}
 /** Iterative expansion visits actual output without recursion or repeated prefix copying. */
 function expandSparqlNode(node: ISparqlNode): string {
   /** Frames retain only the active path through immutable shared children. */
@@ -195,7 +193,8 @@ function expandSparqlNode(node: ISparqlNode): string {
  * Bind the pure fragment owner to original native callbacks. Backends call lazy prepare after their
  * existing operation admission; this helper owns no endpoint, query parser or lifecycle.
  */
-export function createSparqlTag(options: {
+/** Original native endpoints prepare only after entering their backend operation boundary. */
+type ISparqlBindingOptions = {
   readonly select: (
     prepare: () => string,
     ctx?: IOperationContext
@@ -206,58 +205,63 @@ export function createSparqlTag(options: {
     ctx?: IOperationContext
   ) => Promise<readonly IRawQuad[]>
   readonly update: (prepare: () => string, ctx?: IOperationContext) => Promise<void>
-}): ISparqlApi {
-  try {
-    /** Callback fields are borrowed once without rendering or sending a query. */
-    const select = options.select
-    /** Native ASK returns its original boolean Promise. */
-    const ask = options.ask
-    /** Raw CONSTRUCT retains its parser's response-local blank identity. */
-    const construct = options.construct
-    /** Native updates do not acquire generic transaction capability. */
-    const update = options.update
-    if (
-      typeof select !== 'function' ||
-      typeof ask !== 'function' ||
-      typeof construct !== 'function' ||
-      typeof update !== 'function'
-    )
-      throw invalidSparqlArgument()
-    /** Explicit rows declare output shape; no runtime business schema is inferred. */
-    const tag = <
-      TRow extends object & { readonly [K in keyof TRow]: IRdfBindingTerm | undefined } = ISparqlRow
-    >(
-      strings: TemplateStringsArray,
-      ...values: readonly ISparqlInput[]
-    ): ISparqlQuery<TRow> => {
-      /** The original table authenticates both pure and executable SPARQL nodes. */
-      const node = sparqlNode(sparqlFragmentTag(strings, ...values))
-      /** Final body cache belongs only to this query; no global text cache exists. */
-      let compiled: string | undefined
-      /** Native callbacks prepare only after their actual owner's admission. */
-      const prepare = (): string => (compiled ??= expandSparqlNode(node))
-      /** Direct forwarding preserves exact callback receiver, context and Promise. */
-      const query = {
-        select: (ctx?: IOperationContext) =>
-          Reflect.apply(select, options, [prepare, ctx]) as Promise<readonly TRow[]>,
-        ask: (ctx?: IOperationContext) => Reflect.apply(ask, options, [prepare, ctx]),
-        construct: (ctx?: IOperationContext) => Reflect.apply(construct, options, [prepare, ctx]),
-        update: (ctx?: IOperationContext) => Reflect.apply(update, options, [prepare, ctx])
-      } as ISparqlQuery<TRow>
-      sparqlNodes.set(query, node)
-      return Object.freeze(query)
-    }
-    return Object.freeze(
-      Object.assign(tag, {
-        var: sparqlVariable,
-        join: joinSparqlFragments,
-        empty: emptySparqlFragment
-      })
-    )
-  } catch (cause) {
-    if (cause instanceof StorageContractError) throw cause
-    throw invalidSparqlArgument(cause)
+}
+
+/** Bind one native callable tag; graph and compiled state belong to each named query. */
+export function createSparqlTag(options: ISparqlBindingOptions): ISparqlApi {
+  if (
+    typeof options !== 'object' ||
+    options === null ||
+    Array.isArray(options) ||
+    typeof options.select !== 'function' ||
+    typeof options.ask !== 'function' ||
+    typeof options.construct !== 'function' ||
+    typeof options.update !== 'function'
+  )
+    throw invalidSparqlArgument()
+  /** This adapter only constructs query owners; it does not capture mutable execution state. */
+  function tag<
+    TRow extends object & { readonly [K in keyof TRow]: IRdfBindingTerm | undefined } = ISparqlRow
+  >(strings: TemplateStringsArray, ...values: readonly ISparqlInput[]): ISparqlQuery<TRow> {
+    return new BoundSparqlQuery<TRow>(
+      sparqlNode(sparqlFragmentTag(strings, ...values)),
+      options
+    ) as unknown as ISparqlQuery<TRow>
   }
+  tag.var = sparqlVariable
+  tag.join = joinSparqlFragments
+  Object.defineProperty(tag, 'empty', { value: emptySparqlFragment, enumerable: true })
+  return tag as ISparqlApi
+}
+
+/**
+ * One query owns its prepared text while the original backend retains native execution and
+ * lifetime.
+ */
+class BoundSparqlQuery<TRow extends object> {
+  /** The private composition graph preserves repeated references without a global text cache. */
+  readonly #node: ISparqlNode
+  /** Direct native method calls preserve receiver, context and exact Promise identity. */
+  readonly #options: ISparqlBindingOptions
+  /** Final text belongs only to this query, never to an endpoint or process cache. */
+  #compiled: string | undefined
+  /** Register executable identity in the same table used by pure fragments. */
+  constructor(node: ISparqlNode, options: ISparqlBindingOptions) {
+    this.#node = node
+    this.#options = options
+    sparqlNodes.set(this, node)
+  }
+  /** Backend admission determines when lazy body expansion happens. */
+  #prepare = (): string => (this.#compiled ??= expandSparqlNode(this.#node))
+  /** Return the actual native SELECT promise without assimilation. */
+  select = (ctx?: IOperationContext): Promise<readonly TRow[]> =>
+    this.#options.select(this.#prepare, ctx) as Promise<readonly TRow[]>
+  /** Return the actual native ASK promise without assimilation. */
+  ask = (ctx?: IOperationContext) => this.#options.ask(this.#prepare, ctx)
+  /** Return the actual native CONSTRUCT promise and response-local blank identity. */
+  construct = (ctx?: IOperationContext) => this.#options.construct(this.#prepare, ctx)
+  /** Return the actual native UPDATE promise without adding a transaction. */
+  update = (ctx?: IOperationContext) => this.#options.update(this.#prepare, ctx)
 }
 /** Callable APIs publish pure tools without evaluating or probing native statements. */
 function validateSparqlApi(api: unknown): void {

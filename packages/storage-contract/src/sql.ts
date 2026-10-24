@@ -82,7 +82,7 @@ type ISqlPiece =
 /** One weak identity table owns all fragments without a global strong text or driver cache. */
 const sqlNodes = new WeakMap<object, ISqlNode>()
 
-/** Registered input errors retain the exact native reflection or byte-copy cause. */
+/** Invalid SQL inputs use the canonical argument error family. */
 function invalidSqlArgument(cause?: unknown): StorageContractError {
   return new StorageContractError(
     StorageContractErrorCode.invalidArgument,
@@ -90,20 +90,17 @@ function invalidSqlArgument(cause?: unknown): StorageContractError {
     StorageContractErrorText.sqlArgument
   )
 }
-/** Creates one frozen identity over an immutable node graph, with no execution authority. */
+/** Creates one opaque identity over a private node graph, with no execution authority. */
 function registerSqlFragment(pieces: readonly ISqlPiece[]): ISqlFragment {
   /** Public objects contain no forgeable node, parameter or driver fields. */
-  const fragment = Object.freeze({}) as ISqlFragment
-  sqlNodes.set(
-    fragment,
-    Object.freeze({ kind: SqlNodeKind.sequence, pieces: Object.freeze(pieces) })
-  )
+  const fragment = {} as ISqlFragment
+  sqlNodes.set(fragment, { kind: SqlNodeKind.sequence, pieces: pieces })
   return fragment
 }
-/** Empty composition has one canonical frozen identity and contributes no separators. */
-const emptySqlFragment = registerSqlFragment([])
+/** Empty composition has one canonical identity and contributes no separators. */
+const emptySqlFragment = /* @__PURE__ */ registerSqlFragment([])
 /** IN-style SQL lists use a comma and space unless the caller supplies another authentic fragment. */
-const sqlJoinSeparator = registerSqlFragment([', '])
+const sqlJoinSeparator = /* @__PURE__ */ registerSqlFragment([', '])
 
 /** Validates private fragment identity without trusting a public brand or shape. */
 function sqlNode(fragment: unknown): ISqlNode {
@@ -124,12 +121,11 @@ function sqlInputPiece(value: unknown): ISqlPiece {
     typeof value === 'bigint' ||
     typeof value === 'boolean'
   )
-    return Object.freeze({ kind: SqlNodeKind.binding, value })
-  if (isUint8Array(value))
-    return Object.freeze({ kind: SqlNodeKind.binding, value: new Uint8Array(value) })
+    return { kind: SqlNodeKind.binding, value }
+  if (isUint8Array(value)) return { kind: SqlNodeKind.binding, value: new Uint8Array(value) }
   throw invalidSqlArgument()
 }
-/** Captures frozen template arrays and their inserted values without expanding child fragments. */
+/** Captures native template arrays and their inserted values without expanding child fragments. */
 function sqlFragmentTag(
   strings: TemplateStringsArray,
   ...values: readonly ISqlInput[]
@@ -149,41 +145,39 @@ function joinSqlFragments(
   fragments: readonly ISqlFragment[],
   separator: ISqlFragment = sqlJoinSeparator
 ): ISqlFragment {
-  try {
-    if (!Array.isArray(fragments)) throw invalidSqlArgument()
-    /** The separator is authentic even for an empty input, retaining normal argument admission. */
-    const between = sqlNode(separator)
-    /** The caller's dense list length is captured once before each position is captured once. */
-    const length = fragments.length
-    /** Nodes retain repeated references at every occurrence rather than deduplicating identities. */
-    const pieces: ISqlPiece[] = []
-    for (let index = 0; index < length; index++) {
-      if (!Object.hasOwn(fragments, index)) throw invalidSqlArgument()
-      /** This one child read cannot be changed by a later mutation of the caller's list. */
-      const node = sqlNode(fragments[index])
-      if (index > 0) pieces.push(between)
-      pieces.push(node)
-    }
-    return length === 0 ? emptySqlFragment : registerSqlFragment(pieces)
-  } catch (cause) {
-    if (cause instanceof StorageContractError) throw cause
-    throw invalidSqlArgument(cause)
+  if (!Array.isArray(fragments)) throw invalidSqlArgument()
+  /** The separator is authentic even for an empty input, retaining normal argument admission. */
+  const between = sqlNode(separator)
+  /** The ordinary list determines composition order without retaining caller-owned array state. */
+  const length = fragments.length
+  /** Nodes retain repeated references at every occurrence rather than deduplicating identities. */
+  const pieces: ISqlPiece[] = []
+  for (let index = 0; index < length; index++) {
+    /** The canonical child node is retained independently of later caller array mutation. */
+    const node = sqlNode(fragments[index])
+    if (index > 0) pieces.push(between)
+    pieces.push(node)
   }
+  return length === 0 ? emptySqlFragment : registerSqlFragment(pieces)
 }
 /**
  * Pure tagged SQL construction. It captures scalar/byte bindings, authentic child references and
  * quoted identifiers without opening a connection, scanning a partial statement or adding
  * all/get/run.
  */
-export const sqlFragment: Pick<ISqlTag, 'id' | 'join' | 'empty'> & {
+export const sqlFragment = /* @__PURE__ */ createSqlFragmentTools()
+
+/** Initialize the pure callable tools only when this authoring channel is retained. */
+function createSqlFragmentTools(): Pick<ISqlTag, 'id' | 'join' | 'empty'> & {
   (strings: TemplateStringsArray, ...values: readonly ISqlInput[]): ISqlFragment
-} = Object.freeze(
-  Object.assign(sqlFragmentTag, {
-    id: sqlIdentifier,
-    join: joinSqlFragments,
-    empty: emptySqlFragment
-  })
-)
+} {
+  /** The function keeps the canonical node registry; properties add only pure composition tools. */
+  const tag = sqlFragmentTag as Pick<ISqlTag, 'id' | 'join' | 'empty'> & typeof sqlFragmentTag
+  tag.id = sqlIdentifier
+  tag.join = joinSqlFragments
+  Object.defineProperty(tag, 'empty', { value: emptySqlFragment, enumerable: true })
+  return tag
+}
 
 /** Dialect values affect placeholders and lexical quoting, never native connection selection. */
 const SqlDialect = { sqlite: 'sqlite', postgres: 'postgres' } as const
@@ -446,17 +440,15 @@ function compileSqlNode(node: ISqlNode, dialect: 'sqlite' | 'postgres'): ICompil
   /** The first complete rendered text is scanned only after its backend's original admission. */
   const rendered = text.join('')
   assertSingleSqlStatement(rendered, dialect)
-  return Object.freeze({ text: rendered, values: Object.freeze(values) })
+  return { text: rendered, values: values }
 }
 /**
  * Binds shared composition to original backend terminals. Each callback must enter its original
  * operation/transaction owner before calling prepare; its exact Promise is returned unchanged. No
  * connection, driver cache, lease, cancellation timer or disposal owner is created here.
  */
-export function createSqlTag<
-  TValue extends ISqlValue = ISqlValue,
-  TResult extends ISqlRunResult = ISqlRunResult
->(options: {
+/** Original backend callbacks enter their native operation owner before requesting preparation. */
+type ISqlBindingOptions<TValue extends ISqlValue, TResult extends ISqlRunResult> = {
   readonly dialect: 'sqlite' | 'postgres'
   readonly all: (
     prepare: () => ICompiledStorageSql,
@@ -467,65 +459,76 @@ export function createSqlTag<
     ctx?: IOperationContext
   ) => Promise<Readonly<Record<string, TValue>> | undefined>
   readonly run: (prepare: () => ICompiledStorageSql, ctx?: IOperationContext) => Promise<TResult>
-}): ISqlTag<TValue, TResult> {
-  /** Capture the backend's descriptor only once; query calls do not re-read borrowed getters. */
-  let captured: typeof options
-  try {
-    if (typeof options !== 'object' || options === null || Array.isArray(options))
-      throw invalidSqlArgument()
-    captured = { dialect: options.dialect, all: options.all, get: options.get, run: options.run }
-    if (
-      (captured.dialect !== SqlDialect.sqlite && captured.dialect !== SqlDialect.postgres) ||
-      typeof captured.all !== 'function' ||
-      typeof captured.get !== 'function' ||
-      typeof captured.run !== 'function'
-    )
-      throw invalidSqlArgument()
-  } catch (cause) {
-    if (cause instanceof StorageContractError) throw cause
-    throw invalidSqlArgument(cause)
-  }
-  /** One bound identity belongs to one immutable node and one closure-local compiled projection. */
-  const tag = <
-    TRow extends object & { readonly [K in keyof TRow]: TValue } = Readonly<Record<string, TValue>>
-  >(
-    strings: TemplateStringsArray,
-    ...values: readonly ISqlInput[]
-  ): ISqlQuery<TRow, TResult> => {
-    /** The same fragment registry admits pure and executable nodes; no parallel brand is accepted. */
-    const node = sqlNode(sqlFragmentTag(strings, ...values))
-    /** The cache is scoped only to this query's lifetime and never retains native statements. */
-    let compiled: ICompiledStorageSql | undefined
-    /** Each native execution receives fresh mutable byte copies, independent of prior execution. */
-    const prepare = (): ICompiledStorageSql => {
-      compiled ??= compileSqlNode(node, captured.dialect)
-      return Object.freeze({
-        text: compiled.text,
-        values: Object.freeze(
-          compiled.values.map((value) => (isUint8Array(value) ? new Uint8Array(value) : value))
-        )
-      })
-    }
-    /** Wrappers only select an original callback and preserve its receiver, context and Promise. */
-    const query: ISqlQuery<TRow, TResult> = {
-      all: (ctx) =>
-        Reflect.apply(captured.all, options, [prepare, ctx]) as Promise<readonly TRow[]>,
-      get: (ctx) =>
-        Reflect.apply(captured.get, options, [prepare, ctx]) as Promise<TRow | undefined>,
-      run: (ctx) => Reflect.apply(captured.run, options, [prepare, ctx])
-    } as ISqlQuery<TRow, TResult>
-    sqlNodes.set(query, node)
-    return Object.freeze(query)
-  }
-  return Object.freeze(
-    Object.assign(tag, { id: sqlIdentifier, join: joinSqlFragments, empty: emptySqlFragment })
+}
+
+/** Bind native callbacks without opening a driver, compiling text or creating another lifecycle. */
+export function createSqlTag<
+  TValue extends ISqlValue = ISqlValue,
+  TResult extends ISqlRunResult = ISqlRunResult
+>(options: ISqlBindingOptions<TValue, TResult>): ISqlTag<TValue, TResult> {
+  if (
+    typeof options !== 'object' ||
+    options === null ||
+    Array.isArray(options) ||
+    (options.dialect !== SqlDialect.sqlite && options.dialect !== SqlDialect.postgres) ||
+    typeof options.all !== 'function' ||
+    typeof options.get !== 'function' ||
+    typeof options.run !== 'function'
   )
+    throw invalidSqlArgument()
+  /** This small callable adapter creates the named per-query owner; it holds no mutable query state. */
+  function tag<
+    TRow extends object & { readonly [K in keyof TRow]: TValue } = Readonly<Record<string, TValue>>
+  >(strings: TemplateStringsArray, ...values: readonly ISqlInput[]): ISqlQuery<TRow, TResult> {
+    return new BoundSqlQuery<TValue, TResult, TRow>(
+      sqlNode(sqlFragmentTag(strings, ...values)),
+      options
+    ) as unknown as ISqlQuery<TRow, TResult>
+  }
+  tag.id = sqlIdentifier
+  tag.join = joinSqlFragments
+  Object.defineProperty(tag, 'empty', { value: emptySqlFragment, enumerable: true })
+  return tag as ISqlTag<TValue, TResult>
 }
 
 /**
- * Derives only execution endpoints over an authentic existing fragment node. The original SQL
- * identity table, scanner and backend preparation remain canonical; no driver or scope is created.
+ * One executable query owns its graph and compiled projection, with native execution left to its
+ * backend.
  */
+class BoundSqlQuery<TValue extends ISqlValue, TResult extends ISqlRunResult, TRow extends object> {
+  /** The canonical private graph preserves authentic fragments and repeated child references. */
+  readonly #node: ISqlNode
+  /** Direct method calls preserve the original callback receiver, context and exact Promise. */
+  readonly #options: ISqlBindingOptions<TValue, TResult>
+  /** Compilation is cached only for this query; mutable native statements are never retained. */
+  #compiled: ICompiledStorageSql | undefined
+  /** Register this query in the same table used by pure fragments. */
+  constructor(node: ISqlNode, options: ISqlBindingOptions<TValue, TResult>) {
+    this.#node = node
+    this.#options = options
+    sqlNodes.set(this, node)
+  }
+  /** Each native execution gets independent bytes so mutation cannot affect later awaits/executions. */
+  #prepare = (): ICompiledStorageSql => {
+    this.#compiled ??= compileSqlNode(this.#node, this.#options.dialect)
+    return {
+      text: this.#compiled.text,
+      values: this.#compiled.values.map((value) =>
+        isUint8Array(value) ? new Uint8Array(value) : value
+      )
+    }
+  }
+  /** Enter the original native all callback without Promise assimilation. */
+  all = (ctx?: IOperationContext): Promise<readonly TRow[]> =>
+    this.#options.all(this.#prepare, ctx) as Promise<readonly TRow[]>
+  /** Enter the original native get callback without Promise assimilation. */
+  get = (ctx?: IOperationContext): Promise<TRow | undefined> =>
+    this.#options.get(this.#prepare, ctx) as Promise<TRow | undefined>
+  /** Enter the original native run callback without Promise assimilation. */
+  run = (ctx?: IOperationContext): Promise<TResult> => this.#options.run(this.#prepare, ctx)
+}
+
+/** Derive execution endpoints over the same authentic node; no parser, driver or scope is created. */
 export function deriveStorageSqlQuery<
   TRow extends object & { readonly [K in keyof TRow]: ISqlValue } = ISqlRow,
   TResult extends ISqlRunResult = ISqlRunResult
@@ -533,27 +536,30 @@ export function deriveStorageSqlQuery<
   fragment: ISqlFragment,
   terminals: IStorageSqlQueryTerminals<TRow, TResult>
 ): ISqlQuery<TRow, TResult> {
-  /** Authentication retains the original node graph rather than expanding or compiling it. */
+  /** Authentication preserves the original graph without expansion or compilation. */
   const node = sqlNode(fragment)
-  try {
-    /** Borrowed terminal getters are captured once, before publication of the derived identity. */
-    const all = terminals.all
-    /** The original caller continues to own its native callbacks and their Promise results. */
-    const get = terminals.get
-    /** Write execution is delegated through that same captured native endpoint. */
-    const run = terminals.run
-    if (typeof all !== 'function' || typeof get !== 'function' || typeof run !== 'function')
-      throw invalidSqlArgument()
-    /** The original receiver, context and Promise are forwarded without async assimilation. */
-    const query = {
-      all: (ctx?: IOperationContext) => Reflect.apply(all, terminals, [ctx]),
-      get: (ctx?: IOperationContext) => Reflect.apply(get, terminals, [ctx]),
-      run: (ctx?: IOperationContext) => Reflect.apply(run, terminals, [ctx])
-    } as ISqlQuery<TRow, TResult>
-    sqlNodes.set(query, node)
-    return Object.freeze(query)
-  } catch (cause) {
-    if (cause instanceof StorageContractError) throw cause
-    throw invalidSqlArgument(cause)
+  if (
+    typeof terminals.all !== 'function' ||
+    typeof terminals.get !== 'function' ||
+    typeof terminals.run !== 'function'
+  )
+    throw invalidSqlArgument()
+  return new DerivedSqlQuery(node, terminals) as unknown as ISqlQuery<TRow, TResult>
+}
+
+/** A transaction projection owns only its terminal binding and borrows the original fragment graph. */
+class DerivedSqlQuery<TRow extends object, TResult extends ISqlRunResult> {
+  /** The original transaction owner alone grants execution and handles its lifetime. */
+  readonly #terminals: IStorageSqlQueryTerminals<TRow, TResult>
+  /** Register this derived identity in the canonical graph table. */
+  constructor(node: ISqlNode, terminals: IStorageSqlQueryTerminals<TRow, TResult>) {
+    this.#terminals = terminals
+    sqlNodes.set(this, node)
   }
+  /** Forward through the actual original terminal object. */
+  all = (ctx?: IOperationContext) => this.#terminals.all(ctx)
+  /** Forward through the actual original terminal object. */
+  get = (ctx?: IOperationContext) => this.#terminals.get(ctx)
+  /** Forward through the actual original terminal object. */
+  run = (ctx?: IOperationContext) => this.#terminals.run(ctx)
 }
