@@ -1,3 +1,4 @@
+import { entityTestFeatures } from '../helpers/entity-features.js'
 import { indexedDbTestFeatures } from '../helpers/indexed-db-features.js'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb'
@@ -81,6 +82,7 @@ describe('native IndexedDB TTL', () => {
   it('removes expired indexed records through the original sidecar, revision and post-commit paths', async () => {
     const { scheduler, store } = await setup()
     const repository = defineEntity<{ id: string; score: number }>()({
+      features: entityTestFeatures,
       name: 'ttl-index',
       key: 'id',
       indexes: { score: { path: 'score' } }

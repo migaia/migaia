@@ -1,3 +1,4 @@
+import { entityTestFeatures } from '../helpers/entity-features.js'
 import { indexedDbTestFeatures } from '../helpers/indexed-db-features.js'
 import { IDBFactory, IDBIndex, IDBKeyRange, IDBObjectStore } from 'fake-indexeddb'
 import { describe, expect, it, vi } from 'vitest'
@@ -15,7 +16,7 @@ import { captureOperationCleanup } from '../helpers/operation-reporter.js'
 
 type IUser = { id: string; name: string; email: string }
 
-const users = defineEntity<IUser>({ name: 'users', key: 'id' })
+const users = defineEntity<IUser>({ features: entityTestFeatures, name: 'users', key: 'id' })
 
 const freshIndexedDb = () =>
   createIndexedDbTestStore({
@@ -47,11 +48,16 @@ describe('repository over real indexedDbHost backend', () => {
   it('uses the complete sidecar for exact/range/list/stream queries', async () => {
     type IIndexedUser = { id: string; score: number }
     const store = await freshIndexedDb()
-    const baseline = defineEntity<IIndexedUser>({ name: 'native-users', key: 'id' }).connect(store)
+    const baseline = defineEntity<IIndexedUser>({
+      features: entityTestFeatures,
+      name: 'native-users',
+      key: 'id'
+    }).connect(store)
     await baseline.put({ id: 'u1', score: 2 })
     await baseline.put({ id: 'u2', score: 1 })
     await baseline.migrate()
     const repository = defineEntity<IIndexedUser>()({
+      features: entityTestFeatures,
       name: 'native-users',
       key: 'id',
       indexes: { score: { path: 'score' } }
@@ -133,6 +139,7 @@ describe('repository over real indexedDbHost backend', () => {
     const holder = host.backend('holder')
     const writer = host.backend('writer')
     const definition = {
+      features: entityTestFeatures,
       name: 'migration-replay',
       key: 'id',
       indexes: { value: { path: 'value' } }
@@ -142,6 +149,7 @@ describe('repository over real indexedDbHost backend', () => {
     await old.migrate()
     const upgraded = defineEntity<{ id: string; value: number }>()({
       ...definition,
+      features: entityTestFeatures,
       version: 2,
       migrations: {
         2: async (value) => ({ ...(value as { id: string; value: number }), value: 2 })
@@ -221,12 +229,15 @@ describe('repository over real indexedDbHost backend', () => {
   it('compiles narrow ranges into the lookup cursor before defensive filtering', async () => {
     type IRangeUser = { id: string; score: number }
     const store = await freshIndexedDb()
-    const baseline = defineEntity<IRangeUser>({ name: 'native-range-users', key: 'id' }).connect(
-      store
-    )
+    const baseline = defineEntity<IRangeUser>({
+      features: entityTestFeatures,
+      name: 'native-range-users',
+      key: 'id'
+    }).connect(store)
     for (const score of [1, 2, 3, 4, 5]) await baseline.put({ id: `u${score}`, score })
     await baseline.migrate()
     const repository = defineEntity<IRangeUser>()({
+      features: entityTestFeatures,
       name: 'native-range-users',
       key: 'id',
       indexes: { score: { path: 'score' } }
@@ -257,6 +268,7 @@ describe('repository over real indexedDbHost backend', () => {
     type INestedRangeUser = { id: string; values: IStorageKey[] }
     const store = await freshIndexedDb()
     const baseline = defineEntity<INestedRangeUser>({
+      features: entityTestFeatures,
       name: 'native-nested-range-users',
       key: 'id'
     }).connect(store)
@@ -266,6 +278,7 @@ describe('repository over real indexedDbHost backend', () => {
     await baseline.put({ id: 'deep-array', values: [[['tenant', ['region', 'user']]]] })
     await baseline.migrate()
     const repository = defineEntity<INestedRangeUser>()({
+      features: entityTestFeatures,
       name: 'native-nested-range-users',
       key: 'id',
       indexes: {
@@ -308,6 +321,7 @@ describe('repository over real indexedDbHost backend', () => {
     const firstStore = await createIndexedDbTestStore({ factory, keyRange: IDBKeyRange, dbName })
     const secondStore = await createIndexedDbTestStore({ factory, keyRange: IDBKeyRange, dbName })
     const entity = defineEntity<IUniqueUser>()({
+      features: entityTestFeatures,
       name: 'native-unique-users',
       key: 'id',
       indexes: { email: { path: 'email', unique: true } }
@@ -336,17 +350,26 @@ describe('repository over real indexedDbHost backend', () => {
   it('entity privately backfills normalized path and selector projections', async () => {
     type IIndexedUser = { id: string; profile: { email: string }; tags: string[] }
     const store = await freshIndexedDb()
-    const baseline = defineEntity<IIndexedUser>({ name: 'backfilled-users', key: 'id' })
+    const baseline = defineEntity<IIndexedUser>({
+      features: entityTestFeatures,
+      name: 'backfilled-users',
+      key: 'id'
+    })
     await baseline.connect(store).put({
       id: 'u1',
       profile: { email: 'ada@example.com' },
       tags: ['engineer', 'admin']
     })
-    await defineEntity<{ id: string; label: string }>({ name: 'other-backfill', key: 'id' })
+    await defineEntity<{ id: string; label: string }>({
+      features: entityTestFeatures,
+      name: 'other-backfill',
+      key: 'id'
+    })
       .connect(store)
       .put({ id: 'other-1', label: 'must not enter users index' })
     await baseline.connect(store).migrate()
     const indexed = defineEntity<IIndexedUser>()({
+      features: entityTestFeatures,
       name: 'backfilled-users',
       key: 'id',
       indexes: {
@@ -392,6 +415,7 @@ describe('repository over real indexedDbHost backend', () => {
   it('measures decoded custom-codec payloads before issuing a batch', async () => {
     const store = await freshIndexedDb()
     const baseline = defineEntity<{ id: string; email: string }>({
+      features: entityTestFeatures,
       name: 'decoded-cap-codec',
       key: 'id'
     }).connect(store)
@@ -399,6 +423,7 @@ describe('repository over real indexedDbHost backend', () => {
     await baseline.put({ id: 'u2', email: 'small@example.com' })
     await baseline.migrate()
     const indexed = defineEntity<{ id: string; email: string }>()({
+      features: entityTestFeatures,
       name: 'decoded-cap-codec',
       key: 'id',
       codec: {
@@ -451,12 +476,14 @@ describe('repository over real indexedDbHost backend', () => {
   it('fails closed for nested undefined in decoded entity budget', async () => {
     const store = await freshIndexedDb()
     const baseline = defineEntity<{ id: string; email: string }>({
+      features: entityTestFeatures,
       name: 'nested-undefined-codec',
       key: 'id'
     }).connect(store)
     await baseline.put({ id: 'u1', email: 'nested@example.com' })
     await baseline.migrate()
     const indexed = defineEntity<{ id: string; email: string }>()({
+      features: entityTestFeatures,
       name: 'nested-undefined-codec',
       key: 'id',
       codec: {
@@ -493,13 +520,18 @@ describe('repository over real indexedDbHost backend', () => {
   it('keeps the canonical record when a legacy shadow has the same id', async () => {
     type IShadowedUser = { id: string; email: string }
     const store = await freshIndexedDb()
-    const entity = defineEntity<IShadowedUser>({ name: 'shadow-wins', key: 'id' })
+    const entity = defineEntity<IShadowedUser>({
+      features: entityTestFeatures,
+      name: 'shadow-wins',
+      key: 'id'
+    })
     await entity.connect(store).put({ id: 'same', email: 'canonical@example.com' })
     await store.putRecord({ version: 1, state: { id: 'same', email: 'legacy@example.com' } }, [
       'shadow-wins',
       'same'
     ])
     const indexed = defineEntity<IShadowedUser>()({
+      features: entityTestFeatures,
       name: 'shadow-wins',
       key: 'id',
       indexes: { email: { path: 'email' } }
@@ -520,7 +552,11 @@ describe('repository over real indexedDbHost backend', () => {
     type INestedUser = { id: IStorageKey; email: string }
     const store = await freshIndexedDb()
     const diagnostics: string[] = []
-    const entity = defineEntity<INestedUser>({ name: 'nested-legacy', key: 'id' })
+    const entity = defineEntity<INestedUser>({
+      features: entityTestFeatures,
+      name: 'nested-legacy',
+      key: 'id'
+    })
     await entity.connect(store).migrate()
     const nestedId: IStorageKey = ['tenant', ['region', 'user-1']]
     await store.putRecord({ version: 1, state: { id: nestedId, email: 'nested@example.com' } }, [
@@ -532,6 +568,7 @@ describe('repository over real indexedDbHost backend', () => {
       ['tenant', ['region', 'foreign']]
     ])
     const indexed = defineEntity<INestedUser>()({
+      features: entityTestFeatures,
       name: 'nested-legacy',
       key: 'id',
       onDiagnostic: (message) => diagnostics.push(message),
@@ -556,7 +593,11 @@ describe('repository over real indexedDbHost backend', () => {
   it('rejects aggregate projection rows before any sidecar write', async () => {
     const { store, capability } = await freshIndexedDbBackfill()
     const scope = 'backfill-projection-cap'
-    const repository = defineEntity<{ id: string }>({ name: scope, key: 'id' }).connect(store)
+    const repository = defineEntity<{ id: string }>({
+      features: entityTestFeatures,
+      name: scope,
+      key: 'id'
+    }).connect(store)
     for (let index = 0; index < 8; index += 1)
       await store.putRecord({ value: index }, repository.lockKey(`id-${index}`).key)
     const handle = await capability.ensureRecordIndexes(scope, [
@@ -603,6 +644,7 @@ describe('repository over real indexedDbHost backend', () => {
       'legacy'
     ])
     const entity = defineEntity<ILegacyUser>()({
+      features: entityTestFeatures,
       name: 'legacy-backfill',
       key: 'id',
       indexes: { email: { path: 'email', unique: true } }
@@ -650,6 +692,7 @@ describe('repository over real indexedDbHost backend', () => {
   it('custom codec 未 settle 时 abort 能结束等待且不写入', async () => {
     const store = await freshIndexedDb()
     const entity = defineEntity<{ id: string; name: string }>({
+      features: entityTestFeatures,
       name: 'hanging-codec',
       key: 'id',
       codec: {
@@ -671,13 +714,22 @@ describe('repository over real indexedDbHost backend', () => {
 
   it('query-owned backfill propagates cancellation through a hanging decoder', async () => {
     const store = await freshIndexedDb()
-    await defineEntity<{ id: string; email: string }>({ name: 'abort-backfill', key: 'id' })
+    await defineEntity<{ id: string; email: string }>({
+      features: entityTestFeatures,
+      name: 'abort-backfill',
+      key: 'id'
+    })
       .connect(store)
       .put({ id: 'u1', email: 'ada@example.com' })
-    await defineEntity<{ id: string; email: string }>({ name: 'abort-backfill', key: 'id' })
+    await defineEntity<{ id: string; email: string }>({
+      features: entityTestFeatures,
+      name: 'abort-backfill',
+      key: 'id'
+    })
       .connect(store)
       .migrate()
     const indexed = defineEntity<{ id: string; email: string }>()({
+      features: entityTestFeatures,
       name: 'abort-backfill',
       key: 'id',
       codec: {
@@ -703,6 +755,7 @@ describe('repository over real indexedDbHost backend', () => {
   it('active backfill lease keeps concurrent queries on authoritative fallback', async () => {
     const { store, capability } = await freshIndexedDbBackfill()
     const baseline = defineEntity<{ id: string; email: string }>({
+      features: entityTestFeatures,
       name: 'leased-query-users',
       key: 'id'
     })
@@ -718,6 +771,7 @@ describe('repository over real indexedDbHost backend', () => {
     })
     const diagnostics: string[] = []
     const repository = defineEntity<{ id: string; email: string }>()({
+      features: entityTestFeatures,
       name: 'leased-query-users',
       key: 'id',
       indexes: { email: { path: 'email' } },
@@ -736,6 +790,7 @@ describe('repository over real indexedDbHost backend', () => {
     async (failPersistence) => {
       const store = await freshIndexedDb()
       const baseline = defineEntity<{ id: string; email: string }>({
+        features: entityTestFeatures,
         name: 'failed-selector-backfill',
         key: 'id'
       })
@@ -743,6 +798,7 @@ describe('repository over real indexedDbHost backend', () => {
       await baseline.connect(store).migrate()
       const selectorFailure = new RangeError('selector projection failed')
       const indexed = defineEntity<{ id: string; email: string }>()({
+        features: entityTestFeatures,
         name: 'failed-selector-backfill',
         key: 'id',
         indexes: {
@@ -812,6 +868,7 @@ describe('repository over real indexedDbHost backend', () => {
     const store = await freshIndexedDb()
     let calls = 0
     const entity = defineEntity<{ id: string; name: string }>({
+      features: entityTestFeatures,
       name: 'pre-abort-codec',
       key: 'id',
       codec: {
@@ -842,7 +899,11 @@ describe('repository over real indexedDbHost backend', () => {
 
   it('list/stream 只用 [entityName] range 就能正确限定在本 entity 内', async () => {
     const store = await freshIndexedDb()
-    const posts = defineEntity<{ id: string; title: string }>({ name: 'posts', key: 'id' })
+    const posts = defineEntity<{ id: string; title: string }>({
+      features: entityTestFeatures,
+      name: 'posts',
+      key: 'id'
+    })
     const userRepo = users.connect(store)
     const postRepo = posts.connect(store)
     await userRepo.put({ id: 'a', name: 'Ada', email: 'a@b.c' })
@@ -857,6 +918,7 @@ describe('repository over real indexedDbHost backend', () => {
 
   it('range 使用共享 comparator 过滤原始 ID，而不是依赖 v2 wire 编码排序', async () => {
     const numericUsers = defineEntity<{ id: number; name: string }>({
+      features: entityTestFeatures,
       name: 'numeric-users',
       key: 'id'
     })
@@ -876,7 +938,11 @@ describe('repository over real indexedDbHost backend', () => {
 
   it('完整 key domain 的 range 过滤与共享 comparator 保持一致', async () => {
     type IMixedRecord = { id: IStorageKey; label: string }
-    const mixed = defineEntity<IMixedRecord>({ name: 'mixed-key-users', key: 'id' })
+    const mixed = defineEntity<IMixedRecord>({
+      features: entityTestFeatures,
+      name: 'mixed-key-users',
+      key: 'id'
+    })
     const repo = mixed.connect(await freshIndexedDb())
     const keys: IStorageKey[] = [
       -2,
@@ -958,6 +1024,7 @@ describe('repository over real indexedDbHost backend', () => {
   it('显式 migrate 遇到 legacy/v2 重复键时保留 v2 winner', async () => {
     const store = await freshIndexedDb()
     const repo = defineEntity<{ id: string; name: string }>({
+      features: entityTestFeatures,
       name: 'duplicate-migrate',
       key: 'id',
       version: 2,
@@ -978,6 +1045,7 @@ describe('repository over real indexedDbHost backend', () => {
 
   it('findBy 在真实 IndexedDB 上按属性扫描过滤', async () => {
     const indexed = defineEntity<IUser>({
+      features: entityTestFeatures,
       name: 'users-idb-indexed',
       key: 'id'
     })
@@ -1027,6 +1095,7 @@ describe('repository over real indexedDbHost backend', () => {
   it('版本迁移在读取时执行且不隐式写回', async () => {
     const store = await freshIndexedDb()
     const v1 = defineEntity<{ id: string; name: string }>({
+      features: entityTestFeatures,
       name: 'migratable',
       key: 'id',
       version: 1
@@ -1034,6 +1103,7 @@ describe('repository over real indexedDbHost backend', () => {
     await v1.connect(store).put({ id: 'u1', name: 'Ada' })
 
     const v2 = defineEntity<{ id: string; displayName: string }>({
+      features: entityTestFeatures,
       name: 'migratable',
       key: 'id',
       version: 2,
@@ -1053,9 +1123,14 @@ describe('repository over real indexedDbHost backend', () => {
 
   it('显式 migrate 将 batch checkpoint 写入 metadata', async () => {
     const store = await freshIndexedDb()
-    const v1 = defineEntity<{ id: string; name: string }>({ name: 'checkpointed', key: 'id' })
+    const v1 = defineEntity<{ id: string; name: string }>({
+      features: entityTestFeatures,
+      name: 'checkpointed',
+      key: 'id'
+    })
     await v1.connect(store).put({ id: 'u1', name: 'Ada' })
     const v2 = defineEntity<{ id: string; displayName: string }>({
+      features: entityTestFeatures,
       name: 'checkpointed',
       key: 'id',
       version: 2,
@@ -1074,13 +1149,19 @@ describe('repository over real indexedDbHost backend', () => {
   it('migrate 只扫描目标 entity 的 v2 物理前缀，不触碰其他 entity', async () => {
     const store = await freshIndexedDb()
     const target = defineEntity<{ id: string; name: string }>({
+      features: entityTestFeatures,
       name: 'target-migrate',
       key: 'id'
     })
-    const other = defineEntity<{ id: string; name: string }>({ name: 'other-migrate', key: 'id' })
+    const other = defineEntity<{ id: string; name: string }>({
+      features: entityTestFeatures,
+      name: 'other-migrate',
+      key: 'id'
+    })
     await target.connect(store).put({ id: 'target', name: 'Target' })
     await other.connect(store).put({ id: 'other', name: 'Other' })
     const migrated = defineEntity<{ id: string; label: string }>({
+      features: entityTestFeatures,
       name: 'target-migrate',
       key: 'id',
       version: 2,
@@ -1101,12 +1182,14 @@ describe('repository over real indexedDbHost backend', () => {
   it('重复执行 migrate 幂等，不重复覆盖已迁移记录', async () => {
     const store = await freshIndexedDb()
     const v1 = defineEntity<{ id: string; name: string }>({
+      features: entityTestFeatures,
       name: 'idempotent-migrate',
       key: 'id'
     })
     await v1.connect(store).put({ id: 'u1', name: 'Ada' })
     let migrationCalls = 0
     const v2 = defineEntity<{ id: string; displayName: string }>({
+      features: entityTestFeatures,
       name: 'idempotent-migrate',
       key: 'id',
       version: 2,
@@ -1135,6 +1218,7 @@ describe('repository over real indexedDbHost backend', () => {
   it('显式 migrate 分批搬迁 legacy 物理键并删除旧键', async () => {
     const store = await freshIndexedDb()
     const v2 = defineEntity<{ id: string; displayName: string }>({
+      features: entityTestFeatures,
       name: 'legacy-batch-migrate',
       key: 'id',
       version: 2,
@@ -1168,6 +1252,7 @@ describe('repository over real indexedDbHost backend', () => {
   it('migrate 从 running checkpoint 的 exclusive physical key 继续', async () => {
     const store = await freshIndexedDb()
     const v2 = defineEntity<{ id: string; displayName: string }>({
+      features: entityTestFeatures,
       name: 'checkpoint-resume',
       key: 'id',
       version: 2,
@@ -1206,7 +1291,11 @@ describe('repository over real indexedDbHost backend', () => {
 
   it('migrate 非冲突批失败后保留前一批 checkpoint', async () => {
     const source = await freshIndexedDb()
-    const v1 = defineEntity<{ id: string; name: string }>({ name: 'failure-resume', key: 'id' })
+    const v1 = defineEntity<{ id: string; name: string }>({
+      features: entityTestFeatures,
+      name: 'failure-resume',
+      key: 'id'
+    })
     await v1.connect(source).put({ id: 'a', name: 'Ada' })
     await v1.connect(source).put({ id: 'b', name: 'Bob' })
     let calls = 0
@@ -1227,6 +1316,7 @@ describe('repository over real indexedDbHost backend', () => {
       return originalTransaction(run, ctx)
     }
     const v2 = defineEntity<{ id: string; displayName: string }>({
+      features: entityTestFeatures,
       name: 'failure-resume',
       key: 'id',
       version: 2,
@@ -1249,6 +1339,7 @@ describe('repository over real indexedDbHost backend', () => {
   it('migrate 遇到 schema fingerprint 不匹配时从头扫描', async () => {
     const store = await freshIndexedDb()
     const entity = defineEntity<{ id: string; name: string }>({
+      features: entityTestFeatures,
       name: 'checkpoint-mismatch',
       key: 'id',
       version: 2,

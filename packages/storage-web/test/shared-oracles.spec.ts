@@ -1,3 +1,4 @@
+import { entityTestFeatures } from './helpers/entity-features.js'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -34,6 +35,7 @@ describe('shared oracle clusters', () => {
 
   it('proves typed index projection and fallback ordering through one query route', async () => {
     const entity = defineEntity<IIndexedUser>()({
+      features: entityTestFeatures,
       name: 'indexed-users',
       key: 'id',
       indexes: {

@@ -1,3 +1,4 @@
+import { entityTestFeatures } from '../helpers/entity-features.js'
 import { describe, expect, it } from 'vitest'
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb'
 import { defineEntity } from '@migaia/storage-host/entity'
@@ -102,9 +103,11 @@ runConformance(harness, {
     } finally {
       await session.release()
     }
-    const repository = defineEntity<{ id: string }>({ name: handle.scope, key: 'id' }).connect(
-      store
-    )
+    const repository = defineEntity<{ id: string }>({
+      features: entityTestFeatures,
+      name: handle.scope,
+      key: 'id'
+    }).connect(store)
     return (key: string) => repository.lockKey(key).key
   }
 })
