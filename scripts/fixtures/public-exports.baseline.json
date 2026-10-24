@@ -1826,6 +1826,9 @@
         "structuredCodec"
       ]
     },
+    "@migaia/storage-plugin-archive": {
+      ".": ["ArchiveErrorCode", "ERROR_SOURCE", "archivePlugin"]
+    },
     "@migaia/storage-plugin-cache": {
       ".": ["CacheErrorCode", "CacheWriteMode", "ERROR_SOURCE", "cacheBackendKind", "cacheKey", "cachePlugin"],
       "./features/semantic": ["semanticCacheFeature"]
