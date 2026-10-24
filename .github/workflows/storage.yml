@@ -21,6 +21,22 @@ jobs:
   native-services:
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    env:
+      MIGAIA_REDIS_URL: redis://127.0.0.1:17379
+      MIGAIA_VALKEY_URL: redis://127.0.0.1:17380
+      MIGAIA_REDIS_STACK_URL: redis://127.0.0.1:17381
+      MIGAIA_PG_URL: postgresql://storage:storage-local@127.0.0.1:15432/storage
+      MIGAIA_PG_PUBLICATION: migai_storage_publication
+      MIGAIA_PG_SLOT: migai_storage_slot
+      MIGAIA_QDRANT_URL: http://127.0.0.1:16333
+      MIGAIA_SPARQL_QUERY_URL: http://127.0.0.1:13030/storage/sparql
+      MIGAIA_SPARQL_UPDATE_URL: http://127.0.0.1:13030/storage/update
+      MIGAIA_SPARQL_GRAPH_STORE_URL: http://127.0.0.1:13030/storage/data
+      MIGAIA_S3_ENDPOINT: http://127.0.0.1:19000
+      MIGAIA_S3_REGION: us-east-1
+      MIGAIA_S3_BUCKET: migai-storage-tests
+      MIGAIA_S3_ACCESS_KEY_ID: storage
+      MIGAIA_S3_SECRET_ACCESS_KEY: storage-local
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v4
@@ -41,13 +57,23 @@ jobs:
         continue-on-error: true
         run: node scripts/storage-services.mts up
       - name: Build neutral owners before peer consumers
-        run: node scripts/exclusive-window.mjs run --window storage-owners --wait 2700 -- pnpm -r --filter @migaia/storage-host... --filter @migaia/store-persist... run build
+        run: node scripts/exclusive-window.mjs run --window storage-owners --wait 2700 -- pnpm -r --workspace-concurrency=2 --filter @migaia/storage-host... --filter @migaia/store-persist... run build
       - name: Build native packages and browser adapters
-        run: node scripts/exclusive-window.mjs run --window storage-build --wait 2700 -- pnpm -r --filter '@migaia/storage-plugin-*' --filter @migaia/storage-web run build
+        run: node scripts/exclusive-window.mjs run --window storage-build --wait 2700 -- pnpm -r --workspace-concurrency=2 --filter '@migaia/storage-plugin-*' --filter @migaia/storage-web run build
       - name: Check formatting and lint
         run: pnpm -r --no-bail --filter '@migaia/storage-*' run fmt --check && pnpm -r --no-bail --filter '@migaia/storage-*' run lint
       - name: Check storage source and test types
         run: pnpm -r --no-bail --filter '@migaia/storage-*' run typecheck && pnpm -r --no-bail --filter '@migaia/storage-*' run typecheck:test && pnpm --filter @migaia/storage-web run typecheck:e2e
+      - name: Require the declared native service environment
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          for name in MIGAIA_REDIS_URL MIGAIA_VALKEY_URL MIGAIA_REDIS_STACK_URL MIGAIA_PG_URL MIGAIA_PG_PUBLICATION MIGAIA_PG_SLOT MIGAIA_QDRANT_URL MIGAIA_SPARQL_QUERY_URL MIGAIA_SPARQL_UPDATE_URL MIGAIA_SPARQL_GRAPH_STORE_URL MIGAIA_S3_ENDPOINT; do
+            if [ -z "${!name}" ]; then
+              echo "::error::$name is required by the declared storage services"
+              exit 1
+            fi
+          done
       - name: Run every storage package against the same services
         if: ${{ !cancelled() }}
         run: node scripts/storage-services.mts run -- node scripts/exclusive-window.mjs run --window storage-tests --wait 2700 -- pnpm -r --no-bail --workspace-concurrency=1 --filter '@migaia/storage-*' test
