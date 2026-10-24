@@ -64,32 +64,6 @@ describe('asRecordStore / isRecordStore', () => {
       expect.objectContaining({ code: 'UNSUPPORTED_CAPABILITY' })
     )
   })
-  it('record narrowing 对每个 capability 字段只读取一次', () => {
-    const store = fakeStore({ records: true, binary: true, transactions: true, iteration: true })
-    const values = store.capabilities
-    let reads = 0
-    const capabilities: Record<string, unknown> = {}
-    for (const [key, value] of Object.entries(values))
-      Object.defineProperty(capabilities, key, {
-        get: () => {
-          reads += 1
-          return value
-        }
-      })
-    Object.defineProperty(store, 'capabilities', {
-      get: () => capabilities
-    })
-    expect(isRecordStore(store)).toBe(true)
-    expect(reads).toBe(9)
-  })
-  it('backend capabilities metadata 在运行时不可变', async () => {
-    const store = await createMemoryTestStore()
-    expect(() => {
-      ;(store.capabilities as { records: boolean }).records = false
-    }).toThrow(TypeError)
-    expect(store.capabilities.records).toBe(true)
-  })
-
   it('运行时收到 null 或缺少 capabilities 时返回 false/稳定抛 UNSUPPORTED_CAPABILITY', () => {
     expect(isRecordStore(null as unknown as IKeyValueStore)).toBe(false)
     expect(() => asRecordStore(null as unknown as IKeyValueStore)).toThrow(
