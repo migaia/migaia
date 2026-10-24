@@ -279,3 +279,5 @@ redo 的显式后端选择缺少 WAL 时在安装阶段拒绝；replay 可返回
 没有原 native changes 或 redo 接点的后端不能仅因 WAL 插件存在而准入；该组合在配置准备阶段报 UNSUPPORTED_CAPABILITY，避免原普通写绕过所选恢复。
 
 实体查询的 `skip`、`limit`、`distinct`、`after` 和排序分支保留 `onInvalid` 与原 Feature 方法。选源必须先于其它链式步骤，且 `index` / `range` 只能选一次；selector 排序可以继续追加 selector，不能切换 comparator，comparator 必须先用 `limit` 给出有限页或调用 `first`。绕过类型的结构违规在读取前报 `INVALID_CONFIG`。默认 comparator 与显式 comparator 均由原共享查询按 `skip + limit` 保留有界候选，然后分页；重复 `skip` / `limit` 取最后值，`limit(0)` 不读取候选。`count` 保留分页但不执行排序或投影。selector 的同步键校验复用原 portable key owner；用户 selector 抛错保存在 `EXTENSION_FAILED` 的首层 `cause`。
+
+声明式条件会在原 planner 的首段 `where` 内静态选择匹配的已声明索引：唯一 `eq`、其它 `eq` / 较短 `in`、双侧范围、单侧范围 / `startsWith` 依次优先，同级沿声明顺序；显式 `index` / `range` 优先。`explain()` 零 I/O 返回选中规则及未选候选，保守保留 `fullScan: true`，因为实际打开仍可能执行原索引准备或权威回退；`in` / 字符串前缀的宽候选用原条件编译器精确复核。显式 selector 与后续 `where` 保留共享核心的声明顺序；要先过滤，请把 `where` 放在 `orderBy` 前。
