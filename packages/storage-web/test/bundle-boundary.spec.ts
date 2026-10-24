@@ -123,16 +123,18 @@ const browserFullQueryEntry = [
       `import { entity${name[0]!.toUpperCase()}${name.slice(1)}Feature } from '@migaia/storage-host/entity/${name}'`
   ),
   "import { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'",
-  ...['ttl', 'batch', 'journal', 'notifications', 'change-feed', 'indexes'].map((name) => {
-    /** Public factory spelling follows the explicitly selected IndexedDB Feature entry. */
-    const suffix =
-      name === 'ttl'
-        ? 'Ttl'
-        : name === 'change-feed'
-          ? 'ChangeFeed'
-          : name[0]!.toUpperCase() + name.slice(1)
-    return `import { indexedDb${suffix}Feature } from '@migaia/storage-web/features/indexed-db-${name}'`
-  }),
+  ...['ttl', 'batch', 'journal', 'notifications', 'change-feed', 'indexes', 'keyset'].map(
+    (name) => {
+      /** Public factory spelling follows the explicitly selected IndexedDB Feature entry. */
+      const suffix =
+        name === 'ttl'
+          ? 'Ttl'
+          : name === 'change-feed'
+            ? 'ChangeFeed'
+            : name[0]!.toUpperCase() + name.slice(1)
+      return `import { indexedDb${suffix}Feature } from '@migaia/storage-web/features/indexed-db-${name}'`
+    }
+  ),
   '/** Read the same active user names with every optional unit explicitly installed.',
   ' * @param {import("@migaia/storage-web/indexed-db").IIndexedDbOptions} options Native ports/layout.',
   ' * @param {import("@migaia/storage-host").IStorageJournalOptions["logger"]} logger Borrowed application logger.',
@@ -142,7 +144,7 @@ const browserFullQueryEntry = [
   '  const host = await createStorageHost({',
   '    plugins: [storageJournalPlugin(), indexedDbBackendPlugin(options, {',
   '      ttl: indexedDbTtlFeature(), batch: indexedDbBatchFeature(), journal: indexedDbJournalFeature(),',
-  '      notifications: indexedDbNotificationsFeature(), changeFeed: indexedDbChangeFeedFeature(), indexes: indexedDbIndexesFeature()',
+  '      notifications: indexedDbNotificationsFeature(), changeFeed: indexedDbChangeFeedFeature(), indexes: indexedDbIndexesFeature(), keyset: indexedDbKeysetFeature()',
   '    })],',
   "    journal: { logger, namespace: 'browser-bundle-full' }",
   '  })',
