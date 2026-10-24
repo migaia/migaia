@@ -30,5 +30,6 @@ export const localStorageBackendPlugin = <
     localStorageBackendKind,
     readBuiltInPluginId(options, 'local', StorageBackend.local),
     (core) => localStorageHost(options, core),
-    features
+    features,
+    true
   )

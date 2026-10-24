@@ -1,3 +1,4 @@
+import type { ITextRedoStore } from './text-redo.js'
 import {
   createWebStorageBackend,
   snapshotWebStorageOptions,
@@ -31,7 +32,7 @@ export const sessionStorageHost = (
   options: ISessionStorageOptions,
   runtime: IBackendRuntime
 ): IBackendConstruction<
-  IKeyValueBackendStore<ISyncCapableStore<IKeyValueStore>>,
+  IKeyValueBackendStore<ISyncCapableStore<IKeyValueStore> & ITextRedoStore>,
   IWebStorageLike
 > => {
   /** Capture namespace configuration before admitting either an injected or ambient port. */

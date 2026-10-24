@@ -160,9 +160,9 @@ try {
 }
 ```
 
-IndexedDB 支持从 `@migaia/storage-host/journal` 调用 `storageLogStore(hostOrOrg, 'indexed-db', { prefix })`。私有行使用既有 META 对象仓库内的数组键命名空间。业务 `clearAll` 保留历史；删除组织使旧日志缓存句柄失效，原业务视图仍可重新打开。重新打开同一物理组织和前缀前须释放原日志。head、state 与记录随原生事务一同提交，缓存索引在真实 complete 事件内发布。
+IndexedDB 支持从 `@migaia/storage-host/journal` 调用 `storageLogStore(hostOrOrg, 'indexed-db', { prefix })`。私有行使用既有 META 对象仓库内的数组键命名空间。业务 `clearAll` 保留历史；删除组织使旧日志句柄失效，原业务视图仍可重新打开。缓存模式下，重新打开同一物理组织和前缀前须释放原日志。head、state 与记录随原生事务一同提交，缓存索引在真实 complete 事件内发布。
 
-对于当前 realm 的持久 IndexedDB factory，原生 Web Locks 在整个资源期间保证参与页面间独占；冲突打开报 LOCK_REJECTED。缺少 Web Locks 时，此缓存日志组合在恢复 I/O 前报 UNSUPPORTED_CAPABILITY，普通 IndexedDB 操作仍可使用。注入 factory 有原生 Web Locks 时同样使用该能力；缺少时，只有显式声明 `journalFactoryIsPrivate: true`、数据宇宙仅限当前 realm 且不转发共享持久库的组合，才复用原逻辑锁拥有者。对象身份本身不证明隔离。此命名空间支持本身不启用全局自动捕获或显式选择的 undo。
+有原生 Web Locks 时，原资源期间独占与缓存路径保持，冲突打开报 LOCK_REJECTED。缺少 Web Locks、又未声明实际私有 factory 时，原 namespace 声明 `indexExclusive:false`：storageLogStore 不再拒绝，而是在每个操作的原 journal-store readwrite 事务内恢复/读取最新 lastSeq、state 与记录，不跨操作保留索引。注入 factory 有 Web Locks 时同样使用原缓存路径；`journalFactoryIsPrivate:true` 仅适用于数据宇宙局限当前 realm 且不转发共享持久库的真实私有 factory，继续复用原逻辑锁与缓存拥有者。对象身份本身不证明隔离。此命名空间支持本身不启用全局自动捕获或显式选择的 undo。
 
 ## IndexedDB 全局日志与显式 undo
 
@@ -171,3 +171,9 @@ IndexedDB 支持从 `@migaia/storage-host/journal` 调用 `storageLogStore(hostO
 文本、字节、记录、清空与绝对 TTL 元数据的实际写入顺序保留在同一原生事务中；重复写入不按通道重排。原生 complete 才发布日志索引，回滚不增加日志序列。首次组织只读同样完成该组织的一次配置；惰性过期删除与日志一起提交。所有契约写入维护原生点修订，删除或清空后保留墓碑，因此其它无日志契约句柄的 clear/recreate 也会使旧 undo 报 `UNDO_CONFLICT`，在恢复任何目标前拒绝。undo 比对原物理镜像，恢复原绝对期限，不延长过期时间。
 
 原生 Feature 直接借用 IDBDatabase / IDBTransaction，超出当前文本、字节、记录镜像域。启用提交日志的组合在交出该原生句柄前报 `UNSUPPORTED_CAPABILITY`；普通与仅遥测配置下的 Blob / 自定义原生 Feature 保持可用。此有限组合仍待共享目标与 codec 方案复查。严格 IndexedDB 不声明允许最终镜像后等待外部 WAL 的能力，该组合在业务 I/O 前拒绝。
+
+localStorage/sessionStorage/Cookie 可用 `redo: true` 显式启用文本事务与多键写，并同时选择 `journal.redoWal: logger.wal`。该组合要求真实 Web Locks；所有参与者借用同一个真实、可见最新 pending 的原 WAL 对象。仅目标同名或不同 memoryLogStore 不构成共享。浏览器同源 popup 可直接借用 opener 持有的精确 Logger/WAL；持久恢复可用另一个 IDB 后端的 storageLogStore 作为单拥有者载体，不能用待增强文本后端给自己承载 WAL。
+
+原 transaction owner 管理 text-only scope，读取自身 draft；先完整编码，再 wal.begin，顺序应用、binlog、complete，之后发布一次失效提示和成功。应用或 complete 失败会停止该实例准入并保留 pending，重开或已打开的参与 peer 在物理保护内先恢复再读取。回调失败不应用 draft。未选 redo 时原标量与同步行为保持；选中异步 journal 后同步入口沿原 ASYNC_STAGE_IN_SYNC_ENTRY 拒绝。redo 不宣称原生原子提交；undo/atomicBinlog/atomicUndo 与 raw 原生 Feature 句柄在该组合中修改前拒绝。独立 WAL 缓存之间的自动跨页恢复不作保证。
+
+Cookie 的 `redo: true` 复用同一原事务/WAL 协议；普通和 redo 写入共用原 cookie 编码、4096-byte 校验、固定 scope 与可见性检查。批量读取仍由同一原解析器读取一次可见 header，再合入当前 draft。redo 模式把 maxAge 在准备时转换为绝对 expiresAt 镜像，重放不续期；超过原生 Date 域的 maxAge 只在该新组合修改前拒绝，普通 Cookie maxAge 域和 Max-Age 优先级不变。该模式仅记录 JS 可见 cookie，HttpOnly/未知 scope 的原限制保持。

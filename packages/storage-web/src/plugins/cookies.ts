@@ -30,5 +30,6 @@ export const cookieBackendPlugin = <
     cookieBackendKind,
     readBuiltInPluginId(options, 'cookies', StorageBackend.cookie),
     (core) => cookiesHost(options, core),
-    features
+    features,
+    true
   )

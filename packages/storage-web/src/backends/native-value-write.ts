@@ -26,11 +26,15 @@ const withPhysicalValueWrite = async <T>(
   backend: IBackendKind,
   signal: IAbortSignal | undefined,
   runtime: IStorageOperationRuntime,
-  closingSignal?: IAbortSignal
+  closingSignal?: IAbortSignal,
+  lockName = ENTITY_UNIQUE_WRITE_LOCK,
+  preserveRunFailure = false
 ): Promise<T> => {
   /** Host locks coordinate separate pages; injected ports commit in the same synchronous turn. */
   let removeAbort: (() => void) | undefined
   let removeClosing: (() => void) | undefined
+  /** Redo seals its controller on a possibly applied failure; that seal cannot replace its cause. */
+  let entered = false
   /** The concrete member's existing closure cancels only this physical admission. */
   const assertAdmission = (): void => {
     throwIfAborted(signal)
@@ -44,6 +48,7 @@ const withPhysicalValueWrite = async <T>(
     /** Both admission paths recheck cancellation before touching storage. */
     const commit = async (): Promise<T> => {
       assertAdmission()
+      entered = true
       return run()
     }
     if (locks !== undefined) {
@@ -63,7 +68,7 @@ const withPhysicalValueWrite = async <T>(
           runtime.reporter
         )
       return await locks.request(
-        ENTITY_UNIQUE_WRITE_LOCK,
+        lockName,
         {
           mode: 'exclusive',
           ...(controller === undefined ? {} : { signal: controller.signal })
@@ -73,7 +78,7 @@ const withPhysicalValueWrite = async <T>(
     }
     return await commit()
   } catch (cause) {
-    assertAdmission()
+    if (!preserveRunFailure || !entered) assertAdmission()
     throw normalizeError(
       cause,
       backend,
@@ -95,6 +100,17 @@ export const withNativeValueWrite = (
   closingSignal: IAbortSignal
 ): Promise<void> =>
   withPhysicalValueWrite(async () => run(), backend, signal, runtime, closingSignal)
+
+/** Text redo uses this original native lock path for its complete read/recover/apply interval. */
+export const withNativeTextOperation = <R>(
+  run: () => Promise<R>,
+  backend: IBackendKind,
+  runtime: IStorageOperationRuntime,
+  closingSignal: IAbortSignal,
+  lockName: string,
+  signal?: IAbortSignal
+): Promise<R> =>
+  withPhysicalValueWrite(run, backend, signal, runtime, closingSignal, lockName, true)
 
 /** Both native value backends compare the same complete prefix snapshot before their write. */
 export const assertValueSnapshot = (

@@ -1,4 +1,5 @@
-import { bindBrowserExecution } from './execution.js'
+import { createTextRedo, type ITextRedoStore } from './text-redo.js'
+import { bindBrowserExecution, textExecutionKeys } from './execution.js'
 import { createTextBatchApi } from './batch.js'
 import {
   implement,
@@ -8,7 +9,8 @@ import {
   StorageContractErrorCode,
   type ITextChangeFeedApi,
   type IStorageChange,
-  type IStorageStore
+  type IStorageStore,
+  lockKey
 } from '@migaia/storage-contract'
 import { snapshotSyncWriteOptions } from '@migaia/storage-contract'
 import {
@@ -74,6 +76,8 @@ const CAPABILITIES: IStorageCapabilities = Object.freeze({
 export type IWebStorageOptions = {
   /** Prefixes keys to isolate instances and applications. Defaults to `default`. */
   readonly namespace?: string
+  /** Explicitly select original WAL-backed multi-key transactions for this physical namespace. */
+  readonly redo?: true
   /** Customizes physical key encoding. Changing the codec changes the persistence format. */
   readonly namespaceCodec?: INamespaceCodec
 }
@@ -96,7 +100,11 @@ export const snapshotWebStorageOptions = (
   assertWebStorageOptions(options)
   const candidate = options as IWebStorageOptions
   try {
-    return { namespace: candidate.namespace, namespaceCodec: candidate.namespaceCodec }
+    return {
+      namespace: candidate.namespace,
+      namespaceCodec: candidate.namespaceCodec,
+      redo: candidate.redo
+    }
   } catch (cause) {
     throw new StorageError(StorageErrorCode.invalidConfig, { backend, cause })
   }
@@ -147,11 +155,14 @@ export const createWebStorageBackend = (
   runtime: IBackendRuntime,
   bindOrganizations = true
 ): IBackendConstruction<
-  IKeyValueBackendStore<ISyncCapableStore<IKeyValueStore> & ITextChangeFeedApi>,
+  IKeyValueBackendStore<ISyncCapableStore<IKeyValueStore> & ITextChangeFeedApi & ITextRedoStore>,
   IWebStorageLike
 > => {
   const optionsSnapshot = snapshotWebStorageOptions(options, backend)
   const namespace = optionsSnapshot.namespace === undefined ? 'default' : optionsSnapshot.namespace
+  const redoEnabled = optionsSnapshot.redo === true
+  if (optionsSnapshot.redo !== undefined && !redoEnabled)
+    throw new StorageContractError(StorageContractErrorCode.invalidArgument, { backend })
   const namespaceCodecCandidate =
     optionsSnapshot.namespaceCodec === undefined
       ? lengthPrefixedNamespaceCodec
@@ -223,10 +234,11 @@ export const createWebStorageBackend = (
       }
     })
   /** A native source must actually register before the immutable capability can become true. */
-  const capabilities =
-    releaseNativeEvents === undefined
-      ? CAPABILITIES
-      : Object.freeze({ ...CAPABILITIES, changeFeed: true })
+  const capabilities = Object.freeze({
+    ...CAPABILITIES,
+    changeFeed: releaseNativeEvents !== undefined,
+    transactions: redoEnabled
+  })
 
   const assertLive = (): void => {
     controller.assertLive()
@@ -359,6 +371,53 @@ export const createWebStorageBackend = (
     }
   }
 
+  /** The exact native namespace supplies all draft inputs and prepared synchronous assignments. */
+  const redo = createTextRedo({
+    enabled: redoEnabled,
+    backend,
+    namespace,
+    runtime,
+    controller,
+    read: (key) => live.getItem(namespacedStorageKey(namespace, key, namespaceCodec, backend)),
+    keys: () => namespacedEntries().map(({ logicalKey }) => logicalKey),
+    prepare: (key, value) => {
+      const physical = namespacedStorageKey(namespace, key, namespaceCodec, backend)
+      return {
+        value,
+        image: value,
+        apply: () => {
+          try {
+            if (value === null) live.removeItem(physical)
+            else live.setItem(physical, value)
+          } catch (cause) {
+            throw normalizeStorageException(cause, backend, key)
+          }
+        }
+      }
+    },
+    replay: (key, value, present) => {
+      const physical = namespacedStorageKey(namespace, key, namespaceCodec, backend)
+      if (present && typeof value !== 'string')
+        throw new StorageContractError(StorageContractErrorCode.invalidArgument, { backend })
+      return () => {
+        try {
+          if (!present) live.removeItem(physical)
+          else live.setItem(physical, value as string)
+        } catch (cause) {
+          throw normalizeStorageException(cause, backend, key)
+        }
+      }
+    },
+    publish: (changes) => {
+      if (changes.length)
+        publishChange({
+          channel: 'value',
+          kind: 'batch',
+          keys: changes.flatMap(({ target }) => (target.channel === 'text' ? [target.key] : []))
+        })
+    }
+  })
+
   /** Entity preparation ends before this backend's original native snapshot/write boundary. */
   const commitValueWrite: IBackendValueCommit = async (input, ctx) => {
     /** Hold only the existing controller lease across intervention and native physical admission. */
@@ -367,11 +426,8 @@ export const createWebStorageBackend = (
       await runtime.execution.run(
         { operation: StorageOperation.entityUniqueWrite, input, ctx },
         (captured) =>
-          withAbort(ctx, async (signal, _context, operationRuntime) => {
-            await withNativeValueWrite(
-              () => {
-                assertLive()
-                /** Both reads and the private sync write execute without an intervening await. */
+          redoEnabled
+            ? redo.write([lockKey.text(captured.key)], ctx, async (scope) => {
                 const actual = namespacedEntries().flatMap((entry) => {
                   if (
                     typeof entry.logicalKey !== 'string' ||
@@ -382,39 +438,84 @@ export const createWebStorageBackend = (
                   return value === null ? [] : [[entry.logicalKey, value] as const]
                 })
                 assertValueSnapshot(actual, captured.expected, backend)
-                sync.set(captured.key, captured.value)
-              },
-              backend,
-              signal,
-              operationRuntime,
-              controller.closingSignal
-            )
-          })
+                await scope.set(captured.key, captured.value)
+              })
+            : withAbort(ctx, async (signal, _context, operationRuntime) => {
+                if (runtime.journal !== undefined) await runtime.journal.prepare()
+                await withNativeValueWrite(
+                  () => {
+                    assertLive()
+                    /** Both reads and the private sync write execute without an intervening await. */
+                    const actual = namespacedEntries().flatMap((entry) => {
+                      if (
+                        typeof entry.logicalKey !== 'string' ||
+                        !entry.logicalKey.startsWith(captured.prefix)
+                      )
+                        return []
+                      const value = live.getItem(entry.physicalKey)
+                      return value === null ? [] : [[entry.logicalKey, value] as const]
+                    })
+                    assertValueSnapshot(actual, captured.expected, backend)
+                    sync.set(captured.key, captured.value)
+                  },
+                  backend,
+                  signal,
+                  operationRuntime,
+                  controller.closingSignal
+                )
+              })
       )
     } finally {
       release()
     }
   }
 
-  const store: ISyncCapableStore<IKeyValueStore> & ITextChangeFeedApi = {
+  /** A fresh org prepares its selected observation inside the original native-read budget. */
+  const plain = <R>(
+    context: import('@migaia/storage-contract').IOperationContext | undefined,
+    read: () => R
+  ) =>
+    withAbort(context, async () => {
+      if (runtime.journal !== undefined) await runtime.journal.prepare()
+      return read()
+    })
+
+  const store: ISyncCapableStore<IKeyValueStore> & ITextChangeFeedApi & ITextRedoStore = {
     backend,
     capabilities,
     sync,
-    get: (key, ctx) => withAbort(ctx, async () => sync.get(key)),
-    set: (key, value, ctx) => withAbort(ctx, async () => sync.set(key, value)),
-    remove: (key, ctx) => withAbort(ctx, async () => sync.remove(key)),
-    has: (key, ctx) => withAbort(ctx, async () => sync.has(key)),
-    keys: (ctx) => withAbort(ctx, async () => sync.keys()),
+    transaction: redo.transaction,
+    tx: redo.tx,
+    get: (key, ctx) =>
+      redoEnabled ? redo.read(ctx, () => sync.get(key)) : plain(ctx, () => sync.get(key)),
+    set: (key, value, ctx) =>
+      redoEnabled
+        ? redo.write([lockKey.text(key)], ctx, (scope) => scope.set(key, value))
+        : plain(ctx, () => sync.set(key, value)),
+    remove: (key, ctx) =>
+      redoEnabled
+        ? redo.write([lockKey.text(key)], ctx, (scope) => scope.remove(key))
+        : plain(ctx, () => sync.remove(key)),
+    has: (key, ctx) =>
+      redoEnabled ? redo.read(ctx, () => sync.has(key)) : plain(ctx, () => sync.has(key)),
+    keys: (ctx) =>
+      redoEnabled ? redo.read(ctx, () => sync.keys()) : plain(ctx, () => sync.keys()),
     clearValues: (ctx) =>
-      withAbort(ctx, async (signal) => {
-        assertLive()
-        clearNamespacedEntries(clearValuesOperation, signal)
-      }),
+      redoEnabled
+        ? redo.clear(ctx)
+        : withAbort(ctx, async (signal) => {
+            if (runtime.journal !== undefined) await runtime.journal.prepare()
+            assertLive()
+            clearNamespacedEntries(clearValuesOperation, signal)
+          }),
     clearAll: (ctx) =>
-      withAbort(ctx, async (signal) => {
-        assertLive()
-        clearNamespacedEntries(clearAllOperation, signal)
-      }),
+      redoEnabled
+        ? redo.clear(ctx)
+        : withAbort(ctx, async (signal) => {
+            if (runtime.journal !== undefined) await runtime.journal.prepare()
+            assertLive()
+            clearNamespacedEntries(clearAllOperation, signal)
+          }),
     watch: (key, ctx) => {
       assertLive()
       if (!capabilities.changeFeed)
@@ -445,62 +546,84 @@ export const createWebStorageBackend = (
         .catch((error) => reportCleanupError(createStorageOperationReporter(), error)))
   }
   const construction = provideBackendConstruction(
-    bindBrowserExecution(store, runtime),
+    bindBrowserExecution(store, runtime, [], textExecutionKeys),
     [
       implement(
         kv,
         browserKeyValueApi(
           store,
-          createTextBatchApi(
-            backend,
-            runtime,
-            (): IStorageStore<never> => construction.store,
-            assertLive,
-            (keys) => {
-              assertLive()
-              /** Encode every requested key before the first read, including custom typed admission. */
-              const physical = keys.map(({ key }) =>
-                namespacedStorageKey(namespace, key, namespaceCodec, backend)
+          redoEnabled
+            ? redo.batch
+            : createTextBatchApi(
+                backend,
+                runtime,
+                (): IStorageStore<never> => construction.store,
+                assertLive,
+                (keys) => {
+                  assertLive()
+                  /**
+                   * Encode every requested key before the first read, including custom typed
+                   * admission.
+                   */
+                  const physical = keys.map(({ key }) =>
+                    namespacedStorageKey(namespace, key, namespaceCodec, backend)
+                  )
+                  /** Repeated canonical positions reuse the first actual native result. */
+                  const values: (string | undefined)[] = []
+                  for (let index = 0; index < keys.length; index += 1) {
+                    const entry = keys[index]!
+                    if (entry.firstIndex !== index) {
+                      values.push(values[entry.firstIndex])
+                      continue
+                    }
+                    try {
+                      values.push(live.getItem(physical[index]!) ?? undefined)
+                    } catch (cause) {
+                      throw normalizeStorageException(cause, backend, entry.key)
+                    }
+                  }
+                  return values
+                }
               )
-              /** Repeated canonical positions reuse the first actual native result. */
-              const values: (string | undefined)[] = []
-              for (let index = 0; index < keys.length; index += 1) {
-                const entry = keys[index]!
-                if (entry.firstIndex !== index) {
-                  values.push(values[entry.firstIndex])
-                  continue
-                }
-                try {
-                  values.push(live.getItem(physical[index]!) ?? undefined)
-                } catch (cause) {
-                  throw normalizeStorageException(cause, backend, entry.key)
-                }
-              }
-              return values
-            }
-          )
-        )
+        ),
+        redoEnabled ? { forTransaction: (scope) => scope } : undefined
       )
     ],
     controller,
-    () => live
+    () => {
+      if (redoEnabled)
+        throw new StorageContractError(StorageContractErrorCode.unsupported, { backend })
+      return live
+    }
   )
   /** Keep native value commits attached to the same physical construction when borrowed by org. */
+  redo.initialize(construction.store)
   const physical = { ...construction, commitValueWrite }
+  const binding = redo.binding((orgId) => {
+    const target = orgBinding?.resolve(orgId) ?? physical
+    if (target === physical) return binding
+    if (target.journalBinding === undefined)
+      throw new StorageContractError(StorageContractErrorCode.unsupported)
+    return target.journalBinding
+  })
+  const orgBinding = bindOrganizations
+    ? createBrowserOrgBinding(
+        runtime,
+        namespace,
+        { ...physical, journalBinding: binding },
+        (target, ports) =>
+          createWebStorageBackend(
+            backend,
+            live,
+            { namespace: target, namespaceCodec, ...(redoEnabled ? { redo: true } : {}) },
+            ports,
+            false
+          )
+      )
+    : undefined
   return {
     ...physical,
-    ...(bindOrganizations
-      ? {
-          orgBinding: createBrowserOrgBinding(runtime, namespace, physical, (target, ports) =>
-            createWebStorageBackend(
-              backend,
-              live,
-              { namespace: target, namespaceCodec },
-              ports,
-              false
-            )
-          )
-        }
-      : {})
+    journalBinding: binding,
+    ...(orgBinding === undefined ? {} : { orgBinding })
   }
 }

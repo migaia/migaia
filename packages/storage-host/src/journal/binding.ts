@@ -22,6 +22,27 @@ export function snapshotStorageJournalBinding(
 ): IStorageJournalBackendBinding {
   try {
     const result = Object.create(null) as Record<string, unknown>
+    /** Only the original descriptor grants this bounded text-draft projection. */
+    const redo = input?.redo
+    if (redo !== undefined) {
+      if (redo === null || typeof redo !== 'object')
+        throw new StorageContractError(StorageContractErrorCode.invalidArgument)
+      const captured: Record<string, unknown> = Object.create(null)
+      for (const key of [
+        'transactionInfo',
+        'changes',
+        'protect',
+        'apply',
+        'replay',
+        'seal'
+      ] as const) {
+        const method = redo[key]
+        if (typeof method !== 'function')
+          throw new StorageContractError(StorageContractErrorCode.invalidArgument)
+        captured[key] = (...args: unknown[]) => Reflect.apply(method, redo, args)
+      }
+      result.redo = Object.freeze(captured)
+    }
     /** Native authors declare this finite opt-in fact; backend names do not imply it. */
     const requiresIndexedDbUndo = input?.requiresIndexedDbUndo
     if (requiresIndexedDbUndo !== undefined) {

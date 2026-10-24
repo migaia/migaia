@@ -107,7 +107,10 @@ export function createTextBatchApi(
         runtime.execution.run(
           { operation, input: captured.map((item) => item.key), ctx },
           (input) =>
-            withAbort(ctx, async () => read(snapshotStorageBatchKeys(input, backend), operation))
+            withAbort(ctx, async () => {
+              if (runtime.journal !== undefined) await runtime.journal.prepare()
+              return read(snapshotStorageBatchKeys(input, backend), operation)
+            })
         )
       )
     },

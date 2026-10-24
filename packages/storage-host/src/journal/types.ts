@@ -1,11 +1,12 @@
 import type {
   IKeyValueApi,
+  IOperationContext,
   ILockKey,
   IStorageResource,
   ITransactionInfo,
   ITransactionScope
 } from '@migaia/storage-contract'
-import type { ILogPayload, ILogStore } from '@migaia/logger/plugins/durable'
+import type { ILogPayload, ILogStore, IWalExt } from '@migaia/logger/plugins/durable'
 import type { ILoggerCore } from '@migaia/logger'
 import type { ILevelPluginExt } from '@migaia/logger/plugins'
 
@@ -22,6 +23,8 @@ export type IStorageJournalOptions<L extends IStorageJournalLogger> = {
   readonly atomicBinlog?: Readonly<Record<string, ILogStore>>
   readonly indexedDbUndo?: boolean
   readonly atomicUndo?: Readonly<Record<string, ILogStore>>
+  /** Every redo participant borrows this exact original latest-pending WAL object. */
+  readonly redoWal?: IWalExt['wal']
 } & (L extends ILevelPluginExt ? { readonly telemetry?: boolean } : { readonly telemetry?: false })
 /** Initializers can open only actual installed backend bindings for their immutable org. */
 export type IStorageJournalInitializerContext = {
@@ -60,6 +63,10 @@ export type IStorageJournalAttempt = {
 /** Fixed-org author ports prepare before acquisition and leave all commits with the original owner. */
 export type IStorageJournalExecutionPort = {
   prepare(): Promise<void>
+  /** Original text owners hold native protection across recovery and the complete operation. */
+  runRedo?<R>(run: () => Promise<R>, signal?: IOperationContext['signal']): Promise<R>
+  /** The original owner authenticates an exact text-only scope without fake record methods. */
+  beginRedo?(scope: object): IStorageJournalRedoAttempt | undefined
   headLocks(): readonly ILockKey[]
   active(): boolean
   begin(scope: Omit<ITransactionScope, 'use'>): IStorageJournalAttempt | undefined
@@ -117,8 +124,26 @@ export type IStorageJournalChange = Readonly<{
   after: IStorageJournalImage
   afterRevision: ILogPayload
 }>
+/** Exact text-only scopes retain the same original transaction authentication and finalizer. */
+export type IStorageJournalRedoAttempt = {
+  readonly txId: string
+  record(scope: object): Promise<void>
+}
+/** A text owner applies only a prepared draft and keeps native protection/lifetime ownership. */
+export type IStorageJournalRedoBinding = {
+  transactionInfo(scope: object): ITransactionInfo
+  changes(scope: object): readonly IStorageJournalChange[]
+  protect<R>(run: () => Promise<R>, signal?: IOperationContext['signal']): Promise<R>
+  apply(scope: object): void
+  /** Return only original invalidation work, dispatched after durable completion succeeds. */
+  replay(changes: readonly IStorageJournalChange[]): void | (() => void)
+  seal(cause: unknown): void
+}
+
 /** One admitted descriptor closes over its original native transaction and immutable org projection. */
 export type IStorageJournalBackendBinding = {
+  /** Redo never claims a native atomic terminal or private log namespace. */
+  readonly redo?: IStorageJournalRedoBinding
   /** This original native owner requires the existing explicit indexedDbUndo configuration. */
   readonly requiresIndexedDbUndo?: true
   /** Original native owner can await external intent I/O after producing final business images. */

@@ -10,6 +10,7 @@ import {
 import { lockKey, ttl, type IStorageResource } from '@migaia/storage-contract'
 import { createStorageHost, createOrgId, memoryBackendPlugin } from '../src/index.js'
 import { resolveStorageJournalBinding } from '../src/journal/binding.js'
+import { snapshotStorageJournalConfiguration } from '../src/journal/configuration.js'
 import { createStorageNativeJournal } from '../src/journal/commit.js'
 import { StorageJournalKind } from '../src/journal/constants.js'
 
@@ -23,6 +24,36 @@ const runtimeManager = {
 const execution = { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } as const
 
 describe('external storage WAL', () => {
+  it('captures the selected original WAL once and refuses a different pending owner', async () => {
+    await using first = memoryLogStore()
+    await using second = memoryLogStore()
+    const logger = new Logger({ execution, runtimeManager, plugins: [wal({ store: first })] })
+    const other = new Logger({ execution, runtimeManager, plugins: [wal({ store: second })] })
+    try {
+      const order: string[] = []
+      const observed = new Proxy(logger, {
+        get(target, property, receiver) {
+          if (property === 'binlog' || property === 'undo' || property === 'wal')
+            order.push(property)
+          return Reflect.get(target, property, receiver)
+        }
+      })
+      const snapshot = snapshotStorageJournalConfiguration({
+        logger: observed,
+        namespace: 'redo',
+        redoWal: logger.wal
+      })
+      expect(snapshot.redoWal).toBe(logger.wal)
+      expect(snapshot.logger.wal).toBe(logger.wal)
+      expect(order).toEqual(['binlog', 'undo', 'wal'])
+      expect(() =>
+        snapshotStorageJournalConfiguration({ logger, namespace: 'redo', redoWal: other.wal })
+      ).toThrowError(expect.objectContaining({ code: 'UNSUPPORTED_CAPABILITY' }))
+    } finally {
+      await logger.shutdown('manual')
+      await other.shutdown('manual')
+    }
+  })
   it('recovers committed intents by the original marker and aborts uncommitted intents without touching foreign targets', async () => {
     await using records = memoryLogStore()
     await using intents = memoryLogStore()

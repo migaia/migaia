@@ -1,4 +1,8 @@
-import type { IKeyValueStore } from '@migaia/storage-contract'
+import {
+  StorageContractError,
+  StorageContractErrorCode,
+  type IKeyValueStore
+} from '@migaia/storage-contract'
 import {
   definePlugin,
   type IStorageBackendKind,
@@ -35,7 +39,8 @@ export function createBuiltInBackendPlugin<
   kind: IStorageBackendKind<TName, S, C>,
   id: TId,
   createStore: (core: IStoragePluginCore) => IBackendConstruction<S, C>,
-  features?: F & IStorageFeatureStoreCompatibility<IStorageBackendKind<TName, S, C>, NoInfer<F>>
+  features?: F & IStorageFeatureStoreCompatibility<IStorageBackendKind<TName, S, C>, NoInfer<F>>,
+  journal = false
 ): IStorageBackendPlugin<IStorageBackendKind<TName, S, C>, TId, F> {
   /** The descriptor borrows this exact construction; only the host owns its lifetime. */
   const descriptor = (core: IStoragePluginCore<F>) => {
@@ -54,7 +59,16 @@ export function createBuiltInBackendPlugin<
         return construction.prepare ? construction.prepare().then(() => ({})) : {}
       },
       featureExpose: () => ({ getClient: () => construction.getClient() }),
-      capabilityInstaller: (_store: S) => construction.installer
+      capabilityInstaller: (_store: S) => construction.installer,
+      ...(journal
+        ? {
+            journalBinding: (_store: S) => {
+              if (construction.journalBinding === undefined)
+                throw new StorageContractError(StorageContractErrorCode.unsupported)
+              return construction.journalBinding
+            }
+          }
+        : {})
     }
   }
   return definePlugin<TId, typeof descriptor, F>(id, descriptor, features)

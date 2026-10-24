@@ -22,6 +22,36 @@ export const storageWebCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
   ],
   localStorageBackendPlugin: [
     {
+      title: t('Apply one recoverable text draft', '应用可恢复的文本 draft'),
+      problem: t(
+        'Several text values need one recoverable WAL intent.',
+        '多个文本值需要共用可恢复 WAL intent。'
+      ),
+      example: `import { Logger } from '@migaia/logger'
+import { wal, memoryLogStore } from '@migaia/logger/plugins/durable'
+import { createStorageHost } from '@migaia/storage-host'
+import { localStorageBackendPlugin } from '@migaia/storage-web/local-storage'
+const logger = new Logger({
+  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+  plugins: [wal({ store: memoryLogStore() })]
+})
+const host = await createStorageHost({
+  plugins: [localStorageBackendPlugin({ namespace: 'draft', redo: true })],
+  journal: { logger, namespace: 'draft', redoWal: logger.wal }
+})
+try {
+  await host.backend('local').transaction(async (scope) => {
+    await scope.set('a', 'first')
+    await scope.set('b', 'second')
+  })
+  console.log(await host.backend('local').get('b'))
+} finally { await host.dispose(); await logger.shutdown('manual') }`,
+      result: t(
+        'Prints second. This memory WAL demonstrates same-owner recovery only while it stays alive. Crash recovery needs a separate persistent carrier such as an original IndexedDB storageLogStore, held by one owner; participating same-origin popups may directly borrow that exact logger/WAL object.',
+        '输出 second。示例 memory WAL 仅在对象存活时支持同拥有者恢复；崩溃恢复需独立持久载体，例如由一个拥有者持有的原 IndexedDB storageLogStore，同源 popup 可直接借用该精确 logger/WAL 对象。'
+      )
+    },
+    {
       title: t('Save namespaced browser preferences', '保存有命名空间的浏览器偏好'),
       problem: t(
         'Two parts of an application share localStorage. A namespace keeps their text keys separate while one host owns listeners and cleanup.',
@@ -114,8 +144,8 @@ try {
     {
       title: t('Keep private history across business clear', '业务清理后保留私有历史'),
       problem: t(
-        'A persistent log needs its own native metadata namespace and a lifetime-exclusive cached index.',
-        '持久日志需要原生私有元数据命名空间与整个资源期间独占的缓存索引。'
+        'A persistent log needs its original native metadata namespace; lifetime-exclusive owners may cache, while other reliable native transactions restore current state for each operation.',
+        '持久日志使用原生私有元数据命名空间；资源期间独占的拥有者可缓存，其它可靠原生事务按操作现读。'
       ),
       example: `import { createStorageHost } from '@migaia/storage-host'
 import { storageLogStore } from '@migaia/storage-host/journal'
@@ -131,8 +161,8 @@ try {
   } finally { await log.dispose() }
 } finally { await host.dispose() }`,
       result: t(
-        'Prints 1. Native Web Locks protect the resource across participating pages; a conflicting open reports LOCK_REJECTED. Without this persistent exclusion the log combination reports UNSUPPORTED_CAPABILITY before recovery I/O.',
-        '输出 1；原生 Web Locks 在参与页面间保护资源，冲突打开报 LOCK_REJECTED。缺少此持久独占能力时，日志组合在恢复 I/O 前报 UNSUPPORTED_CAPABILITY。'
+        'Prints 1. Native Web Locks retain lifetime exclusion and the cached path, with LOCK_REJECTED on conflict. Otherwise indexExclusive:false restores current lastSeq/state/records inside each original journal-store readwrite transaction and retains no index across operations.',
+        '输出 1；原生 Web Locks 保留资源独占与缓存路径，冲突报 LOCK_REJECTED；其它 indexExclusive:false 组合在每操作原 journal-store readwrite 事务现读 lastSeq/state/记录，不跨操作缓存。'
       )
     },
     {
@@ -204,6 +234,20 @@ try {
     }
   ],
   cookieBackendPlugin: [
+    {
+      title: t('Keep expiry stable during redo', '在 redo 时保持过期时间'),
+      problem: t(
+        'Cookie recovery must not renew a relative Max-Age.',
+        'Cookie 恢复不能重新延长相对 Max-Age。'
+      ),
+      example: `import type { ICookiesOptions } from '@migaia/storage-web/cookies'
+const options: ICookiesOptions = { namespace: 'consent', scope: { path: '/' }, redo: true }
+console.log(options.redo)`,
+      result: t(
+        'Prints true. Installation also requires native Web Locks and journal.redoWal equal to the selected original logger.wal. The original cookie serializer and visibility checks apply; pending intent stores an absolute expiry.',
+        '输出 true；安装还要求原生 Web Locks 及 journal.redoWal 等于选定原 logger.wal。继续使用原 Cookie serializer 与可见性检查，pending intent 保存绝对期限。'
+      )
+    },
     {
       title: t('Reuse one Cookie scope for writes and removal', '写入与删除复用同一 Cookie 作用域'),
       problem: t(

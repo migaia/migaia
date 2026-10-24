@@ -1532,6 +1532,17 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
     }
     return Object.freeze({
       prepare: () => this.#prepareJournalBackend(context, orgId).promise,
+      runRedo: (run, signal) => {
+        const value = prepared()
+        if (value === undefined || !('runRedo' in value))
+          return Promise.reject(new StorageContractError(StorageContractErrorCode.unsupported))
+        return value.runRedo(run, signal)
+      },
+      beginRedo: (scope) => {
+        const value = prepared()
+        if (value === undefined || !('runRedo' in value)) return undefined
+        return value.begin(scope)
+      },
       active: () => prepared() !== undefined,
       headLocks: () => prepared()?.headLocks ?? [],
       begin: (scope: Omit<import('@migaia/storage-contract').ITransactionScope, 'use'>) =>
