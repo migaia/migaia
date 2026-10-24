@@ -271,7 +271,8 @@ describe('rule gate: no Function.prototype call/apply/bind; Reflect.apply only i
       'capability/src/graph/dependency.ts',
       // Dynamic node snapshots invoke captured starts with their original definition receiver.
       'capability/src/graph/dynamic.ts',
-      'capability/src/graph/topology-index.ts',
+      // Read-only topology maps honour forEach `thisArg` and pass their facade to callbacks.
+      'capability/src/graph/topology-admission.ts',
       'capability/src/index.ts',
       // Abort registration invokes captured host methods with their original signal receiver.
       'lifecycle/src/observed-subscription.ts',
