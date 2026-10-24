@@ -134,7 +134,7 @@ class EntityQueryReads<
     this.#invalid = invalid
   }
   /** Delegate page to the original query through the entity operation observer. */
-  readonly page: IEntityQueryReadMethods<R, TContext>['page'] = (size, ctx) =>
+  readonly page: IEntityQueryReadMethods<R, TContext>['page'] = async (size, ctx) =>
     this.#context.input.run(
       () => this.#context.input.keyset(() => this.#prepare().page(size, ctx)),
       this.#plan,
