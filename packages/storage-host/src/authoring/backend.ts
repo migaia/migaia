@@ -55,3 +55,5 @@ export type {
   IBackendJournalNamespaceOptions,
   IBackendJournalTransaction
 } from '../journal/namespace-resource.js'
+
+export { storageJournalLockKey, StorageJournalLock } from '../journal/keys.js'

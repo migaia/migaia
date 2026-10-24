@@ -136,6 +136,31 @@ console.log(host.extensions.label('draft'))`
       example: storageHostCases.createBackendChangeIterator![0]!.example,
       cases: storageHostCases.createBackendChangeIterator
     },
+    storageJournalLockKey: {
+      role: 'operation',
+      purpose: t(
+        'Return the original canonical journal head or resource lock identity without acquiring it.',
+        '返回原 journal head 或 resource 规范锁身份，不获取锁。'
+      ),
+      params: {
+        prefix: t('Nonempty private namespace prefix.', '非空私有 namespace prefix。'),
+        part: t(
+          'StorageJournalLock.head or StorageJournalLock.resource.',
+          'StorageJournalLock.head 或 StorageJournalLock.resource。'
+        )
+      },
+      returns: t(
+        'ILockKey from the original key codec; invalid arguments reject with INVALID_ARGUMENT.',
+        '原 key codec 的 ILockKey，非法入参报 INVALID_ARGUMENT。'
+      )
+    },
+    StorageJournalLock: {
+      role: 'operation',
+      purpose: t(
+        'Canonical head and resource roles for the existing journal lock owner.',
+        '既有 journal 锁拥有者的 head 与 resource 规范角色。'
+      )
+    },
     createBackendJournalNamespace: {
       role: 'operation',
       purpose: t(
@@ -386,8 +411,8 @@ console.log(host.extensions.label('draft'))`,
   types: {
     IStorageJournalOptions: {
       summary: t(
-        'Borrow a logger with a stable namespace and explicit same-registration atomicBinlog/atomicUndo handles by backend id. telemetry=true requires the actual level plugin atLevel port and emits ordinary storage-category entries without changing payload/Error references.',
-        '借用 logger，固定 namespace，按 backend id 显式选择同 registration 的 atomicBinlog/atomicUndo；telemetry=true 要求真实 level 插件 atLevel 接点，沿普通 storage 分类条目交付 payload 与原 Error 引用。'
+        'Borrow a logger with a stable namespace and explicit same-registration atomicBinlog/atomicUndo handles by backend id. telemetry=true requires the actual level plugin atLevel port and emits ordinary storage-category entries without changing payload/Error references, including the first org endpoint after its original preparation.',
+        '借用 logger，固定 namespace，按 backend id 显式选择同 registration 的 atomicBinlog/atomicUndo；telemetry=true 要求真实 level 插件 atLevel 接点，沿普通 storage 分类条目交付 payload 与原 Error 引用，首组织终点也在原准备后记录。'
       ),
       members: {}
     },
