@@ -28,6 +28,8 @@ export type IPgState = {
   readonly terminal: {
     readonly committed: Set<() => void>
     readonly rolledBack: Set<() => void>
+    /** Resource completion is distinct from a proved commit or rollback outcome. */
+    readonly ended: Set<() => void>
     settled: boolean
   }
   readonly codecs: ReturnType<typeof import('./codec.js').createPgCodecs>

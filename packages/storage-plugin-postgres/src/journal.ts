@@ -329,8 +329,7 @@ export function createPgJournalBinding(options: {
             attempts.delete(id)
             ended.resolve()
           }
-          state.terminal.committed.add(finish)
-          state.terminal.rolledBack.add(finish)
+          state.terminal.ended.add(finish)
           void resource
             .run(() => ended.promise)
             .catch((error) => reportCleanupError(createStorageOperationReporter(), error))

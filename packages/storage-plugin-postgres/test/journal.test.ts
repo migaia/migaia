@@ -187,6 +187,76 @@ describe.each(['pg', 'postgres-js'] as const)('%s original global journal', (ada
   })
 })
 
+it('retains a pending WAL intent when lost COMMIT evidence leaves the native outcome unknown', async () => {
+  const pool = new Pool({ connectionString })
+  const native = pgDriver(pool)
+  const prefix = 'pg_wal_unknown_' + randomUUID().slice(0, 8)
+  const org = randomUUID()
+  const original = new Error('lost COMMIT acknowledgement with external WAL')
+  const unavailable = new Error('native commit evidence unavailable')
+  let armed = false
+  let lost = false
+  const driver = {
+    ...native,
+    query: (...args: Parameters<typeof native.query>) => {
+      if (lost && args[0].startsWith('SELECT value FROM ') && args[0].includes('_commit_markers'))
+        throw unavailable
+      return native.query(...args)
+    },
+    connect: async (...args: Parameters<typeof native.connect>) => {
+      const client = await native.connect(...args)
+      return {
+        ...client,
+        query: async (...args: Parameters<typeof client.query>) => {
+          const value = await client.query(...args)
+          if (armed && args[0] === 'COMMIT') {
+            armed = false
+            lost = true
+            throw original
+          }
+          return value
+        }
+      }
+    }
+  }
+  const logger = new Logger({
+    ...loggerOptions,
+    plugins: [binlog({ store: memoryLogStore() }), wal({ store: memoryLogStore() })]
+  })
+  let host = await createStorageHost({
+    org,
+    plugins: [postgresBackendPlugin({ driver, prefix })] as const,
+    journal: { logger, namespace: 'unknown' }
+  })
+  onTestFinished(async () => {
+    await host.dispose()
+    await logger.shutdown('manual')
+    await pool.end()
+  })
+  armed = true
+  const failure = await host
+    .backend('postgres')
+    .transaction((scope) => scope.set('key', 'committed'))
+    .then(
+      () => undefined,
+      (cause: unknown) => cause
+    )
+  expect(failure).toMatchObject({ code: 'TRANSACTION_FAILED' })
+  expect(walkErrorCauses(failure)).toContain(original)
+  expect(walkErrorCauses(failure)).toContain(unavailable)
+  expect((await pool.query('SELECT key FROM ' + prefix + '_kv')).rows).toHaveLength(1)
+  expect(await logger.wal.pending()).toHaveLength(1)
+  await host.dispose()
+  host = await createStorageHost({
+    org,
+    plugins: [postgresBackendPlugin({ driver: native, prefix })] as const,
+    journal: { logger, namespace: 'unknown' }
+  })
+  expect(await host.backend('postgres').get('key')).toBe('committed')
+  expect(await logger.binlog.read(1)).toHaveLength(1)
+  expect(await logger.wal.pending()).toEqual([])
+})
+
 it('awaits original external append settlement without replacing a committed result', async () => {
   const pool = new Pool({ connectionString })
   const logger = new Logger({ ...loggerOptions, plugins: [binlog({ store: memoryLogStore() })] })

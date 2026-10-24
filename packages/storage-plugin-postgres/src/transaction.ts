@@ -151,7 +151,7 @@ export function createPgTransactions<TScope extends Omit<ITransactionScope, 'use
       throwIfAborted(context.signal)
       const client = await configuration.driver.connect(context)
       const state: IPgState = {
-        terminal: { committed: new Set(), rolledBack: new Set(), settled: false },
+        terminal: { committed: new Set(), rolledBack: new Set(), ended: new Set(), settled: false },
         codecs: pgCodecs,
         client,
         orgId: runtime.orgId,
@@ -361,7 +361,14 @@ export function createPgTransactions<TScope extends Omit<ITransactionScope, 'use
         (value) => ({ failed: false as const, value }),
         (cause) => ({ failed: true as const, cause })
       )
-      if (!state.terminal.settled) complete(false)
+      // Only a completed rollback or a never-opened transaction proves that no data committed.
+      // Unknown COMMIT outcomes retain their pending WAL intent for the original recovery owner.
+      if (!state.terminal.settled && !begun && !commitSent) complete(false)
+      await journalAttempt?.settle?.()
+      for (const effect of state.terminal.ended) observePg({ effect }, 'effect')
+      state.terminal.ended.clear()
+      state.terminal.committed.clear()
+      state.terminal.rolledBack.clear()
       if (!settled.failed && settled.value?.status === 'committed' && marker !== undefined) {
         try {
           await (borrowReturned ? configuration.driver : client).query(
