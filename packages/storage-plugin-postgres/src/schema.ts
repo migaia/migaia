@@ -1,7 +1,10 @@
-import type { IPgDriver, IPgServer, IPostgresOptions } from './types.js'
-import { PgNames } from './constants.js'
+import type { IPgConnection, IPgDriver, IPgServer, IPostgresOptions } from './types.js'
+import { PgNames, PgQuantizedMode, PgQuantizedIndexPrefix } from './constants.js'
+import type { IPgQuantizedOptions } from './features/quantized.js'
+import type { IStorageVectorConfiguration, IOperationContext } from '@migaia/storage-contract'
 import { quotePgIdentifier } from './copy-command.js'
-import { capture, invalidArgument } from './errors.js'
+import { capture, invalidArgument, postgresError } from './errors.js'
+import { PostgresErrorCode } from './error-code.js'
 import { PostgresErrorText } from './error-text.js'
 /** Captured configuration contains no mutable caller getters after the plugin factory returns. */
 export type IPgConfiguration = {
@@ -132,4 +135,54 @@ export async function ensurePostgresTables(
       []
     )
   }
+}
+
+/** Index and recall share exactly this native expression, with no copied vector codec. */
+export function pgQuantizedExpression(
+  mode: IPgQuantizedOptions['mode'],
+  dimensions: number,
+  column: string
+): string {
+  return mode === PgQuantizedMode.halfvec
+    ? column + '::halfvec(' + dimensions + ')'
+    : 'binary_quantize(' + column + ')::bit(' + dimensions + ')'
+}
+/** Prepare an explicit opt-in expression index inside the original collection's native transaction. */
+export async function ensurePgQuantizedIndex(
+  client: IPgConnection,
+  table: string,
+  configuration: IStorageVectorConfiguration,
+  mode: IPgQuantizedOptions['mode'],
+  ctx?: IOperationContext
+): Promise<void> {
+  /** The native structured tuple gives the same short identity across hosts and long namespaces. */
+  const name = (
+    await client.query(
+      'SELECT md5(jsonb_build_array($1::text,$2::text,$3::text)::text) AS name',
+      [table, mode, configuration.metric],
+      ctx
+    )
+  ).rows[0]?.name
+  if (typeof name !== 'string' || !/^[a-f0-9]{32}$/.test(name))
+    throw postgresError(PostgresErrorCode.decodeFailed)
+  /** These finite opclasses correspond to the same metric used by the original exact scorer. */
+  const operator =
+    mode === PgQuantizedMode.binary
+      ? 'bit_hamming_ops'
+      : (
+          { cosine: 'halfvec_cosine_ops', dot: 'halfvec_ip_ops', euclid: 'halfvec_l2_ops' } as const
+        )[configuration.metric]
+  await client.query(
+    'CREATE INDEX IF NOT EXISTS ' +
+      quotePgIdentifier(PgQuantizedIndexPrefix + name) +
+      ' ON ' +
+      table +
+      ' USING hnsw ((' +
+      pgQuantizedExpression(mode, configuration.dimensions, 'embedding') +
+      ') ' +
+      operator +
+      ')',
+    [],
+    ctx
+  )
 }

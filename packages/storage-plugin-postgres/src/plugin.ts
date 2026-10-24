@@ -18,6 +18,7 @@ import type {
   IPgNativeOperation
 } from './types.js'
 import { PgNames } from './constants.js'
+import type { IPgQuantizedOptions } from './features/quantized.js'
 import type { IPgReplicationSelection } from './logical-replication.js'
 /** Exact backend identity gates each selected Feature before any native client can be borrowed. */
 export const postgresBackendKind = defineStorageBackendKind<
@@ -27,6 +28,7 @@ export const postgresBackendKind = defineStorageBackendKind<
     getTransactionClient(scope: IPostgresTransactionScope): IPgConnection
     readonly runNative: IPgNativeOperation
     selectVector(): void
+    selectQuantized(mode: IPgQuantizedOptions['mode']): void
     selectReplication(options: IPgReplicationSelection): void
     getReplicationRoute(): import('./types.js').IPgLogicalReplicationRoute
     getServer(): IPgServer
@@ -70,6 +72,8 @@ export function postgresBackendPlugin<
     let construction: IPostgresConstruction<TValue>
     /** Selection is captured once by the original Feature factory, before native installation. */
     let vectorSelected = false
+    /** One selected mode belongs to the original Feature installation and every bound org. */
+    let quantized: IPgQuantizedOptions['mode'] | undefined
     /** One selected Feature owns its resources; no organization replays that factory. */
     let replication: IPgReplicationSelection | undefined
     return {
@@ -79,7 +83,8 @@ export function postgresBackendPlugin<
           captured,
           core,
           () => vectorSelected,
-          () => replication
+          () => replication,
+          () => quantized
         )
         core.registerStore(construction.store)
         core.registerChangeController(construction.store, construction.controller)
@@ -100,6 +105,9 @@ export function postgresBackendPlugin<
         runNative: ((...args) => construction.runNative(...args)) satisfies IPgNativeOperation,
         selectVector: () => {
           vectorSelected = true
+        },
+        selectQuantized: (mode: IPgQuantizedOptions['mode']) => {
+          quantized = mode
         },
         selectReplication: (options: IPgReplicationSelection) => {
           replication = options

@@ -125,6 +125,7 @@ import { pgDriver } from '@migaia/storage-plugin-postgres/pg'
 import { postgresJsDriver } from '@migaia/storage-plugin-postgres/postgres-js'
 import { bunSqlDriver } from '@migaia/storage-plugin-postgres/bun'
 import { pgvectorFeature } from '@migaia/storage-plugin-postgres/features/pgvector'
+import { pgQuantizedFeature } from '@migaia/storage-plugin-postgres/features/quantized'
 import { pgCopyFeature } from '@migaia/storage-plugin-postgres/features/copy'
 import { pgListenFeature } from '@migaia/storage-plugin-postgres/features/listen'
 import { pgLogicalReplicationFeature } from '@migaia/storage-plugin-postgres/features/logical-replication'
@@ -137,7 +138,7 @@ assert.equal(typeof postgresJsDriver,'function')
 assert.equal(typeof bunSqlDriver,'function')
 assert.equal(typeof pgLogicalReplicationFeature,'function')
 const pool=new Pool({connectionString:process.env.MIGAIA_PG_URL})
-const host=await createStorageHost({plugins:[postgresBackendPlugin({driver:pgDriver(pool),prefix:'pg_packed_'+crypto.randomUUID().slice(0,8)},{vector:pgvectorFeature(),copy:pgCopyFeature(),listen:pgListenFeature()})]})
+const host=await createStorageHost({plugins:[postgresBackendPlugin({driver:pgDriver(pool),prefix:'pg_packed_'+crypto.randomUUID().slice(0,8)},{vector:pgvectorFeature(),quantized:pgQuantizedFeature({mode:'halfvec'}),copy:pgCopyFeature(),listen:pgListenFeature()})]})
 try {
  const store=host.backend('postgres')
  await store.use(kv).setMany([{key:['packed',1],value:'one'},{key:['packed',2],value:'two'}])
@@ -147,6 +148,7 @@ try {
  const collection=store.use(vector).collection('packed',{dimensions:1,metric:'dot'})
  await collection.upsert([{id:'a',vector:[2]}])
  assert.equal((await collection.near([1],{exact:true}).topK(1).all())[0].score,2)
+ assert.equal((await collection.near([1]).topK(1).rescore().rerank(({hits})=>hits.map(hit=>hit.score)).all())[0].rerankScore,2)
  const table='pg_packed_copy_'+crypto.randomUUID().replaceAll('-','')
  await store.sql\`CREATE TABLE \${store.sql.id(table)} (id integer)\`.run()
  await store.api.copy.from({table:[table],columns:['id']},async function*(){yield new TextEncoder().encode('1\\n2\\n')})
