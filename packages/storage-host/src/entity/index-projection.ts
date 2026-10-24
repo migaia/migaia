@@ -3,9 +3,17 @@ import { get, parseObjectPath, type IObjectPathTuple } from '@migaia/utils/objec
 import type {
   IRecordIndexDefinition,
   IRecordIndexProjection,
-  IRecordIndexProjectionValue
+  IRecordIndexProjectionValue,
+  IQueryCondition,
+  IStorageKey,
+  IKeyRange
 } from '@migaia/storage-contract'
-import { assertStorageKey } from '@migaia/storage-contract'
+import {
+  assertStorageKey,
+  snapshotStorageKey,
+  compareStorageKeys,
+  QueryOperator
+} from '@migaia/storage-contract'
 import { StorageError, StorageErrorCode } from '../errors.js'
 import type { IKeyValueStore } from '@migaia/storage-contract'
 
@@ -15,6 +23,8 @@ const RESERVED_INDEX_PREFIX = '__'
 
 export type ISnapshotEntityIndex<TDomain> = {
   readonly definition: IRecordIndexDefinition
+  /** Canonical declaration paths are detached once; custom selectors have no declarative path. */
+  readonly paths?: readonly (readonly string[])[]
   project(value: TDomain, backend: IStorageBackend): IRecordIndexProjectionValue | undefined
 }
 
@@ -170,6 +180,11 @@ export const snapshotEntityIndexes = <TDomain>(
     })
     indexes[name] = Object.freeze({
       definition,
+      ...(parsedPath !== undefined
+        ? { paths: Object.freeze([Object.freeze(parsedPath.map(String))]) }
+        : parsedPaths === undefined
+          ? {}
+          : { paths: Object.freeze(parsedPaths.map((path) => Object.freeze(path.map(String)))) }),
       project: (value: TDomain, backend: IStorageBackend) => {
         const selected =
           parsedPath !== undefined
@@ -197,3 +212,240 @@ export const projectEntityIndexes = <TDomain>(
       Object.entries(indexes).map(([name, index]) => [name, index.project(value, backend)])
     )
   )
+
+/** A source candidate is only a canonical range and static priority, never a cursor or ready handle. */
+type IEntityIndexQueryCandidate = Readonly<{
+  index: string
+  range: IKeyRange | undefined
+  rank: number
+  size: number
+}>
+/** Rank names remain stable explain facts while the original index reader owns actual execution. */
+const EntityQueryIndexRank = { uniqueEquality: 0, equality: 1, bounded: 2, oneSided: 3 } as const
+/** Only canonical operators with declared-index candidate semantics can be consumed by this source. */
+export const ENTITY_QUERY_INDEX_OPERATORS: readonly QueryOperator[] = Object.freeze([
+  QueryOperator.eq,
+  QueryOperator.in,
+  QueryOperator.gt,
+  QueryOperator.gte,
+  QueryOperator.lt,
+  QueryOperator.lte,
+  QueryOperator.between,
+  QueryOperator.startsWith
+])
+/** Declarative field equality excludes opaque object identity and unsupported structured domains. */
+const queryIndexKey = (value: unknown, backend: IStorageBackend): IStorageKey | undefined =>
+  typeof value === 'string' ||
+  (typeof value === 'number' && Number.isFinite(value)) ||
+  value instanceof Date
+    ? snapshotStorageKey(value, backend)
+    : undefined
+/**
+ * Compare the original canonical path facts without parsing user conditions or declaration strings
+ * again.
+ */
+const sameIndexPath = (left: readonly string[], right: readonly string[]): boolean =>
+  left.length === right.length && left.every((part, position) => part === right[position])
+/** An AND contributes safe narrowing fields; OR and NOT cannot restrict a source to one branch. */
+const queryIndexFields = (
+  conditions: readonly IQueryCondition[]
+): Extract<IQueryCondition, { kind: 'field' }>[] => {
+  const fields: Extract<IQueryCondition, { kind: 'field' }>[] = []
+  const pending = [...conditions]
+  for (let position = 0; position < pending.length; position++) {
+    const condition = pending[position]!
+    if (condition.kind === 'field') fields.push(condition)
+    else if (condition.kind === 'and') for (const child of condition.conditions) pending.push(child)
+  }
+  return fields
+}
+/** Pick the range for one declared index using only portable scalar field facts. */
+const indexQueryCandidate = <T>(
+  name: string,
+  index: ISnapshotEntityIndex<T>,
+  fields: readonly Extract<IQueryCondition, { kind: 'field' }>[],
+  backend: IStorageBackend
+): IEntityIndexQueryCandidate | undefined => {
+  const paths = index.paths
+  if (paths === undefined || index.definition.multiEntry) return
+  if (paths.length > 1) {
+    const keys: IStorageKey[] = []
+    for (const path of paths) {
+      const equality = fields.find(
+        (field) => sameIndexPath(field.path, path) && field.operator === QueryOperator.eq
+      )
+      const key = equality === undefined ? undefined : queryIndexKey(equality.value, backend)
+      if (key === undefined) return
+      keys.push(key)
+    }
+    const key = Object.freeze(keys)
+    return Object.freeze({
+      index: name,
+      range: Object.freeze({ lower: key, upper: key }),
+      rank: index.definition.unique
+        ? EntityQueryIndexRank.uniqueEquality
+        : EntityQueryIndexRank.equality,
+      size: 0
+    })
+  }
+  const matching = fields.filter((field) => sameIndexPath(field.path, paths[0]!))
+  for (const field of matching)
+    if (field.operator === QueryOperator.eq) {
+      const key = queryIndexKey(field.value, backend)
+      if (key !== undefined)
+        return Object.freeze({
+          index: name,
+          range: Object.freeze({ lower: key, upper: key }),
+          rank: index.definition.unique
+            ? EntityQueryIndexRank.uniqueEquality
+            : EntityQueryIndexRank.equality,
+          size: 0
+        })
+    }
+  let membership: IEntityIndexQueryCandidate | undefined
+  for (const field of matching)
+    if (field.operator === QueryOperator.in && Array.isArray(field.value)) {
+      const keys = field.value.map((value) => queryIndexKey(value, backend))
+      if (keys.some((key) => key === undefined)) continue
+      let lower: IStorageKey | undefined
+      let upper: IStorageKey | undefined
+      for (const key of keys as IStorageKey[]) {
+        if (lower === undefined || compareStorageKeys(key, lower) < 0) lower = key
+        if (upper === undefined || compareStorageKeys(key, upper) > 0) upper = key
+      }
+      if (membership === undefined || keys.length < membership.size)
+        membership = Object.freeze({
+          index: name,
+          range: lower === undefined ? undefined : Object.freeze({ lower, upper }),
+          rank: EntityQueryIndexRank.equality,
+          size: keys.length
+        })
+    }
+  if (membership !== undefined) return membership
+  let lower: IStorageKey | undefined
+  let upper: IStorageKey | undefined
+  let lowerOpen = false
+  let upperOpen = false
+  for (const field of matching) {
+    const between =
+      field.operator === QueryOperator.between && Array.isArray(field.value)
+        ? field.value
+        : undefined
+    const low =
+      between?.[0] ??
+      (field.operator === QueryOperator.gt || field.operator === QueryOperator.gte
+        ? field.value
+        : undefined)
+    const high =
+      between?.[1] ??
+      (field.operator === QueryOperator.lt || field.operator === QueryOperator.lte
+        ? field.value
+        : undefined)
+    const lowKey = queryIndexKey(low, backend)
+    const highKey = queryIndexKey(high, backend)
+    if (lowKey !== undefined) {
+      const order = lower === undefined ? 1 : compareStorageKeys(lowKey, lower)
+      if (order > 0) {
+        lower = lowKey
+        lowerOpen = field.operator === QueryOperator.gt
+      } else if (order === 0) lowerOpen ||= field.operator === QueryOperator.gt
+    }
+    if (highKey !== undefined) {
+      const order = upper === undefined ? -1 : compareStorageKeys(highKey, upper)
+      if (order < 0) {
+        upper = highKey
+        upperOpen = field.operator === QueryOperator.lt
+      } else if (order === 0) upperOpen ||= field.operator === QueryOperator.lt
+    }
+  }
+  if (lower !== undefined || upper !== undefined)
+    return Object.freeze({
+      index: name,
+      range:
+        lower !== undefined && upper !== undefined && compareStorageKeys(lower, upper) > 0
+          ? undefined
+          : Object.freeze({ lower, upper, lowerOpen, upperOpen }),
+      rank:
+        lower !== undefined && upper !== undefined
+          ? EntityQueryIndexRank.bounded
+          : EntityQueryIndexRank.oneSided,
+      size: 0
+    })
+  const prefix = matching.find((field) => field.operator === QueryOperator.startsWith)
+  if (prefix !== undefined && typeof prefix.value === 'string')
+    // A lower-only prefix candidate is conservative for every UTF-16 tail; the original AST checks it exactly.
+    return Object.freeze({
+      index: name,
+      range: Object.freeze({ lower: prefix.value }),
+      rank: EntityQueryIndexRank.oneSided,
+      size: 0
+    })
+  return
+}
+/**
+ * Select one declared source in static priority order; no statistics, readiness checks or I/O occur
+ * here.
+ */
+export const chooseEntityQueryIndex = <T>(
+  indexes: ISnapshotEntityIndexes<T>,
+  conditions: readonly IQueryCondition[],
+  backend: IStorageBackend
+) => {
+  const fields = queryIndexFields(conditions)
+  const candidates = Object.entries(indexes).map(([name, index]) => ({
+    name,
+    candidate: indexQueryCandidate(name, index, fields, backend)
+  }))
+  let chosen: IEntityIndexQueryCandidate | undefined
+  for (const { candidate } of candidates)
+    if (
+      candidate !== undefined &&
+      (chosen === undefined ||
+        candidate.rank < chosen.rank ||
+        (candidate.rank === chosen.rank && candidate.size < chosen.size))
+    )
+      chosen = candidate
+  return Object.freeze({
+    selection:
+      chosen === undefined
+        ? undefined
+        : Object.freeze({ index: chosen.index, range: chosen.range }),
+    sourceReason:
+      chosen === undefined
+        ? EntityText.queryIndexNoCandidate
+        : EntityText.queryIndexChosen(chosen.rank),
+    sourceCandidates: Object.freeze(
+      candidates.map(({ name, candidate }) =>
+        Object.freeze({
+          index: name,
+          reason:
+            candidate === undefined
+              ? EntityText.queryIndexNotEligible
+              : name === chosen?.index
+                ? EntityText.queryIndexChosen(candidate.rank)
+                : EntityText.queryIndexLowerPriority
+        })
+      )
+    )
+  })
+}
+/**
+ * Canonical residual predicates may use other declared scalar paths after the chosen candidate
+ * range.
+ */
+export const supportsEntityIndexCondition = <T>(
+  indexes: ISnapshotEntityIndexes<T>,
+  condition: IQueryCondition
+): boolean => {
+  if (condition.kind === 'not') return supportsEntityIndexCondition(indexes, condition.condition)
+  if (condition.kind !== 'field')
+    return condition.conditions.every((child) => supportsEntityIndexCondition(indexes, child))
+  return (
+    ENTITY_QUERY_INDEX_OPERATORS.includes(condition.operator) &&
+    Object.values(indexes).some(
+      (index) =>
+        !index.definition.multiEntry &&
+        index.paths?.some((path) => sameIndexPath(path, condition.path)) === true
+    )
+  )
+}

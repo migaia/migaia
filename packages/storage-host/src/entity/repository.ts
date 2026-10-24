@@ -7,6 +7,7 @@ import {
   getBackendValueCommit,
   getBackendEntityQueryMethods,
   getBackendEntityAccess,
+  snapshotBackendEntityRecordWatcher,
   type IBackendEntityAccess,
   type IEntitySecondaryMethods
 } from '../core/change-controller.js'
@@ -23,6 +24,9 @@ import {
   compareStorageKeys,
   createRecordQuery,
   RecordQueryMethod,
+  QueryOperation,
+  compileStorageQueryCondition,
+  type IQueryCondition,
   deriveTransactionIterator,
   nextTransactionIterator,
   type IRecordQuerySource,
@@ -107,7 +111,12 @@ import type {
   IEntityConnectStore
 } from './types.js'
 import type { ISnapshotEntityIndexes } from './index-projection.js'
-import { projectEntityIndexes } from './index-projection.js'
+import {
+  projectEntityIndexes,
+  chooseEntityQueryIndex,
+  supportsEntityIndexCondition,
+  ENTITY_QUERY_INDEX_OPERATORS
+} from './index-projection.js'
 import { collectUniqueIndexOwners } from '../core/unique-index.js'
 import { createOrderedRecordIndex } from '../core/ordered-record-index.js'
 import { safeJsonPayloadByteLength } from '../core/json.js'
@@ -277,7 +286,8 @@ const snapshotEntityStore = (store: IEntityConnectStore): IBackendEntityAccess =
     recordStore: () => snapshotRecordStore(store)?.store,
     secondaryStore: () => (isSecondaryIndexRecordStore(store) ? store : undefined),
     assertScope: (scope) => assertTransactionOwner(snapshot.store, scope),
-    assertCurrent: () => undefined
+    assertCurrent: () => undefined,
+    watchRecords: snapshotBackendEntityRecordWatcher(snapshot.store)
   }
 }
 /** Entity extensions preserve the original neutral family and use this package's error owner. */
@@ -1530,7 +1540,8 @@ export const createRepository = <
     selection: IEntityQuerySourceSelection<TDomain>,
     onRead?: () => void,
     orderedSource = true,
-    physicalIds?: Map<string, IStorageKey>
+    physicalIds?: Map<string, IStorageKey>,
+    accepts?: (value: TDomain) => boolean
   ): IStorageIterator<readonly [IStorageKey, TDomain]> => {
     backend.assertScope(scope)
     const source = scope.iterateRecords()
@@ -1612,7 +1623,7 @@ export const createRepository = <
             const id = idOf(name, keyProp, value, store.backend)
             const identity = encodeFlatStorageKey(id)
             if (seen.has(identity)) continue
-            let ordering: IStorageKey = id
+            let ordering: IStorageKey = [id]
             let encodedOrdering: Uint8Array | undefined
             if (index !== undefined) {
               let projection: ReturnType<typeof index.project>
@@ -1640,6 +1651,7 @@ export const createRepository = <
             } else if (!isStorageKeyInRange(id, selection.range)) continue
             if (seen instanceof Map) seen.set(identity, physicalId)
             else seen.add(identity)
+            if (accepts !== undefined && !accepts(value)) continue
             if (!orderedSource) return { done: false, value: [ordering, value] as const }
             rows.set(encodedOrdering ?? encodeOrderedStorageKey(id, store.backend), [
               ordering,
@@ -1925,16 +1937,55 @@ export const createRepository = <
       },
       source: (selectedSource): IRecordQuerySource => ({
         asyncDisposeKey,
-        tieBreakByKey:
-          selectedSource.index === undefined ? undefined : { direction: 'next', parts: true },
+        // A uniform author container permits terminal-local index selection without shrinking key budgets.
+        tieBreakByKey: { direction: 'next', parts: true },
         pushdown: { source: EntityState.querySource, operations: [], operators: [] },
+        ...(scope !== undefined || backend.watchRecords === undefined
+          ? {}
+          : {
+              watch: ({ ctx }: import('@migaia/storage-contract').IRecordQueryInput) =>
+                backend.watchRecords!(ctx)
+            }),
+        plan: (conditions) => {
+          /** Explicit source choice precedes automatic static condition selection. */
+          const explicit = selectedSource.index !== undefined || selectedSource.range !== undefined
+          const automatic = explicit
+            ? undefined
+            : chooseEntityQueryIndex(config.indexes, conditions, store.backend)
+          const selection = Object.freeze({ ...(automatic?.selection ?? selectedSource) })
+          const index = selection.index === undefined ? undefined : config.indexes[selection.index]
+          return Object.freeze({
+            fullScan: true,
+            selection,
+            pushdown: {
+              source: EntityState.querySource,
+              ...(selection.index === undefined ? {} : { index: selection.index }),
+              operations: index === undefined ? [] : [QueryOperation.where],
+              operators: index === undefined ? [] : ENTITY_QUERY_INDEX_OPERATORS,
+              ...(index === undefined
+                ? {}
+                : {
+                    canPushCondition: (condition: IQueryCondition) =>
+                      supportsEntityIndexCondition(config.indexes, condition)
+                  })
+            },
+            sourceReason: explicit ? EntityText.queryIndexExplicit : automatic!.sourceReason,
+            sourceCandidates: explicit
+              ? Object.freeze(
+                  Object.keys(config.indexes).map((index) =>
+                    Object.freeze({ index, reason: EntityText.queryIndexExplicit })
+                  )
+                )
+              : automatic!.sourceCandidates
+          })
+        },
         mutate: (request, run) => {
           if (recordStore === undefined)
             throw new StorageContractError(StorageContractErrorCode.unsupported, {
               backend: store.backend
             })
           /** Capture the same observer/source facts before the original transaction can suspend. */
-          const selection = openingSelection ?? selectedSource
+          const policy = openingSelection ?? selectedSource
           const orderedSource = openingPlan?.hasOrder !== true
           const counter = queryStages === undefined ? undefined : { readCount: 0 }
           opened = counter
@@ -1952,8 +2003,24 @@ export const createRepository = <
               const physicalIds = new Map<string, IStorageKey>()
               try {
                 return await run({
-                  execute: () =>
-                    scopedQuerySource(current, selection, onRead, orderedSource, physicalIds),
+                  execute: ({ selection: planned, conditions }) => {
+                    const selection = {
+                      ...((planned as IEntityQuerySourceSelection<TDomain> | undefined) ??
+                        selectedSource),
+                      onInvalid: policy.onInvalid
+                    }
+                    const predicates = conditions.map((condition) =>
+                      compileStorageQueryCondition<TDomain>(condition)
+                    )
+                    return scopedQuerySource(
+                      current,
+                      selection,
+                      onRead,
+                      orderedSource,
+                      physicalIds,
+                      (value) => predicates.every((predicate) => predicate(value))
+                    )
+                  },
                   accept: async (_key, value) => {
                     const id = idOf(name, keyProp, value as TDomain, store.backend)
                     const physicalId = physicalIds.get(encodeFlatStorageKey(id))
@@ -1985,8 +2052,15 @@ export const createRepository = <
             ? recordStore.transaction(apply, { ...request.ctx, concurrency: request.concurrency })
             : apply(scope)
         },
-        execute: ({ ctx }) => {
-          const selection = openingSelection ?? selectedSource
+        execute: ({ ctx, conditions, selection: planned }) => {
+          const selection = {
+            ...((planned as IEntityQuerySourceSelection<TDomain> | undefined) ?? selectedSource),
+            onInvalid: (openingSelection ?? selectedSource).onInvalid
+          }
+          const predicates = conditions.map((condition) =>
+            compileStorageQueryCondition<TDomain>(condition)
+          )
+          const accepts = (value: TDomain) => predicates.every((predicate) => predicate(value))
           const counter = queryStages === undefined ? undefined : { readCount: 0 }
           opened = counter
           const onRead =
@@ -1996,7 +2070,8 @@ export const createRepository = <
                   counter.readCount++
                 }
           const orderedSource = openingPlan?.hasOrder !== true
-          if (scope !== undefined) return scopedQuerySource(scope, selection, onRead, orderedSource)
+          if (scope !== undefined)
+            return scopedQuerySource(scope, selection, onRead, orderedSource, undefined, accepts)
           const context = snapshotOperationContext(ctx)
           const runtime = createStorageOperationRuntime()
           return entityIterator(
@@ -2012,7 +2087,7 @@ export const createRepository = <
                   orderedSource,
                   onRead
                 ))
-                  yield [[row.key, id], row.value] as const
+                  if (accepts(row.value)) yield [[row.key, id], row.value] as const
               } else {
                 for await (const value of streamImpl(
                   { range: selection.range, onInvalid: selection.onInvalid },
@@ -2022,7 +2097,8 @@ export const createRepository = <
                   undefined,
                   onRead
                 ))
-                  yield [idOf(name, keyProp, value, store.backend), value] as const
+                  if (accepts(value))
+                    yield [[idOf(name, keyProp, value, store.backend)], value] as const
               }
             })(),
             runtime
@@ -2171,7 +2247,11 @@ export const createRepository = <
   }
 
   const repository: IRepository<TDomain, TIndexes, TChangeFeed, TAugmentMethods> = {
-    query: () => queryFor<IOperationContext>(),
+    // Runtime source.watch is installed only for the genuine native feed captured above.
+    query: () =>
+      queryFor<IOperationContext>() as ReturnType<
+        IRepository<TDomain, TIndexes, TChangeFeed, TAugmentMethods>['query']
+      >,
     get: async (id, ctx) => {
       const context = snapshotOperationContext(ctx)
       const runtime = createStorageOperationRuntime()
