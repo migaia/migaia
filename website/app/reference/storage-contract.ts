@@ -4554,14 +4554,32 @@ console.log(candidate.name, candidate.output)`
       members: queryStatisticsMembers
     },
     IRdfNamedNode: {
-      summary: t(
-        'An exact absolute RDF IRI, without URL normalization.',
-        '精确绝对 RDF IRI，不做 URL 规范化。'
-      ),
+      summary: {
+        en: 'Canonical absolute IRI term retaining original Unicode spelling without normalization.',
+        zh: '保留原始字符拼写且不进行规范化改写的绝对资源项。'
+      },
       members: {
-        termType: { summary: t('NamedNode discriminator.', 'NamedNode 标记。') },
-        value: { summary: t('Original absolute IRI spelling.', '原绝对 IRI 拼写。') }
-      }
+        termType: {
+          summary: {
+            en: 'Canonical RDF term discriminator; native blank labels never become standard persistent ground identity.',
+            zh: '规范三元组项区分字段，原生空白标签不变为标准持久完整身份。'
+          }
+        },
+        value: {
+          summary: {
+            en: 'Original canonical term value, preserving validated IRI or lexical spelling without coercion.',
+            zh: '原规范项值，保留已校验资源或字面拼写，不进行类型强制。'
+          }
+        }
+      },
+      example:
+        "import { term } from '@migaia/storage-contract'\nexport const subject = term.iri('urn:example:subject')",
+      scenarios: [
+        {
+          en: 'Construct a canonical RDF value before passing it to native ground storage.',
+          zh: '传给原生完整三元组存储之前，构造规范三元组项值。'
+        }
+      ]
     },
     IRdfBlankNode: {
       summary: t(
@@ -4569,7 +4587,12 @@ console.log(candidate.name, candidate.output)`
         'raw/parser 局部 blank 项；label 不是便携重复身份键。'
       ),
       members: {
-        termType: { summary: t('BlankNode discriminator.', 'BlankNode 标记。') },
+        termType: {
+          summary: {
+            en: 'Canonical RDF term discriminator; native blank labels never become standard persistent ground identity.',
+            zh: '规范三元组项区分字段，原生空白标签不变为标准持久完整身份。'
+          }
+        },
         value: {
           summary: t('Nonempty response/runtime-local label.', '非空的响应或运行时局部 label。')
         }
@@ -4581,7 +4604,12 @@ console.log(candidate.name, candidate.output)`
         '包含必需 datatype 与一致可选 language 的不可变词法 literal。'
       ),
       members: {
-        termType: { summary: t('Literal discriminator.', 'Literal 标记。') },
+        termType: {
+          summary: {
+            en: 'Canonical RDF term discriminator; native blank labels never become standard persistent ground identity.',
+            zh: '规范三元组项区分字段，原生空白标签不变为标准持久完整身份。'
+          }
+        },
         value: {
           summary: t(
             'Exact Unicode scalar string, including escaped control values.',
@@ -4607,21 +4635,70 @@ console.log(candidate.name, candidate.output)`
         'The default graph has no fabricated IRI or binding value.',
         '默认图不含伪造 IRI 或绑定值。'
       ),
-      members: { termType: { summary: t('DefaultGraph discriminator.', 'DefaultGraph 标记。') } }
+      members: {
+        termType: {
+          summary: {
+            en: 'Canonical RDF term discriminator; native blank labels never become standard persistent ground identity.',
+            zh: '规范三元组项区分字段，原生空白标签不变为标准持久完整身份。'
+          }
+        }
+      },
+      example:
+        "import { term } from '@migaia/storage-contract'\nexport const graph = term.defaultGraph",
+      scenarios: [
+        {
+          en: 'Construct a canonical RDF value before passing it to native ground storage.',
+          zh: '传给原生完整三元组存储之前，构造规范三元组项值。'
+        }
+      ]
     },
     IRdfBindingTerm: {
-      summary: t(
-        'Raw binding union of NamedNode, BlankNode and Literal; DefaultGraph is excluded.',
-        'NamedNode、BlankNode 与 Literal 的 raw 绑定联合；不含 DefaultGraph。'
-      ),
-      members: {}
+      summary: {
+        en: 'Native SELECT binding term, including response-local blank labels outside persistent ground identity.',
+        zh: '原生选择查询绑定项，可含不属于持久完整身份的响应内空白标签。'
+      },
+      members: {
+        termType: {
+          summary: {
+            en: 'Canonical RDF term discriminator; native blank labels never become standard persistent ground identity.',
+            zh: '规范三元组项区分字段，原生空白标签不变为标准持久完整身份。'
+          }
+        },
+        value: {
+          summary: {
+            en: 'Original canonical term value, preserving validated IRI or lexical spelling without coercion.',
+            zh: '原规范项值，保留已校验资源或字面拼写，不进行类型强制。'
+          }
+        }
+      }
     },
     IRdfTerm: {
       summary: t(
         'Full raw RDF term union including the default graph.',
         '含默认图的完整 raw RDF 项联合。'
       ),
-      members: {}
+      members: {
+        termType: {
+          summary: {
+            en: 'Canonical RDF term discriminator; native blank labels never become standard persistent ground identity.',
+            zh: '规范三元组项区分字段，原生空白标签不变为标准持久完整身份。'
+          }
+        },
+        value: {
+          summary: {
+            en: 'Original canonical term value, preserving validated IRI or lexical spelling without coercion.',
+            zh: '原规范项值，保留已校验资源或字面拼写，不进行类型强制。'
+          }
+        }
+      },
+      example:
+        "import { term } from '@migaia/storage-contract'\nexport const value = term.literal('bonjour', { language: 'FR' })",
+      scenarios: [
+        {
+          en: 'Construct a canonical RDF value before passing it to native ground storage.',
+          zh: '传给原生完整三元组存储之前，构造规范三元组项值。'
+        }
+      ]
     },
     IQuad: {
       summary: t(
@@ -4629,10 +4706,23 @@ console.log(candidate.name, candidate.output)`
         '便携 ground quad 身份；标准重复写入拒绝 blank 位置。'
       ),
       members: {
-        subject: { summary: t('NamedNode subject.', 'NamedNode 主项。') },
-        predicate: { summary: t('NamedNode relation IRI.', 'NamedNode 关系 IRI。') },
+        subject: {
+          summary: {
+            en: 'Canonical named-node subject; blank identity is excluded from the standard ground contract.',
+            zh: '规范具名主项，标准完整契约排除空白身份。'
+          }
+        },
+        predicate: {
+          summary: {
+            en: 'Canonical named IRI predicate, never a literal or arbitrary grammar string.',
+            zh: '规范具名资源谓词，不是字面项或任意语法字符串。'
+          }
+        },
         object: {
-          summary: t('NamedNode or normalized Literal value.', 'NamedNode 或规范 Literal 值。')
+          summary: {
+            en: 'Canonical named IRI or literal object within the standard ground identity.',
+            zh: '标准完整身份内的规范具名资源或字面对象项。'
+          }
         },
         graph: {
           summary: t(
@@ -4640,7 +4730,15 @@ console.log(candidate.name, candidate.output)`
             'NamedNode 或 DefaultGraph；默认图也须明确提供。'
           )
         }
-      }
+      },
+      example:
+        "import { term, snapshotStorageRdfQuad } from '@migaia/storage-contract'\nexport const quad = snapshotStorageRdfQuad({\n  subject: term.iri('urn:example:s'), predicate: term.iri('urn:example:p'),\n  object: term.literal('ready'), graph: term.defaultGraph\n}, undefined)",
+      scenarios: [
+        {
+          en: 'Construct a canonical RDF value before passing it to native ground storage.',
+          zh: '传给原生完整三元组存储之前，构造规范三元组项值。'
+        }
+      ]
     },
     IRawQuad: {
       summary: t(
@@ -4648,14 +4746,29 @@ console.log(candidate.name, candidate.output)`
         '完整 RDF 1.1 raw/parser quad，保留请求局部 blank 位置。'
       ),
       members: {
-        subject: { summary: t('NamedNode or BlankNode.', 'NamedNode 或 BlankNode。') },
-        predicate: { summary: t('NamedNode relation IRI.', 'NamedNode 关系 IRI。') },
-        object: { summary: t('Any raw binding term.', '任意 raw 绑定项。') },
+        subject: {
+          summary: {
+            en: 'Raw named or blank subject retained by the native document or result owner.',
+            zh: '由原生文档或结果拥有者保留的原始具名或空白主项。'
+          }
+        },
+        predicate: {
+          summary: {
+            en: 'Canonical named IRI predicate, never a literal or arbitrary grammar string.',
+            zh: '规范具名资源谓词，不是字面项或任意语法字符串。'
+          }
+        },
+        object: {
+          summary: {
+            en: 'Raw named, blank or literal object in the original native RDF result.',
+            zh: '原生三元组结果内的原始具名、空白或字面对象项。'
+          }
+        },
         graph: {
-          summary: t(
-            'NamedNode, BlankNode or DefaultGraph.',
-            'NamedNode、BlankNode 或 DefaultGraph。'
-          )
+          summary: {
+            en: 'Native default, named or blank graph identity limited by the raw document boundary.',
+            zh: '受原始文档边界限制的原生缺省、具名或空白图身份。'
+          }
         }
       }
     },
@@ -4673,13 +4786,38 @@ console.log(candidate.name, candidate.output)`
       ),
       members: {
         channel: {
-          summary: t(
-            'The physical text, bytes or record channel.',
-            '物理 text、bytes 或 record 通道。'
-          )
+          summary: {
+            en: 'Canonical text, byte, record or vector channel, without crossing another physical domain.',
+            zh: '规范文本、字节、记录或向量通道，不跨越其它物理领域。'
+          }
         },
-        key: { summary: t('The channel’s original logical key.', '该通道原有逻辑键。') }
-      }
+        key: {
+          summary: {
+            en: 'Original channel key assigned by the application or returned by the same backend.',
+            zh: '应用指定或同一后端返回的原通道键。'
+          }
+        },
+        collection: {
+          summary: {
+            en: 'Application-assigned vector collection belonging to this same organization.',
+            zh: '属于同一组织且由应用指定的向量集合。'
+          }
+        },
+        id: {
+          summary: {
+            en: 'Point ID returned or assigned by the original vector collection.',
+            zh: '由原向量集合返回或指定的点标识符。'
+          }
+        }
+      },
+      example:
+        "import { lockKey } from '@migaia/storage-contract'\nexport const target = lockKey.vector('documents', 'first')",
+      scenarios: [
+        {
+          en: 'Address expiry on the same native channel that owns the underlying entry.',
+          zh: '对底层条目所属的同一原生通道指定期限目标。'
+        }
+      ]
     },
     ITtlApi: {
       summary: t(
@@ -4738,7 +4876,10 @@ console.log(candidate.name, candidate.output)`
             '随事务原子设置当前 draft 目标期限。'
           ),
           params: {
-            target: t('Original typed target.', '原 typed 目标。'),
+            target: {
+              en: 'Canonical text, byte, record or vector target created for this same native store.',
+              zh: '为同一原生存储创建的规范文本、字节、记录或向量目标。'
+            },
             ms: t('Finite nonnegative milliseconds.', '有限非负毫秒数。')
           },
           returns: t(
@@ -4752,7 +4893,12 @@ console.log(candidate.name, candidate.output)`
             'Read the draft’s captured deadline and value snapshot.',
             '读取 draft 捕获的期限和值快照。'
           ),
-          params: { target: t('Original typed target.', '原 typed 目标。') },
+          params: {
+            target: {
+              en: 'Canonical text, byte, record or vector target created for this same native store.',
+              zh: '为同一原生存储创建的规范文本、字节、记录或向量目标。'
+            }
+          },
           returns: t('Remaining milliseconds or undefined.', '剩余毫秒数或 undefined。'),
           example: `await tx.use(ttl).remaining({ channel: 'record', key: 'profile' })`
         },
@@ -4761,7 +4907,12 @@ console.log(candidate.name, candidate.output)`
             'Remove the current draft deadline in this same transaction.',
             '在同一事务中移除当前 draft 期限。'
           ),
-          params: { target: t('Original typed target.', '原 typed 目标。') },
+          params: {
+            target: {
+              en: 'Canonical text, byte, record or vector target created for this same native store.',
+              zh: '为同一原生存储创建的规范文本、字节、记录或向量目标。'
+            }
+          },
           returns: t('Whether an active deadline was removed.', '是否移除了活期限。'),
           example: `await tx.use(ttl).persist({ channel: 'record', key: 'profile' })`
         }
@@ -4821,7 +4972,12 @@ console.log(candidate.name, candidate.output)`
         '原生 typed 键批次中一个已捕获位置。'
       ),
       members: {
-        key: { summary: t('Detached canonical logical key.', '独立的规范逻辑键。') },
+        key: {
+          summary: {
+            en: 'Detached logical key retained from the original captured input position.',
+            zh: '从原始已捕获输入位置保留的独立逻辑键。'
+          }
+        },
         identity: {
           summary: t('Hex identity of the canonical ordered bytes.', '规范有序字节的十六进制身份。')
         },
@@ -4831,7 +4987,15 @@ console.log(candidate.name, candidate.output)`
             '首次出现相同规范键的输入位置；原生去重删除只使用该位置。'
           )
         }
-      }
+      },
+      scenarios: [
+        {
+          en: 'Retain canonical input identity and first occurrence when capturing a native batch.',
+          zh: '捕获原生批量时保留规范输入身份与首次出现位置。'
+        }
+      ],
+      example:
+        "import { snapshotStorageBatchKeys } from '@migaia/storage-contract'\nconsole.log(snapshotStorageBatchKeys(['theme', ['users', 1]], undefined))"
     },
     IRecordsApi: {
       summary: t(
@@ -4840,16 +5004,35 @@ console.log(candidate.name, candidate.output)`
       ),
       members: {
         query: {
-          summary: t(
-            'query<R=TValue>() returns the implemented shared IQueryChain<R> without eager I/O.',
-            'query<R=TValue>() 返回已实现的共用 IQueryChain<R>，不提前 I/O。'
-          )
+          summary: {
+            en: 'Build the shared query over the original native record source.',
+            zh: '在原生记录来源上创建共享记录查询链。'
+          },
+          params: {},
+          returns: {
+            en: 'A typed persistent query builder, without scanning records at construction.',
+            zh: '返回类型化持久查询构造器，创建时不扫描记录。'
+          }
         },
         removeByPrefix: {
-          summary: t(
-            'Original native deletion Promise/count with exact prefix and operation/concurrency context; no wrapper or copied writer.',
-            '原生删除 Promise/计数与精确 prefix、操作/并发上下文，不新增包装或复制 writer。'
-          )
+          summary: {
+            en: 'Delete current-organization records matching one canonical ordered-key prefix.',
+            zh: '删除当前组织内匹配单个规范保序键前缀的记录。'
+          },
+          params: {
+            prefix: {
+              en: 'Application-selected typed record prefix in the original key domain.',
+              zh: '应用选择的原键域类型化记录前缀。'
+            },
+            ctx: {
+              en: 'Original optional operation context carrying one captured cancellation and timeout budget.',
+              zh: '原可选操作上下文，承载单次捕获的取消与超时预算。'
+            }
+          },
+          returns: {
+            en: 'The actual number of deleted records, confirmed by the original native commit.',
+            zh: '返回原生提交确认的实际已删除记录数量。'
+          }
         }
       }
     },
@@ -4882,18 +5065,34 @@ console.log(candidate.name, candidate.output)`
             'Inclusive endpoints in the same ordered field domain.',
             '同一有序字段域中的闭区间端点。'
           )
+        },
+        ne: {
+          summary: {
+            en: 'Reject equality with the captured canonical operand using the shared comparison semantics.',
+            zh: '按共享比较语义排除与已捕获规范操作数相等的值。'
+          }
         }
       }
     },
     IWhere: {
-      summary: t(
-        'Typed nested field conditions and recursive and/or/not.',
-        'typed 嵌套字段条件与递归 and/or/not。'
-      ),
+      summary: {
+        en: 'Portable declarative payload conditions captured into the original canonical AST.',
+        zh: '捕获为原规范条件树的可移植声明式载荷条件。'
+      },
       members: {
-        and: { summary: t('All declared conditions must match.', '所有条件必须匹配。') },
+        and: {
+          summary: {
+            en: 'Conjunction of captured payload conditions, preserving the original declaration order.',
+            zh: '保留原声明顺序的已捕获载荷条件合取集合。'
+          }
+        },
         or: { summary: t('At least one declared condition must match.', '至少一个条件必须匹配。') },
-        not: { summary: t('Negates one nested condition.', '取反一个嵌套条件。') }
+        not: {
+          summary: {
+            en: 'Negation of one captured canonical payload condition without another parser.',
+            zh: '对单个已捕获规范载荷条件取反，不增加其它解析器。'
+          }
+        }
       }
     },
     IQueryCondition: {
@@ -4902,7 +5101,12 @@ console.log(candidate.name, candidate.output)`
         '规划与客户端谓词共用的唯一规范字段/布尔 AST。'
       ),
       members: {
-        kind: { summary: t('Field, and, or or not.', 'field、and、or 或 not。') },
+        kind: {
+          summary: {
+            en: 'Discriminate a field comparison, conjunctive list, alternative list or negation node.',
+            zh: '区分字段比较、合取列表、替代列表与否定条件节点。'
+          }
+        },
         path: {
           summary: t(
             'Validated property segments owned by the canonical utils path parser.',
@@ -4910,15 +5114,38 @@ console.log(candidate.name, candidate.output)`
           )
         },
         operator: {
-          summary: t('A canonical QueryOperator for field nodes.', '字段节点的规范 QueryOperator。')
+          summary: {
+            en: 'Canonical comparison operator supplied by the shared QueryOperator domain.',
+            zh: '共享比较运算符领域提供的规范条件比较操作。'
+          }
         },
         value: {
           summary: t(
             'Portable codec value, undefined, bigint, Date, opaque object identity, or an operator list. Identity objects are not traversed.',
             'portable codec 值、undefined、bigint、Date、不透明对象身份或操作符列表；不遍历身份对象内容。'
           )
+        },
+        conditions: {
+          summary: {
+            en: 'Captured child conditions whose order and boolean grouping are preserved.',
+            zh: '保留声明顺序与布尔分组的已捕获子条件集合。'
+          }
+        },
+        condition: {
+          summary: {
+            en: 'Single captured child condition negated by this canonical node.',
+            zh: '由当前规范否定节点取反的单个已捕获子条件。'
+          }
         }
-      }
+      },
+      example:
+        "import { snapshotStorageWhere } from '@migaia/storage-contract'\nexport const condition = snapshotStorageWhere({ category: 'docs', score: { gte: 3 } })",
+      scenarios: [
+        {
+          en: 'Capture a portable payload condition once before deciding faithful native pushdown.',
+          zh: '决定忠实原生下推前，单次捕获可移植载荷条件。'
+        }
+      ]
     },
     IQueryPlanStep: {
       summary: t(
@@ -4926,7 +5153,15 @@ console.log(candidate.name, candidate.output)`
         '一个不可变的下推或客户端操作，含可选原因与索引。'
       ),
       members: {
-        operation: { summary: t('Canonical operation name.', '规范操作名称。') },
+        operation: {
+          summary: {
+            en: 'One canonical planner operation whose native or client placement is being explained.',
+            zh: '当前解释其原生或客户端执行位置的规范计划操作。'
+          },
+          values: {
+            enum: 'QueryOperation'
+          }
+        },
         reason: { summary: t('Client execution reason when present.', '存在时解释客户端原因。') },
         index: { summary: t('Declared native index when applicable.', '适用的已声明原生索引。') }
       }
@@ -4937,10 +5172,26 @@ console.log(candidate.name, candidate.output)`
         '无需 I/O 得到 pushed/client 事实、保守 fullScan 与原生 source/index。'
       ),
       members: {
-        pushed: { summary: t('Safe native prefix.', '安全原生前缀。') },
+        pushed: {
+          summary: {
+            en: 'Ordered operations executed by the native source before returning candidate rows.',
+            zh: '返回候选条目前由原生来源执行的有序操作集合。'
+          }
+        },
         client: { summary: t('Ordered client remainder with reasons.', '按序客户端余部与原因。') },
-        fullScan: { summary: t('Conservative scan cost signal.', '保守扫描成本标记。') },
-        source: { summary: t('Captured native source label.', '捕获的原生数据源标签。') }
+        fullScan: {
+          summary: {
+            en: 'Whether the declared native plan must visit the complete source candidate domain.',
+            zh: '已声明原生计划是否必须访问完整候选来源域。'
+          }
+        },
+        source: { summary: t('Captured native source label.', '捕获的原生数据源标签。') },
+        index: {
+          summary: {
+            en: 'Optional native index identity declared by the source; it is not a portable index manager.',
+            zh: '来源声明的可选原生索引身份，不代表可移植索引管理器。'
+          }
+        }
       }
     },
     IQueryPushdown: {
@@ -4949,27 +5200,57 @@ console.log(candidate.name, candidate.output)`
         '捕获的原生操作符、操作子集与 source/index 身份，支持事实只声明一次。'
       ),
       members: {
-        operators: { summary: t('Supported field operators.', '支持的字段操作符。') },
-        operations: { summary: t('Supported native operations.', '支持的原生操作。') },
-        source: { summary: t('Stable source label.', '稳定数据源标签。') },
-        index: { summary: t('Optional native index label.', '可选原生索引标签。') },
+        operators: {
+          summary: {
+            en: 'Operators this native source declares it can faithfully translate.',
+            zh: '此原生来源声明能够忠实翻译的比较运算符集合。'
+          }
+        },
+        operations: {
+          summary: {
+            en: 'Canonical operation kinds supported by this native source, in actual chain order.',
+            zh: '此原生来源支持的规范操作种类，仍遵守真实查询链顺序。'
+          }
+        },
+        source: {
+          summary: {
+            en: 'Diagnostic identity of the original native row source used by explain.',
+            zh: '解释计划所使用的原始原生条目来源诊断身份。'
+          }
+        },
+        index: {
+          summary: {
+            en: 'Optional diagnostic identity of the actual native index.',
+            zh: '实际原生索引的可选诊断身份，不授予索引创建权。'
+          }
+        },
         canPushCondition: {
-          summary: t(
-            'Optional pure exact-domain predicate for one canonical condition, after original operator/identity checks. Its original function and receiver are captured once; false retains client filtering and requirePushdown rejects before I/O. Omission preserves prior declarations.',
-            '原操作符与身份检查后，对一个规范条件做可选纯精确值域判定。原函数与 receiver 单次捕获；false 保留客户端过滤，requirePushdown 在 I/O 前拒绝。省略时保留原声明语义。'
-          )
+          summary: {
+            en: 'Optional faithful-domain predicate over the captured canonical AST, without I/O or another parser.',
+            zh: '针对已捕获规范条件树的可选忠实域判断，不进行访问或另建解析器。'
+          }
         }
       }
     },
     IVectorHit: {
-      summary: t(
-        'Native score/id/payload hit; withVector conditionally adds its vector.',
-        '原生 score/id/payload 命中；withVector 条件加入 vector。'
-      ),
+      summary: {
+        en: 'Original native point ID, metric score and optional detached application payload.',
+        zh: '原生点标识、度量分数与可选的已脱离引用应用载荷。'
+      },
       members: {
-        id: { summary: t('Original point identifier.', '原点标识。') },
+        id: {
+          summary: {
+            en: 'Original point identity returned by the native vector collection.',
+            zh: '由原生向量集合返回的原始点身份标识。'
+          }
+        },
         score: { summary: t('Native score in engine result order.', '引擎结果顺序中的原生分数。') },
-        payload: { summary: t('Optional original point payload.', '可选原点 payload。') },
+        payload: {
+          summary: {
+            en: 'Optional detached application payload selected by the original native query.',
+            zh: '由原生查询选择的可选独立应用载荷。'
+          }
+        },
         vector: {
           summary: t('Present in the type only after withVector.', '仅 withVector 后出现在类型中。')
         }
@@ -5061,10 +5342,10 @@ console.log(candidate.name, candidate.output)`
       ),
       members: {
         conditions: {
-          summary: t(
-            'All translatable pre-ranking payload conditions.',
-            '全部可译排名前 payload 条件。'
-          )
+          summary: {
+            en: 'Canonical declarative conditions; faithful native conditions precede ranking.',
+            zh: '规范声明式条件，忠实的原生条件在排名前应用。'
+          }
         },
         topK: {
           summary: t('Final positive safe native ranking bound.', '最终正安全原生排名上限。')
@@ -5075,7 +5356,12 @@ console.log(candidate.name, candidate.output)`
         withVector: {
           summary: t('Whether native hits include vectors.', '原生命中是否包含向量。')
         },
-        ctx: { summary: t('Captured original operation context.', '捕获的原操作上下文。') }
+        ctx: {
+          summary: {
+            en: 'Original readonly vector-query operation context captured once.',
+            zh: '捕获一次的原始只读向量查询操作上下文。'
+          }
+        }
       }
     },
     IVectorQuerySource: {
@@ -5103,15 +5389,29 @@ console.log(candidate.name, candidate.output)`
           )
         },
         pushdown: {
-          summary: t('Original native operation/operator support.', '原生操作及操作符支持。')
+          summary: {
+            en: 'Captured faithful native operation declarations consumed by the original shared planner.',
+            zh: '由原共享计划消费的已捕获忠实原生操作声明。'
+          }
         },
         execute: {
-          summary: t('Open the original ranked storage iterator.', '打开原排名 storage iterator。')
+          summary: {
+            en: 'Execute the native engine query and return its original ranked cursor without JavaScript rescoring.',
+            zh: '执行原生引擎查询并返回原排名游标，不在客户端重新计算分数。'
+          }
         },
         asyncDisposeKey: {
-          summary: t('Optional original resource cleanup key.', '可选原资源清理键。')
+          summary: {
+            en: 'Optional original async-disposal symbol captured once; omission uses the native symbol without creating another owner.',
+            zh: '捕获一次的可选原异步释放符号，省略时使用原生符号，不创建其它资源拥有者。'
+          }
         },
-        exact: { summary: t('Explicit full-scan explanation fact.', '显式 fullScan 解释事实。') },
+        exact: {
+          summary: {
+            en: 'Native exact-ranking support fact; an unsupported engine must reject instead of scanning all candidates in JavaScript.',
+            zh: '原生精确排名支持事实，不支持时拒绝而非在客户端扫描全部候选。'
+          }
+        },
         groupBy: {
           summary: t(
             'Declare standard topK scalar grouping support.',
@@ -5155,13 +5455,32 @@ console.log(candidate.name, candidate.output)`
       ),
       members: {
         operation: {
-          summary: t('Canonical follow or inverse operation.', '规范 follow 或 inverse 操作。')
+          summary: {
+            en: 'Forward follow or inverse edge traversal on the same original RDF graph.',
+            zh: '在同一原三元组图上执行正向跟随或反向边遍历。'
+          },
+          values: {
+            follow: {
+              en: 'Follow the current named object to the next subject in the same graph.',
+              zh: '在同图中从当前具名对象跟随到下个主项。'
+            },
+            inverse: {
+              en: 'Find predecessors whose named object matches the current subject.',
+              zh: '查找具名对象匹配当前主项的前驱成员。'
+            }
+          }
         },
         predicate: {
-          summary: t('Captured ground named predicate.', '捕获的 ground named predicate。')
+          summary: {
+            en: 'Canonical named predicate followed by the original traversal owner.',
+            zh: '原遍历拥有者跟随的规范具名谓词身份。'
+          }
         },
         target: {
-          summary: t('Optional captured ground forward target.', '可选捕获的 ground 正向目标。')
+          summary: {
+            en: 'Canonical selected traversal target under the same graph and term rules.',
+            zh: '同图与同项身份规则下的规范选定遍历目标。'
+          }
         }
       }
     },
@@ -5189,7 +5508,12 @@ console.log(candidate.name, candidate.output)`
             '原声明顺序的安全原生前缀。'
           )
         },
-        ctx: { summary: t('Captured original operation context.', '捕获的原操作上下文。') }
+        ctx: {
+          summary: {
+            en: 'Original readonly query context captured once before source execution.',
+            zh: '来源执行前捕获一次的原只读查询操作上下文。'
+          }
+        }
       }
     },
     IRdfQuerySource: {
@@ -5229,12 +5553,23 @@ console.log(candidate.name, candidate.output)`
           )
         },
         pushdown: {
-          summary: t('Original native traversal/operator support.', '原生遍历及操作符支持。')
+          summary: {
+            en: 'Captured faithful native operation declarations consumed by the original shared planner.',
+            zh: '由原共享计划消费的已捕获忠实原生操作声明。'
+          }
         },
         execute: {
-          summary: t('Open the original quad storage iterator.', '打开原 quad storage iterator。')
+          summary: {
+            en: 'Execute pushed native RDF matching and return the original ground-quad cursor.',
+            zh: '执行已下推的原生三元组匹配，返回原完整三元组游标。'
+          }
         },
-        asyncDisposeKey: { summary: t('Optional original cleanup key.', '可选原清理键。') }
+        asyncDisposeKey: {
+          summary: {
+            en: 'Optional original async-disposal symbol captured once; omission uses the native symbol without creating another owner.',
+            zh: '捕获一次的可选原异步释放符号，省略时使用原生符号，不创建其它资源拥有者。'
+          }
+        }
       }
     },
     IWithTransactionQueryMethods: {
@@ -5282,9 +5617,24 @@ console.log(candidate.name, candidate.output)`
         '原记录 execute 参数，与原生标量统计共享。'
       ),
       members: {
-        conditions: { summary: t('Canonical safe-prefix AST nodes.', '安全前缀的规范 AST 节点。') },
-        fields: { summary: t('Optional native field projection.', '可选原生字段投影。') },
-        ctx: { summary: t('Single captured operation intent.', '单次捕获的 operation 意图。') },
+        conditions: {
+          summary: {
+            en: 'Captured canonical payload conditions already validated by the shared parser.',
+            zh: '共享解析器已经校验并捕获的规范载荷条件集合。'
+          }
+        },
+        fields: {
+          summary: {
+            en: 'Captured selected property paths, or no native projection when omitted.',
+            zh: '已捕获的选定属性路径，省略时不请求原生投影。'
+          }
+        },
+        ctx: {
+          summary: {
+            en: 'Original operation context captured once for this query terminal.',
+            zh: '本查询终点捕获一次的原始操作上下文。'
+          }
+        },
         steps: {
           summary: t('Opted-in authoritative native step order.', '显式选择的原生步骤顺序。')
         }
@@ -5295,7 +5645,28 @@ console.log(candidate.name, candidate.output)`
         'Native watch terminal constrained by this:IQueryShape; a pre-topK vector builder cannot call it. Declared change-feed APIs expose it, while transaction APIs do not.',
         '以 this:IQueryShape 约束的原生 watch 终点，topK 前向量 builder 不能调用；声明 changeFeed 的 API 才提供，事务 API 不提供。'
       ),
-      members: {}
+      members: {
+        watch: {
+          summary: {
+            en: 'Subscribe to the selected original query source without rerunning the query as a polling loop.',
+            zh: '订阅所选原查询来源，不将查询重新执行为轮询循环。'
+          },
+          params: {
+            this: {
+              en: 'The original typed query on which watch is invoked.',
+              zh: '当前调用观察方法的原类型化查询。'
+            },
+            ctx: {
+              en: 'Original optional operation context with cancellation and one captured timeout budget.',
+              zh: '原可选操作上下文，承载取消信号与单次捕获的超时预算。'
+            }
+          },
+          returns: {
+            en: 'A disposable stream of native invalidation descriptions, not result rows.',
+            zh: '返回可释放原生失效描述流，不返回查询结果行。'
+          }
+        }
+      }
     },
     IQueryWatcher: {
       summary: t(
@@ -5316,28 +5687,116 @@ console.log(candidate.name, candidate.output)`
         'Deletion request with the original operation snapshot and separate optional concurrency policy.',
         '删除请求，包含原操作快照和独立可选并发策略。'
       ),
-      members: {}
+      members: {
+        operation: {
+          summary: {
+            en: 'Delete discriminator for the original backend mutation owner.',
+            zh: '原后端修改拥有者使用的删除操作区分字段。'
+          }
+        },
+        ctx: {
+          summary: {
+            en: 'Same frozen context captured once by the shared query terminal.',
+            zh: '共享查询终点捕获一次后复用的同一冻结上下文。'
+          }
+        },
+        concurrency: {
+          summary: {
+            en: 'Original optional write policy passed beside ctx without recapturing its budget.',
+            zh: '与上下文并列传递的原可选写策略，不再次捕获预算。'
+          }
+        }
+      }
     },
     IRecordQueryMutation: {
       summary: t(
         'Record delete/update request with one detached patch for update; the original backend codec validates its value domain.',
         '记录 delete/update 请求，update 包含一份已分离的 patch，值域由原后端 codec 验证。'
       ),
-      members: {}
+      members: {
+        operation: {
+          summary: {
+            en: 'Delete or patch discriminator for the transaction-bound selected record mutation.',
+            zh: '事务绑定的选定记录删除或补丁操作区分字段。'
+          }
+        },
+        patch: {
+          summary: {
+            en: 'Captured portable patch applied only to records selected by this same chain.',
+            zh: '已捕获可移植补丁，仅应用于同一查询链选中的记录。'
+          }
+        },
+        ctx: {
+          summary: {
+            en: 'Original captured query-write context retained by identity.',
+            zh: '按身份保留的原始已捕获查询写入上下文。'
+          }
+        },
+        concurrency: {
+          summary: {
+            en: 'Original optional concurrency policy, separate from the captured operation context.',
+            zh: '独立于已捕获操作上下文的原可选并发策略。'
+          }
+        }
+      }
     },
     IRdfQueryMutation: {
       summary: t(
         'Ground delete/replace request; replacement applies only to the canonical old quad actually selected.',
         'ground delete/replace 请求；替换仅应用于实际选中的规范 old quad。'
       ),
-      members: {}
+      members: {
+        operation: {
+          summary: {
+            en: 'Delete or ground replacement discriminator for the original RDF draft owner.',
+            zh: '原三元组草稿拥有者使用的删除或完整替换操作区分字段。'
+          }
+        },
+        oldQuad: {
+          summary: {
+            en: 'Canonical old ground quad; replacement accepts only an actually selected matching identity.',
+            zh: '规范旧完整三元组，仅实际选中的匹配身份接受替换。'
+          }
+        },
+        newQuad: {
+          summary: {
+            en: 'Canonical replacement ground quad captured before mutation begins.',
+            zh: '修改开始前捕获的规范替换完整三元组。'
+          }
+        },
+        ctx: {
+          summary: {
+            en: 'Original frozen operation context captured by the shared write terminal.',
+            zh: '共享写入终点捕获的原冻结操作上下文。'
+          }
+        },
+        concurrency: {
+          summary: {
+            en: 'Original optional write policy forwarded without rebuilding ctx.',
+            zh: '不重建操作上下文而转发的原可选写入策略。'
+          }
+        }
+      }
     },
     IQueryMutationPort: {
       summary: t(
         'Original transaction-bound execute and accept callbacks; no independent writer, lock or lifecycle authority.',
         '原事务内 execute/accept 回调，不具有独立写入、锁或生命周期权限。'
       ),
-      members: {}
+      members: {
+        execute: {
+          summary: {
+            en: 'Original transaction-bound cursor source used by the same shared selection planner.',
+            zh: '同一共享选择计划使用的原事务绑定游标来源。'
+          }
+        },
+        accept: {
+          summary: {
+            en: 'Accept one canonical selected row in the same draft and return true only for a real accepted change.',
+            zh: '在同一草稿接受单个规范选中条目，仅真实接受修改时返回真值。'
+          }
+        }
+      }
     },
     IQueryMutator: {
       summary: t(
@@ -5353,13 +5812,48 @@ console.log(candidate.name, candidate.output)`
       ),
       members: {
         operation: {
-          summary: t(
-            'Declared count, exists or aggregate operation.',
-            '声明的 count、exists 或 aggregate。'
-          )
+          summary: {
+            en: 'Request a native count, existence test or numeric aggregate on the current bounded query.',
+            zh: '针对当前有界查询请求原生计数、存在判断或数字聚合。'
+          },
+          values: {
+            count: {
+              en: 'Count the current selected native query result.',
+              zh: '计数当前选定原生查询结果。'
+            },
+            exists: {
+              en: 'Return whether the current native selection has a member.',
+              zh: '判断当前原生选择是否存在成员。'
+            },
+            aggregate: {
+              en: 'Reduce the selected numeric field using the declared aggregate.',
+              zh: '按声明聚合方式归约选定数字字段。'
+            }
+          }
         },
         aggregate: {
-          summary: t('min, max, sum or avg for aggregate.', 'aggregate 的 min、max、sum 或 avg。')
+          summary: {
+            en: 'Select the numeric scalar operation without materializing all rows in a second reader.',
+            zh: '选择数字标量操作，不通过第二读取器载入全部行。'
+          },
+          values: {
+            min: {
+              en: 'Smallest selected numeric value.',
+              zh: '选择最小的有效数字值。'
+            },
+            max: {
+              en: 'Largest selected numeric value.',
+              zh: '选择最大的有效数字值。'
+            },
+            sum: {
+              en: 'Sum selected numeric values.',
+              zh: '累计选定的有效数字值。'
+            },
+            avg: {
+              en: 'Mean of selected numeric values.',
+              zh: '求选定有效数字值的平均数。'
+            }
+          }
         },
         field: {
           summary: t('Numeric field in the current result domain.', '当前结果域的数值字段。')
@@ -5387,23 +5881,73 @@ console.log(candidate.name, candidate.output)`
       ),
       members: {
         operation: {
-          summary: t(
-            'Canonical operation from the declared native subset.',
-            '声明的原生子集中的规范操作。'
-          )
+          summary: {
+            en: 'Canonical native terminal step kind; ordered steps remain the authoritative planner history.',
+            zh: '规范原生终点步骤种类，有序步骤仍是计划执行历史的依据。'
+          },
+          values: {
+            enum: 'QueryOperation'
+          }
         },
         condition: {
-          summary: t('Captured canonical AST for a where step.', 'where 步骤捕获的规范 AST。')
+          summary: {
+            en: 'Canonical payload condition already captured by the shared parser.',
+            zh: '已由共享解析器捕获的规范载荷条件树。'
+          }
         },
         fields: {
-          summary: t('Captured field names for a select step.', 'select 步骤捕获的字段名。')
+          summary: {
+            en: 'Original selected property paths, preserving declared projection order.',
+            zh: '原始选定属性路径，保留声明的投影顺序。'
+          }
         },
-        count: { summary: t('Nonnegative safe limit/skip bound.', '非负安全 limit/skip 上限。') },
+        count: {
+          summary: {
+            en: 'Validated nonnegative bound used by the native limit step.',
+            zh: '原生数量限制步骤使用的已校验非负上界。'
+          }
+        },
         field: {
           summary: t(
             'Distinct field with the shared SameValueZero identity contract.',
             '按共享 SameValueZero 身份语义去重的字段。'
           )
+        },
+        by: {
+          summary: {
+            en: 'The key-order discriminator selects canonical key ordering, never a separate property comparator.',
+            zh: '键排序区分字段选择规范键顺序，不代表独立属性比较器。'
+          }
+        },
+        direction: {
+          summary: {
+            en: 'Native order or cursor direction, preserving the same canonical ordered-key domain.',
+            zh: '原生排序或游标方向，保留同一规范保序键领域。'
+          },
+          values: {
+            asc: {
+              en: 'Native ascending canonical key order.',
+              zh: '按规范键采用原生升序。'
+            },
+            desc: {
+              en: 'Native descending canonical key order.',
+              zh: '按规范键采用原生降序。'
+            },
+            next: {
+              en: 'Advance from the cursor in forward key order.',
+              zh: '从游标按正向键顺序继续。'
+            },
+            prev: {
+              en: 'Advance from the cursor in reverse key order.',
+              zh: '从游标按反向键顺序继续。'
+            }
+          }
+        },
+        key: {
+          summary: {
+            en: 'Canonical native order key retained by the shared query planner.',
+            zh: '由共享查询计划保留的规范原生排序键。'
+          }
         }
       }
     },
@@ -5567,18 +6111,29 @@ console.log(candidate.name, candidate.output)`
             '选择有序原生 steps 为执行依据；省略保留旧 execute 参数。'
           )
         },
-        pushdown: { summary: t('Captured native support declaration.', '捕获的原生支持声明。') },
+        pushdown: {
+          summary: {
+            en: 'Captured faithful native operation declarations consumed by the original shared planner.',
+            zh: '由原共享计划消费的已捕获忠实原生操作声明。'
+          }
+        },
         asyncDisposeKey: {
-          summary: t(
-            "Optional readonly typeof Symbol.asyncDispose, captured once. An explicit symbol or undefined is accepted; other values reject with INVALID_ARGUMENT. Omission or undefined uses native Symbol.asyncDispose. Pass the host's existing fallback key when needed; mapped symbolic cleanup and source diagnostics share it while retaining separate cached cleanup Promises and the original owner. The contract creates no fallback symbol.",
-            '可选只读 typeof Symbol.asyncDispose，只捕获一次。显式值接受 Symbol 或 undefined，否则以 INVALID_ARGUMENT 拒绝；省略或 undefined 时使用原生 Symbol.asyncDispose。需要时传宿主既有后备键；映射流的符号清理与来源诊断共用此键，保留独立缓存的清理 Promise 和原 owner。契约不创建后备符号。'
-          )
+          summary: {
+            en: 'Optional original async-disposal symbol captured once; omission uses the native symbol without creating another owner.',
+            zh: '捕获一次的可选原异步释放符号，省略时使用原生符号，不创建其它资源拥有者。'
+          }
         },
         execute: {
-          summary: t(
-            'Return the original cursor over only pushed conditions/fields.',
-            '按已下推条件与字段返回原游标。'
-          )
+          summary: {
+            en: 'Execute pushed native record conditions and projections through the original bounded cursor. ',
+            zh: '通过原有界游标执行已下推的原生记录条件与投影。'
+          }
+        },
+        tieBreakByKey: {
+          summary: {
+            en: 'Declare deterministic canonical-key ordering for equal native sort values when the source actually supplies it.',
+            zh: '仅来源实际提供时，声明相同原生排序值按规范键确定顺序。'
+          }
         }
       }
     },
@@ -5598,10 +6153,20 @@ console.log(candidate.name, candidate.output)`
           summary: t('Committed result, awaited by the outer loop.', '由外层循环等待的提交结果。')
         },
         phase: {
-          summary: t(
-            'Acquire or commit conflict; policy wait is valid only for acquire.',
-            'acquire 或 commit 冲突；策略 wait 仅适用于 acquire。'
-          )
+          summary: {
+            en: 'Distinguish native acquisition refusal from a commit conflict after full rollback and cleanup.',
+            zh: '区分原生获取拒绝与已完整回滚清理后的提交冲突。'
+          },
+          values: {
+            acquire: {
+              en: 'Native acquisition was refused before commit.',
+              zh: '原生获取在提交前被拒绝。'
+            },
+            commit: {
+              en: 'Commit validation conflicted after the attempt ended.',
+              zh: '尝试结束后确认提交验证发生冲突。'
+            }
+          }
         },
         keys: {
           summary: t(
@@ -5637,16 +6202,26 @@ console.log(candidate.name, candidate.output)`
         },
         ...operationMembers,
         admission: {
-          summary: t(
-            'Try first; wait only after an acquire conflict decision.',
-            '先 try，仅 acquire 冲突决策后 wait。'
-          )
+          summary: {
+            en: 'Try immediately first; waiting is admitted only after an acquisition-conflict decision.',
+            zh: '首次立即尝试，仅获取冲突决策允许后才进入等待准入。'
+          },
+          values: {
+            try: {
+              en: 'Attempt native admission without logical waiting.',
+              zh: '不进行逻辑等待，直接尝试原生准入。'
+            },
+            wait: {
+              en: 'Wait under the same original operation deadline.',
+              zh: '在同一原操作期限内等待准入。'
+            }
+          }
         },
         locking: {
-          summary: t(
-            'The authentic effective policy locking mode.',
-            '真实生效策略的 locking 模式。'
-          )
+          summary: {
+            en: 'Effective original pessimistic or optimistic policy mode.',
+            zh: '当前实际生效的原悲观或乐观并发策略模式。'
+          }
         },
         waitTimeoutMs: {
           summary: t(
@@ -5655,16 +6230,48 @@ console.log(candidate.name, candidate.output)`
           )
         },
         wait: {
-          summary: t(
-            'Wait for logical admission, counting only its blocking interval.',
-            '等待逻辑准入，仅统计阻塞区间。'
-          )
+          summary: {
+            en: 'Wait for logical admission and account only actual logical blocking.',
+            zh: '等待逻辑准入，并仅累计实际逻辑阻塞时间。'
+          },
+          params: {
+            pendingAdmission: {
+              en: 'Original native admission Promise supplied by the backend attempt owner.',
+              zh: '后端尝试拥有者提供的原生准入结果。'
+            }
+          },
+          returns: {
+            en: 'The original admission value; timeout or cancellation remains owned by the one outer budget.',
+            zh: '返回原准入值，超时与取消仍由唯一外层预算拥有。'
+          }
         },
         waitPhysical: {
-          summary: t(
-            'Wait for physical admission under the original operation deadline; expiry is LOCK_TIMEOUT.',
-            '在原操作期限内等待物理准入，到期为 LOCK_TIMEOUT。'
-          )
+          summary: {
+            en: 'Wait for native physical admission under the unchanged original operation deadline.',
+            zh: '在未改变的原操作期限内等待原生物理准入。'
+          },
+          params: {
+            pendingAdmission: {
+              en: 'Original native admission Promise supplied by the backend attempt owner.',
+              zh: '后端尝试拥有者提供的原生准入结果。'
+            }
+          },
+          returns: {
+            en: 'The original admission value; timeout or cancellation remains owned by the one outer budget.',
+            zh: '返回原准入值，超时与取消仍由唯一外层预算拥有。'
+          }
+        },
+        lock: {
+          summary: {
+            en: 'Canonical identities captured once by the original transaction-options owner.',
+            zh: '由原事务选项拥有者捕获一次的规范锁身份集合。'
+          }
+        },
+        concurrency: {
+          summary: {
+            en: 'Original authentic policy inherited without changing the enclosing operation budget.',
+            zh: '继承的原始真实策略，不改变外层操作预算。'
+          }
         }
       }
     },
@@ -5675,10 +6282,20 @@ console.log(candidate.name, candidate.output)`
       ),
       members: {
         attempt: {
-          summary: t(
-            'Settle only after real native commit/rollback and cleanup; never treat a signal as release.',
-            '仅在真实原生提交/回滚和清理后结算；signal 不等于释放。'
-          )
+          summary: {
+            en: 'Run one native attempt through complete commit or rollback and resource cleanup.',
+            zh: '执行单次原生尝试，直到完整提交或回滚及资源清理。'
+          },
+          params: {
+            context: {
+              en: 'Captured authentic attempt intent, lock identities and original operation budget.',
+              zh: '已捕获的真实尝试意图、锁身份与原操作预算。'
+            }
+          },
+          returns: {
+            en: 'Committed value or a completed conflict; a signal alone never means native resources are released.',
+            zh: '返回已提交值或已结束冲突，信号本身不表示原生资源已释放。'
+          }
         }
       }
     },
@@ -5747,10 +6364,20 @@ console.log(candidate.name, candidate.output)`
       ),
       members: {
         phase: {
-          summary: t(
-            'Acquire or commit conflict; commit cannot decide wait.',
-            'acquire 或 commit 冲突；commit 不能决定 wait。'
-          )
+          summary: {
+            en: 'Distinguish native acquisition refusal from a commit conflict after full rollback and cleanup.',
+            zh: '区分原生获取拒绝与已完整回滚清理后的提交冲突。'
+          },
+          values: {
+            acquire: {
+              en: 'Native acquisition was refused before commit.',
+              zh: '原生获取在提交前被拒绝。'
+            },
+            commit: {
+              en: 'Commit validation conflicted after the attempt ended.',
+              zh: '尝试结束后确认提交验证发生冲突。'
+            }
+          }
         },
         keys: {
           summary: t(
@@ -5774,8 +6401,10 @@ console.log(candidate.name, candidate.output)`
           )
         },
         signal: {
-          summary: t('Optional original composed cancellation signal.', '可选原组合取消信号。'),
-          default: t('Omitted when no signal is provided.', '未提供信号时省略。')
+          summary: {
+            en: 'Original optional operation signal observed by the canonical conflict decision.',
+            zh: '规范冲突决策所观察到的原可选操作取消信号。'
+          }
         }
       }
     },
@@ -5785,7 +6414,12 @@ console.log(candidate.name, candidate.output)`
         '一份可检查的锁身份和租约状态；到期不证明进程已死。'
       ),
       members: {
-        key: { summary: t('Independent normalized lock identity.', '独立规范锁身份。') },
+        key: {
+          summary: {
+            en: 'Canonical channel-specific key returned by the original native inspection owner.',
+            zh: '由原生检查拥有者返回的规范通道锁键。'
+          }
+        },
         holder: {
           summary: t(
             'Last known real holder or permitted remote handoff.',
@@ -5802,7 +6436,15 @@ console.log(candidate.name, candidate.output)`
           ),
           default: t('Omitted for non-lease locks.', '非租约锁省略。')
         }
-      }
+      },
+      scenarios: [
+        {
+          en: 'Display native lock inspection without treating expiry as proof that a remote process died.',
+          zh: '展示原生锁检查，不将租期过期当作远端进程死亡证据。'
+        }
+      ],
+      example:
+        "import type { ILockHolding } from '@migaia/storage-contract'\nexport function describe(holding: ILockHolding) {\n  console.log(holding.key, holding.expired, holding.expiresAt)\n}"
     },
     ITransactionInfo: {
       summary: t(
@@ -5823,14 +6465,159 @@ console.log(candidate.name, candidate.output)`
           ),
           values: { enum: 'TransactionActivityMode' }
         }
-      }
+      },
+      scenarios: [
+        {
+          en: 'Read the transaction identity supplied by the original admitted scope owner.',
+          zh: '读取原准入作用域拥有者给出的事务身份。'
+        }
+      ],
+      example:
+        "import type { ITransactionInfo } from '@migaia/storage-contract'\nexport function inspect(info: ITransactionInfo) { console.log(info.id, info.activityMode) }"
     },
     ITransactionKeyValueApi: {
       summary: t(
         'Standard transaction text API bound to one original owner, without root operation contexts.',
         '绑定原拥有者的标准事务文本 API，不接受根操作上下文。'
       ),
-      members: {}
+      members: {
+        get: {
+          summary: {
+            en: 'Read the current transaction text draft and its original native snapshot.',
+            zh: '读取当前事务的文本草稿与原生快照，能看到本作用域写入。'
+          },
+          params: {
+            key: {
+              en: 'Application-assigned logical key, or the key returned by the same original backend.',
+              zh: '应用指定的逻辑键，或同一原始后端返回的键。'
+            }
+          },
+          returns: {
+            en: 'Stored text or null for absence, without leaving the authentic transaction scope.',
+            zh: '返回已存文本，不存在时为空，不离开真实事务作用域。'
+          }
+        },
+        set: {
+          summary: {
+            en: 'Stage one text value in the original transaction draft.',
+            zh: '在原事务草稿中暂存单个文本值，随原生终点提交。'
+          },
+          params: {
+            key: {
+              en: 'Application-assigned logical key, or the key returned by the same original backend.',
+              zh: '应用指定的逻辑键，或同一原始后端返回的键。'
+            },
+            value: {
+              en: 'Application text payload, encoded before entering this channel when necessary.',
+              zh: '应用文本载荷，需要时应在进入此通道前完成编码。'
+            },
+            options: {
+              en: 'Optional original conflict policy; execution context is inherited from the transaction.',
+              zh: '可选原冲突策略，执行上下文继承所属事务。'
+            }
+          },
+          returns: {
+            en: 'The draft accepts the write; durability is confirmed only by the outer commit.',
+            zh: '草稿接受写入，仅外层提交才能确认持久化。'
+          }
+        },
+        remove: {
+          summary: {
+            en: 'Stage removal of one text identity in this original transaction.',
+            zh: '在当前原事务中暂存单个文本身份的删除。'
+          },
+          params: {
+            key: {
+              en: 'Application-assigned logical key, or the key returned by the same original backend.',
+              zh: '应用指定的逻辑键，或同一原始后端返回的键。'
+            }
+          },
+          returns: {
+            en: 'The draft accepts deletion; removing an absent entry is a no-op.',
+            zh: '草稿接受删除，不存在的条目不产生修改。'
+          }
+        },
+        has: {
+          summary: {
+            en: 'Check visible text membership in the current authentic transaction draft.',
+            zh: '检查当前真实事务草稿中可见的文本成员关系。'
+          },
+          params: {
+            key: {
+              en: 'Application-assigned logical key, or the key returned by the same original backend.',
+              zh: '应用指定的逻辑键，或同一原始后端返回的键。'
+            }
+          },
+          returns: {
+            en: 'True when the draft currently exposes an unexpired text value.',
+            zh: '当前草稿存在未过期文本值时返回真值。'
+          }
+        },
+        getMany: {
+          summary: {
+            en: 'Read one original transaction text snapshot in caller order, including duplicate positions.',
+            zh: '按调用方顺序读取原事务文本快照，并保留重复位置。'
+          },
+          params: {
+            keys: {
+              en: 'Logical text keys captured before the shared batch is read.',
+              zh: '共享批量读取前捕获的逻辑文本键集合。'
+            }
+          },
+          returns: {
+            en: 'Same-length values with undefined for missing entries; partial decode success is not returned.',
+            zh: '返回同长度值数组，缺失为未定义，不返回部分解码成功。'
+          }
+        },
+        setMany: {
+          summary: {
+            en: 'Stage a validated text batch inside the same original transaction draft.',
+            zh: '在同一原事务草稿内暂存完整校验后的文本批量。'
+          },
+          params: {
+            entries: {
+              en: 'Dense key/value entries with optional TTL; duplicate canonical identities reject before mutation.',
+              zh: '稠密键值条目与可选期限，规范重复身份在修改前拒绝。'
+            }
+          },
+          returns: {
+            en: 'All accepted entries join the original commit or rollback together.',
+            zh: '全部已接受条目共同加入原提交或回滚。'
+          }
+        },
+        removeMany: {
+          summary: {
+            en: 'Stage deletion of distinct canonical text identities in the same transaction.',
+            zh: '在同一事务中暂存去重后的规范文本身份删除。'
+          },
+          params: {
+            keys: {
+              en: 'Logical text keys; equivalent duplicates are accepted only once for counting.',
+              zh: '逻辑文本键，等价重复项仅参与一次删除计数。'
+            }
+          },
+          returns: {
+            en: 'Number of actual draft removals; final durability still follows outer commit.',
+            zh: '返回草稿实际删除数，最终持久化仍随外层提交。'
+          }
+        },
+        removeByPrefix: {
+          summary: {
+            en: 'Remove matching text entries from the current native and draft key range.',
+            zh: '从当前原生与草稿键范围中删除匹配的文本条目。'
+          },
+          params: {
+            prefix: {
+              en: 'Canonical typed prefix in the existing ordered logical-key domain.',
+              zh: '既有保序逻辑键域中的规范类型化前缀。'
+            }
+          },
+          returns: {
+            en: 'Actual accepted draft deletion count, without scanning unrelated channels.',
+            zh: '返回草稿实际接受删除数，不扫描无关通道。'
+          }
+        }
+      }
     },
     ITransactionalCapability: {
       summary: t(
@@ -5853,18 +6640,26 @@ console.log(candidate.name, candidate.output)`
       ),
       members: {
         dispose: {
-          summary: t(
-            'Return the cached main Promise of one actual cleanup; failures reject with the original error reachable.',
-            '返回同一次真实清理的缓存主 Promise，失败拒绝并保留可达原错。'
-          ),
-          example: `await resource.dispose()`
+          summary: {
+            en: 'Release accepted work and original native resources without acquiring any new close authority.',
+            zh: '排空已接受工作并释放原生资源，不获取新的关闭权限。'
+          },
+          params: {},
+          returns: {
+            en: 'The original cached main cleanup Promise; native cleanup failure rejects with its original reachable cause.',
+            zh: '返回原缓存主清理结果，原生清理失败以可追踪的原始原因拒绝。'
+          }
         },
         '[Symbol.asyncDispose]': {
-          summary: t(
-            'Return a separately cached report-only Promise; failed cleanup is reported once and this entry resolves.',
-            '返回独立缓存的只报告 Promise；清理失败报告一次，本入口完成。'
-          ),
-          example: `await resource[Symbol.asyncDispose]()`
+          summary: {
+            en: 'Use the original asynchronous resource-disposal protocol after accepted work drains.',
+            zh: '在已接受工作排空后使用原异步资源释放协议。'
+          },
+          params: {},
+          returns: {
+            en: 'The separately cached symbolic Promise reports cleanup failure and resolves, without replacing the main cleanup Promise.',
+            zh: '单独缓存的符号清理报告失败后完成，不替换主清理结果。'
+          }
         }
       }
     },
@@ -5873,21 +6668,152 @@ console.log(candidate.name, candidate.output)`
         'Asynchronous iterator and owned cleanup resource.',
         '异步迭代器及其自有清理资源。'
       ),
-      members: {}
+      members: {
+        dispose: {
+          summary: {
+            en: 'Release accepted work and original native resources without acquiring any new close authority.',
+            zh: '排空已接受工作并释放原生资源，不获取新的关闭权限。'
+          },
+          params: {},
+          returns: {
+            en: 'The original cached main cleanup Promise; native cleanup failure rejects with its original reachable cause.',
+            zh: '返回原缓存主清理结果，原生清理失败以可追踪的原始原因拒绝。'
+          },
+          example:
+            "import type { IStorageIterator } from '@migaia/storage-contract'\nexport async function consume(stream: IStorageIterator<string>) {\n  await using resource = stream\n  for await (const value of resource) console.log(value)\n}"
+        },
+        '[Symbol.asyncDispose]': {
+          summary: {
+            en: 'Use the original asynchronous resource-disposal protocol after accepted work drains.',
+            zh: '在已接受工作排空后使用原异步资源释放协议。'
+          },
+          params: {},
+          returns: {
+            en: 'The separately cached symbolic Promise reports cleanup failure and resolves, without replacing the main cleanup Promise.',
+            zh: '单独缓存的符号清理报告失败后完成，不替换主清理结果。'
+          },
+          example:
+            "import type { IStorageIterator } from '@migaia/storage-contract'\nexport async function consume(stream: IStorageIterator<string>) {\n  await using resource = stream\n  for await (const value of resource) console.log(value)\n}"
+        }
+      },
+      scenarios: [
+        {
+          en: 'Drain native asynchronous entries and release the same original iterator resource.',
+          zh: '排空原生异步条目并释放同一原迭代资源。'
+        }
+      ],
+      example:
+        "import type { IStorageIterator } from '@migaia/storage-contract'\nexport async function consume(stream: IStorageIterator<string>) {\n  await using resource = stream\n  for await (const value of resource) console.log(value)\n}"
     },
     IStorageIteratorLifetime: {
       summary: t(
         'Original backend-author advance and cleanup functions. It supplies no admission check or transaction authority; native callers retain those responsibilities.',
         '原后端作者推进和清理函数，不提供准入检查或事务权限；这些职责仍由原生调用方持有。'
       ),
-      members: {}
+      members: {
+        isClosing: {
+          summary: {
+            en: 'Read whether the original cached main cleanup has stopped accepting new work.',
+            zh: '读取原缓存主清理是否已经停止接受新工作。'
+          }
+        },
+        advance: {
+          summary: {
+            en: 'Track one accepted native iterator advance until settlement before cleanup can release resources.',
+            zh: '追踪单次已接受的原生迭代推进，结算后清理才可释放资源。'
+          }
+        },
+        dispose: {
+          summary: {
+            en: 'Return the cached main cleanup Promise that drains accepted advances before native close.',
+            zh: '返回缓存主清理结果，在原生关闭前排空已接受推进。'
+          }
+        },
+        returned: {
+          summary: {
+            en: 'Return the cached iterator-return result after the same original cleanup has settled.',
+            zh: '同一原清理结算后返回缓存的迭代退出结果。'
+          }
+        },
+        symbolic: {
+          summary: {
+            en: 'Use the separately cached symbolic cleanup Promise, reporting failures without rejecting disposal.',
+            zh: '使用单独缓存的符号清理结果，报告失败但不拒绝符号释放。'
+          }
+        }
+      },
+      example:
+        "import { createStorageIteratorLifetime } from '@migaia/storage-contract'\nconst life = createStorageIteratorLifetime<string>({ close: async () => undefined, report: error => console.error(error) })\nconsole.log(await life.advance(async () => ({ done: false, value: 'ready' })))\nawait life.dispose()",
+      scenarios: [
+        {
+          en: 'Backend authors drain accepted iterator work before releasing an existing native cursor.',
+          zh: '后端作者在释放既有原生游标前，排空已接受的迭代工作。'
+        }
+      ]
     },
     IStorageBaseAdmission: {
       summary: t(
         'Non-owning single-read base admission retains the original object, disposer receiver and exact reflection failure.',
         '不取得所有权的单读基础准入，保留原对象、释放接收者和精确反射失败。'
       ),
-      members: {}
+      members: {
+        valid: {
+          summary: {
+            en: 'Discriminates complete admitted storage facts from a captured admission failure.',
+            zh: '区分完整准入的存储事实与已捕获的准入失败。'
+          }
+        },
+        store: {
+          summary: {
+            en: 'Exact original accepted base object, retaining its receiver and hidden members.',
+            zh: '精确的原准入基础对象，保留接收者与隐藏成员。'
+          }
+        },
+        backend: {
+          summary: {
+            en: 'Captured valid backend label without constructing a different backend.',
+            zh: '捕获的合法后端标签，不创建其它后端实例。'
+          }
+        },
+        capabilities: {
+          summary: {
+            en: 'Detached capability facts captured once from the original base.',
+            zh: '从原基础对象捕获一次的独立能力事实。'
+          }
+        },
+        dispose: {
+          summary: {
+            en: 'Original explicit cleanup function captured without invoking it.',
+            zh: '不调用清理动作，仅捕获原显式清理函数。'
+          }
+        },
+        receiver: {
+          summary: {
+            en: 'Exact original receiver required by the captured cleanup methods.',
+            zh: '已捕获清理方法所需的精确原始接收者。'
+          }
+        },
+        asyncDispose: {
+          summary: {
+            en: 'Original symbolic cleanup function captured for the same base lifetime.',
+            zh: '为同一基础对象生命周期捕获的原符号清理函数。'
+          }
+        },
+        cause: {
+          summary: {
+            en: 'Original reflection or accessor failure retained on rejected admission.',
+            zh: '准入拒绝时保留的原反射或访问器失败原因。'
+          }
+        }
+      },
+      scenarios: [
+        {
+          en: 'Inspect unknown storage input without executing its operations or invoking its disposer.',
+          zh: '检查未知存储输入，不执行操作或调用其释放器。'
+        }
+      ],
+      example:
+        "import { snapshotStorageBaseDetailed } from '@migaia/storage-contract'\nexport function inspect(value: unknown) {\n  const admission = snapshotStorageBaseDetailed(value)\n  if (admission.valid) console.log(admission.backend)\n}"
     },
     IBackendStageBindings: {
       summary: t(
@@ -5902,15 +6828,16 @@ console.log(candidate.name, candidate.output)`
           )
         },
         operationStages: {
-          summary: t('Bind ordinary operations to the original store.', '把普通操作绑定原 store。'),
-          example: `const operations = bindings.operationStages(store)`
+          summary: {
+            en: 'Original public operation observer bindings, kept separate from native source execution.',
+            zh: '原公开操作观察绑定，与原生来源执行保持独立。'
+          }
         },
         codecStages: {
-          summary: t(
-            'Bind codec observations to the original store.',
-            '把 codec 观察绑定原 store。'
-          ),
-          example: `const codecs = bindings.codecStages(store)`
+          summary: {
+            en: 'Original encode/decode observer bindings owned by the selected codec.',
+            zh: '由所选编解码器拥有的原编码与解码观察绑定。'
+          }
         },
         transactionStages: {
           summary: t(
@@ -5927,11 +6854,10 @@ console.log(candidate.name, candidate.output)`
           example: `const locks = bindings.concurrencyStages(store)`
         },
         sqlStages: {
-          summary: t(
-            'Bind SQL count observations to the original store.',
-            '把 SQL 计数观察绑定原 store。'
-          ),
-          example: `const sql = bindings.sqlStages(store)`
+          summary: {
+            en: 'Original native SQL observer bindings on the same compiled statement path.',
+            zh: '同一已编译语句路径上的原生查询观察绑定。'
+          }
         },
         queryStages: {
           summary: t(
@@ -5943,26 +6869,291 @@ console.log(candidate.name, candidate.output)`
       }
     },
     IBackendStageObserver: {
-      summary: t('Observe backend installation and disposal.', '观察后端安装与释放。'),
-      members: {}
+      summary: {
+        en: 'Observation-only construction, publication and disposal callbacks using the original host registry.',
+        zh: '使用原宿主登记表观察构造、发布与释放阶段的只读回调集合。'
+      },
+      members: {
+        kind: {
+          summary: {
+            en: 'Backend stage discriminator retained by the original host observer registry.',
+            zh: '原宿主观察者登记表保留的后端阶段区分字段。'
+          },
+          values: {
+            enum: 'StorageStageKind'
+          }
+        },
+        beforeBackendCreate: {
+          summary: {
+            en: 'Observe the original native backend before construction begins.',
+            zh: '在原生后端开始构造之前观察原始构造阶段。'
+          }
+        },
+        afterBackendCreate: {
+          summary: {
+            en: 'Observe the created native backend before public installation completes.',
+            zh: '公开安装完成前观察已经创建的原生后端。'
+          }
+        },
+        onBackendRejected: {
+          summary: {
+            en: 'Observe original backend construction or admission rejection without replacing its cause.',
+            zh: '观察原后端构造或准入拒绝，不替换原始错误原因。'
+          }
+        },
+        afterBackendInstall: {
+          summary: {
+            en: 'Observe successful public backend publication in the original install window.',
+            zh: '在原安装窗口观察后端成功完成公开发布。'
+          }
+        },
+        onBackendDisposeStart: {
+          summary: {
+            en: 'Observe the original backend entering disposal before accepted work drains.',
+            zh: '在已接受工作排空前观察原后端开始进入释放。'
+          }
+        },
+        afterBackendDispose: {
+          summary: {
+            en: 'Observe native resource cleanup after the original backend disposal settles.',
+            zh: '原后端释放结算后观察原生资源清理结果。'
+          }
+        },
+        report: {
+          summary: {
+            en: 'Report observer failures through the original owner without replacing the primary operation result.',
+            zh: '经原拥有者报告观察者失败，不替换首要操作结果。'
+          }
+        }
+      }
     },
     IStorageOperationStageObserver: {
       summary: t(
         'Observe store operations bound to original transaction views.',
         '观察绑定原事务视图的存储操作。'
       ),
-      members: {}
+      members: {
+        kind: {
+          summary: {
+            en: 'Storage operation stage discriminator retained by the original operation owner.',
+            zh: '原操作拥有者保留的存储操作阶段区分字段。'
+          },
+          values: {
+            enum: 'StorageStageKind'
+          }
+        },
+        forTransaction: {
+          summary: {
+            en: 'Bind operation observations to the authentic current transaction view.',
+            zh: '将操作观察绑定到真实当前事务视图。'
+          }
+        },
+        beforeStorageOperation: {
+          summary: {
+            en: 'Observe one admitted public storage endpoint before native work begins.',
+            zh: '原生工作开始前观察单个已准入公开存储终点。'
+          }
+        },
+        afterStorageOperation: {
+          summary: {
+            en: 'Observe completed public work once after the original accepted endpoint settles.',
+            zh: '原已接受终点结算后观察一次完成的公开工作。'
+          }
+        },
+        onStorageOperationError: {
+          summary: {
+            en: 'Observe original operation failure without replacing its primary native cause.',
+            zh: '观察原操作失败，不替换首要原生错误原因。'
+          }
+        },
+        onStorageIterationClose: {
+          summary: {
+            en: 'Observe original iterator closure after its accepted native advances drain.',
+            zh: '已接受原生推进排空后观察原迭代器关闭。'
+          }
+        },
+        report: {
+          summary: {
+            en: 'Report observer failures through the original owner without replacing the primary operation result.',
+            zh: '经原拥有者报告观察者失败，不替换首要操作结果。'
+          }
+        }
+      }
     },
     ITransactionStageObserver: {
       summary: t(
         'Observe original transaction operations, commit and cleanup.',
         '观察原事务操作、提交与清理。'
       ),
-      members: {}
+      members: {
+        kind: {
+          summary: {
+            en: 'Transaction stage discriminator belonging to the original native transaction owner.',
+            zh: '原生事务拥有者所属的事务阶段区分字段。'
+          },
+          values: {
+            enum: 'StorageStageKind'
+          }
+        },
+        forTransaction: {
+          summary: {
+            en: 'Bind observer callbacks to this same authentic native scope.',
+            zh: '将观察回调绑定到同一真实原生事务作用域。'
+          }
+        },
+        beforeTransaction: {
+          summary: {
+            en: 'Observe the captured original transaction intent before native admission.',
+            zh: '原生准入前观察已捕获的原事务意图。'
+          }
+        },
+        onTransactionStart: {
+          summary: {
+            en: 'Observe the actual admitted native attempt after original scope creation.',
+            zh: '原作用域创建后观察实际准入的原生尝试。'
+          }
+        },
+        beforeTxOperation: {
+          summary: {
+            en: 'Observe an admitted operation before it changes the original transaction draft.',
+            zh: '改变原事务草稿前观察已经准入的单个操作。'
+          }
+        },
+        afterTxOperation: {
+          summary: {
+            en: 'Observe original transaction-operation settlement without committing early.',
+            zh: '观察原事务操作结算，不提前提交事务。'
+          }
+        },
+        beforeCommit: {
+          summary: {
+            en: 'Observe final original draft validation before the native commit is issued.',
+            zh: '发出原生提交前观察原草稿的最终验证。'
+          }
+        },
+        afterCommit: {
+          summary: {
+            en: 'Observe confirmed native commit after the original commit evidence is available.',
+            zh: '取得原提交证据后观察已确认的原生提交。'
+          }
+        },
+        afterRollback: {
+          summary: {
+            en: 'Observe completed original rollback while preserving the primary transaction failure.',
+            zh: '观察已完成原回滚，并保留首要事务失败。'
+          }
+        },
+        onTransactionClose: {
+          summary: {
+            en: 'Observe original scope closure after native work and accepted resources settle.',
+            zh: '原生工作与已接受资源结算后观察原作用域关闭。'
+          }
+        },
+        beforePersistFlush: {
+          summary: {
+            en: 'Observe original persistence flushing within the same transaction scope.',
+            zh: '在同一事务作用域内观察原持久化刷新开始。'
+          }
+        },
+        afterPersistFlush: {
+          summary: {
+            en: 'Observe completed original persistence flush without adding another transaction.',
+            zh: '观察原持久化刷新完成，不创建第二事务。'
+          }
+        },
+        report: {
+          summary: {
+            en: 'Report observer failures through the original owner without replacing the primary operation result.',
+            zh: '经原拥有者报告观察者失败，不替换首要操作结果。'
+          }
+        }
+      }
     },
     IConcurrencyStageObserver: {
       summary: t('Observe canonical lock and concurrency decisions.', '观察规范锁与并发决策。'),
-      members: {}
+      members: {
+        kind: {
+          summary: {
+            en: 'Concurrency stage discriminator belonging to the original policy-loop observer.',
+            zh: '原策略循环观察者所属的并发阶段区分字段。'
+          },
+          values: {
+            enum: 'StorageStageKind'
+          }
+        },
+        beforeLockAcquire: {
+          summary: {
+            en: 'Observe original policy name and canonical lock count before native acquisition.',
+            zh: '原生获取前观察原策略名称与规范锁数量。'
+          }
+        },
+        onLockAcquired: {
+          summary: {
+            en: 'Observe actual native acquisition and its original attempt number.',
+            zh: '观察实际原生获取成功及其原尝试编号。'
+          }
+        },
+        onLockConflict: {
+          summary: {
+            en: 'Observe acquisition or completed-rollback conflicts with detached key and holder facts.',
+            zh: '观察获取或完整回滚后的冲突，以及独立键和持有者事实。'
+          }
+        },
+        onLockWait: {
+          summary: {
+            en: 'Observe actual accumulated logical waiting in the original admission budget.',
+            zh: '观察原准入预算中实际累计的逻辑等待时间。'
+          }
+        },
+        onConcurrencyDecision: {
+          summary: {
+            en: 'Observe the authentic policy decision without authorizing another retry loop.',
+            zh: '观察真实策略决策，不授予其它重试循环权限。'
+          }
+        },
+        onRetry: {
+          summary: {
+            en: 'Observe original retry count, bounded delay and physical or write-conflict reason.',
+            zh: '观察原重试计数、有界延迟以及物理或写冲突原因。'
+          }
+        },
+        onLockReleased: {
+          summary: {
+            en: 'Observe final native lock release after the attempt owner has settled.',
+            zh: '尝试拥有者结算后观察最终原生锁释放。'
+          }
+        },
+        onLockLost: {
+          summary: {
+            en: 'Observe genuine native ownership loss without treating it as a successful unlock.',
+            zh: '观察真实原生拥有权丢失，不将其当作成功解锁。'
+          }
+        },
+        beforeLockInspect: {
+          summary: {
+            en: 'Observe the original lock inspection before the native read starts.',
+            zh: '在原生读取开始前观察原锁检查阶段。'
+          }
+        },
+        afterLockInspect: {
+          summary: {
+            en: 'Observe actual native inspection count without copying business payloads.',
+            zh: '观察真实原生检查数量，不复制业务数据载荷。'
+          }
+        },
+        onLockInspectError: {
+          summary: {
+            en: 'Observe original inspection error code while retaining its native error owner.',
+            zh: '观察原检查错误码，并保留其原生错误拥有者。'
+          }
+        },
+        report: {
+          summary: {
+            en: 'Report observer failures through the original owner without replacing the primary operation result.',
+            zh: '经原拥有者报告观察者失败，不替换首要操作结果。'
+          }
+        }
+      }
     },
     IStorageKeyPrefix: {
       summary: t(
@@ -5977,7 +7168,10 @@ console.log(candidate.name, candidate.output)`
           )
         },
         lower: {
-          summary: t('Inclusive typed encoded prefix bytes.', '包含端 typed 编码前缀字节。')
+          summary: {
+            en: 'Inclusive encoded lower bound from the original canonical ordered-key codec.',
+            zh: '原规范保序键编解码器返回的包含式编码下界。'
+          }
         },
         upper: {
           summary: t(
@@ -5986,12 +7180,32 @@ console.log(candidate.name, candidate.output)`
           )
         },
         matches: {
-          summary: t(
-            'Validate and encode one candidate through the same owner, using the captured private prefix.',
-            '通过同一 owner 验证与编码一个候选，并使用捕获的私有前缀判定。'
-          )
+          summary: {
+            en: 'Compare one logical key against this already captured canonical typed prefix.',
+            zh: '将单个逻辑键与已捕获的规范类型化前缀比较。'
+          },
+          params: {
+            key: {
+              en: 'Logical key supplied by the application or returned by its backend.',
+              zh: '由应用提供或其后端返回的逻辑键。'
+            }
+          },
+          returns: {
+            en: 'True only when the original key-prefix semantics match.',
+            zh: '仅符合原键前缀语义时返回真值。'
+          },
+          example:
+            "import { snapshotStorageKeyPrefix } from '@migaia/storage-contract'\nconst prefix = snapshotStorageKeyPrefix(['users'], undefined)\nconsole.log(prefix.matches(['users', 1]))"
         }
-      }
+      },
+      scenarios: [
+        {
+          en: 'Share one canonical prefix boundary between ordered native ranges and logical matching.',
+          zh: '在原生保序范围与逻辑匹配之间共用单个规范前缀边界。'
+        }
+      ],
+      example:
+        "import { snapshotStorageKeyPrefix } from '@migaia/storage-contract'\nconst prefix = snapshotStorageKeyPrefix(['users'], undefined)\nconsole.log(prefix.matches(['users', 1]))"
     },
     ITransactionCapabilityView: {
       summary: t(
@@ -6000,10 +7214,20 @@ console.log(candidate.name, candidate.output)`
       ),
       members: {
         use: {
-          summary: t(
-            'Accept only admitted finite transaction tokens and preserve record value inference.',
-            '仅接受已接纳有限事务 token，保留记录值推断。'
-          )
+          summary: {
+            en: 'Borrow the standard API projected by the same authentic transaction scope.',
+            zh: '借用同一真实事务作用域投影的标准能力接口。'
+          },
+          params: {
+            capability: {
+              en: 'Original transactional token whose owner implements this projection.',
+              zh: '由原拥有者实现事务投影的原始能力令牌。'
+            }
+          },
+          returns: {
+            en: 'The current draft-bound API, without new ownership or a second transaction.',
+            zh: '返回绑定当前草稿的接口，不创建新的拥有权或第二事务。'
+          }
         }
       }
     },
@@ -6014,13 +7238,31 @@ console.log(candidate.name, candidate.output)`
       ),
       members: {
         query: {
-          summary: t(
-            'Actual shared IQueryChain with undefined context and the original iterator owner.',
-            '使用 undefined context 与原 iterator owner 的真实共用 IQueryChain。'
-          )
+          summary: {
+            en: 'Build the shared record query against this authentic transaction draft.',
+            zh: '在此真实事务草稿上创建共享记录查询链。'
+          },
+          params: {},
+          returns: {
+            en: 'A draft-bound query whose accepted writes settle with the original outer transaction.',
+            zh: '返回绑定草稿的查询，写入随原外层事务结算。'
+          }
         },
         removeByPrefix: {
-          summary: t('Actual native transaction deletion count.', '原生事务实际删除数。')
+          summary: {
+            en: 'Delete matching record identities from the same native and draft prefix range.',
+            zh: '从同一原生与草稿前缀范围删除匹配记录身份。'
+          },
+          params: {
+            prefix: {
+              en: 'Canonical typed prefix captured before the draft range is read.',
+              zh: '读取草稿范围前捕获的规范类型化前缀。'
+            }
+          },
+          returns: {
+            en: 'Actual accepted draft deletion count, without committing early.',
+            zh: '返回草稿实际接受删除数，不提前提交事务。'
+          }
         }
       }
     },
@@ -6044,7 +7286,12 @@ console.log(candidate.name, candidate.output)`
         '仅共用 changes 计数；后端插入身份须由具体细化提供。'
       ),
       members: {
-        changes: { summary: t('Actual native affected-row count.', '原生实际影响行数。') }
+        changes: {
+          summary: {
+            en: 'Native number of rows changed by the executed statement, without a client-side recount.',
+            zh: '已执行语句的原生影响行数，不在客户端重新计数。'
+          }
+        }
       }
     },
     ISqlFragment: {
@@ -6068,24 +7315,68 @@ console.log(candidate.name, candidate.output)`
       ),
       members: {
         all: {
-          summary: t(
-            'Return the original callback Promise of readonly declared rows.',
-            '返回原回调的 readonly 声明行 Promise。'
-          )
+          summary: {
+            en: 'Read every native row from the compiled parameterized SQL query.',
+            zh: '从已编译参数化查询中读取全部原生结果行。'
+          },
+          params: {
+            ctx: {
+              en: 'Original optional operation context carrying one captured cancellation and timeout budget.',
+              zh: '原可选操作上下文，承载单次捕获的取消与超时预算。'
+            }
+          },
+          returns: {
+            en: 'An ordered native row array using the backend scalar domain.',
+            zh: '返回按原生顺序排列的数据行数组。'
+          },
+          example:
+            "import type { ISqlTag } from '@migaia/storage-contract'\nexport async function read(sql: ISqlTag) {\n  const table = sql.id('notes')\n  const fields = sql.join([sql.id('id')], sql.empty)\n  const query = sql`SELECT ${fields} FROM ${table} WHERE id = ${1}`\n  console.log(await query.all(), await query.get())\n  await query.run()\n}"
         },
         get: {
-          summary: t(
-            'Return the original callback Promise of a row or undefined.',
-            '返回原回调的行或 undefined Promise。'
-          )
+          summary: {
+            en: 'Read the first native row without inventing an empty-row object.',
+            zh: '读取原生首行，不在空结果时虚构数据行对象。'
+          },
+          params: {
+            ctx: {
+              en: 'Original optional operation context carrying one captured cancellation and timeout budget.',
+              zh: '原可选操作上下文，承载单次捕获的取消与超时预算。'
+            }
+          },
+          returns: {
+            en: 'The first native row, or undefined when the result is empty.',
+            zh: '返回首个原生数据行，空结果时为未定义。'
+          },
+          example:
+            "import type { ISqlTag } from '@migaia/storage-contract'\nexport async function read(sql: ISqlTag) {\n  const table = sql.id('notes')\n  const fields = sql.join([sql.id('id')], sql.empty)\n  const query = sql`SELECT ${fields} FROM ${table} WHERE id = ${1}`\n  console.log(await query.all(), await query.get())\n  await query.run()\n}"
         },
         run: {
-          summary: t(
-            'Return the original precise native execution result Promise.',
-            '返回原精确原生执行结果 Promise。'
-          )
+          summary: {
+            en: 'Execute the native compiled statement through its original SQL owner.',
+            zh: '经原查询拥有者执行已编译的原生语句。'
+          },
+          params: {
+            ctx: {
+              en: 'Original optional operation context carrying one captured cancellation and timeout budget.',
+              zh: '原可选操作上下文，承载单次捕获的取消与超时预算。'
+            }
+          },
+          returns: {
+            en: 'The native run result; confirmed row-change counts remain backend-owned.',
+            zh: '返回原生执行结果，确认的行变更数仍归后端拥有。'
+          },
+          example:
+            "import type { ISqlTag } from '@migaia/storage-contract'\nexport async function read(sql: ISqlTag) {\n  const table = sql.id('notes')\n  const fields = sql.join([sql.id('id')], sql.empty)\n  const query = sql`SELECT ${fields} FROM ${table} WHERE id = ${1}`\n  console.log(await query.all(), await query.get())\n  await query.run()\n}"
         }
-      }
+      },
+      example:
+        "import type { ISqlTag } from '@migaia/storage-contract'\nexport async function read(sql: ISqlTag) {\n  const table = sql.id('notes')\n  const fields = sql.join([sql.id('id')], sql.empty)\n  const query = sql`SELECT ${fields} FROM ${table} WHERE id = ${1}`\n  console.log(await query.all(), await query.get())\n  await query.run()\n}",
+      scenarios: [
+        {
+          en: 'Compose parameterized application queries while the concrete SQL backend owns execution and cleanup.',
+          zh: '组合参数化应用查询，由具体数据库后端拥有执行与清理。'
+        }
+      ]
     },
     ISqlTag: {
       summary: t(
@@ -6093,15 +7384,61 @@ console.log(candidate.name, candidate.output)`
         'Typed 后端标签与纯 id/join/empty 工具；TValue 约束原生输出字段，TResult 保留执行结果。'
       ),
       members: {
-        id: { summary: t('Quote each nonempty identifier segment.', '引用各非空标识符段。') },
-        join: {
-          summary: t(
-            'Join authentic child references with an authentic separator.',
-            '用真实分隔片段连接真实子节点引用。'
-          )
+        id: {
+          summary: {
+            en: 'Quote a nonempty identifier path using the original SQL dialect owner.',
+            zh: '由原查询方言拥有者引用非空标识符路径。'
+          },
+          params: {
+            parts: {
+              en: 'Application-assigned table, schema or column name segments, never raw SQL grammar.',
+              zh: '应用指定的表、模式或列名称片段，不是原始查询语法。'
+            }
+          },
+          returns: {
+            en: 'An authentic quoted identifier fragment for this compiler.',
+            zh: '返回此编译器的真实已引用标识符片段。'
+          },
+          example:
+            "import type { ISqlTag } from '@migaia/storage-contract'\nexport async function read(sql: ISqlTag) {\n  const table = sql.id('notes')\n  const fields = sql.join([sql.id('id')], sql.empty)\n  const query = sql`SELECT ${fields} FROM ${table} WHERE id = ${1}`\n  console.log(await query.all(), await query.get())\n  await query.run()\n}"
         },
-        empty: { summary: t('Canonical empty pure fragment.', '规范空纯片段。') }
-      }
+        join: {
+          summary: {
+            en: 'Join authentic SQL fragments without promoting arbitrary values into grammar.',
+            zh: '连接真实查询片段，不将任意数据值提升为语法。'
+          },
+          params: {
+            fragments: {
+              en: 'Authentic fragments returned by the original SQL tag or identifier helper.',
+              zh: '由原查询标签或标识符助手返回的真实片段。'
+            },
+            separator: {
+              en: 'Authentic separator fragment; omission uses the original default separator.',
+              zh: '真实分隔片段，省略时使用原默认分隔符。'
+            }
+          },
+          returns: {
+            en: 'A new authentic joined fragment, retaining parameter order.',
+            zh: '返回新的真实连接片段，并保留参数顺序。'
+          },
+          example:
+            "import type { ISqlTag } from '@migaia/storage-contract'\nexport async function read(sql: ISqlTag) {\n  const table = sql.id('notes')\n  const fields = sql.join([sql.id('id')], sql.empty)\n  const query = sql`SELECT ${fields} FROM ${table} WHERE id = ${1}`\n  console.log(await query.all(), await query.get())\n  await query.run()\n}"
+        },
+        empty: {
+          summary: {
+            en: 'Authentic empty SQL fragment used when a conditional grammar branch contributes no text.',
+            zh: '条件语法分支不贡献正文时使用的真实空查询片段。'
+          }
+        }
+      },
+      example:
+        "import type { ISqlTag } from '@migaia/storage-contract'\nexport async function read(sql: ISqlTag) {\n  const table = sql.id('notes')\n  const fields = sql.join([sql.id('id')], sql.empty)\n  const query = sql`SELECT ${fields} FROM ${table} WHERE id = ${1}`\n  console.log(await query.all(), await query.get())\n  await query.run()\n}",
+      scenarios: [
+        {
+          en: 'Compose parameterized application queries while the concrete SQL backend owns execution and cleanup.',
+          zh: '组合参数化应用查询，由具体数据库后端拥有执行与清理。'
+        }
+      ]
     },
     IStorageSqlQueryTerminals: {
       summary: t(
@@ -6109,9 +7446,60 @@ console.log(candidate.name, candidate.output)`
         '替换 SQL 查询执行且不改变片段身份的有限回调。'
       ),
       members: {
-        all: { summary: t('Return the native row Promise.', '返回原生行 Promise。') },
-        get: { summary: t('Return the native first-row Promise.', '返回原生首行 Promise。') },
-        run: { summary: t('Return the native write-result Promise.', '返回原生写结果 Promise。') }
+        all: {
+          summary: {
+            en: 'Read every native row from the compiled parameterized SQL query.',
+            zh: '从已编译参数化查询中读取全部原生结果行。'
+          },
+          params: {
+            ctx: {
+              en: 'Original optional operation context carrying one captured cancellation and timeout budget.',
+              zh: '原可选操作上下文，承载单次捕获的取消与超时预算。'
+            }
+          },
+          returns: {
+            en: 'An ordered native row array using the backend scalar domain.',
+            zh: '返回按原生顺序排列的数据行数组。'
+          },
+          example:
+            "import type { ISqlTag } from '@migaia/storage-contract'\nexport async function read(sql: ISqlTag) {\n  const table = sql.id('notes')\n  const fields = sql.join([sql.id('id')], sql.empty)\n  const query = sql`SELECT ${fields} FROM ${table} WHERE id = ${1}`\n  console.log(await query.all(), await query.get())\n  await query.run()\n}"
+        },
+        get: {
+          summary: {
+            en: 'Read the first native row without inventing an empty-row object.',
+            zh: '读取原生首行，不在空结果时虚构数据行对象。'
+          },
+          params: {
+            ctx: {
+              en: 'Original optional operation context carrying one captured cancellation and timeout budget.',
+              zh: '原可选操作上下文，承载单次捕获的取消与超时预算。'
+            }
+          },
+          returns: {
+            en: 'The first native row, or undefined when the result is empty.',
+            zh: '返回首个原生数据行，空结果时为未定义。'
+          },
+          example:
+            "import type { ISqlTag } from '@migaia/storage-contract'\nexport async function read(sql: ISqlTag) {\n  const table = sql.id('notes')\n  const fields = sql.join([sql.id('id')], sql.empty)\n  const query = sql`SELECT ${fields} FROM ${table} WHERE id = ${1}`\n  console.log(await query.all(), await query.get())\n  await query.run()\n}"
+        },
+        run: {
+          summary: {
+            en: 'Execute the native compiled statement through its original SQL owner.',
+            zh: '经原查询拥有者执行已编译的原生语句。'
+          },
+          params: {
+            ctx: {
+              en: 'Original optional operation context carrying one captured cancellation and timeout budget.',
+              zh: '原可选操作上下文，承载单次捕获的取消与超时预算。'
+            }
+          },
+          returns: {
+            en: 'The native run result; confirmed row-change counts remain backend-owned.',
+            zh: '返回原生执行结果，确认的行变更数仍归后端拥有。'
+          },
+          example:
+            "import type { ISqlTag } from '@migaia/storage-contract'\nexport async function read(sql: ISqlTag) {\n  const table = sql.id('notes')\n  const fields = sql.join([sql.id('id')], sql.empty)\n  const query = sql`SELECT ${fields} FROM ${table} WHERE id = ${1}`\n  console.log(await query.all(), await query.get())\n  await query.run()\n}"
+        }
       }
     },
     IBlobInfo: {
@@ -6120,12 +7508,42 @@ console.log(candidate.name, candidate.output)`
         '实际原生对象快照的不可变 metadata。'
       ),
       members: {
-        key: { summary: t('Logical string key.', '逻辑 string key。') },
-        size: { summary: t('Byte length.', '字节长度。') },
-        etag: { summary: t('Conditional-write identity.', '条件写身份。') },
-        contentType: { summary: t('Optional media type.', '可选媒体类型。') },
-        metadata: { summary: t('Frozen native string metadata.', '冻结的原生 string metadata。') },
-        updatedAt: { summary: t('Native update timestamp.', '原生更新时间。') }
+        key: {
+          summary: {
+            en: 'Logical object key assigned by the application within this store namespace.',
+            zh: '应用在当前存储命名空间内指定的逻辑对象键。'
+          }
+        },
+        size: {
+          summary: {
+            en: 'Actual native object body length in bytes for this snapshot.',
+            zh: '此快照所对应的真实原生对象正文字节长度。'
+          }
+        },
+        etag: {
+          summary: {
+            en: 'Opaque original object version token used by native conditional writes.',
+            zh: '原生条件写使用的不透明原始对象版本令牌。'
+          }
+        },
+        contentType: {
+          summary: {
+            en: 'Optional content media type captured with the native object.',
+            zh: '随原生对象一同捕获的可选内容媒体类型。'
+          }
+        },
+        metadata: {
+          summary: {
+            en: 'Detached immutable string metadata belonging to this native object snapshot.',
+            zh: '属于此原生对象快照的独立不可变字符串元数据。'
+          }
+        },
+        updatedAt: {
+          summary: {
+            en: 'Native object last-modification time expressed in epoch milliseconds.',
+            zh: '以纪元毫秒表示的原生对象最近修改时间。'
+          }
+        }
       }
     },
     IBlobObject: {
@@ -6134,20 +7552,73 @@ console.log(candidate.name, candidate.output)`
         '可释放且单次消费的原生对象快照。'
       ),
       members: {
-        info: { summary: t('Snapshot metadata.', '快照 metadata。') },
+        info: {
+          summary: {
+            en: 'Immutable native object metadata captured with this same open body snapshot.',
+            zh: '与本次打开的正文快照同时捕获的不可变原生对象元数据。'
+          }
+        },
         stream: {
-          summary: t(
-            'Consume through the platform WHATWG byte stream once.',
-            '通过平台 WHATWG 字节流消费一次。'
-          )
+          summary: {
+            en: 'Consume the one body right as a byte stream, mutually exclusive with bytes.',
+            zh: '以字节流消费唯一正文读取权，与完整字节读取互斥。'
+          },
+          params: {},
+          returns: {
+            en: 'The original snapshot stream; a second consumption rejects before native reading.',
+            zh: '返回原快照流，第二次消费在原生读取前拒绝。'
+          },
+          example:
+            "import { blob, type IBlobApi } from '@migaia/storage-contract'\nexport async function read(api: IBlobApi) {\n  await api.put('manual', new TextEncoder().encode('ready'))\n  const bytes = await api.get('manual')\n  if (bytes) { await using object = bytes; console.log(await object.bytes()) }\n  const stream = await api.get('manual')\n  if (stream) { await using object = stream; console.log(await new Response(object.stream()).text()) }\n}"
         },
         bytes: {
-          summary: t(
-            'Consume the same read right into detached bytes.',
-            '将同一读取权消费为独立字节。'
-          )
+          summary: {
+            en: 'Consume the one body right into detached complete bytes.',
+            zh: '将唯一正文读取权消费为已脱离引用的完整字节。'
+          },
+          params: {},
+          returns: {
+            en: 'Complete bytes of this snapshot; stream and bytes cannot both consume it.',
+            zh: '返回本快照完整字节，流式与完整读取不能同时消费。'
+          },
+          example:
+            "import { blob, type IBlobApi } from '@migaia/storage-contract'\nexport async function read(api: IBlobApi) {\n  await api.put('manual', new TextEncoder().encode('ready'))\n  const bytes = await api.get('manual')\n  if (bytes) { await using object = bytes; console.log(await object.bytes()) }\n  const stream = await api.get('manual')\n  if (stream) { await using object = stream; console.log(await new Response(object.stream()).text()) }\n}"
+        },
+        dispose: {
+          summary: {
+            en: 'Release accepted work and original native resources without acquiring any new close authority.',
+            zh: '排空已接受工作并释放原生资源，不获取新的关闭权限。'
+          },
+          params: {},
+          returns: {
+            en: 'The original cached main cleanup Promise; native cleanup failure rejects with its original reachable cause.',
+            zh: '返回原缓存主清理结果，原生清理失败以可追踪的原始原因拒绝。'
+          },
+          example:
+            "import { blob, type IBlobApi } from '@migaia/storage-contract'\nexport async function read(api: IBlobApi) {\n  await api.put('manual', new TextEncoder().encode('ready'))\n  const bytes = await api.get('manual')\n  if (bytes) { await using object = bytes; console.log(await object.bytes()) }\n  const stream = await api.get('manual')\n  if (stream) { await using object = stream; console.log(await new Response(object.stream()).text()) }\n}"
+        },
+        '[Symbol.asyncDispose]': {
+          summary: {
+            en: 'Use the original asynchronous resource-disposal protocol after accepted work drains.',
+            zh: '在已接受工作排空后使用原异步资源释放协议。'
+          },
+          params: {},
+          returns: {
+            en: 'The separately cached symbolic Promise reports cleanup failure and resolves, without replacing the main cleanup Promise.',
+            zh: '单独缓存的符号清理报告失败后完成，不替换主清理结果。'
+          },
+          example:
+            "import { blob, type IBlobApi } from '@migaia/storage-contract'\nexport async function read(api: IBlobApi) {\n  await api.put('manual', new TextEncoder().encode('ready'))\n  const bytes = await api.get('manual')\n  if (bytes) { await using object = bytes; console.log(await object.bytes()) }\n  const stream = await api.get('manual')\n  if (stream) { await using object = stream; console.log(await new Response(object.stream()).text()) }\n}"
         }
-      }
+      },
+      scenarios: [
+        {
+          en: 'Read a download once while preserving its native snapshot and explicit resource release.',
+          zh: '仅消费下载一次，同时保留原生快照与显式资源释放边界。'
+        }
+      ],
+      example:
+        "import { blob, type IBlobApi } from '@migaia/storage-contract'\nexport async function read(api: IBlobApi) {\n  await api.put('manual', new TextEncoder().encode('ready'))\n  const bytes = await api.get('manual')\n  if (bytes) { await using object = bytes; console.log(await object.bytes()) }\n  const stream = await api.get('manual')\n  if (stream) { await using object = stream; console.log(await new Response(object.stream()).text()) }\n}"
     },
     IBlobApi: {
       summary: t(
@@ -6156,27 +7627,128 @@ console.log(candidate.name, candidate.output)`
       ),
       members: {
         put: {
-          summary: t('Write bytes or a stream with optional conditions.', '可带条件写入字节或流。')
+          summary: {
+            en: 'Store one object through the native conditional write and upload owner.',
+            zh: '通过原生条件写与上传拥有者存储单个对象。'
+          },
+          params: {
+            key: {
+              en: 'Object key assigned by the application or returned by this same backend.',
+              zh: '应用指定或同一后端返回的对象存储键。'
+            },
+            body: {
+              en: 'Detached bytes or an unconsumed byte stream; native conditions are checked before reader ownership.',
+              zh: '已脱离引用的字节或尚未消费的字节流，取得读取权前检查原生条件。'
+            },
+            options: {
+              en: 'Optional content type, string metadata, exclusive ifMatch/ifNoneMatch and original ctx.',
+              zh: '可选内容类型、字符串元数据、互斥写入前提及原操作上下文。'
+            }
+          },
+          returns: {
+            en: 'Immutable metadata of the committed object; failed conditions leave the old object intact.',
+            zh: '返回已提交对象的不可变元数据，条件失败时保留旧对象。'
+          }
         },
         get: {
-          summary: t(
-            'Get a disposable snapshot or inclusive range.',
-            '读取可释放快照或 inclusive 范围。'
-          )
+          summary: {
+            en: 'Open one native object snapshot with a single stream-or-bytes consumption right.',
+            zh: '打开单个原生对象快照，只授予一次流式或字节消费权。'
+          },
+          params: {
+            key: {
+              en: 'Object key assigned by the application or returned by this same backend.',
+              zh: '应用指定或同一后端返回的对象存储键。'
+            },
+            options: {
+              en: 'Optional inclusive byte range and original operation context; end may be omitted.',
+              zh: '可选的包含末字节的范围与原上下文，结束位置可省略。'
+            }
+          },
+          returns: {
+            en: 'A disposable snapshot object, or undefined if absent; consumers must release the resource.',
+            zh: '返回可释放的快照对象，不存在时为未定义，消费者必须释放资源。'
+          }
         },
-        head: { summary: t('Read metadata without content.', '只读 metadata，不读内容。') },
+        head: {
+          summary: {
+            en: 'Read native snapshot metadata without opening a body reader.',
+            zh: '不打开正文读取器，仅获取原生快照元数据。'
+          },
+          params: {
+            key: {
+              en: 'Object key assigned by the application or returned by this same backend.',
+              zh: '应用指定或同一后端返回的对象存储键。'
+            },
+            ctx: {
+              en: 'Original optional operation cancellation, timeout and organization context.',
+              zh: '原可选操作取消信号、超时预算与组织上下文。'
+            }
+          },
+          returns: {
+            en: 'Object metadata or undefined when no object is present.',
+            zh: '返回对象元数据，对象不存在时为未定义。'
+          }
+        },
         remove: {
-          summary: t(
-            'Remove one object and report actual presence.',
-            '移除一个对象并返回实际存在状态。'
-          )
+          summary: {
+            en: 'Delete one native object in the current organization.',
+            zh: '删除当前组织内的单个原生对象内容。'
+          },
+          params: {
+            key: {
+              en: 'Object key assigned by the application or returned by this same backend.',
+              zh: '应用指定或同一后端返回的对象存储键。'
+            },
+            ctx: {
+              en: 'Original optional operation cancellation, timeout and organization context.',
+              zh: '原可选操作取消信号、超时预算与组织上下文。'
+            }
+          },
+          returns: {
+            en: 'True only when an existing physical object was deleted.',
+            zh: '仅实际删除已有物理对象时返回真值。'
+          }
         },
-        list: { summary: t('Read an ordered opaque-cursor page.', '读取有序不透明游标页。') },
+        list: {
+          summary: {
+            en: 'Read one ordered native object page without materializing every body.',
+            zh: '读取单个有序原生对象页，不载入全部对象正文。'
+          },
+          params: {
+            options: {
+              en: 'Optional string prefix, opaque after cursor and positive page limit.',
+              zh: '可选字符串前缀、不透明恢复游标与正整数页上界。'
+            },
+            ctx: {
+              en: 'Original optional operation cancellation, timeout and organization context.',
+              zh: '原可选操作取消信号、超时预算与组织上下文。'
+            }
+          },
+          returns: {
+            en: 'Metadata items and an optional next cursor, never complete object bodies.',
+            zh: '返回元数据条目及可选下一页游标，不包含完整对象正文。'
+          }
+        },
         removeByPrefix: {
-          summary: t(
-            'Remove matching native objects and return the count.',
-            '移除匹配原生对象并返回数量。'
-          )
+          summary: {
+            en: 'Delete native object identities matching this organization-bound string prefix.',
+            zh: '删除当前组织内匹配指定字符串前缀的原生对象。'
+          },
+          params: {
+            prefix: {
+              en: 'Application-assigned object key prefix, without accessing another namespace.',
+              zh: '应用指定的对象键前缀，不访问其它命名空间。'
+            },
+            ctx: {
+              en: 'Original optional operation cancellation, timeout and organization context.',
+              zh: '原可选操作取消信号、超时预算与组织上下文。'
+            }
+          },
+          returns: {
+            en: 'Number of physical objects actually removed.',
+            zh: '返回实际删除的物理对象数量。'
+          }
         }
       }
     },
@@ -6186,7 +7758,13 @@ console.log(candidate.name, candidate.output)`
         '携带不透明提交游标的保留存储变更。'
       ),
       members: {
-        cursor: { summary: t('Caller-persisted replay position.', '由调用方持久化的重放位置。') }
+        cursor: { summary: t('Caller-persisted replay position.', '由调用方持久化的重放位置。') },
+        orgId: {
+          summary: {
+            en: 'Organization identity supplied by the original host view, never permission to route into another organization.',
+            zh: '原宿主视图给出的组织身份，不授予进入其它组织的路由权限。'
+          }
+        }
       }
     },
     IDurableChangeFeedApi: {
@@ -6196,26 +7774,73 @@ console.log(candidate.name, candidate.output)`
       ),
       members: {
         readChanges: {
-          summary: t('Read retained commits without acknowledging them.', '读取保留提交但不确认。')
+          summary: {
+            en: 'Replay retained native commit summaries from an opaque saved cursor.',
+            zh: '从已保存的不透明游标重放仍保留的原生提交摘要。'
+          },
+          params: {
+            options: {
+              en: 'Optional after cursor and positive bounded page limit; a retained native source is required.',
+              zh: '可选恢复游标与正整数页上界，要求真实保留的原生来源。'
+            },
+            ctx: {
+              en: 'Original optional operation context with cancellation and one captured timeout budget.',
+              zh: '原可选操作上下文，承载取消信号与单次捕获的超时预算。'
+            }
+          },
+          returns: {
+            en: 'Changes and the original resume cursor; an expired retained position rejects with CHANGE_CURSOR_EXPIRED.',
+            zh: '返回变更与原恢复游标，已过期位置以游标过期错误拒绝。'
+          }
         },
         tailChanges: {
-          summary: t(
-            'Follow commits, acknowledging only successful callbacks.',
-            '跟随提交，仅确认成功回调。'
-          )
+          summary: {
+            en: 'Own a native reliable tail whose cursor advances only after each awaited callback succeeds.',
+            zh: '持有原生可靠尾部流，仅每次等待回调成功后推进游标。'
+          },
+          params: {
+            options: {
+              en: 'Saved from cursor or now, awaited onChange, and optional error observer; persist successfully processed cursors.',
+              zh: '恢复游标或当前起点、等待的变更回调与可选错误观察者，应保存处理成功的游标。'
+            },
+            ctx: {
+              en: 'Original optional operation context with cancellation and one captured timeout budget.',
+              zh: '原可选操作上下文，承载取消信号与单次捕获的超时预算。'
+            }
+          },
+          returns: {
+            en: 'A native resource that drains accepted callbacks on disposal; replay remains at least once.',
+            zh: '返回释放时排空已接受回调的原生资源，重放保持至少一次语义。'
+          }
         }
       }
     },
     ISparqlFragment: {
-      summary: t('Opaque pure SPARQL node identity.', '不透明纯 SPARQL 节点身份。'),
+      summary: {
+        en: 'Authentic SPARQL grammar fragment produced by the single shared compiler owner.',
+        zh: '由唯一共享编译器拥有者产生的真实图查询语法片段。'
+      },
       members: {}
     },
     ISparqlInput: {
-      summary: t(
-        'Named node, literal or authentic SPARQL fragment.',
-        'Named node、literal 或真实 SPARQL 片段。'
-      ),
-      members: {}
+      summary: {
+        en: 'Shared compiler input consisting of canonical RDF terms or authentic grammar fragments.',
+        zh: '共享编译器输入，由规范三元组项或真实语法片段构成。'
+      },
+      members: {
+        termType: {
+          summary: {
+            en: 'Canonical RDF term discriminator; native blank labels never become standard persistent ground identity.',
+            zh: '规范三元组项区分字段，原生空白标签不变为标准持久完整身份。'
+          }
+        },
+        value: {
+          summary: {
+            en: 'Original canonical term value, preserving validated IRI or lexical spelling without coercion.',
+            zh: '原规范项值，保留已校验资源或字面拼写，不进行类型强制。'
+          }
+        }
+      }
     },
     ISparqlRow: {
       summary: t(
@@ -6230,36 +7855,124 @@ console.log(candidate.name, candidate.output)`
         '保留同一纯片段身份的原生查询。'
       ),
       members: {
-        select: { summary: t('Return native binding rows.', '返回原生绑定行。') },
-        ask: { summary: t('Return the native boolean.', '返回原生布尔值。') },
-        construct: {
-          summary: t(
-            'Return raw quads including response-local blank terms.',
-            '返回包含响应局部 blank 项的 raw quad。'
-          )
+        select: {
+          summary: {
+            en: 'Execute native SELECT and decode standard term bindings.',
+            zh: '执行原生选择查询，并解码标准项绑定。'
+          },
+          params: {
+            ctx: {
+              en: 'Original optional operation context carrying one captured cancellation and timeout budget.',
+              zh: '原可选操作上下文，承载单次捕获的取消与超时预算。'
+            }
+          },
+          returns: {
+            en: 'Rows of canonical binding terms; native blank labels remain response-local.',
+            zh: '返回规范绑定项数据行，原生空白标签仅属于当前响应。'
+          }
         },
-        update: { summary: t('Run one native body.', '执行一个原生 body。') }
+        ask: {
+          summary: {
+            en: 'Execute native ASK and validate its actual boolean response.',
+            zh: '执行原生存在查询，并校验真实布尔响应。'
+          },
+          params: {
+            ctx: {
+              en: 'Original optional operation context carrying one captured cancellation and timeout budget.',
+              zh: '原可选操作上下文，承载单次捕获的取消与超时预算。'
+            }
+          },
+          returns: {
+            en: 'The original validated native boolean, without client-side scanning.',
+            zh: '返回已验证原生布尔值，不在客户端扫描数据。'
+          }
+        },
+        construct: {
+          summary: {
+            en: 'Execute native CONSTRUCT and decode complete raw quads.',
+            zh: '执行原生构造查询，并解码完整原始三元组。'
+          },
+          params: {
+            ctx: {
+              en: 'Original optional operation context carrying one captured cancellation and timeout budget.',
+              zh: '原可选操作上下文，承载单次捕获的取消与超时预算。'
+            }
+          },
+          returns: {
+            en: 'Raw quads may contain native blank labels under the declared raw boundary.',
+            zh: '返回可含原生空白标签的原始三元组，遵守已声明原始边界。'
+          }
+        },
+        update: {
+          summary: {
+            en: 'Execute one compiled native SPARQL modification without request replay.',
+            zh: '执行单次已编译原生图修改，不重放请求正文。'
+          },
+          params: {
+            ctx: {
+              en: 'Original optional operation context carrying one captured cancellation and timeout budget.',
+              zh: '原可选操作上下文，承载单次捕获的取消与超时预算。'
+            }
+          },
+          returns: {
+            en: 'Resolves only on confirmed native success; unknown commit evidence remains an error.',
+            zh: '仅原生成功确认后完成，提交证据未知仍为错误。'
+          }
+        }
       }
     },
     ISparqlTagTools: {
-      summary: t(
-        'Pure VARNAME, join and empty composition tools.',
-        '纯 VARNAME、join 与 empty 组合工具。'
-      ),
+      summary: {
+        en: 'Shared authentic variable, fragment-join and empty-fragment tools without a second parser.',
+        zh: '共享真实变量、片段连接与空片段工具，不增加第二解析器。'
+      },
       members: {
         var: {
-          summary: t(
-            'Validate a full SPARQL variable name without a prefix.',
-            '校验不含前缀的完整 SPARQL 变量名。'
-          )
+          summary: {
+            en: 'Create an authentic variable fragment with a validated SPARQL variable name.',
+            zh: '使用已校验变量名称创建真实图查询变量片段。'
+          },
+          params: {
+            name: {
+              en: 'Application-assigned variable name without the leading question mark.',
+              zh: '应用指定的变量名称，不包含开头问号。'
+            }
+          },
+          returns: {
+            en: 'An authentic variable fragment owned by the shared compiler.',
+            zh: '返回由共享编译器拥有的真实变量片段。'
+          },
+          example:
+            "import { sparqlFragment, term, type ISparqlApi } from '@migaia/storage-contract'\nexport async function read(api: ISparqlApi) {\n  const subject = api.var('subject')\n  const pattern = api.join([sparqlFragment`${subject} ?predicate ?object`], api.empty)\n  console.log(await api`SELECT ?subject WHERE { ${pattern} }`.select())\n  console.log(await api`ASK { ${pattern} }`.ask())\n  console.log(await api`CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }`.construct())\n  await api`INSERT DATA { ${term.iri('urn:example:s')} ${term.iri('urn:example:p')} ${term.literal('ready')} }`.update()\n}"
         },
         join: {
-          summary: t(
-            'Join authentic fragments, defaulting to whitespace.',
-            '组合真实片段，默认空白分隔。'
-          )
+          summary: {
+            en: 'Join authentic SPARQL fragments while preserving bound RDF values.',
+            zh: '连接真实图查询片段，同时保留已绑定的三元组项值。'
+          },
+          params: {
+            fragments: {
+              en: 'Authentic fragments produced by the shared SPARQL compiler.',
+              zh: '共享图查询编译器产生的真实片段集合。'
+            },
+            separator: {
+              en: 'Optional authentic separator fragment, never an unchecked grammar string.',
+              zh: '可选真实分隔片段，不是未检查的语法字符串。'
+            }
+          },
+          returns: {
+            en: 'A joined authentic fragment retaining original term identities.',
+            zh: '返回保留原项身份的真实连接片段。'
+          },
+          example:
+            "import { sparqlFragment, term, type ISparqlApi } from '@migaia/storage-contract'\nexport async function read(api: ISparqlApi) {\n  const subject = api.var('subject')\n  const pattern = api.join([sparqlFragment`${subject} ?predicate ?object`], api.empty)\n  console.log(await api`SELECT ?subject WHERE { ${pattern} }`.select())\n  console.log(await api`ASK { ${pattern} }`.ask())\n  console.log(await api`CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }`.construct())\n  await api`INSERT DATA { ${term.iri('urn:example:s')} ${term.iri('urn:example:p')} ${term.literal('ready')} }`.update()\n}"
         },
-        empty: { summary: t('The single empty fragment identity.', '唯一空片段身份。') }
+        empty: {
+          summary: {
+            en: 'Authentic empty SPARQL fragment for a conditional branch that contributes no grammar.',
+            zh: '条件分支不贡献图查询语法时使用的真实空片段。'
+          }
+        }
       }
     },
     ISparqlApi: {
@@ -6268,10 +7981,61 @@ console.log(candidate.name, candidate.output)`
         '带纯工具与行输出类型的原生 callable 模板 tag。'
       ),
       members: {
-        var: { summary: t('Original pure variable tool.', '原纯变量工具。') },
-        join: { summary: t('Original pure join tool.', '原纯 join 工具。') },
-        empty: { summary: t('Original empty fragment.', '原空片段。') }
-      }
+        var: {
+          summary: {
+            en: 'Create an authentic variable fragment with a validated SPARQL variable name.',
+            zh: '使用已校验变量名称创建真实图查询变量片段。'
+          },
+          params: {
+            name: {
+              en: 'Application-assigned variable name without the leading question mark.',
+              zh: '应用指定的变量名称，不包含开头问号。'
+            }
+          },
+          returns: {
+            en: 'An authentic variable fragment owned by the shared compiler.',
+            zh: '返回由共享编译器拥有的真实变量片段。'
+          },
+          example:
+            "import { sparqlFragment, term, type ISparqlApi } from '@migaia/storage-contract'\nexport async function read(api: ISparqlApi) {\n  const subject = api.var('subject')\n  const pattern = api.join([sparqlFragment`${subject} ?predicate ?object`], api.empty)\n  console.log(await api`SELECT ?subject WHERE { ${pattern} }`.select())\n  console.log(await api`ASK { ${pattern} }`.ask())\n  console.log(await api`CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }`.construct())\n  await api`INSERT DATA { ${term.iri('urn:example:s')} ${term.iri('urn:example:p')} ${term.literal('ready')} }`.update()\n}"
+        },
+        join: {
+          summary: {
+            en: 'Join authentic SPARQL fragments while preserving bound RDF values.',
+            zh: '连接真实图查询片段，同时保留已绑定的三元组项值。'
+          },
+          params: {
+            fragments: {
+              en: 'Authentic fragments produced by the shared SPARQL compiler.',
+              zh: '共享图查询编译器产生的真实片段集合。'
+            },
+            separator: {
+              en: 'Optional authentic separator fragment, never an unchecked grammar string.',
+              zh: '可选真实分隔片段，不是未检查的语法字符串。'
+            }
+          },
+          returns: {
+            en: 'A joined authentic fragment retaining original term identities.',
+            zh: '返回保留原项身份的真实连接片段。'
+          },
+          example:
+            "import { sparqlFragment, term, type ISparqlApi } from '@migaia/storage-contract'\nexport async function read(api: ISparqlApi) {\n  const subject = api.var('subject')\n  const pattern = api.join([sparqlFragment`${subject} ?predicate ?object`], api.empty)\n  console.log(await api`SELECT ?subject WHERE { ${pattern} }`.select())\n  console.log(await api`ASK { ${pattern} }`.ask())\n  console.log(await api`CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }`.construct())\n  await api`INSERT DATA { ${term.iri('urn:example:s')} ${term.iri('urn:example:p')} ${term.literal('ready')} }`.update()\n}"
+        },
+        empty: {
+          summary: {
+            en: 'Authentic empty SPARQL fragment for a conditional branch that contributes no grammar.',
+            zh: '条件分支不贡献图查询语法时使用的真实空片段。'
+          }
+        }
+      },
+      example:
+        "import { sparqlFragment, term, type ISparqlApi } from '@migaia/storage-contract'\nexport async function read(api: ISparqlApi) {\n  const subject = api.var('subject')\n  const pattern = api.join([sparqlFragment`${subject} ?predicate ?object`], api.empty)\n  console.log(await api`SELECT ?subject WHERE { ${pattern} }`.select())\n  console.log(await api`ASK { ${pattern} }`.ask())\n  console.log(await api`CONSTRUCT { ?s ?p ?o } WHERE { ?s ?p ?o }`.construct())\n  await api`INSERT DATA { ${term.iri('urn:example:s')} ${term.iri('urn:example:p')} ${term.literal('ready')} }`.update()\n}",
+      scenarios: [
+        {
+          en: 'Compose native queries from RDF terms and authentic fragments without string interpolation of grammar.',
+          zh: '使用三元组项与真实片段组合原生查询，避免以字符串插入语法。'
+        }
+      ]
     },
     DeleteCountMode: {
       summary: t(
@@ -6287,10 +8051,24 @@ console.log(candidate.name, candidate.output)`
       ),
       members: {
         collection: {
-          summary: t(
-            'Borrow a named native collection descriptor with consistent dimensions and metric.',
-            '借用具有一致维度与 metric 的命名原生 collection 描述。'
-          )
+          summary: {
+            en: 'Borrow a logical named collection backed by the installed native vector engine.',
+            zh: '借用由已安装原生向量引擎支撑的逻辑具名集合。'
+          },
+          params: {
+            name: {
+              en: 'Collection name assigned by the application within the current organization.',
+              zh: '应用在当前组织内指定的集合名称。'
+            },
+            options: {
+              en: 'Dimensions and metric when declaring a new collection; omission borrows existing native configuration.',
+              zh: '声明新集合时指定维度与度量，省略时借用既有原生配置。'
+            }
+          },
+          returns: {
+            en: 'A shared collection API; native schema and scoring remain with the real backend.',
+            zh: '返回共享集合接口，原生配置与评分仍由真实后端拥有。'
+          }
         }
       }
     },
@@ -6301,32 +8079,140 @@ console.log(candidate.name, candidate.output)`
       ),
       members: {
         near: {
-          summary: t('Start the shared vector query before topK.', '在 topK 前开始共享向量查询。')
+          summary: {
+            en: 'Build a bounded native nearest-vector query without computing scores in JavaScript.',
+            zh: '创建有界原生最近向量查询，不在客户端计算分数。'
+          },
+          params: {
+            query: {
+              en: 'Finite query vector matching the collection dimensions.',
+              zh: '维度符合集合声明的有限查询向量。'
+            },
+            options: {
+              en: 'Native exact/metric or bounded search settings; unsupported exact search is rejected.',
+              zh: '原生精确或度量及有界检索配置，不支持精确时拒绝。'
+            }
+          },
+          returns: {
+            en: 'A shared persistent native ranking chain.',
+            zh: '返回共享持久原生排名查询链。'
+          }
         },
         similarTo: {
-          summary: t(
-            'Use an existing point as the native query vector.',
-            '使用已有点作为原生查询向量。'
-          )
+          summary: {
+            en: 'Read one native sample and search with the shared sample semantics, excluding its own ID.',
+            zh: '按共享样本语义读取原生样本并搜索，排除样本自身标识。'
+          },
+          params: {
+            id: {
+              en: 'Point ID assigned by the application or returned by the same collection.',
+              zh: '应用指定或同一集合返回的点标识符。'
+            }
+          },
+          returns: {
+            en: 'A native ranking query; a missing sample rejects instead of inventing a zero vector.',
+            zh: '返回原生排名查询，样本缺失时拒绝，不虚构零向量。'
+          }
         },
         recommend: {
-          summary: t('Compose standard positive/negative examples.', '组合标准正负样本。')
+          summary: {
+            en: 'Synthesize the query from positive and negative samples through the single shared recommendation owner.',
+            zh: '经唯一共享推荐拥有者从正负样本合成查询向量。'
+          },
+          params: {
+            examples: {
+              en: 'Nonempty positive IDs and optional negative IDs from this same collection.',
+              zh: '同一集合内非空正样本标识与可选负样本标识。'
+            }
+          },
+          returns: {
+            en: 'A native engine ranking query, with sample IDs excluded from results.',
+            zh: '返回排除样本标识的原生引擎排名查询。'
+          }
         },
         upsert: {
-          summary: t(
-            'Atomically write native points with optional TTL.',
-            '可带 TTL 原子写入原生点。'
-          )
+          summary: {
+            en: 'Validate and detach a complete point batch before the native engine changes any point.',
+            zh: '原生引擎修改任何点之前，校验并分离完整点批量。'
+          },
+          params: {
+            points: {
+              en: 'Dense captured point IDs, finite vectors and portable payloads; duplicate IDs reject before native mutation.',
+              zh: '稠密捕获的点标识、有限向量与可移植载荷，重复标识在原生修改前拒绝。'
+            },
+            ctx: {
+              en: 'Original optional operation context with cancellation and one captured timeout budget.',
+              zh: '原可选操作上下文，承载取消信号与单次捕获的超时预算。'
+            }
+          },
+          returns: {
+            en: 'Resolves after actual native acceptance; optional TTL is applied by the original owner.',
+            zh: '原生实际接受后完成，可选期限由原拥有者应用。'
+          }
         },
         deleteWhere: {
-          summary: t(
-            'Delete native matching points and return the declared numeric count.',
-            '删除原生匹配点并返回约定数值计数。'
-          )
+          summary: {
+            en: 'Delete physical matching points through the selected native counting strategy.',
+            zh: '经所选原生计数策略删除物理匹配点。'
+          },
+          params: {
+            where: {
+              en: 'Canonical declarative payload condition; physical expired matches remain eligible for deletion.',
+              zh: '规范声明式载荷条件，物理过期匹配点仍参与删除。'
+            },
+            ctx: {
+              en: 'Original optional operation context with cancellation and one captured timeout budget.',
+              zh: '原可选操作上下文，承载取消信号与单次捕获的超时预算。'
+            }
+          },
+          returns: {
+            en: 'Promise<number>; Qdrant precount is a prior count and scroll counts collected IDs, without a cross-page snapshot.',
+            zh: '返回异步数字，向量服务预统计为先前计数，分页为已收集标识数，不承诺跨页快照。'
+          }
         },
-        delete: { summary: t('Delete named point IDs.', '按点 ID 删除。') },
+        delete: {
+          summary: {
+            en: 'Delete specified native point identities without returning a fabricated row count.',
+            zh: '删除指定原生点身份，不返回虚构的数据行计数。'
+          },
+          params: {
+            ids: {
+              en: 'Point identities from this same collection, without client-side payload enumeration.',
+              zh: '来自同一集合的点身份，不在客户端枚举载荷。'
+            },
+            ctx: {
+              en: 'Original optional operation context with cancellation and one captured timeout budget.',
+              zh: '原可选操作上下文，承载取消信号与单次捕获的超时预算。'
+            }
+          },
+          returns: {
+            en: 'Resolves after native deletion settles.',
+            zh: '原生删除结算后完成。'
+          }
+        },
         search: {
-          summary: t('Execute the native direct search surface.', '执行原生直接搜索入口。')
+          summary: {
+            en: 'Execute bounded native ranking with the selected filter and payload projection.',
+            zh: '使用所选条件与载荷投影执行有界原生排名。'
+          },
+          params: {
+            query: {
+              en: 'Finite query vector matching the collection dimensions.',
+              zh: '维度符合集合声明的有限查询向量。'
+            },
+            options: {
+              en: 'Native exact/metric or bounded search settings; unsupported exact search is rejected.',
+              zh: '原生精确或度量及有界检索配置，不支持精确时拒绝。'
+            },
+            ctx: {
+              en: 'Original optional operation context with cancellation and one captured timeout budget.',
+              zh: '原可选操作上下文，承载取消信号与单次捕获的超时预算。'
+            }
+          },
+          returns: {
+            en: 'Original native IDs, scores and optional payloads in engine order.',
+            zh: '按引擎顺序返回原生标识、分数及可选载荷。'
+          }
         }
       }
     },
@@ -6336,8 +8222,32 @@ console.log(candidate.name, candidate.output)`
         '原生 collection 维度与 metric，不持有连接。'
       ),
       members: {
-        dimensions: { summary: t('Positive safe integer.', '正安全整数。') },
-        metric: { summary: t('cosine, dot or euclid.', 'cosine、dot 或 euclid。') }
+        dimensions: {
+          summary: {
+            en: 'Positive safe vector dimension count validated by the original vector-input owner.',
+            zh: '由原向量输入拥有者校验的正安全整数向量维数。'
+          }
+        },
+        metric: {
+          summary: {
+            en: 'Native cosine, dot or Euclidean metric chosen for the original collection schema.',
+            zh: '为原集合配置选择的原生余弦、点积或欧氏度量。'
+          },
+          values: {
+            cosine: {
+              en: 'Cosine similarity under native engine precision.',
+              zh: '采用原生引擎精度的余弦相似度。'
+            },
+            dot: {
+              en: 'Native finite inner product.',
+              zh: '使用原生有限向量内积。'
+            },
+            euclid: {
+              en: 'Native Euclidean distance converted to the shared score order.',
+              zh: '将原生欧氏距离转换为共享分数顺序。'
+            }
+          }
+        }
       }
     },
     IStorageVectorValidation: {
@@ -6346,9 +8256,31 @@ console.log(candidate.name, candidate.output)`
         '独立向量输入的可选校验事实。'
       ),
       members: {
-        dimensions: { summary: t('Optional matching positive dimension.', '可选匹配正维度。') },
+        dimensions: {
+          summary: {
+            en: 'Positive safe vector dimension count validated by the original vector-input owner.',
+            zh: '由原向量输入拥有者校验的正安全整数向量维数。'
+          }
+        },
         metric: {
-          summary: t('Optional metric; cosine rejects zero.', '可选 metric；cosine 拒绝零向量。')
+          summary: {
+            en: 'Native cosine, dot or Euclidean metric chosen for the original collection schema.',
+            zh: '为原集合配置选择的原生余弦、点积或欧氏度量。'
+          },
+          values: {
+            cosine: {
+              en: 'Cosine similarity under native engine precision.',
+              zh: '采用原生引擎精度的余弦相似度。'
+            },
+            dot: {
+              en: 'Native finite inner product.',
+              zh: '使用原生有限向量内积。'
+            },
+            euclid: {
+              en: 'Native Euclidean distance converted to the shared score order.',
+              zh: '将原生欧氏距离转换为共享分数顺序。'
+            }
+          }
         }
       }
     },
@@ -6358,19 +8290,94 @@ console.log(candidate.name, candidate.output)`
         '声明点输入，返回独立便携 payload。'
       ),
       members: {
-        id: { summary: t('Logical string point ID.', '逻辑字符串点 ID。') },
-        vector: { summary: t('Readonly finite component array.', '只读有限分量数组。') },
+        id: {
+          summary: {
+            en: 'Nonempty portable point identifier assigned by the application within its collection.',
+            zh: '应用在集合内指定的非空可移植点标识符。'
+          }
+        },
+        vector: {
+          summary: {
+            en: 'Detached finite component array, with signed zero normalized by the original owner.',
+            zh: '已脱离外部引用的有限分量数组，符号零由原拥有者归一化。'
+          }
+        },
         payload: {
           summary: t('Optional caller-declared portable fields.', '可选调用方声明便携字段。')
         }
-      }
+      },
+      scenarios: [
+        {
+          en: 'Capture an application point before passing its finite components to a real vector engine.',
+          zh: '传给真实向量引擎前，捕获应用点及其有限分量。'
+        }
+      ],
+      example:
+        "import { snapshotStorageVectorUpsert } from '@migaia/storage-contract'\nexport const points = snapshotStorageVectorUpsert([\n  { id: 'first', vector: [1, 0], payload: { category: 'docs' } }\n], { dimensions: 2, metric: 'dot' })"
     },
     IVectorFilter: {
       summary: t(
         'Own-path boolean/scalar/range native vector predicates.',
         '按自有路径求值的布尔、标量与范围原生向量谓词。'
       ),
-      members: {}
+      members: {
+        all: {
+          summary: {
+            en: 'All child native vector filters must match.',
+            zh: '全部子原生向量过滤条件必须同时匹配。'
+          }
+        },
+        any: {
+          summary: {
+            en: 'At least one child native vector filter must match.',
+            zh: '至少一个子原生向量过滤条件必须匹配。'
+          }
+        },
+        not: {
+          summary: {
+            en: 'Negate the one nested native vector filter.',
+            zh: '对单个嵌套原生向量过滤条件取反。'
+          }
+        },
+        field: {
+          summary: {
+            en: 'Canonical application payload field path used by the native filter.',
+            zh: '原生过滤使用的规范应用载荷字段路径。'
+          }
+        },
+        eq: {
+          summary: {
+            en: 'Captured scalar operand compared for exact native equality.',
+            zh: '用于原生精确相等比较的已捕获标量操作数。'
+          }
+        },
+        in: {
+          summary: {
+            en: 'Captured portable scalar alternatives for native membership testing.',
+            zh: '用于原生成员判断的已捕获可移植标量候选。'
+          }
+        },
+        gte: {
+          summary: {
+            en: 'Inclusive native lower comparison bound for this payload field.',
+            zh: '当前载荷字段的包含式原生比较下界。'
+          }
+        },
+        lte: {
+          summary: {
+            en: 'Inclusive native upper comparison bound for this payload field.',
+            zh: '当前载荷字段的包含式原生比较上界。'
+          }
+        }
+      },
+      scenarios: [
+        {
+          en: 'Build a portable declarative payload filter that the native source must translate faithfully.',
+          zh: '构造原生来源必须忠实翻译的可移植声明式载荷过滤条件。'
+        }
+      ],
+      example:
+        "import { snapshotStorageVectorFilter } from '@migaia/storage-contract'\nexport const filter = snapshotStorageVectorFilter({ field: 'category', eq: 'docs' })"
     },
     IRdfApi: {
       summary: t(
@@ -6378,15 +8385,61 @@ console.log(candidate.name, candidate.output)`
         '原生原子 ground RDF 写入与共享查询构造。'
       ),
       members: {
-        add: { summary: t('Atomically add canonical ground quads.', '原子添加规范 ground quad。') },
+        add: {
+          summary: {
+            en: 'Add canonical RDF membership through the original native draft owner.',
+            zh: '经原生草稿拥有者加入规范三元组成员关系。'
+          },
+          params: {
+            quads: {
+              en: 'Canonical ground quads, with named subjects/predicates and default or named IRI graph.',
+              zh: '规范完整三元组，使用具名主谓与缺省或具名资源图。'
+            },
+            ctx: {
+              en: 'Original optional operation context carrying one captured cancellation and timeout budget.',
+              zh: '原可选操作上下文，承载单次捕获的取消与超时预算。'
+            }
+          },
+          returns: {
+            en: 'The original write settles; duplicate membership does not create duplicate rows.',
+            zh: '原写入完成，重复成员关系不会产生重复记录。'
+          }
+        },
         delete: {
-          summary: t('Atomically delete canonical ground quads.', '原子删除规范 ground quad。')
+          summary: {
+            en: 'Remove canonical RDF membership through the same native owner.',
+            zh: '经同一原生拥有者移除规范三元组成员关系。'
+          },
+          params: {
+            quads: {
+              en: 'Canonical ground quads, with named subjects/predicates and default or named IRI graph.',
+              zh: '规范完整三元组，使用具名主谓与缺省或具名资源图。'
+            },
+            ctx: {
+              en: 'Original optional operation context carrying one captured cancellation and timeout budget.',
+              zh: '原可选操作上下文，承载单次捕获的取消与超时预算。'
+            }
+          },
+          returns: {
+            en: 'The original write settles; absent membership is a no-op.',
+            zh: '原写入完成，不存在的成员关系不会产生修改。'
+          }
         },
         match: {
-          summary: t(
-            'Construct the shared RDF family with an optional ground pattern.',
-            '按可选 ground 模式构造共享 RDF family。'
-          )
+          summary: {
+            en: 'Build the original ground RDF chain from captured bound positions.',
+            zh: '根据已捕获绑定位置创建原完整三元组查询链。'
+          },
+          params: {
+            pattern: {
+              en: 'Optional bound ground subject, predicate, object and graph positions.',
+              zh: '可选绑定的完整主项、谓词、对象与图位置。'
+            }
+          },
+          returns: {
+            en: 'A persistent shared RDF query; source I/O begins only at an execution terminal.',
+            zh: '返回持久化的共享三元组查询，仅执行终点开始来源访问。'
+          }
         }
       }
     },
@@ -6397,22 +8450,52 @@ console.log(candidate.name, candidate.output)`
       ),
       members: {
         add: {
-          summary: t(
-            'Write through a fresh original operation view.',
-            '通过新的原 operation view 写入。'
-          )
+          summary: {
+            en: 'Add canonical RDF membership through the original native draft owner.',
+            zh: '经原生草稿拥有者加入规范三元组成员关系。'
+          },
+          params: {
+            quads: {
+              en: 'Canonical ground quads, with named subjects/predicates and default or named IRI graph.',
+              zh: '规范完整三元组，使用具名主谓与缺省或具名资源图。'
+            }
+          },
+          returns: {
+            en: 'The original write settles; duplicate membership does not create duplicate rows.',
+            zh: '原写入完成，重复成员关系不会产生重复记录。'
+          }
         },
         delete: {
-          summary: t(
-            'Delete through the same native draft owner.',
-            '通过同一原生 draft owner 删除。'
-          )
+          summary: {
+            en: 'Remove canonical RDF membership through the same native owner.',
+            zh: '经同一原生拥有者移除规范三元组成员关系。'
+          },
+          params: {
+            quads: {
+              en: 'Canonical ground quads, with named subjects/predicates and default or named IRI graph.',
+              zh: '规范完整三元组，使用具名主谓与缺省或具名资源图。'
+            }
+          },
+          returns: {
+            en: 'The original write settles; absent membership is a no-op.',
+            zh: '原写入完成，不存在的成员关系不会产生修改。'
+          }
         },
         match: {
-          summary: t(
-            'Retain actual native iterators and shared read terminals.',
-            '保留真实原生 iterator 与共享读终端。'
-          )
+          summary: {
+            en: 'Build the original ground RDF chain from captured bound positions.',
+            zh: '根据已捕获绑定位置创建原完整三元组查询链。'
+          },
+          params: {
+            pattern: {
+              en: 'Optional bound ground subject, predicate, object and graph positions.',
+              zh: '可选绑定的完整主项、谓词、对象与图位置。'
+            }
+          },
+          returns: {
+            en: 'A persistent shared RDF query; source I/O begins only at an execution terminal.',
+            zh: '返回持久化的共享三元组查询，仅执行终点开始来源访问。'
+          }
         }
       }
     },
@@ -6422,7 +8505,12 @@ console.log(candidate.name, candidate.output)`
         '仅含精确绑定标签 sql 属性，由 store、原事务视图与 ORM 函数共用。'
       ),
       members: {
-        sql: { summary: t('The original backend bound SQL tag.', '原后端绑定的 SQL 标签。') }
+        sql: {
+          summary: {
+            en: 'Original parameterized SQL tag with canonical identifier and fragment construction.',
+            zh: '带规范标识符与片段构造功能的原参数化查询标签。'
+          }
+        }
       }
     },
     ICompiledStorageSql: {
@@ -6450,28 +8538,198 @@ console.log(candidate.name, candidate.output)`
         'Observe SQL execution counts without receiving statement payloads.',
         '观察 SQL 执行计数，不接收语句载荷。'
       ),
-      members: {}
+      members: {
+        kind: {
+          summary: {
+            en: 'SQL stage discriminator for the original compiled native statement owner.',
+            zh: '原已编译原生语句拥有者使用的查询阶段区分字段。'
+          },
+          values: {
+            enum: 'StorageStageKind'
+          }
+        },
+        forTransaction: {
+          summary: {
+            en: 'Bind native SQL observations to the same reserved transaction connection.',
+            zh: '将原生查询观察绑定到同一保留事务连接。'
+          }
+        },
+        beforeSql: {
+          summary: {
+            en: 'Observe compiled statement metadata before original native SQL execution.',
+            zh: '原生查询执行前观察已编译语句元数据。'
+          }
+        },
+        afterSql: {
+          summary: {
+            en: 'Observe original native SQL settlement without rewriting rows or row counts.',
+            zh: '观察原生查询结算，不改写结果行或行计数。'
+          }
+        },
+        onSqlError: {
+          summary: {
+            en: 'Observe the original SQL failure while retaining native response evidence.',
+            zh: '观察原查询失败，同时保留原生响应证据。'
+          }
+        },
+        report: {
+          summary: {
+            en: 'Report observer failures through the original owner without replacing the primary operation result.',
+            zh: '经原拥有者报告观察者失败，不替换首要操作结果。'
+          }
+        }
+      }
     },
     IQueryStageObserver: {
       summary: t(
         'Observe query plans and terminal counts without executing a query.',
         '观察查询计划与结束计数，不执行查询。'
       ),
-      members: {}
+      members: {
+        kind: {
+          summary: {
+            en: 'Query stage discriminator for the same canonical query execution owner.',
+            zh: '同一规范查询执行拥有者使用的查询阶段区分字段。'
+          },
+          values: {
+            enum: 'StorageStageKind'
+          }
+        },
+        forTransaction: {
+          summary: {
+            en: 'Bind native query observations to the original transaction operation view.',
+            zh: '将原生查询观察绑定到原事务操作视图。'
+          }
+        },
+        beforeQuery: {
+          summary: {
+            en: 'Observe the captured original plan before native source execution.',
+            zh: '原生来源执行前观察已捕获的原查询计划。'
+          }
+        },
+        afterQuery: {
+          summary: {
+            en: 'Observe the settled query without rescanning results or changing selected rows.',
+            zh: '观察已结算查询，不重新扫描结果或改变所选条目。'
+          }
+        },
+        onQueryError: {
+          summary: {
+            en: 'Observe original query failure without converting it into an empty result.',
+            zh: '观察原查询失败，不将其转换为空查询结果。'
+          }
+        },
+        report: {
+          summary: {
+            en: 'Report observer failures through the original owner without replacing the primary operation result.',
+            zh: '经原拥有者报告观察者失败，不替换首要操作结果。'
+          }
+        }
+      }
     },
     IConcurrencyHolder: {
       summary: t(
         'Real holder identity or a remote handoff interval with no fabricated owner.',
         '真实持有者身份，或不伪造 owner 的远端交接区间。'
       ),
-      members: {}
+      members: {
+        status: {
+          summary: {
+            en: 'Distinguish a real native holder from a remote handoff interval with no borrowed prior identity.',
+            zh: '区分真实原生持有者与远端交接间隔，交接不借用前持有者身份。'
+          },
+          values: {
+            held: {
+              en: 'Native ownership is held with original owner metadata.',
+              zh: '原生拥有权已持有，并带原拥有者元数据。'
+            },
+            'handing-off': {
+              en: 'Remote transfer is underway; no previous holder metadata is reused.',
+              zh: '远端正在交接，不复用前持有者元数据。'
+            }
+          }
+        },
+        owner: {
+          summary: {
+            en: 'Original owner identity returned by the native lock holder, absent during handoff.',
+            zh: '原生锁持有者返回的原拥有者身份，交接时不存在。'
+          }
+        },
+        label: {
+          summary: {
+            en: 'Optional diagnostic label assigned by the owning application.',
+            zh: '由拥有者应用指定的可选诊断标签。'
+          }
+        },
+        pid: {
+          summary: {
+            en: 'Optional actual native process identifier when available.',
+            zh: '可取得时报告的真实原生进程标识符。'
+          }
+        },
+        since: {
+          summary: {
+            en: 'Original lock acquisition timestamp, absent when only remote handoff is known.',
+            zh: '原始锁获取时间，仅知远端交接时不存在。'
+          }
+        },
+        scope: {
+          summary: {
+            en: 'Whether the original holder is local or remote to this lock owner.',
+            zh: '原持有者相对此锁拥有者属于本地还是远端。'
+          },
+          values: {
+            local: {
+              en: 'The holder belongs to this local owner.',
+              zh: '持有者属于当前本地拥有者。'
+            },
+            remote: {
+              en: 'The native holder or handoff is remote.',
+              zh: '原生持有者或交接状态属于远端。'
+            }
+          }
+        }
+      }
     },
     IConcurrencyDecision: {
-      summary: t(
-        'Exclusive wait, reject or retry decision fields.',
-        '互斥的 wait、reject 或 retry 决策字段。'
-      ),
-      members: {}
+      summary: {
+        en: 'One authentic conflict decision selects waiting, rejection or a bounded retry without owning native resources.',
+        zh: '单个真实冲突决策选择等待、拒绝或有界重试，不拥有原生资源。'
+      },
+      members: {
+        action: {
+          summary: {
+            en: 'Choose logical waiting, rejection or a new optimistic attempt after the original conflict.',
+            zh: '在原冲突后选择逻辑等待、拒绝或新的乐观尝试。'
+          },
+          values: {
+            wait: {
+              en: 'Wait only for acquisition admission within the shared budget.',
+              zh: '仅在共享预算内等待获取准入。'
+            },
+            reject: {
+              en: 'Reject the completed conflict without starting another attempt.',
+              zh: '拒绝已结束冲突，不启动新的尝试。'
+            },
+            retry: {
+              en: 'Start a new allowed attempt after optional bounded delay.',
+              zh: '可选有界延迟后启动新的允许尝试。'
+            }
+          }
+        },
+        timeoutMs: {
+          summary: {
+            en: 'Optional logical acquisition-wait bound; forbidden on reject and retry decisions.',
+            zh: '可选逻辑准入等待上界，拒绝与重试决策不允许此字段。'
+          }
+        },
+        delayMs: {
+          summary: {
+            en: 'Optional retry delay; forbidden when waiting or rejecting a conflict.',
+            zh: '可选重试延迟，等待或拒绝冲突时不允许此字段。'
+          }
+        }
+      }
     },
     IStorageBase: {
       summary: t(
@@ -6482,15 +8740,26 @@ console.log(candidate.name, candidate.output)`
         backend: storeMembers.backend!,
         capabilities: storeMembers.capabilities!,
         dispose: {
-          summary: t('Explicit cleanup owned by the original backend.', '原后端拥有的显式清理。'),
-          example: `await base.dispose()`
+          summary: {
+            en: 'Release accepted work and original native resources without acquiring any new close authority.',
+            zh: '排空已接受工作并释放原生资源，不获取新的关闭权限。'
+          },
+          params: {},
+          returns: {
+            en: 'The original cached main cleanup Promise; native cleanup failure rejects with its original reachable cause.',
+            zh: '返回原缓存主清理结果，原生清理失败以可追踪的原始原因拒绝。'
+          }
         },
         '[Symbol.asyncDispose]': {
-          summary: t(
-            'Report-only cleanup at the canonical resource key.',
-            '规范资源键上的只报告清理。'
-          ),
-          example: `await base[Symbol.asyncDispose]()`
+          summary: {
+            en: 'Use the original asynchronous resource-disposal protocol after accepted work drains.',
+            zh: '在已接受工作排空后使用原异步资源释放协议。'
+          },
+          params: {},
+          returns: {
+            en: 'The separately cached symbolic Promise reports cleanup failure and resolves, without replacing the main cleanup Promise.',
+            zh: '单独缓存的符号清理报告失败后完成，不替换主清理结果。'
+          }
         }
       }
     },
@@ -6499,21 +8768,90 @@ console.log(candidate.name, candidate.output)`
         'Resource base with an exact contravariant capability set and token use/has.',
         '保留精确反变能力集合及令牌 use/has 的资源基础对象。'
       ),
-      members: {}
+      members: {
+        dispose: {
+          summary: {
+            en: 'Release accepted work and original native resources without acquiring any new close authority.',
+            zh: '排空已接受工作并释放原生资源，不获取新的关闭权限。'
+          },
+          params: {},
+          returns: {
+            en: 'The original cached main cleanup Promise; native cleanup failure rejects with its original reachable cause.',
+            zh: '返回原缓存主清理结果，原生清理失败以可追踪的原始原因拒绝。'
+          }
+        },
+        '[Symbol.asyncDispose]': {
+          summary: {
+            en: 'Use the original asynchronous resource-disposal protocol after accepted work drains.',
+            zh: '在已接受工作排空后使用原异步资源释放协议。'
+          },
+          params: {},
+          returns: {
+            en: 'The separately cached symbolic Promise reports cleanup failure and resolves, without replacing the main cleanup Promise.',
+            zh: '单独缓存的符号清理报告失败后完成，不替换主清理结果。'
+          }
+        },
+        use: {
+          summary: {
+            en: 'Read the original capability implementation by the authentic token identity.',
+            zh: '按真实令牌身份读取原能力实现，不创建替代提供者。'
+          },
+          params: {
+            capability: {
+              en: 'Original token exported by its owner or returned by defineStorageCapability.',
+              zh: '由所属包导出或能力工厂返回的原始令牌。'
+            }
+          },
+          returns: {
+            en: 'The original implementation API; an unsupported authentic token throws UNSUPPORTED_CAPABILITY synchronously.',
+            zh: '返回原实现接口；不支持的真实令牌同步抛出 UNSUPPORTED_CAPABILITY。'
+          }
+        },
+        has: {
+          summary: {
+            en: 'Inspect the original capability map without invoking native I/O.',
+            zh: '只读检查原能力映射，不调用原生访问操作。'
+          },
+          params: {
+            capability: {
+              en: 'Authentic capability token from its canonical owner.',
+              zh: '来自规范拥有者的真实能力令牌。'
+            }
+          },
+          returns: {
+            en: 'True only when that exact token identity has a published implementation.',
+            zh: '仅该精确令牌身份具有已发布实现时返回真值。'
+          }
+        }
+      }
     },
     IStorageCapability: {
       summary: t(
         'Opaque API token; its name does not grant runtime authority.',
         '不透明 API 令牌；名称不授予运行权限。'
       ),
-      members: {}
+      members: {
+        name: {
+          summary: {
+            en: 'Stable diagnostic name assigned by the capability factory; identity remains the original token object.',
+            zh: '由能力工厂指定的稳定诊断名称，真实身份仍是原令牌对象。'
+          }
+        }
+      }
     },
     IAnyStorageCapability: {
       summary: t(
         'Shared upper bound for capability identity tokens.',
         '能力身份令牌的共同类型上界。'
       ),
-      members: {}
+      members: {
+        name: {
+          summary: {
+            en: 'Stable diagnostic name carried by an authentic capability token, without granting publication authority.',
+            zh: '真实能力令牌承载的稳定诊断名称，不授予能力发布权限。'
+          }
+        }
+      }
     },
     ICapabilityApi: {
       summary: t(
@@ -6531,7 +8869,15 @@ console.log(candidate.name, candidate.output)`
         getMany: batchMembers.getMany!,
         setMany: batchMembers.setMany!,
         removeMany: batchMembers.removeMany!,
-        removeByPrefix: batchMembers.removeByPrefix!
+        removeByPrefix: batchMembers.removeByPrefix!,
+        get: storeMembers.get,
+        set: storeMembers.set,
+        remove: storeMembers.remove,
+        has: storeMembers.has,
+        keys: storeMembers.keys,
+        clearValues: storeMembers.clearValues,
+        clearAll: storeMembers.clearAll,
+        sync: storeMembers.sync
       }
     },
     ICapabilityImpl: {
@@ -6539,14 +8885,108 @@ console.log(candidate.name, candidate.output)`
         'Authentic frozen pairing of one token and its precise backend API.',
         '一个令牌与精确后端 API 的真实冻结配对。'
       ),
-      members: {}
+      members: {
+        capability: {
+          summary: {
+            en: 'Exact authentic token captured by implement, never a structurally equivalent replacement.',
+            zh: '实现工厂捕获的精确真实令牌，不接受结构相似的替代对象。'
+          }
+        },
+        api: {
+          summary: {
+            en: 'Original implementation object retained without taking ownership; standard API shape admission occurs when the descriptor is published.',
+            zh: '保留而不接管原实现对象；标准接口形状在描述符实际发布时准入。'
+          }
+        }
+      },
+      scenarios: [
+        {
+          en: 'Prepare an authentic token/API descriptor before a backend publishes its implementation batch.',
+          zh: '后端发布实现批次前，准备真实令牌与接口描述符。'
+        }
+      ],
+      example:
+        "import { defineStorageCapability, implement } from '@migaia/storage-contract'\nconst token = defineStorageCapability<{ read(): string }>()('application-catalog')\nexport const implementation = implement(token, { read: () => 'ready' })"
     },
     ICapabilityStore: {
       summary: t(
         'Original base refined with exact APIs, full transaction scope and builder augmentation.',
         '保留具体 API、完整事务视图与构建器增强的基础对象投影。'
       ),
-      members: {}
+      members: {
+        dispose: {
+          summary: {
+            en: 'Release accepted work and original native resources without acquiring any new close authority.',
+            zh: '排空已接受工作并释放原生资源，不获取新的关闭权限。'
+          },
+          params: {},
+          returns: {
+            en: 'The original cached main cleanup Promise; native cleanup failure rejects with its original reachable cause.',
+            zh: '返回原缓存主清理结果，原生清理失败以可追踪的原始原因拒绝。'
+          },
+          example:
+            "import type { IStorageResource } from '@migaia/storage-contract'\nexport async function close(resource: IStorageResource) { await resource.dispose() }"
+        },
+        '[Symbol.asyncDispose]': {
+          summary: {
+            en: 'Use the original asynchronous resource-disposal protocol after accepted work drains.',
+            zh: '在已接受工作排空后使用原异步资源释放协议。'
+          },
+          params: {},
+          returns: {
+            en: 'The separately cached symbolic Promise reports cleanup failure and resolves, without replacing the main cleanup Promise.',
+            zh: '单独缓存的符号清理报告失败后完成，不替换主清理结果。'
+          },
+          example:
+            "import type { IStorageResource } from '@migaia/storage-contract'\nexport async function close(resource: IStorageResource) { await resource.dispose() }"
+        },
+        use: {
+          summary: {
+            en: 'Read the original capability implementation by the authentic token identity.',
+            zh: '按真实令牌身份读取原能力实现，不创建替代提供者。'
+          },
+          params: {
+            capability: {
+              en: 'Original token exported by its owner or returned by defineStorageCapability.',
+              zh: '由所属包导出或能力工厂返回的原始令牌。'
+            }
+          },
+          returns: {
+            en: 'The original implementation API; an unsupported authentic token throws UNSUPPORTED_CAPABILITY synchronously.',
+            zh: '返回原实现接口；不支持的真实令牌同步抛出 UNSUPPORTED_CAPABILITY。'
+          },
+          example:
+            "import { kv, type ICapabilityStore, type IStorageBase } from '@migaia/storage-contract'\nexport async function read(store: ICapabilityStore<IStorageBase, typeof kv>) {\n  if (store.has(kv)) console.log(await store.use(kv).get('theme'))\n}"
+        },
+        has: {
+          summary: {
+            en: 'Inspect the original capability map without invoking native I/O.',
+            zh: '只读检查原能力映射，不调用原生访问操作。'
+          },
+          params: {
+            capability: {
+              en: 'Authentic capability token from its canonical owner.',
+              zh: '来自规范拥有者的真实能力令牌。'
+            }
+          },
+          returns: {
+            en: 'True only when that exact token identity has a published implementation.',
+            zh: '仅该精确令牌身份具有已发布实现时返回真值。'
+          },
+          example:
+            "import { kv, type ICapabilityStore, type IStorageBase } from '@migaia/storage-contract'\nexport async function read(store: ICapabilityStore<IStorageBase, typeof kv>) {\n  if (store.has(kv)) console.log(await store.use(kv).get('theme'))\n}"
+        },
+        backend: storeMembers.backend,
+        capabilities: storeMembers.capabilities
+      },
+      scenarios: [
+        {
+          en: 'Borrow the exact standard API published under an authentic capability token.',
+          zh: '按真实能力令牌借用已发布的精确标准接口。'
+        }
+      ],
+      example:
+        "import { kv, type ICapabilityStore, type IStorageBase } from '@migaia/storage-contract'\nexport async function read(store: ICapabilityStore<IStorageBase, typeof kv>) {\n  if (store.has(kv)) console.log(await store.use(kv).get('theme'))\n}"
     },
     IStorageCapabilitySet: {
       summary: t(
@@ -6564,21 +9004,86 @@ console.log(candidate.name, candidate.output)`
         'Idempotent publish and release of one prepared capability batch.',
         '一批已准备能力的幂等发布与释放。'
       ),
-      members: {}
+      members: {
+        publish: {
+          summary: {
+            en: 'Publish the prepared batch through the same store-owned capability map.',
+            zh: '通过同一存储所属能力映射发布已准备批次。'
+          },
+          params: {},
+          returns: {
+            en: 'The prepared capability APIs become available without changing store ownership.',
+            zh: '已准备能力接口变为可用，不改变存储拥有权。'
+          }
+        },
+        release: {
+          summary: {
+            en: 'Remove only this publication through its original installation owner.',
+            zh: '仅经原安装拥有者移除此发布批次，不影响其它能力。'
+          },
+          params: {},
+          returns: {
+            en: 'This batch is released; no store or borrowed backend is closed.',
+            zh: '本批次完成释放，不关闭存储或借用后端。'
+          }
+        }
+      }
     },
     ICapabilityInstallPort: {
       summary: t(
         'One store’s opaque prepare/publish/release installation authority.',
         '一个 store 的不透明 prepare/publish/release 安装权限。'
       ),
-      members: {}
+      members: {
+        prepare: {
+          summary: {
+            en: 'Validate one complete implementation batch before publishing any capability.',
+            zh: '发布任何能力前校验整批真实实现，避免部分可见。'
+          },
+          params: {
+            implementations: {
+              en: 'Authentic descriptors returned by implement, without duplicate token identities.',
+              zh: '实现工厂返回的真实描述符，不含重复令牌身份。'
+            }
+          },
+          returns: {
+            en: 'A publication handle for this batch; preparation alone does not make the APIs visible.',
+            zh: '返回本批次发布句柄，仅准备不会使接口可见。'
+          }
+        }
+      }
     },
     IChainMethods: {
       summary: t(
         'Finite query, transaction, vector and RDF chain method groups.',
         '有限的 query、事务、vector 与 RDF 链方法分组。'
       ),
-      members: {}
+      members: {
+        query: {
+          summary: {
+            en: 'Record query method augmentations projected by the original selected Feature set.',
+            zh: '由原所选扩展集合投影的记录查询方法增强。'
+          }
+        },
+        tx: {
+          summary: {
+            en: 'Transaction builder augmentations retained by the original scope owner.',
+            zh: '由原作用域拥有者保留的事务构造器方法增强。'
+          }
+        },
+        vector: {
+          summary: {
+            en: 'Vector query method augmentations without changing native scoring ownership.',
+            zh: '不改变原生评分拥有权的向量查询方法增强。'
+          }
+        },
+        rdf: {
+          summary: {
+            en: 'RDF query augmentations preserving original ground-term and traversal semantics.',
+            zh: '保留原完整项与遍历语义的三元组查询方法增强。'
+          }
+        }
+      }
     },
     IChainMethodsOf: {
       summary: t('Pure projection of existing chain method groups.', '已有链方法分组的纯投影。'),
@@ -6596,10 +9101,10 @@ console.log(candidate.name, candidate.output)`
       members: {}
     },
     ILockKey: {
-      summary: t(
-        'Physical text, bytes or record channel and key identity.',
-        'text、bytes 或 record 物理通道及键身份。'
-      ),
+      summary: {
+        en: 'Canonical channel-specific identity; equivalent structured values share the original ordered lock domain.',
+        zh: '规范通道身份，等价结构值共享原保序锁身份领域。'
+      },
       members: {
         channel: {
           summary: t(
@@ -6612,6 +9117,24 @@ console.log(candidate.name, candidate.output)`
             'Existing typed storage key for text/records, or string for bytes; factory snapshots mutable components.',
             'text/record 为原 typed storage key，bytes 为字符串；工厂快照可变组件。'
           )
+        },
+        collection: {
+          summary: {
+            en: 'Vector collection name assigned by the application for this point identity.',
+            zh: '应用为此向量点身份指定的集合名称。'
+          }
+        },
+        id: {
+          summary: {
+            en: 'Point identifier assigned by upsert within the same collection.',
+            zh: '由向量写入在同一集合内指定的点标识符。'
+          }
+        },
+        quad: {
+          summary: {
+            en: 'Canonical ground RDF quad that identifies the locked member.',
+            zh: '用于标识被锁成员的规范完整三元组。'
+          }
         }
       }
     },
@@ -6633,60 +9156,404 @@ console.log(candidate.name, candidate.output)`
             '捕获的悲观或乐观模式，独立于已有键 ConflictPolicy。'
           )
         }
-      }
+      },
+      scenarios: [
+        {
+          en: 'Choose original lock admission and bounded waiting before starting a backend operation.',
+          zh: '启动后端操作前选择原锁准入与有界等待策略。'
+        }
+      ],
+      example:
+        "import { ConcurrencyPolicy } from '@migaia/storage-contract'\nexport const policy = ConcurrencyPolicy.wait({ timeoutMs: 1000 })"
     },
     ITransactionOptions: {
       summary: t(
         'Operation timing, declared locks and a selected concurrency policy.',
         '操作时间选项、声明锁及选定并发策略。'
       ),
-      members: {}
+      members: {
+        lock: {
+          summary: {
+            en: 'Captured canonical channel lock identities; empty and duplicate handling belong to the original owner.',
+            zh: '已捕获规范通道锁身份，空集合与重复处理属于原拥有者。'
+          }
+        },
+        concurrency: {
+          summary: {
+            en: 'Original authentic policy selecting lock admission and conflict behavior under the same operation budget.',
+            zh: '在同一操作预算内选择锁准入与冲突行为的原真实策略。'
+          }
+        }
+      }
     },
     IWriteConcurrencyOptions: {
       summary: t('Per-write concurrency policy override.', '单次写入的并发策略覆盖。'),
-      members: {}
+      members: {
+        concurrency: {
+          summary: {
+            en: 'Optional authentic policy applied by the existing write owner without a second retry loop.',
+            zh: '由既有写入拥有者应用的可选真实策略，不增加第二重试循环。'
+          }
+        }
+      }
     },
     ITransactionBuilder: {
       summary: t(
         'Immutable unlocked chain type retaining its original second augmentation generic.',
         '保留原第二增强泛型的不可变未加锁链类型。'
       ),
-      members: {}
+      members: {
+        concurrency: {
+          summary: {
+            en: 'Return an immutable builder carrying the selected authentic original policy.',
+            zh: '返回携带所选真实原策略的不可变构造器。'
+          },
+          params: {
+            policy: {
+              en: 'Authentic ConcurrencyPolicy identity; only optimistic mode is accepted by unlocked native builders.',
+              zh: '真实并发策略身份，无锁原生构造器仅接受乐观模式。'
+            }
+          },
+          returns: {
+            en: 'A new builder; no native operation or timing budget starts yet.',
+            zh: '返回新构造器，此时不启动原生操作或计时预算。'
+          },
+          example:
+            "import { createTransactionBuilder, lockKey, type IRecordStore } from '@migaia/storage-contract'\nexport async function save(store: IRecordStore) {\n  return createTransactionBuilder(store).lock(lockKey.text('theme')).timeout(1000).run(async scope => {\n    await scope.set('theme', 'dark')\n  })\n}"
+        },
+        signal: {
+          summary: {
+            en: 'Carry the original caller cancellation signal into the eventual transaction.',
+            zh: '将原调用方取消信号传入最终执行的事务。'
+          },
+          params: {
+            signal: {
+              en: 'Original caller signal inherited by the transaction without a second timeout owner.',
+              zh: '事务继承的原调用方信号，不产生第二超时拥有者。'
+            }
+          },
+          returns: {
+            en: 'A new builder preserving its original scope and method augmentations.',
+            zh: '返回保留原作用域与方法增强的新构造器。'
+          },
+          example:
+            "import { createTransactionBuilder, lockKey, type IRecordStore } from '@migaia/storage-contract'\nexport async function save(store: IRecordStore) {\n  return createTransactionBuilder(store).lock(lockKey.text('theme')).timeout(1000).run(async scope => {\n    await scope.set('theme', 'dark')\n  })\n}"
+        },
+        timeout: {
+          summary: {
+            en: 'Capture a nonnegative safe millisecond budget for the eventual original operation.',
+            zh: '为最终原操作捕获非负安全整数毫秒预算。'
+          },
+          params: {
+            ms: {
+              en: 'Application-chosen nonnegative safe integer milliseconds, including zero.',
+              zh: '应用选择的非负安全整数毫秒数，允许为零。'
+            }
+          },
+          returns: {
+            en: 'A new builder; configuration itself consumes no execution budget.',
+            zh: '返回新构造器，配置本身不消耗执行预算。'
+          },
+          example:
+            "import { createTransactionBuilder, lockKey, type IRecordStore } from '@migaia/storage-contract'\nexport async function save(store: IRecordStore) {\n  return createTransactionBuilder(store).lock(lockKey.text('theme')).timeout(1000).run(async scope => {\n    await scope.set('theme', 'dark')\n  })\n}"
+        },
+        lock: {
+          summary: {
+            en: 'Append canonical channel identities and enable the original transaction terminal.',
+            zh: '追加规范通道身份，并启用原事务执行终点。'
+          },
+          params: {
+            first: {
+              en: 'First canonical lock identity from lockKey or the same backend owner.',
+              zh: '来自锁键工厂或同一后端拥有者的首个规范锁身份。'
+            },
+            rest: {
+              en: 'Further canonical identities, copied only for this new builder step.',
+              zh: '其它规范身份，仅为当前新构造步骤进行复制。'
+            }
+          },
+          returns: {
+            en: 'A locked immutable builder retaining the exact native scope.',
+            zh: '返回保留精确原生作用域的已声明锁不可变构造器。'
+          },
+          example:
+            "import { createTransactionBuilder, lockKey, type IRecordStore } from '@migaia/storage-contract'\nexport async function save(store: IRecordStore) {\n  return createTransactionBuilder(store).lock(lockKey.text('theme')).timeout(1000).run(async scope => {\n    await scope.set('theme', 'dark')\n  })\n}"
+        }
+      },
+      example:
+        "import { createTransactionBuilder, lockKey, type IRecordStore } from '@migaia/storage-contract'\nexport async function save(store: IRecordStore) {\n  return createTransactionBuilder(store).lock(lockKey.text('theme')).timeout(1000).run(async scope => {\n    await scope.set('theme', 'dark')\n  })\n}",
+      scenarios: [
+        {
+          en: 'Declare the application lock identities before starting the original native transaction.',
+          zh: '启动原生事务前先声明应用所需的锁身份。'
+        }
+      ]
     },
     ILockedTransactionBuilder: {
       summary: t(
         'Locked chain type exposes run and retains full scope and method augmentation.',
         '加锁链类型公开 run，并保留完整视图与方法增强。'
       ),
-      members: {}
+      members: {
+        concurrency: {
+          summary: {
+            en: 'Return an immutable builder carrying the selected authentic original policy.',
+            zh: '返回携带所选真实原策略的不可变构造器。'
+          },
+          params: {
+            policy: {
+              en: 'Authentic ConcurrencyPolicy identity; only optimistic mode is accepted by unlocked native builders.',
+              zh: '真实并发策略身份，无锁原生构造器仅接受乐观模式。'
+            }
+          },
+          returns: {
+            en: 'A new builder; no native operation or timing budget starts yet.',
+            zh: '返回新构造器，此时不启动原生操作或计时预算。'
+          },
+          example:
+            "import { createTransactionBuilder, lockKey, type IRecordStore } from '@migaia/storage-contract'\nexport async function save(store: IRecordStore) {\n  return createTransactionBuilder(store).lock(lockKey.text('theme')).timeout(1000).run(async scope => {\n    await scope.set('theme', 'dark')\n  })\n}"
+        },
+        signal: {
+          summary: {
+            en: 'Carry the original caller cancellation signal into the eventual transaction.',
+            zh: '将原调用方取消信号传入最终执行的事务。'
+          },
+          params: {
+            signal: {
+              en: 'Original caller signal inherited by the transaction without a second timeout owner.',
+              zh: '事务继承的原调用方信号，不产生第二超时拥有者。'
+            }
+          },
+          returns: {
+            en: 'A new builder preserving its original scope and method augmentations.',
+            zh: '返回保留原作用域与方法增强的新构造器。'
+          },
+          example:
+            "import { createTransactionBuilder, lockKey, type IRecordStore } from '@migaia/storage-contract'\nexport async function save(store: IRecordStore) {\n  return createTransactionBuilder(store).lock(lockKey.text('theme')).timeout(1000).run(async scope => {\n    await scope.set('theme', 'dark')\n  })\n}"
+        },
+        timeout: {
+          summary: {
+            en: 'Capture a nonnegative safe millisecond budget for the eventual original operation.',
+            zh: '为最终原操作捕获非负安全整数毫秒预算。'
+          },
+          params: {
+            ms: {
+              en: 'Application-chosen nonnegative safe integer milliseconds, including zero.',
+              zh: '应用选择的非负安全整数毫秒数，允许为零。'
+            }
+          },
+          returns: {
+            en: 'A new builder; configuration itself consumes no execution budget.',
+            zh: '返回新构造器，配置本身不消耗执行预算。'
+          },
+          example:
+            "import { createTransactionBuilder, lockKey, type IRecordStore } from '@migaia/storage-contract'\nexport async function save(store: IRecordStore) {\n  return createTransactionBuilder(store).lock(lockKey.text('theme')).timeout(1000).run(async scope => {\n    await scope.set('theme', 'dark')\n  })\n}"
+        },
+        lock: {
+          summary: {
+            en: 'Append canonical channel identities and enable the original transaction terminal.',
+            zh: '追加规范通道身份，并启用原事务执行终点。'
+          },
+          params: {
+            first: {
+              en: 'First canonical lock identity from lockKey or the same backend owner.',
+              zh: '来自锁键工厂或同一后端拥有者的首个规范锁身份。'
+            },
+            rest: {
+              en: 'Further canonical identities, copied only for this new builder step.',
+              zh: '其它规范身份，仅为当前新构造步骤进行复制。'
+            }
+          },
+          returns: {
+            en: 'A locked immutable builder retaining the exact native scope.',
+            zh: '返回保留精确原生作用域的已声明锁不可变构造器。'
+          },
+          example:
+            "import { createTransactionBuilder, lockKey, type IRecordStore } from '@migaia/storage-contract'\nexport async function save(store: IRecordStore) {\n  return createTransactionBuilder(store).lock(lockKey.text('theme')).timeout(1000).run(async scope => {\n    await scope.set('theme', 'dark')\n  })\n}"
+        },
+        run: {
+          summary: {
+            en: 'Invoke the original backend transaction exactly once with the captured builder intent.',
+            zh: '携带已捕获构造意图，精确调用一次原后端事务。'
+          },
+          params: {
+            run: {
+              en: 'Application callback receiving the exact authentic native scope.',
+              zh: '接收精确真实原生作用域的应用回调。'
+            }
+          },
+          returns: {
+            en: 'The original transaction Promise and awaited callback value, after real native settlement.',
+            zh: '返回原事务结果及等待后的回调值，均在原生工作真实结算后完成。'
+          },
+          example:
+            "import { createTransactionBuilder, lockKey, type IRecordStore } from '@migaia/storage-contract'\nexport async function save(store: IRecordStore) {\n  return createTransactionBuilder(store).lock(lockKey.text('theme')).timeout(1000).run(async scope => {\n    await scope.set('theme', 'dark')\n  })\n}"
+        }
+      },
+      example:
+        "import { createTransactionBuilder, lockKey, type IRecordStore } from '@migaia/storage-contract'\nexport async function save(store: IRecordStore) {\n  return createTransactionBuilder(store).lock(lockKey.text('theme')).timeout(1000).run(async scope => {\n    await scope.set('theme', 'dark')\n  })\n}",
+      scenarios: [
+        {
+          en: 'Declare the application lock identities before starting the original native transaction.',
+          zh: '启动原生事务前先声明应用所需的锁身份。'
+        }
+      ]
     },
     IOptimisticTransactionBuilder: {
       summary: t(
         'Native immutable transaction chain with run from the root, no lock method and only authentic optimistic policies; the original transaction retains execution authority.',
         '原生不可变事务链：根部具备 run、没有 lock，仅接受真实乐观策略；执行权限仍属于原 transaction。'
       ),
-      members: {}
+      members: {
+        concurrency: {
+          summary: {
+            en: 'Return an immutable builder carrying the selected authentic original policy.',
+            zh: '返回携带所选真实原策略的不可变构造器。'
+          },
+          params: {
+            policy: {
+              en: 'Authentic ConcurrencyPolicy identity; only optimistic mode is accepted by unlocked native builders.',
+              zh: '真实并发策略身份，无锁原生构造器仅接受乐观模式。'
+            }
+          },
+          returns: {
+            en: 'A new builder; no native operation or timing budget starts yet.',
+            zh: '返回新构造器，此时不启动原生操作或计时预算。'
+          },
+          example:
+            "import { createTransactionBuilder, type IRecordStore } from '@migaia/storage-contract'\nexport async function save(store: IRecordStore) {\n  return createTransactionBuilder(store, undefined, undefined, { mode: 'optimistic' })\n    .timeout(1000).run(scope => scope.set('theme', 'dark'))\n}"
+        },
+        signal: {
+          summary: {
+            en: 'Carry the original caller cancellation signal into the eventual transaction.',
+            zh: '将原调用方取消信号传入最终执行的事务。'
+          },
+          params: {
+            signal: {
+              en: 'Original caller signal inherited by the transaction without a second timeout owner.',
+              zh: '事务继承的原调用方信号，不产生第二超时拥有者。'
+            }
+          },
+          returns: {
+            en: 'A new builder preserving its original scope and method augmentations.',
+            zh: '返回保留原作用域与方法增强的新构造器。'
+          },
+          example:
+            "import { createTransactionBuilder, type IRecordStore } from '@migaia/storage-contract'\nexport async function save(store: IRecordStore) {\n  return createTransactionBuilder(store, undefined, undefined, { mode: 'optimistic' })\n    .timeout(1000).run(scope => scope.set('theme', 'dark'))\n}"
+        },
+        timeout: {
+          summary: {
+            en: 'Capture a nonnegative safe millisecond budget for the eventual original operation.',
+            zh: '为最终原操作捕获非负安全整数毫秒预算。'
+          },
+          params: {
+            ms: {
+              en: 'Application-chosen nonnegative safe integer milliseconds, including zero.',
+              zh: '应用选择的非负安全整数毫秒数，允许为零。'
+            }
+          },
+          returns: {
+            en: 'A new builder; configuration itself consumes no execution budget.',
+            zh: '返回新构造器，配置本身不消耗执行预算。'
+          },
+          example:
+            "import { createTransactionBuilder, type IRecordStore } from '@migaia/storage-contract'\nexport async function save(store: IRecordStore) {\n  return createTransactionBuilder(store, undefined, undefined, { mode: 'optimistic' })\n    .timeout(1000).run(scope => scope.set('theme', 'dark'))\n}"
+        },
+        run: {
+          summary: {
+            en: 'Invoke the original backend transaction exactly once with the captured builder intent.',
+            zh: '携带已捕获构造意图，精确调用一次原后端事务。'
+          },
+          params: {
+            run: {
+              en: 'Application callback receiving the exact authentic native scope.',
+              zh: '接收精确真实原生作用域的应用回调。'
+            }
+          },
+          returns: {
+            en: 'The original transaction Promise and awaited callback value, after real native settlement.',
+            zh: '返回原事务结果及等待后的回调值，均在原生工作真实结算后完成。'
+          },
+          example:
+            "import { createTransactionBuilder, type IRecordStore } from '@migaia/storage-contract'\nexport async function save(store: IRecordStore) {\n  return createTransactionBuilder(store, undefined, undefined, { mode: 'optimistic' })\n    .timeout(1000).run(scope => scope.set('theme', 'dark'))\n}"
+        }
+      },
+      example:
+        "import { createTransactionBuilder, type IRecordStore } from '@migaia/storage-contract'\nexport async function save(store: IRecordStore) {\n  return createTransactionBuilder(store, undefined, undefined, { mode: 'optimistic' })\n    .timeout(1000).run(scope => scope.set('theme', 'dark'))\n}",
+      scenarios: [
+        {
+          en: 'Execute a native atomic optimistic backend without inventing a key-lock domain.',
+          zh: '执行原生原子乐观后端，不虚构键锁领域。'
+        }
+      ]
     },
     IOptimisticTransactionBuilderMode: {
       summary: t(
         'Optional fourth author descriptor {mode:"optimistic"}; omission preserves the existing lock-required builder.',
         '可选第四作者描述符 {mode:"optimistic"}；省略时保持既有需声明锁的 builder。'
       ),
-      members: {}
+      members: {
+        mode: {
+          summary: {
+            en: 'Explicit author-only optimistic mode exposes native run without any fabricated key lock.',
+            zh: '显式作者乐观模式公开原生执行入口，不虚构任何键锁。'
+          }
+        }
+      }
     },
     IVersionedEnvelope: {
       summary: t(
         'Own safe version and caller-owned non-null state container.',
         '自有安全版本与调用方拥有的非空状态容器。'
       ),
-      members: {}
+      members: {
+        version: {
+          summary: {
+            en: 'Own nonnegative safe integer archive version validated before migration.',
+            zh: '升级前校验的自有非负安全整数存档版本。'
+          }
+        },
+        state: {
+          summary: {
+            en: 'Original non-null archived state, retained by identity rather than cloned by envelope admission.',
+            zh: '原非空存档状态，信封准入保留其身份而不进行克隆。'
+          }
+        }
+      },
+      scenarios: [
+        {
+          en: 'Validate archive version and preserve original state identity before migration.',
+          zh: '升级前校验存档版本，并保留原始状态身份。'
+        }
+      ],
+      example:
+        "import { assertVersionedEnvelope } from '@migaia/storage-contract'\nexport const archive = assertVersionedEnvelope({ version: 1, state: { theme: 'dark' } })"
     },
     IMigrationStepContext: {
       summary: t(
         'One source/target version transition with an optional borrowed cancellation signal.',
         '一次来源/目标版本转换及可选借用取消信号。'
       ),
-      members: {}
+      members: {
+        fromVersion: {
+          summary: {
+            en: 'Original safe source version assigned by the migration runner.',
+            zh: '升级运行器指定的原始安全来源版本号。'
+          }
+        },
+        toVersion: {
+          summary: {
+            en: 'Next target version assigned by the canonical continuous plan.',
+            zh: '规范连续升级计划指定的下一个目标版本号。'
+          }
+        },
+        signal: {
+          summary: {
+            en: 'Original operation signal borrowed by this one asynchronous step.',
+            zh: '当前单个异步步骤借用的原操作取消信号。'
+          }
+        }
+      }
     },
     IMigrationStep: {
       summary: t(
@@ -6700,7 +9567,14 @@ console.log(candidate.name, candidate.output)`
         'Zero-argument fresh-state factory for resetting older archives once.',
         '对旧存档仅调用一次的零参数新状态工厂。'
       ),
-      members: {}
+      members: {
+        reset: {
+          summary: {
+            en: 'Application callback receiving the old state and producing a replacement for the selected version.',
+            zh: '应用回调接收旧状态，并为指定版本产生替换状态。'
+          }
+        }
+      }
     },
     ISyncMigrationSteps: {
       summary: t(
@@ -6714,28 +9588,157 @@ console.log(candidate.name, candidate.output)`
         'Frozen current/base versions and captured step functions, with optional reset.',
         '冻结的当前/最低版本及步骤快照，可选 reset。'
       ),
-      members: {}
+      members: {
+        version: {
+          summary: {
+            en: 'Current nonnegative safe version chosen by the application.',
+            zh: '应用选择的当前非负安全整数版本号。'
+          }
+        },
+        baseVersion: {
+          summary: {
+            en: 'Earliest source version supported by the captured continuous step chain.',
+            zh: '已捕获连续升级步骤链支持的最早来源版本。'
+          }
+        },
+        steps: {
+          summary: {
+            en: 'Frozen target-version callbacks captured once during plan creation.',
+            zh: '创建计划时捕获一次并冻结的目标版本回调集合。'
+          }
+        },
+        reset: {
+          summary: {
+            en: 'Optional exclusive reset callback replacing step traversal with one new state.',
+            zh: '可选且与步骤遍历互斥的重置回调，产生单个新状态。'
+          }
+        }
+      },
+      scenarios: [
+        {
+          en: 'Upgrade a known archived state through the declared continuous target-version steps.',
+          zh: '按声明的连续目标版本步骤升级已知存档状态。'
+        }
+      ],
+      example:
+        "import { createMigrationPlan, migrateEnvelope } from '@migaia/storage-contract'\nconst plan = createMigrationPlan({ version: 1, steps: { 1: old => ({ previous: old }) } })\nconsole.log(await migrateEnvelope(plan, { version: 0, state: 'draft' }))"
     },
     IMigrationStepObserver: {
       summary: t(
         'Nonblocking before/after observers with a synchronous failure reporter.',
         '不阻塞的步骤前后观察器及同步失败报告。'
       ),
-      members: {}
+      members: {
+        beforeStep: {
+          summary: {
+            en: 'Observe source and target versions before the original step callback starts.',
+            zh: '在原步骤回调开始前观察来源版本与目标版本。'
+          }
+        },
+        afterStep: {
+          summary: {
+            en: 'Observe the completed original step without replacing its returned state.',
+            zh: '观察已完成的原步骤，不替换其返回状态。'
+          }
+        },
+        report: {
+          summary: {
+            en: 'Report observer failures while leaving the migration primary result intact.',
+            zh: '报告观察者失败，同时保持升级首要结果不变。'
+          }
+        }
+      }
     },
     IMigrationRunOptions: {
       summary: t(
         'Borrowed cancellation, utility reporter and step observation configuration.',
         '借用的取消、工具报告器与步骤观察配置。'
       ),
-      members: {}
+      members: {
+        observe: {
+          summary: {
+            en: 'Optional original before/after step observer; it cannot change migration values.',
+            zh: '可选原步骤前后观察者，不能修改升级返回值。'
+          }
+        },
+        signal: {
+          summary: {
+            en: 'Original caller cancellation signal checked by the asynchronous migration owner.',
+            zh: '由异步升级拥有者检查的原调用方取消信号。'
+          }
+        },
+        report: {
+          summary: {
+            en: 'Original reporter for observation or late cleanup failures, preserving the primary error.',
+            zh: '观察或迟到清理失败使用的原报告器，不替换首要错误。'
+          }
+        }
+      }
     },
     ICodecStageObserver: {
       summary: t(
         'Observation-only encode/decode stages bound to the original real store and transaction owner.',
         '绑定原真实 store 与事务拥有者的只观察编解码阶段。'
       ),
-      members: {}
+      members: {
+        kind: {
+          summary: {
+            en: 'Codec stage discriminator used by the original codec observer owner.',
+            zh: '原编解码观察者拥有者使用的阶段区分字段。'
+          },
+          values: {
+            enum: 'StorageStageKind'
+          }
+        },
+        forTransaction: {
+          summary: {
+            en: 'Bind observations to the original authentic transaction view, without creating a second codec.',
+            zh: '将观察绑定到原真实事务视图，不创建第二套编解码器。'
+          }
+        },
+        beforeEncode: {
+          summary: {
+            en: 'Observe the original value immediately before its selected encoder runs.',
+            zh: '在选定编码器运行之前观察原始待编码数据值。'
+          }
+        },
+        afterEncode: {
+          summary: {
+            en: 'Observe completion of original encoding without replacing the encoded result.',
+            zh: '观察原编码完成，不替换已编码结果。'
+          }
+        },
+        onEncodeError: {
+          summary: {
+            en: 'Observe the original encoding failure while preserving its primary cause.',
+            zh: '观察原编码失败，同时保留首要错误原因。'
+          }
+        },
+        beforeDecode: {
+          summary: {
+            en: 'Observe native stored bytes or text before the original decoder runs.',
+            zh: '在原解码器运行之前观察原生已存字节或文本。'
+          }
+        },
+        afterDecode: {
+          summary: {
+            en: 'Observe the original decoded value without changing its clone boundary.',
+            zh: '观察原已解码值，不改变数据克隆边界。'
+          }
+        },
+        onDecodeError: {
+          summary: {
+            en: 'Observe original decoding failure without substituting successful data.',
+            zh: '观察原解码失败，不以成功数据替代该错误。'
+          }
+        },
+        report: {
+          summary: {
+            en: 'Report observer failures through the original owner without replacing the primary operation result.',
+            zh: '经原拥有者报告观察者失败，不替换首要操作结果。'
+          }
+        }
+      }
     },
     IKeyValueStore: {
       summary: t(
@@ -6749,7 +9752,31 @@ console.log(candidate.name, candidate.output)`
         )
       ],
       example: storeExample,
-      members: storeMembers
+      members: {
+        ...storeMembers,
+        dispose: {
+          summary: {
+            en: 'Release accepted work and original native resources without acquiring any new close authority.',
+            zh: '排空已接受工作并释放原生资源，不获取新的关闭权限。'
+          },
+          params: {},
+          returns: {
+            en: 'The original cached main cleanup Promise; native cleanup failure rejects with its original reachable cause.',
+            zh: '返回原缓存主清理结果，原生清理失败以可追踪的原始原因拒绝。'
+          }
+        },
+        '[Symbol.asyncDispose]': {
+          summary: {
+            en: 'Use the original asynchronous resource-disposal protocol after accepted work drains.',
+            zh: '在已接受工作排空后使用原异步资源释放协议。'
+          },
+          params: {},
+          returns: {
+            en: 'The separately cached symbolic Promise reports cleanup failure and resolves, without replacing the main cleanup Promise.',
+            zh: '单独缓存的符号清理报告失败后完成，不替换主清理结果。'
+          }
+        }
+      }
     },
     ISyncKeyValueStore: {
       summary: t(
@@ -6876,7 +9903,35 @@ if (sync) {
         )
       ],
       example: storeExample,
-      members: recordMembers
+      members: {
+        ...recordMembers,
+        dispose: {
+          summary: {
+            en: 'Release accepted work and original native resources without acquiring any new close authority.',
+            zh: '排空已接受工作并释放原生资源，不获取新的关闭权限。'
+          },
+          params: {},
+          returns: {
+            en: 'The original cached main cleanup Promise; native cleanup failure rejects with its original reachable cause.',
+            zh: '返回原缓存主清理结果，原生清理失败以可追踪的原始原因拒绝。'
+          },
+          example:
+            "import type { IRecordStore } from '@migaia/storage-contract'\nexport async function close(store: IRecordStore) { await store.dispose() }"
+        },
+        '[Symbol.asyncDispose]': {
+          summary: {
+            en: 'Use the original asynchronous resource-disposal protocol after accepted work drains.',
+            zh: '在已接受工作排空后使用原异步资源释放协议。'
+          },
+          params: {},
+          returns: {
+            en: 'The separately cached symbolic Promise reports cleanup failure and resolves, without replacing the main cleanup Promise.',
+            zh: '单独缓存的符号清理报告失败后完成，不替换主清理结果。'
+          },
+          example:
+            "import type { IRecordStore } from '@migaia/storage-contract'\nexport async function close(store: IRecordStore) { await store.dispose() }"
+        }
+      }
     },
     IConformanceHarness: {
       summary: t(
@@ -6884,18 +9939,61 @@ if (sync) {
         '现有消费者 runner 接点；契约不拥有执行调度或通知期限。'
       ),
       members: {
-        describe: { summary: t('Register a named case group.', '登记具名用例组。') },
+        describe: {
+          summary: {
+            en: 'Register the conformance group in the caller-supplied existing runner.',
+            zh: '在调用方提供的既有运行器中登记一致性用例分组。'
+          },
+          params: {
+            name: {
+              en: 'Human-readable backend and capability group name chosen by the suite.',
+              zh: '套件选择的可读后端与能力分组名称。'
+            },
+            run: {
+              en: 'Synchronous registration callback executed by the original runner.',
+              zh: '由原运行器执行的同步用例登记回调。'
+            }
+          },
+          returns: {
+            en: 'Registration completes; execution and failure reporting remain runner-owned.',
+            zh: '登记完成，执行与失败报告仍归运行器拥有。'
+          }
+        },
         it: {
-          summary: t(
-            'Register one independently created and disposed case.',
-            '登记一个独立创建与释放的用例。'
-          )
+          summary: {
+            en: 'Register one original conformance case without creating a test runtime.',
+            zh: '登记单个原一致性用例，不创建新的测试运行时。'
+          },
+          params: {
+            name: {
+              en: 'Human-readable behavior label selected by the canonical suite.',
+              zh: '由规范套件选择的可读行为标签。'
+            },
+            run: {
+              en: 'Original synchronous or asynchronous case body; rejection is observed by the supplied runner.',
+              zh: '原同步或异步用例正文，拒绝由所提供运行器观察。'
+            }
+          },
+          returns: {
+            en: 'The existing runner receives this case and owns its assertion failures.',
+            zh: '既有运行器接收此用例，并拥有其断言失败。'
+          }
         },
         expect: {
-          summary: t(
-            'Return the supplied synchronous and async assertion vocabulary.',
-            '返回消费者的同步与异步断言。'
-          )
+          summary: {
+            en: 'Borrow the existing runner assertion object for one actual value.',
+            zh: '为单个实际值借用既有运行器的断言对象。'
+          },
+          params: {
+            actual: {
+              en: 'Actual runtime value or Promise returned by the native behavior under test.',
+              zh: '被检验原生行为返回的实际运行时值或异步结果。'
+            }
+          },
+          returns: {
+            en: 'The original matcher facade; this contract does not implement another assertion engine.',
+            zh: '返回原匹配器门面，契约不实现第二套断言引擎。'
+          }
         }
       }
     },
@@ -6906,28 +10004,109 @@ if (sync) {
       ),
       members: {
         toBe: {
-          summary: t('Assert exact identity or primitive equality.', '断言精确身份或原始值相等。')
+          summary: {
+            en: 'Assert original runner identity equality for the actual value.',
+            zh: '按原运行器规则断言实际值的身份相等。'
+          },
+          params: {
+            expected: {
+              en: 'Expected original value, shape or supported error matcher supplied by this case.',
+              zh: '当前用例给出的预期原值、形状或受支持错误匹配器。'
+            }
+          },
+          returns: {
+            en: 'The original runner assertion succeeds or throws its own failure.',
+            zh: '原运行器断言成功，或抛出其自身的断言失败。'
+          }
         },
-        toEqual: { summary: t('Assert structural equality.', '断言结构相等。') },
-        toBeNull: { summary: t('Assert null.', '断言 null。') },
-        toBeUndefined: { summary: t('Assert undefined.', '断言 undefined。') },
-        toBeDefined: { summary: t('Assert a defined value.', '断言值已定义。') },
+        toEqual: {
+          summary: {
+            en: 'Assert original runner structural equality for the actual value.',
+            zh: '按原运行器规则断言实际值的结构相等。'
+          },
+          params: {
+            expected: {
+              en: 'Expected original value, shape or supported error matcher supplied by this case.',
+              zh: '当前用例给出的预期原值、形状或受支持错误匹配器。'
+            }
+          },
+          returns: {
+            en: 'The original runner assertion succeeds or throws its own failure.',
+            zh: '原运行器断言成功，或抛出其自身的断言失败。'
+          }
+        },
+        toBeNull: {
+          summary: {
+            en: 'Assert that the actual runtime value is exactly null.',
+            zh: '断言实际运行时值精确为空值，而非未定义。'
+          },
+          params: {},
+          returns: {
+            en: 'The original runner assertion succeeds or throws its own failure.',
+            zh: '原运行器断言成功，或抛出其自身的断言失败。'
+          }
+        },
+        toBeUndefined: {
+          summary: {
+            en: 'Assert that the actual runtime value is exactly undefined.',
+            zh: '断言实际运行时值精确为未定义，而非空值。'
+          },
+          params: {},
+          returns: {
+            en: 'The original runner assertion succeeds or throws its own failure.',
+            zh: '原运行器断言成功，或抛出其自身的断言失败。'
+          }
+        },
+        toBeDefined: {
+          summary: {
+            en: 'Assert that the actual runtime value is defined under the original runner.',
+            zh: '按原运行器规则断言实际运行时值已定义。'
+          },
+          params: {},
+          returns: {
+            en: 'The original runner assertion succeeds or throws its own failure.',
+            zh: '原运行器断言成功，或抛出其自身的断言失败。'
+          }
+        },
         toThrow: {
-          summary: t(
-            'Assert a callable fails, optionally matching its text.',
-            '断言函数失败，可匹配错误文本。'
-          )
+          summary: {
+            en: 'Assert original thrown failure matching without replacing the original error.',
+            zh: '匹配原抛出失败，不替换其原始错误对象。'
+          },
+          params: {
+            expected: {
+              en: 'Expected original value, shape or supported error matcher supplied by this case.',
+              zh: '当前用例给出的预期原值、形状或受支持错误匹配器。'
+            }
+          },
+          returns: {
+            en: 'The original runner assertion succeeds or throws its own failure.',
+            zh: '原运行器断言成功，或抛出其自身的断言失败。'
+          }
         },
         toMatchObject: {
-          summary: t('Assert the expected observable fields.', '断言预期可观察字段。')
+          summary: {
+            en: 'Assert the expected semantic fields on the actual native result or failure.',
+            zh: '断言实际原生结果或失败具有预期语义字段。'
+          },
+          params: {
+            expected: {
+              en: 'Expected original value, shape or supported error matcher supplied by this case.',
+              zh: '当前用例给出的预期原值、形状或受支持错误匹配器。'
+            }
+          },
+          returns: {
+            en: 'The original runner assertion succeeds or throws its own failure.',
+            zh: '原运行器断言成功，或抛出其自身的断言失败。'
+          }
         }
       }
     },
     IConformanceAsyncMatchers: {
-      summary: t(
-        'The same matcher arguments with Promise<void> results for resolves/rejects.',
-        '与同步 matcher 参数相同，resolves/rejects 返回 Promise<void>。'
-      ),
+      summary: {
+        en: 'Promise-valued assertion facade supplied by the caller-selected existing test runner.',
+        zh: '调用方所选既有运行器提供的异步结果断言门面类型。'
+      },
       members: {}
     },
     ITextWatchApi: {
@@ -6935,21 +10114,106 @@ if (sync) {
         'Native text-key invalidation stream through watch(key,ctx?), returning the original resource iterator.',
         'watch(key,ctx?) 提供的原生文本键失效流，返回原资源迭代器。'
       ),
-      members: {}
+      members: {
+        watch: {
+          summary: {
+            en: 'Stream native invalidation descriptions for one text key, without replay or value delivery guarantees.',
+            zh: '流式读取单个文本键的原生失效描述，不保证重放或值传递。'
+          },
+          params: {
+            key: {
+              en: 'Text key assigned by the application in this same store namespace.',
+              zh: '应用在同一存储命名空间内指定的文本键。'
+            },
+            ctx: {
+              en: 'Original optional operation context with cancellation and one captured timeout budget.',
+              zh: '原可选操作上下文，承载取消信号与单次捕获的超时预算。'
+            }
+          },
+          returns: {
+            en: 'Original disposable invalidation iterator; it is not a durable change log.',
+            zh: '返回原可释放失效迭代器，不是可靠变更日志。'
+          }
+        }
+      }
     },
     ITextChangeFeedApi: {
-      summary: t(
-        'Native watch and post-commit subscribeChanges methods sharing the original provider owner.',
-        '原生 watch 与提交后 subscribeChanges，共用原 provider owner。'
-      ),
-      members: {}
+      summary: {
+        en: 'Original post-commit observer and native text-watch stream with provider-owned delivery guarantees.',
+        zh: '原提交后观察者与原生文本观察流，传递保证由提供者拥有。'
+      },
+      members: {
+        watch: {
+          summary: {
+            en: 'Stream native invalidation descriptions for one text key, without replay or value delivery guarantees.',
+            zh: '流式读取单个文本键的原生失效描述，不保证重放或值传递。'
+          },
+          params: {
+            key: {
+              en: 'Text key assigned by the application in this same store namespace.',
+              zh: '应用在同一存储命名空间内指定的文本键。'
+            },
+            ctx: {
+              en: 'Original optional operation context with cancellation and one captured timeout budget.',
+              zh: '原可选操作上下文，承载取消信号与单次捕获的超时预算。'
+            }
+          },
+          returns: {
+            en: 'Original disposable invalidation iterator; it is not a durable change log.',
+            zh: '返回原可释放失效迭代器，不是可靠变更日志。'
+          },
+          example:
+            "import type { ITextChangeFeedApi } from '@migaia/storage-contract'\nexport async function observe(feed: ITextChangeFeedApi) {\n  await using stream = feed.watch('theme')\n  for await (const change of stream) console.log(change.kind)\n}"
+        },
+        subscribeChanges: {
+          summary: {
+            en: 'Register an original post-commit invalidation listener without creating a durable history source.',
+            zh: '登记原提交后失效监听者，不创建可靠历史来源。'
+          },
+          params: {
+            listener: {
+              en: 'Receives original channel/key identity; thrown or rejected observer failures are reported.',
+              zh: '接收原通道与键身份，观察者抛出或拒绝时会报告。'
+            }
+          },
+          returns: {
+            en: 'An unsubscribe function removing only this original listener.',
+            zh: '返回仅移除当前原监听者的取消订阅函数。'
+          },
+          example:
+            "import type { ITextChangeFeedApi } from '@migaia/storage-contract'\nexport function observe(feed: ITextChangeFeedApi) {\n  return feed.subscribeChanges(change => console.log(change.channel, change.kind))\n}"
+        }
+      },
+      example:
+        "import type { ITextChangeFeedApi } from '@migaia/storage-contract'\nexport function observe(feed: ITextChangeFeedApi) {\n  return feed.subscribeChanges(change => console.log(change.channel, change.kind))\n}",
+      scenarios: [
+        {
+          en: 'Invalidate a local projection only after the provider reports a committed native change.',
+          zh: '仅在提供者报告原生提交变更后，失效本地数据投影。'
+        }
+      ]
     },
     IWithChangeFeedCapabilities: {
       summary: t(
         'Known-store type refinement retaining native, sync, metadata, transaction and Feature types; only existing records/vector/RDF APIs gain the declared feed.',
         '已知 store 类型细化，保留原生、同步、元数据、事务与 Feature；仅既有 records/vector/RDF API 获得 feed 声明。'
       ),
-      members: {}
+      members: {
+        capabilities: {
+          summary: {
+            en: 'Original immutable capability facts refined only with changeFeed:true after genuine provider admission.',
+            zh: '真实提供者准入后，仅将原不可变能力事实收窄为支持变更通知。'
+          }
+        }
+      },
+      scenarios: [
+        {
+          en: 'Refine a genuinely admitted store that already supplies native invalidation notifications.',
+          zh: '收窄已真实准入且已提供原生失效通知的存储类型。'
+        }
+      ],
+      example:
+        "import { asChangeFeedStore, type IKeyValueStore } from '@migaia/storage-contract'\nexport function observe(store: IKeyValueStore) {\n  const feed = asChangeFeedStore(store)\n  const off = feed.subscribeChanges(change => console.log(change.kind))\n  return off\n}"
     },
     IChangeFeedStore: {
       summary: t(
@@ -6987,6 +10251,48 @@ stop()`,
 const stop = feed.subscribeChanges((change) => console.log(change.keys))
 await feed.set('theme', 'dark', { conflictPolicy: 'replace' })
 stop()`
+        },
+        dispose: {
+          summary: {
+            en: 'Release accepted work and original native resources without acquiring any new close authority.',
+            zh: '排空已接受工作并释放原生资源，不获取新的关闭权限。'
+          },
+          params: {},
+          returns: {
+            en: 'The original cached main cleanup Promise; native cleanup failure rejects with its original reachable cause.',
+            zh: '返回原缓存主清理结果，原生清理失败以可追踪的原始原因拒绝。'
+          }
+        },
+        '[Symbol.asyncDispose]': {
+          summary: {
+            en: 'Use the original asynchronous resource-disposal protocol after accepted work drains.',
+            zh: '在已接受工作排空后使用原异步资源释放协议。'
+          },
+          params: {},
+          returns: {
+            en: 'The separately cached symbolic Promise reports cleanup failure and resolves, without replacing the main cleanup Promise.',
+            zh: '单独缓存的符号清理报告失败后完成，不替换主清理结果。'
+          }
+        },
+        watch: {
+          summary: {
+            en: 'Stream native invalidation descriptions for one text key, without replay or value delivery guarantees.',
+            zh: '流式读取单个文本键的原生失效描述，不保证重放或值传递。'
+          },
+          params: {
+            key: {
+              en: 'Text key assigned by the application in this same store namespace.',
+              zh: '应用在同一存储命名空间内指定的文本键。'
+            },
+            ctx: {
+              en: 'Original optional operation context with cancellation and one captured timeout budget.',
+              zh: '原可选操作上下文，承载取消信号与单次捕获的超时预算。'
+            }
+          },
+          returns: {
+            en: 'Original disposable invalidation iterator; it is not a durable change log.',
+            zh: '返回原可释放失效迭代器，不是可靠变更日志。'
+          }
         }
       }
     },
@@ -7141,7 +10447,15 @@ if (admission.valid) await Reflect.apply(admission.dispose, admission.receiver, 
         'Caller-authored optional operation intent for asynchronous storage methods, using structural signals and backend-owned execution.',
         '调用方为异步存储方法编写的可选操作意图，使用结构信号和后端所有执行流程。'
       ),
-      members: operationMembers
+      members: operationMembers,
+      scenarios: [
+        {
+          en: 'Capture caller cancellation and paging intent once before crossing an asynchronous boundary.',
+          zh: '跨越异步边界之前，单次捕获调用方取消与分页意图。'
+        }
+      ],
+      example:
+        "import { snapshotOperationContext } from '@migaia/storage-contract'\nexport const context = snapshotOperationContext({ timeoutMs: 1000, pageSize: 64 })"
     },
     IOperationContextSnapshot: {
       summary: t(
@@ -7215,7 +10529,353 @@ if (admission.valid) await Reflect.apply(admission.dispose, admission.receiver, 
   const value = await tx.getRecord('profile')
   if (value) await tx.putRecord(value, 'profile', { conflictPolicy: 'replace' })
 })`,
-      members: transactionMembers
+      members: {
+        ...transactionMembers,
+        use: {
+          summary: {
+            en: 'Read the original capability implementation by the authentic token identity.',
+            zh: '按真实令牌身份读取原能力实现，不创建替代提供者。'
+          },
+          params: {
+            capability: {
+              en: 'Original token exported by its owner or returned by defineStorageCapability.',
+              zh: '由所属包导出或能力工厂返回的原始令牌。'
+            }
+          },
+          returns: {
+            en: 'The original implementation API; unsupported tokens reject with UNSUPPORTED_CAPABILITY.',
+            zh: '返回原实现接口，不支持的令牌以不支持能力错误拒绝。'
+          }
+        },
+        get: {
+          summary: {
+            en: 'Read the current transaction text draft and its original native snapshot.',
+            zh: '读取当前事务的文本草稿与原生快照，能看到本作用域写入。'
+          },
+          params: {
+            key: {
+              en: 'Application-assigned logical key, or the key returned by the same original backend.',
+              zh: '应用指定的逻辑键，或同一原始后端返回的键。'
+            }
+          },
+          returns: {
+            en: 'Stored text or null for absence, without leaving the authentic transaction scope.',
+            zh: '返回已存文本，不存在时为空，不离开真实事务作用域。'
+          }
+        },
+        set: {
+          summary: {
+            en: 'Stage one text value in the original transaction draft.',
+            zh: '在原事务草稿中暂存单个文本值，随原生终点提交。'
+          },
+          params: {
+            key: {
+              en: 'Application-assigned logical key, or the key returned by the same original backend.',
+              zh: '应用指定的逻辑键，或同一原始后端返回的键。'
+            },
+            value: {
+              en: 'Application text payload, encoded before entering this channel when necessary.',
+              zh: '应用文本载荷，需要时应在进入此通道前完成编码。'
+            },
+            options: {
+              en: 'Optional original conflict policy; execution context is inherited from the transaction.',
+              zh: '可选原冲突策略，执行上下文继承所属事务。'
+            }
+          },
+          returns: {
+            en: 'The draft accepts the write; durability is confirmed only by the outer commit.',
+            zh: '草稿接受写入，仅外层提交才能确认持久化。'
+          }
+        },
+        remove: {
+          summary: {
+            en: 'Stage removal of one text identity in this original transaction.',
+            zh: '在当前原事务中暂存单个文本身份的删除。'
+          },
+          params: {
+            key: {
+              en: 'Application-assigned logical key, or the key returned by the same original backend.',
+              zh: '应用指定的逻辑键，或同一原始后端返回的键。'
+            }
+          },
+          returns: {
+            en: 'The draft accepts deletion; removing an absent entry is a no-op.',
+            zh: '草稿接受删除，不存在的条目不产生修改。'
+          }
+        },
+        has: {
+          summary: {
+            en: 'Check visible text membership in the current authentic transaction draft.',
+            zh: '检查当前真实事务草稿中可见的文本成员关系。'
+          },
+          params: {
+            key: {
+              en: 'Application-assigned logical key, or the key returned by the same original backend.',
+              zh: '应用指定的逻辑键，或同一原始后端返回的键。'
+            }
+          },
+          returns: {
+            en: 'True when the draft currently exposes an unexpired text value.',
+            zh: '当前草稿存在未过期文本值时返回真值。'
+          }
+        },
+        getMany: {
+          summary: {
+            en: 'Read one original transaction text snapshot in caller order, including duplicate positions.',
+            zh: '按调用方顺序读取原事务文本快照，并保留重复位置。'
+          },
+          params: {
+            keys: {
+              en: 'Logical text keys captured before the shared batch is read.',
+              zh: '共享批量读取前捕获的逻辑文本键集合。'
+            }
+          },
+          returns: {
+            en: 'Same-length values with undefined for missing entries; partial decode success is not returned.',
+            zh: '返回同长度值数组，缺失为未定义，不返回部分解码成功。'
+          }
+        },
+        setMany: {
+          summary: {
+            en: 'Stage a validated text batch inside the same original transaction draft.',
+            zh: '在同一原事务草稿内暂存完整校验后的文本批量。'
+          },
+          params: {
+            entries: {
+              en: 'Dense key/value entries with optional TTL; duplicate canonical identities reject before mutation.',
+              zh: '稠密键值条目与可选期限，规范重复身份在修改前拒绝。'
+            }
+          },
+          returns: {
+            en: 'All accepted entries join the original commit or rollback together.',
+            zh: '全部已接受条目共同加入原提交或回滚。'
+          }
+        },
+        removeMany: {
+          summary: {
+            en: 'Stage deletion of distinct canonical text identities in the same transaction.',
+            zh: '在同一事务中暂存去重后的规范文本身份删除。'
+          },
+          params: {
+            keys: {
+              en: 'Logical text keys; equivalent duplicates are accepted only once for counting.',
+              zh: '逻辑文本键，等价重复项仅参与一次删除计数。'
+            }
+          },
+          returns: {
+            en: 'Number of actual draft removals; final durability still follows outer commit.',
+            zh: '返回草稿实际删除数，最终持久化仍随外层提交。'
+          }
+        },
+        removeByPrefix: {
+          summary: {
+            en: 'Remove matching text entries from the current native and draft key range.',
+            zh: '从当前原生与草稿键范围中删除匹配的文本条目。'
+          },
+          params: {
+            prefix: {
+              en: 'Canonical typed prefix in the existing ordered logical-key domain.',
+              zh: '既有保序逻辑键域中的规范类型化前缀。'
+            }
+          },
+          returns: {
+            en: 'Actual accepted draft deletion count, without scanning unrelated channels.',
+            zh: '返回草稿实际接受删除数，不扫描无关通道。'
+          }
+        },
+        getBytes: {
+          summary: {
+            en: 'Read detached bytes from the original transaction draft.',
+            zh: '从原事务草稿读取已脱离外部引用的字节。'
+          },
+          params: {
+            key: {
+              en: 'Application-assigned logical key, or the key returned by the same original backend.',
+              zh: '应用指定的逻辑键，或同一原始后端返回的键。'
+            }
+          },
+          returns: {
+            en: 'Stored bytes or null when the byte identity is absent.',
+            zh: '返回已存字节，字节身份不存在时为空。'
+          }
+        },
+        setBytes: {
+          summary: {
+            en: 'Stage bytes through the original byte-channel transaction owner.',
+            zh: '经原字节通道事务拥有者暂存字节内容。'
+          },
+          params: {
+            key: {
+              en: 'Application-assigned logical key, or the key returned by the same original backend.',
+              zh: '应用指定的逻辑键，或同一原始后端返回的键。'
+            },
+            value: {
+              en: 'Application record or byte payload; writes capture it before native mutation.',
+              zh: '应用记录或字节载荷，写入会在原生修改前捕获。'
+            },
+            options: {
+              en: 'Original draft conflict policy, without a separate operation budget.',
+              zh: '原草稿冲突策略，不提供独立操作预算。'
+            }
+          },
+          returns: {
+            en: 'The captured byte write joins the same commit or rollback.',
+            zh: '已捕获字节写入加入同一提交或回滚。'
+          }
+        },
+        removeBytes: {
+          summary: {
+            en: 'Stage deletion in the original byte channel only.',
+            zh: '仅在原字节通道中暂存删除操作。'
+          },
+          params: {
+            key: {
+              en: 'Application-assigned logical key, or the key returned by the same original backend.',
+              zh: '应用指定的逻辑键，或同一原始后端返回的键。'
+            }
+          },
+          returns: {
+            en: 'Removal is staged without altering an unrelated text or record identity.',
+            zh: '删除已暂存，不改变无关文本或记录身份。'
+          }
+        },
+        getRecord: {
+          summary: {
+            en: 'Read the current record draft through the original clone boundary.',
+            zh: '经原克隆边界读取当前记录草稿内容。'
+          },
+          params: {
+            key: {
+              en: 'Application-assigned logical key, or the key returned by the same original backend.',
+              zh: '应用指定的逻辑键，或同一原始后端返回的键。'
+            }
+          },
+          returns: {
+            en: 'The original record result, or undefined when absent.',
+            zh: '返回原记录结果，不存在时为未定义。'
+          }
+        },
+        putRecord: {
+          summary: {
+            en: 'Stage a detached record under an explicit or backend-generated key.',
+            zh: '以显式键或后端生成键暂存已脱离外部引用的记录。'
+          },
+          params: {
+            value: {
+              en: 'Application record or byte payload; writes capture it before native mutation.',
+              zh: '应用记录或字节载荷，写入会在原生修改前捕获。'
+            },
+            key: {
+              en: 'Application-assigned logical key, or the key returned by the same original backend.',
+              zh: '应用指定的逻辑键，或同一原始后端返回的键。'
+            },
+            options: {
+              en: 'Original draft conflict policy, without a separate operation budget.',
+              zh: '原草稿冲突策略，不提供独立操作预算。'
+            }
+          },
+          returns: {
+            en: 'The accepted logical record key, generated only by the original backend.',
+            zh: '返回已接受逻辑记录键，仅原后端负责生成新键。'
+          }
+        },
+        deleteRecord: {
+          summary: {
+            en: 'Stage deletion of one record identity in this transaction.',
+            zh: '在当前事务中暂存单个记录身份的删除。'
+          },
+          params: {
+            key: {
+              en: 'Application-assigned logical key, or the key returned by the same original backend.',
+              zh: '应用指定的逻辑键，或同一原始后端返回的键。'
+            }
+          },
+          returns: {
+            en: 'The original draft accepts deletion without committing early.',
+            zh: '原草稿接受删除，不提前提交事务。'
+          }
+        },
+        iterateRecords: {
+          summary: {
+            en: 'Iterate the bounded native record snapshot merged with current draft changes.',
+            zh: '遍历有界原生记录快照，并合并当前草稿修改。'
+          },
+          params: {
+            range: {
+              en: 'Optional canonical lower/upper record-key bounds with open-end flags.',
+              zh: '可选规范记录键上下界与开区间标记。'
+            }
+          },
+          returns: {
+            en: 'Original asynchronous entries; callback expiry and iterator disposal retain their owner.',
+            zh: '返回原异步条目，回调过期与迭代释放仍由原拥有者管理。'
+          }
+        },
+        putIndexedRecord: {
+          summary: {
+            en: 'Stage a record and its declared index projection in the same original draft.',
+            zh: '在同一原草稿中暂存记录及其已声明索引投影。'
+          },
+          params: {
+            value: {
+              en: 'Application record or byte payload; writes capture it before native mutation.',
+              zh: '应用记录或字节载荷，写入会在原生修改前捕获。'
+            },
+            key: {
+              en: 'Application-assigned logical key, or the key returned by the same original backend.',
+              zh: '应用指定的逻辑键，或同一原始后端返回的键。'
+            },
+            handle: {
+              en: 'Authentic index handle returned by this same backend and index scope.',
+              zh: '同一后端与索引作用域返回的真实索引句柄。'
+            },
+            projection: {
+              en: 'Application-produced index entries matching the handle definitions.',
+              zh: '与句柄定义一致、由应用产生的索引条目投影。'
+            },
+            options: {
+              en: 'Original draft conflict policy, without a separate operation budget.',
+              zh: '原草稿冲突策略，不提供独立操作预算。'
+            }
+          },
+          returns: {
+            en: 'The accepted record key; uniqueness conflicts reject before publication.',
+            zh: '返回已接受记录键，唯一性冲突在发布前拒绝。'
+          }
+        },
+        isRecordIndexReady: {
+          summary: {
+            en: 'Inspect readiness of the same native index scope and generation.',
+            zh: '检查同一原生索引作用域与代次是否就绪。'
+          },
+          params: {
+            handle: {
+              en: 'Authentic index handle returned by this same backend and index scope.',
+              zh: '同一后端与索引作用域返回的真实索引句柄。'
+            }
+          },
+          returns: {
+            en: 'True only for the authentic current ready index generation.',
+            zh: '仅真实且当前已就绪的索引代次返回真值。'
+          }
+        },
+        iterateRecordIndex: {
+          summary: {
+            en: 'Iterate an authentic native index range within the original transaction.',
+            zh: '在原事务内遍历真实原生索引范围。'
+          },
+          params: {
+            query: {
+              en: 'Index handle, index name, bounds, direction and optional limit.',
+              zh: '索引句柄、索引名、范围、方向与可选数量上界。'
+            }
+          },
+          returns: {
+            en: 'Original ordered key/value entries, including accepted draft changes.',
+            zh: '返回原保序键值条目，包含已接受草稿修改。'
+          }
+        }
+      }
     },
     ISecondaryIndexTransactionScope: {
       summary: t(
@@ -7231,7 +10891,353 @@ if (admission.valid) await Reflect.apply(admission.dispose, admission.receiver, 
       example: `await indexed.transactionIndexed(handle, async (tx) => {
   await tx.putIndexedRecord({ name: 'Ada' }, 'user-1', handle, { byName: { kind: 'single', key: 'Ada' } })
 })`,
-      members: transactionMembers
+      members: {
+        ...transactionMembers,
+        use: {
+          summary: {
+            en: 'Read the original capability implementation by the authentic token identity.',
+            zh: '按真实令牌身份读取原能力实现，不创建替代提供者。'
+          },
+          params: {
+            capability: {
+              en: 'Original token exported by its owner or returned by defineStorageCapability.',
+              zh: '由所属包导出或能力工厂返回的原始令牌。'
+            }
+          },
+          returns: {
+            en: 'The original implementation API; unsupported tokens reject with UNSUPPORTED_CAPABILITY.',
+            zh: '返回原实现接口，不支持的令牌以不支持能力错误拒绝。'
+          }
+        },
+        get: {
+          summary: {
+            en: 'Read the current transaction text draft and its original native snapshot.',
+            zh: '读取当前事务的文本草稿与原生快照，能看到本作用域写入。'
+          },
+          params: {
+            key: {
+              en: 'Application-assigned logical key, or the key returned by the same original backend.',
+              zh: '应用指定的逻辑键，或同一原始后端返回的键。'
+            }
+          },
+          returns: {
+            en: 'Stored text or null for absence, without leaving the authentic transaction scope.',
+            zh: '返回已存文本，不存在时为空，不离开真实事务作用域。'
+          }
+        },
+        set: {
+          summary: {
+            en: 'Stage one text value in the original transaction draft.',
+            zh: '在原事务草稿中暂存单个文本值，随原生终点提交。'
+          },
+          params: {
+            key: {
+              en: 'Application-assigned logical key, or the key returned by the same original backend.',
+              zh: '应用指定的逻辑键，或同一原始后端返回的键。'
+            },
+            value: {
+              en: 'Application text payload, encoded before entering this channel when necessary.',
+              zh: '应用文本载荷，需要时应在进入此通道前完成编码。'
+            },
+            options: {
+              en: 'Optional original conflict policy; execution context is inherited from the transaction.',
+              zh: '可选原冲突策略，执行上下文继承所属事务。'
+            }
+          },
+          returns: {
+            en: 'The draft accepts the write; durability is confirmed only by the outer commit.',
+            zh: '草稿接受写入，仅外层提交才能确认持久化。'
+          }
+        },
+        remove: {
+          summary: {
+            en: 'Stage removal of one text identity in this original transaction.',
+            zh: '在当前原事务中暂存单个文本身份的删除。'
+          },
+          params: {
+            key: {
+              en: 'Application-assigned logical key, or the key returned by the same original backend.',
+              zh: '应用指定的逻辑键，或同一原始后端返回的键。'
+            }
+          },
+          returns: {
+            en: 'The draft accepts deletion; removing an absent entry is a no-op.',
+            zh: '草稿接受删除，不存在的条目不产生修改。'
+          }
+        },
+        has: {
+          summary: {
+            en: 'Check visible text membership in the current authentic transaction draft.',
+            zh: '检查当前真实事务草稿中可见的文本成员关系。'
+          },
+          params: {
+            key: {
+              en: 'Application-assigned logical key, or the key returned by the same original backend.',
+              zh: '应用指定的逻辑键，或同一原始后端返回的键。'
+            }
+          },
+          returns: {
+            en: 'True when the draft currently exposes an unexpired text value.',
+            zh: '当前草稿存在未过期文本值时返回真值。'
+          }
+        },
+        getMany: {
+          summary: {
+            en: 'Read one original transaction text snapshot in caller order, including duplicate positions.',
+            zh: '按调用方顺序读取原事务文本快照，并保留重复位置。'
+          },
+          params: {
+            keys: {
+              en: 'Logical text keys captured before the shared batch is read.',
+              zh: '共享批量读取前捕获的逻辑文本键集合。'
+            }
+          },
+          returns: {
+            en: 'Same-length values with undefined for missing entries; partial decode success is not returned.',
+            zh: '返回同长度值数组，缺失为未定义，不返回部分解码成功。'
+          }
+        },
+        setMany: {
+          summary: {
+            en: 'Stage a validated text batch inside the same original transaction draft.',
+            zh: '在同一原事务草稿内暂存完整校验后的文本批量。'
+          },
+          params: {
+            entries: {
+              en: 'Dense key/value entries with optional TTL; duplicate canonical identities reject before mutation.',
+              zh: '稠密键值条目与可选期限，规范重复身份在修改前拒绝。'
+            }
+          },
+          returns: {
+            en: 'All accepted entries join the original commit or rollback together.',
+            zh: '全部已接受条目共同加入原提交或回滚。'
+          }
+        },
+        removeMany: {
+          summary: {
+            en: 'Stage deletion of distinct canonical text identities in the same transaction.',
+            zh: '在同一事务中暂存去重后的规范文本身份删除。'
+          },
+          params: {
+            keys: {
+              en: 'Logical text keys; equivalent duplicates are accepted only once for counting.',
+              zh: '逻辑文本键，等价重复项仅参与一次删除计数。'
+            }
+          },
+          returns: {
+            en: 'Number of actual draft removals; final durability still follows outer commit.',
+            zh: '返回草稿实际删除数，最终持久化仍随外层提交。'
+          }
+        },
+        removeByPrefix: {
+          summary: {
+            en: 'Remove matching text entries from the current native and draft key range.',
+            zh: '从当前原生与草稿键范围中删除匹配的文本条目。'
+          },
+          params: {
+            prefix: {
+              en: 'Canonical typed prefix in the existing ordered logical-key domain.',
+              zh: '既有保序逻辑键域中的规范类型化前缀。'
+            }
+          },
+          returns: {
+            en: 'Actual accepted draft deletion count, without scanning unrelated channels.',
+            zh: '返回草稿实际接受删除数，不扫描无关通道。'
+          }
+        },
+        getBytes: {
+          summary: {
+            en: 'Read detached bytes from the original transaction draft.',
+            zh: '从原事务草稿读取已脱离外部引用的字节。'
+          },
+          params: {
+            key: {
+              en: 'Application-assigned logical key, or the key returned by the same original backend.',
+              zh: '应用指定的逻辑键，或同一原始后端返回的键。'
+            }
+          },
+          returns: {
+            en: 'Stored bytes or null when the byte identity is absent.',
+            zh: '返回已存字节，字节身份不存在时为空。'
+          }
+        },
+        setBytes: {
+          summary: {
+            en: 'Stage bytes through the original byte-channel transaction owner.',
+            zh: '经原字节通道事务拥有者暂存字节内容。'
+          },
+          params: {
+            key: {
+              en: 'Application-assigned logical key, or the key returned by the same original backend.',
+              zh: '应用指定的逻辑键，或同一原始后端返回的键。'
+            },
+            value: {
+              en: 'Application record or byte payload; writes capture it before native mutation.',
+              zh: '应用记录或字节载荷，写入会在原生修改前捕获。'
+            },
+            options: {
+              en: 'Original draft conflict policy, without a separate operation budget.',
+              zh: '原草稿冲突策略，不提供独立操作预算。'
+            }
+          },
+          returns: {
+            en: 'The captured byte write joins the same commit or rollback.',
+            zh: '已捕获字节写入加入同一提交或回滚。'
+          }
+        },
+        removeBytes: {
+          summary: {
+            en: 'Stage deletion in the original byte channel only.',
+            zh: '仅在原字节通道中暂存删除操作。'
+          },
+          params: {
+            key: {
+              en: 'Application-assigned logical key, or the key returned by the same original backend.',
+              zh: '应用指定的逻辑键，或同一原始后端返回的键。'
+            }
+          },
+          returns: {
+            en: 'Removal is staged without altering an unrelated text or record identity.',
+            zh: '删除已暂存，不改变无关文本或记录身份。'
+          }
+        },
+        getRecord: {
+          summary: {
+            en: 'Read the current record draft through the original clone boundary.',
+            zh: '经原克隆边界读取当前记录草稿内容。'
+          },
+          params: {
+            key: {
+              en: 'Application-assigned logical key, or the key returned by the same original backend.',
+              zh: '应用指定的逻辑键，或同一原始后端返回的键。'
+            }
+          },
+          returns: {
+            en: 'The original record result, or undefined when absent.',
+            zh: '返回原记录结果，不存在时为未定义。'
+          }
+        },
+        putRecord: {
+          summary: {
+            en: 'Stage a detached record under an explicit or backend-generated key.',
+            zh: '以显式键或后端生成键暂存已脱离外部引用的记录。'
+          },
+          params: {
+            value: {
+              en: 'Application record or byte payload; writes capture it before native mutation.',
+              zh: '应用记录或字节载荷，写入会在原生修改前捕获。'
+            },
+            key: {
+              en: 'Application-assigned logical key, or the key returned by the same original backend.',
+              zh: '应用指定的逻辑键，或同一原始后端返回的键。'
+            },
+            options: {
+              en: 'Original draft conflict policy, without a separate operation budget.',
+              zh: '原草稿冲突策略，不提供独立操作预算。'
+            }
+          },
+          returns: {
+            en: 'The accepted logical record key, generated only by the original backend.',
+            zh: '返回已接受逻辑记录键，仅原后端负责生成新键。'
+          }
+        },
+        deleteRecord: {
+          summary: {
+            en: 'Stage deletion of one record identity in this transaction.',
+            zh: '在当前事务中暂存单个记录身份的删除。'
+          },
+          params: {
+            key: {
+              en: 'Application-assigned logical key, or the key returned by the same original backend.',
+              zh: '应用指定的逻辑键，或同一原始后端返回的键。'
+            }
+          },
+          returns: {
+            en: 'The original draft accepts deletion without committing early.',
+            zh: '原草稿接受删除，不提前提交事务。'
+          }
+        },
+        iterateRecords: {
+          summary: {
+            en: 'Iterate the bounded native record snapshot merged with current draft changes.',
+            zh: '遍历有界原生记录快照，并合并当前草稿修改。'
+          },
+          params: {
+            range: {
+              en: 'Optional canonical lower/upper record-key bounds with open-end flags.',
+              zh: '可选规范记录键上下界与开区间标记。'
+            }
+          },
+          returns: {
+            en: 'Original asynchronous entries; callback expiry and iterator disposal retain their owner.',
+            zh: '返回原异步条目，回调过期与迭代释放仍由原拥有者管理。'
+          }
+        },
+        putIndexedRecord: {
+          summary: {
+            en: 'Stage a record and its declared index projection in the same original draft.',
+            zh: '在同一原草稿中暂存记录及其已声明索引投影。'
+          },
+          params: {
+            value: {
+              en: 'Application record or byte payload; writes capture it before native mutation.',
+              zh: '应用记录或字节载荷，写入会在原生修改前捕获。'
+            },
+            key: {
+              en: 'Application-assigned logical key, or the key returned by the same original backend.',
+              zh: '应用指定的逻辑键，或同一原始后端返回的键。'
+            },
+            handle: {
+              en: 'Authentic index handle returned by this same backend and index scope.',
+              zh: '同一后端与索引作用域返回的真实索引句柄。'
+            },
+            projection: {
+              en: 'Application-produced index entries matching the handle definitions.',
+              zh: '与句柄定义一致、由应用产生的索引条目投影。'
+            },
+            options: {
+              en: 'Original draft conflict policy, without a separate operation budget.',
+              zh: '原草稿冲突策略，不提供独立操作预算。'
+            }
+          },
+          returns: {
+            en: 'The accepted record key; uniqueness conflicts reject before publication.',
+            zh: '返回已接受记录键，唯一性冲突在发布前拒绝。'
+          }
+        },
+        isRecordIndexReady: {
+          summary: {
+            en: 'Inspect readiness of the same native index scope and generation.',
+            zh: '检查同一原生索引作用域与代次是否就绪。'
+          },
+          params: {
+            handle: {
+              en: 'Authentic index handle returned by this same backend and index scope.',
+              zh: '同一后端与索引作用域返回的真实索引句柄。'
+            }
+          },
+          returns: {
+            en: 'True only for the authentic current ready index generation.',
+            zh: '仅真实且当前已就绪的索引代次返回真值。'
+          }
+        },
+        iterateRecordIndex: {
+          summary: {
+            en: 'Iterate an authentic native index range within the original transaction.',
+            zh: '在原事务内遍历真实原生索引范围。'
+          },
+          params: {
+            query: {
+              en: 'Index handle, index name, bounds, direction and optional limit.',
+              zh: '索引句柄、索引名、范围、方向与可选数量上界。'
+            }
+          },
+          returns: {
+            en: 'Original ordered key/value entries, including accepted draft changes.',
+            zh: '返回原保序键值条目，包含已接受草稿修改。'
+          }
+        }
+      }
     },
     ISecondaryIndexRecordStore: {
       summary: t(
@@ -7356,6 +11362,32 @@ if (admission.valid) await Reflect.apply(admission.dispose, admission.receiver, 
   const value = await tx.getRecord('user-1')
   if (value) console.log(value)
 })`
+        },
+        dispose: {
+          summary: {
+            en: 'Release accepted work and original native resources without acquiring any new close authority.',
+            zh: '排空已接受工作并释放原生资源，不获取新的关闭权限。'
+          },
+          params: {},
+          returns: {
+            en: 'The original cached main cleanup Promise; native cleanup failure rejects with its original reachable cause.',
+            zh: '返回原缓存主清理结果，原生清理失败以可追踪的原始原因拒绝。'
+          },
+          example:
+            "import type { ISecondaryIndexRecordStore } from '@migaia/storage-contract'\nexport async function close(store: ISecondaryIndexRecordStore) { await store.dispose() }"
+        },
+        '[Symbol.asyncDispose]': {
+          summary: {
+            en: 'Use the original asynchronous resource-disposal protocol after accepted work drains.',
+            zh: '在已接受工作排空后使用原异步资源释放协议。'
+          },
+          params: {},
+          returns: {
+            en: 'The separately cached symbolic Promise reports cleanup failure and resolves, without replacing the main cleanup Promise.',
+            zh: '单独缓存的符号清理报告失败后完成，不替换主清理结果。'
+          },
+          example:
+            "import type { ISecondaryIndexRecordStore } from '@migaia/storage-contract'\nexport async function close(store: ISecondaryIndexRecordStore) { await store.dispose() }"
         }
       }
     },
@@ -7636,6 +11668,12 @@ if (admission.valid) await Reflect.apply(admission.dispose, admission.receiver, 
             'Omitted: the event does not enumerate affected keys.',
             '省略时事件不枚举受影响的键。'
           )
+        },
+        orgId: {
+          summary: {
+            en: 'Organization identity supplied by the original host view, never permission to route into another organization.',
+            zh: '原宿主视图给出的组织身份，不授予进入其它组织的路由权限。'
+          }
         }
       }
     },
@@ -7755,6 +11793,18 @@ console.log(compareStorageKeys(key, ['users', 2]))`,
             '生产者提供的精确原始失败，通过原生错误原因保留，不替换新错误调用栈。'
           ),
           default: t('Omitted: native cause is undefined.', '省略时原生错误原因为空值。')
+        },
+        fromVersion: {
+          summary: {
+            en: 'Original archive source version attached to a migration failure.',
+            zh: '附加在升级失败上的原存档来源版本号。'
+          }
+        },
+        toVersion: {
+          summary: {
+            en: 'Attempted target version assigned by the migration plan.',
+            zh: '升级计划指定且当前尝试到达的目标版本号。'
+          }
         }
       }
     },
@@ -7771,6 +11821,44 @@ console.log(compareStorageKeys(key, ['users', 2]))`,
       ],
       example: storageContractCases.StorageContractError![0]!.example,
       members: errorMembers
+    },
+    INumericKeys: {
+      summary: {
+        en: 'Payload key union whose declared values support the shared numeric aggregate domain.',
+        zh: '声明值支持共享数字聚合领域的载荷键名联合。'
+      },
+      members: {}
+    },
+    IQueryShape: {
+      summary: {
+        en: 'Minimal structural all-terminal shape used for query-result inference, without granting execution ownership.',
+        zh: '用于查询结果推断的最小结构化全量终点形状，不授予执行拥有权。'
+      },
+      members: {
+        all: {
+          summary: {
+            en: 'Expose the promised result array shape used by the shared type projection.',
+            zh: '公开共享类型投影使用的异步结果数组形状。'
+          },
+          params: {
+            ctx: {
+              en: 'Original optional operation context with cancellation and one captured timeout budget.',
+              zh: '原可选操作上下文，承载取消信号与单次捕获的超时预算。'
+            }
+          },
+          returns: {
+            en: 'The declared result array; native execution remains with the implementing query owner.',
+            zh: '返回所声明结果数组，原生执行仍归实现查询的拥有者。'
+          }
+        }
+      }
+    },
+    IStorageCapabilityApiOf: {
+      summary: {
+        en: 'Extract the original API type carried by one authentic capability token type.',
+        zh: '提取单个真实能力令牌类型承载的原始接口类型。'
+      },
+      members: {}
     }
   },
   enums: (() => {
