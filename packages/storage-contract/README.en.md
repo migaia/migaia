@@ -70,3 +70,9 @@ Host `/authoring/capability` owns publication, store has/use and transaction imp
 Error instances retain their existing frozen behavior; cause objects are not frozen with them. Archive migration reports progress failures through the existing `onArchiveRunError` hook rather than modifying the frozen error. Codec admission does not clone or freeze: pure `assertCodec` validates, while host `snapshotCodec` returns the same admitted instance so class-private methods keep their receiver.
 
 Ordinary store, option, query and snapshot records are not a freezing protocol. Host authors retain copies only where queued/native awaits or a public ownership boundary exposes mutable Date, bytes, array or RDF data. Public lock diagnostics detach keys from a still-active native lease.
+
+## Migrating serialized output
+
+The `@migaia/serialize` format encoders used by storage codecs now emit fields in the object's own property enumeration order instead of sorting field names. Objects with equal fields and values but different insertion orders can produce different bytes. Decoded fields and values are unchanged. Regenerate snapshots, signature inputs or cache keys that depend on the former sorted bytes.
+
+For recursive `Map` and `Set` values, select `defineCollectionsJsonCodec` from `@migaia/serialize/codecs/collections-json` and adapt it with `fromValueCodec` from `@migaia/storage-host/authoring/codec`. Plain JSON does not enable collection encoding implicitly. Older consumers must migrate together before reading the new format. See the [serialize guide](../serialize/USEGUIDE.en.md).

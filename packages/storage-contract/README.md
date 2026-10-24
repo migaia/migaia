@@ -72,3 +72,9 @@ publication、store has/use 和 transaction implementation lookup 统一由 host
 错误实例保留既有冻结行为，cause 对象不会随之冻结。归档迁移的进度错误通过既有 `onArchiveRunError` 通道报告，不修改已冻结错误实例。codec 不承诺冻结或复制：纯 `assertCodec` 只校验；host `snapshotCodec` 校验后返回同一实例，使 `#private` 方法保持 receiver。
 
 普通 store/options/query 与输入快照不作为冻结协议。需要跨排队、native await 或公开返回值边界隔离可变 Date、bytes、数组、RDF term 时，由相应 host 作者入口说明并执行必要复制。公开锁诊断的键必须与仍活动的原 lease 分离。
+
+## 序列化结果迁移
+
+存储 codec 使用的 `@migaia/serialize` 格式编码器现按对象自身的属性枚举顺序输出字段，不再按字段名排序。相同字段和值、不同插入顺序的对象，编码字节可能不同；解码后的字段和值不变。依赖旧排序字节的快照、签名输入或缓存键应按新顺序重新生成，不能把旧字节顺序当作存储契约。
+
+递归 `Map`、`Set` 值改用 `@migaia/serialize/codecs/collections-json` 的 `defineCollectionsJsonCodec`，再从 `@migaia/storage-host/authoring/codec` 使用 `fromValueCodec` 适配。普通 JSON codec 不隐式开启集合编码；新写入格式的旧消费者需同步迁移。格式细节见 [serialize 指南](../serialize/USEGUIDE.md)。
