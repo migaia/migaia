@@ -7,17 +7,22 @@ import { STORAGE_TELEMETRY_TAG } from './constants.js'
 
 /** The original execution owner observes a complete public endpoint without retaining history. */
 export function observeStorageTelemetry<R>(
-  options: IStorageJournalConfigurationSnapshot | undefined,
+  readOptions: () => IStorageJournalConfigurationSnapshot | undefined,
   describe: () => IStoragePipelineInput,
   invoke: (observing: boolean) => Promise<R>,
   now: () => number,
   report: (error: unknown) => void
 ): Promise<R> {
-  if (options?.telemetry !== true) return invoke(false)
+  /** A first org's original prepare runs inside invoke, so its configuration may not exist yet. */
+  const initial = readOptions()
+  if (initial !== undefined && initial.telemetry !== true) return invoke(false)
   /** Only selected observation allocates timing or ordinary logger payload data. */
   const started = now()
   const emit = (outcome: 'success' | 'error', error?: unknown): void => {
     try {
+      /** Read the same completed org configuration; never prepare again or create another budget. */
+      const options = initial ?? readOptions()
+      if (options?.telemetry !== true) return
       /** Backend authors supply canonical keys; the host never guesses an arbitrary input shape. */
       const request = describe()
       if (request.internal || request.scope !== undefined) return
