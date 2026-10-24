@@ -20,6 +20,8 @@ import { pgResource } from './driver-resource.js'
 import { pgKey, pgKeyHex, pgRecordKey, pgTextKey, encodePgRecord, decodePgRecord } from './codec.js'
 import {
   pgIdentity,
+  preparePgRevisionRows,
+  readPgRevisionRows,
   pgLockKey,
   observePgRevision,
   markPgChanged,
@@ -227,6 +229,13 @@ export function createPgJournalImages(
         },
         finalize: async () => {
           const final: IStorageJournalChange[] = []
+          /** This attempt alone prepares changed revision rows before persisting complete mirrors. */
+          const identities = [...state.changed].flatMap(([channel, keys]) =>
+            [...keys.values()].map((key) => pgIdentity(channel, key))
+          )
+          await preparePgRevisionRows(state, tables, identities)
+          /** Native births come from those same rows and remain unchanged at actual COMMIT. */
+          const revisions = await readPgRevisionRows(state, tables, identities)
           for (const [channel, changed] of state.changed) {
             const images = await read(state, channel, [...changed.values()])
             for (const [id, key] of changed) {
@@ -236,7 +245,12 @@ export function createPgJournalImages(
                 target: initial.target,
                 before: initial.image,
                 after: images.get(id)!,
-                afterRevision: String((state.baseline.get(pgIdentity(channel, key)) ?? 0n) + 1n)
+                afterRevision: {
+                  birth: revisions.get(pgIdentity(channel, key))!.birth!,
+                  version: String(
+                    (state.baseline.get(pgIdentity(channel, key))?.version ?? 0n) + 1n
+                  )
+                }
               })
             }
           }
@@ -480,14 +494,8 @@ export function createPgJournalBinding(options: {
           key = keyFor(target)
         if (target.channel === 'rdf') throw invalidArgument()
         const identity = pgIdentity(target.channel, key)
-        const row = (
-          await state.client.query(
-            'SELECT version FROM ' + tables.revisions + ' WHERE org_id=$1 AND key=$2',
-            [orgId, identity],
-            state.ctx
-          )
-        ).rows[0]
-        return String(row?.version ?? 0n)
+        const current = (await readPgRevisionRows(state, tables, [identity])).get(identity)
+        return { birth: current?.birth ?? null, version: String(current?.version ?? 0n) }
       }),
     writeCommitMarker: (scope, txId) =>
       runTransactionOperation(scope, async () => {

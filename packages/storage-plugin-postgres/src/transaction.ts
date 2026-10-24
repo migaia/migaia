@@ -25,7 +25,7 @@ import { inspectThenable, observeThenableRejection } from '@migaia/utils/functio
 import { sleep } from '@migaia/utils/promise'
 import { walkErrorCauses, attachSecondaryErrors } from '@migaia/utils/error'
 import type { IPgConfiguration, IPgTables } from './schema.js'
-import type { IPgState } from './native.js'
+import type { IPgState, IPgRevision } from './native.js'
 import type { IPgJournalCapture } from './journal.js'
 import { commitPgRevisions, recheckPgRevisions } from './native.js'
 import {
@@ -134,7 +134,7 @@ export function createPgTransactions<TScope extends Omit<ITransactionScope, 'use
     journaled: boolean
   ): Promise<IConcurrencyAttempt<Awaited<R>>> => {
     const normalize = publicTransaction ? normalizeTransactionFailure : normalizePostgresError
-    const baseline = new Map<string, bigint>()
+    const baseline = new Map<string, IPgRevision>()
     /** The last real server conflict remains reachable if its physical recovery budget ends. */
     let lastPhysical: unknown
     /** Only the existing concurrency owner distinguishes physical deadlines from external abort. */

@@ -8,7 +8,8 @@ import {
   type ILockKey,
   type IKeyRange,
   type IOperationContext,
-  type ISqlValue
+  type ISqlValue,
+  type ISqlRow
 } from '@migaia/storage-contract'
 import type { IPgConnection, IPgNativeParameter } from './types.js'
 import type { IPgTables } from './schema.js'
@@ -20,6 +21,8 @@ import { PgNames } from './constants.js'
 export type IPgChannel = 'text' | 'bytes' | 'record' | 'metadata'
 /** Selected native vectors share the original revision ledger without a fixed data table. */
 export type IPgMutationChannel = IPgChannel | 'vector'
+/** A row's immutable native birth survives ordinary updates and distinguishes drop/recreation. */
+export type IPgRevision = { readonly version: bigint; readonly birth: string | undefined }
 /** An original native attempt retains observations only until its real COMMIT or ROLLBACK. */
 export type IPgState = {
   /** Complete journal facts belong only to this original native attempt. */
@@ -36,7 +39,7 @@ export type IPgState = {
   readonly client: IPgConnection
   readonly orgId: string
   readonly ctx: IOperationContext | undefined
-  readonly baseline: Map<string, bigint>
+  readonly baseline: Map<string, IPgRevision>
   readonly observed: Map<string, ILockKey>
   readonly changed: Map<IPgMutationChannel, Map<string, IStorageKey>>
   readonly expirations: Map<string, number>
@@ -77,7 +80,59 @@ function encoded(channel: IPgChannel, key: IStorageKey): ISqlValue {
   const captured = pgKey(key)
   return channel === 'record' ? captured.bytes : captured.hex
 }
-/** A point's first observation survives internal physical recovery; own changes never advance it. */
+/** Absent revisions remain zero; persisted rows require their complete native birth identity. */
+function revision(row: ISqlRow | undefined): IPgRevision {
+  if (row === undefined) return { version: 0n, birth: undefined }
+  if (typeof row.version !== 'bigint' || typeof row.birth !== 'string')
+    throw postgresError(PostgresErrorCode.decodeFailed)
+  return { version: row.version, birth: row.birth }
+}
+/** Original bounded native reads serve point/batch observation, recovery and journal mirrors. */
+export async function readPgRevisionRows(
+  state: IPgState,
+  tables: IPgTables,
+  identities: readonly string[],
+  forUpdate = false
+): Promise<ReadonlyMap<string, IPgRevision>> {
+  if (identities.length === 0) return new Map()
+  /** Only these original identities are read; birth is returned as portable text by native SQL. */
+  const rows = (
+    await state.client.query(
+      'SELECT key,version,birth::text AS birth FROM ' +
+        tables.revisions +
+        ' WHERE org_id=$1 AND key=ANY($2::text[])' +
+        (forUpdate ? ' ORDER BY key FOR UPDATE' : ''),
+      [state.orgId, { arrayType: 'text', values: identities }],
+      state.ctx
+    )
+  ).rows
+  return new Map(
+    rows.flatMap((row) => (typeof row.key === 'string' ? [[row.key, revision(row)] as const] : []))
+  )
+}
+/** One existing row-creation statement owns immutable birth allocation, including metadata. */
+export async function preparePgRevisionRows(
+  state: IPgState,
+  tables: IPgTables,
+  identities: readonly string[]
+): Promise<void> {
+  if (identities.length === 0) return
+  await state.client.query(
+    'INSERT INTO ' +
+      tables.revisions +
+      ' (org_id,key,version) SELECT $1,key,0 FROM unnest($2::text[]) AS key ORDER BY key ON CONFLICT(org_id,key) DO NOTHING',
+    [state.orgId, { arrayType: 'text', values: identities }],
+    state.ctx
+  )
+}
+/** A missing first observation permits this attempt's own zero row; existing births never reset. */
+function sameRevision(expected: IPgRevision, actual: IPgRevision | undefined): boolean {
+  return (
+    expected.version === (actual?.version ?? 0n) &&
+    (expected.birth === undefined || expected.birth === actual?.birth)
+  )
+}
+/** A point's first complete observation survives physical recovery; own writes never advance it. */
 export async function observePgRevision(
   state: IPgState,
   tables: IPgTables,
@@ -87,33 +142,25 @@ export async function observePgRevision(
   await state.journal?.capture(channel, [key])
   const identity = pgIdentity(channel, key)
   if (!state.baseline.has(identity)) {
-    const row = (
-      await state.client.query(
-        'SELECT version FROM ' + tables.revisions + ' WHERE org_id=$1 AND key=$2',
-        [state.orgId, identity],
-        state.ctx
-      )
-    ).rows[0]
-    state.baseline.set(identity, typeof row?.version === 'bigint' ? row.version : 0n)
+    state.baseline.set(
+      identity,
+      (await readPgRevisionRows(state, tables, [identity])).get(identity) ?? revision(undefined)
+    )
     state.observed.set(identity, pgLockKey(channel, key))
   }
 }
-/** A range baseline detects inserts and deletes without retaining a full result set. */
+/** A range retains the same complete original epoch row rather than a full result set. */
 export async function observePgRange(
   state: IPgState,
   tables: IPgTables,
   channel: Exclude<IPgMutationChannel, 'metadata'>
 ): Promise<void> {
   const identity = channel + ':*'
-  if (state.baseline.has(identity)) return
-  const row = (
-    await state.client.query(
-      'SELECT version FROM ' + tables.revisions + ' WHERE org_id=$1 AND key=$2',
-      [state.orgId, identity],
-      state.ctx
+  if (!state.baseline.has(identity))
+    state.baseline.set(
+      identity,
+      (await readPgRevisionRows(state, tables, [identity])).get(identity) ?? revision(undefined)
     )
-  ).rows[0]
-  state.baseline.set(identity, typeof row?.version === 'bigint' ? row.version : 0n)
 }
 /** Only actual affected rows contribute to revisions and after-commit invalidation. */
 export function markPgChanged(
@@ -419,29 +466,14 @@ export async function commitPgRevisions(
   for (const identity of increments) identities.add(identity)
   if (identities.size === 0) return
   const ordered = [...identities].sort()
-  await state.client.query(
-    'INSERT INTO ' +
-      tables.revisions +
-      ' (org_id,key,version) SELECT $1,key,0 FROM unnest($2::text[]) AS key ORDER BY key ON CONFLICT(org_id,key) DO NOTHING',
-    [state.orgId, { arrayType: 'text', values: ordered }],
-    state.ctx
-  )
-  const rows = (
-    await state.client.query(
-      'SELECT key,version FROM ' +
-        tables.revisions +
-        ' WHERE org_id=$1 AND key=ANY($2::text[]) ORDER BY key FOR UPDATE',
-      [state.orgId, { arrayType: 'text', values: ordered }],
-      state.ctx
-    )
-  ).rows
+  await preparePgRevisionRows(state, tables, ordered)
+  const rows = await readPgRevisionRows(state, tables, ordered, true)
   const conflicts: ILockKey[] = []
   let rangeConflict = false
-  for (const row of rows) {
-    if (typeof row.key !== 'string') continue
-    const expected = state.baseline.get(row.key)
-    if (expected !== undefined && row.version !== expected) {
-      const key = state.observed.get(row.key)
+  for (const [identity, actual] of rows) {
+    const expected = state.baseline.get(identity)
+    if (expected !== undefined && !sameRevision(expected, actual)) {
+      const key = state.observed.get(identity)
       if (key) conflicts.push(key)
       else rangeConflict = true
     }
@@ -473,25 +505,12 @@ export async function commitPgRevisions(
 }
 /** Physical failure classification reads the same persistent baseline after actual rollback. */
 export async function recheckPgRevisions(state: IPgState, tables: IPgTables): Promise<boolean> {
-  if (state.baseline.size === 0) return true
-  const rows = (
-    await state.client.query(
-      'SELECT key,version FROM ' + tables.revisions + ' WHERE org_id=$1 AND key=ANY($2::text[])',
-      [state.orgId, { arrayType: 'text', values: [...state.baseline.keys()] }],
-      state.ctx
-    )
-  ).rows
-  const actual = new Map(
-    rows.flatMap((row) =>
-      typeof row.key === 'string' && typeof row.version === 'bigint'
-        ? [[row.key, row.version] as const]
-        : []
-    )
-  )
-  for (const [key, version] of state.baseline) if ((actual.get(key) ?? 0n) !== version) return false
+  const actual = await readPgRevisionRows(state, tables, [...state.baseline.keys()])
+  for (const [key, expected] of state.baseline)
+    if (!sameRevision(expected, actual.get(key))) return false
   return true
 }
-/** Native batches capture every missing baseline in one ANY query, rather than per-key I/O. */
+/** Native batches capture every missing complete baseline in one ANY query, rather than per-key I/O. */
 export async function observePgBatch(
   state: IPgState,
   tables: IPgTables,
@@ -504,23 +523,9 @@ export async function observePgBatch(
     const id = pgIdentity(channel, key)
     if (!state.baseline.has(id)) missing.set(id, key)
   }
-  if (missing.size === 0) return
-  const rows = (
-    await state.client.query(
-      'SELECT key,version FROM ' + tables.revisions + ' WHERE org_id=$1 AND key=ANY($2::text[])',
-      [state.orgId, { arrayType: 'text', values: [...missing.keys()] }],
-      state.ctx
-    )
-  ).rows
-  const actual = new Map(
-    rows.flatMap((row) =>
-      typeof row.key === 'string' && typeof row.version === 'bigint'
-        ? [[row.key, row.version] as const]
-        : []
-    )
-  )
+  const actual = await readPgRevisionRows(state, tables, [...missing.keys()])
   for (const [id, key] of missing) {
-    state.baseline.set(id, actual.get(id) ?? 0n)
+    state.baseline.set(id, actual.get(id) ?? revision(undefined))
     state.observed.set(id, pgLockKey(channel, key))
   }
 }

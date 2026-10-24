@@ -28,6 +28,70 @@ if (!connectionString)
   throw new Error('Run through scripts/storage-services.mts run -- to provide PostgreSQL')
 
 describe.each(['pg', 'postgres-js'] as const)('%s original global journal', (adapter) => {
+  it('rejects an old undo after drop and recreation with the same value and local revision', async () => {
+    const pool = new Pool({ connectionString })
+    const client = postgres(connectionString!, { max: 8 })
+    const driver = adapter === 'pg' ? pgDriver(pool) : postgresJsDriver(client)
+    const prefix = 'pg_drop_undo_' + randomUUID().slice(0, 8),
+      org = randomUUID()
+    const logger = new Logger({
+      ...loggerOptions,
+      plugins: [
+        binlog({ store: memoryLogStore() }),
+        wal({ store: memoryLogStore() }),
+        undoLog({ store: memoryLogStore() })
+      ]
+    })
+    const open = () =>
+      createStorageHost({
+        org,
+        plugins: [postgresBackendPlugin({ driver, prefix })] as const,
+        journal: { logger, namespace: 'drop-undo' }
+      })
+    // The package can already have an older private revisions layout; user data is retained.
+    await pool.query(
+      'CREATE TABLE ' +
+        prefix +
+        '_revisions (org_id text NOT NULL,key text NOT NULL,version bigint NOT NULL,PRIMARY KEY(org_id,key))'
+    )
+    await pool.query('INSERT INTO ' + prefix + '_revisions VALUES($1,$2,$3)', [
+      org,
+      'legacy-native-row',
+      7n
+    ])
+    let host = await open()
+    const migrated = (
+      await pool.query(
+        'SELECT version,birth::text AS birth FROM ' + prefix + '_revisions WHERE key=$1',
+        ['legacy-native-row']
+      )
+    ).rows[0]!
+    expect(migrated.version).toBe('7')
+    expect(typeof migrated.birth).toBe('string')
+    onTestFinished(async () => {
+      await host.dispose()
+      await logger.shutdown('manual')
+      await pool.end()
+      await client.end()
+    })
+    await host.backend('postgres').set('point', 'old-before')
+    await host.backend('postgres').set('point', 'after')
+    const txId = (
+      (await logger.binlog.read(await logger.binlog.lastSeq()))[0]!.payload as { txId: string }
+    ).txId
+    await host.dropOrg(org)
+    if (adapter === 'postgres-js') {
+      await host.dispose()
+      host = await open()
+    }
+    const store = host.org(org).backend('postgres')
+    await store.set('point', 'new-before')
+    await store.set('point', 'after')
+    await expect(host.backend('postgres').undo(txId)).rejects.toMatchObject({
+      code: 'UNDO_CONFLICT'
+    })
+    expect(await store.get('point')).toBe('after')
+  })
   it('restores external undo images through the original locked native transaction and rejects ABA', async () => {
     const pool = new Pool({ connectionString })
     const client = postgres(connectionString!, { max: 8 })

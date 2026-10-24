@@ -105,7 +105,14 @@ export async function ensurePostgresTables(
   await driver.query(
     'CREATE TABLE IF NOT EXISTS ' +
       tables.revisions +
-      ' (org_id TEXT NOT NULL,key TEXT COLLATE "C" NOT NULL,version bigint NOT NULL,PRIMARY KEY(org_id,key))',
+      ' (org_id TEXT NOT NULL,key TEXT COLLATE "C" NOT NULL,version bigint NOT NULL,birth uuid NOT NULL DEFAULT gen_random_uuid(),PRIMARY KEY(org_id,key))',
+    []
+  )
+  // Existing private revision rows acquire their own immutable birth without changing user data.
+  await driver.query(
+    'ALTER TABLE ' +
+      tables.revisions +
+      ' ADD COLUMN IF NOT EXISTS birth uuid NOT NULL DEFAULT gen_random_uuid()',
     []
   )
   await driver.query(
