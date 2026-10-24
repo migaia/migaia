@@ -170,7 +170,7 @@ function setup() {
         })
       }
     }
-    return Object.freeze(scope)
+    return scope
   }
   const bindKv = vi.fn((scope: ITransactionScope): ITransactionKeyValueApi => ({
     get: scope.get,
@@ -289,27 +289,19 @@ function setup() {
 }
 
 describe('original transaction capability projections', () => {
-  it('keeps query writes accepted through the original draft and rejects expired writes before patch getters', async () => {
+  it('keeps query writes accepted through the original draft and rejects expired writes', async () => {
     const fixture = setup()
     const query = fixture.scope.use(records).query<IRow>().where({ state: 'paid' }).limit(1)
     const pending = query.update({ value: 8 })
     fixture.controller.stopAdmission()
     expect(await pending).toBe(1)
     expect(fixture.rows.get('a')).toEqual({ state: 'paid', value: 8 })
-    let patchReads = 0
-    await expect(
-      query.update({
-        get value() {
-          patchReads++
-          return 9
-        }
-      })
-    ).rejects.toMatchObject({
+    await expect(query.update({ value: 9 })).rejects.toMatchObject({
       source: 'tx-native',
       code: 'TRANSACTION_FAILED',
       cause: expect.any(Error)
     })
-    expect(patchReads).toBe(0)
+    expect(fixture.rows.get('a')).toEqual({ state: 'paid', value: 8 })
     await fixture.controller.runFinalizers()
     fixture.controller.close()
     expectTypeOf(query.select('value')).not.toHaveProperty('update')

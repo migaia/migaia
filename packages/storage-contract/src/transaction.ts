@@ -43,11 +43,7 @@ import type {
   IRecordIndexQuery
 } from './secondary-index.js'
 import { StorageContractErrorText } from './error-text.js'
-import {
-  assimilateCapturedThen,
-  inspectThenable,
-  observeThenableRejection
-} from '@migaia/utils/function'
+import { observeThenableRejection } from '@migaia/utils/function'
 import type { IBackendKind } from './capabilities.js'
 import { StorageContractError, StorageContractErrorCode } from './errors.js'
 
@@ -143,18 +139,11 @@ export const readTransactionConflictPolicy = (
   backend: IBackendKind
 ): IConflictPolicy => {
   if (options === undefined) return 'conflict'
-  try {
-    if (typeof options === 'object' && options !== null && !Array.isArray(options)) {
-      /** Capture the policy once so accessors cannot change it between validation and use. */
-      const policy = (options as { conflictPolicy?: unknown }).conflictPolicy
-      if (policy === undefined || policy === 'conflict') return 'conflict'
-      if (policy === 'replace') return 'replace'
-    }
-  } catch (cause) {
-    throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
-      backend,
-      cause
-    })
+  if (typeof options === 'object' && options !== null && !Array.isArray(options)) {
+    /** The ordinary option field selects one existing write policy. */
+    const policy = (options as { conflictPolicy?: unknown }).conflictPolicy
+    if (policy === undefined || policy === 'conflict') return 'conflict'
+    if (policy === 'replace') return 'replace'
   }
   throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
     backend,
@@ -293,13 +282,8 @@ function reportTransactionFailure(error: unknown): void {
     throw failure
   })
 }
-/** Uses the canonical captured-then implementation; getters are inspected exactly once. */
+/** Assimilate ordinary callback results through the existing native Promise machinery. */
 function awaitTransactionResult<T>(result: T): Promise<Awaited<T>> {
-  /** Inspection distinguishes a source getter failure from a non-thenable value. */
-  const inspection = inspectThenable(result)
-  if ('error' in inspection) return Promise.reject(inspection.error)
-  if ('then' in inspection && inspection.then !== undefined)
-    return assimilateCapturedThen<Awaited<T>>(inspection.then, result)
   return Promise.resolve(result as Awaited<T>)
 }
 /** Captures one resource-free failure before any view loses its backend state reference. */
@@ -438,12 +422,372 @@ async function runTransactionCheck(
   }
 }
 
-/**
- * Initializes the sole transaction owner before a backend publishes the original base. The
- * normalizer receives expiredScope=true only when this owner creates its cached inactive-view
- * failure, so backends can preserve their original scope-operation metadata. All other failures
- * retain the existing single-argument normalization path; one-argument normalizers remain valid.
- */
+/** Registration callbacks and context belong to the original backend scope factory. */
+type ITransactionRegistrationOptions<TScope extends object> = {
+  readonly createScope: () => TScope
+  readonly onFailure: (error: ITransactionFailure) => void
+  readonly beforeCommit?: (scope: TScope) => void | PromiseLike<void>
+  readonly context?: IOperationContext
+}
+/** One original owner publishes finite registration methods without sharing factory locals. */
+type ITransactionOwner<TBaseScope extends object> = {
+  register<TScope extends TBaseScope>(
+    scope: TScope,
+    options: ITransactionRegistrationOptions<NoInfer<TScope>>
+  ): {
+    stopAdmission(): void
+    runFinalizers(): Promise<void>
+    closeIterators(): Promise<void>
+    close(): void
+  }
+  registerIterator<TScope extends TBaseScope, T>(
+    scope: TScope,
+    port: ITransactionIteratorPort<NoInfer<TScope>, T>
+  ): IStorageIterator<T>
+}
+/** A backend iterator supplies operations only; the existing lifetime owns draining and cleanup. */
+type ITransactionIteratorPort<TScope extends object, T> = {
+  readonly next: (scope: TScope) => PromiseLike<IteratorResult<T>>
+  readonly close: () => void | PromiseLike<void>
+}
+/** Admit the initial view and create only the live context retained until transaction closure. */
+function registerTransactionState<TScope extends object>(
+  owner: IOwnerRegistration,
+  activityMode: TransactionActivityMode,
+  scope: TScope,
+  options: ITransactionRegistrationOptions<TScope>
+): ITransactionState {
+  if (
+    typeof scope !== 'object' ||
+    scope === null ||
+    transactionRegistrations.has(scope) ||
+    typeof options.createScope !== 'function' ||
+    typeof options.onFailure !== 'function' ||
+    (options.beforeCommit !== undefined && typeof options.beforeCommit !== 'function')
+  )
+    throw invalidTransaction()
+  /** This backend context spans accepted asynchronous operations and finalizer callbacks. */
+  const context = snapshotOperationContext(options.context)
+  /** One identity is shared by views whose lifetimes end independently. */
+  const info: ITransactionInfo = { id: String(++nextTransactionId), activityMode }
+  /** Only active work/resources retain callbacks; close detaches these ports. */
+  const state: ITransactionState = {
+    owner,
+    info,
+    views: new Set(),
+    operations: new Set(),
+    iterators: new Set(),
+    userView: undefined,
+    createScope: options.createScope,
+    context,
+    onFailure: options.onFailure,
+    beforeCommit: options.beforeCommit as ITransactionState['beforeCommit'],
+    checks: [],
+    firstFailure: undefined,
+    expiredFailure: undefined,
+    finalizers: undefined,
+    closingIterators: undefined,
+    checksFrozen: false,
+    closed: false
+  }
+  /** The initial callback view shares the same identity registration as every derived view. */
+  const view: IViewRegistration = {
+    kind: RegistrationKind.view,
+    backend: owner.backend,
+    info,
+    state,
+    expiredFailure: undefined,
+    capabilities: undefined
+  }
+  state.userView = view
+  state.views.add(view)
+  transactionRegistrations.set(scope, view)
+  return state
+}
+/** Own admission stop, final checks and terminal detachment for one actual transaction. */
+class TransactionRegistration {
+  /** Every operation and view still refers to this same canonical transaction context. */
+  readonly #state: ITransactionState
+  /** Retain the state already registered by the backend owner. */
+  constructor(state: ITransactionState) {
+    this.#state = state
+  }
+  /** Ending callback admission never cancels operations accepted by a sibling view. */
+  stopAdmission = (): void => {
+    if (this.#state.userView) invalidateView(this.#state.userView)
+    this.#state.userView = undefined
+  }
+  /** Detach the accepted check list before awaiting resources so reentrancy cannot extend it. */
+  runFinalizers = (): Promise<void> => {
+    if (this.#state.finalizers) return this.#state.finalizers
+    this.#state.checksFrozen = true
+    this.stopAdmission()
+    /** These accepted callbacks span the drain await; later registration is already closed. */
+    const checks = this.#state.checks
+    this.#state.checks = []
+    this.#state.finalizers = Promise.resolve().then(() => this.#runFinalizers(checks))
+    return this.#state.finalizers
+  }
+  /** Original check ordering and final beforeCommit share the same view/error owner. */
+  async #runFinalizers(
+    checks: readonly ((scope: object) => void | PromiseLike<void>)[]
+  ): Promise<void> {
+    await closeTransactionIterators(this.#state)
+    if (this.#state.firstFailure) throw this.#state.firstFailure
+    if (this.#state.closed) throw expirationFailure(this.#state)
+    for (const check of checks) await runTransactionCheck(this.#state, check)
+    if (this.#state.beforeCommit) await runTransactionCheck(this.#state, this.#state.beforeCommit)
+  }
+  /** Concurrent cleanup calls share one round; subsequent check views may own new iterators. */
+  closeIterators = (): Promise<void> => {
+    if (this.#state.closingIterators) return this.#state.closingIterators
+    /** Cache before settlement callbacks clear only this original cleanup round. */
+    const closing = closeTransactionIterators(this.#state)
+    this.#state.closingIterators = closing
+    void closing.then(
+      () => {
+        this.#state.closingIterators = undefined
+      },
+      () => {
+        this.#state.closingIterators = undefined
+      }
+    )
+    return closing
+  }
+  /** Invalidate views once and release all backend callback references after the owner settles. */
+  close = (): void => {
+    if (this.#state.closed) return
+    this.#state.closed = true
+    for (const view of this.#state.views) invalidateView(view)
+    this.#state.userView = undefined
+    this.#state.createScope = undefined
+    this.#state.context = undefined
+    this.#state.onFailure = undefined
+    this.#state.beforeCommit = undefined
+    this.#state.checks = []
+    this.#state.operations.clear()
+    this.#state.iterators.clear()
+  }
+}
+/** One native iterator retains its exact view/port until the shared resource lifetime settles. */
+class TransactionIterator<TScope extends object, T> {
+  /** Live authorization is detached on cleanup while the original identity facts remain. */
+  #state: ITransactionState | undefined
+  /** Original view identity determines the cached inactive result after cleanup. */
+  readonly #creationView: IViewRegistration
+  /** Scope authority is borrowed only for accepted advances and is released with the port. */
+  #scope: TScope | undefined
+  /** The backend owns next/close; this owner releases its references after cleanup. */
+  #port: ITransactionIteratorPort<TScope, T> | undefined
+  /** Only the canonical iterator lifetime drains accepted advances and caches cleanup promises. */
+  readonly #lifetime: ReturnType<typeof createStorageIteratorLifetime<T>>
+  /** Private registration is also the transaction's active cleanup entry. */
+  readonly #registration: IIteratorRegistration
+  /** This exact published object is the sole iterator identity registered in the owner table. */
+  readonly iterator: IStorageIterator<T>
+  /** Admit one live original scope before exposing any iterator method. */
+  constructor(
+    owner: TransactionOwner<TScope>,
+    registration: IOwnerRegistration,
+    scope: TScope,
+    port: ITransactionIteratorPort<TScope, T>
+  ) {
+    this.#creationView = transactionView(scope)
+    this.#state = this.#creationView.state
+    if (
+      !this.#state ||
+      this.#state.owner !== registration ||
+      this.#state.closed ||
+      this.#state.firstFailure ||
+      typeof port.next !== 'function' ||
+      typeof port.close !== 'function'
+    )
+      throw invalidTransaction()
+    this.#scope = scope
+    this.#port = port
+    this.#lifetime = createStorageIteratorLifetime<T>({
+      close: () => this.#close(),
+      report: reportTransactionFailure,
+      onSettled: () => this.#settled()
+    })
+    this.#registration = {
+      kind: RegistrationKind.iterator,
+      info: this.#state.info,
+      advance: (currentScope) => this.#advance(currentScope as TScope),
+      cleanup: this.#lifetime.dispose,
+      compose: (run) => (this.#scope ? runTransactionOperation(this.#scope, run) : run(undefined)),
+      derive: (read, closeExtra) => this.#derive(owner, read, closeExtra),
+      fail: (error) => this.#fail(error)
+    }
+    this.iterator = {
+      next: () => this.#next(),
+      return: this.#lifetime.returned,
+      dispose: this.#lifetime.dispose,
+      [registration.asyncDisposeKey]: this.#lifetime.symbolic,
+      [Symbol.asyncIterator]() {
+        return this
+      }
+    }
+    transactionRegistrations.set(this.iterator, this.#registration)
+    this.#state.iterators.add(this.#registration)
+  }
+  /** Capture and release the original close port before awaiting native resource cleanup. */
+  async #close(): Promise<void> {
+    /** Reentrant cleanup cannot invoke a captured backend close twice. */
+    const port = this.#port
+    this.#port = undefined
+    if (port)
+      try {
+        await awaitTransactionResult(port.close())
+      } catch (error) {
+        throw failTransaction(this.#state!, error)
+      }
+  }
+  /** Actual settlement releases the context, backend port and creation scope together. */
+  #settled(): void {
+    this.#state?.iterators.delete(this.#registration)
+    this.#state = undefined
+    this.#port = undefined
+    this.#scope = undefined
+  }
+  /** Each advance borrows the original owner's fresh operation view and complete drain path. */
+  #advance(scope: TScope): Promise<IteratorResult<T>> {
+    return this.#lifetime.advance(() =>
+      runTransactionOperation(scope, (current) => {
+        if (this.#lifetime.isClosing() || !this.#port)
+          return { done: true, value: undefined } as IteratorResult<T>
+        return this.#port.next(current)
+      })
+    )
+  }
+  /** Expired original views retain their cached backend failure rather than reviving a scope. */
+  #next(): Promise<IteratorResult<T>> {
+    return this.#scope
+      ? this.#advance(this.#scope)
+      : this.#creationView.state
+        ? Promise.resolve({ done: true, value: undefined })
+        : rejectedTransactionResult(this.#creationView.expiredFailure)
+  }
+  /** The first data failure reaches the original transaction before cleanup can fail. */
+  #fail(error: unknown): unknown {
+    return this.#state ? (this.#state.firstFailure ?? failTransaction(this.#state, error)) : error
+  }
+  /** A derived reader is another real resource of this owner, using the original iterator port. */
+  #derive<TResult>(
+    owner: TransactionOwner<TScope>,
+    read: (
+      next: () => Promise<IteratorResult<unknown>>,
+      fail: (error: unknown) => unknown,
+      scope: object
+    ) => Promise<IteratorResult<TResult>>,
+    closeExtra?: () => void | PromiseLike<void>
+  ): IStorageIterator<TResult> {
+    if (!this.#scope) throw invalidTransaction()
+    /** Derived cleanup must retain this original context even after the source naturally exhausts. */
+    const state = this.#state!
+    return owner.registerIterator(this.#scope, {
+      next: (scope) =>
+        read(() => nextTransactionIterator(scope, this.iterator), this.#registration.fail, scope),
+      close:
+        closeExtra === undefined
+          ? this.#lifetime.dispose
+          : () => this.#closeDerived(state, closeExtra)
+    })
+  }
+  /** Reverse-order additional-source cleanup attempts both ports and retains every failure. */
+  async #closeDerived(
+    state: ITransactionState,
+    closeExtra: () => void | PromiseLike<void>
+  ): Promise<void> {
+    /** Only this close round's secondary failures are aggregated after the primary. */
+    const errors: unknown[] = []
+    try {
+      await awaitTransactionResult(closeExtra())
+    } catch (error) {
+      errors.push(failTransaction(state, error))
+    }
+    try {
+      await this.#lifetime.dispose()
+    } catch (error) {
+      errors.push(error)
+    }
+    if (errors.length > 0) throw cleanupFailure(state, errors)
+  }
+}
+/** Each backend store has one canonical owner; registration never duplicates native resources. */
+class TransactionOwner<TBaseScope extends object> implements ITransactionOwner<TBaseScope> {
+  /** One record proves store authority for every scope and resource published by this owner. */
+  readonly #registration: IOwnerRegistration
+  /** Activity is fixed before any transaction receives its identity. */
+  readonly #activityMode: TransactionActivityMode
+  /** Validate the real store definition before publishing registration authority. */
+  constructor(
+    store: IStorageBase,
+    normalizeFailure: (error: unknown, expiredScope?: true) => ITransactionFailure,
+    options?: {
+      readonly activityMode?: TransactionActivityMode
+      readonly asyncDisposeKey?: typeof Symbol.asyncDispose
+      readonly defaultPolicy?: IConcurrencyPolicy
+      readonly concurrencyStages?: IConcurrencyStageObserver
+    }
+  ) {
+    this.#activityMode = options?.activityMode ?? TransactionActivityMode.managed
+    /** The caller supplies its original symbol; no alternate lifetime owner is created. */
+    const asyncDisposeKey: typeof Symbol.asyncDispose =
+      options?.asyncDisposeKey ?? Symbol.asyncDispose
+    if (
+      typeof normalizeFailure !== 'function' ||
+      typeof asyncDisposeKey !== 'symbol' ||
+      (this.#activityMode !== TransactionActivityMode.managed &&
+        this.#activityMode !== TransactionActivityMode.native)
+    )
+      throw invalidTransaction()
+    if (options?.defaultPolicy !== undefined) assertConcurrencyPolicy(options.defaultPolicy)
+    if (
+      options?.concurrencyStages !== undefined &&
+      options.concurrencyStages.kind !== StorageStageKind.concurrency
+    )
+      throw invalidTransaction()
+    /** Default policy belongs to this one original store initialization. */
+    const defaultPolicy = options?.defaultPolicy ?? ConcurrencyPolicy.wait()
+    /** Non-owning admission grants neither data nor close authority to this definition layer. */
+    const base = snapshotStorageBaseDetailed(store, { asyncDisposeKey })
+    if (!base.valid || transactionRegistrations.has(store))
+      throw invalidTransaction(base.valid ? undefined : base.cause)
+    this.#registration = {
+      kind: RegistrationKind.owner,
+      store,
+      backend: base.backend,
+      normalizeFailure,
+      asyncDisposeKey,
+      defaultPolicy,
+      concurrencyStages: options?.concurrencyStages
+    }
+    transactionRegistrations.set(store, this.#registration)
+  }
+  /** Register initial callback admission under this owner's existing state and identity table. */
+  register = <TScope extends TBaseScope>(
+    scope: TScope,
+    options: ITransactionRegistrationOptions<NoInfer<TScope>>
+  ): TransactionRegistration => {
+    return new TransactionRegistration(
+      registerTransactionState(this.#registration, this.#activityMode, scope, options)
+    )
+  }
+  /** Publish one actual iterator while preserving its backend-specific scope refinement. */
+  registerIterator = <TScope extends TBaseScope, T>(
+    scope: TScope,
+    port: ITransactionIteratorPort<NoInfer<TScope>, T>
+  ): IStorageIterator<T> => {
+    return new TransactionIterator(
+      this as unknown as TransactionOwner<TScope>,
+      this.#registration,
+      scope,
+      port
+    ).iterator
+  }
+}
+/** Initialize the sole store owner before the original backend base is published. */
 export function createTransactionOwner<
   TValue = unknown,
   TBaseScope extends object = Omit<ITransactionScope<TValue>, 'use'>
@@ -456,308 +800,8 @@ export function createTransactionOwner<
     readonly defaultPolicy?: IConcurrencyPolicy
     readonly concurrencyStages?: IConcurrencyStageObserver
   }
-): {
-  register<TScope extends TBaseScope>(
-    scope: TScope,
-    options: {
-      readonly createScope: () => NoInfer<TScope>
-      readonly onFailure: (error: ITransactionFailure) => void
-      readonly beforeCommit?: (checkScope: NoInfer<TScope>) => void | PromiseLike<void>
-      /** The backend's original attempt fields; this owner never starts another budget. */
-      readonly context?: IOperationContext
-    }
-  ): {
-    stopAdmission(): void
-    runFinalizers(): Promise<void>
-    closeIterators(): Promise<void>
-    close(): void
-  }
-  registerIterator<TScope extends TBaseScope, T>(
-    scope: TScope,
-    port: {
-      readonly next: (currentScope: NoInfer<TScope>) => PromiseLike<IteratorResult<T>>
-      readonly close: () => void | PromiseLike<void>
-    }
-  ): IStorageIterator<T>
-} {
-  try {
-    /** Options and the canonical symbol are captured once before any owner is registered. */
-    const activityMode = options?.activityMode ?? TransactionActivityMode.managed
-    /** The outer host supplies a fallback identity; this foundation never invents one. */
-    const asyncDisposeKey: typeof Symbol.asyncDispose | undefined =
-      options?.asyncDisposeKey ?? Symbol.asyncDispose
-    if (
-      typeof normalizeFailure !== 'function' ||
-      typeof asyncDisposeKey !== 'symbol' ||
-      (activityMode !== TransactionActivityMode.managed &&
-        activityMode !== TransactionActivityMode.native)
-    )
-      throw invalidTransaction()
-    /** The original owner is the only store-default policy registration. */
-    const configuredPolicy = options?.defaultPolicy
-    /** Observations retain their existing host registry and grant no policy or lock authority. */
-    const concurrencyStages = options?.concurrencyStages
-    if (configuredPolicy !== undefined) assertConcurrencyPolicy(configuredPolicy)
-    if (concurrencyStages !== undefined && concurrencyStages.kind !== StorageStageKind.concurrency)
-      throw invalidTransaction()
-    /** Missing policy creates exactly one authentic default for this original owner. */
-    const defaultPolicy =
-      configuredPolicy === undefined ? ConcurrencyPolicy.wait() : configuredPolicy
-    /** Shared non-owning admission validates resource methods and support facts exactly once. */
-    const base = snapshotStorageBaseDetailed(store, { asyncDisposeKey })
-    if (!base.valid || transactionRegistrations.has(store))
-      throw invalidTransaction(base.valid ? undefined : base.cause)
-    /** No backend callbacks or connections are duplicated by this registration. */
-    const owner: IOwnerRegistration = {
-      kind: RegistrationKind.owner,
-      store,
-      backend: base.backend,
-      normalizeFailure,
-      asyncDisposeKey,
-      defaultPolicy,
-      concurrencyStages
-    }
-    transactionRegistrations.set(store, owner)
-    return {
-      register(scope, registrationOptions) {
-        try {
-          /** Capture callbacks before changing registration state. */
-          const { createScope, onFailure, beforeCommit, context } = registrationOptions
-          if (
-            typeof scope !== 'object' ||
-            scope === null ||
-            transactionRegistrations.has(scope) ||
-            typeof createScope !== 'function' ||
-            typeof onFailure !== 'function' ||
-            (beforeCommit !== undefined && typeof beforeCommit !== 'function')
-          )
-            throw invalidTransaction()
-          /** Reuse the original single-read snapshotter, retaining only data and the live signal. */
-          const operationContext = snapshotOperationContext(context)
-          /** All views share one immutable identity, independent of their object lifetime. */
-          const info: ITransactionInfo = Object.freeze({
-            id: String(++nextTransactionId),
-            activityMode
-          })
-          /** Only live sets and unresolved checks retain backend operation references. */
-          const state: ITransactionState = {
-            owner,
-            info,
-            views: new Set(),
-            operations: new Set(),
-            iterators: new Set(),
-            userView: undefined,
-            createScope,
-            context: operationContext,
-            onFailure,
-            beforeCommit: beforeCommit as ITransactionState['beforeCommit'],
-            checks: [],
-            firstFailure: undefined,
-            expiredFailure: undefined,
-            finalizers: undefined,
-            closingIterators: undefined,
-            checksFrozen: false,
-            closed: false
-          }
-          /** The initial user view cannot reopen after callback admission stops. */
-          const view: IViewRegistration = {
-            kind: RegistrationKind.view,
-            backend: base.backend,
-            info,
-            state,
-            expiredFailure: undefined,
-            capabilities: undefined
-          }
-          state.userView = view
-          state.views.add(view)
-          transactionRegistrations.set(scope, view)
-          return {
-            stopAdmission() {
-              if (state.userView) invalidateView(state.userView)
-              state.userView = undefined
-            },
-            runFinalizers() {
-              if (state.finalizers) return state.finalizers
-              state.checksFrozen = true
-              if (state.userView) invalidateView(state.userView)
-              state.userView = undefined
-              /** Freeze and detach the accepted checks before any asynchronous draining begins. */
-              const checks = state.checks
-              state.checks = []
-              state.finalizers = Promise.resolve().then(async () => {
-                await closeTransactionIterators(state)
-                if (state.firstFailure) throw state.firstFailure
-                if (state.closed) throw expirationFailure(state)
-                for (const check of checks) await runTransactionCheck(state, check)
-                if (state.beforeCommit) await runTransactionCheck(state, state.beforeCommit)
-              })
-              return state.finalizers
-            },
-            closeIterators() {
-              if (state.closingIterators) return state.closingIterators
-              /** Only simultaneous cleanup calls share a round; later checks may own new resources. */
-              const closing = closeTransactionIterators(state)
-              state.closingIterators = closing
-              void closing.then(
-                () => {
-                  state.closingIterators = undefined
-                },
-                () => {
-                  state.closingIterators = undefined
-                }
-              )
-              return closing
-            },
-            close() {
-              if (state.closed) return
-              state.closed = true
-              for (const current of state.views) invalidateView(current)
-              state.userView = undefined
-              state.createScope = undefined
-              state.context = undefined
-              state.onFailure = undefined
-              state.beforeCommit = undefined
-              state.checks = []
-              state.operations.clear()
-              state.iterators.clear()
-            }
-          }
-        } catch (cause) {
-          if (cause instanceof StorageContractError) throw cause
-          throw invalidTransaction(cause)
-        }
-      },
-      registerIterator: function registerIterator<TScope extends TBaseScope, T>(
-        scope: TScope,
-        port: {
-          readonly next: (currentScope: NoInfer<TScope>) => PromiseLike<IteratorResult<T>>
-          readonly close: () => void | PromiseLike<void>
-        }
-      ): IStorageIterator<T> {
-        /** Iterator creation borrows a currently authentic view, never public structural claims. */
-        const creationView = transactionView(scope)
-        /** Live authorization must match this exact store owner. */
-        const state = creationView.state
-        if (!state || state.owner !== owner || state.closed || state.firstFailure)
-          throw invalidTransaction()
-        /** The port and original scope are released when the actual cleanup settles. */
-        let next: typeof port.next | undefined
-        /** One close function is captured before the resource becomes observable. */
-        let close: typeof port.close | undefined
-        try {
-          next = port.next
-          close = port.close
-        } catch (cause) {
-          throw invalidTransaction(cause)
-        }
-        if (typeof next !== 'function' || typeof close !== 'function') throw invalidTransaction()
-        /** The live transaction reference is detached after cleanup, leaving only immutable facts. */
-        let iteratorState: ITransactionState | undefined = state
-        /** Creation-scope authority is discarded after cleanup. */
-        let originalScope: object | undefined = scope
-        /** Actual registration is assigned before any resource method can run. */
-        let resource: IIteratorRegistration
-        /** The canonical resource lifetime waits complete accepted advances before native close. */
-        const lifetime = createStorageIteratorLifetime<T>({
-          close: async () => {
-            /** Capture before awaiting so reentrant cleanup cannot invoke the port again. */
-            const release = close
-            close = undefined
-            if (release) {
-              try {
-                await awaitTransactionResult(release())
-              } catch (error) {
-                throw failTransaction(iteratorState!, error)
-              }
-            }
-          },
-          report: reportTransactionFailure,
-          onSettled: () => {
-            iteratorState?.iterators.delete(resource)
-            iteratorState = undefined
-            next = undefined
-            originalScope = undefined
-          }
-        })
-        /** One original scope still authorizes each complete advance and its operation view. */
-        const advance = (currentScope: object): Promise<IteratorResult<T>> =>
-          lifetime.advance(() =>
-            runTransactionOperation(currentScope, (operationScope) => {
-              if (lifetime.isClosing() || !next)
-                return { done: true, value: undefined } as IteratorResult<T>
-              return next(operationScope as typeof scope)
-            })
-          )
-        /** All existing cleanup paths retain the canonical cached main Promise. */
-        const cleanup = lifetime.dispose
-        resource = {
-          kind: RegistrationKind.iterator,
-          info: state.info,
-          advance,
-          cleanup,
-          /** A complete query borrows its own real operation view rather than the expired user view. */
-          compose: (run) =>
-            originalScope ? runTransactionOperation(originalScope, run) : run(undefined),
-          /** A mapped stream remains a real resource in the original scope after native exhaustion. */
-          derive: (read, closeExtra) => {
-            if (!originalScope) throw invalidTransaction()
-            return registerIterator(originalScope as TScope, {
-              next: (currentScope) =>
-                read(
-                  () => nextTransactionIterator(currentScope, iterator),
-                  resource.fail,
-                  currentScope
-                ),
-              close:
-                closeExtra === undefined
-                  ? cleanup
-                  : async () => {
-                      /** Later-created additional sources close first, with both failures retained. */
-                      const errors: unknown[] = []
-                      try {
-                        await awaitTransactionResult(closeExtra())
-                      } catch (error) {
-                        errors.push(failTransaction(state, error))
-                      }
-                      try {
-                        await cleanup()
-                      } catch (error) {
-                        errors.push(error)
-                      }
-                      if (errors.length > 0) throw cleanupFailure(state, errors)
-                    }
-            })
-          },
-          /** Primary query failure reaches the original owner before cursor cleanup can fail. */
-          fail: (error) =>
-            iteratorState
-              ? (iteratorState.firstFailure ?? failTransaction(iteratorState, error))
-              : error
-        }
-        /** Only this actual object is registered; copying its methods grants no new identity. */
-        const iterator: IStorageIterator<T> = {
-          next: () =>
-            originalScope
-              ? advance(originalScope)
-              : creationView.state
-                ? Promise.resolve({ done: true, value: undefined })
-                : rejectedTransactionResult(creationView.expiredFailure),
-          return: lifetime.returned,
-          dispose: cleanup,
-          [owner.asyncDisposeKey]: lifetime.symbolic,
-          [Symbol.asyncIterator]() {
-            return this
-          }
-        }
-        transactionRegistrations.set(iterator, resource)
-        state.iterators.add(resource)
-        return iterator
-      }
-    }
-  } catch (cause) {
-    if (cause instanceof StorageContractError) throw cause
-    throw invalidTransaction(cause)
-  }
+): ITransactionOwner<TBaseScope> {
+  return new TransactionOwner(store, normalizeFailure, options)
 }
 
 /**
@@ -849,10 +893,10 @@ export function assertTransactionOwner(store: IStorageBase, scope: object): ITra
 }
 
 /**
- * Reads the original backend attempt's frozen context from an authentic live view. Every user,
- * operation and finalizer view shares the same snapshot and original signal. Omitted registration
- * context returns undefined; forged or expired views throw INVALID_ARGUMENT. This grants no
- * registration, cancellation-controller, budget or close authority.
+ * Reads the original backend attempt's context from an authentic live view. Every user, operation
+ * and finalizer view shares the same snapshot and original signal. Omitted registration context
+ * returns undefined; forged or expired views throw INVALID_ARGUMENT. This grants no registration,
+ * cancellation-controller, budget or close authority.
  */
 export function readTransactionOperationContext(scope: object): IOperationContext | undefined {
   /** Identity and lifetime use the same private view record as transaction composition. */
@@ -893,12 +937,14 @@ function runTransactionCapabilityMethod(
     /** Re-read publication authority rather than retaining an installation after Feature release. */
     const { binding } = liveTransactionCapability(operationScope, capability)
     /** Only the current operation view reaches backend binding; old views are never reused. */
-    const api = Reflect.apply(binding.forTransaction, binding, [operationScope])
+    const api = (binding as unknown as { forTransaction(scope: object): unknown }).forTransaction(
+      operationScope
+    )
     if (typeof api !== 'object' || api === null) throw invalidTransaction()
     /** Borrow one actual native method and preserve its API receiver and returned value. */
     const execute = (api as Record<string, unknown>)[method]
     if (typeof execute !== 'function') throw invalidTransaction()
-    return Reflect.apply(execute, api, args)
+    return (api as Record<string, (...args: readonly unknown[]) => unknown>)[method]!(...args)
   })
 }
 /** Fresh native SQL binding runs only inside the original accepted operation and its budget. */
@@ -912,10 +958,12 @@ function runTransactionSqlQuery(
     /** Binding authority is re-read for every terminal, including a saved derived query. */
     const { binding } = liveTransactionCapability(operationScope, capability)
     /** The actual backend tag receives the new full operation view, never the old constructor view. */
-    const native = Reflect.apply(binding.forTransaction, binding, [operationScope]) as ISqlExecutor
+    const native = (
+      binding as unknown as { forTransaction(scope: object): unknown }
+    ).forTransaction(operationScope) as ISqlExecutor
     /** One fragment reference reuses captured nodes and bytes without rereading caller input. */
     const query = native.sql`${fragment}`
-    return Reflect.apply(query[method], query, [])
+    return query[method]()
   })
 }
 /** Pure SQL composition retains its fragment owner; terminals acquire no independent lifetime. */
@@ -926,10 +974,6 @@ function transactionSqlTag(
 ): ISqlTag {
   /** Capture the published pure constructor and tools without entering a binder or native call. */
   const original = root.sql
-  /** Original tools preserve their own receiver even through a projected tag. */
-  const id = original.id
-  /** Join and empty remain the original pure fragment composition operations. */
-  const join = original.join
   /** No SQL text or fragment is compiled during capability lookup or query construction. */
   const empty = original.empty
   /** Construction only captures the original graph; every data terminal enters the same owner. */
@@ -938,7 +982,7 @@ function transactionSqlTag(
     const { state } = liveTransactionCapability(scope, capability)
     try {
       /** The root tag supplies pure composition only; its execution callbacks are never selected. */
-      const fragment = Reflect.apply(original, root, [strings, ...values]) as ISqlQuery
+      const fragment = root.sql(strings, ...values) as ISqlQuery
       return deriveStorageSqlQuery(fragment, {
         all: () =>
           runTransactionSqlQuery(scope, capability, fragment, SqlQueryMethod.all) as ReturnType<
@@ -957,13 +1001,11 @@ function transactionSqlTag(
       throw failTransaction(state, error)
     }
   }
-  return Object.freeze(
-    Object.assign(tag, {
-      id: (...parts: readonly [string, ...string[]]) => Reflect.apply(id, original, parts),
-      join: (...args: Parameters<ISqlTag['join']>) => Reflect.apply(join, original, args),
-      empty
-    })
-  ) as ISqlTag
+  return Object.assign(tag, {
+    id: (...parts: readonly [string, ...string[]]) => original.id(...parts),
+    join: (...args: Parameters<ISqlTag['join']>) => original.join(...args),
+    empty
+  }) as ISqlTag
 }
 /** Complete read terminals enter the original operation before validation, execution and cleanup. */
 function transactionQueryReads<R>(scope: object, query: IQueryResult<R, undefined>) {
@@ -989,7 +1031,9 @@ function transactionQueryReads<R>(scope: object, query: IQueryResult<R, undefine
   for (const [method, argumentCount] of methods)
     reads[method] = (...args: readonly unknown[]) =>
       runTransactionOperation(scope, () =>
-        Reflect.apply(query[method], query, args.slice(0, argumentCount))
+        (query as unknown as Record<string, (...values: readonly unknown[]) => unknown>)[method]!(
+          ...args.slice(0, argumentCount)
+        )
       )
   return reads as Pick<IQueryResult<R, undefined>, (typeof methods)[number][0]>
 }
@@ -1007,7 +1051,9 @@ function transactionQueryWrites(scope: object, query: object): Record<string, un
     if (typeof method === 'function')
       writes[name] = (...args: readonly unknown[]) =>
         runTransactionOperation(scope, () =>
-          Reflect.apply(method, query, args.slice(0, argumentCount))
+          (query as Record<string, (...values: readonly unknown[]) => unknown>)[name]!(
+            ...args.slice(0, argumentCount)
+          )
         )
   }
   return writes
@@ -1017,12 +1063,12 @@ function transactionQueryResult<R>(
   scope: object,
   query: IQueryResult<R, undefined>
 ): IQueryResult<R, undefined> {
-  return Object.freeze({
+  return {
     ...query,
     ...transactionQueryReads(scope, query),
     explain: () => query.explain(),
     requirePushdown: () => transactionQueryResult(scope, query.requirePushdown())
-  })
+  }
 }
 /**
  * Rewraps only real pure branch constructors. Each returned chain keeps its original method state,
@@ -1039,7 +1085,12 @@ function transactionQueryBranches<TQuery extends IQueryResult<unknown, undefined
     /** Canonical immutable query constructors are captured once with their original receiver. */
     const method = Reflect.get(query, name)
     if (typeof method === 'function')
-      branches[name] = (...args: readonly unknown[]) => project(Reflect.apply(method, query, args))
+      branches[name] = (...args: readonly unknown[]) =>
+        project(
+          (query as unknown as Record<string, (...values: readonly unknown[]) => TQuery>)[name]!(
+            ...args
+          )
+        )
   }
   return branches
 }
@@ -1063,15 +1114,14 @@ function transactionRecordQuery<TQuery extends IQueryResult<unknown, undefined>>
   )
   /** Only comparator-capable states expose this original bounded transition. */
   const comparator = Reflect.get(query, RecordQueryMethod.orderByComparator)
-  /** One actual selection constructor retains the original overloads and original query receiver. */
-  const select = Reflect.get(query, RecordQueryMethod.select) as IRecordQuery<
-    unknown,
-    undefined
-  >['select']
   if (typeof comparator === 'function')
     branches.orderByComparator = (compare: (left: unknown, right: unknown) => number) => {
       /** Comparator admission remains pure and keeps its one original immediate-bound protocol. */
-      const pending = Reflect.apply(comparator, query, [compare]) as {
+      const pending = (
+        query as unknown as {
+          orderByComparator(compare: (left: unknown, right: unknown) => number): unknown
+        }
+      ).orderByComparator(compare) as {
         first(): Promise<unknown>
         limit(count: number): IQueryResult<unknown, undefined>
       }
@@ -1080,21 +1130,28 @@ function transactionRecordQuery<TQuery extends IQueryResult<unknown, undefined>>
         limit: (count: number) => transactionRecordQuery(scope, pending.limit(count))
       }
     }
-  return Object.freeze({
+  return {
     ...query,
     ...transactionQueryReads(scope, query),
     ...branches,
     ...transactionQueryWrites(scope, query),
     select: (...args: readonly unknown[]) =>
-      transactionQueryResult(scope, Reflect.apply(select, query, args)),
+      transactionQueryResult(
+        scope,
+        (
+          query as unknown as {
+            select(...args: readonly unknown[]): IQueryResult<unknown, undefined>
+          }
+        ).select(...args)
+      ),
     explain: () => query.explain(),
     requirePushdown: (): IQueryResult<unknown, undefined> =>
       transactionRecordQuery(scope, query.requirePushdown())
-  }) as TQuery
+  } as TQuery
 }
 /** RDF branches reuse the same original node constructors and complete read admission table. */
 function transactionRdfQuery(scope: object, query: IRdfQuery<undefined>): IRdfQuery<undefined> {
-  return Object.freeze({
+  return {
     ...query,
     ...transactionQueryReads(scope, query),
     ...transactionQueryWrites(scope, query),
@@ -1104,10 +1161,17 @@ function transactionRdfQuery(scope: object, query: IRdfQuery<undefined>): IRdfQu
       (next) => transactionRdfQuery(scope, next)
     ),
     select: (...args: readonly unknown[]) =>
-      transactionQueryResult(scope, Reflect.apply(query.select, query, args)),
+      transactionQueryResult(
+        scope,
+        (
+          query as unknown as {
+            select(...args: readonly unknown[]): IQueryResult<unknown, undefined>
+          }
+        ).select(...args)
+      ),
     explain: () => query.explain(),
     requirePushdown: () => transactionRdfQuery(scope, query.requirePushdown())
-  }) as IRdfQuery<undefined>
+  } as IRdfQuery<undefined>
 }
 /**
  * Reads the original store capability table from an authentic view. Pure lookup invokes no binder
@@ -1151,12 +1215,17 @@ export function useTransactionCapability<
       const { state, binding } = liveTransactionCapability(scope, capability)
       try {
         /** The backend's pure query constructor must use its real scope, never a root API. */
-        const bound = Reflect.apply(binding.forTransaction, binding, [scope])
+        const bound = (
+          binding as unknown as { forTransaction(scope: object): unknown }
+        ).forTransaction(scope)
         if (typeof bound !== 'object' || bound === null) throw invalidTransaction()
         /** One borrowed constructor keeps the actual shared chain and its source receiver intact. */
         const query = (bound as Record<string, unknown>).query
         if (typeof query !== 'function') throw invalidTransaction()
-        return transactionRecordQuery(scope, Reflect.apply(query, bound, []))
+        return transactionRecordQuery(
+          scope,
+          (bound as { query(): IQueryResult<unknown, undefined> }).query()
+        )
       } catch (error) {
         throw failTransaction(state, error)
       }
@@ -1172,12 +1241,17 @@ export function useTransactionCapability<
       const { state, binding } = liveTransactionCapability(scope, capability)
       try {
         /** The backend supplies its real ground query source and original iterator registration. */
-        const bound = Reflect.apply(binding.forTransaction, binding, [scope])
+        const bound = (
+          binding as unknown as { forTransaction(scope: object): unknown }
+        ).forTransaction(scope)
         if (typeof bound !== 'object' || bound === null) throw invalidTransaction()
         /** One native match lookup preserves receiver and canonical pattern capture. */
         const match = (bound as Record<string, unknown>).match
         if (typeof match !== 'function') throw invalidTransaction()
-        return transactionRdfQuery(scope, Reflect.apply(match, bound, [pattern]))
+        return transactionRdfQuery(
+          scope,
+          (bound as { match(pattern: Partial<IQuad>): IRdfQuery<undefined> }).match(pattern)
+        )
       } catch (error) {
         throw failTransaction(state, error)
       }
@@ -1193,69 +1267,79 @@ export function useTransactionCapability<
         method,
         transaction.rdf ? args.slice(0, 1) : args
       )
-  /** Only the projection object is frozen; the backend scope/API and original base are not patched. */
-  const frozen = Object.freeze(api)
+  /** Cache only the projection identity; the original backend scope and API remain borrowed. */
   ;(view.capabilities ??= new Map()).set(capability, {
     implementation: binding.implementation,
-    api: frozen
+    api
   })
-  return frozen as TCap extends typeof records
+  return api as TCap extends typeof records
     ? ITransactionRecordsApi<IScopeRecordValue<TScope>>
     : ITransactionCapabilityApi<TCap>
 }
 
-/** Registers and invokes a composed operation synchronously before schema, codec or native work. */
+/** One accepted operation owns its public result and fresh view until actual settlement. */
+class TransactionOperation<TScope extends object, TResult> {
+  /** Only the original registered transaction owns admission and failure attribution. */
+  readonly #state: ITransactionState
+  /** This operation's view is invalidated at settlement, never the accepted sibling views. */
+  #view: IViewRegistration | undefined
+  /** Resolve the exact public Promise already inserted into the owner's active set. */
+  #resolve!: (value: Awaited<TResult>) => void
+  /** Reject that same Promise with the first backend-normalized failure. */
+  #reject!: (error: unknown) => void
+  /** Public identity stays stable while this operation drains or triggers rollback. */
+  readonly result: Promise<Awaited<TResult>>
+  /** Admission is synchronous so native transaction requests start in their original active window. */
+  constructor(state: ITransactionState, run: (scope: TScope) => TResult) {
+    this.#state = state
+    this.result = new Promise((resolve, reject) => {
+      this.#resolve = resolve
+      this.#reject = reject
+    })
+    state.operations.add(this.result)
+    this.#execute(run)
+    void this.result.then(undefined, () => undefined)
+  }
+  /** Ordinary Promise assimilation observes asynchronous work; plain values settle immediately. */
+  #execute(run: (scope: TScope) => TResult): void {
+    try {
+      if (typeof run !== 'function') throw invalidTransaction()
+      /** Native extensions remain on their original complete backend factory result. */
+      const created = createTransactionView(this.#state)
+      this.#view = created.view
+      /** User work starts only after its public result occupies the active set. */
+      const value = run(created.scope as TScope)
+      if (
+        value !== null &&
+        (typeof value === 'object' || typeof value === 'function') &&
+        typeof (value as { then?: unknown }).then === 'function'
+      )
+        void Promise.resolve(value).then(
+          (settled) => this.#finish(settled as Awaited<TResult>),
+          (error) => this.#finish(undefined, error, true)
+        )
+      else this.#finish(value as Awaited<TResult>)
+    } catch (error) {
+      this.#finish(undefined, error, true)
+    }
+  }
+  /** Both result paths release only this view and active-set entry before settling the caller. */
+  #finish(value: Awaited<TResult> | undefined, error?: unknown, failed = false): void {
+    if (this.#view) invalidateView(this.#view)
+    this.#state.operations.delete(this.result)
+    if (failed) this.#reject(failTransaction(this.#state, error))
+    else this.#resolve(value as Awaited<TResult>)
+  }
+}
+/** Admit composed work through the original private view registration before invoking user code. */
 export function runTransactionOperation<TScope extends object, TResult>(
   scope: TScope,
   run: (operationScope: TScope) => TResult
 ): Promise<Awaited<TResult>> {
-  /** Forged scopes fail synchronously; authentic expired data calls return backend rejection. */
+  /** Forged identities still fail synchronously; authentic expired calls retain backend rejection. */
   const view = transactionView(scope)
-  /** Capture live state once rather than asking public scope fields for permission. */
-  const state = view.state
-  if (!state) {
-    return rejectedTransactionResult<Awaited<TResult>>(view.expiredFailure)
-  }
-  /** A deferred public result is inserted before invoking the backend view factory or user code. */
-  let resolveResult!: (value: Awaited<TResult>) => void
-  /** The result remains rejected for its caller while an internal observer prevents late leaks. */
-  let rejectResult!: (error: unknown) => void
-  /** Every operation occupies exactly one active-set entry until actual settlement. */
-  const result = new Promise<Awaited<TResult>>((resolve, reject) => {
-    resolveResult = resolve
-    rejectResult = reject
-  })
-  state.operations.add(result)
-  /** One created view belongs exclusively to this operation and is invalidated at settlement. */
-  let operationView: IViewRegistration | undefined
-  /** Both synchronous and asynchronous outcomes use one settlement owner. */
-  const finish = (value: Awaited<TResult> | undefined, error?: unknown, failed = false): void => {
-    if (operationView) invalidateView(operationView)
-    state.operations.delete(result)
-    if (failed) rejectResult(failTransaction(state, error))
-    else resolveResult(value as Awaited<TResult>)
-  }
-  try {
-    if (typeof run !== 'function') throw invalidTransaction()
-    /** Factory methods retain the concrete backend extensions, rather than copying the caller. */
-    const created = createTransactionView(state)
-    operationView = created.view
-    /** Direct invocation lets native transaction requests start in their actual active window. */
-    const value = run(created.scope as TScope)
-    /** Inspection and assimilation share the captured then getter. */
-    const inspection = inspectThenable(value)
-    if ('error' in inspection) finish(undefined, inspection.error, true)
-    else if ('then' in inspection && inspection.then !== undefined)
-      void assimilateCapturedThen<Awaited<TResult>>(inspection.then, value).then(
-        (value) => finish(value),
-        (error) => finish(undefined, error, true)
-      )
-    else finish(value as Awaited<TResult>)
-  } catch (error) {
-    finish(undefined, error, true)
-  }
-  void result.then(undefined, () => undefined)
-  return result
+  if (!view.state) return rejectedTransactionResult<Awaited<TResult>>(view.expiredFailure)
+  return new TransactionOperation(view.state, run).result
 }
 
 /** Registers one final check in order, before the first finalizer run freezes the accepted list. */
