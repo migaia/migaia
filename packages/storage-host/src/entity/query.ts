@@ -38,6 +38,8 @@ type IEntityQueryInput<
   _TContext extends IOperationContext | undefined,
   TMethods extends object
 > = {
+  /** Keyset methods require their independent explicit assembly before preparing a source. */
+  readonly keyset: <R>(invoke: () => R) => R
   readonly source: (selection: IEntityQuerySourceSelection<T>) => IRecordQuerySource
   readonly index: (name: string, match: unknown) => IEntityQuerySourceSelection<T>
   readonly range: (range: IKeyRange) => IKeyRange
@@ -134,7 +136,7 @@ class EntityQueryReads<
   /** Delegate page to the original query through the entity operation observer. */
   readonly page: IEntityQueryReadMethods<R, TContext>['page'] = (size, ctx) =>
     this.#context.input.run(
-      () => this.#prepare().page(size, ctx),
+      () => this.#context.input.keyset(() => this.#prepare().page(size, ctx)),
       this.#plan,
       { ...this.#context.selection, onInvalid: this.#invalid },
       (page) => page.items.length
@@ -622,7 +624,7 @@ class EntityQueryBranch<
   ) =>
     wrapEntityQuery(
       this.#context,
-      this.#state.query.after(cursor),
+      this.#context.input.keyset(() => this.#state.query.after(cursor)),
       this.#state.limit,
       this.#state.explicit,
       this.#state.plan,

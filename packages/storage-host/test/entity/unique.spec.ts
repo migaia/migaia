@@ -1,3 +1,8 @@
+import { entityQueryFeature } from '../../src/entity/query-feature.js'
+import { entityUniqueFeature } from '../../src/entity/unique-feature.js'
+import { entityMigrationFeature } from '../../src/entity/migration-feature.js'
+import { entityIndexesFeature } from '../../src/entity/indexes-feature.js'
+import { entityKeysetFeature } from '../../src/entity/keyset.js'
 // @vitest-environment node
 import { describe, expect, it } from 'vitest'
 import { defineEntity } from '../../src/entity.js'
@@ -11,6 +16,13 @@ const factories = [{ name: 'memory', create: memoryBackend }] as const
 
 /** Both independently connected repositories use the same public definition. */
 const users = defineEntity<IUser>()({
+  features: [
+    entityQueryFeature(),
+    entityUniqueFeature(),
+    entityMigrationFeature(),
+    entityIndexesFeature(),
+    entityKeysetFeature()
+  ],
   name: 'unique-users',
   key: 'id',
   indexes: { byEmail: { path: 'email', unique: true } },
@@ -31,6 +43,13 @@ describe('authoritative fallback unique writes', () => {
       try {
         /** The definition must remain valid even when evaluating a particular value fails. */
         const repo = defineEntity<IUser>()({
+          features: [
+            entityQueryFeature(),
+            entityUniqueFeature(),
+            entityMigrationFeature(),
+            entityIndexesFeature(),
+            entityKeysetFeature()
+          ],
           name: 'failed-projection',
           key: 'id',
           onDiagnostic: () => {},
@@ -152,11 +171,28 @@ describe('authoritative fallback unique writes', () => {
     let migrations = 0
     try {
       /** Seed valid historical values through the public repository. */
-      const old = defineEntity<IUser>({ name: 'migration-unique', key: 'id' }).connect(store)
+      const old = defineEntity<IUser>({
+        features: [
+          entityQueryFeature(),
+          entityUniqueFeature(),
+          entityMigrationFeature(),
+          entityIndexesFeature(),
+          entityKeysetFeature()
+        ],
+        name: 'migration-unique',
+        key: 'id'
+      }).connect(store)
       await old.put({ id: 'a', email: 'same' })
       await old.put({ id: 'b', email: 'SAME' })
       /** The migration would create two owners of one normalized index value. */
       const upgraded = defineEntity<IUser>()({
+        features: [
+          entityQueryFeature(),
+          entityUniqueFeature(),
+          entityMigrationFeature(),
+          entityIndexesFeature(),
+          entityKeysetFeature()
+        ],
         name: 'migration-unique',
         key: 'id',
         version: 2,
