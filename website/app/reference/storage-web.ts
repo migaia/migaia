@@ -200,8 +200,8 @@ const optionCases = (module: string, plugin: string, id: string): readonly IOpti
 const indexedDbFields: Readonly<Record<string, IMemberDoc>> = {
   journalFactoryIsPrivate: {
     summary: t(
-      'Explicit true only for an injected factory whose data universe is confined to this realm. Without native Web Locks, other factory journal combinations reject before recovery I/O.',
-      '仅为数据宇宙局限当前 realm 的注入 factory 显式声明 true；缺少原生 Web Locks 时其它 factory 日志组合在恢复 I/O 前拒绝。'
+      'Explicit true only for an injected factory confined to this realm; it retains the original cached path. Without this declaration or native Web Locks, indexExclusive:false selects current native reads per operation without a cross-operation index.',
+      '仅为数据宇宙局限当前 realm 的真实私有 factory 显式声明 true，保留原缓存路径；缺少该声明与原生 Web Locks 时，以 indexExclusive:false 在每操作原生事务中现读，不跨操作缓存。'
     )
   },
   dbName: {
@@ -935,8 +935,8 @@ console.error(error.source, error.code)`,
     },
     IIndexedDbOptions: {
       summary: t(
-        'Native database preparation and physical layout options. Private storageLogStore history shares the original META store; persistent cached indexes require native Web Locks lifetime exclusion.',
-        '原生数据库准备与物理布局选项；私有 storageLogStore 历史复用原 META 仓库，持久缓存索引要求原生 Web Locks 全资源期独占。'
+        'Native database preparation and physical layout options. Private storageLogStore history shares the original META store. Native Web Locks retain the cached path; indexExclusive:false restores current state inside each original journal-store readwrite transaction without a cross-operation index.',
+        '原生数据库准备与物理布局选项；私有 storageLogStore 历史复用原 META 仓库。原生 Web Locks 保留缓存路径；indexExclusive:false 在每操作原 journal-store readwrite 事务现读，不跨操作缓存。'
       ),
       members: indexedDbFields,
       optionCases: optionCases('indexed-db', 'indexedDbBackendPlugin', 'indexed-db')

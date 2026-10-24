@@ -144,8 +144,8 @@ try {
     {
       title: t('Keep private history across business clear', '业务清理后保留私有历史'),
       problem: t(
-        'A persistent log needs its own native metadata namespace and a lifetime-exclusive cached index.',
-        '持久日志需要原生私有元数据命名空间与整个资源期间独占的缓存索引。'
+        'A persistent log needs its original native metadata namespace; lifetime-exclusive owners may cache, while other reliable native transactions restore current state for each operation.',
+        '持久日志使用原生私有元数据命名空间；资源期间独占的拥有者可缓存，其它可靠原生事务按操作现读。'
       ),
       example: `import { createStorageHost } from '@migaia/storage-host'
 import { storageLogStore } from '@migaia/storage-host/journal'
@@ -161,8 +161,8 @@ try {
   } finally { await log.dispose() }
 } finally { await host.dispose() }`,
       result: t(
-        'Prints 1. Native Web Locks protect the resource across participating pages; a conflicting open reports LOCK_REJECTED. Without this persistent exclusion the log combination reports UNSUPPORTED_CAPABILITY before recovery I/O.',
-        '输出 1；原生 Web Locks 在参与页面间保护资源，冲突打开报 LOCK_REJECTED。缺少此持久独占能力时，日志组合在恢复 I/O 前报 UNSUPPORTED_CAPABILITY。'
+        'Prints 1. Native Web Locks retain lifetime exclusion and the cached path, with LOCK_REJECTED on conflict. Otherwise indexExclusive:false restores current lastSeq/state/records inside each original journal-store readwrite transaction and retains no index across operations.',
+        '输出 1；原生 Web Locks 保留资源独占与缓存路径，冲突报 LOCK_REJECTED；其它 indexExclusive:false 组合在每操作原 journal-store readwrite 事务现读 lastSeq/state/记录，不跨操作缓存。'
       )
     },
     {

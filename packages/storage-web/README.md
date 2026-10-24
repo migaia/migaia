@@ -160,9 +160,9 @@ try {
 }
 ```
 
-IndexedDB 支持从 `@migaia/storage-host/journal` 调用 `storageLogStore(hostOrOrg, 'indexed-db', { prefix })`。私有行使用既有 META 对象仓库内的数组键命名空间。业务 `clearAll` 保留历史；删除组织使旧日志缓存句柄失效，原业务视图仍可重新打开。重新打开同一物理组织和前缀前须释放原日志。head、state 与记录随原生事务一同提交，缓存索引在真实 complete 事件内发布。
+IndexedDB 支持从 `@migaia/storage-host/journal` 调用 `storageLogStore(hostOrOrg, 'indexed-db', { prefix })`。私有行使用既有 META 对象仓库内的数组键命名空间。业务 `clearAll` 保留历史；删除组织使旧日志句柄失效，原业务视图仍可重新打开。缓存模式下，重新打开同一物理组织和前缀前须释放原日志。head、state 与记录随原生事务一同提交，缓存索引在真实 complete 事件内发布。
 
-对于当前 realm 的持久 IndexedDB factory，原生 Web Locks 在整个资源期间保证参与页面间独占；冲突打开报 LOCK_REJECTED。缺少 Web Locks 时，此缓存日志组合在恢复 I/O 前报 UNSUPPORTED_CAPABILITY，普通 IndexedDB 操作仍可使用。注入 factory 有原生 Web Locks 时同样使用该能力；缺少时，只有显式声明 `journalFactoryIsPrivate: true`、数据宇宙仅限当前 realm 且不转发共享持久库的组合，才复用原逻辑锁拥有者。对象身份本身不证明隔离。此命名空间支持本身不启用全局自动捕获或显式选择的 undo。
+有原生 Web Locks 时，原资源期间独占与缓存路径保持，冲突打开报 LOCK_REJECTED。缺少 Web Locks、又未声明实际私有 factory 时，原 namespace 声明 `indexExclusive:false`：storageLogStore 不再拒绝，而是在每个操作的原 journal-store readwrite 事务内恢复/读取最新 lastSeq、state 与记录，不跨操作保留索引。注入 factory 有 Web Locks 时同样使用原缓存路径；`journalFactoryIsPrivate:true` 仅适用于数据宇宙局限当前 realm 且不转发共享持久库的真实私有 factory，继续复用原逻辑锁与缓存拥有者。对象身份本身不证明隔离。此命名空间支持本身不启用全局自动捕获或显式选择的 undo。
 
 ## IndexedDB 全局日志与显式 undo
 
