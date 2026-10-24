@@ -3,7 +3,6 @@ export const STORAGE_DESCRIPTOR_HOOKS = ['install', 'expose', 'featureExpose'] a
 /** Storage-owned author metadata never enters PluginHost's closed native descriptor vocabulary. */
 export const STORAGE_DESCRIPTOR_METADATA = [
   'kind',
-  'contextualExtensions',
   'capabilityInstaller',
   'journalBinding'
 ] as const

@@ -129,12 +129,12 @@ it('measures exact UTF-8 line budgets and keeps embedded newlines inside their c
     await host.detect()
     try {
       for (const key of ['event:a', 'event:b']) await host.backend('hot').putRecord(value, key)
-      expect(await host.extensions.archive.run()).toEqual({
+      expect(await host.extensions.archiveRun()).toEqual({
         archived: 2,
         skipped: 0,
         segments: exact ? 1 : 2
       })
-      expect(await host.extensions.archive.get('event:a')).toEqual(value)
+      expect(await host.extensions.archiveGet('event:a')).toEqual(value)
     } finally {
       await host.dispose()
     }

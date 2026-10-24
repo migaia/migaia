@@ -1,3 +1,4 @@
+import type { Archive } from './constants.js'
 import type { IWhere, IOperationContext } from '@migaia/storage-contract'
 import type { ICollectionsCodecValue } from '@migaia/serialize/codecs/collections-json'
 
@@ -24,11 +25,20 @@ export type IArchiveRunResult = {
 export type IArchiveGetOptions = IOperationContext & { readonly restore?: boolean }
 /** Scanned counts native listing candidates; removed counts actual successful removals. */
 export type IArchiveSweepResult = { readonly scanned: number; readonly removed: number }
-/** Ordinary extension API, with no store ownership or disposal authority. */
-export type IArchiveApi = {
-  run(options?: IArchiveRunOptions): Promise<IArchiveRunResult>
-  get(key: string, options?: IArchiveGetOptions): Promise<ICollectionsCodecValue | undefined>
-  sweep(ctx?: IOperationContext): Promise<IArchiveSweepResult>
+/** Flat extension functions use the plugin id as a prefix and the host's organization context. */
+export type IArchiveApi<N extends string = 'archive'> = {
+  [K in `${N}${typeof Archive.runSuffix}`]: (
+    options?: IArchiveRunOptions
+  ) => Promise<IArchiveRunResult>
+} & {
+  [K in `${N}${typeof Archive.getSuffix}`]: (
+    key: string,
+    options?: IArchiveGetOptions
+  ) => Promise<ICollectionsCodecValue | undefined>
+} & {
+  [K in `${N}${typeof Archive.sweepSuffix}`]: (
+    ctx?: IOperationContext
+  ) => Promise<IArchiveSweepResult>
 }
 /** Both backends must already be published by an earlier installation batch. */
 export type IArchivePluginOptions<T = ICollectionsCodecValue> = {

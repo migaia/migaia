@@ -257,12 +257,7 @@ type IStorageNativeCore = IPluginHostCore<IStoragePipelineInput> & {
   readonly registerOrgBinding: IStoragePluginCore['registerOrgBinding']
   readonly registerFeatureClientResolver: IStoragePluginCore['registerFeatureClientResolver']
   readonly getOrgContext: IStoragePluginCore['getOrgContext']
-  captureStorageExtension(
-    key: PropertyKey,
-    value: unknown,
-    receiver: object,
-    contextual?: boolean
-  ): unknown
+  captureStorageExtension(key: PropertyKey, value: unknown, receiver: object): unknown
 }
 /** Define one native plugin while preserving the original descriptor snapshot and install ownership. */
 export const definePlugin: IStorageDefinePlugin = ((
@@ -359,10 +354,7 @@ export const definePlugin: IStorageDefinePlugin = ((
         const property = Object.getOwnPropertyDescriptor(descriptor, key)
         if (
           property !== undefined &&
-          (!('value' in property) ||
-            (key !== 'kind' &&
-              key !== 'contextualExtensions' &&
-              typeof property.value !== 'function'))
+          (!('value' in property) || (key !== 'kind' && typeof property.value !== 'function'))
         )
           throw createStorageTypeError(
             StorageErrorCode.backendPluginInvalid,
@@ -370,34 +362,9 @@ export const definePlugin: IStorageDefinePlugin = ((
           )
         metadata[key] = property?.value
       }
-      /** One detached list selects finite API objects without changing existing data extensions. */
-      const selected = metadata.contextualExtensions
-      if (
-        selected !== undefined &&
-        (!Array.isArray(selected) || Object.keys(selected).length !== selected.length)
-      )
-        throw createStorageTypeError(
-          StorageErrorCode.backendPluginInvalid,
-          StorageErrorText.backendPluginInvalid
-        )
-      const contextualExtensions = selected === undefined ? [] : [...selected]
-      if (
-        contextualExtensions.some((key) => typeof key !== 'string' || key.length === 0) ||
-        new Set(contextualExtensions).size !== contextualExtensions.length
-      )
-        throw createStorageTypeError(
-          StorageErrorCode.backendPluginInvalid,
-          StorageErrorText.backendPluginInvalid
-        )
-      Object.freeze(contextualExtensions)
-      /** The same original descriptor read snapshots the explicitly selected source API once. */
+      /** Flat extension functions receive the same organization context as backend methods. */
       const captureExtension = (key: PropertyKey, value: unknown, receiver: object) =>
-        nativeCore.captureStorageExtension(
-          key,
-          value,
-          receiver,
-          typeof key === 'string' && contextualExtensions.includes(key)
-        )
+        nativeCore.captureStorageExtension(key, value, receiver)
       /** Registration-local identity cannot be changed by later descriptor mutation. */
       const kind = metadata.kind as IStorageBackendKind | undefined
       /** The provider-issued installation port belongs to this exact backend construction. */

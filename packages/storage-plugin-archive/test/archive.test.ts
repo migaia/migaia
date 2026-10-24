@@ -47,7 +47,11 @@ async function fixture(
     host,
     hot: host.backend('hot'),
     cold: host.backend('cold').use(blob),
-    archive: host.extensions.history
+    archive: {
+      run: host.extensions.historyRun,
+      get: host.extensions.historyGet,
+      sweep: host.extensions.historySweep
+    }
   }
 }
 
@@ -99,11 +103,11 @@ describe('explicit Archive over genuine Memory records and blobs', () => {
         b = host.org('22222222-2222-4222-8222-222222222222')
       await a.backend('hot').putRecord({ old: true, value: 1 }, 'event:a')
       await b.backend('hot').putRecord({ old: true, value: 2 }, 'event:a')
-      const saved = a.extensions.history.run
+      const saved = a.extensions.historyRun
       expect((await saved()).archived).toBe(1)
-      expect((await b.extensions.history.run()).archived).toBe(1)
-      expect(await a.extensions.history.get('event:a')).toEqual({ old: true, value: 1 })
-      expect(await b.extensions.history.get('event:a')).toEqual({ old: true, value: 2 })
+      expect((await b.extensions.historyRun()).archived).toBe(1)
+      expect(await a.extensions.historyGet('event:a')).toEqual({ old: true, value: 1 })
+      expect(await b.extensions.historyGet('event:a')).toEqual({ old: true, value: 2 })
       expect(await archive.get('event:a')).toEqual({ old: true, value: 0 })
     } finally {
       await host.dispose()
@@ -540,7 +544,7 @@ describe('Archive rule and wire admission', () => {
       for (const key of ['event:z', 'event:a', 'other', '\uffff'])
         await host.backend('hot').putRecord({ old: true, value: key }, key)
       await host.backend('hot').putRecord({ old: true }, ['metadata'])
-      expect(await host.extensions.snapshot.run({ limit: 3 })).toEqual({
+      expect(await host.extensions.snapshotRun({ limit: 3 })).toEqual({
         archived: 3,
         skipped: 0,
         segments: 1
@@ -549,10 +553,10 @@ describe('Archive rule and wire admission', () => {
       expect(whereCalls).toBe(1)
       expect(await host.backend('hot').getRecord('\uffff')).toBeDefined()
       expect(await host.backend('hot').getRecord(['metadata'])).toEqual({ old: true })
-      await expect(host.extensions.snapshot.run({ rule: 'missing' })).rejects.toMatchObject({
+      await expect(host.extensions.snapshotRun({ rule: 'missing' })).rejects.toMatchObject({
         code: 'INVALID_ARGUMENT'
       })
-      await expect(host.extensions.snapshot.run({ limit: 0 })).rejects.toMatchObject({
+      await expect(host.extensions.snapshotRun({ limit: 0 })).rejects.toMatchObject({
         code: 'INVALID_ARGUMENT'
       })
     } finally {
@@ -830,7 +834,7 @@ it('gives an overlapping candidate only to its first selected rule even when its
         .backend('hot')
         .putRecord({ old: true, value: 2 }, 'event:a')
         .then(() => undefined)
-    expect(await host.extensions.archive.run()).toEqual({ archived: 0, skipped: 1, segments: 0 })
+    expect(await host.extensions.archiveRun()).toEqual({ archived: 0, skipped: 1, segments: 0 })
     expect(puts).toBe(1)
     expect(whereCalls).toBe(2)
   } finally {
@@ -854,8 +858,8 @@ it('handles maximum UTF-16 prefixes without visiting private tuple metadata', as
   try {
     await host.backend('hot').putRecord(null, '\uffff')
     await host.backend('hot').putRecord({ safe: true }, ['metadata'])
-    expect(await host.extensions.archive.run()).toEqual({ archived: 1, skipped: 0, segments: 1 })
-    expect(await host.extensions.archive.get('\uffff')).toBeNull()
+    expect(await host.extensions.archiveRun()).toEqual({ archived: 1, skipped: 0, segments: 1 })
+    expect(await host.extensions.archiveGet('\uffff')).toBeNull()
     expect(await host.backend('hot').getRecord(['metadata'])).toEqual({ safe: true })
   } finally {
     await host.dispose()

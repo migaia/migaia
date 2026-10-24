@@ -268,7 +268,7 @@ A native binding may declare `requiresIndexedDbUndo?: true`. The original descri
 
 Native author `core.emit` skips optional diagnostics while the host is closing and does not evaluate a lazy payload factory, so HOST_DISPOSING cannot replace the result of already accepted native work. Open execution retains the original registration check and event channel; old handles still reject after full closure or registration revocation. The original host owner continues to publish host lifecycle events.
 
-An ordinary plugin returning a nested API object can declare contextualExtensions: ['archive'] on its descriptor. Only the own methods one level below those top-level keys receive the original IStoragePluginCallContext. They preserve their receiver and Promise identity and reuse the registration guard. Unselected data objects keep their identity. The list is copied once before installation; selected APIs require own data properties, with no recursive projection or closing authority.
+Ordinary plugins return flat function extensions. Each function receives the current organization through the host-provided IStoragePluginCallContext. Archive prefixes its three functions with the plugin id, for example historyRun(), historyGet(key), and historySweep(). Saved functions stay bound to their organization and the plugin lifetime.
 
 Ordinary composition plugins can use the original createChangeController during installation and read getOrgContext().execution at runtime. Original onDispose owns the controller. Release beginMutation only after actual work settles; caller cancellation does not imply external I/O has drained.
 

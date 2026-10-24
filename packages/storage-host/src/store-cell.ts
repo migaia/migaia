@@ -1,11 +1,6 @@
 import type { IChainMethods, IStorageBase, IStorageResource } from '@migaia/storage-contract'
 import { createErrorCollector } from '@migaia/lifecycle'
-import {
-  StorageError,
-  StorageErrorCode,
-  STORAGE_HOST_SOURCE,
-  createStorageTypeError
-} from './errors.js'
+import { StorageError, StorageErrorCode, STORAGE_HOST_SOURCE } from './errors.js'
 import { StorageErrorText } from './error-text.js'
 import type { IStorageFeatureProjection } from './feature-install.js'
 import type {
@@ -48,7 +43,7 @@ export type IStorageStoreCell = {
     context: IStoragePluginCallContext,
     execution: IStorageExecutionPort
   ): object | undefined
-  captureExtension(key: PropertyKey, value: unknown, receiver: object, contextual?: boolean): void
+  captureExtension(key: PropertyKey, value: unknown, receiver: object): void
   projectExtension(
     key: PropertyKey,
     context: IStoragePluginCallContext,
@@ -81,10 +76,6 @@ export function createStorageStoreCell(): IStorageStoreCell {
     {
       readonly value: unknown
       readonly receiver: object
-      readonly contextual?: {
-        readonly source: object
-        readonly members: Readonly<Record<PropertyKey, PropertyDescriptor>>
-      }
     }
   >()
   /** Each organization retains one business view, avoiding per-lookup resource aliases. */
@@ -181,30 +172,8 @@ export function createStorageStoreCell(): IStorageStoreCell {
       projection?.createStoreApi?.(store, context, execution),
     createOrgTransactionApi: (scope, store, context, execution) =>
       projection?.createTransactionApi?.(scope, store, context, execution),
-    captureExtension: (key, value, receiver, contextual = false) => {
-      let api:
-        | {
-            readonly source: object
-            readonly members: Readonly<Record<PropertyKey, PropertyDescriptor>>
-          }
-        | undefined
-      if (contextual) {
-        if (value === null || typeof value !== 'object' || Array.isArray(value))
-          throw createStorageTypeError(
-            StorageErrorCode.backendPluginInvalid,
-            StorageErrorText.backendPluginInvalid
-          )
-        const members: Readonly<Record<PropertyKey, PropertyDescriptor>> =
-          Object.getOwnPropertyDescriptors(value)
-        for (const name of Reflect.ownKeys(members))
-          if (!('value' in members[name]!))
-            throw createStorageTypeError(
-              StorageErrorCode.backendPluginInvalid,
-              StorageErrorText.backendPluginInvalid
-            )
-        api = { source: value, members }
-      }
-      extensions.set(key, { value, receiver, contextual: api })
+    captureExtension: (key, value, receiver) => {
+      extensions.set(key, { value, receiver })
     },
     projectExtension,
     projectExtensions: (context, assertCurrent) => {
@@ -256,31 +225,11 @@ export function createStorageStoreCell(): IStorageStoreCell {
     assertCurrent: () => void
   ): unknown {
     const entry = extensions.get(key)!
-    if (entry.contextual !== undefined) {
-      /** The opt-in API borrows its original receiver and the same immutable org context. */
-      const receiver = Object.assign(Object.create(entry.contextual.source), context)
-      const projected = Object.create(Object.getPrototypeOf(entry.contextual.source))
-      for (const name of Reflect.ownKeys(entry.contextual.members)) {
-        const descriptor = entry.contextual.members[name]!
-        const method = descriptor.value
-        Object.defineProperty(projected, name, {
-          ...descriptor,
-          value:
-            typeof method !== 'function'
-              ? method
-              : (...args: unknown[]) => {
-                  assertCurrent()
-                  return Reflect.apply(method, receiver, args)
-                }
-        })
-      }
-      return Object.freeze(projected)
-    }
     if (typeof entry.value !== 'function') return entry.value
     const receiver = Object.assign(Object.create(entry.receiver), context)
     return (...args: unknown[]) => {
       assertCurrent()
-      return Reflect.apply(entry.value as Function, receiver, args)
+      return receiver[key](...args)
     }
   }
 }

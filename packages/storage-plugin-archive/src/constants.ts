@@ -13,6 +13,12 @@ export const Archive = Object.freeze({
   format: 'migaia-archive',
   compression: 'gzip',
   contentType: 'application/x-ndjson',
+  /** Flat extension names append these stable suffixes to the configured plugin id. */
+  runSuffix: 'Run',
+  /** Read function suffix shared by runtime publication and the public mapped type. */
+  getSuffix: 'Get',
+  /** Cleanup function suffix shared by runtime publication and the public mapped type. */
+  sweepSuffix: 'Sweep',
   run: 'archive.run',
   get: 'archive.get',
   sweep: 'archive.sweep',

@@ -20,19 +20,21 @@ const host = await base.use(
 await host.detect()
 try {
   await host.backend('hot').putRecord({ old: true, answer: 42 }, 'event:one')
-  console.log(await host.extensions.history.run())
-  console.log(await host.extensions.history.get('event:one', { restore: true }))
-  console.log(await host.extensions.history.sweep())
+  console.log(await host.extensions.historyRun())
+  console.log(await host.extensions.historyGet('event:one', { restore: true }))
+  console.log(await host.extensions.historySweep())
 } finally {
   await host.dispose()
 }
 ```
 
-`run({ rule?, limit?, signal?, timeoutMs? })` applies rules in declaration order and counts matching candidates toward the limit. Each segment defaults to 1,048,576 uncompressed UTF-8 bytes; an oversized record gets its own segment. A completed cold upload precedes one original hot transaction that checks the immutable object, rechecks records, updates manifests/reference counts and deletes unchanged eligible hot rows. Earlier committed segments survive later failures; cold orphans remain for explicit `sweep()`.
+The plugin id supplies the function prefix: `history` publishes `historyRun`, `historyGet`, and `historySweep`.
 
-`get(key, { restore? })` checks hot storage first, otherwise validates the entire gzip/NDJSON snapshot through EOF before its finite hot/manifest recheck. Restore is opt-in and preserves a concurrently written hot value. Map/Set use the shared collections codec; bytes become its tagged portable representation. Date and functions are unsupported.
+`historyRun({ rule?, limit?, signal?, timeoutMs? })` applies rules in declaration order and counts matching candidates toward the limit. Each segment defaults to 1,048,576 uncompressed UTF-8 bytes; an oversized record gets its own segment. A completed cold upload precedes one original hot transaction that checks the immutable object, rechecks records, updates manifests/reference counts and deletes unchanged eligible hot rows. Earlier committed segments survive later failures; cold orphans remain for explicit `historySweep()`.
 
-`sweep()` follows opaque blob pages and point-checks segment directories under the same original control lock. It removes only unreferenced objects with this plugin's prefix and format/version metadata. It never scans every manifest. All methods use the current host organization, and closing drains accepted work without closing borrowed storage independently.
+`historyGet(key, { restore? })` checks hot storage first, otherwise validates the entire gzip/NDJSON snapshot through EOF before its finite hot/manifest recheck. Restore is opt-in and preserves a concurrently written hot value. Map/Set use the shared collections codec; bytes become its tagged portable representation. Date and functions are unsupported.
+
+`historySweep()` follows opaque blob pages and point-checks segment directories under the same original control lock. It removes only unreferenced objects with this plugin's prefix and format/version metadata. It never scans every manifest. All methods use the current host organization, and closing drains accepted work without closing borrowed storage independently.
 
 Errors use `storage.backend.archive`: `INVALID_OPTION`, `INVALID_ARGUMENT`, `ARCHIVE_OPERATION_FAILED`, `ARCHIVE_SEGMENT_INVALID`. Original causes remain reachable. Host admission/close, contract capability, conflict and coded cancellation errors preserve their identity. Archive-owned run failures expose only certainly committed `{ archived, skipped, segments }` progress; frozen original conflicts keep their identity and expose these counts through `onArchiveRunError`.
 

@@ -70,10 +70,10 @@ for (const backend of ['memory', 'sqlite', 'postgres'] as const)
       try {
         await host.backend('hot').putRecord({ old: true, value: 'actual' }, 'event:a')
         hold = true
-        const run = host.extensions.archive.run()
+        const run = host.extensions.archiveRun()
         await entered.promise
         let swept = false
-        const sweeping = host.extensions.archive.sweep().then((result) => {
+        const sweeping = host.extensions.archiveSweep().then((result) => {
           swept = true
           return result
         })
@@ -82,18 +82,18 @@ for (const backend of ['memory', 'sqlite', 'postgres'] as const)
         resume.resolve()
         expect(await run).toEqual({ archived: 1, skipped: 0, segments: 1 })
         expect((await sweeping).removed).toBe(0)
-        expect(await host.extensions.archive.get('event:a', { restore: true })).toEqual({
+        expect(await host.extensions.archiveGet('event:a', { restore: true })).toEqual({
           old: true,
           value: 'actual'
         })
-        expect((await host.extensions.archive.sweep()).removed).toBe(1)
+        expect((await host.extensions.archiveSweep()).removed).toBe(1)
         const org = host.org('11111111-1111-4111-8111-111111111111')
         await org.backend('hot').putRecord({ old: true, value: 'org' }, 'event:a')
-        expect((await org.extensions.archive.run()).archived).toBe(1)
-        expect(await org.extensions.archive.get('event:a')).toEqual({ old: true, value: 'org' })
-        expect(await host.extensions.archive.get('event:a')).toEqual({ old: true, value: 'actual' })
+        expect((await org.extensions.archiveRun()).archived).toBe(1)
+        expect(await org.extensions.archiveGet('event:a')).toEqual({ old: true, value: 'org' })
+        expect(await host.extensions.archiveGet('event:a')).toEqual({ old: true, value: 'actual' })
         await host.dropOrg(org.orgId)
-        expect(await org.extensions.archive.get('event:a')).toBeUndefined()
+        expect(await org.extensions.archiveGet('event:a')).toBeUndefined()
         expect((await host.backend('cold').use(blob).list()).items).toHaveLength(0)
         expect(await host.backend('hot').getRecord('event:a')).toEqual({
           old: true,
@@ -151,7 +151,7 @@ it('reopens the original SQLite and filesystem owners and sweeps an upload orpha
   let host = await open()
   try {
     await host.backend('hot').putRecord({ old: true, value: 'durable' }, 'event:a')
-    await expect(host.extensions.archive.run()).rejects.toMatchObject({
+    await expect(host.extensions.archiveRun()).rejects.toMatchObject({
       code: 'ARCHIVE_OPERATION_FAILED'
     })
     expect((await host.backend('cold').use(blob).list()).items).toHaveLength(1)
@@ -159,9 +159,9 @@ it('reopens the original SQLite and filesystem owners and sweeps an upload orpha
     fail = false
     host = await open()
     expect(await host.backend('hot').getRecord('event:a')).toEqual({ old: true, value: 'durable' })
-    expect(await host.extensions.archive.sweep()).toEqual({ scanned: 1, removed: 1 })
-    expect((await host.extensions.archive.run()).archived).toBe(1)
-    expect(await host.extensions.archive.get('event:a')).toEqual({ old: true, value: 'durable' })
+    expect(await host.extensions.archiveSweep()).toEqual({ scanned: 1, removed: 1 })
+    expect((await host.extensions.archiveRun()).archived).toBe(1)
+    expect(await host.extensions.archiveGet('event:a')).toEqual({ old: true, value: 'durable' })
   } finally {
     await host.dispose()
     await rm(directory, { recursive: true, force: true })

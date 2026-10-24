@@ -298,8 +298,8 @@ export const storagePluginArchiveReference: ILibraryReference = {
     },
     IArchiveApi: {
       summary: {
-        en: 'Contextual ordinary extension with borrowed storage and no disposal authority.',
-        zh: '借用存储且没有关闭权的上下文普通扩展。'
+        en: 'Flat archive functions named from the plugin id, without disposal authority.',
+        zh: '按插件 id 命名的平铺归档函数，不提供关闭方法。'
       },
       scenarios: [
         {
@@ -308,9 +308,9 @@ export const storagePluginArchiveReference: ILibraryReference = {
         }
       ],
       example:
-        "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { archivePlugin } from '@migaia/storage-plugin-archive'\n\nconst base = await createStorageHost({\n  plugins: [memoryBackendPlugin({ id: 'hot' }), memoryBackendPlugin({ id: 'cold' })]\n})\nconst host = await base.use(\n  archivePlugin({\n    id: 'history',\n    hot: 'hot',\n    cold: 'cold',\n    rules: [{ name: 'old', prefix: 'event:', olderThanMs: 0, where: () => ({ old: true }) }]\n  })\n)\nawait host.detect()\ntry {\n  await host.backend('hot').putRecord({ old: true, answer: 42 }, 'event:one')\n  await host.extensions.history.run()\n  console.log(await host.extensions.history.get('event:one', { restore: true }))\n  await host.extensions.history.sweep()\n} finally {\n  await host.dispose()\n}\n",
+        "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { archivePlugin } from '@migaia/storage-plugin-archive'\n\nconst base = await createStorageHost({\n  plugins: [memoryBackendPlugin({ id: 'hot' }), memoryBackendPlugin({ id: 'cold' })]\n})\nconst host = await base.use(\n  archivePlugin({\n    id: 'history',\n    hot: 'hot',\n    cold: 'cold',\n    rules: [{ name: 'old', prefix: 'event:', olderThanMs: 0, where: () => ({ old: true }) }]\n  })\n)\nawait host.detect()\ntry {\n  await host.backend('hot').putRecord({ old: true, answer: 42 }, 'event:one')\n  await host.extensions.historyRun()\n  console.log(await host.extensions.historyGet('event:one', { restore: true }))\n  await host.extensions.historySweep()\n} finally {\n  await host.dispose()\n}\n",
       members: {
-        run: {
+        '${N}Run': {
           summary: {
             en: 'Upload bounded candidate segments and atomically commit unchanged rows.',
             zh: '上传有界候选段，原子提交未变行。'
@@ -326,9 +326,9 @@ export const storagePluginArchiveReference: ILibraryReference = {
             zh: '确定提交数量，工作失败保留原原因和先前进度。'
           },
           example:
-            "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { archivePlugin } from '@migaia/storage-plugin-archive'\n\nconst base = await createStorageHost({\n  plugins: [memoryBackendPlugin({ id: 'hot' }), memoryBackendPlugin({ id: 'cold' })]\n})\nconst host = await base.use(\n  archivePlugin({\n    id: 'history',\n    hot: 'hot',\n    cold: 'cold',\n    rules: [{ name: 'old', prefix: 'event:', olderThanMs: 0, where: () => ({ old: true }) }]\n  })\n)\nawait host.detect()\ntry {\n  await host.backend('hot').putRecord({ old: true, answer: 42 }, 'event:one')\n  await host.extensions.history.run()\n  console.log(await host.extensions.history.get('event:one', { restore: true }))\n  await host.extensions.history.sweep()\n} finally {\n  await host.dispose()\n}\n"
+            "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { archivePlugin } from '@migaia/storage-plugin-archive'\n\nconst base = await createStorageHost({\n  plugins: [memoryBackendPlugin({ id: 'hot' }), memoryBackendPlugin({ id: 'cold' })]\n})\nconst host = await base.use(\n  archivePlugin({\n    id: 'history',\n    hot: 'hot',\n    cold: 'cold',\n    rules: [{ name: 'old', prefix: 'event:', olderThanMs: 0, where: () => ({ old: true }) }]\n  })\n)\nawait host.detect()\ntry {\n  await host.backend('hot').putRecord({ old: true, answer: 42 }, 'event:one')\n  await host.extensions.historyRun()\n  console.log(await host.extensions.historyGet('event:one', { restore: true }))\n  await host.extensions.historySweep()\n} finally {\n  await host.dispose()\n}\n"
         },
-        get: {
+        '${N}Get': {
           summary: {
             en: 'Read hot first, otherwise validate the complete cold snapshot before a finite recheck.',
             zh: '先读热层，否则验证完整冷快照并有限复核。'
@@ -348,9 +348,9 @@ export const storagePluginArchiveReference: ILibraryReference = {
             zh: '规范 collections 值或 undefined，清单改变时需显式重试。'
           },
           example:
-            "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { archivePlugin } from '@migaia/storage-plugin-archive'\n\nconst base = await createStorageHost({\n  plugins: [memoryBackendPlugin({ id: 'hot' }), memoryBackendPlugin({ id: 'cold' })]\n})\nconst host = await base.use(\n  archivePlugin({\n    id: 'history',\n    hot: 'hot',\n    cold: 'cold',\n    rules: [{ name: 'old', prefix: 'event:', olderThanMs: 0, where: () => ({ old: true }) }]\n  })\n)\nawait host.detect()\ntry {\n  await host.backend('hot').putRecord({ old: true, answer: 42 }, 'event:one')\n  await host.extensions.history.run()\n  console.log(await host.extensions.history.get('event:one', { restore: true }))\n  await host.extensions.history.sweep()\n} finally {\n  await host.dispose()\n}\n"
+            "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { archivePlugin } from '@migaia/storage-plugin-archive'\n\nconst base = await createStorageHost({\n  plugins: [memoryBackendPlugin({ id: 'hot' }), memoryBackendPlugin({ id: 'cold' })]\n})\nconst host = await base.use(\n  archivePlugin({\n    id: 'history',\n    hot: 'hot',\n    cold: 'cold',\n    rules: [{ name: 'old', prefix: 'event:', olderThanMs: 0, where: () => ({ old: true }) }]\n  })\n)\nawait host.detect()\ntry {\n  await host.backend('hot').putRecord({ old: true, answer: 42 }, 'event:one')\n  await host.extensions.historyRun()\n  console.log(await host.extensions.historyGet('event:one', { restore: true }))\n  await host.extensions.historySweep()\n} finally {\n  await host.dispose()\n}\n"
         },
-        sweep: {
+        '${N}Sweep': {
           summary: {
             en: 'Remove unreferenced matching-format objects under the original control lock.',
             zh: '在原控制锁内移除无引用且格式匹配的对象。'
@@ -366,7 +366,7 @@ export const storagePluginArchiveReference: ILibraryReference = {
             zh: '真实扫描和删除数量，首个删除失败停止后续工作。'
           },
           example:
-            "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { archivePlugin } from '@migaia/storage-plugin-archive'\n\nconst base = await createStorageHost({\n  plugins: [memoryBackendPlugin({ id: 'hot' }), memoryBackendPlugin({ id: 'cold' })]\n})\nconst host = await base.use(\n  archivePlugin({\n    id: 'history',\n    hot: 'hot',\n    cold: 'cold',\n    rules: [{ name: 'old', prefix: 'event:', olderThanMs: 0, where: () => ({ old: true }) }]\n  })\n)\nawait host.detect()\ntry {\n  await host.backend('hot').putRecord({ old: true, answer: 42 }, 'event:one')\n  await host.extensions.history.run()\n  console.log(await host.extensions.history.get('event:one', { restore: true }))\n  await host.extensions.history.sweep()\n} finally {\n  await host.dispose()\n}\n"
+            "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { archivePlugin } from '@migaia/storage-plugin-archive'\n\nconst base = await createStorageHost({\n  plugins: [memoryBackendPlugin({ id: 'hot' }), memoryBackendPlugin({ id: 'cold' })]\n})\nconst host = await base.use(\n  archivePlugin({\n    id: 'history',\n    hot: 'hot',\n    cold: 'cold',\n    rules: [{ name: 'old', prefix: 'event:', olderThanMs: 0, where: () => ({ old: true }) }]\n  })\n)\nawait host.detect()\ntry {\n  await host.backend('hot').putRecord({ old: true, answer: 42 }, 'event:one')\n  await host.extensions.historyRun()\n  console.log(await host.extensions.historyGet('event:one', { restore: true }))\n  await host.extensions.historySweep()\n} finally {\n  await host.dispose()\n}\n"
         }
       }
     }
@@ -407,7 +407,7 @@ export const storagePluginArchiveReference: ILibraryReference = {
       install: storagePluginArchiveCases.archivePlugin![0]!.example,
       grants: [
         {
-          signature: 'host.extensions.history: IArchiveApi',
+          signature: "host.extensions: IArchiveApi<'history'>",
           summary: {
             en: 'Run, read and sweep the current organization archive.',
             zh: '归档、读取和清扫当前组织历史。'
@@ -415,11 +415,11 @@ export const storagePluginArchiveReference: ILibraryReference = {
         }
       ],
       summary: {
-        en: 'Add the literal extension slot to root and organization views; its run, get and sweep methods use each view’s current organization.',
-        zh: '向根及组织视图添加字面量扩展槽，其中归档、读取和清扫方法始终使用对应视图的当前组织。'
+        en: 'Add three flat functions to root and organization views, prefixed by the plugin id. Each function uses its view’s organization.',
+        zh: '向根及组织视图添加三个以插件 id 为前缀的平铺函数，每个函数使用对应视图的当前组织。'
       },
       example:
-        "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { archivePlugin } from '@migaia/storage-plugin-archive'\n\nconst base = await createStorageHost({\n  plugins: [memoryBackendPlugin({ id: 'hot' }), memoryBackendPlugin({ id: 'cold' })]\n})\nconst host = await base.use(\n  archivePlugin({\n    id: 'history',\n    hot: 'hot',\n    cold: 'cold',\n    rules: [{ name: 'old', prefix: 'event:', olderThanMs: 0, where: () => ({ old: true }) }]\n  })\n)\nawait host.detect()\ntry {\n  await host.backend('hot').putRecord({ old: true, answer: 42 }, 'event:one')\n  await host.extensions.history.run()\n  console.log(await host.extensions.history.get('event:one', { restore: true }))\n  await host.extensions.history.sweep()\n} finally {\n  await host.dispose()\n}\n"
+        "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { archivePlugin } from '@migaia/storage-plugin-archive'\n\nconst base = await createStorageHost({\n  plugins: [memoryBackendPlugin({ id: 'hot' }), memoryBackendPlugin({ id: 'cold' })]\n})\nconst host = await base.use(\n  archivePlugin({\n    id: 'history',\n    hot: 'hot',\n    cold: 'cold',\n    rules: [{ name: 'old', prefix: 'event:', olderThanMs: 0, where: () => ({ old: true }) }]\n  })\n)\nawait host.detect()\ntry {\n  await host.backend('hot').putRecord({ old: true, answer: 42 }, 'event:one')\n  await host.extensions.historyRun()\n  console.log(await host.extensions.historyGet('event:one', { restore: true }))\n  await host.extensions.historySweep()\n} finally {\n  await host.dispose()\n}\n"
     }
   }
 }

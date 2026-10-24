@@ -15,8 +15,8 @@ const host = await initial.use(
 await host.detect()
 try {
   await host.backend('hot').putRecord({ old: true, value: new Map([['answer', 42]]) }, 'event:a')
-  const result = await host.extensions.history.run()
-  const restored = await host.extensions.history.get('event:a', { restore: true })
+  const result = await host.extensions.historyRun()
+  const restored = await host.extensions.historyGet('event:a', { restore: true })
   if (
     result.archived !== 1 ||
     !(
@@ -28,7 +28,7 @@ try {
     )
   )
     throw new Error('Built Archive record differs')
-  if ((await host.extensions.history.sweep()).removed !== 1)
+  if ((await host.extensions.historySweep()).removed !== 1)
     throw new Error('Built Archive orphan remains')
 } finally {
   await host.dispose()

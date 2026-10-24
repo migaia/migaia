@@ -183,14 +183,9 @@ export function createStoragePluginHost(options: IPluginHostOptions): IStoragePl
         createTransactionApi: context.storeCell.createTransactionApi,
         getChainMethods: context.storeCell.getChainMethods,
         getOrgContext: context.getOrgContext,
-        captureStorageExtension: (
-          key: PropertyKey,
-          value: unknown,
-          receiver: object,
-          contextual = false
-        ) => {
+        captureStorageExtension: (key: PropertyKey, value: unknown, receiver: object) => {
           /** The native descriptor reader captures each original source value exactly once. */
-          context.storeCell.captureExtension(key, value, receiver, contextual)
+          context.storeCell.captureExtension(key, value, receiver)
           return context.storeCell.projectExtension(
             key,
             context.getOrgContext(context.defaultOrgId).callContext,
