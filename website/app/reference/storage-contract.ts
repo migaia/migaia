@@ -7054,224 +7054,624 @@ console.log(compareStorageKeys(key, ['users', 2]))`,
       members: errorMembers
     }
   },
-  enums: {
-    QueryOperation: {
-      summary: t(
-        'Shared planner vocabulary; actual native support is a declared subset.',
-        '共用规划词汇，真实原生支持由子集声明。'
+  enums: (() => {
+    /** The three reservation tables share original record names; reservation grants no family API. */
+    const reservedQueryValues = {
+      where: t(
+        'Reserve declarative and client predicate filtering; Feature admission rejects this native name.',
+        '保留声明式条件与客户端谓词过滤名称，特性不能覆盖此原生方法。'
       ),
-      values: {
-        where: t('Declarative condition.', '声明式条件。'),
-        predicate: t('Client function predicate.', '客户端函数谓词。'),
-        select: t('Field projection.', '字段投影。'),
-        mapper: t('Client mapping.', '客户端映射。'),
-        order: t('Key selector ordering.', '键选择器排序。'),
-        comparator: t('Comparator ordering.', '比较器排序。'),
-        skip: t('Offset skip.', '偏移跳过。'),
-        after: t('Keyset cursor.', '键集游标。'),
-        limit: t('Result bound.', '结果上限。'),
-        distinct: t('Distinct field.', '字段去重。'),
-        count: t('Count terminal.', '计数终点。'),
-        exists: t('Existence terminal.', '存在性终点。'),
-        aggregate: t('Numeric aggregate.', '数值聚合。'),
-        topK: t('Vector result bound.', '向量结果上限。'),
-        minScore: t('Score threshold.', '分数阈值。'),
-        follow: t('RDF forward relation.', 'RDF 正向关系。'),
-        inverse: t('RDF reverse relation.', 'RDF 反向关系。'),
-        groupBy: t('Group ranked hits.', '已排名命中分组。')
-      }
-    },
-    QueryOperator: {
-      summary: t('Canonical declarative operators.', '规范声明式操作符。'),
-      values: {
-        eq: t('SameValueZero or Date time equality.', 'SameValueZero 或 Date 时间相等。'),
-        ne: t('Negated equality.', '相等判断取反。'),
-        in: t('Membership compiled once to Sets.', '一次编译为 Set 的成员判断。'),
-        exists: t('Presence independently of undefined.', '独立于 undefined 的存在性。'),
-        gt: t('Greater than a same-domain bound.', '大于同域边界。'),
-        gte: t('At least a same-domain bound.', '大于等于同域边界。'),
-        lt: t('Less than a same-domain bound.', '小于同域边界。'),
-        lte: t('At most a same-domain bound.', '小于等于同域边界。'),
-        between: t('Inclusive same-domain interval.', '同域闭区间。'),
-        startsWith: t('String prefix without coercion.', '不强制转换的字符串前缀。'),
-        contains: t('String substring without coercion.', '不强制转换的字符串包含。'),
-        has: t('Array element equality.', '数组元素相等。')
-      }
-    },
-    TransactionActivityMode: {
-      summary: t(
-        'Actual activity constraint chosen by the backend owner.',
-        '后端拥有者选择的真实活跃约束。'
+      select: t(
+        'Reserve field selection or mapping; the actual query family decides its available projection form.',
+        '保留字段选择或映射名称，具体查询族决定可用的投影形式。'
       ),
-      values: {
-        managed: t(
-          'The backend manages activity until its own transaction lifetime ends.',
-          '后端在自身事务生命周期结束前管理活跃期。'
-        ),
-        native: t(
-          'Native transaction activity windows govern every request.',
-          '每次请求受原生事务活跃窗口约束。'
-        )
-      }
-    },
-    TransactionBeforeStage: {
-      summary: t(
-        'Observation boundaries before transaction work; all are report-only.',
-        '事务工作前的观察边界，全部只报告。'
+      all: t(
+        'Reserve the terminal collecting current rows; callers await the original reader and cleanup.',
+        '保留收集当前结果行的终点名称，调用方等待原读取器与资源清理。'
       ),
-      values: {
-        beforeTransaction: t('Before creating a real transaction.', '创建真实事务之前。'),
-        beforeTxOperation: t('Before an admitted transaction operation.', '已接纳事务操作之前。'),
-        beforeCommit: t(
-          'Before the original transaction commits, on the final check view.',
-          '原事务提交前，使用最后检查视图。'
-        ),
-        beforePersistFlush: t(
-          'Before the current transactional persistence flush.',
-          '本次事务持久化 flush 之前。'
-        )
-      }
-    },
-    TransactionObservedStage: {
-      summary: t(
-        'Canonical transaction observations retain the captured original identity.',
-        '规范事务观察保留捕获的原身份。'
+      first: t(
+        'Reserve the first-result terminal, returning undefined when the query has no match.',
+        '保留首条结果终点名称，查询没有匹配项时返回未定义值。'
       ),
-      values: {
-        onTransactionStart: t('After a real transaction is registered.', '真实事务登记之后。'),
-        afterTxOperation: t('After one actual transaction operation.', '一次实际事务操作之后。'),
-        afterCommit: t('After native commit is known to have completed.', '确认原生提交完成之后。'),
-        afterRollback: t('After native rollback completes.', '原生回滚完成之后。'),
-        onTransactionClose: t(
-          'After original transaction lifetime closes.',
-          '原事务生命周期关闭之后。'
-        ),
-        afterPersistFlush: t(
-          'After encoding and request completion; this does not claim commit.',
-          '编码与请求完成之后，不声明已提交。'
-        )
-      }
-    },
-    ConcurrencyHolderState: {
-      summary: t(
-        'Real holder status and the remote handoff interval.',
-        '真实持有状态与远端交接区间。'
+      maybe: t(
+        'Reserve the explicit Maybe result carrying either an item or the empty branch.',
+        '保留显式可选结果终点名称，用判别分支区分结果项与空结果。'
       ),
-      values: {
-        held: t('A real local or remote owner holds the lock.', '真实本地或远端拥有者持锁。'),
-        'handing-off': t(
-          'Remote transfer is in progress; owner identity is intentionally absent.',
-          '远端交接进行中，不提供 owner 身份。'
-        )
-      }
-    },
-    StorageStageKind: {
-      summary: t(
-        'Distinct canonical observer families; kinds grant no data authority.',
-        '独立规范观察家族，kind 不授予数据权限。'
+      firstOrThrow: t(
+        'Reserve required-first reading, which rejects an empty result with QUERY_EMPTY_RESULT.',
+        '保留必须存在首项的读取名称，空结果以明确的查询空结果错误拒绝。'
       ),
-      values: {
-        codec: t('Value codec observations.', '值编解码观察。'),
-        backend: t('Backend construction and disposal.', '后端构造与释放。'),
-        operation: t('Ordinary storage operations.', '普通存储操作。'),
-        transaction: t('Original transaction lifecycle and operations.', '原事务生命周期与操作。'),
-        concurrency: t('Lock and policy decisions.', '锁与策略决策。'),
-        sql: t('SQL execution counts.', 'SQL 执行计数。'),
-        query: t('Query plans and result counts.', '查询计划与结果计数。')
-      }
-    },
-    ConflictPolicy: {
-      summary: t(
-        'Existing-key outcomes used by asynchronous, synchronous and transaction write options.',
-        '异步、同步和事务写选项使用的已有键处理方式。'
+      pluck: t(
+        'Reserve the terminal extracting one selected field from each result row.',
+        '保留从每条结果行提取一个已选字段的读取终点名称。'
       ),
-      values: conflictValues
-    },
-    StorageContractErrorCode: {
-      summary: t(
-        'Stable contract failure codes covering invalid inputs, keys, capability absence, disposal and cancellation.',
-        '涵盖无效输入、键、能力缺失、释放和取消的稳定契约失败码。'
+      exists: t(
+        'Reserve existence reduction; the original reader may stop after the first accepted row.',
+        '保留存在性归约名称，原读取器可在首条被接受的结果后停止。'
       ),
-      values: {
-        queryNotPushable: t(
-          'Strict execution includes client steps; inspect explain before reading.',
-          '严格执行包含客户端步骤；读取前检查 explain。'
-        ),
-        concurrencyPolicyFailed: t(
-          'A policy threw or returned an invalid decision; inspect its original cause.',
-          '策略抛错或返回非法决策，检查原始 cause。'
-        ),
-        lockTimeout: t(
-          'Logical admission budget or physical deadline expired after cleanup.',
-          '清理后报告逻辑准入预算或物理期限到期。'
-        ),
-        lockRejected: t(
-          'Policy rejected an actual acquisition conflict.',
-          '策略拒绝了真实准入冲突。'
-        ),
-        writeConflict: t(
-          'Policy rejected a commit conflict after completed rollback.',
-          '回滚完成后策略拒绝提交冲突。'
-        ),
-        lockLost: t(
-          'A backend proved its own expired lease was replaced.',
-          '后端确认自身过期租约已被替换。'
-        ),
-        invalidArgument: t(
-          'A public descriptor, context, synchronous write option or callback shape is invalid; correct the input before retrying.',
-          '公开描述器、上下文、同步写选项或回调形状无效，重试前应修正输入。'
-        ),
-        invalidKey: t(
-          'A record key violates its type, finiteness, array, depth, node or binary-size domain.',
-          '记录键违反类型、有限性、数组、深度、节点或二进制大小键域要求。'
-        ),
-        unsupported: t(
-          'The supplied backend lacks the required capability or callable methods; select a suitable implementation.',
-          '所提供后端缺少所需能力或可调用方法，应选择合适实现。'
-        ),
-        disposed: t(
-          'A caller uses a backend after its disposal; create or obtain a new store.',
-          '调用方在后端释放后继续使用，应创建或取得新存储。'
-        ),
-        envelopeInvalid: t('Archive envelope shape is invalid.', '存档 envelope 形态无效。'),
-        versionUnsupported: t(
-          'Archive version is outside the supported plan range.',
-          '存档版本不在计划支持范围。'
-        ),
-        migrationGap: t(
-          'Migration target versions contain a gap or noncanonical key.',
-          '迁移目标版本存在断档或非规范键。'
-        ),
-        migrationFailed: t(
-          'A migration step failed; the original error remains on cause.',
-          '迁移步骤失败；原始错误保留在 cause。'
-        ),
-        aborted: t(
-          'A signal or timeout cancels waiting; writes already in atomic commit report the actual commit outcome.',
-          '信号或超时取消等待；已经进入原子提交的写入报告实际提交结局。'
-        )
-      }
-    },
-    KEY_DOMAIN_LIMITS: {
-      summary: t(
-        'Public hard bounds used during structured record-key validation.',
-        '结构化记录键校验使用的公开硬性规模上限。'
+      count: t(
+        'Reserve row counting; this reserved word does not grant statistics to every query family.',
+        '保留结果行计数名称，该保留字本身不向所有查询族授予统计能力。'
       ),
-      values: {
-        maxDepth: t(
-          'Depth thirty-two is allowed with the root at zero; deeper nested key arrays are rejected.',
-          '根深度为零，允许深度三十二，更深的嵌套键数组被拒绝。'
+      each: t(
+        'Reserve sequential callback consumption through the original managed row iterator.',
+        '保留通过原有受管结果迭代器依次执行回调的消费名称。'
+      ),
+      chunk: t(
+        'Reserve bounded chunk consumption without inventing a second row-source lifetime.',
+        '保留有界分块消费名称，不建立第二份行来源生命周期。'
+      ),
+      min: t(
+        'Reserve the numeric minimum reduction on the family that exposes statistics.',
+        '保留数值最小值归约名称，只有公开统计能力的查询族提供该方法。'
+      ),
+      max: t(
+        'Reserve the numeric maximum reduction on the family that exposes statistics.',
+        '保留数值最大值归约名称，只有公开统计能力的查询族提供该方法。'
+      ),
+      sum: t(
+        'Reserve numeric summation; actual source support controls native or client execution.',
+        '保留数值求和名称，由实际来源能力决定原生或客户端执行。'
+      ),
+      avg: t(
+        'Reserve numeric averaging through the original reduction owner.',
+        '保留数值平均值名称，计算仍由原有归约拥有者完成。'
+      ),
+      explain: t(
+        'Reserve pure plan inspection without opening a native data source.',
+        '保留纯查询计划检查名称，检查时不打开原生数据来源。'
+      ),
+      requirePushdown: t(
+        'Reserve strict native execution selection; unsupported client steps reject before I/O.',
+        '保留严格原生执行选择名称，不支持的客户端步骤在读写前拒绝。'
+      ),
+      stream: t(
+        'Reserve the original storage iterator terminal with its existing cleanup ownership.',
+        '保留原存储迭代器终点名称，继续使用已有资源清理拥有者。'
+      ),
+      limit: t(
+        'Reserve a finite result bound that remains part of the immutable query descriptor.',
+        '保留有限结果上限名称，该上限属于不可变查询描述的一部分。'
+      ),
+      orderByComparator: t(
+        'Reserve comparator ordering, executable only with the required finite result bound.',
+        '保留比较器排序名称，只有具备要求的有限结果上限时才能执行。'
+      ),
+      orderBy: t(
+        'Reserve selector ordering by canonical storage keys rather than arbitrary comparison sorting.',
+        '保留按规范存储键选择器排序的名称，不改为任意比较排序。'
+      ),
+      distinct: t(
+        'Reserve canonical field-value deduplication through the original query reader.',
+        '保留规范字段值去重名称，由原查询读取器执行去重。'
+      ),
+      skip: t(
+        'Reserve offset skipping within the existing ordered query operation sequence.',
+        '保留偏移跳过名称，其位置仍属于原有有序查询操作序列。'
+      ),
+      after: t(
+        'Reserve keyset continuation from an opaque cursor bound to the original query source.',
+        '保留键集继续读取名称，使用绑定原查询来源的不透明游标。'
+      ),
+      page: t(
+        'Reserve bounded keyset pages and their original continuation cursor.',
+        '保留有界键集分页名称，并返回原查询拥有者产生的继续读取游标。'
+      ),
+      delete: t(
+        'Reserve selected-row deletion through the actual backend mutation owner.',
+        '保留选中行删除名称，必须通过真实后端修改拥有者执行。'
+      ),
+      update: t(
+        'Reserve record updates through the original writer; this does not add vector update semantics.',
+        '保留原记录写入器的更新名称，本表不额外声明向量更新语义。'
+      ),
+      watch: t(
+        'Reserve native invalidation watching only when the actual source exposes change-feed support.',
+        '保留原生失效观察名称，只有实际来源提供变更流支持时才可调用。'
+      )
+    }
+    return {
+      RecordQueryMethod: {
+        summary: t(
+          'Native record method names reserved before Feature admission; this table cannot be used to override original methods.',
+          '原生记录方法在特性准入之前保留这些名称，不能借此覆盖原方法或创建第二查询拥有者。'
         ),
-        maxNodes: t(
-          'At most 4096 visited nodes per key, including the root and nested array elements.',
-          '每个键最多访问四千零九十六个节点，包含根和嵌套数组元素。'
+        values: reservedQueryValues
+      },
+      VectorQueryMethod: {
+        summary: t(
+          'Vector collision vocabulary includes record names for admission safety; only the actual vector query type grants callable methods.',
+          '向量冲突词汇为准入安全保留记录名称，实际可调用方法仍以原向量查询类型为准。'
         ),
-        maxBinaryBytes: t(
-          'Each binary key buffer may contain at most 1048576 bytes; this is not a sum over all buffers.',
-          '每个二进制键缓冲区最多 `1048576` 字节，不累加全部缓冲区。'
-        )
+        values: {
+          ...reservedQueryValues,
+          topK: t(
+            'Reserve the required finite vector ranking bound.',
+            '保留向量排名必须提供的有限结果数量上限名称。'
+          ),
+          minScore: t(
+            'Reserve filtering by the native vector score threshold.',
+            '保留按原生向量分数门槛排除命中的方法名称。'
+          ),
+          withVector: t(
+            'Reserve explicit vector inclusion in returned hits.',
+            '保留明确要求在返回命中中包含向量数据的方法名称。'
+          ),
+          groupBy: t(
+            'Reserve grouping only where native vector grouping is supported.',
+            '保留分组名称，仅在原生向量来源确实支持分组时使用。'
+          )
+        }
+      },
+      RdfQueryMethod: {
+        summary: t(
+          'RDF collision vocabulary shares original read reservations and adds ground traversal and replacement names.',
+          '资源描述查询复用原有读取保留名称，并额外保留已确定关系遍历与替换的方法名称。'
+        ),
+        values: {
+          ...reservedQueryValues,
+          follow: t(
+            'Reserve forward traversal over a ground named predicate.',
+            '保留沿已确定命名谓词进行正向关系遍历的方法名称。'
+          ),
+          inverse: t(
+            'Reserve reverse traversal over a ground named predicate.',
+            '保留沿已确定命名谓词进行反向关系遍历的方法名称。'
+          ),
+          replace: t(
+            'Reserve exact selected-quad replacement through the original mutation owner.',
+            '保留通过原修改拥有者精确替换已选中四元组的方法名称。'
+          )
+        }
+      },
+      TransactionBuilderMethod: {
+        summary: t(
+          'Reserved fluent transaction names preserve the original immutable builder and backend scope owner.',
+          '事务链保留名称维护原不可变构造器与后端作用域拥有者，特性不能覆盖这些基础方法。'
+        ),
+        values: {
+          lock: t(
+            'Declare canonical lock keys before running a pessimistic transaction.',
+            '在执行悲观事务之前声明规范锁键，保留原键快照顺序。'
+          ),
+          concurrency: t(
+            'Select an authentic policy without creating another retry loop.',
+            '选择真实策略对象，不为该事务建立另一份重试循环。'
+          ),
+          signal: t(
+            'Capture the caller cancellation signal in a new immutable builder.',
+            '在新的不可变事务构造器中捕获调用方取消信号。'
+          ),
+          timeout: t(
+            'Set the original operation budget without adding a separate timeout owner.',
+            '设置原有操作预算，不增加独立的超时或取消拥有者。'
+          ),
+          run: t(
+            'Execute once through the backend original transaction and terminal lifecycle.',
+            '通过后端原有事务与终态生命周期执行调用方工作。'
+          )
+        }
+      },
+      RdfTermType: {
+        summary: t(
+          'Canonical RDF term tags are shared by snapshots, query bindings and native protocol adapters.',
+          '规范资源描述词项标签由快照、查询绑定与原生协议适配器共同使用，不另建标签编码。'
+        ),
+        values: {
+          namedNode: t(
+            'An absolute IRI node whose exact spelling is retained.',
+            '绝对资源标识节点，规范快照保留输入的精确字符拼写。'
+          ),
+          blankNode: t(
+            'A parser-local blank identifier, not a portable repeated-identity mutation key.',
+            '解析器局部的空白标识，不能作为可移植重复身份的写入键。'
+          ),
+          literal: t(
+            'A lexical value with datatype and an optional normalized language.',
+            '具有数据类型及可选规范化语言标签的字面文本值。'
+          ),
+          defaultGraph: t(
+            'The default graph identity, with no fabricated IRI or binding value.',
+            '表示缺省图身份，不伪造资源标识或查询绑定值。'
+          )
+        }
+      },
+      RdfDatatype: {
+        summary: t(
+          'RDF string datatype IRIs are canonical shared values for plain and language-tagged literal snapshots.',
+          '普通字符串与带语言标签字面值的规范数据类型标识，由同一词项快照实现共享。'
+        ),
+        values: {
+          string: t(
+            'The XML Schema string datatype for an ordinary literal without a language tag.',
+            '普通不带语言标签的字面值采用标准模式字符串数据类型。'
+          ),
+          langString: t(
+            'The RDF language-string datatype used with a normalized language tag.',
+            '带有规范化语言标签的字面值采用标准资源描述语言字符串类型。'
+          )
+        }
+      },
+      DeleteCountMode: {
+        summary: t(
+          'Delete-count strategy is explicit: precount estimates before deletion, while scroll counts collected unique IDs.',
+          '删除计数策略必须明确选择，预先计数与逐页收集身份计数具有不同的并发边界。'
+        ),
+        values: {
+          precount: t(
+            'Count matches before native deletion; concurrent changes may make it differ from actual deleted IDs.',
+            '原生删除前先计数匹配项，并发变化可能导致它与实际删除身份数量不同。'
+          ),
+          scroll: t(
+            'Collect unique IDs actually read across pages, delete that finite set and report its size; no cross-page snapshot is promised.',
+            '收集分页实际读到的去重身份，只删除并报告该有限集合，不承诺跨页快照。'
+          )
+        }
+      },
+      QueryOperation: {
+        summary: t(
+          'Canonical planner vocabulary records ordered native or client work; each source declares its supported subset.',
+          '规范查询规划词汇记录有序的原生或客户端工作，每个来源只声明自己实际支持的子集。'
+        ),
+        values: {
+          where: t(
+            'Apply a canonical declarative condition within the ordered native prefix.',
+            '在有序原生前缀中应用规范声明式条件，不重新解释用户谓词。'
+          ),
+          predicate: t(
+            'Execute a JavaScript predicate on the client after its required native prefix.',
+            '在所需原生前缀之后，由客户端执行调用方提供的函数谓词。'
+          ),
+          select: t(
+            "Project selected fields while retaining each family's original row identity.",
+            '投影选定字段，同时保留各查询族原有的结果行身份。'
+          ),
+          mapper: t(
+            'Execute a client mapping callback without claiming native pushdown.',
+            '由客户端执行映射回调，不声称该回调能够下推为原生请求。'
+          ),
+          order: t(
+            'Order by the canonical encoded storage-key selector.',
+            '按规范编码后的存储键选择器顺序排列当前结果行。'
+          ),
+          comparator: t(
+            'Use comparator ordering only with the required finite limit.',
+            '只有提供所要求的有限结果上限时，才能采用比较器排序。'
+          ),
+          skip: t(
+            'Skip the requested count at this exact point of the query descriptor.',
+            '在查询描述的当前精确位置跳过调用方要求的结果数量。'
+          ),
+          after: t(
+            'Seek beyond a compatible opaque keyset anchor.',
+            '从兼容的不透明键集锚点之后继续读取当前查询结果。'
+          ),
+          limit: t(
+            'Bound the results at this point without reordering earlier operations.',
+            '限制当前位置的结果数量，不重新排列此前已经声明的操作。'
+          ),
+          distinct: t(
+            'Deduplicate the selected field using canonical value identity.',
+            '按照规范值身份，对选定字段执行结果去重。'
+          ),
+          count: t(
+            'Reduce accepted rows to their count through a declared native or client path.',
+            '沿已声明的原生或客户端路径，将被接受的结果行归约为数量。'
+          ),
+          exists: t(
+            'Determine whether an accepted row exists and close the original source.',
+            '判断是否存在被接受的结果行，并关闭原有结果来源。'
+          ),
+          aggregate: t(
+            'Execute supported numeric aggregation through the original reader or reducer.',
+            '通过原读取器或归约器执行已支持的数值聚合操作。'
+          ),
+          topK: t(
+            'Keep the bounded highest-ranked vector results using the declared metric.',
+            '按照已声明的度量保留有限数量且排名最靠前的向量结果。'
+          ),
+          minScore: t(
+            'Reject ranked vector hits below the selected score threshold.',
+            '排除相似度分数低于所选门槛的已排名向量结果。'
+          ),
+          follow: t(
+            'Follow a ground RDF predicate from the current forward relation.',
+            '从当前正向关系沿已确定的资源描述谓词继续遍历。'
+          ),
+          inverse: t(
+            'Traverse the inverse ground RDF predicate relation.',
+            '沿已确定的资源描述谓词关系执行反向遍历。'
+          ),
+          groupBy: t(
+            'Group bounded ranked hits only when the actual vector family supports grouping.',
+            '仅在实际向量查询族支持分组时，对有界排名结果执行分组。'
+          )
+        }
+      },
+      QueryOperator: {
+        summary: t(
+          'Canonical declarative predicates preserve value domains and compile through one shared condition owner.',
+          '规范声明式谓词保留原值域，并通过同一个共享条件拥有者完成编译与执行。'
+        ),
+        values: {
+          eq: t(
+            'Compare in the same domain using SameValueZero and Date timestamps.',
+            '只在相同值域比较，普通值采用同值零语义，日期采用时间戳。'
+          ),
+          ne: t(
+            'Negate same-domain equality without coercing values.',
+            '对相同值域的相等判断取反，不隐式转换被比较的值。'
+          ),
+          in: t(
+            'Test membership using a once-compiled canonical set of candidates.',
+            '使用只编译一次的规范候选集合检查成员身份。'
+          ),
+          exists: t(
+            'Test property presence independently of its stored undefined value.',
+            '独立于属性是否保存未定义值，判断该属性本身是否存在。'
+          ),
+          gt: t(
+            'Compare against an exclusive lower bound in the same ordered domain.',
+            '在相同有序值域内与开区间下界比较，要求严格大于边界。'
+          ),
+          gte: t(
+            'Compare against an inclusive lower bound in the same ordered domain.',
+            '在相同有序值域内与闭区间下界比较，允许等于边界。'
+          ),
+          lt: t(
+            'Compare against an exclusive upper bound in the same ordered domain.',
+            '在相同有序值域内与开区间上界比较，要求严格小于边界。'
+          ),
+          lte: t(
+            'Compare against an inclusive upper bound in the same ordered domain.',
+            '在相同有序值域内与闭区间上界比较，允许等于边界。'
+          ),
+          between: t(
+            'Accept values within both inclusive same-domain bounds.',
+            '只接受同时位于相同值域两个闭区间边界之内的值。'
+          ),
+          startsWith: t(
+            'Match a string prefix without converting other value types to text.',
+            '匹配字符串前缀，不把其它类型的值隐式转换为文本。'
+          ),
+          contains: t(
+            'Match a string substring without converting other domains.',
+            '匹配字符串内部的子串，不隐式转换其它值域。'
+          ),
+          has: t(
+            'Test array element equality within the supported canonical value domain.',
+            '在受支持的规范值域内检查数组是否含有相等元素。'
+          )
+        }
+      },
+      TransactionActivityMode: {
+        summary: t(
+          'Backend owners declare the original transaction activity window; this fact grants no commit or resource authority.',
+          '后端拥有者声明原事务活跃窗口，这一事实不授予提交权限或独立资源所有权。'
+        ),
+        values: {
+          managed: t(
+            'The backend maintains activity until its original transaction lifetime ends.',
+            '由后端维护活跃状态，直到其原有事务生命周期实际结束。'
+          ),
+          native: t(
+            'Every request remains subject to the platform native transaction activity window.',
+            '每一次请求都继续受到平台原生事务活跃窗口的约束。'
+          )
+        }
+      },
+      TransactionBeforeStage: {
+        summary: t(
+          'Before-stage observers are report-only boundaries; only the original backend performs writes and commit.',
+          '事务前置观察均为只报告边界，实际写入与提交仍只能由原后端拥有者执行。'
+        ),
+        values: {
+          beforeTransaction: t(
+            'Observe before original transaction creation, without controlling its outcome.',
+            '在原事务创建之前进行观察，不借此控制事务执行结局。'
+          ),
+          beforeTxOperation: t(
+            'Observe before one already-admitted operation on an authentic transaction view.',
+            '在真实事务视图上已经接纳的一次操作之前进行观察。'
+          ),
+          beforeCommit: t(
+            'Observe the original final-check view before native commit; observation cannot commit or veto.',
+            '在原生提交之前观察最后检查视图，观察本身不能提交或否决。'
+          ),
+          beforePersistFlush: t(
+            'Observe before this original transactional persistence flush begins.',
+            '在本次原有事务持久化刷新开始之前进行观察。'
+          )
+        }
+      },
+      TransactionObservedStage: {
+        summary: t(
+          'Completed observations use captured original identity and never reopen a closed transaction scope.',
+          '已完成观察使用捕获的原事务身份，不能重新打开已关闭的事务作用域。'
+        ),
+        values: {
+          onTransactionStart: t(
+            'Observe after the original transaction has been registered successfully.',
+            '原有事务成功登记之后观察其已捕获身份与状态。'
+          ),
+          afterTxOperation: t(
+            'Observe after one actual transaction operation settles.',
+            '一次真实事务操作完成结算之后进行只报告观察。'
+          ),
+          afterCommit: t(
+            'Observe only after the original native owner confirms commit completion.',
+            '只有原生拥有者确认提交完成之后，才观察已提交结果。'
+          ),
+          afterRollback: t(
+            'Observe after original native rollback completes without changing the primary failure.',
+            '原生回滚完成之后进行观察，不替换原始主要失败。'
+          ),
+          onTransactionClose: t(
+            'Observe after the original transaction lifetime has closed.',
+            '在原事务生命周期已经关闭之后观察终态，不恢复操作准入。'
+          ),
+          afterPersistFlush: t(
+            'Observe encoding and native request completion, which alone does not certify commit.',
+            '观察编码与原生请求完成，仅该阶段本身不能证明事务已经提交。'
+          )
+        }
+      },
+      ConcurrencyHolderState: {
+        summary: t(
+          'Holder observations distinguish an actual owner from the handoff interval without inventing another lock authority.',
+          '锁持有者观察区分真实拥有者与交接区间，不另建锁权限或生命周期拥有者。'
+        ),
+        values: {
+          held: t(
+            'A real local or remote owner currently holds the original lock.',
+            '当前确有一个本地或远端拥有者持有该原始锁。'
+          ),
+          handingOff: t(
+            'Remote transfer is in progress and intentionally exposes no owner identity.',
+            '远端交接正在进行，观察记录刻意不提供拥有者身份。'
+          )
+        }
+      },
+      StorageStageKind: {
+        summary: t(
+          'Canonical observer family names choose diagnostics only and do not grant backend, data or lifecycle authority.',
+          '规范观察家族名称只选择诊断类别，不授予后端、数据或生命周期管理权限。'
+        ),
+        values: {
+          codec: t(
+            'Observe the original value encoding and decoding boundaries.',
+            '观察原有值编码与解码边界，不执行额外的数据转换。'
+          ),
+          query: t(
+            'Observe query plans, pushdown choices and actual result counts.',
+            '观察查询计划、下推选择与实际结果数量，不重跑查询。'
+          ),
+          transaction: t(
+            'Observe the original transaction lifetime and admitted operations.',
+            '观察原事务生命周期及已准入操作，不代替提交或回滚。'
+          ),
+          backend: t(
+            'Observe original backend construction, admission and cleanup.',
+            '观察原后端构造、准入与清理，不取得后端关闭权限。'
+          ),
+          sql: t(
+            'Observe the actual native SQL statement execution counts.',
+            '观察实际原生语句执行数量，不新增原生请求或诊断查询。'
+          ),
+          operation: t(
+            'Observe ordinary storage operation entry and settlement.',
+            '观察普通存储操作的进入与结算，不改变其输入或结果。'
+          ),
+          concurrency: t(
+            'Observe original lock admission and concurrency policy decisions.',
+            '观察原锁准入与并发策略决策，不建立另一份锁或重试循环。'
+          )
+        }
+      },
+      ConflictPolicy: {
+        summary: t(
+          'Existing-key outcomes are shared by asynchronous, synchronous and authentic transaction write options.',
+          '异步、同步与真实事务写入选项共用已有键处理方式，不维护第二套冲突规则。'
+        ),
+        values: conflictValues
+      },
+      StorageContractErrorCode: {
+        summary: t(
+          'Stable contract failure codes covering invalid inputs, keys, capability absence, disposal and cancellation.',
+          '涵盖无效输入、键、能力缺失、释放和取消的稳定契约失败码。'
+        ),
+        values: {
+          queryEmptyResult: t(
+            'A required-first terminal exhausted its original query; choose first or maybe when absence is expected.',
+            '必须存在首项的终点耗尽了原查询；允许缺失时应改用首项或显式可选终点。'
+          ),
+          changeCursorExpired: t(
+            'A durable replay cursor was evicted; invalidate the full cache and subscribe from the current position.',
+            '持久重放游标已被淘汰，应让完整缓存失效并从当前进度重新订阅。'
+          ),
+          queryNotPushable: t(
+            'Strict execution includes client steps; inspect explain before reading.',
+            '严格执行包含客户端步骤；读取前检查 explain。'
+          ),
+          concurrencyPolicyFailed: t(
+            'A policy threw or returned an invalid decision; inspect its original cause.',
+            '策略抛错或返回非法决策，检查原始 cause。'
+          ),
+          lockTimeout: t(
+            'Logical admission budget or physical deadline expired after cleanup.',
+            '清理后报告逻辑准入预算或物理期限到期。'
+          ),
+          lockRejected: t(
+            'Policy rejected an actual acquisition conflict.',
+            '策略拒绝了真实准入冲突。'
+          ),
+          writeConflict: t(
+            'Policy rejected a commit conflict after completed rollback.',
+            '回滚完成后策略拒绝提交冲突。'
+          ),
+          lockLost: t(
+            'A backend proved its own expired lease was replaced.',
+            '后端确认自身过期租约已被替换。'
+          ),
+          invalidArgument: t(
+            'A public descriptor, context, synchronous write option or callback shape is invalid; correct the input before retrying.',
+            '公开描述器、上下文、同步写选项或回调形状无效，重试前应修正输入。'
+          ),
+          invalidKey: t(
+            'A record key violates its type, finiteness, array, depth, node or binary-size domain.',
+            '记录键违反类型、有限性、数组、深度、节点或二进制大小键域要求。'
+          ),
+          unsupported: t(
+            'The supplied backend lacks the required capability or callable methods; select a suitable implementation.',
+            '所提供后端缺少所需能力或可调用方法，应选择合适实现。'
+          ),
+          disposed: t(
+            'A caller uses a backend after its disposal; create or obtain a new store.',
+            '调用方在后端释放后继续使用，应创建或取得新存储。'
+          ),
+          envelopeInvalid: t(
+            'Archive envelope shape is invalid.',
+            '保存的数据不是自有版本与状态字段构成的合法存档结构。'
+          ),
+          versionUnsupported: t(
+            'Archive version is outside the supported plan range.',
+            '存档版本不在计划支持范围。'
+          ),
+          migrationGap: t(
+            'Migration target versions contain a gap or noncanonical key.',
+            '迁移目标版本存在断档或非规范键。'
+          ),
+          migrationFailed: t(
+            'A migration step failed; the original error remains on cause.',
+            '迁移步骤失败；原始错误保留在 cause。'
+          ),
+          aborted: t(
+            'A signal or timeout cancels waiting; writes already in atomic commit report the actual commit outcome.',
+            '信号或超时取消等待；已经进入原子提交的写入报告实际提交结局。'
+          )
+        }
+      },
+      KEY_DOMAIN_LIMITS: {
+        summary: t(
+          'Public hard bounds used during structured record-key validation.',
+          '结构化记录键校验使用的公开硬性规模上限。'
+        ),
+        values: {
+          maxDepth: t(
+            'Depth thirty-two is allowed with the root at zero; deeper nested key arrays are rejected.',
+            '根深度为零，允许深度三十二，更深的嵌套键数组被拒绝。'
+          ),
+          maxNodes: t(
+            'At most 4096 visited nodes per key, including the root and nested array elements.',
+            '每个键最多访问四千零九十六个节点，包含根和嵌套数组元素。'
+          ),
+          maxBinaryBytes: t(
+            'Each binary key buffer may contain at most 1048576 bytes; this is not a sum over all buffers.',
+            '每个二进制键缓冲区最多 `1048576` 字节，不累加全部缓冲区。'
+          )
+        }
       }
     }
-  },
+  })(),
   enhancers: {}
 }
