@@ -12,7 +12,8 @@ const storageSourceDirectory = resolve(repositoryRoot, 'packages/storage-host/sr
 /** This symbol represents the removed compiler/metadata execution branch in a poisoned candidate. */
 const legacyExecutionSymbol = 'migaia.storage-host.legacy-execution'
 /** Exact retained wrapper instruction replaced only in the disposable poisoned source copy. */
-const nativeDefinitionRead = 'const definition = readStorageNativePluginDefinition(plugin)'
+const nativeDefinitionRead =
+  'entryState.definition = readStorageNativePluginDefinition(entryState.plugin)'
 
 const RetainedEntryCase = {
   backendRegistration: 'backend-registration',

@@ -42,8 +42,8 @@ import {
   StorageContractError,
   StorageContractErrorCode
 } from '@migaia/storage-contract'
-import { inspectThenable, observeThenableRejection } from '@migaia/utils/function'
 import { withTimeout, type INativeAbortSignal } from '@migaia/utils/promise'
+import { observeThenableRejection } from '@migaia/utils/function'
 import {
   createStorageTypeError,
   createStorageAggregateError,
@@ -79,6 +79,13 @@ import {
 import type { IStorageJournalConfiguration, IStorageJournalExecutionPort } from './journal/types.js'
 import { loadStorageJournalRuntime } from './journal/loader.js'
 import type { prepareStorageJournalConfiguration } from './journal/configuration.js'
+
+/** Deliver final reporter failures through the existing utility host exception boundary. */
+function reportStorageUnhandledFailure(error: unknown): void {
+  observeThenableRejection(undefined, { error }, (failure) => {
+    throw failure
+  })
+}
 
 /** Minimal PluginHost domain core; storage materializers do not expose host mutation to plugins. */
 type IStorageHostCore = object
@@ -257,51 +264,69 @@ type IStorageBatchToken = {
   active: boolean
 }
 
-type IStorageHostOptionsSnapshot = {
-  readonly journal: IStorageHostOptions['journal']
-  readonly org: IStorageHostOptions['org']
-  readonly autoDetect: IStorageHostOptions['autoDetect']
-  readonly installTimeoutMs: number | undefined
-  readonly scheduler: IStorageHostOptions['scheduler']
-  readonly report: IStorageHostOptions['report']
-  readonly hooks: IStorageHostOptions['hooks']
+/** One install batch shares only journal-preparation authority and its ordered registration bridge. */
+type IStorageInstallBatchContext = {
+  /** Original token selects the sole live batch and retains its deadline origin. */
+  readonly batchToken: IStorageBatchToken
+  /** Final journal bootstrap temporarily admits already-materialized native candidates. */
+  preparingJournal: boolean
+  /** Only a successful native batch can publish its selected journal pipeline. */
+  installedJournalPipeline: boolean
+  /** Each original PluginHost definition consumes one matching registration context. */
+  nativeContexts: Map<number, IStorageNativeRegistrationContext>
 }
-
-type IStorageHostCreateSnapshot = {
-  readonly hostOptions: IStorageHostOptionsSnapshot
-  readonly plugins: readonly IStorageBackendPluginHandle[] | undefined
+/** One materialized native definition retains the single original store handoff. */
+type IStorageInstallEntryResult = {
+  readonly plugin: IPlugin<IStorageInstallCore, Record<string, unknown>>
+  readonly storeCell: IStorageStoreCell
 }
+/** One original registration owns its store handoff, dependency borrows and native context ports. */
+type IStorageInstallEntryContext = {
+  /** Original installState is captured before native construction begins. */
+  readonly installState: IStorageInstallBatchContext
+  /** Original plugin is captured before native construction begins. */
+  readonly plugin: IStorageBackendPluginHandle
+  /** Original metadata is captured before native construction begins. */
+  readonly metadata: NonNullable<ReturnType<typeof readStorageNativePluginMetadata>>
+  /** Original index is captured before native construction begins. */
+  readonly index: number
 
-/** Read public Host options once so hostile accessors cannot escape or be revisited later. */
-const snapshotStorageHostCreateOptions = (
-  options:
-    | (IStorageHostOptions & {
-        readonly plugins?: readonly IStorageBackendPluginHandle[]
-      })
-    | undefined
-): IStorageHostCreateSnapshot => {
-  try {
-    return {
-      hostOptions: {
-        journal: options?.journal,
-        org: options?.org,
-        autoDetect: options?.autoDetect,
-        installTimeoutMs: options?.installTimeoutMs,
-        scheduler: options?.scheduler,
-        report: options?.report,
-        hooks: options?.hooks
-      },
-      plugins: options?.plugins
-    }
-  } catch (cause) {
-    throw createStorageTypeError(
-      StorageErrorCode.backendPluginInvalid,
-      StorageErrorText.backendPluginInvalid,
-      cause
-    )
-  }
+  /** Retain only this entry original trusted definition metadata. */
+  native: NonNullable<ReturnType<typeof readStorageNativePluginMetadata>>
+
+  /** Preserve the exact admitted store with one single-assignment handoff. */
+  storeCell: IStorageStoreCell
+
+  /** A late installation cannot regain authority after its deadline. */
+  installExpired: boolean
+
+  /** Kind is captured per registration, never in reusable definition metadata. */
+  kind: IStorageBackendKind | undefined
+
+  /** The original core supplies registration and installation admission for all bound ports. */
+  registrationCore: IStorageInstallCore | undefined
+
+  /** Construction bindings are allocated only when a backend actually requests them. */
+  stageBindings: IBackendStageBindings | undefined
+
+  /** The original installation owns only its captured dependency handles, never their resources. */
+  borrowed: Map<object, IStorageBase> | undefined
+
+  /** Checks belong to this original registration and retain registration order. */
+  checks: Set<IStorageDetectCheck>
+
+  /** A successful complete host pass admits this registration's real execution endpoints. */
+  detected: boolean
+
+  /** Immutable identity does not retain a shared current-store or current-organization slot. */
+  observerBinding: Parameters<typeof createStorageObservers>[0]
+
+  /** Bind the next domain core to its matching entry in this install batch. */
+  context: IStorageNativeRegistrationContext
+
+  /** The original PluginHost definition remains the registration and lifecycle owner. */
+  definition: ReturnType<typeof readStorageNativePluginDefinition>
 }
-
 /** Storage facade over the canonical PluginHost lifecycle owner and its batch transaction. */
 export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] = readonly []> {
   /** One original facade owns immutable org preparation data, never another backend registry. */
@@ -378,8 +403,6 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
 
   /** Creates the shell and snapshots lifecycle/deadline inputs before any plugin runs. */
   constructor(options: IStorageHostOptions = {}) {
-    /** Read constructor options once before any plugin can execute. */
-    const optionsSnapshot = snapshotStorageHostCreateOptions(options)
     const {
       installTimeoutMs: installTimeoutOption,
       scheduler: schedulerOption,
@@ -388,7 +411,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
       org,
       autoDetect,
       journal
-    } = optionsSnapshot.hostOptions
+    } = options ?? {}
     this.#journal =
       typeof journal === 'function' || journal === undefined
         ? journal
@@ -414,22 +437,15 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
     }
     this.#installTimeoutMs = installTimeoutMs
     this.#report = (error) => {
+      if (report === undefined) {
+        reportStorageUnhandledFailure(error)
+        return
+      }
       try {
-        if (report === undefined) {
-          observeThenableRejection(undefined, { error }, (failure) => {
-            throw failure
-          })
-          return
-        }
-        /** Preserve the actual callback result while observing its failure channel. */
         const result = report(error)
-        observeThenableRejection(result, inspectThenable(result), (failure) => {
-          throw failure
-        })
+        if (result !== undefined) void Promise.resolve(result).catch(reportStorageUnhandledFailure)
       } catch (reporterError) {
-        observeThenableRejection(undefined, { error: reporterError }, (failure) => {
-          throw failure
-        })
+        reportStorageUnhandledFailure(reporterError)
       }
     }
 
@@ -497,535 +513,14 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
     }
     this.#activeBatchToken = batchToken
     /** Reject a cancelled or losing batch before the next publication step. */
-    const assertBatchOwner = (): void => {
-      if (
-        !batchToken.active ||
-        this.#activeBatchToken !== batchToken ||
-        this.#state !== 'installing'
-      ) {
-        throw new StorageError(
-          StorageErrorCode.storageHostDisposed,
-          {},
-          StorageErrorText.storageHostDisposed
-        )
-      }
-    }
+
     /** This Promise owns native installation and the one atomic store publication. */
-    const batch = Promise.resolve().then(async () => {
-      assertBatchOwner()
-      /** Resolve only trusted plugin identities before constructing backends. */
-      const nativeMetadata = plugins.map((plugin) => {
-        /** Read the captured storage-owned metadata without invoking native getters. */
-        const metadata = readStorageNativePluginMetadata(plugin)
-        if (metadata === undefined)
-          throw new StorageError(
-            StorageErrorCode.backendPluginInvalid,
-            {},
-            StorageErrorText.backendPluginInvalid
-          )
-        return metadata
-      })
-      /**
-       * Storage owns duplicate backend admission before any backend factory or PluginHost install
-       * runs.
-       */
-      const admittedBackendIds = new Set(this.#registry.keys())
-      for (const [index] of plugins.entries()) {
-        /** Check duplicate public ids independently of native name encoding. */
-        const backendId = nativeMetadata[index]!.id
-        if (admittedBackendIds.has(backendId))
-          throw new StorageError(
-            StorageErrorCode.backendDuplicate,
-            {},
-            StorageErrorText.backendDuplicate
-          )
-        admittedBackendIds.add(backendId)
-      }
-      assertBatchOwner()
-      /** Only the final original batch preparation admits already completed candidate reads. */
-      let preparingJournal = false
-      /** Each batch entry retains exactly one original store handoff. */
-      const nativeContexts = new Map<number, IStorageNativeRegistrationContext>()
-      /** Materialize original definitions in the same order as native registration. */
-      const entries = plugins.map((plugin, index) => {
-        /** Retain only this entry original trusted definition metadata. */
-        const native = nativeMetadata[index]!
-        /** Preserve the exact admitted store with one single-assignment handoff. */
-        const storeCell = createStorageStoreCell()
-        /** A late installation cannot regain authority after its deadline. */
-        let installExpired = false
-        /** Kind is captured per registration, never in reusable definition metadata. */
-        let kind: IStorageBackendKind | undefined
-        /** The original core supplies registration and installation admission for all bound ports. */
-        let registrationCore: IStorageInstallCore | undefined
-        /** Construction bindings are allocated only when a backend actually requests them. */
-        let stageBindings: IBackendStageBindings | undefined
-        /**
-         * The original installation owns only its captured dependency handles, never their
-         * resources.
-         */
-        let borrowed: Map<object, IStorageBase> | undefined
-        /** Checks belong to this original registration and retain registration order. */
-        const checks = new Set<IStorageDetectCheck>()
-        /** A successful complete host pass admits this registration's real execution endpoints. */
-        let detected = false
-        /** The original owners validate both unpublished candidates and committed registrations. */
-        const assertRegistration = (): void => {
-          /**
-           * Original config admission accepts the actual candidate in its current install
-           * operation.
-           */
-          if (preparingJournal)
-            getPluginRuntimeIntegration(registrationCore).assertPreparedRegistration()
-          else void registrationCore!.config.get()
-          if (!batchToken.active) getPluginRuntimeIntegration(registrationCore).assertCurrent()
-        }
-        /** Immutable identity does not retain a shared current-store or current-organization slot. */
-        const observerBinding = {
-          identity: () => ({
-            backendId: native.id,
-            backend: kind?.name ?? native.id,
-            orgId: this.#orgId
-          }),
-          assertCurrent: assertRegistration,
-          emit: this.#events.emit,
-          hasListeners: this.#events.hasListeners,
-          report: this.#report
-        }
-        /** Observations retain original registration validity and agree with the one store handoff. */
-        const bindObservers = (store: IStorageBase): IStorageObserverSet => {
-          observerBinding.assertCurrent()
-          storeCell.bind(store)
-          return createStorageObservers(observerBinding, () => store)
-        }
-        /**
-         * Each call context closes over its organization and only installation-captured
-         * dependencies.
-         */
-        const callContext = (orgId: string): IStoragePluginCallContext => ({
-          orgId,
-          backend: (view) => {
-            assertRegistration()
-            const source = borrowed?.get(view)
-            if (source === undefined)
-              throw new StorageContractError(StorageContractErrorCode.invalidArgument)
-            return this.#projectBackend(source, orgId) as typeof view
-          }
-        })
-        /** Bind the next domain core to its matching entry in this install batch. */
-        const context: IStorageNativeRegistrationContext = {
-          ...(this.#journal === undefined
-            ? {}
-            : {
-                observeExecution: <R>(
-                  orgId: string,
-                  describe: () => IStoragePipelineInput,
-                  invoke: (observing: boolean) => Promise<R>
-                ) =>
-                  loadStorageJournalRuntime().then((runtime) =>
-                    runtime.observeStorageTelemetry(
-                      () => this.#journalOrgs?.get(orgId)?.configuration,
-                      describe,
-                      invoke,
-                      () => this.#scheduler.now(),
-                      this.#report
-                    )
-                  )
-              }),
-          getJournal: (orgId) => this.#journalPort(context, orgId),
-          id: native.id,
-          defaultOrgId: this.#orgId,
-          getOrgContext: (orgId) => {
-            assertRegistration()
-            assertOperationContext({ orgId })
-            /** Read-only ports point to the same original execution and observer implementations. */
-            const binding = {
-              ...observerBinding,
-              identity: () => ({ ...observerBinding.identity(), orgId })
-            }
-            const execution = forwardStorageExecution(
-              this.#inner,
-              context.assertExecution,
-              () => ({
-                backendId: native.id,
-                backend: kind?.name ?? native.id,
-                orgId
-              }),
-              context.observeExecution === undefined
-                ? undefined
-                : (describe, invoke) => context.observeExecution!(orgId, describe, invoke)
-            )
-            const contextForOrg = callContext(orgId)
-            const observe = (store: IStorageBase) => createStorageObservers(binding, () => store)
-            return {
-              journal: context.getJournal(orgId),
-              orgId,
-              execution,
-              callContext: contextForOrg,
-              stageBindings: {
-                backendStages: createStorageObservers(binding, storeCell.get).backend,
-                operationStages: (store) => observe(store).operation,
-                codecStages: (store) => observe(store).codec,
-                transactionStages: (store) => observe(store).transaction,
-                concurrencyStages: (store) => observe(store).concurrency,
-                sqlStages: (store) => observe(store).sql,
-                queryStages: (store) => observe(store).query
-              },
-              createTransactionApi: (scope) =>
-                storeCell.createOrgTransactionApi(
-                  scope,
-                  storeCell.forOrg(orgId, this.#orgId),
-                  contextForOrg,
-                  execution
-                )
-            }
-          },
-          assertCurrent: assertRegistration,
-          assertExecution: () => {
-            assertRegistration()
-            if (!batchToken.active && !detected)
-              throw new StorageContractError(StorageContractErrorCode.unsupported)
-          },
-          isDetected: () => detected,
-          completeDetect: () => {
-            detected = true
-          },
-          getPublishedBackend: (id) => {
-            /** Original scope admission enforces the install window before any lookup. */
-            let view: ReturnType<typeof borrowStorageBackend> | undefined
-            /**
-             * Aliases borrow the source registration's existing facts and release with this
-             * borrower.
-             */
-            const releases: Array<() => void> = []
-            registrationCore!.onDispose(() => {
-              if (view !== undefined) borrowed?.delete(view)
-              for (const release of releases) release()
-            })
-            /** Current-batch and future stores never enter this committed registry. */
-            const store = this.#registry.get(id)
-            if (store === undefined)
-              throw new StorageError(
-                StorageErrorCode.backendNotInstalled,
-                {},
-                StorageErrorText.backendNotInstalled
-              )
-            /** Its existing context retains the exact original lifecycle and enablement guards. */
-            const source = this.#storeContexts.get(store)!
-            const assertBorrowed = () => {
-              assertRegistration()
-              source.context.assertCurrent()
-            }
-            view = borrowStorageBackend(store, assertBorrowed)
-            releases.push(registerBackendEntityAccess(view, store, assertBorrowed))
-            releases.push(
-              registerBackendEnvelopeStages(
-                view,
-                (operation) => source.context.getEnvelopeStages(operation),
-                () => source.context.storeCell.getChainMethods('query')
-              )
-            )
-            const controller = getBackendChangeController(store)
-            if (controller !== undefined)
-              releases.push(registerBackendChangeController(view, controller))
-            ;(borrowed ??= new Map()).set(view, store)
-            return view as ReturnType<IStoragePluginCore['getPublishedBackend']>
-          },
-          registerDetect: (check) => {
-            if (typeof check !== 'function')
-              throw createStorageTypeError(
-                StorageErrorCode.invalidConfig,
-                StorageErrorText.invalidDetectCheck
-              )
-            /** Original onDispose admission enforces exactly the existing installation window. */
-            const entry: IStorageDetectCheck = { check }
-            registrationCore!.onDispose(() => {
-              checks.delete(entry)
-            })
-            checks.add(entry)
-          },
-          runDetect: async () => {
-            assertRegistration()
-            /** Timings describe one backend's real checks without adding a check deadline. */
-            const startedAt = this.#scheduler.now()
-            /** Read the original registration signal, which seals with the resource owner. */
-            const signal = registrationCore!.lifecycle.signal
-            /** Only checks actually invoked contribute to the fixed observation payload. */
-            let checkCount = 0
-            this.#events.emit(Hook.beforeDetect, observerBinding.identity)
-            try {
-              for (const entry of checks) {
-                this.#assertOpen()
-                assertRegistration()
-                checkCount += 1
-                entry.pending = Promise.resolve().then(() => entry.check(signal))
-                try {
-                  await entry.pending
-                } finally {
-                  entry.pending = undefined
-                }
-              }
-              this.#assertOpen()
-              if (this.#events.hasListeners(Hook.afterDetect))
-                this.#events.emit(Hook.afterDetect, () => ({
-                  ...observerBinding.identity(),
-                  checkCount,
-                  elapsedMs: Math.max(0, this.#scheduler.now() - startedAt)
-                }))
-            } catch (error) {
-              if (this.#events.hasListeners(Hook.onDetectError))
-                this.#events.emit(Hook.onDetectError, () => ({
-                  ...observerBinding.identity(),
-                  code: readStorageHookFailureCode(error, this.#report)
-                }))
-              throw error
-            }
-          },
-          setRegistrationCore: (core) => {
-            registrationCore = core
-          },
-          hooks: this.#events.hooks,
-          emit: (name, payload) => {
-            /** Accepted native work may settle during close; optional diagnostics cannot mask it. */
-            if (this.#state === 'closing') return
-            assertRegistration()
-            this.#events.emit(name, payload)
-          },
-          getObservers: (store, orgId) =>
-            createStorageObservers(
-              orgId === undefined
-                ? observerBinding
-                : {
-                    ...observerBinding,
-                    identity: () => ({ ...observerBinding.identity(), orgId })
-                  },
-              () => store
-            ),
-          getEnvelopeStages: (operation, orgId) =>
-            createStorageEnvelopeStages(
-              orgId === undefined
-                ? observerBinding
-                : {
-                    ...observerBinding,
-                    identity: () => ({ ...observerBinding.identity(), orgId })
-                  },
-              operation
-            ),
-          getStageBindings: () =>
-            (stageBindings ??= {
-              backendStages: createStorageObservers(observerBinding, storeCell.get).backend,
-              operationStages: (store) => bindObservers(store).operation,
-              codecStages: (store) => bindObservers(store).codec,
-              transactionStages: (store) => bindObservers(store).transaction,
-              concurrencyStages: (store) => bindObservers(store).concurrency,
-              sqlStages: (store) => bindObservers(store).sql,
-              queryStages: (store) => bindObservers(store).query
-            }),
-          scheduler: this.#scheduler,
-          getKind: () => kind,
-          setKind: (value) => {
-            kind = value
-          },
-          storeCell,
-          runInstall: async <T>(operation: () => Promise<T>): Promise<T> => {
-            if (kind !== undefined) {
-              this.#events.emit(Hook.beforeBackendPluginInstall, observerBinding.identity)
-              this.#events.emit(Hook.beforeBackendCreate, observerBinding.identity)
-            }
-            /** Consume the original batch deadline instead of resetting it per backend. */
-            const elapsed = Math.max(0, this.#scheduler.now() - batchToken.startedAt)
-            /** Observe the actual native work even when timeout wins first. */
-            const pending = operation()
-            /** Distinguish an operation failure from work still running after expiry. */
-            let operationSettled = false
-            void pending.then(
-              () => {
-                operationSettled = true
-              },
-              () => {
-                operationSettled = true
-              }
-            )
-            try {
-              /** The complete original install hook includes selected Feature publication. */
-              const installed = await this.#awaitInstall(pending, batchToken, elapsed)
-              /**
-               * Register last in the original install window so accepted checks drain before any
-               * resource they may inspect, even when a Feature registered them before the store.
-               */
-              registrationCore!.onDispose(async () => {
-                for (const entry of checks) await entry.pending?.catch(this.#report)
-              })
-              if (kind !== undefined) {
-                this.#events.emit(Hook.afterBackendPluginInstall, observerBinding.identity)
-                this.#events.emit(Hook.afterBackendInstall, observerBinding.identity)
-              }
-              return installed
-            } catch (error) {
-              installExpired = !operationSettled
-              if (kind !== undefined) {
-                if (this.#events.hasListeners(Hook.onBackendRejected))
-                  this.#events.emit(Hook.onBackendRejected, () => ({
-                    ...observerBinding.identity(),
-                    code: readStorageHookFailureCode(error, this.#report)
-                  }))
-                if (this.#events.hasListeners(Hook.onBackendPluginInstallError))
-                  this.#events.emit(Hook.onBackendPluginInstallError, () => ({
-                    ...observerBinding.identity(),
-                    code: readStorageHookFailureCode(error, this.#report)
-                  }))
-              }
-              throw error
-            }
-          },
-          isInstallExpired: () => installExpired,
-          registerStore: (store, core) => {
-            /** Use contract-owned admission and its captured original disposal receiver. */
-            const snapshot = snapshotStorageBaseDetailed(store, { asyncDisposeKey })
-            if (!snapshot.valid)
-              throw createStorageTypeError(
-                StorageErrorCode.backendPluginInvalid,
-                StorageErrorText.backendPluginInvalid,
-                snapshot.cause
-              )
-            if (!batchToken.active || this.#activeBatchToken !== batchToken) {
-              void this.#disposeLateStore(snapshot)
-              throw new StorageError(
-                StorageErrorCode.storageHostDisposed,
-                {},
-                StorageErrorText.storageHostDisposed
-              )
-            }
-            try {
-              core.onDispose(() => {
-                this.#events.emit(Hook.onBackendDisposeStart, observerBinding.identity)
-                /** The original captured disposer retains its receiver and one cleanup execution. */
-                const disposed = Reflect.apply(
-                  snapshot.dispose,
-                  snapshot.receiver,
-                  []
-                ) as Promise<void>
-                if (!this.#events.hasListeners(Hook.afterBackendDispose)) return disposed
-                return Promise.resolve(disposed).then(() =>
-                  this.#events.emit(Hook.afterBackendDispose, observerBinding.identity)
-                )
-              })
-            } catch (error) {
-              void this.#disposeLateStore(snapshot)
-              throw error
-            }
-            if (kind === undefined || snapshot.backend !== kind.name)
-              throw createStorageTypeError(
-                StorageErrorCode.backendKindMismatch,
-                StorageErrorText.backendKindMismatch
-              )
-            /** Every admitted base, including frozen raw stores, shares this host's observer owner. */
-            let releaseEnvelope: (() => void) | undefined
-            core.onDispose(() => releaseEnvelope?.())
-            releaseEnvelope = registerBackendEnvelopeStages(
-              snapshot.store,
-              context.getEnvelopeStages,
-              () => context.storeCell.getChainMethods('query')
-            )
-            storeCell.set(snapshot.store)
-            this.#events.emit(Hook.afterBackendCreate, observerBinding.identity)
-          }
-        }
-        nativeContexts.set(index, context)
-        /** The original PluginHost definition remains the registration and lifecycle owner. */
-        const definition = readStorageNativePluginDefinition(plugin)
-        if (definition === undefined)
-          throw new StorageError(
-            StorageErrorCode.backendPluginInvalid,
-            {},
-            StorageErrorText.backendPluginInvalid
-          )
-        return {
-          plugin: definition as IPlugin<IStorageInstallCore, Record<string, unknown>>,
-          storeCell
-        }
-      })
-      /** Pass only the original definitions to the canonical install batch. */
-      const materialized = entries.map((entry) => entry.plugin)
-      /** A final original registration prepares candidates before the atomic public registry swap. */
-      let installedJournalPipeline = false
-      const candidates = [...nativeContexts.values()]
-      if (
-        this.#journal !== undefined &&
-        (candidates.length !== 0 || !this.#journalOrgs?.has(this.#orgId))
-      ) {
-        materialized.push(
-          defineNativePlugin(
-            STORAGE_JOURNAL_BOOTSTRAP_PREFIX + (nativeMetadata[0]?.id ?? this.#orgId),
-            (core) => ({
-              install: async () => {
-                const elapsed = Math.max(0, this.#scheduler.now() - batchToken.startedAt)
-                await this.#awaitInstall(
-                  (async () => {
-                    preparingJournal = true
-                    try {
-                      await this.#journalOptions(this.#orgId, candidates)
-                      for (const context of candidates)
-                        if (context.getKind() !== undefined)
-                          await this.#prepareJournalBackend(context, this.#orgId, candidates)
-                            .promise
-                    } finally {
-                      preparingJournal = false
-                    }
-                  })(),
-                  batchToken,
-                  elapsed
-                )
-                if (!this.#journalPipelineInstalled) {
-                  /** Selected asynchronous journal completion uses the original shared stage owner. */
-                  core.useAsyncPipeline(async (input, next) => next(input))
-                  installedJournalPipeline = true
-                }
-                return {}
-              }
-            })
-          ) as (typeof materialized)[number]
-        )
-      }
-      this.#inner.setNativeContexts(
-        materialized.map((_, index) => nativeContexts.get(index)),
-        materialized.length
-      )
-      /** Committed native handles retain their original guarded extension methods. */
-      const innerHandles = await this.#inner.use(
-        ...(materialized as IPluginConstraint<IStorageHostCore>[])
-      )
-      assertBatchOwner()
-      if (installedJournalPipeline) this.#journalPipelineInstalled = true
-      /** Prepare the next store registry before its atomic public swap. */
-      const nextRegistry = new Map(this.#registry)
-      /** Merge original guarded descriptors without rebuilding extension methods. */
-      const nextExtensions = Object.create(null) as Record<PropertyKey, unknown>
-      for (const source of [this.#extensions, ...innerHandles.map((handle) => handle.extensions)])
-        for (const key of Reflect.ownKeys(source)) {
-          Object.defineProperty(nextExtensions, key, Object.getOwnPropertyDescriptor(source, key)!)
-        }
-      for (const [index] of plugins.entries()) {
-        /** Retain only this entry original trusted definition metadata. */
-        const native = nativeContexts.get(index)
-        this.#detectContexts.add(native!)
-        if (native!.getKind() !== undefined) {
-          nextRegistry.set(native!.id, entries[index]!.storeCell.get())
-          this.#storeContexts.set(entries[index]!.storeCell.get(), {
-            context: native!,
-            native: entries[index]!.storeCell.get()
-          })
-        }
-      }
-      this.#registry = new Map(nextRegistry)
-      this.#extensions = nextExtensions
-      if (!this.#detectRunning) this.#detectPromise = undefined
-    })
+    const batch = Promise.resolve().then(() => this.#runInstallBatch(plugins, batchToken))
     this.#installing = batch
     /** Only the current batch may reopen admission and return the narrowed host. */
     const settled = batch.then(
       () => {
-        assertBatchOwner()
+        this.#assertBatchOwner(batchToken)
         batchToken.active = false
         this.#activeBatchToken = undefined
         if (this.#state === 'installing') this.#state = 'open'
@@ -1677,10 +1172,613 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
     snapshot: Extract<IStorageBaseAdmission, { readonly valid: true }>
   ): Promise<void> {
     try {
-      await Reflect.apply(snapshot.dispose, snapshot.receiver, [])
+      await snapshot.store.dispose()
     } catch (error) {
       this.#report(error)
     }
+  }
+
+  /** Reject a cancelled or losing batch before the next publication step. */
+  #assertBatchOwner(batchToken: IStorageBatchToken): void {
+    if (
+      !batchToken.active ||
+      this.#activeBatchToken !== batchToken ||
+      this.#state !== 'installing'
+    ) {
+      throw new StorageError(
+        StorageErrorCode.storageHostDisposed,
+        {},
+        StorageErrorText.storageHostDisposed
+      )
+    }
+  }
+  /** Install one native batch using the canonical PluginHost transaction and existing deadline. */
+  async #runInstallBatch(
+    plugins: readonly IStorageBackendPluginHandle[],
+    batchToken: IStorageBatchToken
+  ): Promise<void> {
+    this.#assertBatchOwner(batchToken)
+    /** Resolve only trusted plugin identities before constructing backends. */
+    const nativeMetadata = plugins.map((plugin) => {
+      /** Read the captured storage-owned metadata without invoking native getters. */
+      const metadata = readStorageNativePluginMetadata(plugin)
+      if (metadata === undefined)
+        throw new StorageError(
+          StorageErrorCode.backendPluginInvalid,
+          {},
+          StorageErrorText.backendPluginInvalid
+        )
+      return metadata
+    })
+    /**
+     * Storage owns duplicate backend admission before any backend factory or PluginHost install
+     * runs.
+     */
+    const admittedBackendIds = new Set(this.#registry.keys())
+    for (const [index] of plugins.entries()) {
+      /** Check duplicate public ids independently of native name encoding. */
+      const backendId = nativeMetadata[index]!.id
+      if (admittedBackendIds.has(backendId))
+        throw new StorageError(
+          StorageErrorCode.backendDuplicate,
+          {},
+          StorageErrorText.backendDuplicate
+        )
+      admittedBackendIds.add(backendId)
+    }
+    this.#assertBatchOwner(batchToken)
+    /** Only the final original batch preparation admits already completed candidate reads. */
+    const installState = { batchToken, preparingJournal: false } as IStorageInstallBatchContext
+    /** Each batch entry retains exactly one original store handoff. */
+    installState.nativeContexts = new Map<number, IStorageNativeRegistrationContext>()
+    /** Materialize original definitions in the same order as native registration. */
+    const entries = plugins.map((plugin, index) =>
+      this.#createInstallEntry(installState, plugin, nativeMetadata[index]!, index)
+    )
+    /** Pass only the original definitions to the canonical install batch. */
+    const materialized = entries.map((entry) => entry.plugin)
+    /** A final original registration prepares candidates before the atomic public registry swap. */
+    installState.installedJournalPipeline = false
+    const candidates = [...installState.nativeContexts.values()]
+    if (
+      this.#journal !== undefined &&
+      (candidates.length !== 0 || !this.#journalOrgs?.has(this.#orgId))
+    ) {
+      materialized.push(
+        defineNativePlugin(
+          STORAGE_JOURNAL_BOOTSTRAP_PREFIX + (nativeMetadata[0]?.id ?? this.#orgId),
+          (core) => ({
+            install: () => this.#installJournalBootstrap(installState, candidates, core)
+          })
+        ) as (typeof materialized)[number]
+      )
+    }
+    this.#inner.setNativeContexts(
+      materialized.map((_, index) => installState.nativeContexts.get(index)),
+      materialized.length
+    )
+    /** Committed native handles retain their original guarded extension methods. */
+    const innerHandles = await this.#inner.use(
+      ...(materialized as IPluginConstraint<IStorageHostCore>[])
+    )
+    this.#assertBatchOwner(batchToken)
+    if (installState.installedJournalPipeline) this.#journalPipelineInstalled = true
+    this.#publishInstallBatch(plugins, installState, entries, innerHandles)
+  }
+
+  /** Atomically publish the native handles only after the original PluginHost batch commits. */
+  #publishInstallBatch(
+    plugins: readonly IStorageBackendPluginHandle[],
+    installState: IStorageInstallBatchContext,
+    entries: readonly IStorageInstallEntryResult[],
+    innerHandles: readonly { readonly extensions: object }[]
+  ): void {
+    /** Prepare the next store registry before its atomic public swap. */
+    const nextRegistry = new Map(this.#registry)
+    /** Merge original guarded descriptors without rebuilding extension methods. */
+    const nextExtensions = Object.create(null) as Record<PropertyKey, unknown>
+    for (const source of [this.#extensions, ...innerHandles.map((handle) => handle.extensions)])
+      for (const key of Reflect.ownKeys(source)) {
+        Object.defineProperty(nextExtensions, key, Object.getOwnPropertyDescriptor(source, key)!)
+      }
+    for (const [index] of plugins.entries()) {
+      /** Retain only this entry original trusted definition metadata. */
+      const native = installState.nativeContexts.get(index)
+      this.#detectContexts.add(native!)
+      if (native!.getKind() !== undefined) {
+        nextRegistry.set(native!.id, entries[index]!.storeCell.get())
+        this.#storeContexts.set(entries[index]!.storeCell.get(), {
+          context: native!,
+          native: entries[index]!.storeCell.get()
+        })
+      }
+    }
+    this.#registry = nextRegistry
+    this.#extensions = nextExtensions
+    if (!this.#detectRunning) this.#detectPromise = undefined
+  }
+  /** Prepare journal candidates within the original batch deadline before native publication. */
+  async #installJournalBootstrap(
+    installState: IStorageInstallBatchContext,
+    candidates: readonly IStorageNativeRegistrationContext[],
+    core: Pick<IPluginHostCore<never>, 'useAsyncPipeline'>
+  ): Promise<Record<string, never>> {
+    const elapsed = Math.max(0, this.#scheduler.now() - installState.batchToken.startedAt)
+    await this.#awaitInstall(
+      this.#prepareInstallJournal(installState, candidates),
+      installState.batchToken,
+      elapsed
+    )
+    if (!this.#journalPipelineInstalled) {
+      core.useAsyncPipeline(async (input, next) => next(input))
+      installState.installedJournalPipeline = true
+    }
+    return {}
+  }
+  /** Grant only the original bootstrap's temporary prepared-candidate authority. */
+  async #prepareInstallJournal(
+    installState: IStorageInstallBatchContext,
+    candidates: readonly IStorageNativeRegistrationContext[]
+  ): Promise<void> {
+    installState.preparingJournal = true
+    try {
+      await this.#journalOptions(this.#orgId, candidates)
+      for (const context of candidates)
+        if (context.getKind() !== undefined)
+          await this.#prepareJournalBackend(context, this.#orgId, candidates).promise
+    } finally {
+      installState.preparingJournal = false
+    }
+  }
+  /** Materialize one registration with a single store handoff and original native plugin definition. */
+  #createInstallEntry(
+    installState: IStorageInstallBatchContext,
+    plugin: IStorageBackendPluginHandle,
+    metadata: NonNullable<ReturnType<typeof readStorageNativePluginMetadata>>,
+    index: number
+  ): IStorageInstallEntryResult {
+    /** Initialize registration facts in original construction order before any callback can publish. */
+    const entryState = { installState, plugin, metadata, index } as IStorageInstallEntryContext
+
+    /** Retain only this entry original trusted definition metadata. */
+    entryState.native = entryState.metadata
+
+    /** Preserve the exact admitted store with one single-assignment handoff. */
+    entryState.storeCell = createStorageStoreCell()
+
+    /** A late installation cannot regain authority after its deadline. */
+    entryState.installExpired = false
+
+    /** Checks belong to this original registration and retain registration order. */
+    entryState.checks = new Set<IStorageDetectCheck>()
+
+    /** A successful complete host pass admits this registration's real execution endpoints. */
+    entryState.detected = false
+
+    /** Immutable identity does not retain a shared current-store or current-organization slot. */
+    entryState.observerBinding = {
+      identity: () => ({
+        backendId: entryState.native.id,
+        backend: entryState.kind?.name ?? entryState.native.id,
+        orgId: this.#orgId
+      }),
+      assertCurrent: () => this.#assertRegistration(entryState),
+      emit: this.#events.emit,
+      hasListeners: this.#events.hasListeners,
+      report: this.#report
+    }
+    entryState.context = this.#createInstallRegistrationContext(entryState)
+
+    entryState.installState.nativeContexts.set(entryState.index, entryState.context)
+
+    /** The original PluginHost definition remains the registration and lifecycle owner. */
+    entryState.definition = readStorageNativePluginDefinition(entryState.plugin)
+
+    if (entryState.definition === undefined)
+      throw new StorageError(
+        StorageErrorCode.backendPluginInvalid,
+        {},
+        StorageErrorText.backendPluginInvalid
+      )
+    return {
+      plugin: entryState.definition as IPlugin<IStorageInstallCore, Record<string, unknown>>,
+      storeCell: entryState.storeCell
+    }
+  }
+
+  /** The original owners validate both unpublished candidates and committed registrations. */
+  #assertRegistration(entryState: IStorageInstallEntryContext): void {
+    /** Original config admission accepts the actual candidate in its current install operation. */
+    if (entryState.installState.preparingJournal)
+      getPluginRuntimeIntegration(entryState.registrationCore).assertPreparedRegistration()
+    else void entryState.registrationCore!.config.get()
+    if (!entryState.installState.batchToken.active)
+      getPluginRuntimeIntegration(entryState.registrationCore).assertCurrent()
+  }
+
+  /** Observations retain original registration validity and agree with the one store handoff. */
+  #bindObservers(
+    entryState: IStorageInstallEntryContext,
+    store: IStorageBase
+  ): IStorageObserverSet {
+    entryState.observerBinding.assertCurrent()
+    entryState.storeCell.bind(store)
+    return createStorageObservers(entryState.observerBinding, () => store)
+  }
+
+  /** Each call context closes over its organization and only installation-captured dependencies. */
+  #callContext(entryState: IStorageInstallEntryContext, orgId: string): IStoragePluginCallContext {
+    return {
+      orgId,
+      backend: (view) => {
+        this.#assertRegistration(entryState)
+        const source = entryState.borrowed?.get(view)
+        if (source === undefined)
+          throw new StorageContractError(StorageContractErrorCode.invalidArgument)
+        return this.#projectBackend(source, orgId) as typeof view
+      }
+    }
+  }
+
+  /** Bind the next domain core to its matching entry in this install batch. */
+  #createInstallRegistrationContext(
+    entryState: IStorageInstallEntryContext
+  ): IStorageInstallEntryContext['context'] {
+    return {
+      ...(this.#journal === undefined
+        ? {}
+        : {
+            observeExecution: <R>(
+              orgId: string,
+              describe: () => IStoragePipelineInput,
+              invoke: (observing: boolean) => Promise<R>
+            ) =>
+              loadStorageJournalRuntime().then((runtime) =>
+                runtime.observeStorageTelemetry(
+                  () => this.#journalOrgs?.get(orgId)?.configuration,
+                  describe,
+                  invoke,
+                  () => this.#scheduler.now(),
+                  this.#report
+                )
+              )
+          }),
+      getJournal: (orgId) => this.#journalPort(entryState.context, orgId),
+      id: entryState.native.id,
+      defaultOrgId: this.#orgId,
+      getOrgContext: (orgId: Parameters<IStorageNativeRegistrationContext['getOrgContext']>[0]) =>
+        this.#installGetOrgContext(entryState, orgId),
+      assertCurrent: () => this.#assertRegistration(entryState),
+      assertExecution: () => {
+        this.#assertRegistration(entryState)
+        if (!entryState.installState.batchToken.active && !entryState.detected)
+          throw new StorageContractError(StorageContractErrorCode.unsupported)
+      },
+      isDetected: () => entryState.detected,
+      completeDetect: () => {
+        entryState.detected = true
+      },
+      getPublishedBackend: (
+        id: Parameters<IStorageNativeRegistrationContext['getPublishedBackend']>[0]
+      ) => this.#installGetPublishedBackend(entryState, id),
+      registerDetect: (check) => {
+        if (typeof check !== 'function')
+          throw createStorageTypeError(
+            StorageErrorCode.invalidConfig,
+            StorageErrorText.invalidDetectCheck
+          )
+        /** Original onDispose admission enforces exactly the existing installation window. */
+        const entry: IStorageDetectCheck = { check }
+        entryState.registrationCore!.onDispose(() => {
+          entryState.checks.delete(entry)
+        })
+        entryState.checks.add(entry)
+      },
+      runDetect: () => this.#installRunDetect(entryState),
+      setRegistrationCore: (core) => {
+        entryState.registrationCore = core
+      },
+      hooks: this.#events.hooks,
+      emit: (name, payload) => {
+        /** Accepted native work may settle during close; optional diagnostics cannot mask it. */
+        if (this.#state === 'closing') return
+        this.#assertRegistration(entryState)
+        this.#events.emit(name, payload)
+      },
+      getObservers: (store, orgId) =>
+        createStorageObservers(
+          orgId === undefined
+            ? entryState.observerBinding
+            : {
+                ...entryState.observerBinding,
+                identity: () => ({ ...entryState.observerBinding.identity(), orgId })
+              },
+          () => store
+        ),
+      getEnvelopeStages: (operation, orgId) =>
+        createStorageEnvelopeStages(
+          orgId === undefined
+            ? entryState.observerBinding
+            : {
+                ...entryState.observerBinding,
+                identity: () => ({ ...entryState.observerBinding.identity(), orgId })
+              },
+          operation
+        ),
+      getStageBindings: () =>
+        (entryState.stageBindings ??= {
+          backendStages: createStorageObservers(
+            entryState.observerBinding,
+            entryState.storeCell.get
+          ).backend,
+          operationStages: (store) => this.#bindObservers(entryState, store).operation,
+          codecStages: (store) => this.#bindObservers(entryState, store).codec,
+          transactionStages: (store) => this.#bindObservers(entryState, store).transaction,
+          concurrencyStages: (store) => this.#bindObservers(entryState, store).concurrency,
+          sqlStages: (store) => this.#bindObservers(entryState, store).sql,
+          queryStages: (store) => this.#bindObservers(entryState, store).query
+        }),
+      scheduler: this.#scheduler,
+      getKind: () => entryState.kind,
+      setKind: (value) => {
+        entryState.kind = value
+      },
+      storeCell: entryState.storeCell,
+      runInstall: <T>(operation: () => Promise<T>) =>
+        this.#installRunInstall(entryState, operation),
+      isInstallExpired: () => entryState.installExpired,
+      registerStore: (
+        store: Parameters<IStorageNativeRegistrationContext['registerStore']>[0],
+        core: Parameters<IStorageNativeRegistrationContext['registerStore']>[1]
+      ) => this.#installRegisterStore(entryState, store, core)
+    }
+  }
+  /** Project the original native execution, journal and observers for one organization. */
+  #installGetOrgContext(
+    entryState: IStorageInstallEntryContext,
+    orgId: Parameters<IStorageNativeRegistrationContext['getOrgContext']>[0]
+  ): ReturnType<IStorageNativeRegistrationContext['getOrgContext']> {
+    this.#assertRegistration(entryState)
+    assertOperationContext({ orgId })
+    /** Read-only ports point to the same original execution and observer implementations. */
+    const binding = {
+      ...entryState.observerBinding,
+      identity: () => ({ ...entryState.observerBinding.identity(), orgId })
+    }
+    const execution = forwardStorageExecution(
+      this.#inner,
+      entryState.context.assertExecution,
+      () => ({
+        backendId: entryState.native.id,
+        backend: entryState.kind?.name ?? entryState.native.id,
+        orgId
+      }),
+      entryState.context.observeExecution === undefined
+        ? undefined
+        : (describe, invoke) => entryState.context.observeExecution!(orgId, describe, invoke)
+    )
+    const contextForOrg = this.#callContext(entryState, orgId)
+    const observe = (store: IStorageBase) => createStorageObservers(binding, () => store)
+    return {
+      journal: entryState.context.getJournal(orgId),
+      orgId,
+      execution,
+      callContext: contextForOrg,
+      stageBindings: {
+        backendStages: createStorageObservers(binding, entryState.storeCell.get).backend,
+        operationStages: (store) => observe(store).operation,
+        codecStages: (store) => observe(store).codec,
+        transactionStages: (store) => observe(store).transaction,
+        concurrencyStages: (store) => observe(store).concurrency,
+        sqlStages: (store) => observe(store).sql,
+        queryStages: (store) => observe(store).query
+      },
+      createTransactionApi: (scope) =>
+        entryState.storeCell.createOrgTransactionApi(
+          scope,
+          entryState.storeCell.forOrg(orgId, this.#orgId),
+          contextForOrg,
+          execution
+        )
+    }
+  }
+  /** Borrow a committed registration and release its borrowed facts with this installation. */
+  #installGetPublishedBackend(
+    entryState: IStorageInstallEntryContext,
+    id: Parameters<IStorageNativeRegistrationContext['getPublishedBackend']>[0]
+  ): ReturnType<IStorageNativeRegistrationContext['getPublishedBackend']> {
+    /** Original scope admission enforces the install window before any lookup. */
+    let view: ReturnType<typeof borrowStorageBackend> | undefined
+    /** Aliases borrow the source registration's existing facts and release with this borrower. */
+    const releases: Array<() => void> = []
+    entryState.registrationCore!.onDispose(() => {
+      if (view !== undefined) entryState.borrowed?.delete(view)
+      for (const release of releases) release()
+    })
+    /** Current-batch and future stores never enter this committed registry. */
+    const store = this.#registry.get(id)
+    if (store === undefined)
+      throw new StorageError(
+        StorageErrorCode.backendNotInstalled,
+        {},
+        StorageErrorText.backendNotInstalled
+      )
+    /** Its existing context retains the exact original lifecycle and enablement guards. */
+    const source = this.#storeContexts.get(store)!
+    const assertBorrowed = () => {
+      this.#assertRegistration(entryState)
+      source.context.assertCurrent()
+    }
+    view = borrowStorageBackend(store, assertBorrowed)
+    releases.push(registerBackendEntityAccess(view, store, assertBorrowed))
+    releases.push(
+      registerBackendEnvelopeStages(
+        view,
+        (operation) => source.context.getEnvelopeStages(operation),
+        () => source.context.storeCell.getChainMethods('query')
+      )
+    )
+    const controller = getBackendChangeController(store)
+    if (controller !== undefined) releases.push(registerBackendChangeController(view, controller))
+    ;(entryState.borrowed ??= new Map()).set(view, store)
+    return view as ReturnType<IStoragePluginCore['getPublishedBackend']>
+  }
+  /** Run original checks in registration order and retain their pending work for disposal. */
+  async #installRunDetect(
+    entryState: IStorageInstallEntryContext
+  ): ReturnType<IStorageNativeRegistrationContext['runDetect']> {
+    this.#assertRegistration(entryState)
+    /** Timings describe one backend's real checks without adding a check deadline. */
+    const startedAt = this.#scheduler.now()
+    /** Read the original registration signal, which seals with the resource owner. */
+    const signal = entryState.registrationCore!.lifecycle.signal
+    /** Only checks actually invoked contribute to the fixed observation payload. */
+    let checkCount = 0
+    this.#events.emit(Hook.beforeDetect, entryState.observerBinding.identity)
+    try {
+      for (const entry of entryState.checks) {
+        this.#assertOpen()
+        this.#assertRegistration(entryState)
+        checkCount += 1
+        entry.pending = Promise.resolve().then(() => entry.check(signal))
+        try {
+          await entry.pending
+        } finally {
+          entry.pending = undefined
+        }
+      }
+      this.#assertOpen()
+      if (this.#events.hasListeners(Hook.afterDetect))
+        this.#events.emit(Hook.afterDetect, () => ({
+          ...entryState.observerBinding.identity(),
+          checkCount,
+          elapsedMs: Math.max(0, this.#scheduler.now() - startedAt)
+        }))
+    } catch (error) {
+      if (this.#events.hasListeners(Hook.onDetectError))
+        this.#events.emit(Hook.onDetectError, () => ({
+          ...entryState.observerBinding.identity(),
+          code: readStorageHookFailureCode(error, this.#report)
+        }))
+      throw error
+    }
+  }
+  /** Apply the original batch deadline to one native installation and drain accepted checks. */
+  async #installRunInstall<T>(
+    entryState: IStorageInstallEntryContext,
+    operation: () => Promise<T>
+  ): Promise<T> {
+    if (entryState.kind !== undefined) {
+      this.#events.emit(Hook.beforeBackendPluginInstall, entryState.observerBinding.identity)
+      this.#events.emit(Hook.beforeBackendCreate, entryState.observerBinding.identity)
+    }
+    /** Consume the original batch deadline instead of resetting it per backend. */
+    const elapsed = Math.max(
+      0,
+      this.#scheduler.now() - entryState.installState.batchToken.startedAt
+    )
+    /** Observe the actual native work even when timeout wins first. */
+    const pending = operation()
+    /** Distinguish an operation failure from work still running after expiry. */
+    let operationSettled = false
+    void pending.then(
+      () => {
+        operationSettled = true
+      },
+      () => {
+        operationSettled = true
+      }
+    )
+    try {
+      /** The complete original install hook includes selected Feature publication. */
+      const installed = await this.#awaitInstall(
+        pending,
+        entryState.installState.batchToken,
+        elapsed
+      )
+      /**
+       * Register last in the original install window so accepted checks drain before any resource
+       * they may inspect, even when a Feature registered them before the store.
+       */
+      entryState.registrationCore!.onDispose(async () => {
+        for (const entry of entryState.checks) await entry.pending?.catch(this.#report)
+      })
+      if (entryState.kind !== undefined) {
+        this.#events.emit(Hook.afterBackendPluginInstall, entryState.observerBinding.identity)
+        this.#events.emit(Hook.afterBackendInstall, entryState.observerBinding.identity)
+      }
+      return installed
+    } catch (error) {
+      entryState.installExpired = !operationSettled
+      if (entryState.kind !== undefined) {
+        if (this.#events.hasListeners(Hook.onBackendRejected))
+          this.#events.emit(Hook.onBackendRejected, () => ({
+            ...entryState.observerBinding.identity(),
+            code: readStorageHookFailureCode(error, this.#report)
+          }))
+        if (this.#events.hasListeners(Hook.onBackendPluginInstallError))
+          this.#events.emit(Hook.onBackendPluginInstallError, () => ({
+            ...entryState.observerBinding.identity(),
+            code: readStorageHookFailureCode(error, this.#report)
+          }))
+      }
+      throw error
+    }
+  }
+  /** Admit one native store and hand its original disposer and identity to PluginHost. */
+  #installRegisterStore(
+    entryState: IStorageInstallEntryContext,
+    store: Parameters<IStorageNativeRegistrationContext['registerStore']>[0],
+    core: Parameters<IStorageNativeRegistrationContext['registerStore']>[1]
+  ): ReturnType<IStorageNativeRegistrationContext['registerStore']> {
+    /** Use contract-owned admission and its captured original disposal receiver. */
+    const snapshot = snapshotStorageBaseDetailed(store, { asyncDisposeKey })
+    if (!snapshot.valid)
+      throw createStorageTypeError(
+        StorageErrorCode.backendPluginInvalid,
+        StorageErrorText.backendPluginInvalid,
+        snapshot.cause
+      )
+    if (
+      !entryState.installState.batchToken.active ||
+      this.#activeBatchToken !== entryState.installState.batchToken
+    ) {
+      void this.#disposeLateStore(snapshot)
+      throw new StorageError(
+        StorageErrorCode.storageHostDisposed,
+        {},
+        StorageErrorText.storageHostDisposed
+      )
+    }
+    try {
+      core.onDispose(() => {
+        this.#events.emit(Hook.onBackendDisposeStart, entryState.observerBinding.identity)
+        /** The original captured disposer retains its receiver and one cleanup execution. */
+        const disposed = snapshot.store.dispose()
+        if (!this.#events.hasListeners(Hook.afterBackendDispose)) return disposed
+        return Promise.resolve(disposed).then(() =>
+          this.#events.emit(Hook.afterBackendDispose, entryState.observerBinding.identity)
+        )
+      })
+    } catch (error) {
+      void this.#disposeLateStore(snapshot)
+      throw error
+    }
+    if (entryState.kind === undefined || snapshot.backend !== entryState.kind.name)
+      throw createStorageTypeError(
+        StorageErrorCode.backendKindMismatch,
+        StorageErrorText.backendKindMismatch
+      )
+    /** Every admitted base, including frozen raw stores, shares this host's observer owner. */
+    let releaseEnvelope: (() => void) | undefined
+    core.onDispose(() => releaseEnvelope?.())
+    releaseEnvelope = registerBackendEnvelopeStages(
+      snapshot.store,
+      entryState.context.getEnvelopeStages,
+      () => entryState.context.storeCell.getChainMethods('query')
+    )
+    entryState.storeCell.set(snapshot.store)
+    this.#events.emit(Hook.afterBackendCreate, entryState.observerBinding.identity)
   }
 }
 
@@ -1727,15 +1825,15 @@ export function createStorageHost<
 export async function createStorageHost<
   const TPlugins extends readonly IStorageBackendPluginHandle[] = readonly []
 >(options?: IStorageHostCreateOptions<TPlugins>): Promise<IStorageHost<TPlugins>> {
-  /** Read constructor options once before any plugin can execute. */
-  const optionsSnapshot = snapshotStorageHostCreateOptions(options)
-  /** The storage facade retains the one canonical native lifecycle owner. */
-  const facade = new StorageHostFacade(optionsSnapshot.hostOptions)
-  /** Capture the literal initial tuple before installation can begin. */
-  const plugins = optionsSnapshot.plugins
+  /** Constructor options are consumed synchronously before plugin installation can yield. */
+  const facade = new StorageHostFacade(options)
+  /** Rest arguments detach the initial plugin list before installation begins. */
+  const plugins = options?.plugins
+  /** Detection selection must remain stable while native installation awaits. */
+  const autoDetect = options?.autoDetect
   try {
     if (plugins !== undefined && plugins.length > 0) await facade.use(...(plugins as TPlugins))
-    if (optionsSnapshot.hostOptions.autoDetect !== false) await facade.detect()
+    if (autoDetect !== false) await facade.detect()
     return facade as unknown as IStorageHost<TPlugins>
   } catch (error) {
     try {

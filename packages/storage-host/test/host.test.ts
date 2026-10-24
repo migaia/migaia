@@ -327,27 +327,23 @@ describe('neutral storage installation', () => {
       else expect(report).not.toHaveBeenCalled()
     }
   )
-  it('uses the single captured disposer when a late store loses its batch', async () => {
+  it('disposes the original receiver when a late store loses its batch', async () => {
     /** Pause the actual install before its ownership handoff. */
     const entered = deferred<void>()
     /** Resume only after the host has sealed the original batch. */
     const resume = deferred<void>()
-    /** A changing getter would select the wrong cleanup if admission were repeated. */
-    let reads = 0
     /** This is the original function and receiver captured by the successful base snapshot. */
     const original = vi.fn(function (this: IStorageBase) {
       expect(this.backend).toBe('late')
       return Promise.resolve()
     })
-    /** A second read must never replace the original captured disposer. */
-    const replacement = vi.fn(() => Promise.resolve())
     /** The test observes expected late rejection diagnostics without changing cleanup. */
     const report = vi.fn()
     /** The kind and returned store agree; only the closing batch invalidates handoff. */
     const lateKind = defineStorageBackendKind<IStorageBase>()('late')
     /** One host owns the actual asynchronous install and its cancellation signal. */
     const host = new StorageHostFacade({ report })
-    /** The getter is legal input to contract single-read admission. */
+    /** Late native handoff keeps the original resource receiver. */
     const store: IStorageBase = {
       backend: 'late',
       capabilities: {
@@ -361,10 +357,7 @@ describe('neutral storage installation', () => {
         maxValueBytes: undefined,
         opaqueEntries: false
       },
-      get dispose() {
-        reads += 1
-        return reads === 1 ? original : replacement
-      },
+      dispose: original,
       [Symbol.asyncDispose]: () => Promise.resolve()
     }
     /** The backend returns its actual resource after its original install has expired. */
@@ -386,8 +379,6 @@ describe('neutral storage installation', () => {
     await installing
     resume.resolve()
     await closing
-    expect(reads).toBe(1)
     expect(original).toHaveBeenCalledTimes(1)
-    expect(replacement).not.toHaveBeenCalled()
   })
 })

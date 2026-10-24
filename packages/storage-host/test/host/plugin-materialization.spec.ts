@@ -6,7 +6,6 @@ import {
   createStorageHost,
   definePlugin,
   defineStorageBackendKind,
-  StorageHostFacade,
   STORAGE_HOST_SOURCE,
   type IStoragePluginCore
 } from '../../src/index.js'
@@ -29,7 +28,7 @@ const deferred = <T>() => {
 /** Builds a store whose disposer requires the original receiver and private state. */
 const createReceiverDependentStore = async () => {
   const source = await memoryBackend()
-  const counts = { getterReads: 0, calls: 0 }
+  const counts = { calls: 0 }
   class ReceiverDependentStore {
     /** Tracks whether this store has already completed its one allowed disposal. */
     #disposed = false
@@ -45,17 +44,11 @@ const createReceiverDependentStore = async () => {
 
     /** Symbolic cleanup follows the same private-state owner without re-reading dispose. */
     [Symbol.asyncDispose](): Promise<void> {
-      return this.disposeMethod().catch(() => {})
-    }
-
-    /** Counts hostile getter reads while returning the method that needs this receiver. */
-    get dispose(): () => Promise<void> {
-      counts.getterReads += 1
-      return this.disposeMethod
+      return this.dispose().catch(() => {})
     }
 
     /** Uses private state to prove cleanup was invoked with this exact store receiver. */
-    disposeMethod(): Promise<void> {
+    dispose(): Promise<void> {
       if (this.#disposed) return Promise.resolve()
       this.#disposed = true
       counts.calls += 1
@@ -110,109 +103,22 @@ describe('PluginHost materialization', () => {
     await host.dispose()
   })
 
-  it('snapshots a hostile store once before publication and leaves failed batches absent', async () => {
-    const source = await memoryBackend()
-    let backendReads = 0
-    const hostileStore = Object.create(source) as IKeyValueStore
-    Object.defineProperty(hostileStore, 'backend', {
-      configurable: true,
-      enumerable: true,
-      get: () => {
-        backendReads += 1
-        if (backendReads > 1) throw new Error('post-commit backend reread')
-        return source.backend
-      }
-    })
-    const plugin = definePlugin('hostile', (core: IStoragePluginCore) => ({
-      kind,
-      featureExpose: () => ({ getClient: () => undefined }),
-      install: () => {
-        core.registerStore(hostileStore)
-        return {}
-      }
-    }))
-    const host = await createStorageHost({ plugins: [plugin] as const })
-    expect(backendReads).toBe(1)
-    expect(host.backend('hostile')).toBe(hostileStore)
-    await host.dispose()
-  })
-
-  it('retains the exact cause from a hostile contract accessor as native coded TypeError', async () => {
-    const source = await memoryBackend()
-    const cause = new Error('capabilities accessor failure')
-    const hostileStore = Object.create(source) as IKeyValueStore
-    Object.defineProperty(hostileStore, 'capabilities', {
-      configurable: true,
-      enumerable: true,
-      get: () => {
-        throw cause
-      }
-    })
-    const plugin = definePlugin('hostile-cause', (core: IStoragePluginCore) => ({
-      kind,
-      featureExpose: () => ({ getClient: () => undefined }),
-      install: () => {
-        core.registerStore(hostileStore)
-        return {}
-      }
-    }))
-    const host = await createStorageHost()
-    const failure = (await host.use(plugin).catch((error: unknown) => error)) as {
-      readonly cause?: { readonly cause?: unknown }
-    }
-    expect(failure.cause?.cause).toBeInstanceOf(TypeError)
-    expect(failure.cause?.cause).toMatchObject({
-      source: STORAGE_HOST_SOURCE,
-      code: 'BACKEND_PLUGIN_INVALID'
-    })
-    const nativeFailure = failure.cause?.cause
-    expect((nativeFailure as Error).cause).toBe(cause)
-    await host.dispose()
-  })
-
-  it('snapshots Host option getters once with exact native causes', () => {
-    const optionsCause = new Error('Host option accessor failure')
-    const options = Object.defineProperty({}, 'installTimeoutMs', {
-      configurable: true,
-      get: () => {
-        throw optionsCause
-      }
-    })
-    let optionsError: unknown
-    try {
-      new StorageHostFacade(options as never)
-    } catch (error) {
-      optionsError = error
-    }
-    expect(optionsError).toBeInstanceOf(TypeError)
-    expect(optionsError).toMatchObject({
-      source: STORAGE_HOST_SOURCE,
-      code: 'BACKEND_PLUGIN_INVALID'
-    })
-    expect((optionsError as Error).cause).toBe(optionsCause)
-  })
-
-  it('uses the captured disposer exactly once during rollback and Host disposal', async () => {
+  it('disposes each original store once during rollback and Host disposal', async () => {
     const rollbackStore = await memoryBackend()
-    let rollbackGetterReads = 0
     let rollbackCalls = 0
-    const hostileRollbackStore = Object.create(rollbackStore) as IKeyValueStore
-    Object.defineProperty(hostileRollbackStore, 'dispose', {
-      configurable: true,
-      enumerable: true,
-      get: () => {
-        rollbackGetterReads += 1
-        return async () => {
-          rollbackCalls += 1
-          await rollbackStore.dispose()
-        }
+    const nativeRollbackStore = {
+      ...rollbackStore,
+      dispose: async () => {
+        rollbackCalls += 1
+        await rollbackStore.dispose()
       }
-    })
+    }
+
     const rollback = definePlugin('captured-rollback', (core: IStoragePluginCore) => ({
       kind,
       featureExpose: () => ({ getClient: () => undefined }),
       install: () => {
-        core.registerStore(hostileRollbackStore)
+        core.registerStore(nativeRollbackStore)
         return {}
       }
     }))
@@ -225,36 +131,29 @@ describe('PluginHost materialization', () => {
     await expect(host.use(rollback, throws)).rejects.toMatchObject({
       code: 'BACKEND_INSTALL_FAILED'
     })
-    expect(rollbackGetterReads).toBe(1)
     expect(rollbackCalls).toBe(1)
     await host.dispose()
 
     const disposeStore = await memoryBackend()
-    let disposeGetterReads = 0
     let disposeCalls = 0
-    const hostileDisposeStore = Object.create(disposeStore) as IKeyValueStore
-    Object.defineProperty(hostileDisposeStore, 'dispose', {
-      configurable: true,
-      enumerable: true,
-      get: () => {
-        disposeGetterReads += 1
-        return async () => {
-          disposeCalls += 1
-          await disposeStore.dispose()
-        }
+    const nativeDisposeStore = {
+      ...disposeStore,
+      dispose: async () => {
+        disposeCalls += 1
+        await disposeStore.dispose()
       }
-    })
+    }
+
     const installed = definePlugin('captured-dispose', (core: IStoragePluginCore) => ({
       kind,
       featureExpose: () => ({ getClient: () => undefined }),
       install: () => {
-        core.registerStore(hostileDisposeStore)
+        core.registerStore(nativeDisposeStore)
         return {}
       }
     }))
     const installedHost = await createStorageHost({ plugins: [installed] as const })
     await installedHost.dispose()
-    expect(disposeGetterReads).toBe(1)
     expect(disposeCalls).toBe(1)
   })
 
@@ -476,9 +375,7 @@ describe('PluginHost materialization', () => {
     const direct = await createReceiverDependentStore()
     const directAdmission = snapshotStorageBaseDetailed(direct.store)
     expect(directAdmission.valid).toBe(true)
-    if (directAdmission.valid)
-      await Reflect.apply(directAdmission.dispose, directAdmission.receiver, [])
-    expect(direct.counts.getterReads).toBe(1)
+    if (directAdmission.valid) await directAdmission.store.dispose()
     expect(direct.counts.calls).toBe(1)
 
     const hostOwned = await createReceiverDependentStore()
@@ -492,7 +389,6 @@ describe('PluginHost materialization', () => {
     }))
     const host = await createStorageHost({ plugins: [plugin] as const })
     await host.dispose()
-    expect(hostOwned.counts.getterReads).toBe(1)
     expect(hostOwned.counts.calls).toBe(1)
   })
 
