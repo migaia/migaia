@@ -276,6 +276,17 @@ const indexedDbFields: Readonly<Record<string, IMemberDoc>> = {
 
 /** A fixed Cookie scope is reused for writes and removals. */
 const cookieFields: Readonly<Record<string, IMemberDoc>> = {
+  redo: {
+    summary: t(
+      'Selects visible-cookie WAL drafts through the original text transaction owner.',
+      '通过原文本事务拥有者选择可见 Cookie WAL draft。'
+    ),
+    default: t('Omitted; ordinary cookie semantics remain.', '省略时保持普通 Cookie 语义。'),
+    whenToUse: t(
+      'Requires native Web Locks and the exact selected original WAL shared by every participant. maxAge resolves to one absolute expiry before WAL begin; replay never renews it.',
+      '要求原生 Web Locks 及所有参与者共享的选定原 WAL；maxAge 在 WAL begin 前解析为绝对期限，重放不续期。'
+    )
+  },
   namespace: webStorageFields('localStorage').namespace!,
   namespaceCodec: webStorageFields('localStorage').namespaceCodec!,
   document: {

@@ -27,3 +27,13 @@ async function textRedoScope(store: ILocalStorageBackendStore) {
   })
 }
 void textRedoScope
+
+/** The cookie native option does not widen its authenticated text-only transaction scope. */
+async function cookieRedoScope(store: ICookieBackendStore) {
+  await store.transaction(async (scope) => {
+    await scope.use(kv).set('key', 'visible')
+    // @ts-expect-error Cookie transactions have no records family.
+    scope.use(records)
+  })
+}
+void cookieRedoScope

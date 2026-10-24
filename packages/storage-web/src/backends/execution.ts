@@ -1,4 +1,5 @@
 import type { IStorageBase, IOperationContext, ILockKey } from '@migaia/storage-contract'
+import { lockKey } from '@migaia/storage-contract'
 import type { IBackendRuntime } from './construction.js'
 import { storageBackendOperation } from '../constants.js'
 
@@ -29,6 +30,13 @@ const syncEndpoints = { get: 1, set: 2, remove: 1, has: 1, keys: 0, clearValues:
 
 /** Native metadata remains a separate existing group with its original context slots. */
 const metadataEndpoints = { get: 1, set: 2, delete: 1 } as const
+
+/** Text-only native backends supply their canonical scalar facts after pipeline input capture. */
+export const textExecutionKeys = (name: string, args: readonly unknown[]): readonly ILockKey[] =>
+  (name === 'get' || name === 'set' || name === 'remove' || name === 'has') &&
+  typeof args[0] === 'string'
+    ? [lockKey.text(args[0])]
+    : []
 
 /**
  * Attach the host's existing execution boundary to concrete browser methods. This mutates the

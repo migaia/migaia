@@ -59,7 +59,7 @@ export type ITextRedoStore = {
   tx(): ITransactionBuilder<ITextRedoScope>
 }
 /** One native assignment is encoded and validated before the original WAL begin. */
-type ITextPrepared = {
+export type ITextPrepared = {
   readonly value: string | null
   readonly image: unknown
   readonly apply: () => void
@@ -72,6 +72,8 @@ type ITextRedoInput = {
   readonly runtime: IBackendRuntime
   readonly controller: IBackendChangeController
   readonly read: (key: IStorageKey) => string | null
+  /** Native snapshot backends may read all missing draft keys from one original header. */
+  readonly readMany?: (keys: readonly IStorageKey[]) => readonly (string | undefined)[]
   readonly keys: () => readonly IStorageKey[]
   readonly prepare: (key: IStorageKey, value: string | null) => ITextPrepared
   readonly replay: (key: IStorageKey, image: unknown, present: boolean) => () => void
@@ -156,7 +158,8 @@ export function createTextRedo(input: ITextRedoInput) {
     run: (scope: ITextRedoScope) => R,
     options?: ITransactionOptions,
     pipeline = true,
-    keys?: readonly ILockKey[]
+    keys?: readonly ILockKey[],
+    prepare: ITextRedoInput['prepare'] = input.prepare
   ): Promise<Awaited<R>> => {
     controller.assertLive()
     assertTransactionCallback(run, backend)
@@ -209,7 +212,7 @@ export function createTextRedo(input: ITextRedoInput) {
                       }
                       const stage = (key: IStorageKey, value: string | null): void => {
                         const before = read(key)
-                        const prepared = input.prepare(key, value)
+                        const prepared = prepare(key, value)
                         const after = encodeStorageJournalImage(
                           prepared.value !== null,
                           prepared.image
@@ -283,11 +286,21 @@ export function createTextRedo(input: ITextRedoInput) {
                               if (read(key) !== null) stage(key, null)
                             }),
                           getMany: (keys) =>
-                            operation('getMany', keys, (keys) =>
-                              snapshotStorageBatchKeys(keys, backend).map(
-                                ({ key }) => read(key) ?? undefined
-                              )
-                            ),
+                            operation('getMany', keys, (keys) => {
+                              const captured = snapshotStorageBatchKeys(keys, backend)
+                              if (input.readMany !== undefined) {
+                                const missing = captured.filter(
+                                  ({ key }) => !values.has(encodeFlatStorageKey(key))
+                                )
+                                const native = input.readMany(missing.map(({ key }) => key))
+                                for (let index = 0; index < missing.length; index++)
+                                  values.set(
+                                    encodeFlatStorageKey(missing[index]!.key),
+                                    native[index] ?? null
+                                  )
+                              }
+                              return captured.map(({ key }) => read(key) ?? undefined)
+                            }),
                           setMany: (entries) =>
                             operation('setMany', entries, (entries) => {
                               for (const { key, value } of snapshotBrowserBatchEntries(
@@ -428,8 +441,9 @@ export function createTextRedo(input: ITextRedoInput) {
     write: <R>(
       keys: readonly ILockKey[],
       context: IWriteOptions | undefined,
-      run: (scope: ITextRedoScope) => R
-    ) => transaction(run, context, false, keys),
+      run: (scope: ITextRedoScope) => R,
+      prepare?: ITextRedoInput['prepare']
+    ) => transaction(run, context, false, keys, prepare),
     binding: (forOrg: IStorageJournalBackendBinding['forOrg']): IStorageJournalBackendBinding => ({
       forOrg,
       openNamespace: async () => unsupported(),

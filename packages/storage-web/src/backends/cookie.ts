@@ -1,8 +1,18 @@
-import { bindBrowserExecution } from './execution.js'
+import { createTextRedo, type ITextPrepared, type ITextRedoStore } from './text-redo.js'
+import { bindBrowserExecution, textExecutionKeys } from './execution.js'
 import { createBrowserOrgBinding } from './organizations.js'
 import { resolveStorageNamespace } from '@migaia/storage-host/authoring/backend'
-import { createTextBatchApi } from './batch.js'
-import { implement, kv, type IStorageChange, type IStorageStore } from '@migaia/storage-contract'
+import { createTextBatchApi, BrowserBatchMethod } from './batch.js'
+import {
+  implement,
+  kv,
+  lockKey,
+  snapshotStorageBatchKeys,
+  StorageContractError,
+  StorageContractErrorCode,
+  type IStorageChange,
+  type IStorageStore
+} from '@migaia/storage-contract'
 import { snapshotOperationContext, snapshotSyncWriteOptions } from '@migaia/storage-contract'
 import { throwIfAborted, withAbort } from '@migaia/storage-host/authoring/backend'
 import {
@@ -21,7 +31,7 @@ import {
 import { StorageError, StorageErrorCode, createStorageTypeError } from '../types/errors.js'
 import { StorageErrorText } from '../error-text.js'
 import { normalizeStorageException } from '../utils/quota.js'
-import { StorageBackend, StorageOperation } from '../constants.js'
+import { StorageBackend, StorageOperation, storageBackendOperation } from '../constants.js'
 import { assertValueSnapshot, withNativeValueWrite } from './native-value-write.js'
 import type {
   ICookieRemoveContext,
@@ -75,6 +85,8 @@ export type ICookieDocument = {
 export type ICookiesOptions = {
   /** Prefixes keys to isolate instances and applications. Defaults to `default`. */
   readonly namespace?: string
+  /** Explicitly select the original WAL-backed visible-cookie draft. */
+  readonly redo?: true
   /** Customizes physical key encoding. Changing the codec changes the cookie persistence format. */
   readonly namespaceCodec?: INamespaceCodec
   /**
@@ -107,7 +119,7 @@ const withCookieAbort = async <T>(
 /** Snapshot lifecycle and cookie-specific write fields before cancellation or serialization. */
 const snapshotCookieWriteContext = (
   context: ICookieWriteContext | undefined,
-  key: string
+  key: IStorageKey
 ): ICookieWriteContextSnapshot | undefined => {
   const lifecycle = snapshotOperationContext(context)
   if (context === undefined) return undefined
@@ -201,7 +213,7 @@ export const cookiesHost = (
   runtime: IBackendRuntime,
   bindOrganizations = true
 ): IBackendConstruction<
-  IKeyValueBackendStore<ISyncCapableStore<ICookieStore>>,
+  IKeyValueBackendStore<ISyncCapableStore<ICookieStore> & ITextRedoStore>,
   ICookieDocument
 > => {
   if (options === null || typeof options !== 'object' || Array.isArray(options))
@@ -213,17 +225,24 @@ export const cookiesHost = (
   let configuredNamespaceCodec: unknown
   let configuredScope: unknown
   let configuredDocument: unknown
+  let configuredRedo: unknown
   try {
     configuredNamespace = options.namespace
     configuredNamespaceCodec = options.namespaceCodec
     configuredScope = options.scope
     configuredDocument = options.document
+    configuredRedo = options.redo
   } catch (cause) {
     throw new StorageError(StorageErrorCode.invalidConfig, {
       backend: StorageBackend.cookie,
       cause
     })
   }
+  const redoEnabled = configuredRedo === true
+  if (configuredRedo !== undefined && !redoEnabled)
+    throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
+      backend: StorageBackend.cookie
+    })
   const namespace = configuredNamespace === undefined ? 'default' : configuredNamespace
   const namespaceCodecCandidate =
     configuredNamespaceCodec === undefined ? lengthPrefixedNamespaceCodec : configuredNamespaceCodec
@@ -391,6 +410,136 @@ export const cookiesHost = (
     if (entries.length > 0) publishChange({ channel: 'value', kind: 'clear' })
   }
 
+  /** Prepare one visible-cookie assignment before WAL; ordinary sync writes use the same validation. */
+  const prepareCookie = (
+    key: IStorageKey,
+    value: string | null,
+    ctx?: ICookieWriteContext,
+    behavior?: {
+      readonly notify?: boolean
+      readonly durable?: true
+      readonly remove?: true
+      readonly encode?: () => string
+    }
+  ): ITextPrepared => {
+    const notify = behavior?.notify !== false
+    const durable = behavior?.durable === true
+    if (value === null && behavior?.remove) {
+      const physicalKey = namespacedStorageKey(
+        namespace,
+        key,
+        namespaceCodec,
+        StorageBackend.cookie
+      )
+      const visible = readVisibleCookie(physicalKey, StorageOperation.cookieRemove, key)
+      const assignment = serializeCookieRemoval(physicalKey, scope)
+      return {
+        value: null,
+        image: undefined,
+        apply: () => {
+          writeCookie(assignment, StorageOperation.cookieRemove, key)
+          if (notify && visible !== undefined)
+            publishChange({ channel: 'value', kind: 'remove', keys: [key] })
+        }
+      }
+    }
+    assertLive()
+    const context = snapshotCookieWriteContext(ctx, key)
+    snapshotSyncWriteOptions(context)
+    if (typeof value !== 'string')
+      throw new StorageError(StorageErrorCode.invalidConfig, {
+        backend: StorageBackend.cookie,
+        key,
+        cause: new TypeError(StorageErrorText.cookieValueInvalid)
+      })
+    const physicalKey =
+      behavior?.encode?.() ??
+      namespacedStorageKey(namespace, key, namespaceCodec, StorageBackend.cookie)
+    /** Snapshot mutable/getter-backed context fields before validation and serialization. */
+    const maxAge = context?.maxAge
+    const expires = context?.expires
+    if (maxAge !== undefined && !Number.isSafeInteger(maxAge))
+      throw new StorageError(StorageErrorCode.invalidConfig, {
+        backend: StorageBackend.cookie,
+        key,
+        cause: new RangeError(StorageErrorText.cookieMaxAgeInvalid)
+      })
+    if (expires !== undefined && (typeof expires !== 'object' || expires === null))
+      throw new StorageError(StorageErrorCode.invalidConfig, {
+        backend: StorageBackend.cookie,
+        key,
+        cause: new RangeError(StorageErrorText.cookieExpiresInvalid)
+      })
+    /** Read a Date-like value once so validation and serialization cannot observe different times. */
+    let expiresTime: number | undefined
+    try {
+      expiresTime =
+        expires === undefined
+          ? undefined
+          : ((expires as { getTime(): unknown }).getTime() as number)
+    } catch (cause) {
+      throw new StorageError(StorageErrorCode.invalidConfig, {
+        backend: StorageBackend.cookie,
+        key,
+        cause
+      })
+    }
+    if (expiresTime !== undefined && !Number.isFinite(expiresTime))
+      throw new StorageError(StorageErrorCode.invalidConfig, {
+        backend: StorageBackend.cookie,
+        key,
+        cause: new RangeError(StorageErrorText.cookieExpiresInvalid)
+      })
+    const expiresNow =
+      maxAge !== undefined ? maxAge <= 0 : expiresTime !== undefined && expiresTime <= Date.now()
+    /** Relative expiry becomes one absolute native date so replay never renews a failed write. */
+    const deadline =
+      !durable || maxAge === undefined ? expiresTime : expiresNow ? 0 : Date.now() + maxAge * 1000
+    if (durable && deadline !== undefined && !Number.isFinite(new Date(deadline).getTime()))
+      throw new StorageContractError(StorageContractErrorCode.unsupported, {
+        backend: StorageBackend.cookie,
+        key
+      })
+    const visibleBefore = readVisibleCookie(physicalKey, StorageOperation.cookieSet, key)
+    const assignment = expiresNow
+      ? serializeCookieRemoval(physicalKey, scope)
+      : serializeCookieAssignment(physicalKey, value, {
+          ...scope,
+          expires: deadline === undefined ? undefined : new Date(deadline),
+          maxAge: durable ? undefined : maxAge
+        })
+    return {
+      value: expiresNow ? null : value,
+      image: { value, ...(deadline === undefined ? {} : { expiresAt: deadline }) },
+      apply: () => {
+        writeCookie(assignment, StorageOperation.cookieSet, key)
+        const visible = readVisibleCookie(physicalKey, StorageOperation.cookieSet, key)
+        if (expiresNow && visible === undefined) {
+          if (notify && visibleBefore !== undefined)
+            publishChange({ channel: 'value', kind: 'remove', keys: [key] })
+          return
+        }
+        if (!expiresNow && visible === value) {
+          if (notify) publishChange({ channel: 'value', kind: 'put', keys: [key] })
+          return
+        }
+        if (visible !== undefined)
+          throw new StorageError(StorageErrorCode.cookieScopeAmbiguous, {
+            backend: StorageBackend.cookie,
+            key,
+            operation: StorageOperation.cookieSet,
+            cause: new Error(StorageErrorText.cookieRedoScopeMismatch)
+          })
+        throw new StorageError(StorageErrorCode.writeFailed, {
+          backend: StorageBackend.cookie,
+          key,
+          operation: StorageOperation.cookieSet,
+          cause: new Error(StorageErrorText.cookieRedoWriteInvisible)
+        })
+      }
+    }
+  }
+
   const sync: ISyncCookieStore = {
     get: (key) => {
       assertLive()
@@ -403,88 +552,9 @@ export const cookiesHost = (
       )
     },
     set: (key, value, ctx) => {
-      assertLive()
-      const context = snapshotCookieWriteContext(ctx, key)
-      snapshotSyncWriteOptions(context)
-      if (typeof value !== 'string')
-        throw new StorageError(StorageErrorCode.invalidConfig, {
-          backend: StorageBackend.cookie,
-          key,
-          cause: new TypeError('cookie value must be a string')
-        })
-      const physicalKey = namespacedKey(namespace, key, namespaceCodec, StorageBackend.cookie)
-      /** Snapshot mutable/getter-backed context fields before validation and serialization. */
-      const maxAge = context?.maxAge
-      const expires = context?.expires
-      if (maxAge !== undefined && !Number.isSafeInteger(maxAge))
-        throw new StorageError(StorageErrorCode.invalidConfig, {
-          backend: StorageBackend.cookie,
-          key,
-          cause: new RangeError('cookie maxAge must be a safe integer')
-        })
-      if (expires !== undefined && (typeof expires !== 'object' || expires === null))
-        throw new StorageError(StorageErrorCode.invalidConfig, {
-          backend: StorageBackend.cookie,
-          key,
-          cause: new RangeError('cookie expires must be a valid Date')
-        })
-      /** Read a Date-like value once so validation and serialization cannot observe different times. */
-      let expiresTime: number | undefined
-      try {
-        expiresTime =
-          expires === undefined
-            ? undefined
-            : ((expires as { getTime(): unknown }).getTime() as number)
-      } catch (cause) {
-        throw new StorageError(StorageErrorCode.invalidConfig, {
-          backend: StorageBackend.cookie,
-          key,
-          cause
-        })
-      }
-      if (expiresTime !== undefined && !Number.isFinite(expiresTime))
-        throw new StorageError(StorageErrorCode.invalidConfig, {
-          backend: StorageBackend.cookie,
-          key,
-          cause: new RangeError('cookie expires must be a valid Date')
-        })
-      const expiresNow =
-        maxAge !== undefined ? maxAge <= 0 : expiresTime !== undefined && expiresTime <= Date.now()
-      const visibleBefore = readVisibleCookie(physicalKey, StorageOperation.cookieSet, key)
-      writeCookie(
-        expiresNow
-          ? serializeCookieRemoval(physicalKey, scope)
-          : serializeCookieAssignment(physicalKey, value, {
-              ...scope,
-              expires: expiresTime === undefined ? undefined : new Date(expiresTime),
-              maxAge
-            }),
-        StorageOperation.cookieSet,
-        key
-      )
-      const visible = readVisibleCookie(physicalKey, StorageOperation.cookieSet, key)
-      if (expiresNow && visible === undefined) {
-        if (visibleBefore !== undefined)
-          publishChange({ channel: 'value', kind: 'remove', keys: [key] })
-        return
-      }
-      if (!expiresNow && visible === value) {
-        publishChange({ channel: 'value', kind: 'put', keys: [key] })
-        return
-      }
-      if (visible !== undefined)
-        throw new StorageError(StorageErrorCode.cookieScopeAmbiguous, {
-          backend: StorageBackend.cookie,
-          key,
-          operation: StorageOperation.cookieSet,
-          cause: new Error('same cookie name remains visible from an unknown scope')
-        })
-      throw new StorageError(StorageErrorCode.writeFailed, {
-        backend: StorageBackend.cookie,
-        key,
-        operation: StorageOperation.cookieSet,
-        cause: new Error('cookie write was not visible in the active scope')
-      })
+      prepareCookie(key, value, ctx, {
+        encode: () => namespacedKey(namespace, key, namespaceCodec, StorageBackend.cookie)
+      }).apply()
     },
     remove: (key) => {
       assertLive()
@@ -515,6 +585,108 @@ export const cookiesHost = (
     }
   }
 
+  /** One native header snapshot supplies ordinary and redo batch reads through the same parser. */
+  const readCookieBatch = (
+    keys: readonly import('@migaia/storage-contract').IStorageBatchKey[],
+    operation: string
+  ): readonly (string | undefined)[] => {
+    assertLive()
+    /** Typed codec admission completes before reading the visible cookie snapshot. */
+    const physical = keys.map(({ key }) =>
+      namespacedStorageKey(namespace, key, namespaceCodec, StorageBackend.cookie)
+    )
+    /** One header snapshot supplies all requested results without per-key public reads. */
+    const visible = new Map<string, string>()
+    /** Duplicate visible names retain the original fixed-scope ambiguity failure. */
+    const ambiguous = new Set<string>()
+    for (const [key, value] of parseCookieEntries(readCookie(operation))) {
+      if (visible.has(key)) ambiguous.add(key)
+      visible.set(key, value)
+    }
+    /** Canonical duplicate positions reuse the first result from this one header. */
+    const values: (string | undefined)[] = []
+    for (let index = 0; index < keys.length; index += 1) {
+      const entry = keys[index]!
+      if (entry.firstIndex !== index) {
+        values.push(values[entry.firstIndex])
+        continue
+      }
+      const key = physical[index]!
+      if (ambiguous.has(key))
+        throw new StorageError(StorageErrorCode.cookieScopeAmbiguous, {
+          backend: StorageBackend.cookie,
+          key: entry.key,
+          operation
+        })
+      values.push(visible.get(key))
+    }
+    return values
+  }
+
+  /** Cookie replay preserves the fixed native scope and absolute expiry, without renewing Max-Age. */
+  const redo = createTextRedo({
+    enabled: redoEnabled,
+    backend: StorageBackend.cookie,
+    namespace,
+    runtime,
+    controller,
+    read: (key) =>
+      readVisibleCookie(
+        namespacedStorageKey(namespace, key, namespaceCodec, StorageBackend.cookie),
+        'cookie.get',
+        key
+      ) ?? null,
+    readMany: (keys) =>
+      keys.length === 0
+        ? []
+        : readCookieBatch(
+            snapshotStorageBatchKeys(keys, StorageBackend.cookie),
+            storageBackendOperation(StorageBackend.cookie, BrowserBatchMethod.getMany)
+          ),
+    keys: () => namespacedEntries().map(({ logicalKey }) => logicalKey),
+    prepare: (key, value) =>
+      prepareCookie(key, value, undefined, { notify: false, durable: true, remove: true }),
+    replay: (key, image, present) => {
+      if (!present)
+        return prepareCookie(key, null, undefined, { notify: false, durable: true, remove: true })
+          .apply
+      if (typeof image !== 'object' || image === null || Array.isArray(image))
+        throw new StorageContractError(StorageContractErrorCode.invalidArgument)
+      const value: unknown = Reflect.get(image, 'value')
+      const expiresAt: unknown = Reflect.get(image, 'expiresAt')
+      if (
+        typeof value !== 'string' ||
+        (expiresAt !== undefined &&
+          (typeof expiresAt !== 'number' || !Number.isFinite(new Date(expiresAt).getTime())))
+      )
+        throw new StorageContractError(StorageContractErrorCode.invalidArgument)
+      return prepareCookie(
+        key,
+        value,
+        { expires: expiresAt === undefined ? undefined : new Date(expiresAt) },
+        { notify: false, durable: true }
+      ).apply
+    },
+    publish: (changes) => {
+      if (changes.length)
+        publishChange({
+          channel: 'value',
+          kind: 'batch',
+          keys: changes.flatMap(({ target }) => (target.channel === 'text' ? [target.key] : []))
+        })
+    }
+  })
+
+  /** The original cookie lifecycle budget prepares each lazy org's configured observations once. */
+  const plain = <R>(
+    context: IOperationContext | undefined,
+    read: (signal: AbortSignal | undefined) => R
+  ) =>
+    withCookieAbort(context, async (signal) => {
+      if (runtime.journal !== undefined) await runtime.journal.prepare()
+      return read(signal)
+    })
+
   /** Cookie entities retain their fixed scope and the original visibility/quota checks. */
   const commitValueWrite: IBackendValueCommit = async (input, ctx) => {
     const release = controller.beginMutation()
@@ -522,14 +694,8 @@ export const cookiesHost = (
       await runtime.execution.run(
         { operation: StorageOperation.entityUniqueWrite, input, ctx },
         (captured) =>
-          withAbort(ctx, async (signal, _context, operationRuntime) => {
-            await withNativeValueWrite(
-              () => {
-                assertLive()
-                /**
-                 * Snapshot verification and the original private native write share one synchronous
-                 * turn.
-                 */
+          redoEnabled
+            ? redo.write([lockKey.text(captured.key)], ctx, async (scope) => {
                 const actual = namespacedEntries(StorageOperation.entityUniqueWrite).flatMap(
                   (entry) => {
                     if (
@@ -546,47 +712,104 @@ export const cookiesHost = (
                   }
                 )
                 assertValueSnapshot(actual, captured.expected, StorageBackend.cookie)
-                sync.set(captured.key, captured.value)
-              },
-              StorageBackend.cookie,
-              signal,
-              operationRuntime,
-              controller.closingSignal
-            )
-          })
+                await scope.set(captured.key, captured.value)
+              })
+            : withAbort(ctx, async (signal, _context, operationRuntime) => {
+                if (runtime.journal !== undefined) await runtime.journal.prepare()
+                await withNativeValueWrite(
+                  () => {
+                    assertLive()
+                    /**
+                     * Snapshot verification and the original private native write share one
+                     * synchronous turn.
+                     */
+                    const actual = namespacedEntries(StorageOperation.entityUniqueWrite).flatMap(
+                      (entry) => {
+                        if (
+                          typeof entry.logicalKey !== 'string' ||
+                          !entry.logicalKey.startsWith(captured.prefix)
+                        )
+                          return []
+                        const value = readVisibleCookie(
+                          entry.physicalKey,
+                          StorageOperation.entityUniqueWrite,
+                          entry.logicalKey
+                        )
+                        return value === undefined ? [] : [[entry.logicalKey, value] as const]
+                      }
+                    )
+                    assertValueSnapshot(actual, captured.expected, StorageBackend.cookie)
+                    sync.set(captured.key, captured.value)
+                  },
+                  StorageBackend.cookie,
+                  signal,
+                  operationRuntime,
+                  controller.closingSignal
+                )
+              })
       )
     } finally {
       release()
     }
   }
 
-  const store: ISyncCapableStore<ICookieStore> = {
+  const store: ISyncCapableStore<ICookieStore> & ITextRedoStore = {
     backend: StorageBackend.cookie,
-    capabilities: CAPABILITIES,
+    capabilities: redoEnabled
+      ? Object.freeze({ ...CAPABILITIES, transactions: true })
+      : CAPABILITIES,
     sync,
-    get: (key, ctx) => withCookieAbort(ctx, async () => sync.get(key)),
+    transaction: redo.transaction,
+    tx: redo.tx,
+    get: (key, ctx) =>
+      redoEnabled ? redo.read(ctx, () => sync.get(key)) : plain(ctx, () => sync.get(key)),
     set: async (key, value, ctx?: ICookieWriteContext) => {
       const context = snapshotCookieWriteContext(ctx, key)
-      await withAbort(context?.lifecycle, async () =>
-        sync.set(key, value, {
+      if (redoEnabled) {
+        await redo.write(
+          [lockKey.text(key)],
+          context?.lifecycle,
+          (scope) => scope.set(key, value),
+          (key, value) =>
+            prepareCookie(
+              key,
+              value,
+              { expires: context?.expires, maxAge: context?.maxAge },
+              { notify: false, durable: true, remove: true }
+            )
+        )
+        return
+      }
+      await withAbort(context?.lifecycle, async () => {
+        if (runtime.journal !== undefined) await runtime.journal.prepare()
+        return sync.set(key, value, {
           expires: context?.expires,
           maxAge: context?.maxAge
         })
-      )
+      })
     },
-    remove: (key, ctx?: ICookieRemoveContext) => withCookieAbort(ctx, async () => sync.remove(key)),
-    has: (key, ctx) => withCookieAbort(ctx, async () => sync.has(key)),
-    keys: (ctx) => withCookieAbort(ctx, async () => sync.keys()),
+    remove: (key, ctx?: ICookieRemoveContext) =>
+      redoEnabled
+        ? redo.write([lockKey.text(key)], ctx, (scope) => scope.remove(key))
+        : plain(ctx, () => sync.remove(key)),
+    has: (key, ctx) =>
+      redoEnabled ? redo.read(ctx, () => sync.has(key)) : plain(ctx, () => sync.has(key)),
+    keys: (ctx) =>
+      redoEnabled ? redo.read(ctx, () => sync.keys()) : plain(ctx, () => sync.keys()),
     clearValues: (ctx) =>
-      withCookieAbort(ctx, async (signal) => {
-        assertLive()
-        clearNamespacedEntries('cookie.clearValues', signal)
-      }),
+      redoEnabled
+        ? redo.clear(ctx)
+        : plain(ctx, (signal) => {
+            assertLive()
+            clearNamespacedEntries('cookie.clearValues', signal)
+          }),
     clearAll: (ctx) =>
-      withCookieAbort(ctx, async (signal) => {
-        assertLive()
-        clearNamespacedEntries('cookie.clearAll', signal)
-      }),
+      redoEnabled
+        ? redo.clear(ctx)
+        : plain(ctx, (signal) => {
+            assertLive()
+            clearNamespacedEntries('cookie.clearAll', signal)
+          }),
     dispose: () => {
       return controller.dispose()
     },
@@ -596,67 +819,66 @@ export const cookiesHost = (
         .catch((error) => reportCleanupError(createStorageOperationReporter(), error)))
   }
   const construction = provideBackendConstruction(
-    bindBrowserExecution(store, runtime),
+    bindBrowserExecution(store, runtime, [], textExecutionKeys),
     [
       implement(
         kv,
         browserKeyValueApi(
           store,
-          createTextBatchApi(
-            StorageBackend.cookie,
-            runtime,
-            (): IStorageStore<never> => construction.store,
-            assertLive,
-            (keys, operation) => {
-              assertLive()
-              /** Typed codec admission completes before reading the visible cookie snapshot. */
-              const physical = keys.map(({ key }) =>
-                namespacedStorageKey(namespace, key, namespaceCodec, StorageBackend.cookie)
+          redoEnabled
+            ? redo.batch
+            : createTextBatchApi(
+                StorageBackend.cookie,
+                runtime,
+                (): IStorageStore<never> => construction.store,
+                assertLive,
+                readCookieBatch
               )
-              /** One header snapshot supplies all requested results without per-key public reads. */
-              const visible = new Map<string, string>()
-              /** Duplicate visible names retain the original fixed-scope ambiguity failure. */
-              const ambiguous = new Set<string>()
-              for (const [key, value] of parseCookieEntries(readCookie(operation))) {
-                if (visible.has(key)) ambiguous.add(key)
-                visible.set(key, value)
-              }
-              /** Canonical duplicate positions reuse the first result from this one header. */
-              const values: (string | undefined)[] = []
-              for (let index = 0; index < keys.length; index += 1) {
-                const entry = keys[index]!
-                if (entry.firstIndex !== index) {
-                  values.push(values[entry.firstIndex])
-                  continue
-                }
-                const key = physical[index]!
-                if (ambiguous.has(key))
-                  throw new StorageError(StorageErrorCode.cookieScopeAmbiguous, {
-                    backend: StorageBackend.cookie,
-                    key: entry.key,
-                    operation
-                  })
-                values.push(visible.get(key))
-              }
-              return values
-            }
-          )
-        )
+        ),
+        redoEnabled ? { forTransaction: (scope) => scope } : undefined
       )
     ],
     controller,
-    () => doc
+    () => {
+      if (redoEnabled)
+        throw new StorageContractError(StorageContractErrorCode.unsupported, {
+          backend: StorageBackend.cookie
+        })
+      return doc
+    }
   )
   /** The fixed cookie scope and native atomic writer remain on this same physical construction. */
+  redo.initialize(construction.store)
   const physical = { ...construction, commitValueWrite }
+  const binding = redo.binding((orgId) => {
+    const target = orgBinding?.resolve(orgId) ?? physical
+    if (target === physical) return binding
+    if (target.journalBinding === undefined)
+      throw new StorageContractError(StorageContractErrorCode.unsupported)
+    return target.journalBinding
+  })
+  const orgBinding = bindOrganizations
+    ? createBrowserOrgBinding(
+        runtime,
+        namespace,
+        { ...physical, journalBinding: binding },
+        (target, ports) =>
+          cookiesHost(
+            {
+              namespace: target,
+              namespaceCodec,
+              scope,
+              document: doc,
+              ...(redoEnabled ? { redo: true } : {})
+            },
+            ports,
+            false
+          )
+      )
+    : undefined
   return {
     ...physical,
-    ...(bindOrganizations
-      ? {
-          orgBinding: createBrowserOrgBinding(runtime, namespace, physical, (target, ports) =>
-            cookiesHost({ namespace: target, namespaceCodec, scope, document: doc }, ports, false)
-          )
-        }
-      : {})
+    journalBinding: binding,
+    ...(orgBinding === undefined ? {} : { orgBinding })
   }
 }

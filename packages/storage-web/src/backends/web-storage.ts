@@ -1,5 +1,5 @@
 import { createTextRedo, type ITextRedoStore } from './text-redo.js'
-import { bindBrowserExecution } from './execution.js'
+import { bindBrowserExecution, textExecutionKeys } from './execution.js'
 import { createTextBatchApi } from './batch.js'
 import {
   implement,
@@ -546,12 +546,7 @@ export const createWebStorageBackend = (
         .catch((error) => reportCleanupError(createStorageOperationReporter(), error)))
   }
   const construction = provideBackendConstruction(
-    bindBrowserExecution(store, runtime, [], (name, args) =>
-      (name === 'get' || name === 'set' || name === 'remove' || name === 'has') &&
-      typeof args[0] === 'string'
-        ? [lockKey.text(args[0])]
-        : []
-    ),
+    bindBrowserExecution(store, runtime, [], textExecutionKeys),
     [
       implement(
         kv,

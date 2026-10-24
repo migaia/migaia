@@ -235,6 +235,20 @@ try {
   ],
   cookieBackendPlugin: [
     {
+      title: t('Keep expiry stable during redo', '在 redo 时保持过期时间'),
+      problem: t(
+        'Cookie recovery must not renew a relative Max-Age.',
+        'Cookie 恢复不能重新延长相对 Max-Age。'
+      ),
+      example: `import type { ICookiesOptions } from '@migaia/storage-web/cookies'
+const options: ICookiesOptions = { namespace: 'consent', scope: { path: '/' }, redo: true }
+console.log(options.redo)`,
+      result: t(
+        'Prints true. Installation also requires native Web Locks and journal.redoWal equal to the selected original logger.wal. The original cookie serializer and visibility checks apply; pending intent stores an absolute expiry.',
+        '输出 true；安装还要求原生 Web Locks 及 journal.redoWal 等于选定原 logger.wal。继续使用原 Cookie serializer 与可见性检查，pending intent 保存绝对期限。'
+      )
+    },
+    {
       title: t('Reuse one Cookie scope for writes and removal', '写入与删除复用同一 Cookie 作用域'),
       problem: t(
         'Removing a cookie with a different path can leave the original value behind. Choose the scope once when installing its backend.',

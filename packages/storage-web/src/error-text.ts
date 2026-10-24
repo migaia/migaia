@@ -1,5 +1,15 @@
 /** Stable diagnostic text shared by backend, entity, Host and reactive boundaries. */
 export const StorageErrorText = Object.freeze({
+  /** Cookie validation keeps the original scalar value failure text. */
+  cookieValueInvalid: 'cookie value must be a string',
+  /** Cookie expiry validation rejects unsafe relative seconds before native assignment. */
+  cookieMaxAgeInvalid: 'cookie maxAge must be a safe integer',
+  /** Cookie expiry validation preserves the existing invalid-Date scenario. */
+  cookieExpiresInvalid: 'cookie expires must be a valid Date',
+  /** A visible name after assignment belongs to an unknown fixed scope. */
+  cookieRedoScopeMismatch: 'same cookie name remains visible from an unknown scope',
+  /** A native cookie assignment was rejected by the active document scope. */
+  cookieRedoWriteInvisible: 'cookie write was not visible in the active scope',
   /** Only an explicit true declaration can authorize realm-local journal index exclusion. */
   indexedDbJournalFactoryIsolationInvalid: 'journalFactoryIsPrivate must be true or omitted',
   /** The known shared realm factory cannot be declared private by this optional admission fact. */
