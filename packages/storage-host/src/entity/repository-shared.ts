@@ -33,7 +33,7 @@ import {
   reportCleanupError
 } from '../core/operation-reporter.js'
 import { EntityText } from './text.js'
-import { type IEntityQueryPlan, type IEntityQuerySourceSelection } from './query.js'
+import { type IEntityQueryPlan, type IEntityQuerySourceSelection } from './query-adapter.js'
 import type { IOperationContext, IStorageKey } from '@migaia/storage-contract'
 import type { IRecordStore, IKeyValueStore } from '@migaia/storage-contract'
 import type { ISchemaAdapter } from '../entity.js'

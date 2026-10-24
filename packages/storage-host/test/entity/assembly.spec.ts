@@ -1,8 +1,10 @@
+import { entityMigrationFeature } from '@migaia/storage-host/entity/migration'
 import { describe, expect, it } from 'vitest'
 import { defineEntity } from '../../src/entity.js'
-import { entityQueryFeature } from '../../src/entity/query-feature.js'
-import { entityIndexesFeature } from '../../src/entity/indexes-feature.js'
-import { entityKeysetFeature } from '../../src/entity/keyset.js'
+import { entityUniqueFeature } from '@migaia/storage-host/entity/unique'
+import { entityQueryFeature } from '@migaia/storage-host/entity/query'
+import { entityIndexesFeature } from '@migaia/storage-host/entity/indexes'
+import { entityKeysetFeature } from '@migaia/storage-host/entity/keyset'
 import { StorageErrorCode } from '../../src/error-code.js'
 import { STORAGE_HOST_SOURCE } from '../../src/errors.js'
 import { memoryBackend } from '../helpers/memory.js'
@@ -48,6 +50,32 @@ describe('explicit entity assembly', () => {
     await expect(repository.query().page(1)).rejects.toMatchObject(missing('keyset'))
   })
 
+  it('migrates an older record through the public migration unit without enabling queries', async () => {
+    const store = await memoryBackend()
+    await store.putRecord({ version: 1, state: { id: 'a', group: 'one' } }, ['migration-only', 'a'])
+    const repository = defineEntity<IRow>({
+      name: 'migration-only',
+      key: 'id',
+      version: 2,
+      features: [entityMigrationFeature()],
+      migrations: { 2: (state) => ({ ...(state as IRow), group: 'migrated' }) }
+    }).connect(store)
+    expect(await repository.get('a')).toEqual({ id: 'a', group: 'migrated' })
+    expect(() => repository.query()).toThrow(expect.objectContaining(missing('query')))
+  })
+
+  it('never hides a missing migration assembly behind the invalid-record skip policy', async () => {
+    const store = await memoryBackend()
+    await store.putRecord({ version: 2, state: { id: 'a', group: 'one' } }, ['query-version', 'a'])
+    const repository = defineEntity<IRow>({
+      name: 'query-version',
+      key: 'id',
+      features: [entityQueryFeature()]
+    }).connect(store)
+    await expect(repository.query().all()).rejects.toMatchObject(missing('migration'))
+    await expect(repository.list({ onInvalid: 'skip' })).rejects.toMatchObject(missing('migration'))
+  })
+
   it('admits keyset only through its independent assembly and keeps the original cursor path', async () => {
     const repository = defineEntity<IRow>({
       name: 'keyset',
@@ -59,6 +87,22 @@ describe('explicit entity assembly', () => {
     const first = await repository.query().page(1)
     expect(first.items).toEqual([{ id: 'a', group: 'one' }])
     expect(await repository.query().after(first.next!).all()).toEqual([{ id: 'b', group: 'two' }])
+  })
+
+  it('enforces unique writes without installing index planning', async () => {
+    const repository = defineEntity<IRow>()({
+      name: 'unique-only',
+      key: 'id',
+      features: [entityQueryFeature(), entityUniqueFeature()],
+      indexes: { group: { path: 'group', unique: true } }
+    }).connect(await memoryBackend())
+    await repository.put({ id: 'a', group: 'one' })
+    await expect(repository.put({ id: 'b', group: 'one' })).rejects.toMatchObject({
+      code: StorageErrorCode.indexUniqueConflict
+    })
+    expect(() => repository.query().index('group')).toThrow(
+      expect.objectContaining(missing('indexes'))
+    )
   })
 
   it('rejects missing declaration assemblies before store connection', () => {

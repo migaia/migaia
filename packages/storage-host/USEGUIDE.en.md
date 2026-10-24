@@ -86,6 +86,8 @@ console.log(await users.get('u1'))
 
 Select only required units in `features`: `entityQueryFeature()` from `/entity/query` adds query/list/stream; `entityIndexesFeature()` from `/entity/indexes` adds index declaration/planning; `entityUniqueFeature()` from `/entity/unique` adds unique commit checks; `entityMigrationFeature()` from `/entity/migration` adds version plans and persisted migration; `entityKeysetFeature()` from `/entity/keyset` admits page/after. Index, unique and persisted migration paths reuse query operations, so also declare query for those paths. Units never enable another unit implicitly.
 
+The unique unit captures its own constraint projections without enabling index planning. Unique write checks alone do not require the indexes unit.
+
 `defineEntity<T>()({...})` declares an object's primary key and indexes. `connect(store)` attaches it to a backend. This example writes first, then queries through the same definition.
 
 ```ts doc-test=run

@@ -136,7 +136,10 @@ class EntityDefinition<TDomain, TStored> {
     }
     if (
       options.indexes !== undefined &&
-      !features.some((feature) => feature.name === EntityFeatureName.indexes)
+      !features.some(
+        (feature) =>
+          feature.name === EntityFeatureName.indexes || feature.name === EntityFeatureName.unique
+      )
     )
       missingEntityFeature(EntityFeatureName.indexes)
     if (

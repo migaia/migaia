@@ -1,3 +1,4 @@
+import { isStorageErrorFamily } from '../core/error-family.js'
 import { isPlainObject } from '@migaia/utils/object'
 import { asyncDisposeKey } from '@migaia/plugin-host'
 import { repositoryMigrationKey } from '../core/record-layout.js'
@@ -29,7 +30,7 @@ import { encodeFlatStorageKey, snapshotKeyRange } from '../core/key-domain.js'
 
 import { createStorageOperationRuntime } from '../core/operation-reporter.js'
 import { EntityText } from './text.js'
-import { createEntityQuery } from './query.js'
+import { createEntityQuery } from './query-adapter.js'
 import { snapshotOperationContext } from '../authoring/context.js'
 import type { IOperationContext, IStorageKey } from '@migaia/storage-contract'
 
@@ -631,6 +632,9 @@ export class EntityIndexesOwner<
       const envelope = await this.#context.decodeEnvelope(candidate.raw, ctx, runtime)
       domain = await this.#context.materialize(envelope, ctx, runtime)
     } catch (cause) {
+      /** Missing assembly cannot be persisted as a skipped invalid business record. */
+      if (isStorageErrorFamily(cause) && cause.code === StorageErrorCode.entityFeatureRequired)
+        throw cause
       this.#context.emitDiagnostic(
         EntityText.storageWebEntitySkippedInvalidIndexBackfillRecord(
           this.#context.name,

@@ -86,6 +86,8 @@ console.log(await users.get('u1'))
 
 只在 `features` 中选择用到的单元：`/entity/query` 的 `entityQueryFeature()` 开启 query/list/stream；`/entity/indexes` 的 `entityIndexesFeature()` 开启索引声明和规划；`/entity/unique` 的 `entityUniqueFeature()` 开启唯一提交检查；`/entity/migration` 的 `entityMigrationFeature()` 开启版本计划和持久迁移；`/entity/keyset` 的 `entityKeysetFeature()` 准入 page/after。索引、unique 与持久迁移会复用查询操作，使用这些路径时也需声明 query；单元不会自动开启其他单元。
 
+unique 单元能单独捕获约束投影，不会因此开启索引规划；仅做唯一写入检查时不需 indexes 单元。
+
 `defineEntity<T>()({...})` 声明对象的主键与索引，`connect(store)` 连接实际后端。下面先写入，再用同一声明查询。
 
 ```ts doc-test=run
