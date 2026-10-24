@@ -61,14 +61,21 @@ import {
 import { asyncDisposeKey } from '@migaia/plugin-host'
 import { createAbortController } from '@migaia/lifecycle'
 import { walkErrorCauses } from '@migaia/utils/error'
+import { bytesToBase64, base64ToBytes } from '@migaia/utils/bytes'
 import type {
   IStoragePluginCore,
   IStorageJournalBackendBinding,
-  IStorageJournalNamespaceView
+  IStorageJournalNamespaceView,
+  IStorageJournalImage,
+  IStorageJournalChange,
+  IStorageJournalTarget,
+  IStorageJournalExecutionPort
 } from '@migaia/storage-host'
 import {
   createBackendJournalNamespace,
   type IBackendJournalTransaction,
+  encodeFlatStorageKey,
+  decodeFlatStorageKey,
   createStorageOperationReporter,
   reportCleanupError,
   throwIfAborted,
@@ -127,6 +134,8 @@ const physicalGroups = new Map<
     {
       readonly locks: IBackendKeyLockPort
       readonly revisions: IBackendRevisionPort
+      /** One native-local group birth distinguishes a reopened owner from an old revision zero. */
+      readonly birth: string
       references: number
     }
   >
@@ -135,11 +144,13 @@ const physicalGroups = new Map<
 type IChannel = 'text' | 'bytes' | 'record' | 'metadata'
 /** Trusted short control segments use the same connection owner field without granting a scope. */
 const SQLITE_CONTROL_ACTIVE = Symbol('sqlite-control-active')
+/** A complete revision distinguishes ordinary updates from native row deletion and recreation. */
+type ISqliteRevision = { readonly version: number; readonly birth: string | undefined }
 /** A native callback and every short view refer to one actual active transaction. */
 type INativeState = {
   readonly orgId: string
   readonly context: IConcurrencyAttemptContext | undefined
-  readonly baseline: Map<string, number>
+  readonly baseline: Map<string, ISqliteRevision>
   readonly changed: Map<IChannel, Map<string, IStorageKey>>
   readonly expirations: Map<
     string,
@@ -152,6 +163,21 @@ type INativeState = {
   scopeStore?: IStorageBase
   /** Allocated only when a private namespace joins this actual native attempt. */
   journalTerminal?: ISqliteJournalTerminal
+  /** First raw images are allocated only for a selected original journal attempt. */
+  journalBefore?: Map<
+    string,
+    {
+      readonly target: IStorageJournalTarget
+      readonly before: IStorageJournalImage
+      current: IStorageJournalImage
+    }
+  >
+  /** Actual native mutation order retains intermediate images only for the selected attempt. */
+  journalSteps?: Array<Omit<IStorageJournalChange, 'afterRevision'>>
+  /** Complete final facts are produced once immediately before the original journal append. */
+  journalChanges?: readonly IStorageJournalChange[]
+  /** Only actual COMMIT permits marker cleanup inside this original physical admission. */
+  committedTxId?: string
 }
 /** All organization scopes retain the original connection admission and current native attempt. */
 type ISqlitePhysicalState = {
@@ -310,6 +336,7 @@ export function createSqliteStore<TValue>(
     | {
         readonly locks: IBackendKeyLockPort
         readonly revisions: IBackendRevisionPort
+        readonly birth: string
         references: number
       }
     | undefined
@@ -355,8 +382,20 @@ export function createSqliteStore<TValue>(
       )
       if (wal)
         driver.exec(
-          `CREATE TABLE IF NOT EXISTS ${tables.locks}(org_id TEXT NOT NULL,key TEXT NOT NULL,owner TEXT NOT NULL,attempt_token TEXT NOT NULL,label TEXT,pid INTEGER,since INTEGER NOT NULL,expires_at INTEGER NOT NULL,PRIMARY KEY(org_id,key));CREATE TABLE IF NOT EXISTS ${tables.revisions}(org_id TEXT NOT NULL,key TEXT NOT NULL,revision INTEGER NOT NULL,PRIMARY KEY(org_id,key))`
+          `CREATE TABLE IF NOT EXISTS ${tables.locks}(org_id TEXT NOT NULL,key TEXT NOT NULL,owner TEXT NOT NULL,attempt_token TEXT NOT NULL,label TEXT,pid INTEGER,since INTEGER NOT NULL,expires_at INTEGER NOT NULL,PRIMARY KEY(org_id,key));CREATE TABLE IF NOT EXISTS ${tables.revisions}(org_id TEXT NOT NULL,key TEXT NOT NULL,revision INTEGER NOT NULL,birth TEXT NOT NULL DEFAULT(lower(hex(randomblob(16)))),PRIMARY KEY(org_id,key))`
         )
+    }
+    if (shared === undefined && wal) {
+      /** The private row gains immutable native identity without changing prior user values. */
+      const columns = driver.prepare('PRAGMA table_info(' + tables.revisions + ')').all()
+      if (!columns.some((column) => column.name === 'birth')) {
+        driver.exec(
+          'ALTER TABLE ' + tables.revisions + " ADD COLUMN birth TEXT NOT NULL DEFAULT ''"
+        )
+        driver.exec(
+          'UPDATE ' + tables.revisions + " SET birth=lower(hex(randomblob(16))) WHERE birth=''"
+        )
+      }
     }
     if (!wal) {
       /** Different handles to one file share logical locks; memory connections stay independent. */
@@ -370,6 +409,7 @@ export function createSqliteStore<TValue>(
         group = {
           locks: core.createKeyLockPort(),
           revisions: core.createRevisionPort(),
+          birth: crypto.randomUUID(),
           references: 0
         }
         groups.set(groupId, group)
@@ -482,6 +522,12 @@ export function createSqliteStore<TValue>(
     orgId === runtime.orgId
       ? group!
       : physicalGroups.get(physical)!.get(JSON.stringify([table, orgId]))!
+  /** The existing org call context supplies the one configured journal port for its actual org. */
+  const journalFor = (context?: IOperationContext): IStorageJournalExecutionPort | undefined => {
+    if (core.journal === undefined) return undefined
+    const orgId = operationOrg(context)
+    return orgId === runtime.orgId ? core.journal : core.getOrgContext(orgId).journal
+  }
   /** Root calls cannot borrow the connection while any actual native transaction owns it. */
   const assertRoot = (): void => {
     controller.assertLive()
@@ -595,23 +641,82 @@ export function createSqliteStore<TValue>(
       throw sqliteError(SqliteErrorCode.decodeFailed, new Error(SqliteErrorText.malformedKey))
     return captured.keys[0]!
   }
-  /** Read/write baselines retain missing-row tombstones in the original native revision table. */
-  const revision = (state: INativeState, channel: IChannel, key: IStorageKey): void => {
-    if (channel === 'metadata') return
-    const id = identity(channel, key)
-    if (!state.baseline.has(id)) {
-      const row = wal
-        ? statement<ISqliteRow | undefined>(
-            `SELECT revision FROM ${tables.revisions} WHERE org_id=? AND key=?`,
-            [state.orgId, id],
-            'get'
-          )
-        : undefined
-      state.baseline.set(
-        id,
-        wal ? Number(row?.revision ?? 0) : localGroup(state.orgId).revisions.read(channel, id)
-      )
+  /** Metadata borrows one original record guard; ordinary business keys keep their exact identity. */
+  const revisionKey = (channel: IChannel, key: IStorageKey): ILockKey =>
+    channel === 'metadata'
+      ? lockKey.record([SqliteNames.metadata, key])
+      : channel === 'text'
+        ? lockKey.text(key)
+        : channel === 'bytes'
+          ? lockKey.bytes(key as string)
+          : lockKey.record(key)
+  /** The canonical lock owner supplies the single revision identity for every protected target. */
+  const revisionIdentity = (channel: IChannel, key: IStorageKey): string =>
+    snapshotConcurrencyLockKeys([revisionKey(channel, key)], SqliteNames.backend).identities[0]!
+  /** Native row births and original local group births are the only revision owners. */
+  const currentRevision = (state: INativeState, channel: IChannel, id: string): ISqliteRevision => {
+    if (!wal) {
+      const current = localGroup(state.orgId)
+      return {
+        version: current.revisions.read(channel === 'metadata' ? 'record' : channel, id),
+        birth: current.birth
+      }
     }
+    const row = statement<ISqliteRow | undefined>(
+      'SELECT revision,birth FROM ' + tables.revisions + ' WHERE org_id=? AND key=?',
+      [state.orgId, id],
+      'get',
+      state
+    )
+    if (row !== undefined && typeof row.birth !== 'string')
+      throw sqliteError(SqliteErrorCode.decodeFailed)
+    return { version: Number(row?.revision ?? 0), birth: row?.birth as string | undefined }
+  }
+  /** The original native raw row and absolute deadline form one opaque canonical codec image. */
+  const journalImage = (
+    state: INativeState,
+    channel: IChannel,
+    key: IStorageKey
+  ): IStorageJournalImage => {
+    const row = statement<ISqliteRow | undefined>(
+      'SELECT value' +
+        (channel === 'metadata' ? '' : ',expires_at') +
+        ' FROM ' +
+        tables[channel] +
+        ' WHERE org_id=? AND key=?',
+      [state.orgId, encoded(channel, key)],
+      'get',
+      state
+    )
+    return row === undefined
+      ? { present: false }
+      : {
+          present: true,
+          value: recordCodec.encode({
+            version: 1,
+            channel,
+            value: channel === 'bytes' ? bytesToBase64(row.value as Uint8Array) : row.value,
+            deadline: channel === 'metadata' ? null : row.expires_at
+          } as ICollectionsCodecValue)
+        }
+  }
+  /** Only selected attempts retain first-before images, using the existing physical key codec. */
+  const captureJournal = (state: INativeState, channel: IChannel, key: IStorageKey): void => {
+    if (state.journalBefore === undefined) return
+    const id = identity(channel, key)
+    if (state.journalBefore.has(id)) return
+    const target: IStorageJournalTarget =
+      channel === 'metadata'
+        ? { channel, key: encodeFlatStorageKey(key) }
+        : revisionKey(channel, snapshotStorageKey(key, SqliteNames.backend))
+    const before = journalImage(state, channel, key)
+    state.journalBefore.set(id, { target, before, current: before })
+  }
+  /** First observations survive only original physical recovery, not a strategy retry. */
+  const revision = (state: INativeState, channel: IChannel, key: IStorageKey): void => {
+    captureJournal(state, channel, key)
+    const id = revisionIdentity(channel, key)
+    if (!state.baseline.has(id)) state.baseline.set(id, currentRevision(state, channel, id))
   }
   /** Every real mutation is tracked once for revision updates and post-commit publication. */
   const changed = (state: INativeState, channel: IChannel, key: IStorageKey): void => {
@@ -623,20 +728,29 @@ export function createSqliteStore<TValue>(
     }
     const id = identity(channel, key)
     if (!keys.has(id)) keys.set(id, snapshotStorageKey(key, SqliteNames.backend))
-    if (wal && channel !== 'metadata')
+    if (wal)
       statement(
-        `INSERT INTO ${tables.revisions}(org_id,key,revision) VALUES(?,?,1) ON CONFLICT(org_id,key) DO UPDATE SET revision=revision+1`,
-        [state.orgId, identity(channel, key)],
+        `INSERT INTO ${tables.revisions}(org_id,key,revision,birth) VALUES(?,?,1,lower(hex(randomblob(16)))) ON CONFLICT(org_id,key) DO UPDATE SET revision=revision+1`,
+        [state.orgId, revisionIdentity(channel, key)],
         'run',
         state
       )
+    const first = state.journalBefore?.get(id)
+    if (first !== undefined) {
+      const after = journalImage(state, channel, key)
+      state.journalSteps!.push({ target: first.target, before: first.current, after })
+      first.current = after
+    }
   }
   /** The shared revision owner advances in the same synchronous turn as successful native COMMIT. */
   const advanceRevisions = (state: INativeState): void => {
     if (wal) return
-    for (const channel of ['text', 'bytes', 'record'] as const)
-      for (const id of state.changed.get(channel)?.keys() ?? [])
-        localGroup(state.orgId).revisions.write(channel, id)
+    for (const [channel, keys] of state.changed)
+      for (const key of keys.values())
+        localGroup(state.orgId).revisions.write(
+          channel === 'metadata' ? 'record' : channel,
+          revisionIdentity(channel, key)
+        )
   }
   /** One successful native COMMIT owns all ordinary and expiry change publication. */
   const publishChanges = (state: INativeState): void => {
@@ -714,6 +828,7 @@ export function createSqliteStore<TValue>(
   /** Expired cross-channel rows are reclaimed inside the same original native write transaction. */
   const prune = (channel: IChannel, key: IStorageKey, state: INativeState): void => {
     if (channel === 'metadata') return
+    revision(state, channel, key)
     const result = statement<{ changes: number | bigint }>(
       `DELETE FROM ${tables[channel]} WHERE org_id=? AND key=? AND expires_at IS NOT NULL AND expires_at<=?`,
       [state.orgId, encoded(channel, key), Date.now()],
@@ -857,6 +972,7 @@ export function createSqliteStore<TValue>(
     policy: 'conflict' | 'replace',
     ttlMs?: number
   ): void => {
+    revision(state, channel, key)
     if (channel !== 'metadata') {
       for (const other of ['text', 'bytes', 'record'] as const) {
         if (other === 'bytes' && typeof key !== 'string') continue
@@ -870,6 +986,7 @@ export function createSqliteStore<TValue>(
         )
         if (present) {
           if (policy !== 'replace') throw sqliteError(SqliteErrorCode.duplicateKey)
+          revision(state, other, key)
           statement(
             `DELETE FROM ${tables[other]} WHERE org_id=? AND key=?`,
             [state.orgId, encoded(other, key)],
@@ -1093,6 +1210,8 @@ export function createSqliteStore<TValue>(
     return withAbort<Awaited<R>>(ctx, async (signal, context): Promise<Awaited<R>> => {
       assertRoot()
       throwIfAborted(signal)
+      const selectedJournal = journalFor(context)
+      if (selectedJournal !== undefined) await selectedJournal.prepare()
       return operation(
         name,
         input,
@@ -1121,10 +1240,18 @@ export function createSqliteStore<TValue>(
     let capturedInput!: I
     /** Fixed preparation retains only this operation's payload and exact affected keys. */
     let mutation!: IRootMutation<R>
+    let selectedJournal: IStorageJournalExecutionPort | undefined
     return runWithConcurrency<Awaited<R>>(
       {
         store,
         options: ctx === undefined ? {} : ctx,
+        prepare:
+          core.journal === undefined || name === SqliteOperation.dropOrg
+            ? undefined
+            : (context) => {
+                selectedJournal = journalFor(context)
+                return selectedJournal?.prepare()
+              },
         execute: (context, proceed) =>
           operation(
             name,
@@ -1139,7 +1266,7 @@ export function createSqliteStore<TValue>(
           ),
         lock: () => {
           mutation = prepare(capturedInput)
-          return mutation.keys
+          return [...mutation.keys, ...(selectedJournal?.headLocks() ?? [])]
         }
       },
       {
@@ -1169,11 +1296,37 @@ export function createSqliteStore<TValue>(
                   context,
                   mutation.committed
                 ) as Awaited<R>
+              if (selectedJournal?.active()) {
+                const native = () =>
+                  nativeAttempt(
+                    context,
+                    (scope) => mutation.run(journalScope(scope).state),
+                    true,
+                    mutation.committed
+                  )
+                const run = () =>
+                  physicalRun(context, () => (wal ? walAttempt(context, native) : native()))
+                return wal
+                  ? await run()
+                  : await localGroup(operationOrg(context)).locks.attempt(
+                      context,
+                      {
+                        owner: controller.origin,
+                        since: Date.now(),
+                        status: 'held',
+                        scope: 'local'
+                      },
+                      { attempt: run },
+                      concurrencyStages,
+                      controller.closingSignal,
+                      ranges
+                    )
+              }
               return wal
                 ? await physicalRun(context, () =>
                     walAttempt(context, async () => ({
                       status: 'committed' as const,
-                      value: write()
+                      value: write() as Awaited<R>
                     }))
                   )
                 : await localGroup(operationOrg(context)).locks.attemptWrite(
@@ -1708,7 +1861,11 @@ export function createSqliteStore<TValue>(
     state?: INativeState,
     scope?: ISqliteTransactionScope<TValue>
   ): R => {
-    if (shared !== undefined)
+    if (
+      shared !== undefined ||
+      state?.journalBefore !== undefined ||
+      (state === undefined && core.journal?.active())
+    )
       throw new StorageContractError(StorageContractErrorCode.unsupported, {
         backend: SqliteNames.backend
       })
@@ -2034,10 +2191,12 @@ export function createSqliteStore<TValue>(
   /** Run one actual callback and owner lifecycle, retaining native isolation through cleanup. */
   const nativeAttempt = async <R>(
     context: IConcurrencyAttemptContext,
-    callback: (scope: ISqliteTransactionScope<TValue>) => R
+    callback: (scope: ISqliteTransactionScope<TValue>) => R,
+    journaled = true,
+    committed?: () => void
   ): Promise<IConcurrencyAttempt<Awaited<R>>> => {
     /** Original baseline survives only internal physical recovery, never a strategy retry. */
-    const baseline = new Map<string, number>()
+    const baseline = new Map<string, ISqliteRevision>()
     /** First-read deadlines survive only this original attempt and its physical recovery. */
     const expirations: INativeState['expirations'] = new Map()
     /** A physical upgrade recovery changes only the native BEGIN, not the strategy attempt number. */
@@ -2062,6 +2221,8 @@ export function createSqliteStore<TValue>(
       let value: Awaited<R> | undefined
       /** Terminal events retain immutable transaction facts after data views expire. */
       let terminal: ReturnType<IBackendStageBindings['transactionStages']> | undefined
+      let journalAttempt: ReturnType<IStorageJournalExecutionPort['begin']>
+      let transactionId: string | undefined
       try {
         observe(transactionStages, 'beforeTransaction')
         await control(
@@ -2084,18 +2245,8 @@ export function createSqliteStore<TValue>(
           /** Compare in the new writer transaction before the callback can change its own baseline. */
           for (const [id, expected] of baseline) {
             const channel = identityRange(id).channel
-            const row = wal
-              ? statement<ISqliteRow | undefined>(
-                  `SELECT revision FROM ${tables.revisions} WHERE org_id=? AND key=?`,
-                  [state.orgId, id],
-                  'get'
-                )
-              : undefined
-            if (
-              (wal
-                ? Number(row?.revision ?? 0)
-                : localGroup(state.orgId).revisions.read(channel, id)) !== expected
-            ) {
+            const actual = currentRevision(state, channel, id)
+            if (actual.version !== expected.version || actual.birth !== expected.birth) {
               rollbackNative()
               begun = false
               return {
@@ -2115,10 +2266,18 @@ export function createSqliteStore<TValue>(
           onFailure: (failure) => {
             state.failure ??= failure
           },
-          beforeCommit: (checkScope) =>
+          beforeCommit: (checkScope) => {
             observe(transactionStages.forTransaction(checkScope), 'beforeCommit')
+            return journalAttempt?.record(checkScope)
+          }
         })
         terminal = transactionStages.forTransaction(scope)
+        transactionId = assertTransactionOwner(store, scope).id
+        if (journaled && journalFor(context)?.active()) {
+          state.journalBefore = new Map()
+          state.journalSteps = []
+          journalAttempt = journalFor(context)!.begin(scope)
+        }
         observe(terminal, 'onTransactionStart')
         try {
           value = (await callback(scope)) as Awaited<R>
@@ -2146,6 +2305,8 @@ export function createSqliteStore<TValue>(
         await control(SqliteControl.commit, context, false, () => {
           begun = false
           advanceRevisions(state)
+          committed?.()
+          state.committedTxId = transactionId
           finishJournal(state, true)
         })
         let changedKeys = 0
@@ -2197,6 +2358,7 @@ export function createSqliteStore<TValue>(
         throw normalizeTransactionFailure(failure)
       } finally {
         finishJournal(state, begun ? undefined : false)
+        if (journalAttempt?.settle !== undefined) await journalAttempt.settle()
         registration?.close()
         if (registration) observe(terminal, 'onTransactionClose')
         /** Failed rollback keeps actual unknown native ownership sealed against root access. */
@@ -2267,13 +2429,22 @@ export function createSqliteStore<TValue>(
   /** All public transactions enter the existing concurrency loop and original physical limiter. */
   const transact = <R>(
     callback: (scope: ISqliteTransactionScope<TValue>) => R,
-    options: ITransactionOptions = {}
+    options: ITransactionOptions = {},
+    journaled = true
   ): Promise<Awaited<R>> => {
     assertTransactionCallback(callback, SqliteNames.backend)
     controller.assertLive()
     const finish = controller.beginMutation()
     const result = runWithConcurrency<Awaited<R>>(
-      { store, options },
+      {
+        store,
+        options,
+        prepare:
+          !journaled || core.journal === undefined
+            ? undefined
+            : (context) => journalFor(context)?.prepare(),
+        lock: (context) => (journaled ? (journalFor(context)?.headLocks() ?? []) : [])
+      },
       {
         attempt: async (context) => {
           /** This native backend owns no vector collection or RDF graph and never falls back to key. */
@@ -2283,10 +2454,15 @@ export function createSqliteStore<TValue>(
             })
           const run = () =>
             physicalRun(context, () => {
-              const invoke = () => nativeAttempt(context, callback)
+              const invoke = () => nativeAttempt(context, callback, journaled)
               const execute = () => (wal ? walAttempt(context, invoke) : invoke())
               return core.execution.run(
-                { operation: SqliteOperation.transaction, input: {}, ctx: context },
+                {
+                  operation: SqliteOperation.transaction,
+                  input: {},
+                  ctx: context,
+                  internal: journaled ? undefined : true
+                },
                 execute
               )
             })
@@ -2342,9 +2518,14 @@ export function createSqliteStore<TValue>(
         const key =
           channel === 'record' ? decodeKey(row.key as Uint8Array) : decodeHexKey(row.key as string)
         revision(state, channel, key)
-        changed(state, channel, key)
       }
       statement(`DELETE FROM ${tables[channel]} WHERE org_id=?`, [state.orgId], 'run', state)
+      for (const row of rows)
+        changed(
+          state,
+          channel,
+          channel === 'record' ? decodeKey(row.key as Uint8Array) : decodeHexKey(row.key as string)
+        )
     }
   }
   /** String-only legacy keys omit typed batch keys while retaining canonical identity. */
@@ -2686,6 +2867,35 @@ export function createSqliteStore<TValue>(
     iterateRecords: iterator,
     transaction: (run, options) => transact(run, options),
     tx: () => createTransactionBuilder(store, undefined, core.getChainMethods('tx')),
+    ...(core.journal === undefined
+      ? {}
+      : {
+          undo: async (txId: string, ctx?: IOperationContext) => {
+            controller.assertLive()
+            const release = controller.beginMutation()
+            let selected: IStorageJournalExecutionPort | undefined
+            return runWithConcurrency<{ readonly txId: string }>(
+              {
+                store,
+                options: ctx === undefined ? {} : ctx,
+                prepare: (context) => {
+                  selected = journalFor(context)
+                  return selected!.prepare()
+                }
+              },
+              {
+                attempt: async (context) => ({
+                  status: 'committed',
+                  value: await selected!.undo(txId, (keys, work) =>
+                    createTransactionBuilder(store, context, core.getChainMethods('tx'))
+                      .lock(keys[0]!, ...keys.slice(1))
+                      .run(work)
+                  )
+                })
+              }
+            ).finally(release)
+          }
+        }),
     metadata: {
       get: (key, ctx) => {
         textInput(key)
@@ -2698,7 +2908,7 @@ export function createSqliteStore<TValue>(
         return rootRead(SqliteOperation.metadataSet, { key, value }, ctx, (orgId) =>
           syncMutation(
             (state) => write('metadata', key, value, state, 'replace'),
-            [],
+            [revisionKey('metadata', key)],
             undefined,
             orgId
           )
@@ -2711,7 +2921,7 @@ export function createSqliteStore<TValue>(
             (state) => {
               remove('metadata', key, state)
             },
-            [],
+            [revisionKey('metadata', key)],
             undefined,
             orgId
           )
@@ -3074,8 +3284,155 @@ export function createSqliteStore<TValue>(
       normalizeTransactionFailure,
       { activityMode: 'managed', asyncDisposeKey, defaultPolicy: concurrency, concurrencyStages }
     )
+    /** Persisted targets restore only original channels and the original flat metadata key codec. */
+    const targetKey = (target: IStorageJournalTarget): { channel: IChannel; key: IStorageKey } => {
+      if (target.channel === 'vector' || target.channel === 'rdf')
+        throw new StorageContractError(StorageContractErrorCode.unsupported, {
+          backend: SqliteNames.backend
+        })
+      const key = target.channel === 'metadata' ? decodeFlatStorageKey(target.key) : target.key
+      if (key === undefined || (target.channel === 'metadata' && typeof key !== 'string'))
+        throw new StorageContractError(StorageContractErrorCode.invalidArgument)
+      return { channel: target.channel, key }
+    }
+    /** Final mirrors are read from the same native writer after all accepted operation finalizers. */
+    const journalChanges = (state: INativeState): readonly IStorageJournalChange[] => {
+      if (state.journalChanges !== undefined) return state.journalChanges
+      if (state.changed.size === 0) return []
+      const changes: IStorageJournalChange[] = []
+      for (const step of state.journalSteps ?? []) {
+        const { channel, key } = targetKey(step.target)
+        const first = state.journalBefore!.get(identity(channel, key))!
+        if (!first.before.present && !first.current.present) continue
+        const current = currentRevision(state, channel, revisionIdentity(channel, key))
+        changes.push({
+          ...step,
+          afterRevision: { birth: current.birth ?? null, version: current.version + (wal ? 0 : 1) }
+        })
+      }
+      return (state.journalChanges = changes)
+    }
+    /** Marker cleanup joins this exact already-committed physical admission or its original runner. */
+    const marker = async <R>(txId: string, invoke: (state: INativeState) => R): Promise<R> => {
+      if (typeof txId !== 'string' || txId.length === 0)
+        throw new StorageContractError(StorageContractErrorCode.invalidArgument)
+      const active = physicalState.active
+      if (
+        active &&
+        active !== SQLITE_CONTROL_ACTIVE &&
+        active.orgId === runtime.orgId &&
+        active.committedTxId === txId
+      )
+        return invoke(active)
+      return transact((scope) => invoke(journalScope(scope).state), {}, false)
+    }
     /** Fixed native namespaces use the existing private journal table and original scope runner. */
     const journal: Omit<IStorageJournalBackendBinding, 'forOrg'> = {
+      externalWal: true,
+      lockTarget: (target) => {
+        const { channel, key } = targetKey(target)
+        return revisionKey(channel, key)
+      },
+      changes: (scope) => journalChanges(journalScope(scope).state),
+      readImage: (scope, target) =>
+        runTransactionOperation(scope, () => {
+          const state = journalScope(scope).state
+          const { channel, key } = targetKey(target)
+          return Promise.resolve(journalImage(state, channel, key))
+        }),
+      readRevision: (scope, target) =>
+        runTransactionOperation(scope, () => {
+          const state = journalScope(scope).state
+          const { channel, key } = targetKey(target)
+          revision(state, channel, key)
+          const current = currentRevision(state, channel, revisionIdentity(channel, key))
+          return Promise.resolve({ birth: current.birth ?? null, version: current.version })
+        }),
+      writeImage: (scope, target, image) =>
+        runTransactionOperation(scope, () => {
+          const state = journalScope(scope).state
+          const { channel, key } = targetKey(target)
+          revision(state, channel, key)
+          if (!image.present) {
+            remove(channel, key, state)
+            return Promise.resolve()
+          }
+          const payload = recordCodec.decode(image.value)
+          if (
+            payload === null ||
+            typeof payload !== 'object' ||
+            Array.isArray(payload) ||
+            !('value' in payload) ||
+            !('deadline' in payload) ||
+            !('version' in payload) ||
+            payload.version !== 1 ||
+            !('channel' in payload) ||
+            payload.channel !== channel
+          )
+            throw sqliteError(SqliteErrorCode.decodeFailed)
+          const { value, deadline } = payload
+          if (
+            typeof value !== 'string' ||
+            (deadline !== null && (typeof deadline !== 'number' || !Number.isFinite(deadline))) ||
+            (channel === 'metadata' && deadline !== null)
+          )
+            throw sqliteError(SqliteErrorCode.decodeFailed)
+          statement(
+            'INSERT INTO ' +
+              tables[channel] +
+              '(org_id,key,value' +
+              (channel === 'metadata' ? '' : ',expires_at') +
+              ') VALUES(?,?,?' +
+              (channel === 'metadata' ? '' : ',?') +
+              ') ON CONFLICT(org_id,key) DO UPDATE SET value=excluded.value' +
+              (channel === 'metadata' ? '' : ',expires_at=excluded.expires_at'),
+            [
+              state.orgId,
+              encoded(channel, key),
+              channel === 'bytes' ? base64ToBytes(value) : value,
+              ...(channel === 'metadata' ? [] : [deadline as ISqliteValue])
+            ],
+            'run',
+            state
+          )
+          changed(state, channel, key)
+          return Promise.resolve()
+        }),
+      writeCommitMarker: (scope, txId) =>
+        runTransactionOperation(scope, () => {
+          const current = journalScope(scope)
+          if (current.info.id !== txId)
+            throw new StorageContractError(StorageContractErrorCode.invalidArgument)
+          statement(
+            'INSERT INTO ' +
+              tables.markers +
+              '(org_id,key) VALUES(?,?) ON CONFLICT(org_id,key) DO NOTHING',
+            [current.state.orgId, txId],
+            'run',
+            current.state
+          )
+          return Promise.resolve()
+        }),
+      hasCommitMarker: (txId) =>
+        marker(
+          txId,
+          (state) =>
+            statement<ISqliteRow | undefined>(
+              'SELECT key FROM ' + tables.markers + ' WHERE org_id=? AND key=?',
+              [state.orgId, txId],
+              'get',
+              state
+            ) !== undefined
+        ),
+      removeCommitMarker: (txId) =>
+        marker(txId, (state) => {
+          statement(
+            'DELETE FROM ' + tables.markers + ' WHERE org_id=? AND key=?',
+            [state.orgId, txId],
+            'run',
+            state
+          )
+        }),
       openNamespace: async (prefix) => {
         controller.assertLive()
         if (typeof prefix !== 'string' || prefix.length === 0)
@@ -3198,7 +3555,11 @@ export function createSqliteStore<TValue>(
         return createBackendJournalNamespace({
           assertLive: () => {
             controller.assertLive()
-            if (openedGeneration !== journalGeneration.value)
+            if (
+              !wal &&
+              typeof physical !== 'string' &&
+              openedGeneration !== journalGeneration.value
+            )
               throw new StorageContractError(StorageContractErrorCode.disposed, {
                 backend: SqliteNames.backend
               })
@@ -3240,7 +3601,7 @@ export function createSqliteStore<TValue>(
                   }
                 ),
           authenticate: (scope) => ({ info: journalScope(scope).info, port: project(scope) }),
-          transaction: (work) => transact((scope) => work(project(scope)))
+          transaction: (work) => transact((scope) => work(project(scope)), {}, false)
         })
       }
     }

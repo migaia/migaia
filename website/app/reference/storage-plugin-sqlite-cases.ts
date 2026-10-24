@@ -5,6 +5,45 @@ const t = (en: string, zh: string): IText => ({ en, zh })
 export const storagePluginSqliteCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
   sqliteBackendPlugin: [
     {
+      title: t('Undo through the original native transaction', '沿原生事务撤销'),
+      problem: t(
+        'Restore a committed value with complete revision checks and the existing WAL.',
+        '经完整修订校验与既有 WAL 恢复已提交值。'
+      ),
+      example: `import { Logger } from '@migaia/logger'
+import { binlog, wal, undoLog, memoryLogStore } from '@migaia/logger/plugins/durable'
+import { createStorageHost } from '@migaia/storage-host'
+import { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'
+import { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'
+
+await using connection = nodeSqliteDriver(':memory:')
+await using changes = memoryLogStore()
+await using intents = memoryLogStore()
+await using images = memoryLogStore()
+const logger = new Logger({
+  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+  plugins: [binlog({ store: changes }), wal({ store: intents }), undoLog({ store: images })]
+})
+try {
+  await using host = await createStorageHost({
+    plugins: [sqliteBackendPlugin({ driver: connection })] as const,
+    journal: { logger, namespace: 'application' }
+  })
+  const store = host.backend('sqlite')
+  await store.set('theme', 'before')
+  await store.set('theme', 'after')
+  const entry = (await logger.binlog.read(await logger.binlog.lastSeq()))[0]!
+  await store.undo((entry.payload as { txId: string }).txId)
+  console.log(await store.get('theme'))
+} finally {
+  await logger.shutdown('manual')
+}`,
+      result: t(
+        'Prints before. The host borrows the logger; the caller releases it before the three log stores.',
+        '输出 before。宿主借用 Logger，调用方在三个日志载体之前释放 Logger。'
+      )
+    },
+    {
       title: t('Keep native logs outside business keys', '原生日志独立于业务键'),
       problem: t(
         'Clearing application values must preserve the private native log sequence.',
