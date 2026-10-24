@@ -8,7 +8,8 @@ it('exports only the common public cache contract', async () => {
     'CacheWriteMode',
     'ERROR_SOURCE',
     'cacheBackendKind',
-    'cacheKey'
+    'cacheKey',
+    'cachePlugin'
   ])
   expect(root.ERROR_SOURCE).toBe('storage.backend.cache')
 })

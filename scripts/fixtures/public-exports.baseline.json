@@ -1825,7 +1825,7 @@
       ]
     },
     "@migaia/storage-plugin-cache": {
-      ".": ["CacheErrorCode", "CacheWriteMode", "ERROR_SOURCE", "cacheBackendKind", "cacheKey"]
+      ".": ["CacheErrorCode", "CacheWriteMode", "ERROR_SOURCE", "cacheBackendKind", "cacheKey", "cachePlugin"]
     },
     "@migaia/storage-plugin-qdrant": {
       ".": ["ERROR_SOURCE", "QdrantErrorCode", "qdrantBackendKind", "qdrantBackendPlugin"],
