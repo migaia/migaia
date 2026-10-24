@@ -2100,24 +2100,29 @@ test('documents feature admission, readiness, and traceability', () => {
 
 test('documents boundary admission and capability composition', () => {
   const targets = [
-    ['snapshotStorageCapabilities', ['value']],
-    ['isStorageCapabilities', ['value']],
-    ['snapshotKeyValueStoreDetailed', ['store']],
-    ['snapshotKeyValueStore', ['store']],
-    ['snapshotRecordStore', ['store']],
-    ['isKeyValueStore', ['store']],
-    ['asRecordStore', ['store']],
-    ['isRecordStore', ['store']],
-    ['asSecondaryIndexRecordStore', ['store']],
-    ['isSecondaryIndexRecordStore', ['store']],
-    ['asChangeFeedStore', ['store']],
-    ['isChangeFeedStore', ['store']]
+    ['authoring/store', 'snapshotStorageCapabilities', ['value']],
+    ['index', 'isStorageCapabilities', ['value']],
+    ['authoring/store', 'snapshotKeyValueStoreDetailed', ['store']],
+    ['authoring/store', 'snapshotKeyValueStore', ['store']],
+    ['authoring/store', 'snapshotRecordStore', ['store']],
+    ['index', 'isKeyValueStore', ['store']],
+    ['index', 'asRecordStore', ['store']],
+    ['index', 'isRecordStore', ['store']],
+    ['index', 'asSecondaryIndexRecordStore', ['store']],
+    ['index', 'isSecondaryIndexRecordStore', ['store']],
+    ['index', 'asChangeFeedStore', ['store']],
+    ['index', 'isChangeFeedStore', ['store']]
   ] as const
 
-  for (const [symbolName, expectedOptions] of targets)
+  for (const [moduleName, symbolName, expectedOptions] of targets)
     for (const locale of ['en', 'zh'] as const) {
-      const guide = findApiGuide('storage-contract', 'index', symbolName, locale)
-      assert.ok(guide, `storage-contract:index#${symbolName} has no ${locale} capability guide`)
+      /** Runtime guides follow their canonical authoring owner; pure guards stay at contract root. */
+      const libraryName = moduleName === 'index' ? 'storage-contract' : 'storage-host'
+      const guide = findApiGuide(libraryName, moduleName, symbolName, locale)
+      assert.ok(
+        guide,
+        `${libraryName}:${moduleName}#${symbolName} has no ${locale} capability guide`
+      )
       assert.ok(guide.quickStart?.trim())
       assert.ok(guide.scenarios.length >= 3)
       assert.ok(guide.avoidWhen.length >= 3)
@@ -2138,25 +2143,28 @@ test('documents boundary admission and capability composition', () => {
 test('documents keys, operation context, and transactions', () => {
   const targets = [
     [
+      'authoring/context',
       'snapshotOperationContext',
       ['ctx.signal', 'ctx.timeoutMs', 'ctx.pageSize', 'ctx.conflictPolicy']
     ],
-    ['assertOperationContext', ['ctx']],
-    ['snapshotSyncWriteOptions', ['options.conflictPolicy']],
-    ['assertSyncWriteOptions', ['options']],
-    ['assertStringStorageKey', ['value', 'backend', 'label']],
-    ['assertStorageKey', ['value', 'backend', 'label']],
-    ['snapshotStorageKey', ['value', 'backend', 'label']],
-    ['compareStorageKeys', ['a', 'b']],
-    ['KEY_DOMAIN_LIMITS', []],
-    ['assertTransactionCallback', ['run', 'backend']],
-    ['readTransactionConflictPolicy', ['options.conflictPolicy', 'backend']]
+    ['index', 'assertOperationContext', ['ctx']],
+    ['authoring/context', 'snapshotSyncWriteOptions', ['options.conflictPolicy']],
+    ['index', 'assertSyncWriteOptions', ['options']],
+    ['index', 'assertStringStorageKey', ['value', 'backend', 'label']],
+    ['index', 'assertStorageKey', ['value', 'backend', 'label']],
+    ['authoring/key', 'snapshotStorageKey', ['value', 'backend', 'label']],
+    ['authoring/key', 'compareStorageKeys', ['a', 'b']],
+    ['index', 'KEY_DOMAIN_LIMITS', []],
+    ['index', 'assertTransactionCallback', ['run', 'backend']],
+    ['index', 'readTransactionConflictPolicy', ['options.conflictPolicy', 'backend']]
   ] as const
 
-  for (const [symbolName, expectedOptions] of targets)
+  for (const [moduleName, symbolName, expectedOptions] of targets)
     for (const locale of ['en', 'zh'] as const) {
-      const guide = findApiGuide('storage-contract', 'index', symbolName, locale)
-      assert.ok(guide, `storage-contract:index#${symbolName} has no ${locale} input guide`)
+      /** Runtime guides follow their canonical authoring owner; pure guards stay at contract root. */
+      const libraryName = moduleName === 'index' ? 'storage-contract' : 'storage-host'
+      const guide = findApiGuide(libraryName, moduleName, symbolName, locale)
+      assert.ok(guide, `${libraryName}:${moduleName}#${symbolName} has no ${locale} input guide`)
       assert.ok(guide.quickStart?.trim())
       assert.ok(guide.scenarios.length >= 3)
       assert.ok(guide.avoidWhen.length >= 3)
@@ -2176,25 +2184,31 @@ test('documents keys, operation context, and transactions', () => {
 
 test('documents wire identity, policy, and traceability', () => {
   const targets = [
-    ['snapshotCodec', ['codec']],
-    ['assertCodec', ['codec']],
-    ['collectionsJsonCodec', []],
-    ['COLLECTIONS_JSON_CODEC_NAME', []],
-    ['ConflictPolicy', []],
-    ['StorageContractConflictPolicy', []],
-    ['intrinsicConstructorName', ['value']],
-    ['STORAGE_CONTRACT_SOURCE', []],
+    ['authoring/codec', 'snapshotCodec', ['codec']],
+    ['index', 'assertCodec', ['codec']],
+    ['index', 'collectionsJsonCodec', []],
+    ['index', 'COLLECTIONS_JSON_CODEC_NAME', []],
+    ['index', 'ConflictPolicy', []],
+    ['index', 'StorageContractConflictPolicy', []],
+    ['authoring/backend', 'intrinsicConstructorName', ['value']],
+    ['index', 'STORAGE_CONTRACT_SOURCE', []],
     [
+      'index',
       'StorageContractError',
       ['code', 'details.backend', 'details.key', 'details.cause', 'message']
     ],
-    ['isStorageContractError', ['value']]
+    ['index', 'isStorageContractError', ['value']]
   ] as const
 
-  for (const [symbolName, expectedOptions] of targets)
+  for (const [moduleName, symbolName, expectedOptions] of targets)
     for (const locale of ['en', 'zh'] as const) {
-      const guide = findApiGuide('storage-contract', 'index', symbolName, locale)
-      assert.ok(guide, `storage-contract:index#${symbolName} has no ${locale} codec/error guide`)
+      /** Runtime guides follow their canonical authoring owner; pure guards stay at contract root. */
+      const libraryName = moduleName === 'index' ? 'storage-contract' : 'storage-host'
+      const guide = findApiGuide(libraryName, moduleName, symbolName, locale)
+      assert.ok(
+        guide,
+        `${libraryName}:${moduleName}#${symbolName} has no ${locale} codec/error guide`
+      )
       assert.ok(guide.quickStart?.trim())
       assert.ok(guide.scenarios.length >= 3)
       assert.ok(guide.avoidWhen.length >= 3)

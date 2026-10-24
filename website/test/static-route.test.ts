@@ -3917,10 +3917,10 @@ test('gives primary tasks independent bilingual pages', () => {
       'Stop accepting work and shut down after parent loss',
       'Keep shutdown and exit callbacks separate'
     ],
-    ['/zh/docs/storage-contract', '在存储边界固定输入与错误语义', '为什么选它'],
+    ['/zh/docs/storage-contract', '用同一契约连接存储实现', '为什么选它'],
     [
       '/en/docs/storage-contract',
-      'Capture inputs and failures at storage boundaries',
+      'Connect storage implementations through one contract',
       'Why choose it'
     ],
     ['/zh/docs/storage-contract/getting-started', '安装并保存第一项偏好', '字符串存储的完整方法'],

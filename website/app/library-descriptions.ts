@@ -36,18 +36,24 @@ export const LIBRARY_REFERENCE_DESCRIPTIONS_ZH = {
   serialize: '把应用数据编码为可存储或传输的格式，并在读取时解码。',
   'storage-contract': '定义键值、记录、向量、RDF 与对象存储能力、查询和事务契约。',
   'storage-web': '通过宿主插件读写 Web Storage、Cookie 与 IndexedDB，按需启用响应式查询。',
-  'storage-host': '安装存储后端与 Feature，隔离组织数据，并提供内存后端、实体仓储与持久日志桥。',
+  'storage-host':
+    '把内存、数据库和文件后端装到同一个存储宿主（host），用带类型的 backend(id) 获取对应存储，并统一结束工作与释放资源。适合同时使用多个数据源、需要组织隔离或事务的应用：先安装后端插件，再选择各后端提供的能力；多个后端的写入不会自动合成一个原子事务。',
   'storage-plugin-redis':
-    '通过原生客户端读写 Redis 或 Valkey，并按需安装 Streams、发布订阅与检索能力。',
+    '把 Redis 或 Valkey 接到统一存储接口，集中处理组织键、过期时间、记录查询和显式键锁，减少业务代码逐次拼接物理键和补写期限的负担。选择已连接客户端对应的驱动并安装插件后，可按需增加 Streams、限流或向量检索；可用能力取决于服务模块与驱动，Redis 的事务部分失败限制仍然适用。',
   'storage-plugin-postgres':
-    '通过原生 PostgreSQL 事务读写数据，按需接入 pgvector、通知与逻辑复制。',
+    '把 PostgreSQL 接到统一存储接口，避免文本、记录、过期时间和应用 SQL 分别提交时出现一半更新成功的情况。将已有客户端或连接池交给对应驱动，再把插件安装到 host，就能在同一数据库事务中组合这些操作；通知、逻辑复制和向量等能力按需选择，客户端仍由应用负责关闭。',
   'storage-plugin-sqlite':
-    '通过 Node 或 Bun 原生 SQLite 连接读写数据，在同一事务中使用存储和 SQL。',
-  'storage-plugin-qdrant': '管理 Qdrant 向量集合，执行相似度查询并按需安装混合检索与管理能力。',
-  'storage-plugin-sparql': '通过 SPARQL 协议或 Oxigraph 管理 RDF，执行查询与有条件的批量更新。',
-  'storage-plugin-object': '通过文件系统或 S3 存储对象，使用流式读写、条件写入与可选签名链接。',
-  'storage-plugin-cache': '组合已安装的存储层进行缓存读取、回填与写入，并按需安装语义缓存。',
-  'storage-plugin-archive': '将事务型热存储中的记录显式归档到对象冷存储，并提供读取、恢复与清扫。',
+    '用运行时内置的 SQLite 保存本地设置、离线记录和缓存，让文本、记录、过期时间与应用 SQL 可以在同一个数据库事务内提交。选择运行时对应的驱动和数据库文件或内存库，再把插件安装到 host，无需另装 npm 原生数据库扩展；连接由应用创建和关闭，根入口不自动选择或加载驱动。',
+  'storage-plugin-qdrant':
+    '把应用向量及其属性保存到真实 Qdrant 服务，通过查询链完成近邻搜索、筛选和支持的重排，减少业务代码手写原生请求与组织条件的重复工作。将配置服务地址的插件安装到 host 后，再选择 vector 能力和集合；标准查询在排名前处理组织与期限条件，过期数据的物理清理由应用显式执行。',
+  'storage-plugin-sparql':
+    '把 RDF 数据写入远程 SPARQL 端点或本地 Oxigraph，并用查询链读取、筛选和修改四元组，也就是包含主语、谓词、对象和图的数据。选择 HTTP 或 Oxigraph 适配后安装插件，应用可用 RDF 值构造查询，并通过 expect 声明提交时必须仍存在的四元组；网络写入结果未知时不会自动重试。',
+  'storage-plugin-object':
+    '用同一套 blob API 将附件、导出文件等二进制内容保存到专用目录或 S3，并按需读取完整字节、流或指定范围。选择文件或 S3 驱动，再把 object 插件安装到 host，即可使用组织隔离与读取资源释放；条件写入须由所选驱动和服务实际支持，本包不提供普通键值存储或事务。',
+  'storage-plugin-cache':
+    '把已安装的键值后端按快慢顺序组合成多级缓存，让重复查询共享回源结果，并把下层读到的数据补到上层。适合同时使用内存和持久存储、又不想逐次手写回填与失效传播的应用；可设置缓存期限、缺失值缓存和延后写入，各层之间不提供原子提交，延后写入也不是持久队列。',
+  'storage-plugin-archive':
+    '把不常访问的旧记录从日常读写的热存储移到 blob 对象存储，减少热表需要保留的历史数据，同时保留按原键读取和显式恢复的入口。将插件接到已安装的热后端和对象后端后，由应用主动运行归档规则；归档按段提交，不把整个任务当成跨存储事务。',
   'store-devtools': '查看 Store 的状态与 action 历史，通过时间旅行和依赖树定位状态变化。',
   'store-indexed': '在对象、数组、Map 和 Set 中按键或索引订阅变化，让相关计算随集合更新。',
   'store-keyed': '在独立作用域中按业务 key 管理状态，并只订阅需要的部分。',
@@ -106,23 +112,23 @@ export const LIBRARY_REFERENCE_DESCRIPTIONS_EN = {
   'storage-web':
     'Read and write Web Storage, cookies and IndexedDB through host plugins, with optional reactive queries.',
   'storage-host':
-    'Install storage backends and Features, isolate organization data, and use memory storage, entity repositories and durable journal bridges.',
+    'Bring memory, database and file backends into one storage host, select each through typed backend(id) calls, and finish storage work with one cleanup entry point. Use it when an application needs several data sources, organization isolation or transactions: install the relevant plugins, then select the capabilities each backend provides. Writes across separate backends do not automatically form one atomic transaction.',
   'storage-plugin-redis':
-    'Read and write Redis or Valkey through native clients and optionally install Streams, pubsub and search capabilities.',
+    'Use Redis or Valkey through one storage API that handles organization keys, expiry, record queries and explicit key locks, reducing repeated key-prefix and expiry code. Choose a driver for your connected client or pool, install the plugin, and add Streams, rate limiting or vector search when needed. Available capabilities depend on the server modules and driver; Redis transaction partial-failure limits still apply.',
   'storage-plugin-postgres':
-    'Read and write data through native PostgreSQL transactions and optionally add pgvector, notifications and logical replication.',
+    'Use PostgreSQL through one storage API when text, records, expiry and application SQL must commit together rather than leave half an update saved. Pass an existing client or pool to its driver and install the plugin in a host, then combine these operations in the same database transaction. Select notifications, logical replication or vectors separately when needed; your application still closes the client.',
   'storage-plugin-sqlite':
-    'Read and write through native Node or Bun SQLite connections and share storage and SQL within one transaction.',
+    "Store local settings, offline records and caches with the runtime's built-in SQLite, combining text, records, expiry and application SQL in one database transaction. Select the driver for your runtime and a database file or in-memory database, then install the plugin in a host without adding an npm native database extension. Your application creates and closes the connection; the root import does not choose or load a driver automatically.",
   'storage-plugin-qdrant':
-    'Manage Qdrant vector collections, run similarity queries and optionally install hybrid search and management features.',
+    'Store vectors and their payloads in a real Qdrant service, then use query chains for nearest-neighbor search, filtering and supported reranking instead of repeating native requests and organization filters throughout the application. Configure the service URL, install the plugin in a host, and select the vector capability and a collection. Standard queries apply organization and expiry filters before ranking; physically removing expired points is an explicit application operation.',
   'storage-plugin-sparql':
-    'Manage RDF through the SPARQL protocol or Oxigraph, execute queries and submit conditional batch updates.',
+    'Write RDF to a remote SPARQL endpoint or local Oxigraph store and use query chains to read, filter and change quads: data made of a subject, predicate, object and graph. Install the plugin with an HTTP or Oxigraph adapter, construct queries from RDF values, and use expect to require specific quads to remain present at commit. A network write with an unknown outcome is not retried automatically.',
   'storage-plugin-object':
-    'Store objects through the filesystem or S3 with streaming reads and writes, conditional updates and optional signed URLs.',
+    'Save attachments, exports and other binary content in a dedicated directory or S3 through the same blob API, then read complete bytes, a stream or a selected range. Choose a file or S3 driver and install the object plugin in a host to use organization isolation and disposable reads. Conditional writes require support from the selected driver and service; this package does not provide ordinary key-value storage or transactions.',
   'storage-plugin-cache':
-    'Combine installed storage tiers for cache reads, backfill and writes, with an optional semantic cache.',
+    'Arrange installed key-value backends from faster to slower cache tiers, share loads for repeated requests, and fill upper tiers from lower ones. Use it to combine memory and persistent storage without writing refill and invalidation logic at every call. Configure expiry, caching of missing results and optional delayed writes as needed; tiers do not commit atomically, and delayed writes are not a durable queue.',
   'storage-plugin-archive':
-    'Explicitly archive records from transactional hot storage to object cold storage, then read, restore or sweep them.',
+    'Move rarely read records out of the storage used for everyday updates and into blob storage, while keeping reads by original key and an explicit restore operation. Connect the plugin to installed hot and object backends, then run archive rules when your application chooses. Each segment commits separately; the whole archive job is not a transaction across both stores.',
   'store-devtools':
     'Inspect Store state and action history and use time travel and dependency trees to investigate changes.',
   'store-indexed':

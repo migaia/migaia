@@ -19845,7 +19845,7 @@
         {
           "name": "IStorageChange",
           "kind": "type",
-          "signature": "export type IStorageChange = { /** * Provider-supplied sequence value; ordering and delivery guarantees belong to the * implementation. */ readonly sequence: number; /** Provider-supplied identity of the change's origin. */ readonly origin: string; /** Optional organization identity supplied by the original host context; never a routing grant. */ readonly orgId?: string; /** Affected public channel: value, bytes, record, or all for a broad invalidation. */ readonly channel: 'value' | 'bytes' | 'record' | 'all'; /** Operation category: put, remove, clear, batch, or migrate. */ readonly kind: 'put' | 'remove' | 'clear' | 'batch' | 'migrate'; /** Optional provider-defined scope associated with this invalidation. */ readonly scope?: string; /** Optional affected keys; omission supplies no exact key list. */ readonly keys?: readonly IStorageKey[]; };",
+          "signature": "export type IStorageChange = { /** * Provider-supplied sequence value; ordering and delivery guarantees belong to the * implementation. */ readonly sequence: number; /** Provider-supplied identity of the change's origin. */ readonly origin: string; /** Optional organization identity supplied by the original host context; never a routing grant. */ readonly orgId?: string; /** Affected public channel: value, bytes, record, or all for a broad invalidation. */ readonly channel: 'value' | 'bytes' | 'record' | 'all'; /** A reset without orgId invalidates every organization; routed resets affect that org only. */ readonly kind: 'put' | 'remove' | 'clear' | 'batch' | 'migrate' | 'reset'; /** Optional provider-defined scope associated with this invalidation. */ readonly scope?: string; /** Optional affected keys; omission supplies no exact key list. */ readonly keys?: readonly IStorageKey[]; };",
           "declarationLine": 6,
           "source": "packages/storage-contract/dist/change-feed.d.ts",
           "purpose": "Backend-issued post-commit invalidation record, identifying the affected channel and operation without carrying authoritative stored values.",
@@ -19898,10 +19898,10 @@
               "name": "kind",
               "kind": "property",
               "optional": false,
-              "signature": "readonly kind: 'put' | 'remove' | 'clear' | 'batch' | 'migrate';",
-              "description": "Operation category: put, remove, clear, batch, or migrate.",
+              "signature": "readonly kind: 'put' | 'remove' | 'clear' | 'batch' | 'migrate' | 'reset';",
+              "description": "A reset without orgId invalidates every organization; routed resets affect that org only.",
               "parameterDetails": [],
-              "returns": "'put' | 'remove' | 'clear' | 'batch' | 'migrate'"
+              "returns": "'put' | 'remove' | 'clear' | 'batch' | 'migrate' | 'reset'"
             },
             {
               "name": "scope",
@@ -19926,7 +19926,7 @@
           "aliasOf": "IStorageChange",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IStorageChange = { /** * Provider-supplied sequence value; ordering and delivery guarantees belong to the * implementation. */ readonly sequence: number; /** Provider-supplied identity of the change's origin. */ readonly origin: string; /** Optional organization identity supplied by the original host context; never a routing grant. */ readonly orgId?: string; /** Affected public channel: value, bytes, record, or all for a broad invalidation. */ readonly channel: 'value' | 'bytes' | 'record' | 'all'; /** Operation category: put, remove, clear, batch, or migrate. */ readonly kind: 'put' | 'remove' | 'clear' | 'batch' | 'migrate'; /** Optional provider-defined scope associated with this invalidation. */ readonly scope?: string; /** Optional affected keys; omission supplies no exact key list. */ readonly keys?: readonly IStorageKey[]; };"
+            "export type IStorageChange = { /** * Provider-supplied sequence value; ordering and delivery guarantees belong to the * implementation. */ readonly sequence: number; /** Provider-supplied identity of the change's origin. */ readonly origin: string; /** Optional organization identity supplied by the original host context; never a routing grant. */ readonly orgId?: string; /** Affected public channel: value, bytes, record, or all for a broad invalidation. */ readonly channel: 'value' | 'bytes' | 'record' | 'all'; /** A reset without orgId invalidates every organization; routed resets affect that org only. */ readonly kind: 'put' | 'remove' | 'clear' | 'batch' | 'migrate' | 'reset'; /** Optional provider-defined scope associated with this invalidation. */ readonly scope?: string; /** Optional affected keys; omission supplies no exact key list. */ readonly keys?: readonly IStorageKey[]; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -19965,7 +19965,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-contract/dist/change-feed.d.ts:IStorageChange:export type IStorageChange = { /** * Provider-supplied sequence value; ordering and delivery guarantees belong to the * implementation. */ readonly sequence: number; /** Provider-supplied identity of the change's origin. */ readonly origin: string; /** Optional organization identity supplied by the original host context; never a routing grant. */ readonly orgId?: string; /** Affected public channel: value, bytes, record, or all for a broad invalidation. */ readonly channel: 'value' | 'bytes' | 'record' | 'all'; /** Operation category: put, remove, clear, batch, or migrate. */ readonly kind: 'put' | 'remove' | 'clear' | 'batch' | 'migrate'; /** Optional provider-defined scope associated with this invalidation. */ readonly scope?: string; /** Optional affected keys; omission supplies no exact key list. */ readonly keys?: readonly IStorageKey[]; };",
+          "identity": "packages/storage-contract/dist/change-feed.d.ts:IStorageChange:export type IStorageChange = { /** * Provider-supplied sequence value; ordering and delivery guarantees belong to the * implementation. */ readonly sequence: number; /** Provider-supplied identity of the change's origin. */ readonly origin: string; /** Optional organization identity supplied by the original host context; never a routing grant. */ readonly orgId?: string; /** Affected public channel: value, bytes, record, or all for a broad invalidation. */ readonly channel: 'value' | 'bytes' | 'record' | 'all'; /** A reset without orgId invalidates every organization; routed resets affect that org only. */ readonly kind: 'put' | 'remove' | 'clear' | 'batch' | 'migrate' | 'reset'; /** Optional provider-defined scope associated with this invalidation. */ readonly scope?: string; /** Optional affected keys; omission supplies no exact key list. */ readonly keys?: readonly IStorageKey[]; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],

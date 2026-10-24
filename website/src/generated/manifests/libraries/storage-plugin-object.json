@@ -10,58 +10,181 @@
       "readme": {
         "sections": [
           {
-            "id": "对象存储后端",
-            "heading": "对象存储后端",
+            "id": "migaia-storage-plugin-object",
+            "heading": "@migaia/storage-plugin-object",
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "`@migaia/storage-plugin-object` 通过原生文件系统或 S3 兼容服务提供共享 `blob` 能力。根工厂不加载 SDK 或打开目录。安装真实 peer：`@migaia/storage-host`、`@aws-sdk/client-s3` 和 `@aws-sdk/s3-request-presigner`。"
-              },
-              {
-                "type": "code",
-                "language": "ts",
-                "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { blob } from '@migaia/storage-contract'\nimport { objectBackendPlugin } from '@migaia/storage-plugin-object'\nimport { fsObjectDriver } from '@migaia/storage-plugin-object/fs'\n\nawait using host = await createStorageHost({\n  plugins: [objectBackendPlugin({ driver: fsObjectDriver({ root: './objects' }) })] as const\n})\nconst objects = host.backend('object').use(blob)\nconst info = await objects.put('photo', new Uint8Array([1, 2, 3]), {\n  contentType: 'application/octet-stream',\n  metadata: { owner: 'ada' }\n})\nconst object = await objects.get('photo', { range: { start: 1, end: 2 } })\nif (object) {\n  try {\n    console.log(object.info.size, await object.bytes())\n  } finally {\n    await object.dispose()\n  }\n}\nawait objects.put('photo', new Uint8Array([4]), { ifMatch: info.etag })"
+                "text": "用同一套 `blob` API 将附件、导出文件等二进制内容保存到专用目录或 S3，并按需读取完整字节、流或指定范围。选择文件或 S3 驱动，再把 object 插件安装到 host，即可使用组织隔离与读取资源释放；条件写入须由所选驱动和服务实际支持，本包不提供普通键值存储或事务。"
               },
               {
                 "type": "paragraph",
-                "text": "文件系统入口识别 Node、Bun、Deno，只加载对应原生适配。一个真实目录仅支持本进程内一个写实例；不要跨进程共享或混入其它文件。一次 pointer rename 同时发布不可变数据与元数据；覆盖或删除不改变已打开读句柄的快照。SHA-256 标识内容，相同内容的写入可能保留 etag。这里只保证原子可见性，不承诺 fsync 级掉电耐久。"
-              },
-              {
-                "type": "paragraph",
-                "text": "`get` 返回一次内容快照，只能选择一次 `stream()` 或 `bytes()`。EOF 和 cancel 释放底层资源，未消费对象须 dispose。范围 end 为闭区间，`info.size` 始终是完整大小。缺失 get/head 返回 undefined；remove 返回删除前是否观察到对象。"
+                "text": "English · 使用指南"
               }
             ]
           },
           {
-            "id": "s3",
-            "heading": "S3",
+            "id": "你可能遇到过",
+            "heading": "你可能遇到过",
             "blocks": [
               {
-                "type": "code",
-                "language": "ts",
-                "code": "import { s3ObjectDriver } from '@migaia/storage-plugin-object/s3'\nimport { objectPresignFeature } from '@migaia/storage-plugin-object/features/presign'\n\nconst plugin = objectBackendPlugin(\n  {\n    driver: s3ObjectDriver({\n      config: { region: 'us-east-1', endpoint: 'http://127.0.0.1:19000', forcePathStyle: true },\n      bucket: 'objects',\n      prefix: 'app/'\n    })\n  },\n  { presign: objectPresignFeature() }\n)"
-              },
-              {
-                "type": "paragraph",
-                "text": "传入的 `client` 属于借用，始终不销毁；`config` 分支在安装时创建自有客户端。凭据沿 SDK 原有提供方。检测在保留前缀随机对象上验证单次条件写；权限或条件不支持只报告，不中断宿主创建。无条件操作仍按真实权限执行，条件 multipart 按实际 Complete 请求判定，不降级。"
-              },
-              {
-                "type": "paragraph",
-                "text": "未知长度流及至少 16 MiB 的字节值使用 multipart；默认每段 8 MiB、并发四段，缓冲上限为五段加输入当前块。修改 command 局部禁用 SDK 重试及区域重定向，借用 client 配置不变。发出提交但确认未知时为 `OBJECT_COMMIT_UNKNOWN`，重放前先 head；已确认写后补读元数据失败为 `OBJECT_FAILED`，附 `committed: true`。"
-              },
-              {
-                "type": "paragraph",
-                "text": "S3 metadata 名称为小写 HTTP token，值为无换行 ASCII 头字节。etag 不透明，updatedAt 来自原生 LastModified。上传签名返回调用方必须携带的所有内容、metadata 和条件头。期限为 1 至 604800 的整数秒，默认 900，不能超过凭据有效期；签名不执行上传或下载。"
+                "type": "list",
+                "items": [
+                  "数据文件写好了，元数据还没更新就被读走：两次文件写入分别可见。",
+                  "两个请求都按旧版本覆盖文件：更新前的检查与写入之间没有保护。",
+                  "只要文件的一小段，却读进了整个文件：接口没有范围读取。",
+                  "提前结束下载后句柄还开着：流与资源释放没有配套使用。"
+                ]
               }
             ]
           },
           {
-            "id": "组织与分页",
-            "heading": "组织与分页",
+            "id": "为什么选它",
+            "heading": "为什么选它",
+            "blocks": [
+              {
+                "type": "list",
+                "items": [
+                  "本地驱动把内容与元数据一起发布；已打开的读取仍看到原内容。本地文件",
+                  "`get()` 返回可释放对象，可选择 `bytes()` 或 `stream()`，也能指定闭区间范围。流与范围",
+                  "S3 驱动区分写入失败、提交未知和写后元数据失败，便于决定如何恢复。S3",
+                  "组织视图隔离逻辑键，分页游标绑定组织与前缀。组织与分页"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "从这里开始",
+            "heading": "从这里开始",
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "通过 `host.org(orgId).backend('object').use(blob)` 获取不可变组织视图，首次写不建立注册数据。物理键复用共享组织元组与保序编码，返回键仍是逻辑键。`list({ prefix, limit, after })` 默认每页 100，按 UTF-16 字典序排列。游标绑定同一后端安装、组织和前缀，不承诺跨页快照。`removeByPrefix('')` 只清本组织。缓存与归档经宿主消费 `blob`，不依赖驱动文件。"
+                "text": "目录应专供这个插件使用。下面写入 `hello`，再从实际文件读取。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { blob } from '@migaia/storage-contract'\nimport { objectBackendPlugin } from '@migaia/storage-plugin-object'\nimport { fsObjectDriver } from '@migaia/storage-plugin-object/fs'\n\nconst host = await createStorageHost({\n  plugins: [objectBackendPlugin({ driver: fsObjectDriver({ root: './example-objects' }) })]\n})\ntry {\n  const objects = host.backend('object').use(blob)\n  await objects.put('greeting', new TextEncoder().encode('hello'))\n  const object = await objects.get('greeting')\n  if (object) {\n    try {\n      console.log(new TextDecoder().decode(await object.bytes()))\n    } finally {\n      // hello\n      await object.dispose()\n    }\n  }\n  await objects.remove('greeting')\n} finally {\n  await host.dispose()\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "预期输出："
+              },
+              {
+                "type": "code",
+                "language": "text",
+                "code": "hello"
+              }
+            ]
+          },
+          {
+            "id": "手写时的隐患",
+            "heading": "手写时的隐患",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "直接写文件可以保存字节，但元数据与并发更新还需要额外设计："
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { writeFile, readFile } from 'node:fs/promises'\n\nawait writeFile('./example.bin', new Uint8Array([1, 2, 3])) // 写入途中可能被其它请求读取。\nawait writeFile('./example.meta', JSON.stringify({ size: 3 })) // 与内容不是同一次发布。\nconsole.log(await readFile('./example.bin')) // 全量读入；没有范围或 etag 条件。"
+              }
+            ]
+          },
+          {
+            "id": "三分钟理解",
+            "heading": "三分钟理解",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "`选择 fs/S3 driver → 安装 objectBackendPlugin → use(blob) → put/get → 释放读取对象与宿主`。"
+              },
+              {
+                "type": "table",
+                "headers": ["名称", "含义"],
+                "rows": [
+                  ["key", "应用逻辑键，不是目录中的文件路径"],
+                  ["`IBlobInfo`", "完整对象大小、etag、内容类型、metadata 与更新时间"],
+                  ["`IBlobObject`", "一次读取的内容与释放方法"],
+                  ["etag", "传回后端用于条件写的标识，不应自行解析"],
+                  ["driver", "选择本地目录或 S3 客户端的配置"]
+                ]
+              }
+            ]
+          },
+          {
+            "id": "常见场景",
+            "heading": "常见场景",
+            "blocks": [
+              {
+                "type": "table",
+                "headers": ["想做什么", "组合", "示例"],
+                "rows": [
+                  ["保存本地附件，避免覆盖别人更新", "fs + `ifMatch`", "本地与条件"],
+                  ["处理大文件或部分内容", "流 + range", "流与范围"],
+                  ["使用 S3 或兼容服务", "s3 driver", "S3"],
+                  ["生成上传或下载链接", "presign Feature，仅 S3", "签名链接"],
+                  ["多组织附件与翻页", "host org + blob list", "组织与分页"]
+                ]
+              }
+            ]
+          },
+          {
+            "id": "安装",
+            "heading": "安装",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "这些 storage 包当前是 `private: true` 的仓库 workspace 包，尚不作为已发布的 registry 包提供。在仓库内消费包添加："
+              },
+              {
+                "type": "code",
+                "language": "bash",
+                "code": "pnpm add --workspace @migaia/storage-plugin-object @migaia/storage-host @migaia/storage-contract\npnpm add @aws-sdk/client-s3@^3.1140.0 @aws-sdk/s3-request-presigner@^3.1140.0"
+              },
+              {
+                "type": "paragraph",
+                "text": "SDK 是包声明的真实 peer。本地 `/fs` 入口按 Node、Bun、Deno 选择原生文件适配；S3 使用独立 `/s3` 入口，签名使用 `/features/presign`。根插件工厂不会打开目录或创建客户端，资源在安装时打开。包声明 Node.js `>=24`。"
+              }
+            ]
+          },
+          {
+            "id": "常用-api",
+            "heading": "常用 API",
+            "blocks": [
+              {
+                "type": "table",
+                "headers": ["API", "用途"],
+                "rows": [
+                  [
+                    "`objectBackendPlugin({ id?, driver }, features?)`",
+                    "安装后端，默认 ID 为 `object`"
+                  ],
+                  ["`fsObjectDriver({ root })` / `s3ObjectDriver(options)`", "选择本地目录或 S3"],
+                  ["`store.use(blob).put/get/head`", "写内容、开读取对象、只读元数据"],
+                  ["`object.bytes()` / `stream()` / `dispose()`", "消费一次内容并释放"],
+                  ["`remove` / `removeByPrefix` / `list`", "删除或分页枚举本组织对象"],
+                  ["`objectPresignFeature()`", "明确选择 S3 签名 API"]
+                ]
+              }
+            ]
+          },
+          {
+            "id": "使用边界",
+            "heading": "使用边界",
+            "blocks": [
+              {
+                "type": "list",
+                "items": [
+                  "后端提供 blob，不提供普通 KV 或事务。逻辑键是字符串，空字符串也合法。metadata 值为字符串；S3 另要求名称为小写 HTTP token、值为无换行的 ASCII 头字节。",
+                  "一个真实目录只支持本进程内一个写实例；跨进程共享不受支持。目录必须可信且专用，不要放其它应用文件。文件更新提供原子可见性，不保证 fsync 级掉电耐久。文件 etag 基于内容 SHA-256，同字节内容可能保留同一 etag，不能把它当每次更新递增的版本号。",
+                  "`get/head` 缺失返回 `undefined`；`remove` 返回删除前是否观察到对象。`get` 的 `stream/bytes` 共享一次消费机会；EOF 或 cancel 释放底层读取，未消费或提前结束应显式 dispose。",
+                  "range 的 `start`、`end` 是非负安全整数，end 为闭区间；省略 end 读到末尾。`info.size` 始终是完整大小。范围起点超过内容时返回空内容，不把对象当作缺失。",
+                  "`ifMatch` 与 `ifNoneMatch: true` 互斥，条件失败报 `WRITE_CONFLICT`。S3 条件能力由检测确认；不支持时条件写报 `UNSUPPORTED_CAPABILITY`，不会退回无条件写。",
+                  "对象错误 source 为 `storage.backend.object`。`OBJECT_DATA_INVALID` 表示数据或响应不完整；`OBJECT_COMMIT_UNKNOWN` 表示提交确认未知；`OBJECT_FAILED` 可能带 `committed: true`，表示写入已确认而后续元数据读取失败。先检查状态再决定重试。",
+                  "`host.org(uuid).backend('object').use(blob)` 隔离组织；关闭宿主释放读资源和自建 S3 客户端。调用方传入的 `S3Client` 始终借用，需调用方自己关闭。"
+                ]
               }
             ]
           }
@@ -70,48 +193,129 @@
       "guide": {
         "sections": [
           {
-            "id": "对象存储后端",
-            "heading": "对象存储后端",
+            "id": "object-使用指南",
+            "heading": "object 使用指南",
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "`@migaia/storage-plugin-object` 通过原生文件系统或 S3 兼容服务提供共享 `blob` 能力。根工厂不加载 SDK 或打开目录。安装真实 peer：`@migaia/storage-host`、`@aws-sdk/client-s3` 和 `@aws-sdk/s3-request-presigner`。"
+                "text": "English · 概览与安装"
               },
               {
-                "type": "code",
-                "language": "ts",
-                "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { blob } from '@migaia/storage-contract'\nimport { objectBackendPlugin } from '@migaia/storage-plugin-object'\nimport { fsObjectDriver } from '@migaia/storage-plugin-object/fs'\n\nawait using host = await createStorageHost({\n  plugins: [objectBackendPlugin({ driver: fsObjectDriver({ root: './objects' }) })] as const\n})\nconst objects = host.backend('object').use(blob)\nconst info = await objects.put('photo', new Uint8Array([1, 2, 3]), {\n  contentType: 'application/octet-stream',\n  metadata: { owner: 'ada' }\n})\nconst object = await objects.get('photo', { range: { start: 1, end: 2 } })\nif (object) {\n  try {\n    console.log(object.info.size, await object.bytes())\n  } finally {\n    await object.dispose()\n  }\n}\nawait objects.put('photo', new Uint8Array([4]), { ifMatch: info.etag })"
-              },
-              {
-                "type": "paragraph",
-                "text": "文件系统入口识别 Node、Bun、Deno，只加载对应原生适配。一个真实目录仅支持本进程内一个写实例；不要跨进程共享或混入其它文件。一次 pointer rename 同时发布不可变数据与元数据；覆盖或删除不改变已打开读句柄的快照。SHA-256 标识内容，相同内容的写入可能保留 etag。这里只保证原子可见性，不承诺 fsync 级掉电耐久。"
-              },
-              {
-                "type": "paragraph",
-                "text": "`get` 返回一次内容快照，只能选择一次 `stream()` 或 `bytes()`。EOF 和 cancel 释放底层资源，未消费对象须 dispose。范围 end 为闭区间，`info.size` 始终是完整大小。缺失 get/head 返回 undefined；remove 返回删除前是否观察到对象。"
+                "type": "table",
+                "headers": ["你的问题", "看这里"],
+                "rows": [
+                  ["保存本地内容并检查覆盖条件", "本地文件与条件写入"],
+                  ["不把整个大文件读入内存", "流与范围读取"],
+                  ["使用远程桶和 multipart", "使用 S3"],
+                  ["让客户端直接上传或下载", "生成签名链接"],
+                  ["隔离组织文件与翻页", "组织与分页"],
+                  ["判断失败后能否重试", "错误与结束工作"]
+                ]
               }
             ]
           },
           {
-            "id": "s3",
-            "heading": "S3",
+            "id": "本地文件与条件写入",
+            "heading": "本地文件与条件写入",
             "blocks": [
+              {
+                "type": "paragraph",
+                "text": "`root` 是非空目录路径，目录由插件专用。下面先写入并读取，再只在 etag 仍匹配时覆盖。"
+              },
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { s3ObjectDriver } from '@migaia/storage-plugin-object/s3'\nimport { objectPresignFeature } from '@migaia/storage-plugin-object/features/presign'\n\nconst plugin = objectBackendPlugin(\n  {\n    driver: s3ObjectDriver({\n      config: { region: 'us-east-1', endpoint: 'http://127.0.0.1:19000', forcePathStyle: true },\n      bucket: 'objects',\n      prefix: 'app/'\n    })\n  },\n  { presign: objectPresignFeature() }\n)"
+                "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { blob } from '@migaia/storage-contract'\nimport { objectBackendPlugin } from '@migaia/storage-plugin-object'\nimport { fsObjectDriver } from '@migaia/storage-plugin-object/fs'\n\nconst host = await createStorageHost({\n  plugins: [objectBackendPlugin({ driver: fsObjectDriver({ root: './guide-objects' }) })]\n})\ntry {\n  const objects = host.backend('object').use(blob)\n  const info = await objects.put('photo', new Uint8Array([1, 2, 3]), {\n    contentType: 'application/octet-stream',\n    metadata: { author: 'ada' }\n  })\n  const object = await objects.get('photo')\n  if (object) {\n    try {\n      console.log([...(await object.bytes())])\n    } finally {\n      // [1, 2, 3]\n      await object.dispose()\n    }\n  }\n  await objects.put('photo', new Uint8Array([4]), { ifMatch: info.etag })\n  console.log((await objects.head('photo'))?.size) // 1\n  await objects.remove('photo')\n} finally {\n  await host.dispose()\n}"
               },
               {
                 "type": "paragraph",
-                "text": "传入的 `client` 属于借用，始终不销毁；`config` 分支在安装时创建自有客户端。凭据沿 SDK 原有提供方。检测在保留前缀随机对象上验证单次条件写；权限或条件不支持只报告，不中断宿主创建。无条件操作仍按真实权限执行，条件 multipart 按实际 Complete 请求判定，不降级。"
+                "text": "`ifNoneMatch: true` 只在不存在时创建；`ifMatch: etag` 只在当前标识相同才写，两者互斥。失败报 contract `WRITE_CONFLICT`，不覆盖现有内容。etag 应原样传回；文件 etag 由内容哈希生成，同字节内容的再次写入可能不改变它，因此不能检测仅 metadata 的每次变动。"
               },
               {
                 "type": "paragraph",
-                "text": "未知长度流及至少 16 MiB 的字节值使用 multipart；默认每段 8 MiB、并发四段，缓冲上限为五段加输入当前块。修改 command 局部禁用 SDK 重试及区域重定向，借用 client 配置不变。发出提交但确认未知时为 `OBJECT_COMMIT_UNKNOWN`，重放前先 head；已确认写后补读元数据失败为 `OBJECT_FAILED`，附 `committed: true`。"
+                "text": "本地驱动支持 Node、Bun、Deno，安装时选择对应文件适配。一个真实目录只允许本进程一个写实例，不能由多个进程共同写。插件可能清理自己的未完成文件，因此目录要可信且专用。内容与 metadata 通过一次指针替换同时可见，已打开读对象不受后续覆盖或删除影响；此保证不包含掉电耐久或跨进程锁。"
+              }
+            ]
+          },
+          {
+            "id": "流与范围读取",
+            "heading": "流与范围读取",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "上传接受 `Uint8Array` 或未锁定的 `ReadableStream<Uint8Array>`。流块必须是字节数组。下面从流上传四个字节，再读取闭区间 `[1, 2]`。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { blob } from '@migaia/storage-contract'\nimport { objectBackendPlugin } from '@migaia/storage-plugin-object'\nimport { fsObjectDriver } from '@migaia/storage-plugin-object/fs'\n\nconst host = await createStorageHost({\n  plugins: [objectBackendPlugin({ driver: fsObjectDriver({ root: './guide-streams' }) })]\n})\ntry {\n  const objects = host.backend('object').use(blob)\n  const body = new ReadableStream<Uint8Array>({\n    start(controller) {\n      controller.enqueue(new Uint8Array([10, 20, 30, 40]))\n      controller.close()\n    }\n  })\n  await objects.put('sample', body)\n  const object = await objects.get('sample', { range: { start: 1, end: 2 } })\n  if (object) {\n    try {\n      console.log(object.info.size) // 4\n      console.log([...(await object.bytes())]) // [20, 30]\n    } finally {\n      await object.dispose()\n    }\n  }\n  await objects.remove('sample')\n} finally {\n  await host.dispose()\n}"
               },
               {
                 "type": "paragraph",
-                "text": "S3 metadata 名称为小写 HTTP token，值为无换行 ASCII 头字节。etag 不透明，updatedAt 来自原生 LastModified。上传签名返回调用方必须携带的所有内容、metadata 和条件头。期限为 1 至 604800 的整数秒，默认 900，不能超过凭据有效期；签名不执行上传或下载。"
+                "text": "`end` 省略时读到末尾，超出末尾会截短；`start` 超出大小或对象本身为空时返回空流。`info.size` 仍表示完整对象。需要持续消费时，使用 `object.stream().pipeTo(destination)`；不要再调用 `bytes()`。两种方式共享一次消费机会，第二次消费会拒绝。`bytes()` 会聚合所选内容，适合大小可控的读取。"
+              },
+              {
+                "type": "paragraph",
+                "text": "EOF、流错误与 cancel 会释放底层读取。尚未消费、提前停止或异常退出时，仍用 `finally` 释放对象，或 `await using`。对象不能交给多个独立消费者。取消与超时通过 `options.ctx` 提供；上传的流也需要配合取消，不要无限阻塞生产者。"
+              }
+            ]
+          },
+          {
+            "id": "使用-s3",
+            "heading": "使用 S3",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "先创建桶并配置 SDK 能使用的凭据。下面假定 `application-objects` 桶位于 `us-east-1`，使用 SDK 默认凭据链，不把密钥写入代码。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { blob } from '@migaia/storage-contract'\nimport { objectBackendPlugin } from '@migaia/storage-plugin-object'\nimport { s3ObjectDriver } from '@migaia/storage-plugin-object/s3'\n\nconst host = await createStorageHost({\n  plugins: [\n    objectBackendPlugin({\n      driver: s3ObjectDriver({\n        config: { region: 'us-east-1' },\n        bucket: 'application-objects',\n        prefix: 'guide/'\n      })\n    })\n  ]\n})\ntry {\n  const objects = host.backend('object').use(blob)\n  await objects.put('report', new TextEncoder().encode('ready'), { contentType: 'text/plain' })\n  const object = await objects.get('report')\n  if (object) {\n    try {\n      console.log(new TextDecoder().decode(await object.bytes()))\n    } finally {\n      // ready\n      await object.dispose()\n    }\n  }\n  await objects.remove('report')\n} finally {\n  await host.dispose()\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "兼容服务可在 `config` 配置 `endpoint` 与 `forcePathStyle`。`client` 与 `config` 必须二选一：传入 `client` 是借用，宿主不 destroy；传入 `config` 则安装时创建客户端，关闭时销毁。`prefix` 默认 `''`；逻辑键还会按组织编码，所以不要假定它与桶中裸对象名相同。"
+              },
+              {
+                "type": "table",
+                "headers": ["上传选项", "默认与范围"],
+                "rows": [
+                  ["`multipartThresholdBytes`", "`16777216`（16 MiB），正安全整数"],
+                  ["`partBytes`", "`8388608`（8 MiB），至少 `5242880`（5 MiB）的安全整数"],
+                  ["`partConcurrency`", "`4`，正安全整数"]
+                ]
+              },
+              {
+                "type": "paragraph",
+                "text": "未知长度的流及达到阈值的字节数组使用 multipart。默认同时缓冲的上界为五段加输入当前块。上传失败会尝试清理未完成 multipart；清理失败经宿主 report 报告。修改请求局部禁用 SDK 重试与区域重定向，不改调用方 client 的全局配置，避免自动重放结果不明的提交。"
+              },
+              {
+                "type": "paragraph",
+                "text": "默认环境检测先 `HeadBucket`，失败会阻止创建。随后会在保留前缀下写入并删除随机探测对象，验证条件写；缺少相关权限或条件不支持会报告，条件能力保持不可用，而不把无条件操作伪装成条件成功。实际无条件操作仍受服务权限限制。条件 multipart 还必须由服务支持最终 Complete 请求的条件；不支持时拒绝，不回退。"
+              },
+              {
+                "type": "paragraph",
+                "text": "S3 metadata 名称须为小写 HTTP token，值须为无换行 ASCII；contentType 也需合法头值。etag 不透明；updatedAt 使用原生 LastModified。读取范围时，会核对服务的 Content-Range 和内容长度；损坏或不完整响应是错误，不能作为缺失处理。"
+              }
+            ]
+          },
+          {
+            "id": "生成签名链接",
+            "heading": "生成签名链接",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "签名只支持 S3，必须明确选择 `objectPresignFeature()`。下面生成一个带内容类型约束的上传请求；签名本身不上传内容。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { objectBackendPlugin } from '@migaia/storage-plugin-object'\nimport { s3ObjectDriver } from '@migaia/storage-plugin-object/s3'\nimport { objectPresignFeature } from '@migaia/storage-plugin-object/features/presign'\n\nconst host = await createStorageHost({\n  plugins: [\n    objectBackendPlugin(\n      {\n        driver: s3ObjectDriver({ config: { region: 'us-east-1' }, bucket: 'application-objects' })\n      },\n      { presign: objectPresignFeature() }\n    )\n  ]\n})\ntry {\n  const signing = host.backend('object').api.presign\n  const upload = await signing.upload('avatar', {\n    expiresInSeconds: 300,\n    contentType: 'image/png',\n    metadata: { author: 'ada' }\n  })\n  console.log(upload.method, upload.headers) // PUT，以及必须携带的请求头\n  const download = await signing.download('avatar', { expiresInSeconds: 300 })\n  console.log(download.method) // GET\n} finally {\n  await host.dispose()\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "把返回的 `url`、`method` 与全部 `headers` 交给实际 HTTP 客户端。漏掉内容、metadata、条件或 range 头会改变已签名请求。`expiresInSeconds` 为 `1` 到 `604800` 的整数秒，默认 `900`；实际有效期不会超过凭据有效期。上传支持与 `put` 相同的条件，下载支持闭区间 range。不要把临时签名 URL 写进公开日志。"
               }
             ]
           },
@@ -121,7 +325,41 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "通过 `host.org(orgId).backend('object').use(blob)` 获取不可变组织视图，首次写不建立注册数据。物理键复用共享组织元组与保序编码，返回键仍是逻辑键。`list({ prefix, limit, after })` 默认每页 100，按 UTF-16 字典序排列。游标绑定同一后端安装、组织和前缀，不承诺跨页快照。`removeByPrefix('')` 只清本组织。缓存与归档经宿主消费 `blob`，不依赖驱动文件。"
+                "text": "下面在新组织内存两项，再沿返回游标翻页；不要自己构造或跨组织复用游标。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createStorageHost, createOrgId } from '@migaia/storage-host'\nimport { blob } from '@migaia/storage-contract'\nimport { objectBackendPlugin } from '@migaia/storage-plugin-object'\nimport { fsObjectDriver } from '@migaia/storage-plugin-object/fs'\n\nconst host = await createStorageHost({\n  plugins: [\n    objectBackendPlugin({\n      driver: fsObjectDriver({ root: './guide-organizations' })\n    })\n  ]\n})\ntry {\n  const orgId = createOrgId()\n  const objects = host.org(orgId).backend('object').use(blob)\n  await objects.put('photos/a', new Uint8Array([1]))\n  await objects.put('photos/b', new Uint8Array([2]))\n  let after: string | undefined\n  do {\n    const page = await objects.list({ prefix: 'photos/', limit: 1, after })\n    console.log(page.items.map((item) => item.key)) // 依次为 photos/a、photos/b\n    after = page.next\n  } while (after !== undefined)\n  await host.dropOrg(orgId)\n} finally {\n  await host.dispose()\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "`list` 默认 prefix 为 `''`、limit 为 `100`；limit 必须为正安全整数。键按 UTF-16 字典序排列，游标绑定同一安装实例、组织与前缀。分页不承诺跨页快照，翻页期间的并发写入可能改变后续结果。`removeByPrefix('')` 只清当前组织，并返回实际观察到的删除数；它不是跨对象事务。"
+              }
+            ]
+          },
+          {
+            "id": "错误与结束工作",
+            "heading": "错误与结束工作",
+            "blocks": [
+              {
+                "type": "table",
+                "headers": ["错误", "含义与处理"],
+                "rows": [
+                  ["contract `INVALID_ARGUMENT`", "修正键、body、range、条件或头字段"],
+                  ["contract `WRITE_CONFLICT`", "etag 条件失败；重新读取并决定如何合并"],
+                  ["contract `UNSUPPORTED_CAPABILITY`", "驱动、条件写或 Feature 不支持当前组合"],
+                  ["`OBJECT_DATA_INVALID`", "文件数据或服务响应不完整，不要作为不存在处理"],
+                  ["`OBJECT_COMMIT_UNKNOWN`", "已发出提交但确认未知；先 head/读取确认，不盲目重放"],
+                  [
+                    "`OBJECT_FAILED`",
+                    "检查 cause；若 `committed: true`，写入已成功，仅后续元数据失败"
+                  ]
+                ]
+              },
+              {
+                "type": "paragraph",
+                "text": "对象错误 source 是 `storage.backend.object`，共享校验与条件错误来自 `@migaia/storage-contract`。保留 cause 供诊断。显式关闭失败会拒绝；资源语法会报告清理失败，避免覆盖主错误。先释放读取对象，再关闭宿主；调用方注入的 S3Client 仍需自己关闭。关闭不删除已保存内容。"
               }
             ]
           }
@@ -131,58 +369,204 @@
         "readme": {
           "sections": [
             {
-              "id": "object-storage-backend",
-              "heading": "Object storage backend",
+              "id": "migaia-storage-plugin-object",
+              "heading": "@migaia/storage-plugin-object",
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "`@migaia/storage-plugin-object` supplies the shared `blob` capability through a native filesystem or an S3-compatible service. The root factory does not load the SDK or open a directory. Install the real peers `@migaia/storage-host`, `@aws-sdk/client-s3` and `@aws-sdk/s3-request-presigner`."
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { blob } from '@migaia/storage-contract'\nimport { objectBackendPlugin } from '@migaia/storage-plugin-object'\nimport { fsObjectDriver } from '@migaia/storage-plugin-object/fs'\n\nawait using host = await createStorageHost({\n  plugins: [objectBackendPlugin({ driver: fsObjectDriver({ root: './objects' }) })] as const\n})\nconst objects = host.backend('object').use(blob)\nconst info = await objects.put('photo', new Uint8Array([1, 2, 3]), {\n  contentType: 'application/octet-stream',\n  metadata: { owner: 'ada' }\n})\nconst object = await objects.get('photo', { range: { start: 1, end: 2 } })\nif (object) {\n  try {\n    console.log(object.info.size, await object.bytes())\n  } finally {\n    await object.dispose()\n  }\n}\nawait objects.put('photo', new Uint8Array([4]), { ifMatch: info.etag })"
+                  "text": "Save attachments, exports and other binary content in a dedicated directory or S3 through the same `blob` API, then read complete bytes, a stream or a selected range. Choose a file or S3 driver and install the object plugin in a host to use organization isolation and disposable reads. Conditional writes require support from the selected driver and service; this module does not provide ordinary key-value storage or transactions."
                 },
                 {
                   "type": "paragraph",
-                  "text": "The filesystem entry detects Node, Bun or Deno and loads only that runtime's native adapter. One real directory has one writer instance per process. Do not share it between processes or mix unrelated files into it. A pointer rename publishes immutable data and metadata together. Open reads retain their original generation after replacement or removal. SHA-256 identifies content; a same-content write may retain its etag. This is atomic visibility, without an fsync durability guarantee."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`get` returns one content snapshot. Choose `stream()` or `bytes()` once. EOF and cancel release the underlying resource; always dispose an unconsumed object. Range end is inclusive, and `info.size` remains the full size. Missing get/head return undefined; remove returns whether an object was observed before deletion."
+                  "text": "中文 · Usage guide"
                 }
               ]
             },
             {
-              "id": "s3",
-              "heading": "S3",
+              "id": "problems-you-may-have-seen",
+              "heading": "Problems you may have seen",
               "blocks": [
                 {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "import { s3ObjectDriver } from '@migaia/storage-plugin-object/s3'\nimport { objectPresignFeature } from '@migaia/storage-plugin-object/features/presign'\n\nconst plugin = objectBackendPlugin(\n  {\n    driver: s3ObjectDriver({\n      config: { region: 'us-east-1', endpoint: 'http://127.0.0.1:19000', forcePathStyle: true },\n      bucket: 'objects',\n      prefix: 'app/'\n    })\n  },\n  { presign: objectPresignFeature() }\n)"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "An injected `client` is borrowed and never destroyed. A `config` creates an owned client during installation. Credentials follow the SDK's ordinary providers. Service detection uses a reserved random probe object to verify single-put conditional writes. Permission failure or unsupported conditions are reported without failing host creation; unconditional operations retain their native permission behavior. Conditional multipart support is determined by its actual completion request and never downgraded."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "Unknown-length streams and byte values at least 16 MiB use multipart. Defaults are 8 MiB per part and four outstanding parts. The buffer bound is five part buffers plus the current input chunk. Modification commands disable SDK retries and regional redirects locally; the borrowed client's configuration is unchanged. An unknown dispatched commit reports `OBJECT_COMMIT_UNKNOWN`; inspect head before replaying. A confirmed put whose metadata follow-up fails reports `OBJECT_FAILED` with `committed: true`."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "S3 metadata names must be lowercase HTTP tokens; values use ASCII header bytes without newlines. Etag is opaque and updatedAt comes from native LastModified. Signed uploads return every content, metadata and condition header that the caller must send. Expiry is integer seconds from 1 through 604800, default 900, and cannot outlive the credentials. Signing executes no upload or download."
+                  "type": "list",
+                  "items": [
+                    "Readers see a new data file before its metadata is updated because two writes become visible separately.",
+                    "Two requests overwrite a file from the same old version because checking and writing are unprotected.",
+                    "Reading a small section loads the entire file because the API has no range support.",
+                    "An interrupted download leaves a handle open because stream consumption and cleanup are separate."
+                  ]
                 }
               ]
             },
             {
-              "id": "organization-and-paging",
-              "heading": "Organization and paging",
+              "id": "why-choose-it",
+              "heading": "Why choose it",
+              "blocks": [
+                {
+                  "type": "list",
+                  "items": [
+                    "The filesystem driver publishes content and metadata together; an open read keeps its original content. Local files",
+                    "`get()` returns a disposable object with a choice of `bytes()` or `stream()` and inclusive byte ranges. Streams and ranges",
+                    "S3 distinguishes failed writes, unknown commits and failures reading metadata after a write, helping recovery decisions. S3",
+                    "Organization views separate logical keys, and page cursors are tied to organization and prefix. Organizations and pages"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "start-here",
+              "heading": "Start here",
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "Use `host.org(orgId).backend('object').use(blob)` for an immutable organization view. The host creates no registry data on first write. Physical keys use the shared organization tuple and ordered-key encoder; returned keys remain logical. `list({ prefix, limit, after })` defaults to 100 items in UTF-16 lexical order. Cursors bind one backend installation, organization and prefix. Listings have no cross-page snapshot. `removeByPrefix('')` clears only that organization. Cache and archive consume `blob` through the host and do not depend on driver files."
+                  "text": "Use a directory dedicated to this plugin. This example writes `hello` and reads it from the actual filesystem."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { blob } from '@migaia/storage-contract'\nimport { objectBackendPlugin } from '@migaia/storage-plugin-object'\nimport { fsObjectDriver } from '@migaia/storage-plugin-object/fs'\n\nconst host = await createStorageHost({\n  plugins: [objectBackendPlugin({ driver: fsObjectDriver({ root: './example-objects' }) })]\n})\ntry {\n  const objects = host.backend('object').use(blob)\n  await objects.put('greeting', new TextEncoder().encode('hello'))\n  const object = await objects.get('greeting')\n  if (object) {\n    try {\n      console.log(new TextDecoder().decode(await object.bytes()))\n    } finally {\n      // hello\n      await object.dispose()\n    }\n  }\n  await objects.remove('greeting')\n} finally {\n  await host.dispose()\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Expected output:"
+                },
+                {
+                  "type": "code",
+                  "language": "text",
+                  "code": "hello"
+                }
+              ]
+            },
+            {
+              "id": "pitfalls-when-writing-it-yourself",
+              "heading": "Pitfalls when writing it yourself",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Direct file writes save bytes, but metadata and concurrent updates need additional coordination:"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { writeFile, readFile } from 'node:fs/promises'\n\nawait writeFile('./example.bin', new Uint8Array([1, 2, 3])) // Other requests may read mid-write.\nawait writeFile('./example.meta', JSON.stringify({ size: 3 })) // Published separately from content.\nconsole.log(await readFile('./example.bin')) // Full read; no range or etag condition."
+                }
+              ]
+            },
+            {
+              "id": "the-three-minute-model",
+              "heading": "The three-minute model",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`choose fs/S3 driver → install objectBackendPlugin → use(blob) → put/get → release reads and host`."
+                },
+                {
+                  "type": "table",
+                  "headers": ["Term", "Meaning"],
+                  "rows": [
+                    ["Key", "An application key, not a file path within the directory"],
+                    ["`IBlobInfo`", "Full size, etag, content type, metadata and update time"],
+                    ["`IBlobObject`", "Content from one read, together with cleanup"],
+                    [
+                      "Etag",
+                      "A backend identifier to pass back for conditional writes; do not parse it"
+                    ],
+                    ["Driver", "Configuration selecting a directory or S3 client"]
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "common-scenarios",
+              "heading": "Common scenarios",
+              "blocks": [
+                {
+                  "type": "table",
+                  "headers": ["Need", "Composition", "Example"],
+                  "rows": [
+                    [
+                      "Local attachments without overwriting another update",
+                      "fs + `ifMatch`",
+                      "Files and conditions"
+                    ],
+                    ["Large files or partial content", "Stream + range", "Streams and ranges"],
+                    ["S3 or a compatible service", "s3 driver", "S3"],
+                    ["Upload or download links", "Presign Feature, S3 only", "Signed links"],
+                    [
+                      "Organization attachments and paging",
+                      "host org + blob list",
+                      "Organizations and pages"
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "install",
+              "heading": "Install",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "These storage module are currently `private: true` workspace module in this repository, not published registry module. Add them from a consuming module inside the workspace:"
+                },
+                {
+                  "type": "code",
+                  "language": "bash",
+                  "code": "pnpm add --workspace @migaia/storage-plugin-object @migaia/storage-host @migaia/storage-contract\npnpm add @aws-sdk/client-s3@^3.1140.0 @aws-sdk/s3-request-presigner@^3.1140.0"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "The SDK module are declared native peers. `/fs` selects a Node, Bun or Deno file adapter. Use `/s3` for S3 and `/features/presign` for signing. The root plugin factory does not open directories or construct clients; installation opens resources. The module declares Node.js `>=24`."
+                }
+              ]
+            },
+            {
+              "id": "common-apis",
+              "heading": "Common APIs",
+              "blocks": [
+                {
+                  "type": "table",
+                  "headers": ["API", "Purpose"],
+                  "rows": [
+                    [
+                      "`objectBackendPlugin({ id?, driver }, features?)`",
+                      "Install a backend, default ID `object`"
+                    ],
+                    [
+                      "`fsObjectDriver({ root })` / `s3ObjectDriver(options)`",
+                      "Choose a directory or S3"
+                    ],
+                    [
+                      "`store.use(blob).put/get/head`",
+                      "Write content, open a read, or inspect metadata"
+                    ],
+                    [
+                      "`object.bytes()` / `stream()` / `dispose()`",
+                      "Consume content once and release it"
+                    ],
+                    [
+                      "`remove` / `removeByPrefix` / `list`",
+                      "Delete or page through this organization's objects"
+                    ],
+                    ["`objectPresignFeature()`", "Explicitly select S3 signing APIs"]
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "behavior-to-know",
+              "heading": "Behavior to know",
+              "blocks": [
+                {
+                  "type": "list",
+                  "items": [
+                    "This backend provides blob, not ordinary KV or transactions. Logical keys are strings, including the empty string. Metadata values are strings; S3 additionally requires lowercase HTTP-token names and ASCII header values without line breaks.",
+                    "A real directory supports one writer instance in the current process. Sharing it across processes is unsupported. Keep it trusted and dedicated, without unrelated application files. Filesystem updates provide atomic visibility, not fsync-level power-loss durability. File etags are SHA-256 content hashes: the same bytes may retain an etag, so it is not an incrementing update version.",
+                    "Missing `get/head` returns `undefined`. `remove` reports whether it observed an object before deleting. `stream/bytes` share one consumption right. EOF or cancellation releases the read; explicitly dispose unread or abandoned objects.",
+                    "Range `start/end` are nonnegative safe integers; end is inclusive and optional. `info.size` remains the full size. A start beyond the content returns empty bytes, not an absent object.",
+                    "`ifMatch` and `ifNoneMatch: true` are mutually exclusive. Failed conditions use `WRITE_CONFLICT`. S3 conditions require detection support and reject with `UNSUPPORTED_CAPABILITY` when unavailable, without falling back to unconditional writes.",
+                    "Object errors use `source: 'storage.backend.object'`. `OBJECT_DATA_INVALID` means corrupt data or incomplete responses; `OBJECT_COMMIT_UNKNOWN` means commit confirmation is unknown. `OBJECT_FAILED` may include `committed: true` when writing succeeded but follow-up metadata reading failed. Inspect state before retrying.",
+                    "`host.org(uuid).backend('object').use(blob)` separates organizations. Host shutdown releases read resources and S3 clients created from config. A caller-supplied `S3Client` is always borrowed and must be closed by its caller."
+                  ]
                 }
               ]
             }
@@ -191,58 +575,194 @@
         "guide": {
           "sections": [
             {
-              "id": "object-storage-backend",
-              "heading": "Object storage backend",
+              "id": "object-storage-usage-guide",
+              "heading": "Object storage usage guide",
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "`@migaia/storage-plugin-object` supplies the shared `blob` capability through a native filesystem or an S3-compatible service. The root factory does not load the SDK or open a directory. Install the real peers `@migaia/storage-host`, `@aws-sdk/client-s3` and `@aws-sdk/s3-request-presigner`."
+                  "text": "中文 · Overview and installation"
                 },
                 {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { blob } from '@migaia/storage-contract'\nimport { objectBackendPlugin } from '@migaia/storage-plugin-object'\nimport { fsObjectDriver } from '@migaia/storage-plugin-object/fs'\n\nawait using host = await createStorageHost({\n  plugins: [objectBackendPlugin({ driver: fsObjectDriver({ root: './objects' }) })] as const\n})\nconst objects = host.backend('object').use(blob)\nconst info = await objects.put('photo', new Uint8Array([1, 2, 3]), {\n  contentType: 'application/octet-stream',\n  metadata: { owner: 'ada' }\n})\nconst object = await objects.get('photo', { range: { start: 1, end: 2 } })\nif (object) {\n  try {\n    console.log(object.info.size, await object.bytes())\n  } finally {\n    await object.dispose()\n  }\n}\nawait objects.put('photo', new Uint8Array([4]), { ifMatch: info.etag })"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "The filesystem entry detects Node, Bun or Deno and loads only that runtime's native adapter. One real directory has one writer instance per process. Do not share it between processes or mix unrelated files into it. A pointer rename publishes immutable data and metadata together. Open reads retain their original generation after replacement or removal. SHA-256 identifies content; a same-content write may retain its etag. This is atomic visibility, without an fsync durability guarantee."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`get` returns one content snapshot. Choose `stream()` or `bytes()` once. EOF and cancel release the underlying resource; always dispose an unconsumed object. Range end is inclusive, and `info.size` remains the full size. Missing get/head return undefined; remove returns whether an object was observed before deletion."
+                  "type": "table",
+                  "headers": ["Your task", "Start here"],
+                  "rows": [
+                    [
+                      "Save local content and protect overwrites",
+                      "Local files and conditional writes"
+                    ],
+                    ["Avoid reading a whole large file into memory", "Streams and range reads"],
+                    ["Use a remote bucket and multipart uploads", "Use S3"],
+                    ["Let a client upload or download directly", "Create signed links"],
+                    [
+                      "Separate organization files and page through keys",
+                      "Organizations and pagination"
+                    ],
+                    ["Decide whether a failed write can be retried", "Errors and shutdown"]
+                  ]
                 }
               ]
             },
             {
-              "id": "s3",
-              "heading": "S3",
+              "id": "local-files-and-conditional-writes",
+              "heading": "Local files and conditional writes",
               "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`root` is a nonempty path to a dedicated directory. This example writes and reads content, then overwrites only while its etag still matches."
+                },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { s3ObjectDriver } from '@migaia/storage-plugin-object/s3'\nimport { objectPresignFeature } from '@migaia/storage-plugin-object/features/presign'\n\nconst plugin = objectBackendPlugin(\n  {\n    driver: s3ObjectDriver({\n      config: { region: 'us-east-1', endpoint: 'http://127.0.0.1:19000', forcePathStyle: true },\n      bucket: 'objects',\n      prefix: 'app/'\n    })\n  },\n  { presign: objectPresignFeature() }\n)"
+                  "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { blob } from '@migaia/storage-contract'\nimport { objectBackendPlugin } from '@migaia/storage-plugin-object'\nimport { fsObjectDriver } from '@migaia/storage-plugin-object/fs'\n\nconst host = await createStorageHost({\n  plugins: [objectBackendPlugin({ driver: fsObjectDriver({ root: './guide-objects' }) })]\n})\ntry {\n  const objects = host.backend('object').use(blob)\n  const info = await objects.put('photo', new Uint8Array([1, 2, 3]), {\n    contentType: 'application/octet-stream',\n    metadata: { author: 'ada' }\n  })\n  const object = await objects.get('photo')\n  if (object) {\n    try {\n      console.log([...(await object.bytes())])\n    } finally {\n      // [1, 2, 3]\n      await object.dispose()\n    }\n  }\n  await objects.put('photo', new Uint8Array([4]), { ifMatch: info.etag })\n  console.log((await objects.head('photo'))?.size) // 1\n  await objects.remove('photo')\n} finally {\n  await host.dispose()\n}"
                 },
                 {
                   "type": "paragraph",
-                  "text": "An injected `client` is borrowed and never destroyed. A `config` creates an owned client during installation. Credentials follow the SDK's ordinary providers. Service detection uses a reserved random probe object to verify single-put conditional writes. Permission failure or unsupported conditions are reported without failing host creation; unconditional operations retain their native permission behavior. Conditional multipart support is determined by its actual completion request and never downgraded."
+                  "text": "`ifNoneMatch: true` creates only if absent; `ifMatch: etag` writes only when the current identifier matches. They are mutually exclusive. A failed condition uses contract `WRITE_CONFLICT` without overwriting existing content. Pass the etag back unchanged. Filesystem etags are content hashes, so writing the same bytes may leave the etag unchanged; it cannot detect every metadata-only update."
                 },
                 {
                   "type": "paragraph",
-                  "text": "Unknown-length streams and byte values at least 16 MiB use multipart. Defaults are 8 MiB per part and four outstanding parts. The buffer bound is five part buffers plus the current input chunk. Modification commands disable SDK retries and regional redirects locally; the borrowed client's configuration is unchanged. An unknown dispatched commit reports `OBJECT_COMMIT_UNKNOWN`; inspect head before replaying. A confirmed put whose metadata follow-up fails reports `OBJECT_FAILED` with `committed: true`."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "S3 metadata names must be lowercase HTTP tokens; values use ASCII header bytes without newlines. Etag is opaque and updatedAt comes from native LastModified. Signed uploads return every content, metadata and condition header that the caller must send. Expiry is integer seconds from 1 through 604800, default 900, and cannot outlive the credentials. Signing executes no upload or download."
+                  "text": "The filesystem driver supports Node, Bun and Deno, selecting an adapter during installation. A real directory allows one writer in this process and cannot be shared by writing processes. Keep it trusted and dedicated because the plugin may reclaim its unfinished files. A single pointer replacement publishes bytes and metadata together; open read objects retain their content after overwrite or deletion. This does not provide power-loss durability or cross-process locking."
                 }
               ]
             },
             {
-              "id": "organization-and-paging",
-              "heading": "Organization and paging",
+              "id": "streams-and-range-reads",
+              "heading": "Streams and range reads",
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "Use `host.org(orgId).backend('object').use(blob)` for an immutable organization view. The host creates no registry data on first write. Physical keys use the shared organization tuple and ordered-key encoder; returned keys remain logical. `list({ prefix, limit, after })` defaults to 100 items in UTF-16 lexical order. Cursors bind one backend installation, organization and prefix. Listings have no cross-page snapshot. `removeByPrefix('')` clears only that organization. Cache and archive consume `blob` through the host and do not depend on driver files."
+                  "text": "Uploads accept `Uint8Array` or an unlocked `ReadableStream<Uint8Array>`; chunks must be byte arrays. Upload four bytes from a stream, then read inclusive range `[1, 2]`:"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { blob } from '@migaia/storage-contract'\nimport { objectBackendPlugin } from '@migaia/storage-plugin-object'\nimport { fsObjectDriver } from '@migaia/storage-plugin-object/fs'\n\nconst host = await createStorageHost({\n  plugins: [objectBackendPlugin({ driver: fsObjectDriver({ root: './guide-streams' }) })]\n})\ntry {\n  const objects = host.backend('object').use(blob)\n  const body = new ReadableStream<Uint8Array>({\n    start(controller) {\n      controller.enqueue(new Uint8Array([10, 20, 30, 40]))\n      controller.close()\n    }\n  })\n  await objects.put('sample', body)\n  const object = await objects.get('sample', { range: { start: 1, end: 2 } })\n  if (object) {\n    try {\n      console.log(object.info.size) // 4\n      console.log([...(await object.bytes())]) // [20, 30]\n    } finally {\n      await object.dispose()\n    }\n  }\n  await objects.remove('sample')\n} finally {\n  await host.dispose()\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Omit `end` to read through EOF; ends beyond EOF are clipped. A start beyond the size or an empty object returns an empty stream. `info.size` still describes the full object. For continuous consumption use `object.stream().pipeTo(destination)`, then do not call `bytes()`. Both share one consumption right; consuming again rejects. `bytes()` collects the selected content and suits reads with bounded size."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "EOF, stream errors and cancellation release the native read. Use `finally` or `await using` for unread objects, early exits and failures. Do not give one object to multiple independent consumers. Provide cancellation and timeout through `options.ctx`; stream producers must cooperate with cancellation rather than block indefinitely."
+                }
+              ]
+            },
+            {
+              "id": "use-s3",
+              "heading": "Use S3",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Create a bucket and configure credentials the SDK can resolve. This example assumes an `application-objects` bucket in `us-east-1` and uses the SDK's default credential chain rather than hard-coded secrets."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { blob } from '@migaia/storage-contract'\nimport { objectBackendPlugin } from '@migaia/storage-plugin-object'\nimport { s3ObjectDriver } from '@migaia/storage-plugin-object/s3'\n\nconst host = await createStorageHost({\n  plugins: [\n    objectBackendPlugin({\n      driver: s3ObjectDriver({\n        config: { region: 'us-east-1' },\n        bucket: 'application-objects',\n        prefix: 'guide/'\n      })\n    })\n  ]\n})\ntry {\n  const objects = host.backend('object').use(blob)\n  await objects.put('report', new TextEncoder().encode('ready'), { contentType: 'text/plain' })\n  const object = await objects.get('report')\n  if (object) {\n    try {\n      console.log(new TextDecoder().decode(await object.bytes()))\n    } finally {\n      // ready\n      await object.dispose()\n    }\n  }\n  await objects.remove('report')\n} finally {\n  await host.dispose()\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "For compatible services, set `endpoint` and `forcePathStyle` in `config`. Choose exactly one of `client` and `config`. A supplied client is borrowed and never destroyed by the host; config creates a client during installation and destroys it during shutdown. `prefix` defaults to `''`. Logical keys are also encoded for organizations, so do not assume they equal raw bucket object names."
+                },
+                {
+                  "type": "table",
+                  "headers": ["Upload option", "Default and range"],
+                  "rows": [
+                    ["`multipartThresholdBytes`", "`16777216` (16 MiB), positive safe integer"],
+                    ["`partBytes`", "`8388608` (8 MiB), safe integer at least `5242880` (5 MiB)"],
+                    ["`partConcurrency`", "`4`, positive safe integer"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Unknown-length streams and byte arrays at or above the threshold use multipart. Default buffering is bounded by five parts plus the current input chunk. Failed uploads attempt to clean up incomplete multipart state; cleanup failures reach the host report callback. Mutation requests locally disable SDK retries and region redirects without changing the supplied client's global settings, avoiding automatic replay of uncertain commits."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Default environment detection starts with `HeadBucket`; failure prevents host creation. It then writes and deletes random probe objects under a reserved prefix to check conditions. Missing probe permissions or unsupported conditions are reported and leave conditional writes unavailable, rather than treating unconditional writes as conditional success. Actual unconditional operations still require service permissions. Conditional multipart also requires conditions on the final Complete request; unsupported services reject without fallback."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "S3 metadata names must be lowercase HTTP tokens, and values must be ASCII without line breaks. Content type must also be a valid header value. Etags are opaque; updatedAt comes from native LastModified. Range reads verify Content-Range and length; incomplete responses are failures, not missing objects."
+                }
+              ]
+            },
+            {
+              "id": "create-signed-links",
+              "heading": "Create signed links",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Signing is S3-only and requires explicit `objectPresignFeature()` selection. Generate an upload request constrained by content type; signing itself does not upload data."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { objectBackendPlugin } from '@migaia/storage-plugin-object'\nimport { s3ObjectDriver } from '@migaia/storage-plugin-object/s3'\nimport { objectPresignFeature } from '@migaia/storage-plugin-object/features/presign'\n\nconst host = await createStorageHost({\n  plugins: [\n    objectBackendPlugin(\n      {\n        driver: s3ObjectDriver({ config: { region: 'us-east-1' }, bucket: 'application-objects' })\n      },\n      { presign: objectPresignFeature() }\n    )\n  ]\n})\ntry {\n  const signing = host.backend('object').api.presign\n  const upload = await signing.upload('avatar', {\n    expiresInSeconds: 300,\n    contentType: 'image/png',\n    metadata: { author: 'ada' }\n  })\n  console.log(upload.method, upload.headers) // PUT and required request headers\n  const download = await signing.download('avatar', { expiresInSeconds: 300 })\n  console.log(download.method) // GET\n} finally {\n  await host.dispose()\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Give the actual HTTP client the returned `url`, `method` and every header. Omitting content, metadata, condition or range headers changes the signed request. `expiresInSeconds` accepts integer seconds from `1` to `604800`, defaulting to `900`. Actual validity cannot exceed credential expiry. Uploads support the same conditions as `put`; downloads support inclusive ranges. Keep temporary signed URLs out of public logs."
+                }
+              ]
+            },
+            {
+              "id": "organizations-and-pagination",
+              "heading": "Organizations and pagination",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Write two objects inside a new organization, then page with the returned cursor. Do not construct cursors or reuse them across organizations."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createStorageHost, createOrgId } from '@migaia/storage-host'\nimport { blob } from '@migaia/storage-contract'\nimport { objectBackendPlugin } from '@migaia/storage-plugin-object'\nimport { fsObjectDriver } from '@migaia/storage-plugin-object/fs'\n\nconst host = await createStorageHost({\n  plugins: [\n    objectBackendPlugin({\n      driver: fsObjectDriver({ root: './guide-organizations' })\n    })\n  ]\n})\ntry {\n  const orgId = createOrgId()\n  const objects = host.org(orgId).backend('object').use(blob)\n  await objects.put('photos/a', new Uint8Array([1]))\n  await objects.put('photos/b', new Uint8Array([2]))\n  let after: string | undefined\n  do {\n    const page = await objects.list({ prefix: 'photos/', limit: 1, after })\n    console.log(page.items.map((item) => item.key)) // photos/a, then photos/b\n    after = page.next\n  } while (after !== undefined)\n  await host.dropOrg(orgId)\n} finally {\n  await host.dispose()\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`list` defaults to prefix `''` and limit `100`. Limit must be a positive safe integer. Keys use UTF-16 lexical order; cursors bind to one installation, organization and prefix. Paging is not a snapshot across pages: concurrent writes can change later results. `removeByPrefix('')` clears only this organization and counts observed removals; it is not a cross-object transaction."
+                }
+              ]
+            },
+            {
+              "id": "errors-and-shutdown",
+              "heading": "Errors and shutdown",
+              "blocks": [
+                {
+                  "type": "table",
+                  "headers": ["Error", "Meaning and action"],
+                  "rows": [
+                    [
+                      "Contract `INVALID_ARGUMENT`",
+                      "Correct keys, bodies, ranges, conditions or headers"
+                    ],
+                    [
+                      "Contract `WRITE_CONFLICT`",
+                      "Etag condition failed; reread and decide how to merge"
+                    ],
+                    [
+                      "Contract `UNSUPPORTED_CAPABILITY`",
+                      "The driver, condition or Feature does not support this combination"
+                    ],
+                    [
+                      "`OBJECT_DATA_INVALID`",
+                      "Stored data or a service response is incomplete; do not treat it as absent"
+                    ],
+                    [
+                      "`OBJECT_COMMIT_UNKNOWN`",
+                      "Commit was sent but confirmation is unknown; inspect head/content before replaying"
+                    ],
+                    [
+                      "`OBJECT_FAILED`",
+                      "Inspect cause; `committed: true` means the write succeeded and metadata follow-up failed"
+                    ]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Object errors use `source: 'storage.backend.object'`; shared validation and condition errors come from `@migaia/storage-contract`. Retain causes for diagnosis. Explicit cleanup rejects on failure; resource syntax reports cleanup failures to preserve a primary error. Release read objects before closing the host. Supplied S3 clients remain yours to close. Shutdown does not delete stored content."
                 }
               ]
             }
@@ -789,8 +1309,12 @@
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "import { createStorageHost } from '@migaia/storage-host'\nimport { blob } from '@migaia/storage-contract'\nimport { objectBackendPlugin } from '@migaia/storage-plugin-object'\nimport { fsObjectDriver } from '@migaia/storage-plugin-object/fs'\n\nawait using host = await createStorageHost({\n  plugins: [objectBackendPlugin({ driver: fsObjectDriver({ root: './objects' }) })] as const\n})\nconst objects = host.backend('object').use(blob)\nconst info = await objects.put('photo', new Uint8Array([1, 2, 3]), {\n  contentType: 'application/octet-stream',\n  metadata: { owner: 'ada' }\n})\nconst object = await objects.get('photo', { range: { start: 1, end: 2 } })\nif (object) {\n  try {\n    console.log(object.info.size, await object.bytes())\n  } finally {\n    await object.dispose()\n  }\n}\nawait objects.put('photo', new Uint8Array([4]), { ifMatch: info.etag })",
-            "import { s3ObjectDriver } from '@migaia/storage-plugin-object/s3'\nimport { objectPresignFeature } from '@migaia/storage-plugin-object/features/presign'\n\nconst plugin = objectBackendPlugin(\n  {\n    driver: s3ObjectDriver({\n      config: { region: 'us-east-1', endpoint: 'http://127.0.0.1:19000', forcePathStyle: true },\n      bucket: 'objects',\n      prefix: 'app/'\n    })\n  },\n  { presign: objectPresignFeature() }\n)"
+            "import { createStorageHost } from '@migaia/storage-host'\nimport { blob } from '@migaia/storage-contract'\nimport { objectBackendPlugin } from '@migaia/storage-plugin-object'\nimport { fsObjectDriver } from '@migaia/storage-plugin-object/fs'\n\nconst host = await createStorageHost({\n  plugins: [objectBackendPlugin({ driver: fsObjectDriver({ root: './guide-objects' }) })]\n})\ntry {\n  const objects = host.backend('object').use(blob)\n  const info = await objects.put('photo', new Uint8Array([1, 2, 3]), {\n    contentType: 'application/octet-stream',\n    metadata: { author: 'ada' }\n  })\n  const object = await objects.get('photo')\n  if (object) {\n    try {\n      console.log([...(await object.bytes())])\n    } finally {\n      // [1, 2, 3]\n      await object.dispose()\n    }\n  }\n  await objects.put('photo', new Uint8Array([4]), { ifMatch: info.etag })\n  console.log((await objects.head('photo'))?.size) // 1\n  await objects.remove('photo')\n} finally {\n  await host.dispose()\n}",
+            "import { createStorageHost } from '@migaia/storage-host'\nimport { blob } from '@migaia/storage-contract'\nimport { objectBackendPlugin } from '@migaia/storage-plugin-object'\nimport { fsObjectDriver } from '@migaia/storage-plugin-object/fs'\n\nconst host = await createStorageHost({\n  plugins: [objectBackendPlugin({ driver: fsObjectDriver({ root: './guide-streams' }) })]\n})\ntry {\n  const objects = host.backend('object').use(blob)\n  const body = new ReadableStream<Uint8Array>({\n    start(controller) {\n      controller.enqueue(new Uint8Array([10, 20, 30, 40]))\n      controller.close()\n    }\n  })\n  await objects.put('sample', body)\n  const object = await objects.get('sample', { range: { start: 1, end: 2 } })\n  if (object) {\n    try {\n      console.log(object.info.size) // 4\n      console.log([...(await object.bytes())]) // [20, 30]\n    } finally {\n      await object.dispose()\n    }\n  }\n  await objects.remove('sample')\n} finally {\n  await host.dispose()\n}",
+            "import { createStorageHost } from '@migaia/storage-host'\nimport { blob } from '@migaia/storage-contract'\nimport { objectBackendPlugin } from '@migaia/storage-plugin-object'\nimport { s3ObjectDriver } from '@migaia/storage-plugin-object/s3'\n\nconst host = await createStorageHost({\n  plugins: [\n    objectBackendPlugin({\n      driver: s3ObjectDriver({\n        config: { region: 'us-east-1' },\n        bucket: 'application-objects',\n        prefix: 'guide/'\n      })\n    })\n  ]\n})\ntry {\n  const objects = host.backend('object').use(blob)\n  await objects.put('report', new TextEncoder().encode('ready'), { contentType: 'text/plain' })\n  const object = await objects.get('report')\n  if (object) {\n    try {\n      console.log(new TextDecoder().decode(await object.bytes()))\n    } finally {\n      // ready\n      await object.dispose()\n    }\n  }\n  await objects.remove('report')\n} finally {\n  await host.dispose()\n}",
+            "import { createStorageHost } from '@migaia/storage-host'\nimport { objectBackendPlugin } from '@migaia/storage-plugin-object'\nimport { s3ObjectDriver } from '@migaia/storage-plugin-object/s3'\nimport { objectPresignFeature } from '@migaia/storage-plugin-object/features/presign'\n\nconst host = await createStorageHost({\n  plugins: [\n    objectBackendPlugin(\n      {\n        driver: s3ObjectDriver({ config: { region: 'us-east-1' }, bucket: 'application-objects' })\n      },\n      { presign: objectPresignFeature() }\n    )\n  ]\n})\ntry {\n  const signing = host.backend('object').api.presign\n  const upload = await signing.upload('avatar', {\n    expiresInSeconds: 300,\n    contentType: 'image/png',\n    metadata: { author: 'ada' }\n  })\n  console.log(upload.method, upload.headers) // PUT，以及必须携带的请求头\n  const download = await signing.download('avatar', { expiresInSeconds: 300 })\n  console.log(download.method) // GET\n} finally {\n  await host.dispose()\n}",
+            "import { createStorageHost, createOrgId } from '@migaia/storage-host'\nimport { blob } from '@migaia/storage-contract'\nimport { objectBackendPlugin } from '@migaia/storage-plugin-object'\nimport { fsObjectDriver } from '@migaia/storage-plugin-object/fs'\n\nconst host = await createStorageHost({\n  plugins: [\n    objectBackendPlugin({\n      driver: fsObjectDriver({ root: './guide-organizations' })\n    })\n  ]\n})\ntry {\n  const orgId = createOrgId()\n  const objects = host.org(orgId).backend('object').use(blob)\n  await objects.put('photos/a', new Uint8Array([1]))\n  await objects.put('photos/b', new Uint8Array([2]))\n  let after: string | undefined\n  do {\n    const page = await objects.list({ prefix: 'photos/', limit: 1, after })\n    console.log(page.items.map((item) => item.key)) // 依次为 photos/a、photos/b\n    after = page.next\n  } while (after !== undefined)\n  await host.dropOrg(orgId)\n} finally {\n  await host.dispose()\n}",
+            "import { createStorageHost } from '@migaia/storage-host'\nimport { blob } from '@migaia/storage-contract'\nimport { objectBackendPlugin } from '@migaia/storage-plugin-object'\nimport { fsObjectDriver } from '@migaia/storage-plugin-object/fs'\n\nconst host = await createStorageHost({\n  plugins: [objectBackendPlugin({ driver: fsObjectDriver({ root: './example-objects' }) })]\n})\ntry {\n  const objects = host.backend('object').use(blob)\n  await objects.put('greeting', new TextEncoder().encode('hello'))\n  const object = await objects.get('greeting')\n  if (object) {\n    try {\n      console.log(new TextDecoder().decode(await object.bytes()))\n    } finally {\n      // hello\n      await object.dispose()\n    }\n  }\n  await objects.remove('greeting')\n} finally {\n  await host.dispose()\n}"
           ],
           "members": [],
           "composes": [],
@@ -864,23 +1388,23 @@
           ],
           "identity": "packages/storage-plugin-object/dist/plugin.d.ts:objectBackendPlugin:export declare function objectBackendPlugin<const TId extends string = 'object', const F extends IStorageFeatureRecord = {}>(options: { readonly id?: TId; readonly driver: IObjectDriver; }, features?: F & IStorageFeatureStoreCompatibility<typeof objectBackendKind, NoInfer<F>>): IStorageBackendPlugin<typeof objectBackendKind, NoInfer<TId>, F>;",
           "guidance": [],
-          "usageScore": 42,
+          "usageScore": 84,
           "configuration": [
             {
               "name": "id",
               "type": "TId",
               "optional": true,
-              "description": "",
+              "description": "`objectBackendPlugin({ id?, driver }, features?)` — 安装后端，默认 ID 为 `object`",
               "descriptionEn": "",
-              "descriptionZh": ""
+              "descriptionZh": "`objectBackendPlugin({ id?, driver }, features?)` — 安装后端，默认 ID 为 `object`"
             },
             {
               "name": "driver",
               "type": "IObjectDriver",
               "optional": false,
-              "description": "",
+              "description": "`选择 fs/S3 driver → 安装 objectBackendPlugin → use(blob) → put/get → 释放读取对象与宿主`。",
               "descriptionEn": "",
-              "descriptionZh": ""
+              "descriptionZh": "`选择 fs/S3 driver → 安装 objectBackendPlugin → use(blob) → put/get → 释放读取对象与宿主`。"
             }
           ],
           "fragment": "storage-plugin-object-index--objectBackendPlugin"
@@ -1086,7 +1610,7 @@
           "name": "IObjectPresignApi",
           "kind": "type",
           "signature": "export type IObjectPresignApi = { upload(key: string, options?: IObjectPresignUploadOptions): Promise<IObjectSignedRequest<'PUT'>>; download(key: string, options?: IObjectPresignDownloadOptions): Promise<IObjectSignedRequest<'GET'>>; };",
-          "declarationLine": 29,
+          "declarationLine": 31,
           "source": "packages/storage-plugin-object/dist/features/presign.d.ts",
           "purpose": "Installed native S3 request signing with no transfer or transaction authority.",
           "core": "upload: Sign one organized native upload.\nupload.key: Logical string object key.\nupload.options: Optional content, metadata, condition and expiry options.\nSigned PUT URL and required headers.\ndownload: Sign one organized native download.\ndownload.key: Logical string object key.\ndownload.options: Optional inclusive range and expiry options.\nSigned GET URL and required headers.",
@@ -1191,7 +1715,7 @@
           "name": "IObjectPresignDownloadOptions",
           "kind": "type",
           "signature": "export type IObjectPresignDownloadOptions = { readonly expiresInSeconds?: number; readonly range?: { readonly start: number; readonly end?: number; }; readonly ctx?: IOperationContext; };",
-          "declarationLine": 20,
+          "declarationLine": 22,
           "source": "packages/storage-plugin-object/dist/features/presign.d.ts",
           "purpose": "Native signed-download expiry and inclusive range.",
           "core": "expiresInSeconds: Integer seconds from 1 through 604800.\n900 seconds, capped by credential expiry.\nrange: Nonnegative safe-integer start and optional inclusive end at least start.\nFull object download.\nctx: Original caller cancellation and deadline context.\nNo caller cancellation or deadline.",
@@ -1283,7 +1807,7 @@
           "name": "IObjectPresignUploadOptions",
           "kind": "type",
           "signature": "export type IObjectPresignUploadOptions = { readonly expiresInSeconds?: number; readonly contentType?: string; readonly metadata?: Readonly<Record<string, string>>; readonly ifMatch?: string; readonly ifNoneMatch?: true; readonly ctx?: IOperationContext; };",
-          "declarationLine": 11,
+          "declarationLine": 13,
           "source": "packages/storage-plugin-object/dist/features/presign.d.ts",
           "purpose": "Native signed-upload content and condition inputs.",
           "core": "expiresInSeconds: Integer seconds from 1 through 604800.\n900 seconds, capped by credential expiry.\ncontentType: Native content type included in the signature.\nNo content type header.\nmetadata: Lowercase HTTP-token names with ASCII header values; frozen at admission.\nEmpty metadata.\nifMatch: Opaque native etag required at commit; excludes ifNoneMatch.\nNo etag condition.\nifNoneMatch: Only true is valid: require absence at native commit.\nNo absence condition.\nctx: Original caller cancellation and deadline context.\nNo caller cancellation or deadline.",
@@ -1402,7 +1926,7 @@
           "name": "IObjectSignedRequest",
           "kind": "type",
           "signature": "export type IObjectSignedRequest<TMethod extends 'GET' | 'PUT'> = Readonly<{ url: string; method: TMethod; headers: Readonly<Record<string, string>>; }>;",
-          "declarationLine": 5,
+          "declarationLine": 7,
           "source": "packages/storage-plugin-object/dist/features/presign.d.ts",
           "purpose": "Official SDK-signed request; send its exact headers and method to its URL.",
           "core": "url: Credential-bound URL; never place it in ordinary operation hooks.\nmethod: PUT uploads and GET downloads.\nheaders: All content, metadata, range and condition headers required by this signature.",
@@ -1493,29 +2017,29 @@
         {
           "name": "objectPresignFeature",
           "kind": "function",
-          "signature": "export declare function objectPresignFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"object\", import(\"../types.js\").IObjectStore, import(\"@aws-sdk/client-s3\").S3Client | undefined, { getDriverKind(): ObjectDriverKind; getS3Client(): import(\"@aws-sdk/client-s3\").S3Client; getObjectAddress(key: string, ctx?: IOperationContext): import(\"../types.js\").IObjectAddress; }>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly presign: IObjectPresignApi; }; readonly transaction: {}; }>, {}>;",
-          "declarationLine": 34,
+          "signature": "export declare function objectPresignFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"object\", IObjectStore, S3Client | undefined, { getDriverKind(): ObjectDriverKind; getS3Client(): S3Client; getObjectAddress(key: string, ctx?: IOperationContext): import(\"../types.js\").IObjectAddress; }>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly presign: IObjectPresignApi; }; readonly transaction: {}; }>, {}>;",
+          "declarationLine": 36,
           "source": "packages/storage-plugin-object/dist/features/presign.d.ts",
           "purpose": "Add store.api.presign upload/download signing with the same native S3 client and organized keys. Filesystem installation rejects this Feature.",
           "core": "An object Feature with an empty transaction projection; signing executes no object transfer.",
           "advanced": "",
           "parameters": ["This function declaration has no parameters."],
           "parameterDetails": [],
-          "returns": "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"object\", import(\"../types.js\").IObjectStore, import(\"@aws-sdk/client-s3\").S3Client | undefined, { getDriverKind(): ObjectDriverKind; getS3Client(): import(\"@aws-sdk/client-s3\").S3Client; getObjectAddress(key: string, ctx?: IOperationContext): import(\"../types.js\").IObjectAddress; }>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly presign: IObjectPresignApi; }; readonly transaction: {}; }>, {}>",
+          "returns": "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"object\", IObjectStore, S3Client | undefined, { getDriverKind(): ObjectDriverKind; getS3Client(): S3Client; getObjectAddress(key: string, ctx?: IOperationContext): import(\"../types.js\").IObjectAddress; }>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly presign: IObjectPresignApi; }; readonly transaction: {}; }>, {}>",
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "import { s3ObjectDriver } from '@migaia/storage-plugin-object/s3'\nimport { objectPresignFeature } from '@migaia/storage-plugin-object/features/presign'\n\nconst plugin = objectBackendPlugin(\n  {\n    driver: s3ObjectDriver({\n      config: { region: 'us-east-1', endpoint: 'http://127.0.0.1:19000', forcePathStyle: true },\n      bucket: 'objects',\n      prefix: 'app/'\n    })\n  },\n  { presign: objectPresignFeature() }\n)"
+            "import { createStorageHost } from '@migaia/storage-host'\nimport { objectBackendPlugin } from '@migaia/storage-plugin-object'\nimport { s3ObjectDriver } from '@migaia/storage-plugin-object/s3'\nimport { objectPresignFeature } from '@migaia/storage-plugin-object/features/presign'\n\nconst host = await createStorageHost({\n  plugins: [\n    objectBackendPlugin(\n      {\n        driver: s3ObjectDriver({ config: { region: 'us-east-1' }, bucket: 'application-objects' })\n      },\n      { presign: objectPresignFeature() }\n    )\n  ]\n})\ntry {\n  const signing = host.backend('object').api.presign\n  const upload = await signing.upload('avatar', {\n    expiresInSeconds: 300,\n    contentType: 'image/png',\n    metadata: { author: 'ada' }\n  })\n  console.log(upload.method, upload.headers) // PUT，以及必须携带的请求头\n  const download = await signing.download('avatar', { expiresInSeconds: 300 })\n  console.log(download.method) // GET\n} finally {\n  await host.dispose()\n}"
           ],
           "members": [],
           "composes": [],
           "exportPath": "./features/presign",
           "overloadSignatures": [
-            "export declare function objectPresignFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"object\", import(\"../types.js\").IObjectStore, import(\"@aws-sdk/client-s3\").S3Client | undefined, { getDriverKind(): ObjectDriverKind; getS3Client(): import(\"@aws-sdk/client-s3\").S3Client; getObjectAddress(key: string, ctx?: IOperationContext): import(\"../types.js\").IObjectAddress; }>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly presign: IObjectPresignApi; }; readonly transaction: {}; }>, {}>;"
+            "export declare function objectPresignFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"object\", IObjectStore, S3Client | undefined, { getDriverKind(): ObjectDriverKind; getS3Client(): S3Client; getObjectAddress(key: string, ctx?: IOperationContext): import(\"../types.js\").IObjectAddress; }>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly presign: IObjectPresignApi; }; readonly transaction: {}; }>, {}>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [
-            "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"object\", import(\"../types.js\").IObjectStore, import(\"@aws-sdk/client-s3\").S3Client | undefined, { getDriverKind(): ObjectDriverKind; getS3Client(): import(\"@aws-sdk/client-s3\").S3Client; getObjectAddress(key: string, ctx?: IOperationContext): import(\"../types.js\").IObjectAddress; }>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly presign: IObjectPresignApi; }; readonly transaction: {}; }>, {}>"
+            "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"object\", IObjectStore, S3Client | undefined, { getDriverKind(): ObjectDriverKind; getS3Client(): S3Client; getObjectAddress(key: string, ctx?: IOperationContext): import(\"../types.js\").IObjectAddress; }>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly presign: IObjectPresignApi; }; readonly transaction: {}; }>, {}>"
           ],
           "whenToUse": "",
           "notUse": "",
@@ -1552,9 +2076,9 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-plugin-object/dist/features/presign.d.ts:objectPresignFeature:export declare function objectPresignFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"object\", import(\"../types.js\").IObjectStore, import(\"@aws-sdk/client-s3\").S3Client | undefined, { getDriverKind(): ObjectDriverKind; getS3Client(): import(\"@aws-sdk/client-s3\").S3Client; getObjectAddress(key: string, ctx?: IOperationContext): import(\"../types.js\").IObjectAddress; }>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly presign: IObjectPresignApi; }; readonly transaction: {}; }>, {}>;",
+          "identity": "packages/storage-plugin-object/dist/features/presign.d.ts:objectPresignFeature:export declare function objectPresignFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"object\", IObjectStore, S3Client | undefined, { getDriverKind(): ObjectDriverKind; getS3Client(): S3Client; getObjectAddress(key: string, ctx?: IOperationContext): import(\"../types.js\").IObjectAddress; }>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly presign: IObjectPresignApi; }; readonly transaction: {}; }>, {}>;",
           "guidance": [],
-          "usageScore": 24,
+          "usageScore": 20,
           "configuration": [],
           "fragment": "storage-plugin-object-features/presign--objectPresignFeature"
         }
@@ -1598,7 +2122,10 @@
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "import { createStorageHost } from '@migaia/storage-host'\nimport { blob } from '@migaia/storage-contract'\nimport { objectBackendPlugin } from '@migaia/storage-plugin-object'\nimport { fsObjectDriver } from '@migaia/storage-plugin-object/fs'\n\nawait using host = await createStorageHost({\n  plugins: [objectBackendPlugin({ driver: fsObjectDriver({ root: './objects' }) })] as const\n})\nconst objects = host.backend('object').use(blob)\nconst info = await objects.put('photo', new Uint8Array([1, 2, 3]), {\n  contentType: 'application/octet-stream',\n  metadata: { owner: 'ada' }\n})\nconst object = await objects.get('photo', { range: { start: 1, end: 2 } })\nif (object) {\n  try {\n    console.log(object.info.size, await object.bytes())\n  } finally {\n    await object.dispose()\n  }\n}\nawait objects.put('photo', new Uint8Array([4]), { ifMatch: info.etag })"
+            "import { createStorageHost } from '@migaia/storage-host'\nimport { blob } from '@migaia/storage-contract'\nimport { objectBackendPlugin } from '@migaia/storage-plugin-object'\nimport { fsObjectDriver } from '@migaia/storage-plugin-object/fs'\n\nconst host = await createStorageHost({\n  plugins: [objectBackendPlugin({ driver: fsObjectDriver({ root: './guide-objects' }) })]\n})\ntry {\n  const objects = host.backend('object').use(blob)\n  const info = await objects.put('photo', new Uint8Array([1, 2, 3]), {\n    contentType: 'application/octet-stream',\n    metadata: { author: 'ada' }\n  })\n  const object = await objects.get('photo')\n  if (object) {\n    try {\n      console.log([...(await object.bytes())])\n    } finally {\n      // [1, 2, 3]\n      await object.dispose()\n    }\n  }\n  await objects.put('photo', new Uint8Array([4]), { ifMatch: info.etag })\n  console.log((await objects.head('photo'))?.size) // 1\n  await objects.remove('photo')\n} finally {\n  await host.dispose()\n}",
+            "import { createStorageHost } from '@migaia/storage-host'\nimport { blob } from '@migaia/storage-contract'\nimport { objectBackendPlugin } from '@migaia/storage-plugin-object'\nimport { fsObjectDriver } from '@migaia/storage-plugin-object/fs'\n\nconst host = await createStorageHost({\n  plugins: [objectBackendPlugin({ driver: fsObjectDriver({ root: './guide-streams' }) })]\n})\ntry {\n  const objects = host.backend('object').use(blob)\n  const body = new ReadableStream<Uint8Array>({\n    start(controller) {\n      controller.enqueue(new Uint8Array([10, 20, 30, 40]))\n      controller.close()\n    }\n  })\n  await objects.put('sample', body)\n  const object = await objects.get('sample', { range: { start: 1, end: 2 } })\n  if (object) {\n    try {\n      console.log(object.info.size) // 4\n      console.log([...(await object.bytes())]) // [20, 30]\n    } finally {\n      await object.dispose()\n    }\n  }\n  await objects.remove('sample')\n} finally {\n  await host.dispose()\n}",
+            "import { createStorageHost, createOrgId } from '@migaia/storage-host'\nimport { blob } from '@migaia/storage-contract'\nimport { objectBackendPlugin } from '@migaia/storage-plugin-object'\nimport { fsObjectDriver } from '@migaia/storage-plugin-object/fs'\n\nconst host = await createStorageHost({\n  plugins: [\n    objectBackendPlugin({\n      driver: fsObjectDriver({ root: './guide-organizations' })\n    })\n  ]\n})\ntry {\n  const orgId = createOrgId()\n  const objects = host.org(orgId).backend('object').use(blob)\n  await objects.put('photos/a', new Uint8Array([1]))\n  await objects.put('photos/b', new Uint8Array([2]))\n  let after: string | undefined\n  do {\n    const page = await objects.list({ prefix: 'photos/', limit: 1, after })\n    console.log(page.items.map((item) => item.key)) // 依次为 photos/a、photos/b\n    after = page.next\n  } while (after !== undefined)\n  await host.dropOrg(orgId)\n} finally {\n  await host.dispose()\n}",
+            "import { createStorageHost } from '@migaia/storage-host'\nimport { blob } from '@migaia/storage-contract'\nimport { objectBackendPlugin } from '@migaia/storage-plugin-object'\nimport { fsObjectDriver } from '@migaia/storage-plugin-object/fs'\n\nconst host = await createStorageHost({\n  plugins: [objectBackendPlugin({ driver: fsObjectDriver({ root: './example-objects' }) })]\n})\ntry {\n  const objects = host.backend('object').use(blob)\n  await objects.put('greeting', new TextEncoder().encode('hello'))\n  const object = await objects.get('greeting')\n  if (object) {\n    try {\n      console.log(new TextDecoder().decode(await object.bytes()))\n    } finally {\n      // hello\n      await object.dispose()\n    }\n  }\n  await objects.remove('greeting')\n} finally {\n  await host.dispose()\n}"
           ],
           "members": [],
           "composes": [],
@@ -1660,15 +2187,15 @@
           ],
           "identity": "packages/storage-plugin-object/dist/fs.d.ts:fsObjectDriver:export declare function fsObjectDriver(options: IFsObjectDriverOptions): IObjectDriver;",
           "guidance": [],
-          "usageScore": 24,
+          "usageScore": 54,
           "configuration": [
             {
               "name": "root",
               "type": "string",
               "optional": false,
-              "description": "",
+              "description": "`root` 是非空目录路径，目录由插件专用。下面先写入并读取，再只在 etag 仍匹配时覆盖。",
               "descriptionEn": "",
-              "descriptionZh": ""
+              "descriptionZh": "`root` 是非空目录路径，目录由插件专用。下面先写入并读取，再只在 etag 仍匹配时覆盖。"
             }
           ],
           "fragment": "storage-plugin-object-fs--fsObjectDriver"
@@ -1933,7 +2460,8 @@
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "import { s3ObjectDriver } from '@migaia/storage-plugin-object/s3'\nimport { objectPresignFeature } from '@migaia/storage-plugin-object/features/presign'\n\nconst plugin = objectBackendPlugin(\n  {\n    driver: s3ObjectDriver({\n      config: { region: 'us-east-1', endpoint: 'http://127.0.0.1:19000', forcePathStyle: true },\n      bucket: 'objects',\n      prefix: 'app/'\n    })\n  },\n  { presign: objectPresignFeature() }\n)"
+            "import { createStorageHost } from '@migaia/storage-host'\nimport { blob } from '@migaia/storage-contract'\nimport { objectBackendPlugin } from '@migaia/storage-plugin-object'\nimport { s3ObjectDriver } from '@migaia/storage-plugin-object/s3'\n\nconst host = await createStorageHost({\n  plugins: [\n    objectBackendPlugin({\n      driver: s3ObjectDriver({\n        config: { region: 'us-east-1' },\n        bucket: 'application-objects',\n        prefix: 'guide/'\n      })\n    })\n  ]\n})\ntry {\n  const objects = host.backend('object').use(blob)\n  await objects.put('report', new TextEncoder().encode('ready'), { contentType: 'text/plain' })\n  const object = await objects.get('report')\n  if (object) {\n    try {\n      console.log(new TextDecoder().decode(await object.bytes()))\n    } finally {\n      // ready\n      await object.dispose()\n    }\n  }\n  await objects.remove('report')\n} finally {\n  await host.dispose()\n}",
+            "import { createStorageHost } from '@migaia/storage-host'\nimport { objectBackendPlugin } from '@migaia/storage-plugin-object'\nimport { s3ObjectDriver } from '@migaia/storage-plugin-object/s3'\nimport { objectPresignFeature } from '@migaia/storage-plugin-object/features/presign'\n\nconst host = await createStorageHost({\n  plugins: [\n    objectBackendPlugin(\n      {\n        driver: s3ObjectDriver({ config: { region: 'us-east-1' }, bucket: 'application-objects' })\n      },\n      { presign: objectPresignFeature() }\n    )\n  ]\n})\ntry {\n  const signing = host.backend('object').api.presign\n  const upload = await signing.upload('avatar', {\n    expiresInSeconds: 300,\n    contentType: 'image/png',\n    metadata: { author: 'ada' }\n  })\n  console.log(upload.method, upload.headers) // PUT，以及必须携带的请求头\n  const download = await signing.download('avatar', { expiresInSeconds: 300 })\n  console.log(download.method) // GET\n} finally {\n  await host.dispose()\n}"
           ],
           "members": [],
           "composes": [],
@@ -1990,7 +2518,7 @@
               "name": "client",
               "type": "S3Client",
               "optional": true,
-              "description": ""
+              "description": "Caller-supplied clients remain borrowed; configured clients are disposed by this owner."
             },
             {
               "name": "config",
@@ -2031,23 +2559,23 @@
           ],
           "identity": "packages/storage-plugin-object/dist/s3.d.ts:s3ObjectDriver:export declare function s3ObjectDriver(options: IS3ObjectDriverOptions): IObjectDriver;",
           "guidance": [],
-          "usageScore": 24,
+          "usageScore": 30,
           "configuration": [
             {
               "name": "client",
               "type": "S3Client",
               "optional": true,
-              "description": "传入的 `client` 属于借用，始终不销毁；`config` 分支在安装时创建自有客户端。凭据沿 SDK 原有提供方。检测在保留前缀随机对象上验证单次条件写；权限或条件不支持只报告，不中断宿主创建。无条件操作仍按真实权限执行，条件 multipart 按实际 Complete 请求判定，不降级。",
-              "descriptionEn": "",
-              "descriptionZh": "传入的 `client` 属于借用，始终不销毁；`config` 分支在安装时创建自有客户端。凭据沿 SDK 原有提供方。检测在保留前缀随机对象上验证单次条件写；权限或条件不支持只报告，不中断宿主创建。无条件操作仍按真实权限执行，条件 multipart 按实际 Complete 请求判定，不降级。"
+              "description": "兼容服务可在 `config` 配置 `endpoint` 与 `forcePathStyle`。`client` 与 `config` 必须二选一：传入 `client` 是借用，宿主不 destroy；传入 `config` 则安装时创建客户端，关闭时销毁。`prefix` 默认 `''`；逻辑键还会按组织编码，所以不要假定它与桶中裸对象名相同。",
+              "descriptionEn": "Caller-supplied clients remain borrowed; configured clients are disposed by this owner.",
+              "descriptionZh": "兼容服务可在 `config` 配置 `endpoint` 与 `forcePathStyle`。`client` 与 `config` 必须二选一：传入 `client` 是借用，宿主不 destroy；传入 `config` 则安装时创建客户端，关闭时销毁。`prefix` 默认 `''`；逻辑键还会按组织编码，所以不要假定它与桶中裸对象名相同。"
             },
             {
               "name": "config",
               "type": "S3ClientConfig",
               "optional": true,
-              "description": "传入的 `client` 属于借用，始终不销毁；`config` 分支在安装时创建自有客户端。凭据沿 SDK 原有提供方。检测在保留前缀随机对象上验证单次条件写；权限或条件不支持只报告，不中断宿主创建。无条件操作仍按真实权限执行，条件 multipart 按实际 Complete 请求判定，不降级。",
+              "description": "兼容服务可在 `config` 配置 `endpoint` 与 `forcePathStyle`。`client` 与 `config` 必须二选一：传入 `client` 是借用，宿主不 destroy；传入 `config` 则安装时创建客户端，关闭时销毁。`prefix` 默认 `''`；逻辑键还会按组织编码，所以不要假定它与桶中裸对象名相同。",
               "descriptionEn": "",
-              "descriptionZh": "传入的 `client` 属于借用，始终不销毁；`config` 分支在安装时创建自有客户端。凭据沿 SDK 原有提供方。检测在保留前缀随机对象上验证单次条件写；权限或条件不支持只报告，不中断宿主创建。无条件操作仍按真实权限执行，条件 multipart 按实际 Complete 请求判定，不降级。"
+              "descriptionZh": "兼容服务可在 `config` 配置 `endpoint` 与 `forcePathStyle`。`client` 与 `config` 必须二选一：传入 `client` 是借用，宿主不 destroy；传入 `config` 则安装时创建客户端，关闭时销毁。`prefix` 默认 `''`；逻辑键还会按组织编码，所以不要假定它与桶中裸对象名相同。"
             },
             {
               "name": "bucket",
@@ -2061,33 +2589,33 @@
               "name": "prefix",
               "type": "string",
               "optional": true,
-              "description": "",
+              "description": "兼容服务可在 `config` 配置 `endpoint` 与 `forcePathStyle`。`client` 与 `config` 必须二选一：传入 `client` 是借用，宿主不 destroy；传入 `config` 则安装时创建客户端，关闭时销毁。`prefix` 默认 `''`；逻辑键还会按组织编码，所以不要假定它与桶中裸对象名相同。",
               "descriptionEn": "",
-              "descriptionZh": ""
+              "descriptionZh": "兼容服务可在 `config` 配置 `endpoint` 与 `forcePathStyle`。`client` 与 `config` 必须二选一：传入 `client` 是借用，宿主不 destroy；传入 `config` 则安装时创建客户端，关闭时销毁。`prefix` 默认 `''`；逻辑键还会按组织编码，所以不要假定它与桶中裸对象名相同。"
             },
             {
               "name": "multipartThresholdBytes",
               "type": "number",
               "optional": true,
-              "description": "",
+              "description": "`multipartThresholdBytes` — `16777216`（16 MiB），正安全整数",
               "descriptionEn": "",
-              "descriptionZh": ""
+              "descriptionZh": "`multipartThresholdBytes` — `16777216`（16 MiB），正安全整数"
             },
             {
               "name": "partBytes",
               "type": "number",
               "optional": true,
-              "description": "",
+              "description": "`partBytes` — `8388608`（8 MiB），至少 `5242880`（5 MiB）的安全整数",
               "descriptionEn": "",
-              "descriptionZh": ""
+              "descriptionZh": "`partBytes` — `8388608`（8 MiB），至少 `5242880`（5 MiB）的安全整数"
             },
             {
               "name": "partConcurrency",
               "type": "number",
               "optional": true,
-              "description": "",
+              "description": "`partConcurrency` — `4`，正安全整数",
               "descriptionEn": "",
-              "descriptionZh": ""
+              "descriptionZh": "`partConcurrency` — `4`，正安全整数"
             }
           ],
           "fragment": "storage-plugin-object-s3--s3ObjectDriver"

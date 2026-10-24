@@ -75090,8 +75090,8 @@ class CheckoutElement extends HTMLElement {
   },
   'storage-contract:index': {
     zh: {
-      title: '在存储边界固定输入与错误语义',
-      lede: '接入既有存储时，先把键、操作选项、能力和数据格式讲清楚。本包提供中立契约与校验工具，实际读写由具体后端执行。',
+      title: '用同一契约连接存储实现',
+      lede: '用能力令牌、实现定义、纯校验与带码错误描述存储边界。具体后端执行读写；需要输入快照、执行队列或事务运行时的作者使用 storage-host/authoring。',
       document: {
         sections: [
           {
@@ -75100,23 +75100,23 @@ class CheckoutElement extends HTMLElement {
             blocks: [
               {
                 type: 'paragraph',
-                text: '异步操作使用复合键前，调用方已改动其中日期或字节，见 [捕获复合键](/zh/docs/storage-contract/api/snapshotStorageKey#storage-contract-index--snapshotStorageKey--case-1)。'
+                text: '多个后端的方法名称相同，但支持的操作不同，见 [能力令牌 kv](/zh/docs/storage-contract/api/kv) 与 [records](/zh/docs/storage-contract/api/records)。'
               },
               {
                 type: 'paragraph',
-                text: '同一次存储操作在不同层读到不同的选项值，见 [只捕获一次操作选项](/zh/docs/storage-contract/api/snapshotOperationContext#storage-contract-index--snapshotOperationContext--case-1)。'
+                text: '插件返回了一组方法，却没有对应的能力定义，见 [implement](/zh/docs/storage-contract/api/implement)。定义实现不会安装插件或打开连接。'
               },
               {
                 type: 'paragraph',
-                text: '权限数据中的 `Map`、`Set` 经普通 JSON 编码后变成空对象，见 [恢复嵌套集合](/zh/docs/storage-host/api/fromValueCodec#storage-host-authoring-codec--fromValueCodec--case-1)。'
+                text: '无效键或超时进入后端后才失败，见 [键校验](/zh/docs/storage-contract/api/assertStorageKey) 与 [操作选项校验](/zh/docs/storage-contract/api/assertOperationContext)。'
               },
               {
                 type: 'paragraph',
-                text: '旧版后端缺少新增能力标志，应用无法直接据此选择通道，见 [规范化旧版能力描述](/zh/docs/storage-contract/api/snapshotStorageCapabilities#storage-contract-index--snapshotStorageCapabilities--case-1)。'
+                text: '异步读写需要保存调用时的复合键，见 host authoring 的 [键快照](/zh/docs/storage-host/api/authoring/key/snapshotStorageKey)。纯校验本身不复制输入。'
               },
               {
                 type: 'paragraph',
-                text: '错误只剩一段消息，调用方无法检查最初失败，见 [保留原始失败](/zh/docs/storage-contract/api/StorageContractError#storage-contract-index--StorageContractError--case-1)。'
+                text: '错误只剩一段消息，调用方无法检查最初失败，见 [契约错误](/zh/docs/storage-contract/api/StorageContractError) 与 [错误识别](/zh/docs/storage-contract/api/isStorageContractError)。'
               }
             ]
           },
@@ -75126,23 +75126,23 @@ class CheckoutElement extends HTMLElement {
             blocks: [
               {
                 type: 'paragraph',
-                text: '递归复制复合键组件，使原键后续修改不影响已捕获的值，见 [复合键隔离示例](/zh/docs/storage-contract/api/snapshotStorageKey#storage-contract-index--snapshotStorageKey--case-1)。'
+                text: '标准能力由同一令牌标识，方法实现通过 [implement](/zh/docs/storage-contract/api/implement) 定义；名称或能力标志不能代替令牌身份。'
               },
               {
                 type: 'paragraph',
-                text: '冻结的操作选项快照可以跨层按同一对象复用，避免重复读取访问器，见 [一次捕获示例](/zh/docs/storage-contract/api/snapshotOperationContext#storage-contract-index--snapshotOperationContext--case-1)。'
+                text: '[assertOperationContext](/zh/docs/storage-contract/api/assertOperationContext) 检查普通输入边界，不创建计时器、订阅或执行任务。'
               },
               {
                 type: 'paragraph',
-                text: '同一版本格式同时拥有编码与解码规则，使嵌套集合可通过文本往返，见 [集合类型恢复示例](/zh/docs/storage-host/api/fromValueCodec#storage-host-authoring-codec--fromValueCodec--case-1)。'
+                text: '[assertCodec](/zh/docs/storage-contract/api/assertCodec) 检查格式描述；真正的转换由 codec 执行，适配工作由 [host authoring](/zh/docs/storage-host/api/authoring/codec/fromValueCodec) 提供。'
               },
               {
                 type: 'paragraph',
-                text: '能力描述按明确规则补齐旧版标志，并与原描述后续修改分离，见 [能力快照示例](/zh/docs/storage-contract/api/snapshotStorageCapabilities#storage-contract-index--snapshotStorageCapabilities--case-1)。'
+                text: '[isRecordStore](/zh/docs/storage-contract/api/isRecordStore) 与 [asRecordStore](/zh/docs/storage-contract/api/asRecordStore) 检查已有存储的方法和能力；它们不增加后端能力。'
               },
               {
                 type: 'paragraph',
-                text: '契约错误同时保留稳定来源、错误码与同一个原始原因，见 [错误原因链示例](/zh/docs/storage-contract/api/StorageContractError#storage-contract-index--StorageContractError--case-1)。'
+                text: '[StorageContractError](/zh/docs/storage-contract/api/StorageContractError) 保留稳定来源、语义错误码与原始原因，调用方可按来源和错误码分支。'
               }
             ]
           },
@@ -75152,7 +75152,7 @@ class CheckoutElement extends HTMLElement {
             blocks: [
               {
                 type: 'paragraph',
-                text: '这个起点无需创建后端。`Map` 以成员键关联值，`Set` 保存不重复的值；这里把它们编码为文本再恢复。安装包后，把完整代码保存为 example.ts，在 Node.js 24 中运行 node example.ts。'
+                text: '下面的完整例子区分契约与执行：storage-contract 定义 codec 形状，host authoring 把 serialize 的集合编码器适配为该形状。安装 storage-host 与 serialize 后，把代码保存为 example.ts，在 Node.js 24 中运行 node example.ts；这里不创建后端。'
               },
               {
                 type: 'code',
@@ -75176,75 +75176,47 @@ class CheckoutElement extends HTMLElement {
             blocks: [
               {
                 type: 'paragraph',
-                text: '应用从具体实现取得存储对象后再做能力收窄；后端或适配器作者可复用输入快照工具。类型契约不会替后端执行读写、取消或清理。'
+                text: '应用使用能力令牌选择接口，作者通过 implement 定义实现。下列纯校验只检查输入；需要复制异步输入、适配 codec 或执行事务时，进入明确标出的 host authoring 入口。契约不会替后端执行读写、取消或清理。'
               },
               {
                 type: 'table',
                 headers: ['入口', '何时使用'],
                 rows: [
                   [
-                    '[fromValueCodec](/zh/docs/storage-host/api/fromValueCodec)',
-                    '用版本化文本往返 `Map`、`Set`；不打开存储。'
+                    '[kv](/zh/docs/storage-contract/api/kv) / [records](/zh/docs/storage-contract/api/records)',
+                    '用标准令牌选择文本或记录接口。'
                   ],
                   [
-                    '[snapshotStorageKey](/zh/docs/storage-contract/api/snapshotStorageKey)',
-                    '校验、复制复合键，并拒绝无效键。'
-                  ],
-                  [
-                    '[snapshotOperationContext](/zh/docs/storage-contract/api/snapshotOperationContext)',
-                    '捕获取消、超时、分页与冲突意图；执行交给后端。'
-                  ],
-                  [
-                    '[snapshotStorageCapabilities](/zh/docs/storage-contract/api/snapshotStorageCapabilities)',
-                    '校验能力字段并兼容两个旧版缺失标志。'
-                  ],
-                  [
-                    '[StorageContractError](/zh/docs/storage-contract/api/StorageContractError)',
-                    '为契约失败保留来源、错误码和原因链。'
-                  ],
-                  [
-                    '[snapshotKeyValueStore](/zh/docs/storage-contract/api/snapshotKeyValueStore)',
-                    '检查外部提供的字符串存储并捕获能力事实。'
-                  ],
-                  [
-                    '[isRecordStore](/zh/docs/storage-contract/api/isRecordStore) / [asRecordStore](/zh/docs/storage-contract/api/asRecordStore)',
-                    '使用字节、记录、范围迭代或事务前检查实际后端。'
-                  ],
-                  [
-                    '[asSecondaryIndexRecordStore](/zh/docs/storage-contract/api/asSecondaryIndexRecordStore)',
-                    '接纳支持完整二级索引扩展的记录存储。'
-                  ],
-                  [
-                    '[asChangeFeedStore](/zh/docs/storage-contract/api/asChangeFeedStore)',
-                    '接纳提交后变更流；订阅和退订仍由调用方持有。'
-                  ],
-                  [
-                    '[snapshotKeyValueStoreDetailed](/zh/docs/storage-contract/api/snapshotKeyValueStoreDetailed)',
-                    '取得精确读取失败原因、捕获释放函数及原接收者。'
+                    '[implement](/zh/docs/storage-contract/api/implement)',
+                    '定义令牌对应的实现；安装与执行仍由宿主和后端负责。'
                   ],
                   [
                     '[assertStorageKey](/zh/docs/storage-contract/api/assertStorageKey) / [assertStringStorageKey](/zh/docs/storage-contract/api/assertStringStorageKey)',
-                    '仅校验记录键或纯字符串键，不复制。'
+                    '仅校验键，不复制。'
                   ],
                   [
-                    '[compareStorageKeys](/zh/docs/storage-contract/api/compareStorageKeys)',
-                    '比较已经有效的记录键，不代替键接纳。'
+                    '[assertOperationContext](/zh/docs/storage-contract/api/assertOperationContext) / [assertCodec](/zh/docs/storage-contract/api/assertCodec)',
+                    '检查操作选项或 codec 形状，不启动任务或执行转换。'
                   ],
                   [
-                    '[assertTransactionCallback](/zh/docs/storage-contract/api/assertTransactionCallback) / [readTransactionConflictPolicy](/zh/docs/storage-contract/api/readTransactionConflictPolicy)',
-                    '检查事务回调并读取冲突策略，不启动事务。'
+                    '[isRecordStore](/zh/docs/storage-contract/api/isRecordStore) / [asRecordStore](/zh/docs/storage-contract/api/asRecordStore)',
+                    '使用记录接口前检查已有存储；不添加后端能力。'
                   ],
                   [
-                    '[snapshotCodec](/zh/docs/storage-contract/api/snapshotCodec) / [assertCodec](/zh/docs/storage-contract/api/assertCodec)',
-                    '检查编解码器名称、输出形式及两个方法。'
+                    '[StorageContractError](/zh/docs/storage-contract/api/StorageContractError) / [isStorageContractError](/zh/docs/storage-contract/api/isStorageContractError)',
+                    '识别带来源、错误码与原因链的契约失败。'
                   ],
                   [
-                    '[snapshotSyncWriteOptions](/zh/docs/storage-contract/api/snapshotSyncWriteOptions) / [assertSyncWriteOptions](/zh/docs/storage-contract/api/assertSyncWriteOptions)',
-                    '检查同步写入选项，拒绝非空的信号或超时。'
+                    '[host authoring: snapshotStorageKey](/zh/docs/storage-host/api/authoring/key/snapshotStorageKey)',
+                    '复制异步操作需要保留的键值；不冻结副本。'
                   ],
                   [
-                    '[isArrayBuffer](/zh/docs/utils/api/bytes/isArrayBuffer) / [isUint8Array](/zh/docs/utils/api/bytes/isUint8Array) / [intrinsicConstructorName](/zh/docs/storage-contract/api/intrinsicConstructorName)',
-                    '由 utils 检查二进制品牌，或取得诊断用构造器名称。'
+                    '[host authoring: snapshotOperationContext](/zh/docs/storage-host/api/authoring/context/snapshotOperationContext)',
+                    '保存操作标量意图并借用原信号；不启动计时器。'
+                  ],
+                  [
+                    '[host authoring: fromValueCodec](/zh/docs/storage-host/api/authoring/codec/fromValueCodec)',
+                    '适配 serialize 编解码器，实际转换由该编解码器执行。'
                   ]
                 ]
               }
@@ -75268,8 +75240,8 @@ class CheckoutElement extends HTMLElement {
       ]
     },
     en: {
-      title: 'Capture inputs and failures at storage boundaries',
-      lede: 'When connecting an existing store, make keys, options, capabilities and formats explicit. This package supplies neutral contracts and validation tools; concrete backends perform I/O.',
+      title: 'Connect storage implementations through one contract',
+      lede: 'Describe storage boundaries with capability tokens, implementation definitions, pure guards and coded errors. Backends perform I/O; authors use storage-host/authoring for input snapshots and execution runtimes.',
       document: {
         sections: [
           {
@@ -75278,23 +75250,23 @@ class CheckoutElement extends HTMLElement {
             blocks: [
               {
                 type: 'paragraph',
-                text: 'A caller changes a Date or binary component before async work uses its composite key; see [capture the key](/en/docs/storage-contract/api/snapshotStorageKey#storage-contract-index--snapshotStorageKey--case-1).'
+                text: 'Backends expose similar method names but support different operations; see the [kv](/en/docs/storage-contract/api/kv) and [records](/en/docs/storage-contract/api/records) capability tokens.'
               },
               {
                 type: 'paragraph',
-                text: 'Different layers read different option values for the same storage operation; see [capture options once](/en/docs/storage-contract/api/snapshotOperationContext#storage-contract-index--snapshotOperationContext--case-1).'
+                text: 'A plugin returns methods without a matching capability definition; see [implement](/en/docs/storage-contract/api/implement). Defining an implementation does not install a plugin or open a connection.'
               },
               {
                 type: 'paragraph',
-                text: 'Ordinary JSON turns the Map and Set in permissions data into empty objects; see [restore nested collections](/en/docs/storage-host/api/fromValueCodec#storage-host-authoring-codec--fromValueCodec--case-1).'
+                text: 'Invalid keys or timeouts reach a backend before failing; see [key validation](/en/docs/storage-contract/api/assertStorageKey) and [operation validation](/en/docs/storage-contract/api/assertOperationContext).'
               },
               {
                 type: 'paragraph',
-                text: 'An older backend omits new capability flags that the application needs to choose a channel; see [normalize its descriptor](/en/docs/storage-contract/api/snapshotStorageCapabilities#storage-contract-index--snapshotStorageCapabilities--case-1).'
+                text: 'Async I/O needs the composite key supplied at call time; see the host authoring [key snapshot](/en/docs/storage-host/api/authoring/key/snapshotStorageKey). Pure validation does not copy inputs.'
               },
               {
                 type: 'paragraph',
-                text: 'An error reduced to a message leaves callers unable to inspect the original failure; see [retain the cause](/en/docs/storage-contract/api/StorageContractError#storage-contract-index--StorageContractError--case-1).'
+                text: 'An error reduced to a message leaves callers unable to inspect the original failure; see [contract errors](/en/docs/storage-contract/api/StorageContractError) and [error recognition](/en/docs/storage-contract/api/isStorageContractError).'
               }
             ]
           },
@@ -75304,23 +75276,23 @@ class CheckoutElement extends HTMLElement {
             blocks: [
               {
                 type: 'paragraph',
-                text: 'Recursive copies detach composite key components from later caller mutations; see [the key snapshot case](/en/docs/storage-contract/api/snapshotStorageKey#storage-contract-index--snapshotStorageKey--case-1).'
+                text: 'One token identifies each standard capability. [implement](/en/docs/storage-contract/api/implement) defines its methods; names and capability flags do not replace token identity.'
               },
               {
                 type: 'paragraph',
-                text: 'Layers reuse the same frozen option snapshot without rereading its original getters; see [the one-read case](/en/docs/storage-contract/api/snapshotOperationContext#storage-contract-index--snapshotOperationContext--case-1).'
+                text: '[assertOperationContext](/en/docs/storage-contract/api/assertOperationContext) checks ordinary inputs without creating timers, subscriptions or tasks.'
               },
               {
                 type: 'paragraph',
-                text: 'One versioned format owns both encoding and decoding so nested collections survive a text round trip; see [the collection case](/en/docs/storage-host/api/fromValueCodec#storage-host-authoring-codec--fromValueCodec--case-1).'
+                text: '[assertCodec](/en/docs/storage-contract/api/assertCodec) checks the format descriptor. The codec performs conversion, while [host authoring](/en/docs/storage-host/api/authoring/codec/fromValueCodec) supplies adaptation.'
               },
               {
                 type: 'paragraph',
-                text: 'Explicit legacy defaults and a separate capability record keep later descriptor changes out of captured facts; see [the capability snapshot case](/en/docs/storage-contract/api/snapshotStorageCapabilities#storage-contract-index--snapshotStorageCapabilities--case-1).'
+                text: '[isRecordStore](/en/docs/storage-contract/api/isRecordStore) and [asRecordStore](/en/docs/storage-contract/api/asRecordStore) inspect an existing store and its capabilities; they do not add backend support.'
               },
               {
                 type: 'paragraph',
-                text: 'Contract errors retain a stable source, semantic code and the exact original cause; see [the cause identity case](/en/docs/storage-contract/api/StorageContractError#storage-contract-index--StorageContractError--case-1).'
+                text: '[StorageContractError](/en/docs/storage-contract/api/StorageContractError) retains a stable source, semantic code and original cause so callers can branch on source and code.'
               }
             ]
           },
@@ -75330,7 +75302,7 @@ class CheckoutElement extends HTMLElement {
             blocks: [
               {
                 type: 'paragraph',
-                text: 'This starting point needs no backend. A Map associates keys with values and a Set keeps distinct values; encode both to text and restore them. After installing the package, save this complete code as example.ts and run node example.ts with Node.js 24.'
+                text: 'This complete example separates the contract from execution: storage-contract defines the codec shape, and host authoring adapts a serialize collections codec to that shape. After installing storage-host and serialize, save the code as example.ts and run node example.ts with Node.js 24. No backend is created.'
               },
               {
                 type: 'code',
@@ -75354,75 +75326,47 @@ class CheckoutElement extends HTMLElement {
             blocks: [
               {
                 type: 'paragraph',
-                text: 'Applications narrow stores obtained from concrete implementations; backend and adapter authors can reuse input snapshots. Type contracts do not execute I/O, cancellation or cleanup.'
+                text: 'Applications select APIs with capability tokens, while authors define implementations with implement. Pure guards only inspect inputs. Use the explicitly marked host authoring entries for async input copies, codec adaptation and transaction execution; contracts do not perform I/O, cancellation or cleanup.'
               },
               {
                 type: 'table',
                 headers: ['Entry', 'When to use it'],
                 rows: [
                   [
-                    '[fromValueCodec](/en/docs/storage-host/api/fromValueCodec)',
-                    'Round-trip Map and Set through versioned text without opening a store.'
+                    '[kv](/en/docs/storage-contract/api/kv) / [records](/en/docs/storage-contract/api/records)',
+                    'Select text or record APIs using standard tokens.'
                   ],
                   [
-                    '[snapshotStorageKey](/en/docs/storage-contract/api/snapshotStorageKey)',
-                    'Validate and copy composite keys, rejecting invalid input.'
-                  ],
-                  [
-                    '[snapshotOperationContext](/en/docs/storage-contract/api/snapshotOperationContext)',
-                    'Capture cancellation, timeout, paging and conflict intent for the backend.'
-                  ],
-                  [
-                    '[snapshotStorageCapabilities](/en/docs/storage-contract/api/snapshotStorageCapabilities)',
-                    'Validate capabilities and normalize two older omissions.'
-                  ],
-                  [
-                    '[StorageContractError](/en/docs/storage-contract/api/StorageContractError)',
-                    'Retain source, code and the cause chain of a contract failure.'
-                  ],
-                  [
-                    '[snapshotKeyValueStore](/en/docs/storage-contract/api/snapshotKeyValueStore)',
-                    'Inspect a supplied string store and capture its capability facts.'
-                  ],
-                  [
-                    '[isRecordStore](/en/docs/storage-contract/api/isRecordStore) / [asRecordStore](/en/docs/storage-contract/api/asRecordStore)',
-                    'Check a backend before using bytes, records, range iteration or transactions.'
-                  ],
-                  [
-                    '[asSecondaryIndexRecordStore](/en/docs/storage-contract/api/asSecondaryIndexRecordStore)',
-                    'Admit a record store with the complete secondary-index extension.'
-                  ],
-                  [
-                    '[asChangeFeedStore](/en/docs/storage-contract/api/asChangeFeedStore)',
-                    'Admit a post-commit change feed; the caller owns subscription and cleanup.'
-                  ],
-                  [
-                    '[snapshotKeyValueStoreDetailed](/en/docs/storage-contract/api/snapshotKeyValueStoreDetailed)',
-                    'Capture the exact read failure, disposer and original receiver.'
+                    '[implement](/en/docs/storage-contract/api/implement)',
+                    'Define an implementation; the host and backend own installation and execution.'
                   ],
                   [
                     '[assertStorageKey](/en/docs/storage-contract/api/assertStorageKey) / [assertStringStorageKey](/en/docs/storage-contract/api/assertStringStorageKey)',
-                    'Validate record or string-only keys without copying.'
+                    'Validate keys without copying them.'
                   ],
                   [
-                    '[compareStorageKeys](/en/docs/storage-contract/api/compareStorageKeys)',
-                    'Compare already-valid record keys without admitting them.'
+                    '[assertOperationContext](/en/docs/storage-contract/api/assertOperationContext) / [assertCodec](/en/docs/storage-contract/api/assertCodec)',
+                    'Check operation options or codec shapes without starting tasks or converting data.'
                   ],
                   [
-                    '[assertTransactionCallback](/en/docs/storage-contract/api/assertTransactionCallback) / [readTransactionConflictPolicy](/en/docs/storage-contract/api/readTransactionConflictPolicy)',
-                    'Validate the callback and read conflict policy without starting a transaction.'
+                    '[isRecordStore](/en/docs/storage-contract/api/isRecordStore) / [asRecordStore](/en/docs/storage-contract/api/asRecordStore)',
+                    'Inspect an existing store before using records; no backend support is added.'
                   ],
                   [
-                    '[snapshotCodec](/en/docs/storage-contract/api/snapshotCodec) / [assertCodec](/en/docs/storage-contract/api/assertCodec)',
-                    'Check a codec name, output form and both methods.'
+                    '[StorageContractError](/en/docs/storage-contract/api/StorageContractError) / [isStorageContractError](/en/docs/storage-contract/api/isStorageContractError)',
+                    'Recognize contract failures with a source, code and cause chain.'
                   ],
                   [
-                    '[snapshotSyncWriteOptions](/en/docs/storage-contract/api/snapshotSyncWriteOptions) / [assertSyncWriteOptions](/en/docs/storage-contract/api/assertSyncWriteOptions)',
-                    'Check sync write options and reject supplied signal or timeout values.'
+                    '[host authoring: snapshotStorageKey](/en/docs/storage-host/api/authoring/key/snapshotStorageKey)',
+                    'Copy key values required by deferred work without freezing the copy.'
                   ],
                   [
-                    '[isArrayBuffer](/en/docs/utils/api/bytes/isArrayBuffer) / [isUint8Array](/en/docs/utils/api/bytes/isUint8Array) / [intrinsicConstructorName](/en/docs/storage-contract/api/intrinsicConstructorName)',
-                    'Use utils for binary brands, or inspect a diagnostic constructor name.'
+                    '[host authoring: snapshotOperationContext](/en/docs/storage-host/api/authoring/context/snapshotOperationContext)',
+                    'Capture scalar operation intent and borrow the original signal without starting a timer.'
+                  ],
+                  [
+                    '[host authoring: fromValueCodec](/en/docs/storage-host/api/authoring/codec/fromValueCodec)',
+                    'Adapt a serialize codec, whose implementation performs conversion.'
                   ]
                 ]
               }

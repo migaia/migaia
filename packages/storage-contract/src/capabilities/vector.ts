@@ -119,13 +119,17 @@ export const vector = /* @__PURE__ */ defineStandardStorageCapability<IVectorApi
 
 /** Collection configuration is data only; the native collection owner checks repeated names. */
 export type IStorageVectorConfiguration = {
+  /** Positive component count shared by every vector stored in this native collection. */
   readonly dimensions: number
+  /** Native distance family; cosine additionally requires a nonzero vector direction. */
   readonly metric: 'cosine' | 'dot' | 'euclid'
 }
 
 /** Optional validation facts also serve query synthesis before a collection is known. */
 export type IStorageVectorValidation = {
+  /** Require the collection's exact component count when its schema is already known. */
   readonly dimensions?: number
+  /** Apply this known distance family, including cosine's nonzero-direction requirement. */
   readonly metric?: IStorageVectorConfiguration['metric']
 }
 

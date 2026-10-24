@@ -1653,6 +1653,23 @@ const workerAdapterTimeoutDescription = {
 const optionTranslations: Readonly<
   Record<string, Readonly<Partial<Record<IGuideLocale, string>>>>
 > = {
+  /** Pure vector guards document known schema facts without introducing a collection or copying it. */
+  'storage-contract:index:assertStorageVector:dimensions': {
+    en: 'When the collection schema is known, require this exact positive number of components; omission validates the supplied dense vector without imposing a known dimension.',
+    zh: '已知集合结构时，要求向量分量数等于该正整数；省略时仍校验稠密向量，但不额外指定已知维度。'
+  },
+  'storage-contract:index:assertStorageVector:metric': {
+    en: 'Validate the known cosine, dot or euclid distance family; cosine also rejects a zero direction. Omit only when no collection metric is known.',
+    zh: '校验已知的 cosine、dot 或 euclid 距离类型；cosine 还会拒绝零向量。尚不知道集合距离类型时可省略。'
+  },
+  'storage-contract:index:assertStorageVectorCollection:dimensions': {
+    en: 'Positive safe integer declaring the component count for this collection; every stored vector must use the same count.',
+    zh: '用正的安全整数声明集合维度；写入该集合的每个向量都必须有相同分量数。'
+  },
+  'storage-contract:index:assertStorageVectorCollection:metric': {
+    en: 'Declare the native cosine, dot or euclid distance family used by the collection; cosine vectors must have a nonzero direction.',
+    zh: '声明集合使用的原生 cosine、dot 或 euclid 距离类型；cosine 向量必须具有非零方向。'
+  },
   'store-worker:index:WorkerAdapter:timeoutMs': workerAdapterTimeoutDescription,
   /** Bind reviewed descriptions only to their listed public configuration fields. */
   ...Object.fromEntries(
@@ -9907,7 +9924,7 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
       }
     ]
   }),
-  'storage-host:authoring/codec:snapshotCodec': createStorageContractGuide({
+  'storage-host:authoring-codec:snapshotCodec': createStorageContractGuide({
     purposeEn:
       'Validates and returns the original codec instance so class-private methods retain their receiver. It performs no conversion, descriptor clone or freezing.',
     purposeZh:
@@ -10004,7 +10021,7 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
       }
     ]
   }),
-  'storage-host:authoring/codec:fromValueCodec': createStorageContractGuide({
+  'storage-host:authoring-codec:fromValueCodec': createStorageContractGuide({
     purposeEn:
       'Adapt a value codec into the storage codec contract once. The adapter preserves each callback input/output, names the format id@version and maps string/binary/unknown carriers to text/binary/structured. Failures retain the original serialize error on cause.',
     purposeZh:
@@ -10086,7 +10103,7 @@ await records.putRecord({ id: 1 }, 'user:1', { conflictPolicy: ConflictPolicy.co
       '继续增加 alias。'
     ]
   }),
-  'storage-host:authoring/backend:intrinsicConstructorName': createStorageContractGuide({
+  'storage-host:authoring-backend:intrinsicConstructorName': createStorageContractGuide({
     purposeEn:
       'Reads ordinary prototype constructor metadata for diagnostics. The mutable name must never select a protocol or grant a capability.',
     purposeZh: '读取普通 prototype constructor 元数据作诊断；可变名称不能选择协议或授予能力。',
@@ -10325,7 +10342,7 @@ await records.putRecord({ id: 1 }, 'user:1', { conflictPolicy: ConflictPolicy.co
       }
     ]
   }),
-  'storage-host:authoring/context:snapshotOperationContext': createStorageContractGuide({
+  'storage-host:authoring-context:snapshotOperationContext': createStorageContractGuide({
     purposeEn:
       'Captures scalar operation choices before native asynchronous work while borrowing the original live signal. Results are ordinary records without repeated-call identity or accessor-read guarantees.',
     purposeZh:
@@ -10466,7 +10483,7 @@ await records.putRecord({ id: 1 }, 'user:1', { conflictPolicy: ConflictPolicy.co
       }
     ]
   }),
-  'storage-host:authoring/context:snapshotSyncWriteOptions': createStorageContractGuide({
+  'storage-host:authoring-context:snapshotSyncWriteOptions': createStorageContractGuide({
     purposeEn:
       'Validates the reduced synchronous-write contract and returns only conflictPolicy. signal and timeoutMs are rejected because a synchronous channel cannot honor cancellation after execution begins.',
     purposeZh:
@@ -10727,7 +10744,7 @@ await records.putRecord({ id: 1 }, 'user:1', { conflictPolicy: ConflictPolicy.co
       }
     ]
   }),
-  'storage-host:authoring/key:snapshotStorageKey': createStorageContractGuide({
+  'storage-host:authoring-key:snapshotStorageKey': createStorageContractGuide({
     purposeEn:
       'Validates and detaches a structured key so later asynchronous work cannot observe caller mutation. Compound arrays and Dates are copied; ArrayBuffers are normalized through the cross-realm key classifier.',
     purposeZh:
@@ -10811,7 +10828,7 @@ await records.putRecord({ id: 1 }, 'user:1', { conflictPolicy: ConflictPolicy.co
       }
     ]
   }),
-  'storage-host:authoring/key:compareStorageKeys': createStorageContractGuide({
+  'storage-host:authoring-key:compareStorageKeys': createStorageContractGuide({
     purposeEn:
       'Provides the canonical total ordering for valid storage keys: number, Date, string, ArrayBuffer, then compound array, with lexicographic comparison inside each domain. It matches validation and cross-realm classification.',
     purposeZh:
@@ -11040,7 +11057,7 @@ await records.putRecord({ id: 1 }, 'user:1', { conflictPolicy: ConflictPolicy.co
       }
     ]
   }),
-  'storage-host:authoring/store:snapshotStorageCapabilities': createStorageContractGuide({
+  'storage-host:authoring-store:snapshotStorageCapabilities': createStorageContractGuide({
     purposeEn:
       'Validates and detaches scalar capability facts for deferred host admission. Legacy secondary-index and change-feed omissions normalize to false.',
     purposeZh:
@@ -11140,7 +11157,7 @@ await records.putRecord({ id: 1 }, 'user:1', { conflictPolicy: ConflictPolicy.co
       }
     ]
   }),
-  'storage-host:authoring/store:snapshotKeyValueStoreDetailed': createStorageContractGuide({
+  'storage-host:authoring-store:snapshotKeyValueStoreDetailed': createStorageContractGuide({
     purposeEn:
       'Checks the original KV shape and retains its resource receiver plus detached capability facts for later host admission. Ordinary invalid shapes return a failed admission record.',
     purposeZh:
@@ -11190,7 +11207,7 @@ await records.putRecord({ id: 1 }, 'user:1', { conflictPolicy: ConflictPolicy.co
       }
     ]
   }),
-  'storage-host:authoring/store:snapshotKeyValueStore': createStorageContractGuide({
+  'storage-host:authoring-store:snapshotKeyValueStore': createStorageContractGuide({
     purposeEn:
       'Retains the original admitted KV object and an independent capability descriptor before deferred host routing.',
     purposeZh: '在宿主异步路由前保留准入后的原 KV 对象及独立能力说明。',
@@ -11239,7 +11256,7 @@ await records.putRecord({ id: 1 }, 'user:1', { conflictPolicy: ConflictPolicy.co
       }
     ]
   }),
-  'storage-host:authoring/store:snapshotRecordStore': createStorageContractGuide({
+  'storage-host:authoring-store:snapshotRecordStore': createStorageContractGuide({
     purposeEn:
       'Admits the complete structured-record surface and retains the original provider with independent capability facts for deferred consumption.',
     purposeZh: '检查完整结构化记录接口，为异步消费保留原 provider 与独立能力事实。',

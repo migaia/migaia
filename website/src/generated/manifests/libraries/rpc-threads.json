@@ -47,7 +47,7 @@
                 "type": "list",
                 "items": [
                   "卡住的调用会到期，也能随时取消。 常见封装只在 Worker 回复时 resolve，超时和取消都要自己拼。这里每次调用默认有 30 秒期限，可以用 `timeoutMs` 单独设置，也可以传入 `AbortSignal`；到期或取消时分别以带 `code` 的 `TimeoutError`、`AbortError` 拒绝。示例",
-                  "Worker 崩溃，进行中的调用立刻失败。 常见封装要你自己监听 `exit`，再逐个拒绝还在等的调用。这里连接一断，未完成的调用就以 `REMOTE_RESULT_UNKNOWN` 拒绝，明确告诉你“结果未知，先对账再重试”。示例",
+                  "Worker 崩溃，进行中的调用立刻失败。 常见封装要你自己监听 `exit`，再逐个拒绝还在等的调用。这里连接一断，未完成的调用就以 `REMOTE_RESULT_UNKNOWN` 拒绝，明确告诉你“结果未知，先对账再重试”；默认还会按递增的间隔自动重启 Worker。示例",
                   "错误原样回到主线程。 结构化克隆会把自定义错误变成普通 `Error`，并丢掉 `code` 这类自定义字段。这里类名、`code` 和 `cause` 链都会还原，主线程可以继续按 `code` 分支。示例",
                   "忙不过来时直接拒绝，不无限排队。 常见封装把消息全部塞进 Worker 的队列。这里同时执行的调用数有上限，超出的调用立即以 `OVERLOADED` 拒绝，提供方函数不会执行，调用方可以马上限流或降级。示例",
                   "双向调用和流共用一条连接。 两端都能提供方法、发起调用；返回异步生成器的方法用 `stream()` 逐项读取，不用另建消息路由。示例"
@@ -893,7 +893,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "这个拒绝只说明结果未知，不说明 Worker 没有执行；非幂等操作重试前要先对账。崩溃后是否重启由 `supervisor.restart` 决定，本例关闭了重启。"
+                "text": "这个拒绝只说明结果未知，不说明 Worker 没有执行；非幂等操作重试前要先对账。崩溃后是否重启由 `supervisor.restart` 决定，本例关闭了重启；默认的 `on-failure` 会按递增的间隔自动重启 Worker。重启完成前发出的调用会以 `REMOTE_CLOSED` 拒绝，重启完成后的调用由新 Worker 处理。"
               }
             ]
           },
@@ -1615,7 +1615,7 @@
                   "type": "list",
                   "items": [
                     "Stuck calls expire, and any call can be cancelled. A typical wrapper resolves only when the Worker replies, so timeouts and cancellation are yours to build. Here every call has a 30-second deadline by default, which `timeoutMs` overrides, and accepts an `AbortSignal`; a call that expires or is cancelled rejects with a `TimeoutError` or `AbortError` carrying a `code`. Example",
-                    "When the Worker crashes, calls in flight fail at once. A typical wrapper leaves you to listen for `exit` and reject each waiting call yourself. Here, as soon as the connection drops, unfinished calls reject with `REMOTE_RESULT_UNKNOWN`, which tells you plainly that the result is unknown and should be reconciled before a retry. Example",
+                    "When the Worker crashes, calls in flight fail at once. A typical wrapper leaves you to listen for `exit` and reject each waiting call yourself. Here, as soon as the connection drops, unfinished calls reject with `REMOTE_RESULT_UNKNOWN`, which tells you plainly that the result is unknown and should be reconciled before a retry; by default the Worker is also restarted with a growing delay. Example",
                     "Errors come back intact. Structured cloning turns a custom error into a plain `Error` and drops custom fields such as `code`. Here the class name, `code` and `cause` chain are restored, so the main thread keeps branching on `code`. Example",
                     "Overload is rejected, not queued forever. A typical wrapper pushes every message into the Worker's queue. Here the number of calls running at once is capped; a call over the cap rejects immediately with `OVERLOADED` without running the provider, so the caller can throttle or degrade right away. Example",
                     "Calls in both directions and streams share one connection. Either side can provide methods and make calls, and a method that returns an async generator is read item by item with `stream()`, with no extra message routing. Example"
@@ -2504,7 +2504,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "The rejection only says the result is unknown; it does not say the Worker did nothing, so reconcile a non-idempotent operation before retrying it. Whether the Worker restarts after a crash is set by `supervisor.restart`; this example turns restarts off."
+                  "text": "The rejection only says the result is unknown; it does not say the Worker did nothing, so reconcile a non-idempotent operation before retrying it. Whether the Worker restarts after a crash is set by `supervisor.restart`; this example turns restarts off, while the default `on-failure` restarts it automatically with a growing delay. Calls made before the restart finishes reject with `REMOTE_CLOSED`; calls made after it are handled by the new Worker."
                 }
               ]
             },

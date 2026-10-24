@@ -10,59 +10,180 @@
       "readme": {
         "sections": [
           {
-            "id": "多级缓存",
-            "heading": "多级缓存",
+            "id": "migaia-storage-plugin-cache",
+            "heading": "@migaia/storage-plugin-cache",
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "`cachePlugin` 组合已经发布的存储后端。先在较早宿主批次安装各层，再安装缓存，并显式调用 `host.detect()`。"
-              },
-              {
-                "type": "code",
-                "language": "ts",
-                "code": "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { cachePlugin, cacheKey } from '@migaia/storage-plugin-cache'\n\nconst original = await createStorageHost({ plugins: [memoryBackendPlugin({ id: 'memory' })] })\nconst host = await original.use(\n  cachePlugin({\n    tiers: [{ backend: 'memory', ttlMs: 30000 }],\n    maxAgeMs: 30000,\n    staleAfterMs: 10000,\n    negativeTtlMs: 1000\n  })\n)\nawait host.detect()\ntry {\n  const cache = host.backend('cache')\n  const key = await cacheKey('response', { model: 'model-one', version: 1 })\n  const value = await cache.getOrLoad(\n    key,\n    async (signal) => {\n      if (signal.aborted) return undefined\n      return { answer: 42 }\n    },\n    { meta: { model: 'model-one' } }\n  )\n  console.log(value, await cache.peek(key), cache.stats())\n  await cache.invalidate(key)\n} finally {\n  await host.dispose()\n}"
+                "text": "把已安装的键值后端按快慢顺序组合成多级缓存，让重复查询共享回源结果，并把下层读到的数据补到上层。适合同时使用内存和持久存储、又不想逐次手写回填与失效传播的应用；可设置缓存期限、缺失值缓存和延后写入，各层之间不提供原子提交，延后写入也不是持久队列。"
               },
               {
                 "type": "paragraph",
-                "text": "层按从快到慢排列。through 写入从最慢层向上完成；back 写入按键合并，由宿主 scheduler 刷出，失败只报告并丢弃，不重试。最慢层必须为 through。`flush()` 立即处理待写项；释放时等待已准入工作、刷出一次、取消订阅，不关闭借用层。"
-              },
-              {
-                "type": "paragraph",
-                "text": "缓存提供最终一致与失效通知，不提供跨 store 原子提交，也不声明事务。建议专用后端实例，避免宽业务通知清除无关缓存副本。变更流之上的层必须设置硬 TTL，限制漏通知的陈旧上界；可靠变更流沿后端原游标协议。"
-              },
-              {
-                "type": "paragraph",
-                "text": "逻辑键只接受字符串。平铺 `get` 只读取平铺 `set` 写入的条目；codec 值与负条目经 `getOrLoad`、`getOrLoadEntry` 和 `peek` 访问。`cacheKey` 复用原 portable serializer 与 SHA-256，对象字段顺序不影响结果，非法值保留原 serializer 错误。"
-              },
-              {
-                "type": "paragraph",
-                "text": "带计数的 KV `removeByPrefix` 仅单层可用；多层在 I/O 前报 `UNSUPPORTED_CAPABILITY`，因为原生计数无法识别跨层重复逻辑副本。多层无计数删除使用 `invalidate({ prefix })` 或清空方法。`removeMany` 按已给出的不同逻辑键计数，多个副本只计一次。"
-              },
-              {
-                "type": "paragraph",
-                "text": "各层条目同时以该层采样后的有效硬期限限制自身到期时间。原生 `expire` 失败会报告，不能留下可无限命中的副本。正数单次 TTL 在回源或写入前要求所有目标层具有 TTL 能力；共享 KV `setMany` 保留非负有限 TTL 域，零表示立即删除。"
-              },
-              {
-                "type": "paragraph",
-                "text": "传播仅在显式检测阶段订阅。可靠源的游标写入紧邻上层的缺省组织，`$cache.cursor` 为内部元数据保留键。游标缺失或过期时先清除所管上层前缀，再从 now 继续。删除或游标持久化失败不保留积压队列：下一原生批次先清上层，再于成功后推进游标。仅游标过期会替换原生 tail 资源，不为断线启动重连定时器。"
+                "text": "English · 使用指南"
               }
             ]
           },
           {
-            "id": "语义缓存",
-            "heading": "语义缓存",
+            "id": "你可能遇到过",
+            "heading": "你可能遇到过",
+            "blocks": [
+              {
+                "type": "list",
+                "items": [
+                  "同一个热点请求同时回源很多次：每个请求独立执行了加载函数。",
+                  "查不到的数据反复查询数据库：未命中没有短期缓存。",
+                  "下层已经更新，上层还在返回旧数据：副本缺少失效传播或硬期限。",
+                  "为了批量回源自己维护 Map、去重和取消：单键与批量请求没有共享加载状态。"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "为什么选它",
+            "heading": "为什么选它",
+            "blocks": [
+              {
+                "type": "list",
+                "items": [
+                  "多级读取、回填与写入使用已安装后端，层顺序由你指定。多级缓存",
+                  "`getOrLoad` 和 `getOrLoadMany` 合并同键加载；一个调用方取消不会中断其它等待者。回源策略",
+                  "可分别设置新鲜期、最大年龄和负缓存期限，旧值可以先返回并后台刷新。期限",
+                  "语义检索由显式选择的 Feature 提供，普通缓存无需嵌入模型或向量后端。语义缓存"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "从这里开始",
+            "heading": "从这里开始",
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "从 `@migaia/storage-plugin-cache/features/semantic` 导入 `semanticCacheFeature`，在 `cachePlugin` 第二参数中选择 `{ semantic: semanticCacheFeature(options) }`。向量后端必须在更早批次发布。配置 collection、维度、原生 metric、最低分与调用方嵌入函数。候选顺序沿原向量引擎，逐个执行 `accept`；复核失败只报告并跳过，不在 JavaScript 中计算向量分数。"
+                "text": "先安装数据层，再安装缓存。第二次请求从缓存取得同一值，不再运行加载函数。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { cachePlugin } from '@migaia/storage-plugin-cache'\n\nconst base = await createStorageHost({ plugins: [memoryBackendPlugin({ id: 'values' })] })\ntry {\n  const host = await base.use(cachePlugin({ tiers: [{ backend: 'values', ttlMs: 30000 }] }))\n  await host.detect()\n  const cache = host.backend('cache')\n  let loads = 0\n  const load = async () => ({ answer: ++loads })\n  await cache.getOrLoad('answer', load)\n  console.log(await cache.getOrLoad('answer', load), loads) // { answer: 1 } 1\n} finally {\n  await base.dispose()\n}"
               },
               {
                 "type": "paragraph",
-                "text": "`cache.api.semantic.set(prompt, value, { payload: { model: 'one' } })` 按 prompt 与模型元数据独立存储。`get` 可设置 `where`、`minScore`、一至十个 `candidates` 和异步 `accept`。`getOrLoad` 按组织、prompt 与规范 payload 合并回源，单调用取消不影响共享任务，并支持缩短 TTL 与 `cacheIf`。关闭时排空任务，不关闭借用的向量后端。`$cache.*` 为保留字段。"
+                "text": "预期输出："
+              },
+              {
+                "type": "code",
+                "language": "text",
+                "code": "{ answer: 1 } 1"
+              }
+            ]
+          },
+          {
+            "id": "手写时的隐患",
+            "heading": "手写时的隐患",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "只用 Map 包住一个加载函数，容易遗漏共享请求、过期和负缓存："
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "const values = new Map<string, unknown>()\nasync function read(key: string) {\n  if (values.has(key)) return values.get(key) // 没有到期时间，旧值会一直留下。\n  const value = await Promise.resolve({ answer: 42 }) // 并发请求各自回源。\n  values.set(key, value) // undefined 的缓存策略也需要单独决定。\n  return value\n}\nconsole.log(await read('answer'))"
+              }
+            ]
+          },
+          {
+            "id": "三分钟理解",
+            "heading": "三分钟理解",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "`请求 → 按层查找 → 命中则返回并回填 → 缺失则共享回源 → 写入各层`。"
+              },
+              {
+                "type": "table",
+                "headers": ["名称", "含义"],
+                "rows": [
+                  ["tier 层", "从快到慢排列的已安装 KV 后端"],
+                  ["through", "等本次写入结算，从最慢层向上处理"],
+                  ["back", "同键待写项合并后延迟处理，失败报告并丢弃"],
+                  ["negative", "对加载结果 `undefined` 的短期缓存"],
+                  ["stale", "已过新鲜期但仍在有效期限内的值"]
+                ]
+              }
+            ]
+          },
+          {
+            "id": "常见场景",
+            "heading": "常见场景",
+            "blocks": [
+              {
+                "type": "table",
+                "headers": ["想做什么", "组合", "示例"],
+                "rows": [
+                  ["合并热门请求和缺失查询", "`getOrLoad` + `negativeTtlMs`", "缺失值"],
+                  ["本地层加持久层", "多个 tiers", "组合多个层"],
+                  ["按标签失效，较大值放对象层", "`tagIndex` + `offload`", "标签与大值"],
+                  ["用模型元数据筛选相似回答", "semantic Feature + vector 后端", "语义缓存"]
+                ]
+              }
+            ]
+          },
+          {
+            "id": "安装",
+            "heading": "安装",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "这些 storage 包当前是 `private: true` 的仓库 workspace 包，尚不作为已发布的 registry 包提供。以下命令用于仓库内的消费包："
+              },
+              {
+                "type": "code",
+                "language": "bash",
+                "code": "pnpm add --workspace @migaia/storage-plugin-cache @migaia/storage-host @migaia/storage-contract"
               },
               {
                 "type": "paragraph",
-                "text": "`invalidate(where, { count: 'scroll' })` 返回原 `deleteWhere` 数字，缺省保留 `precount`。删除包含物理仍存在的过期匹配点；Qdrant 两策略继承原并发边界，不强制切换、不重新计数、不承诺全局快照。原 context 与 count 由该原生删除拥有者单次校验；向量 TTL 由原 `upsert` 设置。"
+                "text": "运行环境要求 Node.js 24 或相应兼容环境。使用 Redis、PostgreSQL 等层时，还需安装各后端插件及其真实客户端 peer。语义 Feature 额外需要你提供嵌入函数和支持 vector 的后端；根入口不自动启用它。"
+              }
+            ]
+          },
+          {
+            "id": "常用-api",
+            "heading": "常用 API",
+            "blocks": [
+              {
+                "type": "table",
+                "headers": ["API", "用途"],
+                "rows": [
+                  ["`cachePlugin(options, features?)`", "选择已有数据层与可选 Feature"],
+                  [
+                    "`getOrLoad` / `getOrLoadEntry` / `getOrLoadMany`",
+                    "读取或共享回源；Entry 形式还给出状态"
+                  ],
+                  ["`peek(key)` / `stats()`", "查看条目与计数，不调用加载函数"],
+                  ["`invalidate(key \\", "{ prefix } \\", "{ tag })`", "删除匹配副本"],
+                  ["`flush()` / `sweepOffload()`", "刷出待写项，或清理已到期的外置对象"],
+                  ["`cacheKey(namespace, input)`", "用 portable 序列化与 SHA-256 生成稳定键"]
+                ]
+              }
+            ]
+          },
+          {
+            "id": "使用边界",
+            "heading": "使用边界",
+            "blocks": [
+              {
+                "type": "list",
+                "items": [
+                  "每个层必须在更早安装批次中已经可用，并支持 KV。配置 `ttlMs` 的层还必须支持 TTL；最慢层必须使用 `through`。缓存不提供跨层原子提交或事务。",
+                  "层读取失败会报告并按未命中处理；层写入失败会报告并跳过。加载或编码失败报 `CACHE_LOAD_FAILED`，嵌入失败报 `CACHE_EMBED_FAILED`，原错误在 `cause` 中。缓存错误 source 为 `storage.backend.cache`；参数与能力错误也可能来自 storage-contract。",
+                  "普通 `get/set` 用于字符串；`get` 只读普通 `set` 写入的条目。对象值和负条目请用 `getOrLoad`、`getOrLoadEntry` 与 `peek`。",
+                  "默认启用失效传播，订阅在 `detect()` 时建立。变更源上方各层必须有硬 TTL；通知不是跨层提交保证。建议使用专门的缓存后端，避免业务 clear 通知清掉无关副本。",
+                  "`write: 'back'` 不是持久队列。失败不重试；`flush()` 立即处理当前待写项，关闭前也会刷出一次。开启传播时，back 层必须位于所有变更源下方且有 TTL；不满足会拒绝配置。",
+                  "多层 `removeByPrefix` 无法给出可靠去重数量，会在 I/O 前报 `UNSUPPORTED_CAPABILITY`。用无计数的 `invalidate({ prefix })` 删除多层副本；`removeMany` 对已知不同逻辑键只计一次。",
+                  "`host.org(uuid).backend('cache')` 把各层路由到同一组织。关闭缓存排空已接纳工作并取消订阅，不单独关闭借用层；关闭宿主会统一释放它安装的后端。"
+                ]
               }
             ]
           }
@@ -71,111 +192,180 @@
       "guide": {
         "sections": [
           {
-            "id": "多级缓存",
-            "heading": "多级缓存",
+            "id": "cache-使用指南",
+            "heading": "cache 使用指南",
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "`cachePlugin` 组合已经发布的存储后端。先在较早宿主批次安装各层，再安装缓存，并显式调用 `host.detect()`。"
+                "text": "English · 概览与安装"
+              },
+              {
+                "type": "table",
+                "headers": ["你的问题", "看这里"],
+                "rows": [
+                  ["合并重复回源，短期记住查无此项", "加载缺失值与负缓存"],
+                  ["组合内存、磁盘或远程层", "组合多个层"],
+                  ["返回旧值同时刷新，或取消单个请求", "期限、刷新与取消"],
+                  ["按标签删除，减少大值副本", "标签与大值"],
+                  ["按相似问题寻找可复用回答", "选择语义缓存"]
+                ]
+              }
+            ]
+          },
+          {
+            "id": "加载缺失值与负缓存",
+            "heading": "加载缺失值与负缓存",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "基础层必须先安装，再用 `host.use(cachePlugin(...))` 追加缓存。只有配置 `negativeTtlMs` 后，加载结果 `undefined` 才会被短期保存。"
               },
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { cachePlugin, cacheKey } from '@migaia/storage-plugin-cache'\n\nconst original = await createStorageHost({ plugins: [memoryBackendPlugin({ id: 'memory' })] })\nconst host = await original.use(\n  cachePlugin({\n    tiers: [{ backend: 'memory', ttlMs: 30000 }],\n    maxAgeMs: 30000,\n    staleAfterMs: 10000,\n    negativeTtlMs: 1000\n  })\n)\nawait host.detect()\ntry {\n  const cache = host.backend('cache')\n  const key = await cacheKey('response', { model: 'model-one', version: 1 })\n  const value = await cache.getOrLoad(\n    key,\n    async (signal) => {\n      if (signal.aborted) return undefined\n      return { answer: 42 }\n    },\n    { meta: { model: 'model-one' } }\n  )\n  console.log(value, await cache.peek(key), cache.stats())\n  await cache.invalidate(key)\n} finally {\n  await host.dispose()\n}"
+                "code": "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { cachePlugin } from '@migaia/storage-plugin-cache'\n\nconst base = await createStorageHost({ plugins: [memoryBackendPlugin({ id: 'data' })] })\ntry {\n  const host = await base.use(\n    cachePlugin({\n      tiers: [{ backend: 'data', ttlMs: 30000 }],\n      negativeTtlMs: 1000\n    })\n  )\n  await host.detect()\n  const cache = host.backend('cache')\n  await cache.getOrLoad('profile:ada', async () => ({ name: 'Ada' }))\n  console.log(await cache.getOrLoad('profile:ada', async () => ({ name: 'unused' })))\n  // { name: 'Ada' }\n  await cache.getOrLoad('profile:missing', async () => undefined)\n  console.log((await cache.peek('profile:missing'))?.negative) // true\n  await cache.invalidate('profile:ada')\n} finally {\n  await base.dispose()\n}"
               },
               {
                 "type": "paragraph",
-                "text": "层按从快到慢排列。through 写入从最慢层向上完成；back 写入按键合并，由宿主 scheduler 刷出，失败只报告并丢弃，不重试。最慢层必须为 through。`flush()` 立即处理待写项；释放时等待已准入工作、刷出一次、取消订阅，不关闭借用层。"
+                "text": "`getOrLoadEntry` 还返回 `tier`、`stale`、`negative`、`ageMs`、`meta` 与 `tags`。`peek()` 不回源；缺失返回 `undefined`。`getOrLoadMany(keys, loader)` 对输入去重，按层批量读取，只把缺失且尚无共享任务的键交给 loader；loader 返回 `ReadonlyMap<string, value | undefined>`。"
               },
               {
                 "type": "paragraph",
-                "text": "缓存提供最终一致与失效通知，不提供跨 store 原子提交，也不声明事务。建议专用后端实例，避免宽业务通知清除无关缓存副本。变更流之上的层必须设置硬 TTL，限制漏通知的陈旧上界；可靠变更流沿后端原游标协议。"
+                "text": "`stampedeLock: { backend, timeoutMs? }` 可选择 tiers 中支持真实事务与键锁的层，锁内复查并把值与 TTL 写入同一事务。timeoutMs 默认 `30000` 毫秒。事务重放可能再次调用 loader，不承诺回源只执行一次。"
               },
               {
                 "type": "paragraph",
-                "text": "逻辑键只接受字符串。平铺 `get` 只读取平铺 `set` 写入的条目；codec 值与负条目经 `getOrLoad`、`getOrLoadEntry` 和 `peek` 访问。`cacheKey` 复用原 portable serializer 与 SHA-256，对象字段顺序不影响结果，非法值保留原 serializer 错误。"
+                "text": "普通 `get/set` 只读写普通字符串条目，不用于读取上面编码的对象。键只接受字符串。需要由复杂参数生成稳定键时，使用 `await cacheKey('profile', { id: 'ada', version: 1 })`，从根入口导入 `cacheKey`；不支持的输入保留原 serializer 错误。"
               }
             ]
           },
           {
-            "id": "条目策略",
-            "heading": "条目策略",
+            "id": "组合多个层",
+            "heading": "组合多个层",
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "单次 `ttlMs`、`maxAgeMs`、`staleAfterMs`、`negativeTtlMs` 只能缩短配置上界；延长时报 `CACHE_TIER_INVALID`。`jitterRatio` 在零至 0.5 之间，复用原数值 helper 只缩短期限；可注入 `clock`、`random`。旧值立即返回，共享一次后台刷新。仅配置负缓存期限时缓存 undefined；`cacheIf` 返回 false 则跳过全部层。"
+                "text": "`tiers` 按从快到慢排列，默认每层 `write: 'through'`。下面用两个独立 memory 实例展示配置；换成 SQLite、Redis 或 PostgreSQL 时，先安装对应后端并保留相同 ID。"
               },
-              {
-                "type": "paragraph",
-                "text": "`mode: 'refresh'` 跳过读取，作废旧普通回源并合并已有刷新；`mode: 'bypass'` 只回源。单个调用方取消只让自身以 contract `ABORTED` 拒绝，共享任务只接收缓存关闭 signal。回源与编码失败以 `CACHE_LOAD_FAILED` 保留原 cause 与原生错误类型。"
-              },
-              {
-                "type": "paragraph",
-                "text": "`getOrLoadMany` 去重输入键，每个经过的层调用一次原生 `getMany`，每个 through 回填层调用一次 `setMany`；缺失键进入与单键相同的单飞 Map，共享一次批量回源。`maxEntryBytes` 让超限条目跳过对应层。"
-              },
-              {
-                "type": "paragraph",
-                "text": "`stampedeLock` 选取支持真实事务与键锁的层，由原事务锁内复查并把 TTL 写在同一 draft。物理重放可能再次回源，不承诺 exactly-once；锁与事务原错误保持。"
-              },
-              {
-                "type": "paragraph",
-                "text": "`tagIndex` 选 records 与 TTL 后端。先写标签记录，再写缓存值；索引失败报告并跳过值写入。`invalidate({ tag })` 只迭代该标签范围。`offload` 选 blob 后端且要求层 TTL：达到 `minBytes` 的编码内容以 SHA-256 对象键存储，值层只存引用。失效只删除引用，显式 `sweepOffload()` 清理旧对象；共享对象后端按各引用层最长 TTL 保留。"
-              },
-              {
-                "type": "paragraph",
-                "text": "观察事件为 `onCacheHit`、`onCacheMiss`、`onCacheLoad`、`onCacheInvalidate`、`onCacheTierError`、`onCacheWriteBackDropped`，只含数量与身份，不含键值。层失败降级为未命中或跳过写入，经宿主报告原诊断。组织视图把所有层路由到同一不可变宿主组织上下文。"
-              },
-              {
-                "type": "paragraph",
-                "text": "带计数的 KV `removeByPrefix` 仅单层可用；多层在 I/O 前报 `UNSUPPORTED_CAPABILITY`，因为原生计数无法识别跨层重复逻辑副本。多层无计数删除使用 `invalidate({ prefix })` 或清空方法。`removeMany` 按已给出的不同逻辑键计数，多个副本只计一次。"
-              },
-              {
-                "type": "paragraph",
-                "text": "各层条目同时以该层采样后的有效硬期限限制自身到期时间。原生 `expire` 失败会报告，不能留下可无限命中的副本。正数单次 TTL 在回源或写入前要求所有目标层具有 TTL 能力；共享 KV `setMany` 保留非负有限 TTL 域，零表示立即删除。"
-              },
-              {
-                "type": "paragraph",
-                "text": "传播仅在显式检测阶段订阅。可靠源的游标写入紧邻上层的缺省组织，`$cache.cursor` 为内部元数据保留键。游标缺失或过期时先清除所管上层前缀，再从 now 继续。删除或游标持久化失败不保留积压队列：下一原生批次先清上层，再于成功后推进游标。仅游标过期会替换原生 tail 资源，不为断线启动重连定时器。"
-              }
-            ]
-          },
-          {
-            "id": "语义缓存",
-            "heading": "语义缓存",
-            "blocks": [
-              {
-                "type": "paragraph",
-                "text": "从 `@migaia/storage-plugin-cache/features/semantic` 导入 `semanticCacheFeature`，在 `cachePlugin` 第二参数中选择 `{ semantic: semanticCacheFeature(options) }`。向量后端必须在更早批次发布。配置 collection、维度、原生 metric、最低分与调用方嵌入函数。候选顺序沿原向量引擎，逐个执行 `accept`；复核失败只报告并跳过，不在 JavaScript 中计算向量分数。"
-              },
-              {
-                "type": "paragraph",
-                "text": "`cache.api.semantic.set(prompt, value, { payload: { model: 'one' } })` 按 prompt 与模型元数据独立存储。`get` 可设置 `where`、`minScore`、一至十个 `candidates` 和异步 `accept`。`getOrLoad` 按组织、prompt 与规范 payload 合并回源，单调用取消不影响共享任务，并支持缩短 TTL 与 `cacheIf`。关闭时排空任务，不关闭借用的向量后端。`$cache.*` 为保留字段。"
-              },
-              {
-                "type": "paragraph",
-                "text": "`invalidate(where, { count: 'scroll' })` 返回原 `deleteWhere` 数字，缺省保留 `precount`。删除包含物理仍存在的过期匹配点；Qdrant 两策略继承原并发边界，不强制切换、不重新计数、不承诺全局快照。原 context 与 count 由该原生删除拥有者单次校验；向量 TTL 由原 `upsert` 设置。"
-              }
-            ]
-          },
-          {
-            "id": "四层原生组合",
-            "heading": "四层原生组合",
-            "blocks": [
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'\nimport { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'\nimport { redisBackendPlugin } from '@migaia/storage-plugin-redis'\nimport { nodeRedisDriver } from '@migaia/storage-plugin-redis/node-redis'\nimport { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'\nimport { pgDriver } from '@migaia/storage-plugin-postgres/pg'\nimport { createClientPool } from 'redis'\nimport { Pool } from 'pg'\nimport { cachePlugin } from '@migaia/storage-plugin-cache'\n\nconst redis = createClientPool({ url: process.env.MIGAIA_REDIS_URL })\nconst postgres = new Pool({ connectionString: process.env.MIGAIA_PG_URL })\nawait redis.connect()\nconst prefix = 'cache_guide_' + crypto.randomUUID().replaceAll('-', '')\nconst base = await createStorageHost({\n  plugins: [\n    memoryBackendPlugin({ id: 'l1' }),\n    sqliteBackendPlugin({ id: 'l2', driver: nodeSqliteDriver(':memory:') }),\n    redisBackendPlugin({ id: 'l3', driver: nodeRedisDriver(redis), prefix }),\n    postgresBackendPlugin({ id: 'l4', driver: pgDriver(postgres), prefix })\n  ]\n})\nconst host = await base.use(\n  cachePlugin({\n    propagate: false,\n    tiers: [\n      { backend: 'l1', ttlMs: 10000 },\n      { backend: 'l2', ttlMs: 20000 },\n      { backend: 'l3', ttlMs: 30000 },\n      { backend: 'l4', ttlMs: 60000 }\n    ],\n    stampedeLock: { backend: 'l3', timeoutMs: 1000 }\n  })\n)\nawait host.detect()\ntry {\n  const answer = await host.backend('cache').getOrLoad('answer', async () => ({ text: 'Hello' }))\n  console.log(answer)\n  await host.backend('cache').clearAll()\n} finally {\n  await host.dispose()\n  await redis.close()\n  await postgres.end()\n}"
+                "code": "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { cachePlugin, CacheWriteMode } from '@migaia/storage-plugin-cache'\n\nconst base = await createStorageHost({\n  plugins: [memoryBackendPlugin({ id: 'fast' }), memoryBackendPlugin({ id: 'slow' })]\n})\ntry {\n  const host = await base.use(\n    cachePlugin({\n      propagate: false,\n      tiers: [\n        { backend: 'fast', ttlMs: 10000, write: CacheWriteMode.back },\n        { backend: 'slow', ttlMs: 60000 }\n      ],\n      writeBackIntervalMs: 1000\n    })\n  )\n  await host.detect()\n  const cache = host.backend('cache')\n  await cache.set('status', 'ready')\n  await cache.flush()\n  console.log(await cache.get('status')) // ready\n} finally {\n  await base.dispose()\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "through 写入从最慢层向上完成；命中慢层会回填更快层。back 把同键待写项合并，默认每 `1000` 毫秒处理一次；失败报告后丢弃，不自动重试。最慢层不能用 back。这里关闭传播，以便独立演示 back；默认 `propagate: true` 时，所有变更源上方的层必须有 TTL，而 back 层必须在所有变更源下方并有 TTL。"
+              },
+              {
+                "type": "paragraph",
+                "text": "失效订阅在 `detect()` 建立。可靠变更源的游标失效或丢失时，会先清上层对应前缀，再继续订阅；普通通知也不保证所有副本同时更新。给上层设置硬 TTL，限定通知遗漏造成的旧值期限。建议各层使用专用后端或专用实例。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`prefix` 默认是 `cache:<插件ID>:`，可为同一数据后端上的独立缓存选择不同前缀。`clock` 默认 `Date.now`，`random` 默认 `Math.random`；只有需要可控时间或抖动来源时才覆盖。`$cache.cursor` 是传播游标的保留键，不用于业务条目。"
+              },
+              {
+                "type": "paragraph",
+                "text": "缓存没有跨层事务。层故障会报告并降级为未命中或跳过写入；一次调用成功不代表每个副本都已持久化。多层删除前缀请用 `invalidate({ prefix: 'profile:' })`，不要用需要返回数量的 KV `removeByPrefix`。"
               }
             ]
           },
           {
-            "id": "原生语义示例",
-            "heading": "原生语义示例",
+            "id": "期限-刷新与取消",
+            "heading": "期限、刷新与取消",
             "blocks": [
+              {
+                "type": "paragraph",
+                "text": "下面在不等待到期的情况下演示强制刷新与绕过：refresh 写入新值，bypass 的值只返回给本次调用。"
+              },
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { cachePlugin } from '@migaia/storage-plugin-cache'\nimport { semanticCacheFeature } from '@migaia/storage-plugin-cache/features/semantic'\n\nconst base = await createStorageHost({\n  plugins: [memoryBackendPlugin({ id: 'values' }), memoryBackendPlugin({ id: 'vectors' })]\n})\nconst host = await base.use(\n  cachePlugin(\n    {\n      tiers: [{ backend: 'values', ttlMs: 30000 }]\n    },\n    {\n      semantic: semanticCacheFeature({\n        backend: 'vectors',\n        collection: 'answers',\n        dimensions: 2,\n        minScore: 0.8,\n        ttlMs: 30000,\n        embed: async () => [1, 0]\n      })\n    }\n  )\n)\nawait host.detect()\ntry {\n  const semantic = host.backend('cache').api.semantic\n  await semantic.set('Question', { text: 'Answer' }, { payload: { model: 'one' } })\n  const hit = await semantic.get('Question', { where: { model: 'one' }, candidates: 3 })\n  console.log(hit?.value)\n  await semantic.invalidate({ model: 'one' }, { count: 'scroll' })\n} finally {\n  await host.dispose()\n}"
+                "code": "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { cachePlugin } from '@migaia/storage-plugin-cache'\n\nconst base = await createStorageHost({ plugins: [memoryBackendPlugin({ id: 'data' })] })\ntry {\n  const host = await base.use(\n    cachePlugin({\n      tiers: [{ backend: 'data', ttlMs: 30000 }],\n      maxAgeMs: 30000,\n      staleAfterMs: 10000\n    })\n  )\n  await host.detect()\n  const cache = host.backend('cache')\n  let revision = 0\n  const load = async () => ({ revision: ++revision })\n  await cache.getOrLoad('answer', load)\n  console.log(await cache.getOrLoad('answer', load, { mode: 'refresh' })) // { revision: 2 }\n  console.log(await cache.getOrLoad('answer', load, { mode: 'bypass' })) // { revision: 3 }\n  console.log(await cache.getOrLoad('answer', load)) // { revision: 2 }\n} finally {\n  await base.dispose()\n}"
+              },
+              {
+                "type": "table",
+                "headers": ["选项", "单位与默认", "作用"],
+                "rows": [
+                  ["tier `ttlMs`", "正安全整数毫秒；默认未设", "该层硬期限，需要后端 TTL 能力"],
+                  ["`maxAgeMs`", "正安全整数毫秒；默认未设", "限制条目最大年龄"],
+                  [
+                    "`staleAfterMs`",
+                    "正安全整数毫秒；默认未设",
+                    "超过后先返回旧值，共享后台刷新；须小于有效硬期限"
+                  ],
+                  ["`negativeTtlMs`", "正安全整数毫秒；默认未设", "保存 `undefined` 的期限"],
+                  ["`jitterRatio`", "`0` 到 `0.5`；默认 `0`", "随机缩短期限，避免同时到期"],
+                  ["per-call `mode`", "`'default'`", "`'refresh'` 跳过读取；`'bypass'` 只回源"]
+                ]
+              },
+              {
+                "type": "paragraph",
+                "text": "单次 `ttlMs/maxAgeMs/staleAfterMs/negativeTtlMs` 只能缩短已有配置上限，不能延长。正数单次 TTL 要求目标层都有 TTL 能力；普通 KV `setMany` 的共享 TTL 域另允许零，表示立即删除。"
+              },
+              {
+                "type": "paragraph",
+                "text": "加载函数接收缓存关闭的 signal；调用方的 `options.ctx.signal` 只取消自己的等待，以 contract `ABORTED` 拒绝，不取消其它请求共享的加载。加载函数应响应传入 signal，关闭才能及时排空。`cacheIf(value)` 为 false 时不写各层。加载和编码失败为 `CACHE_LOAD_FAILED`，原错误留在 cause；不要把它当未命中吞掉。"
+              }
+            ]
+          },
+          {
+            "id": "标签与大值",
+            "heading": "标签与大值",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "标签索引需要 records 与 TTL；offload 需要 blob，且引用层必须有 TTL。下面均用内置 memory 能力展示完整组合，应用可换成对象存储插件保存大值。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { cachePlugin } from '@migaia/storage-plugin-cache'\n\nconst base = await createStorageHost({\n  plugins: [\n    memoryBackendPlugin({ id: 'values' }),\n    memoryBackendPlugin({ id: 'tags' }),\n    memoryBackendPlugin({ id: 'objects' })\n  ]\n})\ntry {\n  const host = await base.use(\n    cachePlugin({\n      tiers: [{ backend: 'values', ttlMs: 30000, offload: { backend: 'objects', minBytes: 128 } }],\n      tagIndex: { backend: 'tags' }\n    })\n  )\n  await host.detect()\n  const cache = host.backend('cache')\n  await cache.getOrLoad('article:1', async () => ({ body: 'x'.repeat(500) }), {\n    tags: ['articles'],\n    meta: { revision: 1 }\n  })\n  console.log((await cache.peek<{ body: string }>('article:1'))?.value?.body.length) // 500\n  await cache.invalidate({ tag: 'articles' })\n  console.log(await cache.peek('article:1')) // undefined\n  await cache.sweepOffload()\n} finally {\n  await base.dispose()\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "达到 `minBytes` 的编码内容按内容哈希保存，对应层只保存引用；未达到则直接存值。`maxEntryBytes` 可让过大条目跳过某层。标签记录先于值写入，标签索引失败时报告并跳过值，避免生成无法按标签清理的条目。"
+              },
+              {
+                "type": "paragraph",
+                "text": "失效只删除引用，不立即删除可能仍被其它键引用的对象。`sweepOffload()` 清理已过保留期限的对象，刚失效的对象可能仍需保留到最长引用 TTL；不要期待失效后立即释放全部空间。"
+              }
+            ]
+          },
+          {
+            "id": "选择语义缓存",
+            "heading": "选择语义缓存",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "从独立入口导入 `semanticCacheFeature`，在缓存插件第二参数选择。下面的两维嵌入只演示精确重复；真实应用应接自己的模型，维度、metric 和模型版本需与 collection 一致。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { cachePlugin } from '@migaia/storage-plugin-cache'\nimport { semanticCacheFeature } from '@migaia/storage-plugin-cache/features/semantic'\n\nconst base = await createStorageHost({\n  plugins: [memoryBackendPlugin({ id: 'values' }), memoryBackendPlugin({ id: 'vectors' })]\n})\ntry {\n  const host = await base.use(\n    cachePlugin(\n      { tiers: [{ backend: 'values', ttlMs: 30000 }] },\n      {\n        semantic: semanticCacheFeature({\n          backend: 'vectors',\n          collection: 'answers',\n          dimensions: 2,\n          metric: 'cosine',\n          minScore: 0.8,\n          ttlMs: 30000,\n          embed: async () => [1, 0]\n        })\n      }\n    )\n  )\n  await host.detect()\n  const semantic = host.backend('cache').api.semantic\n  await semantic.set('Question', { text: 'Answer' }, { payload: { model: 'one' } })\n  const hit = await semantic.get<{ text: string }>('Question', {\n    where: { model: 'one' },\n    candidates: 3,\n    accept: (item) => item.prompt === 'Question'\n  })\n  console.log(hit?.value) // { text: 'Answer' }\n  await semantic.invalidate({ model: 'one' }, { count: 'scroll' })\n} finally {\n  await base.dispose()\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "向量后端须在更早批次发布；设置 semantic TTL 时还需 TTL 能力。metric 默认为 `cosine`，还支持 `dot`、`euclid`；分数和候选顺序由原生向量引擎决定，不能跨 metric 沿用同一阈值。`candidates` 为 `1` 到 `10`，默认 `1`；逐个执行可选 `accept`，返回 false 则继续，accept 失败报告后跳过该候选。"
+              },
+              {
+                "type": "paragraph",
+                "text": "payload 只支持字符串、有限数字与布尔值，`$cache.*` 是保留字段。相同 prompt 与不同 payload 分开保存。`getOrLoad` 按组织、prompt 与规范 payload 共享回源；其单次 TTL 只能缩短上限，`cacheIf` 可拒绝写入，单调用取消不影响其它等待者。嵌入失败报 `CACHE_EMBED_FAILED`。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`invalidate(where, { count })` 返回向量后端的删除数量；默认 `precount`，也可选 `scroll`。数量包含物理仍在但已过期的匹配点，继承后端的并发边界，不代表全局快照。semantic 只在明确选择后存在，经 `api.semantic` 使用，不增加缓存事务或关闭向量后端。"
+              }
+            ]
+          },
+          {
+            "id": "组织与结束工作",
+            "heading": "组织与结束工作",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "使用 `host.org(uuid).backend('cache')`，所有借用层及 Feature API 都使用该组织。缓存关闭会取消共享加载、等待已接纳工作、刷出一次 back 队列并取消订阅。它不单独关闭借用层；仍由宿主统一关闭已安装后端。`stats()` 只返回计数，tier 故障通过宿主 `report` 与缓存 hook 报告。"
               }
             ]
           }
@@ -185,59 +375,204 @@
         "readme": {
           "sections": [
             {
-              "id": "multi-tier-cache",
-              "heading": "Multi-tier cache",
+              "id": "migaia-storage-plugin-cache",
+              "heading": "@migaia/storage-plugin-cache",
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "`cachePlugin` composes already-published storage backends. Install tiers in an earlier host batch, then install the cache and explicitly call `host.detect()`."
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { cachePlugin, cacheKey } from '@migaia/storage-plugin-cache'\n\nconst original = await createStorageHost({ plugins: [memoryBackendPlugin({ id: 'memory' })] })\nconst host = await original.use(\n  cachePlugin({\n    tiers: [{ backend: 'memory', ttlMs: 30000 }],\n    maxAgeMs: 30000,\n    staleAfterMs: 10000,\n    negativeTtlMs: 1000\n  })\n)\nawait host.detect()\ntry {\n  const cache = host.backend('cache')\n  const key = await cacheKey('response', { model: 'model-one', version: 1 })\n  const value = await cache.getOrLoad(\n    key,\n    async (signal) => {\n      if (signal.aborted) return undefined\n      return { answer: 42 }\n    },\n    { meta: { model: 'model-one' } }\n  )\n  console.log(value, await cache.peek(key), cache.stats())\n  await cache.invalidate(key)\n} finally {\n  await host.dispose()\n}"
+                  "text": "Arrange installed key-value backends from faster to slower cache tiers, share loads for repeated requests, and fill upper tiers from lower ones. Use it to combine memory and persistent storage without writing refill and invalidation logic at every call. Configure expiry, caching of missing results and optional delayed writes as needed; tiers do not commit atomically, and delayed writes are not a durable queue."
                 },
                 {
                   "type": "paragraph",
-                  "text": "Layers are ordered fastest to slowest. Through writes finish from the slowest layer upwards. Back writes coalesce by key and flush through the host scheduler; failures are reported and dropped without retries. The slowest layer must be through. `flush()` sends pending writes immediately; disposal drains admitted work, flushes once and releases subscriptions without closing borrowed tiers."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "The cache is eventually consistent with invalidation notifications; it has no cross-store atomic commit and advertises no transactions. Use dedicated backend instances to avoid broad business notifications evicting unrelated cache copies. Upper layers of a change feed require hard TTLs to bound missed notifications. Durable feeds use their original cursor protocol."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "Logical keys are strings. Flat `get` sees only entries written by flat `set`; codec values and negative entries are available through `getOrLoad`, `getOrLoadEntry` and `peek`. `cacheKey` uses the original portable serializer and SHA-256, preserving field-order equivalence and original serializer errors."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "The counted KV `removeByPrefix` is available for one tier. With multiple tiers it rejects `UNSUPPORTED_CAPABILITY` before I/O: native counts cannot identify duplicate logical copies across tiers. Use `invalidate({ prefix })` or clear methods for multi-tier deletion without a count. `removeMany` counts distinct supplied logical keys, even when several copies are removed."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "Each stored envelope also caps its expiry at that layer's sampled effective hard deadline. A failed native `expire` is reported and cannot leave an unlimited valid cache copy. Positive per-call TTL requires each target tier's TTL capability before loading or writing. Shared KV `setMany` retains its finite nonnegative TTL domain: zero removes immediately."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "Propagation subscribes only during explicit detection. Reliable sources persist cursors in the immediately upper default-org tier; `$cache.cursor` is reserved for that metadata. Missing or expired cursors clear managed upper prefixes before continuing from now. Failed invalidation or cursor persistence retains no backlog: the next native batch first clears the upper prefixes, then advances the cursor only after success. Only cursor expiry replaces the native tail resource; disconnects do not start a reconnect timer."
+                  "text": "中文 · Usage guide"
                 }
               ]
             },
             {
-              "id": "semantic-cache",
-              "heading": "Semantic cache",
+              "id": "problems-you-may-have-seen",
+              "heading": "Problems you may have seen",
+              "blocks": [
+                {
+                  "type": "list",
+                  "items": [
+                    "A burst of requests loads the same hot key repeatedly because every request runs its own loader.",
+                    "Missing data keeps reaching the database because misses have no short-lived cache entry.",
+                    "A lower layer changes while an upper layer serves old data because copies lack invalidation or hard expiry.",
+                    "Batch loading needs its own maps, deduplication and cancellation because single-key and batch requests do not share loads."
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "why-choose-it",
+              "heading": "Why choose it",
+              "blocks": [
+                {
+                  "type": "list",
+                  "items": [
+                    "Reads, promotion and writes use installed backends in the tier order you choose. Tiered caching",
+                    "`getOrLoad` and `getOrLoadMany` share loads for the same key. Cancelling one caller does not interrupt other waiters. Loading policy",
+                    "Freshness, maximum age and negative expiry are separate settings; stale data can return while a background refresh runs. Expiry",
+                    "Semantic lookup is an explicitly selected Feature. Ordinary caching needs no embedding model or vector backend. Semantic caching"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "start-here",
+              "heading": "Start here",
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "Import `semanticCacheFeature` from `@migaia/storage-plugin-cache/features/semantic` and select it as `{ semantic: semanticCacheFeature(options) }` in the second `cachePlugin` argument. Its vector backend must be published in an earlier batch. Configure a collection, dimensions, native metric, minimum score and your embedding callback. The Feature uses the original engine's candidate ordering and sequential `accept` callbacks; failed acceptance reports and skips that candidate. It performs no JavaScript vector scoring."
+                  "text": "Install the data tier before the cache. The second request reads the cached value without running the loader again."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { cachePlugin } from '@migaia/storage-plugin-cache'\n\nconst base = await createStorageHost({ plugins: [memoryBackendPlugin({ id: 'values' })] })\ntry {\n  const host = await base.use(cachePlugin({ tiers: [{ backend: 'values', ttlMs: 30000 }] }))\n  await host.detect()\n  const cache = host.backend('cache')\n  let loads = 0\n  const load = async () => ({ answer: ++loads })\n  await cache.getOrLoad('answer', load)\n  console.log(await cache.getOrLoad('answer', load), loads) // { answer: 1 } 1\n} finally {\n  await base.dispose()\n}"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`cache.api.semantic.set(prompt, value, { payload: { model: 'one' } })` stores independent prompt/model identities. `get` accepts `where`, `minScore`, one to ten `candidates`, and optional asynchronous `accept`. `getOrLoad` shares a loader by organization, prompt and canonical payload, retains caller-only cancellation, and supports shortened TTL and `cacheIf`. Closing drains shared work without closing the vector backend. `$cache.*` payload fields are reserved."
+                  "text": "Expected output:"
+                },
+                {
+                  "type": "code",
+                  "language": "text",
+                  "code": "{ answer: 1 } 1"
+                }
+              ]
+            },
+            {
+              "id": "pitfalls-when-writing-it-yourself",
+              "heading": "Pitfalls when writing it yourself",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "A Map around a loader still needs shared requests, expiry and an explicit policy for missing values:"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "const values = new Map<string, unknown>()\nasync function read(key: string) {\n  if (values.has(key)) return values.get(key) // No expiry: old data stays indefinitely.\n  const value = await Promise.resolve({ answer: 42 }) // Concurrent requests load separately.\n  values.set(key, value) // Decide separately whether undefined should be cached.\n  return value\n}\nconsole.log(await read('answer'))"
+                }
+              ]
+            },
+            {
+              "id": "the-three-minute-model",
+              "heading": "The three-minute model",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`request → search tiers → return a hit and promote it → share a missing load → write tiers`."
+                },
+                {
+                  "type": "table",
+                  "headers": ["Term", "Meaning"],
+                  "rows": [
+                    ["Tier", "An installed KV backend, ordered from fastest to slowest"],
+                    ["through", "Settle this write, processing the slowest tier first"],
+                    [
+                      "back",
+                      "Coalesce writes by key for later processing; report and drop failures"
+                    ],
+                    ["negative", "A short-lived cached `undefined` result"],
+                    ["stale", "A value beyond its fresh period but still within its valid lifetime"]
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "common-scenarios",
+              "heading": "Common scenarios",
+              "blocks": [
+                {
+                  "type": "table",
+                  "headers": ["Need", "Composition", "Example"],
+                  "rows": [
+                    [
+                      "Share hot requests and missing lookups",
+                      "`getOrLoad` + `negativeTtlMs`",
+                      "Missing values"
+                    ],
+                    ["Combine local and persistent layers", "Multiple tiers", "Combine tiers"],
+                    [
+                      "Invalidate tags and offload large values",
+                      "`tagIndex` + `offload`",
+                      "Tags and large values"
+                    ],
+                    [
+                      "Filter similar answers by model metadata",
+                      "Semantic Feature + vector backend",
+                      "Semantic caching"
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "install",
+              "heading": "Install",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "These storage module are currently `private: true` workspace module in this repository, not published registry module. Run this from a consuming module inside the workspace:"
+                },
+                {
+                  "type": "code",
+                  "language": "bash",
+                  "code": "pnpm add --workspace @migaia/storage-plugin-cache @migaia/storage-host @migaia/storage-contract"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`invalidate(where, { count: 'scroll' })` returns the native `deleteWhere` number; omission retains `precount`. Physical expired matches are included. Qdrant's two modes retain their documented concurrent-write boundaries; the Feature does not switch mode, recount, or claim a global snapshot. Original context and count are validated once by that native deletion owner. Native `upsert` owns vector TTL."
+                  "text": "The module declares Node.js 24 or a compatible runtime. Redis, PostgreSQL and other tiers need their respective plugins and native client peers. The semantic Feature also needs your embedding function and a vector-capable backend; the root entry does not enable it automatically."
+                }
+              ]
+            },
+            {
+              "id": "common-apis",
+              "heading": "Common APIs",
+              "blocks": [
+                {
+                  "type": "table",
+                  "headers": ["API", "Purpose"],
+                  "rows": [
+                    [
+                      "`cachePlugin(options, features?)`",
+                      "Select existing tiers and optional Features"
+                    ],
+                    [
+                      "`getOrLoad` / `getOrLoadEntry` / `getOrLoadMany`",
+                      "Read or share a load; Entry also returns cache status"
+                    ],
+                    ["`peek(key)` / `stats()`", "Inspect entries and counters without loading"],
+                    ["`invalidate(key \\", "{ prefix } \\", "{ tag })`", "Delete matching copies"],
+                    [
+                      "`flush()` / `sweepOffload()`",
+                      "Process pending writes or collect expired offloaded objects"
+                    ],
+                    [
+                      "`cacheKey(namespace, input)`",
+                      "Build a stable key using portable serialization and SHA-256"
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "behavior-to-know",
+              "heading": "Behavior to know",
+              "blocks": [
+                {
+                  "type": "list",
+                  "items": [
+                    "Every tier must already exist in an earlier installation batch and support KV. Tiers with `ttlMs` also need TTL. The slowest tier must use `through`. Cache offers no cross-tier atomic commit or transactions.",
+                    "Tier read failures are reported and treated as misses; tier write failures are reported and skipped. Loader and encoding failures use `CACHE_LOAD_FAILED`; embedding failures use `CACHE_EMBED_FAILED`. The original error remains in `cause`. Cache errors use `source: 'storage.backend.cache'`; argument and capability errors may come from storage-contract.",
+                    "Ordinary `get/set` handle strings; `get` reads only entries written by ordinary `set`. Use `getOrLoad`, `getOrLoadEntry` and `peek` for encoded objects and negative entries.",
+                    "Invalidation propagation is enabled by default and subscribes during `detect()`. Every tier above a change source needs hard TTL. Notifications do not make writes atomic across tiers. Dedicated cache backends avoid unrelated business clear notifications removing cache copies.",
+                    "`write: 'back'` is not a durable queue. Failures are not retried. `flush()` processes current pending writes, and shutdown flushes once too. With propagation enabled, a back tier must be below every change source and have TTL; otherwise configuration is rejected.",
+                    "Multi-tier `removeByPrefix` cannot return a reliable deduplicated count, so it rejects with `UNSUPPORTED_CAPABILITY` before I/O. Use uncounted `invalidate({ prefix })` instead. `removeMany` counts each known distinct logical key once.",
+                    "`host.org(uuid).backend('cache')` routes every tier to the same organization. Cache shutdown drains work already started and cancels subscriptions without closing borrowed tiers separately. Host shutdown releases the backends it installed."
+                  ]
                 }
               ]
             }
@@ -246,111 +581,206 @@
         "guide": {
           "sections": [
             {
-              "id": "multi-tier-cache",
-              "heading": "Multi-tier cache",
+              "id": "cache-usage-guide",
+              "heading": "Cache usage guide",
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "`cachePlugin` composes already-published storage backends. Install tiers in an earlier host batch, then install the cache and explicitly call `host.detect()`."
+                  "text": "中文 · Overview and installation"
+                },
+                {
+                  "type": "table",
+                  "headers": ["Your task", "Start here"],
+                  "rows": [
+                    [
+                      "Share duplicate loads and remember misses briefly",
+                      "Load missing values and cache misses"
+                    ],
+                    ["Combine memory, disk or remote tiers", "Combine tiers"],
+                    [
+                      "Serve stale data while refreshing, or cancel one request",
+                      "Expiry, refresh and cancellation"
+                    ],
+                    ["Invalidate by tag and reduce large-value copies", "Tags and large values"],
+                    ["Reuse answers to similar questions", "Opt into semantic caching"]
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "load-missing-values-and-cache-misses",
+              "heading": "Load missing values and cache misses",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Install base tiers first, then add the cache through `host.use(cachePlugin(...))`. A loader's `undefined` result is cached only when `negativeTtlMs` is configured."
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { cachePlugin, cacheKey } from '@migaia/storage-plugin-cache'\n\nconst original = await createStorageHost({ plugins: [memoryBackendPlugin({ id: 'memory' })] })\nconst host = await original.use(\n  cachePlugin({\n    tiers: [{ backend: 'memory', ttlMs: 30000 }],\n    maxAgeMs: 30000,\n    staleAfterMs: 10000,\n    negativeTtlMs: 1000\n  })\n)\nawait host.detect()\ntry {\n  const cache = host.backend('cache')\n  const key = await cacheKey('response', { model: 'model-one', version: 1 })\n  const value = await cache.getOrLoad(\n    key,\n    async (signal) => {\n      if (signal.aborted) return undefined\n      return { answer: 42 }\n    },\n    { meta: { model: 'model-one' } }\n  )\n  console.log(value, await cache.peek(key), cache.stats())\n  await cache.invalidate(key)\n} finally {\n  await host.dispose()\n}"
+                  "code": "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { cachePlugin } from '@migaia/storage-plugin-cache'\n\nconst base = await createStorageHost({ plugins: [memoryBackendPlugin({ id: 'data' })] })\ntry {\n  const host = await base.use(\n    cachePlugin({\n      tiers: [{ backend: 'data', ttlMs: 30000 }],\n      negativeTtlMs: 1000\n    })\n  )\n  await host.detect()\n  const cache = host.backend('cache')\n  await cache.getOrLoad('profile:ada', async () => ({ name: 'Ada' }))\n  console.log(await cache.getOrLoad('profile:ada', async () => ({ name: 'unused' })))\n  // { name: 'Ada' }\n  await cache.getOrLoad('profile:missing', async () => undefined)\n  console.log((await cache.peek('profile:missing'))?.negative) // true\n  await cache.invalidate('profile:ada')\n} finally {\n  await base.dispose()\n}"
                 },
                 {
                   "type": "paragraph",
-                  "text": "Layers are ordered fastest to slowest. Through writes finish from the slowest layer upwards. Back writes coalesce by key and flush through the host scheduler; failures are reported and dropped without retries. The slowest layer must be through. `flush()` sends pending writes immediately; disposal drains admitted work, flushes once and releases subscriptions without closing borrowed tiers."
+                  "text": "`getOrLoadEntry` also returns `tier`, `stale`, `negative`, `ageMs`, `meta` and `tags`. `peek()` never loads and returns `undefined` for a missing entry. `getOrLoadMany(keys, loader)` deduplicates keys, reads each tier in batches, and passes only missing keys without an existing shared load to the loader. Return a `ReadonlyMap<string, value | undefined>`."
                 },
                 {
                   "type": "paragraph",
-                  "text": "The cache is eventually consistent with invalidation notifications; it has no cross-store atomic commit and advertises no transactions. Use dedicated backend instances to avoid broad business notifications evicting unrelated cache copies. Upper layers of a change feed require hard TTLs to bound missed notifications. Durable feeds use their original cursor protocol."
+                  "text": "`stampedeLock: { backend, timeoutMs? }` can select a tier with real transactions and key locks. It rechecks under the lock and writes the value and TTL in that transaction. The timeout defaults to `30000` milliseconds. Transaction replay may invoke the loader again; this does not guarantee exactly-once loading."
                 },
                 {
                   "type": "paragraph",
-                  "text": "Logical keys are strings. Flat `get` sees only entries written by flat `set`; codec values and negative entries are available through `getOrLoad`, `getOrLoadEntry` and `peek`. `cacheKey` uses the original portable serializer and SHA-256, preserving field-order equivalence and original serializer errors."
+                  "text": "Ordinary `get/set` read and write plain string entries, not the encoded objects above. Keys must be strings. For a stable key derived from parameters, import `cacheKey` from the root and use `await cacheKey('profile', { id: 'ada', version: 1 })`. Unsupported input retains the serializer's original error."
                 }
               ]
             },
             {
-              "id": "entry-policy",
-              "heading": "Entry policy",
+              "id": "combine-tiers",
+              "heading": "Combine tiers",
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "Call `ttlMs`, `maxAgeMs`, `staleAfterMs` and `negativeTtlMs` may shorten configured bounds. A longer override rejects with `CACHE_TIER_INVALID`. `jitterRatio` is between zero and 0.5 and only shortens expiry through the original numeric helper; `clock` and `random` can be injected. A stale hit returns immediately while one shared refresh runs. Undefined results are cached only when a negative TTL exists. `cacheIf` false skips all layers."
+                  "text": "Order `tiers` from fastest to slowest. Each tier defaults to `write: 'through'`. This complete example uses two independent memory instances; install SQLite, Redis or PostgreSQL under the same IDs when replacing them in an application."
                 },
-                {
-                  "type": "paragraph",
-                  "text": "`mode: 'refresh'` skips reads, supersedes an earlier normal load and joins an existing refresh. `mode: 'bypass'` performs only the source call. One caller's cancellation rejects that caller with contract `ABORTED`; shared work receives only the cache closing signal. Source or encoder failures use `CACHE_LOAD_FAILED` with the original cause and native class."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`getOrLoadMany` deduplicates input keys, performs one native `getMany` per visited tier and one native `setMany` per through fill tier. New misses enter the same single-flight Map as single-key requests and share one batch source call. `maxEntryBytes` skips oversized entries for that tier."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`stampedeLock` selects a tier with native transactions and key locks. The original transaction rechecks the locked key before loading and writes its TTL in the same draft. Callback replay may load again; this is at least once, not exactly once. Native lock and transaction errors remain unchanged."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`tagIndex` selects a records-and-TTL backend. Tag records are written before cache values; a tag-index failure reports and skips cache writes. `invalidate({ tag })` visits only that tag's key range. `offload` selects a blob backend and requires a tier TTL: encoded values above `minBytes` use SHA-256 object keys and references. Invalidating values removes references only; explicit `sweepOffload()` removes old objects. Shared object backends retain objects for the longest configured tier TTL."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "Hooks report counts and identities, never keys or values: `onCacheHit`, `onCacheMiss`, `onCacheLoad`, `onCacheInvalidate`, `onCacheTierError`, `onCacheWriteBackDropped`. Layer failures degrade to misses or skipped writes and retain their original diagnostics through the host reporter. Organization views route every tier through the same immutable host org context."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "The counted KV `removeByPrefix` is available for one tier. With multiple tiers it rejects `UNSUPPORTED_CAPABILITY` before I/O: native counts cannot identify duplicate logical copies across tiers. Use `invalidate({ prefix })` or clear methods for multi-tier deletion without a count. `removeMany` counts distinct supplied logical keys, even when several copies are removed."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "Each stored envelope also caps its expiry at that layer's sampled effective hard deadline. A failed native `expire` is reported and cannot leave an unlimited valid cache copy. Positive per-call TTL requires each target tier's TTL capability before loading or writing. Shared KV `setMany` retains its finite nonnegative TTL domain: zero removes immediately."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "Propagation subscribes only during explicit detection. Reliable sources persist cursors in the immediately upper default-org tier; `$cache.cursor` is reserved for that metadata. Missing or expired cursors clear managed upper prefixes before continuing from now. Failed invalidation or cursor persistence retains no backlog: the next native batch first clears the upper prefixes, then advances the cursor only after success. Only cursor expiry replaces the native tail resource; disconnects do not start a reconnect timer."
-                }
-              ]
-            },
-            {
-              "id": "semantic-cache",
-              "heading": "Semantic cache",
-              "blocks": [
-                {
-                  "type": "paragraph",
-                  "text": "Import `semanticCacheFeature` from `@migaia/storage-plugin-cache/features/semantic` and select it as `{ semantic: semanticCacheFeature(options) }` in the second `cachePlugin` argument. Its vector backend must be published in an earlier batch. Configure a collection, dimensions, native metric, minimum score and your embedding callback. The Feature uses the original engine's candidate ordering and sequential `accept` callbacks; failed acceptance reports and skips that candidate. It performs no JavaScript vector scoring."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`cache.api.semantic.set(prompt, value, { payload: { model: 'one' } })` stores independent prompt/model identities. `get` accepts `where`, `minScore`, one to ten `candidates`, and optional asynchronous `accept`. `getOrLoad` shares a loader by organization, prompt and canonical payload, retains caller-only cancellation, and supports shortened TTL and `cacheIf`. Closing drains shared work without closing the vector backend. `$cache.*` payload fields are reserved."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`invalidate(where, { count: 'scroll' })` returns the native `deleteWhere` number; omission retains `precount`. Physical expired matches are included. Qdrant's two modes retain their documented concurrent-write boundaries; the Feature does not switch mode, recount, or claim a global snapshot. Original context and count are validated once by that native deletion owner. Native `upsert` owns vector TTL."
-                }
-              ]
-            },
-            {
-              "id": "four-native-tiers",
-              "heading": "Four native tiers",
-              "blocks": [
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'\nimport { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'\nimport { redisBackendPlugin } from '@migaia/storage-plugin-redis'\nimport { nodeRedisDriver } from '@migaia/storage-plugin-redis/node-redis'\nimport { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'\nimport { pgDriver } from '@migaia/storage-plugin-postgres/pg'\nimport { createClientPool } from 'redis'\nimport { Pool } from 'pg'\nimport { cachePlugin } from '@migaia/storage-plugin-cache'\n\nconst redis = createClientPool({ url: process.env.MIGAIA_REDIS_URL })\nconst postgres = new Pool({ connectionString: process.env.MIGAIA_PG_URL })\nawait redis.connect()\nconst prefix = 'cache_guide_' + crypto.randomUUID().replaceAll('-', '')\nconst base = await createStorageHost({\n  plugins: [\n    memoryBackendPlugin({ id: 'l1' }),\n    sqliteBackendPlugin({ id: 'l2', driver: nodeSqliteDriver(':memory:') }),\n    redisBackendPlugin({ id: 'l3', driver: nodeRedisDriver(redis), prefix }),\n    postgresBackendPlugin({ id: 'l4', driver: pgDriver(postgres), prefix })\n  ]\n})\nconst host = await base.use(\n  cachePlugin({\n    propagate: false,\n    tiers: [\n      { backend: 'l1', ttlMs: 10000 },\n      { backend: 'l2', ttlMs: 20000 },\n      { backend: 'l3', ttlMs: 30000 },\n      { backend: 'l4', ttlMs: 60000 }\n    ],\n    stampedeLock: { backend: 'l3', timeoutMs: 1000 }\n  })\n)\nawait host.detect()\ntry {\n  const answer = await host.backend('cache').getOrLoad('answer', async () => ({ text: 'Hello' }))\n  console.log(answer)\n  await host.backend('cache').clearAll()\n} finally {\n  await host.dispose()\n  await redis.close()\n  await postgres.end()\n}"
+                  "code": "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { cachePlugin, CacheWriteMode } from '@migaia/storage-plugin-cache'\n\nconst base = await createStorageHost({\n  plugins: [memoryBackendPlugin({ id: 'fast' }), memoryBackendPlugin({ id: 'slow' })]\n})\ntry {\n  const host = await base.use(\n    cachePlugin({\n      propagate: false,\n      tiers: [\n        { backend: 'fast', ttlMs: 10000, write: CacheWriteMode.back },\n        { backend: 'slow', ttlMs: 60000 }\n      ],\n      writeBackIntervalMs: 1000\n    })\n  )\n  await host.detect()\n  const cache = host.backend('cache')\n  await cache.set('status', 'ready')\n  await cache.flush()\n  console.log(await cache.get('status')) // ready\n} finally {\n  await base.dispose()\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Through writes settle from the slowest tier upwards. Hits in slower tiers promote values to faster ones. Back mode coalesces pending writes by key and processes them every `1000` milliseconds by default. Failed items are reported and dropped without retry. The slowest tier cannot use back. This example disables propagation to demonstrate back separately. With the default `propagate: true`, every tier above a change source needs TTL, and back tiers must be below all change sources and have TTL."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Subscriptions start during `detect()`. If a reliable source loses its cursor or the cursor expires, the cache clears the relevant upper prefix before continuing. Ordinary notifications also cannot update every copy simultaneously. Hard TTL bounds stale copies when a notification is missed. Dedicated backends or instances are recommended for cache data."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`prefix` defaults to `cache:<pluginID>:`. Choose distinct prefixes for independent caches sharing a data backend. `clock` defaults to `Date.now`, and `random` to `Math.random`; override them only when a controlled clock or jitter source is needed. `$cache.cursor` is reserved for propagation cursors, not business entries."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Cache has no cross-tier transactions. Tier failures are reported and degrade to misses or skipped writes. A successful call does not mean every copy is durable. For multi-tier prefix deletion, use `invalidate({ prefix: 'profile:' })` rather than the counted KV `removeByPrefix`."
                 }
               ]
             },
             {
-              "id": "native-semantic-example",
-              "heading": "Native semantic example",
+              "id": "expiry-refresh-and-cancellation",
+              "heading": "Expiry, refresh and cancellation",
               "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "This example demonstrates refresh and bypass without waiting for expiry. Refresh stores the new value; bypass returns its value only to that call."
+                },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { cachePlugin } from '@migaia/storage-plugin-cache'\nimport { semanticCacheFeature } from '@migaia/storage-plugin-cache/features/semantic'\n\nconst base = await createStorageHost({\n  plugins: [memoryBackendPlugin({ id: 'values' }), memoryBackendPlugin({ id: 'vectors' })]\n})\nconst host = await base.use(\n  cachePlugin(\n    {\n      tiers: [{ backend: 'values', ttlMs: 30000 }]\n    },\n    {\n      semantic: semanticCacheFeature({\n        backend: 'vectors',\n        collection: 'answers',\n        dimensions: 2,\n        minScore: 0.8,\n        ttlMs: 30000,\n        embed: async () => [1, 0]\n      })\n    }\n  )\n)\nawait host.detect()\ntry {\n  const semantic = host.backend('cache').api.semantic\n  await semantic.set('Question', { text: 'Answer' }, { payload: { model: 'one' } })\n  const hit = await semantic.get('Question', { where: { model: 'one' }, candidates: 3 })\n  console.log(hit?.value)\n  await semantic.invalidate({ model: 'one' }, { count: 'scroll' })\n} finally {\n  await host.dispose()\n}"
+                  "code": "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { cachePlugin } from '@migaia/storage-plugin-cache'\n\nconst base = await createStorageHost({ plugins: [memoryBackendPlugin({ id: 'data' })] })\ntry {\n  const host = await base.use(\n    cachePlugin({\n      tiers: [{ backend: 'data', ttlMs: 30000 }],\n      maxAgeMs: 30000,\n      staleAfterMs: 10000\n    })\n  )\n  await host.detect()\n  const cache = host.backend('cache')\n  let revision = 0\n  const load = async () => ({ revision: ++revision })\n  await cache.getOrLoad('answer', load)\n  console.log(await cache.getOrLoad('answer', load, { mode: 'refresh' })) // { revision: 2 }\n  console.log(await cache.getOrLoad('answer', load, { mode: 'bypass' })) // { revision: 3 }\n  console.log(await cache.getOrLoad('answer', load)) // { revision: 2 }\n} finally {\n  await base.dispose()\n}"
+                },
+                {
+                  "type": "table",
+                  "headers": ["Option", "Unit and default", "Effect"],
+                  "rows": [
+                    [
+                      "Tier `ttlMs`",
+                      "Positive safe integer milliseconds; unset",
+                      "Hard expiry for that tier; needs backend TTL"
+                    ],
+                    [
+                      "`maxAgeMs`",
+                      "Positive safe integer milliseconds; unset",
+                      "Maximum entry age"
+                    ],
+                    [
+                      "`staleAfterMs`",
+                      "Positive safe integer milliseconds; unset",
+                      "Serve stale data while refreshing; must be below effective hard limits"
+                    ],
+                    [
+                      "`negativeTtlMs`",
+                      "Positive safe integer milliseconds; unset",
+                      "Lifetime for a cached `undefined`"
+                    ],
+                    [
+                      "`jitterRatio`",
+                      "`0` through `0.5`; default `0`",
+                      "Randomly shorten expiry to spread refreshes"
+                    ],
+                    [
+                      "Per-call `mode`",
+                      "`'default'`",
+                      "`'refresh'` skips reads; `'bypass'` only loads"
+                    ]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Per-call `ttlMs/maxAgeMs/staleAfterMs/negativeTtlMs` may shorten configured bounds, never extend them. A positive per-call TTL requires TTL support in every target tier. The shared KV `setMany` TTL domain separately accepts zero to remove immediately."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "A loader receives the cache-closing signal. `options.ctx.signal` cancels only that caller's wait with contract `ABORTED`, leaving other callers' shared load running. Respond to the loader signal so shutdown can drain promptly. A false `cacheIf(value)` skips all tier writes. Loader and encoding failures use `CACHE_LOAD_FAILED` and preserve the original cause; do not silently turn them into misses."
+                }
+              ]
+            },
+            {
+              "id": "tags-and-large-values",
+              "heading": "Tags and large values",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Tag indexes need records and TTL; offload storage needs blob, and its reference tier must have TTL. This complete example uses built-in memory capabilities. An application can replace the object tier with the object-storage plugin."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { cachePlugin } from '@migaia/storage-plugin-cache'\n\nconst base = await createStorageHost({\n  plugins: [\n    memoryBackendPlugin({ id: 'values' }),\n    memoryBackendPlugin({ id: 'tags' }),\n    memoryBackendPlugin({ id: 'objects' })\n  ]\n})\ntry {\n  const host = await base.use(\n    cachePlugin({\n      tiers: [{ backend: 'values', ttlMs: 30000, offload: { backend: 'objects', minBytes: 128 } }],\n      tagIndex: { backend: 'tags' }\n    })\n  )\n  await host.detect()\n  const cache = host.backend('cache')\n  await cache.getOrLoad('article:1', async () => ({ body: 'x'.repeat(500) }), {\n    tags: ['articles'],\n    meta: { revision: 1 }\n  })\n  console.log((await cache.peek<{ body: string }>('article:1'))?.value?.body.length) // 500\n  await cache.invalidate({ tag: 'articles' })\n  console.log(await cache.peek('article:1')) // undefined\n  await cache.sweepOffload()\n} finally {\n  await base.dispose()\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Encoded content at or above `minBytes` is stored under a content hash; the tier keeps a reference. Smaller values stay in the tier. `maxEntryBytes` can skip oversized entries for a tier. Tags are written before values; a failed tag-index write is reported and skips the value so it does not leave an untracked tagged entry."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Invalidation removes references rather than immediately deleting objects that another key may use. `sweepOffload()` collects objects after their retention period. A newly invalidated object may remain until the longest referring tier's TTL; invalidation does not promise immediate disk reclamation."
+                }
+              ]
+            },
+            {
+              "id": "opt-into-semantic-caching",
+              "heading": "Opt into semantic caching",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Import `semanticCacheFeature` from its separate entry and select it in the cache plugin's second argument. The two-dimensional embedding below demonstrates an exact repeated prompt. Use a real model in an application, with dimensions, metric and model version matching the collection."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { cachePlugin } from '@migaia/storage-plugin-cache'\nimport { semanticCacheFeature } from '@migaia/storage-plugin-cache/features/semantic'\n\nconst base = await createStorageHost({\n  plugins: [memoryBackendPlugin({ id: 'values' }), memoryBackendPlugin({ id: 'vectors' })]\n})\ntry {\n  const host = await base.use(\n    cachePlugin(\n      { tiers: [{ backend: 'values', ttlMs: 30000 }] },\n      {\n        semantic: semanticCacheFeature({\n          backend: 'vectors',\n          collection: 'answers',\n          dimensions: 2,\n          metric: 'cosine',\n          minScore: 0.8,\n          ttlMs: 30000,\n          embed: async () => [1, 0]\n        })\n      }\n    )\n  )\n  await host.detect()\n  const semantic = host.backend('cache').api.semantic\n  await semantic.set('Question', { text: 'Answer' }, { payload: { model: 'one' } })\n  const hit = await semantic.get<{ text: string }>('Question', {\n    where: { model: 'one' },\n    candidates: 3,\n    accept: (item) => item.prompt === 'Question'\n  })\n  console.log(hit?.value) // { text: 'Answer' }\n  await semantic.invalidate({ model: 'one' }, { count: 'scroll' })\n} finally {\n  await base.dispose()\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "The vector backend must be installed earlier and needs TTL support when semantic TTL is configured. Metric defaults to `cosine`; `dot` and `euclid` are also supported. Native engines determine scores and candidate order. Do not reuse a score threshold across metrics. `candidates` accepts `1` through `10`, defaulting to `1`. Optional `accept` runs in order; false continues, while a failed acceptance callback is reported and skips that candidate."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Payload fields support strings, finite numbers and booleans. `$cache.*` fields are reserved. Identical prompts with different payloads are stored separately. `getOrLoad` shares loads by organization, prompt and canonical payload; per-call TTL can only shorten the limit, `cacheIf` may prevent storage, and cancelling one caller does not affect others. Embedding failures use `CACHE_EMBED_FAILED`."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`invalidate(where, { count })` returns the vector backend's deletion count. The default is `precount`; `scroll` is also supported. Counts include matching expired points still physically stored and retain the backend's concurrency limits, rather than representing a global snapshot. Semantic APIs exist only when selected, under `api.semantic`; they add no cache transaction or vector-backend shutdown."
+                }
+              ]
+            },
+            {
+              "id": "organizations-and-shutdown",
+              "heading": "Organizations and shutdown",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Use `host.org(uuid).backend('cache')` to route borrowed tiers and Feature APIs to that organization. Shutdown cancels shared loads, waits for work already started, flushes back writes once, and cancels subscriptions. It does not independently close borrowed tiers; the host closes installed backends. `stats()` returns counters only; tier failures reach the host report callback and cache hooks."
                 }
               ]
             }
@@ -554,9 +984,7 @@
           "returns": "Promise<string>",
           "errors": [],
           "lifecycleConcurrency": "",
-          "examples": [
-            "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { cachePlugin, cacheKey } from '@migaia/storage-plugin-cache'\n\nconst original = await createStorageHost({ plugins: [memoryBackendPlugin({ id: 'memory' })] })\nconst host = await original.use(\n  cachePlugin({\n    tiers: [{ backend: 'memory', ttlMs: 30000 }],\n    maxAgeMs: 30000,\n    staleAfterMs: 10000,\n    negativeTtlMs: 1000\n  })\n)\nawait host.detect()\ntry {\n  const cache = host.backend('cache')\n  const key = await cacheKey('response', { model: 'model-one', version: 1 })\n  const value = await cache.getOrLoad(\n    key,\n    async (signal) => {\n      if (signal.aborted) return undefined\n      return { answer: 42 }\n    },\n    { meta: { model: 'model-one' } }\n  )\n  console.log(value, await cache.peek(key), cache.stats())\n  await cache.invalidate(key)\n} finally {\n  await host.dispose()\n}"
-          ],
+          "examples": [],
           "members": [],
           "composes": [],
           "aliasOf": "cacheKey",
@@ -611,7 +1039,7 @@
           "declaredConfiguration": [],
           "identity": "packages/storage-plugin-cache/dist/key.d.ts:cacheKey:export declare function cacheKey(...parts: readonly [ICodecValue, ...ICodecValue[]]): Promise<string>;",
           "guidance": [],
-          "usageScore": 30,
+          "usageScore": 10,
           "configuration": [],
           "fragment": "storage-plugin-cache-index--cacheKey"
         },
@@ -644,9 +1072,12 @@
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { cachePlugin, cacheKey } from '@migaia/storage-plugin-cache'\n\nconst original = await createStorageHost({ plugins: [memoryBackendPlugin({ id: 'memory' })] })\nconst host = await original.use(\n  cachePlugin({\n    tiers: [{ backend: 'memory', ttlMs: 30000 }],\n    maxAgeMs: 30000,\n    staleAfterMs: 10000,\n    negativeTtlMs: 1000\n  })\n)\nawait host.detect()\ntry {\n  const cache = host.backend('cache')\n  const key = await cacheKey('response', { model: 'model-one', version: 1 })\n  const value = await cache.getOrLoad(\n    key,\n    async (signal) => {\n      if (signal.aborted) return undefined\n      return { answer: 42 }\n    },\n    { meta: { model: 'model-one' } }\n  )\n  console.log(value, await cache.peek(key), cache.stats())\n  await cache.invalidate(key)\n} finally {\n  await host.dispose()\n}",
-            "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'\nimport { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'\nimport { redisBackendPlugin } from '@migaia/storage-plugin-redis'\nimport { nodeRedisDriver } from '@migaia/storage-plugin-redis/node-redis'\nimport { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'\nimport { pgDriver } from '@migaia/storage-plugin-postgres/pg'\nimport { createClientPool } from 'redis'\nimport { Pool } from 'pg'\nimport { cachePlugin } from '@migaia/storage-plugin-cache'\n\nconst redis = createClientPool({ url: process.env.MIGAIA_REDIS_URL })\nconst postgres = new Pool({ connectionString: process.env.MIGAIA_PG_URL })\nawait redis.connect()\nconst prefix = 'cache_guide_' + crypto.randomUUID().replaceAll('-', '')\nconst base = await createStorageHost({\n  plugins: [\n    memoryBackendPlugin({ id: 'l1' }),\n    sqliteBackendPlugin({ id: 'l2', driver: nodeSqliteDriver(':memory:') }),\n    redisBackendPlugin({ id: 'l3', driver: nodeRedisDriver(redis), prefix }),\n    postgresBackendPlugin({ id: 'l4', driver: pgDriver(postgres), prefix })\n  ]\n})\nconst host = await base.use(\n  cachePlugin({\n    propagate: false,\n    tiers: [\n      { backend: 'l1', ttlMs: 10000 },\n      { backend: 'l2', ttlMs: 20000 },\n      { backend: 'l3', ttlMs: 30000 },\n      { backend: 'l4', ttlMs: 60000 }\n    ],\n    stampedeLock: { backend: 'l3', timeoutMs: 1000 }\n  })\n)\nawait host.detect()\ntry {\n  const answer = await host.backend('cache').getOrLoad('answer', async () => ({ text: 'Hello' }))\n  console.log(answer)\n  await host.backend('cache').clearAll()\n} finally {\n  await host.dispose()\n  await redis.close()\n  await postgres.end()\n}",
-            "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { cachePlugin } from '@migaia/storage-plugin-cache'\nimport { semanticCacheFeature } from '@migaia/storage-plugin-cache/features/semantic'\n\nconst base = await createStorageHost({\n  plugins: [memoryBackendPlugin({ id: 'values' }), memoryBackendPlugin({ id: 'vectors' })]\n})\nconst host = await base.use(\n  cachePlugin(\n    {\n      tiers: [{ backend: 'values', ttlMs: 30000 }]\n    },\n    {\n      semantic: semanticCacheFeature({\n        backend: 'vectors',\n        collection: 'answers',\n        dimensions: 2,\n        minScore: 0.8,\n        ttlMs: 30000,\n        embed: async () => [1, 0]\n      })\n    }\n  )\n)\nawait host.detect()\ntry {\n  const semantic = host.backend('cache').api.semantic\n  await semantic.set('Question', { text: 'Answer' }, { payload: { model: 'one' } })\n  const hit = await semantic.get('Question', { where: { model: 'one' }, candidates: 3 })\n  console.log(hit?.value)\n  await semantic.invalidate({ model: 'one' }, { count: 'scroll' })\n} finally {\n  await host.dispose()\n}"
+            "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { cachePlugin } from '@migaia/storage-plugin-cache'\n\nconst base = await createStorageHost({ plugins: [memoryBackendPlugin({ id: 'data' })] })\ntry {\n  const host = await base.use(\n    cachePlugin({\n      tiers: [{ backend: 'data', ttlMs: 30000 }],\n      negativeTtlMs: 1000\n    })\n  )\n  await host.detect()\n  const cache = host.backend('cache')\n  await cache.getOrLoad('profile:ada', async () => ({ name: 'Ada' }))\n  console.log(await cache.getOrLoad('profile:ada', async () => ({ name: 'unused' })))\n  // { name: 'Ada' }\n  await cache.getOrLoad('profile:missing', async () => undefined)\n  console.log((await cache.peek('profile:missing'))?.negative) // true\n  await cache.invalidate('profile:ada')\n} finally {\n  await base.dispose()\n}",
+            "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { cachePlugin, CacheWriteMode } from '@migaia/storage-plugin-cache'\n\nconst base = await createStorageHost({\n  plugins: [memoryBackendPlugin({ id: 'fast' }), memoryBackendPlugin({ id: 'slow' })]\n})\ntry {\n  const host = await base.use(\n    cachePlugin({\n      propagate: false,\n      tiers: [\n        { backend: 'fast', ttlMs: 10000, write: CacheWriteMode.back },\n        { backend: 'slow', ttlMs: 60000 }\n      ],\n      writeBackIntervalMs: 1000\n    })\n  )\n  await host.detect()\n  const cache = host.backend('cache')\n  await cache.set('status', 'ready')\n  await cache.flush()\n  console.log(await cache.get('status')) // ready\n} finally {\n  await base.dispose()\n}",
+            "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { cachePlugin } from '@migaia/storage-plugin-cache'\n\nconst base = await createStorageHost({ plugins: [memoryBackendPlugin({ id: 'data' })] })\ntry {\n  const host = await base.use(\n    cachePlugin({\n      tiers: [{ backend: 'data', ttlMs: 30000 }],\n      maxAgeMs: 30000,\n      staleAfterMs: 10000\n    })\n  )\n  await host.detect()\n  const cache = host.backend('cache')\n  let revision = 0\n  const load = async () => ({ revision: ++revision })\n  await cache.getOrLoad('answer', load)\n  console.log(await cache.getOrLoad('answer', load, { mode: 'refresh' })) // { revision: 2 }\n  console.log(await cache.getOrLoad('answer', load, { mode: 'bypass' })) // { revision: 3 }\n  console.log(await cache.getOrLoad('answer', load)) // { revision: 2 }\n} finally {\n  await base.dispose()\n}",
+            "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { cachePlugin } from '@migaia/storage-plugin-cache'\n\nconst base = await createStorageHost({\n  plugins: [\n    memoryBackendPlugin({ id: 'values' }),\n    memoryBackendPlugin({ id: 'tags' }),\n    memoryBackendPlugin({ id: 'objects' })\n  ]\n})\ntry {\n  const host = await base.use(\n    cachePlugin({\n      tiers: [{ backend: 'values', ttlMs: 30000, offload: { backend: 'objects', minBytes: 128 } }],\n      tagIndex: { backend: 'tags' }\n    })\n  )\n  await host.detect()\n  const cache = host.backend('cache')\n  await cache.getOrLoad('article:1', async () => ({ body: 'x'.repeat(500) }), {\n    tags: ['articles'],\n    meta: { revision: 1 }\n  })\n  console.log((await cache.peek<{ body: string }>('article:1'))?.value?.body.length) // 500\n  await cache.invalidate({ tag: 'articles' })\n  console.log(await cache.peek('article:1')) // undefined\n  await cache.sweepOffload()\n} finally {\n  await base.dispose()\n}",
+            "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { cachePlugin } from '@migaia/storage-plugin-cache'\nimport { semanticCacheFeature } from '@migaia/storage-plugin-cache/features/semantic'\n\nconst base = await createStorageHost({\n  plugins: [memoryBackendPlugin({ id: 'values' }), memoryBackendPlugin({ id: 'vectors' })]\n})\ntry {\n  const host = await base.use(\n    cachePlugin(\n      { tiers: [{ backend: 'values', ttlMs: 30000 }] },\n      {\n        semantic: semanticCacheFeature({\n          backend: 'vectors',\n          collection: 'answers',\n          dimensions: 2,\n          metric: 'cosine',\n          minScore: 0.8,\n          ttlMs: 30000,\n          embed: async () => [1, 0]\n        })\n      }\n    )\n  )\n  await host.detect()\n  const semantic = host.backend('cache').api.semantic\n  await semantic.set('Question', { text: 'Answer' }, { payload: { model: 'one' } })\n  const hit = await semantic.get<{ text: string }>('Question', {\n    where: { model: 'one' },\n    candidates: 3,\n    accept: (item) => item.prompt === 'Question'\n  })\n  console.log(hit?.value) // { text: 'Answer' }\n  await semantic.invalidate({ model: 'one' }, { count: 'scroll' })\n} finally {\n  await base.dispose()\n}",
+            "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { cachePlugin } from '@migaia/storage-plugin-cache'\n\nconst base = await createStorageHost({ plugins: [memoryBackendPlugin({ id: 'values' })] })\ntry {\n  const host = await base.use(cachePlugin({ tiers: [{ backend: 'values', ttlMs: 30000 }] }))\n  await host.detect()\n  const cache = host.backend('cache')\n  let loads = 0\n  const load = async () => ({ answer: ++loads })\n  await cache.getOrLoad('answer', load)\n  console.log(await cache.getOrLoad('answer', load), loads) // { answer: 1 } 1\n} finally {\n  await base.dispose()\n}"
           ],
           "members": [],
           "composes": [],
@@ -810,63 +1241,63 @@
           ],
           "identity": "packages/storage-plugin-cache/dist/plugin.d.ts:cachePlugin:export declare function cachePlugin<const TId extends string = 'cache', const F extends IStorageFeatureRecord = {}>(options: ICacheOptions & { readonly id?: TId; }, features?: F & IStorageFeatureStoreCompatibility<typeof cacheBackendKind, NoInfer<F>>): IStorageBackendPlugin<typeof cacheBackendKind, NoInfer<TId>, F>;",
           "guidance": [],
-          "usageScore": 64,
+          "usageScore": 86,
           "configuration": [
             {
               "name": "id",
               "type": "TId",
               "optional": true,
-              "description": "",
+              "description": "普通 `get/set` 只读写普通字符串条目，不用于读取上面编码的对象。键只接受字符串。需要由复杂参数生成稳定键时，使用 `await cacheKey('profile', { id: 'ada', version: 1 })`，从根入口导入 `cacheKey`；不支持的输入保留原 serializer 错误。",
               "descriptionEn": "",
-              "descriptionZh": ""
+              "descriptionZh": "普通 `get/set` 只读写普通字符串条目，不用于读取上面编码的对象。键只接受字符串。需要由复杂参数生成稳定键时，使用 `await cacheKey('profile', { id: 'ada', version: 1 })`，从根入口导入 `cacheKey`；不支持的输入保留原 serializer 错误。"
             },
             {
               "name": "tiers",
               "type": "readonly [ICacheTierOptions, ...ICacheTierOptions[]]",
               "optional": false,
-              "description": "",
+              "description": "`stampedeLock: { backend, timeoutMs? }` 可选择 tiers 中支持真实事务与键锁的层，锁内复查并把值与 TTL 写入同一事务。timeoutMs 默认 `30000` 毫秒。事务重放可能再次调用 loader，不承诺回源只执行一次。",
               "descriptionEn": "",
-              "descriptionZh": ""
+              "descriptionZh": "`stampedeLock: { backend, timeoutMs? }` 可选择 tiers 中支持真实事务与键锁的层，锁内复查并把值与 TTL 写入同一事务。timeoutMs 默认 `30000` 毫秒。事务重放可能再次调用 loader，不承诺回源只执行一次。"
             },
             {
               "name": "prefix",
               "type": "string",
               "optional": true,
-              "description": "带计数的 KV `removeByPrefix` 仅单层可用；多层在 I/O 前报 `UNSUPPORTED_CAPABILITY`，因为原生计数无法识别跨层重复逻辑副本。多层无计数删除使用 `invalidate({ prefix })` 或清空方法。`removeMany` 按已给出的不同逻辑键计数，多个副本只计一次。",
+              "description": "`prefix` 默认是 `cache:<插件ID>:`，可为同一数据后端上的独立缓存选择不同前缀。`clock` 默认 `Date.now`，`random` 默认 `Math.random`；只有需要可控时间或抖动来源时才覆盖。`$cache.cursor` 是传播游标的保留键，不用于业务条目。",
               "descriptionEn": "",
-              "descriptionZh": "带计数的 KV `removeByPrefix` 仅单层可用；多层在 I/O 前报 `UNSUPPORTED_CAPABILITY`，因为原生计数无法识别跨层重复逻辑副本。多层无计数删除使用 `invalidate({ prefix })` 或清空方法。`removeMany` 按已给出的不同逻辑键计数，多个副本只计一次。"
+              "descriptionZh": "`prefix` 默认是 `cache:<插件ID>:`，可为同一数据后端上的独立缓存选择不同前缀。`clock` 默认 `Date.now`，`random` 默认 `Math.random`；只有需要可控时间或抖动来源时才覆盖。`$cache.cursor` 是传播游标的保留键，不用于业务条目。"
             },
             {
               "name": "maxAgeMs",
               "type": "number",
               "optional": true,
-              "description": "",
+              "description": "`maxAgeMs` — 正安全整数毫秒；默认未设 — 限制条目最大年龄",
               "descriptionEn": "",
-              "descriptionZh": ""
+              "descriptionZh": "`maxAgeMs` — 正安全整数毫秒；默认未设 — 限制条目最大年龄"
             },
             {
               "name": "staleAfterMs",
               "type": "number",
               "optional": true,
-              "description": "",
+              "description": "`staleAfterMs` — 正安全整数毫秒；默认未设 — 超过后先返回旧值，共享后台刷新；须小于有效硬期限",
               "descriptionEn": "",
-              "descriptionZh": ""
+              "descriptionZh": "`staleAfterMs` — 正安全整数毫秒；默认未设 — 超过后先返回旧值，共享后台刷新；须小于有效硬期限"
             },
             {
               "name": "negativeTtlMs",
               "type": "number",
               "optional": true,
-              "description": "",
+              "description": "基础层必须先安装，再用 `host.use(cachePlugin(...))` 追加缓存。只有配置 `negativeTtlMs` 后，加载结果 `undefined` 才会被短期保存。",
               "descriptionEn": "",
-              "descriptionZh": ""
+              "descriptionZh": "基础层必须先安装，再用 `host.use(cachePlugin(...))` 追加缓存。只有配置 `negativeTtlMs` 后，加载结果 `undefined` 才会被短期保存。"
             },
             {
               "name": "stampedeLock",
               "type": "{ readonly backend: string; readonly timeoutMs?: number; }",
               "optional": true,
-              "description": "Groups `stampedeLock.backend`, `stampedeLock.timeoutMs`; configure the nested fields below.",
-              "descriptionEn": "Groups `stampedeLock.backend`, `stampedeLock.timeoutMs`; configure the nested fields below.",
-              "descriptionZh": ""
+              "description": "`stampedeLock: { backend, timeoutMs? }` 可选择 tiers 中支持真实事务与键锁的层，锁内复查并把值与 TTL 写入同一事务。timeoutMs 默认 `30000` 毫秒。事务重放可能再次调用 loader，不承诺回源只执行一次。",
+              "descriptionEn": "",
+              "descriptionZh": "`stampedeLock: { backend, timeoutMs? }` 可选择 tiers 中支持真实事务与键锁的层，锁内复查并把值与 TTL 写入同一事务。timeoutMs 默认 `30000` 毫秒。事务重放可能再次调用 loader，不承诺回源只执行一次。"
             },
             {
               "name": "stampedeLock.backend",
@@ -896,41 +1327,41 @@
               "name": "propagate",
               "type": "boolean",
               "optional": true,
-              "description": "",
+              "description": "through 写入从最慢层向上完成；命中慢层会回填更快层。back 把同键待写项合并，默认每 `1000` 毫秒处理一次；失败报告后丢弃，不自动重试。最慢层不能用 back。这里关闭传播，以便独立演示 back；默认 `propagate: true` 时，所有变更源上方的层必须有 TTL，而 back 层必须在所有变更源下方并有 TTL。",
               "descriptionEn": "",
-              "descriptionZh": ""
+              "descriptionZh": "through 写入从最慢层向上完成；命中慢层会回填更快层。back 把同键待写项合并，默认每 `1000` 毫秒处理一次；失败报告后丢弃，不自动重试。最慢层不能用 back。这里关闭传播，以便独立演示 back；默认 `propagate: true` 时，所有变更源上方的层必须有 TTL，而 back 层必须在所有变更源下方并有 TTL。"
             },
             {
               "name": "clock",
               "type": "() => number",
               "optional": true,
-              "description": "",
+              "description": "`prefix` 默认是 `cache:<插件ID>:`，可为同一数据后端上的独立缓存选择不同前缀。`clock` 默认 `Date.now`，`random` 默认 `Math.random`；只有需要可控时间或抖动来源时才覆盖。`$cache.cursor` 是传播游标的保留键，不用于业务条目。",
               "descriptionEn": "",
-              "descriptionZh": ""
+              "descriptionZh": "`prefix` 默认是 `cache:<插件ID>:`，可为同一数据后端上的独立缓存选择不同前缀。`clock` 默认 `Date.now`，`random` 默认 `Math.random`；只有需要可控时间或抖动来源时才覆盖。`$cache.cursor` 是传播游标的保留键，不用于业务条目。"
             },
             {
               "name": "jitterRatio",
               "type": "number",
               "optional": true,
-              "description": "",
+              "description": "`jitterRatio` — `0` 到 `0.5`；默认 `0` — 随机缩短期限，避免同时到期",
               "descriptionEn": "",
-              "descriptionZh": ""
+              "descriptionZh": "`jitterRatio` — `0` 到 `0.5`；默认 `0` — 随机缩短期限，避免同时到期"
             },
             {
               "name": "random",
               "type": "() => number",
               "optional": true,
-              "description": "The original jitter helper consumes this source; omitted uses Math.random.",
+              "description": "`prefix` 默认是 `cache:<插件ID>:`，可为同一数据后端上的独立缓存选择不同前缀。`clock` 默认 `Date.now`，`random` 默认 `Math.random`；只有需要可控时间或抖动来源时才覆盖。`$cache.cursor` 是传播游标的保留键，不用于业务条目。",
               "descriptionEn": "The original jitter helper consumes this source; omitted uses Math.random.",
-              "descriptionZh": ""
+              "descriptionZh": "`prefix` 默认是 `cache:<插件ID>:`，可为同一数据后端上的独立缓存选择不同前缀。`clock` 默认 `Date.now`，`random` 默认 `Math.random`；只有需要可控时间或抖动来源时才覆盖。`$cache.cursor` 是传播游标的保留键，不用于业务条目。"
             },
             {
               "name": "codec",
               "type": "ICodec<ICodecValue, string>",
               "optional": true,
-              "description": "逻辑键只接受字符串。平铺 `get` 只读取平铺 `set` 写入的条目；codec 值与负条目经 `getOrLoad`、`getOrLoadEntry` 和 `peek` 访问。`cacheKey` 复用原 portable serializer 与 SHA-256，对象字段顺序不影响结果，非法值保留原 serializer 错误。",
+              "description": "",
               "descriptionEn": "",
-              "descriptionZh": "逻辑键只接受字符串。平铺 `get` 只读取平铺 `set` 写入的条目；codec 值与负条目经 `getOrLoad`、`getOrLoadEntry` 和 `peek` 访问。`cacheKey` 复用原 portable serializer 与 SHA-256，对象字段顺序不影响结果，非法值保留原 serializer 错误。"
+              "descriptionZh": ""
             },
             {
               "name": "tagIndex",
@@ -965,7 +1396,9 @@
           "returns": "No explicit return annotation is declared for this const.",
           "errors": [],
           "lifecycleConcurrency": "",
-          "examples": [],
+          "examples": [
+            "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { cachePlugin, CacheWriteMode } from '@migaia/storage-plugin-cache'\n\nconst base = await createStorageHost({\n  plugins: [memoryBackendPlugin({ id: 'fast' }), memoryBackendPlugin({ id: 'slow' })]\n})\ntry {\n  const host = await base.use(\n    cachePlugin({\n      propagate: false,\n      tiers: [\n        { backend: 'fast', ttlMs: 10000, write: CacheWriteMode.back },\n        { backend: 'slow', ttlMs: 60000 }\n      ],\n      writeBackIntervalMs: 1000\n    })\n  )\n  await host.detect()\n  const cache = host.backend('cache')\n  await cache.set('status', 'ready')\n  await cache.flush()\n  console.log(await cache.get('status')) // ready\n} finally {\n  await base.dispose()\n}"
+          ],
           "members": [
             {
               "name": "through",
@@ -1032,7 +1465,7 @@
           "declaredConfiguration": [],
           "identity": "packages/storage-plugin-cache/dist/constants.d.ts:CacheWriteMode:export declare const CacheWriteMode: { readonly through: 'through'; readonly back: 'back'; };\nexport type CacheWriteMode = keyof typeof CacheWriteMode;",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 14,
           "configuration": [],
           "fragment": "storage-plugin-cache-index--CacheWriteMode"
         },
@@ -2824,7 +3257,7 @@
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { cachePlugin } from '@migaia/storage-plugin-cache'\nimport { semanticCacheFeature } from '@migaia/storage-plugin-cache/features/semantic'\n\nconst base = await createStorageHost({\n  plugins: [memoryBackendPlugin({ id: 'values' }), memoryBackendPlugin({ id: 'vectors' })]\n})\nconst host = await base.use(\n  cachePlugin(\n    {\n      tiers: [{ backend: 'values', ttlMs: 30000 }]\n    },\n    {\n      semantic: semanticCacheFeature({\n        backend: 'vectors',\n        collection: 'answers',\n        dimensions: 2,\n        minScore: 0.8,\n        ttlMs: 30000,\n        embed: async () => [1, 0]\n      })\n    }\n  )\n)\nawait host.detect()\ntry {\n  const semantic = host.backend('cache').api.semantic\n  await semantic.set('Question', { text: 'Answer' }, { payload: { model: 'one' } })\n  const hit = await semantic.get('Question', { where: { model: 'one' }, candidates: 3 })\n  console.log(hit?.value)\n  await semantic.invalidate({ model: 'one' }, { count: 'scroll' })\n} finally {\n  await host.dispose()\n}"
+            "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { cachePlugin } from '@migaia/storage-plugin-cache'\nimport { semanticCacheFeature } from '@migaia/storage-plugin-cache/features/semantic'\n\nconst base = await createStorageHost({\n  plugins: [memoryBackendPlugin({ id: 'values' }), memoryBackendPlugin({ id: 'vectors' })]\n})\ntry {\n  const host = await base.use(\n    cachePlugin(\n      { tiers: [{ backend: 'values', ttlMs: 30000 }] },\n      {\n        semantic: semanticCacheFeature({\n          backend: 'vectors',\n          collection: 'answers',\n          dimensions: 2,\n          metric: 'cosine',\n          minScore: 0.8,\n          ttlMs: 30000,\n          embed: async () => [1, 0]\n        })\n      }\n    )\n  )\n  await host.detect()\n  const semantic = host.backend('cache').api.semantic\n  await semantic.set('Question', { text: 'Answer' }, { payload: { model: 'one' } })\n  const hit = await semantic.get<{ text: string }>('Question', {\n    where: { model: 'one' },\n    candidates: 3,\n    accept: (item) => item.prompt === 'Question'\n  })\n  console.log(hit?.value) // { text: 'Answer' }\n  await semantic.invalidate({ model: 'one' }, { count: 'scroll' })\n} finally {\n  await base.dispose()\n}"
           ],
           "members": [],
           "composes": [],
@@ -2924,7 +3357,7 @@
           ],
           "identity": "packages/storage-plugin-cache/dist/features/semantic.d.ts:semanticCacheFeature:export declare function semanticCacheFeature(options: ISemanticCacheOptions): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"cache\", import(\"../types.js\").ICacheStore, undefined, {}>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly semantic: ISemanticCacheApi; }; readonly transaction: {}; }>, {}>;",
           "guidance": [],
-          "usageScore": 26,
+          "usageScore": 18,
           "configuration": [
             {
               "name": "backend",
@@ -2938,9 +3371,9 @@
               "name": "collection",
               "type": "string",
               "optional": false,
-              "description": "从 `@migaia/storage-plugin-cache/features/semantic` 导入 `semanticCacheFeature`，在 `cachePlugin` 第二参数中选择 `{ semantic: semanticCacheFeature(options) }`。向量后端必须在更早批次发布。配置 collection、维度、原生 metric、最低分与调用方嵌入函数。候选顺序沿原向量引擎，逐个执行 `accept`；复核失败只报告并跳过，不在 JavaScript 中计算向量分数。",
+              "description": "",
               "descriptionEn": "",
-              "descriptionZh": "从 `@migaia/storage-plugin-cache/features/semantic` 导入 `semanticCacheFeature`，在 `cachePlugin` 第二参数中选择 `{ semantic: semanticCacheFeature(options) }`。向量后端必须在更早批次发布。配置 collection、维度、原生 metric、最低分与调用方嵌入函数。候选顺序沿原向量引擎，逐个执行 `accept`；复核失败只报告并跳过，不在 JavaScript 中计算向量分数。"
+              "descriptionZh": ""
             },
             {
               "name": "dimensions",
@@ -2954,17 +3387,17 @@
               "name": "metric",
               "type": "'cosine' | 'dot' | 'euclid'",
               "optional": true,
-              "description": "从 `@migaia/storage-plugin-cache/features/semantic` 导入 `semanticCacheFeature`，在 `cachePlugin` 第二参数中选择 `{ semantic: semanticCacheFeature(options) }`。向量后端必须在更早批次发布。配置 collection、维度、原生 metric、最低分与调用方嵌入函数。候选顺序沿原向量引擎，逐个执行 `accept`；复核失败只报告并跳过，不在 JavaScript 中计算向量分数。",
+              "description": "向量后端须在更早批次发布；设置 semantic TTL 时还需 TTL 能力。metric 默认为 `cosine`，还支持 `dot`、`euclid`；分数和候选顺序由原生向量引擎决定，不能跨 metric 沿用同一阈值。`candidates` 为 `1` 到 `10`，默认 `1`；逐个执行可选 `accept`，返回 false 则继续，accept 失败报告后跳过该候选。",
               "descriptionEn": "",
-              "descriptionZh": "从 `@migaia/storage-plugin-cache/features/semantic` 导入 `semanticCacheFeature`，在 `cachePlugin` 第二参数中选择 `{ semantic: semanticCacheFeature(options) }`。向量后端必须在更早批次发布。配置 collection、维度、原生 metric、最低分与调用方嵌入函数。候选顺序沿原向量引擎，逐个执行 `accept`；复核失败只报告并跳过，不在 JavaScript 中计算向量分数。"
+              "descriptionZh": "向量后端须在更早批次发布；设置 semantic TTL 时还需 TTL 能力。metric 默认为 `cosine`，还支持 `dot`、`euclid`；分数和候选顺序由原生向量引擎决定，不能跨 metric 沿用同一阈值。`candidates` 为 `1` 到 `10`，默认 `1`；逐个执行可选 `accept`，返回 false 则继续，accept 失败报告后跳过该候选。"
             },
             {
               "name": "minScore",
               "type": "number",
               "optional": false,
-              "description": "`cache.api.semantic.set(prompt, value, { payload: { model: 'one' } })` 按 prompt 与模型元数据独立存储。`get` 可设置 `where`、`minScore`、一至十个 `candidates` 和异步 `accept`。`getOrLoad` 按组织、prompt 与规范 payload 合并回源，单调用取消不影响共享任务，并支持缩短 TTL 与 `cacheIf`。关闭时排空任务，不关闭借用的向量后端。`$cache.*` 为保留字段。",
+              "description": "",
               "descriptionEn": "",
-              "descriptionZh": "`cache.api.semantic.set(prompt, value, { payload: { model: 'one' } })` 按 prompt 与模型元数据独立存储。`get` 可设置 `where`、`minScore`、一至十个 `candidates` 和异步 `accept`。`getOrLoad` 按组织、prompt 与规范 payload 合并回源，单调用取消不影响共享任务，并支持缩短 TTL 与 `cacheIf`。关闭时排空任务，不关闭借用的向量后端。`$cache.*` 为保留字段。"
+              "descriptionZh": ""
             },
             {
               "name": "ttlMs",
