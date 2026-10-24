@@ -5179,7 +5179,7 @@
           "declarationLine": 280,
           "source": "packages/logger/dist/typing.d.ts",
           "purpose": "The `core` a plugin receives in `install(core)`: the logger core without `use` / `unUse`, plus `onDispose()` for cleanup.",
-          "core": "config: Configuration store of the installed plugins. On a logger it is `ILoggerConfig` (`get(path)`, `update(name, recipe)`); inside a plugin `install(core)` it is a reader of that plugin configuration only (`get()`).\nctx: Frozen context of this logger: `id`, application `options`, default context `path`, `topic`, `createdAt` and `env`.\nscheduler: Clock and timers used by `flush()`, `shutdown()` and batch deadlines; the `scheduler` option or `systemScheduler`.\nruntimeManager: Host capabilities (stdout, UUID, scheduling, fetch, fs) captured at construction from the `runtimeManager` option or `getLoggerRuntimeManager()`; plugins use the same object.\nlog: Console-style entry point: builds an entry with this tag and message and dispatches it through pipeline, hooks and sinks. A trailing object stays an argument; it is not turned into `meta`. Never throws for sink failures.\nlog.tag: Entry tag such as `info` or `audit`; the level() threshold applies only to the five standard levels, while its filters apply to every tag.\nlog.message: Message text; `%s`, `%d`, `%o` placeholders are left for the console sink.\nlog.args: Extra values stored in `entry.args` in order.\nNo value. Shutdown handlers can still enqueue final structured entries; calls are ignored after draining closes dispatch admission.\ndispatchRaw: Dispatches an entry with explicit fields (`meta`, `data`, `context`, `error`, `time`) for structured or audit logs.\ndispatchRaw.input: Required tag and message, plus optional args (default []), meta (undefined), data ({}), context (constructor context), error (first Error argument projected to name/message/stack/raw, otherwise undefined) and time (current Date). The core assigns id; callers cannot supply it. Metadata/data keys such as orderId and route are application-defined. Containers are copied, nested application values stay shared.\ndispatchRaw.options: Optional `{ asyncOutput }`: `true` schedules the output with `defer()` so the call returns before any sink runs; default `false`.\nNothing; failures go to `onFailure()`.\nraw: Writes text straight to stdout (or `console.log` without `process`), skipping pipeline and sinks; used for streaming output. Ignored once shutdown starts.\nraw.text: Text passed unchanged to runtimeManager.write. A host stdout writer can preserve no-newline output; the default console.log fallback without process adds its own newline.\nraw.options: Optional `{ asyncOutput }`: `true` schedules the output with `defer()` so the call returns before any sink runs; default `false`.\nNothing.\nusePipeline: Registers a synchronous stage (entry, next, context?) => void in every pipeline mode. PluginHost lifts it into the selected mode; call next(entry) to continue or omit next to drop the entry.\nusePipeline.stage: The stage function; call `next` at most once.\nThe same logger for chaining; synchronous registration works in all modes. Other stage registration methods follow the mode compatibility matrix.\nuseAsyncPipeline: Registers an async onion-style stage (mode `async` only): code after `await next(entry)` runs once the downstream finished.\nuseAsyncPipeline.stage: `async (entry, next) => void`.\nThe same logger; other modes reject it at type level and at runtime.\nuseGeneratorPipeline: Registers a generator stage (modes `generator` and `async-generator`).\nuseGeneratorPipeline.stage: Generator (entry, context?), with optional pipeline context as the second argument, never next. Return a payload or GENERATOR_CONTINUE after yielding to continue; an implicit undefined return halts.\nThe same logger, for chaining.\nuseAsyncGeneratorPipeline: Registers an async generator stage (mode `async-generator` only); each stage runs to its final value before the next.\nuseAsyncGeneratorPipeline.stage: Async generator (entry, context?) with optional context as the second argument. Yield stores a candidate; return payload or GENERATOR_CONTINUE to continue. The logger explicitly delegates stage registration to its functional Host.\nuseSink: Registers an output that receives every entry passing the pipeline. Each sink gets its own shallow copy; a returned Promise is awaited by `flush()`; a throw goes to `onFailure()` with source `sink`.\nuseSink.sink: `(entry) => void | Promise<void>`.\nA function that removes only this registration; calling it again does nothing.\nhook: Registers a hook under a name: built-in `before`, `after`, `before:<tag>`, `after:<tag>`, or a name a plugin fires. Hooks receive the live entry and may change it.\nhook.name: Hook name.\nhook.fn: `(entry) => void | Promise<void>`; a returned Promise is awaited by `flush()`.\nAn idempotent off callback removing only this registration; registering the same function again creates an independent subscription.\nfireHook: Runs every hook registered under `name` with the given entry now.\nfireHook.name: Hook name to fire.\nfireHook.entry: An entry, usually received in a sink or stage.\nNothing; hook failures go to `onFailure()`.\nonFailure: Observes failures of sinks, hooks, pipeline, deferred tasks, flush, forwarding and shutdown. Logging calls never throw them, so register this in production. If the terminal runtime reporter throws, rejects or has a throwing then getter, the existing Utils host exception queue exposes that failure without recursion or changing the business result.\nonFailure.fn: `({ source, error }) => void`; see `ILogFailure`.\ndefer: Runs a task after the current synchronous stack through the runtime manager; `flush()` and `shutdown()` wait for it.\ndefer.task: `() => void | Promise<void>`.\nNothing; the task is scheduled, not awaited.\nonFlush: Registers a callback that empties a buffer on every `flush()`.\nonFlush.fn: `() => void | Promise<void>`.\nflush: Public flush() takes no argument. It waits for tracked deferred tasks, async sink results, onFlush callbacks, batches and forwarded loggers within a 3000 ms scheduler budget. Concurrent pending calls share one Promise; hitting the deadline reports LIFECYCLE_DEADLINE without aborting underlying work or proving delivery.\nResolves when the known work finished or the budget ran out.\nonShutdown: Registers a cleanup handler run at the start of `shutdown()`; it may still write final logs.\nonShutdown.fn: `(reason) => void | Promise<void>`; `reason` is the value passed to `shutdown()`.\nshutdown: Closes the logger: shutdown handlers and flush share a 3000 ms waiting budget, then Host disposal uses execution budgets separately. Handlers can enqueue final structured logs while raw output is closed. Reentrant and later calls share one terminal Promise; completed shutdown ignores new logs and cannot reopen.\nshutdown.reason: Why it closes: `manual` from application code; `signal`, `uncaughtException`, `unhandledRejection` are passed by `process()`.\nAn `IPluginHostDisposalResult` from `@migaia/plugin-host`; `cleanupErrors` lists plugin cleanup failures. A clock failure rejects this same published completion after attempting Host cleanup, retaining primary and cleanup causes. Persistent clock failure can also defeat the Host budget; cleanup or receipt success does not promise remote delivery.\ndispose: Same as `shutdown(\"manual\")`.\nThe disposal result of `shutdown()`.\nextends: Forwards every entry, after this logger processed it, through the whole pipeline and sinks of each target (their level filters apply). Self or cyclic forwarding throws `EXTENDS_SELF` / `EXTENDS_CYCLE`.\nextends.others: Target loggers created by `new Logger()`.\nThis logger, for chaining.\nunextend: Removes forwarding edges to the given loggers; the targets are not closed.\nunextend.others: Loggers previously passed to `extends()`.\n`true` when at least one edge was removed.\nonDispose: Inside a plugin `install(core)` only: registers a cleanup run when the plugin is uninstalled.\nonDispose.resource: A disposer function or an object with `dispose()`.\nNothing; the cleanup is registered.",
+          "core": "config: Configuration store of the installed plugins. On a logger it is `ILoggerConfig` (`get(path)`, `update(name, recipe)`); inside a plugin `install(core)` it is a reader of that plugin configuration only (`get()`).\nctx: Frozen context of this logger: `id`, application `options`, default context `path`, `topic`, `createdAt` and `env`.\nscheduler: Clock and timers used by `flush()`, `shutdown()` and batch deadlines; the `scheduler` option or `systemScheduler`.\nruntimeManager: Host capabilities (stdout, UUID, scheduling, fetch, fs) captured at construction from the `runtimeManager` option or `getLoggerRuntimeManager()`; plugins use the same object.\nlog: Console-style entry point: builds an entry with this tag and message and dispatches it through pipeline, hooks and sinks. A trailing object stays an argument; it is not turned into `meta`. Never throws for sink failures.\nlog.tag: Entry tag such as `info` or `audit`; the level() threshold applies only to the five standard levels, while its filters apply to every tag.\nlog.message: Message text; `%s`, `%d`, `%o` placeholders are left for the console sink.\nlog.args: Extra values stored in `entry.args` in order.\nNo value. Shutdown handlers can still enqueue final structured entries; calls are ignored after draining closes dispatch admission.\ndispatchRaw: Dispatches an entry with explicit fields (`meta`, `data`, `context`, `error`, `time`) for structured or audit logs.\ndispatchRaw.input: Required tag and message, plus optional args (default []), meta (undefined), data ({}), context (constructor context), error (first Error argument projected to name/message/stack/raw, otherwise undefined) and time (current Date). The core assigns id; callers cannot supply it. Metadata/data keys such as orderId and route are application-defined. Containers are copied, nested application values stay shared.\ndispatchRaw.options: Optional `{ asyncOutput }`: `true` schedules the output with `defer()` so the call returns before any sink runs; default `false`.\nNothing; failures go to `onFailure()`.\nraw: Writes text straight to stdout (or `console.log` without `process`), skipping pipeline and sinks; used for streaming output. Ignored once shutdown starts.\nraw.text: Text passed unchanged to runtimeManager.write. A host stdout writer can preserve no-newline output; the default console.log fallback without process adds its own newline.\nraw.options: Optional `{ asyncOutput }`: `true` schedules the output with `defer()` so the call returns before any sink runs; default `false`.\nNothing.\nusePipeline: Registers a synchronous stage (entry, next, context?) => void in every pipeline mode. PluginHost lifts it into the selected mode; call next(entry) to continue or omit next to drop the entry.\nusePipeline.stage: The stage function; call `next` at most once.\nThe same logger for chaining; synchronous registration works in all modes. Other stage registration methods follow the mode compatibility matrix.\nuseAsyncPipeline: Registers an async onion-style stage (mode `async` only): code after `await next(entry)` runs once the downstream finished.\nuseAsyncPipeline.stage: `async (entry, next) => void`.\nThe same logger; other modes reject it at type level and at runtime.\nuseGeneratorPipeline: Registers a generator stage (modes `generator` and `async-generator`).\nuseGeneratorPipeline.stage: Generator (entry, context?), with optional pipeline context as the second argument, never next. Return a payload or GENERATOR_CONTINUE after yielding to continue; an implicit undefined return halts.\nThe same logger, for chaining.\nuseAsyncGeneratorPipeline: Registers an async generator stage (mode `async-generator` only); each stage runs to its final value before the next.\nuseAsyncGeneratorPipeline.stage: Async generator (entry, context?) with optional context as the second argument. Yield stores a candidate; return payload or GENERATOR_CONTINUE to continue. The logger explicitly delegates stage registration to its functional Host.\nuseSink: Registers an output that receives every entry passing the pipeline. Each sink gets its own shallow copy; a returned Promise is awaited by `flush()`; a throw goes to `onFailure()` with source `sink`.\nuseSink.sink: `(entry) => void | Promise<void>`.\nA function that removes only this registration; calling it again does nothing.\nhook: Registers a hook under a name: built-in `before`, `after`, `before:<tag>`, `after:<tag>`, or a name a plugin fires. Hooks receive the live entry and may change it.\nhook.name: Hook name.\nhook.fn: `(entry) => void | Promise<void>`; a returned Promise is awaited by `flush()`.\nAn idempotent off callback removing only this registration; registering the same function again creates an independent subscription.\nfireHook: Runs every hook registered under `name` with the given entry now.\nfireHook.name: Hook name to fire.\nfireHook.entry: An entry, usually received in a sink or stage.\nNothing; hook failures go to `onFailure()`.\nonFailure: Observes failures of sinks, hooks, pipeline, deferred tasks, flush, forwarding and shutdown. Logging calls never throw them, so register this in production. If the terminal runtime reporter throws, rejects or has a throwing then getter, the existing Utils host exception queue exposes that failure without recursion or changing the business result.\nonFailure.fn: `({ source, error }) => void`; see `ILogFailure`.\ndefer: Runs a task after the current synchronous stack through the runtime manager; `flush()` and `shutdown()` wait for it.\ndefer.task: `() => void | Promise<void>`.\nNothing; the task is scheduled, not awaited.\nonFlush: Registers a callback that empties a buffer on every `flush()`.\nonFlush.fn: `() => void | Promise<void>`.\nflush: Public flush() takes no argument. It waits for tracked deferred tasks, async sink results, onFlush callbacks, batches and forwarded loggers within a 3000 ms scheduler budget. Concurrent pending calls share one Promise; hitting the deadline reports LIFECYCLE_DEADLINE without aborting underlying work or proving delivery.\nResolves when the known work finished or the budget ran out.\nonShutdown: Registers a cleanup handler run at the start of `shutdown()`; it may still write final logs.\nonShutdown.fn: `(reason) => void | Promise<void>`; `reason` is the value passed to `shutdown()`.\nshutdown: Closes the logger: shutdown handlers and flush share a 3000 ms waiting budget, then Host disposal uses execution budgets separately. Handlers can enqueue final structured logs while raw output is closed. Reentrant and later calls share one terminal Promise; completed shutdown ignores new logs and cannot reopen.\nshutdown.reason: Why it closes: `manual` from application code; `signal`, `uncaughtException`, `unhandledRejection` are passed by `process()`.\nAn `IPluginHostDisposalResult` from `@migaia/plugin-host`; `cleanupErrors` lists plugin cleanup failures. A clock failure rejects this same published completion after attempting Host cleanup, retaining primary and cleanup causes. Persistent clock failure can also defeat the Host budget; cleanup or receipt success does not promise remote delivery.\ndispose: Same as `shutdown(\"manual\")`.\nThe disposal result of `shutdown()`.\nextends: Forwards every entry, after this logger processed it, through the whole pipeline and sinks of each target (their level filters apply). Self or cyclic forwarding throws `EXTENDS_SELF` / `EXTENDS_CYCLE`.\nextends.others: Target loggers created by `new Logger()`.\nThis logger, for chaining.\nunextend: Removes forwarding edges to the given loggers; the targets are not closed.\nunextend.others: Loggers previously passed to `extends()`.\n`true` when at least one edge was removed.\nonDispose: Inside a plugin `install(core)` only: registers a cleanup run when the plugin is uninstalled.\nonDispose.resource: A disposer function or an object with `dispose()`.\nNothing; the cleanup is registered.\nreportFailure: Report a durable observation or resource failure through the original Logger policy without adding a public instance method.\nreportFailure.failure: The original structured ILogFailure with its error and operation metadata.\nNothing; reporting retains the existing failure policy and does not authorize a commit.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -5568,7 +5568,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "config: Configuration store of the installed plugins. On a logger it is `ILoggerConfig` (`get(path)`, `update(name, recipe)`); inside a plugin `install(core)` it is a reader of that plugin configuration only (`get()`).\nctx: Frozen context of this logger: `id`, application `options`, default context `path`, `topic`, `createdAt` and `env`.\nscheduler: Clock and timers used by `flush()`, `shutdown()` and batch deadlines; the `scheduler` option or `systemScheduler`.\nruntimeManager: Host capabilities (stdout, UUID, scheduling, fetch, fs) captured at construction from the `runtimeManager` option or `getLoggerRuntimeManager()`; plugins use the same object.\nlog: Console-style entry point: builds an entry with this tag and message and dispatches it through pipeline, hooks and sinks. A trailing object stays an argument; it is not turned into `meta`. Never throws for sink failures.\nlog.tag: Entry tag such as `info` or `audit`; the level() threshold applies only to the five standard levels, while its filters apply to every tag.\nlog.message: Message text; `%s`, `%d`, `%o` placeholders are left for the console sink.\nlog.args: Extra values stored in `entry.args` in order.\nNo value. Shutdown handlers can still enqueue final structured entries; calls are ignored after draining closes dispatch admission.\ndispatchRaw: Dispatches an entry with explicit fields (`meta`, `data`, `context`, `error`, `time`) for structured or audit logs.\ndispatchRaw.input: Required tag and message, plus optional args (default []), meta (undefined), data ({}), context (constructor context), error (first Error argument projected to name/message/stack/raw, otherwise undefined) and time (current Date). The core assigns id; callers cannot supply it. Metadata/data keys such as orderId and route are application-defined. Containers are copied, nested application values stay shared.\ndispatchRaw.options: Optional `{ asyncOutput }`: `true` schedules the output with `defer()` so the call returns before any sink runs; default `false`.\nNothing; failures go to `onFailure()`.\nraw: Writes text straight to stdout (or `console.log` without `process`), skipping pipeline and sinks; used for streaming output. Ignored once shutdown starts.\nraw.text: Text passed unchanged to runtimeManager.write. A host stdout writer can preserve no-newline output; the default console.log fallback without process adds its own newline.\nraw.options: Optional `{ asyncOutput }`: `true` schedules the output with `defer()` so the call returns before any sink runs; default `false`.\nNothing.\nusePipeline: Registers a synchronous stage (entry, next, context?) => void in every pipeline mode. PluginHost lifts it into the selected mode; call next(entry) to continue or omit next to drop the entry.\nusePipeline.stage: The stage function; call `next` at most once.\nThe same logger for chaining; synchronous registration works in all modes. Other stage registration methods follow the mode compatibility matrix.\nuseAsyncPipeline: Registers an async onion-style stage (mode `async` only): code after `await next(entry)` runs once the downstream finished.\nuseAsyncPipeline.stage: `async (entry, next) => void`.\nThe same logger; other modes reject it at type level and at runtime.\nuseGeneratorPipeline: Registers a generator stage (modes `generator` and `async-generator`).\nuseGeneratorPipeline.stage: Generator (entry, context?), with optional pipeline context as the second argument, never next. Return a payload or GENERATOR_CONTINUE after yielding to continue; an implicit undefined return halts.\nThe same logger, for chaining.\nuseAsyncGeneratorPipeline: Registers an async generator stage (mode `async-generator` only); each stage runs to its final value before the next.\nuseAsyncGeneratorPipeline.stage: Async generator (entry, context?) with optional context as the second argument. Yield stores a candidate; return payload or GENERATOR_CONTINUE to continue. The logger explicitly delegates stage registration to its functional Host.\nuseSink: Registers an output that receives every entry passing the pipeline. Each sink gets its own shallow copy; a returned Promise is awaited by `flush()`; a throw goes to `onFailure()` with source `sink`.\nuseSink.sink: `(entry) => void | Promise<void>`.\nA function that removes only this registration; calling it again does nothing.\nhook: Registers a hook under a name: built-in `before`, `after`, `before:<tag>`, `after:<tag>`, or a name a plugin fires. Hooks receive the live entry and may change it.\nhook.name: Hook name.\nhook.fn: `(entry) => void | Promise<void>`; a returned Promise is awaited by `flush()`.\nAn idempotent off callback removing only this registration; registering the same function again creates an independent subscription.\nfireHook: Runs every hook registered under `name` with the given entry now.\nfireHook.name: Hook name to fire.\nfireHook.entry: An entry, usually received in a sink or stage.\nNothing; hook failures go to `onFailure()`.\nonFailure: Observes failures of sinks, hooks, pipeline, deferred tasks, flush, forwarding and shutdown. Logging calls never throw them, so register this in production. If the terminal runtime reporter throws, rejects or has a throwing then getter, the existing Utils host exception queue exposes that failure without recursion or changing the business result.\nonFailure.fn: `({ source, error }) => void`; see `ILogFailure`.\ndefer: Runs a task after the current synchronous stack through the runtime manager; `flush()` and `shutdown()` wait for it.\ndefer.task: `() => void | Promise<void>`.\nNothing; the task is scheduled, not awaited.\nonFlush: Registers a callback that empties a buffer on every `flush()`.\nonFlush.fn: `() => void | Promise<void>`.\nflush: Public flush() takes no argument. It waits for tracked deferred tasks, async sink results, onFlush callbacks, batches and forwarded loggers within a 3000 ms scheduler budget. Concurrent pending calls share one Promise; hitting the deadline reports LIFECYCLE_DEADLINE without aborting underlying work or proving delivery.\nResolves when the known work finished or the budget ran out.\nonShutdown: Registers a cleanup handler run at the start of `shutdown()`; it may still write final logs.\nonShutdown.fn: `(reason) => void | Promise<void>`; `reason` is the value passed to `shutdown()`.\nshutdown: Closes the logger: shutdown handlers and flush share a 3000 ms waiting budget, then Host disposal uses execution budgets separately. Handlers can enqueue final structured logs while raw output is closed. Reentrant and later calls share one terminal Promise; completed shutdown ignores new logs and cannot reopen.\nshutdown.reason: Why it closes: `manual` from application code; `signal`, `uncaughtException`, `unhandledRejection` are passed by `process()`.\nAn `IPluginHostDisposalResult` from `@migaia/plugin-host`; `cleanupErrors` lists plugin cleanup failures. A clock failure rejects this same published completion after attempting Host cleanup, retaining primary and cleanup causes. Persistent clock failure can also defeat the Host budget; cleanup or receipt success does not promise remote delivery.\ndispose: Same as `shutdown(\"manual\")`.\nThe disposal result of `shutdown()`.\nextends: Forwards every entry, after this logger processed it, through the whole pipeline and sinks of each target (their level filters apply). Self or cyclic forwarding throws `EXTENDS_SELF` / `EXTENDS_CYCLE`.\nextends.others: Target loggers created by `new Logger()`.\nThis logger, for chaining.\nunextend: Removes forwarding edges to the given loggers; the targets are not closed.\nunextend.others: Loggers previously passed to `extends()`.\n`true` when at least one edge was removed.\nonDispose: Inside a plugin `install(core)` only: registers a cleanup run when the plugin is uninstalled.\nonDispose.resource: A disposer function or an object with `dispose()`.\nNothing; the cleanup is registered."
+              "content": "config: Configuration store of the installed plugins. On a logger it is `ILoggerConfig` (`get(path)`, `update(name, recipe)`); inside a plugin `install(core)` it is a reader of that plugin configuration only (`get()`).\nctx: Frozen context of this logger: `id`, application `options`, default context `path`, `topic`, `createdAt` and `env`.\nscheduler: Clock and timers used by `flush()`, `shutdown()` and batch deadlines; the `scheduler` option or `systemScheduler`.\nruntimeManager: Host capabilities (stdout, UUID, scheduling, fetch, fs) captured at construction from the `runtimeManager` option or `getLoggerRuntimeManager()`; plugins use the same object.\nlog: Console-style entry point: builds an entry with this tag and message and dispatches it through pipeline, hooks and sinks. A trailing object stays an argument; it is not turned into `meta`. Never throws for sink failures.\nlog.tag: Entry tag such as `info` or `audit`; the level() threshold applies only to the five standard levels, while its filters apply to every tag.\nlog.message: Message text; `%s`, `%d`, `%o` placeholders are left for the console sink.\nlog.args: Extra values stored in `entry.args` in order.\nNo value. Shutdown handlers can still enqueue final structured entries; calls are ignored after draining closes dispatch admission.\ndispatchRaw: Dispatches an entry with explicit fields (`meta`, `data`, `context`, `error`, `time`) for structured or audit logs.\ndispatchRaw.input: Required tag and message, plus optional args (default []), meta (undefined), data ({}), context (constructor context), error (first Error argument projected to name/message/stack/raw, otherwise undefined) and time (current Date). The core assigns id; callers cannot supply it. Metadata/data keys such as orderId and route are application-defined. Containers are copied, nested application values stay shared.\ndispatchRaw.options: Optional `{ asyncOutput }`: `true` schedules the output with `defer()` so the call returns before any sink runs; default `false`.\nNothing; failures go to `onFailure()`.\nraw: Writes text straight to stdout (or `console.log` without `process`), skipping pipeline and sinks; used for streaming output. Ignored once shutdown starts.\nraw.text: Text passed unchanged to runtimeManager.write. A host stdout writer can preserve no-newline output; the default console.log fallback without process adds its own newline.\nraw.options: Optional `{ asyncOutput }`: `true` schedules the output with `defer()` so the call returns before any sink runs; default `false`.\nNothing.\nusePipeline: Registers a synchronous stage (entry, next, context?) => void in every pipeline mode. PluginHost lifts it into the selected mode; call next(entry) to continue or omit next to drop the entry.\nusePipeline.stage: The stage function; call `next` at most once.\nThe same logger for chaining; synchronous registration works in all modes. Other stage registration methods follow the mode compatibility matrix.\nuseAsyncPipeline: Registers an async onion-style stage (mode `async` only): code after `await next(entry)` runs once the downstream finished.\nuseAsyncPipeline.stage: `async (entry, next) => void`.\nThe same logger; other modes reject it at type level and at runtime.\nuseGeneratorPipeline: Registers a generator stage (modes `generator` and `async-generator`).\nuseGeneratorPipeline.stage: Generator (entry, context?), with optional pipeline context as the second argument, never next. Return a payload or GENERATOR_CONTINUE after yielding to continue; an implicit undefined return halts.\nThe same logger, for chaining.\nuseAsyncGeneratorPipeline: Registers an async generator stage (mode `async-generator` only); each stage runs to its final value before the next.\nuseAsyncGeneratorPipeline.stage: Async generator (entry, context?) with optional context as the second argument. Yield stores a candidate; return payload or GENERATOR_CONTINUE to continue. The logger explicitly delegates stage registration to its functional Host.\nuseSink: Registers an output that receives every entry passing the pipeline. Each sink gets its own shallow copy; a returned Promise is awaited by `flush()`; a throw goes to `onFailure()` with source `sink`.\nuseSink.sink: `(entry) => void | Promise<void>`.\nA function that removes only this registration; calling it again does nothing.\nhook: Registers a hook under a name: built-in `before`, `after`, `before:<tag>`, `after:<tag>`, or a name a plugin fires. Hooks receive the live entry and may change it.\nhook.name: Hook name.\nhook.fn: `(entry) => void | Promise<void>`; a returned Promise is awaited by `flush()`.\nAn idempotent off callback removing only this registration; registering the same function again creates an independent subscription.\nfireHook: Runs every hook registered under `name` with the given entry now.\nfireHook.name: Hook name to fire.\nfireHook.entry: An entry, usually received in a sink or stage.\nNothing; hook failures go to `onFailure()`.\nonFailure: Observes failures of sinks, hooks, pipeline, deferred tasks, flush, forwarding and shutdown. Logging calls never throw them, so register this in production. If the terminal runtime reporter throws, rejects or has a throwing then getter, the existing Utils host exception queue exposes that failure without recursion or changing the business result.\nonFailure.fn: `({ source, error }) => void`; see `ILogFailure`.\ndefer: Runs a task after the current synchronous stack through the runtime manager; `flush()` and `shutdown()` wait for it.\ndefer.task: `() => void | Promise<void>`.\nNothing; the task is scheduled, not awaited.\nonFlush: Registers a callback that empties a buffer on every `flush()`.\nonFlush.fn: `() => void | Promise<void>`.\nflush: Public flush() takes no argument. It waits for tracked deferred tasks, async sink results, onFlush callbacks, batches and forwarded loggers within a 3000 ms scheduler budget. Concurrent pending calls share one Promise; hitting the deadline reports LIFECYCLE_DEADLINE without aborting underlying work or proving delivery.\nResolves when the known work finished or the budget ran out.\nonShutdown: Registers a cleanup handler run at the start of `shutdown()`; it may still write final logs.\nonShutdown.fn: `(reason) => void | Promise<void>`; `reason` is the value passed to `shutdown()`.\nshutdown: Closes the logger: shutdown handlers and flush share a 3000 ms waiting budget, then Host disposal uses execution budgets separately. Handlers can enqueue final structured logs while raw output is closed. Reentrant and later calls share one terminal Promise; completed shutdown ignores new logs and cannot reopen.\nshutdown.reason: Why it closes: `manual` from application code; `signal`, `uncaughtException`, `unhandledRejection` are passed by `process()`.\nAn `IPluginHostDisposalResult` from `@migaia/plugin-host`; `cleanupErrors` lists plugin cleanup failures. A clock failure rejects this same published completion after attempting Host cleanup, retaining primary and cleanup causes. Persistent clock failure can also defeat the Host budget; cleanup or receipt success does not promise remote delivery.\ndispose: Same as `shutdown(\"manual\")`.\nThe disposal result of `shutdown()`.\nextends: Forwards every entry, after this logger processed it, through the whole pipeline and sinks of each target (their level filters apply). Self or cyclic forwarding throws `EXTENDS_SELF` / `EXTENDS_CYCLE`.\nextends.others: Target loggers created by `new Logger()`.\nThis logger, for chaining.\nunextend: Removes forwarding edges to the given loggers; the targets are not closed.\nunextend.others: Loggers previously passed to `extends()`.\n`true` when at least one edge was removed.\nonDispose: Inside a plugin `install(core)` only: registers a cleanup run when the plugin is uninstalled.\nonDispose.resource: A disposer function or an object with `dispose()`.\nNothing; the cleanup is registered.\nreportFailure: Report a durable observation or resource failure through the original Logger policy without adding a public instance method.\nreportFailure.failure: The original structured ILogFailure with its error and operation metadata.\nNothing; reporting retains the existing failure policy and does not authorize a commit."
             },
             {
               "id": "advanced-usage",
@@ -10911,7 +10911,7 @@
           "declarationLine": 42,
           "source": "packages/logger/dist/plugins/durable/committed-index.d.ts",
           "purpose": "Assert the original safe-integer domain and preserve numeric error semantics.",
-          "core": "Narrows unknown to number; the default minimum is one.",
+          "core": "value: Unknown value to narrow to a safe integer.\nminimum: Inclusive minimum, default one; pass zero for a high watermark.\nNarrows unknown to number; the default minimum is one.",
           "advanced": "",
           "parameters": ["value: unknown", "minimum: number (optional)"],
           "parameterDetails": [
@@ -10978,7 +10978,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Narrows unknown to number; the default minimum is one."
+              "content": "value: Unknown value to narrow to a safe integer.\nminimum: Inclusive minimum, default one; pass zero for a high watermark.\nNarrows unknown to number; the default minimum is one."
             },
             {
               "id": "advanced-usage",
@@ -11000,7 +11000,7 @@
           "declarationLine": 3,
           "source": "packages/logger/dist/plugins/durable/binlog.d.ts",
           "purpose": "Install ordered append/read/subscribe methods; initialize once and borrow the original store.",
-          "core": "Caller-owned resource or synchronous logger plugin; await ready before a native transaction.\nOrdered history/live log; it borrows a store and never disposes it.",
+          "core": "options: Exact caller-owned log store, optional metadata observation and echo.\nCaller-owned resource or synchronous logger plugin; await ready before a native transaction.\nstore: Original caller-owned ILogStore, reserved for one installed durable plugin; plugin removal never closes it.\nobserve: Receives metadata-only stage observations; throws, then-getter errors and late rejection only report.\nOmitted: no stage observer is called.\nTrace lifecycle and operation timing without receiving business payloads or intervening in commits.\necho: Emit kind and sequence/time metadata through ordinary logging, never business payloads.\nfalse: no ordinary echo.\nOrdered history/live log; it borrows a store and never disposes it.",
           "advanced": "Keep durable records with caller-owned resources.",
           "parameters": ["options: IBinlogOptions"],
           "parameterDetails": [
@@ -11059,7 +11059,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Caller-owned resource or synchronous logger plugin; await ready before a native transaction.\nOrdered history/live log; it borrows a store and never disposes it."
+              "content": "options: Exact caller-owned log store, optional metadata observation and echo.\nCaller-owned resource or synchronous logger plugin; await ready before a native transaction.\nstore: Original caller-owned ILogStore, reserved for one installed durable plugin; plugin removal never closes it.\nobserve: Receives metadata-only stage observations; throws, then-getter errors and late rejection only report.\nOmitted: no stage observer is called.\nTrace lifecycle and operation timing without receiving business payloads or intervening in commits.\necho: Emit kind and sequence/time metadata through ordinary logging, never business payloads.\nfalse: no ordinary echo.\nOrdered history/live log; it borrows a store and never disposes it."
             },
             {
               "id": "advanced-usage",
@@ -11125,7 +11125,7 @@
           "declarationLine": 59,
           "source": "packages/logger/dist/plugins/durable/committed-index.d.ts",
           "purpose": "Create the original committed map and pending list without another resource, queue or close authority.",
-          "core": "Committed data only; native transaction and publication remain with the adapter.",
+          "core": "snapshot: Optional admitted recovery snapshot; omitted constructs an empty index.\nThe original data-only committed index, without native resources, queue or close authority.",
           "advanced": "",
           "parameters": ["snapshot: ILogStoreSnapshot (optional)"],
           "parameterDetails": [
@@ -11184,7 +11184,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Committed data only; native transaction and publication remain with the adapter."
+              "content": "snapshot: Optional admitted recovery snapshot; omitted constructs an empty index.\nThe original data-only committed index, without native resources, queue or close authority."
             },
             {
               "id": "advanced-usage",
@@ -11281,7 +11281,7 @@
           "declarationLine": 82,
           "source": "packages/logger/dist/plugins/durable/types.d.ts",
           "purpose": "Durable logger contract with explicit ownership and initialization.",
-          "core": "store: The original caller-owned ILogStore; one installed plugin per object. It never enters plugin config.\nobserve: Optional synchronous statistics observer; thrown, getter, and async failures only report.\necho: Default false; true emits kind plus seq/time metadata without payload.",
+          "core": "store: Original caller-owned ILogStore, reserved for one installed durable plugin; plugin removal never closes it.\nobserve: Receives metadata-only stage observations; throws, then-getter errors and late rejection only report.\nOmitted: no stage observer is called.\nTrace lifecycle and operation timing without receiving business payloads or intervening in commits.\necho: Emit kind and sequence/time metadata through ordinary logging, never business payloads.\nfalse: no ordinary echo.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -11334,7 +11334,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "store: The original caller-owned ILogStore; one installed plugin per object. It never enters plugin config.\nobserve: Optional synchronous statistics observer; thrown, getter, and async failures only report.\necho: Default false; true emits kind plus seq/time metadata without payload."
+              "content": "store: Original caller-owned ILogStore, reserved for one installed durable plugin; plugin removal never closes it.\nobserve: Receives metadata-only stage observations; throws, then-getter errors and late rejection only report.\nOmitted: no stage observer is called.\nTrace lifecycle and operation timing without receiving business payloads or intervening in commits.\necho: Emit kind and sequence/time metadata through ordinary logging, never business payloads.\nfalse: no ordinary echo."
             },
             {
               "id": "advanced-usage",
@@ -11356,7 +11356,7 @@
           "declarationLine": 77,
           "source": "packages/logger/dist/plugins/durable/types.d.ts",
           "purpose": "Durable logger contract with explicit ownership and initialization.",
-          "core": "store: The original caller-owned ILogStore; one installed plugin per object. It never enters plugin config.\nobserve: Optional synchronous statistics observer; thrown, getter, and async failures only report.",
+          "core": "store: Original caller-owned ILogStore, reserved for one installed durable plugin; plugin removal never closes it.\nobserve: Receives metadata-only stage observations; throws, then-getter errors and late rejection only report.\nOmitted: no stage observer is called.\nTrace lifecycle and operation timing without receiving business payloads or intervening in commits.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -11418,7 +11418,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "store: The original caller-owned ILogStore; one installed plugin per object. It never enters plugin config.\nobserve: Optional synchronous statistics observer; thrown, getter, and async failures only report."
+              "content": "store: Original caller-owned ILogStore, reserved for one installed durable plugin; plugin removal never closes it.\nobserve: Receives metadata-only stage observations; throws, then-getter errors and late rejection only report.\nOmitted: no stage observer is called.\nTrace lifecycle and operation timing without receiving business payloads or intervening in commits."
             },
             {
               "id": "advanced-usage",
@@ -11439,8 +11439,8 @@
           "signature": "export type ILogAppendNotice = Readonly<{ lastSeq: number; count: number; }>;",
           "declarationLine": 46,
           "source": "packages/logger/dist/plugins/durable/types.d.ts",
-          "purpose": "Frozen lastSeq/count of one actual nonempty append commit.",
-          "core": "Frozen lastSeq/count of one actual nonempty append commit.",
+          "purpose": "One frozen nonempty append commit notice, without records or business payloads.",
+          "core": "lastSeq: Highest sequence committed in this append.\ncount: Number of records committed in this nonempty batch.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -11482,7 +11482,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Frozen lastSeq/count of one actual nonempty append commit."
+              "content": "One frozen nonempty append commit notice, without records or business payloads."
             },
             {
               "id": "getting-started",
@@ -11502,7 +11502,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Frozen lastSeq/count of one actual nonempty append commit."
+              "content": "lastSeq: Highest sequence committed in this append.\ncount: Number of records committed in this nonempty batch."
             },
             {
               "id": "advanced-usage",
@@ -11599,7 +11599,7 @@
           "declarationLine": 63,
           "source": "packages/logger/dist/plugins/durable/types.d.ts",
           "purpose": "Durable logger contract with explicit ownership and initialization.",
-          "core": "store: Exact resource identity bound by the original owner, not write authority itself.\nappend: Immediately append within the current native transaction; return provisional sequences.\nonCommit: Register one actual commit effect and return its cancellation function.\nonRollback: Register one actual rollback effect and return its cancellation function.",
+          "core": "store: Exact resource identity bound by the original owner, not write authority itself.\nappend: Immediately append within the current native transaction; return provisional sequences.\nappend.records: Captured portable kind/payload records for this native transaction.\nProvisional sequence numbers; they become committed only at the original native commit.\nonCommit: Register one actual commit effect and return its cancellation function.\nonCommit.effect: Synchronous effect invoked only after a known native commit.\nCancellation function for this original terminal registration.\nonRollback: Register one actual rollback effect and return its cancellation function.\nonRollback.effect: Synchronous effect invoked only after a known native rollback.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -11697,7 +11697,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "store: Exact resource identity bound by the original owner, not write authority itself.\nappend: Immediately append within the current native transaction; return provisional sequences.\nonCommit: Register one actual commit effect and return its cancellation function.\nonRollback: Register one actual rollback effect and return its cancellation function."
+              "content": "store: Exact resource identity bound by the original owner, not write authority itself.\nappend: Immediately append within the current native transaction; return provisional sequences.\nappend.records: Captured portable kind/payload records for this native transaction.\nProvisional sequence numbers; they become committed only at the original native commit.\nonCommit: Register one actual commit effect and return its cancellation function.\nonCommit.effect: Synchronous effect invoked only after a known native commit.\nCancellation function for this original terminal registration.\nonRollback: Register one actual rollback effect and return its cancellation function.\nonRollback.effect: Synchronous effect invoked only after a known native rollback."
             },
             {
               "id": "advanced-usage",
@@ -11783,8 +11783,8 @@
           "signature": "export type ILogObservation = Readonly<{ stage: LogStage; owner: 'store' | 'binlog' | 'wal' | 'undo'; operation: string; seq?: number; count?: number; durationMs?: number; }>;",
           "declarationLine": 30,
           "source": "packages/logger/dist/plugins/durable/types.d.ts",
-          "purpose": "Fixed identity statistics without payload or native resources.",
-          "core": "Fixed identity statistics without payload or native resources.",
+          "purpose": "Fixed metadata-only operation observations; they never decide a commit or expose business payloads.",
+          "core": "stage: Original LogStage name for open, operation, close, append or pending observation.\nowner: Resource or installed plugin identity: store, binlog, wal or undo.\nStandalone native resource operation.\nInstalled ordered history plugin operation.\nInstalled write-ahead intent plugin operation.\nInstalled business image plugin operation.\noperation: Original operation name within that owner, without a caller payload or native handle.\nseq: Optional sequence associated with this actual operation.\ncount: Optional actual record or result count for this operation.\ndurationMs: Optional elapsed operation time measured in milliseconds.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -11862,7 +11862,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Fixed identity statistics without payload or native resources."
+              "content": "Fixed metadata-only operation observations; they never decide a commit or expose business payloads."
             },
             {
               "id": "getting-started",
@@ -11882,7 +11882,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Fixed identity statistics without payload or native resources."
+              "content": "stage: Original LogStage name for open, operation, close, append or pending observation.\nowner: Resource or installed plugin identity: store, binlog, wal or undo.\nStandalone native resource operation.\nInstalled ordered history plugin operation.\nInstalled write-ahead intent plugin operation.\nInstalled business image plugin operation.\noperation: Original operation name within that owner, without a caller payload or native handle.\nseq: Optional sequence associated with this actual operation.\ncount: Optional actual record or result count for this operation.\ndurationMs: Optional elapsed operation time measured in milliseconds."
             },
             {
               "id": "advanced-usage",
@@ -12096,9 +12096,9 @@
           "signature": "export type ILogRecord = { readonly seq: number; readonly time: number; readonly kind: string; readonly payload: ILogPayload; };",
           "declarationLine": 23,
           "source": "packages/logger/dist/plugins/durable/types.d.ts",
-          "purpose": "Committed sequence, nondecreasing time, kind, and payload snapshot.",
-          "core": "Committed sequence, nondecreasing time, kind, and payload snapshot.",
-          "advanced": "",
+          "purpose": "Detached committed identity, monotonic time and portable JSON payload, without mutable store state.",
+          "core": "kind: Caller-defined nonempty record discriminator, such as order.created; it is not a logger level.\npayload: Payload captured as detached portable JSON before persistence; finite numbers and null are admitted.\nseq: Positive safe sequence assigned at commit; the resource never reuses a committed sequence.\ntime: Nonnegative millisecond timestamp, never decreasing within this resource, including reopened files.",
+          "advanced": "Inspect a committed audit record without retaining or mutating its original storage.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -12151,13 +12151,13 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Inspect a committed audit record without retaining or mutating its original storage.",
           "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Committed sequence, nondecreasing time, kind, and payload snapshot."
+              "content": "Detached committed identity, monotonic time and portable JSON payload, without mutable store state."
             },
             {
               "id": "getting-started",
@@ -12177,12 +12177,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Committed sequence, nondecreasing time, kind, and payload snapshot."
+              "content": "kind: Caller-defined nonempty record discriminator, such as order.created; it is not a logger level.\npayload: Payload captured as detached portable JSON before persistence; finite numbers and null are admitted.\nseq: Positive safe sequence assigned at commit; the resource never reuses a committed sequence.\ntime: Nonnegative millisecond timestamp, never decreasing within this resource, including reopened files."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Inspect a committed audit record without retaining or mutating its original storage."
             }
           ],
           "declaredConfiguration": [],
@@ -12198,8 +12198,8 @@
           "signature": "export type ILogRecordInput = { readonly kind: string; readonly payload: unknown; };",
           "declarationLine": 12,
           "source": "packages/logger/dist/plugins/durable/types.d.ts",
-          "purpose": "A caller kind and payload before sequence/time assignment.",
-          "core": "A caller kind and payload before sequence/time assignment.",
+          "purpose": "Caller input before sequence/time assignment; append captures and validates portable JSON before writing.",
+          "core": "kind: Caller-defined nonempty record discriminator, such as order.created; it is not a logger level.\npayload: Payload captured as detached portable JSON before persistence; finite numbers and null are admitted.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -12241,7 +12241,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "A caller kind and payload before sequence/time assignment."
+              "content": "Caller input before sequence/time assignment; append captures and validates portable JSON before writing."
             },
             {
               "id": "getting-started",
@@ -12261,7 +12261,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "A caller kind and payload before sequence/time assignment."
+              "content": "kind: Caller-defined nonempty record discriminator, such as order.created; it is not a logger level.\npayload: Payload captured as detached portable JSON before persistence; finite numbers and null are admitted."
             },
             {
               "id": "advanced-usage",
@@ -12282,8 +12282,8 @@
           "signature": "export type ILogRecordSnapshot = Readonly<{ kind: string; payload: ILogPayload; }>;",
           "declarationLine": 4,
           "source": "packages/logger/dist/plugins/durable/committed-index.d.ts",
-          "purpose": "Portable JSON batch captured before sequence/time assignment.",
-          "core": "Portable JSON batch captured before sequence/time assignment.",
+          "purpose": "Captured portable JSON input before sequence/time assignment, without native ownership.",
+          "core": "kind: Caller-defined nonempty record discriminator, such as order.created; it is not a logger level.\npayload: Payload captured as detached portable JSON before persistence; finite numbers and null are admitted.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -12325,7 +12325,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Portable JSON batch captured before sequence/time assignment."
+              "content": "Captured portable JSON input before sequence/time assignment, without native ownership."
             },
             {
               "id": "getting-started",
@@ -12345,7 +12345,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Portable JSON batch captured before sequence/time assignment."
+              "content": "kind: Caller-defined nonempty record discriminator, such as order.created; it is not a logger level.\npayload: Payload captured as detached portable JSON before persistence; finite numbers and null are admitted."
             },
             {
               "id": "advanced-usage",
@@ -12367,8 +12367,8 @@
           "declarationLine": 51,
           "source": "packages/logger/dist/plugins/durable/types.d.ts",
           "purpose": "Durable logger contract with explicit ownership and initialization.",
-          "core": "append: Atomically commit a batch and create pending states; empty batches allocate no sequences. Inputs are captured immediately.\nread: Read ascending retained snapshots from an inclusive sequence and an explicit nonnegative limit.\nlastSeq: Read the committed high watermark, preserved after complete truncation.\nonAppend: Observe one frozen {lastSeq,count} notice per nonempty real commit; return an idempotent cancellation function.\ntruncate: Delete only seq < beforeSeq without reusing committed sequences.\nsetState: Only pending may advance to done or aborted; terminal and missing records reject WAL_RECORD_INVALID.\nstates: Return pending sequence numbers in creation order, excluding terminal history.\ndispose: Close admission, drain accepted work, and return one cached explicit cleanup Promise; failure rejects.\n[Symbol.asyncDispose]: Share the same cleanup using a separate cached Promise that reports failure and resolves.",
-          "advanced": "",
+          "core": "append: Capture portable JSON immediately, then atomically commit the entire batch as pending records. Empty batches allocate no sequences.\nappend.records: Ordered kind/payload inputs. Kinds are nonempty strings; payloads must be finite portable JSON without accessors, cycles or unsupported values.\nCommitted sequence numbers in input order; no partial batch becomes visible.\nread: Read ascending retained snapshots without changing record state or consuming them.\nread.fromSeq: Inclusive positive safe sequence, normally returned by append; a truncated prefix starts at the retained floor.\nread.limit: Maximum returned records, a nonnegative safe integer; zero returns an empty array.\nDetached record and JSON payload snapshots in ascending sequence order.\nlastSeq: Read the permanent committed high watermark, preserved after complete prefix truncation.\nZero for a new resource, otherwise the highest committed sequence; it is never reused.\nonAppend: Observe one frozen notice after each nonempty real commit; listener failures only report.\nonAppend.listener: Receives frozen lastSeq/count metadata and returns void. It runs only after commit; thrown or asynchronous failures are reported.\nAn idempotent cancellation function that removes this listener only.\ntruncate: Delete only the prefix below the requested sequence while keeping sequence/time watermarks.\ntruncate.beforeSeq: Exclusive retained boundary, a positive safe integer at most lastSeq + 1; earlier floors are harmless no-ops.\nResolves after truncation commits; future appends keep increasing the original sequence.\nsetState: Advance an existing pending record to a terminal state; missing or terminal rows reject WAL_RECORD_INVALID.\nsetState.seq: Sequence issued by append for an existing pending record in this resource.\nsetState.state: LogRecordState.done or aborted ends the intent; pending leaves a still-pending row unchanged.\nResolves after the state change commits; terminal records cannot reopen.\nstates: Return only active pending sequence numbers in creation order, excluding terminal history.\nstates.filter: Only LogRecordState.pending is supported; any other filter rejects INVALID_OPTION.\nAn ascending snapshot of the active pending sequences.\ndispose: Close admission immediately and drain accepted work before releasing the resource.\nOne cached explicit cleanup Promise; cleanup failure rejects and remains observable.\n[Symbol.asyncDispose]: Share the same cleanup through a separate cached symbolic completion Promise.\nResolves after cleanup, reporting cleanup failure rather than rejecting this symbolic Promise.",
+          "advanced": "Own a standalone atomic log while installed plugins only borrow it.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -12514,7 +12514,7 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Own a standalone atomic log while installed plugins only borrow it.",
           "notUse": "",
           "sections": [
             {
@@ -12540,12 +12540,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "append: Atomically commit a batch and create pending states; empty batches allocate no sequences. Inputs are captured immediately.\nread: Read ascending retained snapshots from an inclusive sequence and an explicit nonnegative limit.\nlastSeq: Read the committed high watermark, preserved after complete truncation.\nonAppend: Observe one frozen {lastSeq,count} notice per nonempty real commit; return an idempotent cancellation function.\ntruncate: Delete only seq < beforeSeq without reusing committed sequences.\nsetState: Only pending may advance to done or aborted; terminal and missing records reject WAL_RECORD_INVALID.\nstates: Return pending sequence numbers in creation order, excluding terminal history.\ndispose: Close admission, drain accepted work, and return one cached explicit cleanup Promise; failure rejects.\n[Symbol.asyncDispose]: Share the same cleanup using a separate cached Promise that reports failure and resolves."
+              "content": "append: Capture portable JSON immediately, then atomically commit the entire batch as pending records. Empty batches allocate no sequences.\nappend.records: Ordered kind/payload inputs. Kinds are nonempty strings; payloads must be finite portable JSON without accessors, cycles or unsupported values.\nCommitted sequence numbers in input order; no partial batch becomes visible.\nread: Read ascending retained snapshots without changing record state or consuming them.\nread.fromSeq: Inclusive positive safe sequence, normally returned by append; a truncated prefix starts at the retained floor.\nread.limit: Maximum returned records, a nonnegative safe integer; zero returns an empty array.\nDetached record and JSON payload snapshots in ascending sequence order.\nlastSeq: Read the permanent committed high watermark, preserved after complete prefix truncation.\nZero for a new resource, otherwise the highest committed sequence; it is never reused.\nonAppend: Observe one frozen notice after each nonempty real commit; listener failures only report.\nonAppend.listener: Receives frozen lastSeq/count metadata and returns void. It runs only after commit; thrown or asynchronous failures are reported.\nAn idempotent cancellation function that removes this listener only.\ntruncate: Delete only the prefix below the requested sequence while keeping sequence/time watermarks.\ntruncate.beforeSeq: Exclusive retained boundary, a positive safe integer at most lastSeq + 1; earlier floors are harmless no-ops.\nResolves after truncation commits; future appends keep increasing the original sequence.\nsetState: Advance an existing pending record to a terminal state; missing or terminal rows reject WAL_RECORD_INVALID.\nsetState.seq: Sequence issued by append for an existing pending record in this resource.\nsetState.state: LogRecordState.done or aborted ends the intent; pending leaves a still-pending row unchanged.\nResolves after the state change commits; terminal records cannot reopen.\nstates: Return only active pending sequence numbers in creation order, excluding terminal history.\nstates.filter: Only LogRecordState.pending is supported; any other filter rejects INVALID_OPTION.\nAn ascending snapshot of the active pending sequences.\ndispose: Close admission immediately and drain accepted work before releasing the resource.\nOne cached explicit cleanup Promise; cleanup failure rejects and remains observable.\n[Symbol.asyncDispose]: Share the same cleanup through a separate cached symbolic completion Promise.\nResolves after cleanup, reporting cleanup failure rather than rejecting this symbolic Promise."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Own a standalone atomic log while installed plugins only borrow it."
             }
           ],
           "declaredConfiguration": [],
@@ -12561,9 +12561,9 @@
           "signature": "export type ILogStoreIndex = { readonly lastSeq: number; readonly time: number; readonly floor: number; read(fromSeq: number, limit: number): readonly ILogRecord[]; pending(): readonly number[]; checkTruncate(beforeSeq: number): boolean; applyTruncate(beforeSeq: number): void; checkState(seq: number, state: LogRecordState): boolean; applyState(seq: number, state: LogRecordState): void; applyAppend(records: readonly ILogRecord[]): void; };",
           "declarationLine": 29,
           "source": "packages/logger/dist/plugins/durable/committed-index.d.ts",
-          "purpose": "Committed reads and check/apply methods; native serialization, commit and notifications remain external.",
-          "core": "Committed reads and check/apply methods; native serialization, commit and notifications remain external.",
-          "advanced": "",
+          "purpose": "Original committed-data map and pending list; native serialization, persistence, commit and publication remain with the caller.",
+          "core": "lastSeq: Permanent committed high watermark, zero for a new index.\ntime: Nonnegative millisecond timestamp, never decreasing within this resource, including reopened files.\nfloor: First retained sequence; survives empty storage and can equal lastSeq + 1 after full truncation.\nread: Read ascending retained snapshots without changing record state or consuming them.\nread.fromSeq: Inclusive positive safe sequence, normally returned by append; a truncated prefix starts at the retained floor.\nread.limit: Maximum returned records, a nonnegative safe integer; zero returns an empty array.\nDetached retained snapshots synchronously, without native I/O.\npending: Visit only active pending entries in sequence order.\nA fresh array of pending sequences.\ncheckTruncate: Check a proposed floor before native persistence without changing the index.\ncheckTruncate.beforeSeq: Exclusive retained boundary, a positive safe integer at most lastSeq + 1; earlier floors are harmless no-ops.\nTrue if the floor advances, false for a no-op; an excessive boundary rejects INVALID_OPTION.\napplyTruncate: Apply an admitted floor only after the caller has committed native deletion.\napplyTruncate.beforeSeq: Exclusive retained boundary, a positive safe integer at most lastSeq + 1; earlier floors are harmless no-ops.\nRemoves the committed prefix and its pending links locally; performs no native I/O.\ncheckState: Check one original pending transition without applying it or writing native data.\ncheckState.seq: Sequence issued by append for an existing pending record in this resource.\ncheckState.state: LogRecordState.done or aborted ends the intent; pending leaves a still-pending row unchanged.\nTrue for a terminal transition, false for pending; missing or terminal rows reject WAL_RECORD_INVALID.\napplyState: Apply the admitted terminal state after the original native transaction commits.\napplyState.seq: Sequence issued by append for an existing pending record in this resource.\napplyState.state: LogRecordState.done or aborted ends the intent; pending leaves a still-pending row unchanged.\nUpdates local state and removes the active pending link; it publishes no notice.\napplyAppend: Apply the exact prepared batch after native commit; rollback must leave the index unchanged.\napplyAppend.records: The original prepared records whose native persistence has succeeded, in sequence order.\nAdvances local head/time and registers pending records without native I/O or publication.",
+          "advanced": "Prepare a native append from its current head and apply exactly that batch only after actual commit.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -12721,13 +12721,13 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Prepare a native append from its current head and apply exactly that batch only after actual commit.",
           "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Committed reads and check/apply methods; native serialization, commit and notifications remain external."
+              "content": "Original committed-data map and pending list; native serialization, persistence, commit and publication remain with the caller."
             },
             {
               "id": "getting-started",
@@ -12747,12 +12747,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Committed reads and check/apply methods; native serialization, commit and notifications remain external."
+              "content": "lastSeq: Permanent committed high watermark, zero for a new index.\ntime: Nonnegative millisecond timestamp, never decreasing within this resource, including reopened files.\nfloor: First retained sequence; survives empty storage and can equal lastSeq + 1 after full truncation.\nread: Read ascending retained snapshots without changing record state or consuming them.\nread.fromSeq: Inclusive positive safe sequence, normally returned by append; a truncated prefix starts at the retained floor.\nread.limit: Maximum returned records, a nonnegative safe integer; zero returns an empty array.\nDetached retained snapshots synchronously, without native I/O.\npending: Visit only active pending entries in sequence order.\nA fresh array of pending sequences.\ncheckTruncate: Check a proposed floor before native persistence without changing the index.\ncheckTruncate.beforeSeq: Exclusive retained boundary, a positive safe integer at most lastSeq + 1; earlier floors are harmless no-ops.\nTrue if the floor advances, false for a no-op; an excessive boundary rejects INVALID_OPTION.\napplyTruncate: Apply an admitted floor only after the caller has committed native deletion.\napplyTruncate.beforeSeq: Exclusive retained boundary, a positive safe integer at most lastSeq + 1; earlier floors are harmless no-ops.\nRemoves the committed prefix and its pending links locally; performs no native I/O.\ncheckState: Check one original pending transition without applying it or writing native data.\ncheckState.seq: Sequence issued by append for an existing pending record in this resource.\ncheckState.state: LogRecordState.done or aborted ends the intent; pending leaves a still-pending row unchanged.\nTrue for a terminal transition, false for pending; missing or terminal rows reject WAL_RECORD_INVALID.\napplyState: Apply the admitted terminal state after the original native transaction commits.\napplyState.seq: Sequence issued by append for an existing pending record in this resource.\napplyState.state: LogRecordState.done or aborted ends the intent; pending leaves a still-pending row unchanged.\nUpdates local state and removes the active pending link; it publishes no notice.\napplyAppend: Apply the exact prepared batch after native commit; rollback must leave the index unchanged.\napplyAppend.records: The original prepared records whose native persistence has succeeded, in sequence order.\nAdvances local head/time and registers pending records without native I/O or publication."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Prepare a native append from its current head and apply exactly that batch only after actual commit."
             }
           ],
           "declaredConfiguration": [],
@@ -12769,7 +12769,7 @@
           "declarationLine": 41,
           "source": "packages/logger/dist/plugins/durable/types.d.ts",
           "purpose": "Durable logger contract with explicit ownership and initialization.",
-          "core": "observe: Optional synchronous statistics observer; thrown, getter, and async failures only report.\nreport: Optional standalone store failure reporter; reporter failures use the original logger terminal channel.",
+          "core": "observe: Receives metadata-only stage observations; throws, then-getter errors and late rejection only report.\nOmitted: no stage observer is called.\nTrace lifecycle and operation timing without receiving business payloads or intervening in commits.\nreport: Standalone failure reporter; a failing reporter uses the existing terminal diagnostics channel.\nThe original logger terminal reporting channel.\nRoute resource cleanup and observation failures into application diagnostics.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -12831,7 +12831,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "observe: Optional synchronous statistics observer; thrown, getter, and async failures only report.\nreport: Optional standalone store failure reporter; reporter failures use the original logger terminal channel."
+              "content": "observe: Receives metadata-only stage observations; throws, then-getter errors and late rejection only report.\nOmitted: no stage observer is called.\nTrace lifecycle and operation timing without receiving business payloads or intervening in commits.\nreport: Standalone failure reporter; a failing reporter uses the existing terminal diagnostics channel.\nThe original logger terminal reporting channel.\nRoute resource cleanup and observation failures into application diagnostics."
             },
             {
               "id": "advanced-usage",
@@ -12852,8 +12852,8 @@
           "signature": "export type ILogStoreRecoveryRow = Readonly<Omit<ILogRecord, 'payload'> & { payload: unknown; state: LogRecordState; }>;",
           "declarationLine": 21,
           "source": "packages/logger/dist/plugins/durable/committed-index.d.ts",
-          "purpose": "Native row identity, state and undecoded payload before recovery validation.",
-          "core": "Native row identity, state and undecoded payload before recovery validation.",
+          "purpose": "Native row fields with undecoded payload; original recovery validates identity/state before payload decoding.",
+          "core": "kind: Caller-defined nonempty record discriminator, such as order.created; it is not a logger level.\npayload: Native encoded payload passed to the caller decoder after row bounds validate.\nseq: Positive safe sequence assigned at commit; the resource never reuses a committed sequence.\ntime: Nonnegative millisecond timestamp, never decreasing within this resource, including reopened files.\nstate: Original pending, done or aborted state retained by native persistence.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -12922,7 +12922,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Native row identity, state and undecoded payload before recovery validation."
+              "content": "Native row fields with undecoded payload; original recovery validates identity/state before payload decoding."
             },
             {
               "id": "getting-started",
@@ -12942,7 +12942,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Native row identity, state and undecoded payload before recovery validation."
+              "content": "kind: Caller-defined nonempty record discriminator, such as order.created; it is not a logger level.\npayload: Native encoded payload passed to the caller decoder after row bounds validate.\nseq: Positive safe sequence assigned at commit; the resource never reuses a committed sequence.\ntime: Nonnegative millisecond timestamp, never decreasing within this resource, including reopened files.\nstate: Original pending, done or aborted state retained by native persistence."
             },
             {
               "id": "advanced-usage",
@@ -12963,9 +12963,9 @@
           "signature": "export type ILogStoreSnapshot = { readonly lastSeq: number; readonly time: number; readonly floor: number; readonly records: readonly (ILogRecord & { readonly state: LogRecordState; })[]; };",
           "declarationLine": 9,
           "source": "packages/logger/dist/plugins/durable/committed-index.d.ts",
-          "purpose": "Detached retained rows and permanent sequence/time/floor watermarks.",
-          "core": "Detached retained rows and permanent sequence/time/floor watermarks.",
-          "advanced": "",
+          "purpose": "Detached retained rows and permanent sequence/time/floor watermarks used for native recovery.",
+          "core": "lastSeq: Permanent committed high watermark, zero for a new store.\ntime: Nonnegative millisecond timestamp, never decreasing within this resource, including reopened files.\nfloor: First retained sequence; survives empty storage and can equal lastSeq + 1 after full truncation.\nrecords: Contiguous retained committed rows with their original state.",
+          "advanced": "Recover a native snapshot before exposing committed data or constructing a cached exclusive index.",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
           "returns": "No explicit return annotation is declared for this type.",
@@ -13018,13 +13018,13 @@
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "",
+          "whenToUse": "Recover a native snapshot before exposing committed data or constructing a cached exclusive index.",
           "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Detached retained rows and permanent sequence/time/floor watermarks."
+              "content": "Detached retained rows and permanent sequence/time/floor watermarks used for native recovery."
             },
             {
               "id": "getting-started",
@@ -13044,12 +13044,12 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Detached retained rows and permanent sequence/time/floor watermarks."
+              "content": "lastSeq: Permanent committed high watermark, zero for a new store.\ntime: Nonnegative millisecond timestamp, never decreasing within this resource, including reopened files.\nfloor: First retained sequence; survives empty storage and can equal lastSeq + 1 after full truncation.\nrecords: Contiguous retained committed rows with their original state."
             },
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": ""
+              "content": "Recover a native snapshot before exposing committed data or constructing a cached exclusive index."
             }
           ],
           "declaredConfiguration": [],
@@ -13065,8 +13065,8 @@
           "signature": "export type IUndoImage = { readonly target: ILogPayload; readonly before: ILogPayload | null; readonly after: ILogPayload | null; };",
           "declarationLine": 112,
           "source": "packages/logger/dist/plugins/durable/types.d.ts",
-          "purpose": "JSON target and before/after images; null is legitimate.",
-          "core": "JSON target and before/after images; null is legitimate.",
+          "purpose": "Portable business target and before/after images; logger stores them but owns no business conflict check or replay.",
+          "core": "target: Portable JSON target interpreted only by the business consumer.\nbefore: Original business image; null remains a legitimate JSON value.\nafter: Resulting business image; it is not a business replay instruction.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -13117,7 +13117,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "JSON target and before/after images; null is legitimate."
+              "content": "Portable business target and before/after images; logger stores them but owns no business conflict check or replay."
             },
             {
               "id": "getting-started",
@@ -13137,7 +13137,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "JSON target and before/after images; null is legitimate."
+              "content": "target: Portable JSON target interpreted only by the business consumer.\nbefore: Original business image; null remains a legitimate JSON value.\nafter: Resulting business image; it is not a business replay instruction."
             },
             {
               "id": "advanced-usage",
@@ -13234,7 +13234,7 @@
           "declarationLine": 101,
           "source": "packages/logger/dist/plugins/durable/types.d.ts",
           "purpose": "Durable logger contract with explicit ownership and initialization.",
-          "core": "wal: Installed persistent intent API.",
+          "core": "wal: Installed persistent intent API with pending, complete and abort operations.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -13287,7 +13287,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "wal: Installed persistent intent API."
+              "content": "wal: Installed persistent intent API with pending, complete and abort operations."
             },
             {
               "id": "advanced-usage",
@@ -13308,8 +13308,8 @@
           "signature": "export declare const LogRecordState: { readonly pending: 'pending'; readonly done: 'done'; readonly aborted: 'aborted'; };\nexport type LogRecordState = keyof typeof LogRecordState;",
           "declarationLine": 2,
           "source": "packages/logger/dist/plugins/durable/state-constants.d.ts",
-          "purpose": "Pending advances only to a terminal state.",
-          "core": "pending: Committed intent remains active.\ndone: Completed; cannot reopen.\naborted: Aborted; cannot reopen.",
+          "purpose": "Stable intent states: pending may remain pending or advance once to done or aborted; terminal records cannot reopen.",
+          "core": "pending: Committed intent remains active and may still complete or abort.\ndone: Intent completed successfully; its terminal state cannot reopen.\naborted: Intent was explicitly aborted; its terminal state cannot reopen.",
           "advanced": "",
           "parameters": ["This const declaration has no parameters."],
           "parameterDetails": [],
@@ -13361,7 +13361,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Pending advances only to a terminal state."
+              "content": "Stable intent states: pending may remain pending or advance once to done or aborted; terminal records cannot reopen."
             },
             {
               "id": "getting-started",
@@ -13381,7 +13381,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "pending: Committed intent remains active.\ndone: Completed; cannot reopen.\naborted: Aborted; cannot reopen."
+              "content": "pending: Committed intent remains active and may still complete or abort.\ndone: Intent completed successfully; its terminal state cannot reopen.\naborted: Intent was explicitly aborted; its terminal state cannot reopen."
             },
             {
               "id": "advanced-usage",
@@ -13402,8 +13402,8 @@
           "signature": "export declare const LogStage: { readonly beforeLogOpen: 'beforeLogOpen'; readonly afterLogOpen: 'afterLogOpen'; readonly onLogOpenError: 'onLogOpenError'; readonly beforeLogOperation: 'beforeLogOperation'; readonly afterLogOperation: 'afterLogOperation'; readonly onLogOperationError: 'onLogOperationError'; readonly beforeLogClose: 'beforeLogClose'; readonly afterLogClose: 'afterLogClose'; readonly onLogCloseError: 'onLogCloseError'; readonly onAppend: 'onAppend'; readonly onWalPending: 'onWalPending'; };\nexport type LogStage = keyof typeof LogStage;",
           "declarationLine": 9,
           "source": "packages/logger/dist/plugins/durable/state-constants.d.ts",
-          "purpose": "Fixed observer-only durable statistics.",
-          "core": "beforeLogOpen: beforeLogOpen statistics; failures only report.\nafterLogOpen: afterLogOpen statistics; failures only report.\nonLogOpenError: onLogOpenError statistics; failures only report.\nbeforeLogOperation: beforeLogOperation statistics; failures only report.\nafterLogOperation: afterLogOperation statistics; failures only report.\nonLogOperationError: onLogOperationError statistics; failures only report.\nbeforeLogClose: beforeLogClose statistics; failures only report.\nafterLogClose: afterLogClose statistics; failures only report.\nonLogCloseError: onLogCloseError statistics; failures only report.\nonAppend: onAppend statistics; failures only report.\nonWalPending: onWalPending statistics; failures only report.",
+          "purpose": "Stable metadata-only lifecycle and operation observation names shared by the original durable resources and installed plugins.",
+          "core": "beforeLogOpen: Before the original durable resource opens; observers cannot change admission.\nafterLogOpen: After the original durable resource opens and recovers successfully.\nonLogOpenError: Original open or recovery failed; an observer failure only reports separately.\nbeforeLogOperation: Before one admitted original log operation, without its business payload.\nafterLogOperation: After the original log operation succeeds, with its actual result metadata.\nonLogOperationError: The original log operation failed; observation cannot replace the original failure.\nbeforeLogClose: Before draining and releasing the original durable resource.\nafterLogClose: After the original durable resource has finished its successful cleanup.\nonLogCloseError: Original resource cleanup failed; symbolic disposal reports without rejecting.\nonAppend: One original nonempty commit publishes append metadata after persistence.\nonWalPending: The original WAL pending read reports its actual active intent count.",
           "advanced": "",
           "parameters": ["This const declaration has no parameters."],
           "parameterDetails": [],
@@ -13527,7 +13527,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Fixed observer-only durable statistics."
+              "content": "Stable metadata-only lifecycle and operation observation names shared by the original durable resources and installed plugins."
             },
             {
               "id": "getting-started",
@@ -13547,7 +13547,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "beforeLogOpen: beforeLogOpen statistics; failures only report.\nafterLogOpen: afterLogOpen statistics; failures only report.\nonLogOpenError: onLogOpenError statistics; failures only report.\nbeforeLogOperation: beforeLogOperation statistics; failures only report.\nafterLogOperation: afterLogOperation statistics; failures only report.\nonLogOperationError: onLogOperationError statistics; failures only report.\nbeforeLogClose: beforeLogClose statistics; failures only report.\nafterLogClose: afterLogClose statistics; failures only report.\nonLogCloseError: onLogCloseError statistics; failures only report.\nonAppend: onAppend statistics; failures only report.\nonWalPending: onWalPending statistics; failures only report."
+              "content": "beforeLogOpen: Before the original durable resource opens; observers cannot change admission.\nafterLogOpen: After the original durable resource opens and recovers successfully.\nonLogOpenError: Original open or recovery failed; an observer failure only reports separately.\nbeforeLogOperation: Before one admitted original log operation, without its business payload.\nafterLogOperation: After the original log operation succeeds, with its actual result metadata.\nonLogOperationError: The original log operation failed; observation cannot replace the original failure.\nbeforeLogClose: Before draining and releasing the original durable resource.\nafterLogClose: After the original durable resource has finished its successful cleanup.\nonLogCloseError: Original resource cleanup failed; symbolic disposal reports without rejecting.\nonAppend: One original nonempty commit publishes append metadata after persistence.\nonWalPending: The original WAL pending read reports its actual active intent count."
             },
             {
               "id": "advanced-usage",
@@ -13569,7 +13569,7 @@
           "declarationLine": 16,
           "source": "packages/logger/dist/plugins/durable/store.d.ts",
           "purpose": "Create a process-local atomic log; the creator owns disposal.",
-          "core": "Caller-owned resource or synchronous logger plugin; await ready before a native transaction.",
+          "core": "options: Optional metadata observer and standalone reporter.\nA synchronous caller-owned ILogStore; it has no plugin ready method.\nobserve: Receives metadata-only stage observations; throws, then-getter errors and late rejection only report.\nOmitted: no stage observer is called.\nTrace lifecycle and operation timing without receiving business payloads or intervening in commits.\nreport: Standalone failure reporter; a failing reporter uses the existing terminal diagnostics channel.\nThe original logger terminal reporting channel.\nRoute resource cleanup and observation failures into application diagnostics.",
           "advanced": "",
           "parameters": ["options: ILogStoreOptions (optional)"],
           "parameterDetails": [
@@ -13629,7 +13629,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Caller-owned resource or synchronous logger plugin; await ready before a native transaction."
+              "content": "options: Optional metadata observer and standalone reporter.\nA synchronous caller-owned ILogStore; it has no plugin ready method.\nobserve: Receives metadata-only stage observations; throws, then-getter errors and late rejection only report.\nOmitted: no stage observer is called.\nTrace lifecycle and operation timing without receiving business payloads or intervening in commits.\nreport: Standalone failure reporter; a failing reporter uses the existing terminal diagnostics channel.\nThe original logger terminal reporting channel.\nRoute resource cleanup and observation failures into application diagnostics."
             },
             {
               "id": "advanced-usage",
@@ -13681,7 +13681,7 @@
           "declarationLine": 47,
           "source": "packages/logger/dist/plugins/durable/committed-index.d.ts",
           "purpose": "Prepare sequence/time from a committed head without changing the index or performing I/O.",
-          "core": "Committed data only; native transaction and publication remain with the adapter.",
+          "core": "records: Already captured record snapshots in append order.\nhead: Current committed lastSeq/time read under the original native transaction.\nnow: Optional nonnegative finite timestamp; omitted uses Date.now after admission.\nA prepared batch with provisional sequence/time facts; apply it only after native commit.",
           "advanced": "",
           "parameters": [
             "records: readonly ILogRecordSnapshot[]",
@@ -13764,7 +13764,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Committed data only; native transaction and publication remain with the adapter."
+              "content": "records: Already captured record snapshots in append order.\nhead: Current committed lastSeq/time read under the original native transaction.\nnow: Optional nonnegative finite timestamp; omitted uses Date.now after admission.\nA prepared batch with provisional sequence/time facts; apply it only after native commit."
             },
             {
               "id": "advanced-usage",
@@ -13786,7 +13786,7 @@
           "declarationLine": 7,
           "source": "packages/logger/dist/plugins/durable/snapshot.d.ts",
           "purpose": "Capture portable JSON before asynchronous admission without assigning sequence/time.",
-          "core": "Committed data only; native transaction and publication remain with the adapter.",
+          "core": "records: Ordered kind/payload inputs captured before any asynchronous admission.\nDetached admitted inputs without assigned sequences, time or native I/O.",
           "advanced": "",
           "parameters": ["records: readonly ILogRecordInput[]"],
           "parameterDetails": [
@@ -13847,7 +13847,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Committed data only; native transaction and publication remain with the adapter."
+              "content": "records: Ordered kind/payload inputs captured before any asynchronous admission.\nDetached admitted inputs without assigned sequences, time or native I/O."
             },
             {
               "id": "advanced-usage",
@@ -13869,7 +13869,7 @@
           "declarationLine": 52,
           "source": "packages/logger/dist/plugins/durable/committed-index.d.ts",
           "purpose": "Validate and detach native recovery rows with the original file-store corruption rules.",
-          "core": "Committed data only; native transaction and publication remain with the adapter.",
+          "core": "head: Permanent native lastSeq/time/floor watermarks.\nrows: Contiguous retained rows in sequence order.\ndecodePayload: Optional synchronous decoder; omitted uses the payload unchanged before JSON validation.\nAn admitted detached recovery snapshot; malformed owned rows reject LOG_STORE_CORRUPT.",
           "advanced": "",
           "parameters": [
             "head: Pick<ILogStoreSnapshot, 'lastSeq' | 'time' | 'floor'>",
@@ -13952,7 +13952,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Committed data only; native transaction and publication remain with the adapter."
+              "content": "head: Permanent native lastSeq/time/floor watermarks.\nrows: Contiguous retained rows in sequence order.\ndecodePayload: Optional synchronous decoder; omitted uses the payload unchanged before JSON validation.\nAn admitted detached recovery snapshot; malformed owned rows reject LOG_STORE_CORRUPT."
             },
             {
               "id": "advanced-usage",
@@ -13974,7 +13974,7 @@
           "declarationLine": 3,
           "source": "packages/logger/dist/plugins/durable/undo.d.ts",
           "purpose": "Install undo image storage; business undo and conflict checks remain the consumer responsibility.",
-          "core": "Caller-owned resource or synchronous logger plugin; await ready before a native transaction.\nActive undo image records; the caller owns business rollback.",
+          "core": "options: Exact caller-owned image store and optional metadata observation.\nCaller-owned resource or synchronous logger plugin; await ready before a native transaction.\nstore: Original caller-owned ILogStore, reserved for one installed durable plugin; plugin removal never closes it.\nobserve: Receives metadata-only stage observations; throws, then-getter errors and late rejection only report.\nOmitted: no stage observer is called.\nTrace lifecycle and operation timing without receiving business payloads or intervening in commits.\nActive undo image records; the caller owns business rollback.",
           "advanced": "Keep durable records with caller-owned resources.",
           "parameters": ["options: IDurablePluginOptions"],
           "parameterDetails": [
@@ -14033,7 +14033,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Caller-owned resource or synchronous logger plugin; await ready before a native transaction.\nActive undo image records; the caller owns business rollback."
+              "content": "options: Exact caller-owned image store and optional metadata observation.\nCaller-owned resource or synchronous logger plugin; await ready before a native transaction.\nstore: Original caller-owned ILogStore, reserved for one installed durable plugin; plugin removal never closes it.\nobserve: Receives metadata-only stage observations; throws, then-getter errors and late rejection only report.\nOmitted: no stage observer is called.\nTrace lifecycle and operation timing without receiving business payloads or intervening in commits.\nActive undo image records; the caller owns business rollback."
             },
             {
               "id": "advanced-usage",
@@ -14085,7 +14085,7 @@
           "declarationLine": 3,
           "source": "packages/logger/dist/plugins/durable/wal.d.ts",
           "purpose": "Install durable pending intent and forward-only complete/abort methods.",
-          "core": "Caller-owned resource or synchronous logger plugin; await ready before a native transaction.\nDurable pending intent with forward-only terminal states.",
+          "core": "options: Exact caller-owned intent store and optional metadata observation.\nCaller-owned resource or synchronous logger plugin; await ready before a native transaction.\nstore: Original caller-owned ILogStore, reserved for one installed durable plugin; plugin removal never closes it.\nobserve: Receives metadata-only stage observations; throws, then-getter errors and late rejection only report.\nOmitted: no stage observer is called.\nTrace lifecycle and operation timing without receiving business payloads or intervening in commits.\nDurable pending intent with forward-only terminal states.",
           "advanced": "Keep durable records with caller-owned resources.",
           "parameters": ["options: IDurablePluginOptions"],
           "parameterDetails": [
@@ -14144,7 +14144,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Caller-owned resource or synchronous logger plugin; await ready before a native transaction.\nDurable pending intent with forward-only terminal states."
+              "content": "options: Exact caller-owned intent store and optional metadata observation.\nCaller-owned resource or synchronous logger plugin; await ready before a native transaction.\nstore: Original caller-owned ILogStore, reserved for one installed durable plugin; plugin removal never closes it.\nobserve: Receives metadata-only stage observations; throws, then-getter errors and late rejection only report.\nOmitted: no stage observer is called.\nTrace lifecycle and operation timing without receiving business payloads or intervening in commits.\nDurable pending intent with forward-only terminal states."
             },
             {
               "id": "advanced-usage",
@@ -14215,7 +14215,7 @@
           "declarationLine": 3,
           "source": "packages/logger/dist/plugins/durable/file.d.ts",
           "purpose": "Open builtin SQLite with a retained exclusive lock and native durable commits.",
-          "core": "Caller-owned resource or synchronous logger plugin; await ready before a native transaction.",
+          "core": "path: Caller-selected SQLite filename; original resource locking rejects a competing live owner.\noptions: Optional metadata observer and standalone reporter.\nResolves to a caller-owned SQLite ILogStore after opening and recovery; open failure keeps its cause.\nobserve: Receives metadata-only stage observations; throws, then-getter errors and late rejection only report.\nOmitted: no stage observer is called.\nTrace lifecycle and operation timing without receiving business payloads or intervening in commits.\nreport: Standalone failure reporter; a failing reporter uses the existing terminal diagnostics channel.\nThe original logger terminal reporting channel.\nRoute resource cleanup and observation failures into application diagnostics.",
           "advanced": "",
           "parameters": ["path: string", "options: ILogStoreOptions (optional)"],
           "parameterDetails": [
@@ -14283,7 +14283,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Caller-owned resource or synchronous logger plugin; await ready before a native transaction."
+              "content": "path: Caller-selected SQLite filename; original resource locking rejects a competing live owner.\noptions: Optional metadata observer and standalone reporter.\nResolves to a caller-owned SQLite ILogStore after opening and recovery; open failure keeps its cause.\nobserve: Receives metadata-only stage observations; throws, then-getter errors and late rejection only report.\nOmitted: no stage observer is called.\nTrace lifecycle and operation timing without receiving business payloads or intervening in commits.\nreport: Standalone failure reporter; a failing reporter uses the existing terminal diagnostics channel.\nThe original logger terminal reporting channel.\nRoute resource cleanup and observation failures into application diagnostics."
             },
             {
               "id": "advanced-usage",
