@@ -1,3 +1,5 @@
+import { storageJournalPlugin } from '@migaia/storage-host/journal'
+import { indexedDbTestFeatures } from './indexed-db-features.js'
 import { Logger } from '@migaia/logger'
 import { binlog, undoLog } from '@migaia/logger/plugins/durable'
 import { createOrgId, createStorageHost } from '@migaia/storage-host'
@@ -25,7 +27,12 @@ async function openIndexedDbJournal(dbName: string, wrapFactory = false): Promis
         cmp: (first, second) => indexedDB.cmp(first, second)
       }
     : undefined
-  const host = await createStorageHost({ plugins: [indexedDbBackendPlugin({ dbName, factory })] })
+  const host = await createStorageHost({
+    plugins: [
+      storageJournalPlugin(),
+      indexedDbBackendPlugin({ dbName, factory }, indexedDbTestFeatures)
+    ]
+  })
   try {
     const log = await storageLogStore(host, 'indexed-db', { prefix: 'history' })
     current = {
@@ -70,7 +77,7 @@ const createNativeJournalLogger = (
 async function runIndexedDbGlobalJournal(dbName: string) {
   const loggers: Array<ReturnType<typeof createNativeJournalLogger>> = []
   const host = await createStorageHost({
-    plugins: [indexedDbBackendPlugin({ dbName })],
+    plugins: [storageJournalPlugin(), indexedDbBackendPlugin({ dbName }, indexedDbTestFeatures)],
     journal: async ({ storageLogStore }) => {
       const records = await storageLogStore('indexed-db', { prefix: 'binlog' })
       const images = await storageLogStore('indexed-db', { prefix: 'undo' })

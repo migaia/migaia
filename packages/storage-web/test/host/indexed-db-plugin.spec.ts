@@ -1,3 +1,4 @@
+import { indexedDbTestFeatures } from '../helpers/indexed-db-features.js'
 import { IDBDatabase, IDBFactory, IDBKeyRange } from 'fake-indexeddb'
 import { describe, expect, it, vi } from 'vitest'
 import { createStorageHost } from '@migaia/storage-host'
@@ -7,12 +8,15 @@ describe('IndexedDB backend plugin', () => {
   it('prepares the canonical layout before publishing the exact store', async () => {
     const host = await createStorageHost({
       plugins: [
-        indexedDbBackendPlugin({
-          id: 'idb',
-          factory: new IDBFactory(),
-          keyRange: IDBKeyRange,
-          dbName: 'r07-host-idb'
-        })
+        indexedDbBackendPlugin(
+          {
+            id: 'idb',
+            factory: new IDBFactory(),
+            keyRange: IDBKeyRange,
+            dbName: 'r07-host-idb'
+          },
+          indexedDbTestFeatures
+        )
       ] as const
     })
     const store = host.backend('idb')
@@ -35,12 +39,15 @@ describe('IndexedDB backend plugin', () => {
     await expect(
       createStorageHost({
         plugins: [
-          indexedDbBackendPlugin({
-            id: 'idb-conflict',
-            factory,
-            keyRange: IDBKeyRange,
-            dbName: 'r07-host-conflict'
-          })
+          indexedDbBackendPlugin(
+            {
+              id: 'idb-conflict',
+              factory,
+              keyRange: IDBKeyRange,
+              dbName: 'r07-host-conflict'
+            },
+            indexedDbTestFeatures
+          )
         ] as const
       })
     ).rejects.toMatchObject({ code: 'BACKEND_INSTALL_FAILED' })
@@ -63,11 +70,14 @@ describe('IndexedDB backend plugin', () => {
       await expect(
         createStorageHost({
           plugins: [
-            indexedDbBackendPlugin({
-              factory,
-              keyRange: IDBKeyRange,
-              dbName: 'register-before-native-prepare'
-            })
+            indexedDbBackendPlugin(
+              {
+                factory,
+                keyRange: IDBKeyRange,
+                dbName: 'register-before-native-prepare'
+              },
+              indexedDbTestFeatures
+            )
           ]
         })
       ).rejects.toMatchObject({ code: 'BACKEND_INSTALL_FAILED' })

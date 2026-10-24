@@ -1,3 +1,4 @@
+import { indexedDbTestFeatures } from './indexed-db-features.js'
 import { createStorageHost, createOrgId } from '@migaia/storage-host'
 import { indexedDbBackendPlugin } from '../../src/indexed-db.js'
 import { indexedDbBlobFeature } from '../../src/features/blobs.js'
@@ -7,7 +8,8 @@ export async function runBrowserIndexedDbBlobsScenario() {
   const dbName = 'browser-blobs-' + createOrgId()
   const org = createOrgId()
   const defaultOrg = createOrgId()
-  const plugin = () => indexedDbBackendPlugin({ dbName }, { blobs: indexedDbBlobFeature() })
+  const plugin = () =>
+    indexedDbBackendPlugin({ dbName }, { ...indexedDbTestFeatures, blobs: indexedDbBlobFeature() })
   const file = new File(['avatar bytes'], 'avatar.txt', {
     type: 'text/plain',
     lastModified: 123456789

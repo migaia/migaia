@@ -1,3 +1,5 @@
+import { storageJournalPlugin } from '@migaia/storage-host/journal'
+import { indexedDbTestFeatures } from '../helpers/indexed-db-features.js'
 // @vitest-environment node
 import { IDBFactory, IDBKeyRange, IDBObjectStore } from 'fake-indexeddb'
 import { describe, expect, it, vi } from 'vitest'
@@ -28,12 +30,16 @@ describe('global IndexedDB native journal', () => {
     let logger: ReturnType<typeof createLogger> | undefined
     await using host = await createStorageHost({
       plugins: [
-        indexedDbBackendPlugin({
-          factory,
-          keyRange: IDBKeyRange,
-          dbName: 'global',
-          journalFactoryIsPrivate: true
-        })
+        storageJournalPlugin(),
+        indexedDbBackendPlugin(
+          {
+            factory,
+            keyRange: IDBKeyRange,
+            dbName: 'global',
+            journalFactoryIsPrivate: true
+          },
+          indexedDbTestFeatures
+        )
       ],
       journal: async ({ storageLogStore }) => {
         const records = await storageLogStore('indexed-db', { prefix: 'binlog' })
@@ -108,7 +114,7 @@ describe('global IndexedDB native journal', () => {
     }
     let logger: ReturnType<typeof createLogger> | undefined
     await using host = await createStorageHost({
-      plugins: [indexedDbBackendPlugin(options)],
+      plugins: [storageJournalPlugin(), indexedDbBackendPlugin(options, indexedDbTestFeatures)],
       journal: async ({ storageLogStore }) => {
         const records = await storageLogStore('indexed-db', { prefix: 'binlog' })
         const images = await storageLogStore('indexed-db', { prefix: 'undo' })
@@ -122,7 +128,9 @@ describe('global IndexedDB native journal', () => {
         }
       }
     })
-    await using peer = await createStorageHost({ plugins: [indexedDbBackendPlugin(options)] })
+    await using peer = await createStorageHost({
+      plugins: [storageJournalPlugin(), indexedDbBackendPlugin(options, indexedDbTestFeatures)]
+    })
     try {
       const store = host.backend('indexed-db')
       await store.set('a', 'final')
@@ -147,11 +155,15 @@ describe('global IndexedDB native journal', () => {
     await using host = await createStorageHost({
       scheduler,
       plugins: [
-        indexedDbBackendPlugin({
-          factory: new IDBFactory(),
-          keyRange: IDBKeyRange,
-          journalFactoryIsPrivate: true
-        })
+        storageJournalPlugin(),
+        indexedDbBackendPlugin(
+          {
+            factory: new IDBFactory(),
+            keyRange: IDBKeyRange,
+            journalFactoryIsPrivate: true
+          },
+          indexedDbTestFeatures
+        )
       ],
       journal: async ({ orgId, storageLogStore }) => {
         const records = await storageLogStore('indexed-db', { prefix: 'binlog' })
@@ -232,9 +244,10 @@ describe('global IndexedDB native journal', () => {
       let logger: ReturnType<typeof createLogger> | undefined
       await using host = await createStorageHost({
         plugins: [
+          storageJournalPlugin(),
           indexedDbBackendPlugin(
             { factory: new IDBFactory(), keyRange: IDBKeyRange, journalFactoryIsPrivate: true },
-            { blobs: indexedDbBlobFeature() }
+            { ...indexedDbTestFeatures, blobs: indexedDbBlobFeature() }
           )
         ],
         journal: async ({ storageLogStore }) => {

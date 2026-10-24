@@ -1,4 +1,9 @@
 import {
+  IndexedDbPointRevisions,
+  isIndexedDbPointRevision,
+  type IIndexedDbPointRevision
+} from './indexed-db-revisions.js'
+import {
   StorageContractError,
   StorageContractErrorCode,
   assertLockKey,
@@ -15,29 +20,22 @@ import {
   type IStorageJournalTarget
 } from '@migaia/storage-host'
 import {
-  createStorageToken,
   decodeFlatStorageKey,
   encodeFlatStorageKey,
   encodeStorageJournalImage
 } from '@migaia/storage-host/authoring/backend'
 import { StorageBackend } from '../constants.js'
-
 /** Original physical channels retain their native store names and public lock identities. */
 export type IIndexedDbImageChannel = 'value' | 'bytes' | 'record'
-/** Birth plus a retained tombstone version prevents delete/recreate and clear ABA. */
-type IIndexedDbImageRevision = { readonly birth: string | null; readonly version: number }
 /** One actual native attempt retains only the keys it reads or changes. */
 type IIndexedDbImageEntry = {
   readonly channel: IIndexedDbImageChannel
   readonly key: IStorageKey
   readonly lock: ILockKey
-  readonly revisionKey: IDBValidKey
-  revision: IIndexedDbImageRevision
+  revision: IIndexedDbPointRevision
   current: IStorageJournalImage | undefined
-  writing: Promise<void> | undefined
 }
-/** Stable native revision tuple tag; clear preserves it to retain complete undo identity. */
-const revisionTag = 'journal-point'
+
 /** Stable persisted deadline target tag maps images back to the original data point lock. */
 const deadlineTag = 'indexed-db.journal.deadline'
 
@@ -94,7 +92,7 @@ export function indexedDbDeadlineTarget(
 
 /** Clear retains these original private tombstones while deleting obsolete record/index revisions. */
 export function isIndexedDbJournalRevision(key: IDBValidKey, namespace: string): boolean {
-  return Array.isArray(key) && key.length === 4 && key[0] === namespace && key[1] === revisionTag
+  return isIndexedDbPointRevision(key, namespace)
 }
 
 /** Image ports reuse one native attempt's ordered revisions and journal history. */
@@ -129,6 +127,8 @@ type IIndexedDbImageAccess = {
 
 /** One native images snapshot owns its existing observations and original transaction ports. */
 type IIndexedDbImageContext = {
+  /** Point versions share the canonical basic mutation owner. */
+  revisions: IndexedDbPointRevisions
   /** Original input is captured before native construction begins. */
   readonly input: {
     readonly namespace: string
@@ -170,6 +170,7 @@ export function createIndexedDbJournalImages(input: {
 
   /** Pending first observations are shared without serializing unrelated native requests. */
   nativeState.entries = new Map<string, Promise<IIndexedDbImageEntry>>()
+  nativeState.revisions = new IndexedDbPointRevisions(input)
 
   /** Late capture cannot manufacture a before image after an accepted business mutation. */
   nativeState.mutated = false
@@ -190,39 +191,18 @@ function observe(
   let pending = nativeState.entries.get(id)
   if (pending === undefined) {
     pending = (async () => {
-      const revisionKey: IDBValidKey = [
-        nativeState.input.namespace,
-        revisionTag,
-        lock.channel,
-        encodeFlatStorageKey(key)
-      ]
-      const raw: unknown = await nativeState.input.request(() =>
-        nativeState.input.revisions.get(revisionKey)
-      )
-      const revision =
-        raw === undefined ? { birth: null, version: 0 } : (raw as IIndexedDbImageRevision)
-      if (
-        typeof revision !== 'object' ||
-        revision === null ||
-        typeof revision.birth !== 'string' ||
-        !Number.isSafeInteger(revision.version) ||
-        revision.version < 0
-      ) {
-        if (raw !== undefined) throw invalid()
-      }
+      const revision = await nativeState.revisions.read(channel, key)
       const stored =
         nativeState.steps === undefined ? undefined : await nativeState.input.read(channel, key)
       return {
         channel,
         key,
         lock,
-        revisionKey,
         revision: revision,
         current:
           stored === undefined
             ? undefined
-            : encodeStorageJournalImage(stored.present, stored.value, channel === 'bytes'),
-        writing: undefined
+            : encodeStorageJournalImage(stored.present, stored.value, channel === 'bytes')
       }
     })()
     nativeState.entries.set(id, pending)
@@ -232,16 +212,9 @@ function observe(
 
 /** One point advances once per native attempt; all later operations share the staged revision. */
 function revise(nativeState: IIndexedDbImageContext, entry: IIndexedDbImageEntry): Promise<void> {
-  if (entry.writing !== undefined) return entry.writing
-  const revision = {
-    birth: entry.revision.birth ?? createStorageToken(),
-    version: entry.revision.version + 1
-  }
-  if (!Number.isSafeInteger(revision.version)) throw invalid()
-  entry.revision = revision
-  return (entry.writing = nativeState.input
-    .request(() => nativeState.input.revisions.put(revision, entry.revisionKey))
-    .then(() => undefined))
+  return nativeState.revisions.advance(entry.channel, entry.key).then((revision) => {
+    entry.revision = revision
+  })
 }
 
 /** The same turn records an image and issues its original business request, without user callbacks. */

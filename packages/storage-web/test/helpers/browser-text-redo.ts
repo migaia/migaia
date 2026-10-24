@@ -1,3 +1,5 @@
+import { storageJournalPlugin } from '@migaia/storage-host/journal'
+import { indexedDbTestFeatures } from './indexed-db-features.js'
 import { Logger, type ILoggerCore } from '@migaia/logger'
 import { wal, type IWalExt } from '@migaia/logger/plugins/durable'
 import { kv } from '@migaia/storage-contract'
@@ -34,7 +36,9 @@ async function prepareTextRedoOwner(
   dbName: string,
   kind: 'local' | 'session' | 'cookies' = 'local'
 ) {
-  const carrierHost = await createStorageHost({ plugins: [indexedDbBackendPlugin({ dbName })] })
+  const carrierHost = await createStorageHost({
+    plugins: [storageJournalPlugin(), indexedDbBackendPlugin({ dbName }, indexedDbTestFeatures)]
+  })
   const carrier = await storageLogStore(carrierHost, 'indexed-db', { prefix: 'wal' })
   const logger = createLogger(carrier)
   await logger.wal.ready()
@@ -60,7 +64,7 @@ const createTextParticipant = async (owner: ITextRedoOwner) => {
         ? sessionStorageBackendPlugin({ namespace: owner.namespace, redo: true })
         : localStorageBackendPlugin({ namespace: owner.namespace, redo: true })
   const host = await createStorageHost({
-    plugins: [plugin],
+    plugins: [storageJournalPlugin(), plugin],
     journal: { logger: owner.logger, namespace: owner.namespace, redoWal: owner.logger.wal }
   })
   return {

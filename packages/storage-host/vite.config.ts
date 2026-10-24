@@ -35,7 +35,7 @@ export default defineConfig({
         'authoring/transaction': 'src/authoring/transaction.ts',
         'authoring/concurrency': 'src/authoring/concurrency.ts',
         entity: 'src/entity.ts',
-        'entity/query': 'src/entity/query-entry.ts',
+        'entity/query': 'src/entity/query.ts',
         'entity/unique': 'src/entity/unique.ts',
         'entity/migration': 'src/entity/migration.ts',
         'entity/indexes': 'src/entity/indexes.ts',

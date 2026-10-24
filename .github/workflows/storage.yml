@@ -52,7 +52,7 @@ jobs:
       - name: Build the original service image
         continue-on-error: true
         run: node scripts/exclusive-window.mjs run --window storage-images --wait 2700 -- node scripts/storage-services.mts build
-      - name: Start independent native services
+      - name: Start native services with SeaweedFS S3
         # The launcher attempts every service even when one image or environment fails.
         continue-on-error: true
         run: node scripts/storage-services.mts up
