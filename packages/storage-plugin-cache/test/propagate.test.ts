@@ -1,3 +1,5 @@
+import { memoryNotificationsFeature } from '@migaia/storage-host/features/memory-notifications'
+import { memoryChangeFeedFeature } from '@migaia/storage-host/features/memory-change-feed'
 import { expect, it } from 'vitest'
 import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
 import { cachePlugin } from '../src/index.js'
@@ -5,7 +7,16 @@ import { cachePlugin } from '../src/index.js'
 /** Real native memory commits deliver through the original subscription owner. */
 it('routes ephemeral commits by immutable org and ignores non-value channels and unrelated keys', async () => {
   const base = await createStorageHost({
-    plugins: [memoryBackendPlugin({ id: 'fast' }), memoryBackendPlugin({ id: 'slow' })]
+    plugins: [
+      memoryBackendPlugin(
+        { id: 'fast' },
+        { notifications: memoryNotificationsFeature(), changeFeed: memoryChangeFeedFeature() }
+      ),
+      memoryBackendPlugin(
+        { id: 'slow' },
+        { notifications: memoryNotificationsFeature(), changeFeed: memoryChangeFeedFeature() }
+      )
+    ]
   })
   const host = await base.use(
     cachePlugin({ tiers: [{ backend: 'fast', ttlMs: 10000 }, { backend: 'slow' }] })

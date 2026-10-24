@@ -1,4 +1,5 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi, onTestFinished } from 'vitest'
+import { memoryNotificationsFeature } from '@migaia/storage-host/features/memory-notifications'
 import { createRuntime } from '@migaia/reactive'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { binaryCodec } from '@migaia/storage-host/entity'
@@ -453,7 +454,12 @@ describe('persistence transactions through actual memory ownership', () => {
      * The production host registration supplies the native scope and its original transaction
      * owner.
      */
-    const storage = await createMemoryTestStore()
+    const host = await createStorageHost({
+      plugins: [memoryBackendPlugin({}, { notifications: memoryNotificationsFeature() })]
+    })
+    onTestFinished(() => host.dispose())
+    /** This workflow observes original backend commits while ordinary fixtures remain basic. */
+    const storage = host.backend('memory')
     /** This exact business workflow is also consumed by the original native browser fixture. */
     const result = await runPersistNativeConsumerScenario(storage)
     expect(result.committed).toEqual({
