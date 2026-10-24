@@ -651,8 +651,8 @@ export const storageWebReference: ILibraryReference = {
     reactiveFeature: {
       role: 'enhancer',
       purpose: t(
-        'Define per-registration live queries for an explicit backend kind or target union. The Feature starts its original native source on first live and owns cleanup through the host lifecycle.',
-        '为明确后端种类或目标联合定义每次注册独立的实时查询；首次实时终点接入原生来源，并通过宿主生命周期拥有清理。'
+        'Define per-registration live queries for an explicit backend kind or target union. Memory and IndexedDB require their notifications Feature before live; missing assembly rejects explicitly. The Feature starts its original native source on first live and owns cleanup through the host lifecycle.',
+        '为明确后端种类或目标联合定义每次注册独立的实时查询；内存与 IndexedDB 须在调用实时终点前选择各自的通知特性，缺失时明确拒绝。首次实时终点接入原生来源，并通过宿主生命周期拥有清理。'
       ),
       params: {
         target: t(
@@ -1159,8 +1159,8 @@ console.error(error.source, error.code)`,
     },
     IIndexedDbOptions: {
       summary: t(
-        'Native database preparation and physical layout options. Private storageLogStore history shares the original META store. Native Web Locks retain the cached path; indexExclusive:false restores current state inside each original journal-store readwrite transaction without a cross-operation index.',
-        '原生数据库准备与物理布局选项；私有 storageLogStore 历史复用原 META 仓库。原生 Web Locks 保留缓存路径；indexExclusive:false 在每操作原 journal-store readwrite 事务现读，不跨操作缓存。'
+        'Native database preparation and physical layout options. Select indexedDbJournalFeature and storageJournalPlugin before using private storageLogStore history in the original META store. Native Web Locks retain the cached path; indexExclusive:false restores current state inside each original journal-store readwrite transaction without a cross-operation index.',
+        '原生数据库准备与物理布局选项；须先选择 indexedDbJournalFeature 和 storageJournalPlugin，私有 storageLogStore 历史才复用原 META 仓库。原生 Web Locks 保留缓存路径；indexExclusive:false 在每操作原 journal-store readwrite 事务现读，不跨操作缓存。'
       ),
       members: indexedDbFields,
       optionCases: optionCases('indexed-db', 'indexedDbBackendPlugin', 'indexed-db')
@@ -1201,8 +1201,8 @@ console.error(error.source, error.code)`,
     IIndexedDbBackendStore: {
       ...storageContractReference.types.IRecordStore!,
       summary: t(
-        'Installed native IndexedDB backend with complete same-transaction scope methods.',
-        '已安装的原生索引数据库后端，提供完整同事务作用域方法。'
+        'Installed native IndexedDB backend with ordinary text, byte, record and same-transaction scope methods. TTL, batch, journal, notifications, change feed and secondary indexes require their explicit Features.',
+        '已安装的原生索引数据库后端，提供普通文本、字节、记录及同事务作用域方法；期限、批量、日志、通知、变更流与次级索引须分别显式选择对应特性。'
       )
     },
     IIndexedDbFeatureExpose: {

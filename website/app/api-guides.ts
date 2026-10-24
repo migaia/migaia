@@ -7767,12 +7767,12 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
     quickStart:
       "import { createStorageHost } from '@migaia/storage-host'\nimport { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'\n\nconst host = await createStorageHost({ plugins: [indexedDbBackendPlugin({ id: 'records', dbName: 'app', recordsStoreName: 'users' })] })\ntry {\n  const storage = host.backend('records')\n  await storage.set('status', 'ready')\n  console.log(await storage.get('status'))\n} finally {\n  await host.dispose()\n}",
     scenariosEn: [
-      'Durable records, bytes, indexes, and transactions need Host ownership.',
+      'Durable records, bytes, and transactions need Host ownership; select the indexes Feature when secondary indexes are needed.',
       'Database preparation must finish before publication.',
       'Live queries are not required.'
     ],
     scenariosZh: [
-      'durable record、byte、index 与 transaction 需要 Host ownership。',
+      '持久记录、字节与事务需要宿主管理；需要次级索引时显式选择索引特性。',
       'database preparation 必须在 publication 前完成。',
       '不需要 live query。'
     ],
@@ -7793,7 +7793,8 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
         defaultValue: 'undefined',
         type: 'IStorageFeatureRecord',
         whenToUse: 'Attach only Features targeting this backend kind.',
-        example: '{ reactive: reactiveFeature(indexedDbBackendKind) }'
+        example:
+          '{ notifications: indexedDbNotificationsFeature(), reactive: reactiveFeature(indexedDbBackendKind) }'
       },
       {
         name: 'id',
@@ -7867,7 +7868,8 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
         defaultValue: 'undefined',
         type: 'IStorageFeatureRecord',
         whenToUse: '仅安装目标包含当前后端种类的特性。',
-        example: '{ reactive: reactiveFeature(indexedDbBackendKind) }'
+        example:
+          '{ notifications: indexedDbNotificationsFeature(), reactive: reactiveFeature(indexedDbBackendKind) }'
       },
       {
         name: 'id',
@@ -7937,9 +7939,9 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
   }),
   'storage-web:features-reactive:reactiveFeature': createStorageWebGuide({
     purposeEn:
-      'Adds live() to an existing query terminal for an explicit backend kind. Pass the Feature record as the backend plugin second argument. The caller supplies its Runtime; the original Host owns source cleanup. Memory uses instance-local push; browser backends retain their native eventual visibility and polling.',
+      'Adds live() to an existing query terminal for an explicit backend kind. Pass the Feature record as the backend plugin second argument. Memory and IndexedDB also require their notifications Feature before live(); missing assembly rejects explicitly. The caller supplies its Runtime; the original Host owns source cleanup. Memory uses instance-local push; browser backends retain their native eventual visibility and reconciliation polling.',
     purposeZh:
-      '为明确后端种类的已有查询终点添加 live()。将特性记录作为后端插件第二参数传入，由调用方提供 Runtime，原宿主拥有来源清理。内存使用实例内推送；浏览器后端保留原生的最终可见性与轮询策略。',
+      '为明确后端种类的已有查询终点添加 live()。将特性记录作为后端插件第二参数传入；内存与 IndexedDB 还须在调用 live() 前选择各自的通知特性，缺失时明确拒绝。调用方提供 Runtime，原宿主拥有来源清理。内存使用实例内推送；浏览器后端保留原生的最终可见性与协调轮询。',
     quickStart:
       "import { memoryNotificationsFeature } from '@migaia/storage-host/features/memory-notifications'\nimport { createRuntime } from '@migaia/reactive'\nimport { records } from '@migaia/storage-contract'\nimport {\n  createStorageHost,\n  memoryBackendKind,\n  memoryBackendPlugin,\n} from '@migaia/storage-host'\nimport { reactiveFeature } from '@migaia/storage-web/features/reactive'\n\ntype IUser = { id: number; name: string }\nconst runtime = createRuntime()\nconst host = await createStorageHost({\n  plugins: [\n    memoryBackendPlugin(undefined, {\n      notifications: memoryNotificationsFeature(),\n      reactive: reactiveFeature(memoryBackendKind),\n    }),\n  ],\n})\ntry {\n  const store = host.backend('memory')\n  await store.putRecord({ id: 1, name: 'Ada' }, 1)\n  const users = store.use(records).query<IUser>().limit(20).live({ runtime })\n  try {\n    await users.ready\n    console.log(users.state.value)\n  } finally {\n    await users.dispose()\n  }\n} finally {\n  await host.dispose()\n}",
     scenariosEn: [
