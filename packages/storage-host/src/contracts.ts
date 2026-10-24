@@ -182,6 +182,7 @@ export const defineFeature: IStorageDefineFeature = ((
 }) as unknown as IStorageDefineFeature
 /** Installation-local native additions come from the original facade, never public object fields. */
 type IStorageNativeCore = IPluginHostCore<IStoragePipelineInput> & {
+  readonly registerJournalRuntime: IStoragePluginCore['registerJournalRuntime']
   readonly journal: IStoragePluginCore['journal']
   setStorageRegistrationCore(core: object): void
   runStorageInstall<T>(operation: () => Promise<T>): Promise<T>
@@ -324,6 +325,7 @@ function createStorageRegistrationCore(
       return context.nativeCore.defaultOrgId
     },
     execution: context.nativeCore.execution,
+    registerJournalRuntime: context.nativeCore.registerJournalRuntime,
     journal: context.nativeCore.journal,
     get hooks() {
       return context.nativeCore.getStorageHooks()

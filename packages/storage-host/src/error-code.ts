@@ -1,5 +1,11 @@
 /** Canonical host boundary codes. */
 export const StorageErrorCode = {
+  /** Journal configuration requires the explicit /journal plugin before backend installation. */
+  journalNotAssembled: 'JOURNAL_NOT_ASSEMBLED',
+  /** Notification construction requires an explicit controller factory or backend Feature. */
+  changeControllerNotAssembled: 'CHANGE_CONTROLLER_NOT_ASSEMBLED',
+  /** Change-feed calls require the explicit iterator Feature before creating an iterator. */
+  changeIteratorNotAssembled: 'CHANGE_ITERATOR_NOT_ASSEMBLED',
   /**
    * A backend definition contains an invalid identifier. Callers must correct the bounded backend
    * ID before retrying installation.

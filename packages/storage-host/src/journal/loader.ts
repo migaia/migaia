@@ -1,4 +1,2 @@
-/** Load journal engines only for an explicitly selected journal configuration. */
-export function loadStorageJournalRuntime() {
-  return import('./runtime.js')
-}
+/** Explicit plugin runtime contract; the base host has no executable journal import. */
+export type IStorageJournalRuntime = typeof import('./runtime.js')

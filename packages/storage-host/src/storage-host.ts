@@ -9,14 +9,13 @@ import { createStorageObservers, type IStorageObserverSet } from './stages.js'
 import { createBackendRevisionPort } from './backends/revisions.js'
 import { createStorageEnvelopeStages } from './envelope-stages.js'
 import {
-  createBackendChangeController,
   registerBackendChangeController,
   registerBackendEnvelopeStages,
   registerBackendValueCommit,
   getBackendChangeController,
   registerBackendEntityAccess,
   type IBackendChangeController
-} from './core/change-controller.js'
+} from './core/backend-registry.js'
 import { StorageHookName as Hook } from './hook-names.js'
 import { borrowStorageBackend } from './borrow.js'
 import { createBackendKeyLockPort } from './backends/key-locks.js'
@@ -77,7 +76,7 @@ import {
   type IStorageJournalConfigurationSnapshot
 } from './journal/configuration-options.js'
 import type { IStorageJournalConfiguration, IStorageJournalExecutionPort } from './journal/types.js'
-import { loadStorageJournalRuntime } from './journal/loader.js'
+import type { IStorageJournalRuntime } from './journal/loader.js'
 import type { prepareStorageJournalConfiguration } from './journal/configuration.js'
 
 /** Deliver final reporter failures through the existing utility host exception boundary. */
@@ -104,6 +103,7 @@ type IStorageDetectCheck = {
 
 /** One native registration's single-assignment store bridge into its PluginHost core. */
 type IStorageNativeRegistrationContext = {
+  readonly registerJournalRuntime: IStoragePluginCore['registerJournalRuntime']
   readonly getJournal: (orgId: string) => IStorageJournalExecutionPort | undefined
   readonly observeExecution?: <R>(
     orgId: string,
@@ -171,6 +171,7 @@ function createStorageRegistrationCore(registration: IStorageRegistrationAssembl
       context.setRegistrationCore(core)
     },
     getStore: context.storeCell.get,
+    registerJournalRuntime: context.registerJournalRuntime,
     journal: context.getJournal(context.defaultOrgId),
     setStorageFeatureProjection: context.storeCell.setFeatureProjection,
     getStorageFeatureClientResolver: context.storeCell.getFeatureClientResolver,
@@ -335,7 +336,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
     | Extract<IStorageJournalConfiguration, Function>
     | undefined
   /** Resolved optional code is reused directly inside native transaction activity windows. */
-  #journalRuntime: Awaited<ReturnType<typeof loadStorageJournalRuntime>> | undefined
+  #journalRuntime: IStorageJournalRuntime | undefined
   /**
    * Concurrent first endpoints share one exact initializer and per-registration preparation
    * Promise.
@@ -672,6 +673,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
    */
   #journalAccess(id: string, orgId: string): IStorageJournalBackendAccess {
     this.#assertOpen()
+    this.#requireJournalRuntime()
     const store = this.#registry.get(id)
     if (store === undefined)
       throw new StorageError(
@@ -704,6 +706,17 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
     }
   }
 
+  /** Require the explicitly installed journal plugin before invoking optional journal code. */
+  #requireJournalRuntime(): IStorageJournalRuntime {
+    if (this.#journalRuntime === undefined)
+      throw new StorageError(
+        StorageErrorCode.journalNotAssembled,
+        {},
+        StorageErrorText.journalNotAssembled
+      )
+    return this.#journalRuntime
+  }
+
   /** Both native installs and the final bootstrap consume the same original batch deadline. */
   #awaitInstall<T>(pending: Promise<T>, token: IStorageBatchToken, elapsed: number): Promise<T> {
     return withTimeout(() => pending, {
@@ -728,7 +741,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
         return source
       }
       /** Load optional logging only when this organization initializes its journal. */
-      const runtime = await loadStorageJournalRuntime()
+      const runtime = this.#requireJournalRuntime()
       this.#journalRuntime = runtime
       const configured = await source({
         orgId,
@@ -793,7 +806,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
           throw new StorageContractError(StorageContractErrorCode.unsupported)
       }
       /** Load optional code before preparing the native journal transaction resources. */
-      const runtime = await loadStorageJournalRuntime()
+      const runtime = this.#requireJournalRuntime()
       this.#journalRuntime = runtime
       entry.value = await runtime.prepareStorageJournalConfiguration(
         configured,
@@ -894,7 +907,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
     invoke: (observing: boolean) => Promise<R>
   ): Promise<R> {
     /** The initial install path may observe before preparation loads the optional module. */
-    const observe = (runtime: Awaited<ReturnType<typeof loadStorageJournalRuntime>>) =>
+    const observe = (runtime: IStorageJournalRuntime) =>
       runtime.observeStorageTelemetry(
         () => this.#journalOrgs?.get(orgId)?.configuration,
         describe,
@@ -902,11 +915,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
         () => this.#scheduler.now(),
         this.#report
       )
-    if (this.#journalRuntime !== undefined) return observe(this.#journalRuntime)
-    return loadStorageJournalRuntime().then((runtime) => {
-      this.#journalRuntime = runtime
-      return observe(runtime)
-    })
+    return observe(this.#requireJournalRuntime())
   }
 
   /** Resolve native organization data through its original registration, then remove ownership. */
@@ -1451,6 +1460,18 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
               invoke: (observing: boolean) => Promise<R>
             ) => this.#observeJournalExecution(orgId, describe, invoke)
           }),
+      registerJournalRuntime: (runtime) => {
+        entryState.registrationCore!.onDispose(() => {
+          if (this.#journalRuntime === runtime) this.#journalRuntime = undefined
+        })
+        if (this.#journalRuntime !== undefined)
+          throw new StorageError(
+            StorageErrorCode.invalidConfig,
+            {},
+            StorageErrorText.defaultError(StorageErrorCode.invalidConfig)
+          )
+        this.#journalRuntime = runtime
+      },
       getJournal: (orgId) => this.#journalPort(entryState.context, orgId),
       id: entryState.native.id,
       defaultOrgId: this.#orgId,
@@ -1871,9 +1892,9 @@ function createStorageNativeAuthoringPorts(registration: IStorageRegistrationAss
       /** Only this original installation can capture late child construction authority. */
       registration.registrationCore!.onDispose(context.storeCell.releaseOrgBindings)
       return {
-        createChangeController: (options) => {
+        createChangeController: (options, factory) => {
           context.assertExecution()
-          const controller = createBackendChangeController(options)
+          const controller = requireChangeControllerFactory(factory)(options)
           context.storeCell.retainOrgBinding(() => controller.dispose())
           return controller
         },
@@ -1890,9 +1911,11 @@ function createStorageNativeAuthoringPorts(registration: IStorageRegistrationAss
           context.storeCell.retainOrgBinding(registerBackendChangeController(store, controller))
           /** Root observers retain all organizations through their original controller channel. */
           const root = getBackendChangeController(context.storeCell.get())
-          if (root !== undefined && root !== controller)
+          if (root !== undefined && root !== controller && 'subscribe' in controller)
             context.storeCell.retainOrgBinding(
-              controller.subscribe((change) => root.publishExternal(change))
+              (controller as IBackendChangeController).subscribe((change) =>
+                root.publishExternal(change)
+              )
             )
         },
         registerValueCommit: (store, commit) => {
@@ -1906,11 +1929,11 @@ function createStorageNativeAuthoringPorts(registration: IStorageRegistrationAss
       registration.registrationCore!.onDispose(() => undefined)
       return createBackendRevisionPort()
     }) satisfies IStoragePluginCore['createRevisionPort'],
-    createChangeController: ((options) => {
+    createChangeController: ((options, factory) => {
       /** Original resource admission owns partial-construction cleanup and the install window. */
       let controller: IBackendChangeController | undefined
       registration.registrationCore!.onDispose(() => controller?.dispose())
-      controller = createBackendChangeController(options)
+      controller = requireChangeControllerFactory(factory)(options)
       return controller
     }) satisfies IStoragePluginCore['createChangeController'],
     registerChangeController: ((store, controller) => {
@@ -2002,4 +2025,17 @@ function createStorageExecutionPorts(registration: IStorageRegistrationAssembly)
       context.registerStore(store, registration.registrationCore)
     }
   }
+}
+
+/** Missing notification assembly is rejected before acquiring a channel or lifecycle resource. */
+function requireChangeControllerFactory(
+  factory: import('./core/change-types.js').IBackendChangeControllerFactory | undefined
+): import('./core/change-types.js').IBackendChangeControllerFactory {
+  if (factory === undefined)
+    throw new StorageError(
+      StorageErrorCode.changeControllerNotAssembled,
+      {},
+      StorageErrorText.changeControllerNotAssembled
+    )
+  return factory
 }

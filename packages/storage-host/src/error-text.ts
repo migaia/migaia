@@ -1,5 +1,14 @@
 /** Canonical host boundary messages. */
 export const StorageErrorText = {
+  /** Tell host callers which assembly supplies journal runtime and private log stores. */
+  journalNotAssembled:
+    'Install storageJournalPlugin() from @migaia/storage-host/journal before using journal options or log stores.',
+  /** Tell backend authors and memory callers which notification assembly is missing. */
+  changeControllerNotAssembled:
+    'Install the backend notification Feature or pass createBackendChangeController from @migaia/storage-host/authoring/change-controller.',
+  /** Tell memory callers how to select the omitted change-feed iterator owner. */
+  changeIteratorNotAssembled:
+    'Install memoryChangeFeedFeature() from @migaia/storage-host/features/memory-change-feed before watching changes.',
   /** Corruption diagnostics never include private journal records or business payloads. */
   journalRecordInvalid: 'storage journal record is invalid',
   /** An uncertain commit seals the handle until recovery reads its original durable head. */
