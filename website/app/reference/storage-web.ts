@@ -1,3 +1,9 @@
+import {
+  storageWebAssemblyModules,
+  storageWebAssemblySymbols,
+  storageWebAssemblyTypes,
+  storageWebAssemblyEnhancers
+} from './storage-web-assembly.js'
 /** Browser backend reference. Neutral host/entity contracts live in storage-host. */
 import { storageContractReference } from './storage-contract.js'
 import { storageWebCases } from './storage-web-cases.js'
@@ -46,7 +52,7 @@ try {
 
 /** Native Blob requests share the same actual record transaction and original host cleanup. */
 const blobExample =
-  "import { createStorageHost } from '@migaia/storage-host'\nimport { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'\nimport { indexedDbBlobFeature } from '@migaia/storage-web/features/blobs'\n\nconst host = await createStorageHost({\n  plugins: [indexedDbBackendPlugin(\n    { dbName: 'attachments' }, { blobs: indexedDbBlobFeature() }\n  )]\n})\ntry {\n  const store = host.backend('indexed-db')\n  await store.transaction(async (scope) => {\n    await scope.api.blobs.put('avatar', new Blob(['avatar bytes'], { type: 'text/plain' }))\n    await scope.putRecord({ attachment: 'avatar' }, 'profile')\n  })\n  console.log(await (await store.api.blobs.get('avatar'))?.text())\n} finally {\n  await host.dispose()\n}"
+  "import { createStorageHost } from '@migaia/storage-host'\nimport { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'\nimport { indexedDbBlobFeature } from '@migaia/storage-web/features/blobs'\n\nconst host = await createStorageHost({\n  plugins: [\n    indexedDbBackendPlugin(\n      { dbName: 'attachments' },\n      { blobs: indexedDbBlobFeature() },\n    ),\n  ],\n})\ntry {\n  const store = host.backend('indexed-db')\n  await store.transaction(async (scope) => {\n    await scope.api.blobs.put(\n      'avatar',\n      new Blob(['avatar bytes'], { type: 'text/plain' }),\n    )\n    await scope.putRecord({ attachment: 'avatar' }, 'profile')\n  })\n  console.log(await (await store.api.blobs.get('avatar'))?.text())\n} finally {\n  await host.dispose()\n}"
 
 /** Backend definitions provide installation recipes rather than independently owned stores. */
 const backends = [
@@ -110,6 +116,7 @@ const redoExample = (
 ): string => `import { Logger } from '@migaia/logger'
 import { memoryLogStore, wal } from '@migaia/logger/plugins/durable'
 import { createStorageHost } from '@migaia/storage-host'
+import { storageJournalPlugin } from '@migaia/storage-host/journal'
 import { ${plugin} } from '@migaia/storage-web/${module}'
 
 const logger = new Logger({
@@ -117,7 +124,7 @@ const logger = new Logger({
   plugins: [wal({ store: memoryLogStore() })]
 })
 const host = await createStorageHost({
-  plugins: [${plugin}({ redo: true })],
+  plugins: [storageJournalPlugin(), ${plugin}({ redo: true })],
   journal: { logger, namespace: 'history', redoWal: logger.wal }
 })
 try {
@@ -131,27 +138,8 @@ try {
 }`
 
 /** Live queries add no host facade and retain the caller's Runtime ownership. */
-const liveExample = `import { createRuntime } from '@migaia/reactive'
-import { records } from '@migaia/storage-contract'
-import { createStorageHost } from '@migaia/storage-host'
-import { indexedDbBackendPlugin, indexedDbBackendKind } from '@migaia/storage-web/indexed-db'
-import { reactiveFeature } from '@migaia/storage-web/features/reactive'
-
-const runtime = createRuntime()
-const host = await createStorageHost({ plugins: [indexedDbBackendPlugin(
-  { dbName: 'users' }, { reactive: reactiveFeature(indexedDbBackendKind) }
-)] })
-try {
-  const query = host.backend('indexed-db').use(records).query().live({ runtime })
-  try {
-    await query.ready
-    console.log(query.state.value)
-  } finally {
-    await query.dispose()
-  }
-} finally {
-  await host.dispose()
-}`
+const liveExample =
+  "import { indexedDbNotificationsFeature } from '@migaia/storage-web/features/indexed-db-notifications'\nimport { createRuntime } from '@migaia/reactive'\nimport { records } from '@migaia/storage-contract'\nimport { createStorageHost } from '@migaia/storage-host'\nimport {\n  indexedDbBackendPlugin,\n  indexedDbBackendKind,\n} from '@migaia/storage-web/indexed-db'\nimport { reactiveFeature } from '@migaia/storage-web/features/reactive'\n\nconst runtime = createRuntime()\nconst host = await createStorageHost({\n  plugins: [\n    indexedDbBackendPlugin(\n      { dbName: 'users' },\n      {\n        notifications: indexedDbNotificationsFeature(),\n        reactive: reactiveFeature(indexedDbBackendKind),\n      },\n    ),\n  ],\n})\ntry {\n  const query = host.backend('indexed-db').use(records).query().live({ runtime })\n  try {\n    await query.ready\n    console.log(query.state.value)\n  } finally {\n    await query.dispose()\n  }\n} finally {\n  await host.dispose()\n}"
 
 /** Explain browser-specific options, leaving native host/context contracts with their owners. */
 const webStorageFields = (storage: string): Readonly<Record<string, IMemberDoc>> => ({
@@ -401,8 +389,8 @@ const backendSymbols: Readonly<Record<string, ISymbolDoc>> = Object.fromEntries(
             : {})
         },
         purpose: t(
-          `Install the native ${module} backend into storage-host. Preparation finishes before publication; the host owns cleanup.${module === 'indexed-db' ? ' Native ttl covers text, bytes and records within the same transaction. Organization dbName mapping preserves the configured default and adds "/" + orgId otherwise. dropOrg drains and closes the target connection, deletes only that database, and keeps borrowed views reusable.' : ' Native localStorage watch requires its matching Window event source; injected ports alone retain changeFeed:false. Text organization views preserve the configured default namespace and use namespace + "/" + orgId otherwise; dropOrg clears only that target and keeps borrowed unique writes native.'}`,
-          `把原生浏览器后端安装到 \`@migaia/storage-host\`，准备完成后才发布，由宿主拥有清理责任。${module === 'indexed-db' ? '原生 ttl 在同一事务支持文本、字节与记录期限。组织 dbName 保留配置的缺省目标，其它组织追加"/" + orgId；dropOrg 排空并关闭目标连接，只删除该数据库，既有借用视图可复用。' : '原生localStorage watch须准入同Window事件源，单独注入端口仍changeFeed:false。文本组织视图保留配置的缺省namespace，其它组织使用namespace + "/" + orgId；dropOrg只清该目标，借用唯一写仍由原生拥有者完成。'}`
+          `Install the native ${module} backend into storage-host. Preparation finishes before publication; the host owns cleanup.${module === 'indexed-db' ? ' The base provides text, bytes, records and transactions. Select TTL, batch, journal, notifications, change feed and secondary indexes explicitly before opening. Organization dbName mapping preserves the configured default and adds "/" + orgId otherwise. dropOrg drains and closes the target connection, deletes only that database, and keeps borrowed views reusable.' : ' Native localStorage watch requires its matching Window event source; injected ports alone retain changeFeed:false. Text organization views preserve the configured default namespace and use namespace + "/" + orgId otherwise; dropOrg clears only that target and keeps borrowed unique writes native.'}`,
+          `把原生浏览器后端安装到 \`@migaia/storage-host\`，准备完成后才发布，由宿主拥有清理责任。${module === 'indexed-db' ? '基础后端提供文本、字节、记录与事务；期限、批量、日志、通知、变更流与次级索引须在打开前显式选择对应特性。组织 dbName 保留配置的缺省目标，其它组织追加"/" + orgId；dropOrg 排空并关闭目标连接，只删除该数据库，既有借用视图可复用。' : '原生localStorage watch须准入同Window事件源，单独注入端口仍changeFeed:false。文本组织视图保留配置的缺省namespace，其它组织使用namespace + "/" + orgId；dropOrg只清该目标，借用唯一写仍由原生拥有者完成。'}`
         ),
         params: {
           options: t(
@@ -526,6 +514,7 @@ const liveQueryMembers: Readonly<Record<string, IMemberDoc>> = {
 /** Reference includes only current public browser entries; neutral ownership is explicit. */
 export const storageWebReference: ILibraryReference = {
   modules: {
+    ...storageWebAssemblyModules,
     index: {
       summary: t(
         'Stable browser error and namespace contracts. Import host and memory from storage-host, entities and storage codecs from storage-host/entity.',
@@ -563,6 +552,7 @@ export const storageWebReference: ILibraryReference = {
     }
   },
   symbols: {
+    ...storageWebAssemblySymbols,
     indexedDbBlobFeature: {
       role: 'enhancer',
       optionDocs: {
@@ -661,8 +651,8 @@ export const storageWebReference: ILibraryReference = {
     reactiveFeature: {
       role: 'enhancer',
       purpose: t(
-        'Define per-registration live queries for an explicit backend kind or target union. The Feature starts its original native source on first live and owns cleanup through the host lifecycle.',
-        '为明确后端种类或目标联合定义每次注册独立的实时查询；首次实时终点接入原生来源，并通过宿主生命周期拥有清理。'
+        'Define per-registration live queries for an explicit backend kind or target union. Memory and IndexedDB require their notifications Feature before live; missing assembly rejects explicitly. The Feature starts its original native source on first live and owns cleanup through the host lifecycle.',
+        '为明确后端种类或目标联合定义每次注册独立的实时查询；内存与 IndexedDB 须在调用实时终点前选择各自的通知特性，缺失时明确拒绝。首次实时终点接入原生来源，并通过宿主生命周期拥有清理。'
       ),
       params: {
         target: t(
@@ -678,6 +668,7 @@ export const storageWebReference: ILibraryReference = {
     }
   },
   types: {
+    ...storageWebAssemblyTypes,
     ILiveQueryOptions: {
       summary: t(
         'Full original live-query admission retains the exact backend, caller Runtime and one read callback per generation.',
@@ -1168,8 +1159,8 @@ console.error(error.source, error.code)`,
     },
     IIndexedDbOptions: {
       summary: t(
-        'Native database preparation and physical layout options. Private storageLogStore history shares the original META store. Native Web Locks retain the cached path; indexExclusive:false restores current state inside each original journal-store readwrite transaction without a cross-operation index.',
-        '原生数据库准备与物理布局选项；私有 storageLogStore 历史复用原 META 仓库。原生 Web Locks 保留缓存路径；indexExclusive:false 在每操作原 journal-store readwrite 事务现读，不跨操作缓存。'
+        'Native database preparation and physical layout options. Select indexedDbJournalFeature and storageJournalPlugin before using private storageLogStore history in the original META store. Native Web Locks retain the cached path; indexExclusive:false restores current state inside each original journal-store readwrite transaction without a cross-operation index.',
+        '原生数据库准备与物理布局选项；须先选择 indexedDbJournalFeature 和 storageJournalPlugin，私有 storageLogStore 历史才复用原 META 仓库。原生 Web Locks 保留缓存路径；indexExclusive:false 在每操作原 journal-store readwrite 事务现读，不跨操作缓存。'
       ),
       members: indexedDbFields,
       optionCases: optionCases('indexed-db', 'indexedDbBackendPlugin', 'indexed-db')
@@ -1210,8 +1201,8 @@ console.error(error.source, error.code)`,
     IIndexedDbBackendStore: {
       ...storageContractReference.types.IRecordStore!,
       summary: t(
-        'Installed native IndexedDB backend with complete same-transaction scope methods.',
-        '已安装的原生索引数据库后端，提供完整同事务作用域方法。'
+        'Installed native IndexedDB backend with ordinary text, byte, record and same-transaction scope methods. TTL, batch, journal, notifications, change feed and secondary indexes require their explicit Features.',
+        '已安装的原生索引数据库后端，提供普通文本、字节、记录及同事务作用域方法；期限、批量、日志、通知、变更流与次级索引须分别显式选择对应特性。'
       )
     },
     IIndexedDbFeatureExpose: {
@@ -1604,6 +1595,10 @@ console.error(error.source, error.code)`,
           '`REACTIVE_ADAPTER_DISPOSE_FAILED`: adapter cleanup failed.',
           '`REACTIVE_ADAPTER_DISPOSE_FAILED`：响应式适配器清理失败。'
         ),
+        indexedDbFeatureNotInstalled: t(
+          'Install the IndexedDB Feature named in the diagnostic before using the optional operation; base reads and writes remain available.',
+          '调用可选操作之前安装诊断指出的索引数据库特性，基础读写仍可用。'
+        ),
         backendDisposeFailed: t(
           '`BACKEND_DISPOSE_FAILED`: backend cleanup failed.',
           '`BACKEND_DISPOSE_FAILED`：直接后端清理失败，应检查保留的原始错误列表。'
@@ -1612,6 +1607,7 @@ console.error(error.source, error.code)`,
     }
   },
   enhancers: {
+    ...storageWebAssemblyEnhancers,
     ...backendEnhancers,
     indexedDbBlobFeature: {
       kind: 'feature',

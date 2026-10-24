@@ -94,15 +94,8 @@ console.log(typeof transactionId)`,
         'Keep committed history outside business clear and preserve watermarks on reopen.',
         '提交历史不受业务 clear 影响，重开保留水位。'
       ),
-      example: `import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
-import { storageLogStore } from '@migaia/storage-host/journal'
-import { LogRecordState } from '@migaia/logger/plugins/durable'
-
-await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
-await using log = await storageLogStore(host, 'memory', { prefix: 'history' })
-await log.append([{ kind: 'order.created', payload: { id: 'o1' } }])
-await log.setState(1, LogRecordState.done)
-console.log(await log.lastSeq(), await log.states(LogRecordState.pending))`,
+      example:
+        "import { storageJournalPlugin } from '@migaia/storage-host/journal'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { storageLogStore } from '@migaia/storage-host/journal'\nimport { LogRecordState } from '@migaia/logger/plugins/durable'\n\nawait using host = await createStorageHost({\n  plugins: [storageJournalPlugin(), memoryBackendPlugin()],\n})\nawait using log = await storageLogStore(host, 'memory', { prefix: 'history' })\nawait log.append([{ kind: 'order.created', payload: { id: 'o1' } }])\nawait log.setState(1, LogRecordState.done)\nconsole.log(await log.lastSeq(), await log.states(LogRecordState.pending))",
       result: t(
         'Prints 1 []. The original registration owns cleanup; opening does not enable global journaling.',
         '输出 1 []。原登记拥有清理；打开日志不自动启用全局 journal。'
@@ -116,24 +109,8 @@ console.log(await log.lastSeq(), await log.states(LogRecordState.pending))`,
         'A Feature needs a fixed-organization stream without constructing another controller.',
         'Feature 需要固定组织的流，无需另建 controller。'
       ),
-      example: `import { createStorageHost, defineFeature, memoryBackendKind, memoryBackendPlugin } from '@migaia/storage-host'
-import { createBackendChangeIterator } from '@migaia/storage-host/authoring/backend'
-
-const changes = defineFeature(memoryBackendKind, ({ featureExpose }) => ({
-  capabilities: [], chain: {},
-  api: { store: {
-    async changes() {
-      return createBackendChangeIterator(featureExpose.getChangeController()!, {
-        orgId: this.orgId, channel: 'value'
-      })
-    }
-  }, transaction: {} }
-}))
-await using host = await createStorageHost({ plugins: [memoryBackendPlugin(undefined, { changes })] })
-await using stream = await host.api.memory.changes()
-const next = stream.next()
-await host.backend('memory').set('status', 'ready')
-console.log((await next).value?.kind)`,
+      example:
+        "import { memoryNotificationsFeature } from '@migaia/storage-host/features/memory-notifications'\nimport {\n  createStorageHost,\n  defineFeature,\n  memoryBackendKind,\n  memoryBackendPlugin,\n} from '@migaia/storage-host'\nimport { createBackendChangeIterator } from '@migaia/storage-host/authoring/change-iterator'\n\nconst changes = defineFeature(memoryBackendKind, ({ featureExpose }) => ({\n  capabilities: [],\n  chain: {},\n  api: {\n    store: {\n      async changes() {\n        return createBackendChangeIterator(featureExpose.getChangeController()!, {\n          orgId: this.orgId,\n          channel: 'value',\n        })\n      },\n    },\n    transaction: {},\n  },\n}))\nawait using host = await createStorageHost({\n  plugins: [\n    memoryBackendPlugin(undefined, {\n      notifications: memoryNotificationsFeature(),\n      changes,\n    }),\n  ],\n})\nawait using stream = await host.api.memory.changes()\nconst next = stream.next()\nawait host.backend('memory').set('status', 'ready')\nconsole.log((await next).value?.kind)",
       result: t(
         'Prints put; the stream borrows the original controller and disposes its one subscription.',
         '输出 put；流借用原 controller，只释放自己的订阅。'
@@ -208,19 +185,8 @@ console.log(events)`,
         'Two repository writes and a status value must share one real transaction.',
         '两个仓储写入与状态值需要共享同一个真实事务。'
       ),
-      example: `import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
-import { defineEntity } from '@migaia/storage-host/entity'
-
-const users = defineEntity<{ id: string; name: string }>({ name: 'users', key: 'id' })
-await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
-const store = host.backend('memory')
-const repo = users.connect(store)
-await store.transaction(async (scope) => {
-  await repo.in(scope).put({ id: 'a', name: 'Ada' })
-  await repo.in(scope).put({ id: 'b', name: 'Grace' })
-  await scope.set('status', 'ready')
-})
-console.log(await repo.query().where({ name: 'Ada' }).orderByComparator((left, right) => left.name.localeCompare(right.name)).limit(1).select('id', 'name').all())`,
+      example:
+        "import { entityQueryFeature } from '@migaia/storage-host/entity/query'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { defineEntity } from '@migaia/storage-host/entity'\n\nconst users = defineEntity<{ id: string; name: string }>({\n  features: [entityQueryFeature()],\n  name: 'users',\n  key: 'id',\n})\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })\nconst store = host.backend('memory')\nconst repo = users.connect(store)\nawait store.transaction(async (scope) => {\n  await repo.in(scope).put({ id: 'a', name: 'Ada' })\n  await repo.in(scope).put({ id: 'b', name: 'Grace' })\n  await scope.set('status', 'ready')\n})\nconsole.log(\n  await repo\n    .query()\n    .where({ name: 'Ada' })\n    .orderByComparator((left, right) => left.name.localeCompare(right.name))\n    .limit(1)\n    .select('id', 'name')\n    .all(),\n)",
       result: t(
         'Prints Ada after all three changes commit atomically.',
         '三个变更原子提交后输出Ada。'
@@ -450,24 +416,8 @@ console.log(await jsonCodec.decode(encoded))`,
         'Build the same-registration private carrier before borrowing its logger.',
         '先建立同 registration 私有载体，再借用其 logger。'
       ),
-      example: `import { Logger } from '@migaia/logger'
-import { binlog } from '@migaia/logger/plugins/durable'
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
-const borrowed: Array<{ shutdown(reason: 'manual'): Promise<unknown> }> = []
-await using host = await createStorageHost({
-  plugins: [memoryBackendPlugin()],
-  journal: async ({storageLogStore}) => {
-    const records = await storageLogStore('memory', { prefix: 'commits' })
-    const logger = new Logger({
-      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
-      plugins: [binlog({ store: records })]
-    })
-    borrowed.push(logger)
-    return { logger, namespace: 'orders', atomicBinlog: { memory: records } }
-  }
-})
-try { await host.backend('memory').set('status', 'ready') }
-finally { for (const logger of borrowed) await logger.shutdown('manual') }`,
+      example:
+        "import { storageJournalPlugin } from '@migaia/storage-host/journal'\nimport { Logger } from '@migaia/logger'\nimport { binlog } from '@migaia/logger/plugins/durable'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nconst borrowed: Array<{ shutdown(reason: 'manual'): Promise<unknown> }> = []\nawait using host = await createStorageHost({\n  plugins: [storageJournalPlugin(), memoryBackendPlugin()],\n  journal: async ({ storageLogStore }) => {\n    const records = await storageLogStore('memory', { prefix: 'commits' })\n    const logger = new Logger({\n      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n      plugins: [binlog({ store: records })],\n    })\n    borrowed.push(logger)\n    return { logger, namespace: 'orders', atomicBinlog: { memory: records } }\n  },\n})\ntry {\n  await host.backend('memory').set('status', 'ready')\n} finally {\n  for (const logger of borrowed) await logger.shutdown('manual')\n}",
       result: t(
         'The value and one storage.commit share the original native commit. Host owns private handles; the application still closes borrowed loggers. The memory namespace uses the same createBackendJournalNamespace resource owner and canonical storageJournalLockKey head/resource identities as native adapters. A namespace declaring indexExclusive:false rejects cached log construction before recovery I/O. Native clear retains per-row images, original epochs and one clear event. Without atomicBinlog the external append starts only after COMMIT; a false-atomic terminal is accepted only for this pure commit-only combination; failure reports without changing committed success. External WAL persists intent before data/marker commit and recovers only the complete fixed target. Native memory undo validates all full revisions and values before one new original commit. External undo requires WAL and original marker ports, preserving pending intent until complete mirror publication; exact repeated mirrors are idempotent. Telemetry uses the actual level plugin, preserves payload/Error references and observes one complete public retry loop. Blob capture and redo remain unfinished.',
         '值与一条 storage.commit 共用原 native 提交；宿主拥有私有句柄，应用仍关闭借用 logger。memory namespace 与 native adapter 复用同 createBackendJournalNamespace 资源拥有者和 storageJournalLockKey head/resource 规范身份；namespace 声明 indexExclusive:false 时在恢复 I/O 前拒绝缓存日志构造。原生 clear 保留逐项镜像、原 epoch 与一次 clear 事件。未选 atomicBinlog 时仅 COMMIT 后外置追加；false-atomic terminal 只准入此纯提交后组合，失败报告且不改变已提交成功。外置 WAL 在业务/marker 提交前持久化 intent，恢复只处理完整固定目标。memory 原生 undo 在一次新原提交前比较全部完整修订和值；外置 undo 要求 WAL 与原 marker 端口，完整镜像发布前保 pending，重复镜像仅内容相等时幂等略过；telemetry 复用真实 level 插件，保留 payload/原 Error 并观察一次完整公开重试循环；blob 捕获与 redo 尚未完成。'
