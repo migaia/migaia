@@ -1,6 +1,5 @@
 import {
   assertOperationContext,
-  snapshotConcurrencyLockKeys,
   StorageContractError,
   StorageContractErrorCode,
   type IBackendKind,
@@ -12,7 +11,7 @@ import {
   type IWalExt,
   type ILogPayload
 } from '@migaia/logger/plugins/durable'
-import { decodeFlatStorageKey, encodeFlatStorageKey } from '../core/key-domain.js'
+import { readStorageJournalTarget, storageJournalTargetIdentity } from './targets.js'
 import { createStorageOperationReporter, reportCleanupError } from '../core/operation-reporter.js'
 import { StorageError, StorageErrorCode } from '../errors.js'
 import { StorageErrorText } from '../error-text.js'
@@ -62,24 +61,6 @@ function matches(
     left.orgId === right.orgId
   )
 }
-/** Restore only the existing target codec and canonical lock domain, with no business replay. */
-function target(input: unknown, backend: IBackendKind): string {
-  const value = object(input)
-  if (value.channel === 'metadata') {
-    if (typeof value.key !== 'string') invalid()
-    if (decodeFlatStorageKey(value.key) === undefined) invalid()
-    return encodeFlatStorageKey([value.channel, value.key])
-  }
-  const candidate =
-    value.channel === 'text' || value.channel === 'bytes' || value.channel === 'record'
-      ? {
-          channel: value.channel,
-          key: typeof value.key === 'string' ? decodeFlatStorageKey(value.key) : invalid()
-        }
-      : value
-  const captured = snapshotConcurrencyLockKeys([candidate], backend)
-  return encodeFlatStorageKey([captured.keys[0]!.channel, captured.identities[0]!])
-}
 /** WAL images always retain full encoded values, independently of binlogValues. */
 function image(input: unknown): void {
   const value = object(input)
@@ -107,7 +88,11 @@ function intent(input: unknown, backend: IBackendKind) {
     for (const [index, entry] of value.changes.entries()) {
       const change = object(entry)
       const logged = object(commit.changes[index])
-      if (target(change.target, backend) !== target(logged.target, backend)) invalid()
+      if (
+        storageJournalTargetIdentity(readStorageJournalTarget(change.target, backend), backend) !==
+        storageJournalTargetIdentity(readStorageJournalTarget(logged.target, backend), backend)
+      )
+        invalid()
       image(change.before)
       image(change.after)
       const after = object(change.after)

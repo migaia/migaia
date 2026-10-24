@@ -386,6 +386,20 @@ console.log(host.extensions.label('draft'))`,
       ),
       members: {}
     },
+    IUndoableStore: {
+      summary: t(
+        'undo(txId, ctx?) returns a new committed txId after all original afterRevision/value checks. Selected logger inference adds it only to journal-enabled backend and borrowed org results.',
+        'undo(txId, ctx?) 在全部原 afterRevision/值检查后返回新的已提交 txId；仅真实所选 logger 推断向启用 journal 的后端和组织借用结果增加该类型。'
+      ),
+      members: {}
+    },
+    IStorageJournalUndoRunner: {
+      summary: t(
+        'Backend-author callback invokes the original tx().lock(...).run with all canonical targets and no new transaction owner.',
+        '后端作者回调用全部规范目标调用原 tx().lock(...).run，不增加事务拥有者。'
+      ),
+      members: {}
+    },
     IStorageJournalAttempt: {
       summary: t(
         'Original authenticated txId, pre-commit record(scope), and optional settle() for terminal-started external append. No new transaction or terminal authority.',
@@ -405,8 +419,8 @@ console.log(host.extensions.label('draft'))`,
       members: {
         journal: {
           summary: t(
-            'Optional global journal configuration; omitted configurations leave the original execution path unchanged. Memory external WAL uses the original intent/marker protocol when its binding explicitly supports external awaits. Automatic undo execution, redo, blob capture and other-backend routing remain unfinished.',
-            '可选全局 journal；省略时保持原路径。memory 外置 WAL 在原 binding 显式允许外部等待时使用原 intent/marker 协议；自动 undo、redo、blob 捕获和其它后端路由尚未完成。'
+            'Optional global journal configuration; omitted configurations leave the original execution path unchanged. Memory external WAL uses the original intent/marker protocol when its binding explicitly supports external awaits. Native memory undo checks all original revisions and values before restoring through the original locked transaction. Redo, blob capture, external undo and other-backend wiring remain unfinished.',
+            '可选全局 journal；省略时保持原路径。memory 外置 WAL 在原 binding 显式允许外部等待时使用原 intent/marker 协议；memory 原生 undo 比较全部原修订和值，再沿原加锁事务恢复；redo、blob 捕获、外置 undo 和其它后端接线尚未完成。'
           )
         }
       }
@@ -470,6 +484,12 @@ console.log(host.extensions.label('draft'))`,
         'descriptor 捕获的原生 I/O 与不可变 forOrg 投影，不使用公开 KV 前缀。'
       ),
       members: {
+        lockTarget: {
+          summary: t(
+            'Map a private image identity back onto the original canonical point lock. Native undo requires the backend-owned mapping and never builds a parallel lock registry.',
+            '把私有镜像身份映射回原规范点锁；原生 undo 要求后端自己的映射，不建立平行锁登记。'
+          )
+        },
         externalWal: {
           summary: t(
             'Optional true fact from the original backend owner permits external waits after final images, together with its existing native commit-marker ports. It does not change nativeAtomic or certify cached-index exclusivity.',

@@ -1,3 +1,4 @@
+import { isStorageErrorFamily } from './core/error-family.js'
 import {
   createStorageHooks,
   readStorageHookFailureCode,
@@ -1399,6 +1400,18 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
     }
     const promise = options.then(async (configured) => {
       context.assertExecution()
+      if (configured.logger.undo !== undefined) {
+        /** Only the original physical backend may publish its undo endpoint; frozen bases stay raw. */
+        let undo: unknown
+        try {
+          undo = Reflect.get(context.storeCell.forOrg(orgId, this.#orgId), 'undo')
+        } catch (cause) {
+          if (isStorageErrorFamily(cause)) throw cause
+          throw new StorageContractError(StorageContractErrorCode.invalidArgument, { cause })
+        }
+        if (typeof undo !== 'function')
+          throw new StorageContractError(StorageContractErrorCode.unsupported)
+      }
       entry.value = await prepareStorageJournalConfiguration(
         configured,
         this.#journalContextAccess(context, orgId),
@@ -1470,7 +1483,13 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
       active: () => prepared() !== undefined,
       headLocks: () => prepared()?.headLocks ?? [],
       begin: (scope: Omit<import('@migaia/storage-contract').ITransactionScope, 'use'>) =>
-        prepared()?.begin(scope)
+        prepared()?.begin(scope),
+      undo: (txId, run) => {
+        const undo = prepared()?.undo
+        if (undo === undefined)
+          return Promise.reject(new StorageContractError(StorageContractErrorCode.unsupported))
+        return undo(txId, run)
+      }
     })
   }
 
@@ -1766,11 +1785,44 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
  * and a 30000 ms install budget. Browser storage is acquired only by selected backend plugins;
  * failed initial installation disposes its newly created facade before rejecting.
  */
-export const createStorageHost = async <
-  const TPlugins extends readonly IStorageBackendPluginHandle[] = readonly []
+export function createStorageHost<
+  const TPlugins extends readonly IStorageBackendPluginHandle[] = readonly [],
+  const TOptions extends Exclude<
+    import('./journal/types.js').IStorageJournalConfiguration,
+    Function
+  > = Exclude<import('./journal/types.js').IStorageJournalConfiguration, Function>
 >(
-  options?: IStorageHostCreateOptions<TPlugins>
-): Promise<IStorageHost<TPlugins>> => {
+  options: Omit<IStorageHostCreateOptions<TPlugins>, 'journal'> & {
+    readonly journal: (
+      context: import('./journal/types.js').IStorageJournalInitializerContext
+    ) => TOptions | PromiseLike<TOptions>
+  }
+): Promise<
+  IStorageHost<
+    TPlugins,
+    (
+      context: import('./journal/types.js').IStorageJournalInitializerContext
+    ) => TOptions | PromiseLike<TOptions>
+  >
+>
+/** Direct options retain the actual selected logger extension instead of widening it. */
+export function createStorageHost<
+  const TPlugins extends readonly IStorageBackendPluginHandle[] = readonly [],
+  const TOptions extends Exclude<
+    import('./journal/types.js').IStorageJournalConfiguration,
+    Function
+  > = Exclude<import('./journal/types.js').IStorageJournalConfiguration, Function>
+>(
+  options: Omit<IStorageHostCreateOptions<TPlugins>, 'journal'> & { readonly journal: TOptions }
+): Promise<IStorageHost<TPlugins, TOptions>>
+/** Broad named options and existing one-parameter callers retain their prior inference. */
+export function createStorageHost<
+  const TPlugins extends readonly IStorageBackendPluginHandle[] = readonly []
+>(options?: IStorageHostCreateOptions<TPlugins>): Promise<IStorageHost<TPlugins>>
+/** Original runtime factory remains the only implementation of every type overload. */
+export async function createStorageHost<
+  const TPlugins extends readonly IStorageBackendPluginHandle[] = readonly []
+>(options?: IStorageHostCreateOptions<TPlugins>): Promise<IStorageHost<TPlugins>> {
   /** Read constructor options once before any plugin can execute. */
   const optionsSnapshot = snapshotStorageHostCreateOptions(options)
   /** The storage facade retains the one canonical native lifecycle owner. */
