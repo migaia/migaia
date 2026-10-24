@@ -50,14 +50,12 @@ export type IPgState = {
 /** Channel labels distinguish revision tombstones while key bytes keep the sole canonical identity. */
 export function pgIdentity(channel: IPgMutationChannel, key: IStorageKey): string {
   return channel === 'metadata'
-    ? pgKey(key).hex
+    ? PgNames.metadataRevisionPrefix + pgKey(key).hex
     : snapshotConcurrencyLockKeys([pgLockKey(channel, key)], PgNames.backend).identities[0]!
 }
 /** The three user channels retain the original finite lock-key constructors. */
-export function pgLockKey(
-  channel: Exclude<IPgMutationChannel, 'metadata'>,
-  key: IStorageKey
-): ILockKey {
+export function pgLockKey(channel: IPgMutationChannel, key: IStorageKey): ILockKey {
+  if (channel === 'metadata') return lockKey.record([PgNames.metadataLockNamespace, key])
   if (channel === 'vector') {
     if (
       !Array.isArray(key) ||
@@ -87,7 +85,6 @@ export async function observePgRevision(
   key: IStorageKey
 ): Promise<void> {
   await state.journal?.capture(channel, [key])
-  if (channel === 'metadata') return
   const identity = pgIdentity(channel, key)
   if (!state.baseline.has(identity)) {
     const row = (
@@ -230,7 +227,10 @@ export async function writePg(
       }
     }
   }
-  if (channel === 'metadata') await observePgRevision(state, tables, channel, key)
+  if (channel === 'metadata') {
+    await observePgRevision(state, tables, channel, key)
+    await state.guardKeys([pgLockKey(channel, key)])
+  }
   const expiry = channel === 'metadata' ? '' : ',expires_at'
   const deadline =
     ttlMs === undefined ? 'NULL' : "clock_timestamp()+($4::float8*interval '1 millisecond')"
@@ -265,7 +265,7 @@ export async function removePg(
   key: IStorageKey
 ): Promise<boolean> {
   await observePgRevision(state, tables, channel, key)
-  if (channel !== 'metadata') await state.guardKeys([pgLockKey(channel, key)])
+  await state.guardKeys([pgLockKey(channel, key)])
   const result = await state.client.query(
     'DELETE FROM ' + tables[channel] + ' WHERE org_id=$1 AND key=$2 RETURNING key',
     [state.orgId, encoded(channel, key)],
@@ -412,9 +412,8 @@ export async function commitPgRevisions(
   const identities = new Set(state.baseline.keys())
   const increments = new Set<string>()
   for (const [channel, changed] of state.changed) {
-    if (channel === 'metadata') continue
     for (const key of changed.values()) increments.add(pgIdentity(channel, key))
-    if (changed.size !== 0) increments.add(channel + ':*')
+    if (channel !== 'metadata' && changed.size !== 0) increments.add(channel + ':*')
   }
   for (const identity of increments) identities.add(identity)
   if (identities.size === 0) return

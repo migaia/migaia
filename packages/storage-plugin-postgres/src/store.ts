@@ -10,6 +10,7 @@ import {
   assertTransactionOwner,
   useTransactionCapability,
   createTransactionBuilder,
+  runWithConcurrency,
   createStorageIteratorLifetime,
   createSqlTag,
   createRecordQuery,
@@ -1040,6 +1041,32 @@ export async function createPostgresStore<T>(
           options?: ITransactionOptions
         ) => engine.run(run, options, PgOperation.transaction),
         tx: () => createTransactionBuilder(store, undefined, core.getChainMethods('tx')),
+        /** Only the original bound native store publishes undo through the shared journal owner. */
+        ...(runtime.journal === undefined
+          ? {}
+          : {
+              undo: async (txId: string, ctx?: IOperationContext) => {
+                controller.assertLive()
+                const release = controller.beginMutation()
+                return runWithConcurrency<{ readonly txId: string }>(
+                  {
+                    store,
+                    options: ctx === undefined ? {} : ctx,
+                    prepare: () => runtime.journal!.prepare()
+                  },
+                  {
+                    attempt: async (context) => ({
+                      status: 'committed',
+                      value: await runtime.journal!.undo(txId, (keys, work) =>
+                        createTransactionBuilder(store, context, core.getChainMethods('tx'))
+                          .lock(keys[0]!, ...keys.slice(1))
+                          .run(work)
+                      )
+                    })
+                  }
+                ).finally(release)
+              }
+            }),
         inspectLocks: (ctx?: IOperationContext) => {
           controller.assertLive()
           return runtime.execution.run(

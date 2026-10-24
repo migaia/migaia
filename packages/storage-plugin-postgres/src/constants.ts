@@ -15,6 +15,10 @@ export const PgNames = {
   markerValue: '1',
   /** External WAL evidence outlives the separate short-lived lost-COMMIT acknowledgement marker. */
   journalMarkerNamespace: 'storage.journal.commit',
+  /** Metadata images borrow one canonical private tuple in the existing record lock owner. */
+  metadataLockNamespace: 'storage.postgres.metadata',
+  /** Metadata revisions remain distinct from business-channel canonical lock identities. */
+  metadataRevisionPrefix: 'metadata:',
   vectorConfiguration: 'vector_config',
   /** Global physical collection schema is not a business org and cannot be deleted by dropOrg. */
   vectorConfigurationOwner: '00000000-0000-0000-0000-000000000000',

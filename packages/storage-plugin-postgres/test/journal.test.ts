@@ -4,7 +4,7 @@ import postgres from 'postgres'
 import { it, expect, onTestFinished, describe } from 'vitest'
 import { createStorageHost } from '@migaia/storage-host'
 import { Logger } from '@migaia/logger'
-import { binlog, wal, memoryLogStore } from '@migaia/logger/plugins/durable'
+import { binlog, wal, undoLog, memoryLogStore } from '@migaia/logger/plugins/durable'
 import { kv, vector, ttl, lockKey } from '@migaia/storage-contract'
 import { deferred } from '@migaia/utils/promise'
 import { walkErrorCauses } from '@migaia/utils/error'
@@ -28,6 +28,96 @@ if (!connectionString)
   throw new Error('Run through scripts/storage-services.mts run -- to provide PostgreSQL')
 
 describe.each(['pg', 'postgres-js'] as const)('%s original global journal', (adapter) => {
+  it('restores external undo images through the original locked native transaction and rejects ABA', async () => {
+    const pool = new Pool({ connectionString })
+    const client = postgres(connectionString!, { max: 8 })
+    const driver = adapter === 'pg' ? pgDriver(pool) : postgresJsDriver(client)
+    const logger = new Logger({
+      ...loggerOptions,
+      plugins: [
+        binlog({ store: memoryLogStore() }),
+        wal({ store: memoryLogStore() }),
+        undoLog({ store: memoryLogStore() })
+      ]
+    })
+    const prefix = 'pg_undo_' + randomUUID().slice(0, 8),
+      org = randomUUID()
+    const host = await createStorageHost({
+      org,
+      plugins: [postgresBackendPlugin({ driver, prefix }, { vector: pgvectorFeature() })] as const,
+      journal: { logger, namespace: 'external-undo' }
+    })
+    onTestFinished(async () => {
+      await host.dispose()
+      await logger.shutdown('manual')
+      await pool.end()
+      await client.end()
+    })
+    const store = host.backend('postgres')
+    const lastTx = async () =>
+      ((await logger.binlog.read(await logger.binlog.lastSeq()))[0]!.payload as { txId: string })
+        .txId
+    await store.set('text', 'before')
+    await store.setBytes('bytes', new Uint8Array([1]))
+    await store.putRecord(null, 'nullable')
+    await store.use(ttl).expire(lockKey.text('text'), 60000)
+    await store.transaction(async (scope) => {
+      await scope.set('text', 'middle')
+      await scope.set('text', 'after')
+      await scope.use(ttl).expire(lockKey.text('text'), 120000)
+      await scope.set('missing', 'created')
+      await scope.setBytes('bytes', new Uint8Array([2]))
+      await scope.deleteRecord('nullable')
+    })
+    const txId = await lastTx()
+    let reads = 0
+    const result = await store.undo(txId, {
+      get timeoutMs() {
+        reads += 1
+        return 60000
+      }
+    })
+    expect(reads).toBe(1)
+    expect(result.txId).not.toBe(txId)
+    expect(await store.get('text')).toBe('before')
+    expect(await store.get('missing')).toBeNull()
+    expect(await store.getBytes('bytes')).toEqual(new Uint8Array([1]))
+    expect(await store.getRecord('nullable')).toBeNull()
+    expect(await store.use(ttl).remaining(lockKey.text('text'))).toBeGreaterThan(0)
+    expect(await store.use(ttl).remaining(lockKey.text('text'))).toBeLessThan(60000)
+    expect(await logger.undo.get(result.txId)).toBeDefined()
+    await expect(store.undo(txId)).rejects.toMatchObject({ code: 'UNDO_CONFLICT' })
+    const points = store.use(vector).collection('undo-points', { dimensions: 1, metric: 'dot' })
+    await points.upsert([{ id: 'point', vector: [1] }])
+    await points.upsert([{ id: 'point', vector: [2] }])
+    await store.undo(await lastTx())
+    expect((await points.near([1], { exact: true }).topK(1).all())[0]!.score).toBe(1)
+    await store.metadata.set('version', { value: 1 })
+    await store.metadata.set('version', { value: 2 })
+    await store.undo(await lastTx())
+    expect(await store.metadata.get('version')).toEqual({ value: 1 })
+    await store.metadata.set('version', { value: 2 })
+    const metadataTx = await lastTx()
+    const ordinary = await createStorageHost({
+      org,
+      plugins: [postgresBackendPlugin({ driver, prefix })] as const
+    })
+    try {
+      await ordinary.backend('postgres').metadata.set('version', { value: 3 })
+      await ordinary.backend('postgres').metadata.set('version', { value: 2 })
+    } finally {
+      await ordinary.dispose()
+    }
+    await expect(store.undo(metadataTx)).rejects.toMatchObject({ code: 'UNDO_CONFLICT' })
+    const other = host.org(randomUUID()).backend('postgres')
+    await other.set('org-only', 'value')
+    const otherTx = await lastTx()
+    await expect(store.undo(otherTx)).rejects.toMatchObject({ code: 'JOURNAL_RECORD_INVALID' })
+    const borrowed = other.undo
+    await borrowed(otherTx)
+    expect(await other.get('org-only')).toBeNull()
+    expect(await logger.wal.pending()).toEqual([])
+  })
   it('recovers original external WAL after an append failure without losing native commit evidence', async () => {
     const pool = new Pool({ connectionString })
     const client = postgres(connectionString!, { max: 8 })

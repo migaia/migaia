@@ -1,7 +1,7 @@
 import { PgNames } from './constants.js'
 import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
 import { attachErrorIdentity } from '@migaia/utils/error'
-import { normalizeError } from '@migaia/storage-host/authoring/backend'
+import { normalizeError, isStorageErrorFamily } from '@migaia/storage-host/authoring/backend'
 import { ERROR_SOURCE, PostgresErrorCode, type IPostgresErrorCode } from './error-code.js'
 import { PostgresErrorText } from './error-text.js'
 /** Add the registered package identity while retaining the untouched native failure on cause. */
@@ -38,6 +38,8 @@ export function normalizePostgresError(cause: unknown): Error {
 export function normalizeTransactionFailure(
   cause: unknown
 ): Error & { readonly source: string; readonly code: string } {
+  // Journal-owned business errors keep the original host identity through this native callback.
+  if (isStorageErrorFamily(cause) && !(cause instanceof StorageContractError)) return cause
   if (
     cause instanceof StorageContractError &&
     (cause.code === StorageContractErrorCode.aborted ||

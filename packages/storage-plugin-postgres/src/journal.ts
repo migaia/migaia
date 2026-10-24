@@ -34,7 +34,9 @@ import { deferred } from '@migaia/utils/promise'
 import { base64ToBytes, bytesToBase64 } from '@migaia/utils/bytes'
 import {
   createStorageOperationReporter,
-  reportCleanupError
+  reportCleanupError,
+  encodeFlatStorageKey,
+  decodeFlatStorageKey
 } from '@migaia/storage-host/authoring/backend'
 /** The image keeps exact original native wire values and absolute PostgreSQL deadlines. */
 export type IPgJournalWire = Readonly<{
@@ -122,12 +124,17 @@ export function decodePgJournalImage(
 function targetFor(channel: IPgMutationChannel, key: IStorageKey): IStorageJournalTarget {
   if (channel === 'metadata') {
     if (typeof key !== 'string') throw invalidArgument()
-    return { channel, key }
+    return { channel, key: encodeFlatStorageKey(key) }
   }
   return pgLockKey(channel, key)
 }
 /** Original vector lock targets carry a tuple only inside native row helpers. */
 function keyFor(target: IStorageJournalTarget): IStorageKey {
+  if (target.channel === 'metadata') {
+    const key = decodeFlatStorageKey(target.key, PgNames.backend)
+    if (typeof key !== 'string') throw invalidArgument()
+    return key
+  }
   if (target.channel === 'rdf')
     throw new StorageContractError(StorageContractErrorCode.unsupported, {
       backend: PgNames.backend
@@ -229,10 +236,7 @@ export function createPgJournalImages(
                 target: initial.target,
                 before: initial.image,
                 after: images.get(id)!,
-                afterRevision:
-                  channel === 'metadata'
-                    ? null
-                    : String((state.baseline.get(pgIdentity(channel, key)) ?? 0n) + 1n)
+                afterRevision: String((state.baseline.get(pgIdentity(channel, key)) ?? 0n) + 1n)
               })
             }
           }
@@ -264,7 +268,7 @@ export function createPgJournalImages(
       const channel = target.channel
       const wire = image.present ? decodePgJournalImage(image, channel) : undefined
       await observePgRevision(state, tables, channel, key)
-      if (channel !== 'metadata') await state.guardKeys([pgLockKey(channel, key)])
+      await state.guardKeys([pgLockKey(channel, key)])
       const nativeKey = channel === 'record' ? pgKey(key).bytes : pgKey(key).hex
       if (wire === undefined) {
         const removed = await state.client.query(
@@ -309,6 +313,11 @@ export function createPgJournalBinding(options: {
   }
   return {
     externalWal: true,
+    lockTarget: (target) => {
+      const key = keyFor(target)
+      if (target.channel === 'rdf') throw invalidArgument()
+      return pgLockKey(target.channel, key)
+    },
     openNamespace: async (prefix): Promise<IStorageJournalNamespace> => {
       controller.assertLive()
       if (typeof prefix !== 'string' || prefix.length === 0) throw invalidArgument()
@@ -469,7 +478,6 @@ export function createPgJournalBinding(options: {
       runTransactionOperation(scope, async () => {
         const state = authenticate(scope),
           key = keyFor(target)
-        if (target.channel === 'metadata') return null
         if (target.channel === 'rdf') throw invalidArgument()
         const identity = pgIdentity(target.channel, key)
         const row = (
