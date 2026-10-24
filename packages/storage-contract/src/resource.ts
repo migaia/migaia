@@ -18,65 +18,95 @@ export type IStorageIteratorLifetime<T> = {
   readonly symbolic: () => Promise<void>
 }
 
-/**
- * Owns the existing iterator drain and cached cleanup paths. Both native transaction iterators and
- * mapped root readers submit their complete accepted advance here; neither creates another queue or
- * lifecycle implementation. Error normalization and reporting remain with the original caller. This
- * backend-author helper does not authorize data admission or register a transaction resource.
- */
-export function createStorageIteratorLifetime<T>(options: {
+/** Original native resource callbacks; the supplied owner retains error normalization authority. */
+export type IStorageIteratorLifetimeOptions = {
   readonly close: () => Promise<void>
   readonly report: (error: unknown) => void | PromiseLike<void>
   readonly onSettled?: () => void
-}): IStorageIteratorLifetime<T> {
-  /** Accepted advances finish before the original native resource can be released. */
-  const advances = new Set<Promise<unknown>>()
-  /** Creating the main cleanup Promise synchronously stops further data admission. */
-  let main: Promise<void> | undefined
-  /** Symbolic cleanup reports once through a separately cached successful Promise. */
-  let symbolic: Promise<void> | undefined
-  /** Iterator return shares cleanup and caches its first result. */
-  let returned: Promise<IteratorResult<T>> | undefined
-  /** One cleanup waits the accepted advances and then releases the original resource once. */
-  function cleanup(): Promise<void> {
-    if (main) return main
-    main = Promise.resolve().then(async () => {
-      await Promise.allSettled(advances)
-      await options.close()
+}
+
+/** Owns the existing accepted-advance drain and cached cleanup paths for one original resource. */
+class StorageIteratorLifetime<T> implements IStorageIteratorLifetime<T> {
+  /** Native close and diagnostic callbacks remain with their original resource owner. */
+  readonly #options: IStorageIteratorLifetimeOptions
+  /** Accepted advances must settle before the original resource can be released. */
+  readonly #advances = new Set<Promise<unknown>>()
+  /** Creating this cached cleanup Promise synchronously stops data admission. */
+  #main: Promise<void> | undefined
+  /** Symbolic cleanup reports once through its separately cached resolving Promise. */
+  #symbolic: Promise<void> | undefined
+  /** Iterator return shares cleanup and retains its first completion result. */
+  #returned: Promise<IteratorResult<T>> | undefined
+
+  /** Borrows native callbacks without registering a second resource lifetime. */
+  constructor(options: IStorageIteratorLifetimeOptions) {
+    this.#options = options
+  }
+
+  /** Waits accepted advances before releasing the original resource exactly once. */
+  #cleanup(): Promise<void> {
+    if (this.#main) return this.#main
+    this.#main = Promise.resolve().then(async () => {
+      await Promise.allSettled(this.#advances)
+      await this.#options.close()
     })
-    if (options.onSettled) void main.then(options.onSettled, options.onSettled)
-    return main
-  }
-  return {
-    isClosing: () => main !== undefined,
-    advance: (run) => {
-      /** Admission and original operation authority remain in the supplied original run callback. */
-      const pending = run()
-      advances.add(pending)
-      /** Completion removes only this accepted advance before natural-end cleanup can wait. */
-      const advancement = pending.then(
-        async (result) => {
-          advances.delete(pending)
-          if (result.done) await cleanup()
-          return result
-        },
-        (error) => {
-          advances.delete(pending)
-          throw error
-        }
+    if (this.#options.onSettled)
+      void this.#main.then(
+        () => this.#options.onSettled!(),
+        () => this.#options.onSettled!()
       )
-      // The returned rejection remains observable while an unawaited advance cannot leak globally.
-      void advancement.then(undefined, () => undefined)
-      return advancement
-    },
-    dispose: cleanup,
-    returned: (value) => {
-      if (!returned) {
-        returned = cleanup().then(() => ({ done: true, value: value as T }))
-        void returned.then(undefined, () => undefined)
-      }
-      return returned
-    },
-    symbolic: () => (symbolic ??= cleanup().then(undefined, options.report))
+    return this.#main
   }
+
+  /** Closing begins when the main cleanup Promise is first created. */
+  readonly isClosing = (): boolean => this.#main !== undefined
+
+  /** Admits the supplied original operation and drains it before any native cleanup. */
+  readonly advance = (run: () => Promise<IteratorResult<T>>): Promise<IteratorResult<T>> => {
+    /** Admission and transaction authority remain in the supplied original run callback. */
+    const pending = run()
+    this.#advances.add(pending)
+    /** Remove this advance before natural-end cleanup waits for the remaining accepted work. */
+    const advancement = pending.then(
+      async (result) => {
+        this.#advances.delete(pending)
+        if (result.done) await this.#cleanup()
+        return result
+      },
+      (error) => {
+        this.#advances.delete(pending)
+        throw error
+      }
+    )
+    // Caller-visible rejection is unchanged; unawaited advances cannot leak a second rejection.
+    void advancement.then(undefined, () => undefined)
+    return advancement
+  }
+
+  /** Explicit cleanup returns the same main Promise on every call. */
+  readonly dispose = (): Promise<void> => this.#cleanup()
+
+  /** Iterator return shares main cleanup and caches the first requested completion value. */
+  readonly returned = (value?: unknown): Promise<IteratorResult<T>> => {
+    if (!this.#returned) {
+      this.#returned = this.#cleanup().then(() => ({ done: true, value: value as T }))
+      void this.#returned.then(undefined, () => undefined)
+    }
+    return this.#returned
+  }
+
+  /** Symbolic cleanup reports failure once through the original owner's diagnostic callback. */
+  readonly symbolic = (): Promise<void> =>
+    (this.#symbolic ??= this.#cleanup().then(undefined, (error) => this.#options.report(error)))
+}
+
+/**
+ * Reuses the canonical lifetime for native and mapped readers. Accepted advances, explicit return
+ * and symbolic cleanup all drain the same resource; admission and transaction registration remain
+ * with the original caller.
+ */
+export function createStorageIteratorLifetime<T>(
+  options: IStorageIteratorLifetimeOptions
+): IStorageIteratorLifetime<T> {
+  return new StorageIteratorLifetime<T>(options)
 }
