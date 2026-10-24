@@ -29,3 +29,26 @@ test('native Web Locks protect a persistent journal index across pages and hand 
     await peer.close()
   }
 })
+
+test('native business changes, logs and undo share the actual IndexedDB terminal in a fixed org', async ({
+  page
+}) => {
+  await page.goto('/')
+  expect(
+    await page.evaluate(
+      (name) => window.runIndexedDbGlobalJournal(name),
+      'native-global-' + crypto.randomUUID()
+    )
+  ).toEqual({
+    changes: [
+      ['text', 'text'],
+      ['bytes', 'bytes'],
+      ['text', 'text'],
+      ['record', 'record']
+    ],
+    rollback: true,
+    restored: true,
+    commits: 2,
+    isolated: true
+  })
+})

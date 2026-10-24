@@ -27,6 +27,7 @@ export type IBackendRuntime = Pick<
   | 'featureExpose'
   | 'getOrgContext'
   | 'createOrgAuthoringPort'
+  | 'journal'
 >
 
 /** Native KV methods and their exact synchronous channel remain on the same provided object. */

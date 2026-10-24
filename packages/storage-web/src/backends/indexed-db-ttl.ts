@@ -1,5 +1,10 @@
-import { compareStorageKeys, type IStorageKey } from '@migaia/storage-contract'
-import { encodeFlatStorageKey } from '@migaia/storage-host/authoring/backend'
+import {
+  compareStorageKeys,
+  StorageContractError,
+  StorageContractErrorCode,
+  type IStorageKey
+} from '@migaia/storage-contract'
+import { encodeFlatStorageKey, decodeFlatStorageKey } from '@migaia/storage-host/authoring/backend'
 import type { IScheduler } from '@migaia/utils/scheduler'
 
 /** The original META store alone owns deadline rows and its native expiry index. */
@@ -33,6 +38,14 @@ export type IIndexedDbTtlInput = {
   readonly present: (channel: IIndexedDbTtlChannel, key: IStorageKey) => Promise<boolean>
   readonly remove: (channel: IIndexedDbTtlChannel, key: IStorageKey) => Promise<void>
   readonly changed: (channel: IIndexedDbTtlChannel, key: IStorageKey) => void
+  /** Private deadline mutations use the same original point revision and ordered capture owner. */
+  readonly deadline: <R>(
+    channel: IIndexedDbTtlChannel,
+    key: IStorageKey,
+    before: number | undefined,
+    after: number | undefined,
+    run: () => Promise<R>
+  ) => Promise<R>
 }
 
 /**
@@ -104,7 +117,9 @@ export function createIndexedDbTtlAccess(input: IIndexedDbTtlInput) {
           captured.deadline = undefined
           if (present) await input.remove(channel, key)
           if (stored !== undefined)
-            await input.request(() => input.metadata.delete(captured.metadataKey))
+            await input.deadline(channel, key, deadline, undefined, () =>
+              input.request(() => input.metadata.delete(captured.metadataKey))
+            )
         }
       })()
     }
@@ -131,11 +146,19 @@ export function createIndexedDbTtlAccess(input: IIndexedDbTtlInput) {
     removed: async (channel: IIndexedDbTtlChannel, key: IStorageKey): Promise<void> => {
       /** An existing observation retains its original deadline solely for final conflict validation. */
       const prior = observations.get(identity(channel, key))
+      const before = prior?.deadline
       if (prior !== undefined) {
         prior.present = false
         prior.deadline = undefined
       }
-      await input.request(() => input.metadata.delete(metadataKey(channel, key)))
+      const stored =
+        prior === undefined
+          ? await input.request(() => input.metadata.get(metadataKey(channel, key)))
+          : undefined
+      const deadline = before ?? (stored?.[IndexedDbTtlLayout.expiresAt] as number | undefined)
+      await input.deadline(channel, key, deadline, undefined, () =>
+        input.request(() => input.metadata.delete(metadataKey(channel, key)))
+      )
     },
     /** A real TTL write uses the same native draft as the data and publishes only after commit. */
     expire: async (
@@ -146,17 +169,23 @@ export function createIndexedDbTtlAccess(input: IIndexedDbTtlInput) {
       const current = await observe(channel, key)
       if (!current.present) return false
       if (ms === 0) {
+        const before = current.deadline
         current.present = false
         current.expired = true
         current.deadline = undefined
         await input.remove(channel, key)
-        await input.request(() => input.metadata.delete(current.metadataKey))
+        await input.deadline(channel, key, before, undefined, () =>
+          input.request(() => input.metadata.delete(current.metadataKey))
+        )
       } else {
+        const before = current.deadline
         current.deadline = input.now() + ms
-        await input.request(() =>
-          input.metadata.put(
-            { [IndexedDbTtlLayout.expiresAt]: current.deadline },
-            current.metadataKey
+        await input.deadline(channel, key, before, current.deadline, () =>
+          input.request(() =>
+            input.metadata.put(
+              { [IndexedDbTtlLayout.expiresAt]: current.deadline },
+              current.metadataKey
+            )
           )
         )
         input.changed(channel, key)
@@ -167,8 +196,11 @@ export function createIndexedDbTtlAccess(input: IIndexedDbTtlInput) {
     persist: async (channel: IIndexedDbTtlChannel, key: IStorageKey): Promise<boolean> => {
       const current = await observe(channel, key)
       if (!current.present || current.deadline === undefined) return false
+      const before = current.deadline
       current.deadline = undefined
-      await input.request(() => input.metadata.delete(current.metadataKey))
+      await input.deadline(channel, key, before, undefined, () =>
+        input.request(() => input.metadata.delete(current.metadataKey))
+      )
       input.changed(channel, key)
       return true
     },
@@ -208,7 +240,14 @@ export function createIndexedDbTtlAccess(input: IIndexedDbTtlInput) {
           key[2] !== channel
         )
           break
-        await input.request(() => cursor!.delete())
+        const before = cursor.value?.[IndexedDbTtlLayout.expiresAt] as number | undefined
+        const encoded = key[3]
+        const original = typeof encoded === 'string' ? decodeFlatStorageKey(encoded) : undefined
+        if (original === undefined)
+          throw new StorageContractError(StorageContractErrorCode.invalidArgument)
+        await input.deadline(channel, original, before, undefined, () =>
+          input.request(() => cursor!.delete())
+        )
         cursor = await input.request(() => {
           cursor!.continue()
           return cursorRequest
@@ -231,6 +270,32 @@ export function createIndexedDbTtlAccess(input: IIndexedDbTtlInput) {
       for (const value of observations.values())
         if (value.observedDeadline !== undefined && value.observedDeadline <= now) return value
       return undefined
+    },
+    /** Private undo restores the exact physical deadline without performing a business read. */
+    restore: async (
+      channel: IIndexedDbTtlChannel,
+      key: IStorageKey,
+      deadline: number | undefined
+    ): Promise<void> => {
+      const target = metadataKey(channel, key)
+      const stored = await input.request(() => input.metadata.get(target))
+      const before = stored?.[IndexedDbTtlLayout.expiresAt] as number | undefined
+      await input.deadline(channel, key, before, deadline, async () => {
+        if (deadline === undefined) await input.request(() => input.metadata.delete(target))
+        else
+          await input.request(() =>
+            input.metadata.put({ [IndexedDbTtlLayout.expiresAt]: deadline }, target)
+          )
+      })
+      input.changed(channel, key)
+    },
+    /** Physical image comparison never expires data or resamples a relative duration. */
+    deadline: async (
+      channel: IIndexedDbTtlChannel,
+      key: IStorageKey
+    ): Promise<number | undefined> => {
+      const stored = await input.request(() => input.metadata.get(metadataKey(channel, key)))
+      return stored?.[IndexedDbTtlLayout.expiresAt] as number | undefined
     }
   }
 }
