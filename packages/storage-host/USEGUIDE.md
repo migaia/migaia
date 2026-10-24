@@ -110,6 +110,8 @@ memory 的根操作在原并发 budget 内包住完整 pipeline：阶段修改�
 
 实体查询复用原不可变核心：`repo.query().index(name, keyOrRange).where(...).select(...).all()` 替代 `findManyBy`，`.stream()` 替代 `streamBy`。根查询与事务查询保留已安装的 query Feature 方法。此源的对象与字段条件在客户端执行；显式索引查询仍使用原生索引准备或权威扫描回退。比较器必须指定有限上限，候选由原有界堆保留。事务查询继承原 signal 和期限，终点不接另一个 context。
 
+实体查询的 `delete()` 与 `update(patch)` 使用同一共享选择与分页执行器。根仓储只开启一次原记录事务，`repo.in(tx)` 合入当前事务；计数表示本草稿实际接受的记录数，根调用在原生提交确认后才完成。补丁仍走仓储原校验、规范化、编码与唯一索引检查；校验、编码或唯一约束失败时，不提交这些修改；原生提交失败或结果未知仍沿所属后端报告，不自动重放。查询更新不能移动主键：补丁或规范化改变所选物理身份时，在写入前报 `INVALID_CONFIG`，不会覆盖另一个实体。删除按实际所选物理记录处理，即使迁移后的逻辑主键已经不同。缺少真实记录事务的自定义纯 KV 后端在修改前报 `UNSUPPORTED_CAPABILITY`，不退回非原子逐项写。
+
 ```ts
 import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
 import { defineEntity } from '@migaia/storage-host/entity'
@@ -275,3 +277,5 @@ PENDING-USER-REVIEW：dropOrg 遇到存活的全局 journal 时，原私有 name
 redo 的显式后端选择缺少 WAL 时在安装阶段拒绝；replay 可返回原通知回调，只在 WAL complete 成功后派发，通知失败仅报告，不改变已完成结果。
 
 没有原 native changes 或 redo 接点的后端不能仅因 WAL 插件存在而准入；该组合在配置准备阶段报 UNSUPPORTED_CAPABILITY，避免原普通写绕过所选恢复。
+
+实体查询的 `skip`、`limit`、`distinct`、`after` 和排序分支保留 `onInvalid` 与原 Feature 方法。选源必须先于其它链式步骤，且 `index` / `range` 只能选一次；selector 排序可以继续追加 selector，不能切换 comparator，comparator 必须先用 `limit` 给出有限页或调用 `first`。绕过类型的结构违规在读取前报 `INVALID_CONFIG`。默认 comparator 与显式 comparator 均由原共享查询按 `skip + limit` 保留有界候选，然后分页；重复 `skip` / `limit` 取最后值，`limit(0)` 不读取候选。`count` 保留分页但不执行排序或投影。selector 的同步键校验复用原 portable key owner；用户 selector 抛错保存在 `EXTENSION_FAILED` 的首层 `cause`。
