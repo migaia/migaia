@@ -99,9 +99,9 @@ try {
 }
 ```
 
-只选择需要的条目。`changeFeed` 需要同时显式选择 `notifications`，但不会替调用方安装；选择 `reactiveFeature(indexedDbBackendKind)` 后的 `.live()` 也需要 `notifications`，缺少时编码拒绝，不切换为轮询。缺少批量、journal、通知或变更流装配时调用对应入口，报 `@migaia/storage-web / INDEXED_DB_FEATURE_NOT_INSTALLED` 并指出所需 Feature；缺少 TTL 时 `store.use(ttl)` 由规范 capability owner 报 `@migaia/storage-contract / UNSUPPORTED_CAPABILITY`，消息指出 `ttl`。基础 `capabilities.secondaryIndexes`、`capabilities.batch`、`capabilities.changeFeed` 均为 false。已选择变更流仍须通过原生 realm/BroadcastChannel 准入。重新打开曾使用 TTL 的数据库时保留 TTL Feature 声明；基础读取不解释到期元数据。
+只选择需要的条目。`changeFeed` 需要同时显式选择 `notifications`，但不会替调用方安装；选择 `reactiveFeature(indexedDbBackendKind)` 后的 `.live()` 也需要 `notifications`，缺少时编码拒绝，不切换为轮询。memory 的 `.live()` 同样要求显式 `memoryNotificationsFeature()`；缺少时在 adapter/query 分配前报 `@migaia/storage-host / CHANGE_CONTROLLER_NOT_ASSEMBLED`。缺少批量、journal、通知或变更流装配时调用对应入口，报 `@migaia/storage-web / INDEXED_DB_FEATURE_NOT_INSTALLED` 并指出所需 Feature；缺少 TTL 时 `store.use(ttl)` 由规范 capability owner 报 `@migaia/storage-contract / UNSUPPORTED_CAPABILITY`，消息指出 `ttl`。基础 `capabilities.secondaryIndexes`、`capabilities.batch`、`capabilities.changeFeed` 均为 false。已选择变更流仍须通过原生 realm/BroadcastChannel 准入。重新打开曾使用 TTL 的数据库时保留 TTL Feature 声明；基础读取不解释到期元数据。未声明 TTL 的客户端覆盖、删除或清空目标时，会在同一原生事务清除该目标的旧期限；后续重建值不继承期限，也不会被另一 TTL 客户端按旧期限删除。
 
-`indexedDbJournalFeature()` 提供原生镜像、私有日志 namespace 和 undo 端点；全局记录还须在同一插件列表的后端之前显式安装 `storageJournalPlugin()`（来自 `@migaia/storage-host/journal`），并保留原 `journal` 配置。TTL 镜像只随 TTL Feature 维护。物理写入版本与墓碑保留在基础写路径，使已装 journal 的其他实例仍可识别修改、删除和重建冲突；基础路径不捕获镜像或创建日志。
+`indexedDbJournalFeature()` 提供原生镜像、私有日志 namespace 和 undo 端点；全局记录还须在同一插件列表的后端之前显式安装 `storageJournalPlugin()`（来自 `@migaia/storage-host/journal`），并保留原 `journal` 配置。journal 镜像读取和恢复原有物理期限，不替调用方启用 TTL 到期策略。物理写入版本与墓碑保留在基础写路径，使已装 journal 的其他实例仍可识别修改、删除和重建冲突；基础路径不捕获镜像或创建日志。
 
 ## 批量 KV 与结构键
 
@@ -186,13 +186,17 @@ import { records } from '@migaia/storage-contract'
 import { createStorageHost } from '@migaia/storage-host'
 import { indexedDbBackendKind, indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'
 import { reactiveFeature } from '@migaia/storage-web/features/reactive'
+import { indexedDbNotificationsFeature } from '@migaia/storage-web/features/indexed-db-notifications'
 
 const runtime = createRuntime()
 const host = await createStorageHost({
   plugins: [
     indexedDbBackendPlugin(
       { dbName: 'my-app' },
-      { reactive: reactiveFeature(indexedDbBackendKind) }
+      {
+        notifications: indexedDbNotificationsFeature(),
+        reactive: reactiveFeature(indexedDbBackendKind)
+      }
     )
   ]
 })

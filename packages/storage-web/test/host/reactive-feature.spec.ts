@@ -2,7 +2,13 @@ import { memoryTestFeatures } from '../helpers/memory-features.js'
 import { createRuntime } from '@migaia/reactive'
 import { asyncDisposeKey } from '@migaia/plugin-host'
 import { records } from '@migaia/storage-contract'
-import { createStorageHost, memoryBackendKind, memoryBackendPlugin } from '@migaia/storage-host'
+import {
+  createStorageHost,
+  memoryBackendKind,
+  memoryBackendPlugin,
+  STORAGE_HOST_SOURCE,
+  StorageErrorCode
+} from '@migaia/storage-host'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { describe, expect, it, vi } from 'vitest'
 import { reactiveFeature } from '../../src/features/reactive.js'
@@ -50,6 +56,43 @@ describe('reactive Feature', () => {
       expect(first.state.value.status).toBe('disposed')
       expect(second.state.value.status).toBe('disposed')
       expect(runtime.computed(() => 'borrowed').value).toBe('borrowed')
+    } finally {
+      factory.mockRestore()
+    }
+  })
+
+  it('rejects memory live without notifications before adapter or query admission', async () => {
+    /** Capture the actual service so absence is proven before its original adapter allocation. */
+    const services: reactiveModule.IStorageReactiveService[] = []
+    const create = reactiveModule.createStorageReactiveService
+    const factory = vi
+      .spyOn(reactiveModule, 'createStorageReactiveService')
+      .mockImplementation((scheduler) => {
+        const service = create(scheduler)
+        services.push(service)
+        return service
+      })
+    try {
+      const host = await createStorageHost({
+        plugins: [memoryBackendPlugin(undefined, { reactive: reactiveFeature(memoryBackendKind) })]
+      })
+      try {
+        const register = vi.spyOn(services[0]!, 'registerAdapter')
+        const createQuery = vi.spyOn(services[0]!, 'createQuery')
+        const store = host.backend('memory')
+        await store.putRecord({ value: 'base remains usable' }, 'record')
+        await expect(store.getRecord('record')).resolves.toEqual({ value: 'base remains usable' })
+        expect(() => store.use(records).query().live({ runtime: createRuntime() })).toThrow(
+          expect.objectContaining({
+            source: STORAGE_HOST_SOURCE,
+            code: StorageErrorCode.changeControllerNotAssembled
+          })
+        )
+        expect(register).not.toHaveBeenCalled()
+        expect(createQuery).not.toHaveBeenCalled()
+      } finally {
+        await host.dispose()
+      }
     } finally {
       factory.mockRestore()
     }
