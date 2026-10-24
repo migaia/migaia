@@ -20,6 +20,25 @@ console.log(decodeStorageJournalImage(image).value)`,
 ]
 /** Application extensions retain their exact inputs while the host owns installation and cleanup. */
 export const storageHostCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
+  IStorageJournalRedoBinding: [
+    {
+      title: t('Keep redo scope authority bounded', '限制 redo 的 scope 权限'),
+      problem: t(
+        'Text authors must authenticate a real scope without returning their raw store.',
+        '文本作者须认证真实 scope，而不返回 raw store。'
+      ),
+      example: `import type { IStorageJournalRedoBinding } from '@migaia/storage-host'
+import type { ITransactionScope } from '@migaia/storage-contract'
+function transactionId(binding: IStorageJournalRedoBinding, scope: Omit<ITransactionScope, 'use'>): string {
+  return binding.transactionInfo(scope).id
+}
+console.log(typeof transactionId)`,
+      result: t(
+        'Prints function. The actual binding is issued only by an original admitted text owner; this type grants no installer, store or commit handle.',
+        '输出 function。实际 binding 仅由原已准入文本拥有者提供，此类型不授 installer、store 或 commit 句柄。'
+      )
+    }
+  ],
   encodeStorageJournalImage: portableImageCases,
   decodeStorageJournalImage: portableImageCases,
   IStorageFeatureClientResolver: [

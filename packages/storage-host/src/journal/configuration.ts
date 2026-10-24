@@ -1,6 +1,7 @@
 import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
 import type { IBinlogExt, IUndoLogExt, IWalExt, ILogStore } from '@migaia/logger/plugins/durable'
 import type { IStorageJournalConfiguration } from './types.js'
+import { createStorageRedoJournal } from './redo.js'
 import { createStorageNativeJournal } from './commit.js'
 import type { IStorageJournalBackendAccess } from './binding.js'
 import type { ILevelPluginExt } from '@migaia/logger/plugins'
@@ -13,6 +14,7 @@ export type IStorageJournalConfigurationSnapshot = Readonly<{
   binlogValues: boolean | undefined
   atomicBinlog: Readonly<Record<string, ILogStore>> | undefined
   atomicUndo: Readonly<Record<string, ILogStore>> | undefined
+  redoWal: IWalExt['wal'] | undefined
   indexedDbUndo: boolean | undefined
   telemetry: boolean | undefined
   atLevel?: ILevelPluginExt['atLevel']
@@ -33,8 +35,16 @@ export function snapshotStorageJournalConfiguration(
   input: Exclude<IStorageJournalConfiguration, Function>
 ): IStorageJournalConfigurationSnapshot {
   try {
-    const { logger, namespace, binlogValues, atomicBinlog, atomicUndo, indexedDbUndo, telemetry } =
-      input
+    const {
+      logger,
+      namespace,
+      binlogValues,
+      atomicBinlog,
+      atomicUndo,
+      indexedDbUndo,
+      redoWal,
+      telemetry
+    } = input
     if (
       typeof logger !== 'object' ||
       logger === null ||
@@ -49,6 +59,12 @@ export function snapshotStorageJournalConfiguration(
     const atLevel: unknown = telemetry === true ? Reflect.get(logger, 'atLevel') : undefined
     if (telemetry === true && typeof atLevel !== 'function')
       throw new StorageContractError(StorageContractErrorCode.unsupported)
+    /** Preserve the original binlog, undo, wal observation order and receiver identities. */
+    const binlog = Reflect.get(logger, 'binlog') as IBinlogExt['binlog'] | undefined
+    const undo = Reflect.get(logger, 'undo') as IUndoLogExt['undo'] | undefined
+    const wal = Reflect.get(logger, 'wal') as IWalExt['wal'] | undefined
+    if (redoWal !== undefined && redoWal !== wal)
+      throw new StorageContractError(StorageContractErrorCode.unsupported)
     return Object.freeze({
       ...(typeof atLevel === 'function'
         ? {
@@ -57,15 +73,16 @@ export function snapshotStorageJournalConfiguration(
           }
         : {}),
       logger: Object.freeze({
-        binlog: Reflect.get(logger, 'binlog') as IBinlogExt['binlog'] | undefined,
-        undo: Reflect.get(logger, 'undo') as IUndoLogExt['undo'] | undefined,
-        wal: Reflect.get(logger, 'wal') as IWalExt['wal'] | undefined
+        binlog,
+        undo,
+        wal
       }),
       namespace,
       binlogValues,
       atomicBinlog: snapshotSelections(atomicBinlog),
       atomicUndo: snapshotSelections(atomicUndo),
       indexedDbUndo,
+      redoWal,
       telemetry
     })
   } catch (cause) {
@@ -84,6 +101,23 @@ export function prepareStorageJournalConfiguration(
     'report' | 'onBinlogAppendError' | 'beforeRecover' | 'afterRecover' | 'onRecoverError'
   >
 ) {
+  if (access.binding.redo !== undefined && options.logger.wal !== undefined) {
+    if (
+      options.redoWal !== options.logger.wal ||
+      options.logger.undo !== undefined ||
+      options.atomicBinlog !== undefined ||
+      options.atomicUndo !== undefined
+    )
+      return Promise.reject(new StorageContractError(StorageContractErrorCode.unsupported))
+    return createStorageRedoJournal({
+      access,
+      backend,
+      namespace: options.namespace,
+      logger: options.logger,
+      binlogValues: options.binlogValues,
+      ...observation
+    })
+  }
   if (options.logger.binlog === undefined && options.logger.undo === undefined)
     return Promise.resolve(undefined)
   if (

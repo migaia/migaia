@@ -447,12 +447,27 @@ console.log(host.extensions.label('draft'))`,
     }
   },
   types: {
+    IStorageJournalRedoBinding: {
+      summary: t(
+        'Original text scope authentication, native protect/apply/replay/seal callbacks. No new queue, raw store, native transaction or close authority is returned.',
+        '原文本 scope 认证及物理 protect/apply/replay/seal 回调，不返回新队列、raw store、原生事务或关闭权。'
+      ),
+      example: storageHostCases.IStorageJournalRedoBinding![0]!.example,
+      members: {}
+    },
     IStorageJournalOptions: {
       summary: t(
         'Borrow a logger with a stable namespace and explicit same-registration atomicBinlog/atomicUndo handles by backend id. telemetry=true requires the actual level plugin atLevel port and emits ordinary storage-category entries without changing payload/Error references, including the first org endpoint after its original preparation. Global journal selects an async bootstrap stage, so sync methods reject with the original ASYNC_STAGE_IN_SYNC_ENTRY before their terminal.',
         '借用 logger，固定 namespace，按 backend id 显式选择同 registration 的 atomicBinlog/atomicUndo；telemetry=true 要求真实 level 插件 atLevel 接点，沿普通 storage 分类条目交付 payload 与原 Error 引用，首组织终点也在原准备后记录；全局 journal 选择异步 bootstrap stage，同步方法在终点前报原 ASYNC_STAGE_IN_SYNC_ENTRY。'
       ),
-      members: {}
+      members: {
+        redoWal: {
+          summary: t(
+            'Explicitly select the exact logger.wal object whose latest pending index all redo participants share. Independent caches and matching namespace strings are insufficient.',
+            '显式选择所有 redo 参与者共享最新 pending 的精确 logger.wal 对象；独立缓存与同名 namespace 不够。'
+          )
+        }
+      }
     },
     IStorageJournalInitializerContext: {
       summary: t(
