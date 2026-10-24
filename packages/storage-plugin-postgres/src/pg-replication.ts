@@ -324,6 +324,8 @@ export function createPgReplication(
       let failed = false
       let stopAbort = () => {}
       let streaming: Promise<unknown> | undefined
+      /** Accepted readiness I/O drains before this original resource reports startup failure. */
+      let startup: Promise<void> | undefined
       /**
        * The original peer start port identifies this backend before readiness can fail; cleanup
        * never waits for a successor consuming the same slot.
@@ -333,6 +335,7 @@ export function createPgReplication(
         stopAbort()
         await service.stop()
         await streaming
+        await startup
         while (
           nativePid !== undefined &&
           (await query(pool, 'SELECT pid FROM pg_stat_activity WHERE pid=$1', [nativePid])).rows
@@ -362,7 +365,7 @@ export function createPgReplication(
       }
       service.on('error', fail)
       service.on('start', () => {
-        void (async () => {
+        startup = (async () => {
           const row = (
             await query(pool, 'SELECT active_pid FROM pg_replication_slots WHERE slot_name=$1', [
               options.slot

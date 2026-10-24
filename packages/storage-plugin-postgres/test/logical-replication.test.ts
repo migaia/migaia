@@ -135,7 +135,7 @@ it('replays partial multi-org commits and confirms only complete caller-processe
 })
 
 /** A real replication transport must reject startup failures instead of leaving open pending. */
-for (const mode of ['pid-query', 'abort'] as const) {
+for (const mode of ['pid-query', 'abort', 'ready-query-abort'] as const) {
   it('drains and rejects actual replication startup ' + mode, async () => {
     const connectionString = process.env.MIGAIA_PG_URL
     const publication = process.env.MIGAIA_PG_PUBLICATION
@@ -149,6 +149,7 @@ for (const mode of ['pid-query', 'abort'] as const) {
     const original = new Error('replication-startup-original')
     const cancellation = new AbortController()
     let reported: unknown
+    let startupSettled = false
     /** Intercept only the pool readiness query; original native clients keep their real receiver. */
     const observedPool = new Proxy(pool, {
       get(target, key, receiver) {
@@ -167,7 +168,22 @@ for (const mode of ['pid-query', 'abort'] as const) {
             text.includes('SELECT active_pid')
           )
             throw original
-          const result = await Reflect.apply(target.query, target, args)
+          const waiting =
+            mode === 'ready-query-abort' &&
+            typeof text === 'string' &&
+            text.includes('SELECT active_pid')
+          if (waiting && input !== null && typeof input === 'object')
+            args[0] = {
+              ...input,
+              text: text.replace(
+                'FROM pg_replication_slots',
+                'FROM pg_replication_slots CROSS JOIN pg_sleep(0.075)'
+              )
+            }
+          const pending = Reflect.apply(target.query, target, args)
+          if (waiting) cancellation.abort(original)
+          const result = await pending
+          if (waiting) startupSettled = true
           if (mode === 'abort' && typeof text === 'string' && text.includes('FROM pg_database'))
             cancellation.abort(original)
           return result
@@ -192,13 +208,14 @@ for (const mode of ['pid-query', 'abort'] as const) {
           { signal: cancellation.signal }
         )
       ).rejects.toMatchObject({
-        code: mode === 'abort' ? 'ABORTED' : 'SQL_FAILED',
+        code: mode === 'pid-query' ? 'SQL_FAILED' : 'ABORTED',
         cause: original
       })
       expect(reported).toMatchObject({
-        code: mode === 'abort' ? 'ABORTED' : 'SQL_FAILED',
+        code: mode === 'pid-query' ? 'SQL_FAILED' : 'ABORTED',
         cause: original
       })
+      if (mode === 'ready-query-abort') expect(startupSettled).toBe(true)
       expect((await pool.query('SELECT 1::int4 AS alive')).rows[0]).toEqual({ alive: 1 })
     } finally {
       await pool.query('SELECT pg_drop_replication_slot($1)', [slot])
