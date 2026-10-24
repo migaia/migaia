@@ -604,7 +604,8 @@ export async function createPostgresStore<T>(
               scope,
               PgOperation.get,
               () => textKey(key),
-              (state) => readPg(state, tables, 'text', key) as Promise<string | null>
+              (state, _current, input) =>
+                readPg(state, tables, 'text', input) as Promise<string | null>
             ),
           set: (key, value, options) =>
             scoped(

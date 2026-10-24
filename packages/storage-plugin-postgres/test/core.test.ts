@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
 import postgres from 'postgres'
 import { describe, it, expect, onTestFinished } from 'vitest'
-import { createStorageHost } from '@migaia/storage-host'
+import { createStorageHost, definePlugin } from '@migaia/storage-host'
 import {
   kv,
   records,
@@ -149,4 +149,39 @@ describe.each(['pg', 'postgres-js'] as const)('%s real native core', (adapter) =
         .run((scope) => scope.get('none'))
     ).toBeNull()
   })
+})
+
+/** The actual stage-transformed key must reach the original scoped read, just as root reads do. */
+it('uses pipeline input for the original scoped text get', async () => {
+  const pool = new Pool({ connectionString })
+  const transform = definePlugin('pg-input-transform', (core) => ({
+    install() {
+      core.useAsyncPipeline((request, next) =>
+        next(
+          request.operation === 'get' && request.scope !== undefined
+            ? { ...request, input: 'transformed' }
+            : request
+        )
+      )
+      return {}
+    }
+  }))
+  const host = await createStorageHost({
+    plugins: [
+      postgresBackendPlugin({
+        driver: pgDriver(pool),
+        prefix: 'pg_input_' + randomUUID().slice(0, 8)
+      }),
+      transform
+    ] as const
+  })
+  onTestFinished(async () => {
+    await host.dispose()
+    await pool.end()
+  })
+  const store = host.backend('postgres')
+  await store.set('original', 'old')
+  await store.set('transformed', 'new')
+  expect(await store.get('original')).toBe('old')
+  expect(await store.transaction((scope) => scope.get('original'))).toBe('new')
 })
