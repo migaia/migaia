@@ -572,6 +572,12 @@ console.log(host.extensions.label('draft'))`,
         'descriptor 捕获的原生 I/O 与不可变 forOrg 投影，不使用公开 KV 前缀。'
       ),
       members: {
+        requiresIndexedDbUndo: {
+          summary: t(
+            'Optional true native fact captured once. A logger with undo requires indexedDbUndo:true before terminal I/O; absent facts preserve other backends.',
+            '可选 true 原生事实，单读捕获；logger 含 undo 时原生终点 I/O 前要求 indexedDbUndo:true，缺省保持其它后端语义。'
+          )
+        },
         lockTarget: {
           summary: t(
             'Map a private image identity back onto the original canonical point lock. Native undo requires the backend-owned mapping and never builds a parallel lock registry.',

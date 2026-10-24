@@ -86,6 +86,12 @@ export function prepareStorageJournalConfiguration(
 ) {
   if (options.logger.binlog === undefined && options.logger.undo === undefined)
     return Promise.resolve(undefined)
+  if (
+    access.binding.requiresIndexedDbUndo === true &&
+    options.logger.undo !== undefined &&
+    options.indexedDbUndo !== true
+  )
+    return Promise.reject(new StorageContractError(StorageContractErrorCode.unsupported))
   return createStorageNativeJournal({
     access,
     backend,
