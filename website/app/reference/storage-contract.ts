@@ -87,6 +87,22 @@ const conflictMember: IMemberDoc = {
   values: { enum: 'ConflictPolicy' }
 }
 
+/** Explain and author-plan views share the same detached source-selection diagnostics. */
+const querySourceReasonMembers: Readonly<Record<string, IMemberDoc>> = {
+  sourceReason: {
+    summary: t(
+      'Optional reason why this native source or index was selected, captured without I/O.',
+      '无需访问数据即可捕获的可选理由，解释选择此原生来源或索引的原因。'
+    )
+  },
+  sourceCandidates: {
+    summary: t(
+      'Detached readonly index/reason candidates explaining alternatives considered by the original source author.',
+      '独立的只读索引与理由候选，解释原来源作者考虑过的其它选择。'
+    )
+  }
+}
+
 /** Operation fields validate intent; concrete backends own execution and cancellation timing. */
 const operationMembers: Readonly<Record<string, IMemberDoc>> = {
   signal: {
@@ -5184,6 +5200,7 @@ console.log(candidate.name, candidate.output)`
         '无需 I/O 得到 pushed/client 事实、保守 fullScan 与原生 source/index。'
       ),
       members: {
+        ...querySourceReasonMembers,
         pushed: {
           summary: {
             en: 'Ordered operations executed by the native source before returning candidate rows.',
@@ -5625,10 +5642,16 @@ console.log(candidate.name, candidate.output)`
     },
     IRecordQueryInput: {
       summary: t(
-        'The unchanged record execute argument shared by native scalar reductions.',
-        '原记录 execute 参数，与原生标量统计共享。'
+        'Record execute input shared by native reductions; optional selection carries one original terminal plan fact.',
+        '与原生统计共享的记录执行输入；可选 selection 仅携带原终点计划事实。'
       ),
       members: {
+        selection: {
+          summary: t(
+            'Optional opaque author fact from this exact terminal plan, returned unchanged only to the original native source. Omission adds no input key.',
+            '当前精确终点计划中的可选不透明作者事实，仅原样传回原生来源。省略时不增加输入键。'
+          )
+        },
         conditions: {
           summary: {
             en: 'Captured canonical payload conditions already validated by the shared parser.',
@@ -6073,6 +6096,20 @@ console.log(candidate.name, candidate.output)`
         requirePushdown: queryChainMembers.requirePushdown!
       }
     },
+    IQueryConditions: {
+      summary: t(
+        'Type-only reusable where overloads returning the caller-supplied exact branch type. Object, field/operator/value and synchronous predicate forms reuse the original field and operand constraints.',
+        '仅包含类型的可复用 where 重载，返回调用方指定的精确分支类型。对象、字段与运算符和值、同步谓词三种写法复用原字段和操作数约束。'
+      ),
+      scenarios: [
+        t(
+          'Adapt an entity branch without widening its conditions or copying the shared query field domain.',
+          '适配实体查询分支，同时保留精确条件约束，不复制共享查询字段域。'
+        )
+      ],
+      example: storageContractCases.createRecordQuery![0]!.example,
+      members: { where: queryChainMembers.where! }
+    },
     IQueryChain: {
       summary: t(
         'Immutable filtering and one projection compose over the original read terminals.',
@@ -6087,12 +6124,45 @@ console.log(candidate.name, candidate.output)`
       example: storageContractCases.createRecordQuery![0]!.example,
       members: queryChainMembers
     },
+    IRecordQuerySourcePlan: {
+      summary: t(
+        'Readonly terminal-local source facts returned to the original planner. Only the author interprets selection; explain exposes source diagnostics without exposing that opaque fact.',
+        '返回原规划器的只读终点局部来源事实。只有作者解释 selection；explain 仅公开来源诊断，不公开该不透明事实。'
+      ),
+      members: {
+        fullScan: {
+          summary: t(
+            'Optional true-only conservative scan fact: the selected native source may fall back to scanning. It can enlarge explain.fullScan, never claim a proven no-scan path.',
+            '只允许为 true 的可选保守扫描事实，表示选定原生来源仍可能回退扫描。只能扩大 explain.fullScan，不能声称已经证明无需扫描。'
+          )
+        },
+        pushdown: {
+          summary: t(
+            'Faithful native operations and operators for this exact selected source or index.',
+            '当前精确选定来源或索引能够忠实执行的原生操作与运算符。'
+          )
+        },
+        selection: {
+          summary: t(
+            'Optional immutable author-owned source fact passed unchanged to original execute, reduce, scoped mutation reads and watch.',
+            '可选的作者拥有的不可变来源事实，原样传给原 execute、reduce、事务写入读取与 watch。'
+          )
+        },
+        ...querySourceReasonMembers
+      }
+    },
     IRecordQuerySource: {
       summary: t(
         'Author seam with one execute callback returning the original unknown-row IStorageIterator; no new resource owner.',
         '作者接点：一个 execute 回调返回原 unknown 行 IStorageIterator，不新增资源 owner。'
       ),
       members: {
+        plan: {
+          summary: t(
+            'Optional pure source selection over the once-captured canonical leading where conditions. The original planner stops at its first chain barrier, captures the result once and reuses it for execution and explain; no extra parser or resource owner is added.',
+            '针对一次捕获的前缀规范 where 条件进行可选纯来源选择。原规划器在首个链屏障处停止，捕获一次结果并供执行与 explain 共用，不新增解析器或资源拥有者。'
+          )
+        },
         watch: {
           summary: t(
             'Optional native subscription callback; accepts the same complete native input and returns the original change iterator. Client steps reject before subscription; no shared event queue or lifetime wrapper is added.',
