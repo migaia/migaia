@@ -3,6 +3,7 @@ import type { IBinlogExt, IUndoLogExt, IWalExt, ILogStore } from '@migaia/logger
 import type { IStorageJournalConfiguration } from './types.js'
 import { createStorageNativeJournal } from './commit.js'
 import type { IStorageJournalBackendAccess } from './binding.js'
+import type { ILevelPluginExt } from '@migaia/logger/plugins'
 import { isStorageErrorFamily } from '../core/error-family.js'
 
 /** Configuration data stays with the original org cell; these maps grant no backend authority. */
@@ -14,6 +15,7 @@ export type IStorageJournalConfigurationSnapshot = Readonly<{
   atomicUndo: Readonly<Record<string, ILogStore>> | undefined
   indexedDbUndo: boolean | undefined
   telemetry: boolean | undefined
+  atLevel?: ILevelPluginExt['atLevel']
 }>
 
 /** Capture native handle selections once, preserving each exact original store object. */
@@ -43,7 +45,17 @@ export function snapshotStorageJournalConfiguration(
       )
     )
       throw new StorageContractError(StorageContractErrorCode.invalidArgument)
+    /** The actual level extension is borrowed only for explicitly selected telemetry. */
+    const atLevel: unknown = telemetry === true ? Reflect.get(logger, 'atLevel') : undefined
+    if (telemetry === true && typeof atLevel !== 'function')
+      throw new StorageContractError(StorageContractErrorCode.unsupported)
     return Object.freeze({
+      ...(typeof atLevel === 'function'
+        ? {
+            atLevel: (...args: Parameters<ILevelPluginExt['atLevel']>) =>
+              Reflect.apply(atLevel, logger, args)
+          }
+        : {}),
       logger: Object.freeze({
         binlog: Reflect.get(logger, 'binlog') as IBinlogExt['binlog'] | undefined,
         undo: Reflect.get(logger, 'undo') as IUndoLogExt['undo'] | undefined,
@@ -72,8 +84,6 @@ export function prepareStorageJournalConfiguration(
     'report' | 'onBinlogAppendError' | 'beforeRecover' | 'afterRecover' | 'onRecoverError'
   >
 ) {
-  if (options.telemetry)
-    return Promise.reject(new StorageContractError(StorageContractErrorCode.unsupported))
   if (options.logger.binlog === undefined && options.logger.undo === undefined)
     return Promise.resolve(undefined)
   return createStorageNativeJournal({

@@ -367,8 +367,8 @@ console.log(host.extensions.label('draft'))`,
   types: {
     IStorageJournalOptions: {
       summary: t(
-        'Borrow a logger with a stable namespace and explicit same-registration atomicBinlog/atomicUndo handles by backend id. telemetry=true requires the actual level plugin; selected unimplemented guarantees reject.',
-        '借用 logger，固定 namespace，按 backend id 显式选择同 registration 的 atomicBinlog/atomicUndo；telemetry=true 要求真实 level 插件，未实现的已选保证明确拒绝。'
+        'Borrow a logger with a stable namespace and explicit same-registration atomicBinlog/atomicUndo handles by backend id. telemetry=true requires the actual level plugin atLevel port and emits ordinary storage-category entries without changing payload/Error references.',
+        '借用 logger，固定 namespace，按 backend id 显式选择同 registration 的 atomicBinlog/atomicUndo；telemetry=true 要求真实 level 插件 atLevel 接点，沿普通 storage 分类条目交付 payload 与原 Error 引用。'
       ),
       members: {}
     },
