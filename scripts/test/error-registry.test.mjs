@@ -143,8 +143,9 @@ test('maps merged RPC codes and preserves capability graph ownership', () => {
   )
   /**
    * Codes later programs registered after the merge froze its fixture sets: probe reporting,
-   * forwarding, authentication sessions, provider generations, capability negotiation and the API
-   * audit's callback failures. Each already has its own registry row and owner tests.
+   * forwarding, authentication sessions, provider generations, capability negotiation, host
+   * admission and the API audit's callback failures. Each already has its own registry row and
+   * owner tests.
    */
   const laterAdded = {
     contract: ['CALLBACK_FAILED'],
@@ -154,6 +155,12 @@ test('maps merged RPC codes and preserves capability graph ownership', () => {
       'CHALLENGE_INVALID',
       'FORWARD_HOP_LIMIT',
       'FORWARD_LOOP',
+      'HOST_ASSEMBLER_DUPLICATE',
+      'HOST_FEATURE_DUPLICATE',
+      'HOST_PEER_NAME_DUPLICATE',
+      'HOST_PLUGIN_INVALID',
+      'HOST_TRANSPORT_DUPLICATE',
+      'HOST_TRANSPORT_MISSING',
       'PROBE_FAILED',
       'PROVIDER_GENERATION_MISMATCH',
       'PROVIDER_GENERATION_RETIRED',
