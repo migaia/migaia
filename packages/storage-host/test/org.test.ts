@@ -243,14 +243,28 @@ describe('immutable storage organizations', () => {
     const marker = Object.freeze({ value: 'original API data' })
     const plugin = definePlugin('nested', (core) => {
       const memory = core.getPublishedBackend('memory')
+      /** The original install-time controller owns composed work and its existing disposal drain. */
+      const controller = core.createChangeController({ backend: 'nested' })
       return {
         contextualExtensions: selected,
         install: () => ({
           archive: Object.freeze({
             marker,
             async put(this: IStoragePluginCallContext, key: string, value: string) {
-              await this.backend(memory).use(kv).set(key, value)
-              return this.orgId
+              const release = controller.beginMutation()
+              try {
+                return await core
+                  .getOrgContext(this.orgId)
+                  .execution.run(
+                    { operation: 'nested.put', input: { key, value } },
+                    async ({ key, value }) => {
+                      await this.backend(memory).use(kv).set(key, value)
+                      return this.orgId
+                    }
+                  )
+              } finally {
+                release()
+              }
             }
           }),
           data
@@ -259,6 +273,7 @@ describe('immutable storage organizations', () => {
     })
     const base = await createStorageHost({ plugins: [memoryBackendPlugin()] })
     const host = await base.use(plugin)
+    await host.detect()
     expect(reads).toBe(1)
     selected.push('data')
     const first = createOrgId()
