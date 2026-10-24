@@ -242,6 +242,20 @@ export function createEntityQuery<
       ),
       where,
       select,
+      delete: (ctx) =>
+        input.run(
+          () => prepare(query, limit, explicit).delete(ctx),
+          plan,
+          { ...selection, onInvalid: invalid },
+          (count) => count
+        ),
+      update: (patch, ctx) =>
+        input.run(
+          () => prepare(query, limit, explicit).update(patch, ctx),
+          plan,
+          { ...selection, onInvalid: invalid },
+          (count) => count
+        ),
       limit: (count: number) => {
         const bounded = query.limit(count)
         return wrap(

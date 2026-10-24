@@ -22,6 +22,7 @@ import {
   assertStorageKey,
   compareStorageKeys,
   createRecordQuery,
+  RecordQueryMethod,
   deriveTransactionIterator,
   nextTransactionIterator,
   type IRecordQuerySource,
@@ -1527,12 +1528,14 @@ export const createRepository = <
     scope: ITransactionScope,
     selection: IEntityQuerySourceSelection<TDomain>,
     onRead?: () => void,
-    orderedSource = true
+    orderedSource = true,
+    physicalIds?: Map<string, IStorageKey>
   ): IStorageIterator<readonly [IStorageKey, TDomain]> => {
     backend.assertScope(scope)
     const source = scope.iterateRecords()
     const rows = createOrderedRecordIndex<readonly [IStorageKey, TDomain]>()
-    const seen = new Set<string>()
+    /** Mutation reuses this existing deduplication table to retain actual physical identities. */
+    const seen = physicalIds ?? new Set<string>()
     let prepared = false
     let initialized = false
     let cursor: IStorageIterator<[IStorageKey, unknown]> | undefined
@@ -1634,7 +1637,8 @@ export const createRepository = <
               ordering = [first, id]
               if (orderedSource) encodedOrdering = encodeIndexOrder(first, id)
             } else if (!isStorageKeyInRange(id, selection.range)) continue
-            seen.add(identity)
+            if (seen instanceof Map) seen.set(identity, physicalId)
+            else seen.add(identity)
             if (!orderedSource) return { done: false, value: [ordering, value] as const }
             rows.set(encodedOrdering ?? encodeOrderedStorageKey(id, store.backend), [
               ordering,
@@ -1654,7 +1658,7 @@ export const createRepository = <
           await cursor?.dispose()
         } finally {
           rows.clear()
-          seen.clear()
+          if (physicalIds === undefined) seen.clear()
         }
       }
     )
@@ -1894,6 +1898,63 @@ export const createRepository = <
         tieBreakByKey:
           selectedSource.index === undefined ? undefined : { direction: 'next', parts: true },
         pushdown: { source: EntityState.querySource, operations: [], operators: [] },
+        mutate: (request, run) => {
+          if (recordStore === undefined)
+            throw new StorageContractError(StorageContractErrorCode.unsupported, {
+              backend: store.backend
+            })
+          /** Capture the same observer/source facts before the original transaction can suspend. */
+          const selection = openingSelection ?? selectedSource
+          const orderedSource = openingPlan?.hasOrder !== true
+          const counter = queryStages === undefined ? undefined : { readCount: 0 }
+          opened = counter
+          const onRead =
+            counter === undefined
+              ? undefined
+              : () => {
+                  counter.readCount++
+                }
+          /** The authentic operation owns selection, repository writes and the existing first error. */
+          const apply = (target: ITransactionScope): Promise<number> =>
+            runTransactionOperation(target, async (current) => {
+              backend.assertScope(current)
+              /** This is the source's original seen table, not an index or a retained row cache. */
+              const physicalIds = new Map<string, IStorageKey>()
+              try {
+                return await run({
+                  execute: () =>
+                    scopedQuerySource(current, selection, onRead, orderedSource, physicalIds),
+                  accept: async (_key, value) => {
+                    const id = idOf(name, keyProp, value as TDomain, store.backend)
+                    const physicalId = physicalIds.get(encodeFlatStorageKey(id))
+                    if (physicalId === undefined)
+                      throw new StorageError(StorageErrorCode.invalidConfig, {
+                        backend: store.backend,
+                        cause: new TypeError(EntityText.queryIdentityChanged)
+                      })
+                    /** Count only rows still present in this same draft after selection callbacks. */
+                    const raw =
+                      (await current.getRecord(composeRepositoryKey(name, physicalId))) ??
+                      (await current.getRecord(composeStructuredKey(name, physicalId)))
+                    if (raw === undefined) return false
+                    if (request.operation === RecordQueryMethod.delete)
+                      await bindRepository(current).remove(physicalId)
+                    else
+                      await bindRepository(current, physicalId).put({
+                        ...(value as TDomain),
+                        ...request.patch
+                      })
+                    return true
+                  }
+                })
+              } finally {
+                physicalIds.clear()
+              }
+            })
+          return scope === undefined
+            ? recordStore.transaction(apply, { ...request.ctx, concurrency: request.concurrency })
+            : apply(scope)
+        },
         execute: ({ ctx }) => {
           const selection = openingSelection ?? selectedSource
           const counter = queryStages === undefined ? undefined : { readCount: 0 }
@@ -1944,7 +2005,8 @@ export const createRepository = <
   /** Per-repository final changes belong to one authentic original transaction identity. */
   const uniqueStates = new WeakMap<ITransactionInfo, WeakRef<Map<string, IEntityUniqueMutation>>>()
   const bindRepository = (
-    scope: ITransactionScope
+    scope: ITransactionScope,
+    expectedIdentity?: IStorageKey
   ): IEntityTransactionScope<TDomain, TIndexes, TAugmentMethods> => {
     const info = backend.assertScope(scope)
     let stateReference = uniqueStates.get(info)
@@ -1993,6 +2055,12 @@ export const createRepository = <
           const runtime = entityRuntime(current)
           const prepared = await toEnvelope(value, context, runtime)
           const id = idOf(name, keyProp, prepared.domain, store.backend)
+          /** Query patches cannot move a physical record or overwrite another entity identity. */
+          if (expectedIdentity !== undefined && compareStorageKeys(id, expectedIdentity) !== 0)
+            throw new StorageError(StorageErrorCode.invalidConfig, {
+              backend: store.backend,
+              cause: new TypeError(EntityText.queryIdentityChanged)
+            })
           const raw = await encodeEnvelope(prepared.envelope, context, runtime)
           /** A historical repository handle is usable only after this native snapshot confirms it. */
           const handle =
@@ -2682,7 +2750,7 @@ export const createRepository = <
       return { scanned, eligible, migrated, skipped, alreadyCurrent, conflicted }
     },
 
-    in: bindRepository,
+    in: (scope) => bindRepository(scope),
     lockKey: (id) => {
       assertStorageKey(id, store.backend)
       return records

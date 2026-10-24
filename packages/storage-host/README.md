@@ -109,6 +109,8 @@ memory 的根操作在原并发 budget 内包住完整 pipeline：阶段修改�
 
 实体查询复用原不可变核心：`repo.query().index(name, keyOrRange).where(...).select(...).all()` 替代 `findManyBy`，`.stream()` 替代 `streamBy`。根查询与事务查询保留已安装的 query Feature 方法。此源的对象与字段条件在客户端执行；显式索引查询仍使用原生索引准备或权威扫描回退。比较器必须指定有限上限，候选由原有界堆保留。事务查询继承原 signal 和期限，终点不接另一个 context。
 
+实体查询的 `delete()` 与 `update(patch)` 使用同一共享选择与分页执行器。根仓储只开启一次原记录事务，`repo.in(tx)` 合入当前事务；计数表示本草稿实际接受的记录数，根调用在原生提交确认后才完成。补丁仍走仓储原校验、规范化、编码与唯一索引检查；校验、编码或唯一约束失败时，不提交这些修改；原生提交失败或结果未知仍沿所属后端报告，不自动重放。查询更新不能移动主键：补丁或规范化改变所选物理身份时，在写入前报 `INVALID_CONFIG`，不会覆盖另一个实体。删除按实际所选物理记录处理，即使迁移后的逻辑主键已经不同。缺少真实记录事务的自定义纯 KV 后端在修改前报 `UNSUPPORTED_CAPABILITY`，不退回非原子逐项写。
+
 ```ts
 import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
 import { defineEntity } from '@migaia/storage-host/entity'

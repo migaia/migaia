@@ -2,6 +2,8 @@
 export const EntityText = {
   /** Predicates are synchronous boolean decisions; async mapping belongs to select. */
   queryPredicateBoolean: 'Entity query predicate must return a synchronous boolean',
+  /** Query patches preserve their selected physical identity instead of moving or replacing a row. */
+  queryIdentityChanged: 'Entity query update cannot change the record identity',
 
   /** Invalid callbacks are rejected before entering a native transaction. */
   batchCallbackMustBeAFunction: 'batch callback must be a function',

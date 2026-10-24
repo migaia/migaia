@@ -2,6 +2,7 @@ import { expect, it, vi } from 'vitest'
 import { asyncDisposeKey } from '@migaia/plugin-host'
 import { deferred } from '@migaia/utils/promise'
 import { walkErrorCauses } from '@migaia/utils/error'
+import { composeRepositoryKey } from '../../src/entity/key.js'
 import { defineEntity } from '../../src/entity.js'
 import {
   createStorageHost,
@@ -20,6 +21,103 @@ const rows = defineEntity<IRow>()({
   key: 'id',
   indexes: { group: { path: 'group' } },
   onDiagnostic: () => {}
+})
+
+it('writes only the selected page through the original entity transaction', async () => {
+  const store = await memoryBackend()
+  const repo = rows.connect(store)
+  await repo.put({ id: 'a', group: 'one', score: 1 })
+  await repo.put({ id: 'b', group: 'one', score: 2 })
+  await repo.put({ id: 'c', group: 'two', score: 3 })
+  expect(
+    await repo
+      .query()
+      .where({ group: 'one' })
+      .orderBy((row) => row.score, 'desc')
+      .limit(1)
+      .update({ score: 8 })
+  ).toBe(1)
+  expect(await repo.get('a')).toMatchObject({ score: 1 })
+  expect(await repo.get('b')).toMatchObject({ score: 8 })
+  expect(await repo.query().index('group', 'two').delete()).toBe(1)
+  expect(await repo.get('c')).toBeUndefined()
+})
+
+it('keeps entity query deletion and text writes in the same authentic transaction', async () => {
+  const store = await memoryBackend()
+  const repo = rows.connect(store)
+  await repo.put({ id: 'a', group: 'one', score: 1 })
+  const primary = new Error('entity delete rollback')
+  const failed = await store
+    .transaction(async (scope) => {
+      expect(await repo.in(scope).query().where({ group: 'one' }).delete()).toBe(1)
+      await scope.set('summary', 'removed')
+      throw primary
+    })
+    .catch((error) => error)
+  expect(walkErrorCauses(failed)).toContain(primary)
+  expect(await repo.get('a')).toMatchObject({ score: 1 })
+  expect(await store.get('summary')).toBeUndefined()
+  await store.transaction(async (scope) => {
+    expect(await repo.in(scope).query().where({ group: 'one' }).delete()).toBe(1)
+    await scope.set('summary', 'removed')
+  })
+  expect(await repo.get('a')).toBeUndefined()
+  expect(await store.get('summary')).toBe('removed')
+})
+
+it('rolls back failed query patches and refuses identity changes before any entity write', async () => {
+  const store = await memoryBackend()
+  const primary = new Error('entity patch validation')
+  const definition = defineEntity<IRow>()({
+    name: 'query-patch',
+    key: 'id',
+    schema: {
+      name: 'query-patch',
+      validate: async (value) => {
+        const row = value as IRow
+        if (row.id === 'b' && row.score === 99) throw primary
+        return row
+      }
+    }
+  })
+  const repo = definition.connect(store)
+  await repo.put({ id: 'a', group: 'one', score: 1 })
+  await repo.put({ id: 'b', group: 'one', score: 2 })
+  const failed = await repo
+    .query()
+    .update({ score: 99 })
+    .catch((error) => error)
+  expect(walkErrorCauses(failed)).toContain(primary)
+  expect(await repo.get('a')).toMatchObject({ score: 1 })
+  expect(await repo.get('b')).toMatchObject({ score: 2 })
+  await expect(repo.query().where({ id: 'a' }).update({ id: 'b', score: 5 })).rejects.toMatchObject(
+    { code: 'INVALID_CONFIG' }
+  )
+  expect(await repo.get('a')).toMatchObject({ score: 1 })
+  expect(await repo.get('b')).toMatchObject({ score: 2 })
+  expect(await repo.query().where({ id: 'a' }).update({ id: 'a', score: 5 })).toBe(1)
+  expect(await repo.get('a')).toMatchObject({ score: 5 })
+})
+
+it('deletes the actual selected physical record when migration changes its logical id', async () => {
+  const store = await memoryBackend()
+  const definition = defineEntity<IRow>()({
+    name: 'query-migrated',
+    key: 'id',
+    version: 2,
+    migrations: { 2: (value) => ({ ...(value as IRow), id: 'z' }) },
+    onDiagnostic: () => {}
+  })
+  const repo = definition.connect(store)
+  await store.putRecord(
+    { version: 1, state: { id: 'a', group: 'old', score: 1 } },
+    composeRepositoryKey('query-migrated', 'a')
+  )
+  await repo.put({ id: 'z', group: 'current', score: 2 })
+  expect(await repo.query().where({ group: 'old' }).delete()).toBe(1)
+  expect(await store.getRecord(composeRepositoryKey('query-migrated', 'a'))).toBeUndefined()
+  expect(await repo.get('z')).toMatchObject({ group: 'current', score: 2 })
 })
 
 it('keeps source branches immutable and shares index filtering, projection and bounded ordering', async () => {
