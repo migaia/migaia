@@ -6,6 +6,12 @@
  */
 import type { ILibraryReference, IMemberDoc, IText } from './contract.js'
 import { storageContractCases } from './storage-contract-cases.ts'
+import {
+  storageContractVectorSymbols,
+  storageContractVectorTypes,
+  storageContractVectorEnums,
+  storageVectorRerankMember
+} from './storage-contract-vector.js'
 
 /** Creates the localized versions of a source-backed reference sentence. */
 const t = (en: string, zh: string): IText => ({ en, zh })
@@ -1283,6 +1289,7 @@ const vectorQueryMembers: Readonly<Record<string, IMemberDoc>> = {
     ...queryChainMembers.distinct!,
     example: "const ids = await query.distinct('id').all()"
   },
+  rerank: storageVectorRerankMember,
   delete: queryDeleteMember
 }
 
@@ -2767,8 +2774,8 @@ export const storageContractReference: ILibraryReference = {
       ),
       params: {
         source: t(
-          'IVectorQuerySource captures native support, execute, optional exact/groupBy and the original resource key.',
-          'IVectorQuerySource 捕获原生支持、execute、可选 exact/groupBy 与原资源键。'
+          'IVectorQuerySource captures the original ranking cursor, exact/groupBy support and optional original request origin. Native Features require native: true; new reranked operations borrow the optional original beginOperation lease until scorer and cleanup settle.',
+          'IVectorQuerySource 捕获原排名游标、exact/groupBy 支持及可选原始请求来源；原生 Feature 需要 native: true，新增重排操作借可选原 beginOperation 租用，直到评分器和清理实际结算。'
         ),
         methods: t(
           'Optional original pure Feature functions; reserved names reject before I/O.',
@@ -2776,8 +2783,8 @@ export const storageContractReference: ILibraryReference = {
         )
       },
       returns: t(
-        'IVectorQueryBuilder; topK enables shared reads. Native filters cross payload callbacks before ranking; callbacks never refill hits.',
-        '返回 IVectorQueryBuilder；topK 开启共享读取。原生过滤跨 payload 回调在排名前执行；回调不补搜命中。'
+        'IVectorQueryBuilder; topK enables shared reads and one optional portable rerank over actual bounded hits. Native filters precede ranking; client predicates never refill hits. Reranked results retain engine score and add rerankScore without write, watch or strict-pushdown methods.',
+        '返回 IVectorQueryBuilder；topK 开启共享读取，以及对实际有界命中执行的可选可移植重排。原生条件在排名前过滤，客户端谓词不补搜；重排保留引擎 score 并增加 rerankScore，不再提供写入、订阅或严格下推方法。'
       ),
       example: storageContractCases.createVectorQuery![0]!.example,
       cases: storageContractCases.createVectorQuery
@@ -4501,7 +4508,8 @@ console.log(candidate.name, candidate.output)`
         '观察到的构造名称；非对象、名称缺失或访问失败时为空值。'
       ),
       example: `console.log(intrinsicConstructorName(new Date(0)))`
-    }
+    },
+    ...storageContractVectorSymbols
   },
   types: {
     IRecordQuery: {
@@ -5287,8 +5295,8 @@ console.log(candidate.name, candidate.output)`
     },
     IVectorQueryBuilderCore: {
       summary: t(
-        'Pre-topK construction retains native controls and Feature methods without exposing read terminals.',
-        'topK 前的向量构建保留原生排名控制与 Feature 方法，必须先声明有限 topK 才能读取。'
+        'Pre-topK construction retains native controls and Feature methods without exposing read terminals or portable rerank.',
+        'topK 前的向量构建保留原生排名控制与 Feature 方法，必须先声明有限 topK 才能读取或执行可移植重排。'
       ),
       scenarios: [
         t(
@@ -5301,8 +5309,8 @@ console.log(candidate.name, candidate.output)`
     },
     IVectorQueryBuilder: {
       summary: t(
-        'Pre-topK construction retains native controls and Feature methods without exposing read terminals.',
-        'topK 前的向量构建保留原生排名控制与 Feature 方法，必须先声明有限 topK 才能读取。'
+        'Pre-topK construction retains native controls and Feature methods without exposing read terminals or portable rerank.',
+        'topK 前的向量构建保留原生排名控制与 Feature 方法，必须先声明有限 topK 才能读取或执行可移植重排。'
       ),
       scenarios: [
         t(
@@ -5315,8 +5323,8 @@ console.log(candidate.name, candidate.output)`
     },
     IVectorQueryBase: {
       summary: t(
-        'Bounded vector reads retain native ranking and payload filtering without record aggregates, pages or arbitrary ordering.',
-        '有界向量查询读取原排名命中并过滤 payload，不提供记录统计、键集分页或任意排序。'
+        'Bounded vector reads retain native ranking and payload filtering, with an optional final client rerank. Record aggregates, keyset pages and selector/comparator ordering remain unavailable.',
+        '有界向量读取保留原生排名与 payload 过滤，可选择最终客户端重排；仍不提供记录统计、键集分页或选择器、比较器排序。'
       ),
       scenarios: [
         t(
@@ -5329,8 +5337,8 @@ console.log(candidate.name, candidate.output)`
     },
     IVectorQuery: {
       summary: t(
-        'Bounded vector queries preserve hit and Feature types; only explicitly groupable sources expose scalar payload grouping.',
-        '有界向量查询保留命中和 Feature 类型，仅显式支持分组的来源提供标量 payload 分组。'
+        'Bounded queries preserve payload, explicit vector state and Feature types. TGroupable alone grants scalar payload grouping; portable rerank returns a read-only stage whose grouping observes only retained topN hits.',
+        '有界查询保留负载、显式向量状态与 Feature 类型，仅 TGroupable 授予标量 payload 分组；可移植重排返回只读阶段，其分组只观察已保留的 topN 命中。'
       ),
       scenarios: [
         t(
@@ -5366,8 +5374,8 @@ console.log(candidate.name, candidate.output)`
     },
     IVectorQueryInput: {
       summary: t(
-        'Native pre-ranking conditions, topK, minScore, withVector and captured context.',
-        '原生排名前条件、topK、minScore、withVector 与捕获上下文。'
+        'Native pre-ranking conditions, topK, minScore, withVector and original captured context, plus opaque native data only after an explicit same-source refinement.',
+        '原生排名前条件、topK、minScore、withVector 与原捕获上下文；只有显式选择同来源原生派生后才增加不透明 native 数据。'
       ),
       members: {
         conditions: {
@@ -5385,10 +5393,16 @@ console.log(candidate.name, candidate.output)`
         withVector: {
           summary: t('Whether native hits include vectors.', '原生命中是否包含向量。')
         },
+        native: {
+          summary: t(
+            'Present only after an explicit native Feature refinement. The Feature captures and validates this opaque request; only the original execute callback interprets it.',
+            '仅在显式原生 Feature 派生后出现，由 Feature 捕获并校验此不透明请求，仅原 execute 回调解释其内容。'
+          )
+        },
         ctx: {
           summary: {
-            en: 'Original readonly vector-query operation context captured once.',
-            zh: '捕获一次的原始只读向量查询操作上下文。'
+            en: 'Original readonly vector-query operation context captured once; native refinement and portable rerank do not create a second budget or replace its caller signal.',
+            zh: '捕获一次的原只读向量查询上下文，原生派生与可移植重排不创建第二预算，也不替换调用方信号。'
           }
         }
       }
@@ -5399,6 +5413,24 @@ console.log(candidate.name, candidate.output)`
         '原生排名回调与捕获的支持、资源事实。'
       ),
       members: {
+        beginOperation: {
+          summary: t(
+            'Optional once-captured author callback returning the original provider operation release. Only a new accepted reranked terminal or stream next borrows it, and releases after the actual scorer and original cleanup settle; unselected paths and pre-I/O rejection acquire no lease.',
+            '可选且单次捕获的作者回调，返回原 provider 操作释放函数；只有新接纳的重排终点或 stream next 借用，评分器与原清理实际结算后释放，未选择路径及 I/O 前拒绝不取得租用。'
+          )
+        },
+        origin: {
+          summary: t(
+            'Optional once-captured original near vector, similarTo ID or recommendation ID lists, independent of native sample resolution. Original sources may omit it, but a new rerank then rejects before I/O with INVALID_ARGUMENT.',
+            '可选且单次捕获的原 near 向量、similarTo 身份或推荐身份列表，独立于原生样本解析；旧来源可省略，但新增 rerank 此时在 I/O 前以 INVALID_ARGUMENT 拒绝。'
+          )
+        },
+        native: {
+          summary: t(
+            'Optional exact true fact declaring that this original execute callback understands a selected Feature native request. Omission rejects new native refinement without changing ordinary queries.',
+            '可选且只能为 true 的事实，声明原 execute 回调理解已选择 Feature 的 native 请求；省略时拒绝新原生派生，普通查询保持原语义。'
+          )
+        },
         watch: {
           summary: t(
             'Optional native subscription callback; accepts the same complete native input and returns the original change iterator. Client steps reject before subscription; no shared event queue or lifetime wrapper is added.',
@@ -11950,7 +11982,8 @@ console.log(compareStorageKeys(key, ['users', 2]))`,
         zh: '提取单个真实能力令牌类型承载的原始接口类型。'
       },
       members: {}
-    }
+    },
+    ...storageContractVectorTypes
   },
   enums: (() => {
     /** The three reservation tables share original record names; reservation grants no family API. */
@@ -12094,6 +12127,10 @@ console.log(compareStorageKeys(key, ['users', 2]))`,
           withVector: t(
             'Reserve explicit vector inclusion in returned hits.',
             '保留明确要求在返回命中中包含向量数据的方法名称。'
+          ),
+          rerank: t(
+            'Reserve the portable client scorer available only after topK; its result is read-only and retains original engine scores.',
+            '保留仅在 topK 后提供的可移植客户端评分方法，其结果为只读并保留原引擎分数。'
           ),
           groupBy: t(
             'Reserve grouping only where native vector grouping is supported.',
@@ -12271,6 +12308,10 @@ console.log(compareStorageKeys(key, ['users', 2]))`,
           minScore: t(
             'Reject ranked vector hits below the selected score threshold.',
             '排除相似度分数低于所选门槛的已排名向量结果。'
+          ),
+          rerank: t(
+            'Score the actual bounded vector hits on the client, then keep stable descending rerankScore order and the selected topN.',
+            '在客户端为实际有界向量命中评分，再按 rerankScore 稳定降序保留所选 topN。'
           ),
           follow: t(
             'Follow a ground RDF predicate from the current forward relation.',
@@ -12479,6 +12520,14 @@ console.log(compareStorageKeys(key, ['users', 2]))`,
           '涵盖无效输入、键、能力缺失、释放和取消的稳定契约失败码。'
         ),
         values: {
+          rerankFailed: t(
+            'The application scorer threw or rejected; inspect the original error on cause without treating it as a native engine failure.',
+            '应用评分器抛错或拒绝，应检查 cause 上的原始错误，不将其误归为原生引擎失败。'
+          ),
+          rerankResultInvalid: t(
+            'The scorer result is not a dense array containing one finite numeric score for every candidate; correct the scorer output.',
+            '评分结果不是为每个候选提供一个有限数字的稠密数组，应修正评分器输出。'
+          ),
           queryEmptyResult: t(
             'A required-first terminal exhausted its original query; choose first or maybe when absence is expected.',
             '必须存在首项的终点耗尽了原查询；允许缺失时应改用首项或显式可选终点。'
@@ -12568,7 +12617,8 @@ console.log(compareStorageKeys(key, ['users', 2]))`,
             '每个二进制键缓冲区最多 `1048576` 字节，不累加全部缓冲区。'
           )
         }
-      }
+      },
+      ...storageContractVectorEnums
     }
   })(),
   enhancers: {}

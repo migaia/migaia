@@ -61,15 +61,15 @@ const readMembers: Record<string, IMemberDoc> = {}
 const reads = [
   [
     'all',
-    'Collect the retained hits in final reranking order.',
-    '按最终重排顺序收集所有保留候选。',
+    'Collect the retained hits in the final stage order.',
+    '按当前阶段的最终顺序收集所有保留候选。',
     'A Promise of the complete retained hit array.',
     '返回包含全部保留候选数组的 Promise。'
   ],
   [
     'first',
-    'Read the first retained hit and close the original source early.',
-    '读取首个保留候选，并提前关闭原数据源。',
+    'Read the first retained hit after the bounded stage and original source cleanup finish.',
+    '在有界阶段及原数据源清理完成后读取首个保留候选。',
     'The first hit, or undefined when no candidate remains.',
     '返回首个候选，没有剩余候选时返回 undefined。'
   ],
@@ -89,15 +89,15 @@ const reads = [
   ],
   [
     'exists',
-    'Observe whether any candidate survives the complete reranking and truncation.',
-    '观察完整重排与截断后是否仍存在候选。',
+    'Observe whether any candidate survives the complete stage ranking and truncation.',
+    '观察当前阶段完整排名与截断后是否仍存在候选。',
     'A boolean after original cursor cleanup finishes.',
     '原游标清理完成后返回是否存在候选的布尔值。'
   ],
   [
     'count',
-    'Count retained rows after the scorer and topN have selected the final set.',
-    '在评分器与 topN 选出最终集合后统计保留行。',
+    'Count retained rows after the current stage has selected its final bounded set.',
+    '在当前阶段选出最终有界集合后统计保留行。',
     'The retained row count, never the engine collection size.',
     '返回保留行数，而不是引擎集合的总数据量。'
   ],
@@ -105,8 +105,8 @@ const reads = [
     'stream',
     'Pull retained hits through the original storage iterator and its accepted-work cleanup.',
     '经原存储迭代器及其已接纳工作清理机制逐项取得保留候选。',
-    'The original IStorageIterator view; dispose it on early exit.',
-    '返回原 IStorageIterator 视图，提前退出时应释放。'
+    'An IStorageIterator from the original query reader; dispose it on early exit.',
+    '返回原查询读取器的 IStorageIterator，提前退出时应释放。'
   ]
 ] as const
 for (const [name, en, zh, resultEn, resultZh] of reads)
@@ -124,8 +124,8 @@ function read(query: IVectorRerankedQuery<unknown>) { return query.${name}() }`
   }
 readMembers.explain = {
   summary: t(
-    'Inspect the existing plan without reading data; rerank is explicitly a client step.',
-    '无需读取数据即可检查既有计划，重排明确显示为客户端步骤。'
+    'Inspect the existing plan without reading data; native source work and client steps retain their original boundaries.',
+    '无需读取数据即可检查既有计划，原生来源工作与客户端步骤保留各自边界。'
   ),
   returns: t(
     'A detached IQueryPlan describing pushed and client work.',
@@ -537,10 +537,23 @@ export const storageContractVectorTypes: ILibraryReference['types'] = {
       ...nativeReadMembers,
       select: {
         ...selectMember,
+        params: {
+          ...selectMember.params,
+          fields: t(
+            'One or more native hit fields such as id, score, payload or an explicitly requested vector; native results do not yet carry rerankScore.',
+            '一个或多个原生命中字段，例如 id、score、payload 或显式请求的 vector；原生结果此时尚不包含 rerankScore。'
+          )
+        },
         example: `import type { IVectorNativeQuery } from '@migaia/storage-contract'
 function ids(query: IVectorNativeQuery<unknown>) { return query.select('id', 'score') }`
       },
-      groupBy: groupMember,
+      groupBy: {
+        ...groupMember,
+        example: `import type { IVectorNativeQuery } from '@migaia/storage-contract'
+function groups(query: IVectorNativeQuery<{ category: string }, true>) {
+  return query.groupBy('category', { perGroup: 1 })
+}`
+      },
       rerank: storageVectorRerankMember,
       withVector: {
         summary: t(
