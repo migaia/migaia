@@ -21,6 +21,7 @@ import {
   storageHostBackfillEnums
 } from './storage-host-backfill.js'
 import { storageHostNativeAuthorTypes } from './storage-host-native-authors.js'
+import { storageHostEntitySymbols, storageHostEntityTypes } from './storage-host-entity.js'
 /** Shared bilingual text keeps the reference descriptions aligned. */
 const t = (en: string, zh: string): IText => ({ en, zh })
 /** Neutral host and authoring entry, with no browser or native driver import. */
@@ -514,7 +515,8 @@ console.log(host.extensions.label('draft'))`,
     },
     ...storageHostAuthoringSymbols,
     ...storageHostRuntimeSymbols,
-    ...storageHostBackfillSymbols
+    ...storageHostBackfillSymbols,
+    ...storageHostEntitySymbols
   },
   types: {
     IStorageJournalRedoAttempt: {
@@ -1123,7 +1125,8 @@ off()`
     ...storageHostPluginTypes,
     ...storageHostHookTypes,
     ...storageHostBackfillTypes,
-    ...storageHostNativeAuthorTypes
+    ...storageHostNativeAuthorTypes,
+    ...storageHostEntityTypes
   },
   enums: {
     StorageErrorCode: {
