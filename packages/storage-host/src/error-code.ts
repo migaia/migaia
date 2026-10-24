@@ -49,6 +49,11 @@ export const StorageErrorCode = {
   backendKindMismatch: 'BACKEND_KIND_MISMATCH',
   /** Schema or codec configuration is malformed; repair its descriptor before retrying. */
   invalidConfig: 'INVALID_CONFIG',
+  /**
+   * An entity optional operation or declaration lacks its explicit subpath Feature; install the
+   * named unit before retrying.
+   */
+  entityFeatureRequired: 'ENTITY_FEATURE_REQUIRED',
   /** A schema rejects a value or returns invalid output; inspect the original validation cause. */
   validationFailed: 'VALIDATION_FAILED',
   /** Encoding rejects the value before backend I/O; inspect the codec failure on cause. */

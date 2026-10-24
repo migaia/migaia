@@ -54,3 +54,5 @@ export type {
   IRecordComparator,
   IRepository
 } from './entity/types.js'
+
+export type { IEntityFeature } from './entity/assembly.js'

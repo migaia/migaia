@@ -19,6 +19,7 @@ import type { IKeyValueStore } from '@migaia/storage-contract'
 import type { IStorageBorrowedBackend } from '../types.js'
 /** Raw backends retain resource admission; only certified host views may omit ownership members. */
 export type IEntityConnectStore = IKeyValueStore | IStorageBorrowedBackend<IKeyValueStore>
+import type { IEntityFeature } from './assembly.js'
 import type { ISchemaAdapter } from '../entity.js'
 import type { IMigrationStep } from '@migaia/storage-contract'
 import type { ICodec } from '../entity.js'
@@ -132,6 +133,11 @@ export type IEntityOptions<
   TStored = TDomain,
   TIndexes extends IEntityIndexDefinitions<TDomain> | undefined = undefined
 > = {
+  /**
+   * Explicit optional units imported from the entity capability subpaths; omitted means basic reads
+   * and writes only.
+   */
+  readonly features?: readonly IEntityFeature[]
   /** Nonempty entity namespace; names beginning with the reserved __ prefix are rejected. */
   readonly name: string
   /** Names the domain object property used as its primary key. */

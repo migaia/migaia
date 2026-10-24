@@ -1,3 +1,8 @@
+import { entityQueryFeature } from '../../src/entity/query-feature.js'
+import { entityUniqueFeature } from '../../src/entity/unique-feature.js'
+import { entityMigrationFeature } from '../../src/entity/migration-feature.js'
+import { entityIndexesFeature } from '../../src/entity/indexes-feature.js'
+import { entityKeysetFeature } from '../../src/entity/keyset.js'
 import { expect, it } from 'vitest'
 import { createStorageHost, memoryBackendPlugin } from '../../src/index.js'
 import { defineEntity } from '../../src/entity.js'
@@ -8,6 +13,13 @@ import { memoryBackend } from '../helpers/memory.js'
  * subscriber.
  */
 const definition = defineEntity<{ id: string; group: string }>()({
+  features: [
+    entityQueryFeature(),
+    entityUniqueFeature(),
+    entityMigrationFeature(),
+    entityIndexesFeature(),
+    entityKeysetFeature()
+  ],
   name: 'entity-watch',
   key: 'id',
   onDiagnostic: () => {},

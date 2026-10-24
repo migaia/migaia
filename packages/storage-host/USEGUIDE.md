@@ -73,11 +73,26 @@ memory 的记录过滤在客户端执行。换用数据库后端时，下推能�
 
 ## 使用实体仓储
 
+`/entity` 现在只包含定义、连接和基础读写。附加能力需从独立子路径显式装配；缺少装配时抛出 `source: @migaia/storage-host`、`code: ENTITY_FEATURE_REQUIRED`，消息写明所需导入。
+
+```ts
+import { defineEntity } from '@migaia/storage-host/entity'
+const users = defineEntity<{ id: string; name: string }>({ name: 'users', key: 'id' }).connect(
+  store
+)
+await users.put({ id: 'u1', name: 'Ada' })
+console.log(await users.get('u1'))
+```
+
+只在 `features` 中选择用到的单元：`/entity/query` 的 `entityQueryFeature()` 开启 query/list/stream；`/entity/indexes` 的 `entityIndexesFeature()` 开启索引声明和规划；`/entity/unique` 的 `entityUniqueFeature()` 开启唯一提交检查；`/entity/migration` 的 `entityMigrationFeature()` 开启版本计划和持久迁移；`/entity/keyset` 的 `entityKeysetFeature()` 准入 page/after。索引、unique 与持久迁移会复用查询操作，使用这些路径时也需声明 query；单元不会自动开启其他单元。
+
 `defineEntity<T>()({...})` 声明对象的主键与索引，`connect(store)` 连接实际后端。下面先写入，再用同一声明查询。
 
 ```ts doc-test=run
 import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
 import { defineEntity } from '@migaia/storage-host/entity'
+import { entityQueryFeature } from '@migaia/storage-host/entity/query'
+import { entityIndexesFeature } from '@migaia/storage-host/entity/indexes'
 
 type IOrder = { id: string; state: string; total: number }
 const host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
@@ -85,6 +100,7 @@ try {
   const orders = defineEntity<IOrder>()({
     name: 'orders',
     key: 'id',
+    features: [entityQueryFeature(), entityIndexesFeature()],
     indexes: { byState: { path: 'state' } }
   }).connect(host.backend('memory'))
   await orders.put({ id: 'o1', state: 'paid', total: 20 })

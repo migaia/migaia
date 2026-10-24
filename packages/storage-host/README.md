@@ -127,3 +127,5 @@ pnpm add --workspace @migaia/logger
 | SQL、SPARQL 与数据通道工具 | `/authoring/sql`、`/authoring/sparql`、相应通道入口           |
 
 完整路径和依赖说明见 [storage-contract](../storage-contract/README.md#入口与依赖方向)。旧 contract 根入口不保留这些运行时导出。
+
+实体装配变更：`/entity` 提供基础读写。旧版自动包含的查询、索引、unique 检查、迁移和 keyset，现需在 `features` 中声明对应 `/entity/*` 单元；业务只导入需要的单元。缺少时抛出 `ENTITY_FEATURE_REQUIRED`。迁移方式见[实体仓储](./USEGUIDE.md#使用实体仓储)。
