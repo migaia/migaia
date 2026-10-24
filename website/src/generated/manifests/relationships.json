@@ -96363,6 +96363,36 @@
     },
     {
       "from": "/en/docs/storage-contract/api",
+      "to": "/en/docs/storage-contract/api#storage-contract-index--IQueryConditions",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/storage-contract/api#storage-contract-index--IQueryConditions",
+      "to": "/en/docs/storage-contract/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/storage-contract/api#storage-contract-index--IQueryConditions",
+      "to": "/en/docs/storage-contract/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/storage-contract/getting-started",
+      "to": "/en/docs/storage-contract/api#storage-contract-index--IQueryConditions",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/storage-contract/api#storage-contract-index--IQueryConditions",
+      "to": "/en/docs/storage-contract",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/storage-contract",
+      "to": "/en/docs/storage-contract/api#storage-contract-index--IQueryConditions",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/storage-contract/api",
       "to": "/en/docs/storage-contract/api#storage-contract-index--IQueryCursor",
       "type": "api-symbol"
     },
@@ -97009,36 +97039,6 @@
     {
       "from": "/en/docs/storage-contract/getting-started",
       "to": "/en/docs/storage-contract/api#storage-contract-index--IRawQuad",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/storage-contract/api#storage-contract-index--IRawQuad",
-      "to": "/en/docs/storage-contract",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/docs/storage-contract",
-      "to": "/en/docs/storage-contract/api#storage-contract-index--IRawQuad",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/storage-contract/api",
-      "to": "/en/docs/storage-contract/api#storage-contract-index--IRdfApi",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/storage-contract/api#storage-contract-index--IRdfApi",
-      "to": "/en/docs/storage-contract/api",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/storage-contract/api#storage-contract-index--IRdfApi",
-      "to": "/en/docs/storage-contract/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/docs/storage-contract/getting-started",
-      "to": "/en/docs/storage-contract/api#storage-contract-index--IRdfApi",
       "type": "guide-symbol"
     },
     {
@@ -150962,6 +150962,36 @@
       "type": "architecture-symbol"
     },
     {
+      "from": "/en/docs/storage-contract/api#storage-contract-index--IRawQuad",
+      "to": "/en/docs/storage-contract",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/storage-contract",
+      "to": "/en/docs/storage-contract/api#storage-contract-index--IRawQuad",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/storage-contract/api",
+      "to": "/en/docs/storage-contract/api#storage-contract-index--IRdfApi",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/storage-contract/api#storage-contract-index--IRdfApi",
+      "to": "/en/docs/storage-contract/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/storage-contract/api#storage-contract-index--IRdfApi",
+      "to": "/en/docs/storage-contract/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/storage-contract/getting-started",
+      "to": "/en/docs/storage-contract/api#storage-contract-index--IRdfApi",
+      "type": "guide-symbol"
+    },
+    {
       "from": "/en/docs/storage-contract/api#storage-contract-index--IRdfApi",
       "to": "/en/docs/storage-contract",
       "type": "symbol-architecture"
@@ -151813,6 +151843,36 @@
     },
     {
       "from": "/en/docs/storage-contract/api",
+      "to": "/en/docs/storage-contract/api#storage-contract-index--IRecordQuerySourcePlan",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/storage-contract/api#storage-contract-index--IRecordQuerySourcePlan",
+      "to": "/en/docs/storage-contract/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/storage-contract/api#storage-contract-index--IRecordQuerySourcePlan",
+      "to": "/en/docs/storage-contract/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/storage-contract/getting-started",
+      "to": "/en/docs/storage-contract/api#storage-contract-index--IRecordQuerySourcePlan",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/storage-contract/api#storage-contract-index--IRecordQuerySourcePlan",
+      "to": "/en/docs/storage-contract",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/storage-contract",
+      "to": "/en/docs/storage-contract/api#storage-contract-index--IRecordQuerySourcePlan",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/storage-contract/api",
       "to": "/en/docs/storage-contract/api#storage-contract-index--IRecordsApi",
       "type": "api-symbol"
     },
@@ -159903,6 +159963,36 @@
     },
     {
       "from": "/zh/docs/storage-contract/api",
+      "to": "/zh/docs/storage-contract/api#storage-contract-index--IQueryConditions",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-contract/api#storage-contract-index--IQueryConditions",
+      "to": "/zh/docs/storage-contract/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/storage-contract/api#storage-contract-index--IQueryConditions",
+      "to": "/zh/docs/storage-contract/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/storage-contract/getting-started",
+      "to": "/zh/docs/storage-contract/api#storage-contract-index--IQueryConditions",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-contract/api#storage-contract-index--IQueryConditions",
+      "to": "/zh/docs/storage-contract",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/storage-contract",
+      "to": "/zh/docs/storage-contract/api#storage-contract-index--IQueryConditions",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-contract/api",
       "to": "/zh/docs/storage-contract/api#storage-contract-index--IQueryCursor",
       "type": "api-symbol"
     },
@@ -161429,6 +161519,36 @@
     {
       "from": "/zh/docs/storage-contract",
       "to": "/zh/docs/storage-contract/api#storage-contract-index--IRecordQuerySource",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-contract/api",
+      "to": "/zh/docs/storage-contract/api#storage-contract-index--IRecordQuerySourcePlan",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-contract/api#storage-contract-index--IRecordQuerySourcePlan",
+      "to": "/zh/docs/storage-contract/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/storage-contract/api#storage-contract-index--IRecordQuerySourcePlan",
+      "to": "/zh/docs/storage-contract/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/storage-contract/getting-started",
+      "to": "/zh/docs/storage-contract/api#storage-contract-index--IRecordQuerySourcePlan",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-contract/api#storage-contract-index--IRecordQuerySourcePlan",
+      "to": "/zh/docs/storage-contract",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/storage-contract",
+      "to": "/zh/docs/storage-contract/api#storage-contract-index--IRecordQuerySourcePlan",
       "type": "architecture-symbol"
     },
     {
@@ -166540,126 +166660,6 @@
       "from": "/zh/docs/storage-contract",
       "to": "/zh/docs/storage-contract/api/conformance",
       "type": "architecture-api"
-    },
-    {
-      "from": "/zh/docs/storage-contract/api/conformance",
-      "to": "/zh/docs/storage-contract/api/conformance#storage-contract-conformance--IConformanceAsyncMatchers",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/storage-contract/api/conformance#storage-contract-conformance--IConformanceAsyncMatchers",
-      "to": "/zh/docs/storage-contract/api/conformance",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/storage-contract/api/conformance#storage-contract-conformance--IConformanceAsyncMatchers",
-      "to": "/zh/docs/storage-contract/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/docs/storage-contract/getting-started",
-      "to": "/zh/docs/storage-contract/api/conformance#storage-contract-conformance--IConformanceAsyncMatchers",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/storage-contract/api/conformance#storage-contract-conformance--IConformanceAsyncMatchers",
-      "to": "/zh/docs/storage-contract",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/docs/storage-contract",
-      "to": "/zh/docs/storage-contract/api/conformance#storage-contract-conformance--IConformanceAsyncMatchers",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/storage-contract/api/conformance",
-      "to": "/zh/docs/storage-contract/api/conformance#storage-contract-conformance--IConformanceHarness",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/storage-contract/api/conformance#storage-contract-conformance--IConformanceHarness",
-      "to": "/zh/docs/storage-contract/api/conformance",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/storage-contract/api/conformance#storage-contract-conformance--IConformanceHarness",
-      "to": "/zh/docs/storage-contract/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/docs/storage-contract/getting-started",
-      "to": "/zh/docs/storage-contract/api/conformance#storage-contract-conformance--IConformanceHarness",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/storage-contract/api/conformance#storage-contract-conformance--IConformanceHarness",
-      "to": "/zh/docs/storage-contract",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/docs/storage-contract",
-      "to": "/zh/docs/storage-contract/api/conformance#storage-contract-conformance--IConformanceHarness",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/storage-contract/api/conformance",
-      "to": "/zh/docs/storage-contract/api/conformance#storage-contract-conformance--IConformanceMatchers",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/storage-contract/api/conformance#storage-contract-conformance--IConformanceMatchers",
-      "to": "/zh/docs/storage-contract/api/conformance",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/storage-contract/api/conformance#storage-contract-conformance--IConformanceMatchers",
-      "to": "/zh/docs/storage-contract/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/docs/storage-contract/getting-started",
-      "to": "/zh/docs/storage-contract/api/conformance#storage-contract-conformance--IConformanceMatchers",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/storage-contract/api/conformance#storage-contract-conformance--IConformanceMatchers",
-      "to": "/zh/docs/storage-contract",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/docs/storage-contract",
-      "to": "/zh/docs/storage-contract/api/conformance#storage-contract-conformance--IConformanceMatchers",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/storage-contract/api/conformance",
-      "to": "/zh/docs/storage-contract/api/conformance#storage-contract-conformance--runConformance",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/storage-contract/api/conformance#storage-contract-conformance--runConformance",
-      "to": "/zh/docs/storage-contract/api/conformance",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/storage-contract/api/conformance#storage-contract-conformance--runConformance",
-      "to": "/zh/docs/storage-contract/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/docs/storage-contract/getting-started",
-      "to": "/zh/docs/storage-contract/api/conformance#storage-contract-conformance--runConformance",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/storage-contract/api/conformance#storage-contract-conformance--runConformance",
-      "to": "/zh/docs/storage-contract",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/docs/storage-contract",
-      "to": "/zh/docs/storage-contract/api/conformance#storage-contract-conformance--runConformance",
-      "type": "architecture-symbol"
     },
     {
       "from": "/en/docs/storage-host/api",
@@ -195539,6 +195539,126 @@
     {
       "from": "/zh/docs/utils",
       "to": "/zh/docs/utils/api/value#utils-value--isSafeIntegerValue",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-contract/api/conformance",
+      "to": "/zh/docs/storage-contract/api/conformance#storage-contract-conformance--IConformanceAsyncMatchers",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-contract/api/conformance#storage-contract-conformance--IConformanceAsyncMatchers",
+      "to": "/zh/docs/storage-contract/api/conformance",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/storage-contract/api/conformance#storage-contract-conformance--IConformanceAsyncMatchers",
+      "to": "/zh/docs/storage-contract/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/storage-contract/getting-started",
+      "to": "/zh/docs/storage-contract/api/conformance#storage-contract-conformance--IConformanceAsyncMatchers",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-contract/api/conformance#storage-contract-conformance--IConformanceAsyncMatchers",
+      "to": "/zh/docs/storage-contract",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/storage-contract",
+      "to": "/zh/docs/storage-contract/api/conformance#storage-contract-conformance--IConformanceAsyncMatchers",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-contract/api/conformance",
+      "to": "/zh/docs/storage-contract/api/conformance#storage-contract-conformance--IConformanceHarness",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-contract/api/conformance#storage-contract-conformance--IConformanceHarness",
+      "to": "/zh/docs/storage-contract/api/conformance",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/storage-contract/api/conformance#storage-contract-conformance--IConformanceHarness",
+      "to": "/zh/docs/storage-contract/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/storage-contract/getting-started",
+      "to": "/zh/docs/storage-contract/api/conformance#storage-contract-conformance--IConformanceHarness",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-contract/api/conformance#storage-contract-conformance--IConformanceHarness",
+      "to": "/zh/docs/storage-contract",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/storage-contract",
+      "to": "/zh/docs/storage-contract/api/conformance#storage-contract-conformance--IConformanceHarness",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-contract/api/conformance",
+      "to": "/zh/docs/storage-contract/api/conformance#storage-contract-conformance--IConformanceMatchers",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-contract/api/conformance#storage-contract-conformance--IConformanceMatchers",
+      "to": "/zh/docs/storage-contract/api/conformance",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/storage-contract/api/conformance#storage-contract-conformance--IConformanceMatchers",
+      "to": "/zh/docs/storage-contract/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/storage-contract/getting-started",
+      "to": "/zh/docs/storage-contract/api/conformance#storage-contract-conformance--IConformanceMatchers",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-contract/api/conformance#storage-contract-conformance--IConformanceMatchers",
+      "to": "/zh/docs/storage-contract",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/storage-contract",
+      "to": "/zh/docs/storage-contract/api/conformance#storage-contract-conformance--IConformanceMatchers",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-contract/api/conformance",
+      "to": "/zh/docs/storage-contract/api/conformance#storage-contract-conformance--runConformance",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-contract/api/conformance#storage-contract-conformance--runConformance",
+      "to": "/zh/docs/storage-contract/api/conformance",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/storage-contract/api/conformance#storage-contract-conformance--runConformance",
+      "to": "/zh/docs/storage-contract/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/storage-contract/getting-started",
+      "to": "/zh/docs/storage-contract/api/conformance#storage-contract-conformance--runConformance",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/storage-contract/api/conformance#storage-contract-conformance--runConformance",
+      "to": "/zh/docs/storage-contract",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/storage-contract",
+      "to": "/zh/docs/storage-contract/api/conformance#storage-contract-conformance--runConformance",
       "type": "architecture-symbol"
     }
   ]

@@ -10095,6 +10095,12 @@
       "library": "storage-contract"
     },
     {
+      "path": "/en/docs/storage-contract/api/IQueryConditions",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
       "path": "/en/docs/storage-contract/api/IQueryCursor",
       "locale": "en",
       "domain": "docs",
@@ -10156,12 +10162,6 @@
     },
     {
       "path": "/en/docs/storage-contract/api/IQueryReducer",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/IQueryReduction",
       "locale": "en",
       "domain": "docs",
       "library": "storage-contract"
@@ -26271,6 +26271,12 @@
       "library": "serialize"
     },
     {
+      "path": "/en/docs/storage-contract/api/IQueryReduction",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
       "path": "/en/docs/storage-contract/api/IQueryReductionResult",
       "locale": "en",
       "domain": "docs",
@@ -26505,6 +26511,12 @@
       "library": "storage-contract"
     },
     {
+      "path": "/en/docs/storage-contract/api/IRecordQuerySourcePlan",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
       "path": "/en/docs/storage-contract/api/IRecordStore",
       "locale": "en",
       "domain": "docs",
@@ -26686,18 +26698,6 @@
     },
     {
       "path": "/en/docs/storage-contract/api/IStorageCounterIncrement",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/IStorageImplementationsOf",
-      "locale": "en",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/en/docs/storage-contract/api/IStorageIterator",
       "locale": "en",
       "domain": "docs",
       "library": "storage-contract"
@@ -32349,6 +32349,18 @@
       "library": "wasm"
     },
     {
+      "path": "/en/docs/storage-contract/api/IStorageImplementationsOf",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/en/docs/storage-contract/api/IStorageIterator",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
       "path": "/en/docs/storage-contract/api/IStorageIteratorLifetime",
       "locale": "en",
       "domain": "docs",
@@ -33849,6 +33861,12 @@
       "library": "storage-contract"
     },
     {
+      "path": "/zh/docs/storage-contract/api/IQueryConditions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
       "path": "/zh/docs/storage-contract/api/IQueryCursor",
       "locale": "zh",
       "domain": "docs",
@@ -34150,6 +34168,12 @@
     },
     {
       "path": "/zh/docs/storage-contract/api/IRecordQuerySource",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/zh/docs/storage-contract/api/IRecordQuerySourcePlan",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-contract"
@@ -35464,30 +35488,6 @@
     },
     {
       "path": "/zh/docs/storage-contract/codecs-and-errors",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/getting-started",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/readme",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/records-indexes-and-transactions",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "storage-contract"
-    },
-    {
-      "path": "/zh/docs/storage-contract/safe-operations-and-keys",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-contract"
@@ -41803,6 +41803,30 @@
       "locale": "zh",
       "domain": "docs",
       "library": "utils"
+    },
+    {
+      "path": "/zh/docs/storage-contract/getting-started",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/zh/docs/storage-contract/readme",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/zh/docs/storage-contract/records-indexes-and-transactions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/zh/docs/storage-contract/safe-operations-and-keys",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-contract"
     }
   ]
 }
