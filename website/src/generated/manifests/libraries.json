@@ -46265,6 +46265,18 @@
                 {
                   "type": "paragraph",
                   "text": "并发循环在 prepare、execute 或 executeAttempt 路径中，把原生选项字段与 symbol 扩展的一次捕获值转发到同一冻结上下文及锁键推导。调用方 getter 不会重读，后续原生 attempt 保留这些字段。没有准备阶段的原准入顺序不变。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "记录数据源可以提供可省的纯 `plan(conditions)` 作者接点。原规划器只传入已经捕获的连续规范 `where` 前缀；遇到函数谓词、排序、分页、去重或投影即停止，不读取用户条件的 getter，不跨屏障缩小数据源。回调返回 `IRecordQuerySourcePlan`：本次原生 `pushdown` 声明、可省的不可变 `selection`，以及可省的 `sourceReason` 和 `sourceCandidates` 说明。静态声明和动态声明使用同一准入实现。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "本次终点的原计划保存该选择，原 `execute`、`reduce`、事务内 mutation reader 和 `watch` 经同一个输入编译器取得同一 `selection` 身份；原生统计回退仍复用该计划。选择事实由原数据源作者保持不可变，契约不读取其内部字段、不另编码、不创建游标或重试器。`explain()` 只展示已选索引及独立冻结的理由元数据，不暴露选择事实；没有声明 `plan` 时保留原输入字段、原解释结果及回调语义。作者回调或元数据失败沿原查询错误边界，在原生 I/O 前拒绝。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`IRecordQuerySourcePlan.fullScan?: true` 只允许保守地将解释结果标为可能全扫描，适用于原生索引仍可能回退的来源；不能传 `false` 伪造无扫描证据。条件下推、实际选源与资源路径不受该说明字段干预。"
                 }
               ]
             }
@@ -47594,6 +47606,18 @@
                 {
                   "type": "paragraph",
                   "text": "并发循环在 prepare、execute 或 executeAttempt 路径中，把原生选项字段与 symbol 扩展的一次捕获值转发到同一冻结上下文及锁键推导。调用方 getter 不会重读，后续原生 attempt 保留这些字段。没有准备阶段的原准入顺序不变。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "记录数据源可以提供可省的纯 `plan(conditions)` 作者接点。原规划器只传入已经捕获的连续规范 `where` 前缀；遇到函数谓词、排序、分页、去重或投影即停止，不读取用户条件的 getter，不跨屏障缩小数据源。回调返回 `IRecordQuerySourcePlan`：本次原生 `pushdown` 声明、可省的不可变 `selection`，以及可省的 `sourceReason` 和 `sourceCandidates` 说明。静态声明和动态声明使用同一准入实现。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "本次终点的原计划保存该选择，原 `execute`、`reduce`、事务内 mutation reader 和 `watch` 经同一个输入编译器取得同一 `selection` 身份；原生统计回退仍复用该计划。选择事实由原数据源作者保持不可变，契约不读取其内部字段、不另编码、不创建游标或重试器。`explain()` 只展示已选索引及独立冻结的理由元数据，不暴露选择事实；没有声明 `plan` 时保留原输入字段、原解释结果及回调语义。作者回调或元数据失败沿原查询错误边界，在原生 I/O 前拒绝。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`IRecordQuerySourcePlan.fullScan?: true` 只允许保守地将解释结果标为可能全扫描，适用于原生索引仍可能回退的来源；不能传 `false` 伪造无扫描证据。条件下推、实际选源与资源路径不受该说明字段干预。"
                 }
               ]
             }
@@ -48929,6 +48953,18 @@
                   {
                     "type": "paragraph",
                     "text": "On prepare, execute, and executeAttempt paths, the concurrency loop forwards captured native option fields and symbol extensions through the same frozen callback context and lock derivation. Caller getters are read once, and native attempts retain those fields. Admission order without a preparation stage remains unchanged."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Record sources may declare an optional pure author callback, `plan(conditions)`. The original planner supplies only the already captured, consecutive canonical `where` prefix. It stops at a predicate, ordering, page bound, distinct or projection, without rereading caller getters or moving conditions across a barrier. The callback returns `IRecordQuerySourcePlan`: this execution's native `pushdown`, optional immutable `selection`, and optional `sourceReason` / `sourceCandidates` metadata. Static and dynamic declarations use the same admission body."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "The original terminal plan retains that choice. The existing input compiler passes the same `selection` identity to `execute`, `reduce`, scoped mutation readers and `watch`; native reduction fallback also reuses this plan. The source author keeps the selection immutable. Contract does not inspect or encode its fields, open a cursor, or introduce retries. `explain()` exposes only the chosen index and detached frozen decision metadata. Omitting `plan` preserves legacy input fields, explanation fields and callback semantics. Author or metadata failures use the original query failure boundary before native I/O."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "`IRecordQuerySourcePlan.fullScan?: true` can only conservatively mark a possible full scan, for example when an indexed source can still fall back. It cannot accept `false` to invent evidence. This metadata does not change condition pushdown, source execution or resource ownership."
                   }
                 ]
               }
@@ -50301,6 +50337,18 @@
                   {
                     "type": "paragraph",
                     "text": "On prepare, execute, and executeAttempt paths, the concurrency loop forwards captured native option fields and symbol extensions through the same frozen callback context and lock derivation. Caller getters are read once, and native attempts retain those fields. Admission order without a preparation stage remains unchanged."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Record sources may declare an optional pure author callback, `plan(conditions)`. The original planner supplies only the already captured, consecutive canonical `where` prefix. It stops at a predicate, ordering, page bound, distinct or projection, without rereading caller getters or moving conditions across a barrier. The callback returns `IRecordQuerySourcePlan`: this execution's native `pushdown`, optional immutable `selection`, and optional `sourceReason` / `sourceCandidates` metadata. Static and dynamic declarations use the same admission body."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "The original terminal plan retains that choice. The existing input compiler passes the same `selection` identity to `execute`, `reduce`, scoped mutation readers and `watch`; native reduction fallback also reuses this plan. The source author keeps the selection immutable. Contract does not inspect or encode its fields, open a cursor, or introduce retries. `explain()` exposes only the chosen index and detached frozen decision metadata. Omitting `plan` preserves legacy input fields, explanation fields and callback semantics. Author or metadata failures use the original query failure boundary before native I/O."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "`IRecordQuerySourcePlan.fullScan?: true` can only conservatively mark a possible full scan, for example when an indexed source can still fall back. It cannot accept `false` to invent evidence. This metadata does not change condition pushdown, source execution or resource ownership."
                   }
                 ]
               }
