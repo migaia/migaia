@@ -75,7 +75,7 @@ it('routes the same text, record and selected vector identities to their immutab
 })
 
 /** Global native collection identity is independent from each host's configured default org. */
-it('shares one native collection across hosts with different defaults and preserves it across org drop', async () => {
+it('shares native collections and drops their historical org rows without selecting the Feature', async () => {
   const connectionString = process.env.MIGAIA_PG_URL
   if (!connectionString)
     throw new Error('Run through scripts/storage-services.mts run -- to provide PostgreSQL')
@@ -90,9 +90,14 @@ it('shares one native collection across hosts with different defaults and preser
     })
   const first = await makeHost()
   const second = await makeHost()
+  const unselected = await createStorageHost({
+    org: randomUUID(),
+    plugins: [postgresBackendPlugin({ driver: pgDriver(pool), prefix })] as const
+  })
   onTestFinished(async () => {
     await first.dispose()
     await second.dispose()
+    await unselected.dispose()
     await pool.end()
   })
   const orgId = randomUUID()
@@ -134,7 +139,8 @@ it('shares one native collection across hosts with different defaults and preser
   expect((await pool.query('SELECT org_id FROM ' + prefix + '_vector_config')).rows).toEqual([
     { org_id: zeroOrg }
   ])
-  await first.dropOrg(orgId)
+  expect(unselected.backend('postgres').has(vector)).toBe(false)
+  await unselected.dropOrg(orgId)
   expect(
     await right.use(vector).collection('shared').near([1], { exact: true }).topK(1).all()
   ).toEqual([])

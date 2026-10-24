@@ -1172,13 +1172,8 @@ export async function createPostgresStore<T>(
             (state, input) => removePrefixPg(state, tables, 'record', input)
           )
       }
-      /** Each organization constructs its own native vector API from the immutable child context. */
-      const createVectorApi = () => {
-        controller.assertLive()
-        if (configuration.server === 'cockroach')
-          throw new StorageContractError(StorageContractErrorCode.unsupported, {
-            backend: PgNames.backend
-          })
+      /** Historical managed data remains owned here even when its Feature is not selected. */
+      const nativeVectors = () => {
         vectors ??= createPgVectors({
           configuration,
           tables,
@@ -1204,7 +1199,16 @@ export async function createPostgresStore<T>(
                 )
             })
         })
-        return vectors.standard
+        return vectors
+      }
+      /** Each selected organization publishes only its immutable child context's actual API. */
+      const createVectorApi = () => {
+        controller.assertLive()
+        if (configuration.server === 'cockroach')
+          throw new StorageContractError(StorageContractErrorCode.unsupported, {
+            backend: PgNames.backend
+          })
+        return nativeVectors().standard
       }
       /** The selected peer and native route remain under the original capability/operation owners. */
       const createDurableApi = () => {
@@ -1320,8 +1324,7 @@ export async function createPostgresStore<T>(
         controller,
         createVectorApi,
         dropVectorOrg: async (client, orgId) => {
-          createVectorApi()
-          await vectors!.dropOrg(client, orgId)
+          await nativeVectors().dropOrg(client, orgId)
         },
         createDurableApi,
         reportReplication: (maxSlotWalKeepSize) =>
@@ -1415,7 +1418,7 @@ export async function createPostgresStore<T>(
             (table) => table !== tables.vectorConfiguration
           ))
             await client.query('DELETE FROM ' + table + ' WHERE org_id=$1', [orgId])
-          if (vectorSelected()) {
+          {
             let current = organizations.get(orgId)
             if (current === undefined) {
               current = bind(core.getOrgContext(orgId), true)
