@@ -368,6 +368,9 @@ export type {
 export {
   vector,
   DeleteCountMode,
+  assertStorageVectorCollection,
+  assertStorageVector,
+  assertStorageVectorIds,
   snapshotStorageVectorCollection,
   snapshotStorageVector,
   snapshotStorageVectorUpsert,

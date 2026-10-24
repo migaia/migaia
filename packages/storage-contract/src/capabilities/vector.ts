@@ -166,63 +166,71 @@ function assertVectorArrayLength(
 ): void {
   if (!Number.isSafeInteger(length) || length < minimum) invalidVector(backend)
 }
-/** Snapshot declared configuration once; absence is resolved only by the native collection owner. */
+/** Validate declared collection metadata without copying private native schema values. */
+export function assertStorageVectorCollection(
+  name: string,
+  options?: IStorageVectorConfiguration,
+  backend?: IBackendKind
+): void {
+  if (typeof name !== 'string') invalidVector(backend)
+  if (options === undefined) return
+  assertVectorObject(options, backend)
+  const { dimensions, metric } = options
+  if (
+    !Number.isSafeInteger(dimensions) ||
+    dimensions < 1 ||
+    typeof metric !== 'string' ||
+    !Object.hasOwn(VectorMetric, metric)
+  )
+    invalidVector(backend)
+}
+/** Capture caller metadata because native layout lookup and deferred queries can await. */
 export function snapshotStorageVectorCollection(
   name: string,
   options?: IStorageVectorConfiguration,
   backend?: IBackendKind
 ): Readonly<{ name: string; options: Readonly<IStorageVectorConfiguration> | undefined }> {
-  return vectorInput(backend, () => {
-    if (typeof name !== 'string') invalidVector(backend)
-    if (options === undefined) return Object.freeze({ name, options: undefined })
-    assertVectorObject(options, backend)
-    const { dimensions, metric } = options
-    if (
-      !Number.isSafeInteger(dimensions) ||
-      dimensions < 1 ||
-      typeof metric !== 'string' ||
-      !Object.hasOwn(VectorMetric, metric)
-    )
-      invalidVector(backend)
-    return Object.freeze({ name, options: Object.freeze({ dimensions, metric }) })
-  })
+  assertStorageVectorCollection(name, options, backend)
+  return {
+    name,
+    options:
+      options === undefined ? undefined : { dimensions: options.dimensions, metric: options.metric }
+  }
 }
-/** Capture finite components and reject cosine's undefined zero direction without native work. */
+/** Validate finite dense components and the native schema without allocating another vector. */
+export function assertStorageVector(
+  input: readonly number[],
+  options?: IStorageVectorValidation,
+  backend?: IBackendKind
+): void {
+  if (options !== undefined) assertVectorObject(options, backend)
+  const dimensions = options?.dimensions
+  const metric = options?.metric
+  if (
+    (dimensions !== undefined && (!Number.isSafeInteger(dimensions) || dimensions < 1)) ||
+    (metric !== undefined &&
+      (typeof metric !== 'string' || !Object.hasOwn(VectorMetric, metric))) ||
+    !Array.isArray(input) ||
+    input.length === 0 ||
+    (dimensions !== undefined && input.length !== dimensions)
+  )
+    invalidVector(backend)
+  /** Cosine cannot rank the zero direction; a sum of squares could overflow for finite values. */
+  let nonzero = false
+  for (const value of input) {
+    if (typeof value !== 'number' || !Number.isFinite(value)) invalidVector(backend)
+    if (value !== 0) nonzero = true
+  }
+  if (metric === VectorMetric.cosine && !nonzero) invalidVector(backend)
+}
+/** Capture caller components because native layout lookup and deferred queries can await. */
 export function snapshotStorageVector(
   input: readonly number[],
   options?: IStorageVectorValidation,
   backend?: IBackendKind
 ): readonly number[] {
-  return vectorInput(backend, () => {
-    if (options !== undefined) assertVectorObject(options, backend)
-    const dimensions = options?.dimensions
-    const metric = options?.metric
-    if (
-      (dimensions !== undefined && (!Number.isSafeInteger(dimensions) || dimensions < 1)) ||
-      (metric !== undefined &&
-        (typeof metric !== 'string' || !Object.hasOwn(VectorMetric, metric))) ||
-      !Array.isArray(input)
-    )
-      invalidVector(backend)
-    /** Read the borrowed array bound once before copying each component. */
-    const length = input.length
-    assertVectorArrayLength(length, 1, backend)
-    if (dimensions !== undefined && length !== dimensions) invalidVector(backend)
-    /** The accepted vector owns its component array and exposes no mutable input. */
-    const result: number[] = []
-    /** Zero detection avoids a norm sum that can overflow on otherwise finite components. */
-    let nonzero = false
-    for (let index = 0; index < length; index++) {
-      if (!Object.hasOwn(input, index)) invalidVector(backend)
-      /** Each component is captured once after dense-array admission. */
-      const value = input[index]
-      if (typeof value !== 'number' || !Number.isFinite(value)) invalidVector(backend)
-      result.push(value)
-      if (value !== 0) nonzero = true
-    }
-    if (metric === VectorMetric.cosine && !nonzero) invalidVector(backend)
-    return Object.freeze(result)
-  })
+  assertStorageVector(input, options, backend)
+  return [...input]
 }
 /**
  * Capture every point before returning a write plan. The serialize owner projects class instances
@@ -414,34 +422,28 @@ export function snapshotStorageVectorSearch(
   })
 }
 
-/**
- * Capture dense string IDs once before native work. The default preserves order and duplicates;
- * callers selecting recommendation uniqueness reject duplicates without changing delete semantics.
- */
+/** Validate native ID lists without copying already private recommendation batches. */
+export function assertStorageVectorIds(
+  ids: readonly string[],
+  backend?: IBackendKind,
+  rejectDuplicates = false
+): void {
+  if (!Array.isArray(ids) || typeof rejectDuplicates !== 'boolean') invalidVector(backend)
+  /** Duplicate rejection is selected explicitly; ordinary deletes keep their original policy. */
+  const seen = rejectDuplicates ? new Set<string>() : undefined
+  for (const id of ids) {
+    if (typeof id !== 'string' || seen?.has(id)) invalidVector(backend)
+    seen?.add(id)
+  }
+}
+/** Capture caller IDs because native schema lookup and deferred recommendation reads can await. */
 export function snapshotStorageVectorIds(
   ids: readonly string[],
   backend?: IBackendKind,
   rejectDuplicates = false
 ): readonly string[] {
-  return vectorInput(backend, () => {
-    if (!Array.isArray(ids) || typeof rejectDuplicates !== 'boolean') invalidVector(backend)
-    /** Read the borrowed bound once, then each own ID once. */
-    const length = ids.length
-    assertVectorArrayLength(length, 0, backend)
-    /** The immutable result owns its values and does not impose a key-domain limit on vector IDs. */
-    const result: string[] = []
-    /** Uniqueness is only a selected admission constraint, never a hidden deletion policy. */
-    const seen = rejectDuplicates ? new Set<string>() : undefined
-    for (let index = 0; index < length; index++) {
-      if (!Object.hasOwn(ids, index)) invalidVector(backend)
-      /** Capture each accessor value before validating or copying it. */
-      const id = ids[index]
-      if (typeof id !== 'string' || seen?.has(id)) invalidVector(backend)
-      seen?.add(id)
-      result.push(id)
-    }
-    return Object.freeze(result)
-  })
+  assertStorageVectorIds(ids, backend, rejectDuplicates)
+  return [...ids]
 }
 /** Resolve only the declared deletion strategy; engines retain ownership of actual count behavior. */
 export function snapshotStorageDeleteCountMode(
