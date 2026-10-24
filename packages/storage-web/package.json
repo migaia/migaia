@@ -57,6 +57,10 @@
     "./features/reactive": {
       "types": "./dist/features/reactive.d.ts",
       "default": "./dist/features/reactive.js"
+    },
+    "./features/blobs": {
+      "types": "./dist/features/blobs.d.ts",
+      "default": "./dist/features/blobs.js"
     }
   },
   "publishConfig": {

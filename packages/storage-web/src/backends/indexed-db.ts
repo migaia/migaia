@@ -255,6 +255,22 @@ export type IIndexedDbOptions = {
 export type IIndexedDbFeatureExpose = {
   requireObjectStore(name: string): void
   getTransactionClient(scope: ITransactionScope<unknown>): IDBTransaction
+  /** Resolve only the exact original scope of this immutable physical organization. */
+  getTransactionClientForOrg(scope: object, orgId: string): IDBTransaction
+}
+
+/** Physical client access shares the original opener and exact native transaction registry. */
+type IIndexedDbPhysical<TValue> = IBackendConstruction<
+  IIndexedDbProvidedStore<TValue>,
+  IDBDatabase
+> & {
+  getPreparedClient(): IDBDatabase | Promise<IDBDatabase>
+  getTransactionClient(scope: object): IDBTransaction
+}
+/** Fixed-org Feature resolution never exposes construction or resource ownership. */
+type IIndexedDbConstruction<TValue> = IIndexedDbPhysical<TValue> & {
+  getOrgClient(orgId: string): IDBDatabase | Promise<IDBDatabase>
+  getOrgTransactionClient(scope: object, orgId: string): IDBTransaction
 }
 
 /** The native store retains its complete transaction scope in the shared immutable builder. */
@@ -584,8 +600,7 @@ export const indexedDbHost = <TValue = unknown>(
   runtime: IBackendRuntime,
   declaredObjectStores: readonly string[] = [],
   bindOrganizations = true
-): IBackendConstruction<IIndexedDbProvidedStore<TValue>, IDBDatabase> &
-  Pick<IIndexedDbFeatureExpose, 'getTransactionClient'> => {
+): IIndexedDbConstruction<TValue> => {
   if (options === null || typeof options !== 'object' || Array.isArray(options))
     throw new StorageError(StorageErrorCode.invalidConfig, {
       backend: StorageBackend.indexedDb,
@@ -5165,12 +5180,17 @@ export const indexedDbHost = <TValue = unknown>(
     return deleting
   }
   /** Retain the original provider, transaction owner, and native deletion closure for every org. */
-  const physical = {
+  const physical: IIndexedDbPhysical<TValue> = {
     ...construction,
     dropData,
-    getTransactionClient: (
-      scope: Parameters<IIndexedDbFeatureExpose['getTransactionClient']>[0]
-    ) => {
+    getPreparedClient: () => {
+      assertLive()
+      /** A prepared physical connection stays synchronous inside native transaction callbacks. */
+      if (prepareState === 'ready' && deleting === undefined && activeDatabase !== undefined)
+        return activeDatabase
+      return open(createStorageOperationRuntime())
+    },
+    getTransactionClient: (scope: object) => {
       /** Only the canonical owner can authorize a live view for this exact provided store. */
       const { id } = assertTransactionOwner(construction.store, scope)
       /** This lookup exposes the already-open native transaction and grants no new authority. */
@@ -5180,28 +5200,35 @@ export const indexedDbHost = <TValue = unknown>(
       return native.native
     }
   }
+  /** Original organization constructions also supply exact native Feature clients. */
+  const orgBinding = bindOrganizations
+    ? createBrowserOrgBinding<
+        IIndexedDbProvidedStore<TValue>,
+        IDBDatabase,
+        IIndexedDbPhysical<TValue>
+      >(runtime, dbName, physical, (target, ports) =>
+        indexedDbHost<TValue>(
+          {
+            dbName: target,
+            kvStoreName,
+            bytesStoreName,
+            recordsStoreName,
+            cleanupLegacyRecords,
+            factory,
+            keyRange,
+            owner: { label: ownerLabel }
+          },
+          ports,
+          featureStoreNames,
+          false
+        )
+      )
+    : undefined
   return {
     ...physical,
-    ...(bindOrganizations
-      ? {
-          orgBinding: createBrowserOrgBinding(runtime, dbName, physical, (target, ports) =>
-            indexedDbHost<TValue>(
-              {
-                dbName: target,
-                kvStoreName,
-                bytesStoreName,
-                recordsStoreName,
-                cleanupLegacyRecords,
-                factory,
-                keyRange,
-                owner: { label: ownerLabel }
-              },
-              ports,
-              featureStoreNames,
-              false
-            )
-          )
-        }
-      : {})
+    ...(orgBinding === undefined ? {} : { orgBinding }),
+    getOrgClient: (orgId) => (orgBinding?.resolve(orgId) ?? physical).getPreparedClient(),
+    getOrgTransactionClient: (scope, orgId) =>
+      (orgBinding?.resolve(orgId) ?? physical).getTransactionClient(scope)
   }
 }

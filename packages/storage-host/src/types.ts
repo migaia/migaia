@@ -146,6 +146,7 @@ export type IStorageOrgAuthoringPort = Pick<
   IStoragePluginCore,
   | 'createChangeController'
   | 'createKeyLockPort'
+  | 'createRevisionPort'
   | 'registerChangeController'
   | 'registerValueCommit'
 >
@@ -572,66 +573,86 @@ export type IStorageHostOptions = {
   readonly hooks?: { readonly [K in keyof IStorageHookMap]?: (payload: IStorageHookMap[K]) => void }
 }
 /** Exact initial tuple participates in duplicate admission and store inference. */
-export type IStorageHostCreateOptions<P extends readonly IStorageBackendPluginHandle[]> =
-  IStorageHostOptions & { readonly plugins?: IRejectInstalledOrDuplicateIds<{}, P> }
+export type IStorageHostCreateOptions<
+  P extends readonly IStorageBackendPluginHandle[],
+  J extends import('./journal/types.js').IStorageJournalConfiguration | undefined =
+    | import('./journal/types.js').IStorageJournalConfiguration
+    | undefined
+> = Omit<IStorageHostOptions, 'journal'> & {
+  readonly journal?: J
+  readonly plugins?: IRejectInstalledOrDuplicateIds<{}, P>
+}
+/** Only an actual statically selected undo extension adds the public undo business method. */
+type IStorageJournalUndoSurface<J> = (
+  J extends (...args: never[]) => infer R ? Awaited<R> : J
+) extends { readonly logger: import('@migaia/logger/plugins/durable').IUndoLogExt }
+  ? import('./journal/types.js').IUndoableStore
+  : Record<never, never>
 /** Neutral host registry and lifetime; backend implementations remain separate from installation. */
-export type IStorageHost<P extends readonly IStorageBackendPluginHandle[]> =
-  import('@migaia/storage-contract').IStorageResource & {
-    readonly hooks: IStorageHooks
-    detect(): Promise<void>
-    org(orgId: string): IStorageOrgView<P>
-    dropOrg(orgId: string): Promise<void>
-    codecStages(store: IStorageBase | IStorageBorrowedBackend<IStorageBase>): ICodecStageObserver
-    queryStages(store: IStorageBase | IStorageBorrowedBackend<IStorageBase>): IQueryStageObserver
-    transactionStages(
-      store: IStorageBase | IStorageBorrowedBackend<IStorageBase>
-    ): ITransactionStageObserver
-    concurrencyStages(
-      store: IStorageBase | IStorageBorrowedBackend<IStorageBase>
-    ): IConcurrencyStageObserver
-    backendStages(
-      store: IStorageBase | IStorageBorrowedBackend<IStorageBase>
-    ): IBackendStageObserver
-    sqlStages(store: IStorageBase | IStorageBorrowedBackend<IStorageBase>): ISqlStageObserver
-    operationStages(
-      store: IStorageBase | IStorageBorrowedBackend<IStorageBase>
-    ): IStorageOperationStageObserver
-    envelopeStages(
-      store: IStorageBase | IStorageBorrowedBackend<IStorageBase>,
-      operation: Readonly<{ operation: string; targetVersion: number }>
-    ): IStorageEnvelopeStages
-    readonly extensions: Readonly<IStoragePluginExtensions<P[number]>>
-    readonly api: {
-      readonly [N in keyof IPluginStoreMap<P>]: IPluginStoreMap<P>[N] extends {
-        readonly api: infer A
-      }
-        ? A
-        : undefined
+export type IStorageHost<
+  P extends readonly IStorageBackendPluginHandle[],
+  J extends import('./journal/types.js').IStorageJournalConfiguration | undefined = undefined
+> = import('@migaia/storage-contract').IStorageResource & {
+  readonly hooks: IStorageHooks
+  detect(): Promise<void>
+  org(orgId: string): IStorageOrgView<P, J>
+  dropOrg(orgId: string): Promise<void>
+  codecStages(store: IStorageBase | IStorageBorrowedBackend<IStorageBase>): ICodecStageObserver
+  queryStages(store: IStorageBase | IStorageBorrowedBackend<IStorageBase>): IQueryStageObserver
+  transactionStages(
+    store: IStorageBase | IStorageBorrowedBackend<IStorageBase>
+  ): ITransactionStageObserver
+  concurrencyStages(
+    store: IStorageBase | IStorageBorrowedBackend<IStorageBase>
+  ): IConcurrencyStageObserver
+  backendStages(store: IStorageBase | IStorageBorrowedBackend<IStorageBase>): IBackendStageObserver
+  sqlStages(store: IStorageBase | IStorageBorrowedBackend<IStorageBase>): ISqlStageObserver
+  operationStages(
+    store: IStorageBase | IStorageBorrowedBackend<IStorageBase>
+  ): IStorageOperationStageObserver
+  envelopeStages(
+    store: IStorageBase | IStorageBorrowedBackend<IStorageBase>,
+    operation: Readonly<{ operation: string; targetVersion: number }>
+  ): IStorageEnvelopeStages
+  readonly extensions: Readonly<IStoragePluginExtensions<P[number]>>
+  readonly api: {
+    readonly [N in keyof IPluginStoreMap<P>]: IPluginStoreMap<P>[N] extends {
+      readonly api: infer A
     }
-    use<const Next extends readonly IStorageBackendPluginHandle[]>(
-      ...plugins: IRejectInstalledOrDuplicateIds<{ [N in IStoragePluginId<P[number]>]: true }, Next>
-    ): Promise<IStorageHost<readonly [...P, ...Next]>>
-    backend<N extends keyof IPluginStoreMap<P> & string>(id: N): IPluginStoreMap<P>[N]
-    hasBackend(id: string): id is keyof IPluginStoreMap<P> & string
-    backends(): ReadonlyMap<
-      keyof IPluginStoreMap<P> & string,
-      IPluginStoreMap<P>[keyof IPluginStoreMap<P>]
-    >
+      ? A
+      : undefined
   }
+  use<const Next extends readonly IStorageBackendPluginHandle[]>(
+    ...plugins: IRejectInstalledOrDuplicateIds<{ [N in IStoragePluginId<P[number]>]: true }, Next>
+  ): Promise<IStorageHost<readonly [...P, ...Next], J>>
+  backend<N extends keyof IPluginStoreMap<P> & string>(
+    id: N
+  ): IPluginStoreMap<P>[N] & IStorageJournalUndoSurface<J>
+  hasBackend(id: string): id is keyof IPluginStoreMap<P> & string
+  backends(): ReadonlyMap<
+    keyof IPluginStoreMap<P> & string,
+    IPluginStoreMap<P>[keyof IPluginStoreMap<P>] & IStorageJournalUndoSurface<J>
+  >
+}
 
 /** A business view retains inference while lifecycle and installation stay with its root host. */
-export type IStorageOrgView<P extends readonly IStorageBackendPluginHandle[]> = Omit<
-  IStorageHost<P>,
+export type IStorageOrgView<
+  P extends readonly IStorageBackendPluginHandle[],
+  J extends import('./journal/types.js').IStorageJournalConfiguration | undefined = undefined
+> = Omit<
+  IStorageHost<P, J>,
   'use' | 'dropOrg' | 'dispose' | typeof Symbol.asyncDispose | 'backend' | 'backends' | 'org'
 > & {
   readonly orgId: string
-  org(orgId: string): IStorageOrgView<P>
+  org(orgId: string): IStorageOrgView<P, J>
   backend<N extends keyof IPluginStoreMap<P> & string>(
     id: N
-  ): IStorageBorrowedBackend<IPluginStoreMap<P>[N]>
+  ): IStorageBorrowedBackend<IPluginStoreMap<P>[N] & IStorageJournalUndoSurface<J>>
   backends(): ReadonlyMap<
     keyof IPluginStoreMap<P> & string,
-    IStorageBorrowedBackend<IPluginStoreMap<P>[keyof IPluginStoreMap<P>]>
+    IStorageBorrowedBackend<
+      IPluginStoreMap<P>[keyof IPluginStoreMap<P>] & IStorageJournalUndoSurface<J>
+    >
   >
 }
 

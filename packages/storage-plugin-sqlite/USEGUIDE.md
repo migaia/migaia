@@ -106,6 +106,12 @@ Feature 的 `query` 和 `tx` 链方法保留在实际派生链上。Feature 借�
 所有托管表以 org_id 作为主键第一列。根原生 SQL 属于调用方 schema 访问；自建表的
 组织过滤由调用方显式提供，不能直接修改内部表。
 
+通过 `host.org(orgId).backend('sqlite')` 访问固定组织。缺省组织及其它组织都使用
+同一套表；创建组织不执行 DDL，也不另开连接。各组织复用同一个原生准入队列，
+数据、期限、锁与修订按 `org_id` 隔离；`host.dropOrg(orgId)` 只删除该组织的托管行。
+原生 Feature 借用同一个冻结 client，工厂只安装一次。显式组织视图不提供任意 SQL
+或数据库维护；事务内调用这些跨组织入口也会拒绝，并保留原事务错误链。
+
 ## 维护与错误
 
 从 `/features/maintenance` 导入 sqliteMaintenanceFeature，并放入插件第二参数。

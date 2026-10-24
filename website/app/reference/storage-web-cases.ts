@@ -5,6 +5,21 @@ const t = (en: string, zh: string): IText => ({ en, zh })
 
 /** Browser cases use actual host ownership, native ports, and current public entries. */
 export const storageWebCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
+  indexedDbBlobFeature: [
+    {
+      title: t('Commit attachments with records', '随记录提交附件'),
+      problem: t(
+        'Attachments and records need one native rollback boundary.',
+        '附件与记录需要共用原生回滚边界。'
+      ),
+      example:
+        "import { createStorageHost } from '@migaia/storage-host'\nimport { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'\nimport { indexedDbBlobFeature } from '@migaia/storage-web/features/blobs'\n\nconst host = await createStorageHost({\n  plugins: [indexedDbBackendPlugin(\n    { dbName: 'attachments' }, { blobs: indexedDbBlobFeature() }\n  )]\n})\ntry {\n  const store = host.backend('indexed-db')\n  await store.transaction(async (scope) => {\n    await scope.api.blobs.put('avatar', new Blob(['avatar bytes'], { type: 'text/plain' }))\n    await scope.putRecord({ attachment: 'avatar' }, 'profile')\n  })\n  console.log(await (await store.api.blobs.get('avatar'))?.text())\n} finally {\n  await host.dispose()\n}",
+      result: t(
+        'Prints avatar bytes after one actual commit; a failed transaction leaves both rows absent.',
+        '一次真实提交后输出 avatar bytes；失败事务不留下两类行。'
+      )
+    }
+  ],
   localStorageBackendPlugin: [
     {
       title: t('Save namespaced browser preferences', '保存有命名空间的浏览器偏好'),

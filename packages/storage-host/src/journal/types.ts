@@ -38,6 +38,18 @@ export type IStorageJournalConfiguration =
   | ((
       context: IStorageJournalInitializerContext
     ) => IStorageJournalAnyOptions | PromiseLike<IStorageJournalAnyOptions>)
+/** Undo restores a committed target only after its original revision and value checks. */
+export type IUndoableStore = {
+  undo(
+    txId: string,
+    ctx?: import('@migaia/storage-contract').IOperationContext
+  ): Promise<{ readonly txId: string }>
+}
+/** The backend invokes its original transaction builder after the journal supplies all locks. */
+export type IStorageJournalUndoRunner = (
+  keys: readonly ILockKey[],
+  work: (scope: Omit<ITransactionScope, 'use'>) => Promise<{ readonly txId: string }>
+) => Promise<{ readonly txId: string }>
 /** A native attempt records through its actual original scope before the owner's commit. */
 export type IStorageJournalAttempt = {
   readonly txId: string
@@ -51,6 +63,7 @@ export type IStorageJournalExecutionPort = {
   headLocks(): readonly ILockKey[]
   active(): boolean
   begin(scope: Omit<ITransactionScope, 'use'>): IStorageJournalAttempt | undefined
+  undo(txId: string, run: IStorageJournalUndoRunner): Promise<{ readonly txId: string }>
 }
 
 /** Private strings belong to the original backend, outside business keys, clear and notifications. */
@@ -104,6 +117,10 @@ export type IStorageJournalChange = Readonly<{
 }>
 /** One admitted descriptor closes over its original native transaction and immutable org projection. */
 export type IStorageJournalBackendBinding = {
+  /** Original native owner can await external intent I/O after producing final business images. */
+  readonly externalWal?: true
+  /** Map private image identities onto their original canonical point lock, without granting locks. */
+  lockTarget?(target: IStorageJournalTarget): ILockKey
   forOrg(orgId: string): IStorageJournalBackendBinding
   openNamespace(prefix: string): Promise<IStorageJournalNamespace>
   changes?(scope: Omit<ITransactionScope, 'use'>): readonly IStorageJournalChange[]

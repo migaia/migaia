@@ -62,6 +62,22 @@ describe('public exports baseline', () => {
   })
 })
 
+describe('native Blob subpath', () => {
+  it('publishes the selected Feature only at its dedicated built entry', async () => {
+    const entry = await import('../dist/features/blobs.js')
+    expect(Object.keys(entry)).toEqual(['indexedDbBlobFeature'])
+    expect(entry.indexedDbBlobFeature).toBeTypeOf('function')
+    expect(Object.hasOwn(storageWeb, 'indexedDbBlobFeature')).toBe(false)
+    const manifest = JSON.parse(
+      readFileSync(resolve(import.meta.dirname, '../package.json'), 'utf8')
+    )
+    expect(manifest.exports['./features/blobs']).toEqual({
+      types: './dist/features/blobs.d.ts',
+      default: './dist/features/blobs.js'
+    })
+  })
+})
+
 describe('package-owner bundle boundary', () => {
   it('keeps canonical owner roots and subpaths external instead of bundling duplicate code', () => {
     const source = readBuiltJavaScript()

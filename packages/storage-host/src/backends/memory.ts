@@ -237,6 +237,7 @@ type IMemoryBase<T> = Omit<ISyncCapableStore<IRecordStore<T>>, 'transaction'> &
     ): Promise<Awaited<R>>
     tx(): ITransactionBuilder<IMemoryScope<T>>
     inspectLocks(ctx?: IOperationContext): Promise<readonly ILockHolding[]>
+    undo?(txId: string, ctx?: IOperationContext): Promise<{ readonly txId: string }>
   }
 /** Canonical keys and committed values belong to their actual memory channel. */
 type IMemoryEntry = {
@@ -374,6 +375,8 @@ export function createMemoryBackend<T = unknown>(
     journalBinding: (() => {
       /** The descriptor owns one projector; every result closes over one existing physical org. */
       const binding = (orgId: string): IStorageJournalBackendBinding => ({
+        externalWal: true,
+        lockTarget: (target) => snapshotMemoryJournalTarget(target).lock,
         forOrg: binding,
         openNamespace: (prefix) => forOrg(orgId).journal.open(prefix),
         changes: (scope) => forOrg(orgId).journalImages.changes(scope),
@@ -1456,6 +1459,37 @@ function createMemoryNamespace<T>(
         }
       ),
     tx: () => createTransactionBuilder(store, undefined, core.getChainMethods('tx')),
+    /** Backend construction alone publishes undo; the host never patches a frozen root base. */
+    ...(core.journal === undefined
+      ? {}
+      : {
+          undo: async (txId: string, ctx?: IOperationContext) => {
+            controller.assertLive()
+            /** The existing controller drains accepted image lookup and the actual native commit. */
+            const release = controller.beginMutation()
+            /**
+             * This outer call supplies only the original shared budget; the builder owns all locks,
+             * retries, the one pipeline and native data transaction.
+             */
+            return runWithConcurrency<{ readonly txId: string }>(
+              {
+                store: base,
+                options: ctx === undefined ? {} : ctx,
+                prepare: () => core.journal!.prepare()
+              },
+              {
+                attempt: async (context) => ({
+                  status: 'committed',
+                  value: await core.journal!.undo(txId, (keys, work) =>
+                    createTransactionBuilder(store, context, core.getChainMethods('tx'))
+                      .lock(keys[0]!, ...keys.slice(1))
+                      .run(work)
+                  )
+                })
+              }
+            ).finally(release)
+          }
+        }),
     inspectLocks: (ctx) =>
       asyncEntry(MemoryOperation.inspectLocks, undefined, ctx, () => {
         controller.assertLive()
@@ -4195,4 +4229,7 @@ function createMemoryNamespace<T>(
 }
 
 /** Precise native store shape is retained by the first-party plugin factory. */
-export type IMemoryBackendStore<T = unknown> = ReturnType<typeof createMemoryBackend<T>>['store']
+export type IMemoryBackendStore<T = unknown> = Omit<
+  ReturnType<typeof createMemoryBackend<T>>['store'],
+  'undo'
+>
