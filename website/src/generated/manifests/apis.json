@@ -318728,16 +318728,16 @@
         },
         {
           "name": "storageBackendPluginExtensionsBrand",
-          "kind": "const",
-          "signature": "export declare const storageBackendPluginExtensionsBrand: unique symbol;",
+          "kind": "type",
+          "signature": "export type { storageBackendPluginExtensionsBrand } from './types.js';",
           "declarationLine": 249,
           "source": "packages/storage-host/dist/types.d.ts",
-          "purpose": "storageBackendPluginExtensionsBrand is part of this module's public const contract.",
+          "purpose": "storageBackendPluginExtensionsBrand is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for storageBackendPluginExtensionsBrand.",
           "advanced": "No additional advanced behavior is declared for storageBackendPluginExtensionsBrand.",
-          "parameters": ["This const declaration has no parameters."],
+          "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this const.",
+          "returns": "No explicit return annotation is declared for this type.",
           "errors": ["No documented errors are declared for storageBackendPluginExtensionsBrand."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for storageBackendPluginExtensionsBrand.",
           "examples": [],
@@ -318745,17 +318745,17 @@
           "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const storageBackendPluginExtensionsBrand: unique symbol;"
+            "export type { storageBackendPluginExtensionsBrand } from './types.js';"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
-          "whenToUse": "Use storageBackendPluginExtensionsBrand when its const contract and declared inputs match the result you need.",
+          "whenToUse": "Use storageBackendPluginExtensionsBrand when its type contract and declared inputs match the result you need.",
           "notUse": "Choose a different public symbol when storageBackendPluginExtensionsBrand does not match the required inputs or return contract.",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "storageBackendPluginExtensionsBrand is part of this module's public const contract."
+              "content": "storageBackendPluginExtensionsBrand is part of this module's public type contract."
             },
             {
               "id": "getting-started",
@@ -318765,12 +318765,12 @@
             {
               "id": "when-to-use",
               "title": "适用场景",
-              "content": "Use storageBackendPluginExtensionsBrand when its const contract and declared inputs match the result you need. Choose a different public symbol when storageBackendPluginExtensionsBrand does not match the required inputs or return contract."
+              "content": "Use storageBackendPluginExtensionsBrand when its type contract and declared inputs match the result you need. Choose a different public symbol when storageBackendPluginExtensionsBrand does not match the required inputs or return contract."
             },
             {
               "id": "quick-implementation",
               "title": "快速实现",
-              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
             },
             {
               "id": "core-usage",
@@ -318784,7 +318784,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-host/dist/types.d.ts:storageBackendPluginExtensionsBrand:export declare const storageBackendPluginExtensionsBrand: unique symbol;",
+          "identity": "packages/storage-host/dist/types.d.ts:storageBackendPluginExtensionsBrand:export type { storageBackendPluginExtensionsBrand } from './types.js';",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],

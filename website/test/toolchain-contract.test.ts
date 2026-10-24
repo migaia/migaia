@@ -54,6 +54,20 @@ function referenceOptionSummary(
   )?.summary[locale]
 }
 
+test('keeps erased storage star exports out of the runtime inventory', () => {
+  const host = generatedApis.find((api) => api.id === 'storage-host:index')
+  const brand = host?.symbols.find(
+    (symbol) => symbol.name === 'storageBackendPluginExtensionsBrand'
+  )
+  assert.ok(brand)
+  assert.equal(brand.kind, 'type')
+  assert.match(brand.signature, /^export type \{/)
+  assert.equal(
+    host?.symbols.find((symbol) => symbol.name === 'memoryBackendPlugin')?.kind,
+    'function'
+  )
+})
+
 test('validates bounded writer selection before generation', () => {
   assert.equal(parseSelectedLibrary([]), null)
   assert.equal(parseSelectedLibrary(['--library', 'plugin-host']), 'plugin-host')
