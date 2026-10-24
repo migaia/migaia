@@ -40,6 +40,10 @@
     "./features/management": {
       "types": "./dist/features/management.d.ts",
       "default": "./dist/features/management.js"
+    },
+    "./features/rescore": {
+      "types": "./dist/features/rescore.d.ts",
+      "default": "./dist/features/rescore.js"
     }
   },
   "scripts": {

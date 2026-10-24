@@ -171,7 +171,11 @@ export const QdrantRequiredOperations = [
   QdrantRoute.deletePayload.name
 ] as const
 /** Managed slots use native engine storage; the source Dot slot preserves cosine input amplitude. */
-export const QdrantManagedVectorName = { search: 'migaia_search', source: 'migaia_source' } as const
+export const QdrantManagedVectorName = {
+  search: 'migaia_search',
+  source: 'migaia_source',
+  rescore: 'migaia_rescore'
+} as const
 /** Reserved fields and stable point/configuration names belong only to this backend. */
 export const QdrantText = {
   backend: 'qdrant',
@@ -186,6 +190,8 @@ export const QdrantText = {
   apiKey: 'api-key',
   sdkMinimum: '1.11.0',
   search: 'vector.search',
+  /** Native extra-slot packets and their write operation share this Feature-owned discriminator. */
+  rescore: 'qdrant.rescore',
   upsert: 'vector.upsert',
   delete: 'vector.delete',
   deleteWhere: 'vector.deleteWhere',

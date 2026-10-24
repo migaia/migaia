@@ -5,9 +5,15 @@ import type {
   IQdrantStore,
   IQdrantUpdateResult
 } from './types.js'
+import type { IQdrantRescorePoint, IQdrantRescoreResult } from './feature-types.js'
 /** Only the exact installed store lends this finite original execution port to its Features. */
 export const nativeFeaturePort = Symbol('qdrant-native-feature')
 export type IQdrantNativeFeaturePort = {
+  updateRescoreVectors(
+    collection: string,
+    points: readonly IQdrantRescorePoint[],
+    ctx?: IOperationContext
+  ): Promise<IQdrantRescoreResult>
   run<K extends IQdrantOperationName>(
     operation: K,
     args: readonly unknown[],

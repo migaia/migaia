@@ -18,6 +18,7 @@ import { qdrantManagementFeature } from '../src/features/management.js'
 import { qdrantHybridFeature } from '../src/features/hybrid.js'
 import { qdrantRecommendFeature } from '../src/features/recommend.js'
 import { qdrantGroupByFeature } from '../src/features/group-by.js'
+import { qdrantRescoreFeature } from '../src/features/rescore.js'
 import { nativeHttp } from '../src/native.js'
 import { QdrantManagedVectorName } from '../src/constants.js'
 import type { IQdrantHttp } from '../src/types.js'
@@ -95,6 +96,232 @@ describe.skipIf(!url)('Qdrant canonical vector subject', () => {
 })
 describe('real native vector backend', () => {
   it.skipIf(!url)(
+    'rescores dense and multivector slots with one filtered native query',
+    async () => {
+      for (const multivector of [undefined, 'max_sim'] as const) {
+        const fixture = native()
+        const other = createOrgId()
+        const host = await createStorageHost({
+          plugins: [
+            qdrantBackendPlugin(
+              { url: url!, collectionPrefix: crypto.randomUUID(), http: fixture.http },
+              {
+                rescore: qdrantRescoreFeature({
+                  collections: { points: { dimensions: 2, metric: 'dot', multivector } }
+                })
+              }
+            )
+          ] as const
+        })
+        const store = host.backend('qdrant')
+        const collection = store
+          .use(vector)
+          .collection<{ active: boolean; pick?: boolean }>('points', {
+            dimensions: 2,
+            metric: 'dot'
+          })
+        const extra = (x: number) =>
+          multivector
+            ? [
+                [x, 0],
+                [0, 1],
+                [0, 0]
+              ]
+            : [x, 0]
+        try {
+          await collection.upsert([
+            { id: 'a', vector: [5, 0], payload: { active: true } },
+            { id: 'b', vector: [4, 0], payload: { active: true, pick: false } },
+            { id: 'c', vector: [3, 0], payload: { active: true } },
+            { id: 'inactive', vector: [100, 0], payload: { active: false } }
+          ])
+          await collection.upsert([{ id: 'expired', vector: [90, 0], payload: { active: true } }], {
+            ttlMs: 0
+          })
+          if (multivector) {
+            const before = fixture.calls.length
+            await expect(
+              store.api.qdrantRescore.updateVectors('points', [
+                {
+                  id: 'a',
+                  vector: [
+                    [0, 0],
+                    [0, 1]
+                  ]
+                }
+              ])
+            ).rejects.toMatchObject({ code: 'QDRANT_REQUEST_FAILED', cause: { status: 422 } })
+            expect(fixture.calls.slice(before)).toEqual(['updateVectors'])
+          }
+          const operation = await store.api.qdrantRescore.updateVectors('points', [
+            { id: 'a', vector: extra(0) },
+            { id: 'b', vector: extra(3) },
+            { id: 'c', vector: extra(2) },
+            { id: 'inactive', vector: extra(100) },
+            { id: 'expired', vector: extra(90) }
+          ])
+          expect(operation.status).toBe('completed')
+          const foreign = host.org(other).backend('qdrant')
+          await foreign
+            .use(vector)
+            .collection('points')
+            .upsert([{ id: 'foreign', vector: [1000, 0], payload: { active: true } }])
+          await foreign.api.qdrantRescore.updateVectors('points', [
+            { id: 'foreign', vector: extra(1000) }
+          ])
+          const captures = { query: 0, topN: 0, component: 0 }
+          const queryVector = multivector
+            ? [
+                [1, 0],
+                [0, 1],
+                [0, 0]
+              ]
+            : [1, 0]
+          const queryRow = multivector ? (queryVector[0] as number[]) : queryVector
+          Object.defineProperty(queryRow, 0, {
+            get: () => {
+              captures.component++
+              return 1
+            }
+          })
+          const query = collection
+            .near([1, 0])
+            .minScore(2.5)
+            .where({ active: true })
+            .withVector()
+            .topK(3)
+            .rescore({
+              get query() {
+                captures.query++
+                return queryVector
+              },
+              get topN() {
+                captures.topN++
+                return 2
+              }
+            })
+          const before = fixture.requests.length
+          const hits = await query.all()
+          expect(captures).toEqual({ query: 1, topN: 1, component: 1 })
+          expect(hits.map((hit) => hit.id)).toEqual(['b', 'c'])
+          expect(hits.map((hit) => hit.score)).toEqual(multivector ? [4, 3] : [3, 2])
+          expect(hits.map((hit) => hit.vector)).toEqual([
+            [4, 0],
+            [3, 0]
+          ])
+          const calls = fixture.requests
+            .slice(before)
+            .filter((request) => request.operation === 'query')
+          expect(calls).toHaveLength(1)
+          expect(calls[0]!.args[1]).toMatchObject({
+            using: QdrantManagedVectorName.rescore,
+            limit: 2,
+            prefetch: {
+              using: QdrantManagedVectorName.search,
+              limit: 3,
+              score_threshold: 2.5,
+              filter: { must: expect.any(Array) }
+            }
+          })
+          expect(JSON.stringify(calls[0]!.args[1])).not.toContain(other)
+          expect(JSON.stringify(calls[0]!.args[1])).toContain('$expiresAt')
+          expect(await query.rerank(() => [1, 2], { topN: 1 }).all()).toMatchObject([
+            { id: 'c', score: multivector ? 3 : 2, rerankScore: 2 }
+          ])
+          const postFilter = await collection
+            .near([1, 0])
+            .where({ active: true })
+            .where((payload) => payload.pick !== false)
+            .topK(3)
+            .rescore({
+              query: multivector
+                ? [
+                    [1, 0],
+                    [0, 1],
+                    [0, 0]
+                  ]
+                : [1, 0],
+              topN: 1
+            })
+            .all()
+          expect(postFilter).toEqual([])
+          expect(
+            (await collection.near([1, 0]).where({ active: true }).topK(3).all()).map(
+              (hit) => hit.id
+            )
+          ).toEqual(['a', 'b', 'c'])
+          const invalidBefore = fixture.requests.length
+          await expect(
+            store.api.qdrantRescore.updateVectors('points', [
+              { id: 'a', vector: multivector ? [1, 0] : [[1, 0]] }
+            ])
+          ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' })
+          expect(() =>
+            collection
+              .near([1, 0])
+              .topK(3)
+              .rescore({ query: [1, 0], topN: 4 })
+          ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT' }))
+          expect(fixture.requests).toHaveLength(invalidBefore)
+          await collection.upsert([{ id: 'b', vector: [4, 0], payload: { active: true } }])
+          expect((await query.all()).some((hit) => hit.id === 'b')).toBe(false)
+        } finally {
+          await host.dispose()
+          await fixture.close()
+        }
+      }
+    }
+  )
+  it.skipIf(!url)(
+    'keeps an existing collection without an extra slot usable and refuses only rescoring',
+    async () => {
+      const fixture = native()
+      const prefix = crypto.randomUUID()
+      const first = await createStorageHost({
+        plugins: [
+          qdrantBackendPlugin({ url: url!, collectionPrefix: prefix, http: fixture.http })
+        ] as const
+      })
+      await first
+        .backend('qdrant')
+        .use(vector)
+        .collection('old', { dimensions: 2, metric: 'dot' })
+        .upsert([{ id: 'kept', vector: [1, 0] }])
+      await first.dispose()
+      const host = await createStorageHost({
+        plugins: [
+          qdrantBackendPlugin(
+            { url: url!, collectionPrefix: prefix, http: fixture.http },
+            {
+              rescore: qdrantRescoreFeature({
+                collections: { old: { dimensions: 2, metric: 'dot' } }
+              })
+            }
+          )
+        ] as const
+      })
+      try {
+        const store = host.backend('qdrant')
+        const collection = store.use(vector).collection('old')
+        expect((await collection.near([1, 0]).topK(1).all())[0]?.id).toBe('kept')
+        await expect(
+          collection
+            .near([1, 0])
+            .topK(1)
+            .rescore({ query: [1, 0] })
+            .all()
+        ).rejects.toMatchObject({ code: 'UNSUPPORTED_CAPABILITY' })
+        await expect(
+          store.api.qdrantRescore.updateVectors('old', [{ id: 'kept', vector: [2, 0] }])
+        ).rejects.toMatchObject({ code: 'UNSUPPORTED_CAPABILITY' })
+        expect((await collection.near([1, 0]).topK(1).all())[0]?.id).toBe('kept')
+      } finally {
+        await host.dispose()
+        await fixture.close()
+      }
+    }
+  )
+  it.skipIf(!url)(
     'shares dense ID and count capture while retaining native first-occurrence deletion',
     async () => {
       const fixture = native(),
@@ -116,6 +343,7 @@ describe('real native vector backend', () => {
           { id: 'source', vector: [1] },
           { id: 'candidate', vector: [2] }
         ])
+
         expect(
           (
             await collection
@@ -185,11 +413,17 @@ describe('real native vector backend', () => {
       const fixture = native(),
         http = { ...fixture.http }
       Reflect.deleteProperty(http, 'createSnapshot')
+      Reflect.deleteProperty(http, 'updateVectors')
       const host = await createStorageHost({
           plugins: [
             qdrantBackendPlugin(
               { url: url!, collectionPrefix: crypto.randomUUID(), http },
-              { management: qdrantManagementFeature() }
+              {
+                management: qdrantManagementFeature(),
+                rescore: qdrantRescoreFeature({
+                  collections: { valid: { dimensions: 1, metric: 'dot' } }
+                })
+              }
             )
           ] as const
         }),
@@ -200,6 +434,10 @@ describe('real native vector backend', () => {
         const before = fixture.calls.length
         await expect(async () =>
           store.api.qdrantManagement!.createSnapshot(fixture.created[0]!, { wait: true })
+        ).rejects.toMatchObject({ code: 'UNSUPPORTED_CAPABILITY' })
+        expect(fixture.calls).toHaveLength(before)
+        await expect(async () =>
+          store.api.qdrantRescore.updateVectors('valid', [{ id: 'one', vector: [2] }])
         ).rejects.toMatchObject({ code: 'UNSUPPORTED_CAPABILITY' })
         expect(fixture.calls).toHaveLength(before)
       } finally {

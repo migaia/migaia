@@ -1,5 +1,11 @@
 import type { QdrantClient, Schemas } from '@qdrant/js-client-rest'
-import type { IOperationContext, IWriteConcurrencyOptions, IWhere } from '@migaia/storage-contract'
+import type {
+  IOperationContext,
+  IWriteConcurrencyOptions,
+  IWhere,
+  IVectorQuery,
+  IVectorNativeQuery
+} from '@migaia/storage-contract'
 import type { IStorageFeatureOutput } from '@migaia/storage-host'
 import type { IQdrantHttp, IQdrantUpdateResult } from './types.js'
 export type IQdrantHybridBranch = Omit<Schemas['Prefetch'], 'prefetch' | 'query' | 'using'> & {
@@ -94,4 +100,51 @@ export type IQdrantManagementOutput = IStorageFeatureOutput<
   readonly [],
   {},
   { readonly store: { readonly qdrantManagement: IQdrantManagementApi }; readonly transaction: {} }
+>
+/** Each selected logical collection has one extra native slot, independent of its search metric. */
+export type IQdrantRescoreSlot = {
+  readonly dimensions: number
+  readonly metric?: 'cosine' | 'dot' | 'euclid'
+  readonly multivector?: 'max_sim'
+}
+/** Configuration is captured before native collection creation; existing data is never migrated. */
+export type IQdrantRescoreOptions = {
+  readonly collections: Readonly<Record<string, IQdrantRescoreSlot>>
+}
+/** The selected slot decides whether one vector or a nonempty matrix is accepted. */
+export type IQdrantRescoreVector = readonly number[] | readonly (readonly number[])[]
+/** Native vector updates address original logical identities within the exact organization. */
+export type IQdrantRescorePoint = { readonly id: string; readonly vector: IQdrantRescoreVector }
+/** The original query owns the recall bound; this stage only chooses its final prefix. */
+export type IQdrantRescoreQueryOptions = {
+  readonly query: IQdrantRescoreVector
+  readonly topN?: number
+}
+/** The actual native operation record is never interpreted as a point count. */
+export type IQdrantRescoreResult = Awaited<ReturnType<IQdrantHttp['updateVectors']>>
+/** Extra-slot writes reuse the installed backend's original operation and resource owner. */
+export type IQdrantRescoreApi = {
+  updateVectors(
+    collection: string,
+    points: readonly IQdrantRescorePoint[],
+    ctx?: IOperationContext
+  ): Promise<IQdrantRescoreResult>
+}
+/** The explicit receiver prevents pre-topK and post-readonly stages from regaining native writes. */
+export type IQdrantRescoreMethods = {
+  rescore<P, G extends boolean, V extends boolean, M extends object>(
+    this: IVectorQuery<P, G, V, M>,
+    options: IQdrantRescoreQueryOptions
+  ): IVectorNativeQuery<P, G, V, M>
+}
+/** Private captured options have no setters, backend handles or registration authority. */
+export type IQdrantRescoreConfiguration = Readonly<
+  Record<
+    string,
+    Readonly<{
+      dimensions: number
+      metric: 'cosine' | 'dot' | 'euclid'
+      multivector?: 'max_sim'
+    }>
+  >
 >
