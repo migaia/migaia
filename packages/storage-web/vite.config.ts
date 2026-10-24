@@ -37,6 +37,7 @@ export default defineConfig({
         'features/reactive': 'src/features/reactive.ts',
         'features/blobs': 'src/features/blobs.ts',
         'features/indexed-db-indexes': 'src/features/indexed-db-indexes.ts',
+        'features/indexed-db-keyset': 'src/features/indexed-db-keyset.ts',
         'features/indexed-db-ttl': 'src/features/indexed-db-ttl.ts',
         'features/indexed-db-batch': 'src/features/indexed-db-batch.ts',
         'features/indexed-db-journal': 'src/features/indexed-db-journal.ts',

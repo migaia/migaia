@@ -28,6 +28,7 @@ import {
   type ICapabilityStore,
   type ICapabilityImpl,
   type IRecordsApi,
+  type IRecordQuerySource,
   type ITransactionRecordsApi,
   type ITransactionStageObserver,
   type IStorageIterator,
@@ -46,7 +47,7 @@ import {
   readConcurrencyLockIdentities,
   lockKey
 } from '@migaia/storage-host/authoring/concurrency'
-import { createRecordQuery } from '@migaia/storage-host/authoring/query'
+import { createRecordQueryWithoutKeyset } from '@migaia/storage-host/authoring/query'
 import { snapshotStorageKeyPrefix } from '@migaia/storage-host/authoring/key'
 import { isStorageErrorFamily, type IStorageErrorFamily } from './errors.js'
 import {
@@ -2553,15 +2554,22 @@ function createIndexedDbRecordApi<TValue>(
   indexedDbContext: IIndexedDbContext<TValue>
 ): IIndexedDbContext<TValue>['recordApi'] {
   return {
-    query: <R = TValue>() =>
-      createRecordQuery<R>(
-        {
-          asyncDisposeKey,
-          pushdown: recordQueryPushdown,
-          execute: ({ ctx }) => indexedDbContext.store.iterateRecords(undefined, ctx)
-        },
-        indexedDbContext.runtime.getChainMethods('query')
-      ),
+    query: <R = TValue>() => {
+      /** Native execution remains in the original storage owner with optional cursor assembly. */
+      const source: IRecordQuerySource = {
+        asyncDisposeKey,
+        pushdown: recordQueryPushdown,
+        execute: ({ ctx }) => indexedDbContext.store.iterateRecords(undefined, ctx)
+      }
+      /** Pure Feature chain declarations retain their original public query surface. */
+      const methods = indexedDbContext.runtime.getChainMethods('query')
+      return (
+        indexedDbContext.assemblies.keyset?.query<R>(source, methods) ??
+        createRecordQueryWithoutKeyset<R>(source, methods, () =>
+          indexedDbFeatureMissing.fail(IndexedDbFeature.keyset)
+        )
+      )
+    },
     removeByPrefix: (prefix, ctx) =>
       rootMutation(
         indexedDbContext,
@@ -2595,14 +2603,21 @@ function transactionRecordApi<TValue>(
   scope: ITransactionScope
 ): ITransactionRecordsApi<TValue> {
   return {
-    query: <R = TValue>() =>
-      createRecordQuery<R, undefined>(
-        {
-          pushdown: recordQueryPushdown,
-          execute: () => scope.iterateRecords()
-        },
-        indexedDbContext.runtime.getChainMethods('query')
-      ),
+    query: <R = TValue>() => {
+      /** The selected cursor owner borrows this same admitted native transaction source. */
+      const source: IRecordQuerySource = {
+        pushdown: recordQueryPushdown,
+        execute: () => scope.iterateRecords()
+      }
+      /** Pure chain declarations never change the existing transaction lifetime. */
+      const methods = indexedDbContext.runtime.getChainMethods('query')
+      return (
+        indexedDbContext.assemblies.keyset?.query<R, undefined>(source, methods) ??
+        createRecordQueryWithoutKeyset<R, undefined>(source, methods, () =>
+          indexedDbFeatureMissing.fail(IndexedDbFeature.keyset)
+        )
+      )
+    },
     removeByPrefix: (prefix) => {
       /** The native map grants no authority; membership is proved before the original handle lookup. */
       const { id } = assertTransactionOwner(indexedDbContext.construction.store, scope)

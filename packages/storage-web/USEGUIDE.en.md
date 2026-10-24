@@ -71,6 +71,7 @@ Write options accept a valid `expires: Date` or integer `maxAge`. Expired writes
 import { createStorageHost } from '@migaia/storage-host'
 import { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'
 import { indexedDbIndexesFeature } from '@migaia/storage-web/features/indexed-db-indexes'
+import { indexedDbKeysetFeature } from '@migaia/storage-web/features/indexed-db-keyset'
 import { indexedDbTtlFeature } from '@migaia/storage-web/features/indexed-db-ttl'
 import { indexedDbBatchFeature } from '@migaia/storage-web/features/indexed-db-batch'
 import { indexedDbJournalFeature } from '@migaia/storage-web/features/indexed-db-journal'
@@ -83,6 +84,7 @@ const host = await createStorageHost({
       { dbName: 'my-app' },
       {
         indexes: indexedDbIndexesFeature(),
+        keyset: indexedDbKeysetFeature(),
         ttl: indexedDbTtlFeature(),
         batch: indexedDbBatchFeature(),
         journal: indexedDbJournalFeature(),
@@ -280,3 +282,5 @@ The original transaction owner manages the text-only scope and read-own-draft be
 While one instance has an active draft, its root reads, writes and other transactions immediately reject with `WRITE_CONFLICT`, including independent callers selecting `ConcurrencyPolicy.wait()`. Use the supplied scope inside the callback. This isolation prevents callback reentry from waiting on its own Web Lock; same-instance queued wait is not provided. Other instances still wait or cancel through native Web Locks. Behavior without redo remains unchanged.
 
 Cookie `redo: true` reuses this same transaction/WAL protocol. Ordinary and redo writes share the original cookie encoding, 4096-byte limit, fixed scope and visibility checks. Batch reads still parse one native visible header and merge the current draft. Redo resolves maxAge to an absolute expiresAt image during preparation, so replay never renews it. Values outside the native Date domain reject before mutation only in this new combination; ordinary Cookie maxAge and Max-Age precedence remain unchanged. Only JS-visible cookies participate; original HttpOnly/unknown-scope limits remain.
+
+Raw `store.use(records).query().page()` and `.after()` additionally require `indexedDbKeysetFeature()` from `@migaia/storage-web/features/indexed-db-keyset` in the backend Feature record. Basic `.all()` remains available. This unit borrows the canonical host cursor implementation without enabling native indexes. Omitted raw pagination rejects with `@migaia/storage-web / INDEXED_DB_FEATURE_NOT_INSTALLED` and names the missing factory before opening a reader. Entity pagination has its own `entityKeysetFeature()` declaration and does not require this raw-query Feature.
