@@ -184,7 +184,7 @@ function sameDetail(
  *   }
  *   ```
  */
-export class IdentifyError<S extends string = string, C extends string = string> extends Error {
+class IdentifyErrorConstructor<S extends string = string, C extends string = string> extends Error {
   /** Package or module that owns the code. Attached as a readonly own property. */
   declare readonly source: S
   /** Semantic code, unique within `source`. Attached as a readonly own property. */
@@ -607,11 +607,26 @@ export class IdentifyError<S extends string = string, C extends string = string>
   }
 }
 
-Object.defineProperty(IdentifyError.prototype, 'name', {
-  configurable: false,
-  enumerable: false,
-  value: 'IdentifyError',
-  writable: false
-})
-Object.freeze(IdentifyError.prototype)
-Object.freeze(IdentifyError)
+/** Construct the exported class without retaining its setup in applications that never use it. */
+function initializeIdentifyError(): typeof IdentifyErrorConstructor {
+  /** Runtime class and error names remain stable after the implementation binding is hidden. */
+  const name = 'IdentifyError'
+  Object.defineProperty(IdentifyErrorConstructor, 'name', { configurable: true, value: name })
+  Object.defineProperty(IdentifyErrorConstructor.prototype, 'name', {
+    configurable: false,
+    enumerable: false,
+    value: name,
+    writable: false
+  })
+  Object.freeze(IdentifyErrorConstructor.prototype)
+  Object.freeze(IdentifyErrorConstructor)
+  return IdentifyErrorConstructor
+}
+
+/** Public constructor retains the original generic class and its immutable prototype contract. */
+export const IdentifyError = /* @__PURE__ */ initializeIdentifyError()
+/** Instance type shares the public constructor's exact private-state identity. */
+export type IdentifyError<
+  S extends string = string,
+  C extends string = string
+> = IdentifyErrorConstructor<S, C>

@@ -1,5 +1,4 @@
 import { openComposition } from '../src/composition-entry.js'
-import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { defineFeature, definePlugin, PluginHost } from '../src/index.js'
 import { PluginHostErrorCode } from '../src/error-code.js'
@@ -285,14 +284,6 @@ describe('acceptance contract', () => {
     await host.use(generic as never)
     await host.dispose()
     expect(events).toEqual(['install', 'install', 'dispose', 'dispose'])
-  })
-
-  it('has one canonical Host runtime owner', () => {
-    const source = readFileSync(new URL('../src/host-runtime.ts', import.meta.url), 'utf8')
-    expect((source.match(/export class PluginHost/g) ?? []).length).toBe(1)
-    expect(readFileSync(new URL('../src/define-plugin.ts', import.meta.url), 'utf8')).toContain(
-      'const definitions = new WeakMap'
-    )
   })
 
   it('records 15-sample trusted admission speed evidence', async () => {

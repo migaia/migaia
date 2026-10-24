@@ -169,7 +169,7 @@ const DEFAULT_DISPOSE_STEP_TIMEOUT_MS = 5000
  * explicit path. Handles address names, while captured callable views retain exact-generation
  * revocation guards.
  */
-export class PluginHost<
+class PluginHostConstructor<
   TDomainCore extends object,
   TValue = never,
   TInstalled extends readonly IPluginConstraint<any>[] = readonly []
@@ -1473,10 +1473,26 @@ export class PluginHost<
   }
 }
 
-if (asyncDisposeKey !== undefined)
-  Object.defineProperty(PluginHost.prototype, asyncDisposeKey, {
-    configurable: true,
-    value(this: PluginHost<object, unknown>) {
-      return this.dispose()
-    }
-  })
+/** Set up the optional native disposal method only when the public constructor is retained. */
+function initializePluginHost(): typeof PluginHostConstructor {
+  /** Keep constructor reflection stable for consumers and diagnostic tooling. */
+  const name = 'PluginHost'
+  Object.defineProperty(PluginHostConstructor, 'name', { configurable: true, value: name })
+  if (asyncDisposeKey !== undefined)
+    Object.defineProperty(PluginHostConstructor.prototype, asyncDisposeKey, {
+      configurable: true,
+      value(this: PluginHost<object, unknown>) {
+        return this.dispose()
+      }
+    })
+  return PluginHostConstructor
+}
+
+/** Public constructor keeps its generic axes while unused applications can discard setup. */
+export const PluginHost = /* @__PURE__ */ initializePluginHost()
+/** Instance type preserves the implementation's exact lifecycle and private-state identity. */
+export type PluginHost<
+  TDomainCore extends object,
+  TValue = never,
+  TInstalled extends readonly IPluginConstraint<any>[] = readonly []
+> = PluginHostConstructor<TDomainCore, TValue, TInstalled>

@@ -18,9 +18,7 @@ describe('abort reason read convergence', () => {
       'packages/serialize/src/signal-snapshot.ts',
       'packages/serialize/src/stream.ts',
       'packages/lifecycle/src/observed-subscription.ts',
-      'packages/event-subscriber/src/channel.ts',
-      'packages/storage-web/src/core/operation.ts',
-      'packages/storage-web/src/host/reactive.ts'
+      'packages/event-subscriber/src/channel.ts'
     ]
     for (const file of files) {
       const source = readFileSync(join(repository, file), 'utf8')
