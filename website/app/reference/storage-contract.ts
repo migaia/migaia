@@ -718,6 +718,18 @@ const keyValidationParams = {
 
 /** Error fields stay on the frozen native error; the original cause remains independently reachable. */
 const errorMembers: Readonly<Record<string, IMemberDoc>> = {
+  fromVersion: {
+    summary: t(
+      'Archive version immediately before the failed migration step or reset, retained on the original error when supplied.',
+      '失败迁移步骤或重置之前的存档版本，在提供时保留于原错误对象。'
+    )
+  },
+  toVersion: {
+    summary: t(
+      'Target version of the failed migration step or reset, retaining the attempted upgrade boundary for diagnostics.',
+      '失败迁移步骤或重置的目标版本，供诊断检查实际尝试的升级边界。'
+    )
+  },
   capability: {
     summary: t(
       'Optional missing capability name retained before the original error is frozen; the name grants no authority.',
@@ -11821,6 +11833,15 @@ console.log(compareStorageKeys(key, ['users', 2]))`,
       ],
       example: storageContractCases.StorageContractError![0]!.example,
       members: errorMembers
+    },
+    IQueryResultOf: {
+      summary: t(
+        'Infer the complete awaited result of a structural all terminal while preserving row arrays and Feature-dependent output types.',
+        '从结构化 all 终点推导完整兑现结果，保留行数组与依赖 Feature 的输出类型。'
+      ),
+      example:
+        "import type { IQueryResultOf, IRecordQuery } from '@migaia/storage-contract'\ntype IRows = IQueryResultOf<IRecordQuery<{ id: string }>>\nconst rows: IRows = [{ id: 'a' }]",
+      members: {}
     },
     INumericKeys: {
       summary: {
