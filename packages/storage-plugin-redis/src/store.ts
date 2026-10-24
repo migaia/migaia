@@ -321,9 +321,10 @@ function redisObserve(
 ): void {
   if (!observer) return
   try {
-    const callback = (observer as Record<string, (...args: readonly unknown[]) => unknown>)[name]
-    if (typeof callback !== 'function') return
-    const result = callback(...values)
+    /** Ordinary method invocation retains the original observer receiver. */
+    const callbacks = observer as Record<string, (...args: readonly unknown[]) => unknown>
+    if (typeof callbacks[name] !== 'function') return
+    const result = callbacks[name](...values)
     void Promise.resolve(result).catch((error) => reportCleanupError(environment.report, error))
   } catch (error) {
     reportCleanupError(environment.report, error)

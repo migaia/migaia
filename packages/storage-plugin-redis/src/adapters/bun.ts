@@ -16,17 +16,24 @@ import {
   reportCleanupError
 } from '@migaia/storage-host/authoring/backend'
 
-/** Bun owns duplicate creation and connection state; no URL or lookalike client is reconstructed. */
-export function bunRedisDriver(client: IBunRedisClient): IRedisDriver<IBunRedisClient> {
-  if (!client || typeof client.duplicate !== 'function') throw invalidArgument()
-  const reporter = createStorageOperationReporter()
-  const withConnection = async <T>(
+/** The real SDK owns native leases; this driver owns only borrowed root metadata and reporting. */
+class BunRedisDriver implements IRedisDriver<IBunRedisClient> {
+  /** Injected native root remains caller-owned and is never closed by this driver. */
+  readonly #root: IBunRedisClient
+  /** All native cleanup failures use the existing report boundary. */
+  readonly #reporter = createStorageOperationReporter()
+  /** Capture the borrowed SDK root without opening another connection. */
+  constructor(root: IBunRedisClient) {
+    this.#root = root
+  }
+  /** Keep the complete original native callback inside the SDK's lease and unwind path. */
+  readonly withConnection: IRedisDriver<IBunRedisClient>['withConnection'] = async <T>(
     run: (connection: IRedisConnection<IBunRedisClient>) => Promise<T>
   ): Promise<T> => {
     if (typeof run !== 'function') throw invalidArgument()
     let owned: IBunRedisClient | undefined, result: T
     try {
-      owned = await client.duplicate()
+      owned = await this.#root.duplicate()
       const connection = owned
       result = await runRedisCallback(run, {
         getClient: () => connection,
@@ -58,7 +65,7 @@ export function bunRedisDriver(client: IBunRedisClient): IRedisDriver<IBunRedisC
               try {
                 await connection.send(RedisCommand.discard, [])
               } catch (cleanup) {
-                reportCleanupError(reporter, normalizeRedisError(cleanup))
+                reportCleanupError(this.#reporter, normalizeRedisError(cleanup))
               }
             throw normalizeRedisError(error)
           }
@@ -68,7 +75,7 @@ export function bunRedisDriver(client: IBunRedisClient): IRedisDriver<IBunRedisC
       try {
         owned?.close()
       } catch (cleanup) {
-        reportCleanupError(reporter, normalizeRedisError(cleanup))
+        reportCleanupError(this.#reporter, normalizeRedisError(cleanup))
       }
       throw normalizeRedisError(error)
     }
@@ -79,53 +86,57 @@ export function bunRedisDriver(client: IBunRedisClient): IRedisDriver<IBunRedisC
     }
     return result
   }
-  return {
-    command: (input) => {
-      const args = captureCommand(input, false) as string[]
-      return withConnection((connection) => connection.command(args))
-    },
-    withConnection,
-    subscribe: async (channel, listener) => {
-      if (typeof channel !== 'string' || typeof listener !== 'function') throw invalidArgument()
-      let owned: IBunRedisClient
+  /** Capture caller arguments before asynchronous native lease acquisition. */
+  readonly command: IRedisDriver<IBunRedisClient>['command'] = (input) => {
+    const args = captureCommand(input, false) as string[]
+    return this.withConnection((connection) => connection.command(args))
+  }
+  /** Subscribe through one genuine native lease and the original shared resource owner. */
+  readonly subscribe: IRedisDriver<IBunRedisClient>['subscribe'] = async (channel, listener) => {
+    if (typeof channel !== 'string' || typeof listener !== 'function') throw invalidArgument()
+    let owned: IBunRedisClient
+    try {
+      owned = await this.#root.duplicate()
+    } catch (error) {
+      throw normalizeRedisError(error)
+    }
+    const state = subscriptionResource(async () => {
       try {
-        owned = await client.duplicate()
-      } catch (error) {
-        throw normalizeRedisError(error)
-      }
-      const state = subscriptionResource(async () => {
-        try {
-          await owned.unsubscribe(channel, receive)
-        } catch (error) {
-          try {
-            owned.close()
-          } catch (cleanup) {
-            state.report(cleanup)
-          }
-          throw error
-        }
-        owned.close()
-      })
-      const receive = (message: string): void => {
-        if (state.isClosing()) return
-        try {
-          const pending = listener(message) as unknown
-          if (pending !== undefined) void Promise.resolve(pending).catch(state.report)
-        } catch (error) {
-          state.report(error)
-        }
-      }
-      try {
-        await owned.subscribe(channel, receive)
+        await owned.unsubscribe(channel, receive)
       } catch (error) {
         try {
           owned.close()
         } catch (cleanup) {
           state.report(cleanup)
         }
-        throw normalizeRedisError(error)
+        throw error
       }
-      return state.resource
+      owned.close()
+    })
+    const receive = (message: string): void => {
+      if (state.isClosing()) return
+      try {
+        const pending = listener(message) as unknown
+        if (pending !== undefined) void Promise.resolve(pending).catch(state.report)
+      } catch (error) {
+        state.report(error)
+      }
     }
+    try {
+      await owned.subscribe(channel, receive)
+    } catch (error) {
+      try {
+        owned.close()
+      } catch (cleanup) {
+        state.report(cleanup)
+      }
+      throw normalizeRedisError(error)
+    }
+    return state.resource
   }
+}
+/** Validate the supported SDK before publishing its exact borrowed driver ports. */
+export function bunRedisDriver(client: IBunRedisClient): IRedisDriver<IBunRedisClient> {
+  if (!client || typeof client.duplicate !== 'function') throw invalidArgument()
+  return new BunRedisDriver(client)
 }

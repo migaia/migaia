@@ -63,68 +63,90 @@ export const RedisSuffix = {
 export function redisPortableIdentity(value: ICodecValue): string {
   return redisHex(new TextEncoder().encode(textCodec.encode(asCodecValue(value))))
 }
-/** Same-slot namespace and original logical key codec are the only physical key mapping. */
+/** Pure physical layout metadata belongs to one fixed organization, with no native resource state. */
+type IRedisLayoutContext = {
+  /** Canonical prefix hex retains the original nonempty same-slot hash tag. */
+  tag: string
+  /** Every logical key uses the exact original organization envelope. */
+  orgId: string
+  /** Native organization bounds reuse the original canonical ordered writer. */
+  lower: string
+  /** The exclusive upper endpoint belongs to the same fixed organization interval. */
+  upper: string
+}
+/** Project a logical key through the one canonical organization codec. */
+function redisLayoutEncode(context: IRedisLayoutContext, key: IStorageKey): string {
+  return redisHex(encodeStorageOrgKey(context.orgId, key, RedisText.backend))
+}
+/** Decode only the original organization envelope and retain native corruption causes. */
+function redisLayoutDecode(context: IRedisLayoutContext, encoded: string): IStorageKey {
+  try {
+    return decodeStorageOrgKey(context.orgId, redisUnhex(encoded), RedisText.backend)
+  } catch (error) {
+    throw redisError(RedisErrorCode.decodeFailed, error)
+  }
+}
+/** Publish fixed mapping methods with explicit context; no mutable factory state or native I/O. */
 export function createRedisLayout(prefix: string, orgId: string) {
   if (typeof prefix !== 'string') throw invalidArgument()
-  const tag = '{' + redisHex(encodeOrderedStorageKey(prefix, RedisText.backend)) + '}',
-    encode = (key: IStorageKey): string =>
-      redisHex(encodeStorageOrgKey(orgId, key, RedisText.backend)),
-    span = snapshotStorageOrgKeyPrefix(orgId, undefined, RedisText.backend),
-    lower = redisHex(span.lower),
-    upper = redisHex(span.upper),
-    decode = (encoded: string): IStorageKey => {
-      try {
-        return decodeStorageOrgKey(orgId, redisUnhex(encoded), RedisText.backend)
-      } catch (error) {
-        throw redisError(RedisErrorCode.decodeFailed, error)
-      }
-    }
-  return {
+  const tag = '{' + redisHex(encodeOrderedStorageKey(prefix, RedisText.backend)) + '}'
+  const span = snapshotStorageOrgKeyPrefix(orgId, undefined, RedisText.backend)
+  const context: IRedisLayoutContext = {
     tag,
     orgId,
+    lower: redisHex(span.lower),
+    upper: redisHex(span.upper)
+  }
+  return {
+    tag: context.tag,
+    orgId: context.orgId,
     owns: (physical: string): boolean => {
-      if (physical.startsWith(tag + ':' + RedisSuffix.locks + ':' + orgId + ':')) return true
-      if (!physical.startsWith(tag + ':')) return false
-      if (physical.startsWith(tag + ':' + RedisSuffix.vector + ':'))
-        return physical.split(':')[3] === orgId
+      if (physical.startsWith(context.tag + ':' + RedisSuffix.locks + ':' + context.orgId + ':'))
+        return true
+      if (!physical.startsWith(context.tag + ':')) return false
+      if (physical.startsWith(context.tag + ':' + RedisSuffix.vector + ':'))
+        return physical.split(':')[3] === context.orgId
       const encoded = physical.slice(physical.lastIndexOf(':') + 1)
-      return encoded >= lower && encoded < upper
+      return encoded >= context.lower && encoded < context.upper
     },
     feature: (channel: 'streams' | 'sorted' | 'rate' | 'pubsub', name: IStorageKey): string =>
-      tag + ':' + channel + ':' + encode(name),
+      context.tag + ':' + channel + ':' + redisLayoutEncode(context, name),
     vectorPrefix: (collection: string): string =>
-      tag + ':' + RedisSuffix.vector + ':' + redisPortableIdentity(collection) + ':',
+      context.tag + ':' + RedisSuffix.vector + ':' + redisPortableIdentity(collection) + ':',
     vectorPoint: (collection: string, id: string): string =>
-      tag +
+      context.tag +
       ':' +
       RedisSuffix.vector +
       ':' +
       redisPortableIdentity(collection) +
       ':' +
-      orgId +
+      context.orgId +
       ':' +
       redisPortableIdentity(id),
     vectorIndex: (collection: string): string =>
-      tag + ':' + RedisSuffix.vectorIndex + ':' + redisPortableIdentity(collection),
-    vectorPattern: tag + ':' + RedisSuffix.vector + ':*:' + orgId + ':*',
-    revisions: tag + ':' + RedisSuffix.revisions,
-    changes: tag + ':' + RedisSuffix.changes,
-    durableChanges: tag + ':' + RedisSuffix.durableChanges,
+      context.tag + ':' + RedisSuffix.vectorIndex + ':' + redisPortableIdentity(collection),
+    vectorPattern: context.tag + ':' + RedisSuffix.vector + ':*:' + context.orgId + ':*',
+    revisions: context.tag + ':' + RedisSuffix.revisions,
+    changes: context.tag + ':' + RedisSuffix.changes,
+    durableChanges: context.tag + ':' + RedisSuffix.durableChanges,
     journal: (namespace: string): string =>
-      tag + ':' + RedisSuffix.journal + ':' + encode(namespace),
-    encode,
-    decode,
+      context.tag + ':' + RedisSuffix.journal + ':' + redisLayoutEncode(context, namespace),
+    encode: (value: IStorageKey) => redisLayoutEncode(context, value),
+    decode: (value: string) => redisLayoutDecode(context, value),
     value: (channel: IRedisChannel, key: IStorageKey): string =>
-      tag + ':' + RedisSuffix[channel] + ':' + encode(key),
-    index: (channel: 'text' | 'record'): string => tag + ':' + RedisSuffix[channel] + ':index',
+      context.tag + ':' + RedisSuffix[channel] + ':' + redisLayoutEncode(context, key),
+    index: (channel: 'text' | 'record'): string =>
+      context.tag + ':' + RedisSuffix[channel] + ':index',
     revision: (channel: IRedisChannel, key: IStorageKey): string =>
-      RedisSuffix[channel] + ':' + encode(key),
-    rangeRevision: (channel: IRedisChannel): string => RedisSuffix[channel] + ':range:' + orgId,
+      RedisSuffix[channel] + ':' + redisLayoutEncode(context, key),
+    rangeRevision: (channel: IRedisChannel): string =>
+      RedisSuffix[channel] + ':range:' + context.orgId,
     lock: (identity: string): string =>
-      tag + ':' + RedisSuffix.locks + ':' + orgId + ':' + identity,
-    lockPattern: tag + ':' + RedisSuffix.locks + ':*'
+      context.tag + ':' + RedisSuffix.locks + ':' + context.orgId + ':' + identity,
+    lockPattern: context.tag + ':' + RedisSuffix.locks + ':*'
   }
 }
+
 /** Fixed string replies admit genuine SDK strings and byte views while rejecting arbitrary coercion. */
 export function replyString(value: unknown): string {
   if (typeof value === 'string') return value

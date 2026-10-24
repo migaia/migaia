@@ -15,7 +15,7 @@ import {
   type IStorageResource
 } from '@migaia/storage-contract'
 import { redisBackendKind } from '../plugin.js'
-import { readNativeFeaturePort } from '../native-feature.js'
+import { readNativeFeaturePort, type IRedisNativeFeaturePort } from '../native-feature.js'
 import { featureInteger, readStreamRows } from '../feature-input.js'
 import { decodeRedisChange } from '../changes.js'
 import { replyString, RedisSuffix } from '../layout.js'
@@ -140,134 +140,187 @@ export function redisChangeStreamFeature(options: { readonly maxLen: number }) {
   )
 }
 
-/** Each original provider receives only its own native organization port, never a shared root API. */
-function createRedisDurableApi(
-  resolve: () => import('../native-feature.js').IRedisNativeFeaturePort
-): IDurableChangeFeedApi {
-  return {
-    async readChanges(options, ctx) {
-      const after = options?.after,
-        limit = featureInteger(options?.limit ?? 100)
-      if (after !== undefined) cursor(after)
-      const port = resolve()
-      return port.run(
-        RedisOperation.changesRead,
-        { after, limit },
-        ctx,
-        false,
-        async (input, connection, layout) => {
-          if (input.after !== undefined) cursor(input.after)
-          featureInteger(input.limit)
-          if (input.after !== undefined)
-            await assertRetained(connection, layout.durableChanges, input.after)
-          let current = input.after ?? '0-0'
-          const result: IDurableStorageChange[] = []
-          for (;;) {
-            const page = changes(
-              await connection.command([
-                RedisCommand.xrange,
-                layout.durableChanges,
-                '(' + current,
-                '+',
-                RedisCommand.count,
-                String(input.limit - result.length)
-              ])
-            )
-            if (page.length === 0) break
-            for (const change of page) {
-              current = change.cursor
-              if (change.orgId === layout.orgId || port.allOrganizations) result.push(change)
-            }
-            if (result.length === input.limit) break
-          }
-          return { changes: result, cursor: current }
+/** One durable tail owns only its last successfully delivered native cursor and original lifetime. */
+class RedisDurableTail implements IStorageResource {
+  /** Native driver and report ports retain the selected organization's original owner. */
+  readonly #port: IRedisNativeFeaturePort
+  /** One immutable org layout selects the same private durable Stream. */
+  readonly #layout: IRedisNativeFeaturePort['layout']
+  /** Canonical operation cancellation remains cooperative with the original blocking read. */
+  readonly #signal: AbortSignal | undefined
+  /** Native cursor advances only after the caller's original callback succeeds. */
+  #current: string
+  /** Captured listener stays fixed across native blocking reads. */
+  readonly #onChange: Parameters<IDurableChangeFeedApi['tailChanges']>[0]['onChange']
+  /** Optional failure observation retains the original report-only contract. */
+  readonly #onError: Parameters<IDurableChangeFeedApi['tailChanges']>[0]['onError']
+  /** Shared lifetime owns the one accepted connection and both cached cleanup Promises. */
+  readonly #lifetime: ReturnType<typeof createStorageIteratorLifetime<never>>
+  /** Start exactly one native connection after resolving the initial high-water cursor. */
+  constructor(
+    port: IRedisNativeFeaturePort,
+    layout: IRedisNativeFeaturePort['layout'],
+    signal: AbortSignal | undefined,
+    current: string,
+    onChange: Parameters<IDurableChangeFeedApi['tailChanges']>[0]['onChange'],
+    onError: Parameters<IDurableChangeFeedApi['tailChanges']>[0]['onError']
+  ) {
+    this.#port = port
+    this.#layout = layout
+    this.#signal = signal
+    this.#current = current
+    this.#onChange = onChange
+    this.#onError = onError
+    this.#lifetime = createStorageIteratorLifetime<never>({
+      close: async () => {},
+      report: port.report
+    })
+    /** The original lifetime drains this exact native loop before cleanup settles. */
+    const pending = this.#lifetime.advance(() => this.#run())
+    void pending.then(undefined, (error) => this.#failed(error))
+  }
+  /** Return the original cached explicit cleanup Promise. */
+  readonly dispose = () => this.#lifetime.dispose()
+  /** Return the original cached report-only symbolic Promise. */
+  readonly [asyncDisposeKey] = () => this.#lifetime.symbolic()
+  /** Borrow exactly one real dedicated connection for the complete blocking tail. */
+  async #run(): Promise<IteratorResult<never>> {
+    await this.#port.driver.withConnection((connection) => this.#consume(connection))
+    return { done: true, value: undefined }
+  }
+  /** Retention rechecks and callback acknowledgement preserve the original read/advance order. */
+  async #consume(connection: IRedisConnection): Promise<void> {
+    while (!this.#lifetime.isClosing()) {
+      throwIfAborted(this.#signal)
+      await assertRetained(connection, this.#layout.durableChanges, this.#current)
+      /** A real native block remains bounded so original cancellation and close can drain. */
+      const reply = await connection.command([
+        RedisCommand.xread,
+        RedisCommand.count,
+        '100',
+        RedisCommand.block,
+        '1000',
+        RedisCommand.streams,
+        this.#layout.durableChanges,
+        this.#current
+      ])
+      if (reply === null) continue
+      /** Only rows for this exact Stream enter native summary decoding. */
+      const rows = readStreamRows(reply, this.#layout.durableChanges)
+      await assertRetained(connection, this.#layout.durableChanges, this.#current)
+      for (const change of changes(rows)) {
+        if (this.#lifetime.isClosing()) return
+        throwIfAborted(this.#signal)
+        if (change.orgId === this.#layout.orgId || this.#port.allOrganizations) {
+          /** Listener callbacks keep the original bare-call receiver, unlike native port methods. */
+          const onChange = this.#onChange
+          await onChange(change)
         }
-      )
-    },
-    async tailChanges(options, ctx) {
-      const from = options.from,
-        onChange = options.onChange,
-        onError = options.onError
-      if (from !== 'now') cursor(from)
-      if (
-        typeof onChange !== 'function' ||
-        (onError !== undefined && typeof onError !== 'function')
-      )
-        throw invalidArgument()
-      const port = resolve()
-      return port.resource(
-        RedisOperation.changesTail,
-        { from },
-        ctx,
-        async (input, layout, signal) => {
-          let current = input.from
-          if (current === 'now') {
-            const last = changes(
-              await port.driver.command([
-                RedisCommand.xrevrange,
-                layout.durableChanges,
-                '+',
-                '-',
-                RedisCommand.count,
-                '1'
-              ])
-            )
-            current = last[0]?.cursor ?? '0-0'
-          } else cursor(current)
-          const lifetime = createStorageIteratorLifetime<never>({
-              close: async () => {},
-              report: port.report
-            }),
-            resource: IStorageResource = {
-              dispose: lifetime.dispose,
-              [asyncDisposeKey]: lifetime.symbolic
-            }
-          const pending = lifetime.advance(async () => {
-            await port.driver.withConnection(async (connection) => {
-              while (!lifetime.isClosing()) {
-                throwIfAborted(signal)
-                await assertRetained(connection, layout.durableChanges, current)
-                const reply = await connection.command([
-                  RedisCommand.xread,
-                  RedisCommand.count,
-                  '100',
-                  RedisCommand.block,
-                  '1000',
-                  RedisCommand.streams,
-                  layout.durableChanges,
-                  current
-                ])
-                if (reply === null) continue
-                const rows = readStreamRows(reply, layout.durableChanges)
-                await assertRetained(connection, layout.durableChanges, current)
-                for (const change of changes(rows)) {
-                  if (lifetime.isClosing()) return
-                  throwIfAborted(signal)
-                  if (change.orgId === layout.orgId || port.allOrganizations) {
-                    await onChange(change)
-                  }
-                  current = change.cursor
-                }
-              }
-            })
-            return { done: true, value: undefined }
-          })
-          void pending.then(undefined, (error) => {
-            const failure = normalizeRedisTransactionFailure(error)
-            port.report(failure)
-            if (onError) {
-              try {
-                const result: unknown = onError(failure)
-                void Promise.resolve(result).catch(port.report)
-              } catch (secondary) {
-                port.report(secondary)
-              }
-            }
-            void resource[asyncDisposeKey]()
-          })
-          return resource
-        }
-      )
+        this.#current = change.cursor
+      }
     }
   }
+  /** Report the original failure and listener failure once before closing the same tail. */
+  #failed(error: unknown): void {
+    /** Callback failure normalization keeps the original business/native cause reachable. */
+    const failure = normalizeRedisTransactionFailure(error)
+    this.#port.report(failure)
+    /** This is the original caller callback, so no tail object becomes its receiver. */
+    const onError = this.#onError
+    if (onError) {
+      try {
+        const result: unknown = onError(failure)
+        void Promise.resolve(result).catch(this.#port.report)
+      } catch (secondary) {
+        this.#port.report(secondary)
+      }
+    }
+    void this[asyncDisposeKey]()
+  }
+}
+
+/** One provider owns the fixed resolver for its original org native execution ports. */
+class RedisDurableFeed implements IDurableChangeFeedApi {
+  /** Resolve current original ports without retaining another root provider or native connection. */
+  readonly #resolve: () => IRedisNativeFeaturePort
+  /** Capture the provider resolver without I/O. */
+  constructor(resolve: () => IRedisNativeFeaturePort) {
+    this.#resolve = resolve
+  }
+  /** Execute readChanges through original native ports and cursor semantics. */
+  readonly readChanges: IDurableChangeFeedApi['readChanges'] = async (options, ctx) => {
+    const after = options?.after,
+      limit = featureInteger(options?.limit ?? 100)
+    if (after !== undefined) cursor(after)
+    const port = this.#resolve()
+    return port.run(
+      RedisOperation.changesRead,
+      { after, limit },
+      ctx,
+      false,
+      async (input, connection, layout) => {
+        if (input.after !== undefined) cursor(input.after)
+        featureInteger(input.limit)
+        if (input.after !== undefined)
+          await assertRetained(connection, layout.durableChanges, input.after)
+        let current = input.after ?? '0-0'
+        const result: IDurableStorageChange[] = []
+        for (;;) {
+          const page = changes(
+            await connection.command([
+              RedisCommand.xrange,
+              layout.durableChanges,
+              '(' + current,
+              '+',
+              RedisCommand.count,
+              String(input.limit - result.length)
+            ])
+          )
+          if (page.length === 0) break
+          for (const change of page) {
+            current = change.cursor
+            if (change.orgId === layout.orgId || port.allOrganizations) result.push(change)
+          }
+          if (result.length === input.limit) break
+        }
+        return { changes: result, cursor: current }
+      }
+    )
+  }
+  /** Execute tailChanges through original native ports and cursor semantics. */
+  readonly tailChanges: IDurableChangeFeedApi['tailChanges'] = async (options, ctx) => {
+    const from = options.from,
+      onChange = options.onChange,
+      onError = options.onError
+    if (from !== 'now') cursor(from)
+    if (typeof onChange !== 'function' || (onError !== undefined && typeof onError !== 'function'))
+      throw invalidArgument()
+    const port = this.#resolve()
+    return port.resource(
+      RedisOperation.changesTail,
+      { from },
+      ctx,
+      async (input, layout, signal) => {
+        let current = input.from
+        if (current === 'now') {
+          const last = changes(
+            await port.driver.command([
+              RedisCommand.xrevrange,
+              layout.durableChanges,
+              '+',
+              '-',
+              RedisCommand.count,
+              '1'
+            ])
+          )
+          current = last[0]?.cursor ?? '0-0'
+        } else cursor(current)
+        return new RedisDurableTail(port, layout, signal, current, onChange, onError)
+      }
+    )
+  }
+}
+/** Publish one selected org durable feed without another cursor or acknowledgement ledger. */
+function createRedisDurableApi(resolve: () => IRedisNativeFeaturePort): IDurableChangeFeedApi {
+  return new RedisDurableFeed(resolve)
 }
