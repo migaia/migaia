@@ -2,13 +2,14 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { Redis } from 'ioredis'
 import { createClientPool } from 'redis'
 import { createStorageHost } from '@migaia/storage-host'
-import { counter, kv, records, ttl } from '@migaia/storage-contract'
+import { counter, kv, records, ttl, durableChangeFeed } from '@migaia/storage-contract'
 import { runConformance } from '@migaia/storage-contract/conformance'
 import { redisBackendPlugin } from '../src/index.js'
 import { nodeRedisDriver } from '../src/adapters/node-redis.js'
 import { ioredisDriver } from '../src/adapters/ioredis.js'
 import { createRedisLayout } from '../src/layout.js'
 import { redisCapabilities } from '../src/types.js'
+import { redisChangeStreamFeature } from '../src/features/change-stream.js'
 
 /** Each canonical case receives an empty namespace and only its own native keys are removed. */
 for (const [service, url] of [
@@ -56,12 +57,17 @@ for (const [service, url] of [
         { describe, expect, it },
         {
           name: 'native standard storage',
-          capabilities: [kv, records, ttl, counter],
+          capabilities: [kv, records, ttl, counter, durableChangeFeed],
           features: redisCapabilities,
           async create() {
             const prefix = crypto.randomUUID(),
               host = await createStorageHost({
-                plugins: [redisBackendPlugin({ driver, prefix })] as const
+                plugins: [
+                  redisBackendPlugin(
+                    { driver, prefix },
+                    { history: redisChangeStreamFeature({ maxLen: 1000 }) }
+                  )
+                ] as const
               })
             tag = createRedisLayout(prefix, crypto.randomUUID()).tag
             dispose = () => host.dispose()

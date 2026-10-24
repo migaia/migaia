@@ -16,6 +16,10 @@ export const RedisCommand = {
   group: 'GROUP',
   /** Native HGET protocol word used by fixed Redis endpoints. */
   hget: 'HGET',
+  /** Native binary HASH capture for selected vector points. */
+  hgetall: 'HGETALL',
+  /** Exact Redis absolute expiry preserves HASH deadlines across draft rewrites. */
+  pexpiretime: 'PEXPIRETIME',
   /** Native HINCRBY protocol word used by fixed Redis endpoints. */
   hincrby: 'HINCRBY',
   /** Native HMGET protocol word used by fixed Redis endpoints. */
@@ -36,8 +40,6 @@ export const RedisCommand = {
   mkstream: 'MKSTREAM',
   /** Native NX protocol word used by fixed Redis endpoints. */
   nx: 'NX',
-  /** Native OK protocol word used by fixed Redis endpoints. */
-  ok: 'OK',
   /** Native PERSIST protocol word used by fixed Redis endpoints. */
   persist: 'PERSIST',
   /** Native PEXPIREAT protocol word used by fixed Redis endpoints. */
@@ -84,6 +86,20 @@ export const RedisCommand = {
   zrank: 'ZRANK',
   /** Native ZREM protocol word used by fixed Redis endpoints. */
   zrem: 'ZREM',
+  /** Native MAXLEN protocol word used by fixed Redis endpoints. */
+  maxlen: 'MAXLEN',
+  /** Native XREAD protocol word used by fixed Redis endpoints. */
+  xread: 'XREAD',
+  /** Native XREVRANGE protocol word used by fixed Redis endpoints. */
+  xrevrange: 'XREVRANGE',
+  /** Native Stream metadata carries retention facts without a client ledger. */
+  xinfo: 'XINFO',
+  /** Native XINFO target for the selected commit Stream. */
+  stream: 'STREAM',
+  /** Native existence check distinguishes empty Streams from missing storage. */
+  exists: 'EXISTS',
+  /** Native subscription setup is observed without exposing its channel. */
+  subscribe: 'SUBSCRIBE',
   multi: 'MULTI',
   exec: 'EXEC',
   discard: 'DISCARD',
@@ -111,6 +127,37 @@ export const redisExecCause = Symbol('redis-exec-cause')
 
 /** Backend operations and protocol events have one stable package owner. */
 export const RedisOperation = {
+  /** Stable changes.read endpoint identity for original pipelines and observations. */
+  changesRead: 'changes.read',
+  /** Stable changes.tail endpoint identity for original pipelines and observations. */
+  changesTail: 'changes.tail',
+  /** Stable pubsub.keyspace endpoint identity for original pipelines and observations. */
+  pubsubKeyspace: 'pubsub.keyspace',
+  /** Stable pubsub.publish endpoint identity for original pipelines and observations. */
+  pubsubPublish: 'pubsub.publish',
+  /** Stable pubsub.subscribe endpoint identity for original pipelines and observations. */
+  pubsubSubscribe: 'pubsub.subscribe',
+  /** Stable rateLimit.consume endpoint identity for original pipelines and observations. */
+  rateLimitConsume: 'rateLimit.consume',
+  /** Stable sortedSets.add endpoint identity for original pipelines and observations. */
+  sortedSetsAdd: 'sortedSets.add',
+  /** Stable sortedSets.rank endpoint identity for original pipelines and observations. */
+  sortedSetsRank: 'sortedSets.rank',
+  /** Stable sortedSets.top endpoint identity for original pipelines and observations. */
+  sortedSetsTop: 'sortedSets.top',
+  /** Stable streams.ack endpoint identity for original pipelines and observations. */
+  streamsAck: 'streams.ack',
+  /** Stable streams.add endpoint identity for original pipelines and observations. */
+  streamsAdd: 'streams.add',
+  /** Stable streams.autoClaim endpoint identity for original pipelines and observations. */
+  streamsAutoClaim: 'streams.autoClaim',
+  /** Stable streams.createGroup endpoint identity for original pipelines and observations. */
+  streamsCreateGroup: 'streams.createGroup',
+  /** Stable streams.range endpoint identity for original pipelines and observations. */
+  streamsRange: 'streams.range',
+  /** Stable streams.readGroup endpoint identity for original pipelines and observations. */
+  streamsReadGroup: 'streams.readGroup',
+
   get: 'get',
   set: 'set',
   remove: 'remove',
@@ -140,6 +187,11 @@ export const RedisOperation = {
   watch: 'watch.next',
   queryDelete: 'query.delete',
   queryUpdate: 'query.update',
+  /** Standard vector endpoints retain one original pipeline each. */
+  vectorUpsert: 'vector.upsert',
+  vectorDelete: 'vector.delete',
+  vectorDeleteWhere: 'vector.deleteWhere',
+  vectorSearch: 'vector.search',
   onRedisCommand: 'onRedisCommand',
   onWatchConflict: 'onWatchConflict'
 } as const

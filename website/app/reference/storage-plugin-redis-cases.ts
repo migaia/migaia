@@ -3,6 +3,85 @@ import type { ICaseDoc, IText } from './contract.js'
 const t = (en: string, zh: string): IText => ({ en, zh })
 /** Only delivered native driver entries appear in this package's current examples. */
 export const storagePluginRedisCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
+  rediSearchVectorFeature: [
+    {
+      title: t('Rank with native FLOAT32 indices', '以原生 FLOAT32 索引排名'),
+      problem: t(
+        'A selected vector capability needs native ranking and pre-KNN filters.',
+        '所选向量能力需要原生排名和 KNN 前过滤。'
+      ),
+      example: `import { createClientPool } from 'redis'
+import { createStorageHost } from '@migaia/storage-host'
+import { vector, ttl } from '@migaia/storage-contract'
+import { redisBackendPlugin } from '@migaia/storage-plugin-redis'
+import { nodeRedisDriver } from '@migaia/storage-plugin-redis/node-redis'
+import { rediSearchVectorFeature } from '@migaia/storage-plugin-redis/features/search'
+const pool = createClientPool({ url: process.env.MIGAIA_REDIS_STACK_URL! }, { maximum: 8 })
+await pool.connect()
+const host = await createStorageHost({ plugins: [redisBackendPlugin({ driver: nodeRedisDriver(pool), prefix: crypto.randomUUID() }, { search: rediSearchVectorFeature() })] as const })
+const store = host.backend('redis')
+try {
+  const items = store.use(vector).collection<{ group: string }>('items', { dimensions: 2, metric: 'cosine' })
+  await items.upsert([{ id: 'one', vector: [1, 0], payload: { group: 'docs' } }])
+  console.log((await items.near([1, 0], { exact: true }).where({ group: 'docs' }).topK(1).all())[0]?.id)
+  await store.use(ttl).expire({ channel: 'vector', collection: 'items', id: 'one' }, 60000)
+} finally {
+  await store.clearAll()
+  await host.dispose()
+  await pool.close()
+}`,
+      result: t(
+        'Prints one. The native exact FLAT path filters the organization and payload before ranking.',
+        '输出 one，原生 exact FLAT 路径在排名前过滤组织与 payload。'
+      )
+    }
+  ],
+  nativeFeatures: [
+    {
+      title: t('Compose independent native Features', '组合独立原生 Feature'),
+      problem: t(
+        'Business streams and committed storage replay have different native sources.',
+        '业务 Stream 与存储提交重放使用不同原生来源。'
+      ),
+      example: `import { createClientPool } from 'redis'
+import { createStorageHost } from '@migaia/storage-host'
+import { durableChangeFeed } from '@migaia/storage-contract'
+import { redisBackendPlugin } from '@migaia/storage-plugin-redis'
+import { nodeRedisDriver } from '@migaia/storage-plugin-redis/node-redis'
+import { redisStreamsFeature } from '@migaia/storage-plugin-redis/features/streams'
+import { redisPubSubFeature } from '@migaia/storage-plugin-redis/features/pubsub'
+import { redisSortedSetsFeature } from '@migaia/storage-plugin-redis/features/sorted-sets'
+import { redisRateLimitFeature } from '@migaia/storage-plugin-redis/features/rate-limit'
+import { redisChangeStreamFeature } from '@migaia/storage-plugin-redis/features/change-stream'
+const pool = createClientPool({ url: process.env.MIGAIA_REDIS_URL! }, { maximum: 8 })
+await pool.connect()
+const host = await createStorageHost({ plugins: [redisBackendPlugin({
+  driver: nodeRedisDriver(pool),
+  prefix: process.env.MIGAIA_EXAMPLE_REDIS_PREFIX ?? crypto.randomUUID()
+}, {
+  streams: redisStreamsFeature(), pubsub: redisPubSubFeature(),
+  scores: redisSortedSetsFeature(), rate: redisRateLimitFeature({ limit: 3, windowMs: 1000 }),
+  history: redisChangeStreamFeature({ maxLen: 1000 })
+})] as const })
+const store = host.backend('redis')
+try {
+  const id = await store.api.streams.add('jobs', { body: new Uint8Array([1, 2]) })
+  console.log((await store.api.streams.range('jobs'))[0]?.id === id)
+  await store.api.sortedSets.add('scores', [{ member: 'one', score: 1 }])
+  console.log((await store.api.sortedSets.top('scores'))[0]?.member)
+  console.log((await store.api.rateLimit.consume('quota')).allowed)
+  const subscription = await store.api.pubsub.subscribe('events', () => undefined)
+  await store.api.pubsub.publish('events', new Uint8Array([3]))
+  await subscription.dispose()
+  await store.set('checkpoint', 'ready')
+  console.log((await store.use(durableChangeFeed).readChanges()).changes.length)
+} finally { await host.dispose(); await pool.close() }`,
+      result: t(
+        'Prints true, one, true and 1. Native data remains in the selected namespace after disposal.',
+        '输出 true、one、true 与 1。释放后原生数据仍保留在所选 namespace。'
+      )
+    }
+  ],
   redisBackendPlugin: [
     {
       title: t('Use the original native transaction', '使用原生事务'),

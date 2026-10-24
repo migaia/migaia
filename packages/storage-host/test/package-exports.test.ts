@@ -24,6 +24,24 @@ describe('storage host package exports', () => {
     expect(runtime).not.toHaveProperty('createBackendKeyLockPort')
     expect(runtime.observeStorageBatch).toBeTypeOf('function')
     expect(runtime.createBackendJournalNamespace).toBeTypeOf('function')
+    const image = runtime.encodeStorageJournalImage(true, { nullable: null })
+    expect(runtime.decodeStorageJournalImage(image)).toEqual({
+      present: true,
+      value: { nullable: null }
+    })
+    expect(runtime.encodeStorageJournalImage(false)).toEqual({ present: false })
+    const bytes = runtime.encodeStorageJournalImage(true, new Uint8Array([1, 2]), true)
+    expect(runtime.decodeStorageJournalImage(bytes, true)).toEqual({
+      present: true,
+      value: new Uint8Array([1, 2])
+    })
+    const head = runtime.storageJournalLockKey('native', runtime.StorageJournalLock.head)
+    const resource = runtime.storageJournalLockKey('native', runtime.StorageJournalLock.resource)
+    expect(head.channel).toBe('text')
+    expect(head).not.toEqual(resource)
+    expect(() => runtime.storageJournalLockKey('', runtime.StorageJournalLock.head)).toThrowError(
+      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+    )
     expect(runtime.asyncDisposeKey).toBe((await import('@migaia/plugin-host')).asyncDisposeKey)
   })
   it('publishes only query vector synthesis from the dedicated vector authoring entry', async () => {

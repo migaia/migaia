@@ -1777,6 +1777,7 @@
         "memoryBackendPlugin"
       ],
       "./authoring/backend": [
+        "StorageJournalLock",
         "assertKeyRange",
         "asyncDisposeKey",
         "collectUniqueIndexOwners",
@@ -1786,7 +1787,9 @@
         "createStorageOperationRuntime",
         "createStorageToken",
         "decodeFlatStorageKey",
+        "decodeStorageJournalImage",
         "encodeFlatStorageKey",
+        "encodeStorageJournalImage",
         "invokeExtension",
         "isStorageErrorFamily",
         "isStorageKeyInRange",
@@ -1799,6 +1802,7 @@
         "resolveStorageNamespace",
         "safeJsonPayloadByteLength",
         "snapshotKeyRange",
+        "storageJournalLockKey",
         "subscribeToAbort",
         "throwIfAborted",
         "withAbort"
@@ -1822,6 +1826,9 @@
         "structuredCodec"
       ]
     },
+    "@migaia/storage-plugin-cache": {
+      ".": ["CacheErrorCode", "CacheWriteMode", "ERROR_SOURCE", "cacheBackendKind", "cacheKey"]
+    },
     "@migaia/storage-plugin-qdrant": {
       ".": ["ERROR_SOURCE", "QdrantErrorCode", "qdrantBackendKind", "qdrantBackendPlugin"],
       "./http": ["fetchHttp"],
@@ -1835,7 +1842,13 @@
       ".": ["ERROR_SOURCE", "RedisErrorCode", "redisBackendKind", "redisBackendPlugin"],
       "./ioredis": ["ioredisDriver"],
       "./node-redis": ["nodeRedisDriver"],
-      "./bun": ["bunRedisDriver"]
+      "./bun": ["bunRedisDriver"],
+      "./features/streams": ["redisStreamsFeature"],
+      "./features/pubsub": ["redisPubSubFeature"],
+      "./features/sorted-sets": ["redisSortedSetsFeature"],
+      "./features/rate-limit": ["redisRateLimitFeature"],
+      "./features/change-stream": ["redisChangeStreamFeature"],
+      "./features/search": ["rediSearchVectorFeature"]
     },
     "@migaia/storage-plugin-sparql": {
       ".": ["ERROR_SOURCE", "SparqlErrorCode", "sparqlBackendKind", "sparqlBackendPlugin"],
@@ -1855,6 +1868,16 @@
       "./fs": ["fsObjectDriver"],
       "./s3": ["s3ObjectDriver"],
       "./features/presign": ["objectPresignFeature"]
+    },
+    "@migaia/storage-plugin-postgres": {
+      ".": ["PostgresErrorCode", "postgresBackendKind", "postgresBackendPlugin"],
+      "./pg": ["pgDriver"],
+      "./postgres-js": ["postgresJsDriver"],
+      "./bun": ["bunSqlDriver"],
+      "./features/pgvector": ["pgvectorFeature"],
+      "./features/listen": ["pgListenFeature"],
+      "./features/copy": ["pgCopyFeature"],
+      "./features/logical-replication": ["pgLogicalReplicationFeature"]
     },
     "@migaia/storage-plugin-sqlite": {
       ".": [

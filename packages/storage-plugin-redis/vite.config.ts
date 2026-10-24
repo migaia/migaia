@@ -8,7 +8,13 @@ export default defineConfig({
         index: 'src/index.ts',
         ioredis: 'src/adapters/ioredis.ts',
         'node-redis': 'src/adapters/node-redis.ts',
-        bun: 'src/adapters/bun.ts'
+        bun: 'src/adapters/bun.ts',
+        'features/streams': 'src/features/streams.ts',
+        'features/pubsub': 'src/features/pubsub.ts',
+        'features/sorted-sets': 'src/features/sorted-sets.ts',
+        'features/rate-limit': 'src/features/rate-limit.ts',
+        'features/change-stream': 'src/features/change-stream.ts',
+        'features/search': 'src/features/search.ts'
       },
       formats: ['es'],
       fileName: (_format, name) => `${name}.js`

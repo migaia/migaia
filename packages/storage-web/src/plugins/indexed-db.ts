@@ -69,7 +69,9 @@ export const indexedDbBackendPlugin = <
         }
       }),
       capabilityInstaller: (_store: ReturnType<typeof indexedDbHost>['store']) =>
-        construction.installer
+        construction.installer,
+      journalBinding: (_store: ReturnType<typeof indexedDbHost>['store']) =>
+        construction.journalBinding
     }
   }
   return definePlugin<TId, typeof descriptor, F>(

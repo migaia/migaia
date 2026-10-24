@@ -136,6 +136,69 @@ console.log(host.extensions.label('draft'))`
       example: storageHostCases.createBackendChangeIterator![0]!.example,
       cases: storageHostCases.createBackendChangeIterator
     },
+    storageJournalLockKey: {
+      role: 'operation',
+      purpose: t(
+        'Return the original canonical journal head or resource lock identity without acquiring it.',
+        '返回原 journal head 或 resource 规范锁身份，不获取锁。'
+      ),
+      params: {
+        prefix: t('Nonempty private namespace prefix.', '非空私有 namespace prefix。'),
+        part: t(
+          'StorageJournalLock.head or StorageJournalLock.resource.',
+          'StorageJournalLock.head 或 StorageJournalLock.resource。'
+        )
+      },
+      returns: t(
+        'ILockKey from the original key codec; invalid arguments reject with INVALID_ARGUMENT.',
+        '原 key codec 的 ILockKey，非法入参报 INVALID_ARGUMENT。'
+      )
+    },
+    StorageJournalLock: {
+      role: 'operation',
+      purpose: t(
+        'Canonical head and resource roles for the existing journal lock owner.',
+        '既有 journal 锁拥有者的 head 与 resource 规范角色。'
+      )
+    },
+    encodeStorageJournalImage: {
+      role: 'operation',
+      purpose: t(
+        'Encode an absent or portable value through the original durable image codec.',
+        '沿原持久镜像 codec 编码缺失或可移植值。'
+      ),
+      params: {
+        present: t(
+          'Preserve absence independently from a present null.',
+          '缺失与存在的 null 独立保留。'
+        ),
+        value: t('The original portable value or byte array.', '原可移植值或字节数组。'),
+        bytes: t('Use the original base64 representation for bytes.', '字节使用原 base64 表示。')
+      },
+      returns: t(
+        'A frozen present/absent image with the original codec identity and version.',
+        '保留原 codec 身份和版本的冻结存在/缺失镜像。'
+      ),
+      example: storageHostCases.encodeStorageJournalImage![0]!.example,
+      cases: storageHostCases.encodeStorageJournalImage
+    },
+    decodeStorageJournalImage: {
+      role: 'operation',
+      purpose: t(
+        'Decode only the original versioned durable image and preserve codec failures on cause.',
+        '仅解码原版本化持久镜像，并在 cause 保留 codec 错误。'
+      ),
+      params: {
+        image: t('One original present/absent image.', '一个原存在/缺失镜像。'),
+        bytes: t('Decode the original base64 byte representation.', '解码原 base64 字节表示。')
+      },
+      returns: t(
+        'Absence or the decoded portable value; malformed owned wire reports JOURNAL_RECORD_INVALID.',
+        '缺失或解码后的可移植值；损坏的自有 wire 报 JOURNAL_RECORD_INVALID。'
+      ),
+      example: storageHostCases.decodeStorageJournalImage![0]!.example,
+      cases: storageHostCases.decodeStorageJournalImage
+    },
     createBackendJournalNamespace: {
       role: 'operation',
       purpose: t(
@@ -386,8 +449,8 @@ console.log(host.extensions.label('draft'))`,
   types: {
     IStorageJournalOptions: {
       summary: t(
-        'Borrow a logger with a stable namespace and explicit same-registration atomicBinlog/atomicUndo handles by backend id. telemetry=true requires the actual level plugin atLevel port and emits ordinary storage-category entries without changing payload/Error references.',
-        '借用 logger，固定 namespace，按 backend id 显式选择同 registration 的 atomicBinlog/atomicUndo；telemetry=true 要求真实 level 插件 atLevel 接点，沿普通 storage 分类条目交付 payload 与原 Error 引用。'
+        'Borrow a logger with a stable namespace and explicit same-registration atomicBinlog/atomicUndo handles by backend id. telemetry=true requires the actual level plugin atLevel port and emits ordinary storage-category entries without changing payload/Error references, including the first org endpoint after its original preparation. Global journal selects an async bootstrap stage, so sync methods reject with the original ASYNC_STAGE_IN_SYNC_ENTRY before their terminal.',
+        '借用 logger，固定 namespace，按 backend id 显式选择同 registration 的 atomicBinlog/atomicUndo；telemetry=true 要求真实 level 插件 atLevel 接点，沿普通 storage 分类条目交付 payload 与原 Error 引用，首组织终点也在原准备后记录；全局 journal 选择异步 bootstrap stage，同步方法在终点前报原 ASYNC_STAGE_IN_SYNC_ENTRY。'
       ),
       members: {}
     },
