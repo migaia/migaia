@@ -49,10 +49,16 @@ export function sqliteBackendPlugin<
   const descriptorFactory = (core: IStoragePluginCore<F>) => {
     /** Each actual host installation gets its own store/owner, never a module singleton. */
     let construction: ISqliteConstruction<TValue>
+    /** Context redirects reuse the same organization constructor installed below. */
+    let ensureOrg: (orgId: string) => void
     return {
       kind: sqliteBackendKind,
       install() {
-        construction = createSqliteStore<TValue>(captured, { core, orgId: core.defaultOrgId })
+        construction = createSqliteStore<TValue>(captured, {
+          core,
+          orgId: core.defaultOrgId,
+          ensureOrg: (orgId) => ensureOrg(orgId)
+        })
         core.registerStore(construction.store)
         core.registerChangeController(construction.store, construction.controller)
         /** Capture late construction authority after the root resource so children drain first. */
@@ -72,6 +78,9 @@ export function sqliteBackendPlugin<
           author.registerChangeController(child.store, child.controller)
           organizations.set(orgId, child)
           return child
+        }
+        ensureOrg = (orgId) => {
+          forOrg(orgId)
         }
         core.registerOrgBinding(construction.store, {
           backend: (orgId) => forOrg(orgId).store,

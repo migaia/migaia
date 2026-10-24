@@ -984,19 +984,28 @@ function createMemoryNamespace<T>(
         options: ctx === undefined ? {} : ctx,
         prepare: selectedJournal === undefined ? undefined : () => selectedJournal!.prepare(),
         execute: (context, invoke) =>
-          core.execution.run({ operation, input, ctx: context }, (captured) => {
-            controller.assertLive()
-            /** Direct closure retains accepted work until queued/native admission truly finishes. */
-            const release = controller.beginMutation()
-            capturedInput = captured
-            try {
-              return invoke().finally(release)
-            } catch (cause) {
-              /** Input/implicit-lock admission can reject before the loop returns its Promise. */
-              release()
-              throw cause
+          core.execution.run(
+            {
+              operation,
+              input,
+              ctx: context,
+              keys: () => mutation?.keys ?? [],
+              internal: journaled ? undefined : true
+            },
+            (captured) => {
+              controller.assertLive()
+              /** Direct closure retains accepted work until queued/native admission truly finishes. */
+              const release = controller.beginMutation()
+              capturedInput = captured
+              try {
+                return invoke().finally(release)
+              } catch (cause) {
+                /** Input/implicit-lock admission can reject before the loop returns its Promise. */
+                release()
+                throw cause
+              }
             }
-          }),
+          ),
         lock: (context) => {
           mutation = prepareMutation(capturedInput, context)
           return selectedJournal === undefined
@@ -1087,11 +1096,19 @@ function createMemoryNamespace<T>(
     operation: string,
     input: I,
     ctx: IOperationContext | undefined,
-    run: (captured: I) => R
+    run: (captured: I) => R,
+    keys?: (captured: I) => readonly ILockKey[]
   ): Promise<R> => {
+    /** The original pipeline's actual captured input is read only if telemetry requests keys. */
+    let current = input
+    const invoke = (captured: I) => {
+      current = captured
+      return run(captured)
+    }
+    const describeKeys = () => keys?.(current) ?? []
     if (core.journal === undefined)
-      return core.execution.run({ operation, input, ctx }, (captured) =>
-        withAbort(ctx, async () => run(captured))
+      return core.execution.run({ operation, input, ctx, keys: describeKeys }, (captured) =>
+        withAbort(ctx, async () => invoke(captured))
       )
     /** The original controller drains lazy org preparation before its native cleanup can finish. */
     const release = controller.beginMutation()
@@ -1104,8 +1121,9 @@ function createMemoryNamespace<T>(
       {
         attempt: async (context) => ({
           status: 'committed',
-          value: await core.execution.run({ operation, input, ctx: context }, (captured) =>
-            withAbort(context, async () => run(captured))
+          value: await core.execution.run(
+            { operation, input, ctx: context, keys: describeKeys },
+            (captured) => withAbort(context, async () => invoke(captured))
           )
         })
       }
@@ -1215,49 +1233,78 @@ function createMemoryNamespace<T>(
     if (selectedJournal !== undefined) admit()
     /** Each pipeline fixes this attempt's original callback or detached native batch. */
     let work: IMemoryAtomicWork<T, R>
+    /** Only the final original pipeline payload belongs to the one public operation observation. */
+    let observedInput: I | undefined
+    /** Actual final native facts are copied only for explicitly enabled observation. */
+    let observing = false
+    let observedKeys: readonly ILockKey[] | undefined
     /** Only actual previous-attempt victim identities feed the original policy's waiting admission. */
     let capacityIdentities: readonly string[] = []
-    return runWithConcurrency<Awaited<R>>(
-      {
-        store: base,
-        options: ctx === undefined ? {} : ctx,
-        prepare: selectedJournal === undefined ? undefined : () => selectedJournal.prepare(),
-        executeAttempt: (context, invoke) =>
-          core.execution.run({ operation, input: input(context), ctx: context }, (captured) => {
-            controller.assertLive()
-            work = prepare(captured, admit)
-            admit()
-            return invoke()
+    const execute = () =>
+      runWithConcurrency<Awaited<R>>(
+        {
+          store: base,
+          options: ctx === undefined ? {} : ctx,
+          prepare: selectedJournal === undefined ? undefined : () => selectedJournal.prepare(),
+          executeAttempt: (context, invoke) =>
+            core.execution.run(
+              { operation, input: input(context), ctx: context, internal: true },
+              (captured) => {
+                controller.assertLive()
+                observedInput = captured
+                work = prepare(captured, admit)
+                admit()
+                return invoke()
+              }
+            ),
+          lock: () =>
+            selectedJournal === undefined
+              ? (work.keys ?? [])
+              : [...(work.keys ?? []), ...selectedJournal.headLocks()]
+        },
+        {
+          attempt: (attempt) =>
+            locks.attempt(
+              attempt,
+              holding(),
+              {
+                attempt: () =>
+                  transact(
+                    work.invoke,
+                    attempt,
+                    work.ranges,
+                    (identities) => {
+                      capacityIdentities = identities
+                    },
+                    journaled,
+                    observing
+                      ? (keys) => {
+                          observedKeys = keys
+                        }
+                      : undefined
+                  )
+              },
+              core.stageBindings.concurrencyStages(store),
+              controller.closingSignal,
+              work.ranges,
+              capacity === undefined ? undefined : () => capacityIdentities
+            )
+        }
+      ).finally(() => release?.())
+    return core.execution.observe === undefined
+      ? execute()
+      : core.execution.observe(
+          () => ({
+            operation,
+            input: observedInput,
+            keys: () => observedKeys ?? work?.keys ?? [],
+            internal: journaled ? undefined : true
           }),
-        lock: () =>
-          selectedJournal === undefined
-            ? (work.keys ?? [])
-            : [...(work.keys ?? []), ...selectedJournal.headLocks()]
-      },
-      {
-        attempt: (attempt) =>
-          locks.attempt(
-            attempt,
-            holding(),
-            {
-              attempt: () =>
-                transact(
-                  work.invoke,
-                  attempt,
-                  work.ranges,
-                  (identities) => {
-                    capacityIdentities = identities
-                  },
-                  journaled
-                )
-            },
-            core.stageBindings.concurrencyStages(store),
-            controller.closingSignal,
-            work.ranges,
-            capacity === undefined ? undefined : () => capacityIdentities
-          )
-      }
-    ).finally(() => release?.())
+          (enabled) => {
+            observing = enabled
+            return execute()
+          }
+        )
   }
 
   /** Native store construction keeps public sync methods separate from internal asynchronous calls. */
@@ -1340,10 +1387,16 @@ function createMemoryNamespace<T>(
         })
     },
     get: (key, ctx) =>
-      asyncEntry(MemoryOperation.get, key, ctx, (captured) => {
-        assertStringStorageKey(captured, STORAGE_MEMORY_BACKEND)
-        return (read('value', captured) as string | undefined) ?? null
-      }),
+      asyncEntry(
+        MemoryOperation.get,
+        key,
+        ctx,
+        (captured) => {
+          assertStringStorageKey(captured, STORAGE_MEMORY_BACKEND)
+          return (read('value', captured) as string | undefined) ?? null
+        },
+        (captured) => [lockKey.text(captured)]
+      ),
     set: (key, value, ctx) =>
       mutationEntry(MemoryOperation.set, { key, value }, ctx, (captured, context) => {
         assertStringStorageKey(captured.key, STORAGE_MEMORY_BACKEND)
@@ -1361,10 +1414,16 @@ function createMemoryNamespace<T>(
         }
       }),
     has: (key, ctx) =>
-      asyncEntry(MemoryOperation.has, key, ctx, (captured) => {
-        assertStringStorageKey(captured, STORAGE_MEMORY_BACKEND)
-        return read('value', captured) !== undefined
-      }),
+      asyncEntry(
+        MemoryOperation.has,
+        key,
+        ctx,
+        (captured) => {
+          assertStringStorageKey(captured, STORAGE_MEMORY_BACKEND)
+          return read('value', captured) !== undefined
+        },
+        (captured) => [lockKey.text(captured)]
+      ),
     keys: (ctx) =>
       asyncEntry(MemoryOperation.keys, undefined, ctx, () => {
         controller.assertLive()
@@ -1376,10 +1435,16 @@ function createMemoryNamespace<T>(
     clearValues: (ctx) => clearEntry(MemoryOperation.clearValues, 'value', ctx),
     clearAll: (ctx) => clearEntry(MemoryOperation.clearAll, undefined, ctx),
     getBytes: (key, ctx) =>
-      asyncEntry(MemoryOperation.getBytes, key, ctx, (captured) => {
-        assertStringStorageKey(captured, STORAGE_MEMORY_BACKEND)
-        return (read('bytes', captured) as Uint8Array | undefined) ?? null
-      }),
+      asyncEntry(
+        MemoryOperation.getBytes,
+        key,
+        ctx,
+        (captured) => {
+          assertStringStorageKey(captured, STORAGE_MEMORY_BACKEND)
+          return (read('bytes', captured) as Uint8Array | undefined) ?? null
+        },
+        (captured) => [lockKey.bytes(captured)]
+      ),
     setBytes: (key, value, ctx) =>
       mutationEntry(MemoryOperation.setBytes, { key, value }, ctx, (captured, context) => {
         assertStringStorageKey(captured.key, STORAGE_MEMORY_BACKEND)
@@ -1402,7 +1467,8 @@ function createMemoryNamespace<T>(
         MemoryOperation.getRecord,
         key,
         ctx,
-        (captured) => read('record', captured) as T | undefined
+        (captured) => read('record', captured) as T | undefined,
+        (captured) => [lockKey.record(captured)]
       ),
     putRecord: (value, key, ctx) =>
       mutationEntry(MemoryOperation.putRecord, { value, key }, ctx, (captured, context) => {
@@ -1740,7 +1806,8 @@ function createMemoryNamespace<T>(
     ctx: IConcurrencyAttemptContext,
     protectedRanges?: IMemoryRootMutation<unknown>['ranges'],
     setCapacityIdentities?: (identities: readonly string[]) => void,
-    journaled = true
+    journaled = true,
+    observeKeys?: (keys: readonly ILockKey[]) => void
   ): Promise<IConcurrencyAttempt<Awaited<R>>> {
     controller.assertLive()
     throwIfAborted(ctx.signal)
@@ -3089,6 +3156,19 @@ function createMemoryNamespace<T>(
       journalDraft?.complete(false)
       if (journalAttempt?.settle !== undefined) await journalAttempt.settle()
       control.close()
+      if (observeKeys !== undefined)
+        observeKeys(
+          [...expected.values()]
+            .map((entry) => {
+              const physical =
+                draft.get(identity(entry.channel, entry.encoded)) ??
+                data[entry.channel].get(entry.encoded)
+              return capacityLock(
+                capacityFact(entry.channel, entry.key, undefined, physical?.rdfLock)
+              )
+            })
+            .filter((key): key is ILockKey => key !== undefined)
+        )
       draft.clear()
       snapshots.clear()
       expected.clear()

@@ -589,3 +589,5 @@ const batch = prepareLogAppend(
 )
 console.log(index.lastSeq, batch[0]?.seq) // 0 1: preparation is not a commit.
 ```
+
+`level()` 还提供 `atLevel(level, entry)`：`entry` 沿原 `dispatchRaw` schema 保留自己的 tag、payload 和原 Error 引用，并通过同一 level 门槛和 filters。例如 `log.atLevel('debug', { tag: 'storage', message: 'get', meta: { operation: 'get' } })`；它复用原 asyncOutput 与输出资源，没有另一条管线。未调用此入口的未知 tag 保持原先仅过滤器检查，debug/error 等旧方法不变。

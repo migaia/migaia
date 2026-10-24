@@ -3,3 +3,6 @@ export const StorageJournalKind = {
   commit: 'storage.commit',
   intent: 'storage.binlog-intent'
 } as const
+
+/** Ordinary operation telemetry is categorized separately from the original logger level. */
+export const STORAGE_TELEMETRY_TAG = 'storage'
