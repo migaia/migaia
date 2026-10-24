@@ -42,3 +42,41 @@ for (const kind of ['local', 'cookies'] as const) {
     }
   })
 }
+
+test('session Storage recovers its failed native draft inside its original page', async ({
+  page
+}) => {
+  await page.goto('/')
+  const namespace = 'text-redo-session-' + crypto.randomUUID(),
+    dbName = namespace + '-carrier'
+  try {
+    expect(
+      await page.evaluate(
+        ({ namespace, dbName }) => window.prepareTextRedoOwner(namespace, dbName, 'session'),
+        { namespace, dbName }
+      )
+    ).toEqual({ pending: 0, lastSeq: 0 })
+    expect(await page.evaluate(() => window.failTextRedoAssignment())).toEqual({
+      code: 'JOURNAL_RECOVERY_FAILED',
+      pending: 1,
+      assignments: 2
+    })
+    expect(await page.evaluate(() => window.recoverTextRedoHere())).toEqual({
+      values: ['first', 'second'],
+      pending: 0
+    })
+    await page.evaluate(() => window.closeTextRedoOwner())
+    expect(
+      await page.evaluate(
+        ({ namespace, dbName }) => window.prepareTextRedoOwner(namespace, dbName, 'session'),
+        { namespace, dbName }
+      )
+    ).toEqual({ pending: 0, lastSeq: 1 })
+    expect(await page.evaluate(() => window.recoverTextRedoHere())).toEqual({
+      values: ['first', 'second'],
+      pending: 0
+    })
+  } finally {
+    await page.evaluate(() => window.closeTextRedoOwner())
+  }
+})
