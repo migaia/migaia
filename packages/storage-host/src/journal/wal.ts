@@ -26,7 +26,7 @@ import {
 import type { IStorageJournalChange, IStorageJournalImage } from './types.js'
 
 /** Complete immutable recovery target; matching names never authenticate a native transaction. */
-type IStorageJournalTargetIdentity = Readonly<{
+export type IStorageJournalTargetIdentity = Readonly<{
   namespace: string
   backendInstanceId: string
   orgId: string
@@ -58,7 +58,7 @@ function identity(input: unknown): IStorageJournalTargetIdentity {
   return value as IStorageJournalTargetIdentity
 }
 /** Compare the full fixed target before any recovery marker I/O or durable mutation. */
-function matches(
+export function storageJournalTargetsMatch(
   left: IStorageJournalTargetIdentity,
   right: IStorageJournalTargetIdentity
 ): boolean {
@@ -67,6 +67,16 @@ function matches(
     left.backendInstanceId === right.backendInstanceId &&
     left.orgId === right.orgId
   )
+}
+/** Read only the complete target before deciding whether its other persisted fields are owned. */
+export function readStorageJournalIntentTarget(input: unknown): IStorageJournalTargetIdentity {
+  try {
+    return identity(object(input).target)
+  } catch (cause) {
+    if (cause instanceof StorageError && cause.code === StorageErrorCode.journalRecordInvalid)
+      throw cause
+    return invalid(cause)
+  }
 }
 /** WAL images always retain full encoded values, independently of binlogValues. */
 function image(input: unknown): IStorageJournalImage {
@@ -77,7 +87,7 @@ function image(input: unknown): IStorageJournalImage {
   return value as IStorageJournalImage
 }
 /** Read one original intent; unrelated kinds are ignored by the caller, damaged owned kinds stop. */
-function intent(input: unknown, backend: IBackendKind) {
+export function readStorageJournalIntent(input: unknown, backend: IBackendKind, redo = false) {
   try {
     const value = object(input)
     const owner = identity(value.target)
@@ -86,7 +96,7 @@ function intent(input: unknown, backend: IBackendKind) {
     if (
       commit.version !== 1 ||
       commit.txId !== value.txId ||
-      !matches(identity(commit.target), owner) ||
+      !storageJournalTargetsMatch(identity(commit.target), owner) ||
       !Array.isArray(commit.changes) ||
       !Array.isArray(value.changes) ||
       commit.changes.length !== value.changes.length ||
@@ -96,11 +106,12 @@ function intent(input: unknown, backend: IBackendKind) {
     if (
       (value.binlog !== undefined && typeof value.binlog !== 'boolean') ||
       (value.undo !== undefined && typeof value.undo !== 'boolean') ||
-      (value.binlog === false && value.undo !== true)
+      (value.binlog === false && value.undo !== true && !redo)
     )
       invalid()
     /** Recovery derives undo from the same full ordered changes, rather than a second wire catalog. */
-    const changes: IStorageJournalChange[] | undefined = value.undo === true ? [] : undefined
+    const changes: IStorageJournalChange[] | undefined =
+      value.undo === true || redo ? [] : undefined
     for (const [index, entry] of value.changes.entries()) {
       const change = object(entry)
       const logged = object(commit.changes[index])
@@ -131,7 +142,8 @@ function intent(input: unknown, backend: IBackendKind) {
       commit: value.commit as ILogPayload,
       binlog: value.binlog !== false,
       undo: value.undo === true,
-      images: value.undo === true ? storageJournalUndoImages(owner, changes!, backend) : undefined
+      images: value.undo === true ? storageJournalUndoImages(owner, changes!, backend) : undefined,
+      changes
     }
   } catch (cause) {
     if (cause instanceof StorageError && cause.code === StorageErrorCode.journalRecordInvalid)
@@ -170,7 +182,7 @@ export async function createStorageExternalWal(options: {
   const report = options.report ?? createStorageOperationReporter()
   /** The original logger owns append/index serialization; repeated undo publication is exact-only. */
   const publish = async (
-    pending: ReturnType<typeof intent>,
+    pending: ReturnType<typeof readStorageJournalIntent>,
     onBinlogFailure?: (error: unknown) => void
   ) => {
     if (pending.binlog) {
@@ -210,8 +222,8 @@ export async function createStorageExternalWal(options: {
           throw cause
         invalid(cause)
       }
-      if (!matches(owner, options.target)) continue
-      const pending = intent(record.payload, options.backend)
+      if (!storageJournalTargetsMatch(owner, options.target)) continue
+      const pending = readStorageJournalIntent(record.payload, options.backend)
       if (await binding.hasCommitMarker(pending.txId)) {
         await publish(pending)
         await wal.complete(record.seq)
@@ -280,7 +292,7 @@ export async function createStorageExternalWal(options: {
         },
         /** Failure before complete leaves both marker and pending intent for the next open. */
         complete: async (onBinlogFailure?: (error: unknown) => void) => {
-          await publish(intent(payload, options.backend), onBinlogFailure)
+          await publish(readStorageJournalIntent(payload, options.backend), onBinlogFailure)
           await wal.complete(seq)
           try {
             await binding.removeCommitMarker!(txId)

@@ -7,7 +7,8 @@ import type {
   IStorageJournalChange,
   IStorageJournalOptions,
   IStorageJournalConfiguration,
-  IStorageJournalExecutionPort
+  IStorageJournalExecutionPort,
+  IStorageJournalRedoBinding
 } from '@migaia/storage-host'
 import type { ITransactionScope } from '@migaia/storage-contract'
 import { createOrgId, createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
@@ -144,4 +145,20 @@ export async function compileUndoSelection(
   }
   await using explicit = await createStorageHost<typeof plugins>(options)
   void [old, explicit]
+}
+
+/** Original text writers receive only exact-scope and existing native-protection callbacks. */
+export function compileRedoAuthor(
+  binding: IStorageJournalRedoBinding,
+  port: IStorageJournalExecutionPort,
+  scope: Omit<ITransactionScope, 'use'>
+) {
+  const id: string = binding.transactionInfo(scope).id
+  const protectedValue: Promise<number> = binding.protect(async () => 1)
+  const operation: Promise<number> | undefined = port.runRedo?.(async () => 1)
+  // @ts-expect-error Redo grants no native commit or store installation authority.
+  void binding.commit
+  // @ts-expect-error Redo never gives the original store or shutdown handle to callers.
+  void binding.getStore
+  void [id, protectedValue, operation]
 }
