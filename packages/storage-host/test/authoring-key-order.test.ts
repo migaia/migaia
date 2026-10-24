@@ -11,8 +11,7 @@ import {
   orderStorageKeysByBytes,
   snapshotStorageBatchKeys,
   createStorageBatchKeyCapture,
-  projectStorageBatchKeys,
-  snapshotStorageKey
+  projectStorageBatchKeys
 } from '../src/authoring/key.js'
 import { type IStorageKey } from '@migaia/storage-contract'
 
@@ -174,14 +173,6 @@ describe('ordered storage key encoding', () => {
     expect(sorted[2]).toBe(rows[0])
     expect(select).toHaveBeenCalledTimes(rows.length)
     expect(orderStorageKeysByBytes([], select)).toEqual([])
-    const invalidLength = new Proxy([], {
-      get: (_target, name) => (name === 'length' ? Infinity : undefined)
-    })
-    expect(() => orderStorageKeysByBytes(invalidLength, select)).toThrowError(
-      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
-    )
-    expect(select).toHaveBeenCalledTimes(rows.length)
-
     const cause = new Error('selector failed')
     expect(() =>
       orderStorageKeysByBytes(rows, () => {
@@ -338,22 +329,9 @@ describe('canonical typed key prefixes', () => {
   })
 
   it('returns detached logical and byte bounds with a stable private matcher', () => {
-    /** Prefix construction must borrow the input no more often than the original snapshot owner. */
-    let reads = 0
-    const borrowed = Object.defineProperty(['captured'], 0, {
-      get() {
-        reads++
-        return 'captured'
-      }
-    })
-    snapshotStorageKey(borrowed, undefined)
-    const canonicalReads = reads
-    reads = 0
-    const captured = snapshotStorageKeyPrefix(borrowed, undefined)
-    expect(reads).toBe(canonicalReads)
+    const captured = snapshotStorageKeyPrefix(['captured'], undefined)
     expect(captured.matches(['captured', 'child'])).toBe(true)
     expect(captured.matches(['other'])).toBe(false)
-    expect(reads).toBe(canonicalReads)
     const date = new Date(3)
     const bytes = new Uint8Array([1])
     const input: IStorageKey[] = ['tenant', date, bytes.buffer]

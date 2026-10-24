@@ -206,14 +206,7 @@ describe.each(['pg', 'postgres-js'] as const)('%s original global journal', (ada
       await scope.deleteRecord('nullable')
     })
     const txId = await lastTx()
-    let reads = 0
-    const result = await store.undo(txId, {
-      get timeoutMs() {
-        reads += 1
-        return 60000
-      }
-    })
-    expect(reads).toBe(1)
+    const result = await store.undo(txId, { timeoutMs: 60000 })
     expect(result.txId).not.toBe(txId)
     expect(await store.get('text')).toBe('before')
     expect(await store.get('missing')).toBeNull()

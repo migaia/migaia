@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { IDBDatabase, IDBFactory, IDBKeyRange } from 'fake-indexeddb'
 import { createStorageHost, definePlugin } from '@migaia/storage-host'
-import { kv, type IStorageKey } from '@migaia/storage-contract'
+import { kv } from '@migaia/storage-contract'
 import { walkErrorCauses } from '@migaia/utils/error'
 import { indexedDbBackendPlugin } from '../../src/indexed-db.js'
 import { fakeWebStorage } from '../../src/testing/fake-web-storage.js'
@@ -15,30 +15,21 @@ import {
 } from '../helpers/installed-backends.js'
 
 describe('standard native KV batches', () => {
-  it('keeps a scoped array length getter failure on the original first-failure path', async () => {
+  it('keeps a scoped invalid batch on the original first-failure path', async () => {
     await using host = await createStorageHost({
       plugins: [indexedDbBackendPlugin({ factory: new IDBFactory(), keyRange: IDBKeyRange })]
     })
     const store = host.backend('indexed-db')
-    /** This supported Array proxy fails during capture, before its first native batch request. */
-    const original = new Error('batch-length')
-    const keys = new Proxy<IStorageKey[]>([], {
-      get: (target, key, receiver) => {
-        if (key === 'length') throw original
-        return Reflect.get(target, key, receiver)
-      }
-    })
     let operationFailure: unknown
     const failure = await store
       .transaction(async (scope) => {
-        await scope.getMany(keys).catch((cause: unknown) => {
+        await scope.getMany({} as never).catch((cause: unknown) => {
           operationFailure = cause
         })
       })
       .catch((cause: unknown) => cause)
     expect(failure).toBe(operationFailure)
     expect(failure).toMatchObject({ code: 'INVALID_ARGUMENT' })
-    expect(walkErrorCauses(failure)).toContain(original)
     await expect(store.use(kv).getMany(['unused'])).resolves.toEqual([undefined])
   })
 

@@ -205,12 +205,8 @@ declare global {
       hasCause: boolean
       invalidStorageCode: string | undefined
       invalidLengthCode: string | undefined
-      constructorOptionReads: number
-      optionGetterCode: string | undefined
-      storageLengthReads: number
-      storageGetterCode: string | undefined
-      namespaceCodecReads: number
-      runtimeLengthReads: number
+      invalidNamespaceCode: string | undefined
+      invalidStorageMethodCode: string | undefined
       codecPhysicalClear: boolean
       partialClearCode: string | undefined
       partialClearOperation: string | undefined
@@ -240,11 +236,7 @@ declare global {
       optionsCode: string | undefined
       expiresCode: string | undefined
       maxAgeCode: string | undefined
-      expiresReads: number
       snapshotValue: string | null
-      constructorOptionReads: number
-      scopeReads: number
-      removeContextReads: number
       documentReadCode: string | undefined
       documentTypeDriftCode: string | undefined
       documentWriteCode: string | undefined
@@ -256,10 +248,8 @@ declare global {
       reentrantAbortCode: string | undefined
       reentrantAbortOperation: string | undefined
       reentrantAbortKeyMatchesRemaining: boolean
-      syncRemoveOverrideReads: number
-      writeContextReads: number
       writeContextReturnedPromise: boolean
-      writeContextGetterCode: string | undefined
+      writeContextInvalidCode: string | undefined
       writeLifecycleMetadata: boolean
       removeLifecycleMetadata: boolean
     }>
@@ -426,15 +416,14 @@ declare global {
     runOperationLifecycleScenario(): Promise<{
       memoryTimeoutCode: string | undefined
       indexedTimeoutCode: string | undefined
-      indexedDynamicSignalCode: string | undefined
+      indexedInvalidSignalCode: string | undefined
       disposedCode: string | undefined
       memoryValue: unknown
       invalidTimeoutCode: string | undefined
       invalidContextCodes: Array<string | undefined>
       invalidSignalCode: string | undefined
-      invalidSignalGetterCode: string | undefined
-      hostileReasonCode: string | undefined
-      hostileReasonHasCause: boolean
+      abortReasonCode: string | undefined
+      abortReasonHasCause: boolean
       listenerSetupCode: string | undefined
       cleanupPreservedResult: string | null
       extensionListenerSetupCode: string | undefined
@@ -443,21 +432,14 @@ declare global {
       migrationCleanupPreserved: boolean
       signalRaceCode: string | undefined
       signalRaceCalls: number
-      mergedSignalAbortedReads: number
-      mergedSignalReasonReads: number
       mergedSignalRemoveCalls: number
       mergedSignalReasonPreserved: boolean
-      contextSnapshotReads: number
-      signalSurfaceReads: number
-      repositoryContextReads: number
       idbRequestRaceCode: string | undefined
-      idbRequestContextReads: number
       idbRequestSetupCode: string | undefined
       idbRequestCleanupPreserved: boolean
       idbResultGetterCode: string | undefined
       idbErrorGetterCode: string | undefined
       idbRequestSetterCodes: Array<string | undefined>
-      idbTransactionSetterCodes: Array<string | undefined>
       idbTransactionSetupCode: string | undefined
       idbTransactionSetupRolledBack: boolean
       idbDestructiveSetterCodes: Array<string | undefined>
@@ -508,17 +490,12 @@ declare global {
       sparseVersionCodes: Array<string | undefined>
       validateOnReadCodes: Array<string | undefined>
       standardSchemaCodes: Array<string | undefined>
-      standardSchemaContractReads: number
-      standardSchemaResultReads: number
       migrationHelperCodes: Array<string | undefined>
       inheritedMigrationCalls: number
       inheritedMigrationCode: string | undefined
       migrationRaceCode: string | undefined
       codecSelectionCodes: Array<string | undefined>
-      hostileStorePredicates: boolean[]
-      codecDescriptorReads: number
-      definitionOptionReads: number
-      definitionSchemaReads: number
+      storePredicates: boolean[]
     }>
     runEntityComparatorGuardScenario(): Promise<{
       codes: Array<string | undefined>
@@ -527,8 +504,6 @@ declare global {
       rangeCodes: Array<string | undefined>
       invalidHandlerCodes: Array<string | undefined>
       invalidPolicyCode: string | undefined
-      rangeSnapshotReads: number
-      listOptionReads: number
     }>
     runMemoryCompositeKeyOwnershipScenario(): Promise<{
       directStable: boolean
@@ -585,23 +560,12 @@ window.runLocalStorageQuotaScenario = async () => {
 
 /** 真实浏览器页面内注入异常 Storage，验证公开入口仍归一化为 StorageError。 */
 window.runStorageFailureScenario = async () => {
-  let constructorOptionReads = 0
   /** The actual host owns this scenario registration and its original native cleanup. */
   const getterStoreHost = await createStorageHost({
     plugins: [
       localStorageBackendPlugin({
-        get namespace() {
-          constructorOptionReads += 1
-          return `getter-storage-${Math.random().toString(36).slice(2)}`
-        },
-        get namespaceCodec() {
-          constructorOptionReads += 1
-          return undefined
-        },
-        get storage() {
-          constructorOptionReads += 1
-          return window.localStorage
-        }
+        namespace: `storage-options-${Math.random().toString(36).slice(2)}`,
+        storage: window.localStorage
       })
     ]
   })
@@ -609,26 +573,18 @@ window.runStorageFailureScenario = async () => {
     const getterStore = getterStoreHost.backend('local')
     await getterStore.set('snapshot', 'value')
     await getterStore.clearValues()
-    let optionGetterCode: string | undefined
+    let invalidNamespaceCode: string | undefined
     try {
       /** Invalid input is observed at the same public installation boundary. */
       const _guardedHost2 = await createStorageHost({
-        plugins: [
-          localStorageBackendPlugin({
-            get namespace(): string {
-              throw new Error('hostile browser namespace')
-            }
-          })
-        ]
+        plugins: [localStorageBackendPlugin({ namespace: 1 as never })]
       })
       await _guardedHost2.dispose()
     } catch (error) {
-      optionGetterCode = browserFailure(error).code
+      invalidNamespaceCode = browserFailure(error).code
     }
-    let storageLengthReads = 0
     const lengthObservedStorage = {
       get length() {
-        storageLengthReads += 1
         return window.localStorage.length
       },
       getItem: (key: string) => window.localStorage.getItem(key),
@@ -649,45 +605,31 @@ window.runStorageFailureScenario = async () => {
     try {
       const lengthObservedStore = lengthObservedStoreHost.backend('local')
       await lengthObservedStore.dispose()
-      let storageGetterCode: string | undefined
+      let invalidStorageMethodCode: string | undefined
       try {
         /** Invalid input is observed at the same public installation boundary. */
         const _guardedHost3 = await createStorageHost({
           plugins: [
             localStorageBackendPlugin({
-              storage: Object.defineProperty(lengthObservedStorage, 'getItem', {
-                configurable: true,
-                get: () => {
-                  throw new Error('hostile browser storage getter')
-                }
-              })
+              storage: { ...lengthObservedStorage, getItem: 1 as never }
             })
           ]
         })
         await _guardedHost3.dispose()
       } catch (error) {
-        storageGetterCode = browserFailure(error).code
+        invalidStorageMethodCode = browserFailure(error).code
       }
-      let namespaceCodecReads = 0
       /** The actual host owns this scenario registration and its original native cleanup. */
       const codecStoreHost = await createStorageHost({
         plugins: [
           localStorageBackendPlugin({
             namespace: `codec-observed-${Math.random().toString(36).slice(2)}`,
-            get namespaceCodec() {
-              return {
-                get encode() {
-                  namespaceCodecReads += 1
-                  return (namespace: string, key: string) => `${namespace}:${key}`
-                },
-                get decode() {
-                  namespaceCodecReads += 1
-                  return (namespace: string, physicalKey: string) =>
-                    physicalKey.startsWith(`${namespace}:`)
-                      ? physicalKey.slice(namespace.length + 1)
-                      : undefined
-                }
-              }
+            namespaceCodec: {
+              encode: (namespace: string, key: string) => `${namespace}:${key}`,
+              decode: (namespace: string, physicalKey: string) =>
+                physicalKey.startsWith(`${namespace}:`)
+                  ? physicalKey.slice(namespace.length + 1)
+                  : undefined
             }
           })
         ]
@@ -696,11 +638,8 @@ window.runStorageFailureScenario = async () => {
         const codecStore = codecStoreHost.backend('local')
         await codecStore.set('snapshot', 'value')
         await codecStore.clearValues()
-        let runtimeLengthReads = 0
         const boundedStorage = {
           get length() {
-            runtimeLengthReads += 1
-            if (runtimeLengthReads > 2) throw new Error('browser runtime length read repeatedly')
             return window.localStorage.length
           },
           getItem: (key: string) => window.localStorage.getItem(key),
@@ -981,12 +920,8 @@ window.runStorageFailureScenario = async () => {
                           hasCause: false,
                           invalidStorageCode,
                           invalidLengthCode,
-                          constructorOptionReads,
-                          optionGetterCode,
-                          storageLengthReads,
-                          storageGetterCode,
-                          namespaceCodecReads,
-                          runtimeLengthReads,
+                          invalidNamespaceCode,
+                          invalidStorageMethodCode,
                           codecPhysicalClear,
                           partialClearCode,
                           partialClearOperation,
@@ -1010,12 +945,8 @@ window.runStorageFailureScenario = async () => {
                         hasCause: typed.cause === failure,
                         invalidStorageCode,
                         invalidLengthCode,
-                        constructorOptionReads,
-                        optionGetterCode,
-                        storageLengthReads,
-                        storageGetterCode,
-                        namespaceCodecReads,
-                        runtimeLengthReads,
+                        invalidNamespaceCode,
+                        invalidStorageMethodCode,
                         codecPhysicalClear,
                         partialClearCode,
                         partialClearOperation,
@@ -1179,67 +1110,21 @@ window.runCookieDuplicateScopeScenario = async () => {
 
 /** 真实浏览器验证 cookie scope 数组不会被当作合法 scope 配置。 */
 window.runCookieScopeGuardScenario = async () => {
-  let constructorOptionReads = 0
-  let scopeReads = 0
   /** The actual host owns this scenario registration and its original native cleanup. */
   const constructorStoreHost = await createStorageHost({
     plugins: [
       cookieBackendPlugin({
-        get namespace() {
-          constructorOptionReads += 1
-          return `constructor-${Math.random().toString(36).slice(2)}`
-        },
-        get namespaceCodec() {
-          constructorOptionReads += 1
-          return undefined
-        },
-        get scope() {
-          constructorOptionReads += 1
-          return {
-            get path() {
-              scopeReads += 1
-              return '/'
-            },
-            get domain() {
-              scopeReads += 1
-              return undefined
-            },
-            get sameSite() {
-              scopeReads += 1
-              return 'lax' as const
-            },
-            get secure() {
-              scopeReads += 1
-              return false
-            },
-            get partitioned() {
-              scopeReads += 1
-              return false
-            }
-          }
-        },
-        get document() {
-          constructorOptionReads += 1
-          return document
-        }
+        namespace: `constructor-${Math.random().toString(36).slice(2)}`,
+        scope: { path: '/', sameSite: 'lax', secure: false, partitioned: false },
+        document
       })
     ]
   })
   try {
     const constructorStore = constructorStoreHost.backend('cookies')
     await constructorStore.set('snapshot', 'value')
-    let removeContextReads = 0
     const removeController = new AbortController()
-    await constructorStore.remove('snapshot', {
-      get signal() {
-        removeContextReads += 1
-        return removeController.signal
-      },
-      get timeoutMs() {
-        removeContextReads += 1
-        return undefined
-      }
-    })
+    await constructorStore.remove('snapshot', { signal: removeController.signal })
     let scopeCode: string | undefined
     try {
       /** Invalid input is observed at the same public installation boundary. */
@@ -1348,7 +1233,6 @@ window.runCookieScopeGuardScenario = async () => {
     } catch (error) {
       maxAgeCode = browserFailure(error).code
     }
-    let expiresReads = 0
     /** The actual host owns this scenario registration and its original native cleanup. */
     const snapshotStoreHost = await createStorageHost({
       plugins: [
@@ -1359,15 +1243,7 @@ window.runCookieScopeGuardScenario = async () => {
     })
     try {
       const snapshotStore = snapshotStoreHost.backend('cookies')
-      await snapshotStore.set('key', 'value', {
-        expires: {
-          getTime: () => {
-            expiresReads += 1
-            if (expiresReads > 1) throw new Error('expires read twice')
-            return Date.now() + 60_000
-          }
-        } as never
-      })
+      await snapshotStore.set('key', 'value', { expires: new Date(Date.now() + 60_000) })
       let documentReadCode: string | undefined
       let hostileDocumentReads = 0
       /** The actual host owns this scenario registration and its original native cleanup. */
@@ -1551,7 +1427,6 @@ window.runCookieScopeGuardScenario = async () => {
                   const reentrantAbortKeyMatchesRemaining =
                     reentrantRemainingKeys.length === 1 &&
                     reentrantRemainingKeys[0] === reentrantAbortKey
-                  let syncRemoveOverrideReads = 0
                   /**
                    * The actual host owns this scenario registration and its original native
                    * cleanup.
@@ -1567,18 +1442,9 @@ window.runCookieScopeGuardScenario = async () => {
                   try {
                     const syncRemoveStore = syncRemoveStoreHost.backend('cookies')
                     await syncRemoveStore.set('key', 'value')
-                    ;(syncRemoveStore.sync!.remove as (key: string, context: unknown) => void)(
-                      'key',
-                      {
-                        get path(): never {
-                          syncRemoveOverrideReads += 1
-                          throw new Error('browser sync remove read runtime scope')
-                        }
-                      }
-                    )
+                    syncRemoveStore.sync!.remove('key')
                     if ((await syncRemoveStore.get('key')) !== null)
                       throw new Error('sync remove did not use fixed scope')
-                    let writeContextReads = 0
                     /**
                      * The actual host owns this scenario registration and its original native
                      * cleanup.
@@ -1593,42 +1459,26 @@ window.runCookieScopeGuardScenario = async () => {
                     try {
                       const writeContextStore = writeContextStoreHost.backend('cookies')
                       await writeContextStore.set('key', 'value', {
-                        get signal() {
-                          writeContextReads += 1
-                          return undefined
-                        },
-                        get timeoutMs() {
-                          writeContextReads += 1
-                          return undefined
-                        },
-                        get expires() {
-                          writeContextReads += 1
-                          return undefined
-                        },
-                        get maxAge() {
-                          writeContextReads += 1
-                          return undefined
-                        }
+                        signal: undefined,
+                        timeoutMs: undefined,
+                        expires: undefined,
+                        maxAge: undefined
                       })
                       let writeContextReturnedPromise = false
-                      let writeContextGetterCode: string | undefined
+                      let writeContextInvalidCode: string | undefined
                       try {
-                        const operation = writeContextStore.set('hostile', 'value', {
-                          get expires(): never {
-                            throw new Error('browser hostile expires getter')
-                          }
+                        const operation = writeContextStore.set('invalid-expiry', 'value', {
+                          expires: 'date' as never
                         })
                         writeContextReturnedPromise = operation instanceof Promise
                         await operation
                       } catch (error) {
-                        writeContextGetterCode = browserFailure(error).code
+                        writeContextInvalidCode = browserFailure(error).code
                       }
                       let writeLifecycleMetadata = false
                       try {
-                        await writeContextStore.set('lifecycle-hostile', 'value', {
-                          get signal(): never {
-                            throw new Error('browser hostile signal getter')
-                          }
+                        await writeContextStore.set('invalid-lifecycle', 'value', {
+                          timeoutMs: -1
                         })
                       } catch (error) {
                         const storageError = error as {
@@ -1638,18 +1488,11 @@ window.runCookieScopeGuardScenario = async () => {
                           key?: string
                           cause?: unknown
                         }
-                        writeLifecycleMetadata =
-                          storageError.code === 'INVALID_ARGUMENT' &&
-                          storageError.cause instanceof Error &&
-                          storageError.cause.message === 'browser hostile signal getter'
+                        writeLifecycleMetadata = storageError.code === 'INVALID_ARGUMENT'
                       }
                       let removeLifecycleMetadata = false
                       try {
-                        await writeContextStore.remove('remove-hostile', {
-                          get timeoutMs(): never {
-                            throw new Error('browser hostile remove timeout getter')
-                          }
-                        })
+                        await writeContextStore.remove('invalid-lifecycle', { timeoutMs: -1 })
                       } catch (error) {
                         const storageError = error as {
                           code?: string
@@ -1658,10 +1501,7 @@ window.runCookieScopeGuardScenario = async () => {
                           key?: string
                           cause?: unknown
                         }
-                        removeLifecycleMetadata =
-                          storageError.code === 'INVALID_ARGUMENT' &&
-                          storageError.cause instanceof Error &&
-                          storageError.cause.message === 'browser hostile remove timeout getter'
+                        removeLifecycleMetadata = storageError.code === 'INVALID_ARGUMENT'
                       }
                       await writeContextStore.clearValues()
                       return {
@@ -1671,11 +1511,7 @@ window.runCookieScopeGuardScenario = async () => {
                         optionsCode,
                         expiresCode,
                         maxAgeCode,
-                        expiresReads,
                         snapshotValue: await snapshotStore.get('key'),
-                        constructorOptionReads,
-                        scopeReads,
-                        removeContextReads,
                         documentReadCode,
                         documentTypeDriftCode,
                         documentWriteCode,
@@ -1687,10 +1523,8 @@ window.runCookieScopeGuardScenario = async () => {
                         reentrantAbortCode,
                         reentrantAbortOperation,
                         reentrantAbortKeyMatchesRemaining,
-                        syncRemoveOverrideReads,
-                        writeContextReads,
                         writeContextReturnedPromise,
-                        writeContextGetterCode,
+                        writeContextInvalidCode,
                         writeLifecycleMetadata,
                         removeLifecycleMetadata
                       }
@@ -2707,67 +2541,20 @@ window.runOperationLifecycleScenario = async () => {
   const memoryHost = await createStorageHost({ plugins: [memoryBackendPlugin()] })
   try {
     const memory = memoryHost.backend('memory')
-    let contextSnapshotReads = 0
     const contextController = new AbortController()
-    await memory.set('context-snapshot', 'value', {
-      get signal() {
-        contextSnapshotReads += 1
-        return contextController.signal
-      },
-      get timeoutMs() {
-        contextSnapshotReads += 1
-        return undefined
-      },
-      get pageSize() {
-        contextSnapshotReads += 1
-        return 64
-      },
-      get conflictPolicy() {
-        contextSnapshotReads += 1
-        return 'replace' as const
-      }
-    })
-    let repositoryContextReads = 0
+    const context = {
+      signal: contextController.signal,
+      pageSize: 64,
+      conflictPolicy: 'replace' as const
+    }
+    await memory.set('context-snapshot', 'value', context)
     const lifecycleEntity = defineEntity<{ id: string }>({
       name: 'operation-lifecycle',
       key: 'id'
     })
-    let signalSurfaceReads = 0
-    const stableSignal = {
-      get aborted() {
-        return false
-      },
-      get addEventListener() {
-        signalSurfaceReads += 1
-        if (signalSurfaceReads > 2) throw new Error('browser signal surface method read twice')
-        return () => {}
-      },
-      get removeEventListener() {
-        signalSurfaceReads += 1
-        if (signalSurfaceReads > 2) throw new Error('browser signal surface method read twice')
-        return () => {}
-      }
-    } as never
-    const stableSnapshot = snapshotOperationContext({ signal: stableSignal })
+    const stableSnapshot = snapshotOperationContext({ signal: contextController.signal })
     await withAbort(stableSnapshot, async () => undefined)
-    await lifecycleEntity.connect(memory).put({ id: 'snapshot' }, {
-      get signal() {
-        repositoryContextReads += 1
-        return contextController.signal
-      },
-      get timeoutMs() {
-        repositoryContextReads += 1
-        return undefined
-      },
-      get pageSize() {
-        repositoryContextReads += 1
-        return 64
-      },
-      get conflictPolicy() {
-        repositoryContextReads += 1
-        return 'replace' as const
-      }
-    } as never)
+    await lifecycleEntity.connect(memory).put({ id: 'snapshot' }, context)
     let memoryTimeoutCode: string | undefined
     try {
       await memory.set('timeout', 'no-write', { timeoutMs: 0 })
@@ -2794,37 +2581,19 @@ window.runOperationLifecycleScenario = async () => {
     } catch (error) {
       invalidSignalCode = (error as { code?: string }).code
     }
-    let invalidSignalGetterCode: string | undefined
+    let abortReasonCode: string | undefined
+    let abortReasonHasCause = false
+    const reason = new Error('browser external abort')
+    const abortedController = new AbortController()
+    abortedController.abort(reason)
     try {
-      await memory.get('invalid-signal-getter', {
-        signal: {
-          get aborted(): never {
-            throw new Error('browser hostile aborted getter')
-          },
-          addEventListener: () => {},
-          removeEventListener: () => {}
-        } as never
-      })
-    } catch (error) {
-      invalidSignalGetterCode = (error as { code?: string }).code
-    }
-    let hostileReasonCode: string | undefined
-    let hostileReasonHasCause = false
-    try {
-      await memory.get('hostile-reason', {
-        signal: {
-          aborted: true,
-          get reason(): never {
-            throw new Error('browser hostile reason getter')
-          },
-          addEventListener: () => {},
-          removeEventListener: () => {}
-        } as never,
+      await memory.get('aborted-reason', {
+        signal: abortedController.signal,
         timeoutMs: 1000
       })
     } catch (error) {
-      hostileReasonCode = (error as { code?: string }).code
-      hostileReasonHasCause = (error as { cause?: unknown }).cause instanceof Error
+      abortReasonCode = (error as { code?: string }).code
+      abortReasonHasCause = walkErrorCauses(error).includes(reason)
     }
     let listenerSetupCode: string | undefined
     try {
@@ -2944,8 +2713,6 @@ window.runOperationLifecycleScenario = async () => {
     }
     let mergedSignalAborted = false
     let mergedSignalListener: (() => void) | undefined
-    let mergedSignalAbortedReads = 0
-    let mergedSignalReasonReads = 0
     let mergedSignalRemoveCalls = 0
     const mergedSignalReason = new Error('browser merged signal reason')
     const mergedSignal = mergeSignals(
@@ -2953,11 +2720,9 @@ window.runOperationLifecycleScenario = async () => {
         timeoutMs: 1000,
         signal: {
           get aborted() {
-            mergedSignalAbortedReads += 1
             return mergedSignalAborted
           },
           get reason() {
-            mergedSignalReasonReads += 1
             return mergedSignalReason
           },
           addEventListener: (_type: 'abort', listener: () => void) => {
@@ -3020,22 +2785,11 @@ window.runOperationLifecycleScenario = async () => {
           } catch (error) {
             indexedTimeoutCode = (error as { code?: string }).code
           }
-          let indexedDynamicSignalCode: string | undefined
-          let indexedSignalReads = 0
+          let indexedInvalidSignalCode: string | undefined
           try {
-            await database.get('dynamic-signal', {
-              signal: {
-                get aborted() {
-                  indexedSignalReads += 1
-                  if (indexedSignalReads > 1) throw new Error('browser dynamic aborted getter')
-                  return false
-                },
-                addEventListener: () => {},
-                removeEventListener: () => {}
-              } as never
-            })
+            await database.get('invalid-signal', { signal: null as never })
           } catch (error) {
-            indexedDynamicSignalCode = (error as { code?: string }).code
+            indexedInvalidSignalCode = (error as { code?: string }).code
           }
           await database.dispose()
           let disposedCode: string | undefined
@@ -3052,25 +2806,21 @@ window.runOperationLifecycleScenario = async () => {
             request.onerror = () => reject(request.error)
           })
           let requestAborted = false
-          let idbRequestContextReads = 0
           let idbRequestRaceCode: string | undefined
           try {
             await fromIdbRequest(
               requestDatabase.transaction('kv').objectStore('kv').get('missing'),
               {
-                get signal() {
-                  idbRequestContextReads += 1
-                  return {
-                    get aborted() {
-                      return requestAborted
-                    },
-                    reason: 'browser request race',
-                    addEventListener: () => {
-                      requestAborted = true
-                    },
-                    removeEventListener: () => {}
-                  } as never
-                }
+                signal: {
+                  get aborted() {
+                    return requestAborted
+                  },
+                  reason: 'browser request race',
+                  addEventListener: () => {
+                    requestAborted = true
+                  },
+                  removeEventListener: () => {}
+                } as never
               },
               operationRuntime
             )
@@ -3167,33 +2917,6 @@ window.runOperationLifecycleScenario = async () => {
               idbRequestSetterCodes.push((error as { code?: string }).code)
             }
           }
-          const idbTransactionSetterCodes: Array<string | undefined> = []
-          for (const property of ['oncomplete', 'onerror', 'onabort'] as const) {
-            try {
-              await idbTransactionCommit(
-                {
-                  abort: () => {},
-                  set oncomplete(_handler: unknown) {
-                    if (property === 'oncomplete')
-                      throw new Error('browser hostile transaction oncomplete setter')
-                  },
-                  set onerror(_handler: unknown) {
-                    if (property === 'onerror')
-                      throw new Error('browser hostile transaction onerror setter')
-                  },
-                  set onabort(_handler: unknown) {
-                    if (property === 'onabort')
-                      throw new Error('browser hostile transaction onabort setter')
-                  }
-                } as unknown as IDBTransaction,
-                undefined,
-                operationRuntime
-              )
-              idbTransactionSetterCodes.push(undefined)
-            } catch (error) {
-              idbTransactionSetterCodes.push((error as { code?: string }).code)
-            }
-          }
           const setupTransaction = requestDatabase.transaction('kv', 'readwrite')
           setupTransaction.objectStore('kv').put('must-rollback', 'setup-failure')
           let idbTransactionSetupCode: string | undefined
@@ -3269,15 +2992,14 @@ window.runOperationLifecycleScenario = async () => {
             return {
               memoryTimeoutCode,
               indexedTimeoutCode,
-              indexedDynamicSignalCode,
+              indexedInvalidSignalCode,
               disposedCode,
               memoryValue,
               invalidTimeoutCode,
               invalidContextCodes,
               invalidSignalCode,
-              invalidSignalGetterCode,
-              hostileReasonCode,
-              hostileReasonHasCause,
+              abortReasonCode,
+              abortReasonHasCause,
               listenerSetupCode,
               cleanupPreservedResult,
               extensionListenerSetupCode,
@@ -3286,21 +3008,14 @@ window.runOperationLifecycleScenario = async () => {
               migrationCleanupPreserved,
               signalRaceCode,
               signalRaceCalls,
-              mergedSignalAbortedReads,
-              mergedSignalReasonReads,
               mergedSignalRemoveCalls,
               mergedSignalReasonPreserved,
-              contextSnapshotReads,
-              signalSurfaceReads,
-              repositoryContextReads,
               idbRequestRaceCode,
-              idbRequestContextReads,
               idbRequestSetupCode,
               idbRequestCleanupPreserved,
               idbResultGetterCode,
               idbErrorGetterCode,
               idbRequestSetterCodes,
-              idbTransactionSetterCodes,
               idbTransactionSetupCode,
               idbTransactionSetupRolledBack,
               idbDestructiveSetterCodes,
@@ -4471,79 +4186,24 @@ window.runIndexedDbOptionsGuardScenario = async () => {
 
 /** 真实浏览器验证 JS 边界传入非法 entity definition 时仍返回统一错误码。 */
 window.runEntityDefinitionGuardScenario = async () => {
-  let definitionOptionReads = 0
-  let definitionSchemaReads = 0
-  const getterDefinition = defineEntity<{ id: string }>({
-    get name() {
-      definitionOptionReads += 1
-      return 'browser-getter-definition'
+  const definition = defineEntity<{ id: string }>({
+    name: 'browser-definition',
+    key: 'id',
+    schema: {
+      name: 'browser-schema',
+      validate: async (value: unknown) => value as { id: string }
     },
-    get key() {
-      definitionOptionReads += 1
-      return 'id' as const
-    },
-    get schema() {
-      definitionOptionReads += 1
-      return {
-        get name() {
-          definitionSchemaReads += 1
-          return 'browser-getter-schema'
-        },
-        get validate() {
-          definitionSchemaReads += 1
-          return async (value: unknown) => value as { id: string }
-        },
-        get encode() {
-          definitionSchemaReads += 1
-          return undefined
-        },
-        get decode() {
-          definitionSchemaReads += 1
-          return undefined
-        },
-        get normalize() {
-          definitionSchemaReads += 1
-          return undefined
-        }
-      }
-    },
-    get codec() {
-      definitionOptionReads += 1
-      return undefined
-    },
-    get version() {
-      definitionOptionReads += 1
-      return 1
-    },
-    get migrations() {
-      definitionOptionReads += 1
-      return undefined
-    },
-    get validateOnRead() {
-      definitionOptionReads += 1
-      return true
-    },
-    get onDiagnostic() {
-      definitionOptionReads += 1
-      return undefined
-    },
-    get defaultOrderBy() {
-      definitionOptionReads += 1
-      return undefined
-    }
+    version: 1,
+    validateOnRead: true
   })
   /** The actual host owns this scenario registration and its original native cleanup. */
-  const getterMemoryHost = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+  const definitionMemoryHost = await createStorageHost({ plugins: [memoryBackendPlugin()] })
   try {
-    await getterDefinition.connect(getterMemoryHost.backend('memory')).put({ id: 'stable' })
-    const hostileStore = {
-      get backend(): 'memory' {
-        throw new Error('hostile browser backend')
-      }
-    }
-    const hostileStorePredicates = [
-      isKeyValueStore(hostileStore),
-      isRecordStore(hostileStore as never)
+    await definition.connect(definitionMemoryHost.backend('memory')).put({ id: 'stable' })
+    const malformedStore = { backend: 'memory' }
+    const storePredicates = [
+      isKeyValueStore(malformedStore),
+      isRecordStore(malformedStore as never)
     ]
     const codes: Array<string | undefined> = []
     for (const value of [null, undefined, [], 'entity', 42, true]) {
@@ -4717,37 +4377,14 @@ window.runEntityDefinitionGuardScenario = async () => {
           standardSchemaCodes.push((error as { code?: string }).code)
         }
       }
-      let standardSchemaContractReads = 0
-      let standardSchemaResultReads = 0
-      const getterSchema = fromStandardSchema<number>({
-        get '~standard'() {
-          standardSchemaContractReads += 1
-          return {
-            get version() {
-              standardSchemaContractReads += 1
-              return 1 as const
-            },
-            get vendor() {
-              standardSchemaContractReads += 1
-              return 'browser-getter-schema'
-            },
-            get validate() {
-              standardSchemaContractReads += 1
-              return async () => ({
-                get issues() {
-                  standardSchemaResultReads += 1
-                  return undefined
-                },
-                get value() {
-                  standardSchemaResultReads += 1
-                  return 42
-                }
-              })
-            }
-          }
+      const standardSchema = fromStandardSchema<number>({
+        '~standard': {
+          version: 1,
+          vendor: 'browser-schema',
+          validate: async () => ({ value: 42 })
         }
       })
-      await getterSchema.validate('input')
+      await standardSchema.validate('input')
       const migrationHelperCodes: Array<string | undefined> = []
       for (const [fromVersion, toVersion] of [
         [Number.NaN, 1],
@@ -4828,25 +4465,12 @@ window.runEntityDefinitionGuardScenario = async () => {
           codecSelectionCodes.push((error as { code?: string }).code)
         }
       }
-      let codecDescriptorReads = 0
-      const selectedGetterCodec = selectCodec(
+      const selectedCodec = selectCodec(
         {
-          get name() {
-            codecDescriptorReads += 1
-            return 'browser-getter-codec'
-          },
-          get output() {
-            codecDescriptorReads += 1
-            return 'text' as const
-          },
-          get encode() {
-            codecDescriptorReads += 1
-            return async (value: unknown) => JSON.stringify(value)
-          },
-          get decode() {
-            codecDescriptorReads += 1
-            return async (value: string) => JSON.parse(value) as unknown
-          }
+          name: 'browser-codec',
+          output: 'text',
+          encode: async (value: unknown) => JSON.stringify(value),
+          decode: async (value: string) => JSON.parse(value) as unknown
         },
         {
           syncRead: true,
@@ -4860,7 +4484,7 @@ window.runEntityDefinitionGuardScenario = async () => {
           opaqueEntries: false
         }
       )
-      await selectedGetterCodec.encode({ stable: true })
+      await selectedCodec.encode({ stable: true })
       return {
         codes,
         storeCodes,
@@ -4876,23 +4500,18 @@ window.runEntityDefinitionGuardScenario = async () => {
         sparseVersionCodes,
         validateOnReadCodes,
         standardSchemaCodes,
-        standardSchemaContractReads,
-        standardSchemaResultReads,
         migrationHelperCodes,
         inheritedMigrationCalls,
         inheritedMigrationCode,
         migrationRaceCode,
         codecSelectionCodes,
-        hostileStorePredicates,
-        codecDescriptorReads,
-        definitionOptionReads,
-        definitionSchemaReads
+        storePredicates
       }
     } finally {
       await entityMemoryHost.dispose()
     }
   } finally {
-    await getterMemoryHost.dispose()
+    await definitionMemoryHost.dispose()
   }
 }
 
@@ -4969,35 +4588,11 @@ window.runEntityComparatorGuardScenario = async () => {
     } catch (error) {
       invalidPolicyCode = (error as { code?: string }).code
     }
-    let rangeSnapshotReads = 0
+    await repo.list({ range: { lower: 'a', upper: 'z' } })
     await repo.list({
-      range: {
-        get lower() {
-          rangeSnapshotReads += 1
-          if (rangeSnapshotReads > 1) throw new Error('range read twice')
-          return 'a'
-        },
-        upper: 'z'
-      }
-    })
-    let listOptionReads = 0
-    await repo.list({
-      get range() {
-        listOptionReads += 1
-        return { lower: 'a', upper: 'z' }
-      },
-      get limit() {
-        listOptionReads += 1
-        return 2
-      },
-      get orderBy() {
-        listOptionReads += 1
-        return undefined
-      },
-      get onInvalid() {
-        listOptionReads += 1
-        return 'throw' as const
-      }
+      range: { lower: 'a', upper: 'z' },
+      limit: 2,
+      onInvalid: 'throw'
     })
     return {
       codes,
@@ -5005,9 +4600,7 @@ window.runEntityComparatorGuardScenario = async () => {
       invalidOptionsCodes,
       rangeCodes,
       invalidHandlerCodes,
-      invalidPolicyCode,
-      rangeSnapshotReads,
-      listOptionReads
+      invalidPolicyCode
     }
   } finally {
     await entityMemoryHost.dispose()

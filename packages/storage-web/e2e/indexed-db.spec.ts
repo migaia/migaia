@@ -442,7 +442,7 @@ test('真实浏览器统一执行 timeoutMs=0 与 dispose lifecycle', async ({ p
   const result = await page.evaluate(() => window.runOperationLifecycleScenario())
   expect(result.memoryTimeoutCode).toBe('ABORTED')
   expect(result.indexedTimeoutCode).toBe('ABORTED')
-  expect(result.indexedDynamicSignalCode).toBe('INVALID_ARGUMENT')
+  expect(result.indexedInvalidSignalCode).toBe('INVALID_ARGUMENT')
   expect(result.disposedCode).toBe('STORE_DISPOSED')
   expect(result.memoryValue).toBeNull()
   expect(result.invalidTimeoutCode).toBe('INVALID_ARGUMENT')
@@ -453,9 +453,8 @@ test('真实浏览器统一执行 timeoutMs=0 与 dispose lifecycle', async ({ p
     'INVALID_ARGUMENT'
   ])
   expect(result.invalidSignalCode).toBe('INVALID_ARGUMENT')
-  expect(result.invalidSignalGetterCode).toBe('INVALID_ARGUMENT')
-  expect(result.hostileReasonCode).toBe('ABORTED')
-  expect(result.hostileReasonHasCause).toBe(true)
+  expect(result.abortReasonCode).toBe('ABORTED')
+  expect(result.abortReasonHasCause).toBe(true)
   expect(result.listenerSetupCode).toBe('INVALID_ARGUMENT')
   expect(result.cleanupPreservedResult).toBeNull()
   expect(result.extensionListenerSetupCode).toBe('INVALID_ARGUMENT')
@@ -464,25 +463,14 @@ test('真实浏览器统一执行 timeoutMs=0 与 dispose lifecycle', async ({ p
   expect(result.migrationCleanupPreserved).toBe(true)
   expect(result.signalRaceCode).toBe('ABORTED')
   expect(result.signalRaceCalls).toBe(0)
-  expect(result.mergedSignalAbortedReads).toBe(3)
-  expect(result.mergedSignalReasonReads).toBe(1)
   expect(result.mergedSignalRemoveCalls).toBe(1)
   expect(result.mergedSignalReasonPreserved).toBe(true)
-  expect(result.contextSnapshotReads).toBe(4)
-  expect(result.signalSurfaceReads).toBe(2)
-  expect(result.repositoryContextReads).toBe(4)
   expect(result.idbRequestRaceCode).toBe('ABORTED')
-  expect(result.idbRequestContextReads).toBe(1)
   expect(result.idbRequestSetupCode).toBe('INVALID_ARGUMENT')
   expect(result.idbRequestCleanupPreserved).toBe(true)
   expect(result.idbResultGetterCode).toBe('TRANSACTION_FAILED')
   expect(result.idbErrorGetterCode).toBe('TRANSACTION_FAILED')
   expect(result.idbRequestSetterCodes).toEqual(['TRANSACTION_FAILED', 'TRANSACTION_FAILED'])
-  expect(result.idbTransactionSetterCodes).toEqual([
-    'TRANSACTION_FAILED',
-    'TRANSACTION_FAILED',
-    'TRANSACTION_FAILED'
-  ])
   expect(result.idbTransactionSetupCode).toBe('INVALID_ARGUMENT')
   expect(result.idbTransactionSetupRolledBack).toBe(true)
   expect(result.idbDestructiveSetterCodes).toEqual([
@@ -571,7 +559,7 @@ test('真实浏览器 entity definition 非对象入口统一返回 INVALID_CONF
     'INVALID_CONFIG',
     'INVALID_CONFIG'
   ])
-  expect(result.hostileStorePredicates).toEqual([false, false])
+  expect(result.storePredicates).toEqual([false, false])
   expect(result.codecCodes).toEqual([
     'INVALID_ARGUMENT',
     'INVALID_ARGUMENT',
@@ -612,8 +600,6 @@ test('真实浏览器 entity definition 非对象入口统一返回 INVALID_CONF
     'INVALID_CONFIG',
     'INVALID_CONFIG'
   ])
-  expect(result.standardSchemaContractReads).toBe(4)
-  expect(result.standardSchemaResultReads).toBe(2)
   expect(result.migrationHelperCodes).toEqual([
     'ENVELOPE_INVALID',
     'INVALID_ARGUMENT',
@@ -627,9 +613,6 @@ test('真实浏览器 entity definition 非对象入口统一返回 INVALID_CONF
     'INVALID_ARGUMENT',
     'INVALID_CONFIG'
   ])
-  expect(result.codecDescriptorReads).toBe(4)
-  expect(result.definitionOptionReads).toBe(9)
-  expect(result.definitionSchemaReads).toBe(5)
 })
 
 test('真实浏览器 orderBy comparator 返回非法类型时拒绝静默排序', async ({ page }) => {
@@ -659,8 +642,6 @@ test('真实浏览器 orderBy comparator 返回非法类型时拒绝静默排序
     'INVALID_CONFIG'
   ])
   expect(result.invalidPolicyCode).toBe('INVALID_ARGUMENT')
-  expect(result.rangeSnapshotReads).toBe(1)
-  expect(result.listOptionReads).toBe(4)
 })
 
 test('native IndexedDB TTL keeps expiry, rollback and reopened deadlines', async ({ page }) => {

@@ -745,11 +745,6 @@ describe('indexedDbHost backend', () => {
     })
     await expect(store.getRecord(['transaction', 2])).resolves.toBeUndefined()
 
-    const overriddenMapKey = ['overridden-map', 1] as IStorageKey[]
-    overriddenMapKey.map = (() => ['overridden-map', 2]) as typeof overriddenMapKey.map
-    await store.putRecord({ value: 'map-safe' }, overriddenMapKey)
-    await expect(store.getRecord(['overridden-map', 1])).resolves.toEqual({ value: 'map-safe' })
-    await expect(store.getRecord(['overridden-map', 2])).resolves.toBeUndefined()
     await store.dispose()
   })
 

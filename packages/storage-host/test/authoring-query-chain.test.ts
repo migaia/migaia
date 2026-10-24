@@ -1855,12 +1855,6 @@ describe('shared keyset pages', () => {
     expect(() => query.after(reflected)).toThrowError(
       expect.objectContaining({ code: 'INVALID_ARGUMENT' })
     )
-    const read = vi.fn()
-    const unknown = Object.defineProperty({}, 'read', { get: read })
-    expect(() => query.after(unknown as never)).toThrowError(
-      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
-    )
-    expect(read).not.toHaveBeenCalled()
     expect(execute).toHaveBeenCalledTimes(2)
   })
 

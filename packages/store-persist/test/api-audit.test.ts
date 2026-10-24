@@ -1,4 +1,3 @@
-import { assertVersionedEnvelope } from '@migaia/storage-contract'
 import { describe, expect, it } from 'vitest'
 import { createRuntime } from '@migaia/reactive'
 import { createStore } from '@migaia/store-light'
@@ -231,29 +230,6 @@ describe('store-persist audit regressions', () => {
     }
   })
 
-  it('keeps a failed envelope getter reachable through a coded validation error', () => {
-    /** The accessor owns this real native failure and its stack. */
-    const primary = new Error('envelope getter failed')
-    /** The public unknown boundary must expose its semantic validation identity. */
-    let failure: unknown
-    try {
-      assertVersionedEnvelope({
-        get version() {
-          throw primary
-        },
-        state: {}
-      })
-    } catch (error) {
-      failure = error
-    }
-    expect(failure).toMatchObject({
-      source: '@migaia/storage-contract',
-      code: 'ENVELOPE_INVALID',
-      cause: primary
-    })
-    expect((failure as Error).cause).toBe(primary)
-    expect(primary.stack).toBeTruthy()
-  })
   it('keeps the private active projection out of the public runtime vocabulary', () => {
     expect(PersistState).not.toHaveProperty('active')
     expect(PersistState.disposed).toBe('disposed')

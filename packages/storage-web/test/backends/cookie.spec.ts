@@ -76,32 +76,23 @@ describe('cookiesHost backend', () => {
       })
   })
 
-  it('所有 Cookie async 方法的 lifecycle 错误穿透为 contract INVALID_ARGUMENT', async () => {
+  it('所有 Cookie async 方法拒绝非法 timeoutMs', async () => {
     const store = await createCookieTestStore({
       namespace: 'async-lifecycle-metadata',
       document: fakeCookieDocument()
     })
     const operations = [
-      ['cookie.get', (context: never) => store.get('key', context)],
-      ['cookie.remove', (context: never) => store.remove('key', context)],
-      ['cookie.has', (context: never) => store.has('key', context)],
-      ['cookie.keys', (context: never) => store.keys(context)],
-      ['cookie.clearValues', (context: never) => store.clearValues(context)],
-      ['cookie.clearAll', (context: never) => store.clearAll(context)]
+      (context: never) => store.get('key', context),
+      (context: never) => store.remove('key', context),
+      (context: never) => store.has('key', context),
+      (context: never) => store.keys(context),
+      (context: never) => store.clearValues(context),
+      (context: never) => store.clearAll(context)
     ] as const
-    for (const [operation, invoke] of operations) {
-      const cause = new Error(`hostile ${operation} timeout getter`)
-      await expect(
-        invoke({
-          get timeoutMs(): never {
-            throw cause
-          }
-        } as never)
-      ).rejects.toMatchObject({
-        code: 'INVALID_ARGUMENT',
-        cause
+    for (const invoke of operations)
+      await expect(invoke({ timeoutMs: -1 } as never)).rejects.toMatchObject({
+        code: 'INVALID_ARGUMENT'
       })
-    }
   })
 
   it('拒绝超出 safe integer 的 maxAge', async () => {

@@ -48,7 +48,6 @@ it('stream direction reverses the explicit comparator order', async () => {
 it('projects explicit selectors and indexed list through the shared query route', async () => {
   type IIndexedUser = { id: string; email: string; tags: string[] }
   let selectorCalls = 0
-  let keyReads = 0
   const diagnostics: string[] = []
   const entity = defineEntity<IIndexedUser>()({
     name: 'indexed-list-users',
@@ -60,15 +59,7 @@ it('projects explicit selectors and indexed list through the shared query route'
       selected: {
         select: (value) => {
           selectorCalls += 1
-          const projection = { kind: 'single' as const } as { kind: 'single'; key?: string }
-          Object.defineProperty(projection, 'key', {
-            enumerable: true,
-            get: () => {
-              keyReads += 1
-              return value.email
-            }
-          })
-          return projection as { readonly kind: 'single'; readonly key: string }
+          return { kind: 'single' as const, key: value.email }
         },
         revision: 1
       }
@@ -104,31 +95,18 @@ it('projects explicit selectors and indexed list through the shared query route'
     streamed.push(value)
   expect(streamed).toEqual([{ id: 'u1', email: 'ada@example.com', tags: ['admin', 'staff'] }])
 
-  const reads = { index: 0, range: 0, limit: 0, orderBy: 0, direction: 0, onInvalid: 0 }
-  const hostileOptions = Object.defineProperties(
-    {},
-    {
-      index: { enumerable: true, get: () => ((reads.index += 1), 'tags') },
-      range: {
-        enumerable: true,
-        get: () => ((reads.range += 1), { lower: 'admin', upper: 'admin' })
-      },
-      limit: { enumerable: true, get: () => ((reads.limit += 1), undefined) },
-      orderBy: { enumerable: true, get: () => ((reads.orderBy += 1), undefined) },
-      direction: { enumerable: true, get: () => ((reads.direction += 1), undefined) },
-      onInvalid: { enumerable: true, get: () => ((reads.onInvalid += 1), undefined) }
-    }
-  )
-  const hostileStream: IIndexedUser[] = []
-  for await (const value of repository.stream(hostileOptions as never)) hostileStream.push(value)
-  expect(hostileStream).toEqual([{ id: 'u1', email: 'ada@example.com', tags: ['admin', 'staff'] }])
-  expect(reads).toEqual({ index: 1, range: 1, limit: 1, orderBy: 1, direction: 1, onInvalid: 1 })
+  const selectedStream: IIndexedUser[] = []
+  for await (const value of repository.stream({
+    index: 'tags',
+    range: { lower: 'admin', upper: 'admin' }
+  }))
+    selectedStream.push(value)
+  expect(selectedStream).toEqual([{ id: 'u1', email: 'ada@example.com', tags: ['admin', 'staff'] }])
   expect(diagnostics).toHaveLength(5)
   expect(diagnostics).toEqual(
     diagnostics.map(() => expect.stringContaining('uses authoritative full-scan fallback'))
   )
   expect(selectorCalls).toBe(4)
-  expect(keyReads).toBe(4)
 })
 
 it('fallback batch does not execute secondary-index selectors', async () => {

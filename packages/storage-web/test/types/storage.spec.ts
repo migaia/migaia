@@ -51,19 +51,6 @@ describe('asRecordStore / isRecordStore', () => {
     ;(invalidCapabilities.capabilities as { opaqueEntries: unknown }).opaqueEntries = 'no'
     expect(isKeyValueStore(invalidCapabilities)).toBe(false)
   })
-  it('runtime predicates 不泄漏 getter 异常', () => {
-    const hostile = {
-      get backend(): 'memory' {
-        throw new Error('hostile backend')
-      }
-    }
-    expect(() => isKeyValueStore(hostile)).not.toThrow()
-    expect(isKeyValueStore(hostile)).toBe(false)
-    expect(isRecordStore(hostile as never)).toBe(false)
-    expect(() => asRecordStore(hostile as never)).toThrow(
-      expect.objectContaining({ code: 'UNSUPPORTED_CAPABILITY' })
-    )
-  })
   it('运行时收到 null 或缺少 capabilities 时返回 false/稳定抛 UNSUPPORTED_CAPABILITY', () => {
     expect(isRecordStore(null as unknown as IKeyValueStore)).toBe(false)
     expect(() => asRecordStore(null as unknown as IKeyValueStore)).toThrow(

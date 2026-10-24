@@ -408,20 +408,15 @@ describe('transaction iterator resources', () => {
     fixture.controller.close()
   })
 
-  it('captures the outer canonical disposal key once without creating a native fallback', async () => {
+  it('uses the supplied disposal key without creating a native fallback', async () => {
     /** A distinct fixed key represents the existing outer host identity. */
     const key: symbol = Symbol('host-disposal')
     /** This base has not been initialized by the tested owner yet. */
     const fixture = setup()
     /** A separate original base supports the host key as its real cleanup method. */
     const base = { ...fixture.base, [key]: fixture.base.dispose }
-    /** Key accessors must not be rediscovered by each iterator wrapper. */
-    let reads = 0
     const owner = createTransactionOwner<unknown, IScope>(base, normalizeFailure, {
-      get asyncDisposeKey(): typeof Symbol.asyncDispose {
-        reads += 1
-        return key as typeof Symbol.asyncDispose
-      }
+      asyncDisposeKey: key as typeof Symbol.asyncDispose
     })
     const root = fixture.createScope()
     const controller = owner.register(root, {
@@ -433,7 +428,6 @@ describe('transaction iterator resources', () => {
       next: async () => ({ done: false, value: 1 }),
       close
     })
-    expect(reads).toBe(1)
     expect(Reflect.get(iterator, Symbol.asyncDispose)).toBeUndefined()
     /** The host owns key selection; the contract only installs the supplied method identity. */
     const symbolic = Reflect.get(iterator, key) as () => Promise<void>

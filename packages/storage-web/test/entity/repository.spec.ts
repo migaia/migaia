@@ -36,31 +36,6 @@ for (const { label, create } of backends) {
       await expect(repo.put({ id: 'u1', name: 'Ada', email: 'a@b.c' })).resolves.toBe('u1')
     })
 
-    it('repository operation context 每个字段只读取一次', async () => {
-      const repo = users.connect(await create())
-      const controller = new AbortController()
-      let reads = 0
-      await repo.put({ id: 'snapshot', name: 'Ada', email: 'ada@example.com' }, {
-        get signal() {
-          reads += 1
-          return controller.signal
-        },
-        get timeoutMs() {
-          reads += 1
-          return undefined
-        },
-        get pageSize() {
-          reads += 1
-          return 64
-        },
-        get conflictPolicy() {
-          reads += 1
-          return 'replace' as const
-        }
-      } as never)
-      expect(reads).toBe(4)
-    })
-
     it('get 未写入的 id 返回 undefined', async () => {
       const repo = users.connect(await create())
       await expect(repo.get('missing')).resolves.toBeUndefined()

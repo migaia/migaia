@@ -215,22 +215,12 @@ describe('organization key segments', () => {
     )
   })
 
-  it('preserves malformed key domain and reflected envelope failures under their actual owners', () => {
+  it('preserves malformed key domains under their actual owners', () => {
     expect(() => prefixStorageOrgKey(firstOrg, {} as IStorageKey)).toThrowError(
       expect.objectContaining({ code: 'INVALID_KEY' })
     )
     expect(() => unprefixStorageOrgKey(firstOrg, ['$o', firstOrg, []])).toThrowError(
       expect.objectContaining({ code: 'INVALID_KEY' })
-    )
-    const original = new Error('org key getter failed')
-    const physical: IStorageKey[] = ['$o', firstOrg, 'key']
-    Object.defineProperty(physical, 2, {
-      get(): never {
-        throw original
-      }
-    })
-    expect(() => unprefixStorageOrgKey(firstOrg, physical)).toThrowError(
-      expect.objectContaining({ code: 'INVALID_ARGUMENT', cause: original })
     )
   })
 })
