@@ -1,5 +1,6 @@
 import type {
   IKeyValueApi,
+  IOperationContext,
   ILockKey,
   IStorageResource,
   ITransactionInfo,
@@ -63,7 +64,7 @@ export type IStorageJournalAttempt = {
 export type IStorageJournalExecutionPort = {
   prepare(): Promise<void>
   /** Original text owners hold native protection across recovery and the complete operation. */
-  runRedo?<R>(run: () => Promise<R>): Promise<R>
+  runRedo?<R>(run: () => Promise<R>, signal?: IOperationContext['signal']): Promise<R>
   /** The original owner authenticates an exact text-only scope without fake record methods. */
   beginRedo?(scope: object): IStorageJournalRedoAttempt | undefined
   headLocks(): readonly ILockKey[]
@@ -130,9 +131,10 @@ export type IStorageJournalRedoAttempt = {
 export type IStorageJournalRedoBinding = {
   transactionInfo(scope: object): ITransactionInfo
   changes(scope: object): readonly IStorageJournalChange[]
-  protect<R>(run: () => Promise<R>): Promise<R>
+  protect<R>(run: () => Promise<R>, signal?: IOperationContext['signal']): Promise<R>
   apply(scope: object): void
-  replay(changes: readonly IStorageJournalChange[]): void
+  /** Return only original invalidation work, dispatched after durable completion succeeds. */
+  replay(changes: readonly IStorageJournalChange[]): void | (() => void)
   seal(cause: unknown): void
 }
 

@@ -101,8 +101,9 @@ export function prepareStorageJournalConfiguration(
     'report' | 'onBinlogAppendError' | 'beforeRecover' | 'afterRecover' | 'onRecoverError'
   >
 ) {
-  if (access.binding.redo !== undefined && options.logger.wal !== undefined) {
+  if (access.binding.redo !== undefined) {
     if (
+      options.logger.wal === undefined ||
       options.redoWal !== options.logger.wal ||
       options.logger.undo !== undefined ||
       options.atomicBinlog !== undefined ||
