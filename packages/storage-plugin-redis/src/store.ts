@@ -562,6 +562,11 @@ export function createRedisStore(
             await context.waitPhysical(sleep(1, { signal: context.signal }))
           }
         } catch (error) {
+          if (
+            error instanceof Error &&
+            Reflect.get(error, 'code') === StorageContractErrorCode.lockLost
+          )
+            observe(concurrencyStages(), 'onLockLost', context.attempt, context.lock?.length ?? 0)
           if (error instanceof RedisLockConflict)
             outcome = {
               status: 'conflict',
@@ -1740,18 +1745,31 @@ export function createRedisStore(
               operate(RedisOperation.inspectLocks, {}, context, undefined, proceed)
           },
           {
-            attempt: (context) =>
-              driver.withConnection(async (connection) => ({
-                status: 'committed' as const,
-                value: await createRedisLocks({
-                  layout,
-                  context,
-                  owner: controller.origin,
-                  label,
-                  maxLockMs,
-                  send: (args) => command(connection, args, orgId)
-                }).inspect()
-              }))
+            attempt: async (context) => {
+              const stages = concurrencyStages()
+              observe(stages, 'beforeLockInspect')
+              try {
+                const value = await driver.withConnection((connection) =>
+                  createRedisLocks({
+                    layout,
+                    context,
+                    owner: controller.origin,
+                    label,
+                    maxLockMs,
+                    send: (args) => command(connection, args, orgId)
+                  }).inspect()
+                )
+                observe(stages, 'afterLockInspect', value.length)
+                return { status: 'committed' as const, value }
+              } catch (error) {
+                observe(
+                  stages,
+                  'onLockInspectError',
+                  error instanceof Error ? Reflect.get(error, 'code') : undefined
+                )
+                throw error
+              }
+            }
           }
         ).finally(finish)
       },
