@@ -1,4 +1,4 @@
-import type { ITypeDoc } from './contract.ts'
+import type { ITypeDoc } from './contract.js'
 
 /** Keep author-port guidance in both locales without borrowing runtime implementation objects. */
 const t = (en: string, zh: string) => ({ en, zh })
