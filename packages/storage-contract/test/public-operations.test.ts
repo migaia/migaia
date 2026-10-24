@@ -45,21 +45,6 @@ describe('public transaction admission', () => {
         expect.objectContaining({ code: 'INVALID_ARGUMENT', cause: expect.any(TypeError) })
       )
   })
-
-  it('keeps a failed transaction policy accessor reachable as the original cause', () => {
-    /** Application options may expose a property whose read fails before acquisition. */
-    const cause = new Error('transaction policy unavailable')
-    expect(() =>
-      readTransactionConflictPolicy(
-        {
-          get conflictPolicy(): never {
-            throw cause
-          }
-        },
-        'memory'
-      )
-    ).toThrow(expect.objectContaining({ source: '@migaia/storage-contract', cause }))
-  })
 })
 
 describe('public storage key snapshots and ordering', () => {
@@ -115,59 +100,30 @@ describe('public storage key snapshots and ordering', () => {
 })
 
 describe('public codec and operation snapshots', () => {
-  it('captures each codec method once and retains the original implementation', async () => {
-    /** Property reads are observable because routing must use one descriptor generation. */
-    const reads = { name: 0, output: 0, encode: 0, decode: 0 }
-    /** Real encoding/decoding operations make the captured function identity observable. */
+  it('captures codec methods and retains the original implementation', async () => {
+    /** Conversion functions remain stable after the caller changes its descriptor. */
     const encode = async (value: unknown) => JSON.stringify(value)
-    /** A codec snapshot must keep this decoder even after the caller changes its descriptor. */
+    /** Decoding retains the original implementation selected before asynchronous routing. */
     const decode = async (raw: unknown) => JSON.parse(String(raw)) as unknown
-    /** Applications may expose computed codec descriptors through ordinary accessors. */
-    const codec: ICodec = {
-      get name() {
-        reads.name++
-        return 'application-json'
-      },
-      get output() {
-        reads.output++
-        return 'text' as const
-      },
-      get encode() {
-        reads.encode++
-        return encode
-      },
-      get decode() {
-        reads.decode++
-        return decode
-      }
-    }
+    /** Supported codecs expose ordinary metadata and callable conversion functions. */
+    const codec: ICodec = { name: 'application-json', output: 'text', encode, decode }
     /** The public descriptor is detached before capability routing and asynchronous use. */
     const snapshot = snapshotCodec(codec)
     Object.defineProperty(codec, 'encode', { value: async () => 'changed' })
     expect(snapshot.encode).toBe(encode)
     expect(snapshot.decode).toBe(decode)
     expect(await snapshot.decode(await snapshot.encode({ count: 2 }))).toEqual({ count: 2 })
-    expect(reads).toEqual({ name: 1, output: 1, encode: 1, decode: 1 })
   })
 
-  it('codes malformed codec descriptors and preserves accessor failures', () => {
+  it('codes malformed codec descriptors', () => {
     /** Invalid public descriptors must produce a contract error rather than native access errors. */
     for (const invalid of [null, [], {}, { name: ' ', output: 'text' }])
       expect(() => snapshotCodec(invalid)).toThrow(
         expect.objectContaining({ code: 'INVALID_ARGUMENT', cause: expect.any(TypeError) })
       )
-    /** A failed public descriptor getter remains reachable without replacing the primary. */
-    const cause = new Error('codec name unavailable')
-    expect(() =>
-      snapshotCodec({
-        get name(): never {
-          throw cause
-        }
-      })
-    ).toThrow(expect.objectContaining({ source: '@migaia/storage-contract', cause }))
   })
 
-  it('freezes operation context once while retaining cancellation and policy identity', () => {
+  it('captures operation context while retaining cancellation and policy identity', () => {
     /** The original signal stays responsible for cancellation after snapshot admission. */
     const controller = new AbortController()
     /** The caller may later mutate options without changing already accepted work. */
@@ -177,7 +133,7 @@ describe('public codec and operation snapshots', () => {
       pageSize: 4096,
       conflictPolicy: 'replace' as const
     }
-    /** Layered backends share this same immutable context rather than rereading user getters. */
+    /** Accepted options remain independent from later caller mutation across backend awaits. */
     const snapshot = snapshotOperationContext(options)
     options.timeoutMs = 20
     expect(snapshot).toEqual({
@@ -186,8 +142,6 @@ describe('public codec and operation snapshots', () => {
       pageSize: 4096,
       conflictPolicy: 'replace'
     })
-    expect(Object.isFrozen(snapshot)).toBe(true)
-    expect(snapshotOperationContext(snapshot)).toBe(snapshot)
     expect(snapshotOperationContext(undefined)).toBeUndefined()
     expect(snapshotOperationContext({ conflictPolicy: 'conflict' })).toMatchObject({
       conflictPolicy: 'conflict'

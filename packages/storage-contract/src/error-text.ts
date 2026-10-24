@@ -116,6 +116,14 @@ export const StorageContractErrorText = {
   valueCodecDecode: 'value codec decoding failed',
   /** SnapshotCodec requires the structural four-field descriptor, including class instances. */
   codecDescriptor: 'codec must declare name, output, encode, and decode',
+  /** Operation admission requires an options record before any backend work can start. */
+  operationContextObject: 'operation context must be an object',
+  /** Cancellation uses the existing structural signal without substituting another lifetime. */
+  operationContextSignal: 'signal must implement the IAbortSignal surface',
+  /** Shared deadline choices must remain nonnegative and exactly representable milliseconds. */
+  operationContextTimeout: 'timeoutMs must be a non-negative safe integer',
+  /** Shared paging hints retain the existing bounded backend page domain. */
+  operationContextPageSize: 'pageSize must be an integer between 1 and 4096',
   /** SnapshotSyncWriteOptions accepts undefined or a non-array object. */
   syncWriteObject: 'sync write options must be an object',
   /** Synchronous writes cannot wait for cancellation or a deadline. */

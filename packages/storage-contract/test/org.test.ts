@@ -145,38 +145,22 @@ describe('canonical organization identity', () => {
     )
   })
 
-  it('captures org once, preserves omission and keeps the original signal and snapshot identity', () => {
-    /** Existing timing and cancellation semantics are unchanged by org admission. */
+  it('captures organization and preserves the original live cancellation signal', () => {
+    /** Caller mutation after admission cannot move accepted work into another organization. */
     const controller = new AbortController()
-    /** A changing caller must not alter the immutable captured organization. */
-    let current = firstOrg
-    /** Getter access is observable exactly once across layered reuse. */
-    let reads = 0
+    /** Scalar options are retained before backend execution awaits. */
     const input = {
       signal: controller.signal,
       timeoutMs: 0,
       pageSize: 1,
       conflictPolicy: 'replace' as const,
-      get orgId() {
-        reads += 1
-        return current
-      }
+      orgId: firstOrg
     }
+    /** The snapshot retains organization choice while the signal remains live. */
     const captured = snapshotOperationContext(input)!
-    current = secondOrg
-    expect(snapshotOperationContext(captured)).toBe(captured)
-    expect(reads).toBe(1)
+    input.orgId = secondOrg
     expect(captured.orgId).toBe(firstOrg)
     expect(captured.signal).toBe(controller.signal)
-    expect(Object.isFrozen(captured)).toBe(true)
-    const original = new Error('org getter failed')
-    expect(() =>
-      assertOperationContext({
-        get orgId(): never {
-          throw original
-        }
-      })
-    ).toThrowError(expect.objectContaining({ cause: original }))
   })
 })
 

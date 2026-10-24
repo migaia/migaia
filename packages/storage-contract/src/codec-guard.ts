@@ -2,43 +2,32 @@ import { StorageContractError, StorageContractErrorCode } from './errors.js'
 import type { ICodec } from './codec.js'
 import { StorageContractErrorText } from './error-text.js'
 
-/**
- * Reads a codec's name, output, encode, and decode once before capability-based routing. Accepts
- * non-array objects, including class instances, with a nonblank name, text/binary/structured
- * output, and two callable methods. Returns a new shallow descriptor, without running the methods
- * or capturing their original receiver; the result is not frozen. Malformed descriptors and
- * getter/reflection failures throw INVALID_ARGUMENT with cause retained.
- */
-export const snapshotCodec = (codec: unknown): ICodec => {
+/** Validates codec metadata and callable conversion ports without copying or running the codec. */
+export function assertCodec(codec: unknown): asserts codec is ICodec {
+  if (typeof codec !== 'object' || codec === null || Array.isArray(codec))
+    throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
+      cause: new TypeError(StorageContractErrorText.codecDescriptor)
+    })
+  /** Ordinary descriptors can be class instances; only their public supported shape is required. */
   const candidate = codec as Record<string, unknown>
-  let name: unknown
-  let output: unknown
-  let encode: unknown
-  let decode: unknown
-  try {
-    if (typeof codec !== 'object' || codec === null || Array.isArray(codec))
-      throw new TypeError(StorageContractErrorText.codecDescriptor)
-    name = candidate.name
-    output = candidate.output
-    encode = candidate.encode
-    decode = candidate.decode
-  } catch (cause) {
-    throw new StorageContractError(StorageContractErrorCode.invalidArgument, { cause })
-  }
   if (
-    typeof name !== 'string' ||
-    name.trim() === '' ||
-    !['text', 'binary', 'structured'].includes(output as string) ||
-    typeof encode !== 'function' ||
-    typeof decode !== 'function'
+    typeof candidate.name !== 'string' ||
+    candidate.name.trim() === '' ||
+    !['text', 'binary', 'structured'].includes(candidate.output as string) ||
+    typeof candidate.encode !== 'function' ||
+    typeof candidate.decode !== 'function'
   )
     throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
       cause: new TypeError(StorageContractErrorText.codecDescriptor)
     })
-  return { name, output, encode, decode } as ICodec
 }
 
-/** Applies snapshotCodec's validation for type narrowing; returns void or throws INVALID_ARGUMENT. */
-export function assertCodec(codec: unknown): asserts codec is ICodec {
-  snapshotCodec(codec)
+/**
+ * Captures codec metadata and conversion function identities before callers retain a selected codec
+ * across asynchronous work. Conversion remains with those original functions and no method runs
+ * during admission.
+ */
+export function snapshotCodec(codec: unknown): ICodec {
+  assertCodec(codec)
+  return { name: codec.name, output: codec.output, encode: codec.encode, decode: codec.decode }
 }
