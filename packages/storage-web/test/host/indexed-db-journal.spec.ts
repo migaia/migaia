@@ -14,22 +14,35 @@ describe('native IndexedDB private journal namespaces', () => {
     vi.stubGlobal('navigator', {})
     vi.stubGlobal('BroadcastChannel', undefined)
     try {
-      await using host = await createStorageHost({
-        plugins: [indexedDbBackendPlugin({ keyRange: IDBKeyRange, dbName: 'no-web-locks' })]
-      })
-      const requests = vi.spyOn(IDBDatabase.prototype, 'transaction')
-      try {
-        await expect(
-          storageLogStore(host, 'indexed-db', { prefix: 'history' })
-        ).rejects.toMatchObject({
-          code: 'UNSUPPORTED_CAPABILITY'
-        })
-        expect(requests).not.toHaveBeenCalled()
-      } finally {
-        requests.mockRestore()
+      /** Two valid factory objects can address the same underlying persistent data universe. */
+      const wrapper: IDBFactory = {
+        open: (name, version) => factory.open(name, version),
+        deleteDatabase: (name) => factory.deleteDatabase(name),
+        databases: () => factory.databases(),
+        cmp: (first, second) => factory.cmp(first, second)
       }
-      await host.backend('indexed-db').set('business', 'available')
-      expect(await host.backend('indexed-db').get('business')).toBe('available')
+      for (const injected of [undefined, wrapper]) {
+        await using host = await createStorageHost({
+          plugins: [
+            indexedDbBackendPlugin({
+              factory: injected,
+              keyRange: IDBKeyRange,
+              dbName: 'no-web-locks'
+            })
+          ]
+        })
+        const requests = vi.spyOn(IDBDatabase.prototype, 'transaction')
+        try {
+          await expect(
+            storageLogStore(host, 'indexed-db', { prefix: 'history' })
+          ).rejects.toMatchObject({ code: 'UNSUPPORTED_CAPABILITY' })
+          expect(requests).not.toHaveBeenCalled()
+        } finally {
+          requests.mockRestore()
+        }
+        await host.backend('indexed-db').set('business', 'available')
+        expect(await host.backend('indexed-db').get('business')).toBe('available')
+      }
     } finally {
       vi.unstubAllGlobals()
     }
@@ -38,7 +51,14 @@ describe('native IndexedDB private journal namespaces', () => {
   it('keeps private history across business clear and reopening with isolated orgs and prefixes', async () => {
     const factory = new IDBFactory()
     await using host = await createStorageHost({
-      plugins: [indexedDbBackendPlugin({ factory, keyRange: IDBKeyRange, dbName: 'journal' })]
+      plugins: [
+        indexedDbBackendPlugin({
+          factory,
+          keyRange: IDBKeyRange,
+          dbName: 'journal',
+          journalFactoryIsPrivate: true
+        })
+      ]
     })
     const first = host.org(createOrgId())
     const second = host.org(createOrgId())
@@ -76,7 +96,14 @@ describe('native IndexedDB private journal namespaces', () => {
   it('keeps the committed index unchanged when the actual native transaction aborts', async () => {
     const factory = new IDBFactory()
     await using host = await createStorageHost({
-      plugins: [indexedDbBackendPlugin({ factory, keyRange: IDBKeyRange, dbName: 'abort' })]
+      plugins: [
+        indexedDbBackendPlugin({
+          factory,
+          keyRange: IDBKeyRange,
+          dbName: 'abort',
+          journalFactoryIsPrivate: true
+        })
+      ]
     })
     const log = await storageLogStore(host, 'indexed-db', { prefix: 'history' })
     const notices: unknown[] = []
@@ -112,7 +139,12 @@ describe('native IndexedDB private journal namespaces', () => {
 
   it('uses the original lifetime lease and invalidates cached reads after physical org deletion', async () => {
     const factory = new IDBFactory()
-    const options = { factory, keyRange: IDBKeyRange, dbName: 'exclusive' }
+    const options = {
+      factory,
+      keyRange: IDBKeyRange,
+      dbName: 'exclusive',
+      journalFactoryIsPrivate: true as const
+    }
     const orgId = createOrgId()
     await using host = await createStorageHost({
       org: orgId,

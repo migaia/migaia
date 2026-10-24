@@ -187,6 +187,12 @@ const optionCases = (module: string, plugin: string, id: string): readonly IOpti
 
 /** Native IndexedDB options remain exact inputs to its one preparation path. */
 const indexedDbFields: Readonly<Record<string, IMemberDoc>> = {
+  journalFactoryIsPrivate: {
+    summary: t(
+      'Explicit true only for an injected factory whose data universe is confined to this realm. Without native Web Locks, other factory journal combinations reject before recovery I/O.',
+      '仅为数据宇宙局限当前 realm 的注入 factory 显式声明 true；缺少原生 Web Locks 时其它 factory 日志组合在恢复 I/O 前拒绝。'
+    )
+  },
   dbName: {
     summary: t('Database name used by this installation.', '本次安装使用的数据库名称。'),
     default: t('`storage-web`.', '默认 `storage-web`。')

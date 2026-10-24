@@ -1,5 +1,10 @@
 /** Stable diagnostic text shared by backend, entity, Host and reactive boundaries. */
 export const StorageErrorText = Object.freeze({
+  /** Only an explicit true declaration can authorize realm-local journal index exclusion. */
+  indexedDbJournalFactoryIsolationInvalid: 'journalFactoryIsPrivate must be true or omitted',
+  /** The known shared realm factory cannot be declared private by this optional admission fact. */
+  indexedDbJournalFactoryMustBeInjected:
+    'journalFactoryIsPrivate requires a separate private injected factory',
   /** Native batch keys are a finite caller-provided array captured before issuing requests. */
   storageBatchKeysInvalid: 'storage batch keys must be an array',
   /** Native batch writes capture one key/value entry for every requested position. */

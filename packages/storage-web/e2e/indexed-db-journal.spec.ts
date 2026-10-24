@@ -10,7 +10,7 @@ test('native Web Locks protect a persistent journal index across pages and hand 
   await peer.goto('/')
   try {
     expect(await page.evaluate((name) => window.openIndexedDbJournal(name), dbName)).toBe(0)
-    expect(await peer.evaluate((name) => window.openIndexedDbJournal(name), dbName)).toBe(
+    expect(await peer.evaluate((name) => window.openIndexedDbJournal(name, true), dbName)).toBe(
       'LOCK_REJECTED'
     )
     expect(await page.evaluate(() => window.appendIndexedDbJournal())).toEqual({
@@ -18,7 +18,7 @@ test('native Web Locks protect a persistent journal index across pages and hand 
       lastSeq: 1
     })
     await page.evaluate(() => window.closeIndexedDbJournal())
-    expect(await peer.evaluate((name) => window.openIndexedDbJournal(name), dbName)).toBe(1)
+    expect(await peer.evaluate((name) => window.openIndexedDbJournal(name, true), dbName)).toBe(1)
     expect(await peer.evaluate(() => window.appendIndexedDbJournal())).toEqual({
       appended: [2],
       lastSeq: 2

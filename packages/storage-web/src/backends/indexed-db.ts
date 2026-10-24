@@ -235,6 +235,8 @@ const indexedDbSignalFailure = (
  * acquisition.
  */
 export type IIndexedDbOptions = {
+  /** Declare only a genuinely realm-private injected factory, never a persistent wrapper. */
+  readonly journalFactoryIsPrivate?: true
   /** Database name; defaults to storage-web. */
   readonly dbName?: string
   /** Text-value object store; defaults to kv. */
@@ -624,6 +626,8 @@ export const indexedDbHost = <TValue = unknown>(
   let configuredRecordsStoreName: string | undefined
   let configuredCleanupLegacyRecords: boolean | undefined
   let configuredFactory: IDBFactory | undefined
+  /** Caller declaration never follows from a factory object's identity or wrapper shape. */
+  let journalFactoryIsPrivate: true | undefined
   let configuredKeyRange: typeof IDBKeyRange | undefined
   /** Holder diagnostics are snapshotted independently from mutable caller configuration. */
   let ownerLabel: string
@@ -634,6 +638,9 @@ export const indexedDbHost = <TValue = unknown>(
     configuredRecordsStoreName = options.recordsStoreName
     configuredCleanupLegacyRecords = options.cleanupLegacyRecords
     configuredFactory = options.factory
+    journalFactoryIsPrivate = options.journalFactoryIsPrivate
+    if (journalFactoryIsPrivate !== undefined && journalFactoryIsPrivate !== true)
+      throw new TypeError(StorageErrorText.indexedDbJournalFactoryIsolationInvalid)
     configuredKeyRange = options.keyRange
     /** Read the optional owner and its label only once during this store's construction. */
     const owner = options.owner
@@ -684,6 +691,14 @@ export const indexedDbHost = <TValue = unknown>(
     configuredKeyRange === undefined
       ? (globalThis as { IDBKeyRange?: typeof IDBKeyRange }).IDBKeyRange
       : configuredKeyRange
+  if (
+    journalFactoryIsPrivate === true &&
+    (configuredFactory === undefined || factory === realmDefaultFactory)
+  )
+    throw new StorageError(StorageErrorCode.invalidConfig, {
+      backend: StorageBackend.indexedDb,
+      cause: new TypeError(StorageErrorText.indexedDbJournalFactoryMustBeInjected)
+    })
 
   if (typeof cleanupLegacyRecords !== 'boolean')
     throw new StorageError(StorageErrorCode.invalidConfig, {
@@ -5263,7 +5278,7 @@ export const indexedDbHost = <TValue = unknown>(
           report: (error) => reportCleanupError(coordinationReporter, error),
           nativeAtomic: true,
           indexExclusive:
-            factory === realmDefaultFactory && webLocks === undefined ? false : undefined,
+            webLocks === undefined && journalFactoryIsPrivate !== true ? false : undefined,
           reserve: (hold) =>
             runWithConcurrency(
               {
@@ -5284,7 +5299,7 @@ export const indexedDbHost = <TValue = unknown>(
                     },
                     {
                       attempt: async () => {
-                        if (factory === realmDefaultFactory && webLocks !== undefined) {
+                        if (webLocks !== undefined) {
                           /**
                            * Native Web Locks owns lifetime exclusion; no expiring metadata lease is
                            * substituted.
@@ -5364,6 +5379,7 @@ export const indexedDbHost = <TValue = unknown>(
             recordsStoreName,
             cleanupLegacyRecords,
             factory,
+            journalFactoryIsPrivate,
             keyRange,
             owner: { label: ownerLabel }
           },

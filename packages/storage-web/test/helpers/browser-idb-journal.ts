@@ -12,8 +12,17 @@ let current:
   | undefined
 
 /** Actual native Web Locks must exclude a second page before it can read a cached journal index. */
-async function openIndexedDbJournal(dbName: string): Promise<number | string> {
-  const host = await createStorageHost({ plugins: [indexedDbBackendPlugin({ dbName })] })
+async function openIndexedDbJournal(dbName: string, wrapFactory = false): Promise<number | string> {
+  /** This distinct legal factory object still forwards the exact same persistent browser database. */
+  const factory: IDBFactory | undefined = wrapFactory
+    ? {
+        open: (name, version) => indexedDB.open(name, version),
+        deleteDatabase: (name) => indexedDB.deleteDatabase(name),
+        databases: () => indexedDB.databases(),
+        cmp: (first, second) => indexedDB.cmp(first, second)
+      }
+    : undefined
+  const host = await createStorageHost({ plugins: [indexedDbBackendPlugin({ dbName, factory })] })
   try {
     const log = await storageLogStore(host, 'indexed-db', { prefix: 'history' })
     current = {
