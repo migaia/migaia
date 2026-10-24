@@ -448,7 +448,7 @@ type IQueryNode = {
       }
     | { readonly operation: typeof QueryOperation.topK; readonly count: number }
     | { readonly operation: typeof QueryOperation.minScore; readonly score: number }
-    | IRdfQueryTraversal
+    | (IRdfQueryTraversal & { readonly compile: IFamilyReaderCompiler })
     | {
         readonly operation: typeof QueryOperation.groupBy
         readonly field: string
@@ -1388,6 +1388,12 @@ type IVectorReaderCompiler = (
   ctx: IOperationContext | undefined
 ) => IQueryReader
 
+/** Family nodes install only their declared reader and reuse the original cleanup owner. */
+type IFamilyReaderCompiler = (
+  compiler: IQueryCompileContext,
+  step: IRdfQueryTraversal
+) => IQueryReader
+
 /** Original topK grouping is compiled only by vector nodes and retains the same Map pass. */
 /** Explicit vector reader state shares the original accepted pull and native cursor. */
 type IVectorGroupReaderContext = {
@@ -1498,10 +1504,7 @@ type IQueryProjectionContext = IQueryReaderInput & {
 /** Traversal state borrows one child cursor and original source cleanup callbacks. */
 type IQueryTraversalContext = IQueryReaderInput & {
   readonly owner: IQueryReaderOwner
-  readonly traversal: Extract<
-    IQueryNode['step'],
-    { operation: typeof QueryOperation.follow | typeof QueryOperation.inverse }
-  >
+  readonly traversal: IRdfQueryTraversal
   readonly rdfSource: IQuerySourceSnapshot
   readonly upstreamClose: ICompiledQueryReader['close']
   readonly upstreamReport: ICompiledQueryReader['report']
@@ -1747,6 +1750,31 @@ function closeQueryTraversal(context: IQueryTraversalContext, report: boolean): 
         : () => context.current!.dispose(),
     (report ? context.upstreamReport : context.upstreamClose) ?? (() => Promise.resolve())
   )
+}
+
+/** RDF nodes alone retain traversal execution; record-only consumers never import this reader. */
+function compileQueryTraversal(
+  compiler: IQueryCompileContext,
+  step: IRdfQueryTraversal
+): IQueryReader {
+  if (compiler.source?.rdf === undefined)
+    throw invalidQueryCondition(undefined, StorageContractErrorText.queryArgument)
+  /** A single child cursor belongs to this explicit traversal state. */
+  const context: IQueryTraversalContext = {
+    upstream: compiler.read,
+    ctx: compiler.owner.ctx,
+    owner: compiler.owner,
+    traversal: step,
+    rdfSource: compiler.source,
+    upstreamClose: compiler.close,
+    upstreamReport: compiler.report,
+    current: undefined,
+    opening: undefined,
+    exhausted: false
+  }
+  compiler.close = () => closeQueryTraversal(context, false)
+  compiler.report = () => closeQueryTraversal(context, true)
+  return (advance, scope) => readTraversedQuery(context, advance, scope)
 }
 
 /** Runs this named reader stage with explicit state and the original accepted pull. */
@@ -2007,24 +2035,7 @@ function compileQueryNode(compiler: IQueryCompileContext): IQueryReader {
     return (advance, scope) => readProjectedQuery(context, advance, scope)
   }
   if (step.operation === QueryOperation.follow || step.operation === QueryOperation.inverse) {
-    if (compiler.source?.rdf === undefined)
-      throw invalidQueryCondition(undefined, StorageContractErrorText.queryArgument)
-    /** A single child cursor belongs to this explicit traversal state. */
-    const context: IQueryTraversalContext = {
-      upstream,
-      ctx,
-      owner: compiler.owner,
-      traversal: step,
-      rdfSource: compiler.source,
-      upstreamClose: compiler.close,
-      upstreamReport: compiler.report,
-      current: undefined,
-      opening: undefined,
-      exhausted: false
-    }
-    compiler.close = () => closeQueryTraversal(context, false)
-    compiler.report = () => closeQueryTraversal(context, true)
-    return (advance, scope) => readTraversedQuery(context, advance, scope)
+    return step.compile(compiler, step)
   }
   if (step.operation === QueryOperation.after) {
     /** The original cursor and comparator define keyset admission. */
@@ -2192,6 +2203,11 @@ function nativeQuerySteps(
   steps: readonly IQueryNode['step'][]
 ): readonly (IQueryNativeStep | IRdfQueryTraversal)[] {
   return steps.map((step) => {
+    if (step.operation === QueryOperation.follow || step.operation === QueryOperation.inverse) {
+      /** Native authors receive traversal data only, never the private client reader compiler. */
+      const { compile: _compile, ...traversal } = step
+      return traversal
+    }
     if (step.operation === QueryOperation.after)
       return {
         operation: QueryOperation.after,
@@ -3871,6 +3887,7 @@ class FamilyQueryBranch {
         return this.#append({
           operation: QueryOperation.follow,
           predicate: captured.predicate!,
+          compile: compileQueryTraversal,
           ...(captured.subject === undefined ? {} : { target: captured.subject })
         })
       },
@@ -3879,7 +3896,11 @@ class FamilyQueryBranch {
         const captured = snapshotStorageRdfPattern({ predicate }, undefined)
         if (captured.predicate === undefined)
           throw invalidQueryCondition(undefined, StorageContractErrorText.queryArgument)
-        return this.#append({ operation: QueryOperation.inverse, predicate: captured.predicate! })
+        return this.#append({
+          operation: QueryOperation.inverse,
+          predicate: captured.predicate!,
+          compile: compileQueryTraversal
+        })
       }
     }
   }
