@@ -203,6 +203,10 @@ export const storageQdrantRescoreTypes: ILibraryReference['types'] = {
           '通过一次原生 prefetch 召回并按额外槽评分，然后允许对实际命中继续执行通用 rerank。'
         ),
         params: {
+          this: t(
+            'The original bounded Qdrant vector query; its payload, grouping, explicit-vector and selected Feature states are preserved.',
+            '原有界 Qdrant 向量查询，保留其载荷、分组、显式向量及已选扩展状态。'
+          ),
           options: t(
             'Extra-slot query and optional topN; client predicates run after outer hits without refilling.',
             '额外槽查询与可选 topN，客户端谓词在外层命中后执行且不补搜。'

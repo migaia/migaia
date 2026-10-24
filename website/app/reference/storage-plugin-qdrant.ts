@@ -1,5 +1,10 @@
 import type { ILibraryReference, IText } from './contract.js'
 import { storagePluginQdrantCases } from './storage-plugin-qdrant-cases.js'
+import {
+  storageQdrantRescoreExample,
+  storageQdrantRescoreSymbols,
+  storageQdrantRescoreTypes
+} from './storage-plugin-qdrant-rescore.js'
 /** Bilingual reference follows the actual finite package entries and shared storage contracts. */
 const t = (en: string, zh: string): IText => ({ en, zh })
 /** Native vector semantics remain separate from standard chain and resource ownership. */
@@ -40,6 +45,13 @@ export const storagePluginQdrantReference: ILibraryReference = {
         en: 'Select native multivalue groups; unsupported lookup forwarding is deliberately absent.',
         zh: '选择原生多值分组，明确不提供未被端口真实转发的分组查找选项。'
       }
+    },
+    'features/rescore': {
+      summary: t(
+        'Select an extra native dense or max_sim slot and rescore an existing bounded recall with one Query API call.',
+        '选择额外原生单向量或 max_sim 向量槽，用一次 Query API 对既有有界召回结果精排。'
+      ),
+      example: storageQdrantRescoreExample
     },
     'features/management': {
       summary: {
@@ -242,7 +254,8 @@ export const storagePluginQdrantReference: ILibraryReference = {
         en: 'An exact-kind native Feature installed by qdrantBackendPlugin; no transaction API is added.',
         zh: '返回由后端工厂安装的精确种类原生扩展，不增加事务接口。'
       }
-    }
+    },
+    ...storageQdrantRescoreSymbols
   },
   types: {
     IQdrantOptions: {
@@ -691,7 +704,8 @@ export const storagePluginQdrantReference: ILibraryReference = {
           }
         }
       }
-    }
+    },
+    ...storageQdrantRescoreTypes
   },
   enums: {
     QdrantErrorCode: {
