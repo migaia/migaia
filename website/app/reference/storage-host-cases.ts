@@ -496,6 +496,42 @@ off()`,
       )
     },
     {
+      title: t('Bind a nested extension to its calling org', '把嵌套扩展绑定到调用组织'),
+      problem: t(
+        'A composed API needs its original borrowed backend and org without changing ordinary data extensions.',
+        '组合API需要原借用后端与组织，同时保留普通数据扩展的身份。'
+      ),
+      example: `import { createStorageHost, createOrgId, definePlugin, memoryBackendPlugin, type IStoragePluginCallContext } from '@migaia/storage-host'
+import { kv } from '@migaia/storage-contract'
+
+const composition = definePlugin('composition', (core) => {
+  const memory = core.getPublishedBackend('memory')
+  return {
+    contextualExtensions: ['archive'],
+    install: () => ({
+      archive: {
+        async put(this: IStoragePluginCallContext, value: string) {
+          await this.backend(memory).use(kv).set('title', value)
+          return this.orgId
+        }
+      }
+    })
+  }
+})
+const base = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+const host = await base.use(composition)
+try {
+  const orgId = createOrgId()
+  const org = host.org(orgId)
+  const put = org.extensions.archive.put
+  console.log(await put('draft') === orgId, await org.backend('memory').get('title'))
+} finally { await host.dispose() }`,
+      result: t(
+        'Prints true and draft. Saved own methods keep their original receiver and org, while registration cleanup still rejects later calls.',
+        '输出true和draft。保存的自有方法保持原receiver与组织，原registration清理仍会拒绝后续调用。'
+      )
+    },
+    {
       title: t(
         'Install an application extension with owned cleanup',
         '安装由宿主负责清理的业务扩展'
