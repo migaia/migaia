@@ -1862,6 +1862,16 @@
       "./s3": ["s3ObjectDriver"],
       "./features/presign": ["objectPresignFeature"]
     },
+    "@migaia/storage-plugin-postgres": {
+      ".": ["PostgresErrorCode", "postgresBackendKind", "postgresBackendPlugin"],
+      "./pg": ["pgDriver"],
+      "./postgres-js": ["postgresJsDriver"],
+      "./bun": ["bunSqlDriver"],
+      "./features/pgvector": ["pgvectorFeature"],
+      "./features/listen": ["pgListenFeature"],
+      "./features/copy": ["pgCopyFeature"],
+      "./features/logical-replication": ["pgLogicalReplicationFeature"]
+    },
     "@migaia/storage-plugin-sqlite": {
       ".": [
         "SqliteErrorCode",
