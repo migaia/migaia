@@ -39,6 +39,8 @@ export const RedisSuffix = {
   revisions: 'rev',
   changes: 'changes',
   durableChanges: 'durable-changes',
+  /** Private log metadata never shares business values, clear operations or notifications. */
+  journal: 'journal',
   changeField: 'change',
   locks: 'lock',
   sequence: '$sequence',
@@ -108,6 +110,8 @@ export function createRedisLayout(prefix: string, orgId: string) {
     revisions: tag + ':' + RedisSuffix.revisions,
     changes: tag + ':' + RedisSuffix.changes,
     durableChanges: tag + ':' + RedisSuffix.durableChanges,
+    journal: (namespace: string): string =>
+      tag + ':' + RedisSuffix.journal + ':' + encode(namespace),
     encode,
     decode,
     value: (channel: IRedisChannel, key: IStorageKey): string =>

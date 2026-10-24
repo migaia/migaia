@@ -5573,59 +5573,61 @@ export const indexedDbHost = <TValue = unknown>(
           indexExclusive:
             webLocks === undefined && journalFactoryIsPrivate !== true ? false : undefined,
           reserve: (hold) =>
-            runWithConcurrency(
-              {
-                store,
-                options: { lock: [storageJournalLockKey(prefix, StorageJournalLock.resource)] },
-                policy: ConcurrencyPolicy.fail()
-              },
-              {
-                attempt: (context) =>
-                  coordination.keyPort.attemptMetadata(
-                    context,
-                    {
-                      status: ConcurrencyHolderState.held,
-                      owner: controller.origin,
-                      label: ownerLabel,
-                      scope: 'local',
-                      since: Date.now()
-                    },
-                    {
-                      attempt: async () => {
-                        if (webLocks !== undefined) {
-                          /**
-                           * Native Web Locks owns lifetime exclusion; no expiring metadata lease is
-                           * substituted.
-                           */
-                          const name = encodeFlatStorageKey([
-                            IndexedDbJournalLayout.resource,
-                            dbName,
-                            prefix
-                          ])
-                          await webLocks
-                            .request(
-                              name,
-                              { mode: 'exclusive', ifAvailable: true },
-                              async (lock) => {
-                                if (lock === null)
-                                  throw new StorageContractError(
-                                    StorageContractErrorCode.lockRejected
-                                  )
-                                await hold()
-                              }
-                            )
-                            .catch((cause: unknown) => {
-                              throw normalizeIndexedDbOperationError(cause)
-                            })
-                        } else await hold()
-                        return { status: 'committed', value: undefined }
-                      }
-                    },
-                    runtime.stageBindings.concurrencyStages(construction.store),
-                    controller.closingSignal
-                  )
-              }
-            ),
+            webLocks === undefined && journalFactoryIsPrivate !== true
+              ? hold()
+              : runWithConcurrency(
+                  {
+                    store,
+                    options: { lock: [storageJournalLockKey(prefix, StorageJournalLock.resource)] },
+                    policy: ConcurrencyPolicy.fail()
+                  },
+                  {
+                    attempt: (context) =>
+                      coordination.keyPort.attemptMetadata(
+                        context,
+                        {
+                          status: ConcurrencyHolderState.held,
+                          owner: controller.origin,
+                          label: ownerLabel,
+                          scope: 'local',
+                          since: Date.now()
+                        },
+                        {
+                          attempt: async () => {
+                            if (webLocks !== undefined) {
+                              /**
+                               * Native Web Locks owns lifetime exclusion; no expiring metadata lease is
+                               * substituted.
+                               */
+                              const name = encodeFlatStorageKey([
+                                IndexedDbJournalLayout.resource,
+                                dbName,
+                                prefix
+                              ])
+                              await webLocks
+                                .request(
+                                  name,
+                                  { mode: 'exclusive', ifAvailable: true },
+                                  async (lock) => {
+                                    if (lock === null)
+                                      throw new StorageContractError(
+                                        StorageContractErrorCode.lockRejected
+                                      )
+                                    await hold()
+                                  }
+                                )
+                                .catch((cause: unknown) => {
+                                  throw normalizeIndexedDbOperationError(cause)
+                                })
+                            } else await hold()
+                            return { status: 'committed', value: undefined }
+                          }
+                        },
+                        runtime.stageBindings.concurrencyStages(construction.store),
+                        controller.closingSignal
+                      )
+                  }
+                ),
           authenticate,
           transaction: (work) =>
             withMutationLease((lease) =>

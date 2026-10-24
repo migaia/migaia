@@ -1,0 +1,51 @@
+{
+  "name": "@migaia/storage-plugin-archive",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Explicit record archival over borrowed transactional hot and blob cold storage",
+  "files": [
+    "dist",
+    "README.md",
+    "README.en.md",
+    "USEGUIDE.md",
+    "USEGUIDE.en.md"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "fmt": "oxfmt src test README.md README.en.md USEGUIDE.md USEGUIDE.en.md package.json",
+    "lint": "oxlint src test",
+    "typecheck": "bun check -p tsconfig.json",
+    "typecheck:test": "bun check -p tsconfig.test.json",
+    "build": "node ../../scripts/dist-stamp.mjs clean && vite build && tsc -p tsconfig.json --emitDeclarationOnly && node ../../scripts/dist-stamp.mjs write",
+    "test": "pnpm run build && vitest run"
+  },
+  "dependencies": {
+    "@migaia/lifecycle": "workspace:^",
+    "@migaia/plugin-host": "workspace:^",
+    "@migaia/serialize": "workspace:^",
+    "@migaia/storage-contract": "workspace:^",
+    "@migaia/utils": "workspace:^"
+  },
+  "devDependencies": {
+    "@migaia/storage-plugin-object": "workspace:^",
+    "@migaia/storage-plugin-postgres": "workspace:^",
+    "@migaia/storage-plugin-sqlite": "workspace:^",
+    "@migaia/storage-web": "workspace:^",
+    "@types/pg": "8.23.1",
+    "fake-indexeddb": "6.2.5",
+    "pg": "8.23.1"
+  },
+  "peerDependencies": {
+    "@migaia/storage-host": "workspace:^"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  }
+}

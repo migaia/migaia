@@ -13,3 +13,7 @@ export type {
   ICacheStats,
   ICacheStore
 } from './types.js'
+import './hooks.js'
+export type { ICacheTierHookPayload } from './hooks.js'
+
+export { cachePlugin } from './plugin.js'

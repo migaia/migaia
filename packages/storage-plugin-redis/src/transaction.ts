@@ -57,6 +57,13 @@ export type IRedisHashEntry = {
   deadline: number
   changed: boolean
 }
+/** One fixed private namespace uses native WATCH identity without a business key or channel. */
+export type IRedisJournalHash = {
+  readonly physical: string
+  readonly original: ReadonlyMap<string, Uint8Array>
+  fields: ReadonlyMap<string, Uint8Array>
+  changed: boolean
+}
 /** Binary protocol text is UTF-8; application strings remain with the original JSON codec. */
 const utf8 = new TextEncoder(),
   text = new TextDecoder('utf-8', { fatal: true })
@@ -119,12 +126,15 @@ export class RedisDraft {
   readonly revisions = new Map<string, number>()
   /** Native HASH state belongs to this same transaction draft, never another attempt. */
   readonly hashes = new Map<string, IRedisHashEntry>()
+  /** Journal metadata stays in this same native attempt but never enters business publication. */
+  readonly journalHashes = new Map<string, IRedisJournalHash>()
   /** Historical native Feature keys are deleted by this original WATCH/EXEC plan. */
   readonly nativeRemovals = new Set<string>()
   /** Original native settlement alone delivers these finite commit/zero-write callbacks. */
   readonly terminal = {
     committed: new Set<() => void>(),
     rolledBack: new Set<() => void>(),
+    ended: new Set<() => void>(),
     settled: false
   }
   /** One captured host journal attempt remains attached to this exact native draft. */
@@ -160,6 +170,20 @@ export class RedisDraft {
   /** The shared revision HASH is watched before callbacks can read or write a draft. */
   async start(): Promise<void> {
     await this.send([RedisCommand.watch, this.layout.revisions])
+  }
+  /**
+   * WATCH precedes the original HASH parser, so all private head and record reads share one
+   * baseline.
+   */
+  async journalHash(namespace: string): Promise<IRedisJournalHash> {
+    const physical = this.layout.journal(namespace),
+      existing = this.journalHashes.get(physical)
+    if (existing) return existing
+    await this.send([RedisCommand.watch, physical])
+    const original = readRedisHash(await this.send([RedisCommand.hgetall, physical]))
+    const entry = { physical, original, fields: original, changed: false }
+    this.journalHashes.set(physical, entry)
+    return entry
   }
   /** Every dependent key and its original revision are watched before the first native GET. */
   async load(channel: IRedisChannel, key: IStorageKey): Promise<IRedisDraftEntry> {
@@ -567,6 +591,16 @@ export class RedisDraft {
       await this.send([RedisCommand.watch, physical])
       if (replyInteger(await this.send([RedisCommand.exists, physical])) === 0) return false
     }
+    for (const entry of this.journalHashes.values()) {
+      await this.send([RedisCommand.watch, entry.physical])
+      if (
+        !sameHash(
+          readRedisHash(await this.send([RedisCommand.hgetall, entry.physical])),
+          entry.original
+        )
+      )
+        return false
+    }
     for (const channel of this.ranges)
       await this.send([RedisCommand.watch, this.layout.index(channel)])
     return true
@@ -577,6 +611,21 @@ export class RedisDraft {
       RedisCommand.del,
       physical
     ])
+    for (const entry of this.journalHashes.values()) {
+      if (!entry.changed) continue
+      /** Retain existing history; only this draft's actual field edits enter the native EXEC. */
+      const removed = [...entry.original.keys()].filter((field) => !entry.fields.has(field))
+      const updated = [...entry.fields].flatMap(([field, value]) => {
+        const previous = entry.original.get(field)
+        return previous &&
+          previous.length === value.length &&
+          value.every((byte, index) => byte === previous[index])
+          ? []
+          : [field, text.decode(value)]
+      })
+      if (updated.length) commands.push([RedisCommand.hset, entry.physical, ...updated])
+      if (removed.length) commands.push([RedisCommand.hdel, entry.physical, ...removed])
+    }
     for (const entry of this.entries.values()) {
       if (!entry.changed) continue
       if (

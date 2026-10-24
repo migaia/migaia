@@ -792,6 +792,49 @@ importers:
         specifier: workspace:^
         version: link:../utils
 
+  packages/storage-plugin-archive:
+    dependencies:
+      '@migaia/lifecycle':
+        specifier: workspace:^
+        version: link:../lifecycle
+      '@migaia/plugin-host':
+        specifier: workspace:^
+        version: link:../plugin-host
+      '@migaia/serialize':
+        specifier: workspace:^
+        version: link:../serialize
+      '@migaia/storage-contract':
+        specifier: workspace:^
+        version: link:../storage-contract
+      '@migaia/storage-host':
+        specifier: workspace:^
+        version: link:../storage-host
+      '@migaia/utils':
+        specifier: workspace:^
+        version: link:../utils
+    devDependencies:
+      '@migaia/storage-plugin-object':
+        specifier: workspace:^
+        version: link:../storage-plugin-object
+      '@migaia/storage-plugin-postgres':
+        specifier: workspace:^
+        version: link:../storage-plugin-postgres
+      '@migaia/storage-plugin-sqlite':
+        specifier: workspace:^
+        version: link:../storage-plugin-sqlite
+      '@migaia/storage-web':
+        specifier: workspace:^
+        version: link:../storage-web
+      '@types/pg':
+        specifier: 8.23.1
+        version: 8.23.1
+      fake-indexeddb:
+        specifier: 6.2.5
+        version: 6.2.5
+      pg:
+        specifier: 8.23.1
+        version: 8.23.1
+
   packages/storage-plugin-cache:
     dependencies:
       '@migaia/serialize':
@@ -806,6 +849,28 @@ importers:
       '@migaia/utils':
         specifier: workspace:^
         version: link:../utils
+    devDependencies:
+      '@migaia/storage-plugin-postgres':
+        specifier: workspace:^
+        version: link:../storage-plugin-postgres
+      '@migaia/storage-plugin-qdrant':
+        specifier: workspace:^
+        version: link:../storage-plugin-qdrant
+      '@migaia/storage-plugin-redis':
+        specifier: workspace:^
+        version: link:../storage-plugin-redis
+      '@migaia/storage-plugin-sqlite':
+        specifier: workspace:^
+        version: link:../storage-plugin-sqlite
+      '@types/pg':
+        specifier: 8.23.1
+        version: 8.23.1
+      pg:
+        specifier: 8.23.1
+        version: 8.23.1
+      redis:
+        specifier: 6.3.0
+        version: 6.3.0
 
   packages/storage-plugin-object:
     dependencies:

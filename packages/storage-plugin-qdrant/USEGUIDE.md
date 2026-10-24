@@ -62,3 +62,5 @@ Hybrid 接受恰两个 named dense/sparse prefetch 分支及 `{fusion:'rrf'}`。
 错误域 `storage.backend.qdrant`：原生 4xx 为 `QDRANT_REQUEST_FAILED`；网络/5xx 为 `QDRANT_UNAVAILABLE`；坏响应或意外响应为 `QDRANT_RESPONSE_INVALID`。保留原错误及适配端能取得的全部证据。HTTP 保留完整 status/body；SDK 1.11 的非等待 snapshot 遇到 202 时，自身 `QdrantClientUnexpectedResponseError` 会丢弃 status 并截断文案，适配器报告 response-invalid，但快照可能已接受。HTTP 端口对此返回原生 null。没有自动 fallback 或重放。hooks 只含净化路由、耗时与可取得的 status，不含认证头或正文。
 
 删除与标准推荐通过共享向量输入拥有者捕获稠密字符串 ID 数组；原生请求仍按首次出现去重。删除计数选项复用同一准入，不改变 precount 或 scroll 行为。
+
+SDK 请求发出后，取消不会撤销原生修改；即使调用方随后取消，请求仍可能成功返回。后端释放等待该真实结果，响应丢失时保留结果未知且不自动重放。hooks 的同步异常或异步拒绝仅上报，介入操作使用宿主原 pipeline。

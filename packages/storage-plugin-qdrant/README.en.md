@@ -35,3 +35,5 @@ Only `vector` and vector-target `ttl` are provided. KV, records, RDF, transactio
 Read [USEGUIDE.en.md](./USEGUIDE.en.md) for deletion counts, TTL, organization isolation, detection and failure boundaries.
 
 Deletion and standard recommendation capture dense string ID arrays through the shared vector input owner. Native requests retain first-occurrence ID deduplication. Deletion count options use the same shared admission without changing precount or scroll behavior.
+
+Cancellation after SDK dispatch does not undo a native modification; the request can still return success. Backend disposal waits for that actual result. A lost response leaves the outcome unknown and is never replayed automatically. Synchronous observer errors and rejected observer Promises are only reported; intervention uses the host's original pipeline.

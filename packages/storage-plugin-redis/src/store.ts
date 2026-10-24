@@ -1,5 +1,6 @@
 import { RedisCommand, RedisOperation } from './constants.js'
 import {
+  ConcurrencyPolicy,
   StorageContractErrorCode,
   kv,
   records,
@@ -400,7 +401,8 @@ export function createRedisStore(
     const nativeAttempt = async <R>(
       context: IConcurrencyAttemptContext,
       run: (draft: RedisDraft) => Promise<R>,
-      scopeOwned = false
+      scopeOwned = false,
+      privateJournal = false
     ): Promise<IConcurrencyAttempt<R>> => {
       assertWrite()
       if (
@@ -426,7 +428,7 @@ export function createRedisStore(
             send,
             locks.guard,
             locks.guardVector,
-            ports.journal?.active() === true
+            !privateJournal && ports.journal?.active() === true
           )
         let outcome: IConcurrencyAttempt<R> | undefined,
           primary: unknown,
@@ -611,6 +613,8 @@ export function createRedisStore(
         } catch (error) {
           cleanup.push(error)
         }
+        for (const effect of draft.terminal.ended) observe({ effect }, 'effect')
+        draft.terminal.ended.clear()
         if (cleanup.length !== 0)
           throw redisError(
             RedisErrorCode.failed,
@@ -2128,6 +2132,24 @@ export function createRedisStore(
     const journal = createRedisJournalBinding({
       forOrg: (next) => forOrg(next).journal,
       assertLive: () => controller.assertLive(),
+      controller,
+      report: (error) => reportCleanupError(report, error),
+      run: <R>(work: (draft: RedisDraft) => Promise<R>): Promise<R> => {
+        assertWrite()
+        const release = controller.beginMutation()
+        return runWithConcurrency<R>(
+          {
+            store,
+            options: { signal: controller.closingSignal },
+            policy: ConcurrencyPolicy.optimistic()
+          },
+          { attempt: (context) => nativeAttempt(context, work, true, true) }
+        )
+          .catch((error) => {
+            throw normalizeRedisTransactionFailure(error)
+          })
+          .finally(release)
+      },
       state: (scope) => {
         const binding = scopeDrafts.get(scope),
           info = assertTransactionOwner(binding?.store ?? store, scope)

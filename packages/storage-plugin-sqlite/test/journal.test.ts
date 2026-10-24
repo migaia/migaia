@@ -7,6 +7,7 @@ import {
   undoLog,
   wal,
   memoryLogStore,
+  LogRecordState,
   type ILogStore
 } from '@migaia/logger/plugins/durable'
 import { lockKey, ttl } from '@migaia/storage-contract'
@@ -68,18 +69,59 @@ it('keeps original native log indexes outside business keys and isolates fixed o
 })
 
 it.each([false, true])(
-  'rejects lifetime-cached file indexes without weakening native transactions (wal:%s)',
+  'shares a current journal index across independent file connections (wal:%s)',
   async (wal) => {
-    const { host, store, connection } = await installed({ wal })
-    const rows = connection.prepare('SELECT count(*) AS n FROM migaia_journal').get()!.n
-    await expect(storageLogStore(host, 'sqlite', { prefix: 'file-log' })).rejects.toMatchObject({
-      code: 'UNSUPPORTED_CAPABILITY'
+    const directory = mkdtempSync(join(tmpdir(), 'migaia-sqlite-current-'))
+    const path = join(directory, 'data.sqlite')
+    const org = createOrgId()
+    const firstConnection = nodeSqliteDriver(path)
+    const secondConnection = nodeSqliteDriver(path)
+    const firstHost = await createStorageHost({
+      org,
+      plugins: [sqliteBackendPlugin({ driver: firstConnection, wal })]
     })
-    expect(connection.prepare('SELECT count(*) AS n FROM migaia_journal').get()!.n).toBe(rows)
-    await store.transaction(async (scope) => {
-      await scope.set('business', 'still-supported')
+    const secondHost = await createStorageHost({
+      org,
+      plugins: [sqliteBackendPlugin({ driver: secondConnection, wal })]
     })
-    expect(await store.get('business')).toBe('still-supported')
+    try {
+      const one = await storageLogStore(firstHost, 'sqlite', { prefix: 'current-file' })
+      const two = await storageLogStore(secondHost, 'sqlite', { prefix: 'current-file' })
+      try {
+        const batches = await Promise.all(
+          Array.from({ length: 12 }, (_, i) =>
+            (i % 2 === 0 ? one : two).append([{ kind: 'shared', payload: i }])
+          )
+        )
+        expect(batches.flat().sort((a, b) => a - b)).toEqual(
+          Array.from({ length: 12 }, (_, i) => i + 1)
+        )
+        expect(await one.lastSeq()).toBe(12)
+        expect(await two.states(LogRecordState.pending)).toEqual(
+          Array.from({ length: 12 }, (_, i) => i + 1)
+        )
+        await one.setState(1, LogRecordState.done)
+        expect(await two.states(LogRecordState.pending)).toEqual(
+          Array.from({ length: 11 }, (_, i) => i + 2)
+        )
+        await two.truncate(3)
+        expect((await one.read(1, 20)).map((row) => row.seq)).toEqual(
+          Array.from({ length: 10 }, (_, i) => i + 3)
+        )
+      } finally {
+        await Promise.all([one.dispose(), two.dispose()])
+      }
+      await using reopened = await storageLogStore(firstHost, 'sqlite', { prefix: 'current-file' })
+      expect(await reopened.lastSeq()).toBe(12)
+      expect((await reopened.read(1, 20)).map((row) => row.seq)).toEqual(
+        Array.from({ length: 10 }, (_, i) => i + 3)
+      )
+      expect(await reopened.append([{ kind: 'recovered', payload: null }])).toEqual([13])
+    } finally {
+      await Promise.all([firstHost.dispose(), secondHost.dispose()])
+      await Promise.all([firstConnection.dispose(), secondConnection.dispose()])
+      rmSync(directory, { recursive: true, force: true })
+    }
   }
 )
 

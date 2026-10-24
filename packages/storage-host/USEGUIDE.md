@@ -212,11 +212,11 @@ memory 的 `changes(scope)` 首次调用须在该真实 attempt 的首项业务�
 
 ### 私有日志资源
 
-`storageLogStore(host, id, { prefix })` 仅从 `@migaia/storage-host/journal` 导出。传入真实宿主或固定组织视图及其已安装后端 ID；它不接受 public KV、raw store 或伪造宿主。后端必须提供原私有 journal binding 与可靠独占，打开先完成恢复。同组织与 prefix 同时只允许一个日志句柄；不同组织相互隔离。句柄由原宿主登记接管，调用方也可提前释放。显式日志关闭排空已入 FIFO 的工作；宿主关闭保留原 pipeline 准入，尚未进入后端的工作可能以原 HOST_DISPOSING cause 拒绝，全部已接纳 Promise 仍排空；业务枚举、clear 与容量不触及私有日志。
+`storageLogStore(host, id, { prefix })` 仅从 `@migaia/storage-host/journal` 导出。传入真实宿主或固定组织视图及其已安装后端 ID；它不接受 public KV、raw store 或伪造宿主。后端必须提供原私有 journal binding，以及可靠独占或同操作原子读改写；打开先完成恢复。独占缓存路径同组织与 prefix 只允许一个日志句柄；非独占路径允许多个句柄，由每次原生事务读取当前状态。不同组织相互隔离。句柄由原宿主登记接管，调用方也可提前释放。显式日志关闭排空已入 FIFO 的工作；宿主关闭保留原 pipeline 准入，尚未进入后端的工作可能以原 HOST_DISPOSING cause 拒绝，全部已接纳 Promise 仍排空；业务枚举、clear 与容量不触及私有日志。
 
-namespace 的可选只读事实 `indexExclusive:false` 表示原拥有者不能在整个句柄期保证缓存索引独占；storageLogStore 在恢复 I/O 和索引建立前拒绝并释放该原资源。同一个 namespace 仍可向提交桥提供真实 transactionInfo/terminal，不能用 nativeAtomic 冒充索引独占。省略此事实保持原有绑定语义。
+namespace 的可选只读事实 `indexExclusive:false` 使 storageLogStore 不保留跨操作索引；每次 append、read、lastSeq、states、状态修改与恢复在同一原生事务内读取当前 head/records/states。省略时保留原独占缓存路径。原生事务与 terminal 权限仍归后端；nativeAtomic 独立决定能否组成 atomicBinlog/atomicUndo。可选 namespace view 的 getOrInsert(key, initial) 只在原事务内初始化并锁定缺失 head 行，不授予新提交或关闭权。
 
-追加先捕获原 logger JSON，再沿既有 FIFO 写入记录并最终提交唯一 head；只有真实非空 commit 才更新原 logger 索引并发布一次冻结通知。状态只从 pending 前进到 done/aborted；截断先提交水位再回收物理行，重开保留最高序号与时间，不复用序号。未确认写入使句柄停止准入，必须关闭并重开；恢复忽略未提交记录及状态候选并清理残留，原错误留在 cause。私有记录或载荷损坏统一报 `JOURNAL_RECORD_INVALID`，原 logger 校验错误仍在 cause。无原生事务的私有 namespace 仍可沿同协议工作，但必须由后端提供可靠独占与单键原子 head 写入。当前内置绑定为 memory；host 内部原生追加端口已接同一日志对象与准确组织，复用原 native scope/terminal，绕过普通日志 FIFO；同一事务并发批次分配不同序号，真实 commit 才一次发布，rollback 不发布。后端还须提供可选 `runCommitted(work, committed)`，在原 head lease 释放前将实际结果交给同步发布回调；缺此接点仅不支持该原生追加组合，普通日志照常。其 callback 是提交后观察，错误仅 report，不能假回滚。该端口不从公开 entry 导出；打开日志不自动启用全局 journal，必须由宿主 journal 选项显式选择。
+追加先捕获原 logger JSON，再沿既有 FIFO 写入记录并最终提交唯一 head；只有真实非空 commit 才更新原 logger 索引并发布一次冻结通知。状态只从 pending 前进到 done/aborted；截断先提交水位再回收物理行，重开保留最高序号与时间，不复用序号。未确认写入使句柄停止准入，必须关闭并重开；恢复忽略未提交记录及状态候选并清理残留，原错误留在 cause。私有记录或载荷损坏统一报 `JOURNAL_RECORD_INVALID`，原 logger 校验错误仍在 cause。无原生事务的私有 namespace 仍可沿同协议工作，但必须由后端提供可靠独占与单键原子 head 写入。内置绑定覆盖 memory、SQLite、PostgreSQL、Redis 和 IndexedDB，各自保留原 nativeAtomic 事实；host 内部原生追加端口已接同一日志对象与准确组织，复用原 native scope/terminal，绕过普通日志 FIFO；同一事务并发批次分配不同序号，真实 commit 才一次发布，rollback 不发布。后端还须提供可选 `runCommitted(work, committed)`，在原 head lease 释放前将实际结果交给同步发布回调；缺此接点仅不支持该原生追加组合，普通日志照常。其 callback 是提交后观察，错误仅 report，不能假回滚。该端口不从公开 entry 导出；打开日志不自动启用全局 journal，必须由宿主 journal 选项显式选择。
 
 ```ts
 import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
@@ -265,6 +265,10 @@ PENDING-USER-REVIEW：dropOrg 遇到存活的全局 journal 时，原私有 name
 原生 binding 可声明 `requiresIndexedDbUndo?: true`，原 descriptor 快照单读并冻结该事实。当借用 logger 含 undo 时，同一配置拥有者要求 `indexedDbUndo: true`，缺省或 false 在打开原生终点前报 UNSUPPORTED_CAPABILITY。其它后端 binding 保持原缺省语义，仅 binlog 或仅遥测的配置不要求 undo 选择。
 
 原生作者的 `core.emit` 在宿主 closing 期间跳过可选诊断，且不执行延迟 payload 工厂，避免用 HOST_DISPOSING 替换已准入原生操作的结算结果。open 期间仍复用原 registration 检查和原事件通道；完全 closed 或失效 registration 的旧句柄继续拒绝。宿主关闭事件本身仍由原宿主拥有者发布。
+
+普通插件返回嵌套API对象时，可在descriptor声明contextualExtensions: ['archive']，只让这些顶层键的一层自有方法取得原IStoragePluginCallContext。方法保原receiver和Promise身份并复用原registration guard；未选择的数据对象保持原身份。列表在安装前单次复制，所选API只接受自有数据属性，不递归投影或授予关闭权。
+
+普通组合插件的安装窗同样可用原createChangeController，并在运行时读取原getOrgContext的execution。controller由原onDispose释放；真实工作settle后才释放beginMutation，取消不把外部未完成I/O伪装成已排空。
 
 文本后端作者可在原 `journalBinding` 提供可选 `redo: IStorageJournalRedoBinding`：`transactionInfo` 认证原 text-only scope，`changes` 捕获同一 draft，`protect` 委托原物理保护，`apply` 同步应用已准备 draft，`replay` 按原完整镜像恢复，`seal` 在不确定应用/完成后停准入。可选 `core.journal.beginRedo(scope)` / `runRedo(work, signal?)` 将原 attempt 取消信号交原物理锁，并在同一保护内恢复当前原 WAL pending 后执行原操作；不增加 FIFO、提交权或 nativeAtomic 保证。原 WAL 与 redo 共用 target/镜像解析。选择该路径须 `redoWal === logger.wal`，所有参与者借用同一个真实、可见最新 pending 的原对象；仅同名目标或分别创建的缓存不能证明共享。该对象选择不授予私有日志权限。undo 与 atomicBinlog/atomicUndo 的非原生组合仍在业务前拒绝；具体 Web 适配接线与跨页面证据单独验收。
 

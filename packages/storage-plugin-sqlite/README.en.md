@@ -140,9 +140,7 @@ Use `storageLogStore(host, 'sqlite', { prefix })` from
 `@migaia/storage-host/journal` for native logs. A caller-owned memory connection
 reserves that log namespace through the original process lock. Private rows stay
 outside business keys and business clear operations; dispose the log to reopen the
-same prefix. File connections cannot guarantee exclusivity for a cached index's
-entire lifetime, so that combination raises `UNSUPPORTED_CAPABILITY` before
-reading log rows. Ordinary native file transactions remain available.
+same prefix. File connections use indexExclusive:false without a cross-operation index. Each log operation reads current head, records and states inside the existing BEGIN IMMEDIATE transaction, so independent connections can share that namespace.
 
 ## Maintenance
 
@@ -188,7 +186,7 @@ rows actually returned.
 
 Global `journal` configuration records each native mutation in its actual order, including repeated writes. SQLite keeps complete raw values and absolute deadlines in the original transaction; undo uses the original locked transaction and checks every complete revision and after-image before restoring any value. External binlog and undo can use the existing WAL; recovery checks a marker committed with the data and never replays a committed mutation. File WAL revision rows retain an immutable birth, so dropping and recreating an organization cannot make an old undo valid again. With `wal: false`, revision identity remains local to the original live group; a reopened group rejects old undo images. Metadata writes advance their original private guard without becoming business log entries.
 
-An in-memory connection can host native binlog and undo stores through the initializer's `storageLogStore`. File cached log indexes still reject; use an external logger for file data. Raw SQL has no complete shared image target and rejects before native execution while commit journaling is active. Global journal configuration installs the host's existing asynchronous pipeline boundary, so synchronous entries report `ASYNC_STAGE_IN_SYNC_ENTRY`; ordinary hosts retain their synchronous API. The logger and its stores stay caller-owned. Host journal errors such as `UNDO_CONFLICT` retain their original source and cause.
+Both memory and file connections can open native logs through the initializer's `storageLogStore`. File operations read their current index inside each native transaction rather than retaining cross-operation state. Raw SQL has no complete shared image target and rejects before native execution while commit journaling is active. Global journal configuration installs the host's existing asynchronous pipeline boundary, so synchronous entries report `ASYNC_STAGE_IN_SYNC_ENTRY`; ordinary hosts retain their synchronous API. The logger and its stores stay caller-owned. Host journal errors such as `UNDO_CONFLICT` retain their original source and cause.
 
 With global journal telemetry enabled, each asynchronous root operation or complete transaction emits one storage event using its actual native key observations. Short transaction operations and private journal or metadata work emit no duplicate business events. The original concurrency loop still owns retries.
 

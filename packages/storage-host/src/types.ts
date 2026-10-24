@@ -385,6 +385,8 @@ export type IStorageNativePluginDescriptor<
   S extends IStorageBase = IStorageBase
 > = {
   readonly kind?: K
+  /** Opt selected top-level API objects into one-level org binding; ordinary data stays unchanged. */
+  readonly contextualExtensions?: readonly string[]
   install?():
     | (object & ThisType<IStoragePluginCallContext>)
     | PromiseLike<object & ThisType<IStoragePluginCallContext>>
@@ -395,14 +397,28 @@ export type IStorageNativePluginDescriptor<
   journalBinding?(store: S): import('./journal/types.js').IStorageJournalBackendBinding
 }
 export declare const storageBackendPluginExtensionsBrand: unique symbol
-export type IStorageNativePluginExtensions<D extends IStorageNativePluginDescriptor> = (D extends {
-  readonly install?: () => infer R
+/** Only explicitly selected finite API objects omit the host-supplied method receiver. */
+type IStorageContextualExtensions<D, E> = {
+  [K in keyof E]: D extends { readonly contextualExtensions: readonly string[] }
+    ? K extends D['contextualExtensions'][number]
+      ? E[K] extends object
+        ? { [M in keyof E[K]]: OmitThisParameter<E[K][M]> }
+        : E[K]
+      : E[K]
+    : E[K]
 }
-  ? Awaited<R> extends object
-    ? Awaited<R>
-    : {}
-  : {}) &
-  (D extends { readonly expose?: () => infer R } ? (R extends object ? R : {}) : {})
+export type IStorageNativePluginExtensions<D extends IStorageNativePluginDescriptor> =
+  IStorageContextualExtensions<
+    D,
+    (D extends {
+      readonly install?: () => infer R
+    }
+      ? Awaited<R> extends object
+        ? Awaited<R>
+        : {}
+      : {}) &
+      (D extends { readonly expose?: () => infer R } ? (R extends object ? R : {}) : {})
+  >
 type IStoragePluginExtensionCarrier<P> = P extends {
   readonly [storageBackendPluginExtensionsBrand]: infer E extends object
 }
@@ -710,6 +726,8 @@ export type IStorageDefinePlugin = {
         | 'emit'
         | 'registerDetect'
         | 'getPublishedBackend'
+        | 'createChangeController'
+        | 'getOrgContext'
       > & { readonly features: IFeatureOutputs<F> }
     ) => IStorageNativePluginDescriptor & { readonly kind?: never },
     const F extends IFeatureRecord = {}

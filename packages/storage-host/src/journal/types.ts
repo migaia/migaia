@@ -76,6 +76,8 @@ export type IStorageJournalExecutionPort = {
 /** Private strings belong to the original backend, outside business keys, clear and notifications. */
 export type IStorageJournalNamespaceView = {
   get(key: Parameters<IKeyValueApi['get']>[0]): ReturnType<IKeyValueApi['get']>
+  /** Atomically bootstrap and lock an absent head row inside the original native transaction. */
+  getOrInsert?(key: string, initial: string): Promise<string>
   has(key: Parameters<IKeyValueApi['has']>[0]): ReturnType<IKeyValueApi['has']>
   set(
     key: Parameters<IKeyValueApi['set']>[0],
