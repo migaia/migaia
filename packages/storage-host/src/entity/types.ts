@@ -10,6 +10,7 @@ import type {
   IQueryConditions,
   IQueryCursor,
   IQueryResult,
+  IQueryWatch,
   IChainMethodsOf,
   ICodecStageObserver,
   IQueryStageObserver
@@ -385,6 +386,22 @@ export type IEntityQueryFinal<
   C extends IOperationContext | undefined = IOperationContext,
   A extends object = {}
 > = IQueryResult<R, C, true, A>
+/** Only a root backed by the actual native record feed advertises its original invalidation watcher. */
+export type IEntityQueryAccess<
+  T,
+  X extends Readonly<Record<string, IStorageKey>> = Readonly<Record<never, IStorageKey>>,
+  C extends IOperationContext | undefined = IOperationContext,
+  F extends boolean = false,
+  A extends object = {}
+> = {
+  query(): IEntityQuery<
+    T,
+    X,
+    C,
+    A & (F extends true ? (C extends undefined ? {} : IQueryWatch<C>) : {})
+  >
+}
+
 /** Explicit observation ports are borrowed from the original installed host, without owning it. */
 export type IEntityConnectOptions = Readonly<{
   codecStages?: ICodecStageObserver
@@ -399,8 +416,7 @@ export type IEntityTransactionScope<
   TDomain,
   TIndexes extends Readonly<Record<string, IStorageKey>> = Readonly<Record<never, IStorageKey>>,
   TAugmentMethods extends object = {}
-> = {
-  query(): IEntityQuery<TDomain, TIndexes, undefined, TAugmentMethods>
+> = IEntityQueryAccess<TDomain, TIndexes, undefined, false, TAugmentMethods> & {
   /** Read and materialize one entity value within this transaction. */
   get(id: IStorageKey): Promise<TDomain | undefined>
   /** Validate/normalize/encode and stage a value under its resulting primary key. */
@@ -418,10 +434,9 @@ export type IEntityTransactionScope<
 export type IRepository<
   TDomain,
   TIndexes extends Readonly<Record<string, IStorageKey>> = Readonly<Record<never, IStorageKey>>,
-  _TChangeFeed extends boolean = false,
+  TChangeFeed extends boolean = false,
   TAugmentMethods extends object = {}
-> = {
-  query(): IEntityQuery<TDomain, TIndexes, IOperationContext, TAugmentMethods>
+> = IEntityQueryAccess<TDomain, TIndexes, IOperationContext, TChangeFeed, TAugmentMethods> & {
   /**
    * Read one domain value or undefined; older envelopes migrate in memory without implicit
    * writeback.

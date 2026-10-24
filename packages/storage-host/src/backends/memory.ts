@@ -227,6 +227,8 @@ type IMemoryScope<T> = ITransactionScope<
 /** The original store retains the concrete complete native transaction view. */
 type IMemoryBase<T> = Omit<ISyncCapableStore<IRecordStore<T>>, 'transaction'> &
   IChangeFeedStore & {
+    /** The original native source already provides record, vector and RDF invalidation watchers. */
+    readonly capabilities: IRecordStore<T>['capabilities'] & { readonly changeFeed: true }
     transaction<R>(
       run: (scope: IMemoryScope<T>) => R,
       options?: ITransactionOptions
