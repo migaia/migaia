@@ -15,7 +15,7 @@ import {
   type ISecondaryIndexRecordStore
 } from '@migaia/storage-contract'
 import { compareStorageKeys, encodeOrderedStorageKey } from '../authoring/key.js'
-import { createRecordQuery } from '../authoring/query.js'
+import { createRecordQueryWithoutKeyset } from '../authoring/query.js'
 
 import {
   StorageError,
@@ -424,7 +424,7 @@ export class EntityIndexesOwner<
         backend: this.#context.store.backend,
         cause: new TypeError(EntityText.comparatorLimit)
       })
-    const source = createRecordQuery<IMatch<TDomain>>({
+    const source = createRecordQueryWithoutKeyset<IMatch<TDomain>>({
       asyncDisposeKey,
       pushdown: { source: EntityState.querySource, operations: [], operators: [] },
       execute: () => this.indexRows(snapshot, ctx, readView, comparator === undefined, onRead)
@@ -533,7 +533,7 @@ export class EntityIndexesOwner<
     let matched = 0
     const runtime = createStorageOperationRuntime()
     /** One source scan caps its diagnostic count while the original heap retains one result. */
-    const source = createRecordQuery<IMatch<TDomain>>({
+    const source = createRecordQueryWithoutKeyset<IMatch<TDomain>>({
       asyncDisposeKey,
       pushdown: { source: EntityState.querySource, operations: [], operators: [] },
       execute: () =>

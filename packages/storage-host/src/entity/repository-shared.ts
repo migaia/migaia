@@ -25,7 +25,7 @@ import { assertTransactionOwner } from '../authoring/transaction.js'
 
 import { StorageError, StorageErrorCode } from '../errors.js'
 
-import { isStorageKeyInRange } from '../core/query.js'
+import { isStorageKeyInRange } from '../core/query-state.js'
 import { normalizeError as normalizeStorageError } from '../core/error-family.js'
 import {
   createStorageOperationRuntime,

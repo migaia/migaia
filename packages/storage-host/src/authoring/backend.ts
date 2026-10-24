@@ -17,7 +17,7 @@ export {
   snapshotKeyRange,
   assertKeyRange
 } from '../core/key-domain.js'
-export { isStorageKeyInRange } from '../core/query.js'
+export { isStorageKeyInRange } from '../core/query-state.js'
 export { safeJsonPayloadByteLength } from '../core/json.js'
 export { createStorageToken } from '../core/storage-token.js'
 export { resolveStorageNamespace } from '../core/namespace.js'

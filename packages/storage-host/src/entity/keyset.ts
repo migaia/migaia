@@ -1,8 +1,11 @@
+import { createRecordQuery } from '../authoring/query.js'
 import { EntityFeatureName } from './constants.js'
 import type { IEntityFeature } from './assembly.js'
 
 /** Keyset assembly delegates page and cursor work to the original canonical query owner. */
 class EntityKeysetOwner {
+  /** Selecting this unit is the sole entity path retaining the canonical pagination engine. */
+  readonly query = createRecordQuery
   /** Keep canonical cursor, failure and resource identity while admitting explicitly assembled use. */
   run = <R>(invoke: () => R): R => invoke()
 }
