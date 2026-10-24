@@ -13,6 +13,8 @@ export const PgNames = {
   markers: 'commit_markers',
   /** Private evidence is written beside business data before the same actual COMMIT. */
   markerValue: '1',
+  /** External WAL evidence outlives the separate short-lived lost-COMMIT acknowledgement marker. */
+  journalMarkerNamespace: 'storage.journal.commit',
   vectorConfiguration: 'vector_config',
   /** Global physical collection schema is not a business org and cannot be deleted by dropOrg. */
   vectorConfigurationOwner: '00000000-0000-0000-0000-000000000000',

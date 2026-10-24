@@ -4,7 +4,7 @@ import postgres from 'postgres'
 import { it, expect, onTestFinished, describe } from 'vitest'
 import { createStorageHost } from '@migaia/storage-host'
 import { Logger } from '@migaia/logger'
-import { binlog, memoryLogStore } from '@migaia/logger/plugins/durable'
+import { binlog, wal, memoryLogStore } from '@migaia/logger/plugins/durable'
 import { kv, vector, ttl, lockKey } from '@migaia/storage-contract'
 import { deferred } from '@migaia/utils/promise'
 import { walkErrorCauses } from '@migaia/utils/error'
@@ -28,6 +28,72 @@ if (!connectionString)
   throw new Error('Run through scripts/storage-services.mts run -- to provide PostgreSQL')
 
 describe.each(['pg', 'postgres-js'] as const)('%s original global journal', (adapter) => {
+  it('recovers original external WAL after an append failure without losing native commit evidence', async () => {
+    const pool = new Pool({ connectionString })
+    const client = postgres(connectionString!, { max: 8 })
+    const driver = adapter === 'pg' ? pgDriver(pool) : postgresJsDriver(client)
+    const logger = new Logger({
+      ...loggerOptions,
+      plugins: [binlog({ store: memoryLogStore() }), wal({ store: memoryLogStore() })]
+    })
+    let fail = true
+    const original = new Error('external WAL append after native commit')
+    const reports: unknown[] = []
+    const borrowed = {
+      ...logger,
+      wal: logger.wal,
+      binlog: {
+        ...logger.binlog,
+        append: async (...args: Parameters<typeof logger.binlog.append>) => {
+          if (fail) throw original
+          return logger.binlog.append(...args)
+        }
+      }
+    }
+    const prefix = 'pg_wal_' + randomUUID().slice(0, 8)
+    const org = randomUUID()
+    const open = () =>
+      createStorageHost({
+        org,
+        plugins: [postgresBackendPlugin({ driver, prefix })] as const,
+        journal: { logger: borrowed, namespace: 'external-wal' },
+        report: (error) => {
+          reports.push(error)
+        }
+      })
+    let host = await open()
+    onTestFinished(async () => {
+      await host.dispose()
+      await logger.shutdown('manual')
+      await pool.end()
+      await client.end()
+    })
+    await host.backend('postgres').set('key', 'committed')
+    expect(await host.backend('postgres').get('key')).toBe('committed')
+    expect(await logger.binlog.read(1)).toEqual([])
+    expect(await logger.wal.pending()).toHaveLength(1)
+    expect(reports).toEqual([original])
+    expect((await pool.query('SELECT key FROM ' + prefix + '_commit_markers')).rows).toHaveLength(1)
+    await host.dispose()
+    fail = false
+    host = await open()
+    expect(await host.backend('postgres').get('key')).toBe('committed')
+    expect(await logger.binlog.read(1)).toHaveLength(1)
+    expect(await logger.wal.pending()).toEqual([])
+    expect((await pool.query('SELECT key FROM ' + prefix + '_commit_markers')).rows).toEqual([])
+    await host.backend('postgres').set('next', 'success')
+    expect(await logger.binlog.read(1)).toHaveLength(2)
+    expect(await logger.wal.pending()).toEqual([])
+    await expect(
+      host.backend('postgres').transaction(async (scope) => {
+        await scope.set('rolled-back', 'draft')
+        throw original
+      })
+    ).rejects.toMatchObject({ code: 'TRANSACTION_FAILED', cause: original })
+    expect(await host.backend('postgres').get('rolled-back')).toBeNull()
+    expect(await logger.binlog.read(1)).toHaveLength(2)
+    expect(await logger.wal.pending()).toEqual([])
+  })
   it('captures exact native changes once and appends only after the real original COMMIT', async () => {
     const pool = new Pool({ connectionString })
     const client = postgres(connectionString!, { max: 8 })

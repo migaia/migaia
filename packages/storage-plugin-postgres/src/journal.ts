@@ -308,6 +308,7 @@ export function createPgJournalBinding(options: {
     return stateFor(scope)
   }
   return {
+    externalWal: true,
     openNamespace: async (prefix): Promise<IStorageJournalNamespace> => {
       controller.assertLive()
       if (typeof prefix !== 'string' || prefix.length === 0) throw invalidArgument()
@@ -489,7 +490,7 @@ export function createPgJournalBinding(options: {
           'INSERT INTO ' +
             tables.markers +
             ' (org_id,key,value) VALUES($1,$2,$3) ON CONFLICT(org_id,key) DO NOTHING',
-          [orgId, txId, PgNames.markerValue],
+          [orgId, pgKey([PgNames.journalMarkerNamespace, txId]).hex, PgNames.markerValue],
           state.ctx
         )
       }),
@@ -497,13 +498,13 @@ export function createPgJournalBinding(options: {
       (
         await options.configuration.driver.query(
           'SELECT value FROM ' + tables.markers + ' WHERE org_id=$1 AND key=$2',
-          [orgId, txId]
+          [orgId, pgKey([PgNames.journalMarkerNamespace, txId]).hex]
         )
       ).rows[0]?.value === PgNames.markerValue,
     removeCommitMarker: async (txId) => {
       await options.configuration.driver.query(
         'DELETE FROM ' + tables.markers + ' WHERE org_id=$1 AND key=$2',
-        [orgId, txId]
+        [orgId, pgKey([PgNames.journalMarkerNamespace, txId]).hex]
       )
     }
   }

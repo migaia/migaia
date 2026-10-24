@@ -75,6 +75,6 @@ const driver = bunSqlDriver(client)
 
 全局 `journal: { logger, namespace, binlogValues: true }` 可借用原 logger 的外置 binlog：本包在原事务内捕获 text/bytes/record/托管 vector 的实际改动和完整期限，真实 COMMIT 后才 append，并等待原 append 结算。外置 append 失败经宿主报告与 `onBinlogAppendError` 观察，不能撤回已经提交的数据；不承诺外置日志与数据原子提交。选用完整镜像时，原生 SQL/COPY/调用者向量表在业务查询或拉取 source 前拒绝。
 
-PostgreSQL 当前有限键租约不能证明日志句柄整个资源期的独占。`storageLogStore`、依赖它的 `atomicBinlog`/`atomicUndo` 组合以 `UNSUPPORTED_CAPABILITY` 在缓存索引与私有 I/O 前拒绝，等待可靠原 namespace reservation 接点；此项为待用户复核的最小隔离。私有 namespace 保留真实同连接 I/O、原 scope 身份和 terminal 回调，不持 BEGIN 到句柄释放，不另建续租器。WAL/telemetry 当前仍沿共享 journal owner 的明确不支持边界。
+PostgreSQL 当前有限键租约不能证明日志句柄整个资源期的独占。`storageLogStore`、依赖它的 `atomicBinlog`/`atomicUndo` 组合以 `UNSUPPORTED_CAPABILITY` 在缓存索引与私有 I/O 前拒绝，等待可靠原 namespace reservation 接点；此项为待用户复核的最小隔离。私有 namespace 保留真实同连接 I/O、原 scope 身份和 terminal 回调，不持 BEGIN 到句柄释放，不另建续租器。借用同一 logger 的外置 WAL 时，原共享 owner 先 await intent，再在同一 PG 事务写入独立命名的 commit marker；真实提交后 append/complete，失败保留 intent 与 marker，重开沿原 owner 恢复。此 marker 与 lost-COMMIT 短期证据复用同一私有表但身份不同，正常事务清理不会误删恢复证据。外置 undo 尚待共享 owner 接点；telemetry 仍保原边界。
 
 每次原生提交先写同事务 marker。COMMIT 应答丢失后仅在原 marker 可见时认定已提交；缺失或读取失败不证明零写，本包封闭原物理 controller，保留原错误链且不盲重放。正常结算后删除该 marker；清理失败只报告并保留证据。
