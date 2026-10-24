@@ -1,16 +1,19 @@
-import { afterAll, describe, expect, it } from 'vitest'
+import { afterAll, describe, expect, it, vi } from 'vitest'
 import { createClientPool } from 'redis'
-import { Logger } from '@migaia/logger'
+import { Logger, type ILogEntry } from '@migaia/logger'
+import { level } from '@migaia/logger/plugins'
 import { binlog, memoryLogStore, undoLog, wal } from '@migaia/logger/plugins/durable'
 import { walkErrorCauses } from '@migaia/utils/error'
 import { deferred } from '@migaia/utils/promise'
 import { createStorageHost, createOrgId } from '@migaia/storage-host'
 import { storageLogStore } from '@migaia/storage-host/journal'
 import { encodeFlatStorageKey } from '@migaia/storage-host/authoring/backend'
-import { ttl, vector } from '@migaia/storage-contract'
+import { ConcurrencyPolicy, kv, lockKey, ttl, vector } from '@migaia/storage-contract'
 import { redisBackendPlugin, type IRedisDriver } from '../src/index.js'
 import { nodeRedisDriver } from '../src/adapters/node-redis.js'
 import { rediSearchVectorFeature } from '../src/features/search.js'
+import { redisStreamsFeature } from '../src/features/streams.js'
+import { redisPubSubFeature } from '../src/features/pubsub.js'
 import { createRedisLayout, decodeRedisValue } from '../src/layout.js'
 
 /** Real logger plugins retain their own durable owner and remain borrowed by storage. */
@@ -64,6 +67,122 @@ for (const service of [
           } while (cursor !== '0')
         }
         await pool.close()
+      }
+    })
+    it('observes one public endpoint across native retries with canonical keys and fixed org', async () => {
+      await connect()
+      const prefix = crypto.randomUUID(),
+        entries: ILogEntry[] = [],
+        logger = new Logger({ ...loggerOptions, plugins: [level()] }),
+        entered = deferred<void>(),
+        resume = deferred<void>()
+      namespaces.push(prefix)
+      logger.useSink((entry) => {
+        entries.push(entry)
+      })
+      const host = await createStorageHost({
+        plugins: [
+          redisBackendPlugin(
+            { driver, prefix },
+            {
+              streams: redisStreamsFeature(),
+              pubsub: redisPubSubFeature()
+            }
+          )
+        ] as const,
+        journal: { logger, namespace: 'telemetry', telemetry: true }
+      })
+      try {
+        const store = host.backend('redis')
+        await store.set('value', 'initial')
+        expect(entries).toHaveLength(1)
+        expect(entries[0]).toMatchObject({
+          message: 'set',
+          meta: {
+            keys: expect.arrayContaining([lockKey.text('value')]),
+            payload: { key: 'value', value: 'initial' },
+            outcome: 'success'
+          }
+        })
+        await store.get('value')
+        expect(entries[1]!.meta!.keys).toEqual([lockKey.text('value')])
+        await store.use(kv).getMany(['value', 'absent'])
+        expect(entries[2]!.meta!.keys).toEqual([lockKey.text('value'), lockKey.text('absent')])
+        entries.length = 0
+        let calls = 0
+        const pending = store.transaction(
+          async (scope) => {
+            calls++
+            const value = await scope.get('value')
+            if (calls === 1) {
+              entered.resolve()
+              await resume.promise
+            }
+            await scope.set('value', value + ':transaction')
+          },
+          { concurrency: ConcurrencyPolicy.optimistic({ retries: 1, backoffMs: 0 }) }
+        )
+        await entered.promise
+        await store.set('value', 'concurrent')
+        resume.resolve()
+        await pending
+        expect(calls).toBe(2)
+        expect(entries.map((entry) => entry.message)).toEqual(['set', 'transaction'])
+        expect(entries[1]!.meta).toMatchObject({
+          keys: expect.arrayContaining([lockKey.text('value')]),
+          outcome: 'success'
+        })
+        entries.length = 0
+        const original = new RangeError('original telemetry callback failure')
+        await expect(
+          store.transaction(async (scope) => {
+            await scope.get('value')
+            throw original
+          })
+        ).rejects.toBe(original)
+        expect(entries).toHaveLength(1)
+        expect(entries[0]!.meta).toMatchObject({ outcome: 'error', code: 'TRANSACTION_FAILED' })
+        expect(entries[0]!.args[0]).toBe(original)
+        entries.length = 0
+        const orgId = createOrgId(),
+          peer = host.org(orgId).backend('redis')
+        await peer.set('value', 'org')
+        const extracted = peer.get
+        expect(await extracted('value')).toBe('org')
+        expect(entries).toHaveLength(2)
+        expect(entries.every((entry) => entry.meta!.orgId === orgId)).toBe(true)
+        entries.length = 0
+        const readOnlyOrg = createOrgId()
+        expect(await host.org(readOnlyOrg).backend('redis').get('absent')).toBeNull()
+        expect(entries).toHaveLength(1)
+        expect(entries[0]).toMatchObject({
+          message: 'get',
+          meta: { orgId: readOnlyOrg, keys: [lockKey.text('absent')], outcome: 'success' }
+        })
+        entries.length = 0
+        const nativeOrg = createOrgId()
+        expect(await host.org(nativeOrg).backend('redis').api.streams.range('jobs')).toEqual([])
+        expect(entries).toHaveLength(1)
+        expect(entries[0]).toMatchObject({
+          message: 'streams.range',
+          meta: { orgId: nativeOrg, keys: [], outcome: 'success' }
+        })
+        entries.length = 0
+        const resourceOrg = createOrgId(),
+          subscription = await host
+            .org(resourceOrg)
+            .backend('redis')
+            .api.pubsub.subscribe('events', () => undefined)
+        await subscription.dispose()
+        expect(entries).toHaveLength(1)
+        expect(entries[0]).toMatchObject({
+          message: 'pubsub.subscribe',
+          meta: { orgId: resourceOrg, keys: [], outcome: 'success' }
+        })
+      } finally {
+        resume.resolve()
+        await host.dispose()
+        await logger.shutdown('manual')
       }
     })
     it('publishes actual final drafts per org only after full EXEC and awaits external settle', async () => {
@@ -160,11 +279,18 @@ for (const service of [
         expect(await store.get('wait')).toBe('native-committed')
         resume.resolve()
         await pending
-        const before = await driver.command(['DBSIZE'])
-        await expect(storageLogStore(host, 'redis', { prefix: 'cached' })).rejects.toMatchObject({
-          code: 'UNSUPPORTED_CAPABILITY'
-        })
-        expect(await driver.command(['DBSIZE'])).toBe(before)
+        const command = vi.spyOn(driver, 'command'),
+          lease = vi.spyOn(driver, 'withConnection')
+        try {
+          await expect(storageLogStore(host, 'redis', { prefix: 'cached' })).rejects.toMatchObject({
+            code: 'UNSUPPORTED_CAPABILITY'
+          })
+          expect(command).not.toHaveBeenCalled()
+          expect(lease).not.toHaveBeenCalled()
+        } finally {
+          command.mockRestore()
+          lease.mockRestore()
+        }
       } finally {
         resume.resolve()
         await host.dispose()

@@ -339,17 +339,21 @@ export function createRedisStore(
       ctx: IOperationContext | undefined,
       scope: object | undefined,
       run: (input: I) => Promise<R>,
-      count?: number
+      count?: number,
+      keys?: () => readonly ILockKey[],
+      internal?: true
     ): Promise<R> => {
       const execute = () =>
-        ports.execution.run<I, R>({ operation: name, input, ctx, scope }, (actual) =>
-          observeStorageBatch(
-            scope ? operations().forTransaction(scope) : operations(),
-            core.featureExpose.getScheduler(),
-            name,
-            count,
-            () => run(actual)
-          )
+        ports.execution.run<I, R>(
+          { operation: name, input, ctx, scope, internal, keys },
+          (actual) =>
+            observeStorageBatch(
+              scope ? operations().forTransaction(scope) : operations(),
+              core.featureExpose.getScheduler(),
+              name,
+              count,
+              () => run(actual)
+            )
         )
       return execute().catch((error) => {
         throw extensionFailure(error, name)
@@ -361,12 +365,15 @@ export function createRedisStore(
       input: I,
       ctx: IOperationContext | undefined,
       run: (input: I, send: (args: readonly string[]) => Promise<unknown>) => Promise<R>,
-      count?: number
+      count?: number,
+      keys?: () => readonly ILockKey[]
     ): Promise<R> => {
       controller.assertLive()
       const finish = controller.beginMutation()
-      return withAbort(ctx, async (signal, captured) =>
-        operate(
+      return withAbort(ctx, async (signal, captured) => {
+        // A fresh org resolves its original once-only configuration inside this existing budget.
+        if (ports.journal !== undefined) await ports.journal.prepare()
+        return operate(
           name,
           input,
           captured,
@@ -381,9 +388,10 @@ export function createRedisStore(
               })
             )
           },
-          count
+          count,
+          keys
         )
-      ).finally(finish)
+      }).finally(finish)
     }
     /**
      * The complete original native attempt settles before strategy callbacks or another lease can
@@ -614,6 +622,19 @@ export function createRedisStore(
         return outcome!
       })
     }
+    /** Original draft facts expose canonical point identities without retaining another key set. */
+    const draftKeys = (draft: RedisDraft): readonly ILockKey[] =>
+      snapshotConcurrencyLockKeys(
+        [
+          ...[...draft.entries.values()].flatMap((entry) =>
+            entry.channel === 'bytes' && typeof entry.key !== 'string'
+              ? []
+              : [{ channel: entry.channel, key: entry.key }]
+          ),
+          ...[...draft.hashes.values()].map((entry) => entry.lock)
+        ],
+        RedisText.backend
+      ).keys
     /** One fixed-input pipeline feeds the original concurrency loop and its actual Redis draft. */
     const write = <I, P, R>(
       name: string,
@@ -628,28 +649,56 @@ export function createRedisStore(
       assertWrite()
       const finish = controller.beginMutation()
       let actual!: P
-      return runWithConcurrency<R>(
-        {
-          store,
-          options: ctx ?? {},
-          policy,
-          ...(ports.journal === undefined ? {} : { prepare: () => ports.journal!.prepare() }),
-          execute: (context, proceed) =>
-            operate<I, Awaited<R>>(
-              name,
-              input,
-              context,
-              undefined,
-              async (prepared): Promise<Awaited<R>> => {
-                actual = capture(prepared)
-                return (await proceed()) as Awaited<R>
-              },
-              count
-            ),
-          lock: () => keys(actual)
-        },
-        { attempt: (context) => nativeAttempt(context, (draft) => run(draft, actual, context)) }
-      ).finally(finish)
+      /** Observation borrows only the final original attempt and public pipeline payload. */
+      let observedInput = input,
+        observedDraft: RedisDraft | undefined,
+        observing = false
+      const execute = () =>
+        runWithConcurrency<R>(
+          {
+            store,
+            options: ctx ?? {},
+            policy,
+            ...(ports.journal === undefined ? {} : { prepare: () => ports.journal!.prepare() }),
+            execute: (context, proceed) =>
+              operate<I, Awaited<R>>(
+                name,
+                input,
+                context,
+                undefined,
+                async (prepared): Promise<Awaited<R>> => {
+                  observedInput = prepared
+                  actual = capture(prepared)
+                  return (await proceed()) as Awaited<R>
+                },
+                count,
+                undefined,
+                true
+              ),
+            lock: () => keys(actual)
+          },
+          {
+            attempt: (context) =>
+              nativeAttempt(context, (draft) => {
+                if (observing) observedDraft = draft
+                return run(draft, actual, context)
+              })
+          }
+        ).finally(finish)
+      return ports.execution.observe === undefined
+        ? execute()
+        : ports.execution.observe(
+            () => ({
+              operation: name,
+              input: observedInput,
+              ctx,
+              keys: () => (observedDraft === undefined ? [] : draftKeys(observedDraft))
+            }),
+            (enabled) => {
+              observing = enabled
+              return execute()
+            }
+          )
     }
     /**
      * Every caller key is detached by the original domain owner before any native connection is
@@ -1345,88 +1394,115 @@ export function createRedisStore(
       assertTransactionCallback(callback, RedisText.backend)
       assertWrite()
       const finish = controller.beginMutation()
-      return runWithConcurrency<Awaited<R>>(
-        {
-          store,
-          options,
-          ...(ports.journal === undefined ? {} : { prepare: () => ports.journal!.prepare() }),
-          executeAttempt: (context, proceed) =>
-            operate(RedisOperation.transaction, {}, context, undefined, proceed)
-        },
-        {
-          attempt: async (context) => {
-            let registration: ReturnType<typeof transactionOwner.register> | undefined,
-              stages: ReturnType<ReturnType<typeof transactions>['forTransaction']> | undefined,
-              changed = 0
-            try {
-              const outcome = await nativeAttempt<Awaited<R>>(
+      /** Only the final native attempt supplies the complete public transaction's telemetry. */
+      let observedDraft: RedisDraft | undefined,
+        observing = false
+      const execute = () =>
+        runWithConcurrency<Awaited<R>>(
+          {
+            store,
+            options,
+            ...(ports.journal === undefined ? {} : { prepare: () => ports.journal!.prepare() }),
+            executeAttempt: (context, proceed) =>
+              operate(
+                RedisOperation.transaction,
+                {},
                 context,
-                async (draft): Promise<Awaited<R>> => {
-                  let failure: unknown,
-                    failed = false
-                  const scope = createScope(draft)
-                  registration = transactionOwner.register(scope, {
-                    createScope: () => createScope(draft),
-                    context,
-                    onFailure: (error) => {
-                      if (!failed) {
-                        failed = true
-                        failure = error
-                      }
-                    },
-                    beforeCommit: async (current) => {
-                      observe(transactions().forTransaction(current), 'beforeCommit')
-                      await draft.journal?.record(current)
-                    }
-                  })
-                  if (draft.journalActive) draft.journal = ports.journal!.begin(scope)
-                  stages = transactions().forTransaction(scope)
-                  observe(transactions(), 'beforeTransaction')
-                  observe(stages, 'onTransactionStart')
-                  let value: Awaited<R> | undefined
-                  try {
-                    value = (await callback(scope)) as Awaited<R>
-                  } catch (error) {
-                    if (!failed) {
-                      failed = true
-                      failure = normalizeRedisTransactionFailure(error)
-                    }
-                  }
-                  registration.stopAdmission()
-                  if (failed) throw failure
-                  await registration.runFinalizers()
-                  throwIfAborted(context.signal)
-                  changed = [...draft.entries.values()].filter((entry) => entry.changed).length
-                  return value as Awaited<R>
-                },
+                undefined,
+                proceed,
+                undefined,
+                undefined,
                 true
               )
-              if (outcome.status === 'committed') observe(stages, 'afterCommit', changed)
-              else observe(stages, 'afterRollback', StorageContractErrorCode.writeConflict)
-              return outcome
-            } catch (error) {
-              registration?.stopAdmission()
-              let failure = normalizeRedisTransactionFailure(error)
+          },
+          {
+            attempt: async (context) => {
+              let registration: ReturnType<typeof transactionOwner.register> | undefined,
+                stages: ReturnType<ReturnType<typeof transactions>['forTransaction']> | undefined,
+                changed = 0
               try {
-                await registration?.closeIterators()
-              } catch (cleanup) {
-                if (cleanup !== error)
-                  failure = redisError(
-                    RedisErrorCode.transactionFailed,
-                    new AggregateError([error, cleanup], RedisText.transactionFailed, {
-                      cause: error
+                const outcome = await nativeAttempt<Awaited<R>>(
+                  context,
+                  async (draft): Promise<Awaited<R>> => {
+                    if (observing) observedDraft = draft
+                    let failure: unknown,
+                      failed = false
+                    const scope = createScope(draft)
+                    registration = transactionOwner.register(scope, {
+                      createScope: () => createScope(draft),
+                      context,
+                      onFailure: (error) => {
+                        if (!failed) {
+                          failed = true
+                          failure = error
+                        }
+                      },
+                      beforeCommit: async (current) => {
+                        observe(transactions().forTransaction(current), 'beforeCommit')
+                        await draft.journal?.record(current)
+                      }
                     })
-                  )
+                    if (draft.journalActive) draft.journal = ports.journal!.begin(scope)
+                    stages = transactions().forTransaction(scope)
+                    observe(transactions(), 'beforeTransaction')
+                    observe(stages, 'onTransactionStart')
+                    let value: Awaited<R> | undefined
+                    try {
+                      value = (await callback(scope)) as Awaited<R>
+                    } catch (error) {
+                      if (!failed) {
+                        failed = true
+                        failure = normalizeRedisTransactionFailure(error)
+                      }
+                    }
+                    registration.stopAdmission()
+                    if (failed) throw failure
+                    await registration.runFinalizers()
+                    throwIfAborted(context.signal)
+                    changed = [...draft.entries.values()].filter((entry) => entry.changed).length
+                    return value as Awaited<R>
+                  },
+                  true
+                )
+                if (outcome.status === 'committed') observe(stages, 'afterCommit', changed)
+                else observe(stages, 'afterRollback', StorageContractErrorCode.writeConflict)
+                return outcome
+              } catch (error) {
+                registration?.stopAdmission()
+                let failure = normalizeRedisTransactionFailure(error)
+                try {
+                  await registration?.closeIterators()
+                } catch (cleanup) {
+                  if (cleanup !== error)
+                    failure = redisError(
+                      RedisErrorCode.transactionFailed,
+                      new AggregateError([error, cleanup], RedisText.transactionFailed, {
+                        cause: error
+                      })
+                    )
+                }
+                observe(stages, 'afterRollback', Reflect.get(failure, 'code'))
+                throw failure
+              } finally {
+                registration?.close()
+                observe(stages, 'onTransactionClose')
               }
-              observe(stages, 'afterRollback', Reflect.get(failure, 'code'))
-              throw failure
-            } finally {
-              registration?.close()
-              observe(stages, 'onTransactionClose')
             }
           }
-        }
-      ).finally(finish)
+        ).finally(finish)
+      return ports.execution.observe === undefined
+        ? execute()
+        : ports.execution.observe(
+            () => ({
+              operation: RedisOperation.transaction,
+              input: {},
+              keys: () => (observedDraft === undefined ? [] : draftKeys(observedDraft))
+            }),
+            (enabled) => {
+              observing = enabled
+              return execute()
+            }
+          )
     }
 
     /** Ordinary point readers share the same native wire decoding as transaction reads. */
@@ -1434,23 +1510,28 @@ export function createRedisStore(
       channel: IRedisChannel,
       input: IStorageKey,
       ctx?: IOperationContext
-    ): Promise<unknown> =>
-      read(
+    ): Promise<unknown> => {
+      /** The one native key snapshot also supplies optional completed telemetry. */
+      let captured = key(input)
+      return read(
         channel === 'text'
           ? RedisOperation.get
           : channel === 'bytes'
             ? RedisOperation.getBytes
             : RedisOperation.getRecord,
-        key(input),
+        captured,
         ctx,
         async (actual, send) => {
+          captured = key(actual)
           const raw = replyOptionalString(
-            await send([RedisCommand.get, layout.value(channel, key(actual))])
+            await send([RedisCommand.get, layout.value(channel, captured)])
           )
           return raw === undefined ? undefined : decodeRedisValue(channel, raw)
         },
-        1
+        1,
+        () => channelLocks(channel, captured)
       )
+    }
     /** Writes capture portable data before pipeline or connection acquisition. */
     const put = (
       channel: IRedisChannel,
@@ -1567,6 +1648,7 @@ export function createRedisStore(
         else controller.assertLive()
         const finish = controller.beginMutation()
         return withAbort(ctx, async (signal, context) => {
+          if (ports.journal !== undefined) await ports.journal.prepare()
           const invoke = (actual: typeof input) => {
             throwIfAborted(signal)
             return nativeDriver.withConnection((connection) =>
@@ -1595,6 +1677,7 @@ export function createRedisStore(
           throw error
         }
         const invoke = async (actual: typeof input): Promise<IStorageResource> => {
+          if (ports.journal !== undefined) await ports.journal.prepare()
           throwIfAborted(merged.signal)
           const underlying = await run(actual, layout, merged.signal)
           let off = () => undefined as void
@@ -1808,12 +1891,14 @@ export function createRedisStore(
           (entry) => entry.key
         )
         if (captured.length === 0) return empty(ctx, [])
+        /** The native batch's canonical snapshot supplies keys without re-reading pipeline input. */
+        let prepared: ReturnType<typeof snapshotStorageBatchKeys> | undefined
         return read(
           RedisOperation.getMany,
           captured,
           ctx,
           async (actual, send) => {
-            const prepared = snapshotStorageBatchKeys(actual, RedisText.backend)
+            prepared = snapshotStorageBatchKeys(actual, RedisText.backend)
             const values = await send([
               RedisCommand.mget,
               ...prepared.map((entry) => layout.value('text', entry.key))
@@ -1825,7 +1910,8 @@ export function createRedisStore(
               return raw === undefined ? undefined : (decodeRedisValue('text', raw) as string)
             })
           },
-          captured.length
+          captured.length,
+          () => (prepared ?? []).map((entry) => ({ channel: 'text', key: entry.key }))
         )
       },
       setMany: (entries, ctx) => {
@@ -1932,19 +2018,22 @@ export function createRedisStore(
       remaining: (input, ctx) => {
         const target = ttlTarget(input)
         if (target.channel === 'vector') return selectedVector().remainingRoot(target, ctx)
+        /** Native TTL lookup and telemetry share the same actual canonical target. */
+        let captured: ITtlTarget = target
         return read(
           RedisOperation.remaining,
           target,
           ctx,
           async (actual, send) => {
-            const target = ttlTarget(actual)
-            if (target.channel === 'vector') unsupported()
+            captured = ttlTarget(actual)
+            if (captured.channel === 'vector') unsupported()
             const value = replyInteger(
-              await send([RedisCommand.pttl, layout.value(target.channel, target.key)])
+              await send([RedisCommand.pttl, layout.value(captured.channel, captured.key)])
             )
             return value < 0 ? undefined : value
           },
-          1
+          1,
+          () => [captured]
         )
       },
       persist: (input, ctx) => {
