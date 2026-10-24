@@ -1,5 +1,9 @@
 /** Stable validation causes used by codec and synchronous-option admission boundaries. */
 export const StorageContractErrorText = {
+  /** String-only channel admission retains the caller's diagnostic field label. */
+  stringStorageKey: (label: string): string => `${label} must be a string`,
+  /** Structured-key admission retains its existing native TypeError cause text. */
+  invalidStorageKey: (label: string): string => `invalid ${label}`,
   /** Physical key readers admit only the original complete canonical ordered wire encoding. */
   orderedKeyInvalid: 'ordered storage key encoding is invalid',
   /** Blob inputs are captured before native object I/O or upload-reader ownership. */
