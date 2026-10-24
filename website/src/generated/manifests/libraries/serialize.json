@@ -8,13 +8,15 @@
       ".",
       "./codec",
       "./codecs/cbor",
+      "./codecs/collections-json",
       "./codecs/identity/v1",
       "./codecs/json",
       "./codecs/message-pack",
       "./codecs/protobuf",
       "./core",
       "./plugins",
-      "./registry"
+      "./registry",
+      "./tagged"
     ],
     "readmeLocales": ["zh", "en"],
     "documentation": {
@@ -109,7 +111,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "registry 集中登记和选择 parser，JSON replacer 可明确移除 localCache；格式标签仍由应用另存，chunk 本身不会自动带上 type。仅需一次普通 JSON 往返时，原生 API 已足够。"
+                "text": "registry 集中登记和选择 parser，JSON replacer 可明确移除 localCache；格式标签仍由应用另存，chunk 本身不会自动带上 type；需要编码值携带 codec 身份时使用 tagged 入口。仅需一次普通 JSON 往返时，原生 API 已足够。"
               }
             ]
           },
@@ -484,7 +486,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "defineJsonCodec、defineMessagePackCodec、defineCBORCodec 的 options.version 必填，为正安全整数；工厂返回冻结 codec，id 分别为 json、message-pack、cbor，输出分别为 string、Uint8Array、Uint8Array。三者先做同一 portable 投影/校验；JSON 稳定排序，MessagePack 不使用扩展并排序键；CBOR 关闭 records 和宿主扩展，解码 bigint 整数仅在可精确表示为安全整数时转 number，否则拒绝。"
+                "text": "defineJsonCodec、defineMessagePackCodec、defineCBORCodec 的 options.version 必填，为正安全整数；工厂返回冻结 codec，id 分别为 json、message-pack、cbor，输出分别为 string、Uint8Array、Uint8Array。三者先做同一 portable 投影/校验；JSON、集合 JSON、CBOR 与 MessagePack 按 Object.keys 属性枚举顺序投影，不做比较排序，getter 每次按该顺序读取；MessagePack 不使用扩展；CBOR 关闭 records 和宿主扩展，解码 bigint 整数仅在可精确表示为安全整数时转 number，否则拒绝。"
               },
               {
                 "type": "paragraph",
@@ -620,7 +622,10 @@
                     "invalidOption",
                     "INVALID_OPTION：插件、版本、portable、scheduler、流选项、Base64 或输出准入非法。"
                   ],
-                  ["envUnsupported", "ENV_UNSUPPORTED：Encoding 等必需宿主能力缺失。"]
+                  ["envUnsupported", "ENV_UNSUPPORTED：Encoding 等必需宿主能力缺失。"],
+                  ["tagMissing", "TAG_MISSING：无标签输入缺少显式 untagged 读取器。"],
+                  ["tagInvalid", "TAG_INVALID：保留头部损坏，不回退。"],
+                  ["tagUnknown", "TAG_UNKNOWN：合法标签没有对应的登记版本。"]
                 ]
               },
               {
@@ -638,6 +643,44 @@
               {
                 "type": "paragraph",
                 "text": "完整组合顺序为：创建 registry；逐片 encode 并交实际 sink；接收端逐片 decode；旧格式用记录的 type 读取，新写默认 primaryType；需要文本边界时再显式做 UTF-8/Base64；最后 await dispose，若设 deadline，记住它只限排空。包提供 fmt、lint、typecheck、typecheck:test、test 与单独 build，不把未复核历史测量当作性能结论。"
+              }
+            ]
+          },
+          {
+            "id": "在-json-中保留-map-与-set",
+            "heading": "在 JSON 中保留 Map 与 Set",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "值含 Map 或 Set 时显式选集合 codec。它复用严格 JSON 的 portable 规则，增加递归集合，投影类实例的可枚举字段，拒绝非有限数字、undefined、Date 与循环引用。保留的 $rpc 记录须符合 bytes/map/set 的精确形状。集合按插入顺序遍历，使用内部槽及内建迭代器。字节解码后仍为 bytes 记录；旧集合元组按普通数据读取。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'\n\nconst codec = defineCollectionsJsonCodec({ version: 1 })\nconst source = new Map([['roles', new Set(['read', 'write'])]])\nconst text = codec.encode(source)\nconsole.log(text) // {\"$rpc\":\"map\",\"entries\":[[\"roles\",{\"$rpc\":\"set\",\"values\":[\"read\",\"write\"]}]]}\nconsole.log(codec.decode(text)) // Map { 'roles' => Set { 'read', 'write' } }"
+              },
+              {
+                "type": "paragraph",
+                "text": "格式 codec 先枚举整数索引，再按字符串插入顺序输出，getter 遍历顺序相同。公开 toPortableValue 与 RPC owned 快照保持既有顺序。普通 RPC 字节 fallback 使用所选 JSON codec，因此按属性顺序输出；对象 fallback 继续使用原 portable 拥有者。"
+              }
+            ]
+          },
+          {
+            "id": "编码结果自带格式标签",
+            "heading": "编码结果自带格式标签",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "首项 codec 写新值，列表内各 id/version 读取自己的带标签载荷。可选 untagged 只读取原始旧数据。未知标签报 TAG_UNKNOWN；保留头部损坏报 TAG_INVALID，不回退。无标签文本若以 mgt1: 开头，也会当作有标签输入，即使它来自 untagged codec。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createTaggedCodec } from '@migaia/serialize/tagged'\nimport { defineJsonCodec } from '@migaia/serialize/codecs/json'\n\nconst current = defineJsonCodec({ version: 2 })\nconst previous = defineJsonCodec({ version: 1 })\nconst tagged = createTaggedCodec({ codecs: [current, previous], untagged: previous })\nconsole.log(tagged.encode({ count: 2 })) // mgt1:json@2;{\"count\":2}\nconsole.log(tagged.decode('mgt1:json@1;{\"count\":1}')) // { count: 1 }\nconsole.log(tagged.decode('{\"count\":1}')) // { count: 1 }\ntry {\n  tagged.decode('mgt1:json@3;{\"count\":3}')\n} catch (error) {\n  console.log((error as Error & { code: string }).code) // TAG_UNKNOWN\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "字符串载体前置 mgt1:<id>@<version>;。字节载体前置 00 4d 47 54、格式字节 01、两字节大端 UTF-8 标签长度与标签。unknown 载体返回带自有 $migaia.codec 和 value 的冻结对象，内层值不冻结。所有 codec 声明同一载体，外层身份为 tagged@1，与存储 envelope 版本独立。ICodecEncodedType、ITaggedCodecOptions、ITaggedEncoded、ITaggedValue 与 ITaggedCodec 保留载体及业务值推断。"
               }
             ]
           }
@@ -1240,7 +1283,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "defineJsonCodec、defineMessagePackCodec、defineCBORCodec 的 options.version 必填，为正安全整数；工厂返回冻结 codec，id 分别为 json、message-pack、cbor，输出分别为 string、Uint8Array、Uint8Array。三者先做同一 portable 投影/校验；JSON 稳定排序，MessagePack 不使用扩展并排序键；CBOR 关闭 records 和宿主扩展，解码 bigint 整数仅在可精确表示为安全整数时转 number，否则拒绝。"
+                "text": "defineJsonCodec、defineMessagePackCodec、defineCBORCodec 的 options.version 必填，为正安全整数；工厂返回冻结 codec，id 分别为 json、message-pack、cbor，输出分别为 string、Uint8Array、Uint8Array。三者先做同一 portable 投影/校验；JSON、集合 JSON、CBOR 与 MessagePack 按 Object.keys 属性枚举顺序投影，不做比较排序，getter 每次按该顺序读取；MessagePack 不使用扩展；CBOR 关闭 records 和宿主扩展，解码 bigint 整数仅在可精确表示为安全整数时转 number，否则拒绝。"
               },
               {
                 "type": "paragraph",
@@ -1376,7 +1419,10 @@
                     "invalidOption",
                     "INVALID_OPTION：插件、版本、portable、scheduler、流选项、Base64 或输出准入非法。"
                   ],
-                  ["envUnsupported", "ENV_UNSUPPORTED：Encoding 等必需宿主能力缺失。"]
+                  ["envUnsupported", "ENV_UNSUPPORTED：Encoding 等必需宿主能力缺失。"],
+                  ["tagMissing", "TAG_MISSING：无标签输入缺少显式 untagged 读取器。"],
+                  ["tagInvalid", "TAG_INVALID：保留头部损坏，不回退。"],
+                  ["tagUnknown", "TAG_UNKNOWN：合法标签没有对应的登记版本。"]
                 ]
               },
               {
@@ -1394,6 +1440,44 @@
               {
                 "type": "paragraph",
                 "text": "完整组合顺序为：创建 registry；逐片 encode 并交实际 sink；接收端逐片 decode；旧格式用记录的 type 读取，新写默认 primaryType；需要文本边界时再显式做 UTF-8/Base64；最后 await dispose，若设 deadline，记住它只限排空。包提供 fmt、lint、typecheck、typecheck:test、test 与单独 build，不把未复核历史测量当作性能结论。"
+              }
+            ]
+          },
+          {
+            "id": "在-json-中保留-map-与-set",
+            "heading": "在 JSON 中保留 Map 与 Set",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "值含 Map 或 Set 时显式选集合 codec。它复用严格 JSON 的 portable 规则，增加递归集合，投影类实例的可枚举字段，拒绝非有限数字、undefined、Date 与循环引用。保留的 $rpc 记录须符合 bytes/map/set 的精确形状。集合按插入顺序遍历，使用内部槽及内建迭代器。字节解码后仍为 bytes 记录；旧集合元组按普通数据读取。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'\n\nconst codec = defineCollectionsJsonCodec({ version: 1 })\nconst source = new Map([['roles', new Set(['read', 'write'])]])\nconst text = codec.encode(source)\nconsole.log(text) // {\"$rpc\":\"map\",\"entries\":[[\"roles\",{\"$rpc\":\"set\",\"values\":[\"read\",\"write\"]}]]}\nconsole.log(codec.decode(text)) // Map { 'roles' => Set { 'read', 'write' } }"
+              },
+              {
+                "type": "paragraph",
+                "text": "格式 codec 先枚举整数索引，再按字符串插入顺序输出，getter 遍历顺序相同。公开 toPortableValue 与 RPC owned 快照保持既有顺序。普通 RPC 字节 fallback 使用所选 JSON codec，因此按属性顺序输出；对象 fallback 继续使用原 portable 拥有者。"
+              }
+            ]
+          },
+          {
+            "id": "编码结果自带格式标签",
+            "heading": "编码结果自带格式标签",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "首项 codec 写新值，列表内各 id/version 读取自己的带标签载荷。可选 untagged 只读取原始旧数据。未知标签报 TAG_UNKNOWN；保留头部损坏报 TAG_INVALID，不回退。无标签文本若以 mgt1: 开头，也会当作有标签输入，即使它来自 untagged codec。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createTaggedCodec } from '@migaia/serialize/tagged'\nimport { defineJsonCodec } from '@migaia/serialize/codecs/json'\n\nconst current = defineJsonCodec({ version: 2 })\nconst previous = defineJsonCodec({ version: 1 })\nconst tagged = createTaggedCodec({ codecs: [current, previous], untagged: previous })\nconsole.log(tagged.encode({ count: 2 })) // mgt1:json@2;{\"count\":2}\nconsole.log(tagged.decode('mgt1:json@1;{\"count\":1}')) // { count: 1 }\nconsole.log(tagged.decode('{\"count\":1}')) // { count: 1 }\ntry {\n  tagged.decode('mgt1:json@3;{\"count\":3}')\n} catch (error) {\n  console.log((error as Error & { code: string }).code) // TAG_UNKNOWN\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "字符串载体前置 mgt1:<id>@<version>;。字节载体前置 00 4d 47 54、格式字节 01、两字节大端 UTF-8 标签长度与标签。unknown 载体返回带自有 $migaia.codec 和 value 的冻结对象，内层值不冻结。所有 codec 声明同一载体，外层身份为 tagged@1，与存储 envelope 版本独立。ICodecEncodedType、ITaggedCodecOptions、ITaggedEncoded、ITaggedValue 与 ITaggedCodec 保留载体及业务值推断。"
               }
             ]
           }
@@ -1491,7 +1575,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Registry centralizes parser registration and selection, while a JSON replacer can remove localCache explicitly. Applications still save the format tag separately; chunks do not embed type automatically. Native APIs suffice for a single ordinary JSON round trip."
+                  "text": "Registry centralizes parser registration and selection, while a JSON replacer can remove localCache explicitly. Applications still save the format tag separately; chunks do not embed type automatically. Use the tagged entry when the encoded value itself must carry its codec identity. Native APIs suffice for a single ordinary JSON round trip."
                 }
               ]
             },
@@ -1905,7 +1989,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "defineJsonCodec, defineMessagePackCodec and defineCBORCodec require a positive safe-integer options.version and return frozen codecs. IDs are json, message-pack and cbor; outputs are string, Uint8Array and Uint8Array respectively. All three use the same portable projection/validation. JSON sorts keys deterministically; MessagePack sorts keys without extensions. CBOR disables records and host extensions, converting decoded bigint integers to numbers only when they are exact safe integers; otherwise it rejects."
+                  "text": "defineJsonCodec, defineMessagePackCodec and defineCBORCodec require a positive safe-integer options.version and return frozen codecs. IDs are json, message-pack and cbor; outputs are string, Uint8Array and Uint8Array respectively. All three use the same portable projection/validation. JSON, collections JSON, CBOR and MessagePack project fields in Object.keys enumeration order without comparison sorting; getters run once in that order. MessagePack uses no extensions. CBOR disables records and host extensions, converting decoded bigint integers to numbers only when they are exact safe integers; otherwise it rejects."
                 },
                 {
                   "type": "paragraph",
@@ -2053,7 +2137,10 @@
                     [
                       "envUnsupported",
                       "ENV_UNSUPPORTED: required host capabilities such as Encoding are unavailable."
-                    ]
+                    ],
+                    ["tagMissing", "TAG_MISSING: raw input has no explicit untagged reader."],
+                    ["tagInvalid", "TAG_INVALID: reserved header is malformed; no fallback."],
+                    ["tagUnknown", "TAG_UNKNOWN: valid tag has no registered codec revision."]
                   ]
                 },
                 {
@@ -2071,6 +2158,44 @@
                 {
                   "type": "paragraph",
                   "text": "A complete workflow creates the registry, encodes independent frames into the real sink, decodes them individually at the receiver, reads old formats using saved type tags and writes the default primaryType. Apply UTF-8/Base64 only at an actual text boundary, then await dispose. A configured deadline limits draining only. module scripts provide fmt, lint, typecheck, typecheck:test, test and a separate build; unverified historical measurements are not performance claims."
+                }
+              ]
+            },
+            {
+              "id": "preserve-map-and-set-in-json",
+              "heading": "Preserve Map and Set in JSON",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Use the collection codec explicitly when values contain Map or Set. It shares the strict portable profile with JSON, adds recursive collections, projects enumerable class fields, and rejects nonfinite numbers, undefined, Date and cycles. Reserved $rpc records must have the exact bytes/map/set shape. Collection iteration preserves insertion order and uses intrinsic slots and iterators. Bytes remain bytes records after decoding; old collection tuples are ordinary data."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'\n\nconst codec = defineCollectionsJsonCodec({ version: 1 })\nconst source = new Map([['roles', new Set(['read', 'write'])]])\nconst text = codec.encode(source)\nconsole.log(text) // {\"$rpc\":\"map\",\"entries\":[[\"roles\",{\"$rpc\":\"set\",\"values\":[\"read\",\"write\"]}]]}\nconsole.log(codec.decode(text)) // Map { 'roles' => Set { 'read', 'write' } }"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Format codecs keep integer-index enumeration followed by string insertion order, including getter traversal. Public toPortableValue and RPC owned snapshots keep their existing ordering. Ordinary RPC byte fallback uses its selected JSON codec and therefore uses property order; object fallback keeps its existing portable owner."
+                }
+              ]
+            },
+            {
+              "id": "carry-a-format-tag-in-the-encoded-value",
+              "heading": "Carry a format tag in the encoded value",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "The first codec writes new values; every listed id/version can read its own tagged payload. An optional untagged codec only reads raw legacy values. Unknown tags fail with TAG_UNKNOWN; malformed reserved headers fail with TAG_INVALID and never fall back. A raw text value starting with mgt1: is interpreted as tagged input, even when it was produced by the untagged codec."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createTaggedCodec } from '@migaia/serialize/tagged'\nimport { defineJsonCodec } from '@migaia/serialize/codecs/json'\n\nconst current = defineJsonCodec({ version: 2 })\nconst previous = defineJsonCodec({ version: 1 })\nconst tagged = createTaggedCodec({ codecs: [current, previous], untagged: previous })\nconsole.log(tagged.encode({ count: 2 })) // mgt1:json@2;{\"count\":2}\nconsole.log(tagged.decode('mgt1:json@1;{\"count\":1}')) // { count: 1 }\nconsole.log(tagged.decode('{\"count\":1}')) // { count: 1 }\ntry {\n  tagged.decode('mgt1:json@3;{\"count\":3}')\n} catch (error) {\n  console.log((error as Error & { code: string }).code) // TAG_UNKNOWN\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "String carriers prepend mgt1:<id>@<version>;. Byte carriers prepend 00 4d 47 54, framing byte 01, a two-byte big-endian UTF-8 tag length and the tag. Unknown carriers return a frozen object with own $migaia.codec and value fields; the inner value stays unfrozen. All codecs must declare the same carrier. The framing identity is tagged@1; it is separate from storage envelope versions. ICodecEncodedType, ITaggedCodecOptions, ITaggedEncoded, ITaggedValue and ITaggedCodec preserve carrier and business-value inference."
                 }
               ]
             }
@@ -2700,7 +2825,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "defineJsonCodec, defineMessagePackCodec and defineCBORCodec require a positive safe-integer options.version and return frozen codecs. IDs are json, message-pack and cbor; outputs are string, Uint8Array and Uint8Array respectively. All three use the same portable projection/validation. JSON sorts keys deterministically; MessagePack sorts keys without extensions. CBOR disables records and host extensions, converting decoded bigint integers to numbers only when they are exact safe integers; otherwise it rejects."
+                  "text": "defineJsonCodec, defineMessagePackCodec and defineCBORCodec require a positive safe-integer options.version and return frozen codecs. IDs are json, message-pack and cbor; outputs are string, Uint8Array and Uint8Array respectively. All three use the same portable projection/validation. JSON, collections JSON, CBOR and MessagePack project fields in Object.keys enumeration order without comparison sorting; getters run once in that order. MessagePack uses no extensions. CBOR disables records and host extensions, converting decoded bigint integers to numbers only when they are exact safe integers; otherwise it rejects."
                 },
                 {
                   "type": "paragraph",
@@ -2848,7 +2973,10 @@
                     [
                       "envUnsupported",
                       "ENV_UNSUPPORTED: required host capabilities such as Encoding are unavailable."
-                    ]
+                    ],
+                    ["tagMissing", "TAG_MISSING: raw input has no explicit untagged reader."],
+                    ["tagInvalid", "TAG_INVALID: reserved header is malformed; no fallback."],
+                    ["tagUnknown", "TAG_UNKNOWN: valid tag has no registered codec revision."]
                   ]
                 },
                 {
@@ -2866,6 +2994,44 @@
                 {
                   "type": "paragraph",
                   "text": "A complete workflow creates the registry, encodes independent frames into the real sink, decodes them individually at the receiver, reads old formats using saved type tags and writes the default primaryType. Apply UTF-8/Base64 only at an actual text boundary, then await dispose. A configured deadline limits draining only. module scripts provide fmt, lint, typecheck, typecheck:test, test and a separate build; unverified historical measurements are not performance claims."
+                }
+              ]
+            },
+            {
+              "id": "preserve-map-and-set-in-json",
+              "heading": "Preserve Map and Set in JSON",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Use the collection codec explicitly when values contain Map or Set. It shares the strict portable profile with JSON, adds recursive collections, projects enumerable class fields, and rejects nonfinite numbers, undefined, Date and cycles. Reserved $rpc records must have the exact bytes/map/set shape. Collection iteration preserves insertion order and uses intrinsic slots and iterators. Bytes remain bytes records after decoding; old collection tuples are ordinary data."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'\n\nconst codec = defineCollectionsJsonCodec({ version: 1 })\nconst source = new Map([['roles', new Set(['read', 'write'])]])\nconst text = codec.encode(source)\nconsole.log(text) // {\"$rpc\":\"map\",\"entries\":[[\"roles\",{\"$rpc\":\"set\",\"values\":[\"read\",\"write\"]}]]}\nconsole.log(codec.decode(text)) // Map { 'roles' => Set { 'read', 'write' } }"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Format codecs keep integer-index enumeration followed by string insertion order, including getter traversal. Public toPortableValue and RPC owned snapshots keep their existing ordering. Ordinary RPC byte fallback uses its selected JSON codec and therefore uses property order; object fallback keeps its existing portable owner."
+                }
+              ]
+            },
+            {
+              "id": "carry-a-format-tag-in-the-encoded-value",
+              "heading": "Carry a format tag in the encoded value",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "The first codec writes new values; every listed id/version can read its own tagged payload. An optional untagged codec only reads raw legacy values. Unknown tags fail with TAG_UNKNOWN; malformed reserved headers fail with TAG_INVALID and never fall back. A raw text value starting with mgt1: is interpreted as tagged input, even when it was produced by the untagged codec."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createTaggedCodec } from '@migaia/serialize/tagged'\nimport { defineJsonCodec } from '@migaia/serialize/codecs/json'\n\nconst current = defineJsonCodec({ version: 2 })\nconst previous = defineJsonCodec({ version: 1 })\nconst tagged = createTaggedCodec({ codecs: [current, previous], untagged: previous })\nconsole.log(tagged.encode({ count: 2 })) // mgt1:json@2;{\"count\":2}\nconsole.log(tagged.decode('mgt1:json@1;{\"count\":1}')) // { count: 1 }\nconsole.log(tagged.decode('{\"count\":1}')) // { count: 1 }\ntry {\n  tagged.decode('mgt1:json@3;{\"count\":3}')\n} catch (error) {\n  console.log((error as Error & { code: string }).code) // TAG_UNKNOWN\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "String carriers prepend mgt1:<id>@<version>;. Byte carriers prepend 00 4d 47 54, framing byte 01, a two-byte big-endian UTF-8 tag length and the tag. Unknown carriers return a frozen object with own $migaia.codec and value fields; the inner value stays unfrozen. All codecs must declare the same carrier. The framing identity is tagged@1; it is separate from storage envelope versions. ICodecEncodedType, ITaggedCodecOptions, ITaggedEncoded, ITaggedValue and ITaggedCodec preserve carrier and business-value inference."
                 }
               ]
             }
@@ -3032,7 +3198,7 @@
           "name": "ISerializeCleanupKind",
           "kind": "type",
           "signature": "export type ISerializeCleanupKind = (typeof SerializeCleanupKind)[keyof typeof SerializeCleanupKind];",
-          "declarationLine": 65,
+          "declarationLine": 86,
           "source": "packages/serialize/dist/format-constants.d.ts",
           "purpose": "Distinguishes cleanup failures from drain-deadline diagnostics.",
           "core": "Distinguishes cleanup failures from drain-deadline diagnostics.",
@@ -3097,7 +3263,7 @@
           "name": "ISerializeCleanupPolicy",
           "kind": "type",
           "signature": "export type ISerializeCleanupPolicy = (typeof SerializeCleanupPolicy)[keyof typeof SerializeCleanupPolicy];",
-          "declarationLine": 63,
+          "declarationLine": 84,
           "source": "packages/serialize/dist/format-constants.d.ts",
           "purpose": "Selects how disposal exposes parser cleanup errors.",
           "core": "Selects how disposal exposes parser cleanup errors.",
@@ -3162,7 +3328,7 @@
           "name": "ISerializeOutputFormat",
           "kind": "type",
           "signature": "export type ISerializeOutputFormat = (typeof SerializeOutput)[keyof typeof SerializeOutput];",
-          "declarationLine": 59,
+          "declarationLine": 80,
           "source": "packages/serialize/dist/format-constants.d.ts",
           "purpose": "Describes output representations for consumers and persistence adapters.",
           "core": "Describes output representations for consumers and persistence adapters.",
@@ -3227,7 +3393,7 @@
           "name": "ISerializePhase",
           "kind": "type",
           "signature": "export type ISerializePhase = (typeof SerializePhase)[keyof typeof SerializePhase];",
-          "declarationLine": 61,
+          "declarationLine": 82,
           "source": "packages/serialize/dist/format-constants.d.ts",
           "purpose": "Error-location labels identifying which serialization operation owns a failure position. These constants emit no instrumentation events.",
           "core": "Error-location labels identifying which serialization operation owns a failure position. These constants emit no instrumentation events.",
@@ -3292,7 +3458,7 @@
           "name": "ISerializePluginType",
           "kind": "type",
           "signature": "export type ISerializePluginType = (typeof SerializePluginType)[keyof typeof SerializePluginType];",
-          "declarationLine": 67,
+          "declarationLine": 88,
           "source": "packages/serialize/dist/format-constants.d.ts",
           "purpose": "Built-in registration tag used by jsonPlugin and jsonParser metadata.",
           "core": "Built-in registration tag used by jsonPlugin and jsonParser metadata.",
@@ -3357,7 +3523,7 @@
           "name": "ISerializeTextFormat",
           "kind": "type",
           "signature": "export type ISerializeTextFormat = (typeof SerializeTextFormat)[keyof typeof SerializeTextFormat];",
-          "declarationLine": 29,
+          "declarationLine": 50,
           "source": "packages/serialize/dist/format-constants.d.ts",
           "purpose": "Output-only formats accepted by emitOutput; these do not register input parsers.",
           "core": "Output-only formats accepted by emitOutput; these do not register input parsers.",
@@ -3422,7 +3588,7 @@
           "name": "SerializeChunkKind",
           "kind": "const",
           "signature": "export declare const SerializeChunkKind: { /** Complete in-memory payload; registry encoding permits it only as the sole chunk. */ readonly value: 'value'; /** Wire text joined directly when all encoded chunks are text. */ readonly text: 'text'; /** Wire bytes; multi-chunk assembly promotes accompanying text into the binary result. */ readonly bytes: 'bytes'; };",
-          "declarationLine": 2,
+          "declarationLine": 23,
           "source": "packages/serialize/dist/format-constants.d.ts",
           "purpose": "Discriminates the payload representation at chunk tuple index zero.",
           "core": "value: A complete arbitrary value; use when storage or transport already preserves structured values.\ntext: Wire text that can be concatenated with other text chunks.\nbytes: Wire bytes carried by Uint8Array; mixed text is encoded before byte assembly.",
@@ -3515,7 +3681,7 @@
           "name": "SerializeCleanupKind",
           "kind": "const",
           "signature": "export declare const SerializeCleanupKind: { /** Parser release failed and report policy emits its original failure. */ readonly cleanupError: 'cleanup-error'; /** Disposal stopped waiting for pending work at its admitted deadline. */ readonly drainTimeout: 'drain-timeout'; };",
-          "declarationLine": 45,
+          "declarationLine": 66,
           "source": "packages/serialize/dist/format-constants.d.ts",
           "purpose": "Distinguishes cleanup failures from drain-deadline diagnostics.",
           "core": "cleanupError: A parser disposer failed; delivered to the report cleanup policy callback.\ndrainTimeout: Draining reached its deadline; parser cleanup continues after the observer is notified.",
@@ -3599,7 +3765,7 @@
           "name": "SerializeCleanupPolicy",
           "kind": "const",
           "signature": "export declare const SerializeCleanupPolicy: { /** Default: reject disposal with cleanup failures, retaining any earlier primary. */ readonly throw: 'throw'; /** Send cleanup failures to the required cleanup reporter without replacing the primary. */ readonly report: 'report'; };",
-          "declarationLine": 38,
+          "declarationLine": 59,
           "source": "packages/serialize/dist/format-constants.d.ts",
           "purpose": "Selects how disposal exposes parser cleanup errors.",
           "core": "throw: Reject disposal on parser cleanup failure while retaining any earlier primary failure.\nreport: Send a cleanup diagnostic to the required reporter without changing the disposal primary outcome.",
@@ -3683,7 +3849,7 @@
           "name": "SerializeOutput",
           "kind": "const",
           "signature": "export declare const SerializeOutput: { /** Text representation chosen by a serializer or persistence adapter. */ readonly text: 'text'; /** Structured representation supported by the receiving carrier. */ readonly structured: 'structured'; /** Binary representation requiring a compatible carrier or explicit conversion. */ readonly binary: 'binary'; };",
-          "declarationLine": 11,
+          "declarationLine": 32,
           "source": "packages/serialize/dist/format-constants.d.ts",
           "purpose": "Describes output representations for consumers and persistence adapters.",
           "core": "text: Choose text output for carriers that store or embed strings.\nstructured: Choose structured output when the carrier stores values without wire encoding.\nbinary: Choose binary output for byte-oriented transport or storage.",
@@ -3776,7 +3942,7 @@
           "name": "SerializePhase",
           "kind": "const",
           "signature": "export declare const SerializePhase: { /** Failure while producing encoded chunks or frames. */ readonly encode: 'encode'; /** Failure while parsing an encoded chunk or frame. */ readonly decode: 'decode'; };",
-          "declarationLine": 31,
+          "declarationLine": 52,
           "source": "packages/serialize/dist/format-constants.d.ts",
           "purpose": "Error-location labels identifying which serialization operation owns a failure position. These constants emit no instrumentation events.",
           "core": "encode: The failure arose while producing or collecting encoded output.\ndecode: The failure arose while validating or decoding an input chunk.",
@@ -3860,7 +4026,7 @@
           "name": "SerializePluginType",
           "kind": "const",
           "signature": "export declare const SerializePluginType: { /** Routing token used by the built-in native JSON plugin. */ readonly json: 'json'; };",
-          "declarationLine": 52,
+          "declarationLine": 73,
           "source": "packages/serialize/dist/format-constants.d.ts",
           "purpose": "Built-in registration tag used by jsonPlugin and jsonParser metadata.",
           "core": "json: Registers the native JSON parser under the JSON envelope format tag.",
@@ -3935,7 +4101,7 @@
           "name": "SerializeTextFormat",
           "kind": "const",
           "signature": "export declare const SerializeTextFormat: { /** Default emitter format using native JSON after own-data admission. */ readonly json: 'json'; /** YAML flow-style output for the admitted subset; not a registered decoding plugin. */ readonly yaml: 'yaml'; /** TOML output requiring a record root, Unicode scalar strings, and no null values. */ readonly toml: 'toml'; };",
-          "declarationLine": 20,
+          "declarationLine": 41,
           "source": "packages/serialize/dist/format-constants.d.ts",
           "purpose": "Output-only formats accepted by emitOutput; these do not register input parsers.",
           "core": "json: Compact JSON for finite portable own data; the default output format.\nyaml: YAML flow collections and quoted strings for the admitted portable graph.\ntoml: TOML key assignments; root must be a record, null is rejected and strings require Unicode scalars.",
@@ -4204,14 +4370,24 @@
           "ownerFragment": "serialize-core--encodeStream"
         },
         {
-          "identity": "packages/serialize/dist/codec.d.ts:ICodec:export type ICodec<TValue, TEncoded, TId extends string = string, TVersion extends number = number> = Readonly<{ /** Stable format identity, separate from parser registry plugin routing. */ id: TId; /** Explicit format revision; built-in factories require a positive safe integer. */ version: TVersion; /** Unknown preserves arbitrary values, string carries text, and uint8array carries binary frames. */ encodedType: 'unknown' | 'string' | 'uint8array'; /** * Synchronously converts a domain value to the declared representation; format failures are * thrown. */ encode: (value: TValue) => TEncoded; /** * Synchronously restores the codec's domain value; decoding does not imply original object * identity. */ decode: (value: TEncoded) => TValue; }>;",
+          "identity": "packages/serialize/dist/codec.d.ts:ICodec:export type ICodec<TValue, TEncoded, TId extends string = string, TVersion extends number = number> = Readonly<{ /** Stable format identity, separate from parser registry plugin routing. */ id: TId; /** Explicit format revision; built-in factories require a positive safe integer. */ version: TVersion; /** Unknown preserves arbitrary values, string carries text, and uint8array carries binary frames. */ encodedType: ICodecEncodedType; /** * Synchronously converts a domain value to the declared representation; format failures are * thrown. */ encode: (value: TValue) => TEncoded; /** * Synchronously restores the codec's domain value; decoding does not imply original object * identity. */ decode: (value: TEncoded) => TValue; }>;",
           "name": "ICodec",
-          "signature": "export type ICodec<TValue, TEncoded, TId extends string = string, TVersion extends number = number> = Readonly<{ /** Stable format identity, separate from parser registry plugin routing. */ id: TId; /** Explicit format revision; built-in factories require a positive safe integer. */ version: TVersion; /** Unknown preserves arbitrary values, string carries text, and uint8array carries binary frames. */ encodedType: 'unknown' | 'string' | 'uint8array'; /** * Synchronously converts a domain value to the declared representation; format failures are * thrown. */ encode: (value: TValue) => TEncoded; /** * Synchronously restores the codec's domain value; decoding does not imply original object * identity. */ decode: (value: TEncoded) => TValue; }>;",
+          "signature": "export type ICodec<TValue, TEncoded, TId extends string = string, TVersion extends number = number> = Readonly<{ /** Stable format identity, separate from parser registry plugin routing. */ id: TId; /** Explicit format revision; built-in factories require a positive safe integer. */ version: TVersion; /** Unknown preserves arbitrary values, string carries text, and uint8array carries binary frames. */ encodedType: ICodecEncodedType; /** * Synchronously converts a domain value to the declared representation; format failures are * thrown. */ encode: (value: TValue) => TEncoded; /** * Synchronously restores the codec's domain value; decoding does not imply original object * identity. */ decode: (value: TEncoded) => TValue; }>;",
           "source": "packages/serialize/dist/codec.d.ts",
           "exportPath": ".",
           "ownerExportPath": "./codec",
           "ownerModule": "codec",
           "ownerFragment": "serialize-codec--ICodec"
+        },
+        {
+          "identity": "packages/serialize/dist/codec.d.ts:ICodecEncodedType:export type ICodecEncodedType = 'unknown' | 'string' | 'uint8array';",
+          "name": "ICodecEncodedType",
+          "signature": "export type ICodecEncodedType = 'unknown' | 'string' | 'uint8array';",
+          "source": "packages/serialize/dist/codec.d.ts",
+          "exportPath": ".",
+          "ownerExportPath": "./codec",
+          "ownerModule": "codec",
+          "ownerFragment": "serialize-codec--ICodecEncodedType"
         },
         {
           "identity": "packages/serialize/dist/codec.d.ts:ICodecValue:export type ICodecValue = null | boolean | number | string | readonly ICodecValue[] | Readonly<{ [key: string]: ICodecValue; }>;",
@@ -4524,9 +4700,9 @@
           "ownerFragment": "serialize-core--SerializeCodecError"
         },
         {
-          "identity": "packages/serialize/dist/error-code.d.ts:SerializeErrorCode:export declare const SerializeErrorCode: { /** * Thrown when `encode` or `decode` is called after the registry closes or disposal begins. * * Create another registry instead of reusing this instance. Enforces the two-phase contract that * rejects new requests before releasing resources. */ readonly registryDisposed: 'REGISTRY_DISPOSED'; /** * Thrown when no registered parser matches the requested `type`. * * Check plugin registration and the archive format tag. This is a stable configuration or format * failure; retrying the same type does not fix it. */ readonly codecNotFound: 'CODEC_NOT_FOUND'; /** * Thrown when encoding fails: the parser's `encode` throws, streaming encoding fails, or no * chunks are produced. * * `cause` retains the original exception when one exists. Use `chunkIndex` and `bytesConsumed` to * locate the failure. */ readonly encodeFailed: 'ENCODE_FAILED'; /** * Thrown when the parser's `decode` or streaming decoding fails. * * `cause` retains the original exception. Use `chunkIndex` and `bytesConsumed` to locate the * failure. */ readonly decodeFailed: 'DECODE_FAILED'; /** * Thrown for an invalid chunk: a malformed `[type, data]` pair, incorrect text or byte payload, * unknown kind, or a value chunk used by a carrier that accepts only wire data. * * Check parser output and input chunks. This indicates an invalid parser or damaged archive, not * a backend failure. */ readonly invalidChunk: 'INVALID_CHUNK'; /** * Thrown when encoding or decoding is cancelled through an abort signal. * * Treat this as cancellation and retry with a fresh signal when appropriate. It differs from * unrecoverable `ENCODE_FAILED` and `DECODE_FAILED` errors. */ readonly aborted: 'ABORTED'; /** * Thrown for invalid options, including illegal or duplicate plugin types, an empty plugin list, * invalid frame budgets or `maxInFlight`, and a scheduler without `{ now, schedule }` * capabilities. * * Correct the input. The message identifies the invalid option. */ /** Text emitters also reject nonportable own data and values the selected format cannot express. */ readonly invalidOption: 'INVALID_OPTION'; /** * Thrown when `createSerializeRegistry` cannot obtain host `TextEncoder` or `TextDecoder` * capabilities. Standalone `jsonParser` bytes decoding also uses this code when neither its * injected decoder nor the host `TextDecoder` exists. Core collectors require an explicit encoder * for byte merges. * * Inject `encoder` and `decoder`, or use a host with the Encoding API. `cause` retains the * original capability failure when one exists; absent capability needs no synthetic cause. */ readonly envUnsupported: 'ENV_UNSUPPORTED'; };",
+          "identity": "packages/serialize/dist/error-code.d.ts:SerializeErrorCode:export declare const SerializeErrorCode: { /** * Thrown when `encode` or `decode` is called after the registry closes or disposal begins. * * Create another registry instead of reusing this instance. Enforces the two-phase contract that * rejects new requests before releasing resources. */ readonly registryDisposed: 'REGISTRY_DISPOSED'; /** * Thrown when no registered parser matches the requested `type`. * * Check plugin registration and the archive format tag. This is a stable configuration or format * failure; retrying the same type does not fix it. */ readonly codecNotFound: 'CODEC_NOT_FOUND'; /** * Thrown when encoding fails: the parser's `encode` throws, streaming encoding fails, or no * chunks are produced. * * `cause` retains the original exception when one exists. Use `chunkIndex` and `bytesConsumed` to * locate the failure. */ readonly encodeFailed: 'ENCODE_FAILED'; /** * Thrown when the parser's `decode` or streaming decoding fails. * * `cause` retains the original exception. Use `chunkIndex` and `bytesConsumed` to locate the * failure. */ readonly decodeFailed: 'DECODE_FAILED'; /** * Thrown for an invalid chunk: a malformed `[type, data]` pair, incorrect text or byte payload, * unknown kind, or a value chunk used by a carrier that accepts only wire data. * * Check parser output and input chunks. This indicates an invalid parser or damaged archive, not * a backend failure. */ readonly invalidChunk: 'INVALID_CHUNK'; /** * Thrown when encoding or decoding is cancelled through an abort signal. * * Treat this as cancellation and retry with a fresh signal when appropriate. It differs from * unrecoverable `ENCODE_FAILED` and `DECODE_FAILED` errors. */ readonly aborted: 'ABORTED'; /** * Thrown for invalid options, including illegal or duplicate plugin types, an empty plugin list, * invalid frame budgets or `maxInFlight`, and a scheduler without `{ now, schedule }` * capabilities. * * Correct the input. The message identifies the invalid option. */ /** Text emitters also reject nonportable own data and values the selected format cannot express. */ readonly invalidOption: 'INVALID_OPTION'; /** * Thrown when `createSerializeRegistry` cannot obtain host `TextEncoder` or `TextDecoder` * capabilities. Standalone `jsonParser` bytes decoding also uses this code when neither its * injected decoder nor the host `TextDecoder` exists. Core collectors require an explicit encoder * for byte merges. * * Inject `encoder` and `decoder`, or use a host with the Encoding API. `cause` retains the * original capability failure when one exists; absent capability needs no synthetic cause. */ readonly envUnsupported: 'ENV_UNSUPPORTED'; /** Untagged input has no configured fallback; supply one or pass tagged data. */ readonly tagMissing: 'TAG_MISSING'; /** A reserved tagged header is truncated or malformed; reject the damaged input. */ readonly tagInvalid: 'TAG_INVALID'; /** A valid format tag is not registered; supply the corresponding codec revision. */ readonly tagUnknown: 'TAG_UNKNOWN'; };",
           "name": "SerializeErrorCode",
-          "signature": "export declare const SerializeErrorCode: { /** * Thrown when `encode` or `decode` is called after the registry closes or disposal begins. * * Create another registry instead of reusing this instance. Enforces the two-phase contract that * rejects new requests before releasing resources. */ readonly registryDisposed: 'REGISTRY_DISPOSED'; /** * Thrown when no registered parser matches the requested `type`. * * Check plugin registration and the archive format tag. This is a stable configuration or format * failure; retrying the same type does not fix it. */ readonly codecNotFound: 'CODEC_NOT_FOUND'; /** * Thrown when encoding fails: the parser's `encode` throws, streaming encoding fails, or no * chunks are produced. * * `cause` retains the original exception when one exists. Use `chunkIndex` and `bytesConsumed` to * locate the failure. */ readonly encodeFailed: 'ENCODE_FAILED'; /** * Thrown when the parser's `decode` or streaming decoding fails. * * `cause` retains the original exception. Use `chunkIndex` and `bytesConsumed` to locate the * failure. */ readonly decodeFailed: 'DECODE_FAILED'; /** * Thrown for an invalid chunk: a malformed `[type, data]` pair, incorrect text or byte payload, * unknown kind, or a value chunk used by a carrier that accepts only wire data. * * Check parser output and input chunks. This indicates an invalid parser or damaged archive, not * a backend failure. */ readonly invalidChunk: 'INVALID_CHUNK'; /** * Thrown when encoding or decoding is cancelled through an abort signal. * * Treat this as cancellation and retry with a fresh signal when appropriate. It differs from * unrecoverable `ENCODE_FAILED` and `DECODE_FAILED` errors. */ readonly aborted: 'ABORTED'; /** * Thrown for invalid options, including illegal or duplicate plugin types, an empty plugin list, * invalid frame budgets or `maxInFlight`, and a scheduler without `{ now, schedule }` * capabilities. * * Correct the input. The message identifies the invalid option. */ /** Text emitters also reject nonportable own data and values the selected format cannot express. */ readonly invalidOption: 'INVALID_OPTION'; /** * Thrown when `createSerializeRegistry` cannot obtain host `TextEncoder` or `TextDecoder` * capabilities. Standalone `jsonParser` bytes decoding also uses this code when neither its * injected decoder nor the host `TextDecoder` exists. Core collectors require an explicit encoder * for byte merges. * * Inject `encoder` and `decoder`, or use a host with the Encoding API. `cause` retains the * original capability failure when one exists; absent capability needs no synthetic cause. */ readonly envUnsupported: 'ENV_UNSUPPORTED'; };",
+          "signature": "export declare const SerializeErrorCode: { /** * Thrown when `encode` or `decode` is called after the registry closes or disposal begins. * * Create another registry instead of reusing this instance. Enforces the two-phase contract that * rejects new requests before releasing resources. */ readonly registryDisposed: 'REGISTRY_DISPOSED'; /** * Thrown when no registered parser matches the requested `type`. * * Check plugin registration and the archive format tag. This is a stable configuration or format * failure; retrying the same type does not fix it. */ readonly codecNotFound: 'CODEC_NOT_FOUND'; /** * Thrown when encoding fails: the parser's `encode` throws, streaming encoding fails, or no * chunks are produced. * * `cause` retains the original exception when one exists. Use `chunkIndex` and `bytesConsumed` to * locate the failure. */ readonly encodeFailed: 'ENCODE_FAILED'; /** * Thrown when the parser's `decode` or streaming decoding fails. * * `cause` retains the original exception. Use `chunkIndex` and `bytesConsumed` to locate the * failure. */ readonly decodeFailed: 'DECODE_FAILED'; /** * Thrown for an invalid chunk: a malformed `[type, data]` pair, incorrect text or byte payload, * unknown kind, or a value chunk used by a carrier that accepts only wire data. * * Check parser output and input chunks. This indicates an invalid parser or damaged archive, not * a backend failure. */ readonly invalidChunk: 'INVALID_CHUNK'; /** * Thrown when encoding or decoding is cancelled through an abort signal. * * Treat this as cancellation and retry with a fresh signal when appropriate. It differs from * unrecoverable `ENCODE_FAILED` and `DECODE_FAILED` errors. */ readonly aborted: 'ABORTED'; /** * Thrown for invalid options, including illegal or duplicate plugin types, an empty plugin list, * invalid frame budgets or `maxInFlight`, and a scheduler without `{ now, schedule }` * capabilities. * * Correct the input. The message identifies the invalid option. */ /** Text emitters also reject nonportable own data and values the selected format cannot express. */ readonly invalidOption: 'INVALID_OPTION'; /** * Thrown when `createSerializeRegistry` cannot obtain host `TextEncoder` or `TextDecoder` * capabilities. Standalone `jsonParser` bytes decoding also uses this code when neither its * injected decoder nor the host `TextDecoder` exists. Core collectors require an explicit encoder * for byte merges. * * Inject `encoder` and `decoder`, or use a host with the Encoding API. `cause` retains the * original capability failure when one exists; absent capability needs no synthetic cause. */ readonly envUnsupported: 'ENV_UNSUPPORTED'; /** Untagged input has no configured fallback; supply one or pass tagged data. */ readonly tagMissing: 'TAG_MISSING'; /** A reserved tagged header is truncated or malformed; reject the damaged input. */ readonly tagInvalid: 'TAG_INVALID'; /** A valid format tag is not registered; supply the corresponding codec revision. */ readonly tagUnknown: 'TAG_UNKNOWN'; };",
           "source": "packages/serialize/dist/error-code.d.ts",
           "exportPath": ".",
           "ownerExportPath": "./core",
@@ -4752,7 +4928,7 @@
         {
           "name": "CodecErrorText",
           "kind": "const",
-          "signature": "export declare const CodecErrorText: { /** Factory version admission failure before a codec is returned. */ readonly invalidVersion: 'serialize codec version must be a positive safe integer'; /** Protobuf schema identity/version admission failure, independent of the executable binding. */ readonly invalidSchema: 'serialize protobuf schema descriptor is invalid'; /** Fallback for an unclassified format encoder failure; the original remains on cause. */ readonly encodeFailed: 'serialize codec encode failed'; /** Fallback for an unclassified format decoder failure; the original remains on cause. */ readonly decodeFailed: 'serialize codec decode failed'; /** Portable-profile rejection shared by format conversion and decoded-value admission. */ readonly portableValueInvalid: 'serialize codec value is outside the portable profile'; };",
+          "signature": "export declare const CodecErrorText: { /** Factory version admission failure before a codec is returned. */ readonly invalidVersion: 'serialize codec version must be a positive safe integer'; /** Protobuf schema identity/version admission failure, independent of the executable binding. */ readonly invalidSchema: 'serialize protobuf schema descriptor is invalid'; /** Fallback for an unclassified format encoder failure; the original remains on cause. */ readonly encodeFailed: 'serialize codec encode failed'; /** Fallback for an unclassified format decoder failure; the original remains on cause. */ readonly decodeFailed: 'serialize codec decode failed'; /** Portable-profile rejection shared by format conversion and decoded-value admission. */ readonly portableValueInvalid: 'serialize codec value is outside the portable profile'; /** Tagged codec construction requires compatible unique descriptors and callable methods. */ readonly taggedOptionsInvalid: 'serialize tagged codec options are invalid'; /** Untagged input needs an explicitly selected fallback instead of format guessing. */ readonly tagMissing: 'serialize codec tag is missing'; /** Reserved headers cannot fall back to a legacy decoder after malformed framing. */ readonly tagInvalid: 'serialize codec tag is invalid'; /** A syntactically valid tag requires a matching registered format revision. */ readonly tagUnknown: 'serialize codec tag is not registered'; };",
           "declarationLine": 2,
           "source": "packages/serialize/dist/codec-text.d.ts",
           "purpose": "Stable diagnostic messages for standalone format codec boundaries.",
@@ -4809,13 +4985,49 @@
               "description": "Portable-profile rejection shared by format conversion and decoded-value admission.",
               "parameterDetails": [],
               "returns": "'serialize codec value is outside the portable profile'"
+            },
+            {
+              "name": "taggedOptionsInvalid",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly taggedOptionsInvalid: 'serialize tagged codec options are invalid';",
+              "description": "Tagged codec construction requires compatible unique descriptors and callable methods.",
+              "parameterDetails": [],
+              "returns": "'serialize tagged codec options are invalid'"
+            },
+            {
+              "name": "tagMissing",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly tagMissing: 'serialize codec tag is missing';",
+              "description": "Untagged input needs an explicitly selected fallback instead of format guessing.",
+              "parameterDetails": [],
+              "returns": "'serialize codec tag is missing'"
+            },
+            {
+              "name": "tagInvalid",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly tagInvalid: 'serialize codec tag is invalid';",
+              "description": "Reserved headers cannot fall back to a legacy decoder after malformed framing.",
+              "parameterDetails": [],
+              "returns": "'serialize codec tag is invalid'"
+            },
+            {
+              "name": "tagUnknown",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly tagUnknown: 'serialize codec tag is not registered';",
+              "description": "A syntactically valid tag requires a matching registered format revision.",
+              "parameterDetails": [],
+              "returns": "'serialize codec tag is not registered'"
             }
           ],
           "composes": [],
           "aliasOf": "CodecErrorText",
           "exportPath": "./codec",
           "overloadSignatures": [
-            "export declare const CodecErrorText: { /** Factory version admission failure before a codec is returned. */ readonly invalidVersion: 'serialize codec version must be a positive safe integer'; /** Protobuf schema identity/version admission failure, independent of the executable binding. */ readonly invalidSchema: 'serialize protobuf schema descriptor is invalid'; /** Fallback for an unclassified format encoder failure; the original remains on cause. */ readonly encodeFailed: 'serialize codec encode failed'; /** Fallback for an unclassified format decoder failure; the original remains on cause. */ readonly decodeFailed: 'serialize codec decode failed'; /** Portable-profile rejection shared by format conversion and decoded-value admission. */ readonly portableValueInvalid: 'serialize codec value is outside the portable profile'; };"
+            "export declare const CodecErrorText: { /** Factory version admission failure before a codec is returned. */ readonly invalidVersion: 'serialize codec version must be a positive safe integer'; /** Protobuf schema identity/version admission failure, independent of the executable binding. */ readonly invalidSchema: 'serialize protobuf schema descriptor is invalid'; /** Fallback for an unclassified format encoder failure; the original remains on cause. */ readonly encodeFailed: 'serialize codec encode failed'; /** Fallback for an unclassified format decoder failure; the original remains on cause. */ readonly decodeFailed: 'serialize codec decode failed'; /** Portable-profile rejection shared by format conversion and decoded-value admission. */ readonly portableValueInvalid: 'serialize codec value is outside the portable profile'; /** Tagged codec construction requires compatible unique descriptors and callable methods. */ readonly taggedOptionsInvalid: 'serialize tagged codec options are invalid'; /** Untagged input needs an explicitly selected fallback instead of format guessing. */ readonly tagMissing: 'serialize codec tag is missing'; /** Reserved headers cannot fall back to a legacy decoder after malformed framing. */ readonly tagInvalid: 'serialize codec tag is invalid'; /** A syntactically valid tag requires a matching registered format revision. */ readonly tagUnknown: 'serialize codec tag is not registered'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4854,7 +5066,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/serialize/dist/codec-text.d.ts:CodecErrorText:export declare const CodecErrorText: { /** Factory version admission failure before a codec is returned. */ readonly invalidVersion: 'serialize codec version must be a positive safe integer'; /** Protobuf schema identity/version admission failure, independent of the executable binding. */ readonly invalidSchema: 'serialize protobuf schema descriptor is invalid'; /** Fallback for an unclassified format encoder failure; the original remains on cause. */ readonly encodeFailed: 'serialize codec encode failed'; /** Fallback for an unclassified format decoder failure; the original remains on cause. */ readonly decodeFailed: 'serialize codec decode failed'; /** Portable-profile rejection shared by format conversion and decoded-value admission. */ readonly portableValueInvalid: 'serialize codec value is outside the portable profile'; };",
+          "identity": "packages/serialize/dist/codec-text.d.ts:CodecErrorText:export declare const CodecErrorText: { /** Factory version admission failure before a codec is returned. */ readonly invalidVersion: 'serialize codec version must be a positive safe integer'; /** Protobuf schema identity/version admission failure, independent of the executable binding. */ readonly invalidSchema: 'serialize protobuf schema descriptor is invalid'; /** Fallback for an unclassified format encoder failure; the original remains on cause. */ readonly encodeFailed: 'serialize codec encode failed'; /** Fallback for an unclassified format decoder failure; the original remains on cause. */ readonly decodeFailed: 'serialize codec decode failed'; /** Portable-profile rejection shared by format conversion and decoded-value admission. */ readonly portableValueInvalid: 'serialize codec value is outside the portable profile'; /** Tagged codec construction requires compatible unique descriptors and callable methods. */ readonly taggedOptionsInvalid: 'serialize tagged codec options are invalid'; /** Untagged input needs an explicitly selected fallback instead of format guessing. */ readonly tagMissing: 'serialize codec tag is missing'; /** Reserved headers cannot fall back to a legacy decoder after malformed framing. */ readonly tagInvalid: 'serialize codec tag is invalid'; /** A syntactically valid tag requires a matching registered format revision. */ readonly tagUnknown: 'serialize codec tag is not registered'; };",
           "guidance": [],
           "usageScore": 12,
           "configuration": [],
@@ -4942,8 +5154,8 @@
         {
           "name": "ICodec",
           "kind": "type",
-          "signature": "export type ICodec<TValue, TEncoded, TId extends string = string, TVersion extends number = number> = Readonly<{ /** Stable format identity, separate from parser registry plugin routing. */ id: TId; /** Explicit format revision; built-in factories require a positive safe integer. */ version: TVersion; /** Unknown preserves arbitrary values, string carries text, and uint8array carries binary frames. */ encodedType: 'unknown' | 'string' | 'uint8array'; /** * Synchronously converts a domain value to the declared representation; format failures are * thrown. */ encode: (value: TValue) => TEncoded; /** * Synchronously restores the codec's domain value; decoding does not imply original object * identity. */ decode: (value: TEncoded) => TValue; }>;",
-          "declarationLine": 3,
+          "signature": "export type ICodec<TValue, TEncoded, TId extends string = string, TVersion extends number = number> = Readonly<{ /** Stable format identity, separate from parser registry plugin routing. */ id: TId; /** Explicit format revision; built-in factories require a positive safe integer. */ version: TVersion; /** Unknown preserves arbitrary values, string carries text, and uint8array carries binary frames. */ encodedType: ICodecEncodedType; /** * Synchronously converts a domain value to the declared representation; format failures are * thrown. */ encode: (value: TValue) => TEncoded; /** * Synchronously restores the codec's domain value; decoding does not imply original object * identity. */ decode: (value: TEncoded) => TValue; }>;",
+          "declarationLine": 5,
           "source": "packages/serialize/dist/codec.d.ts",
           "purpose": "Generic synchronous codec object containing format identity, explicit version, encoded representation and two callbacks. Format factories freeze the codec object; they do not freeze decoded application data.",
           "core": "id: Codec format identifier fixed by its factory, such as `json`, `cbor`, `message-pack`, `protobuf` or `identity`.\nversion: The version number supplied when creating this codec, which converts values to a data format and back. It identifies the format version that producers and consumers agree to use. The codec retains the number; changing the original construction options later does not change this property.\nencodedType: Declares the runtime representation produced by encoding so a transport can admit the correct payload shape.\nIdentity representation preserves any input without changing object identity.\nText representation emitted by the JSON format codec.\nByte representation emitted by CBOR, MessagePack and Protobuf codecs.\nencode: Synchronously converts the supplied application value to the codec representation; built-in format failures carry package codes and original causes.\nencode.value: Application value admitted by this codec; portable formats accept `ICodecValue`, while Protobuf accepts its generated message shape.\nThe encoded `TEncoded` value; identity returns the input itself, while format codecs return text or bytes.\ndecode: Synchronously restores the application value from this codec representation; invalid portable data or malformed format data throws.\ndecode.value: Encoded value returned by the matching codec encode operation, or received from a carrier using that format and version.\nThe decoded `TValue`; identity returns the same object, portable formats validate the result and Protobuf returns its message shape.",
@@ -4977,10 +5189,10 @@
               "name": "encodedType",
               "kind": "property",
               "optional": false,
-              "signature": "encodedType: 'unknown' | 'string' | 'uint8array';",
+              "signature": "encodedType: ICodecEncodedType;",
               "description": "Unknown preserves arbitrary values, string carries text, and uint8array carries binary frames.",
               "parameterDetails": [],
-              "returns": "'unknown' | 'string' | 'uint8array'"
+              "returns": "ICodecEncodedType"
             },
             {
               "name": "encode",
@@ -5004,7 +5216,7 @@
           "composes": [],
           "exportPath": "./codec",
           "overloadSignatures": [
-            "export type ICodec<TValue, TEncoded, TId extends string = string, TVersion extends number = number> = Readonly<{ /** Stable format identity, separate from parser registry plugin routing. */ id: TId; /** Explicit format revision; built-in factories require a positive safe integer. */ version: TVersion; /** Unknown preserves arbitrary values, string carries text, and uint8array carries binary frames. */ encodedType: 'unknown' | 'string' | 'uint8array'; /** * Synchronously converts a domain value to the declared representation; format failures are * thrown. */ encode: (value: TValue) => TEncoded; /** * Synchronously restores the codec's domain value; decoding does not imply original object * identity. */ decode: (value: TEncoded) => TValue; }>;"
+            "export type ICodec<TValue, TEncoded, TId extends string = string, TVersion extends number = number> = Readonly<{ /** Stable format identity, separate from parser registry plugin routing. */ id: TId; /** Explicit format revision; built-in factories require a positive safe integer. */ version: TVersion; /** Unknown preserves arbitrary values, string carries text, and uint8array carries binary frames. */ encodedType: ICodecEncodedType; /** * Synchronously converts a domain value to the declared representation; format failures are * thrown. */ encode: (value: TValue) => TEncoded; /** * Synchronously restores the codec's domain value; decoding does not imply original object * identity. */ decode: (value: TEncoded) => TValue; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -5043,17 +5255,81 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/serialize/dist/codec.d.ts:ICodec:export type ICodec<TValue, TEncoded, TId extends string = string, TVersion extends number = number> = Readonly<{ /** Stable format identity, separate from parser registry plugin routing. */ id: TId; /** Explicit format revision; built-in factories require a positive safe integer. */ version: TVersion; /** Unknown preserves arbitrary values, string carries text, and uint8array carries binary frames. */ encodedType: 'unknown' | 'string' | 'uint8array'; /** * Synchronously converts a domain value to the declared representation; format failures are * thrown. */ encode: (value: TValue) => TEncoded; /** * Synchronously restores the codec's domain value; decoding does not imply original object * identity. */ decode: (value: TEncoded) => TValue; }>;",
+          "identity": "packages/serialize/dist/codec.d.ts:ICodec:export type ICodec<TValue, TEncoded, TId extends string = string, TVersion extends number = number> = Readonly<{ /** Stable format identity, separate from parser registry plugin routing. */ id: TId; /** Explicit format revision; built-in factories require a positive safe integer. */ version: TVersion; /** Unknown preserves arbitrary values, string carries text, and uint8array carries binary frames. */ encodedType: ICodecEncodedType; /** * Synchronously converts a domain value to the declared representation; format failures are * thrown. */ encode: (value: TValue) => TEncoded; /** * Synchronously restores the codec's domain value; decoding does not imply original object * identity. */ decode: (value: TEncoded) => TValue; }>;",
           "guidance": [],
           "usageScore": 12,
           "configuration": [],
           "fragment": "serialize-codec--ICodec"
         },
         {
+          "name": "ICodecEncodedType",
+          "kind": "type",
+          "signature": "export type ICodecEncodedType = 'unknown' | 'string' | 'uint8array';",
+          "declarationLine": 3,
+          "source": "packages/serialize/dist/codec.d.ts",
+          "purpose": "Encoded carrier selected by a codec, independent of its business value type.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ICodecEncodedType.",
+          "advanced": "No additional advanced behavior is declared for ICodecEncodedType.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for ICodecEncodedType."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ICodecEncodedType.",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "exportPath": "./codec",
+          "overloadSignatures": [
+            "export type ICodecEncodedType = 'unknown' | 'string' | 'uint8array';"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use ICodecEncodedType when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when ICodecEncodedType does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Encoded carrier selected by a codec, independent of its business value type."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ICodecEncodedType from @migaia/serialize/codec, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ICodecEncodedType when its type contract and declared inputs match the result you need. Choose a different public symbol when ICodecEncodedType does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ICodecEncodedType."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for ICodecEncodedType."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/serialize/dist/codec.d.ts:ICodecEncodedType:export type ICodecEncodedType = 'unknown' | 'string' | 'uint8array';",
+          "guidance": [],
+          "usageScore": 6,
+          "configuration": [],
+          "fragment": "serialize-codec--ICodecEncodedType"
+        },
+        {
           "name": "ICodecValue",
           "kind": "type",
           "signature": "export type ICodecValue = null | boolean | number | string | readonly ICodecValue[] | Readonly<{ [key: string]: ICodecValue; }>;",
-          "declarationLine": 26,
+          "declarationLine": 28,
           "source": "packages/serialize/dist/codec.d.ts",
           "purpose": "Recursive portable value union: null, booleans, finite numbers, strings, dense arrays and ordinary or null-prototype records. Native bytes encode through the reserved portable bytes tag, not as a decoded native typed array.",
           "core": "Recursive portable value union: null, booleans, finite numbers, strings, dense arrays and ordinary or null-prototype records. Native bytes encode through the reserved portable bytes tag, not as a decoded native typed array.",
@@ -5383,7 +5659,7 @@
           "name": "normalizeCodecFailure",
           "kind": "function",
           "signature": "export declare function normalizeCodecFailure(error: unknown, code: (typeof SerializeErrorCode)[keyof typeof SerializeErrorCode], message: string): Error;",
-          "declarationLine": 37,
+          "declarationLine": 39,
           "source": "packages/serialize/dist/codec.d.ts",
           "purpose": "Returns an already tagged serialize Error unchanged; otherwise wraps the original thrown value in a coded native TypeError. This prevents repeated format-codec wrapping while retaining an original cause.",
           "core": "error: Original thrown value captured by a format callback boundary.\ncode: Fallback semantic code from SerializeErrorCode, used only when the error is not already serialize-tagged.\nmessage: Fallback caller-owned diagnostic, usually selected from CodecErrorText.\nThe original tagged Error, or a TypeError wrapper whose cause is exactly the original thrown value.",
@@ -5566,7 +5842,7 @@
           "declaredConfiguration": [],
           "identity": "packages/serialize/dist/portable.d.ts:toPortableValue:export declare function toPortableValue(value: unknown, active?: Set<object>): unknown;",
           "guidance": [],
-          "usageScore": 6,
+          "usageScore": 12,
           "configuration": [],
           "fragment": "serialize-codec--toPortableValue"
         }
@@ -5592,7 +5868,7 @@
         {
           "name": "defineCBORCodec",
           "kind": "function",
-          "signature": "export declare function defineCBORCodec<const TVersion extends number>(options: ICborCodecOptions<TVersion>): ICodec<ICodecValue, Uint8Array, 'cbor', TVersion>;",
+          "signature": "export declare function defineCBORCodec<const TVersion extends number>(options: ICborCodecOptions<TVersion>): ICodec<ICodecValue, Uint8Array, 'cbor', TVersion> & { readonly encodedType: 'uint8array'; };",
           "declarationLine": 14,
           "source": "packages/serialize/dist/codecs/cbor.d.ts",
           "purpose": "Creates a frozen synchronous cbor-x codec for portable values, without records or host-specific extensions. Decoded bigint integers are converted to numbers only when they are exactly safe integers.",
@@ -5606,7 +5882,7 @@
               "optional": false
             }
           ],
-          "returns": "ICodec<ICodecValue, Uint8Array, 'cbor', TVersion>",
+          "returns": "ICodec<ICodecValue, Uint8Array, 'cbor', TVersion> & { readonly encodedType: 'uint8array'; }",
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [],
@@ -5614,7 +5890,7 @@
           "composes": [],
           "exportPath": "./codecs/cbor",
           "overloadSignatures": [
-            "export declare function defineCBORCodec<const TVersion extends number>(options: ICborCodecOptions<TVersion>): ICodec<ICodecValue, Uint8Array, 'cbor', TVersion>;"
+            "export declare function defineCBORCodec<const TVersion extends number>(options: ICborCodecOptions<TVersion>): ICodec<ICodecValue, Uint8Array, 'cbor', TVersion> & { readonly encodedType: 'uint8array'; };"
           ],
           "overloadParameterDetails": [
             [
@@ -5625,7 +5901,9 @@
               }
             ]
           ],
-          "overloadReturns": ["ICodec<ICodecValue, Uint8Array, 'cbor', TVersion>"],
+          "overloadReturns": [
+            "ICodec<ICodecValue, Uint8Array, 'cbor', TVersion> & { readonly encodedType: 'uint8array'; }"
+          ],
           "whenToUse": "",
           "notUse": "",
           "sections": [
@@ -5668,7 +5946,7 @@
               "description": "Required positive safe integer codec revision; no default is supplied."
             }
           ],
-          "identity": "packages/serialize/dist/codecs/cbor.d.ts:defineCBORCodec:export declare function defineCBORCodec<const TVersion extends number>(options: ICborCodecOptions<TVersion>): ICodec<ICodecValue, Uint8Array, 'cbor', TVersion>;",
+          "identity": "packages/serialize/dist/codecs/cbor.d.ts:defineCBORCodec:export declare function defineCBORCodec<const TVersion extends number>(options: ICborCodecOptions<TVersion>): ICodec<ICodecValue, Uint8Array, 'cbor', TVersion> & { readonly encodedType: 'uint8array'; };",
           "guidance": [],
           "usageScore": 12,
           "configuration": [
@@ -5676,9 +5954,9 @@
               "name": "version",
               "type": "TVersion",
               "optional": false,
-              "description": "defineJsonCodec、defineMessagePackCodec、defineCBORCodec 的 options.version 必填，为正安全整数；工厂返回冻结 codec，id 分别为 json、message-pack、cbor，输出分别为 string、Uint8Array、Uint8Array。三者先做同一 portable 投影/校验；JSON 稳定排序，MessagePack 不使用扩展并排序键；CBOR 关闭 records 和宿主扩展，解码 bigint 整数仅在可精确表示为安全整数时转 number，否则拒绝。",
+              "description": "defineJsonCodec、defineMessagePackCodec、defineCBORCodec 的 options.version 必填，为正安全整数；工厂返回冻结 codec，id 分别为 json、message-pack、cbor，输出分别为 string、Uint8Array、Uint8Array。三者先做同一 portable 投影/校验；JSON、集合 JSON、CBOR 与 MessagePack 按 Object.keys 属性枚举顺序投影，不做比较排序，getter 每次按该顺序读取；MessagePack 不使用扩展；CBOR 关闭 records 和宿主扩展，解码 bigint 整数仅在可精确表示为安全整数时转 number，否则拒绝。",
               "descriptionEn": "Required positive safe integer codec revision; no default is supplied.",
-              "descriptionZh": "defineJsonCodec、defineMessagePackCodec、defineCBORCodec 的 options.version 必填，为正安全整数；工厂返回冻结 codec，id 分别为 json、message-pack、cbor，输出分别为 string、Uint8Array、Uint8Array。三者先做同一 portable 投影/校验；JSON 稳定排序，MessagePack 不使用扩展并排序键；CBOR 关闭 records 和宿主扩展，解码 bigint 整数仅在可精确表示为安全整数时转 number，否则拒绝。"
+              "descriptionZh": "defineJsonCodec、defineMessagePackCodec、defineCBORCodec 的 options.version 必填，为正安全整数；工厂返回冻结 codec，id 分别为 json、message-pack、cbor，输出分别为 string、Uint8Array、Uint8Array。三者先做同一 portable 投影/校验；JSON、集合 JSON、CBOR 与 MessagePack 按 Object.keys 属性枚举顺序投影，不做比较排序，getter 每次按该顺序读取；MessagePack 不使用扩展；CBOR 关闭 records 和宿主扩展，解码 bigint 整数仅在可精确表示为安全整数时转 number，否则拒绝。"
             }
           ],
           "fragment": "serialize-codecs/cbor--defineCBORCodec"
@@ -5756,6 +6034,187 @@
           "usageScore": 6,
           "configuration": [],
           "fragment": "serialize-codecs/cbor--ICborCodecOptions"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "serialize:codecs/collections-json",
+      "library": "serialize",
+      "module": "codecs/collections-json",
+      "exportPath": "./codecs/collections-json",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/docs/serialize/getting-started",
+      "architecturePath": "/en/docs/serialize",
+      "symbols": [
+        {
+          "name": "defineCollectionsJsonCodec",
+          "kind": "function",
+          "signature": "export declare function defineCollectionsJsonCodec<const TVersion extends number>(options: IJsonCodecOptions<TVersion>): ICodec<ICollectionsCodecValue, string, 'collections-json', TVersion> & { readonly encodedType: 'string'; };",
+          "declarationLine": 12,
+          "source": "packages/serialize/dist/codecs/collections-json.d.ts",
+          "purpose": "Creates a frozen collections-json codec preserving recursive Map/Set order. Other inputs share strict portable rules; bytes decode as records, class fields are projected, and malformed reserved records reject.",
+          "core": "options: Required positive safe-integer version.\nString codec with literal id and version. Format failures carry ENCODE_FAILED or DECODE_FAILED and the original error on cause.\nversion: Caller-selected positive safe integer identifying this codec wire version; no default is assigned and the exact literal type is retained.",
+          "advanced": "",
+          "parameters": ["options: IJsonCodecOptions<TVersion>"],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "IJsonCodecOptions<TVersion>",
+              "optional": false
+            }
+          ],
+          "returns": "ICodec<ICollectionsCodecValue, string, 'collections-json', TVersion> & { readonly encodedType: 'string'; }",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [
+            "import { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'\n\nconst codec = defineCollectionsJsonCodec({ version: 1 })\nconst source = new Map([['roles', new Set(['read', 'write'])]])\nconst text = codec.encode(source)\nconsole.log(text) // {\"$rpc\":\"map\",\"entries\":[[\"roles\",{\"$rpc\":\"set\",\"values\":[\"read\",\"write\"]}]]}\nconsole.log(codec.decode(text)) // Map { 'roles' => Set { 'read', 'write' } }"
+          ],
+          "members": [],
+          "composes": [],
+          "exportPath": "./codecs/collections-json",
+          "overloadSignatures": [
+            "export declare function defineCollectionsJsonCodec<const TVersion extends number>(options: IJsonCodecOptions<TVersion>): ICodec<ICollectionsCodecValue, string, 'collections-json', TVersion> & { readonly encodedType: 'string'; };"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "IJsonCodecOptions<TVersion>",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": [
+            "ICodec<ICollectionsCodecValue, string, 'collections-json', TVersion> & { readonly encodedType: 'string'; }"
+          ],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Creates a frozen collections-json codec preserving recursive Map/Set order. Other inputs share strict portable rules; bytes decode as records, class fields are projected, and malformed reserved records reject."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import defineCollectionsJsonCodec from @migaia/serialize/codecs/collections-json, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use defineCollectionsJsonCodec when its function contract and declared inputs match the result you need. Choose a different public symbol when defineCollectionsJsonCodec does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "options: Required positive safe-integer version.\nString codec with literal id and version. Format failures carry ENCODE_FAILED or DECODE_FAILED and the original error on cause.\nversion: Caller-selected positive safe integer identifying this codec wire version; no default is assigned and the exact literal type is retained."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [
+            {
+              "name": "version",
+              "type": "TVersion",
+              "optional": false,
+              "description": "Required positive safe integer revision; no default version is inserted."
+            }
+          ],
+          "identity": "packages/serialize/dist/codecs/collections-json.d.ts:defineCollectionsJsonCodec:export declare function defineCollectionsJsonCodec<const TVersion extends number>(options: IJsonCodecOptions<TVersion>): ICodec<ICollectionsCodecValue, string, 'collections-json', TVersion> & { readonly encodedType: 'string'; };",
+          "guidance": [],
+          "usageScore": 24,
+          "configuration": [
+            {
+              "name": "version",
+              "type": "TVersion",
+              "optional": false,
+              "description": "Required positive safe integer revision; no default version is inserted.",
+              "descriptionEn": "Required positive safe integer revision; no default version is inserted.",
+              "descriptionZh": ""
+            }
+          ],
+          "fragment": "serialize-codecs/collections-json--defineCollectionsJsonCodec"
+        },
+        {
+          "name": "ICollectionsCodecValue",
+          "kind": "type",
+          "signature": "export type ICollectionsCodecValue = ICodecValue | Uint8Array | ReadonlyMap<ICollectionsCodecValue, ICollectionsCodecValue> | ReadonlySet<ICollectionsCodecValue> | readonly ICollectionsCodecValue[] | Readonly<{ [key: string]: ICollectionsCodecValue; }>;",
+          "declarationLine": 4,
+          "source": "packages/serialize/dist/codecs/collections-json.d.ts",
+          "purpose": "Portable format values extended with recursively nested collections and intrinsic bytes.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ICollectionsCodecValue.",
+          "advanced": "No additional advanced behavior is declared for ICollectionsCodecValue.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for ICollectionsCodecValue."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ICollectionsCodecValue.",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "exportPath": "./codecs/collections-json",
+          "overloadSignatures": [
+            "export type ICollectionsCodecValue = ICodecValue | Uint8Array | ReadonlyMap<ICollectionsCodecValue, ICollectionsCodecValue> | ReadonlySet<ICollectionsCodecValue> | readonly ICollectionsCodecValue[] | Readonly<{ [key: string]: ICollectionsCodecValue; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use ICollectionsCodecValue when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when ICollectionsCodecValue does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Portable format values extended with recursively nested collections and intrinsic bytes."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ICollectionsCodecValue from @migaia/serialize/codecs/collections-json, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ICollectionsCodecValue when its type contract and declared inputs match the result you need. Choose a different public symbol when ICollectionsCodecValue does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ICollectionsCodecValue."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for ICollectionsCodecValue."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/serialize/dist/codecs/collections-json.d.ts:ICollectionsCodecValue:export type ICollectionsCodecValue = ICodecValue | Uint8Array | ReadonlyMap<ICollectionsCodecValue, ICollectionsCodecValue> | ReadonlySet<ICollectionsCodecValue> | readonly ICollectionsCodecValue[] | Readonly<{ [key: string]: ICollectionsCodecValue; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "serialize-codecs/collections-json--ICollectionsCodecValue"
         }
       ],
       "aliases": []
@@ -5909,7 +6368,7 @@
         {
           "name": "defineJsonCodec",
           "kind": "function",
-          "signature": "export declare function defineJsonCodec<const TVersion extends number>(options: IJsonCodecOptions<TVersion>): ICodec<ICodecValue, string, 'json', TVersion>;",
+          "signature": "export declare function defineJsonCodec<const TVersion extends number>(options: IJsonCodecOptions<TVersion>): ICodec<ICodecValue, string, 'json', TVersion> & { readonly encodedType: 'string'; };",
           "declarationLine": 14,
           "source": "packages/serialize/dist/codecs/json.d.ts",
           "purpose": "Creates a frozen synchronous JSON codec with explicit version metadata. Its portable profile admits null, booleans, finite numbers, strings, dense arrays and ordinary records; encoding validates and projects supported data before stringify, while decoding parses and validates without freezing the result. Unsupported scalars such as NaN reject rather than silently becoming null. This differs from the native-JSON registry plugin, and the version is not embedded in the encoded text.",
@@ -5923,17 +6382,18 @@
               "optional": false
             }
           ],
-          "returns": "ICodec<ICodecValue, string, 'json', TVersion>",
+          "returns": "ICodec<ICodecValue, string, 'json', TVersion> & { readonly encodedType: 'string'; }",
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "import { defineJsonCodec } from '@migaia/serialize/codecs/json'\n\nconst codec = defineJsonCodec({ version: 1 })\nconsole.log('有限值:', codec.encode({ count: 2 }))\nconsole.log('原生 JSON:', JSON.stringify({ count: Number.NaN }))\ntry {\n  codec.encode({ count: Number.NaN })\n} catch (error) {\n  console.log('portable 拒绝:', (error as Error & { code: string }).code)\n}"
+            "import { defineJsonCodec } from '@migaia/serialize/codecs/json'\n\nconst codec = defineJsonCodec({ version: 1 })\nconsole.log('有限值:', codec.encode({ count: 2 }))\nconsole.log('原生 JSON:', JSON.stringify({ count: Number.NaN }))\ntry {\n  codec.encode({ count: Number.NaN })\n} catch (error) {\n  console.log('portable 拒绝:', (error as Error & { code: string }).code)\n}",
+            "import { createTaggedCodec } from '@migaia/serialize/tagged'\nimport { defineJsonCodec } from '@migaia/serialize/codecs/json'\n\nconst current = defineJsonCodec({ version: 2 })\nconst previous = defineJsonCodec({ version: 1 })\nconst tagged = createTaggedCodec({ codecs: [current, previous], untagged: previous })\nconsole.log(tagged.encode({ count: 2 })) // mgt1:json@2;{\"count\":2}\nconsole.log(tagged.decode('mgt1:json@1;{\"count\":1}')) // { count: 1 }\nconsole.log(tagged.decode('{\"count\":1}')) // { count: 1 }\ntry {\n  tagged.decode('mgt1:json@3;{\"count\":3}')\n} catch (error) {\n  console.log((error as Error & { code: string }).code) // TAG_UNKNOWN\n}"
           ],
           "members": [],
           "composes": [],
           "exportPath": "./codecs/json",
           "overloadSignatures": [
-            "export declare function defineJsonCodec<const TVersion extends number>(options: IJsonCodecOptions<TVersion>): ICodec<ICodecValue, string, 'json', TVersion>;"
+            "export declare function defineJsonCodec<const TVersion extends number>(options: IJsonCodecOptions<TVersion>): ICodec<ICodecValue, string, 'json', TVersion> & { readonly encodedType: 'string'; };"
           ],
           "overloadParameterDetails": [
             [
@@ -5944,7 +6404,9 @@
               }
             ]
           ],
-          "overloadReturns": ["ICodec<ICodecValue, string, 'json', TVersion>"],
+          "overloadReturns": [
+            "ICodec<ICodecValue, string, 'json', TVersion> & { readonly encodedType: 'string'; }"
+          ],
           "whenToUse": "",
           "notUse": "",
           "sections": [
@@ -5987,9 +6449,9 @@
               "description": "Required positive safe integer revision; no default version is inserted."
             }
           ],
-          "identity": "packages/serialize/dist/codecs/json.d.ts:defineJsonCodec:export declare function defineJsonCodec<const TVersion extends number>(options: IJsonCodecOptions<TVersion>): ICodec<ICodecValue, string, 'json', TVersion>;",
+          "identity": "packages/serialize/dist/codecs/json.d.ts:defineJsonCodec:export declare function defineJsonCodec<const TVersion extends number>(options: IJsonCodecOptions<TVersion>): ICodec<ICodecValue, string, 'json', TVersion> & { readonly encodedType: 'string'; };",
           "guidance": [],
-          "usageScore": 42,
+          "usageScore": 72,
           "configuration": [
             {
               "name": "version",
@@ -6098,10 +6560,10 @@
         {
           "name": "defineMessagePackCodec",
           "kind": "function",
-          "signature": "export declare function defineMessagePackCodec<const TVersion extends number>(options: IMessagePackCodecOptions<TVersion>): ICodec<ICodecValue, Uint8Array, 'message-pack', TVersion>;",
+          "signature": "export declare function defineMessagePackCodec<const TVersion extends number>(options: IMessagePackCodecOptions<TVersion>): ICodec<ICodecValue, Uint8Array, 'message-pack', TVersion> & { readonly encodedType: 'uint8array'; };",
           "declarationLine": 14,
           "source": "packages/serialize/dist/codecs/message-pack.d.ts",
-          "purpose": "Creates a frozen synchronous MessagePack codec using @msgpack/msgpack, sorted record keys and no custom extensions. Portable admission is shared with the JSON and CBOR codecs.",
+          "purpose": "Creates a frozen synchronous MessagePack codec using @msgpack/msgpack, property enumeration order and no custom extensions. Portable admission is shared with the JSON and CBOR codecs.",
           "core": "options: Required IMessagePackCodecOptions with a caller-selected positive safe integer version; install @msgpack/msgpack before importing.\nICodec with id message-pack and Uint8Array output. Invalid version or profile uses INVALID_OPTION; format failures retain cause with ENCODE_FAILED or DECODE_FAILED.\nversion: Caller-selected positive safe integer identifying this codec wire version; no default is assigned and the exact literal type is retained.",
           "advanced": "",
           "parameters": ["options: IMessagePackCodecOptions<TVersion>"],
@@ -6112,7 +6574,7 @@
               "optional": false
             }
           ],
-          "returns": "ICodec<ICodecValue, Uint8Array, 'message-pack', TVersion>",
+          "returns": "ICodec<ICodecValue, Uint8Array, 'message-pack', TVersion> & { readonly encodedType: 'uint8array'; }",
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [],
@@ -6120,7 +6582,7 @@
           "composes": [],
           "exportPath": "./codecs/message-pack",
           "overloadSignatures": [
-            "export declare function defineMessagePackCodec<const TVersion extends number>(options: IMessagePackCodecOptions<TVersion>): ICodec<ICodecValue, Uint8Array, 'message-pack', TVersion>;"
+            "export declare function defineMessagePackCodec<const TVersion extends number>(options: IMessagePackCodecOptions<TVersion>): ICodec<ICodecValue, Uint8Array, 'message-pack', TVersion> & { readonly encodedType: 'uint8array'; };"
           ],
           "overloadParameterDetails": [
             [
@@ -6131,14 +6593,16 @@
               }
             ]
           ],
-          "overloadReturns": ["ICodec<ICodecValue, Uint8Array, 'message-pack', TVersion>"],
+          "overloadReturns": [
+            "ICodec<ICodecValue, Uint8Array, 'message-pack', TVersion> & { readonly encodedType: 'uint8array'; }"
+          ],
           "whenToUse": "",
           "notUse": "",
           "sections": [
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Creates a frozen synchronous MessagePack codec using @msgpack/msgpack, sorted record keys and no custom extensions. Portable admission is shared with the JSON and CBOR codecs."
+              "content": "Creates a frozen synchronous MessagePack codec using @msgpack/msgpack, property enumeration order and no custom extensions. Portable admission is shared with the JSON and CBOR codecs."
             },
             {
               "id": "getting-started",
@@ -6174,7 +6638,7 @@
               "description": "Required positive safe integer revision, independent of the peer library version."
             }
           ],
-          "identity": "packages/serialize/dist/codecs/message-pack.d.ts:defineMessagePackCodec:export declare function defineMessagePackCodec<const TVersion extends number>(options: IMessagePackCodecOptions<TVersion>): ICodec<ICodecValue, Uint8Array, 'message-pack', TVersion>;",
+          "identity": "packages/serialize/dist/codecs/message-pack.d.ts:defineMessagePackCodec:export declare function defineMessagePackCodec<const TVersion extends number>(options: IMessagePackCodecOptions<TVersion>): ICodec<ICodecValue, Uint8Array, 'message-pack', TVersion> & { readonly encodedType: 'uint8array'; };",
           "guidance": [],
           "usageScore": 12,
           "configuration": [
@@ -6182,9 +6646,9 @@
               "name": "version",
               "type": "TVersion",
               "optional": false,
-              "description": "defineJsonCodec、defineMessagePackCodec、defineCBORCodec 的 options.version 必填，为正安全整数；工厂返回冻结 codec，id 分别为 json、message-pack、cbor，输出分别为 string、Uint8Array、Uint8Array。三者先做同一 portable 投影/校验；JSON 稳定排序，MessagePack 不使用扩展并排序键；CBOR 关闭 records 和宿主扩展，解码 bigint 整数仅在可精确表示为安全整数时转 number，否则拒绝。",
+              "description": "defineJsonCodec、defineMessagePackCodec、defineCBORCodec 的 options.version 必填，为正安全整数；工厂返回冻结 codec，id 分别为 json、message-pack、cbor，输出分别为 string、Uint8Array、Uint8Array。三者先做同一 portable 投影/校验；JSON、集合 JSON、CBOR 与 MessagePack 按 Object.keys 属性枚举顺序投影，不做比较排序，getter 每次按该顺序读取；MessagePack 不使用扩展；CBOR 关闭 records 和宿主扩展，解码 bigint 整数仅在可精确表示为安全整数时转 number，否则拒绝。",
               "descriptionEn": "Required positive safe integer revision, independent of the peer library version.",
-              "descriptionZh": "defineJsonCodec、defineMessagePackCodec、defineCBORCodec 的 options.version 必填，为正安全整数；工厂返回冻结 codec，id 分别为 json、message-pack、cbor，输出分别为 string、Uint8Array、Uint8Array。三者先做同一 portable 投影/校验；JSON 稳定排序，MessagePack 不使用扩展并排序键；CBOR 关闭 records 和宿主扩展，解码 bigint 整数仅在可精确表示为安全整数时转 number，否则拒绝。"
+              "descriptionZh": "defineJsonCodec、defineMessagePackCodec、defineCBORCodec 的 options.version 必填，为正安全整数；工厂返回冻结 codec，id 分别为 json、message-pack、cbor，输出分别为 string、Uint8Array、Uint8Array。三者先做同一 portable 投影/校验；JSON、集合 JSON、CBOR 与 MessagePack 按 Object.keys 属性枚举顺序投影，不做比较排序，getter 每次按该顺序读取；MessagePack 不使用扩展；CBOR 关闭 records 和宿主扩展，解码 bigint 整数仅在可精确表示为安全整数时转 number，否则拒绝。"
             }
           ],
           "fragment": "serialize-codecs/message-pack--defineMessagePackCodec"
@@ -6285,7 +6749,7 @@
         {
           "name": "defineProtobufCodec",
           "kind": "function",
-          "signature": "export declare function defineProtobufCodec<const TVersion extends number, const TSchemaId extends string, const TSchemaVersion extends number, const TBinding extends DescMessage>(options: IProtobufCodecOptions<TVersion, TSchemaId, TSchemaVersion, TBinding>): ICodec<MessageShape<TBinding>, Uint8Array, 'protobuf', TVersion> & Readonly<{ schema: IProtobufSchema<TSchemaId, TSchemaVersion>; }>;",
+          "signature": "export declare function defineProtobufCodec<const TVersion extends number, const TSchemaId extends string, const TSchemaVersion extends number, const TBinding extends DescMessage>(options: IProtobufCodecOptions<TVersion, TSchemaId, TSchemaVersion, TBinding>): ICodec<MessageShape<TBinding>, Uint8Array, 'protobuf', TVersion> & { readonly encodedType: 'uint8array'; } & Readonly<{ schema: IProtobufSchema<TSchemaId, TSchemaVersion>; }>;",
           "declarationLine": 32,
           "source": "packages/serialize/dist/codecs/protobuf.d.ts",
           "purpose": "Creates a frozen Buf Protobuf codec from a generated message descriptor. Codec version, application schema identity and schema version are distinct; the schema metadata is copied and frozen at construction.",
@@ -6301,7 +6765,7 @@
               "optional": false
             }
           ],
-          "returns": "ICodec<MessageShape<TBinding>, Uint8Array, 'protobuf', TVersion> & Readonly<{ schema: IProtobufSchema<TSchemaId, TSchemaVersion>; }>",
+          "returns": "ICodec<MessageShape<TBinding>, Uint8Array, 'protobuf', TVersion> & { readonly encodedType: 'uint8array'; } & Readonly<{ schema: IProtobufSchema<TSchemaId, TSchemaVersion>; }>",
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [],
@@ -6309,7 +6773,7 @@
           "composes": [],
           "exportPath": "./codecs/protobuf",
           "overloadSignatures": [
-            "export declare function defineProtobufCodec<const TVersion extends number, const TSchemaId extends string, const TSchemaVersion extends number, const TBinding extends DescMessage>(options: IProtobufCodecOptions<TVersion, TSchemaId, TSchemaVersion, TBinding>): ICodec<MessageShape<TBinding>, Uint8Array, 'protobuf', TVersion> & Readonly<{ schema: IProtobufSchema<TSchemaId, TSchemaVersion>; }>;"
+            "export declare function defineProtobufCodec<const TVersion extends number, const TSchemaId extends string, const TSchemaVersion extends number, const TBinding extends DescMessage>(options: IProtobufCodecOptions<TVersion, TSchemaId, TSchemaVersion, TBinding>): ICodec<MessageShape<TBinding>, Uint8Array, 'protobuf', TVersion> & { readonly encodedType: 'uint8array'; } & Readonly<{ schema: IProtobufSchema<TSchemaId, TSchemaVersion>; }>;"
           ],
           "overloadParameterDetails": [
             [
@@ -6321,7 +6785,7 @@
             ]
           ],
           "overloadReturns": [
-            "ICodec<MessageShape<TBinding>, Uint8Array, 'protobuf', TVersion> & Readonly<{ schema: IProtobufSchema<TSchemaId, TSchemaVersion>; }>"
+            "ICodec<MessageShape<TBinding>, Uint8Array, 'protobuf', TVersion> & { readonly encodedType: 'uint8array'; } & Readonly<{ schema: IProtobufSchema<TSchemaId, TSchemaVersion>; }>"
           ],
           "whenToUse": "",
           "notUse": "",
@@ -6377,7 +6841,7 @@
               "description": "Generated Buf message descriptor used by toBinary/fromBinary; not arbitrary encode/decode callbacks."
             }
           ],
-          "identity": "packages/serialize/dist/codecs/protobuf.d.ts:defineProtobufCodec:export declare function defineProtobufCodec<const TVersion extends number, const TSchemaId extends string, const TSchemaVersion extends number, const TBinding extends DescMessage>(options: IProtobufCodecOptions<TVersion, TSchemaId, TSchemaVersion, TBinding>): ICodec<MessageShape<TBinding>, Uint8Array, 'protobuf', TVersion> & Readonly<{ schema: IProtobufSchema<TSchemaId, TSchemaVersion>; }>;",
+          "identity": "packages/serialize/dist/codecs/protobuf.d.ts:defineProtobufCodec:export declare function defineProtobufCodec<const TVersion extends number, const TSchemaId extends string, const TSchemaVersion extends number, const TBinding extends DescMessage>(options: IProtobufCodecOptions<TVersion, TSchemaId, TSchemaVersion, TBinding>): ICodec<MessageShape<TBinding>, Uint8Array, 'protobuf', TVersion> & { readonly encodedType: 'uint8array'; } & Readonly<{ schema: IProtobufSchema<TSchemaId, TSchemaVersion>; }>;",
           "guidance": [],
           "usageScore": 12,
           "configuration": [
@@ -6385,9 +6849,9 @@
               "name": "version",
               "type": "TVersion",
               "optional": false,
-              "description": "defineJsonCodec、defineMessagePackCodec、defineCBORCodec 的 options.version 必填，为正安全整数；工厂返回冻结 codec，id 分别为 json、message-pack、cbor，输出分别为 string、Uint8Array、Uint8Array。三者先做同一 portable 投影/校验；JSON 稳定排序，MessagePack 不使用扩展并排序键；CBOR 关闭 records 和宿主扩展，解码 bigint 整数仅在可精确表示为安全整数时转 number，否则拒绝。",
+              "description": "defineJsonCodec、defineMessagePackCodec、defineCBORCodec 的 options.version 必填，为正安全整数；工厂返回冻结 codec，id 分别为 json、message-pack、cbor，输出分别为 string、Uint8Array、Uint8Array。三者先做同一 portable 投影/校验；JSON、集合 JSON、CBOR 与 MessagePack 按 Object.keys 属性枚举顺序投影，不做比较排序，getter 每次按该顺序读取；MessagePack 不使用扩展；CBOR 关闭 records 和宿主扩展，解码 bigint 整数仅在可精确表示为安全整数时转 number，否则拒绝。",
               "descriptionEn": "Required positive safe integer codec revision; no default is inserted.",
-              "descriptionZh": "defineJsonCodec、defineMessagePackCodec、defineCBORCodec 的 options.version 必填，为正安全整数；工厂返回冻结 codec，id 分别为 json、message-pack、cbor，输出分别为 string、Uint8Array、Uint8Array。三者先做同一 portable 投影/校验；JSON 稳定排序，MessagePack 不使用扩展并排序键；CBOR 关闭 records 和宿主扩展，解码 bigint 整数仅在可精确表示为安全整数时转 number，否则拒绝。"
+              "descriptionZh": "defineJsonCodec、defineMessagePackCodec、defineCBORCodec 的 options.version 必填，为正安全整数；工厂返回冻结 codec，id 分别为 json、message-pack、cbor，输出分别为 string、Uint8Array、Uint8Array。三者先做同一 portable 投影/校验；JSON、集合 JSON、CBOR 与 MessagePack 按 Object.keys 属性枚举顺序投影，不做比较排序，getter 每次按该顺序读取；MessagePack 不使用扩展；CBOR 关闭 records 和宿主扩展，解码 bigint 整数仅在可精确表示为安全整数时转 number，否则拒绝。"
             },
             {
               "name": "schema",
@@ -6988,7 +7452,10 @@
                       "invalidOption",
                       "INVALID_OPTION：插件、版本、portable、scheduler、流选项、Base64 或输出准入非法。"
                     ],
-                    ["envUnsupported", "ENV_UNSUPPORTED：Encoding 等必需宿主能力缺失。"]
+                    ["envUnsupported", "ENV_UNSUPPORTED：Encoding 等必需宿主能力缺失。"],
+                    ["tagMissing", "TAG_MISSING：无标签输入缺少显式 untagged 读取器。"],
+                    ["tagInvalid", "TAG_INVALID：保留头部损坏，不回退。"],
+                    ["tagUnknown", "TAG_UNKNOWN：合法标签没有对应的登记版本。"]
                   ]
                 },
                 {
@@ -7188,7 +7655,10 @@
                       "invalidOption",
                       "INVALID_OPTION：插件、版本、portable、scheduler、流选项、Base64 或输出准入非法。"
                     ],
-                    ["envUnsupported", "ENV_UNSUPPORTED：Encoding 等必需宿主能力缺失。"]
+                    ["envUnsupported", "ENV_UNSUPPORTED：Encoding 等必需宿主能力缺失。"],
+                    ["tagMissing", "TAG_MISSING：无标签输入缺少显式 untagged 读取器。"],
+                    ["tagInvalid", "TAG_INVALID：保留头部损坏，不回退。"],
+                    ["tagUnknown", "TAG_UNKNOWN：合法标签没有对应的登记版本。"]
                   ]
                 },
                 {
@@ -7382,7 +7852,10 @@
                       "invalidOption",
                       "INVALID_OPTION：插件、版本、portable、scheduler、流选项、Base64 或输出准入非法。"
                     ],
-                    ["envUnsupported", "ENV_UNSUPPORTED：Encoding 等必需宿主能力缺失。"]
+                    ["envUnsupported", "ENV_UNSUPPORTED：Encoding 等必需宿主能力缺失。"],
+                    ["tagMissing", "TAG_MISSING：无标签输入缺少显式 untagged 读取器。"],
+                    ["tagInvalid", "TAG_INVALID：保留头部损坏，不回退。"],
+                    ["tagUnknown", "TAG_UNKNOWN：合法标签没有对应的登记版本。"]
                   ]
                 },
                 {
@@ -7568,7 +8041,10 @@
                       "invalidOption",
                       "INVALID_OPTION：插件、版本、portable、scheduler、流选项、Base64 或输出准入非法。"
                     ],
-                    ["envUnsupported", "ENV_UNSUPPORTED：Encoding 等必需宿主能力缺失。"]
+                    ["envUnsupported", "ENV_UNSUPPORTED：Encoding 等必需宿主能力缺失。"],
+                    ["tagMissing", "TAG_MISSING：无标签输入缺少显式 untagged 读取器。"],
+                    ["tagInvalid", "TAG_INVALID：保留头部损坏，不回退。"],
+                    ["tagUnknown", "TAG_UNKNOWN：合法标签没有对应的登记版本。"]
                   ]
                 },
                 {
@@ -8454,7 +8930,7 @@
           "name": "ISerializeChunkKind",
           "kind": "type",
           "signature": "export type ISerializeChunkKind = (typeof SerializeChunkKind)[keyof typeof SerializeChunkKind];",
-          "declarationLine": 57,
+          "declarationLine": 78,
           "source": "packages/serialize/dist/format-constants.d.ts",
           "purpose": "Discriminates the payload representation at chunk tuple index zero.",
           "core": "Discriminates the payload representation at chunk tuple index zero.",
@@ -8603,7 +9079,7 @@
           "name": "ISerializeErrorCode",
           "kind": "type",
           "signature": "export type ISerializeErrorCode = (typeof SerializeErrorCode)[keyof typeof SerializeErrorCode];",
-          "declarationLine": 75,
+          "declarationLine": 81,
           "source": "packages/serialize/dist/error-code.d.ts",
           "purpose": "Value union of SerializeErrorCode for package-boundary failure classification; codes remain stable independently from message text.",
           "core": "Value union of SerializeErrorCode for package-boundary failure classification; codes remain stable independently from message text.",
@@ -8691,7 +9167,10 @@
                       "invalidOption",
                       "INVALID_OPTION：插件、版本、portable、scheduler、流选项、Base64 或输出准入非法。"
                     ],
-                    ["envUnsupported", "ENV_UNSUPPORTED：Encoding 等必需宿主能力缺失。"]
+                    ["envUnsupported", "ENV_UNSUPPORTED：Encoding 等必需宿主能力缺失。"],
+                    ["tagMissing", "TAG_MISSING：无标签输入缺少显式 untagged 读取器。"],
+                    ["tagInvalid", "TAG_INVALID：保留头部损坏，不回退。"],
+                    ["tagUnknown", "TAG_UNKNOWN：合法标签没有对应的登记版本。"]
                   ]
                 },
                 {
@@ -8819,7 +9298,10 @@
                       "invalidOption",
                       "INVALID_OPTION：插件、版本、portable、scheduler、流选项、Base64 或输出准入非法。"
                     ],
-                    ["envUnsupported", "ENV_UNSUPPORTED：Encoding 等必需宿主能力缺失。"]
+                    ["envUnsupported", "ENV_UNSUPPORTED：Encoding 等必需宿主能力缺失。"],
+                    ["tagMissing", "TAG_MISSING：无标签输入缺少显式 untagged 读取器。"],
+                    ["tagInvalid", "TAG_INVALID：保留头部损坏，不回退。"],
+                    ["tagUnknown", "TAG_UNKNOWN：合法标签没有对应的登记版本。"]
                   ]
                 },
                 {
@@ -9275,7 +9757,10 @@
                       "invalidOption",
                       "INVALID_OPTION：插件、版本、portable、scheduler、流选项、Base64 或输出准入非法。"
                     ],
-                    ["envUnsupported", "ENV_UNSUPPORTED：Encoding 等必需宿主能力缺失。"]
+                    ["envUnsupported", "ENV_UNSUPPORTED：Encoding 等必需宿主能力缺失。"],
+                    ["tagMissing", "TAG_MISSING：无标签输入缺少显式 untagged 读取器。"],
+                    ["tagInvalid", "TAG_INVALID：保留头部损坏，不回退。"],
+                    ["tagUnknown", "TAG_UNKNOWN：合法标签没有对应的登记版本。"]
                   ]
                 },
                 {
@@ -9584,7 +10069,10 @@
                       "invalidOption",
                       "INVALID_OPTION：插件、版本、portable、scheduler、流选项、Base64 或输出准入非法。"
                     ],
-                    ["envUnsupported", "ENV_UNSUPPORTED：Encoding 等必需宿主能力缺失。"]
+                    ["envUnsupported", "ENV_UNSUPPORTED：Encoding 等必需宿主能力缺失。"],
+                    ["tagMissing", "TAG_MISSING：无标签输入缺少显式 untagged 读取器。"],
+                    ["tagInvalid", "TAG_INVALID：保留头部损坏，不回退。"],
+                    ["tagUnknown", "TAG_UNKNOWN：合法标签没有对应的登记版本。"]
                   ]
                 },
                 {
@@ -9702,7 +10190,10 @@
                       "invalidOption",
                       "INVALID_OPTION：插件、版本、portable、scheduler、流选项、Base64 或输出准入非法。"
                     ],
-                    ["envUnsupported", "ENV_UNSUPPORTED：Encoding 等必需宿主能力缺失。"]
+                    ["envUnsupported", "ENV_UNSUPPORTED：Encoding 等必需宿主能力缺失。"],
+                    ["tagMissing", "TAG_MISSING：无标签输入缺少显式 untagged 读取器。"],
+                    ["tagInvalid", "TAG_INVALID：保留头部损坏，不回退。"],
+                    ["tagUnknown", "TAG_UNKNOWN：合法标签没有对应的登记版本。"]
                   ]
                 },
                 {
@@ -10199,7 +10690,10 @@
                       "invalidOption",
                       "INVALID_OPTION：插件、版本、portable、scheduler、流选项、Base64 或输出准入非法。"
                     ],
-                    ["envUnsupported", "ENV_UNSUPPORTED：Encoding 等必需宿主能力缺失。"]
+                    ["envUnsupported", "ENV_UNSUPPORTED：Encoding 等必需宿主能力缺失。"],
+                    ["tagMissing", "TAG_MISSING：无标签输入缺少显式 untagged 读取器。"],
+                    ["tagInvalid", "TAG_INVALID：保留头部损坏，不回退。"],
+                    ["tagUnknown", "TAG_UNKNOWN：合法标签没有对应的登记版本。"]
                   ]
                 },
                 {
@@ -10228,7 +10722,7 @@
         {
           "name": "SerializeErrorCode",
           "kind": "const",
-          "signature": "export declare const SerializeErrorCode: { /** * Thrown when `encode` or `decode` is called after the registry closes or disposal begins. * * Create another registry instead of reusing this instance. Enforces the two-phase contract that * rejects new requests before releasing resources. */ readonly registryDisposed: 'REGISTRY_DISPOSED'; /** * Thrown when no registered parser matches the requested `type`. * * Check plugin registration and the archive format tag. This is a stable configuration or format * failure; retrying the same type does not fix it. */ readonly codecNotFound: 'CODEC_NOT_FOUND'; /** * Thrown when encoding fails: the parser's `encode` throws, streaming encoding fails, or no * chunks are produced. * * `cause` retains the original exception when one exists. Use `chunkIndex` and `bytesConsumed` to * locate the failure. */ readonly encodeFailed: 'ENCODE_FAILED'; /** * Thrown when the parser's `decode` or streaming decoding fails. * * `cause` retains the original exception. Use `chunkIndex` and `bytesConsumed` to locate the * failure. */ readonly decodeFailed: 'DECODE_FAILED'; /** * Thrown for an invalid chunk: a malformed `[type, data]` pair, incorrect text or byte payload, * unknown kind, or a value chunk used by a carrier that accepts only wire data. * * Check parser output and input chunks. This indicates an invalid parser or damaged archive, not * a backend failure. */ readonly invalidChunk: 'INVALID_CHUNK'; /** * Thrown when encoding or decoding is cancelled through an abort signal. * * Treat this as cancellation and retry with a fresh signal when appropriate. It differs from * unrecoverable `ENCODE_FAILED` and `DECODE_FAILED` errors. */ readonly aborted: 'ABORTED'; /** * Thrown for invalid options, including illegal or duplicate plugin types, an empty plugin list, * invalid frame budgets or `maxInFlight`, and a scheduler without `{ now, schedule }` * capabilities. * * Correct the input. The message identifies the invalid option. */ /** Text emitters also reject nonportable own data and values the selected format cannot express. */ readonly invalidOption: 'INVALID_OPTION'; /** * Thrown when `createSerializeRegistry` cannot obtain host `TextEncoder` or `TextDecoder` * capabilities. Standalone `jsonParser` bytes decoding also uses this code when neither its * injected decoder nor the host `TextDecoder` exists. Core collectors require an explicit encoder * for byte merges. * * Inject `encoder` and `decoder`, or use a host with the Encoding API. `cause` retains the * original capability failure when one exists; absent capability needs no synthetic cause. */ readonly envUnsupported: 'ENV_UNSUPPORTED'; };",
+          "signature": "export declare const SerializeErrorCode: { /** * Thrown when `encode` or `decode` is called after the registry closes or disposal begins. * * Create another registry instead of reusing this instance. Enforces the two-phase contract that * rejects new requests before releasing resources. */ readonly registryDisposed: 'REGISTRY_DISPOSED'; /** * Thrown when no registered parser matches the requested `type`. * * Check plugin registration and the archive format tag. This is a stable configuration or format * failure; retrying the same type does not fix it. */ readonly codecNotFound: 'CODEC_NOT_FOUND'; /** * Thrown when encoding fails: the parser's `encode` throws, streaming encoding fails, or no * chunks are produced. * * `cause` retains the original exception when one exists. Use `chunkIndex` and `bytesConsumed` to * locate the failure. */ readonly encodeFailed: 'ENCODE_FAILED'; /** * Thrown when the parser's `decode` or streaming decoding fails. * * `cause` retains the original exception. Use `chunkIndex` and `bytesConsumed` to locate the * failure. */ readonly decodeFailed: 'DECODE_FAILED'; /** * Thrown for an invalid chunk: a malformed `[type, data]` pair, incorrect text or byte payload, * unknown kind, or a value chunk used by a carrier that accepts only wire data. * * Check parser output and input chunks. This indicates an invalid parser or damaged archive, not * a backend failure. */ readonly invalidChunk: 'INVALID_CHUNK'; /** * Thrown when encoding or decoding is cancelled through an abort signal. * * Treat this as cancellation and retry with a fresh signal when appropriate. It differs from * unrecoverable `ENCODE_FAILED` and `DECODE_FAILED` errors. */ readonly aborted: 'ABORTED'; /** * Thrown for invalid options, including illegal or duplicate plugin types, an empty plugin list, * invalid frame budgets or `maxInFlight`, and a scheduler without `{ now, schedule }` * capabilities. * * Correct the input. The message identifies the invalid option. */ /** Text emitters also reject nonportable own data and values the selected format cannot express. */ readonly invalidOption: 'INVALID_OPTION'; /** * Thrown when `createSerializeRegistry` cannot obtain host `TextEncoder` or `TextDecoder` * capabilities. Standalone `jsonParser` bytes decoding also uses this code when neither its * injected decoder nor the host `TextDecoder` exists. Core collectors require an explicit encoder * for byte merges. * * Inject `encoder` and `decoder`, or use a host with the Encoding API. `cause` retains the * original capability failure when one exists; absent capability needs no synthetic cause. */ readonly envUnsupported: 'ENV_UNSUPPORTED'; /** Untagged input has no configured fallback; supply one or pass tagged data. */ readonly tagMissing: 'TAG_MISSING'; /** A reserved tagged header is truncated or malformed; reject the damaged input. */ readonly tagInvalid: 'TAG_INVALID'; /** A valid format tag is not registered; supply the corresponding codec revision. */ readonly tagUnknown: 'TAG_UNKNOWN'; };",
           "declarationLine": 9,
           "source": "packages/serialize/dist/error-code.d.ts",
           "purpose": "Package semantic error codes; classify with source rather than matching messages.",
@@ -10312,13 +10806,40 @@
               "description": "Thrown when `createSerializeRegistry` cannot obtain host `TextEncoder` or `TextDecoder` * capabilities. Standalone `jsonParser` bytes decoding also uses this code when neither its * injected decoder nor the host `TextDecoder` exists. Core collectors require an explicit encoder * for byte merges. * * Inject `encoder` and `decoder`, or use a host with the Encoding API. `cause` retains the * original capability failure when one exists; absent capability needs no synthetic cause.",
               "parameterDetails": [],
               "returns": "'ENV_UNSUPPORTED'"
+            },
+            {
+              "name": "tagMissing",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly tagMissing: 'TAG_MISSING';",
+              "description": "Untagged input has no configured fallback; supply one or pass tagged data.",
+              "parameterDetails": [],
+              "returns": "'TAG_MISSING'"
+            },
+            {
+              "name": "tagInvalid",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly tagInvalid: 'TAG_INVALID';",
+              "description": "A reserved tagged header is truncated or malformed; reject the damaged input.",
+              "parameterDetails": [],
+              "returns": "'TAG_INVALID'"
+            },
+            {
+              "name": "tagUnknown",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly tagUnknown: 'TAG_UNKNOWN';",
+              "description": "A valid format tag is not registered; supply the corresponding codec revision.",
+              "parameterDetails": [],
+              "returns": "'TAG_UNKNOWN'"
             }
           ],
           "composes": [],
           "aliasOf": "SerializeErrorCode",
           "exportPath": "./core",
           "overloadSignatures": [
-            "export declare const SerializeErrorCode: { /** * Thrown when `encode` or `decode` is called after the registry closes or disposal begins. * * Create another registry instead of reusing this instance. Enforces the two-phase contract that * rejects new requests before releasing resources. */ readonly registryDisposed: 'REGISTRY_DISPOSED'; /** * Thrown when no registered parser matches the requested `type`. * * Check plugin registration and the archive format tag. This is a stable configuration or format * failure; retrying the same type does not fix it. */ readonly codecNotFound: 'CODEC_NOT_FOUND'; /** * Thrown when encoding fails: the parser's `encode` throws, streaming encoding fails, or no * chunks are produced. * * `cause` retains the original exception when one exists. Use `chunkIndex` and `bytesConsumed` to * locate the failure. */ readonly encodeFailed: 'ENCODE_FAILED'; /** * Thrown when the parser's `decode` or streaming decoding fails. * * `cause` retains the original exception. Use `chunkIndex` and `bytesConsumed` to locate the * failure. */ readonly decodeFailed: 'DECODE_FAILED'; /** * Thrown for an invalid chunk: a malformed `[type, data]` pair, incorrect text or byte payload, * unknown kind, or a value chunk used by a carrier that accepts only wire data. * * Check parser output and input chunks. This indicates an invalid parser or damaged archive, not * a backend failure. */ readonly invalidChunk: 'INVALID_CHUNK'; /** * Thrown when encoding or decoding is cancelled through an abort signal. * * Treat this as cancellation and retry with a fresh signal when appropriate. It differs from * unrecoverable `ENCODE_FAILED` and `DECODE_FAILED` errors. */ readonly aborted: 'ABORTED'; /** * Thrown for invalid options, including illegal or duplicate plugin types, an empty plugin list, * invalid frame budgets or `maxInFlight`, and a scheduler without `{ now, schedule }` * capabilities. * * Correct the input. The message identifies the invalid option. */ /** Text emitters also reject nonportable own data and values the selected format cannot express. */ readonly invalidOption: 'INVALID_OPTION'; /** * Thrown when `createSerializeRegistry` cannot obtain host `TextEncoder` or `TextDecoder` * capabilities. Standalone `jsonParser` bytes decoding also uses this code when neither its * injected decoder nor the host `TextDecoder` exists. Core collectors require an explicit encoder * for byte merges. * * Inject `encoder` and `decoder`, or use a host with the Encoding API. `cause` retains the * original capability failure when one exists; absent capability needs no synthetic cause. */ readonly envUnsupported: 'ENV_UNSUPPORTED'; };"
+            "export declare const SerializeErrorCode: { /** * Thrown when `encode` or `decode` is called after the registry closes or disposal begins. * * Create another registry instead of reusing this instance. Enforces the two-phase contract that * rejects new requests before releasing resources. */ readonly registryDisposed: 'REGISTRY_DISPOSED'; /** * Thrown when no registered parser matches the requested `type`. * * Check plugin registration and the archive format tag. This is a stable configuration or format * failure; retrying the same type does not fix it. */ readonly codecNotFound: 'CODEC_NOT_FOUND'; /** * Thrown when encoding fails: the parser's `encode` throws, streaming encoding fails, or no * chunks are produced. * * `cause` retains the original exception when one exists. Use `chunkIndex` and `bytesConsumed` to * locate the failure. */ readonly encodeFailed: 'ENCODE_FAILED'; /** * Thrown when the parser's `decode` or streaming decoding fails. * * `cause` retains the original exception. Use `chunkIndex` and `bytesConsumed` to locate the * failure. */ readonly decodeFailed: 'DECODE_FAILED'; /** * Thrown for an invalid chunk: a malformed `[type, data]` pair, incorrect text or byte payload, * unknown kind, or a value chunk used by a carrier that accepts only wire data. * * Check parser output and input chunks. This indicates an invalid parser or damaged archive, not * a backend failure. */ readonly invalidChunk: 'INVALID_CHUNK'; /** * Thrown when encoding or decoding is cancelled through an abort signal. * * Treat this as cancellation and retry with a fresh signal when appropriate. It differs from * unrecoverable `ENCODE_FAILED` and `DECODE_FAILED` errors. */ readonly aborted: 'ABORTED'; /** * Thrown for invalid options, including illegal or duplicate plugin types, an empty plugin list, * invalid frame budgets or `maxInFlight`, and a scheduler without `{ now, schedule }` * capabilities. * * Correct the input. The message identifies the invalid option. */ /** Text emitters also reject nonportable own data and values the selected format cannot express. */ readonly invalidOption: 'INVALID_OPTION'; /** * Thrown when `createSerializeRegistry` cannot obtain host `TextEncoder` or `TextDecoder` * capabilities. Standalone `jsonParser` bytes decoding also uses this code when neither its * injected decoder nor the host `TextDecoder` exists. Core collectors require an explicit encoder * for byte merges. * * Inject `encoder` and `decoder`, or use a host with the Encoding API. `cause` retains the * original capability failure when one exists; absent capability needs no synthetic cause. */ readonly envUnsupported: 'ENV_UNSUPPORTED'; /** Untagged input has no configured fallback; supply one or pass tagged data. */ readonly tagMissing: 'TAG_MISSING'; /** A reserved tagged header is truncated or malformed; reject the damaged input. */ readonly tagInvalid: 'TAG_INVALID'; /** A valid format tag is not registered; supply the corresponding codec revision. */ readonly tagUnknown: 'TAG_UNKNOWN'; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -10357,7 +10878,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/serialize/dist/error-code.d.ts:SerializeErrorCode:export declare const SerializeErrorCode: { /** * Thrown when `encode` or `decode` is called after the registry closes or disposal begins. * * Create another registry instead of reusing this instance. Enforces the two-phase contract that * rejects new requests before releasing resources. */ readonly registryDisposed: 'REGISTRY_DISPOSED'; /** * Thrown when no registered parser matches the requested `type`. * * Check plugin registration and the archive format tag. This is a stable configuration or format * failure; retrying the same type does not fix it. */ readonly codecNotFound: 'CODEC_NOT_FOUND'; /** * Thrown when encoding fails: the parser's `encode` throws, streaming encoding fails, or no * chunks are produced. * * `cause` retains the original exception when one exists. Use `chunkIndex` and `bytesConsumed` to * locate the failure. */ readonly encodeFailed: 'ENCODE_FAILED'; /** * Thrown when the parser's `decode` or streaming decoding fails. * * `cause` retains the original exception. Use `chunkIndex` and `bytesConsumed` to locate the * failure. */ readonly decodeFailed: 'DECODE_FAILED'; /** * Thrown for an invalid chunk: a malformed `[type, data]` pair, incorrect text or byte payload, * unknown kind, or a value chunk used by a carrier that accepts only wire data. * * Check parser output and input chunks. This indicates an invalid parser or damaged archive, not * a backend failure. */ readonly invalidChunk: 'INVALID_CHUNK'; /** * Thrown when encoding or decoding is cancelled through an abort signal. * * Treat this as cancellation and retry with a fresh signal when appropriate. It differs from * unrecoverable `ENCODE_FAILED` and `DECODE_FAILED` errors. */ readonly aborted: 'ABORTED'; /** * Thrown for invalid options, including illegal or duplicate plugin types, an empty plugin list, * invalid frame budgets or `maxInFlight`, and a scheduler without `{ now, schedule }` * capabilities. * * Correct the input. The message identifies the invalid option. */ /** Text emitters also reject nonportable own data and values the selected format cannot express. */ readonly invalidOption: 'INVALID_OPTION'; /** * Thrown when `createSerializeRegistry` cannot obtain host `TextEncoder` or `TextDecoder` * capabilities. Standalone `jsonParser` bytes decoding also uses this code when neither its * injected decoder nor the host `TextDecoder` exists. Core collectors require an explicit encoder * for byte merges. * * Inject `encoder` and `decoder`, or use a host with the Encoding API. `cause` retains the * original capability failure when one exists; absent capability needs no synthetic cause. */ readonly envUnsupported: 'ENV_UNSUPPORTED'; };",
+          "identity": "packages/serialize/dist/error-code.d.ts:SerializeErrorCode:export declare const SerializeErrorCode: { /** * Thrown when `encode` or `decode` is called after the registry closes or disposal begins. * * Create another registry instead of reusing this instance. Enforces the two-phase contract that * rejects new requests before releasing resources. */ readonly registryDisposed: 'REGISTRY_DISPOSED'; /** * Thrown when no registered parser matches the requested `type`. * * Check plugin registration and the archive format tag. This is a stable configuration or format * failure; retrying the same type does not fix it. */ readonly codecNotFound: 'CODEC_NOT_FOUND'; /** * Thrown when encoding fails: the parser's `encode` throws, streaming encoding fails, or no * chunks are produced. * * `cause` retains the original exception when one exists. Use `chunkIndex` and `bytesConsumed` to * locate the failure. */ readonly encodeFailed: 'ENCODE_FAILED'; /** * Thrown when the parser's `decode` or streaming decoding fails. * * `cause` retains the original exception. Use `chunkIndex` and `bytesConsumed` to locate the * failure. */ readonly decodeFailed: 'DECODE_FAILED'; /** * Thrown for an invalid chunk: a malformed `[type, data]` pair, incorrect text or byte payload, * unknown kind, or a value chunk used by a carrier that accepts only wire data. * * Check parser output and input chunks. This indicates an invalid parser or damaged archive, not * a backend failure. */ readonly invalidChunk: 'INVALID_CHUNK'; /** * Thrown when encoding or decoding is cancelled through an abort signal. * * Treat this as cancellation and retry with a fresh signal when appropriate. It differs from * unrecoverable `ENCODE_FAILED` and `DECODE_FAILED` errors. */ readonly aborted: 'ABORTED'; /** * Thrown for invalid options, including illegal or duplicate plugin types, an empty plugin list, * invalid frame budgets or `maxInFlight`, and a scheduler without `{ now, schedule }` * capabilities. * * Correct the input. The message identifies the invalid option. */ /** Text emitters also reject nonportable own data and values the selected format cannot express. */ readonly invalidOption: 'INVALID_OPTION'; /** * Thrown when `createSerializeRegistry` cannot obtain host `TextEncoder` or `TextDecoder` * capabilities. Standalone `jsonParser` bytes decoding also uses this code when neither its * injected decoder nor the host `TextDecoder` exists. Core collectors require an explicit encoder * for byte merges. * * Inject `encoder` and `decoder`, or use a host with the Encoding API. `cause` retains the * original capability failure when one exists; absent capability needs no synthetic cause. */ readonly envUnsupported: 'ENV_UNSUPPORTED'; /** Untagged input has no configured fallback; supply one or pass tagged data. */ readonly tagMissing: 'TAG_MISSING'; /** A reserved tagged header is truncated or malformed; reject the damaged input. */ readonly tagInvalid: 'TAG_INVALID'; /** A valid format tag is not registered; supply the corresponding codec revision. */ readonly tagUnknown: 'TAG_UNKNOWN'; };",
           "guidance": [
             {
               "id": "错误身份-定位与排查",
@@ -10390,7 +10911,10 @@
                       "invalidOption",
                       "INVALID_OPTION：插件、版本、portable、scheduler、流选项、Base64 或输出准入非法。"
                     ],
-                    ["envUnsupported", "ENV_UNSUPPORTED：Encoding 等必需宿主能力缺失。"]
+                    ["envUnsupported", "ENV_UNSUPPORTED：Encoding 等必需宿主能力缺失。"],
+                    ["tagMissing", "TAG_MISSING：无标签输入缺少显式 untagged 读取器。"],
+                    ["tagInvalid", "TAG_INVALID：保留头部损坏，不回退。"],
+                    ["tagUnknown", "TAG_UNKNOWN：合法标签没有对应的登记版本。"]
                   ]
                 },
                 {
@@ -10812,7 +11336,10 @@
                       "invalidOption",
                       "INVALID_OPTION：插件、版本、portable、scheduler、流选项、Base64 或输出准入非法。"
                     ],
-                    ["envUnsupported", "ENV_UNSUPPORTED：Encoding 等必需宿主能力缺失。"]
+                    ["envUnsupported", "ENV_UNSUPPORTED：Encoding 等必需宿主能力缺失。"],
+                    ["tagMissing", "TAG_MISSING：无标签输入缺少显式 untagged 读取器。"],
+                    ["tagInvalid", "TAG_INVALID：保留头部损坏，不回退。"],
+                    ["tagUnknown", "TAG_UNKNOWN：合法标签没有对应的登记版本。"]
                   ]
                 },
                 {
@@ -12030,6 +12557,475 @@
           "ownerFragment": "serialize-core--ITextEncoder"
         }
       ]
+    },
+    {
+      "id": "serialize:tagged",
+      "library": "serialize",
+      "module": "tagged",
+      "exportPath": "./tagged",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/docs/serialize/getting-started",
+      "architecturePath": "/en/docs/serialize",
+      "symbols": [
+        {
+          "name": "createTaggedCodec",
+          "kind": "function",
+          "signature": "export declare function createTaggedCodec<TValue, TEncoded, const TFormat extends ICodecEncodedType>(options: ITaggedCodecOptions<TValue, TEncoded, TFormat>): ITaggedCodec<TValue, TEncoded, TFormat>;",
+          "declarationLine": 34,
+          "source": "packages/serialize/dist/tagged.d.ts",
+          "purpose": "Creates a frozen tagged@1 codec from unique id/version descriptors sharing one encodedType. Fixed write headers are cached at construction. Missing, malformed and unknown tags use TAG_MISSING, TAG_INVALID and TAG_UNKNOWN.",
+          "core": "options: Required nonempty codecs tuple; first writes and all read. Optional untagged only reads raw input. Each id follows the serialize type pattern and each version is a positive safe integer.\nPrecise string, Uint8Array or frozen ITaggedValue output according to the declared carrier. Decode also accepts raw legacy input. Inner serialize errors keep identity; external failures retain cause.",
+          "advanced": "",
+          "parameters": ["options: ITaggedCodecOptions<TValue, TEncoded, TFormat>"],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "ITaggedCodecOptions<TValue, TEncoded, TFormat>",
+              "optional": false
+            }
+          ],
+          "returns": "ITaggedCodec<TValue, TEncoded, TFormat>",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [
+            "import { createTaggedCodec } from '@migaia/serialize/tagged'\nimport { defineJsonCodec } from '@migaia/serialize/codecs/json'\n\nconst current = defineJsonCodec({ version: 2 })\nconst previous = defineJsonCodec({ version: 1 })\nconst tagged = createTaggedCodec({ codecs: [current, previous], untagged: previous })\nconsole.log(tagged.encode({ count: 2 })) // mgt1:json@2;{\"count\":2}\nconsole.log(tagged.decode('mgt1:json@1;{\"count\":1}')) // { count: 1 }\nconsole.log(tagged.decode('{\"count\":1}')) // { count: 1 }\ntry {\n  tagged.decode('mgt1:json@3;{\"count\":3}')\n} catch (error) {\n  console.log((error as Error & { code: string }).code) // TAG_UNKNOWN\n}"
+          ],
+          "members": [],
+          "composes": [],
+          "exportPath": "./tagged",
+          "overloadSignatures": [
+            "export declare function createTaggedCodec<TValue, TEncoded, const TFormat extends ICodecEncodedType>(options: ITaggedCodecOptions<TValue, TEncoded, TFormat>): ITaggedCodec<TValue, TEncoded, TFormat>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "ITaggedCodecOptions<TValue, TEncoded, TFormat>",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["ITaggedCodec<TValue, TEncoded, TFormat>"],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Creates a frozen tagged@1 codec from unique id/version descriptors sharing one encodedType. Fixed write headers are cached at construction. Missing, malformed and unknown tags use TAG_MISSING, TAG_INVALID and TAG_UNKNOWN."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createTaggedCodec from @migaia/serialize/tagged, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createTaggedCodec when its function contract and declared inputs match the result you need. Choose a different public symbol when createTaggedCodec does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "options: Required nonempty codecs tuple; first writes and all read. Optional untagged only reads raw input. Each id follows the serialize type pattern and each version is a positive safe integer.\nPrecise string, Uint8Array or frozen ITaggedValue output according to the declared carrier. Decode also accepts raw legacy input. Inner serialize errors keep identity; external failures retain cause."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [
+            {
+              "name": "codecs",
+              "type": "readonly [ ITaggedSourceCodec<TValue, TEncoded, TFormat>, ...ITaggedSourceCodec<TValue, TEncoded, TFormat>[] ]",
+              "optional": false,
+              "description": ""
+            },
+            {
+              "name": "untagged",
+              "type": "ITaggedSourceCodec<TValue, TEncoded, TFormat>",
+              "optional": true,
+              "description": ""
+            }
+          ],
+          "identity": "packages/serialize/dist/tagged.d.ts:createTaggedCodec:export declare function createTaggedCodec<TValue, TEncoded, const TFormat extends ICodecEncodedType>(options: ITaggedCodecOptions<TValue, TEncoded, TFormat>): ITaggedCodec<TValue, TEncoded, TFormat>;",
+          "guidance": [],
+          "usageScore": 24,
+          "configuration": [
+            {
+              "name": "codecs",
+              "type": "readonly [ ITaggedSourceCodec<TValue, TEncoded, TFormat>, ...ITaggedSourceCodec<TValue, TEncoded, TFormat>[] ]",
+              "optional": false,
+              "description": "",
+              "descriptionEn": "",
+              "descriptionZh": ""
+            },
+            {
+              "name": "untagged",
+              "type": "ITaggedSourceCodec<TValue, TEncoded, TFormat>",
+              "optional": true,
+              "description": "",
+              "descriptionEn": "",
+              "descriptionZh": ""
+            }
+          ],
+          "fragment": "serialize-tagged--createTaggedCodec"
+        },
+        {
+          "name": "ITaggedCodec",
+          "kind": "type",
+          "signature": "export type ITaggedCodec<TValue, TEncoded, TFormat extends ICodecEncodedType = ICodecEncodedType> = Readonly<{ id: 'tagged'; version: 1; encodedType: TFormat; encode: (value: TValue) => ITaggedEncoded<TEncoded, TFormat>; decode: (value: ITaggedEncoded<TEncoded, TFormat> | TEncoded) => TValue; }>;",
+          "declarationLine": 22,
+          "source": "packages/serialize/dist/tagged.d.ts",
+          "purpose": "Synchronous format router also accepts raw legacy input when an untagged reader is configured.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITaggedCodec.",
+          "advanced": "No additional advanced behavior is declared for ITaggedCodec.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for ITaggedCodec."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITaggedCodec.",
+          "examples": [],
+          "members": [
+            {
+              "name": "id",
+              "kind": "property",
+              "optional": false,
+              "signature": "id: 'tagged';",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "'tagged'"
+            },
+            {
+              "name": "version",
+              "kind": "property",
+              "optional": false,
+              "signature": "version: 1;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "1"
+            },
+            {
+              "name": "encodedType",
+              "kind": "property",
+              "optional": false,
+              "signature": "encodedType: TFormat;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "TFormat"
+            },
+            {
+              "name": "encode",
+              "kind": "property",
+              "optional": false,
+              "signature": "encode: (value: TValue) => ITaggedEncoded<TEncoded, TFormat>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "(value: TValue) => ITaggedEncoded<TEncoded, TFormat>"
+            },
+            {
+              "name": "decode",
+              "kind": "property",
+              "optional": false,
+              "signature": "decode: (value: ITaggedEncoded<TEncoded, TFormat> | TEncoded) => TValue;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "(value: ITaggedEncoded<TEncoded, TFormat> | TEncoded) => TValue"
+            }
+          ],
+          "composes": [],
+          "exportPath": "./tagged",
+          "overloadSignatures": [
+            "export type ITaggedCodec<TValue, TEncoded, TFormat extends ICodecEncodedType = ICodecEncodedType> = Readonly<{ id: 'tagged'; version: 1; encodedType: TFormat; encode: (value: TValue) => ITaggedEncoded<TEncoded, TFormat>; decode: (value: ITaggedEncoded<TEncoded, TFormat> | TEncoded) => TValue; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use ITaggedCodec when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when ITaggedCodec does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Synchronous format router also accepts raw legacy input when an untagged reader is configured."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ITaggedCodec from @migaia/serialize/tagged, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ITaggedCodec when its type contract and declared inputs match the result you need. Choose a different public symbol when ITaggedCodec does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITaggedCodec."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for ITaggedCodec."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/serialize/dist/tagged.d.ts:ITaggedCodec:export type ITaggedCodec<TValue, TEncoded, TFormat extends ICodecEncodedType = ICodecEncodedType> = Readonly<{ id: 'tagged'; version: 1; encodedType: TFormat; encode: (value: TValue) => ITaggedEncoded<TEncoded, TFormat>; decode: (value: ITaggedEncoded<TEncoded, TFormat> | TEncoded) => TValue; }>;",
+          "guidance": [],
+          "usageScore": 6,
+          "configuration": [],
+          "fragment": "serialize-tagged--ITaggedCodec"
+        },
+        {
+          "name": "ITaggedCodecOptions",
+          "kind": "type",
+          "signature": "export type ITaggedCodecOptions<TValue, TEncoded, TFormat extends ICodecEncodedType = ICodecEncodedType> = Readonly<{ codecs: readonly [ ITaggedSourceCodec<TValue, TEncoded, TFormat>, ...ITaggedSourceCodec<TValue, TEncoded, TFormat>[] ]; untagged?: ITaggedSourceCodec<TValue, TEncoded, TFormat>; }>;",
+          "declarationLine": 7,
+          "source": "packages/serialize/dist/tagged.d.ts",
+          "purpose": "First descriptor writes; every registered revision reads; untagged is read-only fallback.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITaggedCodecOptions.",
+          "advanced": "No additional advanced behavior is declared for ITaggedCodecOptions.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for ITaggedCodecOptions."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITaggedCodecOptions.",
+          "examples": [],
+          "members": [
+            {
+              "name": "codecs",
+              "kind": "property",
+              "optional": false,
+              "signature": "codecs: readonly [ ITaggedSourceCodec<TValue, TEncoded, TFormat>, ...ITaggedSourceCodec<TValue, TEncoded, TFormat>[] ];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly [ ITaggedSourceCodec<TValue, TEncoded, TFormat>, ...ITaggedSourceCodec<TValue, TEncoded, TFormat>[] ]"
+            },
+            {
+              "name": "untagged",
+              "kind": "property",
+              "optional": true,
+              "signature": "untagged?: ITaggedSourceCodec<TValue, TEncoded, TFormat>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "ITaggedSourceCodec<TValue, TEncoded, TFormat>"
+            }
+          ],
+          "composes": [],
+          "exportPath": "./tagged",
+          "overloadSignatures": [
+            "export type ITaggedCodecOptions<TValue, TEncoded, TFormat extends ICodecEncodedType = ICodecEncodedType> = Readonly<{ codecs: readonly [ ITaggedSourceCodec<TValue, TEncoded, TFormat>, ...ITaggedSourceCodec<TValue, TEncoded, TFormat>[] ]; untagged?: ITaggedSourceCodec<TValue, TEncoded, TFormat>; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use ITaggedCodecOptions when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when ITaggedCodecOptions does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "First descriptor writes; every registered revision reads; untagged is read-only fallback."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ITaggedCodecOptions from @migaia/serialize/tagged, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ITaggedCodecOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when ITaggedCodecOptions does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITaggedCodecOptions."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for ITaggedCodecOptions."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/serialize/dist/tagged.d.ts:ITaggedCodecOptions:export type ITaggedCodecOptions<TValue, TEncoded, TFormat extends ICodecEncodedType = ICodecEncodedType> = Readonly<{ codecs: readonly [ ITaggedSourceCodec<TValue, TEncoded, TFormat>, ...ITaggedSourceCodec<TValue, TEncoded, TFormat>[] ]; untagged?: ITaggedSourceCodec<TValue, TEncoded, TFormat>; }>;",
+          "guidance": [],
+          "usageScore": 6,
+          "configuration": [],
+          "fragment": "serialize-tagged--ITaggedCodecOptions"
+        },
+        {
+          "name": "ITaggedEncoded",
+          "kind": "type",
+          "signature": "export type ITaggedEncoded<TEncoded, TFormat extends ICodecEncodedType = ICodecEncodedType> = TFormat extends 'string' ? string : TFormat extends 'uint8array' ? Uint8Array : ITaggedValue<TEncoded>;",
+          "declarationLine": 20,
+          "source": "packages/serialize/dist/tagged.d.ts",
+          "purpose": "Tagged output is determined by the declared carrier, never by the inner value's runtime type.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITaggedEncoded.",
+          "advanced": "No additional advanced behavior is declared for ITaggedEncoded.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for ITaggedEncoded."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITaggedEncoded.",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "exportPath": "./tagged",
+          "overloadSignatures": [
+            "export type ITaggedEncoded<TEncoded, TFormat extends ICodecEncodedType = ICodecEncodedType> = TFormat extends 'string' ? string : TFormat extends 'uint8array' ? Uint8Array : ITaggedValue<TEncoded>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use ITaggedEncoded when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when ITaggedEncoded does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Tagged output is determined by the declared carrier, never by the inner value's runtime type."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ITaggedEncoded from @migaia/serialize/tagged, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ITaggedEncoded when its type contract and declared inputs match the result you need. Choose a different public symbol when ITaggedEncoded does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITaggedEncoded."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for ITaggedEncoded."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/serialize/dist/tagged.d.ts:ITaggedEncoded:export type ITaggedEncoded<TEncoded, TFormat extends ICodecEncodedType = ICodecEncodedType> = TFormat extends 'string' ? string : TFormat extends 'uint8array' ? Uint8Array : ITaggedValue<TEncoded>;",
+          "guidance": [],
+          "usageScore": 6,
+          "configuration": [],
+          "fragment": "serialize-tagged--ITaggedEncoded"
+        },
+        {
+          "name": "ITaggedValue",
+          "kind": "type",
+          "signature": "export type ITaggedValue<TEncoded> = Readonly<{ '$migaia.codec': string; value: TEncoded; }>;",
+          "declarationLine": 15,
+          "source": "packages/serialize/dist/tagged.d.ts",
+          "purpose": "Unknown-carrier wrapping freezes only this descriptor, retaining the inner encoded value.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITaggedValue.",
+          "advanced": "No additional advanced behavior is declared for ITaggedValue.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for ITaggedValue."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITaggedValue.",
+          "examples": [],
+          "members": [
+            {
+              "name": "$migaia.codec",
+              "kind": "property",
+              "optional": false,
+              "signature": "'$migaia.codec': string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "value",
+              "kind": "property",
+              "optional": false,
+              "signature": "value: TEncoded;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "TEncoded"
+            }
+          ],
+          "composes": [],
+          "exportPath": "./tagged",
+          "overloadSignatures": [
+            "export type ITaggedValue<TEncoded> = Readonly<{ '$migaia.codec': string; value: TEncoded; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use ITaggedValue when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when ITaggedValue does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Unknown-carrier wrapping freezes only this descriptor, retaining the inner encoded value."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ITaggedValue from @migaia/serialize/tagged, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ITaggedValue when its type contract and declared inputs match the result you need. Choose a different public symbol when ITaggedValue does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITaggedValue."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for ITaggedValue."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/serialize/dist/tagged.d.ts:ITaggedValue:export type ITaggedValue<TEncoded> = Readonly<{ '$migaia.codec': string; value: TEncoded; }>;",
+          "guidance": [],
+          "usageScore": 6,
+          "configuration": [],
+          "fragment": "serialize-tagged--ITaggedValue"
+        }
+      ],
+      "aliases": []
     }
   ]
 }

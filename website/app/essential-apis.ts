@@ -62,13 +62,29 @@ export const essentialApis: Readonly<Record<string, readonly string[]>> = {
     'core:encodeStream',
     'core:decodeStream'
   ],
-  'storage-web': [
-    'host:createStorageHost',
+  'storage-contract': ['kv', 'records', 'vector', 'rdf', 'blob', 'ConcurrencyPolicy'],
+  'storage-host': [
+    'createStorageHost',
+    'memoryBackendPlugin',
+    'defineFeature',
     'entity:defineEntity',
-    'indexed-db:indexedDbHost',
-    'local-storage:localStorageHost',
-    'memory:memoryStorageHost'
+    'journal:storageLogStore'
   ],
+  'storage-web': [
+    'indexed-db:indexedDbBackendPlugin',
+    'local-storage:localStorageBackendPlugin',
+    'session-storage:sessionStorageBackendPlugin',
+    'cookies:cookieBackendPlugin',
+    'features/blobs:indexedDbBlobFeature'
+  ],
+  'storage-plugin-redis': ['redisBackendPlugin'],
+  'storage-plugin-postgres': ['postgresBackendPlugin'],
+  'storage-plugin-sqlite': ['sqliteBackendPlugin'],
+  'storage-plugin-qdrant': ['qdrantBackendPlugin'],
+  'storage-plugin-sparql': ['sparqlBackendPlugin'],
+  'storage-plugin-object': ['objectBackendPlugin'],
+  'storage-plugin-cache': ['cachePlugin', 'cacheKey'],
+  'storage-plugin-archive': ['archivePlugin'],
   'store-devtools': ['createStoreDevTools', 'getDependencyTree', 'getObserverTree'],
   'store-indexed': [
     'ObservableObject',

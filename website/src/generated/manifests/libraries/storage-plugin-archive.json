@@ -1,0 +1,1213 @@
+{
+  "version": 1,
+  "library": {
+    "slug": "storage-plugin-archive",
+    "description": "Explicit record archival over borrowed transactional hot and blob cold storage",
+    "version": "0.0.0",
+    "exports": ["."],
+    "readmeLocales": ["zh", "en"],
+    "documentation": {
+      "readme": {
+        "sections": [
+          {
+            "id": "migaia-storage-plugin-archive",
+            "heading": "@migaia/storage-plugin-archive",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "显式把符合规则的字符串键记录从事务热层移入不可变 gzip NDJSON blob 段。先安装真实热层和冷层，再安装普通扩展插件，并在业务调用前执行 `detect()`。Memory、SQLite、PostgreSQL 热层支持所需外部 I/O；IndexedDB 热层在冷层 I/O 前拒绝。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { archivePlugin } from '@migaia/storage-plugin-archive'\n\nconst base = await createStorageHost({\n  plugins: [memoryBackendPlugin({ id: 'hot' }), memoryBackendPlugin({ id: 'cold' })]\n})\nconst host = await base.use(\n  archivePlugin({\n    id: 'history',\n    hot: 'hot',\n    cold: 'cold',\n    rules: [{ name: 'old', prefix: 'event:', olderThanMs: 0, where: () => ({ old: true }) }]\n  })\n)\nawait host.detect()\ntry {\n  await host.backend('hot').putRecord({ old: true, answer: 42 }, 'event:one')\n  console.log(await host.extensions.history.run())\n  console.log(await host.extensions.history.get('event:one', { restore: true }))\n  console.log(await host.extensions.history.sweep())\n} finally {\n  await host.dispose()\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "`run({ rule?, limit?, signal?, timeoutMs? })` 按声明顺序处理规则，limit 只累计匹配候选。段默认上限为 1,048,576 个未压缩 UTF-8 字节，单条超大记录独立成段。冷上传完成后，原热层事务持有控制锁，核对对象、重读候选、更新清单和引用数，再删除仍符合规则且未改变的热值。后续段失败不回滚前段，遗留冷对象由显式 `sweep()` 清理。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`get(key, { restore? })` 先点读热层；冷读必须验证完整 gzip/NDJSON 至 EOF，再有限复核一次热值和清单。默认不恢复；显式恢复不覆盖并发热写。Map/Set 使用共享 collections codec，字节变为其带标签 portable 表示；Date 和函数不被支持。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`sweep()` 使用原 blob opaque 分页，在同一控制锁内点读段目录，只移除本插件前缀且 format/version 元数据匹配的无引用对象，不逐段扫描全部清单。所有方法使用当前宿主组织。关闭排空已接受工作，插件不独立关闭借用对象。"
+              },
+              {
+                "type": "paragraph",
+                "text": "错误 source 为 `storage.backend.archive`，码为 `INVALID_OPTION`、`INVALID_ARGUMENT`、`ARCHIVE_OPERATION_FAILED`、`ARCHIVE_SEGMENT_INVALID`，原错误保留在原因链。宿主准入/关闭、contract 能力/冲突/已编码取消保留原对象。本包拥有的 run 失败提供仅含确定已提交数量的 `progress`；冻结的原冲突保持身份，数量由 `onArchiveRunError` 提供。"
+              }
+            ]
+          }
+        ]
+      },
+      "guide": {
+        "sections": [
+          {
+            "id": "migaia-storage-plugin-archive",
+            "heading": "@migaia/storage-plugin-archive",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "显式把符合规则的字符串键记录从事务热层移入不可变 gzip NDJSON blob 段。先安装真实热层和冷层，再安装普通扩展插件，并在业务调用前执行 `detect()`。Memory、SQLite、PostgreSQL 热层支持所需外部 I/O；IndexedDB 热层在冷层 I/O 前拒绝。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { archivePlugin } from '@migaia/storage-plugin-archive'\n\nconst base = await createStorageHost({\n  plugins: [memoryBackendPlugin({ id: 'hot' }), memoryBackendPlugin({ id: 'cold' })]\n})\nconst host = await base.use(\n  archivePlugin({\n    id: 'history',\n    hot: 'hot',\n    cold: 'cold',\n    rules: [{ name: 'old', prefix: 'event:', olderThanMs: 0, where: () => ({ old: true }) }]\n  })\n)\nawait host.detect()\ntry {\n  await host.backend('hot').putRecord({ old: true, answer: 42 }, 'event:one')\n  console.log(await host.extensions.history.run())\n  console.log(await host.extensions.history.get('event:one', { restore: true }))\n  console.log(await host.extensions.history.sweep())\n} finally {\n  await host.dispose()\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "`run({ rule?, limit?, signal?, timeoutMs? })` 按声明顺序处理规则，limit 只累计匹配候选。段默认上限为 1,048,576 个未压缩 UTF-8 字节，单条超大记录独立成段。冷上传完成后，原热层事务持有控制锁，核对对象、重读候选、更新清单和引用数，再删除仍符合规则且未改变的热值。后续段失败不回滚前段，遗留冷对象由显式 `sweep()` 清理。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`get(key, { restore? })` 先点读热层；冷读必须验证完整 gzip/NDJSON 至 EOF，再有限复核一次热值和清单。默认不恢复；显式恢复不覆盖并发热写。Map/Set 使用共享 collections codec，字节变为其带标签 portable 表示；Date 和函数不被支持。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`sweep()` 使用原 blob opaque 分页，在同一控制锁内点读段目录，只移除本插件前缀且 format/version 元数据匹配的无引用对象，不逐段扫描全部清单。所有方法使用当前宿主组织。关闭排空已接受工作，插件不独立关闭借用对象。"
+              },
+              {
+                "type": "paragraph",
+                "text": "错误 source 为 `storage.backend.archive`，码为 `INVALID_OPTION`、`INVALID_ARGUMENT`、`ARCHIVE_OPERATION_FAILED`、`ARCHIVE_SEGMENT_INVALID`，原错误保留在原因链。宿主准入/关闭、contract 能力/冲突/已编码取消保留原对象。本包拥有的 run 失败提供仅含确定已提交数量的 `progress`；冻结的原冲突保持身份，数量由 `onArchiveRunError` 提供。"
+              }
+            ]
+          }
+        ]
+      },
+      "en": {
+        "readme": {
+          "sections": [
+            {
+              "id": "migaia-storage-plugin-archive",
+              "heading": "@migaia/storage-plugin-archive",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Explicitly move eligible string-key records from a transactional hot backend into immutable gzip NDJSON blob segments. Install the ordinary extension after both borrowed backends, then call `detect()` before operations. Memory, SQLite and PostgreSQL hot backends allow the required external I/O; IndexedDB hot storage is rejected before cold I/O."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { archivePlugin } from '@migaia/storage-plugin-archive'\n\nconst base = await createStorageHost({\n  plugins: [memoryBackendPlugin({ id: 'hot' }), memoryBackendPlugin({ id: 'cold' })]\n})\nconst host = await base.use(\n  archivePlugin({\n    id: 'history',\n    hot: 'hot',\n    cold: 'cold',\n    rules: [{ name: 'old', prefix: 'event:', olderThanMs: 0, where: () => ({ old: true }) }]\n  })\n)\nawait host.detect()\ntry {\n  await host.backend('hot').putRecord({ old: true, answer: 42 }, 'event:one')\n  console.log(await host.extensions.history.run())\n  console.log(await host.extensions.history.get('event:one', { restore: true }))\n  console.log(await host.extensions.history.sweep())\n} finally {\n  await host.dispose()\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`run({ rule?, limit?, signal?, timeoutMs? })` applies rules in declaration order and counts matching candidates toward the limit. Each segment defaults to 1,048,576 uncompressed UTF-8 bytes; an oversized record gets its own segment. A completed cold upload precedes one original hot transaction that checks the immutable object, rechecks records, updates manifests/reference counts and deletes unchanged eligible hot rows. Earlier committed segments survive later failures; cold orphans remain for explicit `sweep()`."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`get(key, { restore? })` checks hot storage first, otherwise validates the entire gzip/NDJSON snapshot through EOF before its finite hot/manifest recheck. Restore is opt-in and preserves a concurrently written hot value. Map/Set use the shared collections codec; bytes become its tagged portable representation. Date and functions are unsupported."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`sweep()` follows opaque blob pages and point-checks segment directories under the same original control lock. It removes only unreferenced objects with this plugin's prefix and format/version metadata. It never scans every manifest. All methods use the current host organization, and closing drains accepted work without closing borrowed storage independently."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Errors use `storage.backend.archive`: `INVALID_OPTION`, `INVALID_ARGUMENT`, `ARCHIVE_OPERATION_FAILED`, `ARCHIVE_SEGMENT_INVALID`. Original causes remain reachable. Host admission/close, contract capability, conflict and coded cancellation errors preserve their identity. Archive-owned run failures expose only certainly committed `{ archived, skipped, segments }` progress; frozen original conflicts keep their identity and expose these counts through `onArchiveRunError`."
+                }
+              ]
+            }
+          ]
+        },
+        "guide": {
+          "sections": [
+            {
+              "id": "migaia-storage-plugin-archive",
+              "heading": "@migaia/storage-plugin-archive",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Explicitly move eligible string-key records from a transactional hot backend into immutable gzip NDJSON blob segments. Install the ordinary extension after both borrowed backends, then call `detect()` before operations. Memory, SQLite and PostgreSQL hot backends allow the required external I/O; IndexedDB hot storage is rejected before cold I/O."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { archivePlugin } from '@migaia/storage-plugin-archive'\n\nconst base = await createStorageHost({\n  plugins: [memoryBackendPlugin({ id: 'hot' }), memoryBackendPlugin({ id: 'cold' })]\n})\nconst host = await base.use(\n  archivePlugin({\n    id: 'history',\n    hot: 'hot',\n    cold: 'cold',\n    rules: [{ name: 'old', prefix: 'event:', olderThanMs: 0, where: () => ({ old: true }) }]\n  })\n)\nawait host.detect()\ntry {\n  await host.backend('hot').putRecord({ old: true, answer: 42 }, 'event:one')\n  console.log(await host.extensions.history.run())\n  console.log(await host.extensions.history.get('event:one', { restore: true }))\n  console.log(await host.extensions.history.sweep())\n} finally {\n  await host.dispose()\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`run({ rule?, limit?, signal?, timeoutMs? })` applies rules in declaration order and counts matching candidates toward the limit. Each segment defaults to 1,048,576 uncompressed UTF-8 bytes; an oversized record gets its own segment. A completed cold upload precedes one original hot transaction that checks the immutable object, rechecks records, updates manifests/reference counts and deletes unchanged eligible hot rows. Earlier committed segments survive later failures; cold orphans remain for explicit `sweep()`."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`get(key, { restore? })` checks hot storage first, otherwise validates the entire gzip/NDJSON snapshot through EOF before its finite hot/manifest recheck. Restore is opt-in and preserves a concurrently written hot value. Map/Set use the shared collections codec; bytes become its tagged portable representation. Date and functions are unsupported."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`sweep()` follows opaque blob pages and point-checks segment directories under the same original control lock. It removes only unreferenced objects with this plugin's prefix and format/version metadata. It never scans every manifest. All methods use the current host organization, and closing drains accepted work without closing borrowed storage independently."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Errors use `storage.backend.archive`: `INVALID_OPTION`, `INVALID_ARGUMENT`, `ARCHIVE_OPERATION_FAILED`, `ARCHIVE_SEGMENT_INVALID`. Original causes remain reachable. Host admission/close, contract capability, conflict and coded cancellation errors preserve their identity. Archive-owned run failures expose only certainly committed `{ archived, skipped, segments }` progress; frozen original conflicts keep their identity and expose these counts through `onArchiveRunError`."
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  },
+  "apis": [
+    {
+      "id": "storage-plugin-archive:index",
+      "library": "storage-plugin-archive",
+      "module": "index",
+      "exportPath": ".",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/docs/storage-plugin-archive/getting-started",
+      "architecturePath": "/en/docs/storage-plugin-archive",
+      "symbols": [
+        {
+          "name": "ArchiveErrorCode",
+          "kind": "const",
+          "signature": "export declare const ArchiveErrorCode: { /** Installation options cannot describe a valid archive; fix configuration before reinstalling. */ readonly invalidOption: 'INVALID_OPTION'; /** A runtime key, rule or limit is invalid; no cold I/O has started. */ readonly invalidArgument: 'INVALID_ARGUMENT'; /** An explicit archive operation failed; retry only after inspecting its cause and progress. */ readonly operationFailed: 'ARCHIVE_OPERATION_FAILED'; /** Referenced segment or private metadata failed full validation; repair the stored archive. */ readonly segmentInvalid: 'ARCHIVE_SEGMENT_INVALID'; };",
+          "declarationLine": 4,
+          "source": "packages/storage-plugin-archive/dist/error-code.d.ts",
+          "purpose": "Distinct option, argument, operation and segment corruption identities.",
+          "core": "invalidOption: Correct installation options before retrying.\ninvalidArgument: Correct the runtime key, rule or limit.\noperationFailed: Inspect the original cause and certainly committed progress before retrying.\nsegmentInvalid: Retain metadata and repair an invalid referenced segment or directory.",
+          "advanced": "",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "invalidOption",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly invalidOption: 'INVALID_OPTION';",
+              "description": "Installation options cannot describe a valid archive; fix configuration before reinstalling.",
+              "parameterDetails": [],
+              "returns": "'INVALID_OPTION'"
+            },
+            {
+              "name": "invalidArgument",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly invalidArgument: 'INVALID_ARGUMENT';",
+              "description": "A runtime key, rule or limit is invalid; no cold I/O has started.",
+              "parameterDetails": [],
+              "returns": "'INVALID_ARGUMENT'"
+            },
+            {
+              "name": "operationFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly operationFailed: 'ARCHIVE_OPERATION_FAILED';",
+              "description": "An explicit archive operation failed; retry only after inspecting its cause and progress.",
+              "parameterDetails": [],
+              "returns": "'ARCHIVE_OPERATION_FAILED'"
+            },
+            {
+              "name": "segmentInvalid",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly segmentInvalid: 'ARCHIVE_SEGMENT_INVALID';",
+              "description": "Referenced segment or private metadata failed full validation; repair the stored archive.",
+              "parameterDetails": [],
+              "returns": "'ARCHIVE_SEGMENT_INVALID'"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "ArchiveErrorCode",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare const ArchiveErrorCode: { /** Installation options cannot describe a valid archive; fix configuration before reinstalling. */ readonly invalidOption: 'INVALID_OPTION'; /** A runtime key, rule or limit is invalid; no cold I/O has started. */ readonly invalidArgument: 'INVALID_ARGUMENT'; /** An explicit archive operation failed; retry only after inspecting its cause and progress. */ readonly operationFailed: 'ARCHIVE_OPERATION_FAILED'; /** Referenced segment or private metadata failed full validation; repair the stored archive. */ readonly segmentInvalid: 'ARCHIVE_SEGMENT_INVALID'; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Distinct option, argument, operation and segment corruption identities."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ArchiveErrorCode from @migaia/storage-plugin-archive, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ArchiveErrorCode when its const contract and declared inputs match the result you need. Choose a different public symbol when ArchiveErrorCode does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "invalidOption: Correct installation options before retrying.\ninvalidArgument: Correct the runtime key, rule or limit.\noperationFailed: Inspect the original cause and certainly committed progress before retrying.\nsegmentInvalid: Retain metadata and repair an invalid referenced segment or directory."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-archive/dist/error-code.d.ts:ArchiveErrorCode:export declare const ArchiveErrorCode: { /** Installation options cannot describe a valid archive; fix configuration before reinstalling. */ readonly invalidOption: 'INVALID_OPTION'; /** A runtime key, rule or limit is invalid; no cold I/O has started. */ readonly invalidArgument: 'INVALID_ARGUMENT'; /** An explicit archive operation failed; retry only after inspecting its cause and progress. */ readonly operationFailed: 'ARCHIVE_OPERATION_FAILED'; /** Referenced segment or private metadata failed full validation; repair the stored archive. */ readonly segmentInvalid: 'ARCHIVE_SEGMENT_INVALID'; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-archive-index--ArchiveErrorCode"
+        },
+        {
+          "name": "archivePlugin",
+          "kind": "function",
+          "signature": "export declare function archivePlugin<const N extends string, T = ICollectionsCodecValue>(options: IArchivePluginOptions<T> & { readonly id: N; }): IStorageBackendPluginHandle<Readonly<Record<N, IArchiveApi>>> & { readonly id: N; };",
+          "declarationLine": 9,
+          "source": "packages/storage-plugin-archive/dist/plugin.d.ts",
+          "purpose": "Install explicit run/get/sweep methods without claiming a backend kind or closing borrowed storage.",
+          "core": "options: Literal extension ID, earlier hot/cold backend IDs and ordered rules.\nAn ordinary typed extension handle for host.use and current-org methods.\nid: Literal extension identity and private metadata namespace.\nhot: Earlier transactional records backend permitting external I/O.\ncold: Earlier genuine blob backend retaining immutable segments.\nrules: Nonempty declaration order; overlapping candidates belong to the first matching rule.\nAdds the literal extension slot with run, get and sweep to root and org views.",
+          "advanced": "Explicit retention over published storage.",
+          "parameters": ["options: IArchivePluginOptions<T> & { readonly id: N; }"],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "IArchivePluginOptions<T> & { readonly id: N; }",
+              "optional": false
+            }
+          ],
+          "returns": "IStorageBackendPluginHandle<Readonly<Record<N, IArchiveApi>>> & { readonly id: N; }",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [
+            "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { archivePlugin } from '@migaia/storage-plugin-archive'\n\nconst base = await createStorageHost({\n  plugins: [memoryBackendPlugin({ id: 'hot' }), memoryBackendPlugin({ id: 'cold' })]\n})\nconst host = await base.use(\n  archivePlugin({\n    id: 'history',\n    hot: 'hot',\n    cold: 'cold',\n    rules: [{ name: 'old', prefix: 'event:', olderThanMs: 0, where: () => ({ old: true }) }]\n  })\n)\nawait host.detect()\ntry {\n  await host.backend('hot').putRecord({ old: true, answer: 42 }, 'event:one')\n  console.log(await host.extensions.history.run())\n  console.log(await host.extensions.history.get('event:one', { restore: true }))\n  console.log(await host.extensions.history.sweep())\n} finally {\n  await host.dispose()\n}"
+          ],
+          "members": [],
+          "composes": [],
+          "aliasOf": "archivePlugin",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare function archivePlugin<const N extends string, T = ICollectionsCodecValue>(options: IArchivePluginOptions<T> & { readonly id: N; }): IStorageBackendPluginHandle<Readonly<Record<N, IArchiveApi>>> & { readonly id: N; };"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "IArchivePluginOptions<T> & { readonly id: N; }",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": [
+            "IStorageBackendPluginHandle<Readonly<Record<N, IArchiveApi>>> & { readonly id: N; }"
+          ],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Install explicit run/get/sweep methods without claiming a backend kind or closing borrowed storage."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import archivePlugin from @migaia/storage-plugin-archive, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use archivePlugin when its function contract and declared inputs match the result you need. Choose a different public symbol when archivePlugin does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "options: Literal extension ID, earlier hot/cold backend IDs and ordered rules.\nAn ordinary typed extension handle for host.use and current-org methods.\nid: Literal extension identity and private metadata namespace.\nhot: Earlier transactional records backend permitting external I/O.\ncold: Earlier genuine blob backend retaining immutable segments.\nrules: Nonempty declaration order; overlapping candidates belong to the first matching rule.\nAdds the literal extension slot with run, get and sweep to root and org views."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "Explicit retention over published storage."
+            }
+          ],
+          "declaredConfiguration": [
+            {
+              "name": "id",
+              "type": "string",
+              "optional": false,
+              "description": ""
+            },
+            {
+              "name": "hot",
+              "type": "string",
+              "optional": false,
+              "description": ""
+            },
+            {
+              "name": "cold",
+              "type": "string",
+              "optional": false,
+              "description": ""
+            },
+            {
+              "name": "rules",
+              "type": "readonly IArchiveRule<T>[]",
+              "optional": false,
+              "description": ""
+            }
+          ],
+          "identity": "packages/storage-plugin-archive/dist/plugin.d.ts:archivePlugin:export declare function archivePlugin<const N extends string, T = ICollectionsCodecValue>(options: IArchivePluginOptions<T> & { readonly id: N; }): IStorageBackendPluginHandle<Readonly<Record<N, IArchiveApi>>> & { readonly id: N; };",
+          "guidance": [],
+          "usageScore": 24,
+          "configuration": [
+            {
+              "name": "id",
+              "type": "string",
+              "optional": false,
+              "description": "",
+              "descriptionEn": "",
+              "descriptionZh": ""
+            },
+            {
+              "name": "hot",
+              "type": "string",
+              "optional": false,
+              "description": "",
+              "descriptionEn": "",
+              "descriptionZh": ""
+            },
+            {
+              "name": "cold",
+              "type": "string",
+              "optional": false,
+              "description": "",
+              "descriptionEn": "",
+              "descriptionZh": ""
+            },
+            {
+              "name": "rules",
+              "type": "readonly IArchiveRule<T>[]",
+              "optional": false,
+              "description": "",
+              "descriptionEn": "",
+              "descriptionZh": ""
+            }
+          ],
+          "fragment": "storage-plugin-archive-index--archivePlugin"
+        },
+        {
+          "name": "ERROR_SOURCE",
+          "kind": "const",
+          "signature": "export declare const ERROR_SOURCE = \"storage.backend.archive\";",
+          "declarationLine": 2,
+          "source": "packages/storage-plugin-archive/dist/error-code.d.ts",
+          "purpose": "Registered error domain storage.backend.archive.",
+          "core": "Registered error domain storage.backend.archive.",
+          "advanced": "",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "aliasOf": "ERROR_SOURCE",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare const ERROR_SOURCE = \"storage.backend.archive\";"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Registered error domain storage.backend.archive."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ERROR_SOURCE from @migaia/storage-plugin-archive, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ERROR_SOURCE when its const contract and declared inputs match the result you need. Choose a different public symbol when ERROR_SOURCE does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "Registered error domain storage.backend.archive."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-archive/dist/error-code.d.ts:ERROR_SOURCE:export declare const ERROR_SOURCE = \"storage.backend.archive\";",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-archive-index--ERROR_SOURCE"
+        },
+        {
+          "name": "IArchiveApi",
+          "kind": "type",
+          "signature": "export type IArchiveApi = { run(options?: IArchiveRunOptions): Promise<IArchiveRunResult>; get(key: string, options?: IArchiveGetOptions): Promise<ICollectionsCodecValue | undefined>; sweep(ctx?: IOperationContext): Promise<IArchiveSweepResult>; };",
+          "declarationLine": 32,
+          "source": "packages/storage-plugin-archive/dist/types.d.ts",
+          "purpose": "Contextual ordinary extension with borrowed storage and no disposal authority.",
+          "core": "run: Upload bounded candidate segments and atomically commit unchanged rows.\nrun.options: Optional installed rule, candidate limit and original operation context.\nCertainly committed counts; work failures retain original causes and prior progress.\nget: Read hot first, otherwise validate the complete cold snapshot before a finite recheck.\nget.key: String business record key.\nget.options: Original context and optional explicit restore.\nCanonical collections value or undefined; a changed manifest requires explicit retry.\nsweep: Remove unreferenced matching-format objects under the original control lock.\nsweep.ctx: Original cancellation and deadline context.\nActual scanned and removed counts; the first removal failure stops later work.",
+          "advanced": "Explicit retention, read-through history and orphan maintenance.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "run",
+              "kind": "method",
+              "optional": false,
+              "signature": "run(options?: IArchiveRunOptions): Promise<IArchiveRunResult>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "options",
+                  "type": "IArchiveRunOptions",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<IArchiveRunResult>"
+            },
+            {
+              "name": "get",
+              "kind": "method",
+              "optional": false,
+              "signature": "get(key: string, options?: IArchiveGetOptions): Promise<ICollectionsCodecValue | undefined>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "options",
+                  "type": "IArchiveGetOptions",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<ICollectionsCodecValue | undefined>"
+            },
+            {
+              "name": "sweep",
+              "kind": "method",
+              "optional": false,
+              "signature": "sweep(ctx?: IOperationContext): Promise<IArchiveSweepResult>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "ctx",
+                  "type": "IOperationContext",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<IArchiveSweepResult>"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "IArchiveApi",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IArchiveApi = { run(options?: IArchiveRunOptions): Promise<IArchiveRunResult>; get(key: string, options?: IArchiveGetOptions): Promise<ICollectionsCodecValue | undefined>; sweep(ctx?: IOperationContext): Promise<IArchiveSweepResult>; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Explicit retention, read-through history and orphan maintenance.",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Contextual ordinary extension with borrowed storage and no disposal authority."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IArchiveApi from @migaia/storage-plugin-archive, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IArchiveApi when its type contract and declared inputs match the result you need. Choose a different public symbol when IArchiveApi does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "run: Upload bounded candidate segments and atomically commit unchanged rows.\nrun.options: Optional installed rule, candidate limit and original operation context.\nCertainly committed counts; work failures retain original causes and prior progress.\nget: Read hot first, otherwise validate the complete cold snapshot before a finite recheck.\nget.key: String business record key.\nget.options: Original context and optional explicit restore.\nCanonical collections value or undefined; a changed manifest requires explicit retry.\nsweep: Remove unreferenced matching-format objects under the original control lock.\nsweep.ctx: Original cancellation and deadline context.\nActual scanned and removed counts; the first removal failure stops later work."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "Explicit retention, read-through history and orphan maintenance."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-archive/dist/types.d.ts:IArchiveApi:export type IArchiveApi = { run(options?: IArchiveRunOptions): Promise<IArchiveRunResult>; get(key: string, options?: IArchiveGetOptions): Promise<ICollectionsCodecValue | undefined>; sweep(ctx?: IOperationContext): Promise<IArchiveSweepResult>; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-archive-index--IArchiveApi"
+        },
+        {
+          "name": "IArchiveErrorCode",
+          "kind": "type",
+          "signature": "export type IArchiveErrorCode = (typeof ArchiveErrorCode)[keyof typeof ArchiveErrorCode];",
+          "declarationLine": 14,
+          "source": "packages/storage-plugin-archive/dist/error-code.d.ts",
+          "purpose": "Registered archive failure code union.",
+          "core": "Registered archive failure code union.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "aliasOf": "IArchiveErrorCode",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IArchiveErrorCode = (typeof ArchiveErrorCode)[keyof typeof ArchiveErrorCode];"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Registered archive failure code union."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IArchiveErrorCode from @migaia/storage-plugin-archive, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IArchiveErrorCode when its type contract and declared inputs match the result you need. Choose a different public symbol when IArchiveErrorCode does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "Registered archive failure code union."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-archive/dist/error-code.d.ts:IArchiveErrorCode:export type IArchiveErrorCode = (typeof ArchiveErrorCode)[keyof typeof ArchiveErrorCode];",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-archive-index--IArchiveErrorCode"
+        },
+        {
+          "name": "IArchiveGetOptions",
+          "kind": "type",
+          "signature": "export type IArchiveGetOptions = IOperationContext & { readonly restore?: boolean; };",
+          "declarationLine": 23,
+          "source": "packages/storage-plugin-archive/dist/types.d.ts",
+          "purpose": "Read control with an explicit opt-in restore.",
+          "core": "restore: Restore only after complete EOF validation and the finite hot/manifest recheck.\nfalse: return the canonical value without restoring.\nsignal: Original cooperative cancellation signal.\nNo caller cancellation signal.\ntimeoutMs: Original shared operation deadline in milliseconds.\nNo extra operation deadline.\npageSize: Original record iterator page-size hint from 1 through 4096.\nThe native iterator chooses its original page size.\norgId: When supplied, must match the host-bound organization.\nThe host-bound current organization.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "restore",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly restore?: boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            }
+          ],
+          "composes": ["IOperationContext"],
+          "aliasOf": "IArchiveGetOptions",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IArchiveGetOptions = IOperationContext & { readonly restore?: boolean; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Read control with an explicit opt-in restore."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IArchiveGetOptions from @migaia/storage-plugin-archive, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IArchiveGetOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when IArchiveGetOptions does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "restore: Restore only after complete EOF validation and the finite hot/manifest recheck.\nfalse: return the canonical value without restoring.\nsignal: Original cooperative cancellation signal.\nNo caller cancellation signal.\ntimeoutMs: Original shared operation deadline in milliseconds.\nNo extra operation deadline.\npageSize: Original record iterator page-size hint from 1 through 4096.\nThe native iterator chooses its original page size.\norgId: When supplied, must match the host-bound organization.\nThe host-bound current organization."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-archive/dist/types.d.ts:IArchiveGetOptions:export type IArchiveGetOptions = IOperationContext & { readonly restore?: boolean; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-archive-index--IArchiveGetOptions"
+        },
+        {
+          "name": "IArchivePluginOptions",
+          "kind": "type",
+          "signature": "export type IArchivePluginOptions<T = ICollectionsCodecValue> = { readonly id: string; readonly hot: string; readonly cold: string; readonly rules: readonly IArchiveRule<T>[]; };",
+          "declarationLine": 38,
+          "source": "packages/storage-plugin-archive/dist/types.d.ts",
+          "purpose": "Later-batch ordinary extension borrowing previously published storage.",
+          "core": "id: Literal extension identity and private metadata namespace.\nhot: Earlier transactional records backend permitting external I/O.\ncold: Earlier genuine blob backend retaining immutable segments.\nrules: Nonempty declaration order; overlapping candidates belong to the first matching rule.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "id",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly id: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "hot",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly hot: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "cold",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly cold: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "rules",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly rules: readonly IArchiveRule<T>[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly IArchiveRule<T>[]"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "IArchivePluginOptions",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IArchivePluginOptions<T = ICollectionsCodecValue> = { readonly id: string; readonly hot: string; readonly cold: string; readonly rules: readonly IArchiveRule<T>[]; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Later-batch ordinary extension borrowing previously published storage."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IArchivePluginOptions from @migaia/storage-plugin-archive, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IArchivePluginOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when IArchivePluginOptions does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "id: Literal extension identity and private metadata namespace.\nhot: Earlier transactional records backend permitting external I/O.\ncold: Earlier genuine blob backend retaining immutable segments.\nrules: Nonempty declaration order; overlapping candidates belong to the first matching rule."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-archive/dist/types.d.ts:IArchivePluginOptions:export type IArchivePluginOptions<T = ICollectionsCodecValue> = { readonly id: string; readonly hot: string; readonly cold: string; readonly rules: readonly IArchiveRule<T>[]; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-archive-index--IArchivePluginOptions"
+        },
+        {
+          "name": "IArchiveRule",
+          "kind": "type",
+          "signature": "export type IArchiveRule<T = ICollectionsCodecValue> = { readonly name: string; readonly prefix: string; readonly where: (cutoffMs: number) => IWhere<T>; readonly olderThanMs: number; readonly segmentBytes?: number; };",
+          "declarationLine": 4,
+          "source": "packages/storage-plugin-archive/dist/types.d.ts",
+          "purpose": "One ordered candidate rule captured during installation.",
+          "core": "name: Unique nonempty rule identity used by run selection.\nprefix: UTF-16 string prefix bounding the original ordered record iterator.\nwhere: Called once with the run cutoff to construct the shared query predicate.\nwhere.cutoffMs: Single run wall clock minus olderThanMs.\nShared where DSL compiled once for this selected rule.\nChoose records eligible at this retention cutoff.\nolderThanMs: Nonnegative safe integer subtracted from the single run wall clock.\nsegmentBytes: Positive uncompressed UTF-8 budget; an oversized row forms its own segment.\n1,048,576 uncompressed UTF-8 bytes.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "name",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly name: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "prefix",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly prefix: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "where",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly where: (cutoffMs: number) => IWhere<T>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "(cutoffMs: number) => IWhere<T>"
+            },
+            {
+              "name": "olderThanMs",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly olderThanMs: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "segmentBytes",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly segmentBytes?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "IArchiveRule",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IArchiveRule<T = ICollectionsCodecValue> = { readonly name: string; readonly prefix: string; readonly where: (cutoffMs: number) => IWhere<T>; readonly olderThanMs: number; readonly segmentBytes?: number; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "One ordered candidate rule captured during installation."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IArchiveRule from @migaia/storage-plugin-archive, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IArchiveRule when its type contract and declared inputs match the result you need. Choose a different public symbol when IArchiveRule does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "name: Unique nonempty rule identity used by run selection.\nprefix: UTF-16 string prefix bounding the original ordered record iterator.\nwhere: Called once with the run cutoff to construct the shared query predicate.\nwhere.cutoffMs: Single run wall clock minus olderThanMs.\nShared where DSL compiled once for this selected rule.\nChoose records eligible at this retention cutoff.\nolderThanMs: Nonnegative safe integer subtracted from the single run wall clock.\nsegmentBytes: Positive uncompressed UTF-8 budget; an oversized row forms its own segment.\n1,048,576 uncompressed UTF-8 bytes."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-archive/dist/types.d.ts:IArchiveRule:export type IArchiveRule<T = ICollectionsCodecValue> = { readonly name: string; readonly prefix: string; readonly where: (cutoffMs: number) => IWhere<T>; readonly olderThanMs: number; readonly segmentBytes?: number; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-archive-index--IArchiveRule"
+        },
+        {
+          "name": "IArchiveRunOptions",
+          "kind": "type",
+          "signature": "export type IArchiveRunOptions = IOperationContext & { readonly rule?: string; readonly limit?: number; };",
+          "declarationLine": 12,
+          "source": "packages/storage-plugin-archive/dist/types.d.ts",
+          "purpose": "Candidate selection and the original operation cancellation budget.",
+          "core": "rule: Select one installed rule by its exact name.\nAll installed rules, in declaration order.\nlimit: Positive safe integer bound on distinct matching candidates.\nNo candidate limit.\nsignal: Original cooperative cancellation signal.\nNo caller cancellation signal.\ntimeoutMs: Original shared operation deadline in milliseconds.\nNo extra operation deadline.\npageSize: Original record iterator page-size hint from 1 through 4096.\nThe native iterator chooses its original page size.\norgId: When supplied, must match the host-bound organization.\nThe host-bound current organization.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "rule",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly rule?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "limit",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly limit?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            }
+          ],
+          "composes": ["IOperationContext"],
+          "aliasOf": "IArchiveRunOptions",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IArchiveRunOptions = IOperationContext & { readonly rule?: string; readonly limit?: number; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Candidate selection and the original operation cancellation budget."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IArchiveRunOptions from @migaia/storage-plugin-archive, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IArchiveRunOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when IArchiveRunOptions does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "rule: Select one installed rule by its exact name.\nAll installed rules, in declaration order.\nlimit: Positive safe integer bound on distinct matching candidates.\nNo candidate limit.\nsignal: Original cooperative cancellation signal.\nNo caller cancellation signal.\ntimeoutMs: Original shared operation deadline in milliseconds.\nNo extra operation deadline.\npageSize: Original record iterator page-size hint from 1 through 4096.\nThe native iterator chooses its original page size.\norgId: When supplied, must match the host-bound organization.\nThe host-bound current organization."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-archive/dist/types.d.ts:IArchiveRunOptions:export type IArchiveRunOptions = IOperationContext & { readonly rule?: string; readonly limit?: number; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-archive-index--IArchiveRunOptions"
+        },
+        {
+          "name": "IArchiveRunResult",
+          "kind": "type",
+          "signature": "export type IArchiveRunResult = { readonly archived: number; readonly skipped: number; readonly segments: number; };",
+          "declarationLine": 17,
+          "source": "packages/storage-plugin-archive/dist/types.d.ts",
+          "purpose": "Certainly committed run progress.",
+          "core": "archived: Hot records deleted atomically with their manifests and references.\nskipped: Uploaded candidates that changed or disappeared before commit.\nsegments: Committed segments with at least one accepted manifest.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "archived",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly archived: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "skipped",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly skipped: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "segments",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly segments: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "IArchiveRunResult",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IArchiveRunResult = { readonly archived: number; readonly skipped: number; readonly segments: number; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Certainly committed run progress."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IArchiveRunResult from @migaia/storage-plugin-archive, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IArchiveRunResult when its type contract and declared inputs match the result you need. Choose a different public symbol when IArchiveRunResult does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "archived: Hot records deleted atomically with their manifests and references.\nskipped: Uploaded candidates that changed or disappeared before commit.\nsegments: Committed segments with at least one accepted manifest."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-archive/dist/types.d.ts:IArchiveRunResult:export type IArchiveRunResult = { readonly archived: number; readonly skipped: number; readonly segments: number; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-archive-index--IArchiveRunResult"
+        },
+        {
+          "name": "IArchiveSweepResult",
+          "kind": "type",
+          "signature": "export type IArchiveSweepResult = { readonly scanned: number; readonly removed: number; };",
+          "declarationLine": 27,
+          "source": "packages/storage-plugin-archive/dist/types.d.ts",
+          "purpose": "Actual opaque-list maintenance results.",
+          "core": "scanned: Native listed objects examined under the plugin prefix.\nremoved: Objects whose original native remove returned true.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "scanned",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly scanned: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "removed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly removed: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "IArchiveSweepResult",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IArchiveSweepResult = { readonly scanned: number; readonly removed: number; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Actual opaque-list maintenance results."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IArchiveSweepResult from @migaia/storage-plugin-archive, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IArchiveSweepResult when its type contract and declared inputs match the result you need. Choose a different public symbol when IArchiveSweepResult does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "scanned: Native listed objects examined under the plugin prefix.\nremoved: Objects whose original native remove returned true."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-archive/dist/types.d.ts:IArchiveSweepResult:export type IArchiveSweepResult = { readonly scanned: number; readonly removed: number; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-archive-index--IArchiveSweepResult"
+        }
+      ],
+      "aliases": []
+    }
+  ]
+}
