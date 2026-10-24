@@ -11,7 +11,7 @@ import {
   type IWalExt,
   type IUndoLogExt,
   type ILogPayload
-} from '@migaia/logger/plugins/durable'
+} from './logger-runtime.js'
 import { readStorageJournalTarget, storageJournalTargetIdentity } from './targets.js'
 import { createStorageOperationReporter, reportCleanupError } from '../core/operation-reporter.js'
 import { StorageError, StorageErrorCode } from '../errors.js'

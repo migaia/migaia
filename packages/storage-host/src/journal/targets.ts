@@ -1,6 +1,6 @@
 import { snapshotConcurrencyLockKeys } from '../authoring/concurrency.js'
 import { type IBackendKind } from '@migaia/storage-contract'
-import { snapshotLogRecords, type ILogPayload } from '@migaia/logger/plugins/durable'
+import { snapshotLogRecords, type ILogPayload } from './logger-runtime.js'
 import { decodeFlatStorageKey, encodeFlatStorageKey } from '../core/key-domain.js'
 import { StorageError, StorageErrorCode } from '../errors.js'
 import { StorageErrorText } from '../error-text.js'

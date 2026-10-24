@@ -10,7 +10,7 @@ import {
   type IUndoLogExt,
   type IUndoImage,
   type ILogPayload
-} from '@migaia/logger/plugins/durable'
+} from './logger-runtime.js'
 import { StorageError, StorageErrorCode } from '../errors.js'
 import { StorageErrorText } from '../error-text.js'
 import type { IStorageJournalBackendAccess } from './binding.js'

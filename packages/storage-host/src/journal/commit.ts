@@ -12,7 +12,7 @@ import {
   type IWalExt,
   type IUndoLogExt,
   type ILogStore
-} from '@migaia/logger/plugins/durable'
+} from './logger-runtime.js'
 import { encodeFlatStorageKey } from '../core/key-domain.js'
 import type { IStorageJournalBackendAccess } from './binding.js'
 import { resolveStorageLogNativeAccess } from './append-port.js'

@@ -7,7 +7,7 @@ import {
   type ILogAppendPort,
   type ILogAppendNotice,
   type ILogStore
-} from '@migaia/logger/plugins/durable'
+} from './logger-runtime.js'
 import { createEventChannel, EventDispatchPolicy } from '@migaia/event-subscriber'
 import { createConcurrencyLimiter, deferred } from '@migaia/utils/promise'
 import {

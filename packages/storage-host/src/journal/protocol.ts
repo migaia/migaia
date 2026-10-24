@@ -7,7 +7,7 @@ import {
   type ILogRecordSnapshot,
   type ILogStoreRecoveryRow,
   type ILogStoreSnapshot
-} from '@migaia/logger/plugins/durable'
+} from './logger-runtime.js'
 import { StorageError, StorageErrorCode } from '../errors.js'
 import { StorageErrorText } from '../error-text.js'
 import type { IStorageJournalNamespaceView } from './types.js'

@@ -10,7 +10,7 @@ import {
   type IBinlogExt,
   type IWalExt,
   type ILogPayload
-} from '@migaia/logger/plugins/durable'
+} from './logger-runtime.js'
 import type { IStorageJournalBackendAccess } from './binding.js'
 import { StorageJournalKind } from './constants.js'
 import { storageJournalTargetWire } from './targets.js'

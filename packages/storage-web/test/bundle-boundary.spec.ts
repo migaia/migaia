@@ -79,16 +79,9 @@ const packedPackages: readonly IPackageDefinition[] = [
   packageDefinition('storage-contract', '@migaia/storage-contract'),
   packageDefinition('plugin-host', '@migaia/plugin-host'),
   packageDefinition('capability', '@migaia/capability'),
-  packageDefinition('logger', '@migaia/logger'),
   packageDefinition('serialize', '@migaia/serialize'),
   packageDefinition('storage-host', '@migaia/storage-host'),
-  packageDefinition('storage-web', '@migaia/storage-web'),
-  {
-    directory: 'ansis',
-    name: 'ansis',
-    version: '4.3.1',
-    sourceDirectory: realpathSync(resolve(repositoryRoot, 'packages/logger/node_modules/ansis'))
-  }
+  packageDefinition('storage-web', '@migaia/storage-web')
 ]
 /** Explicit app roots needed by the current browser package and its required host peer. */
 const browserPackedRoots = ['@migaia/storage-host', '@migaia/storage-web'] as const

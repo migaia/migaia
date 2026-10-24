@@ -1,7 +1,9 @@
-import { LoggerLevel } from '@migaia/logger'
 import type { IStoragePipelineInput } from '../types.js'
 import type { IStorageJournalConfigurationSnapshot } from './configuration-options.js'
 import { STORAGE_TELEMETRY_TAG } from './constants.js'
+
+/** Resolve the optional logger only when the selected journal runtime is evaluated. */
+const { LoggerLevel } = await import('@migaia/logger')
 
 /** One observed endpoint retains only its current policy and timing facts until settlement. */
 type IStorageTelemetryContext = {
