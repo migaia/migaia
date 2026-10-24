@@ -51,6 +51,22 @@ async function installed(adapter: 'pg' | 'postgres-js') {
   return { host, store: host.backend('postgres'), statements }
 }
 describe.each(['pg', 'postgres-js'] as const)('%s real pgvector', (adapter) => {
+  it('round-trips long collection names and point IDs without a binary-key budget', async () => {
+    const { store } = await installed(adapter)
+    const name = 'name\0\ud800'.repeat(1000) + 'z'
+    const id = 'point\0\udfff'.repeat(1000) + 'z'
+    expect(name.length).toBe(6001)
+    expect(id.length).toBe(7001)
+    const collection = store.use(vector).collection(name, { dimensions: 2, metric: 'dot' })
+    await collection.upsert([{ id, vector: [1, 0], payload: { complete: true } }])
+    expect(
+      await store.use(vector).collection(name).near([1, 0], { exact: true }).topK(1).all()
+    ).toEqual([{ id, score: 1, payload: { complete: true } }])
+    expect(await store.use(ttl).expire(lockKey.vector(name, id), 10000)).toBe(true)
+    expect(await store.use(ttl).persist(lockKey.vector(name, id))).toBe(true)
+    await collection.delete([id])
+    expect(await collection.near([1, 0], { exact: true }).topK(1).all()).toEqual([])
+  })
   it('ranks in the engine after native payload filtering and keeps exact settings local', async () => {
     const { store } = await installed(adapter)
     const collection = store
