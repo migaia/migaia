@@ -191,7 +191,13 @@ export const StorageErrorCode = Object.freeze({
    * Direct backend quiescence, transport, connection, or channel cleanup collected failures.
    * Callers must treat the backend as terminal and inspect all errors.
    */
-  backendDisposeFailed: 'BACKEND_DISPOSE_FAILED'
+  backendDisposeFailed: 'BACKEND_DISPOSE_FAILED',
+
+  /**
+   * An optional IDB operation lacks its explicit Feature; install the named assembly before use.
+   * Enforces round3 explicit assembly.
+   */
+  indexedDbFeatureNotInstalled: 'INDEXED_DB_FEATURE_NOT_INSTALLED'
 } as const)
 
 /** Semantic failure code owned by storage-web; shared contract failures keep their own source. */

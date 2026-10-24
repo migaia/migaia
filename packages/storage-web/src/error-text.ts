@@ -1,3 +1,4 @@
+import { IndexedDbFeature } from './constants.js'
 /** Stable diagnostic text shared by backend, entity, Host and reactive boundaries. */
 export const StorageErrorText = Object.freeze({
   /** Cookie validation keeps the original scalar value failure text. */
@@ -94,3 +95,10 @@ export const indexBackfillFailureText = (entityName: string): string =>
 /** Stable public text for a logical unique-index collision. */
 export const indexUniqueConflictText = (indexName: string): string =>
   `indexed record conflicts with unique index "${indexName}"`
+
+/** Missing IDB Feature names are stable migration guidance for explicit installation. */
+export function indexedDbFeatureMissingText(feature: string): string {
+  return feature === IndexedDbFeature.hostJournal
+    ? 'IndexedDB undo requires explicit storageJournalPlugin() and journal configuration'
+    : `IndexedDB ${feature} requires its explicit indexedDb${feature[0]!.toUpperCase()}${feature.slice(1)}Feature assembly`
+}

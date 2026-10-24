@@ -1,3 +1,4 @@
+import { indexedDbTestFeatures } from '../test/helpers/indexed-db-features.js'
 import { createStorageHost } from '@migaia/storage-host'
 import { indexedDbBackendPlugin } from '../src/indexed-db.js'
 import { NativeTransactionActivity } from './native-transaction-cases.js'
@@ -31,8 +32,8 @@ window.runIndexedDbNativeActivityScenario = async (mode) => {
   /** The actual public installation owns both native connections and their cleanup. */
   const host = await createStorageHost({
     plugins: [
-      indexedDbBackendPlugin({ id: 'writer', dbName }),
-      indexedDbBackendPlugin({ id: 'reader', dbName })
+      indexedDbBackendPlugin({ id: 'writer', dbName }, indexedDbTestFeatures),
+      indexedDbBackendPlugin({ id: 'reader', dbName }, indexedDbTestFeatures)
     ]
   })
   /** This same store starts the original transaction rather than a test-authored scope. */

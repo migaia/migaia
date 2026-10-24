@@ -1,3 +1,4 @@
+import { indexedDbTestFeatures } from '../helpers/indexed-db-features.js'
 import type { IKeyValueStore } from '@migaia/storage-contract'
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb'
 import { describe, expect, it, onTestFinished } from 'vitest'
@@ -57,7 +58,7 @@ const createObservedBackends = async (): Promise<IObservedBackend[]> => {
           factory: new IDBFactory(),
           keyRange: IDBKeyRange
         },
-        { controller: feature }
+        { ...indexedDbTestFeatures, controller: feature }
       )
     ]
   })

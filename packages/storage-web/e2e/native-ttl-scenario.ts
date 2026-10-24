@@ -1,3 +1,4 @@
+import { indexedDbTestFeatures } from '../test/helpers/indexed-db-features.js'
 import { createStorageHost } from '@migaia/storage-host'
 import { kv, ttl } from '@migaia/storage-contract'
 import { createManualScheduler } from '@migaia/utils/testing'
@@ -22,7 +23,10 @@ declare global {
 window.runIndexedDbNativeTtlScenario = async () => {
   const scheduler = createManualScheduler()
   const dbName = 'native-ttl-' + crypto.randomUUID()
-  const host = await createStorageHost({ scheduler, plugins: [indexedDbBackendPlugin({ dbName })] })
+  const host = await createStorageHost({
+    scheduler,
+    plugins: [indexedDbBackendPlugin({ dbName }, indexedDbTestFeatures)]
+  })
   try {
     const store = host.backend('indexed-db')
     await store.use(kv).setMany([{ key: 'text', value: 'value', ttlMs: 10 }])
@@ -57,12 +61,16 @@ window.runIndexedDbNativeTtlScenario = async () => {
 /** Default-clock installations compare one persisted deadline after the original connection closes. */
 async function reopen() {
   const dbName = 'native-ttl-reopen-' + crypto.randomUUID()
-  const first = await createStorageHost({ plugins: [indexedDbBackendPlugin({ dbName })] })
+  const first = await createStorageHost({
+    plugins: [indexedDbBackendPlugin({ dbName }, indexedDbTestFeatures)]
+  })
   const before = first.backend('indexed-db')
   await before.set('kept', 'value')
   await before.use(ttl).expire({ channel: 'text', key: 'kept' }, 60000)
   await first.dispose()
-  const second = await createStorageHost({ plugins: [indexedDbBackendPlugin({ dbName })] })
+  const second = await createStorageHost({
+    plugins: [indexedDbBackendPlugin({ dbName }, indexedDbTestFeatures)]
+  })
   try {
     const after = second.backend('indexed-db')
     const duration = await after.use(ttl).remaining({ channel: 'text', key: 'kept' })

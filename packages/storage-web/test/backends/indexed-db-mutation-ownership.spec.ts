@@ -1,3 +1,4 @@
+import { indexedDbTestFeatures } from '../helpers/indexed-db-features.js'
 import { walkErrorCauses } from '@migaia/utils/error'
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb'
 import { describe, expect, it, onTestFinished } from 'vitest'
@@ -35,7 +36,9 @@ const controllerFeature = defineFeature(indexedDbBackendKind, ({ featureExpose }
 const createInstalledStore = async (options: IIndexedDbOptions) => {
   /** The fixture borrows the installed backend while its original host owns cleanup. */
   const host = await createStorageHost({
-    plugins: [indexedDbBackendPlugin(options, { ownership: controllerFeature })]
+    plugins: [
+      indexedDbBackendPlugin(options, { ...indexedDbTestFeatures, ownership: controllerFeature })
+    ]
   })
   onTestFinished(() => host.dispose())
   return host.backend('indexed-db')

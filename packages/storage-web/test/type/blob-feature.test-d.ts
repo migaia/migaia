@@ -1,3 +1,4 @@
+import { indexedDbTestFeatures } from '../helpers/indexed-db-features.js'
 import { createStorageHost } from '@migaia/storage-host'
 import { indexedDbBackendPlugin } from '../../src/indexed-db.js'
 import {
@@ -9,7 +10,9 @@ import {
 /** Compile the exact selected and absent Feature projections without acquiring browser resources. */
 async function blobFeatureTypes() {
   const host = await createStorageHost({
-    plugins: [indexedDbBackendPlugin({}, { blobs: indexedDbBlobFeature() })]
+    plugins: [
+      indexedDbBackendPlugin({}, { ...indexedDbTestFeatures, blobs: indexedDbBlobFeature() })
+    ]
   })
   const root: IIndexedDbBlobApi = host.backend('indexed-db').api.blobs
   const found: Blob | undefined = await root.get('key')
@@ -22,7 +25,9 @@ async function blobFeatureTypes() {
     // @ts-expect-error Blob API grants no database or backend shutdown authority.
     tx.dispose()
   })
-  const bare = await createStorageHost({ plugins: [indexedDbBackendPlugin()] })
+  const bare = await createStorageHost({
+    plugins: [indexedDbBackendPlugin({}, indexedDbTestFeatures)]
+  })
   // @ts-expect-error Unselected Blob Feature contributes no API group.
   void bare.backend('indexed-db').api.blobs
   await host.dispose()
