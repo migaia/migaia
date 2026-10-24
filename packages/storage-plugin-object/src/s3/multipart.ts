@@ -146,8 +146,8 @@ class ObjectMultipartUpload {
     return size === 0 ? undefined : size === this.#partBytes ? part : part.subarray(0, size)
   }
   /**
-   * Admit bounded native requests, preserve the first failure, and perform original completion/abort
-   * cleanup.
+   * Admit bounded native requests, preserve the first failure, and perform original
+   * completion/abort cleanup.
    */
   async run(): Promise<string> {
     try {

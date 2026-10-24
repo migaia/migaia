@@ -1225,8 +1225,8 @@ function runSparqlNativeGraph<T>(
         /** The original graph prefix mapper is passed only to this accepted native request. */
         const map = (target: IRdfGraphTarget): IRdfGraphTarget => {
           /**
-           * This accepted input is retained across native, pipeline or rendering awaits;
-           * caller mutation must not change that accepted operation.
+           * This accepted input is retained across native, pipeline or rendering awaits; caller
+           * mutation must not change that accepted operation.
            */
           const captured = snapshotGraphTarget(target)
           return {

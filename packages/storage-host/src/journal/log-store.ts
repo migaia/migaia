@@ -408,10 +408,7 @@ function truncateStorageLogRecords(context: IStorageLogContext, beforeSeq: numbe
       }
     )
     if (truncated === undefined) return
-    /**
-     * A peer may append after the floor commits; cleanup must use this transaction's current
-     * head.
-     */
+    /** A peer may append after the floor commits; cleanup must use this transaction's current head. */
     await writeStorageLog(context, async (view, beforeWrite) =>
       reclaimStorageLogRows(
         view,
