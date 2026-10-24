@@ -323,88 +323,178 @@ export function createMemoryBackend<T = unknown>(
   options: IMemoryOptions,
   capacity: IMemoryCapacity | undefined = snapshotMemoryCapacity(options)
 ) {
-  /** Validate the configured target before allocating data or acquiring any native resource. */
-  const namespace = resolveStorageNamespace(
-    options.namespace ?? MemoryState.defaultNamespace,
-    core.defaultOrgId,
-    core.defaultOrgId
-  )
-  /** Every namespace belongs to this installed physical backend and its one lifecycle controller. */
-  const namespaces = new Map<string, ReturnType<typeof createMemoryNamespace<T>>>()
-  /** One controller owns admission, event sequence and final cleanup for all native namespaces. */
-  const controller = core.createChangeController({
-    backend: STORAGE_MEMORY_BACKEND,
-    options: { namespace },
-    finalize: async () => {
-      for (const physical of namespaces.values()) await physical.finalize()
-      namespaces.clear()
-    }
-  })
-  /** Native projections allocate data only on demand, without DDL, registry writes or new lifetimes. */
-  const forOrg = (orgId: string) => {
-    controller.assertLive()
-    const target = resolveStorageNamespace(namespace, orgId, core.defaultOrgId)
-    const existing = namespaces.get(target)
-    if (existing !== undefined) return existing
-    const ports = core.getOrgContext(orgId)
-    const physical = createMemoryNamespace<T>(
-      { ...core, ...ports },
-      options,
-      controller,
-      orgId,
-      orgId === core.defaultOrgId,
-      capacity
+  return new MemoryBackendOwner<T>(core, options, capacity).construct()
+}
+
+/** One installed memory backend owns physical organization namespaces and their lifecycle. */
+class MemoryBackendOwner<T> {
+  /** Original installed ports retain execution, journal and organization ownership. */
+  readonly #core: IStoragePluginCore
+  /** Validated options apply uniformly to every physical organization namespace. */
+  readonly #options: IMemoryOptions
+  /** Optional capacity policy belongs to each namespace, with no cross-org accounting. */
+  readonly #capacity: IMemoryCapacity | undefined
+  /** The validated root namespace determines the physical key for every org projection. */
+  readonly #namespace: string
+  /** Existing physical views are reused until the original controller finalizes them. */
+  readonly #namespaces = new Map<string, ReturnType<typeof createMemoryNamespace<T>>>()
+  /** One original controller governs admission and cleanup across the physical namespaces. */
+  readonly #controller: IBackendChangeController
+
+  /** Validate the physical namespace before allocating its original lifecycle controller. */
+  constructor(
+    core: IStoragePluginCore,
+    options: IMemoryOptions,
+    capacity: IMemoryCapacity | undefined
+  ) {
+    this.#core = core
+    this.#options = options
+    this.#capacity = capacity
+    this.#namespace = resolveStorageNamespace(
+      options.namespace ?? MemoryState.defaultNamespace,
+      core.defaultOrgId,
+      core.defaultOrgId
     )
-    namespaces.set(target, physical)
+    this.#controller = core.createChangeController({
+      backend: STORAGE_MEMORY_BACKEND,
+      options: { namespace: this.#namespace },
+      finalize: () => this.#finalize()
+    })
+  }
+
+  /** Construct the default view and publish only the original native registration ports. */
+  construct() {
+    /** Default host calls and explicit default-org views share one physical namespace. */
+    const physical = this.forOrg(this.#core.defaultOrgId)
+    return {
+      ...physical,
+      controller: this.#controller,
+      orgBinding: {
+        backend: (orgId: string) => this.forOrg(orgId).store,
+        drop: (orgId: string) => this.#dropOrg(orgId)
+      },
+      journalBinding: new MemoryJournalBinding(this, this.#core.defaultOrgId),
+      assertScope: (scope: ITransactionScope) => this.#assertScope(physical, scope)
+    }
+  }
+
+  /** Allocate an org's physical data only on its first real lookup, without new lifetimes or DDL. */
+  forOrg(orgId: string) {
+    this.#controller.assertLive()
+    /** Namespace resolution preserves the original root and explicit-org identity rules. */
+    const target = resolveStorageNamespace(this.#namespace, orgId, this.#core.defaultOrgId)
+    /** Existing views retain exactly their original store and journal identity. */
+    const existing = this.#namespaces.get(target)
+    if (existing !== undefined) return existing
+    /** Org ports supply the original fixed-org execution and journal configuration. */
+    const ports = this.#core.getOrgContext(orgId)
+    /** Each physical namespace borrows the single parent controller. */
+    const physical = createMemoryNamespace<T>(
+      { ...this.#core, ...ports },
+      this.#options,
+      this.#controller,
+      orgId,
+      orgId === this.#core.defaultOrgId,
+      this.#capacity
+    )
+    this.#namespaces.set(target, physical)
     return physical
   }
-  /** Default host calls and explicit default-org views resolve the exact same physical namespace. */
-  const physical = forOrg(core.defaultOrgId)
-  return {
-    ...physical,
-    controller,
-    orgBinding: {
-      backend: (orgId: string) => forOrg(orgId).store,
-      drop: async (orgId: string) => {
-        const current = forOrg(orgId)
-        if (core.journal !== undefined) return current.drop()
-        await current.store.clearAll()
-        current.journal.clear()
+
+  /** Drop only the selected physical org through the original journal-aware clear path. */
+  async #dropOrg(orgId: string): Promise<void> {
+    /** Resolving an unseen org follows the original on-demand native projection behavior. */
+    const current = this.forOrg(orgId)
+    if (this.#core.journal !== undefined) return current.drop()
+    await current.store.clearAll()
+    current.journal.clear()
+  }
+
+  /** Authenticate a genuine scope against the existing physical stores, preserving other failures. */
+  #assertScope(
+    physical: ReturnType<typeof createMemoryNamespace<T>>,
+    scope: ITransactionScope
+  ): void {
+    for (const namespace of this.#namespaces.values()) {
+      try {
+        assertTransactionOwner(namespace.store, scope)
+        return
+      } catch (error) {
+        if (
+          !(error instanceof StorageContractError) ||
+          error.code !== StorageContractErrorCode.invalidArgument
+        )
+          throw error
       }
-    },
-    journalBinding: (() => {
-      /** The descriptor owns one projector; every result closes over one existing physical org. */
-      const binding = (orgId: string): IStorageJournalBackendBinding => ({
-        externalWal: true,
-        lockTarget: (target) => snapshotMemoryJournalTarget(target).lock,
-        forOrg: binding,
-        openNamespace: (prefix) => forOrg(orgId).journal.open(prefix),
-        changes: (scope) => forOrg(orgId).journalImages.changes(scope),
-        readImage: (scope, target) => forOrg(orgId).journalImages.readImage(scope, target),
-        writeImage: (scope, target, image) =>
-          forOrg(orgId).journalImages.writeImage(scope, target, image),
-        readRevision: (scope, target) => forOrg(orgId).journalImages.readRevision(scope, target),
-        writeCommitMarker: (scope, txId) => forOrg(orgId).journal.writeMarker(scope, txId),
-        hasCommitMarker: (txId) => forOrg(orgId).journal.hasMarker(txId),
-        removeCommitMarker: (txId) => forOrg(orgId).journal.removeMarker(txId)
-      })
-      return binding(core.defaultOrgId)
-    })(),
-    assertScope: (scope: ITransactionScope) => {
-      for (const physical of namespaces.values()) {
-        try {
-          assertTransactionOwner(physical.store, scope)
-          return
-        } catch (error) {
-          if (
-            !(error instanceof StorageContractError) ||
-            error.code !== StorageContractErrorCode.invalidArgument
-          )
-            throw error
-        }
-      }
-      assertTransactionOwner(physical.store, scope)
     }
+    assertTransactionOwner(physical.store, scope)
+  }
+
+  /** Drain and clear every allocated namespace once under the original controller disposal. */
+  async #finalize(): Promise<void> {
+    for (const physical of this.#namespaces.values()) await physical.finalize()
+    this.#namespaces.clear()
+  }
+}
+
+/** A fixed-org journal binding delegates to its original physical namespace without a new owner. */
+class MemoryJournalBinding<T> implements IStorageJournalBackendBinding {
+  /** The original backend resolves and reuses every physical organization namespace. */
+  readonly #backend: MemoryBackendOwner<T>
+  /** This binding never borrows a mutable current-organization value. */
+  readonly #orgId: string
+  /** Native memory transactions use the existing external WAL protocol. */
+  readonly externalWal = true
+
+  /** Retain only the backend and immutable organization identity. */
+  constructor(backend: MemoryBackendOwner<T>, orgId: string) {
+    this.#backend = backend
+    this.#orgId = orgId
+  }
+
+  /** Project another fixed organization through the same original backend. */
+  forOrg = (orgId: string): IStorageJournalBackendBinding => {
+    return new MemoryJournalBinding(this.#backend, orgId)
+  }
+  /** Resolve the canonical native journal lock without changing its target semantics. */
+  lockTarget = (target: IStorageJournalTarget) => {
+    return snapshotMemoryJournalTarget(target).lock
+  }
+  /** Open a private namespace owned by the original physical journal. */
+  openNamespace = (prefix: string) => {
+    return this.#backend.forOrg(this.#orgId).journal.open(prefix)
+  }
+  /** Read the exact accepted native scope's ordered journal changes. */
+  changes = (scope: Omit<ITransactionScope, 'use'>) => {
+    return this.#backend.forOrg(this.#orgId).journalImages.changes(scope)
+  }
+  /** Read a target image through the authenticated original native scope. */
+  readImage = (scope: Omit<ITransactionScope, 'use'>, target: IStorageJournalTarget) => {
+    return this.#backend.forOrg(this.#orgId).journalImages.readImage(scope, target)
+  }
+  /** Restore a target image through the same original native attempt. */
+  writeImage = (
+    scope: Omit<ITransactionScope, 'use'>,
+    target: IStorageJournalTarget,
+    image: IStorageJournalImage
+  ) => {
+    return this.#backend.forOrg(this.#orgId).journalImages.writeImage(scope, target, image)
+  }
+  /** Read a target's revision without creating an independent journal view. */
+  readRevision = (scope: Omit<ITransactionScope, 'use'>, target: IStorageJournalTarget) => {
+    return this.#backend.forOrg(this.#orgId).journalImages.readRevision(scope, target)
+  }
+  /** Write the original transaction's commit marker into this physical org. */
+  writeCommitMarker = (scope: Omit<ITransactionScope, 'use'>, txId: string) => {
+    return this.#backend.forOrg(this.#orgId).journal.writeMarker(scope, txId)
+  }
+  /** Observe only markers belonging to this fixed physical organization. */
+  hasCommitMarker = (txId: string) => {
+    return this.#backend.forOrg(this.#orgId).journal.hasMarker(txId)
+  }
+  /** Remove a completed marker using the original journal's terminal path. */
+  removeCommitMarker = (txId: string) => {
+    return this.#backend.forOrg(this.#orgId).journal.removeMarker(txId)
   }
 }
 
