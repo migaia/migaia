@@ -11,6 +11,7 @@
       "./features/listen",
       "./features/logical-replication",
       "./features/pgvector",
+      "./features/quantized",
       "./pg",
       "./postgres-js"
     ],
@@ -77,6 +78,7 @@
               {
                 "type": "list",
                 "items": [
+                  "`/features/quantized`：同批选择 `pgvectorFeature()` 与 `pgQuantizedFeature({mode:'halfvec'|'binary_quantize'})`，只增强有界向量链的 `rescore({topN?})`，量化表达式 HNSW 召回后按原向量精排，不发布第二个 vector provider。",
                   "`/features/pgvector`：`pgvectorFeature()` 发布标准 vector，另有 `api.pgvector.search(target, query, options)` 查询调用方自有表。未选不发布 vector；扩展经 registerDetect 检查。`autoDetect:false` 时仍在首次真实向量终点写前核对扩展。",
                   "`/features/listen`：`pgListenFeature()` 发布根 `api.notifications.listen/notify`；事务只有 notify。提示只在真实提交后出现，不保证断线重放。",
                   "`/features/copy`：`pgCopyFeature()` 发布根/事务 `api.copy.from`。只支持结构化目标与客户端 STDIN；每次实际尝试调用新的 sourceFactory，保留背压与原生排空。",
@@ -128,6 +130,29 @@
               {
                 "type": "paragraph",
                 "text": "选中日志时按执行顺序保留每次实际原生变更，包含同目标多写与中间值。原 SQL 的 RETURNING 行直接提供每次完整 raw 新值与绝对期限，不以后读的最终值替代。undo 仍由 host 原实现合并首次 before、最终 after 并复核完整最终修订；未选日志的操作保原 SQL 与原生路径。"
+              }
+            ]
+          },
+          {
+            "id": "量化召回与原生精排",
+            "heading": "量化召回与原生精排",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { pgQuantizedFeature } from '@migaia/storage-plugin-postgres/features/quantized'\n// postgresBackendPlugin({ driver }, {\n//   vector: pgvectorFeature(), quantized: pgQuantizedFeature({ mode: 'halfvec' })\n// })\nconst selected = await embeddings\n  .near([1, 0, 0])\n  .where({ category: 'guide' })\n  .topK(20)\n  .rescore({ topN: 5 })\n  .rerank(({ hits }) => hits.map((hit) => hit.score))\n  .all()"
+              },
+              {
+                "type": "paragraph",
+                "text": "安装时选择 halfvec 或 binary_quantize。topN 缺省为 k，必须是正安全整数且不超过 k，非法值在 I/O 前拒绝。只读结果保留 withVector、选择、分组与通用 rerank，引擎 score 不变；不能删除、监听或再次接原生 rescore，不会隐式补读向量。"
+              },
+              {
+                "type": "paragraph",
+                "text": "原 schema owner 按 metric 建 halfvec opclass 或 bit_hamming_ops 表达式 HNSW；原事务锁住既有集合配置行，两个 host 可安全准备同一个索引。布局检查与索引准备是独立原生语句，业务查询则只用一条 MATERIALIZED SQL 召回 k 个候选，再按原向量精确排序取 topN。临时 metric 会准备相应索引；样本来源仍先沿原拥有者读取样本，再执行召回与精排语句。显式 rescore 即选择量化召回，即使 near 指定 exact；未接 rescore 的 near({exact:true}) 保持原行为。"
+              },
+              {
+                "type": "paragraph",
+                "text": "org、期限与可推 payload 条件均留在 recall WHERE。HNSW 不保证物理先过滤，也不保证过滤后足 k；JS 谓词只处理 outer 命中且不补搜，后接 rerank 收到这些实际命中。显式量化 ANN 是普通 org 领先索引规则的例外。原向量仍为 float32，halfvec 索引最多 4000 维，binary 索引最多 64000 维但原 vector 列最多 16000 维；量化可能损失精度，超出 halfvec 范围的原生 cast 以 SQL_FAILED 保留原 cause，不假称无损。未新增依赖或后台任务。"
               }
             ]
           }
@@ -190,7 +215,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "cosine、dot、euclid 使用原生 `<=>`、`<#>`、`<->`；score 分别为 1-distance、-distance、-distance。原生 vector(d) 使用 float32，容许相应数值精度与同分换序。先建一次逻辑集合，其它 org 可 `collection('documents')` 使用同一物理配置。`api.pgvector.search({table:['app_vectors'],idColumn:'id',vectorColumn:'embedding',payloadColumn:'payload'}, q, {metric:'cosine',limit:10,efSearch:64})` 只查询调用方已有表；本包不自动建立 ANN 索引。"
+                "text": "cosine、dot、euclid 使用原生 `<=>`、`<#>`、`<->`；score 分别为 1-distance、-distance、-distance。原生 vector(d) 使用 float32，容许相应数值精度与同分换序。先建一次逻辑集合，其它 org 可 `collection('documents')` 使用同一物理配置。`api.pgvector.search({table:['app_vectors'],idColumn:'id',vectorColumn:'embedding',payloadColumn:'payload'}, q, {metric:'cosine',limit:10,efSearch:64})` 只查询调用方已有表；未选 quantized Feature 时，本包不自动建立 ANN 索引。"
               }
             ]
           },
@@ -245,6 +270,29 @@
               {
                 "type": "paragraph",
                 "text": "选中日志时按执行顺序保留每次实际原生变更，包含同目标多写与中间值。原 SQL 的 RETURNING 行直接提供每次完整 raw 新值与绝对期限，不以后读的最终值替代。undo 仍由 host 原实现合并首次 before、最终 after 并复核完整最终修订；未选日志的操作保原 SQL 与原生路径。"
+              }
+            ]
+          },
+          {
+            "id": "量化召回与原生精排",
+            "heading": "量化召回与原生精排",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { pgQuantizedFeature } from '@migaia/storage-plugin-postgres/features/quantized'\n// postgresBackendPlugin({ driver }, {\n//   vector: pgvectorFeature(), quantized: pgQuantizedFeature({ mode: 'halfvec' })\n// })\nconst selected = await embeddings\n  .near([1, 0, 0])\n  .where({ category: 'guide' })\n  .topK(20)\n  .rescore({ topN: 5 })\n  .rerank(({ hits }) => hits.map((hit) => hit.score))\n  .all()"
+              },
+              {
+                "type": "paragraph",
+                "text": "安装时选择 halfvec 或 binary_quantize。topN 缺省为 k，必须是正安全整数且不超过 k，非法值在 I/O 前拒绝。只读结果保留 withVector、选择、分组与通用 rerank，引擎 score 不变；不能删除、监听或再次接原生 rescore，不会隐式补读向量。"
+              },
+              {
+                "type": "paragraph",
+                "text": "原 schema owner 按 metric 建 halfvec opclass 或 bit_hamming_ops 表达式 HNSW；原事务锁住既有集合配置行，两个 host 可安全准备同一个索引。布局检查与索引准备是独立原生语句，业务查询则只用一条 MATERIALIZED SQL 召回 k 个候选，再按原向量精确排序取 topN。临时 metric 会准备相应索引；样本来源仍先沿原拥有者读取样本，再执行召回与精排语句。显式 rescore 即选择量化召回，即使 near 指定 exact；未接 rescore 的 near({exact:true}) 保持原行为。"
+              },
+              {
+                "type": "paragraph",
+                "text": "org、期限与可推 payload 条件均留在 recall WHERE。HNSW 不保证物理先过滤，也不保证过滤后足 k；JS 谓词只处理 outer 命中且不补搜，后接 rerank 收到这些实际命中。显式量化 ANN 是普通 org 领先索引规则的例外。原向量仍为 float32，halfvec 索引最多 4000 维，binary 索引最多 64000 维但原 vector 列最多 16000 维；量化可能损失精度，超出 halfvec 范围的原生 cast 以 SQL_FAILED 保留原 cause，不假称无损。未新增依赖或后台任务。"
               }
             ]
           }
@@ -320,6 +368,7 @@
                 {
                   "type": "list",
                   "items": [
+                    "`/features/quantized`: `pgQuantizedFeature({mode:'halfvec'|'binary_quantize'})` accompanies `pgvectorFeature()` in the same Feature batch. Its bounded `rescore({topN?})` stage uses a quantized expression HNSW index and exactly reorders the recalled candidates by their original vectors. It publishes no second vector provider.",
                     "`/features/pgvector`: `pgvectorFeature()` publishes standard vector and `api.pgvector.search(target, query, options)` for caller-owned native tables. Unselected stores have no vector. registerDetect checks the extension; with autoDetect:false, the first actual vector endpoint still checks before writing.",
                     "`/features/listen`: `pgListenFeature()` provides root `api.notifications.listen/notify`; transactions expose notify only. Hints appear after real commit and do not promise reconnect replay.",
                     "`/features/copy`: `pgCopyFeature()` provides root/transaction `api.copy.from`. It accepts structured identifiers and client STDIN only. Each actual attempt invokes a fresh sourceFactory and retains native backpressure/drain.",
@@ -371,6 +420,29 @@
                 {
                   "type": "paragraph",
                   "text": "Selected journals retain every actual native mutation in execution order, including repeated writes to one target and intermediate values. The original SQL RETURNING row supplies each exact raw after value and absolute deadline; no later read substitutes the final value. Undo keeps the host's existing first-before/final-after merge and complete final revision checks. Unselected operations keep their original SQL and native path."
+                }
+              ]
+            },
+            {
+              "id": "quantized-recall-and-native-exact-rescoring",
+              "heading": "Quantized recall and native exact rescoring",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { pgQuantizedFeature } from '@migaia/storage-plugin-postgres/features/quantized'\n// postgresBackendPlugin({ driver }, {\n//   vector: pgvectorFeature(), quantized: pgQuantizedFeature({ mode: 'halfvec' })\n// })\nconst selected = await embeddings\n  .near([1, 0, 0])\n  .where({ category: 'guide' })\n  .topK(20)\n  .rescore({ topN: 5 })\n  .rerank(({ hits }) => hits.map((hit) => hit.score))\n  .all()"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Choose `halfvec` or `binary_quantize` once at installation. `topN` defaults to k and must be a positive safe integer at most k; invalid bounds reject before I/O. The read-only result supports original `withVector`, selection, grouping and generic rerank, with unchanged engine scores; it cannot delete, watch or acquire a second native rescore. No extra vector retrieval is implicit."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "The original schema owner prepares expression HNSW indexes, using the metric's halfvec opclass or `bit_hamming_ops`. Existing collection metadata is locked in the same native transaction so two hosts prepare one index safely. Layout checks/index preparation are separate native statements; the business query is one `MATERIALIZED` recall of k followed by exact original-vector ordering and topN. A metric override prepares its matching index. Sample-based origins retain their original sample-loading statements before the recall/rescore statement. This explicit quantized stage selects quantized recall even if its near call specified exact; plain `near(...,{exact:true})` keeps its original behavior."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Recall includes organization, expiry and pushed payload conditions. HNSW filters do not promise physical prefiltering or k surviving candidates. JavaScript predicates run on the outer hits without refill; a following generic reranker receives those actual hits. Opt-in expression ANN indexes are the exception to the ordinary org-leading index layout. Original vectors remain float32; halfvec indexing supports at most 4000 dimensions, binary indexing at most 64000 but the original vector column at most 16000. Native casts may lose precision or reject values outside halfvec range with `SQL_FAILED` and the native cause. Quantization is not lossless. No dependencies or background workers are added."
                 }
               ]
             }
@@ -433,7 +505,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "cosine/dot/euclid use `<=>`/`<#>`/`<->` with scores 1-distance/-distance/-distance. Native vector(d) stores float32, with its corresponding precision and tied-order limits. Create a logical collection once; other organizations may use collection('documents') with the shared physical configuration. `api.pgvector.search({table:['app_vectors'],idColumn:'id',vectorColumn:'embedding',payloadColumn:'payload'}, q, {metric:'cosine',limit:10,efSearch:64})` queries caller-owned tables. The module creates no ANN index."
+                  "text": "cosine/dot/euclid use `<=>`/`<#>`/`<->` with scores 1-distance/-distance/-distance. Native vector(d) stores float32, with its corresponding precision and tied-order limits. Create a logical collection once; other organizations may use collection('documents') with the shared physical configuration. `api.pgvector.search({table:['app_vectors'],idColumn:'id',vectorColumn:'embedding',payloadColumn:'payload'}, q, {metric:'cosine',limit:10,efSearch:64})` queries caller-owned tables. Without the quantized Feature the module creates no ANN index."
                 }
               ]
             },
@@ -488,6 +560,29 @@
                 {
                   "type": "paragraph",
                   "text": "Selected journals retain every actual native mutation in execution order, including repeated writes to one target and intermediate values. The original SQL RETURNING row supplies each exact raw after value and absolute deadline; no later read substitutes the final value. Undo keeps the host's existing first-before/final-after merge and complete final revision checks. Unselected operations keep their original SQL and native path."
+                }
+              ]
+            },
+            {
+              "id": "quantized-recall-and-native-exact-rescoring",
+              "heading": "Quantized recall and native exact rescoring",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { pgQuantizedFeature } from '@migaia/storage-plugin-postgres/features/quantized'\n// postgresBackendPlugin({ driver }, {\n//   vector: pgvectorFeature(), quantized: pgQuantizedFeature({ mode: 'halfvec' })\n// })\nconst selected = await embeddings\n  .near([1, 0, 0])\n  .where({ category: 'guide' })\n  .topK(20)\n  .rescore({ topN: 5 })\n  .rerank(({ hits }) => hits.map((hit) => hit.score))\n  .all()"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Choose `halfvec` or `binary_quantize` once at installation. `topN` defaults to k and must be a positive safe integer at most k; invalid bounds reject before I/O. The read-only result supports original `withVector`, selection, grouping and generic rerank, with unchanged engine scores; it cannot delete, watch or acquire a second native rescore. No extra vector retrieval is implicit."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "The original schema owner prepares expression HNSW indexes, using the metric's halfvec opclass or `bit_hamming_ops`. Existing collection metadata is locked in the same native transaction so two hosts prepare one index safely. Layout checks/index preparation are separate native statements; the business query is one `MATERIALIZED` recall of k followed by exact original-vector ordering and topN. A metric override prepares its matching index. Sample-based origins retain their original sample-loading statements before the recall/rescore statement. This explicit quantized stage selects quantized recall even if its near call specified exact; plain `near(...,{exact:true})` keeps its original behavior."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Recall includes organization, expiry and pushed payload conditions. HNSW filters do not promise physical prefiltering or k surviving candidates. JavaScript predicates run on the outer hits without refill; a following generic reranker receives those actual hits. Opt-in expression ANN indexes are the exception to the ordinary org-leading index layout. Original vectors remain float32; halfvec indexing supports at most 4000 dimensions, binary indexing at most 64000 but the original vector column at most 16000. Native casts may lose precision or reject values outside halfvec range with `SQL_FAILED` and the native cause. Quantization is not lossless. No dependencies or background workers are added."
                 }
               ]
             }
@@ -3008,8 +3103,8 @@
         {
           "name": "postgresBackendKind",
           "kind": "const",
-          "signature": "export declare const postgresBackendKind: import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", IPostgresStore<IPgServer>, IPgDriver, { getTransactionClient(scope: IPostgresTransactionScope): IPgConnection; readonly runNative: IPgNativeOperation; selectVector(): void; selectReplication(options: IPgReplicationSelection): void; getReplicationRoute(): import('./types.js').IPgLogicalReplicationRoute; getServer(): IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(maxSlotWalKeepSize: string): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>;",
-          "declarationLine": 5,
+          "signature": "export declare const postgresBackendKind: import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", IPostgresStore<IPgServer>, IPgDriver, { getTransactionClient(scope: IPostgresTransactionScope): IPgConnection; readonly runNative: IPgNativeOperation; selectVector(): void; selectQuantized(mode: IPgQuantizedOptions['mode']): void; selectReplication(options: IPgReplicationSelection): void; getReplicationRoute(): import('./types.js').IPgLogicalReplicationRoute; getServer(): IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(maxSlotWalKeepSize: string): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>;",
+          "declarationLine": 6,
           "source": "packages/storage-plugin-postgres/dist/plugin.d.ts",
           "purpose": "Authenticate selected native Features against the exact PostgreSQL backend kind.",
           "core": "Authenticate selected native Features against the exact PostgreSQL backend kind.",
@@ -3025,7 +3120,7 @@
           "aliasOf": "postgresBackendKind",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const postgresBackendKind: import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", IPostgresStore<IPgServer>, IPgDriver, { getTransactionClient(scope: IPostgresTransactionScope): IPgConnection; readonly runNative: IPgNativeOperation; selectVector(): void; selectReplication(options: IPgReplicationSelection): void; getReplicationRoute(): import('./types.js').IPgLogicalReplicationRoute; getServer(): IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(maxSlotWalKeepSize: string): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>;"
+            "export declare const postgresBackendKind: import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", IPostgresStore<IPgServer>, IPgDriver, { getTransactionClient(scope: IPostgresTransactionScope): IPgConnection; readonly runNative: IPgNativeOperation; selectVector(): void; selectQuantized(mode: IPgQuantizedOptions['mode']): void; selectReplication(options: IPgReplicationSelection): void; getReplicationRoute(): import('./types.js').IPgLogicalReplicationRoute; getServer(): IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(maxSlotWalKeepSize: string): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -3064,7 +3159,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-plugin-postgres/dist/plugin.d.ts:postgresBackendKind:export declare const postgresBackendKind: import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", IPostgresStore<IPgServer>, IPgDriver, { getTransactionClient(scope: IPostgresTransactionScope): IPgConnection; readonly runNative: IPgNativeOperation; selectVector(): void; selectReplication(options: IPgReplicationSelection): void; getReplicationRoute(): import('./types.js').IPgLogicalReplicationRoute; getServer(): IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(maxSlotWalKeepSize: string): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>;",
+          "identity": "packages/storage-plugin-postgres/dist/plugin.d.ts:postgresBackendKind:export declare const postgresBackendKind: import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", IPostgresStore<IPgServer>, IPgDriver, { getTransactionClient(scope: IPostgresTransactionScope): IPgConnection; readonly runNative: IPgNativeOperation; selectVector(): void; selectQuantized(mode: IPgQuantizedOptions['mode']): void; selectReplication(options: IPgReplicationSelection): void; getReplicationRoute(): import('./types.js').IPgLogicalReplicationRoute; getServer(): IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(maxSlotWalKeepSize: string): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -3074,7 +3169,7 @@
           "name": "postgresBackendPlugin",
           "kind": "function",
           "signature": "export declare function postgresBackendPlugin<TValue = unknown, const TServer extends IPgServer = 'postgres', const TId extends string = 'postgres', const F extends IStorageFeatureRecord = {}>(options: IPostgresOptions<TServer> & { readonly id?: TId; }, features?: F & IStorageFeatureStoreCompatibility<typeof postgresBackendKind, NoInfer<F>, IPostgresStore<NoInfer<TServer>, TValue>>): IStorageBackendPlugin<typeof postgresBackendKind, NoInfer<TId>, F, IPostgresStore<NoInfer<TServer>, TValue>>;",
-          "declarationLine": 18,
+          "declarationLine": 20,
           "source": "packages/storage-plugin-postgres/dist/plugin.d.ts",
           "purpose": "Install an injected native driver with standard transactions, SQL and independently selected native Features.",
           "core": "options: Caller-supplied native driver, physical layout and original concurrency policy.\nfeatures: Exact-kind native Feature selections attached during installation.\nAn exact-id plugin; defaults public/migaia/postgres.\nid: Application-assigned backend identifier selected by host.backend.\npostgres, the default backend identifier.\ndriver: Borrowed native driver from pgDriver, postgresJsDriver or bunSqlDriver.\nserver: Actual deployed server preset used for native capability admission.\npostgres enables PostgreSQL semantics.\nPostgreSQL with native change notifications.\nCockroachDB without PostgreSQL changeFeed promises.\nYugabyteDB without PostgreSQL changeFeed promises.\nChoose the actual deployed server, since capability admission depends on its native guarantees.\nschema: Existing SQL schema containing managed tables.\npublic schema.\nprefix: Prefix for fixed managed tables, shared by every organization.\nmigaia table prefix.\nconcurrency: Authentic shared policy governing the original native operation.\nOriginal shared owner default policy.\nowner: Optional application diagnostic identity without value payloads.\nNo application owner label.\nowner.label: Application-assigned label for native lock diagnostics.\nNo diagnostic application label.\nmaxLockMs: Positive native logical-key lock lease bound measured against database time.\n60000 milliseconds.",
@@ -3101,6 +3196,7 @@
           "examples": [
             "import { vector } from '@migaia/storage-contract'\nimport { pgvectorFeature } from '@migaia/storage-plugin-postgres/features/pgvector'\n// postgresBackendPlugin({ driver }, { vector: pgvectorFeature() })\nconst embeddings = store.use(vector).collection('documents', { dimensions: 3, metric: 'cosine' })\nawait embeddings.upsert([{ id: 'a', vector: [1, 0, 0], payload: { category: 'guide' } }], {\n  ttlMs: 10000\n})\nconst hits = await embeddings\n  .near([1, 0, 0], { exact: true })\n  .where('category', 'eq', 'guide')\n  .topK(5)\n  .all()\nconst deleted = await embeddings.deleteWhere({ category: 'guide' }, { count: 'scroll' })",
             "import { durableChangeFeed } from '@migaia/storage-contract'\nimport { pgLogicalReplicationFeature } from '@migaia/storage-plugin-postgres/features/logical-replication'\n// postgresBackendPlugin({ driver: pgDriver(pool) }, { replication: pgLogicalReplicationFeature({ slot, publication }) })\nconst feed = store.use(durableChangeFeed)\nconst batch = await feed.readChanges({ after: savedCursor, limit: 100 })\n// 处理并持久化 batch.changes 后，再持久化 batch.cursor；下一 after 才确认完整位置。\nconst tail = await feed.tailChanges({\n  from: savedCursor ?? 'now',\n  onChange: async (change) => {\n    await processAndPersist(change)\n  },\n  onError: (cause) => console.error(cause)\n})\n// 使用结束后 await tail.dispose()。仅明确退役部署槽时调用 api.logicalReplication.dropSlot()。",
+            "import { pgQuantizedFeature } from '@migaia/storage-plugin-postgres/features/quantized'\n// postgresBackendPlugin({ driver }, {\n//   vector: pgvectorFeature(), quantized: pgQuantizedFeature({ mode: 'halfvec' })\n// })\nconst selected = await embeddings\n  .near([1, 0, 0])\n  .where({ category: 'guide' })\n  .topK(20)\n  .rescore({ topN: 5 })\n  .rerank(({ hits }) => hits.map((hit) => hit.score))\n  .all()",
             "import { Pool } from 'pg'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'\nimport { pgDriver } from '@migaia/storage-plugin-postgres/pg'\n\nconst pool = new Pool({ connectionString: process.env.DATABASE_URL })\ntry {\n  await using host = await createStorageHost({\n    plugins: [postgresBackendPlugin({ driver: pgDriver(pool) })] as const\n  })\n  const store = host.backend('postgres')\n  await store.transaction(async (tx) => {\n    await tx.set('status', 'ready')\n    await tx.putRecord({ name: 'Ada' }, 'user:1')\n    await tx.sql`SELECT 1`.get()\n  })\n} finally {\n  await pool.end()\n}"
           ],
           "members": [],
@@ -3219,15 +3315,15 @@
           ],
           "identity": "packages/storage-plugin-postgres/dist/plugin.d.ts:postgresBackendPlugin:export declare function postgresBackendPlugin<TValue = unknown, const TServer extends IPgServer = 'postgres', const TId extends string = 'postgres', const F extends IStorageFeatureRecord = {}>(options: IPostgresOptions<TServer> & { readonly id?: TId; }, features?: F & IStorageFeatureStoreCompatibility<typeof postgresBackendKind, NoInfer<F>, IPostgresStore<NoInfer<TServer>, TValue>>): IStorageBackendPlugin<typeof postgresBackendKind, NoInfer<TId>, F, IPostgresStore<NoInfer<TServer>, TValue>>;",
           "guidance": [],
-          "usageScore": 34,
+          "usageScore": 52,
           "configuration": [
             {
               "name": "id",
               "type": "TId",
               "optional": true,
-              "description": "cosine、dot、euclid 使用原生 `<=>`、`<#>`、`<->`；score 分别为 1-distance、-distance、-distance。原生 vector(d) 使用 float32，容许相应数值精度与同分换序。先建一次逻辑集合，其它 org 可 `collection('documents')` 使用同一物理配置。`api.pgvector.search({table:['app_vectors'],idColumn:'id',vectorColumn:'embedding',payloadColumn:'payload'}, q, {metric:'cosine',limit:10,efSearch:64})` 只查询调用方已有表；本包不自动建立 ANN 索引。",
+              "description": "cosine、dot、euclid 使用原生 `<=>`、`<#>`、`<->`；score 分别为 1-distance、-distance、-distance。原生 vector(d) 使用 float32，容许相应数值精度与同分换序。先建一次逻辑集合，其它 org 可 `collection('documents')` 使用同一物理配置。`api.pgvector.search({table:['app_vectors'],idColumn:'id',vectorColumn:'embedding',payloadColumn:'payload'}, q, {metric:'cosine',limit:10,efSearch:64})` 只查询调用方已有表；未选 quantized Feature 时，本包不自动建立 ANN 索引。",
               "descriptionEn": "",
-              "descriptionZh": "cosine、dot、euclid 使用原生 `<=>`、`<#>`、`<->`；score 分别为 1-distance、-distance、-distance。原生 vector(d) 使用 float32，容许相应数值精度与同分换序。先建一次逻辑集合，其它 org 可 `collection('documents')` 使用同一物理配置。`api.pgvector.search({table:['app_vectors'],idColumn:'id',vectorColumn:'embedding',payloadColumn:'payload'}, q, {metric:'cosine',limit:10,efSearch:64})` 只查询调用方已有表；本包不自动建立 ANN 索引。"
+              "descriptionZh": "cosine、dot、euclid 使用原生 `<=>`、`<#>`、`<->`；score 分别为 1-distance、-distance、-distance。原生 vector(d) 使用 float32，容许相应数值精度与同分换序。先建一次逻辑集合，其它 org 可 `collection('documents')` 使用同一物理配置。`api.pgvector.search({table:['app_vectors'],idColumn:'id',vectorColumn:'embedding',payloadColumn:'payload'}, q, {metric:'cosine',limit:10,efSearch:64})` 只查询调用方已有表；未选 quantized Feature 时，本包不自动建立 ANN 索引。"
             },
             {
               "name": "driver",
@@ -3517,7 +3613,7 @@
         {
           "name": "pgCopyFeature",
           "kind": "function",
-          "signature": "export declare function pgCopyFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.js\").IPostgresStore<import(\"../types.js\").IPgServer>, import(\"../types.js\").IPgDriver, { getTransactionClient(scope: import(\"../types.js\").IPostgresTransactionScope): import(\"../types.js\").IPgConnection; readonly runNative: import(\"../types.js\").IPgNativeOperation; selectVector(): void; selectReplication(options: import(\"../logical-replication.js\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.js\").IPgLogicalReplicationRoute; getServer(): import(\"../types.js\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(maxSlotWalKeepSize: string): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly copy: IPgCopyApi; }; readonly transaction: { readonly copy: IPgCopyApi; }; }>, {}>;",
+          "signature": "export declare function pgCopyFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.js\").IPostgresStore<import(\"../types.js\").IPgServer>, import(\"../types.js\").IPgDriver, { getTransactionClient(scope: import(\"../types.js\").IPostgresTransactionScope): import(\"../types.js\").IPgConnection; readonly runNative: import(\"../types.js\").IPgNativeOperation; selectVector(): void; selectQuantized(mode: import(\"./quantized.js\").IPgQuantizedOptions['mode']): void; selectReplication(options: import(\"../logical-replication.js\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.js\").IPgLogicalReplicationRoute; getServer(): import(\"../types.js\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(maxSlotWalKeepSize: string): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly copy: IPgCopyApi; }; readonly transaction: { readonly copy: IPgCopyApi; }; }>, {}>;",
           "declarationLine": 4,
           "source": "packages/storage-plugin-postgres/dist/features/copy.d.ts",
           "purpose": "Add streaming client STDIN COPY with a fresh iterable for every actual native transaction attempt.",
@@ -3525,7 +3621,7 @@
           "advanced": "",
           "parameters": ["This function declaration has no parameters."],
           "parameterDetails": [],
-          "returns": "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.js\").IPostgresStore<import(\"../types.js\").IPgServer>, import(\"../types.js\").IPgDriver, { getTransactionClient(scope: import(\"../types.js\").IPostgresTransactionScope): import(\"../types.js\").IPgConnection; readonly runNative: import(\"../types.js\").IPgNativeOperation; selectVector(): void; selectReplication(options: import(\"../logical-replication.js\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.js\").IPgLogicalReplicationRoute; getServer(): import(\"../types.js\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(maxSlotWalKeepSize: string): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly copy: IPgCopyApi; }; readonly transaction: { readonly copy: IPgCopyApi; }; }>, {}>",
+          "returns": "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.js\").IPostgresStore<import(\"../types.js\").IPgServer>, import(\"../types.js\").IPgDriver, { getTransactionClient(scope: import(\"../types.js\").IPostgresTransactionScope): import(\"../types.js\").IPgConnection; readonly runNative: import(\"../types.js\").IPgNativeOperation; selectVector(): void; selectQuantized(mode: import(\"./quantized.js\").IPgQuantizedOptions['mode']): void; selectReplication(options: import(\"../logical-replication.js\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.js\").IPgLogicalReplicationRoute; getServer(): import(\"../types.js\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(maxSlotWalKeepSize: string): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly copy: IPgCopyApi; }; readonly transaction: { readonly copy: IPgCopyApi; }; }>, {}>",
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [],
@@ -3533,11 +3629,11 @@
           "composes": [],
           "exportPath": "./features/copy",
           "overloadSignatures": [
-            "export declare function pgCopyFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.js\").IPostgresStore<import(\"../types.js\").IPgServer>, import(\"../types.js\").IPgDriver, { getTransactionClient(scope: import(\"../types.js\").IPostgresTransactionScope): import(\"../types.js\").IPgConnection; readonly runNative: import(\"../types.js\").IPgNativeOperation; selectVector(): void; selectReplication(options: import(\"../logical-replication.js\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.js\").IPgLogicalReplicationRoute; getServer(): import(\"../types.js\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(maxSlotWalKeepSize: string): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly copy: IPgCopyApi; }; readonly transaction: { readonly copy: IPgCopyApi; }; }>, {}>;"
+            "export declare function pgCopyFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.js\").IPostgresStore<import(\"../types.js\").IPgServer>, import(\"../types.js\").IPgDriver, { getTransactionClient(scope: import(\"../types.js\").IPostgresTransactionScope): import(\"../types.js\").IPgConnection; readonly runNative: import(\"../types.js\").IPgNativeOperation; selectVector(): void; selectQuantized(mode: import(\"./quantized.js\").IPgQuantizedOptions['mode']): void; selectReplication(options: import(\"../logical-replication.js\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.js\").IPgLogicalReplicationRoute; getServer(): import(\"../types.js\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(maxSlotWalKeepSize: string): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly copy: IPgCopyApi; }; readonly transaction: { readonly copy: IPgCopyApi; }; }>, {}>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [
-            "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.js\").IPostgresStore<import(\"../types.js\").IPgServer>, import(\"../types.js\").IPgDriver, { getTransactionClient(scope: import(\"../types.js\").IPostgresTransactionScope): import(\"../types.js\").IPgConnection; readonly runNative: import(\"../types.js\").IPgNativeOperation; selectVector(): void; selectReplication(options: import(\"../logical-replication.js\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.js\").IPgLogicalReplicationRoute; getServer(): import(\"../types.js\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(maxSlotWalKeepSize: string): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly copy: IPgCopyApi; }; readonly transaction: { readonly copy: IPgCopyApi; }; }>, {}>"
+            "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.js\").IPostgresStore<import(\"../types.js\").IPgServer>, import(\"../types.js\").IPgDriver, { getTransactionClient(scope: import(\"../types.js\").IPostgresTransactionScope): import(\"../types.js\").IPgConnection; readonly runNative: import(\"../types.js\").IPgNativeOperation; selectVector(): void; selectQuantized(mode: import(\"./quantized.js\").IPgQuantizedOptions['mode']): void; selectReplication(options: import(\"../logical-replication.js\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.js\").IPgLogicalReplicationRoute; getServer(): import(\"../types.js\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(maxSlotWalKeepSize: string): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly copy: IPgCopyApi; }; readonly transaction: { readonly copy: IPgCopyApi; }; }>, {}>"
           ],
           "whenToUse": "",
           "notUse": "",
@@ -3574,7 +3670,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-plugin-postgres/dist/features/copy.d.ts:pgCopyFeature:export declare function pgCopyFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.js\").IPostgresStore<import(\"../types.js\").IPgServer>, import(\"../types.js\").IPgDriver, { getTransactionClient(scope: import(\"../types.js\").IPostgresTransactionScope): import(\"../types.js\").IPgConnection; readonly runNative: import(\"../types.js\").IPgNativeOperation; selectVector(): void; selectReplication(options: import(\"../logical-replication.js\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.js\").IPgLogicalReplicationRoute; getServer(): import(\"../types.js\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(maxSlotWalKeepSize: string): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly copy: IPgCopyApi; }; readonly transaction: { readonly copy: IPgCopyApi; }; }>, {}>;",
+          "identity": "packages/storage-plugin-postgres/dist/features/copy.d.ts:pgCopyFeature:export declare function pgCopyFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.js\").IPostgresStore<import(\"../types.js\").IPgServer>, import(\"../types.js\").IPgDriver, { getTransactionClient(scope: import(\"../types.js\").IPostgresTransactionScope): import(\"../types.js\").IPgConnection; readonly runNative: import(\"../types.js\").IPgNativeOperation; selectVector(): void; selectQuantized(mode: import(\"./quantized.js\").IPgQuantizedOptions['mode']): void; selectReplication(options: import(\"../logical-replication.js\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.js\").IPgLogicalReplicationRoute; getServer(): import(\"../types.js\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(maxSlotWalKeepSize: string): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly copy: IPgCopyApi; }; readonly transaction: { readonly copy: IPgCopyApi; }; }>, {}>;",
           "guidance": [],
           "usageScore": 12,
           "configuration": [],
@@ -3602,7 +3698,7 @@
         {
           "name": "pgListenFeature",
           "kind": "function",
-          "signature": "export declare function pgListenFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.js\").IPostgresStore<import(\"../types.js\").IPgServer>, import(\"../types.js\").IPgDriver, { getTransactionClient(scope: import(\"../types.js\").IPostgresTransactionScope): import(\"../types.js\").IPgConnection; readonly runNative: import(\"../types.js\").IPgNativeOperation; selectVector(): void; selectReplication(options: import(\"../logical-replication.js\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.js\").IPgLogicalReplicationRoute; getServer(): import(\"../types.js\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(maxSlotWalKeepSize: string): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly notifications: IPgListenApi; }; readonly transaction: { readonly notifications: IPgTransactionNotifyApi; }; }>, {}>;",
+          "signature": "export declare function pgListenFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.js\").IPostgresStore<import(\"../types.js\").IPgServer>, import(\"../types.js\").IPgDriver, { getTransactionClient(scope: import(\"../types.js\").IPostgresTransactionScope): import(\"../types.js\").IPgConnection; readonly runNative: import(\"../types.js\").IPgNativeOperation; selectVector(): void; selectQuantized(mode: import(\"./quantized.js\").IPgQuantizedOptions['mode']): void; selectReplication(options: import(\"../logical-replication.js\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.js\").IPgLogicalReplicationRoute; getServer(): import(\"../types.js\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(maxSlotWalKeepSize: string): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly notifications: IPgListenApi; }; readonly transaction: { readonly notifications: IPgTransactionNotifyApi; }; }>, {}>;",
           "declarationLine": 4,
           "source": "packages/storage-plugin-postgres/dist/features/listen.d.ts",
           "purpose": "Add dedicated root LISTEN resources and transaction-bound native NOTIFY calls without polling.",
@@ -3610,7 +3706,7 @@
           "advanced": "",
           "parameters": ["This function declaration has no parameters."],
           "parameterDetails": [],
-          "returns": "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.js\").IPostgresStore<import(\"../types.js\").IPgServer>, import(\"../types.js\").IPgDriver, { getTransactionClient(scope: import(\"../types.js\").IPostgresTransactionScope): import(\"../types.js\").IPgConnection; readonly runNative: import(\"../types.js\").IPgNativeOperation; selectVector(): void; selectReplication(options: import(\"../logical-replication.js\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.js\").IPgLogicalReplicationRoute; getServer(): import(\"../types.js\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(maxSlotWalKeepSize: string): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly notifications: IPgListenApi; }; readonly transaction: { readonly notifications: IPgTransactionNotifyApi; }; }>, {}>",
+          "returns": "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.js\").IPostgresStore<import(\"../types.js\").IPgServer>, import(\"../types.js\").IPgDriver, { getTransactionClient(scope: import(\"../types.js\").IPostgresTransactionScope): import(\"../types.js\").IPgConnection; readonly runNative: import(\"../types.js\").IPgNativeOperation; selectVector(): void; selectQuantized(mode: import(\"./quantized.js\").IPgQuantizedOptions['mode']): void; selectReplication(options: import(\"../logical-replication.js\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.js\").IPgLogicalReplicationRoute; getServer(): import(\"../types.js\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(maxSlotWalKeepSize: string): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly notifications: IPgListenApi; }; readonly transaction: { readonly notifications: IPgTransactionNotifyApi; }; }>, {}>",
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [],
@@ -3618,11 +3714,11 @@
           "composes": [],
           "exportPath": "./features/listen",
           "overloadSignatures": [
-            "export declare function pgListenFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.js\").IPostgresStore<import(\"../types.js\").IPgServer>, import(\"../types.js\").IPgDriver, { getTransactionClient(scope: import(\"../types.js\").IPostgresTransactionScope): import(\"../types.js\").IPgConnection; readonly runNative: import(\"../types.js\").IPgNativeOperation; selectVector(): void; selectReplication(options: import(\"../logical-replication.js\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.js\").IPgLogicalReplicationRoute; getServer(): import(\"../types.js\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(maxSlotWalKeepSize: string): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly notifications: IPgListenApi; }; readonly transaction: { readonly notifications: IPgTransactionNotifyApi; }; }>, {}>;"
+            "export declare function pgListenFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.js\").IPostgresStore<import(\"../types.js\").IPgServer>, import(\"../types.js\").IPgDriver, { getTransactionClient(scope: import(\"../types.js\").IPostgresTransactionScope): import(\"../types.js\").IPgConnection; readonly runNative: import(\"../types.js\").IPgNativeOperation; selectVector(): void; selectQuantized(mode: import(\"./quantized.js\").IPgQuantizedOptions['mode']): void; selectReplication(options: import(\"../logical-replication.js\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.js\").IPgLogicalReplicationRoute; getServer(): import(\"../types.js\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(maxSlotWalKeepSize: string): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly notifications: IPgListenApi; }; readonly transaction: { readonly notifications: IPgTransactionNotifyApi; }; }>, {}>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [
-            "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.js\").IPostgresStore<import(\"../types.js\").IPgServer>, import(\"../types.js\").IPgDriver, { getTransactionClient(scope: import(\"../types.js\").IPostgresTransactionScope): import(\"../types.js\").IPgConnection; readonly runNative: import(\"../types.js\").IPgNativeOperation; selectVector(): void; selectReplication(options: import(\"../logical-replication.js\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.js\").IPgLogicalReplicationRoute; getServer(): import(\"../types.js\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(maxSlotWalKeepSize: string): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly notifications: IPgListenApi; }; readonly transaction: { readonly notifications: IPgTransactionNotifyApi; }; }>, {}>"
+            "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.js\").IPostgresStore<import(\"../types.js\").IPgServer>, import(\"../types.js\").IPgDriver, { getTransactionClient(scope: import(\"../types.js\").IPostgresTransactionScope): import(\"../types.js\").IPgConnection; readonly runNative: import(\"../types.js\").IPgNativeOperation; selectVector(): void; selectQuantized(mode: import(\"./quantized.js\").IPgQuantizedOptions['mode']): void; selectReplication(options: import(\"../logical-replication.js\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.js\").IPgLogicalReplicationRoute; getServer(): import(\"../types.js\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(maxSlotWalKeepSize: string): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly notifications: IPgListenApi; }; readonly transaction: { readonly notifications: IPgTransactionNotifyApi; }; }>, {}>"
           ],
           "whenToUse": "",
           "notUse": "",
@@ -3659,7 +3755,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-plugin-postgres/dist/features/listen.d.ts:pgListenFeature:export declare function pgListenFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.js\").IPostgresStore<import(\"../types.js\").IPgServer>, import(\"../types.js\").IPgDriver, { getTransactionClient(scope: import(\"../types.js\").IPostgresTransactionScope): import(\"../types.js\").IPgConnection; readonly runNative: import(\"../types.js\").IPgNativeOperation; selectVector(): void; selectReplication(options: import(\"../logical-replication.js\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.js\").IPgLogicalReplicationRoute; getServer(): import(\"../types.js\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(maxSlotWalKeepSize: string): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly notifications: IPgListenApi; }; readonly transaction: { readonly notifications: IPgTransactionNotifyApi; }; }>, {}>;",
+          "identity": "packages/storage-plugin-postgres/dist/features/listen.d.ts:pgListenFeature:export declare function pgListenFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.js\").IPostgresStore<import(\"../types.js\").IPgServer>, import(\"../types.js\").IPgDriver, { getTransactionClient(scope: import(\"../types.js\").IPostgresTransactionScope): import(\"../types.js\").IPgConnection; readonly runNative: import(\"../types.js\").IPgNativeOperation; selectVector(): void; selectQuantized(mode: import(\"./quantized.js\").IPgQuantizedOptions['mode']): void; selectReplication(options: import(\"../logical-replication.js\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.js\").IPgLogicalReplicationRoute; getServer(): import(\"../types.js\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(maxSlotWalKeepSize: string): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly notifications: IPgListenApi; }; readonly transaction: { readonly notifications: IPgTransactionNotifyApi; }; }>, {}>;",
           "guidance": [],
           "usageScore": 12,
           "configuration": [],
@@ -3687,7 +3783,7 @@
         {
           "name": "pgLogicalReplicationFeature",
           "kind": "function",
-          "signature": "export declare function pgLogicalReplicationFeature(options: IPgLogicalReplicationOptions): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.js\").IPostgresStore<import(\"../types.js\").IPgServer>, import(\"../types.js\").IPgDriver, { getTransactionClient(scope: import(\"../types.js\").IPostgresTransactionScope): import(\"../types.js\").IPgConnection; readonly runNative: import(\"../types.js\").IPgNativeOperation; selectVector(): void; selectReplication(options: import(\"../logical-replication.js\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.js\").IPgLogicalReplicationRoute; getServer(): import(\"../types.js\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(maxSlotWalKeepSize: string): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [ICapabilityImpl<import(\"@migaia/storage-contract\").IStorageCapability<\"durableChangeFeed\", IDurableChangeFeedApi>, IDurableChangeFeedApi>], {}, { readonly store: { readonly logicalReplication: { dropSlot(ctx?: IOperationContext): Promise<void>; }; }; readonly transaction: {}; }>, {}>;",
+          "signature": "export declare function pgLogicalReplicationFeature(options: IPgLogicalReplicationOptions): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.js\").IPostgresStore<import(\"../types.js\").IPgServer>, import(\"../types.js\").IPgDriver, { getTransactionClient(scope: import(\"../types.js\").IPostgresTransactionScope): import(\"../types.js\").IPgConnection; readonly runNative: import(\"../types.js\").IPgNativeOperation; selectVector(): void; selectQuantized(mode: import(\"./quantized.js\").IPgQuantizedOptions['mode']): void; selectReplication(options: import(\"../logical-replication.js\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.js\").IPgLogicalReplicationRoute; getServer(): import(\"../types.js\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(maxSlotWalKeepSize: string): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [ICapabilityImpl<import(\"@migaia/storage-contract\").IStorageCapability<\"durableChangeFeed\", IDurableChangeFeedApi>, IDurableChangeFeedApi>], {}, { readonly store: { readonly logicalReplication: { dropSlot(ctx?: IOperationContext): Promise<void>; }; }; readonly transaction: {}; }>, {}>;",
           "declarationLine": 8,
           "source": "packages/storage-plugin-postgres/dist/features/logical-replication.d.ts",
           "purpose": "Publish a durable feed backed by deployment-owned slots and publications without creating them implicitly.",
@@ -3701,7 +3797,7 @@
               "optional": false
             }
           ],
-          "returns": "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.js\").IPostgresStore<import(\"../types.js\").IPgServer>, import(\"../types.js\").IPgDriver, { getTransactionClient(scope: import(\"../types.js\").IPostgresTransactionScope): import(\"../types.js\").IPgConnection; readonly runNative: import(\"../types.js\").IPgNativeOperation; selectVector(): void; selectReplication(options: import(\"../logical-replication.js\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.js\").IPgLogicalReplicationRoute; getServer(): import(\"../types.js\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(maxSlotWalKeepSize: string): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [ICapabilityImpl<import(\"@migaia/storage-contract\").IStorageCapability<\"durableChangeFeed\", IDurableChangeFeedApi>, IDurableChangeFeedApi>], {}, { readonly store: { readonly logicalReplication: { dropSlot(ctx?: IOperationContext): Promise<void>; }; }; readonly transaction: {}; }>, {}>",
+          "returns": "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.js\").IPostgresStore<import(\"../types.js\").IPgServer>, import(\"../types.js\").IPgDriver, { getTransactionClient(scope: import(\"../types.js\").IPostgresTransactionScope): import(\"../types.js\").IPgConnection; readonly runNative: import(\"../types.js\").IPgNativeOperation; selectVector(): void; selectQuantized(mode: import(\"./quantized.js\").IPgQuantizedOptions['mode']): void; selectReplication(options: import(\"../logical-replication.js\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.js\").IPgLogicalReplicationRoute; getServer(): import(\"../types.js\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(maxSlotWalKeepSize: string): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [ICapabilityImpl<import(\"@migaia/storage-contract\").IStorageCapability<\"durableChangeFeed\", IDurableChangeFeedApi>, IDurableChangeFeedApi>], {}, { readonly store: { readonly logicalReplication: { dropSlot(ctx?: IOperationContext): Promise<void>; }; }; readonly transaction: {}; }>, {}>",
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
@@ -3711,7 +3807,7 @@
           "composes": [],
           "exportPath": "./features/logical-replication",
           "overloadSignatures": [
-            "export declare function pgLogicalReplicationFeature(options: IPgLogicalReplicationOptions): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.js\").IPostgresStore<import(\"../types.js\").IPgServer>, import(\"../types.js\").IPgDriver, { getTransactionClient(scope: import(\"../types.js\").IPostgresTransactionScope): import(\"../types.js\").IPgConnection; readonly runNative: import(\"../types.js\").IPgNativeOperation; selectVector(): void; selectReplication(options: import(\"../logical-replication.js\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.js\").IPgLogicalReplicationRoute; getServer(): import(\"../types.js\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(maxSlotWalKeepSize: string): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [ICapabilityImpl<import(\"@migaia/storage-contract\").IStorageCapability<\"durableChangeFeed\", IDurableChangeFeedApi>, IDurableChangeFeedApi>], {}, { readonly store: { readonly logicalReplication: { dropSlot(ctx?: IOperationContext): Promise<void>; }; }; readonly transaction: {}; }>, {}>;"
+            "export declare function pgLogicalReplicationFeature(options: IPgLogicalReplicationOptions): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.js\").IPostgresStore<import(\"../types.js\").IPgServer>, import(\"../types.js\").IPgDriver, { getTransactionClient(scope: import(\"../types.js\").IPostgresTransactionScope): import(\"../types.js\").IPgConnection; readonly runNative: import(\"../types.js\").IPgNativeOperation; selectVector(): void; selectQuantized(mode: import(\"./quantized.js\").IPgQuantizedOptions['mode']): void; selectReplication(options: import(\"../logical-replication.js\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.js\").IPgLogicalReplicationRoute; getServer(): import(\"../types.js\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(maxSlotWalKeepSize: string): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [ICapabilityImpl<import(\"@migaia/storage-contract\").IStorageCapability<\"durableChangeFeed\", IDurableChangeFeedApi>, IDurableChangeFeedApi>], {}, { readonly store: { readonly logicalReplication: { dropSlot(ctx?: IOperationContext): Promise<void>; }; }; readonly transaction: {}; }>, {}>;"
           ],
           "overloadParameterDetails": [
             [
@@ -3723,7 +3819,7 @@
             ]
           ],
           "overloadReturns": [
-            "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.js\").IPostgresStore<import(\"../types.js\").IPgServer>, import(\"../types.js\").IPgDriver, { getTransactionClient(scope: import(\"../types.js\").IPostgresTransactionScope): import(\"../types.js\").IPgConnection; readonly runNative: import(\"../types.js\").IPgNativeOperation; selectVector(): void; selectReplication(options: import(\"../logical-replication.js\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.js\").IPgLogicalReplicationRoute; getServer(): import(\"../types.js\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(maxSlotWalKeepSize: string): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [ICapabilityImpl<import(\"@migaia/storage-contract\").IStorageCapability<\"durableChangeFeed\", IDurableChangeFeedApi>, IDurableChangeFeedApi>], {}, { readonly store: { readonly logicalReplication: { dropSlot(ctx?: IOperationContext): Promise<void>; }; }; readonly transaction: {}; }>, {}>"
+            "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.js\").IPostgresStore<import(\"../types.js\").IPgServer>, import(\"../types.js\").IPgDriver, { getTransactionClient(scope: import(\"../types.js\").IPostgresTransactionScope): import(\"../types.js\").IPgConnection; readonly runNative: import(\"../types.js\").IPgNativeOperation; selectVector(): void; selectQuantized(mode: import(\"./quantized.js\").IPgQuantizedOptions['mode']): void; selectReplication(options: import(\"../logical-replication.js\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.js\").IPgLogicalReplicationRoute; getServer(): import(\"../types.js\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(maxSlotWalKeepSize: string): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [ICapabilityImpl<import(\"@migaia/storage-contract\").IStorageCapability<\"durableChangeFeed\", IDurableChangeFeedApi>, IDurableChangeFeedApi>], {}, { readonly store: { readonly logicalReplication: { dropSlot(ctx?: IOperationContext): Promise<void>; }; }; readonly transaction: {}; }>, {}>"
           ],
           "whenToUse": "",
           "notUse": "",
@@ -3773,7 +3869,7 @@
               "description": ""
             }
           ],
-          "identity": "packages/storage-plugin-postgres/dist/features/logical-replication.d.ts:pgLogicalReplicationFeature:export declare function pgLogicalReplicationFeature(options: IPgLogicalReplicationOptions): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.js\").IPostgresStore<import(\"../types.js\").IPgServer>, import(\"../types.js\").IPgDriver, { getTransactionClient(scope: import(\"../types.js\").IPostgresTransactionScope): import(\"../types.js\").IPgConnection; readonly runNative: import(\"../types.js\").IPgNativeOperation; selectVector(): void; selectReplication(options: import(\"../logical-replication.js\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.js\").IPgLogicalReplicationRoute; getServer(): import(\"../types.js\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(maxSlotWalKeepSize: string): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [ICapabilityImpl<import(\"@migaia/storage-contract\").IStorageCapability<\"durableChangeFeed\", IDurableChangeFeedApi>, IDurableChangeFeedApi>], {}, { readonly store: { readonly logicalReplication: { dropSlot(ctx?: IOperationContext): Promise<void>; }; }; readonly transaction: {}; }>, {}>;",
+          "identity": "packages/storage-plugin-postgres/dist/features/logical-replication.d.ts:pgLogicalReplicationFeature:export declare function pgLogicalReplicationFeature(options: IPgLogicalReplicationOptions): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.js\").IPostgresStore<import(\"../types.js\").IPgServer>, import(\"../types.js\").IPgDriver, { getTransactionClient(scope: import(\"../types.js\").IPostgresTransactionScope): import(\"../types.js\").IPgConnection; readonly runNative: import(\"../types.js\").IPgNativeOperation; selectVector(): void; selectQuantized(mode: import(\"./quantized.js\").IPgQuantizedOptions['mode']): void; selectReplication(options: import(\"../logical-replication.js\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.js\").IPgLogicalReplicationRoute; getServer(): import(\"../types.js\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(maxSlotWalKeepSize: string): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [ICapabilityImpl<import(\"@migaia/storage-contract\").IStorageCapability<\"durableChangeFeed\", IDurableChangeFeedApi>, IDurableChangeFeedApi>], {}, { readonly store: { readonly logicalReplication: { dropSlot(ctx?: IOperationContext): Promise<void>; }; }; readonly transaction: {}; }>, {}>;",
           "guidance": [],
           "usageScore": 16,
           "configuration": [
@@ -3818,7 +3914,7 @@
         {
           "name": "pgvectorFeature",
           "kind": "function",
-          "signature": "export declare function pgvectorFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.js\").IPostgresStore<import(\"../types.js\").IPgServer>, import(\"../types.js\").IPgDriver, { getTransactionClient(scope: import(\"../types.js\").IPostgresTransactionScope): import(\"../types.js\").IPgConnection; readonly runNative: import(\"../types.js\").IPgNativeOperation; selectVector(): void; selectReplication(options: import(\"../logical-replication.js\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.js\").IPgLogicalReplicationRoute; getServer(): import(\"../types.js\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(maxSlotWalKeepSize: string): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [ICapabilityImpl<import(\"@migaia/storage-contract\").IStorageCapability<\"vector\", IVectorApi<false, false, Record<never, never>>>, IVectorApi<true>>], {}, { readonly store: { readonly pgvector: IPgNativeVectorApi; }; readonly transaction: { readonly pgvector: IPgNativeVectorApi; }; }>, {}>;",
+          "signature": "export declare function pgvectorFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.js\").IPostgresStore<import(\"../types.js\").IPgServer>, import(\"../types.js\").IPgDriver, { getTransactionClient(scope: import(\"../types.js\").IPostgresTransactionScope): import(\"../types.js\").IPgConnection; readonly runNative: import(\"../types.js\").IPgNativeOperation; selectVector(): void; selectQuantized(mode: import(\"./quantized.js\").IPgQuantizedOptions['mode']): void; selectReplication(options: import(\"../logical-replication.js\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.js\").IPgLogicalReplicationRoute; getServer(): import(\"../types.js\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(maxSlotWalKeepSize: string): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [ICapabilityImpl<import(\"@migaia/storage-contract\").IStorageCapability<\"vector\", IVectorApi<false, false, Record<never, never>>>, IVectorApi<true>>], {}, { readonly store: { readonly pgvector: IPgNativeVectorApi; }; readonly transaction: { readonly pgvector: IPgNativeVectorApi; }; }>, {}>;",
           "declarationLine": 8,
           "source": "packages/storage-plugin-postgres/dist/features/pgvector.d.ts",
           "purpose": "Publish native standard vector ranking and a separate search API for caller-owned SQL vector tables.",
@@ -3826,21 +3922,22 @@
           "advanced": "",
           "parameters": ["This function declaration has no parameters."],
           "parameterDetails": [],
-          "returns": "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.js\").IPostgresStore<import(\"../types.js\").IPgServer>, import(\"../types.js\").IPgDriver, { getTransactionClient(scope: import(\"../types.js\").IPostgresTransactionScope): import(\"../types.js\").IPgConnection; readonly runNative: import(\"../types.js\").IPgNativeOperation; selectVector(): void; selectReplication(options: import(\"../logical-replication.js\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.js\").IPgLogicalReplicationRoute; getServer(): import(\"../types.js\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(maxSlotWalKeepSize: string): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [ICapabilityImpl<import(\"@migaia/storage-contract\").IStorageCapability<\"vector\", IVectorApi<false, false, Record<never, never>>>, IVectorApi<true>>], {}, { readonly store: { readonly pgvector: IPgNativeVectorApi; }; readonly transaction: { readonly pgvector: IPgNativeVectorApi; }; }>, {}>",
+          "returns": "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.js\").IPostgresStore<import(\"../types.js\").IPgServer>, import(\"../types.js\").IPgDriver, { getTransactionClient(scope: import(\"../types.js\").IPostgresTransactionScope): import(\"../types.js\").IPgConnection; readonly runNative: import(\"../types.js\").IPgNativeOperation; selectVector(): void; selectQuantized(mode: import(\"./quantized.js\").IPgQuantizedOptions['mode']): void; selectReplication(options: import(\"../logical-replication.js\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.js\").IPgLogicalReplicationRoute; getServer(): import(\"../types.js\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(maxSlotWalKeepSize: string): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [ICapabilityImpl<import(\"@migaia/storage-contract\").IStorageCapability<\"vector\", IVectorApi<false, false, Record<never, never>>>, IVectorApi<true>>], {}, { readonly store: { readonly pgvector: IPgNativeVectorApi; }; readonly transaction: { readonly pgvector: IPgNativeVectorApi; }; }>, {}>",
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
-            "import { vector } from '@migaia/storage-contract'\nimport { pgvectorFeature } from '@migaia/storage-plugin-postgres/features/pgvector'\n// postgresBackendPlugin({ driver }, { vector: pgvectorFeature() })\nconst embeddings = store.use(vector).collection('documents', { dimensions: 3, metric: 'cosine' })\nawait embeddings.upsert([{ id: 'a', vector: [1, 0, 0], payload: { category: 'guide' } }], {\n  ttlMs: 10000\n})\nconst hits = await embeddings\n  .near([1, 0, 0], { exact: true })\n  .where('category', 'eq', 'guide')\n  .topK(5)\n  .all()\nconst deleted = await embeddings.deleteWhere({ category: 'guide' }, { count: 'scroll' })"
+            "import { vector } from '@migaia/storage-contract'\nimport { pgvectorFeature } from '@migaia/storage-plugin-postgres/features/pgvector'\n// postgresBackendPlugin({ driver }, { vector: pgvectorFeature() })\nconst embeddings = store.use(vector).collection('documents', { dimensions: 3, metric: 'cosine' })\nawait embeddings.upsert([{ id: 'a', vector: [1, 0, 0], payload: { category: 'guide' } }], {\n  ttlMs: 10000\n})\nconst hits = await embeddings\n  .near([1, 0, 0], { exact: true })\n  .where('category', 'eq', 'guide')\n  .topK(5)\n  .all()\nconst deleted = await embeddings.deleteWhere({ category: 'guide' }, { count: 'scroll' })",
+            "import { pgQuantizedFeature } from '@migaia/storage-plugin-postgres/features/quantized'\n// postgresBackendPlugin({ driver }, {\n//   vector: pgvectorFeature(), quantized: pgQuantizedFeature({ mode: 'halfvec' })\n// })\nconst selected = await embeddings\n  .near([1, 0, 0])\n  .where({ category: 'guide' })\n  .topK(20)\n  .rescore({ topN: 5 })\n  .rerank(({ hits }) => hits.map((hit) => hit.score))\n  .all()"
           ],
           "members": [],
           "composes": [],
           "exportPath": "./features/pgvector",
           "overloadSignatures": [
-            "export declare function pgvectorFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.js\").IPostgresStore<import(\"../types.js\").IPgServer>, import(\"../types.js\").IPgDriver, { getTransactionClient(scope: import(\"../types.js\").IPostgresTransactionScope): import(\"../types.js\").IPgConnection; readonly runNative: import(\"../types.js\").IPgNativeOperation; selectVector(): void; selectReplication(options: import(\"../logical-replication.js\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.js\").IPgLogicalReplicationRoute; getServer(): import(\"../types.js\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(maxSlotWalKeepSize: string): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [ICapabilityImpl<import(\"@migaia/storage-contract\").IStorageCapability<\"vector\", IVectorApi<false, false, Record<never, never>>>, IVectorApi<true>>], {}, { readonly store: { readonly pgvector: IPgNativeVectorApi; }; readonly transaction: { readonly pgvector: IPgNativeVectorApi; }; }>, {}>;"
+            "export declare function pgvectorFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.js\").IPostgresStore<import(\"../types.js\").IPgServer>, import(\"../types.js\").IPgDriver, { getTransactionClient(scope: import(\"../types.js\").IPostgresTransactionScope): import(\"../types.js\").IPgConnection; readonly runNative: import(\"../types.js\").IPgNativeOperation; selectVector(): void; selectQuantized(mode: import(\"./quantized.js\").IPgQuantizedOptions['mode']): void; selectReplication(options: import(\"../logical-replication.js\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.js\").IPgLogicalReplicationRoute; getServer(): import(\"../types.js\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(maxSlotWalKeepSize: string): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [ICapabilityImpl<import(\"@migaia/storage-contract\").IStorageCapability<\"vector\", IVectorApi<false, false, Record<never, never>>>, IVectorApi<true>>], {}, { readonly store: { readonly pgvector: IPgNativeVectorApi; }; readonly transaction: { readonly pgvector: IPgNativeVectorApi; }; }>, {}>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [
-            "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.js\").IPostgresStore<import(\"../types.js\").IPgServer>, import(\"../types.js\").IPgDriver, { getTransactionClient(scope: import(\"../types.js\").IPostgresTransactionScope): import(\"../types.js\").IPgConnection; readonly runNative: import(\"../types.js\").IPgNativeOperation; selectVector(): void; selectReplication(options: import(\"../logical-replication.js\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.js\").IPgLogicalReplicationRoute; getServer(): import(\"../types.js\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(maxSlotWalKeepSize: string): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [ICapabilityImpl<import(\"@migaia/storage-contract\").IStorageCapability<\"vector\", IVectorApi<false, false, Record<never, never>>>, IVectorApi<true>>], {}, { readonly store: { readonly pgvector: IPgNativeVectorApi; }; readonly transaction: { readonly pgvector: IPgNativeVectorApi; }; }>, {}>"
+            "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.js\").IPostgresStore<import(\"../types.js\").IPgServer>, import(\"../types.js\").IPgDriver, { getTransactionClient(scope: import(\"../types.js\").IPostgresTransactionScope): import(\"../types.js\").IPgConnection; readonly runNative: import(\"../types.js\").IPgNativeOperation; selectVector(): void; selectQuantized(mode: import(\"./quantized.js\").IPgQuantizedOptions['mode']): void; selectReplication(options: import(\"../logical-replication.js\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.js\").IPgLogicalReplicationRoute; getServer(): import(\"../types.js\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(maxSlotWalKeepSize: string): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [ICapabilityImpl<import(\"@migaia/storage-contract\").IStorageCapability<\"vector\", IVectorApi<false, false, Record<never, never>>>, IVectorApi<true>>], {}, { readonly store: { readonly pgvector: IPgNativeVectorApi; }; readonly transaction: { readonly pgvector: IPgNativeVectorApi; }; }>, {}>"
           ],
           "whenToUse": "",
           "notUse": "",
@@ -3877,11 +3974,361 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-plugin-postgres/dist/features/pgvector.d.ts:pgvectorFeature:export declare function pgvectorFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.js\").IPostgresStore<import(\"../types.js\").IPgServer>, import(\"../types.js\").IPgDriver, { getTransactionClient(scope: import(\"../types.js\").IPostgresTransactionScope): import(\"../types.js\").IPgConnection; readonly runNative: import(\"../types.js\").IPgNativeOperation; selectVector(): void; selectReplication(options: import(\"../logical-replication.js\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.js\").IPgLogicalReplicationRoute; getServer(): import(\"../types.js\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(maxSlotWalKeepSize: string): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [ICapabilityImpl<import(\"@migaia/storage-contract\").IStorageCapability<\"vector\", IVectorApi<false, false, Record<never, never>>>, IVectorApi<true>>], {}, { readonly store: { readonly pgvector: IPgNativeVectorApi; }; readonly transaction: { readonly pgvector: IPgNativeVectorApi; }; }>, {}>;",
+          "identity": "packages/storage-plugin-postgres/dist/features/pgvector.d.ts:pgvectorFeature:export declare function pgvectorFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.js\").IPostgresStore<import(\"../types.js\").IPgServer>, import(\"../types.js\").IPgDriver, { getTransactionClient(scope: import(\"../types.js\").IPostgresTransactionScope): import(\"../types.js\").IPgConnection; readonly runNative: import(\"../types.js\").IPgNativeOperation; selectVector(): void; selectQuantized(mode: import(\"./quantized.js\").IPgQuantizedOptions['mode']): void; selectReplication(options: import(\"../logical-replication.js\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.js\").IPgLogicalReplicationRoute; getServer(): import(\"../types.js\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(maxSlotWalKeepSize: string): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [ICapabilityImpl<import(\"@migaia/storage-contract\").IStorageCapability<\"vector\", IVectorApi<false, false, Record<never, never>>>, IVectorApi<true>>], {}, { readonly store: { readonly pgvector: IPgNativeVectorApi; }; readonly transaction: { readonly pgvector: IPgNativeVectorApi; }; }>, {}>;",
           "guidance": [],
-          "usageScore": 16,
+          "usageScore": 36,
           "configuration": [],
           "fragment": "storage-plugin-postgres-features/pgvector--pgvectorFeature"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "storage-plugin-postgres:features/quantized",
+      "library": "storage-plugin-postgres",
+      "module": "features/quantized",
+      "exportPath": "./features/quantized",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/docs/storage-plugin-postgres/getting-started",
+      "architecturePath": "/en/docs/storage-plugin-postgres",
+      "symbols": [
+        {
+          "name": "IPgQuantizedOptions",
+          "kind": "type",
+          "signature": "export type IPgQuantizedOptions = { readonly mode: (typeof PgQuantizedMode)[keyof typeof PgQuantizedMode]; };",
+          "declarationLine": 5,
+          "source": "packages/storage-plugin-postgres/dist/features/quantized.d.ts",
+          "purpose": "Installation options choosing one native quantized expression layout while retaining original vectors.",
+          "core": "mode: Required finite mode captured once before native installation or layout work.\nIndex half-precision casts with the current metric opclass; 4000 indexed dimensions maximum.\nIndex vector signs as bits with Hamming distance, then order the recalled original vectors exactly.\nChoose the deployed pgvector layout deliberately; casts are lossy and can reject unrepresentable values with the original SQL_FAILED cause.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "mode",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly mode: (typeof PgQuantizedMode)[keyof typeof PgQuantizedMode];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "(typeof PgQuantizedMode)[keyof typeof PgQuantizedMode]"
+            }
+          ],
+          "composes": [],
+          "exportPath": "./features/quantized",
+          "overloadSignatures": [
+            "export type IPgQuantizedOptions = { readonly mode: (typeof PgQuantizedMode)[keyof typeof PgQuantizedMode]; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Installation options choosing one native quantized expression layout while retaining original vectors."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IPgQuantizedOptions from @migaia/storage-plugin-postgres/features/quantized, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IPgQuantizedOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when IPgQuantizedOptions does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "mode: Required finite mode captured once before native installation or layout work.\nIndex half-precision casts with the current metric opclass; 4000 indexed dimensions maximum.\nIndex vector signs as bits with Hamming distance, then order the recalled original vectors exactly.\nChoose the deployed pgvector layout deliberately; casts are lossy and can reject unrepresentable values with the original SQL_FAILED cause."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-postgres/dist/features/quantized.d.ts:IPgQuantizedOptions:export type IPgQuantizedOptions = { readonly mode: (typeof PgQuantizedMode)[keyof typeof PgQuantizedMode]; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-postgres-features/quantized--IPgQuantizedOptions"
+        },
+        {
+          "name": "IPgQuantizedQueryMethods",
+          "kind": "type",
+          "signature": "export type IPgQuantizedQueryMethods = { rescore<P, G extends boolean, V extends boolean, M extends object>(this: IVectorQuery<P, G, V, M>, options?: IPgQuantizedRescoreOptions): IVectorNativeQuery<P, G, V, M>; };",
+          "declarationLine": 13,
+          "source": "packages/storage-plugin-postgres/dist/features/quantized.d.ts",
+          "purpose": "Selected PostgreSQL vector-chain augmentation with a generic bounded original-query receiver.",
+          "core": "rescore: Recall k by the selected quantized distance and exactly reorder original vectors to topN in one business SQL statement after original layout preparation.\nrescore.this: The original bounded PostgreSQL vector query; its payload, grouping, explicit-vector and selected Feature states are preserved.\nrescore.options: Optional native topN; omission uses the original topK bound and invalid bounds reject before I/O.\nA read-only IVectorNativeQuery preserving payload, grouping and explicit-vector state. It can append generic rerank but cannot delete, watch or rescore again; JavaScript conditions run afterward without refill.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "rescore",
+              "kind": "method",
+              "optional": false,
+              "signature": "rescore<P, G extends boolean, V extends boolean, M extends object>(this: IVectorQuery<P, G, V, M>, options?: IPgQuantizedRescoreOptions): IVectorNativeQuery<P, G, V, M>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "this",
+                  "type": "IVectorQuery<P, G, V, M>",
+                  "optional": false
+                },
+                {
+                  "name": "options",
+                  "type": "IPgQuantizedRescoreOptions",
+                  "optional": true
+                }
+              ],
+              "returns": "IVectorNativeQuery<P, G, V, M>"
+            }
+          ],
+          "composes": [],
+          "exportPath": "./features/quantized",
+          "overloadSignatures": [
+            "export type IPgQuantizedQueryMethods = { rescore<P, G extends boolean, V extends boolean, M extends object>(this: IVectorQuery<P, G, V, M>, options?: IPgQuantizedRescoreOptions): IVectorNativeQuery<P, G, V, M>; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Selected PostgreSQL vector-chain augmentation with a generic bounded original-query receiver."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IPgQuantizedQueryMethods from @migaia/storage-plugin-postgres/features/quantized, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IPgQuantizedQueryMethods when its type contract and declared inputs match the result you need. Choose a different public symbol when IPgQuantizedQueryMethods does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "rescore: Recall k by the selected quantized distance and exactly reorder original vectors to topN in one business SQL statement after original layout preparation.\nrescore.this: The original bounded PostgreSQL vector query; its payload, grouping, explicit-vector and selected Feature states are preserved.\nrescore.options: Optional native topN; omission uses the original topK bound and invalid bounds reject before I/O.\nA read-only IVectorNativeQuery preserving payload, grouping and explicit-vector state. It can append generic rerank but cannot delete, watch or rescore again; JavaScript conditions run afterward without refill."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-postgres/dist/features/quantized.d.ts:IPgQuantizedQueryMethods:export type IPgQuantizedQueryMethods = { rescore<P, G extends boolean, V extends boolean, M extends object>(this: IVectorQuery<P, G, V, M>, options?: IPgQuantizedRescoreOptions): IVectorNativeQuery<P, G, V, M>; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-postgres-features/quantized--IPgQuantizedQueryMethods"
+        },
+        {
+          "name": "IPgQuantizedRescoreOptions",
+          "kind": "type",
+          "signature": "export type IPgQuantizedRescoreOptions = { readonly topN?: number; };",
+          "declarationLine": 9,
+          "source": "packages/storage-plugin-postgres/dist/features/quantized.d.ts",
+          "purpose": "Options for the native second stage after an existing immutable topK bound.",
+          "core": "topN: Positive safe integer no larger than the original k, validated before any I/O. Actual hits may be fewer after native ANN filtering or outer JavaScript predicates.\nOmitted: retain at most the original k recalled candidates.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "topN",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly topN?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            }
+          ],
+          "composes": [],
+          "exportPath": "./features/quantized",
+          "overloadSignatures": [
+            "export type IPgQuantizedRescoreOptions = { readonly topN?: number; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Options for the native second stage after an existing immutable topK bound."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IPgQuantizedRescoreOptions from @migaia/storage-plugin-postgres/features/quantized, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IPgQuantizedRescoreOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when IPgQuantizedRescoreOptions does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "topN: Positive safe integer no larger than the original k, validated before any I/O. Actual hits may be fewer after native ANN filtering or outer JavaScript predicates.\nOmitted: retain at most the original k recalled candidates."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-postgres/dist/features/quantized.d.ts:IPgQuantizedRescoreOptions:export type IPgQuantizedRescoreOptions = { readonly topN?: number; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-postgres-features/quantized--IPgQuantizedRescoreOptions"
+        },
+        {
+          "name": "pgQuantizedFeature",
+          "kind": "function",
+          "signature": "export declare function pgQuantizedFeature(options: IPgQuantizedOptions): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.js\").IPostgresStore<import(\"../types.js\").IPgServer>, import(\"../types.js\").IPgDriver, { getTransactionClient(scope: import(\"../types.js\").IPostgresTransactionScope): import(\"../types.js\").IPgConnection; readonly runNative: import(\"../types.js\").IPgNativeOperation; selectVector(): void; selectQuantized(mode: IPgQuantizedOptions['mode']): void; selectReplication(options: import(\"../logical-replication.js\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.js\").IPgLogicalReplicationRoute; getServer(): import(\"../types.js\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(maxSlotWalKeepSize: string): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [], { readonly vector: IPgQuantizedQueryMethods; }, { readonly store: {}; readonly transaction: {}; }>, {}>;",
+          "declarationLine": 17,
+          "source": "packages/storage-plugin-postgres/dist/features/quantized.d.ts",
+          "purpose": "Select a native quantized expression HNSW layout and add bounded rescore to the existing pgvector chain. Install with pgvectorFeature in the same backend Feature batch; organization, expiry and faithful payload predicates stay in the native recall.",
+          "core": "A chain-only PostgreSQL Feature. Invalid modes reject with INVALID_ARGUMENT; missing pgvector or a non-PostgreSQL preset rejects with UNSUPPORTED_CAPABILITY. Index preparation retains the original driver and native transaction; no second vector provider is published.\nmode: Required finite mode captured once before native installation or layout work.\nIndex half-precision casts with the current metric opclass; 4000 indexed dimensions maximum.\nIndex vector signs as bits with Hamming distance, then order the recalled original vectors exactly.\nChoose the deployed pgvector layout deliberately; casts are lossy and can reject unrepresentable values with the original SQL_FAILED cause.",
+          "advanced": "",
+          "parameters": ["options: IPgQuantizedOptions"],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "IPgQuantizedOptions",
+              "optional": false
+            }
+          ],
+          "returns": "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.js\").IPostgresStore<import(\"../types.js\").IPgServer>, import(\"../types.js\").IPgDriver, { getTransactionClient(scope: import(\"../types.js\").IPostgresTransactionScope): import(\"../types.js\").IPgConnection; readonly runNative: import(\"../types.js\").IPgNativeOperation; selectVector(): void; selectQuantized(mode: IPgQuantizedOptions['mode']): void; selectReplication(options: import(\"../logical-replication.js\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.js\").IPgLogicalReplicationRoute; getServer(): import(\"../types.js\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(maxSlotWalKeepSize: string): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [], { readonly vector: IPgQuantizedQueryMethods; }, { readonly store: {}; readonly transaction: {}; }>, {}>",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [
+            "import { pgQuantizedFeature } from '@migaia/storage-plugin-postgres/features/quantized'\n// postgresBackendPlugin({ driver }, {\n//   vector: pgvectorFeature(), quantized: pgQuantizedFeature({ mode: 'halfvec' })\n// })\nconst selected = await embeddings\n  .near([1, 0, 0])\n  .where({ category: 'guide' })\n  .topK(20)\n  .rescore({ topN: 5 })\n  .rerank(({ hits }) => hits.map((hit) => hit.score))\n  .all()"
+          ],
+          "members": [],
+          "composes": [],
+          "exportPath": "./features/quantized",
+          "overloadSignatures": [
+            "export declare function pgQuantizedFeature(options: IPgQuantizedOptions): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.js\").IPostgresStore<import(\"../types.js\").IPgServer>, import(\"../types.js\").IPgDriver, { getTransactionClient(scope: import(\"../types.js\").IPostgresTransactionScope): import(\"../types.js\").IPgConnection; readonly runNative: import(\"../types.js\").IPgNativeOperation; selectVector(): void; selectQuantized(mode: IPgQuantizedOptions['mode']): void; selectReplication(options: import(\"../logical-replication.js\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.js\").IPgLogicalReplicationRoute; getServer(): import(\"../types.js\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(maxSlotWalKeepSize: string): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [], { readonly vector: IPgQuantizedQueryMethods; }, { readonly store: {}; readonly transaction: {}; }>, {}>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "IPgQuantizedOptions",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": [
+            "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.js\").IPostgresStore<import(\"../types.js\").IPgServer>, import(\"../types.js\").IPgDriver, { getTransactionClient(scope: import(\"../types.js\").IPostgresTransactionScope): import(\"../types.js\").IPgConnection; readonly runNative: import(\"../types.js\").IPgNativeOperation; selectVector(): void; selectQuantized(mode: IPgQuantizedOptions['mode']): void; selectReplication(options: import(\"../logical-replication.js\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.js\").IPgLogicalReplicationRoute; getServer(): import(\"../types.js\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(maxSlotWalKeepSize: string): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [], { readonly vector: IPgQuantizedQueryMethods; }, { readonly store: {}; readonly transaction: {}; }>, {}>"
+          ],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Select a native quantized expression HNSW layout and add bounded rescore to the existing pgvector chain. Install with pgvectorFeature in the same backend Feature batch; organization, expiry and faithful payload predicates stay in the native recall."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import pgQuantizedFeature from @migaia/storage-plugin-postgres/features/quantized, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use pgQuantizedFeature when its function contract and declared inputs match the result you need. Choose a different public symbol when pgQuantizedFeature does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "A chain-only PostgreSQL Feature. Invalid modes reject with INVALID_ARGUMENT; missing pgvector or a non-PostgreSQL preset rejects with UNSUPPORTED_CAPABILITY. Index preparation retains the original driver and native transaction; no second vector provider is published.\nmode: Required finite mode captured once before native installation or layout work.\nIndex half-precision casts with the current metric opclass; 4000 indexed dimensions maximum.\nIndex vector signs as bits with Hamming distance, then order the recalled original vectors exactly.\nChoose the deployed pgvector layout deliberately; casts are lossy and can reject unrepresentable values with the original SQL_FAILED cause."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [
+            {
+              "name": "mode",
+              "type": "(typeof PgQuantizedMode)[keyof typeof PgQuantizedMode]",
+              "optional": false,
+              "description": ""
+            }
+          ],
+          "identity": "packages/storage-plugin-postgres/dist/features/quantized.d.ts:pgQuantizedFeature:export declare function pgQuantizedFeature(options: IPgQuantizedOptions): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", import(\"../types.js\").IPostgresStore<import(\"../types.js\").IPgServer>, import(\"../types.js\").IPgDriver, { getTransactionClient(scope: import(\"../types.js\").IPostgresTransactionScope): import(\"../types.js\").IPgConnection; readonly runNative: import(\"../types.js\").IPgNativeOperation; selectVector(): void; selectQuantized(mode: IPgQuantizedOptions['mode']): void; selectReplication(options: import(\"../logical-replication.js\").IPgReplicationSelection): void; getReplicationRoute(): import(\"../types.js\").IPgLogicalReplicationRoute; getServer(): import(\"../types.js\").IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(maxSlotWalKeepSize: string): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>, IStorageFeatureOutput<readonly [], { readonly vector: IPgQuantizedQueryMethods; }, { readonly store: {}; readonly transaction: {}; }>, {}>;",
+          "guidance": [],
+          "usageScore": 26,
+          "configuration": [
+            {
+              "name": "mode",
+              "type": "(typeof PgQuantizedMode)[keyof typeof PgQuantizedMode]",
+              "optional": false,
+              "description": "`/features/quantized`：同批选择 `pgvectorFeature()` 与 `pgQuantizedFeature({mode:'halfvec'|'binary_quantize'})`，只增强有界向量链的 `rescore({topN?})`，量化表达式 HNSW 召回后按原向量精排，不发布第二个 vector provider。",
+              "descriptionEn": "",
+              "descriptionZh": "`/features/quantized`：同批选择 `pgvectorFeature()` 与 `pgQuantizedFeature({mode:'halfvec'|'binary_quantize'})`，只增强有界向量链的 `rescore({topN?})`，量化表达式 HNSW 召回后按原向量精排，不发布第二个 vector provider。"
+            }
+          ],
+          "fragment": "storage-plugin-postgres-features/quantized--pgQuantizedFeature"
         }
       ],
       "aliases": []

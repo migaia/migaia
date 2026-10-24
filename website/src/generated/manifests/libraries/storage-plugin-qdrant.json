@@ -11,6 +11,7 @@
       "./features/hybrid",
       "./features/management",
       "./features/recommend",
+      "./features/rescore",
       "./http"
     ],
     "readmeLocales": ["zh", "en"],
@@ -62,6 +63,37 @@
               {
                 "type": "paragraph",
                 "text": "SDK 请求发出后，取消不会撤销原生修改；即使调用方随后取消，请求仍可能成功返回。后端释放等待该真实结果，响应丢失时保留结果未知且不自动重放。hooks 的同步异常或异步拒绝仅上报，介入操作使用宿主原 pipeline。"
+              }
+            ]
+          },
+          {
+            "id": "原生命名向量重排",
+            "heading": "原生命名向量重排",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "`@migaia/storage-plugin-qdrant/features/rescore` 的 `qdrantRescoreFeature` 在安装时按逻辑集合声明一个额外向量槽。`dimensions` 必填，`metric` 默认 `cosine`；`multivector: 'max_sim'` 选择多向量，否则使用 dense。只接受顶层 `collections` 映射中声明的集合。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { vector } from '@migaia/storage-contract'\nimport { qdrantBackendPlugin } from '@migaia/storage-plugin-qdrant'\nimport { qdrantRescoreFeature } from '@migaia/storage-plugin-qdrant/features/rescore'\nawait using host = await createStorageHost({\n  plugins: [\n    qdrantBackendPlugin(\n      { url: 'http://localhost:6333' },\n      {\n        rescore: qdrantRescoreFeature({\n          collections: { articles: { dimensions: 2, metric: 'dot' } }\n        })\n      }\n    )\n  ]\n})\nconst store = host.backend('qdrant')\nconst articles = store.use(vector).collection('articles', { dimensions: 2, metric: 'dot' })\nawait articles.upsert([\n  { id: 'a', vector: [2, 0] },\n  { id: 'b', vector: [1, 0] }\n])\nawait store.api.qdrantRescore.updateVectors('articles', [\n  { id: 'a', vector: [0, 1] },\n  { id: 'b', vector: [3, 0] }\n])\nconst hits = await articles\n  .near([1, 0])\n  .topK(10)\n  .rescore({ query: [1, 0], topN: 2 })\n  .all()\nconsole.log(hits.map((hit) => ({ id: hit.id, score: hit.score })))"
+              },
+              {
+                "type": "paragraph",
+                "text": "`updateVectors(collection,points,ctx?)` 只更新当前组织已存在点的额外槽，使用 `wait:true`，返回原生 `operation_id/status` 操作记录，不改变 search/source、payload 或 TTL。重复 ID、非稠密数组和非法向量在 I/O 前拒绝。多向量写入与 query 使用非空二维数组，内层维度一致。原生缺点错误及未知写结果沿原错误链，不自动重试。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`rescore` 只可接在 `topK(k)` 后；`topN` 默认 k，必须为不大于 k 的正安全整数。每次终点只发一次 Query API：prefetch 使用原 search 槽、k、可下推 where、组织、期限与原 minScore；outer 使用额外槽并取 topN。`score` 是 outer 引擎分数；prefetch 分数不由协议返回。函数 where 在 outer 命中后由原共享 reader 执行且不补搜，因此可能不足 topN。`withVector()` 仍返回原标准向量，之后可接通用 `rerank`，后者保留当前引擎 score 并新增 rerankScore。"
+              },
+              {
+                "type": "paragraph",
+                "text": "Qdrant 1.15.5 必须在集合首次创建时声明额外槽，不能在线给旧集合补槽。已有缺槽或配置不符集合的新操作报 `UNSUPPORTED_CAPABILITY`，原标准读写保持可用；不会重建集合或迁移数据。标准 upsert 仍整点替换，可能清除额外槽，应用需在其后重写额外向量。移除 Feature 后标准读写仍保留此原替换语义。额外槽检索及分数由 Qdrant 完成，不在 JavaScript 评分。"
+              },
+              {
+                "type": "paragraph",
+                "text": "Qdrant 1.15.5 对首行全为非负整数的两行多向量矩阵存在原生 JSON 歧义：它可能把矩阵解码为 sparse vector 并拒绝。适配器保留原 QDRANT_REQUEST_FAILED 证据，不变形向量或重试；本版本的三行矩阵与 dense 向量已实际验证。"
               }
             ]
           }
@@ -170,6 +202,37 @@
                 "text": "SDK 请求发出后，取消不会撤销原生修改；即使调用方随后取消，请求仍可能成功返回。后端释放等待该真实结果，响应丢失时保留结果未知且不自动重放。hooks 的同步异常或异步拒绝仅上报，介入操作使用宿主原 pipeline。"
               }
             ]
+          },
+          {
+            "id": "原生命名向量重排",
+            "heading": "原生命名向量重排",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "`@migaia/storage-plugin-qdrant/features/rescore` 的 `qdrantRescoreFeature` 在安装时按逻辑集合声明一个额外向量槽。`dimensions` 必填，`metric` 默认 `cosine`；`multivector: 'max_sim'` 选择多向量，否则使用 dense。只接受顶层 `collections` 映射中声明的集合。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { vector } from '@migaia/storage-contract'\nimport { qdrantBackendPlugin } from '@migaia/storage-plugin-qdrant'\nimport { qdrantRescoreFeature } from '@migaia/storage-plugin-qdrant/features/rescore'\nawait using host = await createStorageHost({\n  plugins: [\n    qdrantBackendPlugin(\n      { url: 'http://localhost:6333' },\n      {\n        rescore: qdrantRescoreFeature({\n          collections: { articles: { dimensions: 2, metric: 'dot' } }\n        })\n      }\n    )\n  ]\n})\nconst store = host.backend('qdrant')\nconst articles = store.use(vector).collection('articles', { dimensions: 2, metric: 'dot' })\nawait articles.upsert([\n  { id: 'a', vector: [2, 0] },\n  { id: 'b', vector: [1, 0] }\n])\nawait store.api.qdrantRescore.updateVectors('articles', [\n  { id: 'a', vector: [0, 1] },\n  { id: 'b', vector: [3, 0] }\n])\nconst hits = await articles\n  .near([1, 0])\n  .topK(10)\n  .rescore({ query: [1, 0], topN: 2 })\n  .all()\nconsole.log(hits.map((hit) => ({ id: hit.id, score: hit.score })))"
+              },
+              {
+                "type": "paragraph",
+                "text": "`updateVectors(collection,points,ctx?)` 只更新当前组织已存在点的额外槽，使用 `wait:true`，返回原生 `operation_id/status` 操作记录，不改变 search/source、payload 或 TTL。重复 ID、非稠密数组和非法向量在 I/O 前拒绝。多向量写入与 query 使用非空二维数组，内层维度一致。原生缺点错误及未知写结果沿原错误链，不自动重试。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`rescore` 只可接在 `topK(k)` 后；`topN` 默认 k，必须为不大于 k 的正安全整数。每次终点只发一次 Query API：prefetch 使用原 search 槽、k、可下推 where、组织、期限与原 minScore；outer 使用额外槽并取 topN。`score` 是 outer 引擎分数；prefetch 分数不由协议返回。函数 where 在 outer 命中后由原共享 reader 执行且不补搜，因此可能不足 topN。`withVector()` 仍返回原标准向量，之后可接通用 `rerank`，后者保留当前引擎 score 并新增 rerankScore。"
+              },
+              {
+                "type": "paragraph",
+                "text": "Qdrant 1.15.5 必须在集合首次创建时声明额外槽，不能在线给旧集合补槽。已有缺槽或配置不符集合的新操作报 `UNSUPPORTED_CAPABILITY`，原标准读写保持可用；不会重建集合或迁移数据。标准 upsert 仍整点替换，可能清除额外槽，应用需在其后重写额外向量。移除 Feature 后标准读写仍保留此原替换语义。额外槽检索及分数由 Qdrant 完成，不在 JavaScript 评分。"
+              },
+              {
+                "type": "paragraph",
+                "text": "Qdrant 1.15.5 对首行全为非负整数的两行多向量矩阵存在原生 JSON 歧义：它可能把矩阵解码为 sparse vector 并拒绝。适配器保留原 QDRANT_REQUEST_FAILED 证据，不变形向量或重试；本版本的三行矩阵与 dense 向量已实际验证。"
+              }
+            ]
           }
         ]
       },
@@ -230,6 +293,37 @@
                 {
                   "type": "paragraph",
                   "text": "Cancellation after SDK dispatch does not undo a native modification; the request can still return success. Backend disposal waits for that actual result. A lost response leaves the outcome unknown and is never replayed automatically. Synchronous observer errors and rejected observer Promises are only reported; intervention uses the host's original pipeline."
+                }
+              ]
+            },
+            {
+              "id": "native-named-vector-rescoring",
+              "heading": "Native named-vector rescoring",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`qdrantRescoreFeature` from `@migaia/storage-plugin-qdrant/features/rescore` declares one extra vector slot per logical collection at installation. `dimensions` is required, `metric` defaults to `cosine`, and `multivector: 'max_sim'` selects multivectors instead of dense vectors. Only collections declared in the `collections` map are eligible."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { vector } from '@migaia/storage-contract'\nimport { qdrantBackendPlugin } from '@migaia/storage-plugin-qdrant'\nimport { qdrantRescoreFeature } from '@migaia/storage-plugin-qdrant/features/rescore'\nawait using host = await createStorageHost({\n  plugins: [\n    qdrantBackendPlugin(\n      { url: 'http://localhost:6333' },\n      {\n        rescore: qdrantRescoreFeature({\n          collections: { articles: { dimensions: 2, metric: 'dot' } }\n        })\n      }\n    )\n  ]\n})\nconst store = host.backend('qdrant')\nconst articles = store.use(vector).collection('articles', { dimensions: 2, metric: 'dot' })\nawait articles.upsert([\n  { id: 'a', vector: [2, 0] },\n  { id: 'b', vector: [1, 0] }\n])\nawait store.api.qdrantRescore.updateVectors('articles', [\n  { id: 'a', vector: [0, 1] },\n  { id: 'b', vector: [3, 0] }\n])\nconst hits = await articles\n  .near([1, 0])\n  .topK(10)\n  .rescore({ query: [1, 0], topN: 2 })\n  .all()\nconsole.log(hits.map((hit) => ({ id: hit.id, score: hit.score })))"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`updateVectors(collection,points,ctx?)` changes only the extra slot of existing points in the current organization, uses `wait:true`, and returns the original native `operation_id/status` record. It leaves search/source, payload and TTL intact. Duplicate IDs, sparse arrays and invalid vectors reject before I/O. Multivector writes and queries use nonempty matrices with consistent inner dimensions. Native missing-point failures and unknown write results retain their original error chain and are never replayed automatically."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`rescore` is available only after `topK(k)`. `topN` defaults to k and must be a positive safe integer no greater than k. Each terminal sends one Query API call: prefetch retains the original search slot, k, pushed where, organization, expiry and original minScore; the outer query uses the extra slot and retains topN. `score` is the outer engine score; the protocol does not return prefetch scores. Function where predicates run through the shared reader after outer hits, without refilling, so fewer than topN hits may remain. `withVector()` still returns the original standard vector. Portable `rerank` may follow, preserving the current engine score and adding rerankScore."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Qdrant 1.15.5 needs the extra slot at initial collection creation; existing collections cannot acquire it online. New operations on a missing or incompatible slot reject with `UNSUPPORTED_CAPABILITY`, while standard reads and writes remain usable. No collection is recreated and no data is migrated. Standard upsert still replaces the whole point and can clear the extra slot; applications must rewrite extra vectors afterward. Removing the Feature preserves that same standard replacement behavior. Qdrant owns rescoring and its score; JavaScript does not score candidates."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Qdrant 1.15.5 has a native JSON ambiguity for two-row multivectors whose first row consists of nonnegative integers: it may decode the matrix as a sparse vector and reject it. The original QDRANT_REQUEST_FAILED evidence is preserved; the adapter does not reshape vectors or retry. Three-row matrices and dense vectors are verified against this version."
                 }
               ]
             }
@@ -336,6 +430,37 @@
                 {
                   "type": "paragraph",
                   "text": "Cancellation after SDK dispatch does not undo a native modification; the request can still return success. Backend disposal waits for that actual result. A lost response leaves the outcome unknown and is never replayed automatically. Synchronous observer errors and rejected observer Promises are only reported; intervention uses the host's original pipeline."
+                }
+              ]
+            },
+            {
+              "id": "native-named-vector-rescoring",
+              "heading": "Native named-vector rescoring",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`qdrantRescoreFeature` from `@migaia/storage-plugin-qdrant/features/rescore` declares one extra vector slot per logical collection at installation. `dimensions` is required, `metric` defaults to `cosine`, and `multivector: 'max_sim'` selects multivectors instead of dense vectors. Only collections declared in the `collections` map are eligible."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { vector } from '@migaia/storage-contract'\nimport { qdrantBackendPlugin } from '@migaia/storage-plugin-qdrant'\nimport { qdrantRescoreFeature } from '@migaia/storage-plugin-qdrant/features/rescore'\nawait using host = await createStorageHost({\n  plugins: [\n    qdrantBackendPlugin(\n      { url: 'http://localhost:6333' },\n      {\n        rescore: qdrantRescoreFeature({\n          collections: { articles: { dimensions: 2, metric: 'dot' } }\n        })\n      }\n    )\n  ]\n})\nconst store = host.backend('qdrant')\nconst articles = store.use(vector).collection('articles', { dimensions: 2, metric: 'dot' })\nawait articles.upsert([\n  { id: 'a', vector: [2, 0] },\n  { id: 'b', vector: [1, 0] }\n])\nawait store.api.qdrantRescore.updateVectors('articles', [\n  { id: 'a', vector: [0, 1] },\n  { id: 'b', vector: [3, 0] }\n])\nconst hits = await articles\n  .near([1, 0])\n  .topK(10)\n  .rescore({ query: [1, 0], topN: 2 })\n  .all()\nconsole.log(hits.map((hit) => ({ id: hit.id, score: hit.score })))"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`updateVectors(collection,points,ctx?)` changes only the extra slot of existing points in the current organization, uses `wait:true`, and returns the original native `operation_id/status` record. It leaves search/source, payload and TTL intact. Duplicate IDs, sparse arrays and invalid vectors reject before I/O. Multivector writes and queries use nonempty matrices with consistent inner dimensions. Native missing-point failures and unknown write results retain their original error chain and are never replayed automatically."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`rescore` is available only after `topK(k)`. `topN` defaults to k and must be a positive safe integer no greater than k. Each terminal sends one Query API call: prefetch retains the original search slot, k, pushed where, organization, expiry and original minScore; the outer query uses the extra slot and retains topN. `score` is the outer engine score; the protocol does not return prefetch scores. Function where predicates run through the shared reader after outer hits, without refilling, so fewer than topN hits may remain. `withVector()` still returns the original standard vector. Portable `rerank` may follow, preserving the current engine score and adding rerankScore."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Qdrant 1.15.5 needs the extra slot at initial collection creation; existing collections cannot acquire it online. New operations on a missing or incompatible slot reject with `UNSUPPORTED_CAPABILITY`, while standard reads and writes remain usable. No collection is recreated and no data is migrated. Standard upsert still replaces the whole point and can clear the extra slot; applications must rewrite extra vectors afterward. Removing the Feature preserves that same standard replacement behavior. Qdrant owns rescoring and its score; JavaScript does not score candidates."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Qdrant 1.15.5 has a native JSON ambiguity for two-row multivectors whose first row consists of nonnegative integers: it may decode the matrix as a sparse vector and reject it. The original QDRANT_REQUEST_FAILED evidence is preserved; the adapter does not reshape vectors or retry. Three-row matrices and dense vectors are verified against this version."
                 }
               ]
             }
@@ -1017,8 +1142,8 @@
         {
           "name": "qdrantBackendKind",
           "kind": "const",
-          "signature": "export declare const qdrantBackendKind: import(\"@migaia/storage-host\").IStorageBackendKind<\"qdrant\", IQdrantStore, IQdrantHttp, {}>;",
-          "declarationLine": 4,
+          "signature": "export declare const qdrantBackendKind: import(\"@migaia/storage-host\").IStorageBackendKind<\"qdrant\", IQdrantStore, IQdrantHttp, { selectRescore(configuration: IQdrantRescoreConfiguration): void; }>;",
+          "declarationLine": 5,
           "source": "packages/storage-plugin-qdrant/dist/plugin.d.ts",
           "purpose": "Identify the exact native vector backend when authenticating selected Feature installation.",
           "core": "Identify the exact native vector backend when authenticating selected Feature installation.",
@@ -1034,7 +1159,7 @@
           "aliasOf": "qdrantBackendKind",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const qdrantBackendKind: import(\"@migaia/storage-host\").IStorageBackendKind<\"qdrant\", IQdrantStore, IQdrantHttp, {}>;"
+            "export declare const qdrantBackendKind: import(\"@migaia/storage-host\").IStorageBackendKind<\"qdrant\", IQdrantStore, IQdrantHttp, { selectRescore(configuration: IQdrantRescoreConfiguration): void; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -1073,7 +1198,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-plugin-qdrant/dist/plugin.d.ts:qdrantBackendKind:export declare const qdrantBackendKind: import(\"@migaia/storage-host\").IStorageBackendKind<\"qdrant\", IQdrantStore, IQdrantHttp, {}>;",
+          "identity": "packages/storage-plugin-qdrant/dist/plugin.d.ts:qdrantBackendKind:export declare const qdrantBackendKind: import(\"@migaia/storage-host\").IStorageBackendKind<\"qdrant\", IQdrantStore, IQdrantHttp, { selectRescore(configuration: IQdrantRescoreConfiguration): void; }>;",
           "guidance": [],
           "usageScore": 2,
           "configuration": [],
@@ -1083,7 +1208,7 @@
           "name": "qdrantBackendPlugin",
           "kind": "function",
           "signature": "export declare function qdrantBackendPlugin<const TId extends string = 'qdrant', const F extends IStorageFeatureRecord = {}>(options: IQdrantOptions & { readonly id?: TId; }, features?: F & IStorageFeatureStoreCompatibility<typeof qdrantBackendKind, NoInfer<F>, IQdrantStore>): IStorageBackendPlugin<typeof qdrantBackendKind, NoInfer<TId>, F, IQdrantStore>;",
-          "declarationLine": 6,
+          "declarationLine": 9,
           "source": "packages/storage-plugin-qdrant/dist/plugin.d.ts",
           "purpose": "Install native vector and expiry operations through the original host lifetime and capability owners.",
           "core": "features: Selected exact-kind native Features; no transaction projection.\nA pure plugin descriptor; only explicit host.detect probes native service readiness.\nid: Application-assigned backend identifier used by host.backend.\nqdrant is the default backend identifier.\nurl: Absolute HTTP or HTTPS service URL configured by application deployment.\napiKey: Authentication key issued by the deployment; it is never included in hook payloads.\nNo API key header is sent.\ncollectionPrefix: Configured managed namespace used to derive deterministic physical collection names.\nmigaia_ is the default namespace prefix.\nhttp: Borrowed finite protocol port; original SDK or fetch ownership remains with the caller.\nCreate the native fetchHttp port from url and apiKey.",
@@ -1108,6 +1233,7 @@
           "errors": [],
           "lifecycleConcurrency": "",
           "examples": [
+            "import { createStorageHost } from '@migaia/storage-host'\nimport { vector } from '@migaia/storage-contract'\nimport { qdrantBackendPlugin } from '@migaia/storage-plugin-qdrant'\nimport { qdrantRescoreFeature } from '@migaia/storage-plugin-qdrant/features/rescore'\nawait using host = await createStorageHost({\n  plugins: [\n    qdrantBackendPlugin(\n      { url: 'http://localhost:6333' },\n      {\n        rescore: qdrantRescoreFeature({\n          collections: { articles: { dimensions: 2, metric: 'dot' } }\n        })\n      }\n    )\n  ]\n})\nconst store = host.backend('qdrant')\nconst articles = store.use(vector).collection('articles', { dimensions: 2, metric: 'dot' })\nawait articles.upsert([\n  { id: 'a', vector: [2, 0] },\n  { id: 'b', vector: [1, 0] }\n])\nawait store.api.qdrantRescore.updateVectors('articles', [\n  { id: 'a', vector: [0, 1] },\n  { id: 'b', vector: [3, 0] }\n])\nconst hits = await articles\n  .near([1, 0])\n  .topK(10)\n  .rescore({ query: [1, 0], topN: 2 })\n  .all()\nconsole.log(hits.map((hit) => ({ id: hit.id, score: hit.score })))",
             "import { createStorageHost } from '@migaia/storage-host'\nimport { vector } from '@migaia/storage-contract'\nimport { qdrantBackendPlugin } from '@migaia/storage-plugin-qdrant'\n\nawait using host = await createStorageHost({\n  plugins: [qdrantBackendPlugin({ url: 'http://127.0.0.1:6333' })] as const\n})\nconst documents = host\n  .backend('qdrant')\n  .use(vector)\n  .collection<{ category: string }>('documents', { dimensions: 2, metric: 'cosine' })\nawait documents.upsert([{ id: 'a', vector: [100, 0], payload: { category: 'guide' } }])\nconsole.log(await documents.near([1, 0], { exact: true }).topK(5).withVector().all())"
           ],
           "members": [],
@@ -1202,7 +1328,7 @@
           ],
           "identity": "packages/storage-plugin-qdrant/dist/plugin.d.ts:qdrantBackendPlugin:export declare function qdrantBackendPlugin<const TId extends string = 'qdrant', const F extends IStorageFeatureRecord = {}>(options: IQdrantOptions & { readonly id?: TId; }, features?: F & IStorageFeatureStoreCompatibility<typeof qdrantBackendKind, NoInfer<F>, IQdrantStore>): IStorageBackendPlugin<typeof qdrantBackendKind, NoInfer<TId>, F, IQdrantStore>;",
           "guidance": [],
-          "usageScore": 12,
+          "usageScore": 36,
           "configuration": [
             {
               "name": "id",
@@ -3080,6 +3206,766 @@
           "usageScore": 10,
           "configuration": [],
           "fragment": "storage-plugin-qdrant-features/recommend--qdrantRecommendFeature"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "storage-plugin-qdrant:features/rescore",
+      "library": "storage-plugin-qdrant",
+      "module": "features/rescore",
+      "exportPath": "./features/rescore",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/docs/storage-plugin-qdrant/getting-started",
+      "architecturePath": "/en/docs/storage-plugin-qdrant",
+      "symbols": [
+        {
+          "name": "IQdrantRescoreApi",
+          "kind": "type",
+          "signature": "export type IQdrantRescoreApi = { updateVectors(collection: string, points: readonly IQdrantRescorePoint[], ctx?: IOperationContext): Promise<IQdrantRescoreResult>; };",
+          "declarationLine": 94,
+          "source": "packages/storage-plugin-qdrant/dist/feature-types.d.ts",
+          "purpose": "Organization-bound extra-vector writes retaining native update acknowledgment and the original execution owner.",
+          "core": "updateVectors: Update only the extra slot of existing points with wait:true; standard upsert remains whole-point replacement.\nupdateVectors.collection: A logical name declared in collections.\nupdateVectors.points: Dense batch of unique logical point IDs and matching vectors or matrices.\nupdateVectors.ctx: Original caller signal and timeout budget; no second cancellation or retry owner.\nThe native update record after real settlement, preserving original operation_id/status and native error evidence.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "updateVectors",
+              "kind": "method",
+              "optional": false,
+              "signature": "updateVectors(collection: string, points: readonly IQdrantRescorePoint[], ctx?: IOperationContext): Promise<IQdrantRescoreResult>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "collection",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "points",
+                  "type": "readonly IQdrantRescorePoint[]",
+                  "optional": false
+                },
+                {
+                  "name": "ctx",
+                  "type": "IOperationContext",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<IQdrantRescoreResult>"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "IQdrantRescoreApi",
+          "exportPath": "./features/rescore",
+          "overloadSignatures": [
+            "export type IQdrantRescoreApi = { updateVectors(collection: string, points: readonly IQdrantRescorePoint[], ctx?: IOperationContext): Promise<IQdrantRescoreResult>; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Organization-bound extra-vector writes retaining native update acknowledgment and the original execution owner."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IQdrantRescoreApi from @migaia/storage-plugin-qdrant/features/rescore, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IQdrantRescoreApi when its type contract and declared inputs match the result you need. Choose a different public symbol when IQdrantRescoreApi does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "updateVectors: Update only the extra slot of existing points with wait:true; standard upsert remains whole-point replacement.\nupdateVectors.collection: A logical name declared in collections.\nupdateVectors.points: Dense batch of unique logical point IDs and matching vectors or matrices.\nupdateVectors.ctx: Original caller signal and timeout budget; no second cancellation or retry owner.\nThe native update record after real settlement, preserving original operation_id/status and native error evidence."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-qdrant/dist/feature-types.d.ts:IQdrantRescoreApi:export type IQdrantRescoreApi = { updateVectors(collection: string, points: readonly IQdrantRescorePoint[], ctx?: IOperationContext): Promise<IQdrantRescoreResult>; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-qdrant-features/rescore--IQdrantRescoreApi"
+        },
+        {
+          "name": "IQdrantRescoreMethods",
+          "kind": "type",
+          "signature": "export type IQdrantRescoreMethods = { rescore<P, G extends boolean, V extends boolean, M extends object>(this: IVectorQuery<P, G, V, M>, options: IQdrantRescoreQueryOptions): IVectorNativeQuery<P, G, V, M>; };",
+          "declarationLine": 98,
+          "source": "packages/storage-plugin-qdrant/dist/feature-types.d.ts",
+          "purpose": "The selected Qdrant vector-chain augmentation; a bounded original query receiver is required.",
+          "core": "rescore: Run one native prefetch recall followed by extra-slot scoring, then allow portable rerank on its actual hits.\nrescore.this: The original bounded Qdrant vector query; its payload, grouping, explicit-vector and selected Feature states are preserved.\nrescore.options: Extra-slot query and optional topN; client predicates run after outer hits without refilling.\nA readonly native query preserving payload, withVector and grouping types, with no delete/watch/requirePushdown.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "rescore",
+              "kind": "method",
+              "optional": false,
+              "signature": "rescore<P, G extends boolean, V extends boolean, M extends object>(this: IVectorQuery<P, G, V, M>, options: IQdrantRescoreQueryOptions): IVectorNativeQuery<P, G, V, M>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "this",
+                  "type": "IVectorQuery<P, G, V, M>",
+                  "optional": false
+                },
+                {
+                  "name": "options",
+                  "type": "IQdrantRescoreQueryOptions",
+                  "optional": false
+                }
+              ],
+              "returns": "IVectorNativeQuery<P, G, V, M>"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "IQdrantRescoreMethods",
+          "exportPath": "./features/rescore",
+          "overloadSignatures": [
+            "export type IQdrantRescoreMethods = { rescore<P, G extends boolean, V extends boolean, M extends object>(this: IVectorQuery<P, G, V, M>, options: IQdrantRescoreQueryOptions): IVectorNativeQuery<P, G, V, M>; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "The selected Qdrant vector-chain augmentation; a bounded original query receiver is required."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IQdrantRescoreMethods from @migaia/storage-plugin-qdrant/features/rescore, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IQdrantRescoreMethods when its type contract and declared inputs match the result you need. Choose a different public symbol when IQdrantRescoreMethods does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "rescore: Run one native prefetch recall followed by extra-slot scoring, then allow portable rerank on its actual hits.\nrescore.this: The original bounded Qdrant vector query; its payload, grouping, explicit-vector and selected Feature states are preserved.\nrescore.options: Extra-slot query and optional topN; client predicates run after outer hits without refilling.\nA readonly native query preserving payload, withVector and grouping types, with no delete/watch/requirePushdown."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-qdrant/dist/feature-types.d.ts:IQdrantRescoreMethods:export type IQdrantRescoreMethods = { rescore<P, G extends boolean, V extends boolean, M extends object>(this: IVectorQuery<P, G, V, M>, options: IQdrantRescoreQueryOptions): IVectorNativeQuery<P, G, V, M>; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-qdrant-features/rescore--IQdrantRescoreMethods"
+        },
+        {
+          "name": "IQdrantRescoreOptions",
+          "kind": "type",
+          "signature": "export type IQdrantRescoreOptions = { readonly collections: Readonly<Record<string, IQdrantRescoreSlot>>; };",
+          "declarationLine": 76,
+          "source": "packages/storage-plugin-qdrant/dist/feature-types.d.ts",
+          "purpose": "Installation options mapping logical collections to their extra native slot schema.",
+          "core": "collections: Caller-owned logical collection names and extra-slot schemas, captured once. Qdrant 1.15.5 can create these slots only with a new collection.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "collections",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly collections: Readonly<Record<string, IQdrantRescoreSlot>>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Readonly<Record<string, IQdrantRescoreSlot>>"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "IQdrantRescoreOptions",
+          "exportPath": "./features/rescore",
+          "overloadSignatures": [
+            "export type IQdrantRescoreOptions = { readonly collections: Readonly<Record<string, IQdrantRescoreSlot>>; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Installation options mapping logical collections to their extra native slot schema."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IQdrantRescoreOptions from @migaia/storage-plugin-qdrant/features/rescore, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IQdrantRescoreOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when IQdrantRescoreOptions does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "collections: Caller-owned logical collection names and extra-slot schemas, captured once. Qdrant 1.15.5 can create these slots only with a new collection."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-qdrant/dist/feature-types.d.ts:IQdrantRescoreOptions:export type IQdrantRescoreOptions = { readonly collections: Readonly<Record<string, IQdrantRescoreSlot>>; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-qdrant-features/rescore--IQdrantRescoreOptions"
+        },
+        {
+          "name": "IQdrantRescorePoint",
+          "kind": "type",
+          "signature": "export type IQdrantRescorePoint = { readonly id: string; readonly vector: IQdrantRescoreVector; };",
+          "declarationLine": 82,
+          "source": "packages/storage-plugin-qdrant/dist/feature-types.d.ts",
+          "purpose": "One existing logical point identity and its replacement extra-slot vector, never a raw physical UUID.",
+          "core": "id: Original logical point ID in this exact organization; native UUID derivation stays with the backend.\nvector: Replacement dense vector or matrix for the configured extra slot; unrelated vectors and payload stay unchanged.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "id",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly id: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "vector",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly vector: IQdrantRescoreVector;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IQdrantRescoreVector"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "IQdrantRescorePoint",
+          "exportPath": "./features/rescore",
+          "overloadSignatures": [
+            "export type IQdrantRescorePoint = { readonly id: string; readonly vector: IQdrantRescoreVector; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "One existing logical point identity and its replacement extra-slot vector, never a raw physical UUID."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IQdrantRescorePoint from @migaia/storage-plugin-qdrant/features/rescore, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IQdrantRescorePoint when its type contract and declared inputs match the result you need. Choose a different public symbol when IQdrantRescorePoint does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "id: Original logical point ID in this exact organization; native UUID derivation stays with the backend.\nvector: Replacement dense vector or matrix for the configured extra slot; unrelated vectors and payload stay unchanged."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-qdrant/dist/feature-types.d.ts:IQdrantRescorePoint:export type IQdrantRescorePoint = { readonly id: string; readonly vector: IQdrantRescoreVector; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-qdrant-features/rescore--IQdrantRescorePoint"
+        },
+        {
+          "name": "IQdrantRescoreQueryOptions",
+          "kind": "type",
+          "signature": "export type IQdrantRescoreQueryOptions = { readonly query: IQdrantRescoreVector; readonly topN?: number; };",
+          "declarationLine": 87,
+          "source": "packages/storage-plugin-qdrant/dist/feature-types.d.ts",
+          "purpose": "A captured extra-slot query and final native result bound after an existing topK.",
+          "core": "query: Dense query or query-row matrix matching the configured extra slot; no embeddings are generated by this library.\ntopN: Positive safe integer no greater than the original recall k; invalid values reject before I/O.\nOmitted: the original recall k.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "query",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly query: IQdrantRescoreVector;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IQdrantRescoreVector"
+            },
+            {
+              "name": "topN",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly topN?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "IQdrantRescoreQueryOptions",
+          "exportPath": "./features/rescore",
+          "overloadSignatures": [
+            "export type IQdrantRescoreQueryOptions = { readonly query: IQdrantRescoreVector; readonly topN?: number; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "A captured extra-slot query and final native result bound after an existing topK."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IQdrantRescoreQueryOptions from @migaia/storage-plugin-qdrant/features/rescore, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IQdrantRescoreQueryOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when IQdrantRescoreQueryOptions does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "query: Dense query or query-row matrix matching the configured extra slot; no embeddings are generated by this library.\ntopN: Positive safe integer no greater than the original recall k; invalid values reject before I/O.\nOmitted: the original recall k."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-qdrant/dist/feature-types.d.ts:IQdrantRescoreQueryOptions:export type IQdrantRescoreQueryOptions = { readonly query: IQdrantRescoreVector; readonly topN?: number; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-qdrant-features/rescore--IQdrantRescoreQueryOptions"
+        },
+        {
+          "name": "IQdrantRescoreResult",
+          "kind": "type",
+          "signature": "export type IQdrantRescoreResult = Awaited<ReturnType<IQdrantHttp['updateVectors']>>;",
+          "declarationLine": 92,
+          "source": "packages/storage-plugin-qdrant/dist/feature-types.d.ts",
+          "purpose": "The original Qdrant updateVectors operation record, never a count of modified or deleted points.",
+          "core": "operation_id: Original native operation identifier when the server returns one.\nstatus: Original native acknowledged or completed status; no operation replay is inferred.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": ["Awaited"],
+          "aliasOf": "IQdrantRescoreResult",
+          "exportPath": "./features/rescore",
+          "overloadSignatures": [
+            "export type IQdrantRescoreResult = Awaited<ReturnType<IQdrantHttp['updateVectors']>>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "The original Qdrant updateVectors operation record, never a count of modified or deleted points."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IQdrantRescoreResult from @migaia/storage-plugin-qdrant/features/rescore, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IQdrantRescoreResult when its type contract and declared inputs match the result you need. Choose a different public symbol when IQdrantRescoreResult does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "operation_id: Original native operation identifier when the server returns one.\nstatus: Original native acknowledged or completed status; no operation replay is inferred."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-qdrant/dist/feature-types.d.ts:IQdrantRescoreResult:export type IQdrantRescoreResult = Awaited<ReturnType<IQdrantHttp['updateVectors']>>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-qdrant-features/rescore--IQdrantRescoreResult"
+        },
+        {
+          "name": "IQdrantRescoreSlot",
+          "kind": "type",
+          "signature": "export type IQdrantRescoreSlot = { readonly dimensions: number; readonly metric?: 'cosine' | 'dot' | 'euclid'; readonly multivector?: 'max_sim'; };",
+          "declarationLine": 70,
+          "source": "packages/storage-plugin-qdrant/dist/feature-types.d.ts",
+          "purpose": "One extra-slot schema captured before a logical collection is first created.",
+          "core": "dimensions: Positive safe integer giving every dense vector or matrix row its component count.\nmetric: Native distance for the extra slot, independently of the original retrieval metric.\ncosine when omitted.\nNative cosine similarity.\nNative dot product.\nNative Euclidean distance, exposed as its negative score.\nmultivector: Select max_sim to score nonempty matrices; omission selects a dense vector slot.\nOmitted: dense vectors.\nSum each query row’s maximum native similarity against the stored matrix.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "dimensions",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly dimensions: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "metric",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly metric?: 'cosine' | 'dot' | 'euclid';",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "'cosine' | 'dot' | 'euclid'"
+            },
+            {
+              "name": "multivector",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly multivector?: 'max_sim';",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "'max_sim'"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "IQdrantRescoreSlot",
+          "exportPath": "./features/rescore",
+          "overloadSignatures": [
+            "export type IQdrantRescoreSlot = { readonly dimensions: number; readonly metric?: 'cosine' | 'dot' | 'euclid'; readonly multivector?: 'max_sim'; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "One extra-slot schema captured before a logical collection is first created."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IQdrantRescoreSlot from @migaia/storage-plugin-qdrant/features/rescore, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IQdrantRescoreSlot when its type contract and declared inputs match the result you need. Choose a different public symbol when IQdrantRescoreSlot does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "dimensions: Positive safe integer giving every dense vector or matrix row its component count.\nmetric: Native distance for the extra slot, independently of the original retrieval metric.\ncosine when omitted.\nNative cosine similarity.\nNative dot product.\nNative Euclidean distance, exposed as its negative score.\nmultivector: Select max_sim to score nonempty matrices; omission selects a dense vector slot.\nOmitted: dense vectors.\nSum each query row’s maximum native similarity against the stored matrix."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-qdrant/dist/feature-types.d.ts:IQdrantRescoreSlot:export type IQdrantRescoreSlot = { readonly dimensions: number; readonly metric?: 'cosine' | 'dot' | 'euclid'; readonly multivector?: 'max_sim'; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-qdrant-features/rescore--IQdrantRescoreSlot"
+        },
+        {
+          "name": "IQdrantRescoreVector",
+          "kind": "type",
+          "signature": "export type IQdrantRescoreVector = readonly number[] | readonly (readonly number[])[];",
+          "declarationLine": 80,
+          "source": "packages/storage-plugin-qdrant/dist/feature-types.d.ts",
+          "purpose": "A readonly dense vector or nonempty matrix of equal-sized dense vectors; the selected collection schema determines the admitted form.",
+          "core": "A readonly dense vector or nonempty matrix of equal-sized dense vectors; the selected collection schema determines the admitted form.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "aliasOf": "IQdrantRescoreVector",
+          "exportPath": "./features/rescore",
+          "overloadSignatures": [
+            "export type IQdrantRescoreVector = readonly number[] | readonly (readonly number[])[];"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "A readonly dense vector or nonempty matrix of equal-sized dense vectors; the selected collection schema determines the admitted form."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IQdrantRescoreVector from @migaia/storage-plugin-qdrant/features/rescore, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IQdrantRescoreVector when its type contract and declared inputs match the result you need. Choose a different public symbol when IQdrantRescoreVector does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "A readonly dense vector or nonempty matrix of equal-sized dense vectors; the selected collection schema determines the admitted form."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-qdrant/dist/feature-types.d.ts:IQdrantRescoreVector:export type IQdrantRescoreVector = readonly number[] | readonly (readonly number[])[];",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-qdrant-features/rescore--IQdrantRescoreVector"
+        },
+        {
+          "name": "qdrantRescoreFeature",
+          "kind": "function",
+          "signature": "export declare function qdrantRescoreFeature(options: IQdrantRescoreOptions): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"qdrant\", import(\"../types.js\").IQdrantStore, import(\"../types.js\").IQdrantHttp, { selectRescore(configuration: import(\"../feature-types.js\").IQdrantRescoreConfiguration): void; }>, IStorageFeatureOutput<readonly [], { readonly vector: IQdrantRescoreMethods; }, { readonly store: { readonly qdrantRescore: IQdrantRescoreApi; }; readonly transaction: {}; }>, {}>;",
+          "declarationLine": 4,
+          "source": "packages/storage-plugin-qdrant/dist/features/rescore.d.ts",
+          "purpose": "Select one extra native dense or max_sim vector slot per configured logical collection. Adds the bounded rescore chain and an organization-bound vector update API without changing the original search/source slots.",
+          "core": "A Qdrant-only Feature. Each rescore terminal sends one Query API call with original recall k in prefetch and topN on the outer slot. Existing collections missing that slot reject only new operations with UNSUPPORTED_CAPABILITY; no data is migrated or recreated.\ncollections: Caller-owned logical collection names and extra-slot schemas, captured once. Qdrant 1.15.5 can create these slots only with a new collection.",
+          "advanced": "",
+          "parameters": ["options: IQdrantRescoreOptions"],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "IQdrantRescoreOptions",
+              "optional": false
+            }
+          ],
+          "returns": "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"qdrant\", import(\"../types.js\").IQdrantStore, import(\"../types.js\").IQdrantHttp, { selectRescore(configuration: import(\"../feature-types.js\").IQdrantRescoreConfiguration): void; }>, IStorageFeatureOutput<readonly [], { readonly vector: IQdrantRescoreMethods; }, { readonly store: { readonly qdrantRescore: IQdrantRescoreApi; }; readonly transaction: {}; }>, {}>",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [
+            "import { createStorageHost } from '@migaia/storage-host'\nimport { vector } from '@migaia/storage-contract'\nimport { qdrantBackendPlugin } from '@migaia/storage-plugin-qdrant'\nimport { qdrantRescoreFeature } from '@migaia/storage-plugin-qdrant/features/rescore'\nawait using host = await createStorageHost({\n  plugins: [\n    qdrantBackendPlugin(\n      { url: 'http://localhost:6333' },\n      {\n        rescore: qdrantRescoreFeature({\n          collections: { articles: { dimensions: 2, metric: 'dot' } }\n        })\n      }\n    )\n  ]\n})\nconst store = host.backend('qdrant')\nconst articles = store.use(vector).collection('articles', { dimensions: 2, metric: 'dot' })\nawait articles.upsert([\n  { id: 'a', vector: [2, 0] },\n  { id: 'b', vector: [1, 0] }\n])\nawait store.api.qdrantRescore.updateVectors('articles', [\n  { id: 'a', vector: [0, 1] },\n  { id: 'b', vector: [3, 0] }\n])\nconst hits = await articles\n  .near([1, 0])\n  .topK(10)\n  .rescore({ query: [1, 0], topN: 2 })\n  .all()\nconsole.log(hits.map((hit) => ({ id: hit.id, score: hit.score })))"
+          ],
+          "members": [],
+          "composes": [],
+          "exportPath": "./features/rescore",
+          "overloadSignatures": [
+            "export declare function qdrantRescoreFeature(options: IQdrantRescoreOptions): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"qdrant\", import(\"../types.js\").IQdrantStore, import(\"../types.js\").IQdrantHttp, { selectRescore(configuration: import(\"../feature-types.js\").IQdrantRescoreConfiguration): void; }>, IStorageFeatureOutput<readonly [], { readonly vector: IQdrantRescoreMethods; }, { readonly store: { readonly qdrantRescore: IQdrantRescoreApi; }; readonly transaction: {}; }>, {}>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "IQdrantRescoreOptions",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": [
+            "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"qdrant\", import(\"../types.js\").IQdrantStore, import(\"../types.js\").IQdrantHttp, { selectRescore(configuration: import(\"../feature-types.js\").IQdrantRescoreConfiguration): void; }>, IStorageFeatureOutput<readonly [], { readonly vector: IQdrantRescoreMethods; }, { readonly store: { readonly qdrantRescore: IQdrantRescoreApi; }; readonly transaction: {}; }>, {}>"
+          ],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Select one extra native dense or max_sim vector slot per configured logical collection. Adds the bounded rescore chain and an organization-bound vector update API without changing the original search/source slots."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import qdrantRescoreFeature from @migaia/storage-plugin-qdrant/features/rescore, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use qdrantRescoreFeature when its function contract and declared inputs match the result you need. Choose a different public symbol when qdrantRescoreFeature does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "A Qdrant-only Feature. Each rescore terminal sends one Query API call with original recall k in prefetch and topN on the outer slot. Existing collections missing that slot reject only new operations with UNSUPPORTED_CAPABILITY; no data is migrated or recreated.\ncollections: Caller-owned logical collection names and extra-slot schemas, captured once. Qdrant 1.15.5 can create these slots only with a new collection."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [
+            {
+              "name": "collections",
+              "type": "Readonly<Record<string, IQdrantRescoreSlot>>",
+              "optional": false,
+              "description": ""
+            }
+          ],
+          "identity": "packages/storage-plugin-qdrant/dist/features/rescore.d.ts:qdrantRescoreFeature:export declare function qdrantRescoreFeature(options: IQdrantRescoreOptions): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"qdrant\", import(\"../types.js\").IQdrantStore, import(\"../types.js\").IQdrantHttp, { selectRescore(configuration: import(\"../feature-types.js\").IQdrantRescoreConfiguration): void; }>, IStorageFeatureOutput<readonly [], { readonly vector: IQdrantRescoreMethods; }, { readonly store: { readonly qdrantRescore: IQdrantRescoreApi; }; readonly transaction: {}; }>, {}>;",
+          "guidance": [],
+          "usageScore": 30,
+          "configuration": [
+            {
+              "name": "collections",
+              "type": "Readonly<Record<string, IQdrantRescoreSlot>>",
+              "optional": false,
+              "description": "`@migaia/storage-plugin-qdrant/features/rescore` 的 `qdrantRescoreFeature` 在安装时按逻辑集合声明一个额外向量槽。`dimensions` 必填，`metric` 默认 `cosine`；`multivector: 'max_sim'` 选择多向量，否则使用 dense。只接受顶层 `collections` 映射中声明的集合。",
+              "descriptionEn": "",
+              "descriptionZh": "`@migaia/storage-plugin-qdrant/features/rescore` 的 `qdrantRescoreFeature` 在安装时按逻辑集合声明一个额外向量槽。`dimensions` 必填，`metric` 默认 `cosine`；`multivector: 'max_sim'` 选择多向量，否则使用 dense。只接受顶层 `collections` 映射中声明的集合。"
+            }
+          ],
+          "fragment": "storage-plugin-qdrant-features/rescore--qdrantRescoreFeature"
         }
       ],
       "aliases": []
