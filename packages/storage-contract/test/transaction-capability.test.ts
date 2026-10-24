@@ -879,6 +879,15 @@ describe('original transaction capability projections', () => {
       kvOnly.use(records)
     }
     void invalidWidening
+    /** Text-only native owners use the same authenticated projection without inventing channels. */
+    function textProjection(
+      scope: ITransactionKeyValueApi & ITransactionCapabilityView<typeof kv>
+    ) {
+      expectTypeOf(useTransactionCapability(scope, kv)).toEqualTypeOf<ITransactionKeyValueApi>()
+      // @ts-expect-error An authentic text-only view cannot acquire records.
+      useTransactionCapability(scope, records)
+    }
+    void textProjection
     fixture.controller.close()
   })
 })
