@@ -763,6 +763,607 @@ const errorMembers: Readonly<Record<string, IMemberDoc>> = {
   }
 }
 
+/** Common read terminals consume the original backend cursor and await its cleanup. */
+const queryReadMembers: Readonly<Record<string, IMemberDoc>> = {
+  all: {
+    summary: t(
+      'Collect every row left by the query plan and await original cursor cleanup.',
+      '收集查询计划最终保留的全部结果，并等待原后端游标清理完成。'
+    ),
+    params: { ctx: contextParam },
+    returns: t(
+      'An array in final query order; source, mapping and cleanup failures reject the promise.',
+      '按最终查询顺序排列的数组；来源、映射及清理错误会拒绝此承诺。'
+    ),
+    example: 'const rows = await query.all()'
+  },
+  first: {
+    summary: t(
+      'Read at most the first matching row, then close the original cursor early.',
+      '最多读取第一条匹配结果，随后提前关闭原后端持有的游标。'
+    ),
+    params: { ctx: contextParam },
+    returns: t(
+      'The first final row, or undefined when the query has no results.',
+      '最终结果中的第一行；没有匹配结果时返回 undefined。'
+    ),
+    example: 'const row = await query.first()'
+  },
+  maybe: {
+    summary: t(
+      'Read the first matching row through the canonical tagged Maybe result.',
+      '读取第一条匹配结果，并使用统一的带标签 Maybe 表达有值或空结果。'
+    ),
+    params: { ctx: contextParam },
+    returns: t(
+      'A { some: true, value } result or { some: false }; undefined values are not confused with absence.',
+      '返回 { some: true, value } 或 { some: false }，避免把 undefined 值与没有结果混淆。'
+    ),
+    example: 'const result = await query.maybe()\nif (result.some) console.log(result.value)'
+  },
+  firstOrThrow: {
+    summary: t(
+      'Read the first row and reject an empty result instead of returning an optional value.',
+      '读取首行；结果为空时拒绝操作，使调用方无需处理可选结果。'
+    ),
+    params: { ctx: contextParam },
+    returns: t(
+      'The first row; an empty query rejects with QUERY_EMPTY_RESULT after original cursor cleanup.',
+      '返回第一行；空查询在完成原游标清理后以 QUERY_EMPTY_RESULT 拒绝。'
+    ),
+    example: 'const required = await query.firstOrThrow()'
+  },
+  pluck: {
+    summary: t(
+      'Collect one typed field from each final result while retaining query order.',
+      '从每条最终结果提取一个有类型约束的字段，并保留原查询顺序。'
+    ),
+    params: {
+      field: t(
+        'An own result-field name selected by the caller from the current row type.',
+        '调用方从当前结果类型中选择的字段名称，提取该字段的实际值。'
+      ),
+      ctx: contextParam
+    },
+    returns: t(
+      'An array of the selected field values in the same order as all().',
+      '按与 all() 相同的结果顺序，返回所选字段组成的值数组。'
+    ),
+    example: "const ids = await query.pluck('id')"
+  },
+  exists: {
+    summary: t(
+      'Determine whether any row survives the plan, stopping the original reader early when possible.',
+      '判断计划执行后是否存在结果，并在可行时提前停止原读取器。'
+    ),
+    params: { ctx: contextParam },
+    returns: t(
+      'True for at least one final row, otherwise false; declared native reduction may answer directly.',
+      '至少存在一条最终结果时为 true，否则为 false；已声明的原生统计可直接回答。'
+    ),
+    example: 'const present = await query.exists()'
+  },
+  count: {
+    summary: t(
+      'Count final query rows, using a declared native scalar reduction when the complete plan permits it.',
+      '统计查询最终保留的行数；完整计划允许时使用已声明的原生标量统计。'
+    ),
+    params: { ctx: contextParam },
+    returns: t(
+      'The number of rows after filtering, bounds, distinct and projection semantics.',
+      '返回经过过滤、数量边界、去重与投影语义后的最终结果数量。'
+    ),
+    example: 'const total = await query.count()'
+  },
+  each: {
+    summary: t(
+      'Visit final rows sequentially and await each callback before advancing the original cursor.',
+      '按顺序访问最终结果，等待每次回调完成后才推进原后端游标。'
+    ),
+    params: {
+      fn: t(
+        'Caller callback receiving the current row and zero-based result index; a returned promise is awaited.',
+        '调用方提供的回调，接收当前行及从零开始的结果索引；返回承诺时会等待完成。'
+      ),
+      ctx: contextParam
+    },
+    returns: t(
+      'The number of visited rows; a callback failure rejects after original cleanup.',
+      '返回已访问的行数；回调失败时，完成原资源清理后拒绝。'
+    ),
+    example: 'const visited = await query.each((row, index) => { console.log(index, row) })'
+  },
+  chunk: {
+    summary: t(
+      'Deliver bounded batches of final rows in order, awaiting the consumer before reading the next batch.',
+      '按顺序交付有界结果批次，等待消费者处理完毕后才读取下一批。'
+    ),
+    params: {
+      size: t(
+        'Caller-selected positive safe integer bounding the number of rows per callback.',
+        '调用方选定的正安全整数，限制每次回调接收的最大结果行数。'
+      ),
+      fn: t(
+        'Caller callback receiving a readonly batch; the final batch may be smaller and returned promises are awaited.',
+        '调用方回调接收只读批次，最后一批可以较小；回调返回的承诺会被等待。'
+      ),
+      ctx: contextParam
+    },
+    returns: t(
+      'The total number of rows delivered across all completed batches.',
+      '返回所有已交付批次包含的结果总行数。'
+    ),
+    example: 'const visited = await query.chunk(20, (rows) => { console.log(rows.length) })'
+  },
+  stream: {
+    summary: t(
+      'Expose the shared query reader as a storage iterator with original cancellation and cleanup ownership.',
+      '以存储迭代器公开共享查询读取器，沿用原取消语义与资源清理归属。'
+    ),
+    params: { ctx: contextParam },
+    returns: t(
+      'An IStorageIterator over final rows; finish iteration or await dispose() when stopping early.',
+      '返回最终结果的 IStorageIterator；应完成迭代，提前停止时等待 dispose()。'
+    ),
+    example:
+      'const rows = query.stream()\ntry { console.log(await rows.next()) } finally { await rows.dispose() }'
+  },
+  explain: {
+    summary: t(
+      'Inspect captured native and client plan steps without opening a backend cursor or performing I/O.',
+      '检查已捕获的原生与客户端计划步骤，不打开后端游标也不执行任何读写。'
+    ),
+    returns: t(
+      'An IQueryPlan with pushed/client steps, source identity and conservative fullScan information.',
+      '返回包含下推步骤、客户端步骤、来源身份及保守 fullScan 信息的 IQueryPlan。'
+    ),
+    example: 'const plan = query.explain()\nconsole.log(plan.pushed, plan.client, plan.fullScan)'
+  }
+}
+
+/** Query refinements preserve the immutable original branch and the current family type. */
+const queryChainMembers: Readonly<Record<string, IMemberDoc>> = {
+  ...queryReadMembers,
+  where: {
+    summary: t(
+      'Append an object condition, typed path condition or client predicate without executing the query.',
+      '追加对象条件、有类型约束的路径条件或客户端谓词，不立即执行查询。'
+    ),
+    params: {
+      condition: t(
+        'Caller-authored IWhere object over the filter row type; the planner captures canonical field conditions.',
+        '调用方按过滤行类型编写的 IWhere 对象，由计划器捕获为规范字段条件。'
+      ),
+      path: t(
+        'Caller-selected typed object path in the filter row; vector queries address payload fields.',
+        '调用方选择的过滤行类型路径；向量查询在此访问 payload 中的字段。'
+      ),
+      operator: t(
+        'A field-compatible operator such as eq, gte, has or startsWith, selected for the path value type.',
+        '根据路径值类型选择兼容操作符，例如 eq、gte、has 或 startsWith。'
+      ),
+      value: t(
+        'Caller operand whose type matches the chosen path and operator; collection operators use their declared element domain.',
+        '调用方传入的条件值，须匹配路径与操作符类型；集合操作符遵循声明的元素值域。'
+      ),
+      predicate: t(
+        'Caller predicate over the filter row; JavaScript predicates stay on the client and cannot be pushed down.',
+        '调用方针对过滤行的谓词；JavaScript 函数仅在客户端执行，不能下推。'
+      )
+    },
+    returns: t(
+      'A new query branch retaining its family and installed Feature methods; the source branch is unchanged.',
+      '返回保留当前家族和已安装 Feature 方法的新查询分支，原分支不变。'
+    ),
+    example: "const paid = query.where({ status: 'paid' }).where('total', 'gte', 100)"
+  },
+  select: {
+    summary: t(
+      'Apply one field projection or awaited mapper and transition to a read-only selected-result shape.',
+      '执行一次字段投影或等待映射函数，转为只提供读取终点的投影结果类型。'
+    ),
+    params: {
+      fields: t(
+        'One or more caller-selected field names from the current result row type.',
+        '调用方从当前结果行类型中选择的一个或多个字段名称。'
+      ),
+      mapper: t(
+        'Caller mapping function over a row; promised outputs are awaited and infer the selected result type.',
+        '调用方提供的行映射函数；承诺结果会被等待，并推导投影后的结果类型。'
+      )
+    },
+    returns: t(
+      'A typed IQueryResult retaining installed Feature methods; select and later where refinements are absent.',
+      '返回保留已安装 Feature 方法的精确 IQueryResult，后续不再提供 select 或 where。'
+    ),
+    example: "const totals = await query.select('total').all()"
+  },
+  distinct: {
+    summary: t(
+      'Retain the first current-order row for each SameValueZero identity of a selected field.',
+      '按所选字段的 SameValueZero 身份去重，保留当前顺序中首次出现的行。'
+    ),
+    params: {
+      field: t(
+        'Caller-selected field name from the current row type whose values determine duplicate identity.',
+        '调用方从当前行类型选择的字段名，以字段值决定重复身份。'
+      )
+    },
+    returns: t(
+      'A new query branch with distinct applied at this position in the ordered plan.',
+      '返回新查询分支，在有序计划的当前位置应用字段去重。'
+    ),
+    example: "const categories = await query.distinct('category').all()"
+  },
+  requirePushdown: {
+    summary: t(
+      'Require a completely native plan; a terminal rejects client work before opening the source.',
+      '要求整个计划均可原生执行；终点发现客户端步骤时在打开来源之前拒绝。'
+    ),
+    returns: t(
+      'A new query branch carrying the native-only requirement without performing I/O.',
+      '返回携带纯原生要求的新查询分支，构建过程不执行读写。'
+    ),
+    example: 'const native = query.requirePushdown()\nconsole.log(native.explain())'
+  }
+}
+
+/** Numeric aggregate terminals skip absent samples and keep bounded accumulator state. */
+const queryStatisticsMembers: Readonly<Record<string, IMemberDoc>> = Object.fromEntries(
+  (['min', 'max', 'sum', 'avg'] as const).map((name) => [
+    name,
+    {
+      summary: t(
+        `${name} computes its numeric aggregate over final query rows, reusing a declared native scalar reduction when available.`,
+        `${name} 对最终查询行计算数值统计；存在兼容的原生标量统计时复用原实现，缺失字段不计入样本。`
+      ),
+      params: {
+        field: t(
+          'Caller-selected numeric field of the current result type; optional numeric fields are accepted.',
+          '调用方选择的当前结果类型数值字段，也接受类型为可选数值的字段。'
+        ),
+        ctx: contextParam
+      },
+      returns:
+        name === 'sum'
+          ? t(
+              'The numeric sum; a query with no numeric samples returns 0.',
+              '返回数值总和；查询没有数值样本时返回零。'
+            )
+          : t(
+              'A tagged Maybe containing the aggregate, or { some: false } when no numeric samples remain.',
+              '返回包含统计结果的带标签 Maybe；没有剩余数值样本时为 { some: false }。'
+            ),
+      example: `const value = await query.${name}('total')`
+    }
+  ])
+)
+
+/** Keyset pages borrow the original cursor owner and expose opaque process-local continuation. */
+const queryPageMember: IMemberDoc = {
+  summary: t(
+    'Read a bounded page and one lookahead to determine whether a next cursor is needed.',
+    '读取有界结果页，并通过一条前瞻结果判断是否需要提供后续游标。'
+  ),
+  params: {
+    size: t(
+      'Caller-selected positive safe integer specifying the maximum items in this page.',
+      '调用方选定的正安全整数，指定本页最多返回的结果条数。'
+    ),
+    ctx: contextParam
+  },
+  returns: t(
+    'Readonly page metadata with items and optional next; reuse next only with the same compatible source, conditions and ordering.',
+    '返回含 items 与可选 next 的只读分页信息；next 仅用于来源、条件及排序兼容的同一查询。'
+  ),
+  example:
+    'const firstPage = await query.page(20)\nif (firstPage.next) console.log(await query.after(firstPage.next).page(20))'
+}
+
+/** Record and RDF bounds share the original ordered plan and keyset cursor validation. */
+const queryBoundsMembers: Readonly<Record<string, IMemberDoc>> = {
+  limit: {
+    summary: t(
+      'Retain at most the caller-selected number of rows at this step of the query plan.',
+      '在当前查询计划步骤最多保留调用方指定数量的行，后续操作沿用该边界。'
+    ),
+    params: {
+      count: t(
+        'A caller-selected nonnegative safe integer; zero produces an empty result without consuming rows.',
+        '调用方选择的非负安全整数；零表示结果为空，不消费来源中的行。'
+      )
+    },
+    returns: t(
+      'A new branch retaining the current query family and its original Feature methods.',
+      '返回保留当前查询家族与原 Feature 方法的新分支。'
+    ),
+    example: 'const rows = await query.limit(10).all()'
+  },
+  skip: {
+    summary: t(
+      'Discard a nonnegative number of rows at this plan position; client offset work is explicitly O(n).',
+      '在当前计划位置跳过非负数量的行；客户端偏移需要明确的线性扫描成本。'
+    ),
+    params: {
+      count: t(
+        'Caller-selected nonnegative safe integer counting rows to discard before later plan steps.',
+        '调用方选定的非负安全整数，指定后续计划步骤执行前需要丢弃的行数。'
+      )
+    },
+    returns: t(
+      'A new branch with the ordered offset step; explain reports client work when not natively supported.',
+      '返回追加有序偏移步骤的新分支；无法原生支持时由 explain 报告客户端工作。'
+    ),
+    example: 'const rows = await query.skip(20).limit(10).all()'
+  },
+  after: {
+    summary: t(
+      'Resume strictly after an opaque keyset anchor produced by a compatible page operation.',
+      '使用兼容分页操作产生的不透明键集锚点，从锚点之后继续读取结果。'
+    ),
+    params: {
+      cursor: t(
+        'The next value returned by page() for the same source and compatible conditions/order; never serialize or forge it.',
+        '来自相同来源且条件与排序兼容的 page() 返回值 next；不得序列化或自行伪造。'
+      )
+    },
+    returns: t(
+      'A new query branch with the validated continuation anchor; incompatible cursors reject before reading.',
+      '返回带已校验续读锚点的新查询分支；不兼容的游标会在读取前拒绝。'
+    ),
+    example:
+      'const page = await query.page(10)\nif (page.next) console.log(await query.after(page.next).all())'
+  }
+}
+
+/** Mutations run through the original backend write pipeline and count accepted distinct drafts. */
+const queryDeleteMember: IMemberDoc = {
+  summary: t(
+    'Delete distinct rows selected by the complete query inside the original backend write transaction.',
+    '在原后端写事务中，删除由完整查询选中的去重结果行。'
+  ),
+  params: {
+    ctx: t(
+      'Caller operation context and optional original concurrency policy; transaction-bound queries accept only undefined and inherit their scope.',
+      '调用方操作上下文及可选原并发策略；绑定事务的查询仅接受 undefined，并继承原作用域。'
+    )
+  },
+  returns: t(
+    'The number of distinct selected drafts accepted for deletion; a root call waits for native commit confirmation.',
+    '返回已接纳删除的去重选中草稿数量；根调用等待原生提交确认。'
+  ),
+  example: 'const removed = await query.where({ archived: true }).delete()'
+}
+
+/** Selector ordering compares canonical storage keys and uses original primary keys for ties. */
+const queryOrderMember: IMemberDoc = {
+  summary: t(
+    'Append a canonical storage-key selector ordering with deterministic primary-key tie breaking.',
+    '追加规范存储键选择器排序，并以原主键确定相同排序值的先后。'
+  ),
+  params: {
+    selector: t(
+      'Caller function mapping a row to an IStorageKey; retain the canonical supported key domain.',
+      '调用方把结果行映射为 IStorageKey 的函数，返回值须符合规范支持的键值域。'
+    ),
+    direction: t(
+      'Caller choice asc or desc; omitted defaults to ascending order for this selector.',
+      '调用方选择 asc 或 desc；省略时该选择器默认按升序排列。'
+    )
+  },
+  returns: t(
+    'A new selector-ordered branch preserving original Feature methods; comparator ordering is no longer available.',
+    '返回保留原 Feature 方法的选择器排序分支，不再提供比较器排序转换。'
+  ),
+  example: "const ordered = query.orderBy((row) => row.id, 'asc')"
+}
+
+/** All ordinary record families compose the same documented terminals and controls. */
+const recordQueryMembers: Readonly<Record<string, IMemberDoc>> = {
+  ...queryChainMembers,
+  ...queryStatisticsMembers,
+  ...queryBoundsMembers,
+  page: queryPageMember,
+  delete: queryDeleteMember,
+  update: {
+    summary: t(
+      'Apply one detached partial-record patch to distinct query-selected rows through the original transaction.',
+      '通过原事务，对查询选中的去重记录应用一次分离后的部分字段补丁。'
+    ),
+    params: {
+      patch: t(
+        'Caller partial record whose fields replace corresponding fields of selected rows; the original backend codec validates values.',
+        '调用方提供的部分记录，字段替换选中行中的对应字段；值由原后端编解码器验证。'
+      ),
+      ctx: queryDeleteMember.params!.ctx!
+    },
+    returns: t(
+      'The number of distinct selected drafts accepted for update, after native root commit confirmation.',
+      '原生根提交确认后，返回已接纳更新的去重选中草稿数量。'
+    ),
+    example: "const updated = await query.where({ status: 'pending' }).update({ status: 'paid' })"
+  }
+}
+
+/** Pre-ranking vector controls are also available after a finite topK bound has been declared. */
+const vectorControlMembers: Readonly<Record<string, IMemberDoc>> = {
+  where: {
+    ...queryChainMembers.where!,
+    summary: t(
+      'Filter payload fields before ranking when natively translatable; client predicates filter original topK hits without refilling them.',
+      '可原生翻译的 payload 条件在排名前过滤；客户端谓词仅过滤原 topK 命中，不补取其它结果。'
+    ),
+    example: 'const enabled = builder.where({ enabled: true }).topK(5)'
+  },
+  requirePushdown: queryChainMembers.requirePushdown!,
+  topK: {
+    summary: t(
+      'Declare or refine the native ranking bound, enabling read terminals only after this finite bound exists.',
+      '声明或细化原生排名上限，只有存在该有限边界后才提供读取终点。'
+    ),
+    params: {
+      count: t(
+        'Caller-selected positive safe integer limiting original native ranked hits before client post-processing.',
+        '调用方选择的正安全整数，在客户端后处理之前限制原生排名命中数量。'
+      )
+    },
+    returns: t(
+      'A bounded vector query retaining payload inference, vector-return state and original Feature methods.',
+      '返回保留 payload 推导、向量返回状态及原 Feature 方法的有界向量查询。'
+    ),
+    example: 'const hits = await builder.topK(5).all()'
+  },
+  minScore: {
+    summary: t(
+      'Declare the final finite score threshold passed to the original native ranking operation.',
+      '声明传递给原生排名操作的最终有限分数阈值，不自行改写原生分数。'
+    ),
+    params: {
+      score: t(
+        'Caller-selected finite numeric threshold in the selected engine’s native score domain.',
+        '调用方选择的有限数值阈值，使用所选引擎的原生分数值域。'
+      )
+    },
+    returns: t(
+      'A new vector branch retaining its current bounded or pre-topK state.',
+      '返回保留当前有界状态或 topK 前状态的新向量分支。'
+    ),
+    example: 'const hits = await builder.minScore(0.5).topK(5).all()'
+  },
+  withVector: {
+    summary: t(
+      'Request vectors from the native engine and include vector in the inferred hit type.',
+      '请求原生引擎返回向量，同时在推导的命中类型中加入 vector 字段。'
+    ),
+    returns: t(
+      'A new vector branch whose hits carry readonly numeric vectors; original payload and Feature types remain intact.',
+      '返回命中包含只读数值向量的新分支，保留原 payload 和 Feature 类型。'
+    ),
+    example: 'const hits = await builder.withVector().topK(5).all()\nconsole.log(hits[0]?.vector)'
+  }
+}
+
+/** Bounded vector examples address hit fields for projection and payload fields for conditions. */
+const vectorQueryMembers: Readonly<Record<string, IMemberDoc>> = {
+  ...queryChainMembers,
+  ...vectorControlMembers,
+  select: {
+    ...queryChainMembers.select!,
+    example: "const scores = await query.select('id', 'score').all()"
+  },
+  distinct: {
+    ...queryChainMembers.distinct!,
+    example: "const ids = await query.distinct('id').all()"
+  },
+  delete: queryDeleteMember
+}
+
+/** RDF traversal remains grounded in the original matcher and preserves same-graph semantics. */
+const rdfQueryMembers: Readonly<Record<string, IMemberDoc>> = {
+  ...queryChainMembers,
+  ...queryStatisticsMembers,
+  ...queryBoundsMembers,
+  where: {
+    ...queryChainMembers.where!,
+    example: "const named = query.where((quad) => quad.object.termType === 'NamedNode')"
+  },
+  select: {
+    ...queryChainMembers.select!,
+    example: "const bindings = await query.select('subject', 'object').all()"
+  },
+  distinct: {
+    ...queryChainMembers.distinct!,
+    example: "const subjects = await query.distinct('subject').all()"
+  },
+  pluck: { ...queryReadMembers.pluck!, example: "const subjects = await query.pluck('subject')" },
+  min: {
+    ...queryStatisticsMembers.min!,
+    example:
+      "const minimum = await query.select((quad) => ({ length: quad.subject.value.length })).min('length')"
+  },
+  max: {
+    ...queryStatisticsMembers.max!,
+    example:
+      "const maximum = await query.select((quad) => ({ length: quad.subject.value.length })).max('length')"
+  },
+  sum: {
+    ...queryStatisticsMembers.sum!,
+    example:
+      "const sum = await query.select((quad) => ({ length: quad.subject.value.length })).sum('length')"
+  },
+  avg: {
+    ...queryStatisticsMembers.avg!,
+    example:
+      "const average = await query.select((quad) => ({ length: quad.subject.value.length })).avg('length')"
+  },
+  page: queryPageMember,
+  orderBy: {
+    ...queryOrderMember,
+    example: "const ordered = query.orderBy((quad) => quad.subject.value, 'asc')"
+  },
+  delete: { ...queryDeleteMember, example: 'const removed = await query.delete()' },
+  follow: {
+    summary: t(
+      'Follow each current ground quad’s object as the next subject in the same graph.',
+      '把当前 ground quad 的对象作为后续主语，在相同 graph 中继续匹配。'
+    ),
+    params: {
+      predicate: t(
+        'Caller-created named-node predicate, normally obtained from term.iri(), for the next ground match.',
+        '调用方创建的具名节点谓词，通常来自 term.iri()，用于后续 ground 匹配。'
+      ),
+      target: t(
+        'Optional caller-created named-node target constraining the next object; omitted leaves that object unbound.',
+        '调用方创建的可选具名节点目标，用于限制后续对象；省略时该对象不受此约束。'
+      )
+    },
+    returns: t(
+      'A new RDF query branch; the original matcher owns child cursors and closes them before the root cursor.',
+      '返回新的 RDF 查询分支；原匹配器持有子游标，并在根游标之前关闭它们。'
+    ),
+    example: "const next = query.follow(term.iri('urn:knows'), term.iri('urn:c'))"
+  },
+  inverse: {
+    summary: t(
+      'Append a reverse ground predicate traversal using the original matcher in the same graph.',
+      '使用原匹配器在相同 graph 中追加反向 ground 谓词遍历步骤。'
+    ),
+    params: {
+      predicate: t(
+        'Caller-created named-node predicate, normally from term.iri(), selecting the reverse relation.',
+        '调用方创建的具名节点谓词，通常来自 term.iri()，指定需要反向遍历的关系。'
+      )
+    },
+    returns: t(
+      'A new RDF branch with an ordered inverse step; execution retains the original matcher and cleanup owner.',
+      '返回追加有序反向步骤的新 RDF 分支，执行仍使用原匹配器和清理归属。'
+    ),
+    example: "const previous = query.inverse(term.iri('urn:knows'))"
+  },
+  replace: {
+    summary: t(
+      'Replace only the canonical old ground quad selected by this query through the original write transaction.',
+      '通过原写事务，仅替换被本查询选中的规范旧 ground quad。'
+    ),
+    params: {
+      oldQuad: t(
+        'Caller-supplied complete ground quad that must equal the canonical selected old value.',
+        '调用方提供的完整 ground quad，必须与选中的规范旧值相等。'
+      ),
+      newQuad: t(
+        'Caller-supplied complete replacement ground quad; RDF terms are validated by the canonical codec.',
+        '调用方提供的完整替换 ground quad，由规范编解码器验证 RDF 词项。'
+      ),
+      ctx: queryDeleteMember.params!.ctx!
+    },
+    returns: t(
+      'The number of distinct selected old drafts accepted for replacement after original native commit confirmation.',
+      '原生提交确认后，返回已接纳替换的去重选中旧草稿数量。'
+    ),
+    example: 'const replaced = await query.replace(oldQuad, newQuad)'
+  }
+}
+
 /** Complete bilingual contract reference; implementations remain external consumers. */
 export const storageContractReference: ILibraryReference = {
   modules: {
@@ -3156,6 +3757,83 @@ console.log(candidate.name, candidate.output)`
     }
   },
   types: {
+    IRecordQuery: {
+      summary: t(
+        'Record query entry adds mutually exclusive canonical selector and bounded comparator ordering.',
+        '记录查询入口支持规范选择器排序或有界比较器排序，两个转换路径互斥并保留原资源归属。'
+      ),
+      scenarios: [
+        t(
+          'Consume a backend-supplied record cursor through the immutable shared query plan.',
+          '把后端提供的记录游标接入共享不可变查询，保留精确字段类型与原资源清理。'
+        )
+      ],
+      example: storageContractCases.createRecordQuery![0]!.example,
+      members: {
+        ...recordQueryMembers,
+        orderBy: queryOrderMember,
+        orderByComparator: {
+          summary: t(
+            'Enter opaque comparison ordering; declare a finite limit before ordinary read terminals.',
+            '进入不透明比较器排序；使用普通读取终点之前，必须声明有限数量上限。'
+          ),
+          params: {
+            compare: t(
+              'Caller function comparing two current record rows using a negative, zero or positive numeric result.',
+              '调用方提供的当前记录行比较函数，以负数、零或正数表示先后关系。'
+            )
+          },
+          returns: t(
+            'An IRecordQueryNeedsLimit with limit(count) and first(ctx); arbitrary comparison stays on the client.',
+            '返回提供 limit(count) 与 first(ctx) 的 IRecordQueryNeedsLimit，任意比较函数在客户端执行。'
+          ),
+          example:
+            'const rows = await query.orderByComparator((left, right) => left.total - right.total).limit(10).all()'
+        }
+      }
+    },
+    IRecordQueryNeedsLimit: {
+      summary: t(
+        'An opaque comparator branch exposes an explicit bound or the one-row first shortcut.',
+        '不透明比较器分支仅提供显式数量上限或单行 first 快捷终点，避免无界保存全部排序结果。'
+      ),
+      scenarios: [
+        t(
+          'Consume a backend-supplied record cursor through the immutable shared query plan.',
+          '把后端提供的记录游标接入共享不可变查询，保留精确字段类型与原资源清理。'
+        )
+      ],
+      example: storageContractCases.createRecordQuery![0]!.example,
+      members: { limit: queryBoundsMembers.limit!, first: queryReadMembers.first! }
+    },
+    IRecordQueryBase: {
+      summary: t(
+        'Common record controls retain filtering, projection, statistics, keyset pages and original transactional mutations.',
+        '记录公共控制保留过滤、一次投影、统计、键集分页与原事务变更，排序模式由当前类型决定。'
+      ),
+      scenarios: [
+        t(
+          'Consume a backend-supplied record cursor through the immutable shared query plan.',
+          '把后端提供的记录游标接入共享不可变查询，保留精确字段类型与原资源清理。'
+        )
+      ],
+      example: storageContractCases.createRecordQuery![0]!.example,
+      members: recordQueryMembers
+    },
+    IQueryStatistics: {
+      summary: t(
+        'Numeric aggregates reuse the original reader or a declared compatible native reducer.',
+        '数值统计复用原查询读取器或已声明且兼容的原生统计，不保存全部结果行。'
+      ),
+      scenarios: [
+        t(
+          'Consume a backend-supplied record cursor through the immutable shared query plan.',
+          '把后端提供的记录游标接入共享不可变查询，保留精确字段类型与原资源清理。'
+        )
+      ],
+      example: storageContractCases.createRecordQuery![0]!.example,
+      members: queryStatisticsMembers
+    },
     IRdfNamedNode: {
       summary: t(
         'An exact absolute RDF IRI, without URL normalization.',
@@ -3580,84 +4258,80 @@ console.log(candidate.name, candidate.output)`
     },
     IVectorQueryBuilderCore: {
       summary: t(
-        'Pre-topK condition, threshold and vector-return controls.',
-        'topK 前的条件、阈值与向量返回控制。'
+        'Pre-topK construction retains native controls and Feature methods without exposing read terminals.',
+        'topK 前的向量构建保留原生排名控制与 Feature 方法，必须先声明有限 topK 才能读取。'
       ),
-      members: {
-        where: {
-          summary: t('Append payload conditions without I/O.', '无 I/O 追加 payload 条件。')
-        },
-        minScore: {
-          summary: t('Declare the final finite native threshold.', '声明最终有限原生阈值。')
-        },
-        withVector: { summary: t('Enable vector-return result typing.', '开启向量返回结果类型。') },
-        requirePushdown: {
-          summary: t('Require a fully native plan before execution.', '执行前要求全原生计划。')
-        },
-        topK: {
-          summary: t(
-            'Declare a positive safe bound and enable reads.',
-            '声明正安全上限并开启读取。'
-          )
-        }
-      }
+      scenarios: [
+        t(
+          'Declare a native ranking bound before consuming precisely typed vector hits.',
+          '先声明原生 topK 排名边界，再使用保留 payload 类型与原始分数的查询终点。'
+        )
+      ],
+      example: storageContractCases.createVectorQuery![0]!.example,
+      members: vectorControlMembers
     },
     IVectorQueryBuilder: {
       summary: t(
-        'Pre-topK core intersected with original Feature methods.',
-        'topK 前核心与原 Feature 方法的交集。'
+        'Pre-topK construction retains native controls and Feature methods without exposing read terminals.',
+        'topK 前的向量构建保留原生排名控制与 Feature 方法，必须先声明有限 topK 才能读取。'
       ),
-      members: {
-        topK: {
-          summary: t(
-            'Transition to a bounded query while retaining Feature methods.',
-            '转入有界查询并保留 Feature 方法。'
-          )
-        }
-      }
+      scenarios: [
+        t(
+          'Declare a native ranking bound before consuming precisely typed vector hits.',
+          '先声明原生 topK 排名边界，再使用保留 payload 类型与原始分数的查询终点。'
+        )
+      ],
+      example: storageContractCases.createVectorQuery![0]!.example,
+      members: vectorControlMembers
     },
     IVectorQueryBase: {
       summary: t(
-        'Bounded shared reads without record statistics or arbitrary ordering.',
-        '有界共享读取，不含记录统计或任意排序。'
+        'Bounded vector reads retain native ranking and payload filtering without record aggregates, pages or arbitrary ordering.',
+        '有界向量查询读取原排名命中并过滤 payload，不提供记录统计、键集分页或任意排序。'
       ),
-      members: {
-        all: {
-          summary: t(
-            'Read bounded native hits with original cursor cleanup.',
-            '读取有界原生命中并清理原游标。'
-          )
-        },
-        where: {
-          summary: t(
-            'Filter payload through the shared condition dispatcher.',
-            '通过共享条件分派过滤 payload。'
-          )
-        },
-        select: {
-          summary: t(
-            'Project hits once; record statistics remain absent.',
-            '一次投影命中，仍无记录统计。'
-          )
-        },
-        topK: {
-          summary: t('Refine the final native bound immutably.', '不可变细化最终原生上限。')
-        },
-        minScore: { summary: t('Refine the native score threshold.', '细化原生分数阈值。') },
-        withVector: { summary: t('Enable vector-bearing hit types.', '开启带 vector 的命中类型。') }
-      }
+      scenarios: [
+        t(
+          'Declare a native ranking bound before consuming precisely typed vector hits.',
+          '先声明原生 topK 排名边界，再使用保留 payload 类型与原始分数的查询终点。'
+        )
+      ],
+      example: storageContractCases.createVectorQuery![0]!.example,
+      members: vectorQueryMembers
     },
     IVectorQuery: {
       summary: t(
-        'Bounded vector query with grouping only when explicitly declared.',
-        '有界向量查询，仅显式声明时提供分组。'
+        'Bounded vector queries preserve hit and Feature types; only explicitly groupable sources expose scalar payload grouping.',
+        '有界向量查询保留命中和 Feature 类型，仅显式支持分组的来源提供标量 payload 分组。'
       ),
+      scenarios: [
+        t(
+          'Declare a native ranking bound before consuming precisely typed vector hits.',
+          '先声明原生 topK 排名边界，再使用保留 payload 类型与原始分数的查询终点。'
+        )
+      ],
+      example: storageContractCases.createVectorQuery![0]!.example,
       members: {
+        ...vectorQueryMembers,
         groupBy: {
           summary: t(
-            'Conditionally group original topK hits by own scalar payload fields.',
-            '条件提供按 payload 自有标量字段对原 topK 命中分组。'
-          )
+            'Group original topK hits by an own scalar payload field with an explicit per-group bound.',
+            '按 payload 自有标量字段对原 topK 命中分组，并遵循每组显式声明的数量边界。'
+          ),
+          params: {
+            field: t(
+              'Caller-selected own scalar payload field; only explicitly groupable sources expose this method.',
+              '调用方选择的 payload 自有标量字段；仅显式声明分组支持的来源提供此方法。'
+            ),
+            options: t(
+              'Required caller object containing perGroup, a positive safe integer bounding retained hits in each group; no default exists.',
+              '调用方必须提供含 perGroup 的对象，该值为限制每组保留命中的正安全整数，没有默认值。'
+            )
+          },
+          returns: t(
+            'A selected result of { group, hits } rows retaining original ranking; grouping never refills hits beyond topK.',
+            '返回由 { group, hits } 组成的投影结果，沿用原排名顺序，分组不补取 topK 之外的命中。'
+          ),
+          example: "const groups = await query.groupBy('category', { perGroup: 2 }).all()"
         }
       }
     },
@@ -3729,51 +4403,31 @@ console.log(candidate.name, candidate.output)`
     },
     IRdfQueryCore: {
       summary: t(
-        'Ground quad reads, one projection, limit and native traversal.',
-        'ground quad 读取、一次投影、limit 与原生遍历。'
+        'Ground RDF queries combine shared reads with same-graph traversal, bounds, pages and original transactional mutation.',
+        'Ground RDF 查询组合共享读取、投影、同 graph 遍历、数量边界、分页及原事务变更。'
       ),
-      members: {
-        orderBy: {
-          summary: t(
-            'Reuse canonical selector key ordering over ground quad rows.',
-            '在 ground quad 行上复用规范 selector 键排序。'
-          )
-        },
-        skip: {
-          summary: t(
-            'Advance explicit row offsets without another cursor owner.',
-            '显式推进记录 offset，不建立另一游标 owner。'
-          )
-        },
-        where: { summary: t('Append shared quad binding conditions.', '追加共享 quad 绑定条件。') },
-        select: { summary: t('Project quad bindings once.', '一次投影 quad 绑定。') },
-        limit: {
-          summary: t('Declare a nonnegative safe streaming bound.', '声明非负安全流式上限。')
-        },
-        follow: {
-          summary: t(
-            'Follow through original same-graph ground matches, natively or through the shared client reader.',
-            '通过同 graph ground match 正向跟随，可由原生或共享客户端 reader 执行。'
-          )
-        },
-        inverse: {
-          summary: t('Append a ground inverse predicate step.', '追加 ground 反向 predicate 步骤。')
-        }
-      }
+      scenarios: [
+        t(
+          'Traverse ground RDF through the original same-graph matcher and cursor owner.',
+          '在原 ground 匹配器之上构建 RDF 查询，沿用同 graph 遍历与原资源清理。'
+        )
+      ],
+      example: storageContractCases.createRdfQuery![0]!.example,
+      members: rdfQueryMembers
     },
     IRdfQuery: {
       summary: t(
-        'Ground RDF core intersected with original Feature methods.',
-        'ground RDF 核心与原 Feature 方法的交集。'
+        'Ground RDF queries combine shared reads with same-graph traversal, bounds, pages and original transactional mutation.',
+        'Ground RDF 查询组合共享读取、投影、同 graph 遍历、数量边界、分页及原事务变更。'
       ),
-      members: {
-        follow: {
-          summary: t(
-            'Retain the RDF query and original Feature extension.',
-            '保留 RDF 查询与原 Feature 扩展。'
-          )
-        }
-      }
+      scenarios: [
+        t(
+          'Traverse ground RDF through the original same-graph matcher and cursor owner.',
+          '在原 ground 匹配器之上构建 RDF 查询，沿用同 graph 遍历与原资源清理。'
+        )
+      ],
+      example: storageContractCases.createRdfQuery![0]!.example,
+      members: rdfQueryMembers
     },
     IRdfQueryTraversal: {
       summary: t(
@@ -3891,17 +4545,17 @@ console.log(candidate.name, candidate.output)`
     },
     IQueryPages: {
       summary: t(
-        'Original-reader pages with one lookahead and mapping only for actual returned items.',
-        '原读取器的分页；仅保留一条前瞻，对实际返回项映射。'
+        'Bounded keyset pages expose opaque in-process continuation and await original cleanup.',
+        '有界键集分页返回仅在进程内有效的不透明续读锚点，并完成原游标清理。'
       ),
-      members: {
-        page: {
-          summary: t(
-            'Read a positive safe page size and an optional next cursor; await original cleanup.',
-            '读取正安全页大小与可选 next 游标，等待原清理。'
-          )
-        }
-      }
+      scenarios: [
+        t(
+          'Consume a backend-supplied record cursor through the immutable shared query plan.',
+          '把后端提供的记录游标接入共享不可变查询，保留精确字段类型与原资源清理。'
+        )
+      ],
+      example: storageContractCases.createRecordQuery![0]!.example,
+      members: { page: queryPageMember }
     },
     IRecordQueryInput: {
       summary: t(
@@ -4036,124 +4690,127 @@ console.log(candidate.name, candidate.output)`
     },
     IRecordOrderedQueryCore: {
       summary: t(
-        'Selector-ordered record controls with no comparator transition.',
-        'selector 排序的记录控制，不提供 comparator 转换。'
+        'Selector-ordered branches preserve their exact family and Feature methods through later refinements.',
+        '选择器排序的记录分支在后续细化中保留精确家族与原 Feature 方法，不再转换为比较器排序。'
       ),
-      members: {
-        orderBy: {
-          summary: t(
-            'Append a canonical selector key and optional asc/desc direction.',
-            '追加规范 selector 键与可选 asc/desc 方向。'
-          )
-        }
-      }
+      scenarios: [
+        t(
+          'Consume a backend-supplied record cursor through the immutable shared query plan.',
+          '把后端提供的记录游标接入共享不可变查询，保留精确字段类型与原资源清理。'
+        )
+      ],
+      example: storageContractCases.createRecordQuery![0]!.example,
+      members: { ...recordQueryMembers, orderBy: queryOrderMember }
     },
     IRecordOrderedQuery: {
       summary: t(
-        'Selector-ordered record core intersected with original Feature methods.',
-        'selector 排序的记录核心与原 Feature 方法的交集。'
+        'Selector-ordered branches preserve their exact family and Feature methods through later refinements.',
+        '选择器排序的记录分支在后续细化中保留精确家族与原 Feature 方法，不再转换为比较器排序。'
       ),
-      members: {
-        orderBy: {
-          summary: t(
-            'Preserve the exact ordered family and Feature methods after refinement.',
-            '细化后保留精确排序家族与 Feature 方法。'
-          )
-        }
-      }
+      scenarios: [
+        t(
+          'Consume a backend-supplied record cursor through the immutable shared query plan.',
+          '把后端提供的记录游标接入共享不可变查询，保留精确字段类型与原资源清理。'
+        )
+      ],
+      example: storageContractCases.createRecordQuery![0]!.example,
+      members: { ...recordQueryMembers, orderBy: queryOrderMember }
     },
     IRecordQueryCore: {
       summary: t(
-        'Record query entry with exclusive selector/comparator ordering transitions.',
-        '记录查询入口，selector/comparator 排序转换互斥。'
+        'Record query entry adds mutually exclusive canonical selector and bounded comparator ordering.',
+        '记录查询入口支持规范选择器排序或有界比较器排序，两个转换路径互斥并保留原资源归属。'
       ),
+      scenarios: [
+        t(
+          'Consume a backend-supplied record cursor through the immutable shared query plan.',
+          '把后端提供的记录游标接入共享不可变查询，保留精确字段类型与原资源清理。'
+        )
+      ],
+      example: storageContractCases.createRecordQuery![0]!.example,
       members: {
-        orderBy: {
-          summary: t(
-            'Enter canonical selector ordering with primary-key ties.',
-            '按主键决胜，进入规范 selector 排序。'
-          )
-        },
+        ...recordQueryMembers,
+        orderBy: queryOrderMember,
         orderByComparator: {
           summary: t(
-            'Enter bounded opaque comparator ordering.',
-            '进入有界不透明 comparator 排序。'
-          )
+            'Enter opaque comparison ordering; declare a finite limit before ordinary read terminals.',
+            '进入不透明比较器排序；使用普通读取终点之前，必须声明有限数量上限。'
+          ),
+          params: {
+            compare: t(
+              'Caller function comparing two current record rows using a negative, zero or positive numeric result.',
+              '调用方提供的当前记录行比较函数，以负数、零或正数表示先后关系。'
+            )
+          },
+          returns: t(
+            'An IRecordQueryNeedsLimit with limit(count) and first(ctx); arbitrary comparison stays on the client.',
+            '返回提供 limit(count) 与 first(ctx) 的 IRecordQueryNeedsLimit，任意比较函数在客户端执行。'
+          ),
+          example:
+            'const rows = await query.orderByComparator((left, right) => left.total - right.total).limit(10).all()'
         }
       }
     },
     IRecordQueryBaseCore: {
       summary: t(
-        'Common record read, distinct, limit and offset controls.',
-        '记录共用读取、distinct、limit 与 offset 控制。'
+        'Common record controls retain filtering, projection, statistics, keyset pages and original transactional mutations.',
+        '记录公共控制保留过滤、一次投影、统计、键集分页与原事务变更，排序模式由当前类型决定。'
       ),
-      members: {
-        limit: {
-          summary: t(
-            'Retain at most a nonnegative safe number of rows.',
-            '最多保留非负安全数量的行。'
-          )
-        },
-        skip: {
-          summary: t(
-            'Advance a nonnegative safe offset with an explicit O(n) explanation.',
-            '推进非负安全 offset，明确解释 O(n) 成本。'
-          )
-        }
-      }
+      scenarios: [
+        t(
+          'Consume a backend-supplied record cursor through the immutable shared query plan.',
+          '把后端提供的记录游标接入共享不可变查询，保留精确字段类型与原资源清理。'
+        )
+      ],
+      example: storageContractCases.createRecordQuery![0]!.example,
+      members: recordQueryMembers
     },
     IQueryRead: {
       summary: t(
-        'Implemented all(ctx) and explain() terminals; all consumes and closes the original iterator.',
-        '已实现的 all(ctx) 与 explain() 终点；all 消费并关闭原迭代器。'
+        'Shared read terminals retain precise row types and the original backend cursor lifetime.',
+        '共享读取终点保留精确结果行类型，沿用原后端游标的生命周期与清理约定。'
       ),
-      members: {
-        all: {
-          summary: t(
-            'Collect results and await original cursor disposal.',
-            '收集结果并等待原游标释放。'
-          )
-        },
-        explain: { summary: t('Plan without reading data.', '不读取数据地规划。') }
-      }
+      scenarios: [
+        t(
+          'Consume a backend-supplied record cursor through the immutable shared query plan.',
+          '把后端提供的记录游标接入共享不可变查询，保留精确字段类型与原资源清理。'
+        )
+      ],
+      example: storageContractCases.createRecordQuery![0]!.example,
+      members: queryReadMembers
     },
     IQueryResult: {
       summary: t(
-        'Selected all/explain/requirePushdown result. select is removed after its single transition.',
-        '选择后的 all/explain/requirePushdown 结果；一次选择后移除 select。'
+        'A projected result retains reads and Feature methods; statistics and pages exist only when TStatistics is true.',
+        '投影结果保留读取与 Feature 方法；仅 TStatistics 为 true 时提供数值统计与键集分页。'
       ),
+      scenarios: [
+        t(
+          'Consume a backend-supplied record cursor through the immutable shared query plan.',
+          '把后端提供的记录游标接入共享不可变查询，保留精确字段类型与原资源清理。'
+        )
+      ],
+      example: storageContractCases.createRecordQuery![0]!.example,
       members: {
-        all: { summary: t('Collect selected results.', '收集选择后的结果。') },
-        requirePushdown: {
-          summary: t('Reject client work before opening a source.', '打开源前拒绝客户端步骤。')
-        }
+        ...queryReadMembers,
+        ...queryStatisticsMembers,
+        page: queryPageMember,
+        requirePushdown: queryChainMembers.requirePushdown!
       }
     },
     IQueryChain: {
       summary: t(
-        'Implemented three-form where, one select, all, explain and requirePushdown with precise field/output types.',
-        '已实现三形态 where、一次 select、all、explain 与 requirePushdown，字段与输出类型精确。'
+        'Immutable filtering and one projection compose over the original read terminals.',
+        '不可变过滤与一次投影建立在原读取终点上，分支保留所属家族和 Feature 方法。'
       ),
-      members: {
-        distinct: {
-          summary: t(
-            'Retain the first current-order row for each SameValueZero field identity.',
-            '每个 SameValueZero 字段身份保留当前顺序首行。'
-          )
-        },
-        where: {
-          summary: t(
-            'Append object, typed path or function condition.',
-            '追加对象、typed 路径或函数条件。'
-          )
-        },
-        select: {
-          summary: t('One field projection or awaited mapper.', '一次字段投影或等待 mapper。')
-        },
-        all: {
-          summary: t('Execute the actual plan and close the source.', '执行真实计划并关闭数据源。')
-        }
-      }
+      scenarios: [
+        t(
+          'Consume a backend-supplied record cursor through the immutable shared query plan.',
+          '把后端提供的记录游标接入共享不可变查询，保留精确字段类型与原资源清理。'
+        )
+      ],
+      example: storageContractCases.createRecordQuery![0]!.example,
+      members: queryChainMembers
     },
     IRecordQuerySource: {
       summary: t(
