@@ -11,65 +11,20 @@ import {
   type IBinlogExt,
   type IWalExt,
   type IUndoLogExt,
-  type IUndoImage,
-  type ILogPayload,
   type ILogStore
 } from '@migaia/logger/plugins/durable'
 import { encodeFlatStorageKey } from '../core/key-domain.js'
 import type { IStorageJournalBackendAccess } from './binding.js'
 import { resolveStorageLogNativeAccess } from './append-port.js'
-import type { IStorageJournalChange } from './types.js'
 import { createStorageOperationReporter, reportCleanupError } from '../core/operation-reporter.js'
 import { isStorageErrorFamily } from '../core/error-family.js'
 
 import { StorageJournalKind } from './constants.js'
 import { createStorageExternalWal } from './wal.js'
-import { storageJournalTargetWire, storageJournalTargetIdentity } from './targets.js'
-import { createStorageJournalUndo } from './undo.js'
+import { storageJournalTargetWire } from './targets.js'
+import { createStorageJournalUndo, storageJournalUndoImages } from './undo.js'
 /** Private terminal access shares the original namespace resource and never enters business KV. */
 const terminalNamespace = 'storage.journal.terminal'
-/** Complete undo targets survive the original logger's target/before/after projection. */
-export type IStorageUndoTarget = Readonly<{
-  version: 1
-  namespace: string
-  backendInstanceId: string
-  orgId: string
-  identity: ILogPayload
-  afterRevision: ILogPayload
-}>
-
-/** Repeated writes keep their first before image and last actual after image and full revision. */
-export function storageJournalUndoImages(
-  target: Readonly<{ namespace: string; backendInstanceId: string; orgId: string }>,
-  changes: readonly IStorageJournalChange[],
-  backend: IBackendKind
-): readonly IUndoImage[] {
-  /** Only this commit's canonical identities participate; no history index or authority is added. */
-  const merged = new Map<string, IUndoImage>()
-  for (const change of changes) {
-    /** The original target codec keeps every persisted business key in its existing domain. */
-    const identity = storageJournalTargetWire(change.target)
-    /** Metadata and native point identities remain distinct even when their strings coincide. */
-    const key = storageJournalTargetIdentity(change.target, backend)
-    /** First-before ownership survives every later overwrite of this same physical identity. */
-    const previous = merged.get(key)
-    merged.set(key, {
-      target: {
-        version: 1,
-        ...target,
-        identity,
-        afterRevision: change.afterRevision
-      } satisfies IStorageUndoTarget,
-      before: previous?.before ?? change.before,
-      after: change.after
-    })
-  }
-  /** The original logger validator supplies the detached immutable JSON domain once. */
-  return snapshotLogRecords([
-    { kind: StorageJournalKind.commit, payload: [...merged.values()] }
-  ])[0]!.payload as readonly IUndoImage[]
-}
-
 /**
  * Join selected real logger stores to the same native transaction. Preparation finishes before
  * callers take the returned head locks or open a business scope; no queue or terminal is created.
@@ -101,7 +56,10 @@ export async function createStorageNativeJournal(options: {
     (binlogValues !== undefined && typeof binlogValues !== 'boolean')
   )
     throw new StorageContractError(StorageContractErrorCode.invalidArgument)
-  if ((undo !== undefined && atomicUndo === undefined) || access.binding.changes === undefined)
+  if (
+    (undo !== undefined && atomicUndo === undefined && logger.wal === undefined) ||
+    access.binding.changes === undefined
+  )
     throw new StorageContractError(StorageContractErrorCode.unsupported)
   /** Stable target fields come only from the host's original fixed-org access closure. */
   const target = Object.freeze({
@@ -144,11 +102,16 @@ export async function createStorageNativeJournal(options: {
     if (nativeAtomic !== true && !(nativeAtomic === false && commitOnly))
       throw new StorageContractError(StorageContractErrorCode.unsupported)
     access.retain(terminal)
-    if (logger.wal !== undefined && binlogNative === undefined)
+    if (
+      logger.wal !== undefined &&
+      ((binlog !== undefined && binlogNative === undefined) ||
+        (undo !== undefined && undoNative === undefined))
+    )
       wal = await createStorageExternalWal({
         access,
         target,
-        binlog,
+        binlog: binlogNative === undefined ? binlog : undefined,
+        undo: undoNative === undefined ? undo : undefined,
         wal: logger.wal,
         backend: options.backend,
         report: options.report,
@@ -190,7 +153,8 @@ export async function createStorageNativeJournal(options: {
       let external: Promise<void> | undefined
       return Object.freeze({
         txId: info.id,
-        ...(binlog !== undefined && binlogNative === undefined
+        ...((binlog !== undefined && binlogNative === undefined) ||
+        (undo !== undefined && undoNative === undefined)
           ? { settle: () => external ?? Promise.resolve() }
           : {}),
         /** Called by the original owner after its final business plan and before actual COMMIT. */
@@ -200,60 +164,78 @@ export async function createStorageNativeJournal(options: {
           /** The original owner supplies its final physical plan, including complete revisions. */
           const changes = access.binding.changes!(current)
           if (changes.length === 0) return
-          if (binlog !== undefined) {
-            /** The shared logger validates and snapshots this one actual ordered commit payload. */
-            const payload = snapshotLogRecords([
-              {
-                kind: StorageJournalKind.commit,
-                payload: {
-                  version: 1,
-                  target,
-                  txId: info.id,
-                  changes: changes.map((change) => ({
-                    target: storageJournalTargetWire(change.target),
-                    present: change.after.present,
-                    ...(binlogValues && change.after.present ? { value: change.after.value } : {})
-                  }))
-                }
-              }
-            ])[0]!.payload
-            if (binlogNative !== undefined)
-              await binlog.append(StorageJournalKind.commit, payload, {
-                transaction: binlogNative.createPort(current)
-              })
-            else {
-              /** Intent is durable before the original owner stages its same-transaction marker. */
-              const intent = await wal?.begin(
-                current,
-                payload,
-                changes.map((change) => ({
-                  ...change,
-                  target: storageJournalTargetWire(change.target)
-                }))
-              )
-              if (intent !== undefined)
-                terminal.onRollback(current, () => {
-                  external = intent.abort()
-                })
-              terminal.onCommit(current, () => {
-                /** Awaited native results cannot be replaced after data is actually committed. */
-                external = (async () => {
-                  try {
-                    if (intent === undefined)
-                      await binlog.append(StorageJournalKind.commit, payload)
-                    else await intent.complete()
-                  } catch (error) {
-                    if (options.onBinlogAppendError !== undefined)
-                      options.onBinlogAppendError(info.id, error)
-                    else reportCleanupError(createStorageOperationReporter(), error)
+          /** One canonical ordered payload also carries the full external undo intent's txId. */
+          const payload =
+            binlog !== undefined || (undo !== undefined && undoNative === undefined)
+              ? snapshotLogRecords([
+                  {
+                    kind: StorageJournalKind.commit,
+                    payload: {
+                      version: 1,
+                      target,
+                      txId: info.id,
+                      changes: changes.map((change) => ({
+                        target: storageJournalTargetWire(change.target),
+                        present: change.after.present,
+                        ...(binlogValues && change.after.present
+                          ? { value: change.after.value }
+                          : {})
+                      }))
+                    }
                   }
-                })()
+                ])[0]!.payload
+              : undefined
+          if (binlog !== undefined && binlogNative !== undefined)
+            await binlog.append(StorageJournalKind.commit, payload!, {
+              transaction: binlogNative.createPort(current)
+            })
+          if (
+            (binlog !== undefined && binlogNative === undefined) ||
+            (undo !== undefined && undoNative === undefined)
+          ) {
+            /** Full images become durable before the original same-transaction marker is staged. */
+            const intent = await wal?.begin(
+              current,
+              payload!,
+              changes.map((change) => ({
+                ...change,
+                target: storageJournalTargetWire(change.target)
+              }))
+            )
+            if (intent !== undefined)
+              terminal.onRollback(current, () => {
+                external = intent.abort()
               })
-            }
+            terminal.onCommit(current, () => {
+              /** Awaited native results cannot be replaced after data is actually committed. */
+              external = (async () => {
+                /** Binlog observers describe append failures only; undo/WAL failures use report. */
+                let binlogReported = false
+                const onBinlogFailure = (error: unknown) => {
+                  if (options.onBinlogAppendError !== undefined) {
+                    binlogReported = true
+                    options.onBinlogAppendError(info.id, error)
+                  }
+                }
+                try {
+                  if (intent === undefined) {
+                    try {
+                      await binlog!.append(StorageJournalKind.commit, payload!)
+                    } catch (error) {
+                      onBinlogFailure(error)
+                      throw error
+                    }
+                  } else await intent.complete(onBinlogFailure)
+                } catch (error) {
+                  if (!binlogReported)
+                    reportCleanupError(options.report ?? createStorageOperationReporter(), error)
+                }
+              })()
+            })
           }
-          if (undo !== undefined)
+          if (undo !== undefined && undoNative !== undefined)
             await undo.record(info.id, storageJournalUndoImages(target, changes, options.backend), {
-              transaction: undoNative!.createPort(current)
+              transaction: undoNative.createPort(current)
             })
         }
       })
