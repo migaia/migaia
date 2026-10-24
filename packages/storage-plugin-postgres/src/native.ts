@@ -172,7 +172,8 @@ export async function readPg(
         (channel === 'metadata' ? '' : ',extract(epoch FROM expires_at)*1000 AS deadline') +
         ' FROM ' +
         tables[channel] +
-        ' WHERE org_id=$1 AND key=$2',
+        ' WHERE org_id=$1 AND key=$2' +
+        (channel === 'metadata' ? '' : ' AND (expires_at IS NULL OR expires_at>clock_timestamp())'),
       [state.orgId, encoded(channel, key)],
       state.ctx
     )
@@ -566,7 +567,7 @@ export async function getManyPg(
     await state.client.query(
       'SELECT key,value,extract(epoch FROM expires_at)*1000 AS deadline FROM ' +
         tables.text +
-        ' WHERE org_id=$1 AND key=ANY($2::text[])',
+        ' WHERE org_id=$1 AND key=ANY($2::text[]) AND (expires_at IS NULL OR expires_at>clock_timestamp())',
       params,
       state.ctx
     )

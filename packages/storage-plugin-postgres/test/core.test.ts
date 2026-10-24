@@ -247,3 +247,78 @@ for (const mode of ['between-statements', 'before-commit'] as const) {
       ).rejects.toMatchObject({ code: 'WRITE_CONFLICT' })
   })
 }
+
+/** A scoped point read uses the same native clock when expiry crosses its prune/select boundary. */
+for (const channel of ['text', 'bytes', 'record', 'batch'] as const) {
+  it('treats an expired point as missing at the actual SELECT for ' + channel, async () => {
+    const pool = new Pool({ connectionString })
+    const native = pgDriver(pool)
+    const prefix = 'pg_point_expiry_' + randomUUID().slice(0, 8),
+      org = randomUUID()
+    const suffix =
+      channel === 'text' || channel === 'batch'
+        ? '_kv'
+        : channel === 'bytes'
+          ? '_bytes'
+          : '_records'
+    let armed = false
+    const driver = {
+      ...native,
+      connect: async (...args: Parameters<typeof native.connect>) => {
+        const client = await native.connect(...args)
+        return {
+          ...client,
+          query: async (...args: Parameters<typeof client.query>) => {
+            const boundary =
+              armed &&
+              args[0].startsWith('SELECT key FROM ') &&
+              args[0].includes(suffix) &&
+              args[0].includes('expires_at<=')
+            if (boundary) {
+              armed = false
+              await client.query(
+                'UPDATE ' +
+                  prefix +
+                  suffix +
+                  " SET expires_at=clock_timestamp()+interval '50 millisecond' WHERE org_id=$1",
+                [org]
+              )
+            }
+            const result = await client.query(...args)
+            if (boundary) await client.query('SELECT pg_sleep(0.075)', [])
+            return result
+          }
+        }
+      }
+    }
+    const host = await createStorageHost({
+      org,
+      plugins: [postgresBackendPlugin({ driver, prefix })] as const
+    })
+    onTestFinished(async () => {
+      await host.dispose()
+      await pool.end()
+    })
+    const store = host.backend('postgres')
+    if (channel === 'text' || channel === 'batch') await store.set('point', 'value')
+    else if (channel === 'bytes') await store.setBytes('point', new Uint8Array([1]))
+    else await store.putRecord({ live: true }, 'point')
+    armed = true
+    await store.transaction(
+      async (scope) => {
+        const value =
+          channel === 'batch'
+            ? await scope.use(kv).getMany(['point'])
+            : channel === 'text'
+              ? await scope.get('point')
+              : channel === 'bytes'
+                ? await scope.getBytes('point')
+                : await scope.getRecord('point')
+        expect(value).toEqual(
+          channel === 'batch' ? [undefined] : channel === 'record' ? undefined : null
+        )
+      },
+      { concurrency: ConcurrencyPolicy.optimistic({ retries: 0 }) }
+    )
+  })
+}
