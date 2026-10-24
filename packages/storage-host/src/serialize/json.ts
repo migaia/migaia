@@ -1,5 +1,6 @@
 import { defineJsonCodec } from '@migaia/serialize/codecs/json'
-import { fromValueCodec, type ICodec } from '@migaia/storage-contract'
+import { type ICodec } from '@migaia/storage-contract'
+import { fromValueCodec } from '../authoring/codec.js'
 import { StorageError, StorageErrorCode } from '../errors.js'
 
 /** The original portable JSON implementation owns validation and value projection. */

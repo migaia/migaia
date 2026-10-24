@@ -135,7 +135,7 @@ Prints `frozen: true`, `same snapshot: true`, `field reads: 4`, `signal aborted:
 `encode(value, ctx?)` turns this object into text; `decode(raw, ctx?)` consumes that text and reconstructs collections. Both omitted context arguments are undefined. output is always `text`. The type assertion describes the expected object shape; the codec reviver creates the Map/Set instances.
 
 ```ts doc-test=run
-import { fromValueCodec } from '@migaia/storage-contract'
+import { fromValueCodec } from '@migaia/storage-host/authoring/codec'
 import { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'
 
 const codec = fromValueCodec(defineCollectionsJsonCodec({ version: 1 }))
@@ -511,7 +511,7 @@ The host captures this store's unique installation port through `onInstaller`. `
 ### fromValueCodec
 
 ```ts
-import { fromValueCodec } from '@migaia/storage-contract'
+import { fromValueCodec } from '@migaia/storage-host/authoring/codec'
 import { defineJsonCodec } from '@migaia/serialize/codecs/json'
 
 const codec = fromValueCodec(defineJsonCodec({ version: 2 }))
@@ -520,7 +520,7 @@ console.log(codec.name, codec.output, await codec.decode(raw))
 // json@2 text { count: 1 }
 ```
 
-The frozen adapter snapshots all five metadata/callback fields once. Text, byte and unknown carriers map to text, binary and structured storage routes. Encode and decode keep independent input types; tagged codecs therefore retain their legacy decode inputs. Both callbacks run once and are awaited. Synchronous throws and rejected Promises become contract `INVALID_ARGUMENT` with the exact source error on cause. No second parsing, value copying, hooks, resource or connection is created. `StorageStageKind` and `ICodecStageObserver` describe observation only; actual store-bound dispatch belongs to the host.
+The adapter validates the public descriptor, retains its format name and route, and calls the original codec methods directly. Text, byte and unknown carriers map to text, binary and structured storage routes. Encode and decode keep independent input types; tagged codecs therefore retain their legacy decode inputs. Both callbacks run once and are awaited. Synchronous throws and rejected Promises become contract `INVALID_ARGUMENT` with the exact source error on cause. No second parsing, value copying, hooks, resource or connection is created. `StorageStageKind` and `ICodecStageObserver` describe observation only; actual store-bound dispatch belongs to the host.
 
 ### Resource-base admission and observer ports
 

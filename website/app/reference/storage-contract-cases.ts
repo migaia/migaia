@@ -1661,8 +1661,8 @@ function next(source: IRdfQuerySource) {
         '存储应使用 serialize 唯一拥有的值格式。适配器将元数据映射到存储路由，并独立保留 encode 与 decode 的输入类型。'
       ),
       example: t(
-        "import { fromValueCodec } from '@migaia/storage-contract'\nimport { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'\nconst codec = fromValueCodec(defineCollectionsJsonCodec({ version: 1 }))\nconst raw = await codec.encode(new Map([['Ada', new Set(['read', 'write'])]]))\nconst restored = await codec.decode(raw)\nconsole.log(codec.name, codec.output, restored instanceof Map)\n// collections-json@1 text true",
-        "import { fromValueCodec } from '@migaia/storage-contract'\nimport { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'\nconst codec = fromValueCodec(defineCollectionsJsonCodec({ version: 1 }))\nconst raw = await codec.encode(new Map([['Ada', new Set(['read', 'write'])]]))\nconst restored = await codec.decode(raw)\nconsole.log(codec.name, codec.output, restored instanceof Map)\n// collections-json@1 text true"
+        "import { fromValueCodec } from '@migaia/storage-host/authoring/codec'\nimport { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'\nconst codec = fromValueCodec(defineCollectionsJsonCodec({ version: 1 }))\nconst raw = await codec.encode(new Map([['Ada', new Set(['read', 'write'])]]))\nconst restored = await codec.decode(raw)\nconsole.log(codec.name, codec.output, restored instanceof Map)\n// collections-json@1 text true",
+        "import { fromValueCodec } from '@migaia/storage-host/authoring/codec'\nimport { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'\nconst codec = fromValueCodec(defineCollectionsJsonCodec({ version: 1 }))\nconst raw = await codec.encode(new Map([['Ada', new Set(['read', 'write'])]]))\nconst restored = await codec.decode(raw)\nconsole.log(codec.name, codec.output, restored instanceof Map)\n// collections-json@1 text true"
       ),
       result: t(
         'Prints collections-json@1 text true. Serialize owns Map/Set revival; adaptation adds no second parser, clone or storage write.',

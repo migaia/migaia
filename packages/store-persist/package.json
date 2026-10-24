@@ -51,10 +51,10 @@
     "@migaia/reactive": "workspace:^",
     "@migaia/serialize": "workspace:^",
     "@migaia/storage-contract": "workspace:^",
+    "@migaia/storage-host": "workspace:^",
     "@migaia/utils": "workspace:^"
   },
   "devDependencies": {
-    "@migaia/storage-host": "workspace:^",
     "@migaia/store-indexed": "workspace:^",
     "@migaia/store-keyed": "workspace:^",
     "@migaia/store-light": "workspace:^",

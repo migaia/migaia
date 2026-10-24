@@ -1,4 +1,5 @@
-import { fromValueCodec, snapshotCodec, type ICodec } from '@migaia/storage-contract'
+import { snapshotCodec, type ICodec } from '@migaia/storage-contract'
+import { fromValueCodec } from '@migaia/storage-host/authoring/codec'
 import { defineJsonCodec } from '@migaia/serialize/codecs/json'
 import type { ICodecValue } from '@migaia/serialize/codec'
 import { jitter } from '@migaia/utils/number'

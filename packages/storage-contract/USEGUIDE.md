@@ -135,7 +135,7 @@ console.log('选项:', snapshot?.timeoutMs, snapshot?.pageSize, snapshot?.confli
 `encode(value, ctx?)` 将本例对象转成文本，`decode(raw, ctx?)` 接收该文本并恢复集合。两个 ctx 省略时都是 undefined。output 固定为 `text`；这里的类型断言只说明预期对象形状，Map/Set 实例由 codec 的还原器创建。
 
 ```ts doc-test=run
-import { fromValueCodec } from '@migaia/storage-contract'
+import { fromValueCodec } from '@migaia/storage-host/authoring/codec'
 import { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'
 
 const codec = fromValueCodec(defineCollectionsJsonCodec({ version: 1 }))
@@ -511,7 +511,7 @@ function attachCatalog(base: IStorageBase, read: (key: string) => Promise<string
 ### fromValueCodec
 
 ```ts
-import { fromValueCodec } from '@migaia/storage-contract'
+import { fromValueCodec } from '@migaia/storage-host/authoring/codec'
 import { defineJsonCodec } from '@migaia/serialize/codecs/json'
 
 const codec = fromValueCodec(defineJsonCodec({ version: 2 }))
@@ -520,7 +520,7 @@ console.log(codec.name, codec.output, await codec.decode(raw))
 // json@2 text { count: 1 }
 ```
 
-冻结适配器只读取一次五个元数据/回调字段。文本、字节与 unknown 载体分别映射为 text、binary 与 structured 存储路由。encode 与 decode 独立保留输入类型，因此 tagged codec 的旧格式解码输入不会丢失。两条回调各调用一次并等待结果；同步抛错与 Promise 拒绝统一包装为 contract `INVALID_ARGUMENT`，cause 保留原始错误。适配器不二次解析、复制值、派发 hooks 或创建资源/连接。`StorageStageKind` 与 `ICodecStageObserver` 仅描述观察；绑定真实 store 的派发仍归宿主。
+适配器在公开入口校验真实 descriptor，保留格式名称与路由，并直接调用原 codec 方法。文本、字节与 unknown 载体分别映射为 text、binary 与 structured 存储路由。encode 与 decode 独立保留输入类型，因此 tagged codec 的旧格式解码输入不会丢失。两条回调各调用一次并等待结果；同步抛错与 Promise 拒绝统一包装为 contract `INVALID_ARGUMENT`，cause 保留原始错误。适配器不二次解析、复制值、派发 hooks 或创建资源/连接。`StorageStageKind` 与 `ICodecStageObserver` 仅描述观察；绑定真实 store 的派发仍归宿主。
 
 ### 资源基础准入与观察端口
 

@@ -86,14 +86,8 @@ const plugin = cachePlugin({
         'Choose the original JSON text codec version and index later tag invalidation in a published records backend.',
         '选择原 JSON 文字编码器版本，并在已发布记录后端中索引后续标签失效。'
       ),
-      example: `import { cachePlugin } from '@migaia/storage-plugin-cache'
-import { fromValueCodec } from '@migaia/storage-contract'
-import { defineJsonCodec } from '@migaia/serialize/codecs/json'
-const plugin = cachePlugin({
-  tiers: [{ backend: 'memory', ttlMs: 30000 }],
-  codec: fromValueCodec(defineJsonCodec({ version: 2 })),
-  tagIndex: { backend: 'records' }
-})`,
+      example:
+        "import { cachePlugin } from '@migaia/storage-plugin-cache'\nimport { fromValueCodec } from '@migaia/storage-host/authoring/codec'\nimport { defineJsonCodec } from '@migaia/serialize/codecs/json'\nconst plugin = cachePlugin({\n  tiers: [{ backend: 'memory', ttlMs: 30000 }],\n  codec: fromValueCodec(defineJsonCodec({ version: 2 })),\n  tagIndex: { backend: 'records' }\n})",
       result: t(
         'Creates a lazy configuration. Installation requires the earlier records backend to provide records and TTL capabilities.',
         '创建惰性配置；安装时要求更早的记录后端同时提供记录与期限能力。'

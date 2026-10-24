@@ -4393,27 +4393,6 @@ console.log(await codec.decode(await codec.encode(new Set([1, 2]))))`
       example: `assertCodec(candidate)
 console.log(candidate.name, candidate.output)`
     },
-    fromValueCodec: {
-      role: 'operation',
-      purpose: t(
-        'Snapshot a serialize codec and adapt its independently typed callbacks to asynchronous storage conversion. The adapter owns no value format or resource.',
-        '快照 serialize codec，将独立类型的两条回调适配为异步存储转换；适配器不拥有值格式或资源。'
-      ),
-      params: {
-        codec: t(
-          'Concrete value codec with id, positive safe version, encodedType, encode and decode.',
-          '包含 id、正安全版本、encodedType、encode 与 decode 的具体值 codec。'
-        )
-      },
-      returns: t(
-        'Frozen exact-name/route adapter. Callback failures become INVALID_ARGUMENT with original cause; encode and decode preserve their separate inputs and Awaited results.',
-        '返回保留精确名称与路由的冻结适配器；回调失败以保留原 cause 的 INVALID_ARGUMENT 报告，两条回调保留各自输入与 Awaited 结果。'
-      ),
-      exampleIntro: storageContractCases.fromValueCodec![0]!.problem,
-      example: storageContractCases.fromValueCodec![0]!.example,
-      exampleResult: storageContractCases.fromValueCodec![0]!.result,
-      cases: storageContractCases.fromValueCodec
-    },
     StorageStageKind: {
       role: 'constant',
       purpose: t(
@@ -4459,6 +4438,14 @@ console.log(candidate.name, candidate.output)`
       example: storageContractCases.StorageContractError![0]!.example,
       exampleResult: storageContractCases.StorageContractError![0]!.result,
       cases: storageContractCases.StorageContractError
+    },
+    StorageContractErrorText: {
+      role: 'constant',
+      purpose: t(
+        'Canonical contract error messages shared with backend-author runtime helpers.',
+        '后端作者运行时帮助函数复用的契约错误文本唯一声明。'
+      ),
+      example: `console.log(StorageContractErrorText.valueCodecEncode)`
     },
     StorageContractErrorCode: {
       role: 'error',

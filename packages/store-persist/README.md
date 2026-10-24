@@ -270,7 +270,7 @@ STORE_PERSIST_SOURCE 为 @migaia/store-persist；稳定码由 StorePersistErrorC
 ## Canonical codec composition and observation
 
 ```ts
-import { fromValueCodec } from '@migaia/storage-contract'
+import { fromValueCodec } from '@migaia/storage-host/authoring/codec'
 import { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'
 import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
 import { createStore } from '@migaia/store-light'

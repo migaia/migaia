@@ -1,3 +1,4 @@
+export { StorageContractErrorText } from './error-text.js'
 // Contract errors
 export {
   StorageContractError,
@@ -22,12 +23,7 @@ export { ConflictPolicy } from './context.js'
 export type { IBackendKind, IStorageCapabilities } from './capabilities.js'
 export { snapshotStorageCapabilities, isStorageCapabilities } from './capabilities.js'
 
-export {
-  fromValueCodec,
-  type ICodec,
-  type ICodecOutput,
-  type ICodecStageObserver
-} from './codec.js'
+export { type ICodec, type ICodecOutput, type ICodecStageObserver } from './codec.js'
 export { StorageStageKind } from './stage-kind.js'
 
 export type {

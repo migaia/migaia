@@ -41,6 +41,10 @@
     "./authoring/backend": {
       "types": "./dist/authoring/backend.d.ts",
       "default": "./dist/authoring/backend.js"
+    },
+    "./authoring/codec": {
+      "types": "./dist/authoring/codec.d.ts",
+      "default": "./dist/authoring/codec.js"
     }
   },
   "publishConfig": {

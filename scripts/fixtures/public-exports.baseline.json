@@ -1036,6 +1036,7 @@
         "STORAGE_CONTRACT_SOURCE",
         "StorageContractError",
         "StorageContractErrorCode",
+        "StorageContractErrorText",
         "StorageStageKind",
         "TransactionActivityMode",
         "TransactionBeforeStage",
@@ -1084,7 +1085,6 @@
         "encodeStorageOrgStringPrefix",
         "encodeStorageRdfQuad",
         "encodeStorageRdfTerm",
-        "fromValueCodec",
         "getStorageOrgGraphPrefix",
         "hasStorageCapability",
         "implement",
@@ -1809,6 +1809,7 @@
         "throwIfAborted",
         "withAbort"
       ],
+      "./authoring/codec": ["fromValueCodec"],
       "./authoring/vector": [
         "recommendStorageVector"
       ],

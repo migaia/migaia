@@ -12,7 +12,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-/** Package whose public adapter and real dependencies are packed for isolated consumption. */
+/** Package whose public contract and real dependencies are packed for isolated consumption. */
 const contractDirectory = resolve(fileURLToPath(new URL('..', import.meta.url)))
 /** Actual dependency closure includes serialize and its neutral lifecycle/utils dependencies. */
 const packageDirectories = ['utils', 'lifecycle', 'serialize', 'storage-contract'].map((name) =>
@@ -22,8 +22,7 @@ const packageDirectories = ['utils', 'lifecycle', 'serialize', 'storage-contract
 const smokeDirectory = mkdtempSync(join(tmpdir(), 'migaia-storage-contract-packed-'))
 
 /**
- * Packs the real dependency closure and verifies public codec composition plus canonical byte
- * ownership.
+ * Packs the real dependency closure and verifies public capabilities plus canonical byte ownership.
  *
  * @returns {void} Completes when the isolated Node consumer exits successfully.
  * @throws {Error} When packing, package extraction, dependency wiring or consumer assertions fail.
@@ -79,8 +78,7 @@ function main() {
     writeFileSync(join(consumerDirectory, 'package.json'), '{"type":"module"}\n', 'utf8')
     writeFileSync(
       join(consumerDirectory, 'identity.mjs'),
-      `import { fromValueCodec, defineStorageCapability, implement, provideCapabilities, hasStorageCapability, useStorageCapability, sql, createSqlTag, deriveStorageSqlQuery, blob, snapshotStorageBlobPut, snapshotStorageBlobGet, snapshotStorageBlobList, createStorageBlobObject, durableChangeFeed, orderStorageKeysByBytes, encodeStorageOrgStringPrefix, encodeOrderedStorageKey, decodeOrderedStorageKey, prefixStorageOrgKey, sparql, sparqlFragment, createSparqlTag, term, rdf, vector, DeleteCountMode, snapshotStorageVectorIds, snapshotStorageDeleteCountMode, createStorageIteratorLifetime, createRecordQuery, snapshotStorageWhere, compileStorageQueryCondition } from '@migaia/storage-contract'
-import { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'
+      `import { defineStorageCapability, implement, provideCapabilities, hasStorageCapability, useStorageCapability, sql, createSqlTag, deriveStorageSqlQuery, blob, snapshotStorageBlobPut, snapshotStorageBlobGet, snapshotStorageBlobList, createStorageBlobObject, durableChangeFeed, orderStorageKeysByBytes, encodeStorageOrgStringPrefix, encodeOrderedStorageKey, decodeOrderedStorageKey, prefixStorageOrgKey, sparql, sparqlFragment, createSparqlTag, term, rdf, vector, DeleteCountMode, snapshotStorageVectorIds, snapshotStorageDeleteCountMode, createStorageIteratorLifetime, createRecordQuery, snapshotStorageWhere, compileStorageQueryCondition } from '@migaia/storage-contract'
 import * as conformance from '@migaia/storage-contract/conformance'
 import { isArrayBuffer as utilsBuffer, isUint8Array as utilsBytes } from '@migaia/utils/bytes'
 /** Independent resource bases exercise package-root capability reads without acquiring external clients. */
@@ -187,16 +185,6 @@ const originalQuery = nativeSql\`SELECT 1\`
 const derivedQuery = deriveStorageSqlQuery(originalQuery, { all: () => sqlPromise, get: async () => undefined, run: async () => ({ changes: 0 }) })
 if (derivedQuery.all() !== sqlPromise || !Object.isFrozen(derivedQuery)) throw new Error('packed SQL terminal projection mismatch')
 if (!utilsBuffer(new ArrayBuffer(1)) || !utilsBytes(new Uint8Array(1))) throw new Error('canonical byte owner mismatch')
-const originalClone = globalThis.structuredClone
-let cloneCalls = 0
-globalThis.structuredClone = value => { cloneCalls += 1; return originalClone(value) }
-const codec = fromValueCodec(defineCollectionsJsonCodec({ version: 1 }))
-let nested = { leaf: 'ok' }
-for (let index = 0; index < 128; index += 1) nested = { next: nested }
-const encoded = await codec.encode(nested)
-if (cloneCalls !== 0 || !encoded.includes('"leaf":"ok"')) throw new Error('codec clone budget exceeded')
-const restored = await codec.decode(await codec.encode(new Map([['roles', new Set(['read'])]])))
-if (!(restored instanceof Map) || !(restored.get('roles') instanceof Set) || !restored.get('roles').has('read')) throw new Error('collection codec composition failed')
 `,
       'utf8'
     )

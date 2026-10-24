@@ -1,3 +1,4 @@
+import { storageContractCases } from './storage-contract-cases.ts'
 import type { ILibraryReference, IText } from './contract.js'
 import { storageHostCases } from './storage-host-cases.js'
 import {
@@ -32,6 +33,13 @@ const t = (en: string, zh: string): IText => ({ en, zh })
 /** Neutral host and authoring entry, with no browser or native driver import. */
 export const storageHostReference: ILibraryReference = {
   modules: {
+    'authoring/codec': {
+      summary: t(
+        'Adapt serialize codecs for asynchronous storage conversion without a second value format.',
+        '将 serialize codec 适配为异步存储转换，不增加值格式。'
+      ),
+      example: storageContractCases.fromValueCodec![0]!.example
+    },
     'vector/mmr': {
       summary: t(
         'Create a pure MMR scorer for portable vector rerank using engine relevance and explicitly requested vectors. Start with mmr and a withVector().topK(k) query; this independent entry performs no retrieval or network work.',
@@ -88,6 +96,28 @@ console.log(host.extensions.label('draft'))`
     }
   },
   symbols: {
+    fromValueCodec: {
+      role: 'operation',
+      purpose: t(
+        'Validate a serialize codec and adapt its independently typed callbacks to asynchronous storage conversion. The adapter owns no value format or resource.',
+        '校验 serialize codec，将独立类型的两条回调适配为异步存储转换；适配器不拥有值格式或资源。'
+      ),
+      params: {
+        codec: t(
+          'Concrete value codec with id, positive safe version, encodedType, encode and decode.',
+          '包含 id、正安全版本、encodedType、encode 与 decode 的具体值 codec。'
+        )
+      },
+      returns: t(
+        'Exact-name/route adapter. Callback failures become INVALID_ARGUMENT with original cause; encode and decode preserve their separate inputs and Awaited results.',
+        '返回保留精确名称与路由的适配器；回调失败以保留原 cause 的 INVALID_ARGUMENT 报告，两条回调保留各自输入与 Awaited 结果。'
+      ),
+      exampleIntro: storageContractCases.fromValueCodec![0]!.problem,
+      example: storageContractCases.fromValueCodec![0]!.example,
+      exampleResult: storageContractCases.fromValueCodec![0]!.result,
+      cases: storageContractCases.fromValueCodec
+    },
+
     asyncDisposeKey: {
       role: 'constant',
       purpose: t(

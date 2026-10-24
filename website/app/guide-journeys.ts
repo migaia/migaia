@@ -75108,7 +75108,7 @@ class CheckoutElement extends HTMLElement {
               },
               {
                 type: 'paragraph',
-                text: '权限数据中的 `Map`、`Set` 经普通 JSON 编码后变成空对象，见 [恢复嵌套集合](/zh/docs/storage-contract/api/fromValueCodec#storage-contract-index--fromValueCodec--case-1)。'
+                text: '权限数据中的 `Map`、`Set` 经普通 JSON 编码后变成空对象，见 [恢复嵌套集合](/zh/docs/storage-host/api/fromValueCodec#storage-host-authoring-codec--fromValueCodec--case-1)。'
               },
               {
                 type: 'paragraph',
@@ -75134,7 +75134,7 @@ class CheckoutElement extends HTMLElement {
               },
               {
                 type: 'paragraph',
-                text: '同一版本格式同时拥有编码与解码规则，使嵌套集合可通过文本往返，见 [集合类型恢复示例](/zh/docs/storage-contract/api/fromValueCodec#storage-contract-index--fromValueCodec--case-1)。'
+                text: '同一版本格式同时拥有编码与解码规则，使嵌套集合可通过文本往返，见 [集合类型恢复示例](/zh/docs/storage-host/api/fromValueCodec#storage-host-authoring-codec--fromValueCodec--case-1)。'
               },
               {
                 type: 'paragraph',
@@ -75157,7 +75157,7 @@ class CheckoutElement extends HTMLElement {
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { fromValueCodec } from '@migaia/storage-contract'\nimport { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'\nconst collectionsCodec = fromValueCodec(defineCollectionsJsonCodec({ version: 1 }))\n\nconst settings = { roles: new Map([['Ada', new Set(['read', 'write'])]]) }\nconst raw = await collectionsCodec.encode(settings)\nconst restored = await collectionsCodec.decode(raw) as typeof settings\nconsole.log('输出形式:', collectionsCodec.output)\nconsole.log('Map:', restored.roles instanceof Map)\nconsole.log('Set:', restored.roles.get('Ada') instanceof Set)\nconsole.log('权限:', [...(restored.roles.get('Ada') ?? [])].join(', '))"
+                code: "import { fromValueCodec } from '@migaia/storage-host/authoring/codec'\nimport { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'\nconst collectionsCodec = fromValueCodec(defineCollectionsJsonCodec({ version: 1 }))\n\nconst settings = { roles: new Map([['Ada', new Set(['read', 'write'])]]) }\nconst raw = await collectionsCodec.encode(settings)\nconst restored = await collectionsCodec.decode(raw) as typeof settings\nconsole.log('输出形式:', collectionsCodec.output)\nconsole.log('Map:', restored.roles instanceof Map)\nconsole.log('Set:', restored.roles.get('Ada') instanceof Set)\nconsole.log('权限:', [...(restored.roles.get('Ada') ?? [])].join(', '))"
               },
               {
                 type: 'code',
@@ -75183,7 +75183,7 @@ class CheckoutElement extends HTMLElement {
                 headers: ['入口', '何时使用'],
                 rows: [
                   [
-                    '[fromValueCodec](/zh/docs/storage-contract/api/fromValueCodec)',
+                    '[fromValueCodec](/zh/docs/storage-host/api/fromValueCodec)',
                     '用版本化文本往返 `Map`、`Set`；不打开存储。'
                   ],
                   [
@@ -75286,7 +75286,7 @@ class CheckoutElement extends HTMLElement {
               },
               {
                 type: 'paragraph',
-                text: 'Ordinary JSON turns the Map and Set in permissions data into empty objects; see [restore nested collections](/en/docs/storage-contract/api/fromValueCodec#storage-contract-index--fromValueCodec--case-1).'
+                text: 'Ordinary JSON turns the Map and Set in permissions data into empty objects; see [restore nested collections](/en/docs/storage-host/api/fromValueCodec#storage-host-authoring-codec--fromValueCodec--case-1).'
               },
               {
                 type: 'paragraph',
@@ -75312,7 +75312,7 @@ class CheckoutElement extends HTMLElement {
               },
               {
                 type: 'paragraph',
-                text: 'One versioned format owns both encoding and decoding so nested collections survive a text round trip; see [the collection case](/en/docs/storage-contract/api/fromValueCodec#storage-contract-index--fromValueCodec--case-1).'
+                text: 'One versioned format owns both encoding and decoding so nested collections survive a text round trip; see [the collection case](/en/docs/storage-host/api/fromValueCodec#storage-host-authoring-codec--fromValueCodec--case-1).'
               },
               {
                 type: 'paragraph',
@@ -75335,7 +75335,7 @@ class CheckoutElement extends HTMLElement {
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { fromValueCodec } from '@migaia/storage-contract'\nimport { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'\nconst collectionsCodec = fromValueCodec(defineCollectionsJsonCodec({ version: 1 }))\n\nconst settings = { roles: new Map([['Ada', new Set(['read', 'write'])]]) }\nconst raw = await collectionsCodec.encode(settings)\nconst restored = await collectionsCodec.decode(raw) as typeof settings\nconsole.log('output:', collectionsCodec.output)\nconsole.log('Map:', restored.roles instanceof Map)\nconsole.log('Set:', restored.roles.get('Ada') instanceof Set)\nconsole.log('permissions:', [...(restored.roles.get('Ada') ?? [])].join(', '))"
+                code: "import { fromValueCodec } from '@migaia/storage-host/authoring/codec'\nimport { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'\nconst collectionsCodec = fromValueCodec(defineCollectionsJsonCodec({ version: 1 }))\n\nconst settings = { roles: new Map([['Ada', new Set(['read', 'write'])]]) }\nconst raw = await collectionsCodec.encode(settings)\nconst restored = await collectionsCodec.decode(raw) as typeof settings\nconsole.log('output:', collectionsCodec.output)\nconsole.log('Map:', restored.roles instanceof Map)\nconsole.log('Set:', restored.roles.get('Ada') instanceof Set)\nconsole.log('permissions:', [...(restored.roles.get('Ada') ?? [])].join(', '))"
               },
               {
                 type: 'code',
@@ -75361,7 +75361,7 @@ class CheckoutElement extends HTMLElement {
                 headers: ['Entry', 'When to use it'],
                 rows: [
                   [
-                    '[fromValueCodec](/en/docs/storage-contract/api/fromValueCodec)',
+                    '[fromValueCodec](/en/docs/storage-host/api/fromValueCodec)',
                     'Round-trip Map and Set through versioned text without opening a store.'
                   ],
                   [
@@ -77253,7 +77253,7 @@ class CheckoutElement extends HTMLElement {
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { fromValueCodec } from '@migaia/storage-contract'\nimport { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'\nconst collectionsCodec = fromValueCodec(defineCollectionsJsonCodec({ version: 1 }))\n\nconst preferences = new Map([['theme', 'dark']])\nconst saved = await collectionsCodec.encode(preferences)\nconst restored = await collectionsCodec.decode(saved)\nconsole.log('恢复为 Map:', restored instanceof Map)\nif (restored instanceof Map) console.log('恢复的主题:', restored.get('theme'))"
+                code: "import { fromValueCodec } from '@migaia/storage-host/authoring/codec'\nimport { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'\nconst collectionsCodec = fromValueCodec(defineCollectionsJsonCodec({ version: 1 }))\n\nconst preferences = new Map([['theme', 'dark']])\nconst saved = await collectionsCodec.encode(preferences)\nconst restored = await collectionsCodec.decode(saved)\nconsole.log('恢复为 Map:', restored instanceof Map)\nif (restored instanceof Map) console.log('恢复的主题:', restored.get('theme'))"
               },
               {
                 type: 'code',
@@ -77339,7 +77339,7 @@ class CheckoutElement extends HTMLElement {
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { fromValueCodec, isStorageContractError } from '@migaia/storage-contract'\nimport { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'\nconst collectionsCodec = fromValueCodec(defineCollectionsJsonCodec({ version: 1 }))\n\ntry {\n  await collectionsCodec.decode('{broken')\n} catch (error) {\n  if (!isStorageContractError(error)) throw error\n  console.log('设置文件错误码:', error.code)\n  console.log('原始原因是 SyntaxError:', (error.cause as Error)?.cause instanceof SyntaxError)\n}"
+                code: "import { isStorageContractError } from '@migaia/storage-contract'\nimport { fromValueCodec } from '@migaia/storage-host/authoring/codec'\nimport { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'\nconst collectionsCodec = fromValueCodec(defineCollectionsJsonCodec({ version: 1 }))\n\ntry {\n  await collectionsCodec.decode('{broken')\n} catch (error) {\n  if (!isStorageContractError(error)) throw error\n  console.log('设置文件错误码:', error.code)\n  console.log('原始原因是 SyntaxError:', (error.cause as Error)?.cause instanceof SyntaxError)\n}"
               },
               {
                 type: 'code',
@@ -77473,7 +77473,7 @@ class CheckoutElement extends HTMLElement {
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { fromValueCodec } from '@migaia/storage-contract'\nimport { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'\nconst collectionsCodec = fromValueCodec(defineCollectionsJsonCodec({ version: 1 }))\n\nconst preferences = new Map([['theme', 'dark']])\nconst saved = await collectionsCodec.encode(preferences)\nconst restored = await collectionsCodec.decode(saved)\nconsole.log('Restored as Map:', restored instanceof Map)\nif (restored instanceof Map) console.log('Restored theme:', restored.get('theme'))"
+                code: "import { fromValueCodec } from '@migaia/storage-host/authoring/codec'\nimport { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'\nconst collectionsCodec = fromValueCodec(defineCollectionsJsonCodec({ version: 1 }))\n\nconst preferences = new Map([['theme', 'dark']])\nconst saved = await collectionsCodec.encode(preferences)\nconst restored = await collectionsCodec.decode(saved)\nconsole.log('Restored as Map:', restored instanceof Map)\nif (restored instanceof Map) console.log('Restored theme:', restored.get('theme'))"
               },
               {
                 type: 'code',
@@ -77562,7 +77562,7 @@ class CheckoutElement extends HTMLElement {
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { fromValueCodec, isStorageContractError } from '@migaia/storage-contract'\nimport { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'\nconst collectionsCodec = fromValueCodec(defineCollectionsJsonCodec({ version: 1 }))\n\ntry {\n  await collectionsCodec.decode('{broken')\n} catch (error) {\n  if (!isStorageContractError(error)) throw error\n  console.log('Settings file error code:', error.code)\n  console.log('Cause is SyntaxError:', (error.cause as Error)?.cause instanceof SyntaxError)\n}"
+                code: "import { isStorageContractError } from '@migaia/storage-contract'\nimport { fromValueCodec } from '@migaia/storage-host/authoring/codec'\nimport { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'\nconst collectionsCodec = fromValueCodec(defineCollectionsJsonCodec({ version: 1 }))\n\ntry {\n  await collectionsCodec.decode('{broken')\n} catch (error) {\n  if (!isStorageContractError(error)) throw error\n  console.log('Settings file error code:', error.code)\n  console.log('Cause is SyntaxError:', (error.cause as Error)?.cause instanceof SyntaxError)\n}"
               },
               {
                 type: 'code',

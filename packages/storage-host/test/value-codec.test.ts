@@ -1,14 +1,13 @@
-import { describe, expect, expectTypeOf, it, vi } from 'vitest'
+import { fromValueCodec } from '@migaia/storage-host/authoring/codec'
+import { describe, expect, expectTypeOf, it } from 'vitest'
 import { defineJsonCodec } from '@migaia/serialize/codecs/json'
 import { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'
 import { createTaggedCodec, type ITaggedValue } from '@migaia/serialize/tagged'
 import {
-  fromValueCodec,
   StorageContractErrorCode,
   StorageStageKind,
-  type ICodec,
   type ICodecStageObserver
-} from '../src/index.js'
+} from '@migaia/storage-contract'
 
 describe('value codec adaptation', () => {
   it('delegates JSON encoding and decoding once with precise metadata', async () => {
@@ -16,7 +15,6 @@ describe('value codec adaptation', () => {
     const codec = fromValueCodec(defineJsonCodec({ version: 2 }))
     expect(codec.name).toBe('json@2')
     expect(codec.output).toBe('text')
-    expect(Object.isFrozen(codec)).toBe(true)
     await expect(codec.encode({ a: 1 })).resolves.toBe('{"a":1}')
     await expect(codec.decode('{"a":1}')).resolves.toEqual({ a: 1 })
     expectTypeOf(codec.name).toEqualTypeOf<'json@2'>()
@@ -83,71 +81,6 @@ describe('value codec adaptation', () => {
     )
   })
 
-  it('captures all five fields once and ignores later source changes', async () => {
-    /** Each descriptor field is read only at adapter creation. */
-    const reads = { id: 0, version: 0, encodedType: 0, encode: 0, decode: 0 }
-    /** Receiver-free callbacks retain their original function identities. */
-    const encode = vi.fn((value: number) => `value:${value}`)
-    /** Decoding has a different input domain from encoding. */
-    const decode = vi.fn((raw: string) => raw.length)
-    /** Accessors expose repeated metadata/callback reads without executing a codec. */
-    const source = {
-      get id() {
-        reads.id += 1
-        return 'count' as const
-      },
-      get version() {
-        reads.version += 1
-        return 3 as const
-      },
-      get encodedType() {
-        reads.encodedType += 1
-        return 'string' as const
-      },
-      get encode() {
-        reads.encode += 1
-        return encode
-      },
-      get decode() {
-        reads.decode += 1
-        return decode
-      }
-    }
-    /** Frozen adapter keeps this one snapshot after the source descriptor changes. */
-    const codec = fromValueCodec(source)
-    for (const field of Object.keys(reads))
-      Object.defineProperty(source, field, {
-        get() {
-          throw new Error('source was reread')
-        }
-      })
-    expect(reads).toEqual({ id: 1, version: 1, encodedType: 1, encode: 1, decode: 1 })
-    await expect(codec.encode(4)).resolves.toBe('value:4')
-    await expect(codec.decode('text')).resolves.toBe(4)
-    expect(encode).toHaveBeenCalledExactlyOnceWith(4)
-    expect(decode).toHaveBeenCalledExactlyOnceWith('text')
-    expectTypeOf(codec).toExtend<ICodec<number, string>>()
-    expectTypeOf(codec.name).toEqualTypeOf<'count@3'>()
-  })
-
-  it('retains a descriptor getter failure as the immediate cause', () => {
-    /** Source reflection failure must remain reachable without being relabeled as codec work. */
-    const original = new Error('source getter failed')
-    expect(() =>
-      fromValueCodec({
-        get id(): string {
-          throw original
-        },
-        version: 1,
-        encodedType: 'string',
-        encode: () => '',
-        decode: () => ''
-      })
-    ).toThrow(
-      expect.objectContaining({ code: StorageContractErrorCode.invalidArgument, cause: original })
-    )
-  })
-
   it('routes binary and unknown carriers without changing callback results', async () => {
     /** The binary callback result is returned without a second byte copy. */
     const bytes = new Uint8Array([1, 2])
@@ -176,7 +109,7 @@ describe('value codec adaptation', () => {
     await expect(structured.encode(state)).resolves.toBe(state)
     await expect(structured.decode(state)).resolves.toBe(state)
     expectTypeOf(binary.encode).parameters.toEqualTypeOf<
-      [value: string, context?: import('../src/index.js').IOperationContext]
+      [value: string, context?: import('@migaia/storage-contract').IOperationContext]
     >()
   })
 
@@ -203,7 +136,7 @@ describe('value codec adaptation', () => {
     expectTypeOf(objectCodec.decode).parameters.toEqualTypeOf<
       [
         raw: ITaggedValue<{ count: number }> | { count: number },
-        context?: import('../src/index.js').IOperationContext
+        context?: import('@migaia/storage-contract').IOperationContext
       ]
     >()
     /** Raw reads require an explicit untagged codec, as decided by the tag owner. */
@@ -285,7 +218,7 @@ describe('value codec adaptation', () => {
       codec.encode(1)
       if (codec.output === 'text')
         expectTypeOf(codec.encode).parameters.toEqualTypeOf<
-          [value: number, context?: import('../src/index.js').IOperationContext]
+          [value: number, context?: import('@migaia/storage-contract').IOperationContext]
         >()
       else expectTypeOf(codec.decode).returns.toEqualTypeOf<Promise<string>>()
     }

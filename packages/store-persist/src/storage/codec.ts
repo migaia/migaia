@@ -1,5 +1,6 @@
 import type { IAbortSignal } from '@migaia/utils/promise'
-import { fromValueCodec, type ICodecStageObserver, type ICodec } from '@migaia/storage-contract'
+import { type ICodecStageObserver, type ICodec } from '@migaia/storage-contract'
+import { fromValueCodec } from '@migaia/storage-host/authoring/codec'
 import { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'
 import { inspectThenable, observeThenableRejection } from '@migaia/utils/function'
 import { isUint8Array } from '@migaia/utils/bytes'

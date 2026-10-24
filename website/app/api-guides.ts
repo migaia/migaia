@@ -10005,13 +10005,13 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
       }
     ]
   }),
-  'storage-contract:index:fromValueCodec': createStorageContractGuide({
+  'storage-host:authoring/codec:fromValueCodec': createStorageContractGuide({
     purposeEn:
-      'Adapt a value codec into the storage codec contract once. The frozen adapter preserves each callback input/output, names the format id@version and maps string/binary/unknown carriers to text/binary/structured. Failures retain the original serialize error on cause.',
+      'Adapt a value codec into the storage codec contract once. The adapter preserves each callback input/output, names the format id@version and maps string/binary/unknown carriers to text/binary/structured. Failures retain the original serialize error on cause.',
     purposeZh:
-      '将值编解码器一次适配为存储契约。冻结适配器保留真实输入输出，以 id@version 命名，并将 string/uint8array/unknown 载体映射为 text/binary/structured；失败在 cause 保留原 serialize 错误。',
+      '将值编解码器一次适配为存储契约。适配器保留真实输入输出，以 id@version 命名，并将 string/uint8array/unknown 载体映射为 text/binary/structured；失败在 cause 保留原 serialize 错误。',
     quickStart:
-      "import { fromValueCodec } from '@migaia/storage-contract'\nimport { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'\n\nconst codec = fromValueCodec(defineCollectionsJsonCodec({ version: 1 }))\nconst text = await codec.encode({ roles: new Set(['admin']) })\nconsole.log(await codec.decode(text))",
+      "import { fromValueCodec } from '@migaia/storage-host/authoring/codec'\nimport { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'\n\nconst codec = fromValueCodec(defineCollectionsJsonCodec({ version: 1 }))\nconst text = await codec.encode({ roles: new Set(['admin']) })\nconsole.log(await codec.decode(text))",
     scenariosEn: [
       'Use a serialize codec with storage.',
       'Preserve Map/Set with the collections codec.',
