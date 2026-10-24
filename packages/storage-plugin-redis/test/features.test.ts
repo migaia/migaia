@@ -244,6 +244,23 @@ for (const url of [
         await expect(feed.readChanges({ after: initial.cursor })).rejects.toMatchObject({
           code: 'CHANGE_CURSOR_EXPIRED'
         })
+        const keyEvent = deferred<Uint8Array>(),
+          keyspace = await api.pubsub.keyspace(0, 'set', (key) => {
+            if (
+              new TextDecoder()
+                .decode(key)
+                .startsWith(createRedisLayout(prefix, crypto.randomUUID()).tag + ':t:')
+            )
+              keyEvent.resolve(key)
+          })
+        await store.set('keyspace-event', 'seen')
+        expect(
+          new TextDecoder()
+            .decode(await keyEvent.promise)
+            .startsWith(createRedisLayout(prefix, crypto.randomUUID()).tag + ':t:')
+        ).toBe(true)
+        await keyspace.dispose()
+        await store.remove('keyspace-event')
       } finally {
         await host.dispose()
         const tag = createRedisLayout(prefix, crypto.randomUUID()).tag
