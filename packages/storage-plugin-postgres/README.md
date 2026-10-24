@@ -54,6 +54,7 @@ const driver = bunSqlDriver(client)
 
 ## 可选 Feature
 
+- `/features/quantized`：同批选择 `pgvectorFeature()` 与 `pgQuantizedFeature({mode:'halfvec'|'binary_quantize'})`，只增强有界向量链的 `rescore({topN?})`，量化表达式 HNSW 召回后按原向量精排，不发布第二个 vector provider。
 - `/features/pgvector`：`pgvectorFeature()` 发布标准 vector，另有 `api.pgvector.search(target, query, options)` 查询调用方自有表。未选不发布 vector；扩展经 registerDetect 检查。`autoDetect:false` 时仍在首次真实向量终点写前核对扩展。
 - `/features/listen`：`pgListenFeature()` 发布根 `api.notifications.listen/notify`；事务只有 notify。提示只在真实提交后出现，不保证断线重放。
 - `/features/copy`：`pgCopyFeature()` 发布根/事务 `api.copy.from`。只支持结构化目标与客户端 STDIN；每次实际尝试调用新的 sourceFactory，保留背压与原生排空。
@@ -80,3 +81,25 @@ PostgreSQL 的 storageLogStore 使用 indexExclusive:false，每操作在原生�
 每次原生提交先写同事务 marker。COMMIT 应答丢失后仅在原 marker 可见时认定已提交；缺失或读取失败不证明零写，本包封闭原物理 controller，保留原错误链且不盲重放。正常结算后删除该 marker；清理失败只报告并保留证据。
 
 选中日志时按执行顺序保留每次实际原生变更，包含同目标多写与中间值。原 SQL 的 RETURNING 行直接提供每次完整 raw 新值与绝对期限，不以后读的最终值替代。undo 仍由 host 原实现合并首次 before、最终 after 并复核完整最终修订；未选日志的操作保原 SQL 与原生路径。
+
+## 量化召回与原生精排
+
+```ts
+import { pgQuantizedFeature } from '@migaia/storage-plugin-postgres/features/quantized'
+// postgresBackendPlugin({ driver }, {
+//   vector: pgvectorFeature(), quantized: pgQuantizedFeature({ mode: 'halfvec' })
+// })
+const selected = await embeddings
+  .near([1, 0, 0])
+  .where({ category: 'guide' })
+  .topK(20)
+  .rescore({ topN: 5 })
+  .rerank(({ hits }) => hits.map((hit) => hit.score))
+  .all()
+```
+
+安装时选择 halfvec 或 binary_quantize。topN 缺省为 k，必须是正安全整数且不超过 k，非法值在 I/O 前拒绝。只读结果保留 withVector、选择、分组与通用 rerank，引擎 score 不变；不能删除、监听或再次接原生 rescore，不会隐式补读向量。
+
+原 schema owner 按 metric 建 halfvec opclass 或 bit_hamming_ops 表达式 HNSW；原事务锁住既有集合配置行，两个 host 可安全准备同一个索引。布局检查与索引准备是独立原生语句，业务查询则只用一条 MATERIALIZED SQL 召回 k 个候选，再按原向量精确排序取 topN。临时 metric 会准备相应索引；样本来源仍先沿原拥有者读取样本，再执行召回与精排语句。显式 rescore 即选择量化召回，即使 near 指定 exact；未接 rescore 的 near({exact:true}) 保持原行为。
+
+org、期限与可推 payload 条件均留在 recall WHERE。HNSW 不保证物理先过滤，也不保证过滤后足 k；JS 谓词只处理 outer 命中且不补搜，后接 rerank 收到这些实际命中。显式量化 ANN 是普通 org 领先索引规则的例外。原向量仍为 float32，halfvec 索引最多 4000 维，binary 索引最多 64000 维但原 vector 列最多 16000 维；量化可能损失精度，超出 halfvec 范围的原生 cast 以 SQL_FAILED 保留原 cause，不假称无损。未新增依赖或后台任务。

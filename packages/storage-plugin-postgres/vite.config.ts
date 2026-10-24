@@ -11,6 +11,7 @@ export default defineConfig({
         bun: 'src/bun.ts',
         'features/listen': 'src/features/listen.ts',
         'features/copy': 'src/features/copy.ts',
+        'features/quantized': 'src/features/quantized.ts',
         'features/pgvector': 'src/features/pgvector.ts',
         'features/logical-replication': 'src/features/logical-replication.ts'
       },

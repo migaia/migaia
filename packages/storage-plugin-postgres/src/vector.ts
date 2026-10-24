@@ -32,6 +32,8 @@ import {
   createStorageOperationReporter
 } from '@migaia/storage-host/authoring/backend'
 import type { IPgConfiguration, IPgTables } from './schema.js'
+import { ensurePgQuantizedIndex, pgQuantizedExpression } from './schema.js'
+import type { IPgQuantizedOptions } from './features/quantized.js'
 import type { IPgState } from './native.js'
 import { observePgRevision, observePgRange, observePgBatch, markPgChanged } from './native.js'
 import type { IPgNativeParameter, IPgConnection } from './types.js'
@@ -40,7 +42,7 @@ import { quotePgIdentifier } from './copy-command.js'
 import { pgVectorCondition, pgVectorFilter, pgVectorProjection } from './vector-filter.js'
 import { invalidArgument, postgresError } from './errors.js'
 import { PostgresErrorCode } from './error-code.js'
-import { PgNames } from './constants.js'
+import { PgNames, PgQuantizedMode } from './constants.js'
 import { encodePgJournalImage, decodePgJournalImage, type IPgJournalVectorPort } from './journal.js'
 /** One native table belongs to the store-wide logical collection rather than one organization. */
 type IPgVectorCollectionState = IStorageVectorConfiguration & { readonly table: string }
@@ -48,6 +50,7 @@ type IPgVectorCollectionState = IStorageVectorConfiguration & { readonly table: 
 export type IPgVectorRuntime = {
   readonly configuration: IPgConfiguration
   readonly tables: IPgTables
+  readonly quantization: IPgQuantizedOptions['mode'] | undefined
   readonly orgId: string
   assertLive(): void
   beginOperation(): () => void
@@ -159,7 +162,10 @@ export function createPgVectors(runtime: IPgVectorRuntime) {
     const key = pgKey(name).hex
     let row = (
       await state.client.query(
-        'SELECT value FROM ' + tables.vectorConfiguration + ' WHERE org_id=$1 AND key=$2',
+        'SELECT value FROM ' +
+          tables.vectorConfiguration +
+          ' WHERE org_id=$1 AND key=$2' +
+          (runtime.quantization === undefined ? '' : ' FOR UPDATE'),
         [PgNames.vectorConfigurationOwner, key],
         state.ctx
       )
@@ -213,7 +219,10 @@ export function createPgVectors(runtime: IPgVectorRuntime) {
       } else
         row = (
           await state.client.query(
-            'SELECT value FROM ' + tables.vectorConfiguration + ' WHERE org_id=$1 AND key=$2',
+            'SELECT value FROM ' +
+              tables.vectorConfiguration +
+              ' WHERE org_id=$1 AND key=$2' +
+              (runtime.quantization === undefined ? '' : ' FOR UPDATE'),
             [PgNames.vectorConfigurationOwner, key],
             state.ctx
           )
@@ -235,6 +244,8 @@ export function createPgVectors(runtime: IPgVectorRuntime) {
       )
     ).rows[0]?.type
     if (column !== 'vector(' + actual.dimensions + ')') throw unsupported()
+    if (runtime.quantization !== undefined)
+      await ensurePgQuantizedIndex(state.client, table, actual, runtime.quantization, state.ctx)
     return { ...actual, table }
   }
   /** One native search is the only ranking path for direct and fluent managed queries. */
@@ -249,6 +260,29 @@ export function createPgVectors(runtime: IPgVectorRuntime) {
     forUpdate = false,
     excluded: readonly string[] = []
   ): Promise<readonly (readonly [IStorageKey, IVectorHit<T, boolean>])[]> => {
+    /** Only this selected source can consume its captured native refinement packet. */
+    const native = input.native
+    let topN: number | undefined
+    if (native !== undefined) {
+      if (
+        native === null ||
+        typeof native !== 'object' ||
+        !('mode' in native) ||
+        !('topN' in native)
+      )
+        throw invalidArgument()
+      const { mode, topN: capturedTopN } = native
+      if (
+        runtime.quantization === undefined ||
+        mode !== runtime.quantization ||
+        typeof capturedTopN !== 'number' ||
+        !Number.isSafeInteger(capturedTopN) ||
+        capturedTopN < 1 ||
+        capturedTopN > input.topK
+      )
+        throw invalidArgument()
+      topN = capturedTopN
+    }
     const config = await collection(state, name, options)
     const selected = metric ?? config.metric
     const direction = snapshotStorageVector(
@@ -256,7 +290,16 @@ export function createPgVectors(runtime: IPgVectorRuntime) {
       { dimensions: config.dimensions, metric: selected },
       PgNames.backend
     )
-    if (exact) await state.client.query('SET LOCAL enable_indexscan=off', [], state.ctx)
+    if (exact && native === undefined)
+      await state.client.query('SET LOCAL enable_indexscan=off', [], state.ctx)
+    if (native !== undefined && selected !== config.metric)
+      await ensurePgQuantizedIndex(
+        state.client,
+        config.table,
+        { ...config, metric: selected },
+        runtime.quantization!,
+        state.ctx
+      )
     await observePgRange(state, tables, 'vector')
     const params: IPgNativeParameter[] = [state.orgId, JSON.stringify(direction)]
     const predicates = ['org_id=$1', '(expires_at IS NULL OR expires_at>clock_timestamp())']
@@ -288,11 +331,40 @@ export function createPgVectors(runtime: IPgVectorRuntime) {
       params.length +
       (forUpdate ? ' FOR UPDATE' : '')
     let text = 'SELECT * FROM (' + inner + ') AS ranked'
+    if (native !== undefined) {
+      const mode = runtime.quantization!
+      const quantizedDistance =
+        pgQuantizedExpression(mode, config.dimensions, 'embedding') +
+        ' ' +
+        (mode === PgQuantizedMode.binary ? '<~>' : metrics[selected].operator) +
+        ' ' +
+        pgQuantizedExpression(mode, config.dimensions, '$2::vector')
+      text =
+        'WITH recalled AS MATERIALIZED (SELECT key,payload,embedding FROM ' +
+        config.table +
+        ' WHERE ' +
+        predicates.join(' AND ') +
+        ' ORDER BY ' +
+        quantizedDistance +
+        ' LIMIT $' +
+        params.length +
+        ') SELECT * FROM (SELECT key,payload' +
+        (input.withVector ? ',embedding::text AS vector' : '') +
+        ',' +
+        metrics[selected].score +
+        '(' +
+        distance +
+        ') AS score FROM recalled) AS ranked'
+    }
     if (input.minScore !== undefined) {
       params.push(input.minScore)
       text += ' WHERE score>=$' + params.length
     }
     text += ' ORDER BY score DESC,key'
+    if (topN !== undefined) {
+      params.push(topN)
+      text += ' LIMIT $' + params.length
+    }
     const rows = (await state.client.query(text, params, state.ctx)).rows
     await observePgBatch(
       state,
@@ -404,6 +476,7 @@ export function createPgVectors(runtime: IPgVectorRuntime) {
           groupBy: true as const,
           exact,
           origin,
+          ...(runtime.quantization === undefined ? {} : { native: true as const }),
           beginOperation: () => runtime.beginOperation(),
           execute: (input: IVectorQueryInput) =>
             vectorRows(() =>

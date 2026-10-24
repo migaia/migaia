@@ -11,10 +11,13 @@ import { QdrantText } from './constants.js'
 import { fetchHttp } from './http.js'
 import { createQdrantBackend } from './store.js'
 import type { IQdrantHttp, IQdrantStore, IQdrantOptions } from './types.js'
+import type { IQdrantRescoreConfiguration } from './feature-types.js'
 /** Kind identity carries the exact native store and finite caller-owned protocol port. */
-export const qdrantBackendKind = defineStorageBackendKind<IQdrantStore, IQdrantHttp>()(
-  QdrantText.backend
-)
+export const qdrantBackendKind = defineStorageBackendKind<
+  IQdrantStore,
+  IQdrantHttp,
+  { selectRescore(configuration: IQdrantRescoreConfiguration): void }
+>()(QdrantText.backend)
 /** Configuration capture is pure; actual connection checks remain the original host detect phase. */
 export function qdrantBackendPlugin<
   const TId extends string = 'qdrant',
@@ -39,10 +42,12 @@ export function qdrantBackendPlugin<
   })
   const descriptor = (core: IStoragePluginCore<F>) => {
     let construction!: ReturnType<typeof createQdrantBackend>
+    /** Only the original installation window selects an extra native schema; orgs share it. */
+    let rescore: IQdrantRescoreConfiguration | undefined
     return {
       kind: qdrantBackendKind,
       install() {
-        construction = createQdrantBackend(captured, core)
+        construction = createQdrantBackend(captured, core, rescore)
         core.registerStore(construction.store)
         core.registerChangeController(construction.store, construction.controller)
         core.registerOrgBinding(construction.store, construction.orgBinding)
@@ -50,7 +55,12 @@ export function qdrantBackendPlugin<
         return {}
       },
       capabilityInstaller: (_store: IQdrantStore) => construction.installer,
-      featureExpose: () => ({ getClient: () => captured.http })
+      featureExpose: () => ({
+        getClient: () => captured.http,
+        selectRescore: (configuration: IQdrantRescoreConfiguration) => {
+          rescore = configuration
+        }
+      })
     }
   }
   return definePlugin<TId, typeof descriptor, F>(captured.id, descriptor, features)

@@ -107,18 +107,22 @@ import {qdrantManagementFeature} from '@migaia/storage-plugin-qdrant/features/ma
 import {qdrantHybridFeature} from '@migaia/storage-plugin-qdrant/features/hybrid'
 import {qdrantRecommendFeature} from '@migaia/storage-plugin-qdrant/features/recommend'
 import {qdrantGroupByFeature} from '@migaia/storage-plugin-qdrant/features/group-by'
+import {qdrantRescoreFeature} from '@migaia/storage-plugin-qdrant/features/rescore'
 import {QdrantClient} from '@qdrant/js-client-rest'
 /** The shared service launcher supplies every runtime's identical native endpoint. */
 const url=process.env.MIGAIA_QDRANT_URL
 assert.ok(url,'configured native Qdrant service required')
 assert.equal(ERROR_SOURCE,'storage.backend.qdrant')
 for(const native of [fetchHttp(url),qdrantClientHttp(new QdrantClient({url}))]){
- const created=[],http={...native,createCollection:async(...args)=>{const result=await native.createCollection(...args);created.push(args[0]);return result}},org=createOrgId(),host=await createStorageHost({org,plugins:[qdrantBackendPlugin({url,http,collectionPrefix:crypto.randomUUID()},{management:qdrantManagementFeature(),hybrid:qdrantHybridFeature(),recommend:qdrantRecommendFeature(),groups:qdrantGroupByFeature()})]})
+ const created=[],http={...native,createCollection:async(...args)=>{const result=await native.createCollection(...args);created.push(args[0]);return result}},org=createOrgId(),host=await createStorageHost({org,plugins:[qdrantBackendPlugin({url,http,collectionPrefix:crypto.randomUUID()},{management:qdrantManagementFeature(),hybrid:qdrantHybridFeature(),recommend:qdrantRecommendFeature(),groups:qdrantGroupByFeature(),rescore:qdrantRescoreFeature({collections:{runtime:{dimensions:2,metric:'dot'}}})})]})
  try{
   const store=host.backend('qdrant'),collection=store.use(vector).collection('runtime',{dimensions:2,metric:'cosine'})
   await collection.upsert([{id:'one\\ud800',vector:[100,0],payload:{kind:'same'}},{id:'two',vector:[0,1],payload:{kind:'same'}}])
   const hits=await collection.near([1,0],{exact:true}).topK(2).withVector().all()
   assert.equal(hits[0].id,'one\\ud800');assert.deepEqual(hits[0].vector,[100,0])
+  await store.api.qdrantRescore.updateVectors('runtime',[{id:'one\\ud800',vector:[1,0]},{id:'two',vector:[4,0]}])
+  const rescored=await collection.near([1,0]).topK(2).rescore({query:[1,0],topN:1}).rerank(()=>[9]).first()
+  assert.equal(rescored.id,'two');assert.equal(rescored.score,4);assert.equal(rescored.rerankScore,9)
   assert.equal(await store.use(ttl).expire(lockKey.vector('runtime','two'),0),true)
   assert.equal((await collection.near([1,0]).topK(2).all()).length,1)
   assert.equal(await collection.deleteWhere({kind:'same'},{count:DeleteCountMode.scroll}),2)

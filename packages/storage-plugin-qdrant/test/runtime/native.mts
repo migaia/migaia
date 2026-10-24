@@ -8,6 +8,7 @@ import { qdrantManagementFeature } from '@migaia/storage-plugin-qdrant/features/
 import { qdrantHybridFeature } from '@migaia/storage-plugin-qdrant/features/hybrid'
 import { qdrantRecommendFeature } from '@migaia/storage-plugin-qdrant/features/recommend'
 import { qdrantGroupByFeature } from '@migaia/storage-plugin-qdrant/features/group-by'
+import { qdrantRescoreFeature } from '@migaia/storage-plugin-qdrant/features/rescore'
 import { QdrantClient } from '@qdrant/js-client-rest'
 /** The shared service launcher supplies every runtime's identical native endpoint. */
 const url = process.env.MIGAIA_QDRANT_URL
@@ -31,7 +32,8 @@ async function exercise(native: IQdrantHttp, url: string): Promise<void> {
       management: qdrantManagementFeature(),
       hybrid: qdrantHybridFeature(),
       recommend: qdrantRecommendFeature(),
-      groups: qdrantGroupByFeature()
+      groups: qdrantGroupByFeature(),
+      rescore: qdrantRescoreFeature({ collections: { runtime: { dimensions: 2, metric: 'dot' } } })
     }
   )
   const host = await createStorageHost({ org, plugins: [plugin] as const })
@@ -47,6 +49,19 @@ async function exercise(native: IQdrantHttp, url: string): Promise<void> {
     const hits = await collection.near([1, 0], { exact: true }).topK(2).withVector().all()
     assert.equal(hits[0]!.id, 'one\ud800')
     assert.deepEqual(hits[0]!.vector, [100, 0])
+    await store.api.qdrantRescore.updateVectors('runtime', [
+      { id: 'one\ud800', vector: [1, 0] },
+      { id: 'two', vector: [4, 0] }
+    ])
+    const rescored = await collection
+      .near([1, 0])
+      .topK(2)
+      .rescore({ query: [1, 0], topN: 1 })
+      .rerank(() => [9])
+      .first()
+    assert.equal(rescored!.id, 'two')
+    assert.equal(rescored!.score, 4)
+    assert.equal(rescored!.rerankScore, 9)
     assert.equal(await store.use(ttl).expire(lockKey.vector('runtime', 'two'), 0), true)
     assert.equal((await collection.near([1, 0]).topK(2).all()).length, 1)
     assert.equal(

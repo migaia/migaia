@@ -1,3 +1,4 @@
+import type { IPgQuantizedOptions } from './features/quantized.js'
 import {
   StorageContractError,
   StorageContractErrorCode,
@@ -191,9 +192,17 @@ export async function createPostgresStore<T>(
   options: IPostgresOptions<IPgServer>,
   core: IStoragePluginCore,
   vectorSelected: () => boolean,
-  replicationSelected: () => IPgReplicationSelection | undefined
+  replicationSelected: () => IPgReplicationSelection | undefined,
+  quantizedSelected: () => IPgQuantizedOptions['mode'] | undefined
 ): Promise<IPostgresConstruction<T>> {
   const configuration = snapshotPostgresOptions(options)
+  if (
+    quantizedSelected() !== undefined &&
+    (!vectorSelected() || configuration.server !== 'postgres')
+  )
+    throw new StorageContractError(StorageContractErrorCode.unsupported, {
+      backend: PgNames.backend
+    })
   const probe = await probePostgres(configuration)
   const tables = postgresTables(configuration, probe.maxIdentifierBytes)
   await ensurePostgresTables(configuration, tables)
@@ -1206,6 +1215,7 @@ export async function createPostgresStore<T>(
         vectors ??= createPgVectors({
           configuration,
           tables,
+          quantization: quantizedSelected(),
           orgId: runtime.orgId,
           assertLive: () => controller.assertLive(),
           beginOperation: () => controller.beginMutation(),

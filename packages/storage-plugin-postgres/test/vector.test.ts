@@ -1,13 +1,16 @@
 import { randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
 import postgres from 'postgres'
-import { describe, it, expect, onTestFinished } from 'vitest'
+import { describe, it, expect, onTestFinished, expectTypeOf } from 'vitest'
 import { createStorageHost } from '@migaia/storage-host'
 import { vector, ttl, lockKey, asChangeFeedStore } from '@migaia/storage-contract'
 import { postgresBackendPlugin } from '../src/index.js'
 import { pgDriver } from '../src/pg.js'
 import { postgresJsDriver } from '../src/postgres-js.js'
 import { pgvectorFeature } from '../src/features/pgvector.js'
+import { pgQuantizedFeature } from '../src/features/quantized.js'
+import type { IPgNativeParameter } from '../src/types.js'
+import { walkErrorCauses } from '@migaia/utils/error'
 /** Real pgvector extension and managed collection tables are mandatory for these selected cases. */
 const connectionString = process.env.MIGAIA_PG_URL
 if (!connectionString)
@@ -225,4 +228,347 @@ describe.each(['pg', 'postgres-js'] as const)('%s real pgvector', (adapter) => {
       ).toBe(1)
     }
   })
+})
+
+/** Quantization borrows the same real driver; observations contain original native SQL and bindings. */
+async function installedQuantized(
+  adapter: 'pg' | 'postgres-js',
+  mode: 'halfvec' | 'binary_quantize'
+) {
+  const pool = new Pool({ connectionString })
+  const client = postgres(connectionString!, { max: 8 })
+  const native = adapter === 'pg' ? pgDriver(pool) : postgresJsDriver(client)
+  const statements: { text: string; values: readonly IPgNativeParameter[] }[] = []
+  const driver = {
+    ...native,
+    connect: async (...args: Parameters<typeof native.connect>) => {
+      const connection = await native.connect(...args)
+      return {
+        ...connection,
+        query: (...query: Parameters<typeof connection.query>) => {
+          statements.push({ text: query[0], values: query[1] })
+          return connection.query(...query)
+        }
+      }
+    }
+  }
+  const host = await createStorageHost({
+    plugins: [
+      postgresBackendPlugin(
+        { driver, prefix: 'pg_quant_' + randomUUID().slice(0, 8) },
+        { vector: pgvectorFeature(), quantized: pgQuantizedFeature({ mode }) }
+      )
+    ] as const
+  })
+  onTestFinished(async () => {
+    await host.dispose()
+    await pool.end()
+    await client.end()
+  })
+  return { host, store: host.backend('postgres'), driver, statements, pool }
+}
+
+describe.each(['pg', 'postgres-js'] as const)('%s quantized Feature', (adapter) => {
+  for (const mode of ['halfvec', 'binary_quantize'] as const) {
+    it(
+      mode + ' recalls once with tenant/expiry/payload filters and exactly rescores before rerank',
+      async () => {
+        const { host, store, driver, statements, pool } = await installedQuantized(adapter, mode)
+        expect(
+          (await pool.query("SELECT extversion FROM pg_extension WHERE extname='vector'")).rows[0]
+            .extversion
+        ).toBe('0.8.7')
+        const collection = store
+          .use(vector)
+          .collection<{ kind: string }>('quantized', { dimensions: 2, metric: 'dot' })
+        await collection.upsert([
+          { id: 'a', vector: [3, 0.1], payload: { kind: 'wanted' } },
+          { id: 'b', vector: [2, 0.2], payload: { kind: 'wanted' } },
+          { id: 'c', vector: [1, 0.3], payload: { kind: 'wanted' } },
+          { id: 'expired', vector: [99, 0.1], payload: { kind: 'wanted' } },
+          { id: 'excluded', vector: [100, 0.1], payload: { kind: 'excluded' } }
+        ])
+        await store.use(ttl).expire(lockKey.vector('quantized', 'expired'), 0)
+        await host
+          .org(randomUUID())
+          .backend('postgres')
+          .use(vector)
+          .collection('quantized')
+          .upsert([{ id: 'foreign', vector: [200, 0.1], payload: { kind: 'wanted' } }])
+        statements.length = 0
+        const query = collection
+          .near([1, 0.1])
+          .where({ kind: 'wanted' })
+          .topK(3)
+          .rescore({ topN: 2 })
+          .withVector()
+        const hits = await query.all()
+        expect(hits.map((hit) => hit.id)).toEqual(['a', 'b'])
+        expect(hits[0]!.score).toBeCloseTo(3.01, 5)
+        expect(hits[0]!.vector[0]).toBe(3)
+        const business = statements.filter((row) =>
+          row.text.startsWith('WITH recalled AS MATERIALIZED')
+        )
+        expect(business).toHaveLength(1)
+        const statement = business[0]!
+        const recall = statement.text.slice(0, statement.text.indexOf(') SELECT'))
+        expect(recall).toContain('org_id=$1')
+        expect(recall).toContain('expires_at>clock_timestamp()')
+        expect(recall).toContain('projection #>')
+        expect(statement.text).toContain(
+          mode === 'halfvec' ? '::halfvec(2)' : 'binary_quantize(embedding)::bit(2)'
+        )
+        expect(statement.values).toContain(3)
+        expect(statement.values.at(-1)).toBe(2)
+        const connection = await driver.connect()
+        try {
+          await connection.query('BEGIN', [])
+          await connection.query('SET LOCAL enable_seqscan=off', [])
+          await connection.query('SET LOCAL enable_bitmapscan=off', [])
+          await connection.query('SET LOCAL enable_sort=off', [])
+          const plan = JSON.stringify(
+            (await connection.query('EXPLAIN (FORMAT JSON) ' + statement.text, statement.values))
+              .rows
+          )
+          expect(plan).toContain('Index Scan')
+          expect(plan).toContain('storage_q_')
+        } finally {
+          await connection.query('ROLLBACK', [])
+          await connection.dispose()
+        }
+        expect(
+          (await query.rerank(({ hits }) => hits.map((hit) => -hit.score), { topN: 1 }).all())[0]!
+            .id
+        ).toBe('b')
+        expect(
+          await collection.near([1, 0.1]).where({ kind: 'wanted' }).topK(3).rescore().count()
+        ).toBe(3)
+        let evaluated = 0
+        expect(
+          await collection
+            .near([1, 0.1])
+            .where(() => {
+              evaluated++
+              return false
+            })
+            .topK(3)
+            .rescore({ topN: 1 })
+            .all()
+        ).toEqual([])
+        expect(evaluated).toBe(1)
+        expect(
+          (
+            await collection.near([1, 0.1], { exact: true }).where({ kind: 'wanted' }).topK(3).all()
+          ).map((hit) => hit.id)
+        ).toEqual(['a', 'b', 'c'])
+        const indexes = (
+          await pool.query(
+            "SELECT indexdef FROM pg_indexes WHERE indexname LIKE 'storage_q_%' AND indexdef LIKE '%" +
+              mode.replace('binary_quantize', 'binary_quantize') +
+              "%'"
+          )
+        ).rows
+        expect(indexes.length).toBeGreaterThan(0)
+        expect(
+          indexes.some((row) =>
+            row.indexdef.includes(mode === 'halfvec' ? 'halfvec_ip_ops' : 'bit_hamming_ops')
+          )
+        ).toBe(true)
+        if (mode === 'halfvec') {
+          for (const [metric, first, opclass] of [
+            ['cosine', 'b', 'halfvec_cosine_ops'],
+            ['euclid', 'c', 'halfvec_l2_ops']
+          ] as const) {
+            expect(
+              (
+                await collection
+                  .near([1, 0.1], { metric })
+                  .where({ kind: 'wanted' })
+                  .topK(3)
+                  .rescore({ topN: 1 })
+                  .all()
+              )[0]!.id
+            ).toBe(first)
+            expect(
+              statements.some(
+                (row) => row.text.includes('USING hnsw') && row.text.includes(opclass)
+              )
+            ).toBe(true)
+          }
+        }
+        expect(
+          await collection
+            .near([1, 0.1])
+            .where({ kind: 'wanted' })
+            .minScore(2.5)
+            .topK(3)
+            .rescore({ topN: 2 })
+            .count()
+        ).toBe(1)
+        expectTypeOf(hits[0]!.payload).toEqualTypeOf<{ kind: string } | undefined>()
+        function invalidTypes() {
+          // @ts-expect-error Only bounded original queries admit native rescore.
+          collection.near([1, 0]).rescore({ topN: 1 })
+          // @ts-expect-error A native result cannot append another rescore.
+          query.rescore({ topN: 1 })
+          // @ts-expect-error Native refined reads never delete selected points.
+          query.delete()
+          // @ts-expect-error Client reranking cannot append native rescore.
+          query.rerank(({ hits }) => hits.map((hit) => hit.score)).rescore({ topN: 1 })
+        }
+        void invalidTypes
+      }
+    )
+  }
+  it('captures options once and rejects invalid bounds without issuing native SQL', async () => {
+    const { store, statements } = await installedQuantized(adapter, 'halfvec')
+    const collection = store.use(vector).collection('bounds', { dimensions: 2, metric: 'dot' })
+    await collection.upsert([{ id: 'a', vector: [1, 0] }])
+    statements.length = 0
+    const base = collection.near([1, 0]).topK(2)
+    for (const topN of [0, -1, 3, 1.5, NaN, Infinity, null as never])
+      expect(() => base.rescore({ topN })).toThrowError(
+        expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+      )
+    expect(statements).toHaveLength(0)
+    let reads = 0
+    const query = base.rescore({
+      get topN() {
+        reads++
+        return 1
+      }
+    })
+    expect(reads).toBe(1)
+    expect(await query.count()).toBe(1)
+    expect(reads).toBe(1)
+  })
+})
+
+it('prepares one cold expression index through two hosts on the same native configuration row', async () => {
+  const pool = new Pool({ connectionString })
+  const driver = pgDriver(pool)
+  const prefix = 'pg_quant_cold_' + randomUUID().slice(0, 8)
+  const initial = await createStorageHost({
+    plugins: [postgresBackendPlugin({ driver, prefix }, { vector: pgvectorFeature() })] as const
+  })
+  try {
+    await initial
+      .backend('postgres')
+      .use(vector)
+      .collection('cold', { dimensions: 2, metric: 'dot' })
+      .upsert([{ id: 'a', vector: [1, 0] }])
+  } finally {
+    await initial.dispose()
+  }
+  const hosts = await Promise.all(
+    [0, 1].map(() =>
+      createStorageHost({
+        plugins: [
+          postgresBackendPlugin(
+            { driver, prefix },
+            { vector: pgvectorFeature(), quantized: pgQuantizedFeature({ mode: 'halfvec' }) }
+          )
+        ] as const
+      })
+    )
+  )
+  try {
+    const hits = await Promise.all(
+      hosts.map((host) =>
+        host.backend('postgres').use(vector).collection('cold').near([1, 0]).topK(1).rescore().all()
+      )
+    )
+    expect(hits.map((rows) => rows.map((row) => row.id))).toEqual([['a'], ['a']])
+    const indexes = await pool.query(
+      "SELECT indexdef FROM pg_indexes WHERE tablename LIKE $1 AND indexdef LIKE '%USING hnsw%'",
+      [prefix + '_v%']
+    )
+    expect(indexes.rows).toHaveLength(1)
+  } finally {
+    await Promise.all(hosts.map((host) => host.dispose()))
+    await pool.end()
+  }
+})
+
+it('keeps native halfvec dimension and value limits without narrowing the original vector domain', async () => {
+  const { store } = await installedQuantized('pg', 'halfvec')
+  for (const [name, components] of [
+    ['dimension', Array.from({ length: 4001 }, () => 1)],
+    ['range', [70000]]
+  ] as const) {
+    const error = await store
+      .use(vector)
+      .collection(name, { dimensions: components.length, metric: 'dot' })
+      .upsert([{ id: 'too-large', vector: components }])
+      .then(
+        () => undefined,
+        (cause: unknown) => cause
+      )
+    expect(
+      walkErrorCauses(error).some(
+        (cause) =>
+          typeof cause === 'object' &&
+          cause !== null &&
+          'source' in cause &&
+          cause.source === 'storage.backend.postgres' &&
+          'code' in cause &&
+          cause.code === 'SQL_FAILED'
+      )
+    ).toBe(true)
+    expect(
+      walkErrorCauses(error).some(
+        (cause) =>
+          typeof cause === 'object' &&
+          cause !== null &&
+          'code' in cause &&
+          (cause.code === '54000' || cause.code === '22003')
+      )
+    ).toBe(true)
+  }
+})
+
+it('rejects malformed modes before installation and requires the selected original pgvector provider', async () => {
+  expect(() => pgQuantizedFeature({ mode: 'other' as never })).toThrowError(
+    expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+  )
+  const original = new Error('quantized-mode-getter')
+  expect(() =>
+    pgQuantizedFeature({
+      get mode(): never {
+        throw original
+      }
+    })
+  ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT', cause: original }))
+  const pool = new Pool({ connectionString })
+  const native = pgDriver(pool)
+  let reads = 0
+  const driver = {
+    ...native,
+    query: (...args: Parameters<typeof native.query>) => {
+      reads++
+      return native.query(...args)
+    }
+  }
+  try {
+    const error = await createStorageHost({
+      plugins: [
+        postgresBackendPlugin({ driver }, { quantized: pgQuantizedFeature({ mode: 'halfvec' }) })
+      ] as const
+    }).then(
+      () => undefined,
+      (cause: unknown) => cause
+    )
+    expect(
+      walkErrorCauses(error).some(
+        (cause) =>
+          typeof cause === 'object' &&
+          cause !== null &&
+          'code' in cause &&
+          cause.code === 'UNSUPPORTED_CAPABILITY'
+      )
+    ).toBe(true)
+    expect(reads).toBe(0)
+  } finally {
+    await pool.end()
+  }
 })
