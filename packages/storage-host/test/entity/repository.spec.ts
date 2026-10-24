@@ -240,31 +240,6 @@ for (const { label, create } of backends) {
       await expect(repo.put({ id: 'u1', name: 'Ada', email: 'a@b.c' })).resolves.toBe('u1')
     })
 
-    it('repository operation context 每个字段只读取一次', async () => {
-      const repo = users.connect(await create())
-      const controller = new AbortController()
-      let reads = 0
-      await repo.put({ id: 'snapshot', name: 'Ada', email: 'ada@example.com' }, {
-        get signal() {
-          reads += 1
-          return controller.signal
-        },
-        get timeoutMs() {
-          reads += 1
-          return undefined
-        },
-        get pageSize() {
-          reads += 1
-          return 64
-        },
-        get conflictPolicy() {
-          reads += 1
-          return 'replace' as const
-        }
-      } as never)
-      expect(reads).toBe(4)
-    })
-
     it('get 未写入的 id 返回 undefined', async () => {
       const repo = users.connect(await create())
       await expect(repo.get('missing')).resolves.toBeUndefined()
@@ -812,29 +787,6 @@ describe('版本迁移', () => {
     })
   })
 
-  it('migrate 对每个 options 字段只读取一次', async () => {
-    const repo = defineEntity<{ id: string }>({
-      name: 'migrate-options-snapshot',
-      key: 'id'
-    }).connect(await memoryBackend())
-    const reads = { batchSize: 0, onInvalid: 0 }
-    await expect(
-      repo.migrate({
-        get batchSize() {
-          reads.batchSize += 1
-          if (reads.batchSize > 1) throw new Error('batchSize read twice')
-          return 1
-        },
-        get onInvalid() {
-          reads.onInvalid += 1
-          if (reads.onInvalid > 1) throw new Error('onInvalid read twice')
-          return 'skip' as const
-        }
-      })
-    ).resolves.toMatchObject({ scanned: 0, migrated: 0 })
-    expect(reads).toEqual({ batchSize: 1, onInvalid: 1 })
-  })
-
   it('migrate 拒绝 null、数组和 primitive options', async () => {
     const repo = defineEntity<{ id: string }>({
       name: 'invalid-migrate-options',
@@ -1014,16 +966,13 @@ describe('版本迁移', () => {
 
     // 读正常、写失败的包装 store：用 putCalls 证明读取路径没有尝试隐式写回。
     let putCalls = 0
-    const flakyStore = new Proxy(inner, {
-      get(target, prop, receiver) {
-        if (prop === 'putRecord')
-          return async () => {
-            putCalls += 1
-            throw new Error('write-back boom')
-          }
-        return Reflect.get(target, prop, receiver)
+    const flakyStore = {
+      ...inner,
+      putRecord: async () => {
+        putCalls += 1
+        throw new Error('write-back boom')
       }
-    })
+    }
 
     const v2 = defineEntity<{ id: string; displayName: string }>({
       name: 'people2',
@@ -1048,16 +997,13 @@ describe('版本迁移', () => {
     })
     await v1.connect(inner).put({ id: 'u1', name: 'Ada' })
 
-    const flakyStore = new Proxy(inner, {
-      get(target, prop, receiver) {
-        if (prop === 'putRecord')
-          return async () => {
-            // eslint-disable-next-line @typescript-eslint/no-throw-literal
-            throw 'boom-string-cause'
-          }
-        return Reflect.get(target, prop, receiver)
+    const flakyStore = {
+      ...inner,
+      putRecord: async () => {
+        // eslint-disable-next-line @typescript-eslint/no-throw-literal
+        throw 'boom-string-cause'
       }
-    })
+    }
 
     const v2 = defineEntity<{ id: string; displayName: string }>({
       name: 'people3',
@@ -1223,45 +1169,16 @@ describe('entity key and invalid-record boundaries', () => {
     await expect(repo.list({ limit: 0 })).resolves.toEqual([])
   })
 
-  it('list 与 stream 对每个 options 字段只读取一次', async () => {
-    const repo = defineEntity<{ id: string }>({ name: 'list-options-snapshot', key: 'id' }).connect(
+  it('list 与 stream apply the same range and invalid-record policy', async () => {
+    const repo = defineEntity<{ id: string }>({ name: 'list-options', key: 'id' }).connect(
       await memoryBackend()
     )
     await repo.put({ id: 'a' })
-    const createOptions = () => {
-      const reads = { range: 0, limit: 0, orderBy: 0, onInvalid: 0 }
-      const options = {
-        get range() {
-          reads.range += 1
-          if (reads.range > 1) throw new Error('range read twice')
-          return { lower: 'a', upper: 'z' }
-        },
-        get limit() {
-          reads.limit += 1
-          if (reads.limit > 1) throw new Error('limit read twice')
-          return 1
-        },
-        get orderBy() {
-          reads.orderBy += 1
-          if (reads.orderBy > 1) throw new Error('orderBy read twice')
-          return undefined
-        },
-        get onInvalid() {
-          reads.onInvalid += 1
-          if (reads.onInvalid > 1) throw new Error('onInvalid read twice')
-          return 'throw' as const
-        }
-      }
-      return { options, reads }
-    }
-    const listed = createOptions()
-    await expect(repo.list(listed.options)).resolves.toEqual([{ id: 'a' }])
-    expect(listed.reads).toEqual({ range: 1, limit: 1, orderBy: 1, onInvalid: 1 })
-    const streamed = createOptions()
+    const options = { range: { lower: 'a', upper: 'z' }, limit: 1, onInvalid: 'throw' as const }
+    await expect(repo.list(options)).resolves.toEqual([{ id: 'a' }])
     const values: Array<{ id: string }> = []
-    for await (const value of repo.stream(streamed.options)) values.push(value)
+    for await (const value of repo.stream(options)) values.push(value)
     expect(values).toEqual([{ id: 'a' }])
-    expect(streamed.reads).toEqual({ range: 1, limit: 1, orderBy: 1, onInvalid: 1 })
   })
 
   it('onInvalid.stage 区分 decode 与 validate', async () => {

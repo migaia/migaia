@@ -1,4 +1,3 @@
-import { inspectThenable, observeThenableRejection } from '@migaia/utils/function'
 import { isPlainObject } from '@migaia/utils/object'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { asyncDisposeKey } from '@migaia/plugin-host'
@@ -9,7 +8,9 @@ import {
   getBackendEntityAccess,
   snapshotBackendEntityRecordWatcher,
   type IBackendEntityAccess,
-  type IEntitySecondaryMethods
+  type IEntitySecondaryMethods,
+  type IEntityKeyValueMethods,
+  type IEntityRecordMethods
 } from '../core/change-controller.js'
 import { repositoryMigrationKey } from '../core/record-layout.js'
 import {
@@ -124,7 +125,9 @@ import {
   asRecordIndexBackfillStore,
   RecordIndexBackfillPhase,
   isBackfillContentionFailure,
-  type IRecordIndexBackfillPreparation
+  type IRecordIndexBackfillPreparation,
+  type IRecordIndexBackfillSession,
+  type IRecordIndexBackfillCandidate
 } from './backfill.js'
 import {
   EntityState,
@@ -150,11 +153,44 @@ const observeEntity = (
 ): void => {
   try {
     const result = invoke()
-    observeThenableRejection(result, inspectThenable(result), (error) => {
+    void Promise.resolve(result).catch((error) => {
       port.report(error)
     })
   } catch (error) {
     port.report(error)
+  }
+}
+
+/** Own the existing generator cleanup promises without replacing its iterator identity. */
+class EntityIteratorLifetime<T> {
+  /** The generator remains the original business iterator and receives its own return calls. */
+  #generator: AsyncGenerator<T, void, unknown>
+  /** Cleanup failures report through the operation that created this actual iterator. */
+  #runtime: IEntityOperationRuntime
+  /** Ordinary disposal preserves the first generator return Promise. */
+  #closing: Promise<void> | undefined
+  /** Symbolic disposal observes cleanup failure once and preserves its result identity. */
+  #symbolic: Promise<void> | undefined
+
+  /** Borrow the generator and its existing cleanup reporter. */
+  constructor(generator: AsyncGenerator<T, void, unknown>, runtime: IEntityOperationRuntime) {
+    this.#generator = generator
+    this.#runtime = runtime
+  }
+  /** Finish the original generator once, including its native finally block. */
+  dispose = (): Promise<void> =>
+    (this.#closing ??= this.#generator.return(undefined).then(() => undefined))
+  /** Observe a failed generator return through the operation's existing report channel. */
+  symbolicDispose = (): Promise<void> =>
+    (this.#symbolic ??= this.dispose().catch((cause) =>
+      reportCleanupError(this.#runtime.reporter, cause)
+    ))
+  /** Attach the resource protocol directly to the original business iterator. */
+  attach(): IStorageIterator<T> {
+    return Object.assign(this.#generator, {
+      dispose: this.dispose,
+      [asyncDisposeKey]: this.symbolicDispose
+    })
   }
 }
 
@@ -163,15 +199,7 @@ function entityIterator<T>(
   generator: AsyncGenerator<T, void, unknown>,
   runtime: IEntityOperationRuntime
 ): IStorageIterator<T> {
-  let closing: Promise<void> | undefined
-  let symbolic: Promise<void> | undefined
-  const dispose = (): Promise<void> =>
-    (closing ??= generator.return(undefined).then(() => undefined))
-  return Object.assign(generator, {
-    dispose,
-    [asyncDisposeKey]: () =>
-      (symbolic ??= dispose().catch((cause) => reportCleanupError(runtime.reporter, cause)))
-  })
+  return new EntityIteratorLifetime(generator, runtime).attach()
 }
 
 /** Runtime snapshots admit related ordering fields once while public callers retain their union. */
@@ -329,94 +357,300 @@ const idOf = <TDomain>(
   return id
 }
 
-export const createRepository = <
+/** Immutable indexed-query input captured before any query route consumes it. */
+type IIndexedListSnapshot<TDomain> = {
+  readonly index: string
+  readonly range: IListSnapshot<TDomain>['range']
+  readonly options: IListSnapshot<TDomain> | undefined
+}
+
+/** Index collection and streaming share native cursors, filtering and the sole bounded heap. */
+/** Native and fallback index rows share one materializer and canonical metadata ordering. */
+type IMatch<TDomain> = {
+  readonly id: IStorageKey
+  readonly key: IStorageKey
+  readonly value: TDomain
+}
+/** One fluent descriptor shares synchronous opening facts without retaining native resources. */
+type IEntityQueryExecution<T> = {
+  scope?: ITransactionScope
+  opened?: { readCount: number }
+  openingPlan?: IEntityQueryPlan
+  openingSelection?: IEntityQuerySourceSelection<T>
+}
+/** One native source keeps selection separate from shared terminal observer facts. */
+type IEntityQuerySourceContext<T> = {
+  execution: IEntityQueryExecution<T>
+  selection: IEntityQuerySourceSelection<T>
+}
+/** Existing migration counters and checkpoint facts are owned by one active run. */
+type IEntityMigrationContext<TDomain> = {
+  /** Context is local progress for the current resumable migration run. */
+  context: IOperationContext | undefined
+  /** Runtime is local progress for the current resumable migration run. */
+  runtime: IEntityOperationRuntime
+  batchSize: number
+  onInvalid: IMigrateOptions<TDomain>['onInvalid']
+  /** MigrationMetadata is local progress for the current resumable migration run. */
+  migrationMetadata: IRecordStore['metadata'] | undefined
+  /** CheckpointKey is local progress for the current resumable migration run. */
+  checkpointKey: string
+  /** Checkpoint is local progress for the current resumable migration run. */
+  checkpoint: IEntityMigrationCheckpoint | undefined
+  /** CheckpointMatches is local progress for the current resumable migration run. */
+  checkpointMatches: boolean
+  /** Scanned is local progress for the current resumable migration run. */
+  scanned: number
+  /** Migrated is local progress for the current resumable migration run. */
+  migrated: number
+  /** Eligible is local progress for the current resumable migration run. */
+  eligible: number
+  /** AlreadyCurrent is local progress for the current resumable migration run. */
+  alreadyCurrent: number
+  /** Skipped is local progress for the current resumable migration run. */
+  skipped: number
+  /** Conflicted is local progress for the current resumable migration run. */
+  conflicted: number
+  /** LastPhysicalKey is local progress for the current resumable migration run. */
+  lastPhysicalKey: IStorageKey | undefined
+  /** Phase is local progress for the current resumable migration run. */
+  phase: (typeof StorageMigrationPhase)[keyof typeof StorageMigrationPhase]
+  /** Batch is local progress for the current resumable migration run. */
+  batch: Array<{
+    readonly physicalKey: IStorageKey
+    readonly raw: unknown
+    readonly id: IStorageKey
+    readonly legacy: boolean
+    readonly migrationRequired: boolean
+    readonly value: TDomain | undefined
+  }>
+}
+type IEntityMigrationCheckpoint = {
+  readonly status: (typeof StorageMigrationStatus)[keyof typeof StorageMigrationStatus]
+  readonly phase?: (typeof StorageMigrationPhase)[keyof typeof StorageMigrationPhase]
+  readonly version: number
+  readonly schemaFingerprint: string
+  readonly lastPhysicalKey?: IStorageKey
+  readonly scanned: number
+  readonly eligible: number
+  readonly migrated: number
+  readonly skipped: number
+  readonly alreadyCurrent: number
+  readonly conflicted: number
+}
+type IEntityScanCandidate = {
+  readonly id: IStorageKey
+  readonly physical: IStorageKey | string
+  readonly raw: unknown
+}
+/** One lazy scan owns ordering storage while borrowing its native read view. */
+type IEntityScanContext<T> = {
+  options: IListSnapshot<T> | undefined
+  ctx: IOperationContext | undefined
+  readView?: IRepositoryReadView
+  onRead?: () => void
+  applyOrdering: boolean
+  candidates: ReturnType<typeof createOrderedRecordIndex<IEntityScanCandidate>>
+}
+/** Preparation and cleanup state belong to one authentic transaction cursor. */
+type IEntityScopedSourceContext<T> = {
+  selection: IEntityQuerySourceSelection<T>
+  onRead?: () => void
+  orderedSource: boolean
+  physicalIds?: Map<string, IStorageKey>
+  accepts?: (value: T) => boolean
+  rows: ReturnType<typeof createOrderedRecordIndex<readonly [IStorageKey, T]>>
+  seen: Map<string, IStorageKey> | Set<string>
+  prepared: boolean
+  initialized: boolean
+  cursor?: IStorageIterator<[IStorageKey, unknown]>
+  item: ReturnType<typeof createOrderedRecordIndex<readonly [IStorageKey, T]>>['first']
+}
+/** One observed stream retains only its original iterator and accumulated diagnostics. */
+type IEntityQueryObservation<T, R> = {
+  iterator: IStorageIterator<R>
+  plan: IEntityQueryPlan
+  selection: IEntityQuerySourceSelection<T>
+  counter: { readCount: number } | undefined
+  returnedCount: number
+  elapsedMs: number
+}
+/** One bound repository borrows its native scope and weak finalizer-owned mutation state. */
+type IEntityRepositoryBinding = {
+  scope: ITransactionScope
+  expectedIdentity?: IStorageKey
+  activeChanges: WeakRef<Map<string, IEntityUniqueMutation>> | undefined
+}
+/** One write terminal owns its source policy and native mutation request. */
+type IEntityQueryMutationContext<T> = {
+  source: IEntityQuerySourceContext<T>
+  policy: IEntityQuerySourceSelection<T>
+  orderedSource: boolean
+  onRead: (() => void) | undefined
+  request: Parameters<NonNullable<IRecordQuerySource['mutate']>>[0]
+  run: Parameters<NonNullable<IRecordQuerySource['mutate']>>[1]
+}
+/** Own one entity repository, its backend access and versioned materialization route. */
+class EntityRepositoryOwner<
   TDomain,
   TStored,
   TIndexes extends Readonly<Record<string, IStorageKey>> = Readonly<Record<never, IStorageKey>>,
   TAugmentMethods extends object = {},
   TChangeFeed extends boolean = false
->(
-  config: IRepositoryConfig<TDomain, TStored>,
-  inputStore: IEntityConnectStore,
-  connectOptions?: IEntityConnectOptions
-): IRepository<TDomain, TIndexes, TChangeFeed, TAugmentMethods> => {
+> {
+  /** The repository borrows its validated entity declaration for every materialization path. */
+  #config: IRepositoryConfig<TDomain, TStored>
+
   /** Entity gets business methods and original owner assertions, never a native close handle. */
-  const backend = snapshotEntityStore(inputStore)
-  const store = backend.store
-  const {
-    name,
-    key: keyProp,
-    version,
-    schema,
-    migrationPlan,
-    validateOnRead,
-    onDiagnostic,
-    defaultOrderBy
-  } = config
-  /** Capture only the two declared ports once and reject cross-kind wiring at connect. */
-  let codecStages: ICodecStageObserver | undefined
-  let queryStages: IQueryStageObserver | undefined
-  try {
-    codecStages = connectOptions?.codecStages
-    queryStages = connectOptions?.queryStages
-    if (
-      (codecStages !== undefined && codecStages.kind !== StorageStageKind.codec) ||
-      (queryStages !== undefined && queryStages.kind !== StorageStageKind.query)
-    )
-      throw new TypeError(StorageErrorText.backendKindMismatch)
-  } catch (cause) {
-    throw new StorageError(StorageErrorCode.invalidConfig, { backend: store.backend, cause })
-  }
+  #backend: IBackendEntityAccess
 
-  const recordStore = backend.recordStore()
-  const records = recordStore !== undefined
+  /** Borrowed text methods carry business access without native disposal authority. */
+  #store: IEntityKeyValueMethods
+  /** The entity name separates physical keys and diagnostic events across definitions. */
+  #name: string
+  /** The declared domain property supplies stable physical record identities. */
+  #keyProp: Extract<keyof TDomain, string>
+  /** Materialization and migration write envelopes at this target version. */
+  #version: number
+  /** The original schema object receives validation and conversion calls with its receiver. */
+  #schema: ISchemaAdapter<TDomain, TStored>
+  /** The shared plan owns version transitions instead of repository-local migration rules. */
+  #migrationPlan: IMigrationPlan
+  /** Read materialization validates domain data only when the declaration enables it. */
+  #validateOnRead: boolean
+  /** The original application callback receives non-fatal entity diagnostics. */
+  #onDiagnostic: (message: string) => void
+  /** An optional application comparator orders bounded entity query results. */
+  #defaultOrderBy: ((left: TDomain, right: TDomain) => number) | undefined
+
+  /** The codec observer receives conversion phases for this repository and its transactions. */
+  #codecStages: ICodecStageObserver | undefined
+
+  /** The declared query observer reports actual read counts and transaction phases. */
+  #queryStages: IQueryStageObserver | undefined
+
+  /** Optional borrowed record methods choose structured transactions instead of text fallback. */
+  #recordStore: IEntityRecordMethods | undefined
+
+  /** Codec selection retains the backend kind established before repository publication. */
+  #records: boolean
+
   /** Non-unique selectors retain their existing write call counts; only constraints need scans. */
-  const uniqueIndexes: ISnapshotEntityIndexes<TDomain> = Object.fromEntries(
-    Object.entries(config.indexes).filter(([, index]) => index.definition.unique)
-  )
-  /** Native and fallback commits share the same canonical unique-key ownership rule. */
-  const uniqueDefinitions = Object.values(uniqueIndexes).map((index) => index.definition)
+  #uniqueIndexes: ISnapshotEntityIndexes<TDomain>
 
-  const emitDiagnostic = (message: string): void => {
-    try {
-      onDiagnostic(message)
-    } catch (cause) {
-      reportCleanupError(createStorageOperationRuntime().reporter, cause)
-    }
-  }
+  /** Native and fallback commits share the same canonical unique-key ownership rule. */
+  #uniqueDefinitions: readonly ISnapshotEntityIndexes<TDomain>[string]['definition'][]
 
   /**
    * Select one codec for every repository path. Structured backends use the identity-like
    * structured codec by default, while text-only backends use JSON; an explicit codec is always
    * routed through capability validation.
    */
-  const selectedCodec: ISelectedCodec = selectCodec(
-    config.codec ?? (records ? structuredCodec : jsonCodec),
-    store.capabilities,
-    emitDiagnostic
-  )
+  #selectedCodec: ISelectedCodec
 
   /** The selected route preserves the original codec identity for observation. */
-  const codecName = config.codec?.name ?? (records ? structuredCodec.name : jsonCodec.name)
+  #codecName: string
+
+  /** The declared schema and version route identify resumable checkpoint compatibility. */
+  #migrationFingerprint: string
+
+  /** A ready handle is a captured backend fact; bound transactions never create or backfill it. */
+  #readyHandle: IRecordIndexHandle | undefined
+
+  /** Per-repository final changes belong to one authentic original transaction identity. */
+  #uniqueStates: WeakMap<ITransactionInfo, WeakRef<Map<string, IEntityUniqueMutation>>>
+  /** One stable public repository view is returned for this owner. */
+  #repository: IRepository<TDomain, TIndexes, TChangeFeed, TAugmentMethods>
+  /** Select codec, backend and stage ports before publishing this repository. */
+  constructor(
+    config: IRepositoryConfig<TDomain, TStored>,
+    inputStore: IEntityConnectStore,
+    connectOptions?: IEntityConnectOptions
+  ) {
+    this.#config = config
+    this.#backend = snapshotEntityStore(inputStore)
+    this.#store = this.#backend.store
+    this.#name = config.name
+    this.#keyProp = config.key
+    this.#version = config.version
+    this.#schema = config.schema
+    this.#migrationPlan = config.migrationPlan
+    this.#validateOnRead = config.validateOnRead
+    this.#onDiagnostic = config.onDiagnostic
+    this.#defaultOrderBy = config.defaultOrderBy
+
+    this.#codecStages = connectOptions?.codecStages
+    this.#queryStages = connectOptions?.queryStages
+    if (
+      (this.#codecStages !== undefined && this.#codecStages.kind !== StorageStageKind.codec) ||
+      (this.#queryStages !== undefined && this.#queryStages.kind !== StorageStageKind.query)
+    )
+      throw new StorageError(StorageErrorCode.invalidConfig, {
+        backend: this.#store.backend,
+        cause: new TypeError(StorageErrorText.backendKindMismatch)
+      })
+    this.#recordStore = this.#backend.recordStore()
+    this.#records = this.#recordStore !== undefined
+    this.#uniqueIndexes = Object.fromEntries(
+      Object.entries(this.#config.indexes).filter(([, index]) => index.definition.unique)
+    )
+    this.#uniqueDefinitions = Object.values(this.#uniqueIndexes).map((index) => index.definition)
+    this.#selectedCodec = selectCodec(
+      this.#config.codec ?? (this.#records ? structuredCodec : jsonCodec),
+      this.#store.capabilities,
+      this.#emitDiagnostic
+    )
+    this.#codecName =
+      this.#config.codec?.name ?? (this.#records ? structuredCodec.name : jsonCodec.name)
+    this.#migrationFingerprint = [
+      this.#name,
+      String(this.#version),
+      this.#keyProp,
+      this.#schema.name,
+      this.#config.codec?.name ?? (this.#records ? structuredCodec.name : jsonCodec.name),
+      `range:${this.#migrationPlan.baseVersion}:${this.#migrationPlan.version}`
+    ].join('|')
+    this.#uniqueStates = new WeakMap<
+      ITransactionInfo,
+      WeakRef<Map<string, IEntityUniqueMutation>>
+    >()
+    this.#repository = this.#createApi()
+  }
+  /** Return the stable public methods while keeping the component state private. */
+  api() {
+    return this.#repository
+  }
+
+  /** Perform the repository emitDiagnostic operation using its own state. */
+  #emitDiagnostic = (message: string): void => {
+    try {
+      /** Preserve the application callback's ordinary function receiver. */
+      const report = this.#onDiagnostic
+      report(message)
+    } catch (cause) {
+      reportCleanupError(createStorageOperationRuntime().reporter, cause)
+    }
+  }
 
   /** Drive backend-private projection migration without exposing its lease/checkpoint protocol. */
-  const backfillIndexes = async (ctx?: IOperationContext): Promise<void> => {
-    const capability = asRecordIndexBackfillStore<unknown>(store)
-    const definitions = Object.values(config.indexes).map((index) => index.definition)
+  #backfillIndexes = async (ctx?: IOperationContext): Promise<void> => {
+    const capability = asRecordIndexBackfillStore<unknown>(this.#store)
+    const definitions = Object.values(this.#config.indexes).map((index) => index.definition)
     if (capability === undefined || definitions.length === 0) return
-    const handle = await capability.ensureRecordIndexes(name, definitions, ctx)
+    const handle = await capability.ensureRecordIndexes(this.#name, definitions, ctx)
     const readiness = await capability.getRecordIndexReadiness(handle, ctx)
     if (readiness.status === 'complete') return
-    const migrationState = (await recordStore?.metadata?.get(repositoryMigrationKey(name), ctx)) as
-      | { readonly status?: unknown; readonly schemaFingerprint?: unknown }
-      | undefined
+    const migrationState = (await this.#recordStore?.metadata?.get(
+      repositoryMigrationKey(this.#name),
+      ctx
+    )) as { readonly status?: unknown; readonly schemaFingerprint?: unknown } | undefined
     const allowComplete =
       migrationState?.status === StorageMigrationStatus.complete &&
-      migrationState.schemaFingerprint === migrationFingerprint
+      migrationState.schemaFingerprint === this.#migrationFingerprint
     let session = await capability.openBackfillSession(
       handle,
       {
-        range: repositoryEntityRange(name),
+        range: repositoryEntityRange(this.#name),
         // Legacy keys can contain arbitrarily nested valid array IDs; the backend scans bounded
         // pages and this preparation classifies entity ownership without a lossy prefix range.
         legacyRange: undefined,
@@ -431,62 +665,14 @@ export const createRepository = <
       while (!finished) {
         await session.renew(ctx)
         const batch = await session.readBatch(ctx, {
-          prepare: async (candidate): Promise<IRecordIndexBackfillPreparation> => {
-            await session.renew(ctx)
-            const runtime = createStorageOperationRuntime()
-            let domain: TDomain | undefined
-            try {
-              if (candidate.phase === RecordIndexBackfillPhase.legacy) {
-                const canonicalId = decodeRepositoryKey(name, candidate.key)
-                const legacyId =
-                  Array.isArray(candidate.key) &&
-                  candidate.key.length === 2 &&
-                  candidate.key[0] === name &&
-                  (typeof candidate.key[1] === 'string' || Array.isArray(candidate.key[1]))
-                    ? (candidate.key[1] as IStorageKey)
-                    : undefined
-                if (canonicalId === undefined && legacyId === undefined)
-                  return { decodedBytes: 0, outcome: 'skipped', counted: false }
-                if (canonicalId !== undefined)
-                  return { decodedBytes: 0, outcome: 'skipped', counted: false }
-                if (legacyId !== undefined) {
-                  const id = legacyId
-                  const canonicalRaw = await recordStore!.getRecord(
-                    composeRepositoryKey(name, id),
-                    ctx
-                  )
-                  if (canonicalRaw !== undefined)
-                    return { decodedBytes: 0, outcome: 'skipped', counted: false }
-                }
-              }
-              const envelope = await decodeEnvelope(candidate.raw, ctx, runtime)
-              domain = await materialize(envelope, ctx, runtime)
-            } catch (cause) {
-              emitDiagnostic(
-                EntityText.storageWebEntitySkippedInvalidIndexBackfillRecord(
-                  name,
-                  String(candidate.key),
-                  String(cause)
-                )
-              )
-              return { decodedBytes: 0, outcome: 'skipped' }
-            }
-            return {
-              decodedBytes: safeJsonPayloadByteLength(domain),
-              outcome: domain === undefined ? 'skipped' : 'indexed',
-              projection:
-                domain === undefined
-                  ? undefined
-                  : projectEntityIndexes(config.indexes, domain, store.backend)
-            }
-          }
+          prepare: (candidate) => this.#prepareEntityBackfillCandidate(session, ctx, candidate)
         })
         if (
           batch.preparations === undefined ||
           batch.preparations.length !== batch.candidates.length
         )
           throw new StorageError(StorageErrorCode.invalidConfig, {
-            backend: store.backend
+            backend: this.#store.backend
           })
         const projections = batch.candidates.map((candidate, index) => {
           const preparation = batch.preparations![index]!
@@ -521,7 +707,7 @@ export const createRepository = <
           session = await capability.openBackfillSession(
             handle,
             {
-              range: repositoryEntityRange(name),
+              range: repositoryEntityRange(this.#name),
               legacyRange: undefined,
               includeLegacy: true,
               allowComplete
@@ -540,7 +726,7 @@ export const createRepository = <
       } catch (persistFailure) {
         throw createStorageAggregateError(
           StorageErrorCode.indexBackfillFailed,
-          indexBackfillFailureText(name),
+          indexBackfillFailureText(this.#name),
           [cause, persistFailure]
         )
       }
@@ -549,83 +735,83 @@ export const createRepository = <
       session.release()
     }
   }
-  const migrationFingerprint = [
-    name,
-    String(version),
-    keyProp,
-    schema.name,
-    config.codec?.name ?? (records ? structuredCodec.name : jsonCodec.name),
-    `range:${migrationPlan.baseVersion}:${migrationPlan.version}`
-  ].join('|')
 
-  const writeEnvelopeAt = async (
+  /** Perform the repository writeEnvelopeAt operation using its own state. */
+  #writeEnvelopeAt = async (
     target: IWriteTarget,
     envelope: IEnvelope,
     ctx: IOperationContext | undefined,
     runtime: IEntityOperationRuntime
   ): Promise<void> => {
-    await writeEncodedEnvelopeAt(target, await encodeEnvelope(envelope, ctx, runtime), ctx)
+    await this.#writeEncodedEnvelopeAt(
+      target,
+      await this.#encodeEnvelope(envelope, ctx, runtime),
+      ctx
+    )
   }
 
   /** Commit already encoded data so exclusive KV sections never invoke application codecs. */
-  const writeEncodedEnvelopeAt = async (
+  #writeEncodedEnvelopeAt = async (
     target: IWriteTarget,
     raw: unknown,
     ctx: IOperationContext | undefined
   ): Promise<void> => {
-    if (recordStore && target.documentKey !== undefined) {
-      await recordStore.putRecord(raw, target.documentKey, ctx)
+    if (this.#recordStore && target.documentKey !== undefined) {
+      await this.#recordStore.putRecord(raw, target.documentKey, ctx)
       return
     }
     if (target.flatKey !== undefined) {
-      await store.set(target.flatKey, raw as string, ctx)
+      await this.#store.set(target.flatKey, raw as string, ctx)
     }
   }
 
   /** Every real conversion emits exactly one matching observation sequence. */
-  const codecCall = async <R>(
+  #codecCall = async <R>(
     phase: 'encode' | 'decode',
     invoke: () => Promise<R>,
     runtime: IEntityOperationRuntime
   ): Promise<R> => {
     const stages =
-      runtime.scope === undefined ? codecStages : codecStages?.forTransaction(runtime.scope)
+      runtime.scope === undefined
+        ? this.#codecStages
+        : this.#codecStages?.forTransaction(runtime.scope)
     const operation =
       phase === 'encode' ? StorageOperation.entityCodecEncode : StorageOperation.entityCodecDecode
-    const before = phase === 'encode' ? stages?.beforeEncode : stages?.beforeDecode
-    const after = phase === 'encode' ? stages?.afterEncode : stages?.afterDecode
-    const failed = phase === 'encode' ? stages?.onEncodeError : stages?.onDecodeError
-    if (before !== undefined)
-      observeEntity(stages!, () => Reflect.apply(before, stages, [operation, codecName]))
+    const before = phase === 'encode' ? 'beforeEncode' : 'beforeDecode'
+    const after = phase === 'encode' ? 'afterEncode' : 'afterDecode'
+    const failed = phase === 'encode' ? 'onEncodeError' : 'onDecodeError'
+    if (stages?.[before] !== undefined)
+      observeEntity(stages!, () => stages![before]!(operation, this.#codecName))
     try {
       const value = await invoke()
-      if (after !== undefined)
-        observeEntity(stages!, () => Reflect.apply(after, stages, [operation, codecName]))
+      if (stages?.[after] !== undefined)
+        observeEntity(stages!, () => stages![after]!(operation, this.#codecName))
       return value
     } catch (cause) {
-      if (failed !== undefined)
+      if (stages?.[failed] !== undefined)
         observeEntity(stages!, () =>
-          Reflect.apply(failed, stages, [
+          stages![failed]!(
             operation,
-            codecName,
+            this.#codecName,
             readStorageHookFailureCode(cause, stages!.report)
-          ])
+          )
         )
       throw cause
     }
   }
+
   /** Encode every repository write through the original codec and extension error boundary. */
-  const encodeEnvelope = (
+  #encodeEnvelope = (
     envelope: IEnvelope,
     ctx: IOperationContext | undefined,
     runtime: IEntityOperationRuntime
   ): Promise<unknown> =>
-    codecCall(
+    this.#codecCall(
       'encode',
       () =>
         invokeExtension(
-          () => selectedCodec.encode(envelope, ctx),
-          store.backend,
+          () => this.#selectedCodec.encode(envelope, ctx),
+          this.#store.backend,
           StorageOperation.entityCodecEncode,
           'codec',
           ctx?.signal,
@@ -634,22 +820,23 @@ export const createRepository = <
       runtime
     )
 
-  const materialize = async (
+  /** Perform the repository materialize operation using its own state. */
+  #materialize = async (
     envelope: IEnvelope | undefined,
     ctx: IOperationContext | undefined,
     runtime: IEntityOperationRuntime
   ): Promise<TDomain | undefined> => {
     if (!envelope) return undefined
     /** Observation borrows this original host row and the shared plan's actual execution. */
-    const stages = getBackendEnvelopeStages(store, {
+    const stages = getBackendEnvelopeStages(this.#store, {
       operation: StorageOperation.entityEnvelope,
-      targetVersion: version
+      targetVersion: this.#version
     })
     /** Timing observes only a real migration; the shared executor owns all steps and cancellation. */
     const started = stages === undefined ? 0 : systemScheduler.now()
     let stored: unknown
     try {
-      stored = await migrateEnvelope(migrationPlan, envelope, {
+      stored = await migrateEnvelope(this.#migrationPlan, envelope, {
         signal: ctx?.signal,
         report: (cause) => reportCleanupError(runtime.reporter, cause),
         observe: stages?.observe
@@ -671,19 +858,19 @@ export const createRepository = <
         )
       throw cause
     }
-    if (envelope.version !== version)
+    if (envelope.version !== this.#version)
       stages?.afterMigrate(
-        version,
-        migrationPlan.reset === undefined ? 'steps' : 'reset',
-        migrationPlan.reset === undefined ? version - envelope.version : 0,
+        this.#version,
+        this.#migrationPlan.reset === undefined ? 'steps' : 'reset',
+        this.#migrationPlan.reset === undefined ? this.#version - envelope.version : 0,
         systemScheduler.now() - started
       )
     let decoded: TDomain
     try {
-      decoded = schema.decode
+      decoded = this.#schema.decode
         ? await invokeExtension(
-            () => schema.decode!(stored as TStored, ctx),
-            store.backend,
+            () => this.#schema.decode!(stored as TStored, ctx),
+            this.#store.backend,
             StorageOperation.entitySchemaDecode,
             'schema',
             ctx?.signal,
@@ -693,11 +880,11 @@ export const createRepository = <
     } catch (cause) {
       throw stageFailure('decode', cause)
     }
-    if (!validateOnRead) return decoded
+    if (!this.#validateOnRead) return decoded
     try {
       return await invokeExtension(
-        () => schema.validate(decoded, ctx),
-        store.backend,
+        () => this.#schema.validate(decoded, ctx),
+        this.#store.backend,
         StorageOperation.entitySchemaValidate,
         'schema',
         ctx?.signal,
@@ -708,33 +895,34 @@ export const createRepository = <
     }
   }
 
-  const toEnvelope = async (
+  /** Perform the repository toEnvelope operation using its own state. */
+  #toEnvelope = async (
     value: TDomain,
     ctx: IOperationContext | undefined,
     runtime: IEntityOperationRuntime
   ): Promise<{ readonly domain: TDomain; readonly envelope: IEnvelope }> => {
     const domain = await invokeExtension(
-      () => schema.validate(value, ctx),
-      store.backend,
+      () => this.#schema.validate(value, ctx),
+      this.#store.backend,
       StorageOperation.entitySchemaValidate,
       'schema',
       ctx?.signal,
       runtime
     )
-    const normalized = schema.normalize
+    const normalized = this.#schema.normalize
       ? await invokeExtension(
-          () => schema.normalize!(domain, ctx),
-          store.backend,
+          () => this.#schema.normalize!(domain, ctx),
+          this.#store.backend,
           StorageOperation.entitySchemaNormalize,
           'schema',
           ctx?.signal,
           runtime
         )
       : domain
-    const stored = schema.encode
+    const stored = this.#schema.encode
       ? await invokeExtension(
-          () => schema.encode!(normalized, ctx),
-          store.backend,
+          () => this.#schema.encode!(normalized, ctx),
+          this.#store.backend,
           StorageOperation.entitySchemaEncode,
           'schema',
           ctx?.signal,
@@ -742,23 +930,27 @@ export const createRepository = <
         )
       : (normalized as unknown as TStored)
     try {
-      return { domain: normalized, envelope: assertVersionedEnvelope({ version, state: stored }) }
+      return {
+        domain: normalized,
+        envelope: assertVersionedEnvelope({ version: this.#version, state: stored })
+      }
     } catch (cause) {
       throw new StorageError(StorageErrorCode.serializeFailed, { cause })
     }
   }
 
-  const decodeEnvelope = async (
+  /** Perform the repository decodeEnvelope operation using its own state. */
+  #decodeEnvelope = async (
     raw: unknown,
     ctx: IOperationContext | undefined,
     runtime: IEntityOperationRuntime
   ): Promise<IEnvelope> => {
-    const decoded: unknown = await codecCall(
+    const decoded: unknown = await this.#codecCall(
       'decode',
       () =>
         invokeExtension(
-          () => selectedCodec.decode(raw, ctx),
-          store.backend,
+          () => this.#selectedCodec.decode(raw, ctx),
+          this.#store.backend,
           StorageOperation.entityCodecDecode,
           'codec',
           ctx?.signal,
@@ -766,10 +958,10 @@ export const createRepository = <
         ),
       runtime
     )
-    /** The shared validator captures hostile envelope fields once; hooks never re-read raw data. */
-    const stages = getBackendEnvelopeStages(store, {
+    /** Hooks observe the same validated version envelope used for materialization. */
+    const stages = getBackendEnvelopeStages(this.#store, {
       operation: StorageOperation.entityEnvelope,
-      targetVersion: version
+      targetVersion: this.#version
     })
     stages?.beforeEnvelopeCheck()
     try {
@@ -783,12 +975,13 @@ export const createRepository = <
   }
 
   /** Apply the invalid-record policy once so handler failures have one stable error boundary. */
-  const invalidAction = (
+  #invalidAction = (
     issue: IInvalidRecordIssue<TDomain>,
     option: IListSnapshot<TDomain> | undefined
-  ): IInvalidRecordAction => invokeInvalidHandler(option?.onInvalid, issue)
+  ): IInvalidRecordAction => this.#invokeInvalidHandler(option?.onInvalid, issue)
 
-  const validateInvalidHandler = (handler: unknown): void => {
+  /** Perform the repository validateInvalidHandler operation using its own state. */
+  #validateInvalidHandler = (handler: unknown): void => {
     if (
       handler !== undefined &&
       handler !== 'skip' &&
@@ -796,64 +989,51 @@ export const createRepository = <
       typeof handler !== 'function'
     )
       throw new StorageError(StorageErrorCode.invalidConfig, {
-        backend: store.backend,
+        backend: this.#store.backend,
         cause: new TypeError(EntityText.oninvalidMustBeSkipThrowOrAHandler)
       })
   }
 
-  /** Snapshot list options once so getters cannot change values after validation. */
-  const normalizeListOptions = (
+  /** Detach list bounds before the lazy source opens and awaits native reads. */
+  #normalizeListOptions = (
     options:
       | IListSnapshot<TDomain>
       | IIndexedListOptions<TDomain, Readonly<Record<string, IStorageKey>>>
       | undefined
   ): IListSnapshot<TDomain> | undefined => {
-    validateListOptions(options, store.backend)
+    validateListOptions(options, this.#store.backend)
     if (options === undefined) return undefined
     let range: IListSnapshot<TDomain>['range']
     let limit: IListSnapshot<TDomain>['limit']
     let orderBy: IListSnapshot<TDomain>['orderBy']
     let direction: IListSnapshot<TDomain>['direction']
     let onInvalid: IListSnapshot<TDomain>['onInvalid']
-    try {
-      range = options.range
-      limit = options.limit
-      orderBy = options.orderBy
-      direction = options.direction
-      onInvalid = options.onInvalid
-    } catch (cause) {
-      throw new StorageError(StorageErrorCode.invalidConfig, {
-        backend: store.backend,
-        cause
-      })
-    }
-    const rangeSnapshot = snapshotKeyRange(range, store.backend)
-    validateLimit(limit, store.backend)
-    validateOrderBy(orderBy, store.backend)
+    range = options.range
+    limit = options.limit
+    orderBy = options.orderBy
+    direction = options.direction
+    onInvalid = options.onInvalid
+
+    const rangeSnapshot = snapshotKeyRange(range, this.#store.backend)
+    validateLimit(limit, this.#store.backend)
+    validateOrderBy(orderBy, this.#store.backend)
     if (direction !== undefined && direction !== 'next' && direction !== 'prev')
       throw new StorageError(StorageErrorCode.invalidConfig, {
-        backend: store.backend,
+        backend: this.#store.backend,
         cause: new TypeError(EntityText.listDirectionMustBeNextOrPrev)
       })
-    validateInvalidHandler(onInvalid)
+    this.#validateInvalidHandler(onInvalid)
     return { range: rangeSnapshot, limit, orderBy, direction, onInvalid }
   }
 
-  /** Immutable indexed-query input captured before any query route consumes it. */
-  type IIndexedListSnapshot = {
-    readonly index: string
-    readonly range: IListSnapshot<TDomain>['range']
-    readonly options: IListSnapshot<TDomain> | undefined
-  }
-
-  /** Read every indexed-list option once and convert it to a guarded snapshot. */
-  const snapshotIndexedListOptions = (
+  /** Detach indexed list bounds before lazy native work can outlive caller mutation. */
+  #snapshotIndexedListOptions = (
     options:
       | IListSnapshot<TDomain>
       | IIndexedListOptions<TDomain, Readonly<Record<string, IStorageKey>>>
       | undefined
-  ): IIndexedListSnapshot | undefined => {
-    validateListOptions(options, store.backend)
+  ): IIndexedListSnapshot<TDomain> | undefined => {
+    validateListOptions(options, this.#store.backend)
     if (options === undefined) return undefined
     let index: unknown
     let range: IListSnapshot<TDomain>['range']
@@ -861,81 +1041,70 @@ export const createRepository = <
     let orderBy: IListSnapshot<TDomain>['orderBy']
     let direction: IListSnapshot<TDomain>['direction']
     let onInvalid: IListSnapshot<TDomain>['onInvalid']
-    try {
-      index = (options as { readonly index?: unknown }).index
-      if (index === undefined) return undefined
-      range = options.range
-      limit = options.limit
-      orderBy = options.orderBy
-      direction = options.direction
-      onInvalid = options.onInvalid
-    } catch (cause) {
-      throw new StorageError(StorageErrorCode.invalidConfig, {
-        backend: store.backend,
-        cause
-      })
-    }
+    index = (options as { readonly index?: unknown }).index
+    if (index === undefined) return undefined
+    range = options.range
+    limit = options.limit
+    orderBy = options.orderBy
+    direction = options.direction
+    onInvalid = options.onInvalid
+
     if (typeof index !== 'string' || index.length === 0)
       throw new StorageError(StorageErrorCode.invalidConfig, {
-        backend: store.backend,
+        backend: this.#store.backend,
         cause: new TypeError(EntityText.indexedListIndexMustBeANonEmptyString)
       })
-    const normalized = normalizeListOptions({ range, limit, orderBy, direction, onInvalid })
+    const normalized = this.#normalizeListOptions({ range, limit, orderBy, direction, onInvalid })
     return { index, range: normalized?.range, options: normalized }
   }
 
   /** Build an indexed snapshot for the findManyBy/findBy/streamBy APIs. */
-  const createIndexedListSnapshot = (
+  #createIndexedListSnapshot = (
     index: string,
     range: IListSnapshot<TDomain>['range'],
     options:
       | IListSnapshot<TDomain>
       | IIndexedListOptions<TDomain, Readonly<Record<string, IStorageKey>>>
       | undefined
-  ): IIndexedListSnapshot => {
-    const normalized = normalizeListOptions(options)
-    const rangeSnapshot = snapshotKeyRange(range, store.backend)
+  ): IIndexedListSnapshot<TDomain> => {
+    const normalized = this.#normalizeListOptions(options)
+    const rangeSnapshot = snapshotKeyRange(range, this.#store.backend)
     return { index, range: rangeSnapshot, options: normalized }
   }
 
   /** Snapshot migration options once before checkpoint or record work begins. */
-  const normalizeMigrateOptions = (
+  #normalizeMigrateOptions = (
     options: IMigrateOptions<TDomain>
   ): { readonly batchSize: number; readonly onInvalid: IMigrateOptions<TDomain>['onInvalid'] } => {
     if (options === null || typeof options !== 'object' || Array.isArray(options))
       throw new StorageError(StorageErrorCode.invalidConfig, {
-        backend: store.backend,
+        backend: this.#store.backend,
         cause: new TypeError(EntityText.migrateOptionsMustBeAnObject)
       })
     let batchSize: IMigrateOptions<TDomain>['batchSize']
     let onInvalid: IMigrateOptions<TDomain>['onInvalid']
-    try {
-      batchSize = options.batchSize
-      onInvalid = options.onInvalid
-    } catch (cause) {
-      throw new StorageError(StorageErrorCode.invalidConfig, {
-        backend: store.backend,
-        cause
-      })
-    }
+    batchSize = options.batchSize
+    onInvalid = options.onInvalid
+
     const normalizedBatchSize = batchSize === undefined ? 100 : batchSize
     if (!Number.isSafeInteger(normalizedBatchSize) || normalizedBatchSize < 1)
       throw new StorageError(StorageErrorCode.invalidConfig, {
-        backend: store.backend,
+        backend: this.#store.backend,
         cause: new RangeError(EntityText.migrateBatchSizeMustBeAPositiveSafeInteger)
       })
-    validateInvalidHandler(onInvalid)
+    this.#validateInvalidHandler(onInvalid)
     return { batchSize: normalizedBatchSize, onInvalid }
   }
 
-  const invokeInvalidHandler = (
+  /** Perform the repository invokeInvalidHandler operation using its own state. */
+  #invokeInvalidHandler = (
     handler: IInvalidRecordAction | IInvalidRecordHandler<TDomain> | undefined,
     issue: IInvalidRecordIssue<TDomain>
   ): IInvalidRecordAction => {
     if (handler === undefined || handler === 'skip' || handler === 'throw') return handler ?? 'skip'
     if (typeof handler !== 'function')
       throw new StorageError(StorageErrorCode.invalidConfig, {
-        backend: store.backend,
+        backend: this.#store.backend,
         key: issue.key,
         cause: new TypeError(EntityText.oninvalidMustBeSkipThrowOrAHandler)
       })
@@ -943,7 +1112,7 @@ export const createRepository = <
       const action = handler(issue)
       if (action !== 'skip' && action !== 'throw')
         throw new StorageError(StorageErrorCode.invalidConfig, {
-          backend: store.backend,
+          backend: this.#store.backend,
           key: issue.key,
           cause: new TypeError(EntityText.oninvalidHandlerMustReturnSkipOrThrow)
         })
@@ -951,14 +1120,15 @@ export const createRepository = <
     } catch (cause) {
       if (isStorageErrorFamily(cause) && cause.code === StorageErrorCode.invalidConfig) throw cause
       throw new StorageError(StorageErrorCode.validationFailed, {
-        backend: store.backend,
+        backend: this.#store.backend,
         key: issue.key,
         cause
       })
     }
   }
 
-  const throwInvalid = (issue: IInvalidRecordIssue<TDomain>): never => {
+  /** Perform the repository throwInvalid operation using its own state. */
+  #throwInvalid = (issue: IInvalidRecordIssue<TDomain>): never => {
     /* c8 ignore start -- all current decode/migrate/validate stages normalize to StorageError. */
     if (isStorageErrorFamily(issue.cause)) throw issue.cause
     const code =
@@ -968,21 +1138,22 @@ export const createRepository = <
           ? StorageErrorCode.deserializeFailed
           : StorageErrorCode.validationFailed
     throw new StorageError(code, {
-      backend: store.backend,
+      backend: this.#store.backend,
       key: issue.key,
       cause: issue.cause
     })
     /* c8 ignore stop */
   }
 
-  const materializeForRead = async (
+  /** Perform the repository materializeForRead operation using its own state. */
+  #materializeForRead = async (
     id: IStorageKey,
     envelope: IEnvelope | undefined,
     ctx: IOperationContext | undefined,
     runtime: IEntityOperationRuntime
   ): Promise<TDomain | undefined> => {
     try {
-      return await materialize(envelope, ctx, runtime)
+      return await this.#materialize(envelope, ctx, runtime)
     } catch (cause) {
       /* c8 ignore start -- materialize's extension boundaries already return StorageError. */
       if (isStorageErrorFamily(cause)) throw cause
@@ -993,31 +1164,33 @@ export const createRepository = <
           : stage === StorageRecordStage.decode
             ? StorageErrorCode.deserializeFailed
             : StorageErrorCode.validationFailed
-      throw new StorageError(code, { backend: store.backend, key: id, cause })
+      throw new StorageError(code, { backend: this.#store.backend, key: id, cause })
     }
   }
 
-  const readEnvelope = async (
+  /** Perform the repository readEnvelope operation using its own state. */
+  #readEnvelope = async (
     id: IStorageKey,
     ctx: IOperationContext | undefined,
     runtime: IEntityOperationRuntime
   ): Promise<IEnvelope | undefined> => {
-    if (recordStore) {
-      let raw = await recordStore.getRecord(composeRepositoryKey(name, id), ctx)
-      if (raw === undefined) raw = await recordStore.getRecord(composeStructuredKey(name, id), ctx)
+    if (this.#recordStore) {
+      let raw = await this.#recordStore.getRecord(composeRepositoryKey(this.#name, id), ctx)
+      if (raw === undefined)
+        raw = await this.#recordStore.getRecord(composeStructuredKey(this.#name, id), ctx)
       if (raw === undefined) return undefined
-      return decodeEnvelope(raw, ctx, runtime)
+      return this.#decodeEnvelope(raw, ctx, runtime)
     }
-    const raw = await store.get(composeFlatKey(name, id), ctx)
+    const raw = await this.#store.get(composeFlatKey(this.#name, id), ctx)
     if (raw === null) return undefined
-    return decodeEnvelope(raw, ctx, runtime)
+    return this.#decodeEnvelope(raw, ctx, runtime)
   }
 
   /**
    * Canonical ID ordering uses the same radix structure; comparator scans retain only heap
    * candidates.
    */
-  const streamImpl = async function* (
+  async *#streamImpl(
     options: IListSnapshot<TDomain> | undefined,
     ctx: IOperationContext | undefined,
     runtime: IEntityOperationRuntime,
@@ -1027,92 +1200,43 @@ export const createRepository = <
     project?: (value: TDomain) => void
   ): AsyncGenerator<TDomain, void, unknown> {
     if (options?.limit === 0) return
-    type ICandidate = {
-      readonly id: IStorageKey
-      readonly physical: IStorageKey | string
-      readonly raw: unknown
-    }
+
     /**
      * Unordered source scans yield immediately; only ordinary canonical ordering builds a candidate
      * index.
      */
-    const scan = async function* (): AsyncGenerator<ICandidate, void, unknown> {
-      if (recordStore !== undefined) {
-        const canonicalIds = new Set<string>()
-        const iterate =
-          readView?.iterateRecords ?? ((range) => recordStore.iterateRecords(range, ctx))
-        try {
-          for (const range of [repositoryEntityRange(name), undefined]) {
-            for await (const [physical, raw] of iterate(range)) {
-              const canonical = decodeRepositoryKey(name, physical)
-              const legacy =
-                Array.isArray(physical) && physical.length === 2 && physical[0] === name
-                  ? (physical[1] as IStorageKey)
-                  : undefined
-              const id = canonical ?? legacy
-              if (id === undefined || !isStorageKeyInRange(id, options?.range)) continue
-              if (range === undefined && canonical !== undefined) continue
-              onRead?.()
-              const identity = encodeFlatStorageKey(id)
-              if (range === undefined && canonicalIds.has(identity)) continue
-              if (canonical !== undefined) canonicalIds.add(identity)
-              yield { id, physical, raw }
-            }
-          }
-        } finally {
-          canonicalIds.clear()
-        }
-      } else {
-        emitDiagnostic(EntityText.valueScan(name))
-        const prefix = flatKeyPrefix(name)
-        for (const physical of readView?.keys === undefined
-          ? await store.keys(ctx)
-          : await readView.keys()) {
-          if (!physical.startsWith(prefix)) continue
-          const id = decodeFlatStorageKey(physical.slice(prefix.length))
-          if (id !== undefined && isStorageKeyInRange(id, options?.range)) {
-            onRead?.()
-            yield { id, physical, raw: undefined }
-          }
-        }
-      }
+
+    /** The source owns this ordered buffer until its generator finally closes. */
+    const scan: IEntityScanContext<TDomain> = {
+      options,
+      ctx,
+      readView,
+      onRead,
+      applyOrdering,
+      candidates: createOrderedRecordIndex<IEntityScanCandidate>()
     }
-    const candidates = createOrderedRecordIndex<ICandidate>()
-    const orderedScan = async function* (): AsyncGenerator<ICandidate, void, unknown> {
-      if (!applyOrdering) {
-        yield* scan()
-        return
-      }
-      for await (const candidate of scan())
-        candidates.set(encodeOrderedStorageKey(candidate.id, store.backend), candidate)
-      for (
-        let item = options?.direction === 'prev' ? candidates.last : candidates.first;
-        item !== undefined;
-        item = options?.direction === 'prev' ? item.previous : item.next
-      )
-        yield item.value
-    }
+
     let count = 0
     try {
-      for await (const row of orderedScan()) {
+      for await (const row of this.#orderedEntityCandidates(scan)) {
         const raw =
-          recordStore !== undefined
+          this.#recordStore !== undefined
             ? readView?.getRecord === undefined
               ? row.raw
               : await readView.getRecord(row.physical as IStorageKey)
             : readView?.get === undefined
-              ? await store.get(row.physical as string, ctx)
+              ? await this.#store.get(row.physical as string, ctx)
               : await readView.get(row.physical as string)
-        if (raw === undefined || (!recordStore && raw === null)) continue
+        if (raw === undefined || (!this.#recordStore && raw === null)) continue
         let value: TDomain | undefined
         try {
           let envelope: IEnvelope
           try {
-            envelope = await decodeEnvelope(raw, ctx, runtime)
+            envelope = await this.#decodeEnvelope(raw, ctx, runtime)
           } catch (cause) {
             throw stageFailure(StorageRecordStage.decode, cause)
           }
-          value = await materialize(envelope, ctx, runtime)
+          value = await this.#materialize(envelope, ctx, runtime)
           if (value !== undefined) project?.(value)
         } catch (cause) {
           value = undefined
@@ -1122,9 +1246,9 @@ export const createRepository = <
             stage: (cause as Partial<IStageFailure>).stage ?? StorageRecordStage.validate,
             cause
           }
-          if (invalidAction(issue, options) === StorageInvalidRecordAction.throw)
-            throwInvalid(issue)
-          emitDiagnostic(EntityText.invalidRecord(name, row.id))
+          if (this.#invalidAction(issue, options) === StorageInvalidRecordAction.throw)
+            this.#throwInvalid(issue)
+          this.#emitDiagnostic(EntityText.invalidRecord(this.#name, row.id))
         }
         if (value !== undefined) {
           yield value
@@ -1132,22 +1256,22 @@ export const createRepository = <
         }
       }
     } finally {
-      candidates.clear()
+      scan.candidates.clear()
     }
   }
 
   /** Domain callbacks and bounded selection use the sole contract query executor. */
-  const listQuery = (
+  #listQuery = (
     options: IListSnapshot<TDomain> | undefined,
     ctx: IOperationContext | undefined,
     runtime: IEntityOperationRuntime,
     readView?: IRepositoryReadView,
     onRead?: () => void
   ): IRecordQueryBase<TDomain, IOperationContext> => {
-    const comparator = options?.orderBy ?? defaultOrderBy
+    const comparator = options?.orderBy ?? this.#defaultOrderBy
     if (comparator !== undefined && options?.limit === undefined)
       throw new StorageError(StorageErrorCode.invalidConfig, {
-        backend: store.backend,
+        backend: this.#store.backend,
         cause: new TypeError(EntityText.comparatorLimit)
       })
     const source = createRecordQuery<TDomain>({
@@ -1155,8 +1279,16 @@ export const createRepository = <
       pushdown: { source: EntityState.querySource, operations: [], operators: [] },
       execute: () =>
         entityIterator(
-          (async function* () {
-            for await (const value of streamImpl(
+          (async function* (
+            repositoryOwner: EntityRepositoryOwner<
+              TDomain,
+              TStored,
+              TIndexes,
+              TAugmentMethods,
+              TChangeFeed
+            >
+          ) {
+            for await (const value of repositoryOwner.#streamImpl(
               { ...options, orderBy: undefined, limit: undefined },
               ctx,
               runtime,
@@ -1164,8 +1296,16 @@ export const createRepository = <
               readView,
               onRead
             ))
-              yield [idOf(name, keyProp, value, store.backend), value] as const
-          })(),
+              yield [
+                idOf(
+                  repositoryOwner.#name,
+                  repositoryOwner.#keyProp,
+                  value,
+                  repositoryOwner.#store.backend
+                ),
+                value
+              ] as const
+          })(this),
           runtime
         )
     })
@@ -1182,7 +1322,7 @@ export const createRepository = <
             return options?.direction === 'prev' ? -result : result
           } catch (cause) {
             throw new StorageError(StorageErrorCode.extensionFailed, {
-              backend: store.backend,
+              backend: this.#store.backend,
               cause,
               operation: StorageOperation.entityOrderBy,
               extensionStage: 'comparator'
@@ -1197,13 +1337,13 @@ export const createRepository = <
    * New fallback write checks reuse the existing extension boundary without changing native
    * backfill identity.
    */
-  const projectUniqueWrite = (value: TDomain): IRecordIndexProjection => {
+  #projectUniqueWrite = (value: TDomain): IRecordIndexProjection => {
     try {
-      return projectEntityIndexes(uniqueIndexes, value, store.backend)
+      return projectEntityIndexes(this.#uniqueIndexes, value, this.#store.backend)
     } catch (cause) {
       throw normalizeError(
         cause,
-        store.backend,
+        this.#store.backend,
         StorageErrorCode.extensionFailed,
         StorageOperation.entityIndexProjection
       )
@@ -1211,7 +1351,7 @@ export const createRepository = <
   }
 
   /** Validate the final proposed rows through the same projection/ownership owner as native IDB. */
-  const validateUniqueRows = async (
+  #validateUniqueRows = async (
     changes: ReadonlyMap<string, IEntityUniqueMutation>,
     ctx: IOperationContext | undefined,
     runtime: IEntityOperationRuntime,
@@ -1223,38 +1363,38 @@ export const createRepository = <
      */
     const rows: Array<{ readonly key: IStorageKey; readonly projection: IRecordIndexProjection }> =
       []
-    for await (const value of streamImpl(undefined, ctx, runtime, false, readView)) {
+    for await (const value of this.#streamImpl(undefined, ctx, runtime, false, readView)) {
       /** Normal repository writes bind the domain key to the physical record identity. */
-      const id = idOf(name, keyProp, value, store.backend)
-      rows.push({ key: id, projection: projectUniqueWrite(value) })
+      const id = idOf(this.#name, this.#keyProp, value, this.#store.backend)
+      rows.push({ key: id, projection: this.#projectUniqueWrite(value) })
     }
     for (const change of changes.values())
       if (change.projection !== undefined)
         rows.push({ key: change.id, projection: change.projection })
-    collectUniqueIndexOwners(uniqueDefinitions, rows, store.backend)
+    collectUniqueIndexOwners(this.#uniqueDefinitions, rows, this.#store.backend)
   }
 
   /** Use one normal record revision as a phantom barrier, with no sidecar or duplicate queue. */
-  const validateUniqueRecordCommit = async (
+  #validateUniqueRecordCommit = async (
     tx: ITransactionScope,
     changes: ReadonlyMap<string, IEntityUniqueMutation>,
     ctx: IOperationContext | undefined,
     runtime: IEntityOperationRuntime
   ): Promise<void> => {
     if (
-      uniqueDefinitions.length === 0 ||
+      this.#uniqueDefinitions.length === 0 ||
       ![...changes.values()].some((change) => change.projection !== undefined)
     )
       return
-    const marker = repositoryUniqueWriteKey(name)
+    const marker = repositoryUniqueWriteKey(this.#name)
     await tx.getRecord(marker)
     const replaced = new Set(
       [...changes.values()].flatMap((change) => [
-        encodeFlatStorageKey(composeRepositoryKey(name, change.id)),
-        encodeFlatStorageKey(composeStructuredKey(name, change.id))
+        encodeFlatStorageKey(composeRepositoryKey(this.#name, change.id)),
+        encodeFlatStorageKey(composeStructuredKey(this.#name, change.id))
       ])
     )
-    await validateUniqueRows(changes, ctx, runtime, {
+    await this.#validateUniqueRows(changes, ctx, runtime, {
       getRecord: (key) =>
         replaced.has(encodeFlatStorageKey(key)) ? Promise.resolve(undefined) : tx.getRecord(key),
       iterateRecords: (range) => tx.iterateRecords(range),
@@ -1269,17 +1409,17 @@ export const createRepository = <
    * Capture only this entity's raw text; exact string equality avoids re-running codecs under a
    * lock.
    */
-  const snapshotUniqueValues = async (
+  #snapshotUniqueValues = async (
     ctx: IOperationContext | undefined
   ): Promise<ReadonlyMap<string, string>> => {
     /** Backend namespace isolation is already owned by its public keys/get methods. */
-    const prefix = flatKeyPrefix(name)
+    const prefix = flatKeyPrefix(this.#name)
     /** Missing keys are absent from the snapshot even if enumeration raced their deletion. */
     const snapshot = new Map<string, string>()
-    for (const key of await store.keys(ctx)) {
+    for (const key of await this.#store.keys(ctx)) {
       if (!key.startsWith(prefix)) continue
       /** Read each stored text once for subsequent schema/projection work. */
-      const raw = await store.get(key, ctx)
+      const raw = await this.#store.get(key, ctx)
       if (raw !== null) snapshot.set(key, raw)
     }
     return snapshot
@@ -1289,43 +1429,43 @@ export const createRepository = <
    * Preserve KV support: validate outside the critical section, then compare-and-commit under its
    * host owner.
    */
-  const writeUniqueValue = async (
+  #writeUniqueValue = async (
     id: IStorageKey,
     domain: TDomain,
     envelope: IEnvelope,
     ctx: IOperationContext | undefined
   ): Promise<void> => {
-    const commit = getBackendValueCommit(store)
+    const commit = getBackendValueCommit(this.#store)
     if (commit === undefined)
       throw new StorageContractError(StorageContractErrorCode.unsupported, {
-        backend: store.backend
+        backend: this.#store.backend
       })
     return withAbort(ctx, async (signal, context, runtime) => {
       /** One deadline covers preparation and lock admission; nested backend calls share its signal. */
       const operation = { ...context, signal, timeoutMs: undefined }
       /** All application encoding runs before lock admission, including asynchronous codecs. */
-      const raw = await encodeEnvelope(envelope, operation, runtime)
+      const raw = await this.#encodeEnvelope(envelope, operation, runtime)
       /** Incoming projection is prepared once; the old value at the same primary key is replaced. */
       const changes = new Map<string, IEntityUniqueMutation>([
         [
           encodeFlatStorageKey(id),
           {
             id,
-            projection: projectUniqueWrite(domain)
+            projection: this.#projectUniqueWrite(domain)
           }
         ]
       ])
       /** Capture the exact raw values whose materialized projections are checked. */
-      const snapshot = await snapshotUniqueValues(operation)
+      const snapshot = await this.#snapshotUniqueValues(operation)
       /** The current primary key is not a competing owner. */
-      const targetKey = composeFlatKey(name, id)
-      await validateUniqueRows(changes, operation, runtime, {
+      const targetKey = composeFlatKey(this.#name, id)
+      await this.#validateUniqueRows(changes, operation, runtime, {
         keys: async () => [...snapshot.keys()].filter((key) => key !== targetKey),
         get: async (key) => snapshot.get(key) ?? null
       })
       await commit(
         {
-          prefix: flatKeyPrefix(name),
+          prefix: flatKeyPrefix(this.#name),
           expected: [...snapshot],
           key: targetKey,
           value: raw as string
@@ -1336,44 +1476,53 @@ export const createRepository = <
   }
 
   /** Fixed ordering metadata concatenates two canonical encodings without taxing a synthetic key. */
-  const encodeIndexOrder = (key: IStorageKey, id: IStorageKey): Uint8Array => {
-    const index = encodeOrderedStorageKey(key, store.backend)
-    const primary = encodeOrderedStorageKey(id, store.backend)
+  #encodeIndexOrder = (key: IStorageKey, id: IStorageKey): Uint8Array => {
+    const index = encodeOrderedStorageKey(key, this.#store.backend)
+    const primary = encodeOrderedStorageKey(id, this.#store.backend)
     const encoded = new Uint8Array(index.byteLength + primary.byteLength)
     encoded.set(index)
     encoded.set(primary, index.byteLength)
     return encoded
   }
 
-  /** A ready handle is a captured backend fact; bound transactions never create or backfill it. */
-  let readyHandle: IRecordIndexHandle | undefined
-  /** Index collection and streaming share native cursors, filtering and the sole bounded heap. */
-  /** Native and fallback index rows share one materializer and canonical metadata ordering. */
-  type IMatch = { readonly id: IStorageKey; readonly key: IStorageKey; readonly value: TDomain }
-  const indexRows = (
-    snapshot: IIndexedListSnapshot,
+  /** Perform the repository indexRows operation using its own state. */
+  #indexRows = (
+    snapshot: IIndexedListSnapshot<TDomain>,
     ctx: IOperationContext | undefined,
     readView?: IRepositoryReadView,
     orderedSource = true,
     onRead?: () => void
-  ): IStorageIterator<readonly [IStorageKey, IMatch]> => {
-    const index = config.indexes[snapshot.index]
+  ): IStorageIterator<readonly [IStorageKey, IMatch<TDomain>]> => {
+    const index = this.#config.indexes[snapshot.index]
     if (index === undefined)
       throw new StorageError(StorageErrorCode.invalidConfig, {
-        backend: store.backend,
-        cause: new TypeError(EntityText.indexMissing(name, snapshot.index))
+        backend: this.#store.backend,
+        cause: new TypeError(EntityText.indexMissing(this.#name, snapshot.index))
       })
     const runtime = readView?.runtime ?? createStorageOperationRuntime()
     return entityIterator(
-      (async function* () {
+      (async function* (
+        repositoryOwner: EntityRepositoryOwner<
+          TDomain,
+          TStored,
+          TIndexes,
+          TAugmentMethods,
+          TChangeFeed
+        >
+      ) {
         if (snapshot.options?.limit === 0) return
         const seen = new Set<string>()
-        const ordered = createOrderedRecordIndex<IMatch>()
-        const match = (value: TDomain): IMatch | undefined => {
-          const id = idOf(name, keyProp, value, store.backend)
+        const ordered = createOrderedRecordIndex<IMatch<TDomain>>()
+        const match = (value: TDomain): IMatch<TDomain> | undefined => {
+          const id = idOf(
+            repositoryOwner.#name,
+            repositoryOwner.#keyProp,
+            value,
+            repositoryOwner.#store.backend
+          )
           const identity = encodeFlatStorageKey(id)
           if (seen.has(identity)) return
-          const projection = index.project(value, store.backend)
+          const projection = index.project(value, repositoryOwner.#store.backend)
           const first = minimumProjectedIndexKey(projection, snapshot.range)
           if (first === undefined) return
           seen.add(identity)
@@ -1381,17 +1530,17 @@ export const createRepository = <
         }
         try {
           if (readView === undefined) {
-            const capability = asRecordIndexBackfillStore<unknown>(store)
+            const capability = asRecordIndexBackfillStore<unknown>(repositoryOwner.#store)
             if (capability !== undefined) {
               try {
-                await backfillIndexes(ctx)
+                await repositoryOwner.#backfillIndexes(ctx)
                 const handle = await capability.ensureRecordIndexes(
-                  name,
-                  Object.values(config.indexes).map((item) => item.definition),
+                  repositoryOwner.#name,
+                  Object.values(repositoryOwner.#config.indexes).map((item) => item.definition),
                   ctx
                 )
                 if ((await capability.getRecordIndexReadiness(handle, ctx)).status === 'complete')
-                  readyHandle = handle
+                  repositoryOwner.#readyHandle = handle
               } catch (cause) {
                 if (!isBackfillContentionFailure(cause)) throw cause
               }
@@ -1399,8 +1548,8 @@ export const createRepository = <
           }
           /** Native index admission retains its original lazy position after source preparation. */
           const secondaryStore =
-            readView === undefined && recordStore !== undefined
-              ? backend.secondaryStore()
+            readView === undefined && repositoryOwner.#recordStore !== undefined
+              ? repositoryOwner.#backend.secondaryStore()
               : undefined
           const native =
             readView === undefined
@@ -1410,7 +1559,8 @@ export const createRepository = <
                 : undefined
               : readView.iterateRecordIndex
           /** Bound operations carry only readiness proved by their own current native scope. */
-          const selectedHandle = readView === undefined ? readyHandle : readView.readyHandle
+          const selectedHandle =
+            readView === undefined ? repositoryOwner.#readyHandle : readView.readyHandle
           if (selectedHandle !== undefined && native !== undefined) {
             for await (const [physical, raw] of native({
               handle: selectedHandle,
@@ -1419,10 +1569,10 @@ export const createRepository = <
               direction: snapshot.options?.direction
             })) {
               onRead?.()
-              let current: IMatch | undefined
+              let current: IMatch<TDomain> | undefined
               try {
-                const value = await materialize(
-                  await decodeEnvelope(raw, ctx, runtime),
+                const value = await repositoryOwner.#materialize(
+                  await repositoryOwner.#decodeEnvelope(raw, ctx, runtime),
                   ctx,
                   runtime
                 )
@@ -1434,19 +1584,27 @@ export const createRepository = <
                   stage: (cause as Partial<IStageFailure>).stage ?? StorageRecordStage.validate,
                   cause
                 }
-                if (invalidAction(issue, snapshot.options) === StorageInvalidRecordAction.throw)
-                  throwInvalid(issue)
-                emitDiagnostic(EntityText.invalidRecord(name, physical))
+                if (
+                  repositoryOwner.#invalidAction(issue, snapshot.options) ===
+                  StorageInvalidRecordAction.throw
+                )
+                  repositoryOwner.#throwInvalid(issue)
+                repositoryOwner.#emitDiagnostic(
+                  EntityText.invalidRecord(repositoryOwner.#name, physical)
+                )
               }
               if (current !== undefined) {
                 if (!orderedSource) yield [current.id, current] as const
-                else ordered.set(encodeIndexOrder(current.key, current.id), current)
+                else
+                  ordered.set(repositoryOwner.#encodeIndexOrder(current.key, current.id), current)
               }
             }
           } else {
-            emitDiagnostic(EntityText.indexFallback(name, snapshot.index))
-            let projected: IMatch | undefined
-            for await (const _value of streamImpl(
+            repositoryOwner.#emitDiagnostic(
+              EntityText.indexFallback(repositoryOwner.#name, snapshot.index)
+            )
+            let projected: IMatch<TDomain> | undefined
+            for await (const _value of repositoryOwner.#streamImpl(
               { onInvalid: snapshot.options?.onInvalid },
               ctx,
               runtime,
@@ -1460,7 +1618,7 @@ export const createRepository = <
               const current = projected
               if (current === undefined) continue
               if (!orderedSource) yield [current.id, current] as const
-              else ordered.set(encodeIndexOrder(current.key, current.id), current)
+              else ordered.set(repositoryOwner.#encodeIndexOrder(current.key, current.id), current)
             }
           }
           for (
@@ -1473,36 +1631,37 @@ export const createRepository = <
           ordered.clear()
           seen.clear()
         }
-      })(),
+      })(this),
       runtime
     )
   }
 
-  const createIndexQuery = (
-    snapshot: IIndexedListSnapshot,
+  /** Perform the repository createIndexQuery operation using its own state. */
+  #createIndexQuery = (
+    snapshot: IIndexedListSnapshot<TDomain>,
     ctx: IOperationContext | undefined,
     readView?: IRepositoryReadView,
     onRead?: () => void
   ): IQueryResult<TDomain, IOperationContext> => {
     ctx = snapshotOperationContext(ctx)
-    const index = config.indexes[snapshot.index]
+    const index = this.#config.indexes[snapshot.index]
     if (index === undefined)
       throw new StorageError(StorageErrorCode.invalidConfig, {
-        backend: store.backend,
-        cause: new TypeError(EntityText.indexMissing(name, snapshot.index))
+        backend: this.#store.backend,
+        cause: new TypeError(EntityText.indexMissing(this.#name, snapshot.index))
       })
-    const comparator = snapshot.options?.orderBy ?? defaultOrderBy
+    const comparator = snapshot.options?.orderBy ?? this.#defaultOrderBy
     if (comparator !== undefined && snapshot.options?.limit === undefined)
       throw new StorageError(StorageErrorCode.invalidConfig, {
-        backend: store.backend,
+        backend: this.#store.backend,
         cause: new TypeError(EntityText.comparatorLimit)
       })
-    const source = createRecordQuery<IMatch>({
+    const source = createRecordQuery<IMatch<TDomain>>({
       asyncDisposeKey,
       pushdown: { source: EntityState.querySource, operations: [], operators: [] },
-      execute: () => indexRows(snapshot, ctx, readView, comparator === undefined, onRead)
+      execute: () => this.#indexRows(snapshot, ctx, readView, comparator === undefined, onRead)
     })
-    let query: IRecordQueryBase<IMatch, IOperationContext> = source
+    let query: IRecordQueryBase<IMatch<TDomain>, IOperationContext> = source
     if (comparator !== undefined)
       query = source
         .orderByComparator((left, right) => {
@@ -1519,7 +1678,7 @@ export const createRepository = <
             return snapshot.options?.direction === 'prev' ? -result : result
           } catch (cause) {
             throw new StorageError(StorageErrorCode.extensionFailed, {
-              backend: store.backend,
+              backend: this.#store.backend,
               cause,
               operation: StorageOperation.entityOrderBy,
               extensionStage: 'comparator'
@@ -1530,8 +1689,9 @@ export const createRepository = <
     else if (snapshot.options?.limit !== undefined) query = source.limit(snapshot.options.limit)
     return query.select((match) => match.value)
   }
+
   /** One scoped source remains registered through mapping, buffering and actual cleanup. */
-  const scopedQuerySource = (
+  #scopedQuerySource = (
     scope: ITransactionScope,
     selection: IEntityQuerySourceSelection<TDomain>,
     onRead?: () => void,
@@ -1539,144 +1699,35 @@ export const createRepository = <
     physicalIds?: Map<string, IStorageKey>,
     accepts?: (value: TDomain) => boolean
   ): IStorageIterator<readonly [IStorageKey, TDomain]> => {
-    backend.assertScope(scope)
+    this.#backend.assertScope(scope)
     const source = scope.iterateRecords()
-    const rows = createOrderedRecordIndex<readonly [IStorageKey, TDomain]>()
-    /** Mutation reuses this existing deduplication table to retain actual physical identities. */
-    const seen = physicalIds ?? new Set<string>()
-    let prepared = false
-    let initialized = false
-    let cursor: IStorageIterator<[IStorageKey, unknown]> | undefined
-    let item: typeof rows.first
+    /** Only this source can advance or release its cursor state. */
+    const sourceContext: IEntityScopedSourceContext<TDomain> = {
+      selection,
+      onRead,
+      orderedSource,
+      physicalIds,
+      accepts,
+      rows: createOrderedRecordIndex<readonly [IStorageKey, TDomain]>(),
+      seen: physicalIds ?? new Set<string>(),
+      prepared: false,
+      initialized: false,
+      item: undefined
+    }
     const derived = deriveTransactionIterator<
       [IStorageKey, unknown],
       readonly [IStorageKey, TDomain]
     >(
       source,
-      async (next, _fail, currentScope) => {
-        const current = currentScope as ITransactionScope
-        backend.assertScope(current)
-        const context = readTransactionOperationContext(current)
-        const runtime = entityRuntime(current)
-        const index = selection.index === undefined ? undefined : config.indexes[selection.index]
-        if (!initialized) {
-          initialized = true
-          const handle =
-            readyHandle !== undefined &&
-            index !== undefined &&
-            (await current.isRecordIndexReady?.(readyHandle))
-              ? readyHandle
-              : undefined
-          if (handle !== undefined && current.iterateRecordIndex !== undefined)
-            cursor = current.iterateRecordIndex({
-              handle,
-              index: selection.index!,
-              range: selection.range
-            })
-        }
-        if (!prepared) {
-          while (true) {
-            const result =
-              cursor === undefined ? await next() : await nextTransactionIterator(current, cursor)
-            if (result.done) break
-            const [physical, raw] = result.value
-            const canonical = decodeRepositoryKey(name, physical)
-            const legacy =
-              Array.isArray(physical) && physical.length === 2 && physical[0] === name
-                ? (physical[1] as IStorageKey)
-                : undefined
-            const physicalId = canonical ?? legacy
-            if (physicalId === undefined) continue
-            onRead?.()
-            if (
-              legacy !== undefined &&
-              canonical === undefined &&
-              (await current.getRecord(composeRepositoryKey(name, legacy))) !== undefined
-            )
-              continue
-            let value: TDomain | undefined
-            try {
-              value = await materialize(
-                await decodeEnvelope(raw, context, runtime),
-                context,
-                runtime
-              )
-            } catch (cause) {
-              const issue: IInvalidRecordIssue<TDomain> = {
-                key: physicalId,
-                raw,
-                stage: (cause as Partial<IStageFailure>).stage ?? StorageRecordStage.validate,
-                cause
-              }
-              if (
-                invalidAction(issue, { onInvalid: selection.onInvalid }) ===
-                StorageInvalidRecordAction.throw
-              )
-                throwInvalid(issue)
-              emitDiagnostic(EntityText.invalidRecord(name, physicalId))
-            }
-            if (value === undefined) continue
-            const id = idOf(name, keyProp, value, store.backend)
-            const identity = encodeFlatStorageKey(id)
-            if (seen.has(identity)) continue
-            let ordering: IStorageKey = [id]
-            let encodedOrdering: Uint8Array | undefined
-            if (index !== undefined) {
-              let projection: ReturnType<typeof index.project>
-              try {
-                projection = index.project(value, store.backend)
-              } catch (cause) {
-                const issue: IInvalidRecordIssue<TDomain> = {
-                  key: physicalId,
-                  raw,
-                  stage: StorageRecordStage.validate,
-                  cause
-                }
-                if (
-                  invalidAction(issue, { onInvalid: selection.onInvalid }) ===
-                  StorageInvalidRecordAction.throw
-                )
-                  throwInvalid(issue)
-                emitDiagnostic(EntityText.invalidRecord(name, physicalId))
-                continue
-              }
-              const first = minimumProjectedIndexKey(projection, selection.range)
-              if (first === undefined) continue
-              ordering = [first, id]
-              if (orderedSource) encodedOrdering = encodeIndexOrder(first, id)
-            } else if (!isStorageKeyInRange(id, selection.range)) continue
-            if (seen instanceof Map) seen.set(identity, physicalId)
-            else seen.add(identity)
-            if (accepts !== undefined && !accepts(value)) continue
-            if (!orderedSource) return { done: false, value: [ordering, value] as const }
-            rows.set(encodedOrdering ?? encodeOrderedStorageKey(id, store.backend), [
-              ordering,
-              value
-            ])
-          }
-          prepared = true
-          item = rows.first
-        }
-        if (item === undefined) return { done: true, value: undefined }
-        const value = item.value
-        item = item.next
-        return { done: false, value }
-      },
-      async () => {
-        try {
-          await cursor?.dispose()
-        } finally {
-          rows.clear()
-          if (physicalIds === undefined) seen.clear()
-        }
-      }
+      (next, _fail, current) =>
+        this.#advanceScopedEntitySource(sourceContext, next, current as ITransactionScope),
+      () => this.#closeScopedEntitySource(sourceContext)
     )
-    // The source was just registered by the authentic scope; derivation shares that original owner.
     return derived!
   }
 
   /** Observation wraps the same original core for both fluent and legacy option adapters. */
-  const observeQueryRead = <R>(
+  #observeQueryRead = <R>(
     invoke: () => Promise<R>,
     plan: IEntityQueryPlan,
     selection: IEntityQuerySourceSelection<TDomain>,
@@ -1684,11 +1735,12 @@ export const createRepository = <
     openedCounter: () => { readCount: number } | undefined,
     returnedCount: (value: R) => number
   ): Promise<R> => {
-    if (queryStages === undefined) return invoke()
-    const stages = current === undefined ? queryStages : queryStages?.forTransaction(current)
+    if (this.#queryStages === undefined) return invoke()
+    const stages =
+      current === undefined ? this.#queryStages : this.#queryStages?.forTransaction(current)
     const started = stages === undefined ? 0 : systemScheduler.now()
     if (stages?.beforeQuery !== undefined)
-      observeEntity(stages, () => stages.beforeQuery!(name, selection.index, plan))
+      observeEntity(stages, () => stages.beforeQuery!(this.#name, selection.index, plan))
     let pending: Promise<R>
     try {
       pending = invoke()
@@ -1700,7 +1752,7 @@ export const createRepository = <
       (values) => {
         if (stages?.afterQuery !== undefined)
           observeEntity(stages, () =>
-            stages.afterQuery!(name, selection.index, {
+            stages.afterQuery!(this.#name, selection.index, {
               readCount: counter?.readCount ?? 0,
               returnedCount: returnedCount(values),
               elapsedMs: systemScheduler.now() - started,
@@ -1713,7 +1765,7 @@ export const createRepository = <
         if (stages?.onQueryError !== undefined)
           observeEntity(stages, () =>
             stages.onQueryError!(
-              name,
+              this.#name,
               selection.index,
               readStorageHookFailureCode(cause, stages.report)
             )
@@ -1722,402 +1774,449 @@ export const createRepository = <
       }
     )
   }
-  const observeQueryStream = <R>(
+
+  /** Perform the repository observeQueryStream operation using its own state. */
+  #observeQueryStream = <R>(
     iterator: IStorageIterator<R>,
     plan: IEntityQueryPlan,
     selection: IEntityQuerySourceSelection<TDomain>,
     counter: { readCount: number } | undefined
   ): IStorageIterator<R> => {
-    let returnedCount = 0
-    let elapsedMs = 0
-    const advance = async (
-      next: () => Promise<IteratorResult<R>>,
-      current?: ITransactionScope
-    ): Promise<IteratorResult<R>> => {
-      const stages = current === undefined ? queryStages : queryStages?.forTransaction(current)
-      const started = stages === undefined ? 0 : systemScheduler.now()
-      if (stages?.beforeQuery !== undefined)
-        observeEntity(stages, () => stages.beforeQuery!(name, selection.index, plan))
-      try {
-        const value = await next()
-        if (!value.done) returnedCount++
-        if (stages !== undefined) elapsedMs += systemScheduler.now() - started
-        if (stages?.afterQuery !== undefined)
-          observeEntity(stages, () =>
-            stages.afterQuery!(name, selection.index, {
-              readCount: counter?.readCount ?? 0,
-              returnedCount,
-              elapsedMs,
-              completed: value.done === true
-            })
-          )
-        return value
-      } catch (cause) {
-        if (stages?.onQueryError !== undefined)
-          observeEntity(stages, () =>
-            stages.onQueryError!(
-              name,
-              selection.index,
-              readStorageHookFailureCode(cause, stages.report)
-            )
-          )
-        throw cause
-      }
+    if (this.#queryStages === undefined) return iterator
+    /** Diagnostics accumulate only for this actual iterator lifetime. */
+    const observation: IEntityQueryObservation<TDomain, R> = {
+      iterator,
+      plan,
+      selection,
+      counter,
+      returnedCount: 0,
+      elapsedMs: 0
     }
-    if (queryStages === undefined) return iterator
     const derived = deriveTransactionIterator(iterator, (next, _fail, current) =>
-      advance(next, current as ITransactionScope)
+      this.#advanceObservedEntityQuery(observation, next, current as ITransactionScope)
     )
     if (derived !== undefined) return derived
     return {
-      next: () => advance(() => iterator.next()),
+      next: () => this.#advanceObservedEntityQuery(observation, () => iterator.next()),
       return: iterator.return === undefined ? undefined : (value) => iterator.return!(value),
-      dispose: iterator.dispose,
-      [asyncDisposeKey]: iterator[asyncDisposeKey],
+      dispose: () => iterator.dispose(),
+      [asyncDisposeKey]: () => iterator[asyncDisposeKey](),
       [Symbol.asyncIterator]() {
         return this
       }
     }
   }
+
   /** Source adaptation contributes no second AST or query executor. */
-  const queryFor = <C extends IOperationContext | undefined>(
+  /** Bind one entity query to its original scope and observer facts. */
+  #queryFor = <C extends IOperationContext | undefined>(
     scope?: ITransactionScope
   ): IEntityQuery<TDomain, TIndexes, C, TAugmentMethods> => {
-    /** Each opened source owns one numeric counter; terminals capture it synchronously on open. */
-    let opened: { readCount: number } | undefined
-    /** Only immutable observer flags are carried through synchronous source opening. */
-    let openingPlan: IEntityQueryPlan | undefined
-    let openingSelection: IEntityQuerySourceSelection<TDomain> | undefined
+    /** Synchronous terminal opening shares these facts with its actual source. */
+    const execution: IEntityQueryExecution<TDomain> = { scope }
     return createEntityQuery<TDomain, TIndexes, C, TAugmentMethods>({
-      predicate: (fn) => (value) => {
-        try {
-          const result = fn(value)
-          const inspected = inspectThenable(result)
-          if (typeof result !== 'boolean') {
-            observeThenableRejection(result, inspected, createStorageOperationRuntime().reporter)
-            throw new TypeError(EntityText.queryPredicateBoolean)
-          }
-          return result
-        } catch (cause) {
-          throw new StorageError(StorageErrorCode.extensionFailed, {
-            backend: store.backend,
-            cause,
-            operation: StorageOperation.queryWhere,
-            extensionStage: 'where'
-          })
-        }
-      },
-      selector: (fn) => (value) => {
-        try {
-          const result = fn(value)
-          const inspected = inspectThenable(result)
-          if ('error' in inspected) throw inspected.error
-          if (inspected.then !== undefined) {
-            observeThenableRejection(result, inspected, createStorageOperationRuntime().reporter)
-            throw new TypeError(EntityText.querySelectorKey)
-          }
-          try {
-            return snapshotStorageKey(result, store.backend)
-          } catch (cause) {
-            throw new TypeError(EntityText.querySelectorKey, { cause })
-          }
-        } catch (cause) {
-          throw new StorageError(StorageErrorCode.extensionFailed, {
-            backend: store.backend,
-            cause,
-            operation: StorageOperation.querySelector,
-            extensionStage: 'selector'
-          })
-        }
-      },
-      mapper: (fn) => async (value) => {
-        try {
-          return await fn(value)
-        } catch (cause) {
-          throw new StorageError(StorageErrorCode.extensionFailed, {
-            backend: store.backend,
-            cause,
-            operation: StorageOperation.querySelect,
-            extensionStage: 'select'
-          })
-        }
-      },
-      comparator: (fn) => (left, right) => {
-        try {
-          const result = fn(left, right)
-          if (!Number.isFinite(result)) {
-            observeThenableRejection(
-              result,
-              inspectThenable(result),
-              createStorageOperationRuntime().reporter
-            )
-            throw new TypeError(StorageErrorText.entityComparatorInvalid)
-          }
-          return result
-        } catch (cause) {
-          throw new StorageError(StorageErrorCode.extensionFailed, {
-            backend: store.backend,
-            cause,
-            operation: StorageOperation.queryComparator,
-            extensionStage: 'comparator'
-          })
-        }
-      },
-      methods: getBackendEntityQueryMethods(store) as TAugmentMethods | undefined,
-      defaultComparator: defaultOrderBy,
-      run: (invoke, plan, selection, returnedCount) => {
-        const collect = (current?: ITransactionScope) => {
-          const previous = openingPlan
-          const previousSelection = openingSelection
-          openingPlan = plan
-          openingSelection = selection
-          try {
-            return observeQueryRead(invoke, plan, selection, current, () => opened, returnedCount)
-          } finally {
-            openingPlan = previous
-            openingSelection = previousSelection
-          }
-        }
-        return scope === undefined
-          ? collect()
-          : runTransactionOperation(scope, (current) => collect(current))
-      },
-      stream: (open, plan, selection) => {
-        const previous = openingPlan
-        const previousSelection = openingSelection
-        openingPlan = plan
-        openingSelection = selection
-        let iterator: ReturnType<typeof open>
-        try {
-          iterator = open()
-        } finally {
-          openingPlan = previous
-          openingSelection = previousSelection
-        }
-        return observeQueryStream(iterator, plan, selection, opened)
-      },
-      missingLimit: () => {
-        throw new StorageError(StorageErrorCode.invalidConfig, {
-          backend: store.backend,
-          cause: new TypeError(EntityText.comparatorLimit)
-        })
-      },
-      invalidState: (cause) => {
-        throw new StorageError(StorageErrorCode.invalidConfig, {
-          backend: store.backend,
-          cause: cause ?? new TypeError(EntityText.queryState)
-        })
-      },
-      invalid: (action) => {
-        normalizeListOptions({ onInvalid: action as IInvalidRecordAction })
-      },
-      range: (range) => snapshotKeyRange(range, store.backend)!,
-      index: (index, match) => {
-        const range =
-          match === undefined
-            ? undefined
-            : isPlainObject(match) && ('lower' in match || 'upper' in match)
-              ? match
-              : { lower: match, upper: match }
-        const snapshot = createIndexedListSnapshot(
-          index,
-          range as import('@migaia/storage-contract').IKeyRange | undefined,
-          undefined
-        )
-        if (config.indexes[index] === undefined)
-          throw new StorageError(StorageErrorCode.invalidConfig, {
-            backend: store.backend,
-            cause: new TypeError(EntityText.indexMissing(name, index))
-          })
-        return { index, range: snapshot.range }
-      },
-      source: (selectedSource): IRecordQuerySource => ({
-        asyncDisposeKey,
-        // A uniform author container permits terminal-local index selection without shrinking key budgets.
-        tieBreakByKey: { direction: 'next', parts: true },
-        pushdown: { source: EntityState.querySource, operations: [], operators: [] },
-        ...(scope !== undefined || backend.watchRecords === undefined
-          ? {}
-          : {
-              watch: ({ ctx }: import('@migaia/storage-contract').IRecordQueryInput) =>
-                backend.watchRecords!(ctx)
-            }),
-        plan: (conditions) => {
-          /** Explicit source choice precedes automatic static condition selection. */
-          const explicit = selectedSource.index !== undefined || selectedSource.range !== undefined
-          const automatic = explicit
-            ? undefined
-            : chooseEntityQueryIndex(config.indexes, conditions, store.backend)
-          const selection = { ...(automatic?.selection ?? selectedSource) }
-          const index = selection.index === undefined ? undefined : config.indexes[selection.index]
-          return {
-            fullScan: true,
-            selection,
-            pushdown: {
-              source: EntityState.querySource,
-              ...(selection.index === undefined ? {} : { index: selection.index }),
-              operations: index === undefined ? [] : [QueryOperation.where],
-              operators: index === undefined ? [] : ENTITY_QUERY_INDEX_OPERATORS,
-              ...(index === undefined
-                ? {}
-                : {
-                    canPushCondition: (condition: IQueryCondition) =>
-                      supportsEntityIndexCondition(config.indexes, condition)
-                  })
-            },
-            sourceReason: explicit ? EntityText.queryIndexExplicit : automatic!.sourceReason,
-            sourceCandidates: explicit
-              ? Object.keys(config.indexes).map((index) => ({
-                  index,
-                  reason: EntityText.queryIndexExplicit
-                }))
-              : automatic!.sourceCandidates
-          }
-        },
-        mutate: (request, run) => {
-          if (recordStore === undefined)
-            throw new StorageContractError(StorageContractErrorCode.unsupported, {
-              backend: store.backend
-            })
-          /** Capture the same observer/source facts before the original transaction can suspend. */
-          const policy = openingSelection ?? selectedSource
-          const orderedSource = openingPlan?.hasOrder !== true
-          const counter = queryStages === undefined ? undefined : { readCount: 0 }
-          opened = counter
-          const onRead =
-            counter === undefined
-              ? undefined
-              : () => {
-                  counter.readCount++
-                }
-          /** The authentic operation owns selection, repository writes and the existing first error. */
-          const apply = (target: ITransactionScope): Promise<number> =>
-            runTransactionOperation(target, async (current) => {
-              backend.assertScope(current)
-              /** This is the source's original seen table, not an index or a retained row cache. */
-              const physicalIds = new Map<string, IStorageKey>()
-              try {
-                return await run({
-                  execute: ({ selection: planned, conditions }) => {
-                    const selection = {
-                      ...((planned as IEntityQuerySourceSelection<TDomain> | undefined) ??
-                        selectedSource),
-                      onInvalid: policy.onInvalid
-                    }
-                    const predicates = conditions.map((condition) =>
-                      compileStorageQueryCondition<TDomain>(condition)
-                    )
-                    return scopedQuerySource(
-                      current,
-                      selection,
-                      onRead,
-                      orderedSource,
-                      physicalIds,
-                      (value) => predicates.every((predicate) => predicate(value))
-                    )
-                  },
-                  accept: async (_key, value) => {
-                    const id = idOf(name, keyProp, value as TDomain, store.backend)
-                    const physicalId = physicalIds.get(encodeFlatStorageKey(id))
-                    if (physicalId === undefined)
-                      throw new StorageError(StorageErrorCode.invalidConfig, {
-                        backend: store.backend,
-                        cause: new TypeError(EntityText.queryIdentityChanged)
-                      })
-                    /** Count only rows still present in this same draft after selection callbacks. */
-                    const raw =
-                      (await current.getRecord(composeRepositoryKey(name, physicalId))) ??
-                      (await current.getRecord(composeStructuredKey(name, physicalId)))
-                    if (raw === undefined) return false
-                    if (request.operation === RecordQueryMethod.delete)
-                      await bindRepository(current).remove(physicalId)
-                    else
-                      await bindRepository(current, physicalId).put({
-                        ...(value as TDomain),
-                        ...request.patch
-                      })
-                    return true
-                  }
-                })
-              } finally {
-                physicalIds.clear()
-              }
-            })
-          return scope === undefined
-            ? recordStore.transaction(apply, { ...request.ctx, concurrency: request.concurrency })
-            : apply(scope)
-        },
-        execute: ({ ctx, conditions, selection: planned }) => {
-          const selection = {
-            ...((planned as IEntityQuerySourceSelection<TDomain> | undefined) ?? selectedSource),
-            onInvalid: (openingSelection ?? selectedSource).onInvalid
-          }
-          const predicates = conditions.map((condition) =>
-            compileStorageQueryCondition<TDomain>(condition)
-          )
-          const accepts = (value: TDomain) => predicates.every((predicate) => predicate(value))
-          const counter = queryStages === undefined ? undefined : { readCount: 0 }
-          opened = counter
-          const onRead =
-            counter === undefined
-              ? undefined
-              : () => {
-                  counter.readCount++
-                }
-          const orderedSource = openingPlan?.hasOrder !== true
-          if (scope !== undefined)
-            return scopedQuerySource(scope, selection, onRead, orderedSource, undefined, accepts)
-          const context = snapshotOperationContext(ctx)
-          const runtime = createStorageOperationRuntime()
-          return entityIterator(
-            (async function* () {
-              if (selection.index !== undefined) {
-                const snapshot = createIndexedListSnapshot(selection.index, selection.range, {
-                  onInvalid: selection.onInvalid
-                })
-                for await (const [id, row] of indexRows(
-                  snapshot,
-                  context,
-                  undefined,
-                  orderedSource,
-                  onRead
-                ))
-                  if (accepts(row.value)) yield [[row.key, id], row.value] as const
-              } else {
-                for await (const value of streamImpl(
-                  { range: selection.range, onInvalid: selection.onInvalid },
-                  context,
-                  runtime,
-                  orderedSource,
-                  undefined,
-                  onRead
-                ))
-                  if (accepts(value))
-                    yield [[idOf(name, keyProp, value, store.backend)], value] as const
-              }
-            })(),
-            runtime
-          )
-        }
-      })
+      predicate: this.#queryPredicate,
+      selector: this.#querySelector,
+      mapper: this.#queryMapper,
+      comparator: this.#queryComparator,
+      methods: getBackendEntityQueryMethods(this.#store) as TAugmentMethods | undefined,
+      defaultComparator: this.#defaultOrderBy,
+      run: (invoke, plan, selection, count) =>
+        this.#runEntityQuery(execution, invoke, plan, selection, count),
+      stream: (open, plan, selection) => this.#streamEntityQuery(execution, open, plan, selection),
+      missingLimit: this.#queryMissingLimit,
+      invalidState: this.#queryInvalidState,
+      invalid: this.#queryInvalid,
+      range: this.#queryRange,
+      index: this.#queryIndex,
+      source: (selection) => this.#createEntitySource(execution, selection)
     })
   }
+  /** Adapt the application predicate callback at the entity boundary. */
+  #queryPredicate: Parameters<
+    typeof createEntityQuery<TDomain, TIndexes, IOperationContext, TAugmentMethods>
+  >[0]['predicate'] = (fn) => (value) => {
+    try {
+      const result = fn(value)
+      if (typeof result !== 'boolean') {
+        void Promise.resolve(result).catch(createStorageOperationRuntime().reporter)
+        throw new TypeError(EntityText.queryPredicateBoolean)
+      }
+      return result
+    } catch (cause) {
+      throw new StorageError(StorageErrorCode.extensionFailed, {
+        backend: this.#store.backend,
+        cause,
+        operation: StorageOperation.queryWhere,
+        extensionStage: 'where'
+      })
+    }
+  }
+  /** Adapt the application selector callback at the entity boundary. */
+  #querySelector: Parameters<
+    typeof createEntityQuery<TDomain, TIndexes, IOperationContext, TAugmentMethods>
+  >[0]['selector'] = (fn) => (value) => {
+    try {
+      const result = fn(value)
+      try {
+        /** Later callbacks can mutate the returned key while the query retains ordering state. */
+        return snapshotStorageKey(result, this.#store.backend)
+      } catch (cause) {
+        void Promise.resolve(result).catch(createStorageOperationRuntime().reporter)
+        throw new TypeError(EntityText.querySelectorKey, { cause })
+      }
+    } catch (cause) {
+      throw new StorageError(StorageErrorCode.extensionFailed, {
+        backend: this.#store.backend,
+        cause,
+        operation: StorageOperation.querySelector,
+        extensionStage: 'selector'
+      })
+    }
+  }
+  /** Adapt the application mapper callback at the entity boundary. */
+  #queryMapper: Parameters<
+    typeof createEntityQuery<TDomain, TIndexes, IOperationContext, TAugmentMethods>
+  >[0]['mapper'] = (fn) => async (value) => {
+    try {
+      return await fn(value)
+    } catch (cause) {
+      throw new StorageError(StorageErrorCode.extensionFailed, {
+        backend: this.#store.backend,
+        cause,
+        operation: StorageOperation.querySelect,
+        extensionStage: 'select'
+      })
+    }
+  }
+  /** Adapt the application comparator callback at the entity boundary. */
+  #queryComparator: Parameters<
+    typeof createEntityQuery<TDomain, TIndexes, IOperationContext, TAugmentMethods>
+  >[0]['comparator'] = (fn) => (left, right) => {
+    try {
+      const result = fn(left, right)
+      if (!Number.isFinite(result)) {
+        void Promise.resolve(result).catch(createStorageOperationRuntime().reporter)
+        throw new TypeError(StorageErrorText.entityComparatorInvalid)
+      }
+      return result
+    } catch (cause) {
+      throw new StorageError(StorageErrorCode.extensionFailed, {
+        backend: this.#store.backend,
+        cause,
+        operation: StorageOperation.queryComparator,
+        extensionStage: 'comparator'
+      })
+    }
+  }
+  /** Carry terminal observer facts through the original transaction operation. */
+  #runEntityQuery = <R>(
+    execution: IEntityQueryExecution<TDomain>,
+    invoke: () => Promise<R>,
+    plan: IEntityQueryPlan,
+    selection: IEntityQuerySourceSelection<TDomain>,
+    returnedCount: (value: R) => number
+  ): Promise<R> => {
+    const collect = (current?: ITransactionScope) => {
+      const previous = execution.openingPlan
+      const previousSelection = execution.openingSelection
+      execution.openingPlan = plan
+      execution.openingSelection = selection
+      try {
+        return this.#observeQueryRead(
+          invoke,
+          plan,
+          selection,
+          current,
+          () => execution.opened,
+          returnedCount
+        )
+      } finally {
+        execution.openingPlan = previous
+        execution.openingSelection = previousSelection
+      }
+    }
+    return execution.scope === undefined
+      ? collect()
+      : runTransactionOperation(execution.scope, (current) => collect(current))
+  }
+  /** Open one stream while publishing only its synchronous observer facts. */
+  #streamEntityQuery = <R>(
+    execution: IEntityQueryExecution<TDomain>,
+    open: () => IStorageIterator<R>,
+    plan: IEntityQueryPlan,
+    selection: IEntityQuerySourceSelection<TDomain>
+  ): IStorageIterator<R> => {
+    const previous = execution.openingPlan
+    const previousSelection = execution.openingSelection
+    execution.openingPlan = plan
+    execution.openingSelection = selection
+    let iterator: ReturnType<typeof open>
+    try {
+      iterator = open()
+    } finally {
+      execution.openingPlan = previous
+      execution.openingSelection = previousSelection
+    }
+    return this.#observeQueryStream(iterator, plan, selection, execution.opened)
+  }
+  /** Adapt the application missingLimit callback at the entity boundary. */
+  #queryMissingLimit: Parameters<
+    typeof createEntityQuery<TDomain, TIndexes, IOperationContext, TAugmentMethods>
+  >[0]['missingLimit'] = () => {
+    throw new StorageError(StorageErrorCode.invalidConfig, {
+      backend: this.#store.backend,
+      cause: new TypeError(EntityText.comparatorLimit)
+    })
+  }
+  /** Adapt the application invalidState callback at the entity boundary. */
+  #queryInvalidState: Parameters<
+    typeof createEntityQuery<TDomain, TIndexes, IOperationContext, TAugmentMethods>
+  >[0]['invalidState'] = (cause) => {
+    throw new StorageError(StorageErrorCode.invalidConfig, {
+      backend: this.#store.backend,
+      cause: cause ?? new TypeError(EntityText.queryState)
+    })
+  }
+  /** Adapt the application invalid callback at the entity boundary. */
+  #queryInvalid: Parameters<
+    typeof createEntityQuery<TDomain, TIndexes, IOperationContext, TAugmentMethods>
+  >[0]['invalid'] = (action) => {
+    this.#normalizeListOptions({ onInvalid: action as IInvalidRecordAction })
+  }
+  /** Adapt the application range callback at the entity boundary. */
+  #queryRange: Parameters<
+    typeof createEntityQuery<TDomain, TIndexes, IOperationContext, TAugmentMethods>
+  >[0]['range'] = (range) => snapshotKeyRange(range, this.#store.backend)!
+  /** Adapt the application index callback at the entity boundary. */
+  #queryIndex: Parameters<
+    typeof createEntityQuery<TDomain, TIndexes, IOperationContext, TAugmentMethods>
+  >[0]['index'] = (index, match) => {
+    const range =
+      match === undefined
+        ? undefined
+        : isPlainObject(match) && ('lower' in match || 'upper' in match)
+          ? match
+          : { lower: match, upper: match }
+    const snapshot = this.#createIndexedListSnapshot(
+      index,
+      range as import('@migaia/storage-contract').IKeyRange | undefined,
+      undefined
+    )
+    if (this.#config.indexes[index] === undefined)
+      throw new StorageError(StorageErrorCode.invalidConfig, {
+        backend: this.#store.backend,
+        cause: new TypeError(EntityText.indexMissing(this.#name, index))
+      })
+    return { index, range: snapshot.range }
+  }
+  /** A source owns one selection and borrows the descriptor execution facts. */
+  #createEntitySource = (
+    execution: IEntityQueryExecution<TDomain>,
+    selectedSource: IEntityQuerySourceSelection<TDomain>
+  ): IRecordQuerySource => {
+    /** Each source selection belongs to its original descriptor execution. */
+    const sourceContext: IEntityQuerySourceContext<TDomain> = {
+      execution,
+      selection: selectedSource
+    }
+    return {
+      asyncDisposeKey,
+      tieBreakByKey: { direction: 'next', parts: true },
+      pushdown: { source: EntityState.querySource, operations: [], operators: [] },
+      ...(execution.scope !== undefined || this.#backend.watchRecords === undefined
+        ? {}
+        : {
+            watch: ({ ctx }: import('@migaia/storage-contract').IRecordQueryInput) =>
+              this.#backend.watchRecords!(ctx)
+          }),
+      plan: (conditions) => this.#planEntitySource(sourceContext, conditions),
+      mutate: (request, run) => this.#mutateEntitySource(sourceContext, request, run),
+      execute: (input) => this.#executeEntitySource(sourceContext, input)
+    }
+  }
+  /** Select the canonical index plan using explicit source facts. */
+  #planEntitySource = (
+    sourceContext: IEntityQuerySourceContext<TDomain>,
+    conditions: Parameters<NonNullable<IRecordQuerySource['plan']>>[0]
+  ): ReturnType<NonNullable<IRecordQuerySource['plan']>> => {
+    /** Explicit source choice precedes automatic static condition selection. */
+    const explicit =
+      sourceContext.selection.index !== undefined || sourceContext.selection.range !== undefined
+    const automatic = explicit
+      ? undefined
+      : chooseEntityQueryIndex(this.#config.indexes, conditions, this.#store.backend)
+    const selection = { ...(automatic?.selection ?? sourceContext.selection) }
+    const index = selection.index === undefined ? undefined : this.#config.indexes[selection.index]
+    return {
+      fullScan: true,
+      selection,
+      pushdown: {
+        source: EntityState.querySource,
+        ...(selection.index === undefined ? {} : { index: selection.index }),
+        operations: index === undefined ? [] : [QueryOperation.where],
+        operators: index === undefined ? [] : ENTITY_QUERY_INDEX_OPERATORS,
+        ...(index === undefined
+          ? {}
+          : {
+              canPushCondition: (condition: IQueryCondition) =>
+                supportsEntityIndexCondition(this.#config.indexes, condition)
+            })
+      },
+      sourceReason: explicit ? EntityText.queryIndexExplicit : automatic!.sourceReason,
+      sourceCandidates: explicit
+        ? Object.keys(this.#config.indexes).map((index) => ({
+            index,
+            reason: EntityText.queryIndexExplicit
+          }))
+        : automatic!.sourceCandidates
+    }
+  }
+  /** Run query writes in the original transaction using explicit source facts. */
+  #mutateEntitySource = (
+    sourceContext: IEntityQuerySourceContext<TDomain>,
+    request: Parameters<NonNullable<IRecordQuerySource['mutate']>>[0],
+    run: Parameters<NonNullable<IRecordQuerySource['mutate']>>[1]
+  ): ReturnType<NonNullable<IRecordQuerySource['mutate']>> => {
+    if (this.#recordStore === undefined)
+      throw new StorageContractError(StorageContractErrorCode.unsupported, {
+        backend: this.#store.backend
+      })
+    /** Capture the same observer/source facts before the original transaction can suspend. */
+    const policy = sourceContext.execution.openingSelection ?? sourceContext.selection
+    const orderedSource = sourceContext.execution.openingPlan?.hasOrder !== true
+    const counter = this.#queryStages === undefined ? undefined : { readCount: 0 }
+    sourceContext.execution.opened = counter
+    const onRead =
+      counter === undefined
+        ? undefined
+        : () => {
+            counter.readCount++
+          }
+    /** The authentic operation owns selection, repository writes and the existing first error. */
+    /** Mutation facts outlive native admission without another captured callback component. */
+    const mutation: IEntityQueryMutationContext<TDomain> = {
+      source: sourceContext,
+      policy,
+      orderedSource,
+      onRead,
+      request,
+      run
+    }
+    return sourceContext.execution.scope === undefined
+      ? this.#recordStore.transaction(
+          (target) => this.#applyEntityQueryMutation(mutation, target),
+          {
+            ...request.ctx,
+            concurrency: request.concurrency
+          }
+        )
+      : this.#applyEntityQueryMutation(mutation, sourceContext.execution.scope)
+  }
+  /** Open the selected lazy native source using explicit source facts. */
+  #executeEntitySource = (
+    sourceContext: IEntityQuerySourceContext<TDomain>,
+    {
+      ctx,
+      conditions,
+      selection: planned
+    }: Parameters<NonNullable<IRecordQuerySource['execute']>>[0]
+  ): ReturnType<NonNullable<IRecordQuerySource['execute']>> => {
+    const selection = {
+      ...((planned as IEntityQuerySourceSelection<TDomain> | undefined) ?? sourceContext.selection),
+      onInvalid: (sourceContext.execution.openingSelection ?? sourceContext.selection).onInvalid
+    }
+    const predicates = conditions.map((condition) =>
+      compileStorageQueryCondition<TDomain>(condition)
+    )
+    const accepts = (value: TDomain) => predicates.every((predicate) => predicate(value))
+    const counter = this.#queryStages === undefined ? undefined : { readCount: 0 }
+    sourceContext.execution.opened = counter
+    const onRead =
+      counter === undefined
+        ? undefined
+        : () => {
+            counter.readCount++
+          }
+    const orderedSource = sourceContext.execution.openingPlan?.hasOrder !== true
+    if (sourceContext.execution.scope !== undefined)
+      return this.#scopedQuerySource(
+        sourceContext.execution.scope,
+        selection,
+        onRead,
+        orderedSource,
+        undefined,
+        accepts
+      )
+    const context = snapshotOperationContext(ctx)
+    const runtime = createStorageOperationRuntime()
+    return entityIterator(
+      (async function* (
+        repositoryOwner: EntityRepositoryOwner<
+          TDomain,
+          TStored,
+          TIndexes,
+          TAugmentMethods,
+          TChangeFeed
+        >
+      ) {
+        if (selection.index !== undefined) {
+          const snapshot = repositoryOwner.#createIndexedListSnapshot(
+            selection.index,
+            selection.range,
+            {
+              onInvalid: selection.onInvalid
+            }
+          )
+          for await (const [id, row] of repositoryOwner.#indexRows(
+            snapshot,
+            context,
+            undefined,
+            orderedSource,
+            onRead
+          ))
+            if (accepts(row.value)) yield [[row.key, id], row.value] as const
+        } else {
+          for await (const value of repositoryOwner.#streamImpl(
+            { range: selection.range, onInvalid: selection.onInvalid },
+            context,
+            runtime,
+            orderedSource,
+            undefined,
+            onRead
+          ))
+            if (accepts(value))
+              yield [
+                [
+                  idOf(
+                    repositoryOwner.#name,
+                    repositoryOwner.#keyProp,
+                    value,
+                    repositoryOwner.#store.backend
+                  )
+                ],
+                value
+              ] as const
+        }
+      })(this),
+      runtime
+    )
+  }
 
-  /** Per-repository final changes belong to one authentic original transaction identity. */
-  const uniqueStates = new WeakMap<ITransactionInfo, WeakRef<Map<string, IEntityUniqueMutation>>>()
-  const bindRepository = (
+  /** Perform the repository bindRepository operation using its own state. */
+  #bindRepository = (
     scope: ITransactionScope,
     expectedIdentity?: IStorageKey
   ): IEntityTransactionScope<TDomain, TIndexes, TAugmentMethods> => {
-    const info = backend.assertScope(scope)
-    let stateReference = uniqueStates.get(info)
-    if (uniqueDefinitions.length !== 0 && stateReference?.deref() === undefined) {
+    const info = this.#backend.assertScope(scope)
+    let stateReference = this.#uniqueStates.get(info)
+    if (this.#uniqueDefinitions.length !== 0 && stateReference?.deref() === undefined) {
       const changes = new Map<string, IEntityUniqueMutation>()
       stateReference = new WeakRef(changes)
-      uniqueStates.set(info, stateReference)
+      this.#uniqueStates.set(info, stateReference)
       registerTransactionFinalizer(scope, async (check) => {
         try {
-          await validateUniqueRecordCommit(
+          await this.#validateUniqueRecordCommit(
             check,
             changes,
             readTransactionOperationContext(check),
@@ -2125,7 +2224,7 @@ export const createRepository = <
           )
         } finally {
           changes.clear()
-          uniqueStates.delete(info)
+          this.#uniqueStates.delete(info)
         }
       })
     }
@@ -2134,160 +2233,125 @@ export const createRepository = <
      * reference.
      */
     const activeChanges = stateReference
+    /** Bound endpoints retain only the same weak mutation state and authentic scope. */
+    const binding: IEntityRepositoryBinding = { scope, expectedIdentity, activeChanges }
     return {
-      query: () => queryFor<undefined>(scope),
-      get: (id: IStorageKey) =>
-        runTransactionOperation(scope, async (current) => {
-          backend.assertScope(current)
-          const context = readTransactionOperationContext(current)
-          assertStorageKey(id, store.backend)
-          const runtime = entityRuntime(current)
-          const raw =
-            (await current.getRecord(composeRepositoryKey(name, id))) ??
-            (await current.getRecord(composeStructuredKey(name, id)))
-          return raw === undefined
-            ? undefined
-            : materializeForRead(id, await decodeEnvelope(raw, context, runtime), context, runtime)
-        }),
-      put: (value: TDomain) =>
-        runTransactionOperation(scope, async (current) => {
-          backend.assertScope(current)
-          const context = readTransactionOperationContext(current)
-          const runtime = entityRuntime(current)
-          const prepared = await toEnvelope(value, context, runtime)
-          const id = idOf(name, keyProp, prepared.domain, store.backend)
-          /** Query patches cannot move a physical record or overwrite another entity identity. */
-          if (expectedIdentity !== undefined && compareStorageKeys(id, expectedIdentity) !== 0)
-            throw new StorageError(StorageErrorCode.invalidConfig, {
-              backend: store.backend,
-              cause: new TypeError(EntityText.queryIdentityChanged)
-            })
-          const raw = await encodeEnvelope(prepared.envelope, context, runtime)
-          /** A historical repository handle is usable only after this native snapshot confirms it. */
-          const handle =
-            readyHandle !== undefined && (await current.isRecordIndexReady?.(readyHandle))
-              ? readyHandle
-              : undefined
-          if (handle !== undefined && current.putIndexedRecord !== undefined)
-            await current.putIndexedRecord(
-              raw,
-              composeRepositoryKey(name, id),
-              handle,
-              projectEntityIndexes(config.indexes, prepared.domain, store.backend),
-              { conflictPolicy: 'replace' }
-            )
-          else
-            await current.putRecord(raw, composeRepositoryKey(name, id), {
-              conflictPolicy: 'replace'
-            })
-          await current.deleteRecord(composeStructuredKey(name, id))
-          activeChanges
-            ?.deref()!
-            .set(encodeFlatStorageKey(id), { id, projection: projectUniqueWrite(prepared.domain) })
-          return id
-        }),
-      remove: (id: IStorageKey) =>
-        runTransactionOperation(scope, async (current) => {
-          backend.assertScope(current)
-          assertStorageKey(id, store.backend)
-          await current.deleteRecord(composeRepositoryKey(name, id))
-          await current.deleteRecord(composeStructuredKey(name, id))
-          activeChanges?.deref()!.set(encodeFlatStorageKey(id), { id, projection: undefined })
-        }),
-      list: (options?: IListSnapshot<TDomain> | IIndexedListOptions<TDomain, TIndexes>) =>
-        runTransactionOperation(scope, async (current) => {
-          backend.assertScope(current)
-          const context = readTransactionOperationContext(current)
-          /** Metadata probes never build indexes or poison this transaction on a stale generation. */
-          const handle =
-            readyHandle !== undefined && (await current.isRecordIndexReady?.(readyHandle))
-              ? readyHandle
-              : undefined
-          const view: IRepositoryReadView = {
-            runtime: entityRuntime(current),
-            readyHandle: handle,
-            getRecord: (key) => current.getRecord(key),
-            iterateRecords: (range) => current.iterateRecords(range),
-            ...(current.iterateRecordIndex === undefined
-              ? {}
-              : { iterateRecordIndex: (query) => current.iterateRecordIndex!(query) })
-          }
-          const indexed = snapshotIndexedListOptions(options)
-          const normalized = indexed?.options ?? normalizeListOptions(options)
-          const counter = queryStages === undefined ? undefined : { readCount: 0 }
-          const onRead =
-            counter === undefined
-              ? undefined
-              : () => {
-                  counter.readCount++
-                }
-          const query =
-            indexed === undefined
-              ? listQuery(normalized, context, entityRuntime(current), view, onRead)
-              : createIndexQuery(indexed, context, view, onRead)
-          return observeQueryRead(
-            () => query.all(context),
-            {
-              hasWhere: false,
-              hasOrder: (normalized?.orderBy ?? defaultOrderBy) !== undefined,
-              hasLimit: normalized?.limit !== undefined
-            },
-            { index: indexed?.index },
-            current,
-            () => counter,
-            (values) => values.length
-          )
-        })
+      query: () => this.#boundQuery(binding),
+      get: (id) => this.#boundGet(binding, id),
+      put: (value) => this.#boundPut(binding, value),
+      remove: (id) => this.#boundRemove(binding, id),
+      list: (options) => this.#boundList(binding, options)
     }
   }
-
-  const repository: IRepository<TDomain, TIndexes, TChangeFeed, TAugmentMethods> = {
-    // Runtime source.watch is installed only for the genuine native feed captured above.
-    query: () =>
-      queryFor<IOperationContext>() as ReturnType<
-        IRepository<TDomain, TIndexes, TChangeFeed, TAugmentMethods>['query']
-      >,
-    get: async (id, ctx) => {
-      const context = snapshotOperationContext(ctx)
-      const runtime = createStorageOperationRuntime()
-      assertStorageKey(id, store.backend, `entity "${name}" id`)
-      return materializeForRead(id, await readEnvelope(id, context, runtime), context, runtime)
-    },
-
-    put: async (value, ctx) => {
-      if (recordStore !== undefined)
-        return recordStore.transaction((scope) => bindRepository(scope).put(value), ctx)
-      if (uniqueDefinitions.length !== 0 && getBackendValueCommit(store) === undefined)
-        throw new StorageContractError(StorageContractErrorCode.unsupported, {
-          backend: store.backend
+  /** Perform transaction-bound query work through its authentic original scope. */
+  #boundQuery = (
+    binding: IEntityRepositoryBinding
+  ): ReturnType<IEntityTransactionScope<TDomain, TIndexes, TAugmentMethods>['query']> =>
+    this.#queryFor<undefined>(binding.scope)
+  /** Perform transaction-bound get work through its authentic original scope. */
+  #boundGet = (
+    binding: IEntityRepositoryBinding,
+    id: IStorageKey
+  ): ReturnType<IEntityTransactionScope<TDomain, TIndexes, TAugmentMethods>['get']> =>
+    runTransactionOperation(binding.scope, async (current) => {
+      this.#backend.assertScope(current)
+      const context = readTransactionOperationContext(current)
+      assertStorageKey(id, this.#store.backend)
+      const runtime = entityRuntime(current)
+      const raw =
+        (await current.getRecord(composeRepositoryKey(this.#name, id))) ??
+        (await current.getRecord(composeStructuredKey(this.#name, id)))
+      return raw === undefined
+        ? undefined
+        : this.#materializeForRead(
+            id,
+            await this.#decodeEnvelope(raw, context, runtime),
+            context,
+            runtime
+          )
+    })
+  /** Perform transaction-bound put work through its authentic original scope. */
+  #boundPut = (
+    binding: IEntityRepositoryBinding,
+    value: TDomain
+  ): ReturnType<IEntityTransactionScope<TDomain, TIndexes, TAugmentMethods>['put']> =>
+    runTransactionOperation(binding.scope, async (current) => {
+      this.#backend.assertScope(current)
+      const context = readTransactionOperationContext(current)
+      const runtime = entityRuntime(current)
+      const prepared = await this.#toEnvelope(value, context, runtime)
+      const id = idOf(this.#name, this.#keyProp, prepared.domain, this.#store.backend)
+      /** Query patches cannot move a physical record or overwrite another entity identity. */
+      if (
+        binding.expectedIdentity !== undefined &&
+        compareStorageKeys(id, binding.expectedIdentity) !== 0
+      )
+        throw new StorageError(StorageErrorCode.invalidConfig, {
+          backend: this.#store.backend,
+          cause: new TypeError(EntityText.queryIdentityChanged)
         })
-      const context = snapshotOperationContext(ctx)
-      const runtime = createStorageOperationRuntime()
-      const prepared = await toEnvelope(value, context, runtime)
-      const id = idOf(name, keyProp, prepared.domain, store.backend)
-      if (uniqueDefinitions.length > 0)
-        await writeUniqueValue(id, prepared.domain, prepared.envelope, context)
-      else
-        await writeEnvelopeAt(
-          { flatKey: composeFlatKey(name, id) },
-          prepared.envelope,
-          context,
-          runtime
+      const raw = await this.#encodeEnvelope(prepared.envelope, context, runtime)
+      /** A historical repository handle is usable only after this native snapshot confirms it. */
+      const handle =
+        this.#readyHandle !== undefined && (await current.isRecordIndexReady?.(this.#readyHandle))
+          ? this.#readyHandle
+          : undefined
+      if (handle !== undefined && current.putIndexedRecord !== undefined)
+        await current.putIndexedRecord(
+          raw,
+          composeRepositoryKey(this.#name, id),
+          handle,
+          projectEntityIndexes(this.#config.indexes, prepared.domain, this.#store.backend),
+          { conflictPolicy: 'replace' }
         )
+      else
+        await current.putRecord(raw, composeRepositoryKey(this.#name, id), {
+          conflictPolicy: 'replace'
+        })
+      await current.deleteRecord(composeStructuredKey(this.#name, id))
+      binding.activeChanges?.deref()!.set(encodeFlatStorageKey(id), {
+        id,
+        projection: this.#projectUniqueWrite(prepared.domain)
+      })
       return id
-    },
-    remove: async (id, ctx) => {
-      if (recordStore !== undefined)
-        return recordStore.transaction((scope) => bindRepository(scope).remove(id), ctx)
-      assertStorageKey(id, store.backend)
-      await store.remove(composeFlatKey(name, id), ctx)
-    },
-
-    list: async (options, ctx) => {
-      const indexed = snapshotIndexedListOptions(options)
-      const normalized = indexed?.options ?? normalizeListOptions(options)
-      const context = snapshotOperationContext(ctx)
-      const counter = queryStages === undefined ? undefined : { readCount: 0 }
+    })
+  /** Perform transaction-bound remove work through its authentic original scope. */
+  #boundRemove = (
+    binding: IEntityRepositoryBinding,
+    id: IStorageKey
+  ): ReturnType<IEntityTransactionScope<TDomain, TIndexes, TAugmentMethods>['remove']> =>
+    runTransactionOperation(binding.scope, async (current) => {
+      this.#backend.assertScope(current)
+      assertStorageKey(id, this.#store.backend)
+      await current.deleteRecord(composeRepositoryKey(this.#name, id))
+      await current.deleteRecord(composeStructuredKey(this.#name, id))
+      binding.activeChanges?.deref()!.set(encodeFlatStorageKey(id), { id, projection: undefined })
+    })
+  /** Perform transaction-bound list work through its authentic original scope. */
+  #boundList = (
+    binding: IEntityRepositoryBinding,
+    options?: IListSnapshot<TDomain> | IIndexedListOptions<TDomain, TIndexes>
+  ): ReturnType<IEntityTransactionScope<TDomain, TIndexes, TAugmentMethods>['list']> =>
+    runTransactionOperation(binding.scope, async (current) => {
+      this.#backend.assertScope(current)
+      const context = readTransactionOperationContext(current)
+      /** Metadata probes never build indexes or poison this transaction on a stale generation. */
+      const handle =
+        this.#readyHandle !== undefined && (await current.isRecordIndexReady?.(this.#readyHandle))
+          ? this.#readyHandle
+          : undefined
+      const view: IRepositoryReadView = {
+        runtime: entityRuntime(current),
+        readyHandle: handle,
+        getRecord: (key) => current.getRecord(key),
+        iterateRecords: (range) => current.iterateRecords(range),
+        ...(current.iterateRecordIndex === undefined
+          ? {}
+          : { iterateRecordIndex: (query) => current.iterateRecordIndex!(query) })
+      }
+      const indexed = this.#snapshotIndexedListOptions(options)
+      const normalized = indexed?.options ?? this.#normalizeListOptions(options)
+      const counter = this.#queryStages === undefined ? undefined : { readCount: 0 }
       const onRead =
         counter === undefined
           ? undefined
@@ -2296,586 +2360,1139 @@ export const createRepository = <
             }
       const query =
         indexed === undefined
-          ? listQuery(normalized, context, createStorageOperationRuntime(), undefined, onRead)
-          : createIndexQuery(indexed, context, undefined, onRead)
-      return observeQueryRead(
+          ? this.#listQuery(normalized, context, entityRuntime(current), view, onRead)
+          : this.#createIndexQuery(indexed, context, view, onRead)
+      return this.#observeQueryRead(
         () => query.all(context),
         {
           hasWhere: false,
-          hasOrder: (normalized?.orderBy ?? defaultOrderBy) !== undefined,
+          hasOrder: (normalized?.orderBy ?? this.#defaultOrderBy) !== undefined,
           hasLimit: normalized?.limit !== undefined
         },
         { index: indexed?.index },
-        undefined,
+        current,
         () => counter,
         (values) => values.length
       )
-    },
-    stream: (options, ctx) => {
-      const indexed = snapshotIndexedListOptions(options)
-      const normalized = indexed?.options ?? normalizeListOptions(options)
-      const context = snapshotOperationContext(ctx)
-      const counter = queryStages === undefined ? undefined : { readCount: 0 }
-      const onRead =
-        counter === undefined
-          ? undefined
-          : () => {
-              counter.readCount++
-            }
-      const query =
-        indexed === undefined
-          ? listQuery(normalized, context, createStorageOperationRuntime(), undefined, onRead)
-          : createIndexQuery(indexed, context, undefined, onRead)
-      return observeQueryStream(
-        query.stream(context),
-        {
-          hasWhere: false,
-          hasOrder: (normalized?.orderBy ?? defaultOrderBy) !== undefined,
-          hasLimit: normalized?.limit !== undefined
-        },
-        { index: indexed?.index },
-        counter
-      )
-    },
+    })
 
-    findBy: async (index, key, ctx) => {
-      assertStorageKey(key, store.backend, `entity "${name}" index query`)
-      const context = snapshotOperationContext(ctx)
-      const snapshot = createIndexedListSnapshot(index, { lower: key, upper: key }, undefined)
-      let matched = 0
-      const runtime = createStorageOperationRuntime()
-      /** One source scan caps its diagnostic count while the original heap retains one result. */
-      const source = createRecordQuery<IMatch>({
-        asyncDisposeKey,
-        pushdown: { source: EntityState.querySource, operations: [], operators: [] },
-        execute: () =>
-          entityIterator(
-            (async function* () {
-              for await (const row of indexRows(snapshot, context, undefined, false)) {
-                if (matched < 2) matched++
-                yield row
-              }
-            })(),
-            runtime
-          )
+  /** Publish the original repository methods without exposing its internal state. */
+  #createApi = (): IRepository<TDomain, TIndexes, TChangeFeed, TAugmentMethods> => ({
+    query: this.#apiQuery,
+    get: this.#apiGet,
+    put: this.#apiPut,
+    remove: this.#apiRemove,
+    list: this.#apiList,
+    stream: this.#apiStream,
+    findBy: this.#apiFindBy,
+    migrate: this.#apiMigrate,
+    in: this.#apiIn,
+    lockKey: this.#apiLockKey,
+    batch: this.#apiBatch
+  })
+  /** Perform the public query operation using this repository state. */
+  #apiQuery: IRepository<TDomain, TIndexes, TChangeFeed, TAugmentMethods>['query'] = () =>
+    this.#queryFor<IOperationContext>() as ReturnType<
+      IRepository<TDomain, TIndexes, TChangeFeed, TAugmentMethods>['query']
+    >
+  /** Perform the public get operation using this repository state. */
+  #apiGet: IRepository<TDomain, TIndexes, TChangeFeed, TAugmentMethods>['get'] = async (
+    id,
+    ctx
+  ) => {
+    const context = snapshotOperationContext(ctx)
+    const runtime = createStorageOperationRuntime()
+    assertStorageKey(id, this.#store.backend, `entity "${this.#name}" id`)
+    return this.#materializeForRead(
+      id,
+      await this.#readEnvelope(id, context, runtime),
+      context,
+      runtime
+    )
+  }
+  /** Perform the public put operation using this repository state. */
+  #apiPut: IRepository<TDomain, TIndexes, TChangeFeed, TAugmentMethods>['put'] = async (
+    value,
+    ctx
+  ) => {
+    if (this.#recordStore !== undefined)
+      return this.#recordStore.transaction((scope) => this.#bindRepository(scope).put(value), ctx)
+    if (this.#uniqueDefinitions.length !== 0 && getBackendValueCommit(this.#store) === undefined)
+      throw new StorageContractError(StorageContractErrorCode.unsupported, {
+        backend: this.#store.backend
       })
-      const [best] = await source
-        .orderByComparator((left, right) => {
-          let compared = 0
-          if (defaultOrderBy !== undefined) {
-            try {
-              compared = defaultOrderBy(left.value, right.value)
-              if (!Number.isFinite(compared)) {
-                observeThenableRejection(compared, inspectThenable(compared), runtime.reporter)
-                throw new TypeError(StorageErrorText.entityComparatorInvalid)
-              }
-            } catch (cause) {
-              throw new StorageError(StorageErrorCode.extensionFailed, {
-                backend: store.backend,
-                cause,
-                operation: StorageOperation.entityOrderBy,
-                extensionStage: 'comparator'
-              })
-            }
-          }
-          return (
-            compared ||
-            compareStorageKeys(left.key, right.key) ||
-            compareStorageKeys(left.id, right.id)
-          )
-        })
-        .limit(1)
-        .all(context)
-      const definition = config.indexes[index]?.definition
-      if (definition !== undefined && !definition.unique && matched === 2)
-        emitDiagnostic(
-          EntityText.storageWebEntityFindByOnNonUniqueIndexReturnedTheFirst(name, index)
-        )
-      return best?.value
-    },
-
-    migrate: async (options: IMigrateOptions<TDomain> = {}, ctx) => {
-      if (
-        recordStore === undefined &&
-        uniqueDefinitions.length !== 0 &&
-        getBackendValueCommit(store) === undefined
+    const context = snapshotOperationContext(ctx)
+    const runtime = createStorageOperationRuntime()
+    const prepared = await this.#toEnvelope(value, context, runtime)
+    const id = idOf(this.#name, this.#keyProp, prepared.domain, this.#store.backend)
+    if (this.#uniqueDefinitions.length > 0)
+      await this.#writeUniqueValue(id, prepared.domain, prepared.envelope, context)
+    else
+      await this.#writeEnvelopeAt(
+        { flatKey: composeFlatKey(this.#name, id) },
+        prepared.envelope,
+        context,
+        runtime
       )
-        throw new StorageContractError(StorageContractErrorCode.unsupported, {
-          backend: store.backend
-        })
-      const context = snapshotOperationContext(ctx)
-      const runtime = createStorageOperationRuntime()
-      const { batchSize, onInvalid } = normalizeMigrateOptions(options)
-      const migrationMetadata = recordStore?.metadata
-      const checkpointKey = repositoryMigrationKey(name)
-      type IMigrationCheckpoint = {
-        readonly status: (typeof StorageMigrationStatus)[keyof typeof StorageMigrationStatus]
-        readonly phase?: (typeof StorageMigrationPhase)[keyof typeof StorageMigrationPhase]
-        readonly version: number
-        readonly schemaFingerprint: string
-        readonly lastPhysicalKey?: IStorageKey
-        readonly scanned: number
-        readonly eligible: number
-        readonly migrated: number
-        readonly skipped: number
-        readonly alreadyCurrent: number
-        readonly conflicted: number
-      }
-      const writeCheckpoint = async (value: unknown): Promise<void> => {
-        if (migrationMetadata) await migrationMetadata.set(checkpointKey, value, context)
-      }
-      const checkpoint = (await migrationMetadata?.get(checkpointKey, context)) as
-        | IMigrationCheckpoint
-        | undefined
-      const checkpointMatches =
-        checkpoint?.status === StorageMigrationStatus.running &&
-        checkpoint.version === version &&
-        checkpoint.schemaFingerprint === migrationFingerprint
-      let scanned = checkpointMatches ? checkpoint.scanned : 0
-      let migrated = checkpointMatches ? checkpoint.migrated : 0
-      let eligible = checkpointMatches ? checkpoint.eligible : 0
-      let alreadyCurrent = checkpointMatches ? checkpoint.alreadyCurrent : 0
-      let skipped = checkpointMatches ? checkpoint.skipped : 0
-      let conflicted = checkpointMatches ? checkpoint.conflicted : 0
-      let lastPhysicalKey = checkpointMatches ? checkpoint.lastPhysicalKey : undefined
-      let phase = checkpointMatches
-        ? (checkpoint.phase ?? StorageMigrationPhase.legacy)
-        : StorageMigrationPhase.v2
-      const batch: Array<{
-        readonly physicalKey: IStorageKey
-        readonly raw: unknown
-        readonly id: IStorageKey
-        readonly legacy: boolean
-        readonly migrationRequired: boolean
-        readonly value: TDomain | undefined
-      }> = []
-      const persistBatch = async (): Promise<void> => {
-        if (batch.length === 0) return
-        if (!recordStore) {
-          for (const entry of batch) {
-            const prepared = await toEnvelope(entry.value!, context, runtime)
-            const nextKey = composeFlatKey(name, entry.id)
-            if (uniqueDefinitions.length > 0)
-              await writeUniqueValue(entry.id, prepared.domain, prepared.envelope, context)
-            else await writeEnvelopeAt({ flatKey: nextKey }, prepared.envelope, context, runtime)
+    return id
+  }
+  /** Perform the public remove operation using this repository state. */
+  #apiRemove: IRepository<TDomain, TIndexes, TChangeFeed, TAugmentMethods>['remove'] = async (
+    id,
+    ctx
+  ) => {
+    if (this.#recordStore !== undefined)
+      return this.#recordStore.transaction((scope) => this.#bindRepository(scope).remove(id), ctx)
+    assertStorageKey(id, this.#store.backend)
+    await this.#store.remove(composeFlatKey(this.#name, id), ctx)
+  }
+  /** Perform the public list operation using this repository state. */
+  #apiList: IRepository<TDomain, TIndexes, TChangeFeed, TAugmentMethods>['list'] = async (
+    options,
+    ctx
+  ) => {
+    const indexed = this.#snapshotIndexedListOptions(options)
+    const normalized = indexed?.options ?? this.#normalizeListOptions(options)
+    const context = snapshotOperationContext(ctx)
+    const counter = this.#queryStages === undefined ? undefined : { readCount: 0 }
+    const onRead =
+      counter === undefined
+        ? undefined
+        : () => {
+            counter.readCount++
           }
-          migrated += batch.length
-        } else {
-          let indexedStore: IEntitySecondaryMethods | undefined
-          let indexedHandle: IRecordIndexHandle | undefined
+    const query =
+      indexed === undefined
+        ? this.#listQuery(normalized, context, createStorageOperationRuntime(), undefined, onRead)
+        : this.#createIndexQuery(indexed, context, undefined, onRead)
+    return this.#observeQueryRead(
+      () => query.all(context),
+      {
+        hasWhere: false,
+        hasOrder: (normalized?.orderBy ?? this.#defaultOrderBy) !== undefined,
+        hasLimit: normalized?.limit !== undefined
+      },
+      { index: indexed?.index },
+      undefined,
+      () => counter,
+      (values) => values.length
+    )
+  }
+  /** Perform the public stream operation using this repository state. */
+  #apiStream: IRepository<TDomain, TIndexes, TChangeFeed, TAugmentMethods>['stream'] = (
+    options,
+    ctx
+  ) => {
+    const indexed = this.#snapshotIndexedListOptions(options)
+    const normalized = indexed?.options ?? this.#normalizeListOptions(options)
+    const context = snapshotOperationContext(ctx)
+    const counter = this.#queryStages === undefined ? undefined : { readCount: 0 }
+    const onRead =
+      counter === undefined
+        ? undefined
+        : () => {
+            counter.readCount++
+          }
+    const query =
+      indexed === undefined
+        ? this.#listQuery(normalized, context, createStorageOperationRuntime(), undefined, onRead)
+        : this.#createIndexQuery(indexed, context, undefined, onRead)
+    return this.#observeQueryStream(
+      query.stream(context),
+      {
+        hasWhere: false,
+        hasOrder: (normalized?.orderBy ?? this.#defaultOrderBy) !== undefined,
+        hasLimit: normalized?.limit !== undefined
+      },
+      { index: indexed?.index },
+      counter
+    )
+  }
+  /** Perform the public findBy operation using this repository state. */
+  #apiFindBy: IRepository<TDomain, TIndexes, TChangeFeed, TAugmentMethods>['findBy'] = async (
+    index,
+    key,
+    ctx
+  ) => {
+    assertStorageKey(key, this.#store.backend, `entity "${this.#name}" index query`)
+    const context = snapshotOperationContext(ctx)
+    const snapshot = this.#createIndexedListSnapshot(index, { lower: key, upper: key }, undefined)
+    let matched = 0
+    const runtime = createStorageOperationRuntime()
+    /** One source scan caps its diagnostic count while the original heap retains one result. */
+    const source = createRecordQuery<IMatch<TDomain>>({
+      asyncDisposeKey,
+      pushdown: { source: EntityState.querySource, operations: [], operators: [] },
+      execute: () =>
+        entityIterator(
+          (async function* (
+            repositoryOwner: EntityRepositoryOwner<
+              TDomain,
+              TStored,
+              TIndexes,
+              TAugmentMethods,
+              TChangeFeed
+            >
+          ) {
+            for await (const row of repositoryOwner.#indexRows(
+              snapshot,
+              context,
+              undefined,
+              false
+            )) {
+              if (matched < 2) matched++
+              yield row
+            }
+          })(this),
+          runtime
+        )
+    })
+    const [best] = await source
+      .orderByComparator((left, right) => {
+        let compared = 0
+        if (this.#defaultOrderBy !== undefined) {
           try {
-            indexedStore =
-              Object.keys(config.indexes).length > 0 ? backend.secondaryStore() : undefined
-            /** Materialize the transaction's current snapshot once, not the earlier scan value. */
-            const executeMigrationBatch = async (tx: ITransactionScope, indexed: boolean) => {
-              /**
-               * Publish counts only after this transaction commits, including invalid-record
-               * policy.
-               */
-              const transactionContext = readTransactionOperationContext(tx)
-              const currentIndexed =
-                indexed &&
-                indexedHandle !== undefined &&
-                (await tx.isRecordIndexReady?.(indexedHandle)) === true
-              const counts = { migrated: 0, alreadyCurrent: 0, skipped: 0, invalidEligible: 0 }
-              /**
-               * Written rows supply prepared projections; unchanged rows use the transactional
-               * view.
-               */
-              const uniqueChanges = new Map<string, IEntityUniqueMutation>()
-              for (const entry of batch) {
-                /** Every write is derived from a read tracked by this transaction. */
-                const currentRaw = await tx.getRecord(entry.physicalKey)
-                if (currentRaw === undefined) continue
-                if (entry.legacy) {
-                  /** An authoritative current-layout record wins over an obsolete legacy copy. */
-                  const existingTarget = await tx.getRecord(composeRepositoryKey(name, entry.id))
-                  if (existingTarget !== undefined) {
-                    await tx.deleteRecord(entry.physicalKey)
-                    continue
-                  }
-                }
-                /** Keep decoding/migration failures under the existing per-record invalid policy. */
-                let currentValue: TDomain | undefined
-                try {
-                  /** A concurrent current-version update must not be rewritten by this migration. */
-                  const currentEnvelope = await decodeEnvelope(
-                    currentRaw,
-                    transactionContext,
-                    runtime
-                  )
-                  if (!entry.legacy && currentEnvelope.version >= version) {
-                    counts.alreadyCurrent += 1
-                    continue
-                  }
-                  currentValue = await materialize(currentEnvelope, transactionContext, runtime)
-                } catch (cause) {
-                  /** The issue reports the actual transactional value, not stale scan data. */
-                  const issue: IInvalidRecordIssue<TDomain> = {
-                    key: entry.id,
-                    raw: currentRaw,
-                    stage: (cause as Partial<IStageFailure>).stage ?? StorageRecordStage.decode,
-                    cause
-                  }
-                  if (invokeInvalidHandler(onInvalid, issue) === StorageInvalidRecordAction.throw)
-                    throwInvalid(issue)
-                  counts.skipped += 1
-                  if (entry.migrationRequired) counts.invalidEligible += 1
-                  continue
-                }
-                if (currentValue === undefined) {
-                  if (entry.migrationRequired) counts.invalidEligible += 1
-                  continue
-                }
-                /** Preparation retains the existing write-side schema/codec validation boundary. */
-                const prepared = await toEnvelope(currentValue, transactionContext, runtime)
-                /** Native and fallback paths write the same current envelope. */
-                const raw = await encodeEnvelope(prepared.envelope, transactionContext, runtime)
-                if (
-                  currentIndexed &&
-                  indexedHandle !== undefined &&
-                  tx.putIndexedRecord !== undefined
-                )
-                  await tx.putIndexedRecord(
-                    raw,
-                    composeRepositoryKey(name, entry.id),
-                    indexedHandle,
-                    projectEntityIndexes(config.indexes, prepared.domain, store.backend),
-                    { conflictPolicy: 'replace' }
-                  )
-                else
-                  await tx.putRecord(raw, composeRepositoryKey(name, entry.id), {
-                    conflictPolicy: 'replace'
-                  })
-                if (entry.legacy) await tx.deleteRecord(entry.physicalKey)
-                if (!currentIndexed && uniqueDefinitions.length > 0)
-                  uniqueChanges.set(encodeFlatStorageKey(entry.id), {
-                    id: entry.id,
-                    projection: projectUniqueWrite(prepared.domain)
-                  })
-                if (entry.migrationRequired) counts.migrated += 1
-              }
-              if (!currentIndexed)
-                await validateUniqueRecordCommit(tx, uniqueChanges, transactionContext, runtime)
-              return counts
+            /** A user comparator remains an ordinary function invocation. */
+            const compare = this.#defaultOrderBy
+            compared = compare(left.value, right.value)
+            if (!Number.isFinite(compared)) {
+              void Promise.resolve(compared).catch(runtime.reporter)
+              throw new TypeError(StorageErrorText.entityComparatorInvalid)
             }
-            if (indexedStore !== undefined) {
-              indexedHandle = await indexedStore.ensureRecordIndexes(
-                name,
-                Object.values(config.indexes).map((index) => index.definition),
-                context
-              )
-              const readiness = await indexedStore.getRecordIndexReadiness(indexedHandle, context)
-              if (readiness.status !== 'complete') indexedHandle = undefined
-            }
-            /** One callback owns migration semantics; backend adapters only supply their scope. */
-            const batchOutcome = await recordStore.transaction(
-              (tx) => executeMigrationBatch(tx, indexedHandle !== undefined),
-              context
-            )
-            migrated += batchOutcome.migrated
-            alreadyCurrent += batchOutcome.alreadyCurrent
-            skipped += batchOutcome.skipped
-            eligible -= batchOutcome.invalidEligible
           } catch (cause) {
-            if (
-              isStorageContractError(cause) &&
-              cause.code === StorageContractErrorCode.writeConflict
-            ) {
-              for (const entry of batch) {
-                try {
-                  const retryRun = async (tx: ITransactionScope) => {
-                    const retryContext = readTransactionOperationContext(tx)
-                    const currentIndexed =
-                      indexedHandle !== undefined &&
-                      (await tx.isRecordIndexReady?.(indexedHandle)) === true
-                    const targetRaw = await tx.getRecord(composeRepositoryKey(name, entry.id))
-                    if (targetRaw !== undefined) {
-                      const targetEnvelope = await decodeEnvelope(targetRaw, retryContext, runtime)
-                      if (targetEnvelope.version >= version) {
-                        if (entry.legacy) await tx.deleteRecord(entry.physicalKey)
-                        return 'alreadyCurrent' as const
-                      }
-                    }
-                    const currentRaw = await tx.getRecord(entry.physicalKey)
-                    if (currentRaw === undefined) return 'missing' as const
-                    const currentEnvelope = await decodeEnvelope(currentRaw, retryContext, runtime)
-                    const currentValue = await materialize(currentEnvelope, retryContext, runtime)
-                    if (currentValue === undefined) return 'missing' as const
-                    if (currentEnvelope.version >= version) return 'alreadyCurrent' as const
-                    const prepared = await toEnvelope(currentValue, retryContext, runtime)
-                    const nextRaw = await encodeEnvelope(prepared.envelope, retryContext, runtime)
-                    if (
-                      currentIndexed &&
-                      indexedHandle !== undefined &&
-                      tx.putIndexedRecord !== undefined
-                    )
-                      await tx.putIndexedRecord(
-                        nextRaw,
-                        composeRepositoryKey(name, entry.id),
-                        indexedHandle,
-                        projectEntityIndexes(config.indexes, prepared.domain, store.backend),
-                        { conflictPolicy: 'replace' }
-                      )
-                    else
-                      await tx.putRecord(nextRaw, composeRepositoryKey(name, entry.id), {
-                        conflictPolicy: 'replace'
-                      })
-                    if (entry.legacy) await tx.deleteRecord(entry.physicalKey)
-                    if (!currentIndexed)
-                      await validateUniqueRecordCommit(
-                        tx,
-                        new Map([
-                          [
-                            encodeFlatStorageKey(entry.id),
-                            {
-                              id: entry.id,
-                              projection: projectEntityIndexes(
-                                uniqueIndexes,
-                                prepared.domain,
-                                store.backend
-                              )
-                            }
-                          ]
-                        ]),
-                        retryContext,
-                        runtime
-                      )
-                    return 'migrated' as const
-                  }
-                  const retryOutcome = await recordStore.transaction(retryRun, context)
-                  if (retryOutcome === 'migrated') migrated += 1
-                  if (retryOutcome === 'alreadyCurrent') alreadyCurrent += 1
-                } catch (retryCause) {
-                  if (
-                    isStorageContractError(retryCause) &&
-                    retryCause.code === StorageContractErrorCode.writeConflict
-                  ) {
-                    conflicted += 1
-                    continue
-                  }
-                  throw normalizeError(
-                    retryCause,
-                    store.backend,
-                    StorageErrorCode.transactionFailed,
-                    'entity.migrate'
-                  )
-                }
+            throw new StorageError(StorageErrorCode.extensionFailed, {
+              backend: this.#store.backend,
+              cause,
+              operation: StorageOperation.entityOrderBy,
+              extensionStage: 'comparator'
+            })
+          }
+        }
+        return (
+          compared ||
+          compareStorageKeys(left.key, right.key) ||
+          compareStorageKeys(left.id, right.id)
+        )
+      })
+      .limit(1)
+      .all(context)
+    const definition = this.#config.indexes[index]?.definition
+    if (definition !== undefined && !definition.unique && matched === 2)
+      this.#emitDiagnostic(
+        EntityText.storageWebEntityFindByOnNonUniqueIndexReturnedTheFirst(this.#name, index)
+      )
+    return best?.value
+  }
+  /** Perform the public migrate operation using this repository state. */
+  #apiMigrate: IRepository<TDomain, TIndexes, TChangeFeed, TAugmentMethods>['migrate'] = async (
+    options: IMigrateOptions<TDomain> = {},
+    ctx
+  ) => {
+    /** Migration progress belongs to this run and its existing checkpoint. */
+    const migration = {} as IEntityMigrationContext<TDomain>
+    if (
+      this.#recordStore === undefined &&
+      this.#uniqueDefinitions.length !== 0 &&
+      getBackendValueCommit(this.#store) === undefined
+    )
+      throw new StorageContractError(StorageContractErrorCode.unsupported, {
+        backend: this.#store.backend
+      })
+    migration.context = snapshotOperationContext(ctx)
+    migration.runtime = createStorageOperationRuntime()
+    ;({ batchSize: migration.batchSize, onInvalid: migration.onInvalid } =
+      this.#normalizeMigrateOptions(options))
+    migration.migrationMetadata = this.#recordStore?.metadata
+    migration.checkpointKey = repositoryMigrationKey(this.#name)
+    migration.checkpoint = (await migration.migrationMetadata?.get(
+      migration.checkpointKey,
+      migration.context
+    )) as IEntityMigrationCheckpoint | undefined
+    migration.checkpointMatches =
+      migration.checkpoint?.status === StorageMigrationStatus.running &&
+      migration.checkpoint.version === this.#version &&
+      migration.checkpoint.schemaFingerprint === this.#migrationFingerprint
+    migration.scanned = migration.checkpointMatches ? migration.checkpoint!.scanned : 0
+    migration.migrated = migration.checkpointMatches ? migration.checkpoint!.migrated : 0
+    migration.eligible = migration.checkpointMatches ? migration.checkpoint!.eligible : 0
+    migration.alreadyCurrent = migration.checkpointMatches
+      ? migration.checkpoint!.alreadyCurrent
+      : 0
+    migration.skipped = migration.checkpointMatches ? migration.checkpoint!.skipped : 0
+    migration.conflicted = migration.checkpointMatches ? migration.checkpoint!.conflicted : 0
+    migration.lastPhysicalKey = migration.checkpointMatches
+      ? migration.checkpoint!.lastPhysicalKey
+      : undefined
+    migration.phase = migration.checkpointMatches
+      ? (migration.checkpoint!.phase ?? StorageMigrationPhase.legacy)
+      : StorageMigrationPhase.v2
+    migration.batch = []
+    if (this.#recordStore) await this.#scanMigrationRecords(migration, this.#recordStore)
+    else await this.#scanMigrationValues(migration)
+    await this.#persistMigrationBatch(migration)
+    await this.#writeMigrationCheckpoint(migration, {
+      status: StorageMigrationStatus.complete,
+      phase: migration.phase,
+      version: this.#version,
+      schemaFingerprint: this.#migrationFingerprint,
+      lastPhysicalKey: migration.lastPhysicalKey,
+      scanned: migration.scanned,
+      eligible: migration.eligible,
+      migrated: migration.migrated,
+      skipped: migration.skipped,
+      alreadyCurrent: migration.alreadyCurrent,
+      conflicted: migration.conflicted
+    })
+    return {
+      scanned: migration.scanned,
+      eligible: migration.eligible,
+      migrated: migration.migrated,
+      skipped: migration.skipped,
+      alreadyCurrent: migration.alreadyCurrent,
+      conflicted: migration.conflicted
+    }
+  }
+  /** Scan canonical and legacy record phases without changing checkpoint order. */
+  #scanMigrationRecords = async (
+    migration: IEntityMigrationContext<TDomain>,
+    recordStore: IEntityRecordMethods
+  ): Promise<void> => {
+    const phases =
+      migration.phase === StorageMigrationPhase.v2
+        ? [StorageMigrationPhase.v2, StorageMigrationPhase.legacy]
+        : [StorageMigrationPhase.legacy]
+    for (const scanPhase of phases) {
+      migration.phase = scanPhase
+      if (
+        scanPhase !==
+        (migration.checkpointMatches
+          ? (migration.checkpoint!.phase ?? StorageMigrationPhase.legacy)
+          : StorageMigrationPhase.v2)
+      )
+        migration.lastPhysicalKey = undefined
+      const entityRange = repositoryEntityRange(this.#name)
+      const migrationRange =
+        scanPhase === StorageMigrationPhase.v2
+          ? migration.lastPhysicalKey
+            ? { ...entityRange, lower: migration.lastPhysicalKey, lowerOpen: true }
+            : entityRange
+          : migration.lastPhysicalKey
+            ? { lower: migration.lastPhysicalKey, lowerOpen: true }
+            : undefined
+      for await (const [physicalKey, raw] of recordStore.iterateRecords(
+        migrationRange,
+        migration.context
+      )) {
+        migration.lastPhysicalKey = physicalKey
+        const v2RecordId = decodeRepositoryKey(this.#name, physicalKey)
+        const legacy =
+          v2RecordId === undefined &&
+          Array.isArray(physicalKey) &&
+          physicalKey.length === 2 &&
+          physicalKey[0] === this.#name
+        const recordId = v2RecordId ?? (legacy ? (physicalKey[1] as IStorageKey) : undefined)
+        if (scanPhase === StorageMigrationPhase.v2 && v2RecordId === undefined) continue
+        if (scanPhase === StorageMigrationPhase.legacy && !legacy) continue
+        if (recordId === undefined) continue
+        migration.scanned += 1
+        let envelope: IEnvelope
+        try {
+          envelope = await this.#decodeEnvelope(raw, migration.context, migration.runtime)
+          /** Eligible records are materialized only under the commit transaction's read set. */
+          const value =
+            envelope.version >= this.#version
+              ? await this.#materialize(envelope, migration.context, migration.runtime)
+              : undefined
+          if (envelope.version >= this.#version && value === undefined) continue
+          if (envelope.version >= this.#version) {
+            migration.alreadyCurrent += 1
+            // A current-version legacy envelope still requires physical relocation before
+            // migration completion can prove that entity queries may stop scanning legacy.
+            if (legacy)
+              migration.batch.push({
+                physicalKey,
+                raw,
+                id: recordId,
+                legacy,
+                migrationRequired: false,
+                value
+              })
+            continue
+          }
+          migration.eligible += 1
+          migration.batch.push({
+            physicalKey,
+            raw,
+            id: recordId,
+            legacy,
+            migrationRequired: true,
+            value
+          })
+        } catch (cause) {
+          const issue: IInvalidRecordIssue<TDomain> = {
+            key: recordId,
+            raw,
+            stage: (cause as Partial<IStageFailure>).stage ?? StorageRecordStage.decode,
+            cause
+          }
+          const action = this.#invokeInvalidHandler(migration.onInvalid, issue)
+          if (action === StorageInvalidRecordAction.throw) this.#throwInvalid(issue)
+          migration.skipped += 1
+        }
+        if (migration.batch.length >= migration.batchSize)
+          await this.#persistMigrationBatch(migration)
+      }
+      if (scanPhase === StorageMigrationPhase.v2 && phases.length > 1) {
+        migration.phase = StorageMigrationPhase.legacy
+        migration.lastPhysicalKey = undefined
+        await this.#writeMigrationCheckpoint(migration, {
+          status: StorageMigrationStatus.running,
+          phase: migration.phase,
+          version: this.#version,
+          schemaFingerprint: this.#migrationFingerprint,
+          scanned: migration.scanned,
+          eligible: migration.eligible,
+          migrated: migration.migrated,
+          skipped: migration.skipped,
+          alreadyCurrent: migration.alreadyCurrent,
+          conflicted: migration.conflicted
+        })
+      }
+    }
+  }
+  /** Scan text records using the existing canonical ordered key index. */
+  #scanMigrationValues = async (migration: IEntityMigrationContext<TDomain>): Promise<void> => {
+    const prefix = flatKeyPrefix(this.#name)
+    /** Migration traverses the same canonical ordered structure without a second sorting path. */
+    const keys = createOrderedRecordIndex<{
+      readonly rawKey: string
+      readonly id: IStorageKey
+    }>()
+    for (const rawKey of await this.#store.keys(migration.context)) {
+      if (!rawKey.startsWith(prefix)) continue
+      const id = decodeFlatStorageKey(rawKey.slice(prefix.length))
+      if (id !== undefined)
+        keys.set(encodeOrderedStorageKey(id, this.#store.backend), { rawKey, id })
+    }
+    for (const {
+      value: { rawKey, id }
+    } of keys.range()) {
+      const raw = await this.#store.get(rawKey, migration.context)
+      if (raw === null) continue
+      migration.scanned += 1
+      try {
+        const envelope = await this.#decodeEnvelope(raw, migration.context, migration.runtime)
+        const value = await this.#materialize(envelope, migration.context, migration.runtime)
+        if (value === undefined) continue
+        if (envelope.version >= this.#version) {
+          migration.alreadyCurrent += 1
+          continue
+        }
+        migration.eligible += 1
+        migration.batch.push({
+          physicalKey: rawKey,
+          raw,
+          id,
+          legacy: false,
+          migrationRequired: true,
+          value
+        })
+      } catch (cause) {
+        const issue: IInvalidRecordIssue<TDomain> = {
+          key: id,
+          raw,
+          stage: (cause as Partial<IStageFailure>).stage ?? StorageRecordStage.decode,
+          cause
+        }
+        const action = this.#invokeInvalidHandler(migration.onInvalid, issue)
+        if (action === StorageInvalidRecordAction.throw) this.#throwInvalid(issue)
+        migration.skipped += 1
+      }
+      if (migration.batch.length >= migration.batchSize)
+        await this.#persistMigrationBatch(migration)
+    }
+  }
+  /** Apply a prepared batch against the current native transaction snapshot. */
+  #executeMigrationBatch = async (
+    migration: IEntityMigrationContext<TDomain>,
+    indexedHandle: IRecordIndexHandle | undefined,
+    tx: ITransactionScope,
+    indexed: boolean
+  ) => {
+    /** Publish counts only after this transaction commits, including invalid-record policy. */
+    const transactionContext = readTransactionOperationContext(tx)
+    const currentIndexed =
+      indexed &&
+      indexedHandle !== undefined &&
+      (await tx.isRecordIndexReady?.(indexedHandle)) === true
+    const counts = { migrated: 0, alreadyCurrent: 0, skipped: 0, invalidEligible: 0 }
+    /** Written rows supply prepared projections; unchanged rows use the transactional view. */
+    const uniqueChanges = new Map<string, IEntityUniqueMutation>()
+    for (const entry of migration.batch) {
+      /** Every write is derived from a read tracked by this transaction. */
+      const currentRaw = await tx.getRecord(entry.physicalKey)
+      if (currentRaw === undefined) continue
+      if (entry.legacy) {
+        /** An authoritative current-layout record wins over an obsolete legacy copy. */
+        const existingTarget = await tx.getRecord(composeRepositoryKey(this.#name, entry.id))
+        if (existingTarget !== undefined) {
+          await tx.deleteRecord(entry.physicalKey)
+          continue
+        }
+      }
+      /** Keep decoding/migration failures under the existing per-record invalid policy. */
+      let currentValue: TDomain | undefined
+      try {
+        /** A concurrent current-version update must not be rewritten by this migration. */
+        const currentEnvelope = await this.#decodeEnvelope(
+          currentRaw,
+          transactionContext,
+          migration.runtime
+        )
+        if (!entry.legacy && currentEnvelope.version >= this.#version) {
+          counts.alreadyCurrent += 1
+          continue
+        }
+        currentValue = await this.#materialize(
+          currentEnvelope,
+          transactionContext,
+          migration.runtime
+        )
+      } catch (cause) {
+        /** The issue reports the actual transactional value, not stale scan data. */
+        const issue: IInvalidRecordIssue<TDomain> = {
+          key: entry.id,
+          raw: currentRaw,
+          stage: (cause as Partial<IStageFailure>).stage ?? StorageRecordStage.decode,
+          cause
+        }
+        if (
+          this.#invokeInvalidHandler(migration.onInvalid, issue) ===
+          StorageInvalidRecordAction.throw
+        )
+          this.#throwInvalid(issue)
+        counts.skipped += 1
+        if (entry.migrationRequired) counts.invalidEligible += 1
+        continue
+      }
+      if (currentValue === undefined) {
+        if (entry.migrationRequired) counts.invalidEligible += 1
+        continue
+      }
+      /** Preparation retains the existing write-side schema/codec validation boundary. */
+      const prepared = await this.#toEnvelope(currentValue, transactionContext, migration.runtime)
+      /** Native and fallback paths write the same current envelope. */
+      const raw = await this.#encodeEnvelope(
+        prepared.envelope,
+        transactionContext,
+        migration.runtime
+      )
+      if (currentIndexed && indexedHandle !== undefined && tx.putIndexedRecord !== undefined)
+        await tx.putIndexedRecord(
+          raw,
+          composeRepositoryKey(this.#name, entry.id),
+          indexedHandle,
+          projectEntityIndexes(this.#config.indexes, prepared.domain, this.#store.backend),
+          { conflictPolicy: 'replace' }
+        )
+      else
+        await tx.putRecord(raw, composeRepositoryKey(this.#name, entry.id), {
+          conflictPolicy: 'replace'
+        })
+      if (entry.legacy) await tx.deleteRecord(entry.physicalKey)
+      if (!currentIndexed && this.#uniqueDefinitions.length > 0)
+        uniqueChanges.set(encodeFlatStorageKey(entry.id), {
+          id: entry.id,
+          projection: this.#projectUniqueWrite(prepared.domain)
+        })
+      if (entry.migrationRequired) counts.migrated += 1
+    }
+    if (!currentIndexed)
+      await this.#validateUniqueRecordCommit(
+        tx,
+        uniqueChanges,
+        transactionContext,
+        migration.runtime
+      )
+    return counts
+  }
+  /** Re-read one conflicted row in the original retry transaction. */
+  #retryMigrationEntry = async (
+    migration: IEntityMigrationContext<TDomain>,
+    indexedHandle: IRecordIndexHandle | undefined,
+    entry: IEntityMigrationContext<TDomain>['batch'][number],
+    tx: ITransactionScope
+  ) => {
+    const retryContext = readTransactionOperationContext(tx)
+    const currentIndexed =
+      indexedHandle !== undefined && (await tx.isRecordIndexReady?.(indexedHandle)) === true
+    const targetRaw = await tx.getRecord(composeRepositoryKey(this.#name, entry.id))
+    if (targetRaw !== undefined) {
+      const targetEnvelope = await this.#decodeEnvelope(targetRaw, retryContext, migration.runtime)
+      if (targetEnvelope.version >= this.#version) {
+        if (entry.legacy) await tx.deleteRecord(entry.physicalKey)
+        return 'alreadyCurrent' as const
+      }
+    }
+    const currentRaw = await tx.getRecord(entry.physicalKey)
+    if (currentRaw === undefined) return 'missing' as const
+    const currentEnvelope = await this.#decodeEnvelope(currentRaw, retryContext, migration.runtime)
+    const currentValue = await this.#materialize(currentEnvelope, retryContext, migration.runtime)
+    if (currentValue === undefined) return 'missing' as const
+    if (currentEnvelope.version >= this.#version) return 'alreadyCurrent' as const
+    const prepared = await this.#toEnvelope(currentValue, retryContext, migration.runtime)
+    const nextRaw = await this.#encodeEnvelope(prepared.envelope, retryContext, migration.runtime)
+    if (currentIndexed && indexedHandle !== undefined && tx.putIndexedRecord !== undefined)
+      await tx.putIndexedRecord(
+        nextRaw,
+        composeRepositoryKey(this.#name, entry.id),
+        indexedHandle,
+        projectEntityIndexes(this.#config.indexes, prepared.domain, this.#store.backend),
+        { conflictPolicy: 'replace' }
+      )
+    else
+      await tx.putRecord(nextRaw, composeRepositoryKey(this.#name, entry.id), {
+        conflictPolicy: 'replace'
+      })
+    if (entry.legacy) await tx.deleteRecord(entry.physicalKey)
+    if (!currentIndexed)
+      await this.#validateUniqueRecordCommit(
+        tx,
+        new Map([
+          [
+            encodeFlatStorageKey(entry.id),
+            {
+              id: entry.id,
+              projection: projectEntityIndexes(
+                this.#uniqueIndexes,
+                prepared.domain,
+                this.#store.backend
+              )
+            }
+          ]
+        ]),
+        retryContext,
+        migration.runtime
+      )
+    return 'migrated' as const
+  }
+  /** Write the existing migration checkpoint through its native metadata owner. */
+  #writeMigrationCheckpoint = async (
+    migration: IEntityMigrationContext<TDomain>,
+    value: unknown
+  ): Promise<void> => {
+    if (migration.migrationMetadata)
+      await migration.migrationMetadata.set(migration.checkpointKey, value, migration.context)
+  }
+  /** Commit one prepared migration batch and publish its durable progress. */
+  #persistMigrationBatch = async (migration: IEntityMigrationContext<TDomain>): Promise<void> => {
+    if (migration.batch.length === 0) return
+    if (!this.#recordStore) {
+      for (const entry of migration.batch) {
+        const prepared = await this.#toEnvelope(entry.value!, migration.context, migration.runtime)
+        const nextKey = composeFlatKey(this.#name, entry.id)
+        if (this.#uniqueDefinitions.length > 0)
+          await this.#writeUniqueValue(
+            entry.id,
+            prepared.domain,
+            prepared.envelope,
+            migration.context
+          )
+        else
+          await this.#writeEnvelopeAt(
+            { flatKey: nextKey },
+            prepared.envelope,
+            migration.context,
+            migration.runtime
+          )
+      }
+      migration.migrated += migration.batch.length
+    } else {
+      let indexedStore: IEntitySecondaryMethods | undefined
+      let indexedHandle: IRecordIndexHandle | undefined
+      try {
+        indexedStore =
+          Object.keys(this.#config.indexes).length > 0 ? this.#backend.secondaryStore() : undefined
+        /** Materialize the transaction's current snapshot once, not the earlier scan value. */
+
+        if (indexedStore !== undefined) {
+          indexedHandle = await indexedStore.ensureRecordIndexes(
+            this.#name,
+            Object.values(this.#config.indexes).map((index) => index.definition),
+            migration.context
+          )
+          const readiness = await indexedStore.getRecordIndexReadiness(
+            indexedHandle,
+            migration.context
+          )
+          if (readiness.status !== 'complete') indexedHandle = undefined
+        }
+        /** One callback owns migration semantics; backend adapters only supply their scope. */
+        const batchOutcome = await this.#recordStore.transaction(
+          (tx) =>
+            this.#executeMigrationBatch(migration, indexedHandle, tx, indexedHandle !== undefined),
+          migration.context
+        )
+        migration.migrated += batchOutcome.migrated
+        migration.alreadyCurrent += batchOutcome.alreadyCurrent
+        migration.skipped += batchOutcome.skipped
+        migration.eligible -= batchOutcome.invalidEligible
+      } catch (cause) {
+        if (
+          isStorageContractError(cause) &&
+          cause.code === StorageContractErrorCode.writeConflict
+        ) {
+          for (const entry of migration.batch) {
+            try {
+              const retryOutcome = await this.#recordStore.transaction(
+                (tx) => this.#retryMigrationEntry(migration, indexedHandle, entry, tx),
+                migration.context
+              )
+              if (retryOutcome === 'migrated') migration.migrated += 1
+              if (retryOutcome === 'alreadyCurrent') migration.alreadyCurrent += 1
+            } catch (retryCause) {
+              if (
+                isStorageContractError(retryCause) &&
+                retryCause.code === StorageContractErrorCode.writeConflict
+              ) {
+                migration.conflicted += 1
+                continue
               }
-            } else {
               throw normalizeError(
-                cause,
-                store.backend,
+                retryCause,
+                this.#store.backend,
                 StorageErrorCode.transactionFailed,
                 'entity.migrate'
               )
             }
           }
-        }
-        await writeCheckpoint({
-          status: StorageMigrationStatus.running,
-          phase,
-          version,
-          schemaFingerprint: migrationFingerprint,
-          lastPhysicalKey,
-          scanned,
-          eligible,
-          migrated,
-          skipped,
-          alreadyCurrent,
-          conflicted
-        })
-        batch.length = 0
-      }
-      if (recordStore) {
-        const phases =
-          phase === StorageMigrationPhase.v2
-            ? [StorageMigrationPhase.v2, StorageMigrationPhase.legacy]
-            : [StorageMigrationPhase.legacy]
-        for (const scanPhase of phases) {
-          phase = scanPhase
-          if (
-            scanPhase !==
-            (checkpointMatches
-              ? (checkpoint.phase ?? StorageMigrationPhase.legacy)
-              : StorageMigrationPhase.v2)
+        } else {
+          throw normalizeError(
+            cause,
+            this.#store.backend,
+            StorageErrorCode.transactionFailed,
+            'entity.migrate'
           )
-            lastPhysicalKey = undefined
-          const entityRange = repositoryEntityRange(name)
-          const migrationRange =
-            scanPhase === StorageMigrationPhase.v2
-              ? lastPhysicalKey
-                ? { ...entityRange, lower: lastPhysicalKey, lowerOpen: true }
-                : entityRange
-              : lastPhysicalKey
-                ? { lower: lastPhysicalKey, lowerOpen: true }
-                : undefined
-          for await (const [physicalKey, raw] of recordStore.iterateRecords(
-            migrationRange,
-            context
-          )) {
-            lastPhysicalKey = physicalKey
-            const v2RecordId = decodeRepositoryKey(name, physicalKey)
-            const legacy =
-              v2RecordId === undefined &&
-              Array.isArray(physicalKey) &&
-              physicalKey.length === 2 &&
-              physicalKey[0] === name
-            const recordId = v2RecordId ?? (legacy ? (physicalKey[1] as IStorageKey) : undefined)
-            if (scanPhase === StorageMigrationPhase.v2 && v2RecordId === undefined) continue
-            if (scanPhase === StorageMigrationPhase.legacy && !legacy) continue
-            if (recordId === undefined) continue
-            scanned += 1
-            let envelope: IEnvelope
-            try {
-              envelope = await decodeEnvelope(raw, context, runtime)
-              /** Eligible records are materialized only under the commit transaction's read set. */
-              const value =
-                envelope.version >= version
-                  ? await materialize(envelope, context, runtime)
-                  : undefined
-              if (envelope.version >= version && value === undefined) continue
-              if (envelope.version >= version) {
-                alreadyCurrent += 1
-                // A current-version legacy envelope still requires physical relocation before
-                // migration completion can prove that entity queries may stop scanning legacy.
-                if (legacy)
-                  batch.push({
-                    physicalKey,
-                    raw,
-                    id: recordId,
-                    legacy,
-                    migrationRequired: false,
-                    value
-                  })
-                continue
-              }
-              eligible += 1
-              batch.push({
-                physicalKey,
-                raw,
-                id: recordId,
-                legacy,
-                migrationRequired: true,
-                value
-              })
-            } catch (cause) {
-              const issue: IInvalidRecordIssue<TDomain> = {
-                key: recordId,
-                raw,
-                stage: (cause as Partial<IStageFailure>).stage ?? StorageRecordStage.decode,
-                cause
-              }
-              const action = invokeInvalidHandler(onInvalid, issue)
-              if (action === StorageInvalidRecordAction.throw) throwInvalid(issue)
-              skipped += 1
-            }
-            if (batch.length >= batchSize) await persistBatch()
-          }
-          if (scanPhase === StorageMigrationPhase.v2 && phases.length > 1) {
-            phase = StorageMigrationPhase.legacy
-            lastPhysicalKey = undefined
-            await writeCheckpoint({
-              status: StorageMigrationStatus.running,
-              phase,
-              version,
-              schemaFingerprint: migrationFingerprint,
-              scanned,
-              eligible,
-              migrated,
-              skipped,
-              alreadyCurrent,
-              conflicted
-            })
-          }
-        }
-      } else {
-        const prefix = flatKeyPrefix(name)
-        /** Migration traverses the same canonical ordered structure without a second sorting path. */
-        const keys = createOrderedRecordIndex<{
-          readonly rawKey: string
-          readonly id: IStorageKey
-        }>()
-        for (const rawKey of await store.keys(context)) {
-          if (!rawKey.startsWith(prefix)) continue
-          const id = decodeFlatStorageKey(rawKey.slice(prefix.length))
-          if (id !== undefined) keys.set(encodeOrderedStorageKey(id, store.backend), { rawKey, id })
-        }
-        for (const {
-          value: { rawKey, id }
-        } of keys.range()) {
-          const raw = await store.get(rawKey, context)
-          if (raw === null) continue
-          scanned += 1
-          try {
-            const envelope = await decodeEnvelope(raw, context, runtime)
-            const value = await materialize(envelope, context, runtime)
-            if (value === undefined) continue
-            if (envelope.version >= version) {
-              alreadyCurrent += 1
-              continue
-            }
-            eligible += 1
-            batch.push({
-              physicalKey: rawKey,
-              raw,
-              id,
-              legacy: false,
-              migrationRequired: true,
-              value
-            })
-          } catch (cause) {
-            const issue: IInvalidRecordIssue<TDomain> = {
-              key: id,
-              raw,
-              stage: (cause as Partial<IStageFailure>).stage ?? StorageRecordStage.decode,
-              cause
-            }
-            const action = invokeInvalidHandler(onInvalid, issue)
-            if (action === StorageInvalidRecordAction.throw) throwInvalid(issue)
-            skipped += 1
-          }
-          if (batch.length >= batchSize) await persistBatch()
         }
       }
-      await persistBatch()
-      await writeCheckpoint({
-        status: StorageMigrationStatus.complete,
-        phase,
-        version,
-        schemaFingerprint: migrationFingerprint,
-        lastPhysicalKey,
-        scanned,
-        eligible,
-        migrated,
-        skipped,
-        alreadyCurrent,
-        conflicted
-      })
-      return { scanned, eligible, migrated, skipped, alreadyCurrent, conflicted }
-    },
+    }
+    await this.#writeMigrationCheckpoint(migration, {
+      status: StorageMigrationStatus.running,
+      phase: migration.phase,
+      version: this.#version,
+      schemaFingerprint: this.#migrationFingerprint,
+      lastPhysicalKey: migration.lastPhysicalKey,
+      scanned: migration.scanned,
+      eligible: migration.eligible,
+      migrated: migration.migrated,
+      skipped: migration.skipped,
+      alreadyCurrent: migration.alreadyCurrent,
+      conflicted: migration.conflicted
+    })
+    migration.batch.length = 0
+  }
+  /** Perform the public in operation using this repository state. */
+  #apiIn: IRepository<TDomain, TIndexes, TChangeFeed, TAugmentMethods>['in'] = (scope) =>
+    this.#bindRepository(scope)
+  /** Perform the public lockKey operation using this repository state. */
+  #apiLockKey: IRepository<TDomain, TIndexes, TChangeFeed, TAugmentMethods>['lockKey'] = (id) => {
+    assertStorageKey(id, this.#store.backend)
+    return this.#records
+      ? lockKey.record(composeRepositoryKey(this.#name, id))
+      : lockKey.text(composeFlatKey(this.#name, id))
+  }
+  /** Perform the public batch operation using this repository state. */
+  #apiBatch: IRepository<TDomain, TIndexes, TChangeFeed, TAugmentMethods>['batch'] = (run, ctx) => {
+    if (typeof run !== 'function')
+      return Promise.reject(
+        new StorageError(StorageErrorCode.invalidConfig, {
+          backend: this.#store.backend,
+          cause: new TypeError(EntityText.batchCallbackMustBeAFunction)
+        })
+      )
+    if (this.#recordStore === undefined)
+      return Promise.reject(
+        new StorageContractError(StorageContractErrorCode.unsupported, {
+          backend: this.#store.backend
+        })
+      )
+    return this.#recordStore.transaction((scope) => run(this.#bindRepository(scope)), ctx)
+  }
 
-    in: (scope) => bindRepository(scope),
-    lockKey: (id) => {
-      assertStorageKey(id, store.backend)
-      return records
-        ? lockKey.record(composeRepositoryKey(name, id))
-        : lockKey.text(composeFlatKey(name, id))
-    },
-    batch: (run, ctx) => {
-      if (typeof run !== 'function')
-        return Promise.reject(
-          new StorageError(StorageErrorCode.invalidConfig, {
-            backend: store.backend,
-            cause: new TypeError(EntityText.batchCallbackMustBeAFunction)
-          })
-        )
-      if (recordStore === undefined)
-        return Promise.reject(
-          new StorageContractError(StorageContractErrorCode.unsupported, { backend: store.backend })
-        )
-      return recordStore.transaction((scope) => run(bindRepository(scope)), ctx)
+  /** Read canonical and legacy physical rows with the existing deduplication policy. */
+  async *#scanEntityCandidates(
+    scan: IEntityScanContext<TDomain>
+  ): AsyncGenerator<IEntityScanCandidate, void, unknown> {
+    if (this.#recordStore !== undefined) {
+      const canonicalIds = new Set<string>()
+      const iterate =
+        scan.readView?.iterateRecords ??
+        ((range) => this.#recordStore!.iterateRecords(range, scan.ctx))
+      try {
+        for (const range of [repositoryEntityRange(this.#name), undefined]) {
+          for await (const [physical, raw] of iterate(range)) {
+            const canonical = decodeRepositoryKey(this.#name, physical)
+            const legacy =
+              Array.isArray(physical) && physical.length === 2 && physical[0] === this.#name
+                ? (physical[1] as IStorageKey)
+                : undefined
+            const id = canonical ?? legacy
+            if (id === undefined || !isStorageKeyInRange(id, scan.options?.range)) continue
+            if (range === undefined && canonical !== undefined) continue
+            scan.onRead?.()
+            const identity = encodeFlatStorageKey(id)
+            if (range === undefined && canonicalIds.has(identity)) continue
+            if (canonical !== undefined) canonicalIds.add(identity)
+            yield { id, physical, raw }
+          }
+        }
+      } finally {
+        canonicalIds.clear()
+      }
+    } else {
+      this.#emitDiagnostic(EntityText.valueScan(this.#name))
+      const prefix = flatKeyPrefix(this.#name)
+      for (const physical of scan.readView?.keys === undefined
+        ? await this.#store.keys(scan.ctx)
+        : await scan.readView.keys()) {
+        if (!physical.startsWith(prefix)) continue
+        const id = decodeFlatStorageKey(physical.slice(prefix.length))
+        if (id !== undefined && isStorageKeyInRange(id, scan.options?.range)) {
+          scan.onRead?.()
+          yield { id, physical, raw: undefined }
+        }
+      }
     }
   }
-  return repository
+  /** Apply canonical key ordering only when the selected source requires it. */
+  async *#orderedEntityCandidates(
+    scan: IEntityScanContext<TDomain>
+  ): AsyncGenerator<IEntityScanCandidate, void, unknown> {
+    if (!scan.applyOrdering) {
+      yield* this.#scanEntityCandidates(scan)
+      return
+    }
+    for await (const candidate of this.#scanEntityCandidates(scan))
+      scan.candidates.set(encodeOrderedStorageKey(candidate.id, this.#store.backend), candidate)
+    for (
+      let item = scan.options?.direction === 'prev' ? scan.candidates.last : scan.candidates.first;
+      item !== undefined;
+      item = scan.options?.direction === 'prev' ? item.previous : item.next
+    )
+      yield item.value
+  }
+  /** Advance the same registered source through initialization, selection and ordered rows. */
+  #advanceScopedEntitySource = async (
+    sourceContext: IEntityScopedSourceContext<TDomain>,
+    next: () => Promise<IteratorResult<[IStorageKey, unknown]>>,
+    currentScope: ITransactionScope
+  ): Promise<IteratorResult<readonly [IStorageKey, TDomain]>> => {
+    const current = currentScope as ITransactionScope
+    this.#backend.assertScope(current)
+    const context = readTransactionOperationContext(current)
+    const runtime = entityRuntime(current)
+    const index =
+      sourceContext.selection.index === undefined
+        ? undefined
+        : this.#config.indexes[sourceContext.selection.index]
+    if (!sourceContext.initialized) {
+      sourceContext.initialized = true
+      const handle =
+        this.#readyHandle !== undefined &&
+        index !== undefined &&
+        (await current.isRecordIndexReady?.(this.#readyHandle))
+          ? this.#readyHandle
+          : undefined
+      if (handle !== undefined && current.iterateRecordIndex !== undefined)
+        sourceContext.cursor = current.iterateRecordIndex({
+          handle,
+          index: sourceContext.selection.index!,
+          range: sourceContext.selection.range
+        })
+    }
+    if (!sourceContext.prepared) {
+      while (true) {
+        const result =
+          sourceContext.cursor === undefined
+            ? await next()
+            : await nextTransactionIterator(current, sourceContext.cursor)
+        if (result.done) break
+        const [physical, raw] = result.value
+        const canonical = decodeRepositoryKey(this.#name, physical)
+        const legacy =
+          Array.isArray(physical) && physical.length === 2 && physical[0] === this.#name
+            ? (physical[1] as IStorageKey)
+            : undefined
+        const physicalId = canonical ?? legacy
+        if (physicalId === undefined) continue
+        sourceContext.onRead?.()
+        if (
+          legacy !== undefined &&
+          canonical === undefined &&
+          (await current.getRecord(composeRepositoryKey(this.#name, legacy))) !== undefined
+        )
+          continue
+        let value: TDomain | undefined
+        try {
+          value = await this.#materialize(
+            await this.#decodeEnvelope(raw, context, runtime),
+            context,
+            runtime
+          )
+        } catch (cause) {
+          const issue: IInvalidRecordIssue<TDomain> = {
+            key: physicalId,
+            raw,
+            stage: (cause as Partial<IStageFailure>).stage ?? StorageRecordStage.validate,
+            cause
+          }
+          if (
+            this.#invalidAction(issue, { onInvalid: sourceContext.selection.onInvalid }) ===
+            StorageInvalidRecordAction.throw
+          )
+            this.#throwInvalid(issue)
+          this.#emitDiagnostic(EntityText.invalidRecord(this.#name, physicalId))
+        }
+        if (value === undefined) continue
+        const id = idOf(this.#name, this.#keyProp, value, this.#store.backend)
+        const identity = encodeFlatStorageKey(id)
+        if (sourceContext.seen.has(identity)) continue
+        let ordering: IStorageKey = [id]
+        let encodedOrdering: Uint8Array | undefined
+        if (index !== undefined) {
+          let projection: ReturnType<typeof index.project>
+          try {
+            projection = index.project(value, this.#store.backend)
+          } catch (cause) {
+            const issue: IInvalidRecordIssue<TDomain> = {
+              key: physicalId,
+              raw,
+              stage: StorageRecordStage.validate,
+              cause
+            }
+            if (
+              this.#invalidAction(issue, { onInvalid: sourceContext.selection.onInvalid }) ===
+              StorageInvalidRecordAction.throw
+            )
+              this.#throwInvalid(issue)
+            this.#emitDiagnostic(EntityText.invalidRecord(this.#name, physicalId))
+            continue
+          }
+          const first = minimumProjectedIndexKey(projection, sourceContext.selection.range)
+          if (first === undefined) continue
+          ordering = [first, id]
+          if (sourceContext.orderedSource) encodedOrdering = this.#encodeIndexOrder(first, id)
+        } else if (!isStorageKeyInRange(id, sourceContext.selection.range)) continue
+        if (sourceContext.seen instanceof Map) sourceContext.seen.set(identity, physicalId)
+        else sourceContext.seen.add(identity)
+        if (sourceContext.accepts !== undefined && !sourceContext.accepts(value)) continue
+        if (!sourceContext.orderedSource) return { done: false, value: [ordering, value] as const }
+        sourceContext.rows.set(
+          encodedOrdering ?? encodeOrderedStorageKey(id, this.#store.backend),
+          [ordering, value]
+        )
+      }
+      sourceContext.prepared = true
+      sourceContext.item = sourceContext.rows.first
+    }
+    if (sourceContext.item === undefined) return { done: true, value: undefined }
+    const value = sourceContext.item.value
+    sourceContext.item = sourceContext.item.next
+    return { done: false, value }
+  }
+  /** Release the native index cursor before clearing source-owned ordering and deduplication. */
+  #closeScopedEntitySource = async (
+    sourceContext: IEntityScopedSourceContext<TDomain>
+  ): Promise<void> => {
+    try {
+      await sourceContext.cursor?.dispose()
+    } finally {
+      sourceContext.rows.clear()
+      if (sourceContext.physicalIds === undefined) sourceContext.seen.clear()
+    }
+  }
+  /** Observe one advance using the actual transaction stages and original result. */
+  #advanceObservedEntityQuery = async <R>(
+    observation: IEntityQueryObservation<TDomain, R>,
+    next: () => Promise<IteratorResult<R>>,
+    current?: ITransactionScope
+  ): Promise<IteratorResult<R>> => {
+    const stages =
+      current === undefined ? this.#queryStages : this.#queryStages?.forTransaction(current)
+    const started = stages === undefined ? 0 : systemScheduler.now()
+    if (stages?.beforeQuery !== undefined)
+      observeEntity(stages, () =>
+        stages.beforeQuery!(this.#name, observation.selection.index, observation.plan)
+      )
+    try {
+      const value = await next()
+      if (!value.done) observation.returnedCount++
+      if (stages !== undefined) observation.elapsedMs += systemScheduler.now() - started
+      if (stages?.afterQuery !== undefined)
+        observeEntity(stages, () =>
+          stages.afterQuery!(this.#name, observation.selection.index, {
+            readCount: observation.counter?.readCount ?? 0,
+            returnedCount: observation.returnedCount,
+            elapsedMs: observation.elapsedMs,
+            completed: value.done === true
+          })
+        )
+      return value
+    } catch (cause) {
+      if (stages?.onQueryError !== undefined)
+        observeEntity(stages, () =>
+          stages.onQueryError!(
+            this.#name,
+            observation.selection.index,
+            readStorageHookFailureCode(cause, stages.report)
+          )
+        )
+      throw cause
+    }
+  }
+
+  /** Decode one current backfill candidate under the original renewable session. */
+  #prepareEntityBackfillCandidate = async (
+    session: IRecordIndexBackfillSession<unknown>,
+    ctx: IOperationContext | undefined,
+    candidate: IRecordIndexBackfillCandidate<unknown>
+  ): Promise<IRecordIndexBackfillPreparation> => {
+    await session.renew(ctx)
+    const runtime = createStorageOperationRuntime()
+    let domain: TDomain | undefined
+    try {
+      if (candidate.phase === RecordIndexBackfillPhase.legacy) {
+        const canonicalId = decodeRepositoryKey(this.#name, candidate.key)
+        const legacyId =
+          Array.isArray(candidate.key) &&
+          candidate.key.length === 2 &&
+          candidate.key[0] === this.#name &&
+          (typeof candidate.key[1] === 'string' || Array.isArray(candidate.key[1]))
+            ? (candidate.key[1] as IStorageKey)
+            : undefined
+        if (canonicalId === undefined && legacyId === undefined)
+          return { decodedBytes: 0, outcome: 'skipped', counted: false }
+        if (canonicalId !== undefined)
+          return { decodedBytes: 0, outcome: 'skipped', counted: false }
+        if (legacyId !== undefined) {
+          const id = legacyId
+          const canonicalRaw = await this.#recordStore!.getRecord(
+            composeRepositoryKey(this.#name, id),
+            ctx
+          )
+          if (canonicalRaw !== undefined)
+            return { decodedBytes: 0, outcome: 'skipped', counted: false }
+        }
+      }
+      const envelope = await this.#decodeEnvelope(candidate.raw, ctx, runtime)
+      domain = await this.#materialize(envelope, ctx, runtime)
+    } catch (cause) {
+      this.#emitDiagnostic(
+        EntityText.storageWebEntitySkippedInvalidIndexBackfillRecord(
+          this.#name,
+          String(candidate.key),
+          String(cause)
+        )
+      )
+      return { decodedBytes: 0, outcome: 'skipped' }
+    }
+    return {
+      decodedBytes: safeJsonPayloadByteLength(domain),
+      outcome: domain === undefined ? 'skipped' : 'indexed',
+      projection:
+        domain === undefined
+          ? undefined
+          : projectEntityIndexes(this.#config.indexes, domain, this.#store.backend)
+    }
+  }
+  /** Select mutation rows from the same authentic transaction and physical identity table. */
+  #executeEntityMutationRows = (
+    mutation: IEntityQueryMutationContext<TDomain>,
+    current: ITransactionScope,
+    physicalIds: Map<string, IStorageKey>,
+    { selection: planned, conditions }: Parameters<IRecordQuerySource['execute']>[0]
+  ): IStorageIterator<readonly [IStorageKey, TDomain]> => {
+    const selection = {
+      ...((planned as IEntityQuerySourceSelection<TDomain> | undefined) ??
+        mutation.source.selection),
+      onInvalid: mutation.policy.onInvalid
+    }
+    const predicates = conditions.map((condition) =>
+      compileStorageQueryCondition<TDomain>(condition)
+    )
+    return this.#scopedQuerySource(
+      current,
+      selection,
+      mutation.onRead,
+      mutation.orderedSource,
+      physicalIds,
+      (value) => predicates.every((predicate) => predicate(value))
+    )
+  }
+  /** Write or remove a row only while its selected physical identity remains in the draft. */
+  #acceptEntityMutationRow = async (
+    mutation: IEntityQueryMutationContext<TDomain>,
+    current: ITransactionScope,
+    physicalIds: Map<string, IStorageKey>,
+    value: unknown
+  ): Promise<boolean> => {
+    const id = idOf(this.#name, this.#keyProp, value as TDomain, this.#store.backend)
+    const physicalId = physicalIds.get(encodeFlatStorageKey(id))
+    if (physicalId === undefined)
+      throw new StorageError(StorageErrorCode.invalidConfig, {
+        backend: this.#store.backend,
+        cause: new TypeError(EntityText.queryIdentityChanged)
+      })
+    /** Count only rows still present in this same draft after selection callbacks. */
+    const raw =
+      (await current.getRecord(composeRepositoryKey(this.#name, physicalId))) ??
+      (await current.getRecord(composeStructuredKey(this.#name, physicalId)))
+    if (raw === undefined) return false
+    if (mutation.request.operation === RecordQueryMethod.delete)
+      await this.#bindRepository(current).remove(physicalId)
+    else
+      await this.#bindRepository(current, physicalId).put({
+        ...(value as TDomain),
+        ...mutation.request.patch
+      })
+    return true
+  }
+  /** Run writes in the existing transaction operation, clearing its identity table on every exit. */
+  #applyEntityQueryMutation = (
+    mutation: IEntityQueryMutationContext<TDomain>,
+    target: ITransactionScope
+  ): Promise<number> =>
+    runTransactionOperation(target, async (current) => {
+      this.#backend.assertScope(current)
+      /** This is the source's original seen table, not an index or a retained row cache. */
+      const physicalIds = new Map<string, IStorageKey>()
+      try {
+        return await mutation.run({
+          execute: (input) =>
+            this.#executeEntityMutationRows(mutation, current, physicalIds, input),
+          accept: (_key, value) =>
+            this.#acceptEntityMutationRow(mutation, current, physicalIds, value)
+        })
+      } finally {
+        physicalIds.clear()
+      }
+    })
+}
+
+export const createRepository = <
+  TDomain,
+  TStored,
+  TIndexes extends Readonly<Record<string, IStorageKey>> = Readonly<Record<never, IStorageKey>>,
+  TAugmentMethods extends object = {},
+  TChangeFeed extends boolean = false
+>(
+  config: IRepositoryConfig<TDomain, TStored>,
+  inputStore: IEntityConnectStore,
+  connectOptions?: IEntityConnectOptions
+): IRepository<TDomain, TIndexes, TChangeFeed, TAugmentMethods> => {
+  return new EntityRepositoryOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>(
+    config,
+    inputStore,
+    connectOptions
+  ).api()
 }

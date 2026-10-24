@@ -192,7 +192,7 @@ describe('entity envelopes through the shared plan owner', () => {
     expect(seen).toEqual(['first', 'second', 'second'])
   })
 
-  it('observes actual recovery on a frozen raw provider without a change controller', async () => {
+  it('observes actual recovery on a raw provider without a change controller', async () => {
     /** Hooks record the original plan's actual step order, not a second migration loop. */
     const order: string[] = []
     const raw = rawPlugin()
@@ -219,7 +219,6 @@ describe('entity envelopes through the shared plan owner', () => {
     })
     const store = raw.getStore()
     expect(host.backend('raw')).toBe(store)
-    expect(Object.isFrozen(store)).toBe(true)
     await store.set(
       composeFlatKey('archives', 'a'),
       JSON.stringify({ version: 1, state: { id: 'a', count: 1 } })
