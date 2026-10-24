@@ -1,6 +1,10 @@
+import { ERROR_SOURCE } from '../src/error-code.js'
+import type { Schemas } from '@qdrant/js-client-rest'
+import { deferred } from '@migaia/utils/promise'
 import { describe, it, expect, vi } from 'vitest'
 import {
   createStorageHost,
+  memoryBackendPlugin,
   createOrgId,
   definePlugin,
   STORAGE_HOST_SOURCE,
@@ -844,3 +848,184 @@ describe('real native vector backend', () => {
     30_000
   )
 })
+
+it.skipIf(!url)(
+  'resolves competing native collection creation to one actual matching schema',
+  async () => {
+    const fixture = native()
+    const gate = deferred<void>()
+    let creates = 0
+    const http: IQdrantHttp = {
+      ...fixture.http,
+      async createCollection(...args) {
+        creates += 1
+        if (creates === 2) gate.resolve()
+        await gate.promise
+        return fixture.http.createCollection(...args)
+      }
+    }
+    const prefix = crypto.randomUUID()
+    const first = await createStorageHost({
+      plugins: [qdrantBackendPlugin({ url: url!, http, collectionPrefix: prefix })] as const
+    })
+    const second = await createStorageHost({
+      plugins: [qdrantBackendPlugin({ url: url!, http, collectionPrefix: prefix })] as const
+    })
+    try {
+      const a = first
+        .backend('qdrant')
+        .use(vector)
+        .collection('race', { dimensions: 2, metric: 'cosine' })
+      const b = second
+        .backend('qdrant')
+        .use(vector)
+        .collection('race', { dimensions: 3, metric: 'cosine' })
+      const results = await Promise.allSettled([
+        a.upsert([{ id: 'two', vector: [1, 0] }]),
+        b.upsert([{ id: 'three', vector: [1, 0, 0] }])
+      ])
+      expect(creates).toBe(2)
+      expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1)
+      const failure = results.find(
+        (result) => result.status === 'rejected'
+      ) as PromiseRejectedResult
+      if (failure.reason.code !== 'INVALID_ARGUMENT') {
+        /** This engine reports an initializing collection as native 500, never a confirmed mismatch. */
+        expect(failure.reason).toMatchObject({
+          source: ERROR_SOURCE,
+          code: 'QDRANT_UNAVAILABLE',
+          name: 'Error',
+          cause: { status: 500, response: expect.any(String) }
+        })
+      }
+      /** An explicit later call reads the actual winner; an unknown modification is never replayed. */
+      await expect(
+        results[0]!.status === 'rejected'
+          ? a.upsert([{ id: 'two', vector: [1, 0] }])
+          : b.upsert([{ id: 'three', vector: [1, 0, 0] }])
+      ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' })
+      expect(creates).toBe(2)
+      expect(fixture.created).toHaveLength(1)
+      expect((await fixture.http.count(fixture.created[0]!, { exact: true })).count).toBe(1)
+      const stored = (await fixture.http.getCollection(fixture.created[0]!)).config.params
+        .vectors as Record<string, Schemas['VectorParams']>
+      expect(stored[QdrantManagedVectorName.source]).toMatchObject({
+        size: stored[QdrantManagedVectorName.search]!.size,
+        distance: 'Dot',
+        hnsw_config: { m: 0, payload_m: 0 }
+      })
+    } finally {
+      await first.dispose()
+      await second.dispose()
+      await fixture.close()
+    }
+  },
+  30_000
+)
+
+for (const malformed of ['missing', 'dimension', 'cosine', 'hnsw', 'quantized', 'extra'] as const)
+  it.skipIf(!url)(
+    'rejects the actual managed native ' + malformed + ' source schema before point writes',
+    async () => {
+      const fixture = native()
+      const http: IQdrantHttp = {
+        ...fixture.http,
+        createCollection(name, options, ctx) {
+          const vectors = structuredClone(options.vectors) as Record<
+            string,
+            Schemas['VectorParams']
+          >
+          const source = vectors[QdrantManagedVectorName.source]!
+          if (malformed === 'missing') delete vectors[QdrantManagedVectorName.source]
+          else if (malformed === 'dimension') source.size = 3
+          else if (malformed === 'cosine') source.distance = 'Cosine'
+          else if (malformed === 'hnsw') source.hnsw_config = { m: 16, payload_m: 0 }
+          else if (malformed === 'quantized')
+            source.quantization_config = { scalar: { type: 'int8', always_ram: true } }
+          else vectors.extra = { size: 2, distance: 'Dot' }
+          return fixture.http.createCollection(name, { ...options, vectors }, ctx)
+        }
+      }
+      const host = await createStorageHost({
+        plugins: [
+          qdrantBackendPlugin({ url: url!, http, collectionPrefix: crypto.randomUUID() })
+        ] as const
+      })
+      try {
+        const collection = host
+          .backend('qdrant')
+          .use(vector)
+          .collection('invalid', { dimensions: 2, metric: 'cosine' })
+        await expect(
+          collection.upsert([{ id: 'never-written', vector: [1, 0] }])
+        ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' })
+        expect(fixture.calls.filter((operation) => operation === 'upsert')).toEqual([])
+        expect((await fixture.http.count(fixture.created[0]!, { exact: true })).count).toBe(0)
+      } finally {
+        await host.dispose()
+        await fixture.close()
+      }
+    },
+    30_000
+  )
+
+for (const metric of ['cosine', 'dot', 'euclid'] as const)
+  it.skipIf(!url)(
+    'matches the same public Memory exact query for ' + metric,
+    async () => {
+      const fixture = native()
+      const host = await createStorageHost({
+        plugins: [
+          memoryBackendPlugin(),
+          qdrantBackendPlugin({
+            url: url!,
+            http: fixture.http,
+            collectionPrefix: crypto.randomUUID()
+          })
+        ] as const
+      })
+      try {
+        const memory = host
+          .backend('memory')
+          .use(vector)
+          .collection<{ group: string }>('same', { dimensions: 2, metric })
+        const engine = host
+          .backend('qdrant')
+          .use(vector)
+          .collection<{ group: string }>('same', { dimensions: 2, metric })
+        const points = [
+          { id: 'a', vector: [3, 1], payload: { group: 'kept' } },
+          { id: 'b', vector: [1, 2], payload: { group: 'kept' } },
+          { id: 'c', vector: [-2, -1], payload: { group: 'kept' } },
+          { id: 'd', vector: [0, -2], payload: { group: 'other' } }
+        ]
+        await memory.upsert(points)
+        await engine.upsert(points)
+        for (const collection of [memory, engine]) {
+          const hits = await collection.near([2, 1], { exact: true }).topK(4).all()
+          const expected = await memory.near([2, 1], { exact: true }).topK(4).all()
+          expect(hits.map((hit) => hit.id)).toEqual(expected.map((hit) => hit.id))
+          for (const [index, hit] of hits.entries())
+            expect(hit.score).toBeCloseTo(expected[index]!.score, 5)
+        }
+        const execute = async (collection: typeof memory) => {
+          const seen: string[] = []
+          const hits = await collection
+            .near([2, 1], { exact: true })
+            .where({ group: 'kept' })
+            .where((payload) => {
+              seen.push(payload.group)
+              return true
+            })
+            .topK(2)
+            .all()
+          return { ids: hits.map((hit) => hit.id), seen }
+        }
+        expect(await execute(engine)).toEqual(await execute(memory))
+      } finally {
+        await host.dispose()
+        await fixture.close()
+      }
+    },
+    30_000
+  )
