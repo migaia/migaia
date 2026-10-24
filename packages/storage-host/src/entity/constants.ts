@@ -10,6 +10,8 @@ export const StorageOperation = {
   /** Stable callback operation labels distinguish query extension failures. */
   queryWhere: 'query.where',
   querySelect: 'query.select',
+  /** Identifies synchronous portable-key selectors before canonical query ordering. */
+  querySelector: 'query.orderBy',
   queryComparator: 'query.orderByComparator',
   entityCodecEncode: 'entity.codec.encode',
   entityCodecDecode: 'entity.codec.decode',

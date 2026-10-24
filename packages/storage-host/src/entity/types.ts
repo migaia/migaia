@@ -6,7 +6,10 @@ import type {
   ITransactionScope,
   IWriteConcurrencyOptions,
   ILockKey,
-  IRecordQuery,
+  IRecordQueryBaseCore,
+  IQueryConditions,
+  IQueryCursor,
+  IQueryResult,
   IChainMethodsOf,
   ICodecStageObserver,
   IQueryStageObserver
@@ -276,36 +279,112 @@ type IEntityStoreChangeFeed<S> = S extends { readonly capabilities: { readonly c
 export type IEntityStoreQueryMethods<S> = 'query' extends keyof IChainMethodsOf<S>
   ? NonNullable<IChainMethodsOf<S>['query']>
   : {}
-/** Query sources are chosen first; filtering, projection and execution remain the shared core. */
-export type IEntityQueryNarrowed<
+/** The original core owns terminals, projection and writes; this adapter adds only finite controls. */
+type IEntityQueryCore<T, C extends IOperationContext | undefined, A extends object> = Omit<
+  IRecordQueryBaseCore<T, C, A>,
+  'where' | 'limit' | 'skip' | 'after' | 'distinct' | 'requirePushdown'
+>
+/** Recursive controls preserve the exact entity and original Feature methods after every branch. */
+type IEntityQueryControls<T, TSelf> = {
+  limit(count: number): TSelf
+  skip(count: number): TSelf
+  after(cursor: IQueryCursor): TSelf
+  distinct<K extends Extract<keyof T, string>>(field: K): TSelf
+  requirePushdown(): TSelf
+  onInvalid(action: IInvalidRecordAction | IInvalidRecordHandler<T>): TSelf
+}
+/** Interface semantics are required to close recursive fluent return types without another executor. */
+export interface IEntityQueryNarrowedCore<
   T,
-  _TIndexes extends Readonly<Record<string, IStorageKey>> = Readonly<Record<never, IStorageKey>>,
+  X extends Readonly<Record<string, IStorageKey>> = Readonly<Record<never, IStorageKey>>,
   C extends IOperationContext | undefined = IOperationContext,
   A extends object = {}
-> = IRecordQuery<T, C, A> & {
-  onInvalid(
-    action: IInvalidRecordAction | IInvalidRecordHandler<T>
-  ): IEntityQueryNarrowed<T, _TIndexes, C, A>
+>
+  extends
+    IEntityQueryCore<T, C, A>,
+    IQueryConditions<T, IEntityQueryNarrowed<T, X, C, A>>,
+    IEntityQueryControls<T, IEntityQueryNarrowed<T, X, C, A>> {
+  orderBy(
+    selector: (row: T) => IStorageKey,
+    direction?: 'asc' | 'desc'
+  ): IEntityQueryOrdered<T, C, A>
+  orderByComparator(compare: IRecordComparator<T>): IEntityQueryNeedsLimit<T, C, A>
 }
+/** A chosen source or ordinary chain step removes the root-only source selection methods. */
+export type IEntityQueryNarrowed<
+  T,
+  X extends Readonly<Record<string, IStorageKey>> = Readonly<Record<never, IStorageKey>>,
+  C extends IOperationContext | undefined = IOperationContext,
+  A extends object = {}
+> = IEntityQueryNarrowedCore<T, X, C, A> & A
 /** The finite source adapter retains exact declared index names and key domains. */
 export type IEntityQuery<
   T,
   X extends Readonly<Record<string, IStorageKey>> = Readonly<Record<never, IStorageKey>>,
   C extends IOperationContext | undefined = IOperationContext,
   A extends object = {}
-> = Omit<IRecordQuery<T, C, A>, 'where' | 'limit' | 'requirePushdown'> & {
-  where: IRecordQuery<T, C, A>['where']
+> = IEntityQueryNarrowed<T, X, C, A> & {
   index<N extends keyof X & string>(
     name: N,
     match?: X[N] | IKeyRange<X[N]>
   ): IEntityQueryNarrowed<T, X, C, A>
   range(range: IKeyRange): IEntityQueryNarrowed<T, X, C, A>
-  onInvalid(
-    action: IInvalidRecordAction | IInvalidRecordHandler<T>
-  ): IEntityQueryNarrowed<T, X, C, A>
-  limit(count: number): IEntityQueryNarrowed<T, X, C, A>
-  requirePushdown(): IEntityQueryNarrowed<T, X, C, A>
 }
+/** Interface semantics preserve recursive selector refinements and exclude opaque comparison. */
+export interface IEntityQueryOrderedCore<
+  T,
+  C extends IOperationContext | undefined = IOperationContext,
+  A extends object = {}
+>
+  extends
+    IEntityQueryCore<T, C, A>,
+    IQueryConditions<T, IEntityQueryOrdered<T, C, A>>,
+    IEntityQueryControls<T, IEntityQueryOrdered<T, C, A>> {
+  orderBy(
+    selector: (row: T) => IStorageKey,
+    direction?: 'asc' | 'desc'
+  ): IEntityQueryOrdered<T, C, A>
+}
+/**
+ * Selector ordering keeps entity controls and original Feature methods without another ordering
+ * mode.
+ */
+export type IEntityQueryOrdered<
+  T,
+  C extends IOperationContext | undefined = IOperationContext,
+  A extends object = {}
+> = IEntityQueryOrderedCore<T, C, A> & A
+/** Interface semantics retain fluent controls after the required comparator bound is declared. */
+export interface IEntityQueryComparedCore<
+  T,
+  C extends IOperationContext | undefined = IOperationContext,
+  A extends object = {}
+>
+  extends
+    IEntityQueryCore<T, C, A>,
+    IQueryConditions<T, IEntityQueryCompared<T, C, A>>,
+    IEntityQueryControls<T, IEntityQueryCompared<T, C, A>> {}
+/** Bounded comparison exposes reads and entity controls while forbidding another ordering mode. */
+export type IEntityQueryCompared<
+  T,
+  C extends IOperationContext | undefined = IOperationContext,
+  A extends object = {}
+> = IEntityQueryComparedCore<T, C, A> & A
+/** The original bounded heap cannot execute an unbounded comparator terminal. */
+export type IEntityQueryNeedsLimit<
+  T,
+  C extends IOperationContext | undefined = IOperationContext,
+  A extends object = {}
+> = {
+  limit(count: number): IEntityQueryCompared<T, C, A>
+  first(ctx?: C): Promise<T | undefined>
+}
+/** Projection is the original terminal-only result and retains its exact awaited output shape. */
+export type IEntityQueryFinal<
+  R,
+  C extends IOperationContext | undefined = IOperationContext,
+  A extends object = {}
+> = IQueryResult<R, C, true, A>
 /** Explicit observation ports are borrowed from the original installed host, without owning it. */
 export type IEntityConnectOptions = Readonly<{
   codecStages?: ICodecStageObserver

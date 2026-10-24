@@ -438,6 +438,9 @@ export type IQueryPlan = {
   readonly fullScan: boolean
   readonly source: string
   readonly index?: string
+  /** Pure source-choice rule and rejected alternatives contain no selection authority. */
+  readonly sourceReason?: string
+  readonly sourceCandidates?: readonly { readonly index: string; readonly reason: string }[]
 }
 /** Backend authors declare native support once; they do not provide another fluent executor. */
 export type IQueryPushdown = {
@@ -795,6 +798,11 @@ function snapshotRecordQueryMethods<T extends object>(
 /** Native execution consumes only the shared AST and optional top-level projection from its plan. */
 export type IRecordQuerySource = {
   readonly pushdown: IQueryPushdown
+  /**
+   * Receives only the leading canonical where prefix; no callback, ordering or page barrier is
+   * crossed.
+   */
+  readonly plan?: (conditions: readonly IQueryCondition[]) => IRecordQuerySourcePlan | undefined
   /** The original source resource key is borrowed from its host without creating a fallback. */
   readonly asyncDisposeKey?: typeof Symbol.asyncDispose
   /** Optional source-key tail order; parts marks an author container of independently valid keys. */
@@ -810,8 +818,20 @@ export type IRecordQuerySource = {
   readonly watch?: IQueryWatcher<IRecordQueryInput>
   readonly execute: (input: IRecordQueryInput) => IStorageIterator<readonly [IStorageKey, unknown]>
 }
+/** One pure source choice augments this execution plan without creating another query runner. */
+export type IRecordQuerySourcePlan = {
+  readonly pushdown: IQueryPushdown
+  /** A native index fallback may conservatively report scanning; false cannot invent evidence. */
+  readonly fullScan?: true
+  /** Immutable author-owned facts travel only back to that author's native callbacks. */
+  readonly selection?: unknown
+  readonly sourceReason?: string
+  readonly sourceCandidates?: readonly { readonly index: string; readonly reason: string }[]
+}
 /** The existing record execute shape is also used verbatim by its native reduction port. */
 export type IRecordQueryInput = {
+  /** Present only when the pure source plan supplies an immutable native selection fact. */
+  readonly selection?: unknown
   readonly conditions: readonly IQueryCondition[]
   readonly fields: readonly string[] | undefined
   readonly ctx: IOperationContext | undefined
@@ -1002,6 +1022,7 @@ type IQuerySourceSnapshot = {
   readonly reduce: IRecordQuerySource['reduce']
   readonly mutate: IRecordQuerySource['mutate']
   readonly watch: IRecordQuerySource['watch']
+  readonly plan: IRecordQuerySource['plan']
   readonly receiver: object
   readonly nativeSteps: boolean
   readonly cursorSource: object
@@ -1033,6 +1054,7 @@ type IQueryCursorSnapshot = {
 }
 /** Planning retains the actual nodes so native and client execution cannot diverge from explain. */
 type IRecordExecutionPlan = {
+  readonly sourcePlan?: IRecordQuerySourcePlan
   readonly explanation: IQueryPlan
   readonly pushed: readonly IQueryNode['step'][]
   readonly client: readonly IQueryNode['step'][]
@@ -1062,6 +1084,58 @@ function queryExecutionFailure(cause: unknown): Error {
       )
   })
 }
+/** Both static and terminal-local declarations use the same original support snapshot. */
+function snapshotQueryPushdown(pushdown: IQueryPushdown, execute: unknown): IQueryPushdown {
+  /** Support arrays become independent immutable planner facts. */
+  const { operators, operations, source: sourceName, index, canPushCondition } = pushdown
+  if (
+    !Array.isArray(operators) ||
+    !Array.isArray(operations) ||
+    typeof sourceName !== 'string' ||
+    sourceName.length === 0 ||
+    (index !== undefined && typeof index !== 'string') ||
+    (canPushCondition !== undefined && typeof canPushCondition !== 'function') ||
+    typeof execute !== 'function'
+  )
+    throw new TypeError(StorageContractErrorText.queryArgument)
+  /** Dense declaration arrays reject an omitted operator rather than silently widening support. */
+  const capture = <T extends string>(values: readonly T[], table: object): readonly T[] => {
+    /** The owning snapshot checks and copies each actual declaration once. */
+    const result: T[] = []
+    /** Borrowed arrays, including proxies, have their length read once during admission. */
+    const length = values.length
+    for (let position = 0; position < length; position++) {
+      /** A missing slot never runs its getter; a present value must name a declared operation. */
+      let value: T | undefined
+      if (
+        !Object.hasOwn(values, position) ||
+        typeof (value = values[position]) !== 'string' ||
+        !Object.hasOwn(table, value)
+      )
+        throw new TypeError(StorageContractErrorText.queryArgument)
+      result.push(value)
+    }
+    return Object.freeze(result)
+  }
+  /** Existing source admission finishes before reading the new optional key-order fact. */
+  return Object.freeze({
+    operators: capture(operators, QueryOperator),
+    operations: capture(operations, QueryOperation),
+    source: sourceName,
+    ...(index === undefined ? {} : { index }),
+    ...(canPushCondition === undefined
+      ? {}
+      : {
+          canPushCondition: (condition: IQueryCondition): boolean => {
+            try {
+              return Reflect.apply(canPushCondition, pushdown, [condition]) === true
+            } catch (cause) {
+              throw queryExecutionFailure(cause)
+            }
+          }
+        })
+  })
+}
 /** A top-level native support declaration is snapshotted once before any chain is returned. */
 function snapshotQuerySource(source: IRecordQuerySource): IQuerySourceSnapshot {
   try {
@@ -1069,55 +1143,7 @@ function snapshotQuerySource(source: IRecordQuerySource): IQuerySourceSnapshot {
       throw new TypeError(StorageContractErrorText.queryArgument)
     /** Every borrowed descriptor field is captured once, never consulted during later execution. */
     const { pushdown, execute } = source
-    /** Support arrays become independent immutable planner facts. */
-    const { operators, operations, source: sourceName, index, canPushCondition } = pushdown
-    if (
-      !Array.isArray(operators) ||
-      !Array.isArray(operations) ||
-      typeof sourceName !== 'string' ||
-      sourceName.length === 0 ||
-      (index !== undefined && typeof index !== 'string') ||
-      (canPushCondition !== undefined && typeof canPushCondition !== 'function') ||
-      typeof execute !== 'function'
-    )
-      throw new TypeError(StorageContractErrorText.queryArgument)
-    /** Dense declaration arrays reject an omitted operator rather than silently widening support. */
-    const capture = <T extends string>(values: readonly T[], table: object): readonly T[] => {
-      /** The owning snapshot checks and copies each actual declaration once. */
-      const result: T[] = []
-      /** Borrowed arrays, including proxies, have their length read once during admission. */
-      const length = values.length
-      for (let position = 0; position < length; position++) {
-        /** A missing slot never runs its getter; a present value must name a declared operation. */
-        let value: T | undefined
-        if (
-          !Object.hasOwn(values, position) ||
-          typeof (value = values[position]) !== 'string' ||
-          !Object.hasOwn(table, value)
-        )
-          throw new TypeError(StorageContractErrorText.queryArgument)
-        result.push(value)
-      }
-      return Object.freeze(result)
-    }
-    /** Existing source admission finishes before reading the new optional key-order fact. */
-    const capturedPushdown = Object.freeze({
-      operators: capture(operators, QueryOperator),
-      operations: capture(operations, QueryOperation),
-      source: sourceName,
-      ...(index === undefined ? {} : { index }),
-      ...(canPushCondition === undefined
-        ? {}
-        : {
-            canPushCondition: (condition: IQueryCondition): boolean => {
-              try {
-                return Reflect.apply(canPushCondition, pushdown, [condition]) === true
-              } catch (cause) {
-                throw queryExecutionFailure(cause)
-              }
-            }
-          })
-    })
+    const capturedPushdown = snapshotQueryPushdown(pushdown, execute)
     /** One read keeps a mutable author descriptor from changing later comparison semantics. */
     const keyOrder = source.tieBreakByKey
     /** The captured declaration cannot change direction or key-budget interpretation later. */
@@ -1162,12 +1188,17 @@ function snapshotQuerySource(source: IRecordQuerySource): IQuerySourceSnapshot {
     const watch = source.watch
     if (watch !== undefined && typeof watch !== 'function')
       throw new TypeError(StorageContractErrorText.queryArgument)
+    /** Pure planning authority is borrowed once, just like the original native callbacks. */
+    const plan = source.plan
+    if (plan !== undefined && typeof plan !== 'function')
+      throw new TypeError(StorageContractErrorText.queryArgument)
     return {
       receiver: source,
       execute,
       reduce,
       mutate,
       watch,
+      plan,
       pushdown: capturedPushdown,
       tieBreakByKey,
       nativeSteps: nativeSteps === true,
@@ -1176,6 +1207,68 @@ function snapshotQuerySource(source: IRecordQuerySource): IQuerySourceSnapshot {
     }
   } catch (cause) {
     throw invalidQueryCondition(cause, StorageContractErrorText.queryArgument)
+  }
+}
+/** Capture one pure decision without resnapshotting conditions or exposing its private selection. */
+function planRecordSource(
+  source: IQuerySourceSnapshot,
+  steps: readonly IQueryNode['step'][]
+): IRecordQuerySourcePlan | undefined {
+  if (source.plan === undefined) return undefined
+  /**
+   * Only adjacent leading declarations can restrict a source without changing callback/page
+   * effects.
+   */
+  const conditions: IQueryCondition[] = []
+  for (const step of steps) {
+    if (step.operation !== QueryOperation.where) break
+    conditions.push(step.condition)
+  }
+  try {
+    /** The original author receives the same captured receiver and canonical AST identities. */
+    const result = Reflect.apply(source.plan, source.receiver, [Object.freeze(conditions)])
+    if (result === undefined) return undefined
+    if (result === null || typeof result !== 'object' || Array.isArray(result))
+      throw new TypeError(StorageContractErrorText.queryArgument)
+    const { pushdown, fullScan, selection, sourceReason, sourceCandidates } = result
+    if (fullScan !== undefined && fullScan !== true)
+      throw new TypeError(StorageContractErrorText.queryArgument)
+    /** This execution reuses the original support admission, including exact callback receivers. */
+    const captured = snapshotQueryPushdown(pushdown, source.execute)
+    if (sourceReason !== undefined && typeof sourceReason !== 'string')
+      throw new TypeError(StorageContractErrorText.queryArgument)
+    /** Explain gets detached metadata only, never the native selection or callback authority. */
+    let candidates: IRecordQuerySourcePlan['sourceCandidates']
+    if (sourceCandidates !== undefined) {
+      if (!Array.isArray(sourceCandidates))
+        throw new TypeError(StorageContractErrorText.queryArgument)
+      /** Candidate metadata is detached, so later author mutation cannot rewrite an explanation. */
+      const entries: { readonly index: string; readonly reason: string }[] = []
+      /** A borrowed descriptor array has its bound captured only once. */
+      const length = sourceCandidates.length
+      for (let position = 0; position < length; position++) {
+        if (!Object.hasOwn(sourceCandidates, position))
+          throw new TypeError(StorageContractErrorText.queryArgument)
+        /** Each present descriptor is read once under the same native-query error boundary. */
+        const candidate = sourceCandidates[position]
+        if (candidate === null || typeof candidate !== 'object' || Array.isArray(candidate))
+          throw new TypeError(StorageContractErrorText.queryArgument)
+        const { index, reason } = candidate
+        if (typeof index !== 'string' || typeof reason !== 'string')
+          throw new TypeError(StorageContractErrorText.queryArgument)
+        entries.push(Object.freeze({ index, reason }))
+      }
+      candidates = Object.freeze(entries)
+    }
+    return Object.freeze({
+      pushdown: captured,
+      ...(fullScan === undefined ? {} : { fullScan }),
+      ...(selection === undefined ? {} : { selection }),
+      ...(sourceReason === undefined ? {} : { sourceReason }),
+      ...(candidates === undefined ? {} : { sourceCandidates: candidates })
+    })
+  } catch (cause) {
+    throw queryExecutionFailure(cause)
   }
 }
 /** Canonical condition identity preserves Date values, operand order and opaque object identity. */
@@ -1449,10 +1542,14 @@ function planRecordQuery(
       steps[index + 1]?.operation !== QueryOperation.limit
     )
       throw invalidQueryCondition(undefined, StorageContractErrorText.queryComparatorLimit)
+  /** Selection follows original structural admission and stays local to this execution plan. */
+  const sourcePlan = planRecordSource(source, signature)
+  /** Both native/client partition and explain consume this exact support snapshot. */
+  const pushdown = sourcePlan?.pushdown ?? source.pushdown
   /** Membership lookups are compiled once per plan, never once per row. */
-  const operations = new Set(source.pushdown.operations)
+  const operations = new Set(pushdown.operations)
   /** Field support has the same lifetime as this single execution plan. */
-  const operators = new Set(source.pushdown.operators)
+  const operators = new Set(pushdown.operators)
   /** Actual pushed nodes are handed unchanged to the source execution callback. */
   const pushed: IQueryNode['step'][] = []
   /** Client nodes preserve declaration order after the first non-pushable operation. */
@@ -1537,7 +1634,7 @@ function planRecordQuery(
             ? StorageContractErrorText.queryUnsupported
             : step.operation === QueryOperation.where
               ? (queryConditionReason(step.condition, operators) ??
-                (source.pushdown.canPushCondition?.(step.condition) === false
+                (pushdown.canPushCondition?.(step.condition) === false
                   ? StorageContractErrorText.queryUnsupported
                   : undefined))
               : undefined
@@ -1549,7 +1646,7 @@ function planRecordQuery(
           ...(step.operation === QueryOperation.skip
             ? { reason: StorageContractErrorText.querySkip }
             : {}),
-          ...(source.pushdown.index === undefined ? {} : { index: source.pushdown.index })
+          ...(pushdown.index === undefined ? {} : { index: pushdown.index })
         })
       )
     } else {
@@ -1564,6 +1661,7 @@ function planRecordQuery(
     }
   }
   return {
+    ...(sourcePlan === undefined ? {} : { sourcePlan }),
     pushed,
     client,
     signature,
@@ -1571,13 +1669,18 @@ function planRecordQuery(
       pushed: Object.freeze(pushedSteps),
       client: Object.freeze(clientSteps),
       fullScan:
-        source.vector !== undefined
-          ? source.vector.exact || source.pushdown.index === undefined
-          : source.pushdown.index === undefined ||
+        sourcePlan?.fullScan === true ||
+        (source.vector !== undefined
+          ? source.vector.exact || pushdown.index === undefined
+          : pushdown.index === undefined ||
             ((source.rdf === undefined || Object.keys(source.rdf.pattern).length === 0) &&
-              !pushed.some((step) => step.operation === QueryOperation.where)),
-      source: source.pushdown.source,
-      ...(source.pushdown.index === undefined ? {} : { index: source.pushdown.index })
+              !pushed.some((step) => step.operation === QueryOperation.where))),
+      source: pushdown.source,
+      ...(sourcePlan?.sourceReason === undefined ? {} : { sourceReason: sourcePlan.sourceReason }),
+      ...(sourcePlan?.sourceCandidates === undefined
+        ? {}
+        : { sourceCandidates: sourcePlan.sourceCandidates }),
+      ...(pushdown.index === undefined ? {} : { index: pushdown.index })
     })
   }
 }
@@ -2309,6 +2412,7 @@ function querySourceInput(
       conditions,
       fields,
       ctx: captured,
+      ...(plan.sourcePlan?.selection === undefined ? {} : { selection: plan.sourcePlan.selection }),
       ...(source.nativeSteps
         ? { steps: nativeQuerySteps(source, plan.pushed) as readonly IQueryNativeStep[] }
         : {})
@@ -2608,68 +2712,99 @@ function recordQueryReads<R, TContext extends IOperationContext | undefined>(
   function nativeReduction(
     request: IQueryReduction,
     ctx: TContext | undefined
-  ): Promise<IQueryReductionResult> | undefined {
-    if (source.reduce === undefined || !source.pushdown.operations.includes(request.operation))
-      return undefined
+  ): { readonly native?: Promise<IQueryReductionResult>; readonly plan?: IRecordExecutionPlan } {
+    if (
+      source.reduce === undefined ||
+      (source.plan === undefined && !source.pushdown.operations.includes(request.operation))
+    )
+      return {}
     /** The original planner drops only irrelevant output/order nodes for the requested reduction. */
     const countOnly =
       request.operation === QueryOperation.aggregate
         ? QueryOperation.aggregate
         : request.operation === QueryOperation.count
     const plan = planRecordQuery(source, node, countOnly)
-    if (plan.client.length > 0) return undefined
-    return consumeRecordQuery<IQueryReductionResult, IQueryReductionResult>(
-      source,
-      node,
-      strict,
-      ctx,
-      async (read) => {
-        /**
-         * A native scalar result remains inside its original accepted cursor operation until
-         * cleanup.
-         */
-        const next = await read()
-        if (next.done)
-          throw invalidQueryCondition(undefined, StorageContractErrorText.queryArgument)
-        /** Read the finite result once; no backend rows are materialized by a scalar terminal. */
-        const value = next.value
-        if (
-          request.operation === QueryOperation.count ||
-          (request.operation === QueryOperation.aggregate &&
-            request.aggregate === RecordQueryMethod.sum)
-        ) {
-          if (typeof value !== 'number')
-            throw invalidQueryCondition(undefined, StorageContractErrorText.queryNumericField)
-          return value
-        }
-        if (request.operation === QueryOperation.exists) {
-          if (typeof value !== 'boolean')
-            throw invalidQueryCondition(undefined, StorageContractErrorText.queryArgument)
-          return value
-        }
-        if (typeof value !== 'object' || value === null)
-          throw invalidQueryCondition(undefined, StorageContractErrorText.queryArgument)
-        /** Native Maybe results use the same presence discriminator as client reductions. */
-        const some = value.some
-        if (some === false) return { some: false }
-        const sample = some === true ? value.value : undefined
-        if (some !== true || typeof sample !== 'number')
-          throw invalidQueryCondition(undefined, StorageContractErrorText.queryNumericField)
-        return { some: true, value: sample }
-      },
-      countOnly,
-      undefined,
-      { request, plan }
+    if (
+      plan.client.length > 0 ||
+      !(plan.sourcePlan?.pushdown ?? source.pushdown).operations.includes(request.operation)
     )
+      return source.plan === undefined ? {} : { plan }
+    return {
+      plan,
+      native: consumeRecordQuery<IQueryReductionResult, IQueryReductionResult>(
+        source,
+        node,
+        strict,
+        ctx,
+        async (read) => {
+          /**
+           * A native scalar result remains inside its original accepted cursor operation until
+           * cleanup.
+           */
+          const next = await read()
+          if (next.done)
+            throw invalidQueryCondition(undefined, StorageContractErrorText.queryArgument)
+          /** Read the finite result once; no backend rows are materialized by a scalar terminal. */
+          const value = next.value
+          if (
+            request.operation === QueryOperation.count ||
+            (request.operation === QueryOperation.aggregate &&
+              request.aggregate === RecordQueryMethod.sum)
+          ) {
+            if (typeof value !== 'number')
+              throw invalidQueryCondition(undefined, StorageContractErrorText.queryNumericField)
+            return value
+          }
+          if (request.operation === QueryOperation.exists) {
+            if (typeof value !== 'boolean')
+              throw invalidQueryCondition(undefined, StorageContractErrorText.queryArgument)
+            return value
+          }
+          if (typeof value !== 'object' || value === null)
+            throw invalidQueryCondition(undefined, StorageContractErrorText.queryArgument)
+          /** Native Maybe results use the same presence discriminator as client reductions. */
+          const some = value.some
+          if (some === false) return { some: false }
+          const sample = some === true ? value.value : undefined
+          if (some !== true || typeof sample !== 'number')
+            throw invalidQueryCondition(undefined, StorageContractErrorText.queryNumericField)
+          return { some: true, value: sample }
+        },
+        countOnly,
+        undefined,
+        { request, plan }
+      )
+    }
   }
+  /** Fallbacks reuse the original prepared-plan port and its single context admission. */
+  const prepareFallback = (
+    plan: IRecordExecutionPlan | undefined,
+    ctx: TContext | undefined
+  ): IPreparedQueryExecution | undefined =>
+    plan === undefined
+      ? undefined
+      : {
+          plan,
+          ctx: prepareQueryExecution(source, plan, strict, ctx)
+        }
   /** Only comparator.first supplies the documented implicit one-row retained bound. */
   const firstNode: IQueryNode | undefined =
     node?.step.operation === QueryOperation.comparator
       ? { previous: node, step: { operation: QueryOperation.limit, count: 1 } }
       : node
   /** Presence is the original IteratorResult.done bit, including a present undefined value. */
-  const first = (ctx?: TContext): Promise<IteratorResult<R>> =>
-    consumeRecordQuery<R, IteratorResult<R>>(source, firstNode, strict, ctx, (read) => read())
+  const first = (ctx?: TContext, planned?: IRecordExecutionPlan): Promise<IteratorResult<R>> =>
+    consumeRecordQuery<R, IteratorResult<R>>(
+      source,
+      firstNode,
+      strict,
+      ctx,
+      (read) => read(),
+      false,
+      undefined,
+      undefined,
+      prepareFallback(planned, ctx)
+    )
   /** One scalar accumulator reads each actual numeric field once and never retains source rows. */
   async function aggregate(
     operation:
@@ -2681,7 +2816,7 @@ function recordQueryReads<R, TContext extends IOperationContext | undefined>(
     ctx?: TContext
   ): Promise<number | IMaybe<number>> {
     assertQueryField(field)
-    const native = nativeReduction(
+    const { native, plan } = nativeReduction(
       { operation: QueryOperation.aggregate, aggregate: operation, field },
       ctx
     )
@@ -2718,7 +2853,10 @@ function recordQueryReads<R, TContext extends IOperationContext | undefined>(
           ? { some: false }
           : { some: true, value: operation === RecordQueryMethod.avg ? value / count : value }
       },
-      QueryOperation.aggregate
+      QueryOperation.aggregate,
+      undefined,
+      undefined,
+      prepareFallback(plan, ctx)
     )
   }
   return {
@@ -2798,11 +2936,11 @@ function recordQueryReads<R, TContext extends IOperationContext | undefined>(
       return next.value
     },
     exists: async (ctx) => {
-      const native = nativeReduction({ operation: QueryOperation.exists }, ctx)
-      return native === undefined ? !(await first(ctx)).done : ((await native) as boolean)
+      const { native, plan } = nativeReduction({ operation: QueryOperation.exists }, ctx)
+      return native === undefined ? !(await first(ctx, plan)).done : ((await native) as boolean)
     },
     count: async (ctx) => {
-      const native = nativeReduction({ operation: QueryOperation.count }, ctx)
+      const { native, plan } = nativeReduction({ operation: QueryOperation.count }, ctx)
       if (native !== undefined) return native as Promise<number>
       assertClientTerminal()
       return consumeRecordQuery<R, number>(
@@ -2816,7 +2954,10 @@ function recordQueryReads<R, TContext extends IOperationContext | undefined>(
           while (!(await read()).done) count++
           return count
         },
-        true
+        true,
+        undefined,
+        undefined,
+        prepareFallback(plan, ctx)
       )
     },
     pluck: async (field, ctx) => {

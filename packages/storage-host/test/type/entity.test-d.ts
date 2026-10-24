@@ -117,3 +117,36 @@ const baseOnlyPlugin = definePlugin('base-only', (core: IStoragePluginCore) => (
 const baseOnlyHost = await createStorageHost({ plugins: [baseOnlyPlugin] as const })
 // @ts-expect-error a precise base-only backend does not provide entity key-value channels.
 users.connect(baseOnlyHost.org('00000000-0000-0000-0000-000000000001').backend('base-only'))
+
+/** Every source/ordering transition preserves the entity adapter and exact callback domain. */
+const narrowedQuery = indexedRepo.query().where({ name: 'Ada' }).skip(1).onInvalid('throw')
+narrowedQuery.where('score', 'gt', 1).select('name').all()
+// @ts-expect-error source selection must occur before any shared condition/control.
+narrowedQuery.index('name', 'Ada')
+// @ts-expect-error selecting a source removes the mutually exclusive second choice.
+indexedRepo.query().index('name', 'Ada').range({ lower: 'a' })
+// @ts-expect-error declared path operands retain the original numeric domain.
+indexedRepo.query().where('score', 'startsWith', 'a')
+const selectorQuery = indexedRepo
+  .query()
+  .orderBy((row) => row.name)
+  .onInvalid('skip')
+  .skip(1)
+selectorQuery
+  .orderBy((row) => row.score)
+  .limit(2)
+  .select('id')
+  .all()
+// @ts-expect-error selector ordering cannot switch to opaque comparison.
+selectorQuery.orderByComparator((left, right) => left.score - right.score)
+const comparatorQuery = indexedRepo
+  .query()
+  .orderByComparator((left, right) => left.score - right.score)
+// @ts-expect-error opaque comparison must declare a finite bound before a general terminal.
+comparatorQuery.all()
+const boundedQuery = comparatorQuery.limit(2).onInvalid('throw').where({ name: 'Ada' })
+boundedQuery.skip(1).all()
+// @ts-expect-error a bounded comparator cannot introduce selector ordering.
+boundedQuery.orderBy((row) => row.name)
+// @ts-expect-error a bounded comparator cannot introduce another comparator.
+boundedQuery.orderByComparator((left, right) => left.score - right.score)
