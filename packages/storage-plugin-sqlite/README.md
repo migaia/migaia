@@ -149,3 +149,5 @@ TRANSACTION_FAILED、DUPLICATE_KEY 或 DECODE_FAILED。原生/codec 错误保留
 内存连接可通过 initializer 的 `storageLogStore` 提供同库 binlog 与 undo；文件缓存日志索引仍拒绝，文件数据应配外置 Logger。raw SQL 没有完整共享镜像目标，启用提交日志时在原生执行前拒绝。全局 journal 配置沿宿主既有异步管线边界，所有同步入口报 `ASYNC_STAGE_IN_SYNC_ENTRY`；普通宿主仍保留同步 API。Logger 及日志载体继续归调用方释放。`UNDO_CONFLICT` 等宿主日志错误保留原 source 与 cause。
 
 启用全局 journal 遥测时，每个异步根操作与完整事务各发一条 storage 事件，键来自原生读写实际观察；短效事务操作与私有日志、元数据工作不重复发业务事件。重试仍由原并发循环负责。
+
+配置提交日志时，get、has、keys、二进制与记录读取、getMany、TTL remaining 和记录迭代所触发的过期清理，均加入同一原生事务并记录实际删除。undo 恢复原始值和绝对期限，已过期的期限不会被刷新。仅遥测或初始化器不选择提交日志时，读取仍使用原读取段；无 journal 的路径不变。
