@@ -12,11 +12,10 @@ test('Worker 请求在处理端无响应时会超时并结束请求', async ({ p
   )
 })
 
-test('未认证的显式 transfer 在真实 Worker 边界被拒绝且不转移所有权', async ({ page }) => {
+test('真实 Worker 请求复制字节并保留调用方的完整 buffer', async ({ page }) => {
   await page.goto('/')
-  await expect(page.evaluate(() => window.runStoreWorkerTransferScenario())).resolves.toEqual([
-    'rpc.endpoint',
-    'CAPABILITY_UNSUPPORTED',
+  await expect(page.evaluate(() => window.runStoreWorkerCopyScenario())).resolves.toEqual([
+    [1, 2, 3, 4],
     4
   ])
 })
@@ -45,13 +44,13 @@ test('Worker failure retains the original native error and stack across realms',
 test('请求 options 在真实 Worker admission 时只读取一次', async ({ page }) => {
   await page.goto('/')
   await expect(page.evaluate(() => window.runStoreWorkerRequestOptionsScenario())).resolves.toEqual(
-    [42, 1, 1]
+    [42, 1, 0]
   )
 })
 
 test('workerComputed 仅消费已知 options 快照并完成真实 Resource 请求', async ({ page }) => {
   await page.goto('/')
   await expect(page.evaluate(() => window.runStoreWorkerComputedScenario())).resolves.toEqual([
-    42, 1, 0
+    42, 0, 0
   ])
 })

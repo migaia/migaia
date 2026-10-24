@@ -33,7 +33,7 @@ pnpm add @migaia/store-worker @migaia/reactive @migaia/serialize
 
 ### 示例参数
 
-`new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] })` 在另一个线程执行当前文件；`isMainThread` 区分两条分支，`workerData` 是交给子线程的端口，`transferList` 转移的是端口而非业务输入。`port1.start()` 启用原生端口的事件分发。`request` 的两个泛型只声明输入与返回值类型；本例载荷为 `[20, 22]`，未设置 `signal` 或业务转移列表。适配器的 `clientId` 默认 `'main'`，`timeoutMs` 默认 `undefined`，不设期限。
+`new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] })` 在另一个线程执行当前文件；`isMainThread` 区分两条分支，`workerData` 是交给子线程的端口，`transferList` 转移的是端口而非业务输入。`port1.start()` 启用原生端口的事件分发。`request` 的两个泛型只声明输入与返回值类型；本例载荷为 `[20, 22]`，未设置 `signal`。适配器的 `clientId` 默认 `'main'`，`timeoutMs` 默认 `undefined`，不设期限。
 
 ```ts doc-test=run
 import {
@@ -312,7 +312,7 @@ if (!isMainThread) {
 
 ### 示例参数
 
-`workerPlugin` 的 `worker` 必填，本例为原生端口；`type: 'json'` 覆盖默认 `'worker'`，只作为本地注册表格式标签，不改变 Worker 中 `jsonParser()` 的算法。`ownership` 默认 `'copy'`，`clientId` 默认 `'main'`，`terminateOnDispose` 默认 `false`。注册表借助插件进行 `encode` / `decode`，`registry.dispose()` 清理插件端点；本例仍负责原生端口和 Worker。
+`workerPlugin` 的 `worker` 必填，本例为原生端口；`type: 'json'` 覆盖默认 `'worker'`，只作为本地注册表格式标签，不改变 Worker 中 `jsonParser()` 的算法。`clientId` 默认 `'main'`，`terminateOnDispose` 默认 `false`。注册表借助插件进行 `encode` / `decode`，`registry.dispose()` 清理插件端点；本例仍负责原生端口和 Worker。
 
 ```ts doc-test=run
 import {
@@ -360,19 +360,19 @@ if (!isMainThread) {
 
 依次输出 `数据块： text`、`恢复： report 2`：工作端 JSON 解析器返回文本块，并恢复了原有字段。
 
-显式 `type: 'json'` 覆盖默认 `'worker'`，`ownership` 默认 `'copy'`，`terminateOnDispose` 默认 `false`。注册表释放解析器端点，原生端口与 Worker 仍由调用方关闭；这里证明接线，不作速度结论。
+显式 `type: 'json'` 覆盖默认 `'worker'`，`terminateOnDispose` 默认 `false`。注册表释放解析器端点，原生端口与 Worker 仍由调用方关闭；这里证明接线，不作速度结论。
 
 ## 取消解码时保留输入字节
 
 输入字节可能还要留给下一次重试，当前解码却可能在发送前就不再需要。
 
-转移共用的底层缓冲区可能让所有视图失效；把取消一律当成已经分离，也会丢弃根本没有发送的输入。
+所有 Worker 调用复制参数，不 detach 输入。取消结果与输入内存分别可观察；已经开始的计算仍需主动处理取消信号。
 
-为真实 Worker JSON 解析器使用 `workerParser` 的默认复制策略，先完成一次解码，再传入预先中止的信号，检查失败原因和原字节后决定是否重试。
+为真实 Worker JSON 解析器使用 `workerParser` 的复制路径，先完成一次解码，再传入预先中止的信号，检查失败原因和原字节后决定是否重试。
 
 ### 示例参数
 
-`workerParser({ worker: port1 })` 使用默认 `type: 'worker'`、`ownership: 'copy'`、`clientId: 'main'` 和 `terminateOnDispose: false`。`decode` 接收 `['bytes', bytes]` 与上下文；`signal` 控制此次调用，`context: 'settings'` 为诊断名称。第二次调用前已取消，原始 `DOMException` 保留在 `cause`，输入未被发送或分离；这不证明在途计算能够被强制中断。
+`workerParser({ worker: port1 })` 使用默认 `type: 'worker'`、`clientId: 'main'` 和 `terminateOnDispose: false`。`decode` 接收 `['bytes', bytes]` 与上下文；`signal` 控制此次调用，`context: 'settings'` 为诊断名称。第二次调用前已取消，原始 `DOMException` 保留在 `cause`，输入未被发送或分离；这不证明在途计算能够被强制中断。
 
 ```ts doc-test=run
 import {
@@ -431,7 +431,7 @@ if (!isMainThread) {
 
 依次输出 `解码： 2 11`、`已取消： REQUEST_ABORTED true`、`输入： {"count":2}`。
 
-默认所有权策略为 `'copy'`；本次预取消保留调用方的原始原因且不发送工作，不证明已经运行的计算会被抢占中断。显式转移和字节分离同样不代表载荷实现了零拷贝。
+所有 Worker 调用复制参数，不 detach 输入。本次预取消保留调用方的原始原因且不发送工作，不证明已经运行的计算会被抢占中断。
 
 ## 契约细节
 
@@ -439,12 +439,12 @@ if (!isMainThread) {
 
 本包提供两条 Worker 接线：WorkerAdapter / createWorkerHandler 执行通用计算，workerComputed 把请求接入 Resource；序列化子入口连接普通 parser、Worker 与 SerializeRegistry。桥内部使用一个 `createRpcHost` 加 `dedicatedWorkerPlugin({ worker })`。rpc-host 拥有请求关联、provider、取消、deadline、source 身份与错误传输；rpc-plugin-browser 提供实际载体。Resource 拥有缓存与响应式生命周期，serialize 拥有格式。本包只保留载荷转换、分段 credit / ACK 接线，不创建另一套 RPC 引擎。
 
-| 入口                                    | 公开内容                                                                                                                    |
-| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `@migaia/store-worker`                  | WorkerAdapter、createWorkerHandler、workerComputed、IManagedRpcHandler、端口 / Resource 配置类型、所有权 / 诊断常量与错误。 |
-| `@migaia/store-worker/serialize/worker` | workerParser、workerPlugin、createSerializeWorkerHandler，及 IWorkerPluginOptions、IWorkerLike、IWorkerFailureEvent。       |
+| 入口                                    | 公开内容                                                                                                              |
+| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `@migaia/store-worker`                  | WorkerAdapter、createWorkerHandler、workerComputed、IManagedRpcHandler、端口 / Resource 配置类型、诊断常量与错误。    |
+| `@migaia/store-worker/serialize/worker` | workerParser、workerPlugin、createSerializeWorkerHandler，及 IWorkerPluginOptions、IWorkerLike、IWorkerFailureEvent。 |
 
-运行时依赖为 reactive、resource、serialize、rpc-host、rpc-plugin-browser、rpc-contract 与 utils。应用直接导入的包应显式安装。序列化 factory 使用精确 `/serialize/worker` 子入口，没有根 aliases 或通配入口。encodeWorkerValue / decodeWorkerValue 与 transferablesOf 保持内部；旧 CHUNK_MERGE_FAILED 路径已删除，保留六码。
+运行时依赖为 reactive、resource、serialize、rpc-host、rpc-plugin-browser、rpc-contract 与 utils。应用直接导入的包应显式安装。序列化 factory 使用精确 `/serialize/worker` 子入口，没有根 aliases 或通配入口。encodeWorkerValue / decodeWorkerValue 保持内部；旧 CHUNK_MERGE_FAILED 路径已删除，保留六码。
 
 一个桥拥有一个 RPC host 和一条借用的物理 Worker 连接，默认本端身份 main、对端 worker。初始 provider 在连接准备前登记，后续注册走同一个 Host provide 路径。这不赋予同一个 Worker 对象共享多客户端服务的保证。MessagePort 可以满足端口形状，创建者仍负责独立物理链路与资源归属。
 
@@ -461,11 +461,10 @@ IWorkerPort 是 browser plugin 的 IWebWorkerLikePort 类型别名，要求 post
 | options.timeoutMs          | undefined，不设默认请求期限；需要时显式给毫秒数。                                  |
 | request(payload, options?) | payload 为调用输入，返回结果 Promise；Input / Output 泛型只提供调用端静态类型。    |
 | request 的 signal          | 未设置，按请求独立协作取消。                                                       |
-| request 的 transfer        | 未设置，显式原生转移列表；它不等于序列化插件 ownership 策略。                      |
 
-构造 options 的 clientId / timeoutMs、请求 options 的 signal / transfer 各在入口捕获，不在等待初始化后重读调用方 getter。非法 options 对象或读取失败带 INVALID_OPTION，捕获原错保留在 cause；request 返回 rejected Promise，构造期失败同步抛出。端口与 RPC 配置的后续准入继续由 Core 负责，不把所有 Core 错误改成本包错误。
+构造 options 的 clientId / timeoutMs、请求 options 的 signal 在入口捕获，不在等待初始化后重读调用方 getter。非法 options 对象或读取失败带 INVALID_OPTION，捕获原错保留在 cause；request 返回 rejected Promise，构造期失败同步抛出。端口与 RPC 配置的后续准入继续由 Core 负责，不把所有 Core 错误改成本包错误。
 
-同一 Adapter 可并发 request；Host 关联每项结果，隔离 deadline 与取消。独立请求可用 Promise.all，但该原生 runtime 路径发送 call/terminal 操作，不承诺旧 envelope 自动批处理。request 等业务完成；内部 notify 使用 `host.notify(method, payload, { targetId, transfer })`，其 Promise 在真实物理发送后结算，不等 provider 回复。原生 postMessage 失败以原错误作为 cause 拒绝，通知不发送业务响应。
+同一 Adapter 可并发 request；Host 关联每项结果，隔离 deadline 与取消。独立请求可用 Promise.all，但该原生 runtime 路径发送 call/terminal 操作，不承诺旧 envelope 自动批处理。request 等业务完成；内部 notify 使用 `host.notify(method, payload, { targetId })`，其 Promise 在真实物理发送后结算，不等 provider 回复。原生 postMessage 失败以原错误作为 cause 拒绝，通知不发送业务响应。
 
 | 成员      | 生命周期                                                                                                           |
 | --------- | ------------------------------------------------------------------------------------------------------------------ |
@@ -497,14 +496,13 @@ Adapter.dispose 不 terminate 借用的 Worker / port。清理失败以 rejected
 
 ### workerComputed 与 Resource
 
-`workerComputed(adapter, selectInput, options?)` 返回标准 `Resource<Output>`。每次 Resource fetcher 同步调用 selectInput 一次，再以该输入请求 Adapter，并转发 Resource signal 和可选 transfer(input)。同步读取的 signal / computed 依赖由 Resource 追踪；await 后才读取的值不自动归入这次同步依赖。它不提供跨 Resource 或跨 Worker 的全局缓存 / 请求去重。
+`workerComputed(adapter, selectInput, options?)` 返回标准 `Resource<Output>`。每次 Resource fetcher 同步调用 selectInput 一次，再以该输入请求 Adapter，并转发 Resource signal。同步读取的 signal / computed 依赖由 Resource 追踪；await 后才读取的值不自动归入这次同步依赖。它不提供跨 Resource 或跨 Worker 的全局缓存 / 请求去重。
 
 | 参数 / 选项          | 默认与语义                                                                |
 | -------------------- | ------------------------------------------------------------------------- |
 | adapter              | 必填的 WorkerAdapter 实例；Resource 借用，不负责 dispose。                |
 | selectInput          | 必填同步函数，返回当前计算输入。                                          |
 | runtime              | defaultRuntime。                                                          |
-| transfer             | undefined；若提供必须是函数，返回此次输入的转移列表。                     |
 | ttl                  | Infinity，Resource 缓存有效期。                                           |
 | autoStart            | true；false 只跳过构造时主动启动，读取 state / promise 仍可触发按需取值。 |
 | staleWhileRevalidate | false。                                                                   |
@@ -515,9 +513,9 @@ Adapter.dispose 不 terminate 借用的 Worker / port。清理失败以 rejected
 | debugName            | undefined。                                                               |
 | scheduler            | systemScheduler。                                                         |
 
-这些 Resource 字段原样交给 Resource，不在 Worker 层重新实现规则。读取已知 options 各一次，不通过对象 rest 枚举未知 getter；非法 adapter、selectInput、transfer 或配置 getter 在 Resource 接管 / 自动启动前以 INVALID_OPTION 同步拒绝，原错为 cause。Resource 的 refetch、load、state 和 dispose 继续遵循 resource 包。
+这些 Resource 字段原样交给 Resource，不在 Worker 层重新实现规则。读取已知 options 各一次，不通过对象 rest 枚举未知 getter；非法 adapter、selectInput 或配置 getter 在 Resource 接管 / 自动启动前以 INVALID_OPTION 同步拒绝，原错为 cause。Resource 的 refetch、load、state 和 dispose 继续遵循 resource 包。
 
-结束时先释放 Resource，再 await adapter.dispose，最后由创建者终止原生 Worker / 端口。transfer 回调返回的显式非空列表遵循下方未认证 transfer 拒绝规则；重试不会绕过能力准入。
+结束时先释放 Resource，再 await adapter.dispose，最后由创建者终止原生 Worker / 端口。所有 Worker 调用复制参数，不 detach 输入。
 
 ### 序列化 parser 与插件
 
@@ -528,10 +526,9 @@ workerParser(options) 是主端 ISerializeParser；workerPlugin(options) 只是�
 | worker                    | 必填，IWorkerLike 端口。                                                        |
 | type                      | worker，格式标签，必须与真实 Worker parser 的编码含义相符；读存档时用正确标签。 |
 | clientId                  | main。                                                                          |
-| ownership                 | copy；另一个值为 transfer，见字节规则。                                         |
 | terminateOnDispose        | false，借用 Worker 由调用方拥有。                                               |
 
-options 的这五个字段在入口各读一次；非对象、反射或读取失败、非法字段值以 INVALID_OPTION 拒绝。parser 无 timeoutMs 选项，不能建议配置不存在的 parser.timeoutMs；取消使用 SerializeContext.signal，注册表另有自己的生命周期预算。
+options 的这四个字段在入口各读一次；非对象、反射或读取失败、非法字段值以 INVALID_OPTION 拒绝。parser 无 timeoutMs 选项，不能建议配置不存在的 parser.timeoutMs；取消使用 SerializeContext.signal，注册表另有自己的生命周期预算。
 
 encode(value, context) 将 Uint8Array 输入分类为 bytes，其他为 value，返回按块消费的异步序列；不是同步返回一份合并好的 chunk。decode(chunk, context) 请求 Worker 解码，返回结果段的 payload，不再给调用方多包一层 chunk。context 提供 signal 和用于诊断的 context 名称；注册表会传入其真实上下文。
 
@@ -543,19 +540,13 @@ createSerializeWorkerHandler(parser, post) 的两个参数必填：真实 parser
 
 handler 传 parser.encode 输入段的 payload；输出可为一个合法 ISerializeChunk，或同步 / 异步 chunk iterable。主端以 open / chunk / end 帧增量接收，初始两个 credit、按顺序 ACK，消费后补 credit；不调用 collectStream 或先把所有结果拼为一份。credit 限制单流发送进度，不是全 Worker 的总字节上限，producer 可先取得下一块再等待发送 credit。
 
-合法 text / bytes / value 段保持顺序，可有空流和混合段。parser.decode 接收原 chunk，Uint8Array 输出分类为 bytes，其他输出分类为 value。Worker 输出使用既有 portable-copy 表示；主端输入 ownership 不赋予输出 backing 转移资格。
+合法 text / bytes / value 段保持顺序，可有空流和混合段。parser.decode 接收原 chunk，Uint8Array 输出分类为 bytes，其他输出分类为 value。Worker 输入与输出均使用既有 portable-copy 表示，不 detach 调用方输入。
 
 消费者提前结束或取消会通知对应 stream，唤醒等待 credit 的 producer，并尝试 iterator.return；清理又失败时用既有 secondary-error 附加保留主错与次错。终结错误通过 Core RPC rejection 传 source/code/name/message/stack/cause/errors 链，不另造普通 error 应用帧。实际不可合作的业务代码仍须由应用负责，不把流取消宣称为强制停止 Worker。
 
-### 字节复制、转移与实际载荷
+### Worker 输入复制
 
-WorkerByteOwnership 保留公开的 copy / transfer 词表，IByteOwnership 是值联合；WorkerDiagnosticType 只有 worker。默认 copy 保留调用方输入，字节沿既有 base64url portable 表示传输。
-
-该未认证 Worker 桥收到显式非空 transfer list 时，在发送业务帧前以 `source: 'rpc.endpoint'`、`code: 'CAPABILITY_UNSUPPORTED'` 拒绝，原 backing 不 detach。序列化 ownership transfer 选中的完整普通 ArrayBuffer backing 也遵循此规则；局部 subarray 或 SharedArrayBuffer backing 不进入原生转移列表，继续复制。text / value 段内的对象不会被递归转移。
-
-旧单向 endpoint 曾在编码载荷之外提交独立的 native transfer sidecar。Host runtime 要求真实认证的 binary 准入与载荷图内的 backing，本包不伪签名，也不新增未认证 binary 扩展。此桥应使用 copy；空 transfer list 不请求原生所有权转移。transferablesOf / exclusiveBuffer 保持内部工具，不作为业务 API。
-
-Worker 输出也使用 portable 复制。编码与往返仍有成本，不承诺零拷贝或当前速度倍率。
+所有 Worker 调用复制参数，不 detach 输入。WorkerDiagnosticType 只有 worker，字节沿既有 base64url portable 表示传输。编码与往返仍有成本，不承诺零拷贝或速度比例。
 
 ### 取消、错误与清理归属
 

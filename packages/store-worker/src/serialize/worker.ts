@@ -25,15 +25,12 @@ import type { IStoreWorkerErrorCode } from '../error-code.js'
 import { StoreWorkerErrorText } from '../error-text.js'
 import { snapshotOwnDescriptors } from '@migaia/utils/object'
 import {
-  WorkerByteOwnership,
   WorkerDiagnosticType,
   WorkerRpcIdentity,
   WorkerSerializeFrameKind,
   WorkerSerializeFrameMethod,
-  WorkerSerializePhase,
-  type IByteOwnership
+  WorkerSerializePhase
 } from '../worker-constants.js'
-import { transferablesOf } from './transferables.js'
 import { CursorQueue } from '../cursor-queue.js'
 
 /**
@@ -109,26 +106,22 @@ function wakeAllWorkers(state: IWorkerAckState): void {
 
 /** Preserves parser codec diagnostics when WebRPC reports an aborted request. */
 function createWorkerRequestAbortedError(
-  ownership: IByteOwnership,
   optionType: string | undefined,
   phase: ISerializePhase,
   chunk: ISerializeChunk,
   context: ISerializeContext,
   abortCause: unknown
 ): SerializeCodecError<IStoreWorkerErrorCode> {
-  return new SerializeCodecError(
-    StoreWorkerErrorText.aborted(ownership === WorkerByteOwnership.transfer),
-    {
-      type: optionType ?? WorkerDiagnosticType.worker,
-      phase,
-      context: context.context,
-      chunkIndex: 0,
-      bytesConsumed: chunk[0] === SerializeChunkKind.bytes ? chunk[1].byteLength : 0,
-      code: StoreWorkerErrorCode.requestAborted,
-      source: STORE_WORKER_SOURCE,
-      cause: abortCause
-    }
-  )
+  return new SerializeCodecError(StoreWorkerErrorText.aborted(), {
+    type: optionType ?? WorkerDiagnosticType.worker,
+    phase,
+    context: context.context,
+    chunkIndex: 0,
+    bytesConsumed: chunk[0] === SerializeChunkKind.bytes ? chunk[1].byteLength : 0,
+    code: StoreWorkerErrorCode.requestAborted,
+    source: STORE_WORKER_SOURCE,
+    cause: abortCause
+  })
 }
 
 /** Creates a bounded-consumer queue for frames dispatched beside one RPC response. */
@@ -252,13 +245,6 @@ export type IWorkerPluginOptions = {
    * default (false). Cleanup attempts optional terminate even when endpoint cleanup fails.
    */
   readonly terminateOnDispose?: boolean
-  /**
-   * Defaults to copy, omitting input transfer. Transfer requests the complete ArrayBuffer of an
-   * exclusive Uint8Array view; subviews and SharedArrayBuffer-backed views omit transfer. A sent
-   * transfer can detach all aliases, but pre-cancellation can prevent it. Inspect actual input
-   * before retrying; this policy does not establish zero-copy portable payload delivery.
-   */
-  readonly ownership?: IByteOwnership
   /** Local RPC endpoint id, default main; it is a captured string rather than an id factory. */
   readonly clientId?: string
 }
@@ -288,9 +274,9 @@ function assertWorkerParserOptions(options: unknown): asserts options is IWorker
  * owns format behavior, while the bridge validates chunk shapes and carries RPC errors and their
  * causes; pre-cancellation produces REQUEST_ABORTED codec diagnostics.
  *
- * The portable RPC bridge base64url-encodes bytes before native send; transfer lists are separate.
- * Detaching input does not establish zero-copy payload delivery. Supported values follow that
- * bridge's portable profile, not arbitrary cyclic objects or custom-class preservation.
+ * The portable RPC bridge copies inputs and base64url-encodes bytes without detaching buffers.
+ * Supported values follow that bridge's portable profile, not arbitrary cyclic objects or
+ * custom-class preservation.
  *
  * Invalid options throw at creation. The returned parser's dispose shares one asynchronous cleanup
  * result, closes the endpoint and optionally attempts terminate. Both failures are retained in
@@ -302,13 +288,11 @@ export function workerParser(options: IWorkerPluginOptions): ISerializeParser {
   let worker: IWorkerPluginOptions['worker']
   let optionType: string | undefined
   let clientId: string | undefined
-  let ownership: IWorkerPluginOptions['ownership']
   let terminateOnDispose: boolean | undefined
   try {
     worker = options.worker
     optionType = options.type
     clientId = options.clientId
-    ownership = options.ownership
     terminateOnDispose = options.terminateOnDispose
   } catch (error) {
     throw createStoreWorkerError(
@@ -332,20 +316,12 @@ export function workerParser(options: IWorkerPluginOptions): ISerializeParser {
   if (worker === null || typeof worker !== 'object') {
     throw createStoreWorkerError(StoreWorkerErrorCode.invalidOption, StoreWorkerErrorText.worker)
   }
-  if (
-    ownership !== undefined &&
-    ownership !== WorkerByteOwnership.copy &&
-    ownership !== WorkerByteOwnership.transfer
-  ) {
-    throw createStoreWorkerError(StoreWorkerErrorCode.invalidOption, StoreWorkerErrorText.ownership)
-  }
   if (terminateOnDispose !== undefined && typeof terminateOnDispose !== 'boolean') {
     throw createStoreWorkerError(
       StoreWorkerErrorCode.invalidOption,
       StoreWorkerErrorText.terminateOnDispose
     )
   }
-  const resolvedOwnership = ownership ?? WorkerByteOwnership.copy
   const resolvedTerminateOnDispose = terminateOnDispose ?? false
   const streams = new Map<string, IWorkerFrameQueue>()
   let nextStreamId = 1
@@ -389,7 +365,7 @@ export function workerParser(options: IWorkerPluginOptions): ISerializeParser {
       if (disposePromise !== undefined) throw new RpcLifecycleError(StoreWorkerErrorText.disposed)
       const result = (await endpoint.request(
         { phase, chunk },
-        { signal: context.signal, transfer: transferablesOf(chunk, resolvedOwnership) }
+        { signal: context.signal }
       )) as ISerializeChunk
       if (!isChunkShape(result)) {
         throw createStoreWorkerError(
@@ -401,21 +377,13 @@ export function workerParser(options: IWorkerPluginOptions): ISerializeParser {
     } catch (error) {
       // Endpoint's abort rejection is generic; re-throw it as the
       // SerializeCodecError shape this parser's callers rely on for diagnostics
-      // (chunk index / bytes consumed / which format), and to flag when
-      // transfer is requested; inspect the actual buffer rather than assuming it detached.
+      // (chunk index / bytes consumed / which format). Inputs remain caller-owned copies.
       if (error instanceof Error && error.name === 'AbortError') {
         // web-rpc may synthesize its own AbortError at the transport boundary;
         // the caller's explicit reason is the authoritative original failure
         // and must remain reachable for identity/stack diagnostics.
         const abortCause = context.signal.reason ?? error
-        throw createWorkerRequestAbortedError(
-          resolvedOwnership,
-          optionType,
-          phase,
-          chunk,
-          context,
-          abortCause
-        )
+        throw createWorkerRequestAbortedError(optionType, phase, chunk, context, abortCause)
       }
       throw error
     }
@@ -429,7 +397,6 @@ export function workerParser(options: IWorkerPluginOptions): ISerializeParser {
       const abortCause = context.signal.reason ?? workerStreamCancelledError()
       return Promise.reject(
         createWorkerRequestAbortedError(
-          resolvedOwnership,
           optionType,
           WorkerSerializePhase.encode,
           chunk,
@@ -480,7 +447,7 @@ export function workerParser(options: IWorkerPluginOptions): ISerializeParser {
             streamId,
             clientId: clientId ?? WorkerRpcIdentity.main
           },
-          { signal: context.signal, transfer: transferablesOf(chunk, resolvedOwnership) }
+          { signal: context.signal }
         )
       })
       .then(
@@ -531,7 +498,7 @@ export function workerParser(options: IWorkerPluginOptions): ISerializeParser {
   return {
     name: optionType ?? WorkerDiagnosticType.worker,
     encode: (value, context) =>
-      // 本地只分类 bytes/value；portable bridge 另编码载荷，transfer list 不代表零拷贝。
+      // 本地只分类 bytes/value；portable bridge 复制并另编码载荷，不分离调用方的 buffer。
       streamEncode(workerChunk(value), context),
     decode: async (chunk, context) => {
       // 回包按 value/bytes 分类；两种情况都返回段内负载，不返回段外壳。

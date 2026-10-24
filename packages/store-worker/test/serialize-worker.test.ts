@@ -2,21 +2,16 @@ import { describe, expect, it } from 'vitest'
 import { RPC_CORE_ERROR_SOURCE, RpcLifecycleError } from '@migaia/rpc-host'
 import { StoreWorkerErrorCode } from '../src/error-code.js'
 import { workerParser } from '../src/serialize/worker.js'
-import { transferablesOf } from '../src/serialize/transferables.js'
-import { WorkerByteOwnership } from '../src/worker-constants.js'
 
 describe('workerParser lifecycle', () => {
   it('rejects null options with a tagged configuration error', () => {
     expect(() => workerParser(null as never)).toThrow('[store] worker options must be an object')
   })
 
-  it('rejects hostile option values instead of silently changing transfer/lifecycle semantics', () => {
+  it('rejects hostile option values instead of silently changing lifecycle semantics', () => {
     const worker = {} as never
     expect(() => workerParser({ worker: null as never })).toThrow(
       '[store] worker options.worker must be an object'
-    )
-    expect(() => workerParser({ worker, ownership: 'move' as never })).toThrow(
-      '[store] worker options.ownership must be copy or transfer'
     )
     expect(() => workerParser({ worker, terminateOnDispose: 'yes' as never })).toThrow(
       '[store] worker options.terminateOnDispose must be boolean'
@@ -31,12 +26,6 @@ describe('workerParser lifecycle', () => {
     expect(() => workerParser({ worker, clientId: Symbol('client') as never })).toThrow(
       expect.objectContaining({ source: 'store.worker', code: 'INVALID_OPTION' })
     )
-  })
-
-  it('does not transfer SharedArrayBuffer-backed bytes', () => {
-    const shared = new SharedArrayBuffer(4)
-    const bytes = new Uint8Array(shared)
-    expect(transferablesOf(['bytes', bytes], WorkerByteOwnership.transfer)).toEqual([])
   })
 
   it('shares one dispose promise and terminates an owned worker exactly once', async () => {

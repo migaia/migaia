@@ -4,9 +4,7 @@ declare global {
   interface Window {
     runStoreWorkerScenario(): Promise<number>
     runStoreWorkerTimeoutScenario(): Promise<unknown>
-    runStoreWorkerTransferScenario(): Promise<
-      readonly [string | undefined, string | undefined, number]
-    >
+    runStoreWorkerCopyScenario(): Promise<readonly [readonly number[], number]>
     runStoreWorkerAbortScenario(): Promise<unknown>
     runStoreWorkerErrorScenario(): Promise<readonly IWorkerErrorSummary[]>
     runStoreWorkerRequestOptionsScenario(): Promise<readonly number[]>
@@ -48,21 +46,15 @@ window.runStoreWorkerTimeoutScenario = async () => {
   }
 }
 
-window.runStoreWorkerTransferScenario = async () => {
+window.runStoreWorkerCopyScenario = async () => {
   const worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })
   const adapter = new WorkerAdapter(worker)
-  const buffer = new Uint8Array([1, 2, 3, 4]).buffer
+  const input = new Uint8Array([1, 2, 3, 4])
   try {
-    /** Explicit unsigned transfer is rejected by the canonical capability owner before detachment. */
-    let failure: unknown
-    try {
-      await adapter.request<ArrayBuffer, number>(buffer, { transfer: [buffer] })
-    } catch (error) {
-      failure = error
-    }
-    /** The browser projects the same actual native rejection without serializing Error instances. */
-    const identity = failure as { source?: string; code?: string } | undefined
-    return [identity?.source, identity?.code, buffer.byteLength] as const
+    /** Old JavaScript option fields are ignored; the actual native Worker receives copied bytes. */
+    const options = { transfer: [input.buffer], signal: undefined }
+    const result = await adapter.request<Uint8Array, number[]>(input, options)
+    return [result, input.buffer.byteLength] as const
   } finally {
     await adapter.dispose()
     worker.terminate()

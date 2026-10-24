@@ -100,32 +100,22 @@ export function createWorkerContractEndpoint(
   /** Operations use one Host, while raw delivery can proceed after local managed preparation. */
   const bridge: IWorkerContractEndpoint = {
     request(payload, options) {
-      /** Preserve the old worker list unchanged; canonical Host owns capability admission. */
-      const transfer = options?.transfer as readonly ArrayBuffer[] | undefined
       return opening
         .then(() =>
           host.send(defaultTargetId, WorkerRpcIdentity.call, encodeWorkerValue(payload), {
             signal: options?.signal,
             /** Omission historically means no application deadline, not the Host default. */
-            timeoutMs: endpointOptions.timeoutMs ?? false,
-            ...(transfer === undefined || (Array.isArray(transfer) && transfer.length === 0)
-              ? {}
-              : { transfer })
+            timeoutMs: endpointOptions.timeoutMs ?? false
           })
         )
         .then(decodeWorkerValue)
     },
     notify(payload, method = 'notify', options) {
       const targetId = options?.targetId ?? defaultTargetId
-      /** An absent worker transfer policy must remain absent at canonical Host admission. */
-      const transfer = options?.transfer as readonly ArrayBuffer[] | undefined
       return opening.then(
         () =>
           host.notify(method, encodeWorkerValue(payload), {
-            targetId,
-            ...(transfer === undefined || (Array.isArray(transfer) && transfer.length === 0)
-              ? {}
-              : { transfer })
+            targetId
           }) as Promise<void>
       )
     },
@@ -175,15 +165,8 @@ export function createWorkerContractEndpoint(
 
 /** Public worker bridge surface shared by the normal and serialization worker consumers. */
 export type IWorkerContractEndpoint = Readonly<{
-  request(
-    payload: unknown,
-    options?: { signal?: IAbortSignal; transfer?: readonly unknown[] }
-  ): Promise<unknown>
-  notify(
-    payload: unknown,
-    method?: string,
-    options?: { transfer?: readonly unknown[]; targetId?: string }
-  ): Promise<void>
+  request(payload: unknown, options?: { signal?: IAbortSignal }): Promise<unknown>
+  notify(payload: unknown, method?: string, options?: { targetId?: string }): Promise<void>
   onRequest(
     method: string,
     handler?: (

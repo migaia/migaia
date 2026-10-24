@@ -4,14 +4,6 @@ export const WorkerDiagnosticType = {
   worker: 'worker'
 } as const
 
-/** Byte-transfer policy for worker serializer inputs. */
-export const WorkerByteOwnership = {
-  /** Default policy: do not place an input buffer in the native transfer list. */
-  copy: 'copy',
-  /** Request transfer for full exclusive ArrayBuffer-backed byte views; other views are copied. */
-  transfer: 'transfer'
-} as const
-
 /** Serialization phases executed inside the worker. */
 export const WorkerSerializePhase = {
   encode: 'encode',
@@ -44,6 +36,4 @@ export const WorkerRpcBridgeFeatureName = 'store-worker-bridge'
 
 /** Public fallback diagnostic values declared by WorkerDiagnosticType. */
 export type IWorkerDiagnosticType = (typeof WorkerDiagnosticType)[keyof typeof WorkerDiagnosticType]
-/** Public copy/transfer policy values; requesting transfer is not proof that a send detached input. */
-export type IByteOwnership = (typeof WorkerByteOwnership)[keyof typeof WorkerByteOwnership]
 export type IWorkerSerializePhase = (typeof WorkerSerializePhase)[keyof typeof WorkerSerializePhase]

@@ -33,7 +33,7 @@ Create a real Node Worker, transfer a MessagePort to it, and pair WorkerAdapter 
 
 ### Example parameters
 
-`new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] })` executes this file in another thread. `isMainThread` selects the branch, `workerData` carries the child port, and `transferList` transfers that port rather than application input. `port1.start()` enables native port event delivery. The two request type arguments describe input and output statically; the payload is `[20, 22]`, with no signal or application transfer list. Adapter defaults are `clientId: 'main'` and `timeoutMs: undefined`, meaning no deadline.
+`new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] })` executes this file in another thread. `isMainThread` selects the branch, `workerData` carries the child port, and `transferList` transfers that port rather than application input. `port1.start()` enables native port event delivery. The two request type arguments describe input and output statically; the payload is `[20, 22]`, with no cancellation signal. Adapter defaults are `clientId: 'main'` and `timeoutMs: undefined`, meaning no deadline.
 
 ```ts doc-test=run
 import {
@@ -312,7 +312,7 @@ Install jsonParser with createSerializeWorkerHandler inside a real Worker, then 
 
 ### Example parameters
 
-`worker` is required and receives a native port. `type: 'json'` overrides the default `'worker'` label for local registry routing; it does not change the Worker-side `jsonParser()` algorithm. Defaults are `ownership: 'copy'`, `clientId: 'main'`, and `terminateOnDispose: false`. Registry encode/decode calls use the plugin; registry disposal releases its endpoint, while the example still owns the native port and Worker.
+`worker` is required and receives a native port. `type: 'json'` overrides the default `'worker'` label for local registry routing; it does not change the Worker-side `jsonParser()` algorithm. Defaults are `clientId: 'main'`, and `terminateOnDispose: false`. Registry encode/decode calls use the plugin; registry disposal releases its endpoint, while the example still owns the native port and Worker.
 
 ```ts doc-test=run
 import {
@@ -360,19 +360,19 @@ restored: report 2
 
 The output is `chunk: text`, then `restored: report 2`: the Worker-side JSON parser produces a text chunk and restores the original fields.
 
-The explicit type 'json' replaces the default 'worker'; ownership defaults to 'copy' and terminateOnDispose to false. Registry disposal releases its parser endpoint, while the caller closes the native port and Worker. This is wiring evidence, not a speed measurement.
+The explicit type 'json' replaces the default 'worker'; terminateOnDispose defaults to false. Registry disposal releases its parser endpoint, while the caller closes the native port and Worker. This is wiring evidence, not a speed measurement.
 
 ## Keep input bytes available when a decode is cancelled
 
 A byte buffer may be needed for a later retry, while the current decode can become unnecessary before it is sent.
 
-Transferring a shared backing buffer can invalidate all its views; treating every cancellation as proof of detachment also discards input that was never sent.
+All Worker calls copy parameters without detaching caller input. Cancellation and input memory remain separately observable; work already running must cooperate with its signal.
 
-Use workerParser's default copy policy for the real Worker JSON parser. Decode once, then pass a pre-aborted signal and inspect its failure cause and the original bytes before deciding whether to retry.
+Use workerParser's copying path for the real Worker JSON parser. Decode once, then pass a pre-aborted signal and inspect its failure cause and the original bytes before deciding whether to retry.
 
 ### Example parameters
 
-`workerParser({ worker: port1 })` uses `type: 'worker'`, `ownership: 'copy'`, `clientId: 'main'`, and `terminateOnDispose: false`. Decode receives `['bytes', bytes]` plus context: `signal` controls this call, and `'settings'` names its diagnostic context. The second call is cancelled before sending, preserving the original `DOMException` as cause and keeping the bytes attached; this does not prove forced interruption of work already running.
+`workerParser({ worker: port1 })` uses `type: 'worker'`, `clientId: 'main'`, and `terminateOnDispose: false`. Decode receives `['bytes', bytes]` plus context: `signal` controls this call, and `'settings'` names its diagnostic context. The second call is cancelled before sending, preserving the original `DOMException` as cause and keeping the bytes attached; this does not prove forced interruption of work already running.
 
 ```ts doc-test=run
 import {
@@ -431,7 +431,7 @@ input: {"count":2}
 
 The output is `decoded: 2 11`, `cancelled: REQUEST_ABORTED true`, then `input: {"count":2}`.
 
-Copy is the default ownership policy. This pre-cancelled decode preserves the caller's reason as cause and does not send work; it does not prove interruption of an already-running calculation. Transfer and byte detachment also do not establish zero-copy payload delivery.
+All Worker calls copy parameters without detaching caller input. This pre-cancelled decode preserves the caller's reason as cause and does not send work; it does not prove interruption of an already-running calculation.
 
 ## Contract details
 
@@ -439,12 +439,12 @@ Copy is the default ownership policy. This pre-cancelled decode preserves the ca
 
 This package connects two Worker use cases. WorkerAdapter / createWorkerHandler execute general computation, while workerComputed connects requests to Resource; the serialization subentry connects an ordinary parser to Worker and SerializeRegistry. The bridge internally creates one `createRpcHost` with `dedicatedWorkerPlugin({ worker })`. rpc-host owns request correlation, providers, cancellation, deadlines, source identity, and error transport; rpc-plugin-browser lends the physical carrier. Resource owns caching and reactive lifetime, and serialize owns formats. This package retains payload conversion and chunk credit / ACK without another RPC engine.
 
-| Entry                                   | Public contents                                                                                                                                     |
-| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@migaia/store-worker`                  | WorkerAdapter, createWorkerHandler, workerComputed, IManagedRpcHandler, port / Resource option types, ownership / diagnostic constants, and errors. |
-| `@migaia/store-worker/serialize/worker` | workerParser, workerPlugin, createSerializeWorkerHandler, IWorkerPluginOptions, IWorkerLike, and IWorkerFailureEvent.                               |
+| Entry                                   | Public contents                                                                                                                         |
+| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `@migaia/store-worker`                  | WorkerAdapter, createWorkerHandler, workerComputed, IManagedRpcHandler, port / Resource option types, diagnostic constants, and errors. |
+| `@migaia/store-worker/serialize/worker` | workerParser, workerPlugin, createSerializeWorkerHandler, IWorkerPluginOptions, IWorkerLike, and IWorkerFailureEvent.                   |
 
-Runtime dependencies are reactive, resource, serialize, rpc-host, rpc-plugin-browser, rpc-contract, and utils. Install directly imported packages explicitly. Serialization factories use the exact `/serialize/worker` subentry, without root aliases or a wildcard. encodeWorkerValue / decodeWorkerValue and transferablesOf stay internal. The obsolete CHUNK_MERGE_FAILED path is removed; six local codes remain.
+Runtime dependencies are reactive, resource, serialize, rpc-host, rpc-plugin-browser, rpc-contract, and utils. Install directly imported packages explicitly. Serialization factories use the exact `/serialize/worker` subentry, without root aliases or a wildcard. encodeWorkerValue / decodeWorkerValue stay internal. The obsolete CHUNK_MERGE_FAILED path is removed; six local codes remain.
 
 One bridge owns one RPC host and one borrowed physical Worker connection, defaulting to local identity main and remote identity worker. Initial providers register before connection preparation; later registration uses the same Host provide path. This does not make one Worker object a shared multi-client service. A MessagePort can satisfy the port shape, but its creator still arranges a separate physical link and ownership.
 
@@ -461,11 +461,10 @@ IWorkerPort aliases the browser plugin's IWebWorkerLikePort: postMessage, addEve
 | options.timeoutMs                 | undefined, with no default request deadline; supply milliseconds when needed.                                      |
 | request(payload, options?)        | Sends input and returns a result Promise; Input / Output generics provide caller-side static typing only.          |
 | Request signal                    | Unset; cooperative cancellation scoped to that request.                                                            |
-| Request transfer                  | Unset; an explicit native transfer list, distinct from serializer ownership policy.                                |
 
-Construction captures clientId / timeoutMs, and requests capture signal / transfer without rereading caller getters after initialization. Invalid option objects or property reads produce INVALID_OPTION with caught failures on cause. request rejects its Promise while construction errors throw synchronously. Core retains later port and RPC admission rather than every Core failure becoming a local error.
+Construction captures clientId / timeoutMs, and requests capture signal without rereading caller getters after initialization. Invalid option objects or property reads produce INVALID_OPTION with caught failures on cause. request rejects its Promise while construction errors throw synchronously. Core retains later port and RPC admission rather than every Core failure becoming a local error.
 
-One Adapter supports concurrent requests. The Host correlates each result and isolates its deadline / cancellation. Independent requests can use Promise.all, but this native runtime path emits call/terminal operations and does not promise legacy envelope auto-batching. request waits for business completion. Internal notify uses `host.notify(method, payload, { targetId, transfer })`: its Promise settles after actual physical send, not a provider reply. A native postMessage failure rejects with its original error on cause; no business response is sent for notification.
+One Adapter supports concurrent requests. The Host correlates each result and isolates its deadline / cancellation. Independent requests can use Promise.all, but this native runtime path emits call/terminal operations and does not promise legacy envelope auto-batching. request waits for business completion. Internal notify uses `host.notify(method, payload, { targetId })`: its Promise settles after actual physical send, not a provider reply. A native postMessage failure rejects with its original error on cause; no business response is sent for notification.
 
 | Member    | Lifetime                                                                                                                                                      |
 | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -497,14 +496,13 @@ A message admitted during initialization is not delivered after close, and pendi
 
 ### workerComputed and Resource
 
-`workerComputed(adapter, selectInput, options?)` returns a standard `Resource<Output>`. Each fetcher invocation synchronously calls selectInput once, requests that input through the Adapter, and forwards Resource signal plus optional transfer(input). Resource tracks synchronous signal / computed reads; reads after await do not become that invocation's synchronous dependencies. This does not establish global caching or deduplication across Resources or Workers.
+`workerComputed(adapter, selectInput, options?)` returns a standard `Resource<Output>`. Each fetcher invocation synchronously calls selectInput once, requests that input through the Adapter, and forwards Resource signal. Resource tracks synchronous signal / computed reads; reads after await do not become that invocation's synchronous dependencies. This does not establish global caching or deduplication across Resources or Workers.
 
 | Parameter / option   | Default and meaning                                                                          |
 | -------------------- | -------------------------------------------------------------------------------------------- |
 | adapter              | Required WorkerAdapter instance, borrowed rather than disposed by Resource.                  |
 | selectInput          | Required synchronous function producing current input.                                       |
 | runtime              | defaultRuntime.                                                                              |
-| transfer             | undefined; when supplied, a function returning this input's transfer list.                   |
 | ttl                  | Infinity, Resource cache lifetime.                                                           |
 | autoStart            | true; false skips eager construction, while state / promise reads can still start lazy work. |
 | staleWhileRevalidate | false.                                                                                       |
@@ -515,9 +513,9 @@ A message admitted during initialization is not delivered after close, and pendi
 | debugName            | undefined.                                                                                   |
 | scheduler            | systemScheduler.                                                                             |
 
-Resource receives these options without Worker-specific reimplementation. Known keys are captured once without object-rest enumeration of unknown getters. Invalid adapter, selectInput, transfer, or option getters synchronously produce INVALID_OPTION before Resource ownership / automatic startup, retaining caught causes. refetch, load, state, and dispose retain the resource package's semantics.
+Resource receives these options without Worker-specific reimplementation. Known keys are captured once without object-rest enumeration of unknown getters. Invalid adapter, selectInput, or option getters synchronously produce INVALID_OPTION before Resource ownership / automatic startup, retaining caught causes. refetch, load, state, and dispose retain the resource package's semantics.
 
-Release Resource first, await adapter.dispose, then let the creator terminate the physical Worker / ports. An explicit nonempty transfer list from the callback follows the unsigned-transfer rejection below; retry does not bypass capability admission.
+Release Resource first, await adapter.dispose, then let the creator terminate the physical Worker / ports. All Worker calls copy their parameters without detaching caller input.
 
 ### Serialization parser and plugin
 
@@ -528,10 +526,9 @@ workerParser(options) is a caller-side ISerializeParser. workerPlugin(options) s
 | worker                     | Required IWorkerLike port.                                                                                                      |
 | type                       | worker, the registry format label; it must describe the actual Worker parser's encoding and be selected correctly when reading. |
 | clientId                   | main.                                                                                                                           |
-| ownership                  | copy; the other value is transfer, described below.                                                                             |
 | terminateOnDispose         | false; supplied Workers remain caller-owned.                                                                                    |
 
-These five fields are read once at admission. Invalid option objects, reflection / property reads, or field values produce INVALID_OPTION. There is no parser.timeoutMs option. Use SerializeContext.signal for cancellation; registry lifecycle budgets remain separate.
+These four fields are read once at admission. Invalid option objects, reflection / property reads, or field values produce INVALID_OPTION. There is no parser.timeoutMs option. Use SerializeContext.signal for cancellation; registry lifecycle budgets remain separate.
 
 encode(value, context) classifies Uint8Array input as bytes and other input as value, returning an asynchronous sequence of chunks rather than one merged result. decode(chunk, context) requests decoding and returns the result payload without another chunk wrapper. context carries signal and a diagnostic context name; the registry supplies its actual context.
 
@@ -543,19 +540,13 @@ createSerializeWorkerHandler(parser, post) requires a real parser with encode / 
 
 The handler passes the input chunk payload to parser.encode. Results may be one valid ISerializeChunk or a sync / async chunk iterable. The caller receives open / chunk / end incrementally, with two initial credits and ordered ACK; consumption restores credit. Neither collectStream nor whole-output merging is used. Credit bounds sending progress for one stream, not the whole Worker's byte budget; the producer may obtain its next chunk before waiting for sending credit.
 
-Valid text / bytes / value chunks retain order, including empty and mixed streams. parser.decode receives the original chunk; Uint8Array output is classified as bytes and other output as value. Worker output uses the existing portable-copy representation; caller input ownership does not make output backing transferable.
+Valid text / bytes / value chunks retain order, including empty and mixed streams. parser.decode receives the original chunk; Uint8Array output is classified as bytes and other output as value. Worker inputs and outputs use the existing portable-copy representation without detaching caller input.
 
 Early consumer completion or cancellation notifies that stream, wakes producers awaiting credit, and attempts iterator.return. If cleanup also fails, existing secondary-error attachment retains the primary and secondary chains. Core RPC rejection transports source/code/name/message/stack/cause/errors rather than a separate application error frame. Uncooperative business code still requires application ownership; stream cancellation does not forcibly stop the Worker.
 
-### Copying, transfer, and actual payloads
+### Copied Worker inputs
 
-WorkerByteOwnership retains the public copy / transfer vocabulary; IByteOwnership is its value union. WorkerDiagnosticType contains worker. Default copy preserves caller input and transports bytes through the existing base64url portable representation.
-
-An explicit nonempty transfer list on this unsigned Worker bridge rejects with `source: 'rpc.endpoint'` and `code: 'CAPABILITY_UNSUPPORTED'` before any business frame is posted. The original backing remains attached. This includes eligible full ordinary ArrayBuffer backing selected by serialization ownership transfer; a partial subarray or SharedArrayBuffer-backed view does not enter the native transfer list and uses copying instead. Nested objects in a text / value chunk are not recursively transferred.
-
-The old one-way endpoint submitted a native transfer sidecar separately from its encoded payload. The Host runtime requires genuine authenticated binary admission and backing present in the payload graph; this package supplies neither a fake signing profile nor an unsigned binary extension. Use copy for this bridge. Empty transfer lists do not request native ownership transfer. transferablesOf / exclusiveBuffer remain internal helpers, not business APIs.
-
-Worker output also uses portable copying. Encoding and round trips still cost time; no zero-copy delivery or current speed ratio is promised.
+All Worker calls copy their parameters without detaching caller input. WorkerDiagnosticType contains worker; bytes travel through the existing base64url portable representation. Encoding and round trips still cost time; no zero-copy delivery or speed ratio is promised.
 
 ### Cancellation, errors, and ownership
 

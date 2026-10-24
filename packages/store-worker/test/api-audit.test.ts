@@ -210,11 +210,11 @@ describe('store-worker audit regressions', () => {
     expect(original.stack).toBeTruthy()
   })
 
-  it('Worker-D03 does not claim pre-aborted transfer input is detached or unretryable', async () => {
+  it('Worker-D03 does not claim pre-aborted byte input is detached or unretryable', async () => {
     /** No provider is needed because cancellation occurs before any transport send. */
     const channel = new MessageChannel()
     /** The real parser still owns an actual native port and endpoint lifecycle. */
-    const parser = workerParser({ worker: channel.port1, ownership: 'transfer' })
+    const parser = workerParser({ worker: channel.port1 })
     /** This exact original native reason must stay reachable through the codec wrapper. */
     const reason = new DOMException('pre-aborted input', 'AbortError')
     /** Cancellation is already visible at public encode admission. */
@@ -222,7 +222,7 @@ describe('store-worker audit regressions', () => {
     controller.abort(reason)
     /** These bytes have never crossed postMessage. */
     const input = new Uint8Array([1, 2, 3])
-    /** Capture the supported codec diagnostic instead of inferring detach from the ownership option. */
+    /** Capture the supported codec diagnostic while retaining the original input bytes. */
     let failure: unknown
     try {
       try {

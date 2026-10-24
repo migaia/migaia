@@ -11,6 +11,8 @@ import type { ISerializeChunk, ISerializeParser } from '@migaia/serialize'
 import { SerializeChunkKind } from '@migaia/serialize'
 import { WorkerAdapter, createWorkerHandler, workerComputed } from '../src/index'
 import * as storeWorker from '../src/index'
+import * as publicStoreWorker from '@migaia/store-worker'
+import * as publicWorkerParser from '@migaia/store-worker/serialize/worker'
 import { toManagedRpcHandler } from '../src/managed-rpc-handler'
 import { createSerializeWorkerHandler, workerParser } from '../src/serialize/worker.js'
 import { createWorkerContractEndpoint } from '../src/worker-contract.js'
@@ -89,8 +91,9 @@ function installLinkedSerializeWorkerHandler(
 const mockEndpoint = (dispose: () => Promise<void>) => ({ dispose })
 
 describe('store-worker exports', () => {
-  it('exports only the canonical byte ownership vocabulary', () => {
-    expect(storeWorker.WorkerByteOwnership).toEqual({ copy: 'copy', transfer: 'transfer' })
+  it('omits removed byte ownership exports from both public runtime entries', () => {
+    expect('WorkerByteOwnership' in publicStoreWorker).toBe(false)
+    expect('WorkerByteOwnership' in publicWorkerParser).toBe(false)
     expect('Worker' + 'Ownership' in storeWorker).toBe(false)
   })
 
@@ -202,7 +205,73 @@ describe('store-worker exports', () => {
     await adapter.dispose()
   })
 
-  it('rejects unsigned transfer without detaching and preserves native one-way completion and send failure', async () => {
+  it('copies the same exclusive bytes through request, workerComputed and the parser without detaching', async () => {
+    /** Both public client paths use the same original buffer over real native MessagePorts. */
+    const input = new Uint8Array([3, 5, 8])
+    const channel = new MessageChannel()
+    const handler = createWorkerHandler<Uint8Array, number[]>(
+      (value) => [...value],
+      (message) => channel.port2.postMessage(message)
+    )
+    channel.port2.addEventListener('message', (event) => void handler((event as MessageEvent).data))
+    channel.port1.start()
+    channel.port2.start()
+    const adapter = new WorkerAdapter(channel.port1)
+    /** JavaScript extras from the removed API must be ignored, without reading their getters. */
+    const requestOptions = { transfer: [input.buffer] }
+    const computedOptions = { transfer: () => [input.buffer] }
+    const resource = workerComputed<Uint8Array, number[]>(adapter, () => input, {
+      ...computedOptions,
+      autoStart: false
+    })
+    const parserChannel = new MessageChannel()
+    const parserHandler = createSerializeWorkerHandler(
+      {
+        name: 'copy-bytes',
+        encode: (value) => ['value', value] as const,
+        decode: (chunk) => chunk[1]
+      },
+      (message) => parserChannel.port2.postMessage(message)
+    )
+    parserChannel.port2.addEventListener(
+      'message',
+      (event) => void parserHandler((event as MessageEvent).data)
+    )
+    parserChannel.port1.start()
+    parserChannel.port2.start()
+    const parserOptions = { worker: parserChannel.port1, ownership: 'transfer' as const }
+    const parser = workerParser(parserOptions)
+    try {
+      await expect(
+        adapter.request(input, { ...requestOptions, signal: undefined })
+      ).resolves.toEqual([3, 5, 8])
+      expect(input.buffer.byteLength).toBe(3)
+      await expect(resource.promise).resolves.toEqual([3, 5, 8])
+      expect(input.buffer.byteLength).toBe(3)
+      await expect(
+        parser.decode(['bytes', input], {
+          signal: new AbortController().signal,
+          context: 'copy-bytes'
+        })
+      ).resolves.toEqual(input)
+      expect(input.buffer.byteLength).toBe(3)
+      expect([...input]).toEqual([3, 5, 8])
+    } finally {
+      resource.dispose()
+      await Promise.all([
+        adapter.dispose(),
+        handler.dispose(),
+        parser.dispose?.(),
+        parserHandler.dispose()
+      ])
+      channel.port1.close()
+      channel.port2.close()
+      parserChannel.port1.close()
+      parserChannel.port2.close()
+    }
+  })
+
+  it('preserves native one-way completion and original physical send failure', async () => {
     /** Native ports retain real structured-clone and physical-send behavior. */
     const channel = new MessageChannel()
     /** Actual client posts distinguish rejected admission from any physical business emission. */
@@ -266,7 +335,6 @@ describe('store-worker exports', () => {
         return endpoint
       })
     ])
-    const transferred = new ArrayBuffer(8)
     try {
       /** This actual round trip completes negotiation before physical-send accounting begins. */
       await expect(client.request('ready')).resolves.toBe('ready')
@@ -276,16 +344,6 @@ describe('store-worker exports', () => {
         entered()
         await held
       })
-      const sentBeforeTransfer = clientPosts.length
-      await expect(
-        client.notify({ transferred }, 'notice', { transfer: [transferred] })
-      ).rejects.toMatchObject({
-        source: 'rpc.endpoint',
-        code: 'CAPABILITY_UNSUPPORTED'
-      })
-      expect(transferred.byteLength).toBe(8)
-      expect(received).toEqual([])
-      expect(clientPosts).toHaveLength(sentBeforeTransfer)
       const workerPostsBeforeNotice = workerPosts.length
       await client.notify('sent', 'notice')
       await entering
@@ -477,17 +535,22 @@ describe('store-worker exports', () => {
     )
   })
 
-  it('snapshots serialize worker accessor options exactly once', () => {
+  it('snapshots known serialize worker options once and ignores removed ownership', () => {
     let reads = 0
     const options = { worker: fakePort() } as {
       worker: ReturnType<typeof fakePort>
-      ownership?: string
+      type?: string
     }
-    Object.defineProperty(options, 'ownership', {
+    Object.defineProperty(options, 'type', {
       get: () => {
         reads++
-        if (reads > 1) throw new Error('ownership reread')
-        return 'copy'
+        if (reads > 1) throw new Error('type reread')
+        return 'snapshot-format'
+      }
+    })
+    Object.defineProperty(options, 'ownership', {
+      get: () => {
+        throw new Error('removed ownership read')
       }
     })
     const parser = workerParser(options as never)
@@ -644,7 +707,7 @@ describe('store-worker exports', () => {
     const pending = adapter.request({}, options)
 
     expect(signalReads).toBe(1)
-    expect(transferReads).toBe(1)
+    expect(transferReads).toBe(0)
     adapter.close()
     await expect(pending).rejects.toThrow('worker adapter is disposed')
   })
@@ -673,13 +736,6 @@ describe('store-worker exports', () => {
         source: 'store.worker',
         code: 'INVALID_OPTION',
         message: '[store] workerComputed selectInput must be a function'
-      })
-    )
-    expect(() => workerComputed(adapter, () => 1, { transfer: 1 as never })).toThrow(
-      expect.objectContaining({
-        source: 'store.worker',
-        code: 'INVALID_OPTION',
-        message: '[store] workerComputed transfer must be a function'
       })
     )
     adapter.close()
@@ -722,7 +778,7 @@ describe('store-worker exports', () => {
     const resource = workerComputed(adapter, () => 1, options as never)
 
     expect(runtimeReads).toBe(1)
-    expect(transferReads).toBe(1)
+    expect(transferReads).toBe(0)
     expect(unknownReads).toBe(0)
     resource.dispose()
     adapter.close()
@@ -730,9 +786,9 @@ describe('store-worker exports', () => {
 
   it('contains a throwing workerComputed option getter with its original cause', () => {
     const adapter = new WorkerAdapter(fakePort())
-    const failure = new Error('workerComputed transfer getter failed')
-    const options = {} as { transfer?: never }
-    Object.defineProperty(options, 'transfer', {
+    const failure = new Error('workerComputed runtime getter failed')
+    const options = {} as { runtime?: never }
+    Object.defineProperty(options, 'runtime', {
       get: () => {
         throw failure
       }

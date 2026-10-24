@@ -52,15 +52,13 @@ function snapshotWorkerClientOptions(options: object): {
   }
 }
 
-/** Captures per-request cancellation and transfer policy before asynchronous endpoint admission. */
+/** Captures per-request cancellation before asynchronous endpoint admission. */
 function snapshotWorkerRequestOptions(options: object): {
   readonly signal?: IAbortSignal
-  readonly transfer?: readonly unknown[]
 } {
   try {
     return {
-      signal: (options as { readonly signal?: IAbortSignal }).signal,
-      transfer: (options as { readonly transfer?: readonly unknown[] }).transfer
+      signal: (options as { readonly signal?: IAbortSignal }).signal
     }
   } catch (error) {
     throw createStoreWorkerError(
@@ -87,7 +85,7 @@ function createWorkerEndpoint(
  * Construction starts asynchronous endpoint setup; requests wait for it. Use portable primitive,
  * array and plain-record data, with supported undefined/ArrayBuffer/Uint8Array wrappers, rather
  * than assuming arbitrary JavaScript objects round-trip. The bridge reserves $worker markers and
- * encodes bytes as base64url independently of native transfer lists.
+ * copies inputs and encodes bytes as base64url without detaching the caller's buffers.
  *
  * Close only stops admission; await dispose to release the endpoint, then release the physical
  * Worker/port separately. RPC owns remote errors, cancellation and timeout outcomes.
@@ -121,23 +119,19 @@ export class WorkerAdapter {
 
   /**
    * Waits for endpoint setup and the remote computation, returning its decoded result; Output is a
-   * static expectation rather than runtime schema validation. Captures optional signal and transfer
-   * once before asynchronous admission; both default to undefined. Transfer is explicit and may
-   * detach listed buffers when sent, without establishing zero-copy payload delivery. Invalid
-   * options or terminal admission reject, as do RPC/remote failures. Cancellation asks a
-   * cooperative provider to stop and does not undo completed effects or forcibly terminate it.
+   * static expectation rather than runtime schema validation. Captures optional signal once before
+   * asynchronous admission; it defaults to undefined. Inputs are copied without detaching the
+   * caller's buffers. Invalid options or terminal admission reject, as do RPC/remote failures.
+   * Cancellation asks a cooperative provider to stop and does not undo completed effects or
+   * forcibly terminate it.
    */
-  request<Input, Output>(
-    payload: Input,
-    options: { signal?: IAbortSignal; transfer?: readonly unknown[] } = {}
-  ): Promise<Output> {
+  request<Input, Output>(payload: Input, options: { signal?: IAbortSignal } = {}): Promise<Output> {
     if (this.#disposed)
       return Promise.reject(
         createStoreWorkerError(StoreWorkerErrorCode.adapterDisposed, StoreWorkerErrorText.disposed)
       )
     let requestOptions: {
       readonly signal?: IAbortSignal
-      readonly transfer?: readonly unknown[]
     }
     try {
       assertWorkerOptions(options)
@@ -247,40 +241,29 @@ export function createWorkerHandler<Input, Output>(
 }
 
 /**
- * Resource options plus worker input transfer. Resource owns caching, dependency tracking and
- * request cancellation; this type does not transfer ownership of the adapter or physical Worker.
+ * Resource owns caching, dependency tracking and request cancellation; the adapter and physical
+ * Worker remain caller-owned, and worker inputs are copied.
  */
-export type IWorkerComputedOptions<Input, Output> = IResourceOptions<Output> & {
+export type IWorkerComputedOptions<Output> = IResourceOptions<Output> & {
   /** Borrowed reactive Runtime, default defaultRuntime, used for the returned Resource. */
   readonly runtime?: IRuntime
-  /** Optional synchronous transfer-list selector per input; omitted means no explicit transfer list. */
-  readonly transfer?: (input: Input) => readonly unknown[]
 }
 
 /** Stable worker/resource configuration captured before Resource ownership and auto-start. */
-type IWorkerComputedOptionSnapshot<Input, Output> = {
+type IWorkerComputedOptionSnapshot<Output> = {
   readonly runtime: IRuntime
-  readonly transfer: ((input: Input) => readonly unknown[]) | undefined
   readonly resource: IResourceOptions<Output>
 }
 
 /** Reads only owned worker/resource option keys once and rejects hostile accessors at admission. */
-function snapshotWorkerComputedOptions<Input, Output>(
-  options: IWorkerComputedOptions<Input, Output>
-): IWorkerComputedOptionSnapshot<Input, Output> {
+function snapshotWorkerComputedOptions<Output>(
+  options: IWorkerComputedOptions<Output>
+): IWorkerComputedOptionSnapshot<Output> {
   assertWorkerOptions(options)
   try {
     const runtime = options.runtime ?? defaultRuntime
-    const transfer = options.transfer
-    if (transfer !== undefined && typeof transfer !== 'function') {
-      throw createStoreWorkerError(
-        StoreWorkerErrorCode.invalidOption,
-        StoreWorkerErrorText.workerComputedCallback('transfer')
-      )
-    }
     return {
       runtime,
-      transfer,
       resource: {
         debugName: options.debugName,
         ttl: options.ttl,
@@ -311,9 +294,9 @@ function snapshotWorkerComputedOptions<Input, Output>(
 
 /**
  * Builds a Resource whose fetcher synchronously selects input, then requests it through adapter.
- * Reactive reads made during selectInput follow Resource dependency tracking; transfer, when
- * provided, selects the explicit native transfer list for that same input. Known options are
- * captured once before Resource ownership; invalid adapter/callback/options throw synchronously.
+ * Reactive reads made during selectInput follow Resource dependency tracking; inputs are copied
+ * without detaching their buffers. Known options are captured once before Resource ownership;
+ * invalid adapter/callback/options throw synchronously.
  *
  * Resource defaults apply: autoStart true, ttl Infinity, staleWhileRevalidate/keepAlive false,
  * retry/retryDelay 0, initialSnapshot/debugName undefined and systemScheduler. Request failures
@@ -323,7 +306,7 @@ function snapshotWorkerComputedOptions<Input, Output>(
 export function workerComputed<Input, Output>(
   adapter: WorkerAdapter,
   selectInput: () => Input,
-  options: IWorkerComputedOptions<Input, Output> = {}
+  options: IWorkerComputedOptions<Output> = {}
 ): Resource<Output> {
   const snapshot = snapshotWorkerComputedOptions(options)
   if (!(adapter instanceof WorkerAdapter)) {
@@ -342,8 +325,7 @@ export function workerComputed<Input, Output>(
     ({ signal }) => {
       const input = selectInput()
       return adapter.request<Input, Output>(input, {
-        signal,
-        transfer: snapshot.transfer?.(input)
+        signal
       })
     },
     snapshot.runtime,
