@@ -18,7 +18,6 @@ import type {
   IStoragePluginCallContext,
   IStorageFeatureClientResolver
 } from './types.js'
-import { assimilateCapturedThen, inspectThenable } from '@migaia/utils/function'
 import { STORAGE_CHAIN_FAMILIES } from './state-constants.js'
 /** A closed output-shape failure stays at the existing backend definition boundary. */
 function invalid(cause?: unknown): never {
@@ -38,15 +37,10 @@ function duplicate(name: string, key: PropertyKey): never {
 /** Snapshot own data once; methods are rebound only at their actual execution endpoint. */
 function entries(value: unknown): readonly (readonly [string, unknown])[] {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return invalid()
-  /** Reflection failure belongs to this same definition boundary and retains its original cause. */
-  let properties: readonly (readonly [PropertyKey, PropertyDescriptor | undefined])[]
-  try {
-    properties = Reflect.ownKeys(value).map(
-      (key) => [key, Object.getOwnPropertyDescriptor(value, key)] as const
-    )
-  } catch (cause) {
-    return invalid(cause)
-  }
+  /** Own data shape is part of the closed Feature output contract, including symbols. */
+  const properties = Reflect.ownKeys(value).map(
+    (key) => [key, Object.getOwnPropertyDescriptor(value, key)] as const
+  )
   return properties.map(([key, descriptor]) => {
     /** Retain one own data snapshot without executing a caller accessor. */
     if (
@@ -75,11 +69,8 @@ export type IStorageFeatureProjection = {
   readonly chain?: IChainMethods
 }
 
-/**
- * Prepare selected roots only; dependencies remain raw construction outputs until explicitly
- * copied.
- */
-export function installStorageFeatures(input: {
+/** Registration inputs borrow the original provider, execution, and client owners. */
+type IStorageFeatureInstallInput = {
   readonly name: string
   readonly store: IStorageBase
   readonly features: Readonly<Record<string, object>>
@@ -89,180 +80,278 @@ export function installStorageFeatures(input: {
   readonly onDispose: (release: () => void) => void
   readonly callContext: IStoragePluginCallContext
   readonly clientResolver?: IStorageFeatureClientResolver
-}): IStorageFeatureProjection | undefined {
-  /** Publish selected root outputs without implicitly publishing dependencies. */
+}
+
+/** One selected-root publication owns only method definitions and capability admission data. */
+type IStorageFeatureInstallContext = {
+  readonly input: IStorageFeatureInstallInput
+  readonly implementations: ICapabilityImpl[]
+  readonly storeApi: Record<string, unknown>
+  readonly storeApiDefinitions: Record<string, unknown>
+  transactionApi?: Record<string, unknown>
+  chain?: Partial<Record<keyof IChainMethods, Record<string, Function>>>
+}
+
+/** An API view borrows one real organization and optional canonical transaction scope. */
+type IStorageFeatureApiContext = {
+  readonly input: IStorageFeatureInstallInput
+  readonly store: IStorageBase
+  readonly callContext: IStoragePluginCallContext
+  readonly execution: IStorageExecutionPort
+  readonly scope?: object
+}
+
+/** Prepare selected roots without publishing their dependency-only outputs. */
+export function installStorageFeatures(
+  input: IStorageFeatureInstallInput
+): IStorageFeatureProjection | undefined {
+  /** No selected roots means no new method tables, projection, or cleanup. */
   const roots = Object.values(input.features)
   if (roots.length === 0) return
-  /** One local publication batch belongs to the original store capability provider. */
-  const implementations: ICapabilityImpl[] = []
-  /** API names are scoped to this one backend instance and this install lifetime. */
-  const storeApi = Object.create(null) as Record<string, unknown>
-  /** Original raw definitions are shared by immutable organization projections. */
-  const storeApiDefinitions = Object.create(null) as Record<string, unknown>
-  /** Absent groups retain no method table or scope projection callback. */
-  let transactionApi: Record<string, unknown> | undefined
-  /** Only selected root families contribute methods to the original fluent creators. */
-  let chain: Partial<Record<keyof IChainMethods, Record<string, Function>>> | undefined
-  for (const root of roots) {
-    /** Reject unknown Feature output fields before installing capabilities. */
-    const outputEntries = entries(root)
-    if (
-      outputEntries.length !== 3 ||
-      outputEntries.some(([key]) => key !== 'capabilities' && key !== 'chain' && key !== 'api')
-    )
-      invalid()
-    /** Consume only this admitted three-field root output. */
-    const output = Object.fromEntries(outputEntries) as IStorageFeatureOutput
-    if (!Array.isArray(output.capabilities)) invalid()
-    implementations.push(...output.capabilities)
-    /** Keep store and transaction API namespaces distinct during admission. */
-    const groups = entries(output.api)
-    if (groups.length !== 2 || groups.some(([key]) => key !== 'store' && key !== 'transaction'))
-      invalid()
-    /** Later admission consumes captured data rather than rereading a Feature-owned proxy. */
-    const api = Object.fromEntries(groups)
-    for (const [key, value] of entries(api.store)) {
-      if (Object.hasOwn(storeApi, key)) duplicate(input.name, key)
-      storeApiDefinitions[key] = snapshotApi(value)
-      storeApi[key] = bindApi(value, key)
-    }
-    for (const [key, value] of entries(api.transaction)) {
-      if (typeof input.expose.getTransactionClient !== 'function') invalid()
-      transactionApi ??= Object.create(null) as Record<string, unknown>
-      if (Object.hasOwn(transactionApi, key)) duplicate(input.name, key)
-      transactionApi[key] = snapshotApi(value)
-    }
-    for (const [family, methods] of entries(output.chain)) {
-      if (!Object.hasOwn(STORAGE_CHAIN_FAMILIES, family)) invalid()
-      /** The family is one finite original fluent surface, not an extension registry. */
-      const key = family as keyof IChainMethods
-      chain ??= Object.create(null) as NonNullable<typeof chain>
-      /** Each selected family is created once and subsequently mixed into actual original nodes. */
-      const target = chain[key] ?? (chain[key] = Object.create(null) as Record<string, Function>)
-      for (const [name, method] of entries(methods)) {
-        if (typeof method !== 'function') invalid()
-        if (
-          (key === 'query' && Object.hasOwn(RecordQueryMethod, name)) ||
-          (key === 'tx' && Object.hasOwn(TransactionBuilderMethod, name))
-        )
-          duplicate(input.name, name)
-        if (Object.hasOwn(target, name)) duplicate(input.name, name)
-        target[name] = function (this: object, ...args: unknown[]) {
-          /** Fluent methods configure original nodes; actual I/O terminals own pipeline entry. */
-          input.expose.getStore!()
-          return Reflect.apply(method, this, args)
-        }
-      }
-    }
+  /** Mutable publication data belongs to this explicit installation context. */
+  const context: IStorageFeatureInstallContext = {
+    input,
+    implementations: [],
+    storeApi: Object.create(null),
+    storeApiDefinitions: Object.create(null)
   }
-  if (implementations.length !== 0) {
-    if (input.installer === undefined) invalid()
-    /** The original provider owns capability preparation, visibility and release. */
-    const publication = input.installer.prepare(implementations)
-    input.onDispose(publication.release)
-    publication.publish()
-  }
+  for (const root of roots) admitStorageFeatureRoot(context, root)
+  publishStorageFeatureCapabilities(context)
   if ('api' in input.store) duplicate(input.name, 'api')
   Object.defineProperty(input.store, 'api', {
-    value: storeApi,
+    value: context.storeApi,
     enumerable: true,
     configurable: true
   })
+  return createStorageFeatureProjection(context)
+}
 
+/** Admit one closed root before any capabilities become visible. */
+function admitStorageFeatureRoot(context: IStorageFeatureInstallContext, root: object): void {
+  /** Consume the exact three-field root output once. */
+  const outputEntries = entries(root)
+  if (
+    outputEntries.length !== 3 ||
+    outputEntries.some(([key]) => key !== 'capabilities' && key !== 'chain' && key !== 'api')
+  )
+    invalid()
+  /** Closed shape admission precedes provider publication. */
+  const output = Object.fromEntries(outputEntries) as IStorageFeatureOutput
+  if (!Array.isArray(output.capabilities)) invalid()
+  context.implementations.push(...output.capabilities)
+  /** Store and transaction APIs retain separate namespaces. */
+  const groups = entries(output.api)
+  if (groups.length !== 2 || groups.some(([key]) => key !== 'store' && key !== 'transaction'))
+    invalid()
+  /** Only admitted own data reaches the API definition snapshot. */
+  const api = Object.fromEntries(groups)
+  admitStorageFeatureApis(context, api)
+  admitStorageFeatureChains(context, output.chain)
+}
+
+/** Snapshot definitions before later organization and transaction views can be requested. */
+function admitStorageFeatureApis(
+  context: IStorageFeatureInstallContext,
+  api: Record<string, unknown>
+): void {
+  for (const [key, value] of entries(api.store)) {
+    if (Object.hasOwn(context.storeApi, key)) duplicate(context.input.name, key)
+    /** Groups outlive this synchronous install and must resist later caller mutation. */
+    const definition = snapshotFeatureApi(value)
+    context.storeApiDefinitions[key] = definition
+    context.storeApi[key] = bindFeatureApi(definition, key, featureApiContext(context.input))
+  }
+  for (const [key, value] of entries(api.transaction)) {
+    if (typeof context.input.expose.getTransactionClient !== 'function') invalid()
+    context.transactionApi ??= Object.create(null) as Record<string, unknown>
+    if (Object.hasOwn(context.transactionApi, key)) duplicate(context.input.name, key)
+    context.transactionApi[key] = snapshotFeatureApi(value)
+  }
+}
+
+/** Mix finite selected families into their original fluent creators. */
+function admitStorageFeatureChains(context: IStorageFeatureInstallContext, chain: unknown): void {
+  for (const [family, methods] of entries(chain)) {
+    if (!Object.hasOwn(STORAGE_CHAIN_FAMILIES, family)) invalid()
+    /** This finite family remains owned by the original fluent construction layer. */
+    const key = family as keyof IChainMethods
+    context.chain ??= Object.create(null) as NonNullable<IStorageFeatureInstallContext['chain']>
+    /** One table combines selected roots without a second fluent registry. */
+    const target =
+      context.chain[key] ?? (context.chain[key] = Object.create(null) as Record<string, Function>)
+    for (const [name, method] of entries(methods)) {
+      if (typeof method !== 'function') invalid()
+      if (
+        (key === 'query' && Object.hasOwn(RecordQueryMethod, name)) ||
+        (key === 'tx' && Object.hasOwn(TransactionBuilderMethod, name))
+      )
+        duplicate(context.input.name, name)
+      if (Object.hasOwn(target, name)) duplicate(context.input.name, name)
+      target[name] = function (this: object, ...args: unknown[]) {
+        /** Configuration borrows the actual fluent node; terminals retain pipeline ownership. */
+        context.input.expose.getStore!()
+        return Reflect.apply(method, this, args)
+      }
+    }
+  }
+}
+
+/** The original provider owns prepare, visibility, and release order. */
+function publishStorageFeatureCapabilities(context: IStorageFeatureInstallContext): void {
+  if (context.implementations.length === 0) return
+  if (context.input.installer === undefined) invalid()
+  /** Register release before making the prepared capabilities visible. */
+  const publication = context.input.installer.prepare(context.implementations)
+  context.input.onDispose(publication.release)
+  publication.publish()
+}
+
+/** Reuse captured roots without rerunning Feature factories for organizations or transactions. */
+function createStorageFeatureProjection(
+  context: IStorageFeatureInstallContext
+): IStorageFeatureProjection {
   return {
-    createStoreApi: (store, context, execution) => {
-      /** Organization methods reuse the captured selected roots without rerunning Feature factories. */
-      const api = Object.create(null) as Record<string, unknown>
-      for (const [key, value] of Object.entries(storeApiDefinitions))
-        api[key] = bindApi(value, key, undefined, store, context, execution)
-      return api
-    },
-    ...(transactionApi === undefined
+    createStoreApi: (store, callContext, execution) =>
+      createFeatureApi(context.storeApiDefinitions, {
+        input: context.input,
+        store,
+        callContext,
+        execution
+      }),
+    ...(context.transactionApi === undefined
       ? {}
       : {
           createTransactionApi: (
             scope: object,
-            store = input.store,
-            context = input.callContext,
-            execution = input.execution
-          ): object => {
-            /** Each actual original view receives its own bound API before the backend freezes it. */
-            const api = Object.create(null) as Record<string, unknown>
-            for (const [key, value] of Object.entries(transactionApi))
-              api[key] = bindApi(value, key, scope, store, context, execution)
-            return api
-          }
+            store = context.input.store,
+            callContext = context.input.callContext,
+            execution = context.input.execution
+          ): object =>
+            createFeatureApi(context.transactionApi!, {
+              input: context.input,
+              store,
+              callContext,
+              execution,
+              scope
+            })
         }),
-    ...(chain === undefined ? {} : { chain })
+    ...(context.chain === undefined ? {} : { chain: context.chain })
   }
+}
 
-  /** Definition data is captured once; no later scope construction rereads Feature-owned objects. */
-  function snapshotApi(value: unknown): unknown {
-    if (typeof value === 'function') return value
-    /** Capture nested groups now so mutation/getters cannot alter a later registered native view. */
-    const group = Object.create(null) as Record<string, unknown>
-    for (const [key, member] of entries(value)) group[key] = snapshotApi(member)
-    return group
-  }
+/** Borrow the root's existing call context and execution admission port. */
+function featureApiContext(input: IStorageFeatureInstallInput): IStorageFeatureApiContext {
+  return { input, store: input.store, callContext: input.callContext, execution: input.execution }
+}
 
-  /** Every nested API leaf performs canonical registration admission before touching a client. */
-  function bindApi(
-    value: unknown,
-    path: string,
-    scope?: object,
-    store = input.store,
-    context = input.callContext,
-    execution = input.execution
-  ): unknown {
-    if (typeof value === 'function')
-      return (...args: unknown[]) => {
-        if (scope === undefined)
-          return execution.run({ operation: path, input: args }, (captured) => {
-            /** Use the original admitted backend object instead of creating a replacement. */
-            input.expose.getStore!()
-            if (input.clientResolver !== undefined) {
-              /** Only opt-in native routing may prepare this exact organization's client. */
-              const client = input.clientResolver.getClient(context.orgId)
-              /** Reuse the original thenable inspector rather than rereading a lazy then getter. */
-              const inspection = inspectThenable(client)
-              if ('error' in inspection) return invalid(inspection.error)
-              if (inspection.then !== undefined)
-                return assimilateCapturedThen(inspection.then, client).then((ready) => {
-                  /** A late preparation never revives a disposed original registration. */
-                  input.expose.getStore!()
-                  return Reflect.apply(
-                    value,
-                    { ...context, store, client: ready, scope: undefined },
-                    captured
-                  )
-                })
-              return Reflect.apply(value, { ...context, store, client, scope: undefined }, captured)
-            }
-            /** Fetch the lazy native client only at its actual execution endpoint. */
-            const client = input.expose.getClient?.()
-            return Reflect.apply(value, { ...context, store, client, scope: undefined }, captured)
-          })
-        /** Original scope admission owns expiry/first-failure semantics before any host/client work. */
-        return runTransactionOperation(scope, (current) => {
-          assertTransactionOwner(store, current)
-          return execution.run({ operation: path, input: args, scope: current }, (captured) => {
-            /** Client projection is lazy and uses this operation's exact current registered view. */
-            const client =
-              input.clientResolver?.getTransactionClient === undefined
-                ? input.expose.getTransactionClient!(current)
-                : input.clientResolver.getTransactionClient(current, context.orgId)
-            return Reflect.apply(
-              value,
-              { ...context, store: current, client, scope: current },
-              captured
-            )
-          })
-        })
-      }
-    /** Freeze a nested API group while its leaves retain registration guards. */
-    const group = Object.create(null) as Record<string, unknown>
-    for (const [key, member] of entries(value))
-      group[key] = bindApi(member, `${path}.${key}`, scope, store, context, execution)
-    return group
+/** Materialize one native view from already admitted, detached definitions. */
+function createFeatureApi(
+  definitions: Record<string, unknown>,
+  context: IStorageFeatureApiContext
+): object {
+  /** Each real view receives its own method table while preserving definition identity. */
+  const api = Object.create(null) as Record<string, unknown>
+  for (const [key, value] of Object.entries(definitions))
+    api[key] = bindFeatureApi(value, key, context)
+  return api
+}
+
+/** Detach nested groups once because later organization and scope construction outlives install. */
+function snapshotFeatureApi(value: unknown): unknown {
+  if (typeof value === 'function') return value
+  /** Only definition containers are copied; callable identity remains the author's original. */
+  const group = Object.create(null) as Record<string, unknown>
+  for (const [key, member] of entries(value)) group[key] = snapshotFeatureApi(member)
+  return group
+}
+
+/** Bind accepted definitions to one explicit organization or transaction context. */
+function bindFeatureApi(value: unknown, path: string, context: IStorageFeatureApiContext): unknown {
+  if (typeof value === 'function')
+    return (...args: unknown[]) => runFeatureApi(context, value, path, args)
+  /** This internal group was admitted once before publication; do not validate or copy it again. */
+  const group = Object.create(null) as Record<string, unknown>
+  for (const [key, member] of Object.entries(value as Record<string, unknown>))
+    group[key] = bindFeatureApi(member, `${path}.${key}`, context)
+  return group
+}
+
+/** Admit the entire Feature operation through the existing canonical scope and pipeline owners. */
+function runFeatureApi(
+  context: IStorageFeatureApiContext,
+  method: Function,
+  path: string,
+  args: unknown[]
+): unknown {
+  if (context.scope === undefined)
+    return context.execution.run({ operation: path, input: args }, (captured) =>
+      runStoreFeatureApi(context, method, captured)
+    )
+  return runTransactionOperation(context.scope, (current) => {
+    assertTransactionOwner(context.store, current)
+    return context.execution.run({ operation: path, input: args, scope: current }, (captured) => {
+      /** Use the exact current registered view; client selection remains synchronous here. */
+      const client =
+        context.input.clientResolver?.getTransactionClient === undefined
+          ? context.input.expose.getTransactionClient!(current)
+          : context.input.clientResolver.getTransactionClient(current, context.callContext.orgId)
+      return Reflect.apply(
+        method,
+        {
+          ...context.callContext,
+          store: current,
+          client,
+          scope: current
+        },
+        captured
+      )
+    })
+  })
+}
+
+/** Resolve only opt-in native preparation; synchronous clients retain synchronous method results. */
+function runStoreFeatureApi(
+  context: IStorageFeatureApiContext,
+  method: Function,
+  captured: unknown[]
+): Promise<unknown> {
+  context.input.expose.getStore!()
+  if (context.input.clientResolver !== undefined) {
+    /** Ordinary PromiseLike preparation is part of the public resolver contract. */
+    const client = context.input.clientResolver.getClient(context.callContext.orgId)
+    if (
+      client !== null &&
+      (typeof client === 'object' || typeof client === 'function') &&
+      typeof (client as PromiseLike<unknown>).then === 'function'
+    )
+      /** Retain the original fresh-Promise settlement step before checking late registration use. */
+      return new Promise<unknown>((resolve, reject) => {
+        ;(client as PromiseLike<unknown>).then(resolve, reject)
+      }).then((ready) => {
+        /** Preparation can settle after disposal; re-enter the original registration admission. */
+        context.input.expose.getStore!()
+        return invokeStoreFeatureApi(context, method, captured, ready)
+      })
+    return invokeStoreFeatureApi(context, method, captured, client)
   }
+  return invokeStoreFeatureApi(context, method, captured, context.input.expose.getClient?.())
+}
+
+/** Preserve the public dynamic Feature call-context receiver without changing its API. */
+function invokeStoreFeatureApi(
+  context: IStorageFeatureApiContext,
+  method: Function,
+  captured: unknown[],
+  client: unknown
+): Promise<unknown> {
+  return Reflect.apply(
+    method,
+    {
+      ...context.callContext,
+      store: context.store,
+      client,
+      scope: undefined
+    },
+    captured
+  )
 }

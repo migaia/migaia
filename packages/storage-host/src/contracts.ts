@@ -1,7 +1,6 @@
 import type { IBackendStageBindings } from '@migaia/storage-contract'
 import type { IStorageHooks } from './hook-types.js'
 import type { IStorageHookEmitter } from './hooks.js'
-import { assimilateCapturedThen } from '@migaia/utils/function'
 import {
   defineFeature as defineNativeFeature,
   definePlugin as defineNativePlugin,
@@ -42,130 +41,93 @@ const nativePluginMetadata = new WeakMap<object, { readonly id: string }>()
 type IStorageNativeProjectionFields = Readonly<Record<PropertyKey, unknown>>
 
 /**
- * Projects caller-owned data descriptors with Storage-owned fields without probing caller values.
- * PluginHost remains responsible for one real `then` read, validation, and rejection containment.
+ * Project ordinary own descriptors for native admission. Promise outputs remain the actual native
+ * Promise so PluginHost can reject and observe their rejection without another assimilation owner.
  */
-const createNativeDataProjection = (
+function createNativeDataProjection(
   value: unknown,
   fields: IStorageNativeProjectionFields,
   preserveMethodReceiver = false,
   projectValue?: (key: PropertyKey, value: unknown, receiver: object) => unknown
-): unknown => {
-  if (value === null || typeof value !== 'object') return value
-  /** Empty target keeps Proxy invariants independent of frozen caller-owned output. */
-  const target = Object.create(null)
-  return new Proxy(target, {
-    getPrototypeOf: () => Object.getPrototypeOf(value),
-    get: (_target, key) => {
-      /** Native owns the one observable property read, including hostile dynamic `then` getters. */
-      const result = Reflect.get(value, key, value)
-      if (key !== 'then' || typeof result !== 'function') return result
-      return (resolve: (output: unknown) => void, reject: (error: unknown) => void): void => {
-        void assimilateCapturedThen(result, value).then(resolve, reject)
-      }
-    },
-    ownKeys: () => [...new Set([...Reflect.ownKeys(value), ...Reflect.ownKeys(fields)])],
-    getOwnPropertyDescriptor: (_target, key) => {
-      /**
-       * Caller descriptors always win so native validation observes their exact data/accessor
-       * shape.
-       */
-      const descriptor = Object.getOwnPropertyDescriptor(value, key)
-      if (descriptor !== undefined) {
-        /**
-         * Native's original descriptor read also captures immutable organization method
-         * definitions.
-         */
-        if (projectValue !== undefined && 'value' in descriptor)
-          return {
-            ...descriptor,
-            value: projectValue(key, descriptor.value, value),
-            configurable: true
-          }
-        if (
-          preserveMethodReceiver &&
-          key !== 'then' &&
-          'value' in descriptor &&
-          typeof descriptor.value === 'function'
-        ) {
-          return {
-            ...descriptor,
-            value: (...args: unknown[]) => Reflect.apply(descriptor.value, value, args),
-            configurable: true
-          }
-        }
-        return { ...descriptor, configurable: true }
-      }
-      /** Storage-private fields fill only keys absent from the caller output. */
-      const field = Object.getOwnPropertyDescriptor(fields, key)
-      return field === undefined ? undefined : { ...field, configurable: true }
-    }
-  })
+): unknown {
+  if (value === null || typeof value !== 'object' || value instanceof Promise) return value
+  /** Keep the original prototype and own data/accessor shape for PluginHost's closed boundary. */
+  const output = Object.create(Object.getPrototypeOf(value))
+  for (const key of Reflect.ownKeys(value)) {
+    /** Captured definitions survive later caller mutation while keeping native rejection semantics. */
+    const descriptor = Object.getOwnPropertyDescriptor(value, key)!
+    if (projectValue !== undefined && 'value' in descriptor)
+      Object.defineProperty(output, key, {
+        ...descriptor,
+        value: projectValue(key, descriptor.value, value),
+        configurable: true
+      })
+    else if (
+      preserveMethodReceiver &&
+      key !== 'then' &&
+      'value' in descriptor &&
+      typeof descriptor.value === 'function'
+    )
+      Object.defineProperty(output, key, {
+        ...descriptor,
+        value: (...args: unknown[]) => Reflect.apply(descriptor.value, value, args),
+        configurable: true
+      })
+    else Object.defineProperty(output, key, { ...descriptor, configurable: true })
+  }
+  for (const key of Reflect.ownKeys(fields))
+    if (!Object.hasOwn(value, key))
+      Object.defineProperty(output, key, {
+        ...Object.getOwnPropertyDescriptor(fields, key),
+        configurable: true
+      })
+  return output
 }
 
-/** Maps a caller descriptor hook only after PluginHost has observed its own data descriptor. */
+/** Native owns validation; Storage replaces only admitted hook data functions. */
 type IStorageDescriptorHook = (() => unknown) | undefined
 
-/** Storage-owned hooks supplied by the transparent descriptor projection. */
+/** Finite registration bridges attach no additional native lifecycle authority. */
 type IStorageDescriptorHooks = Readonly<{
   readonly install: (hook: IStorageDescriptorHook) => () => unknown
   readonly featureExpose: (hook: IStorageDescriptorHook) => () => unknown
   readonly expose: (hook: IStorageDescriptorHook) => () => unknown
 }>
 
-/**
- * Preserves the caller descriptor's real shape for PluginHost, replacing only admitted hook data
- * functions with Storage's existing registration bridges.
- */
-const createNativeDescriptorProjection = (
-  value: unknown,
-  hooks: IStorageDescriptorHooks
-): unknown => {
-  if (value === null || typeof value !== 'object') return value
-  /** Empty target permits projection of frozen or non-configurable caller descriptors. */
-  const target = Object.create(null)
-  /** These are the only descriptor hooks Storage bridges into its existing registration closure. */
-  const hookNames = new Set<string>(STORAGE_DESCRIPTOR_HOOKS)
-  return new Proxy(target, {
-    getPrototypeOf: () => Object.getPrototypeOf(value),
-    get: (_target, key) => {
-      /** A real source read preserves dynamic thenable detection and its original receiver. */
-      const result = Reflect.get(value, key, value)
-      if (key !== 'then' || typeof result !== 'function') return result
-      return (resolve: (output: unknown) => void, reject: (error: unknown) => void): void => {
-        void assimilateCapturedThen(result, value).then(resolve, reject)
-      }
-    },
-    ownKeys: () => [
-      ...new Set([
-        ...Reflect.ownKeys(value).filter(
-          (key) => !STORAGE_DESCRIPTOR_METADATA.some((field) => field === key)
+/** Preserve unknown keys and invalid descriptors so native admission remains their single owner. */
+function createNativeDescriptorProjection(value: unknown, hooks: IStorageDescriptorHooks): unknown {
+  if (value === null || typeof value !== 'object' || value instanceof Promise) return value
+  /** Author-only metadata is removed before the original closed descriptor admission. */
+  const output = Object.create(Object.getPrototypeOf(value))
+  /** Native always receives installation and Feature bridges; expose remains optional. */
+  const keys = new Set([
+    ...Reflect.ownKeys(value).filter(
+      (key) => !STORAGE_DESCRIPTOR_METADATA.some((field) => field === key)
+    ),
+    ...STORAGE_DESCRIPTOR_HOOKS.filter((key) => key !== 'expose')
+  ])
+  for (const key of keys) {
+    /** Only own data callbacks are bridged; accessors retain the native rejection path. */
+    const descriptor = Object.getOwnPropertyDescriptor(value, key)
+    if (
+      typeof key === 'string' &&
+      STORAGE_DESCRIPTOR_HOOKS.some((hook) => hook === key) &&
+      (key !== 'expose' || descriptor !== undefined) &&
+      (descriptor === undefined ||
+        ('value' in descriptor && typeof descriptor.value === 'function'))
+    )
+      Object.defineProperty(output, key, {
+        value: hooks[key as keyof IStorageDescriptorHooks](
+          descriptor?.value as IStorageDescriptorHook
         ),
-        ...[...hookNames].filter((key) => key !== 'expose')
-      ])
-    ],
-    getOwnPropertyDescriptor: (_target, key) => {
-      /** Native inspects the source descriptor once before any Storage bridge can execute it. */
-      const descriptor = Object.getOwnPropertyDescriptor(value, key)
-      if (
-        typeof key === 'string' &&
-        hookNames.has(key) &&
-        (key !== 'expose' || descriptor !== undefined) &&
-        (descriptor === undefined ||
-          ('value' in descriptor && typeof descriptor.value === 'function'))
-      ) {
-        return {
-          value: hooks[key as keyof IStorageDescriptorHooks](
-            descriptor?.value as IStorageDescriptorHook
-          ),
-          enumerable: descriptor?.enumerable ?? true,
-          configurable: true,
-          writable: true
-        }
-      }
-      return descriptor === undefined ? undefined : { ...descriptor, configurable: true }
-    }
-  })
+        enumerable: descriptor?.enumerable ?? true,
+        configurable: true,
+        writable: true
+      })
+    else if (descriptor !== undefined)
+      Object.defineProperty(output, key, { ...descriptor, configurable: true })
+  }
+  return output
 }
 
 /** Define a diagnostic kind token whose exact object identity is checked during installation. */
@@ -259,243 +221,342 @@ type IStorageNativeCore = IPluginHostCore<IStoragePipelineInput> & {
   readonly getOrgContext: IStoragePluginCore['getOrgContext']
   captureStorageExtension(key: PropertyKey, value: unknown, receiver: object): unknown
 }
-/** Define one native plugin while preserving the original descriptor snapshot and install ownership. */
+/** Immutable definition data is shared across registrations without retaining any native Store. */
+type IStoragePluginDefinitionContext = {
+  readonly name: string
+  readonly descriptorFactory: (core: IStoragePluginCore) => IStorageNativePluginDescriptor
+  readonly features?: IFeatureRecord
+  readonly plan?: ReturnType<typeof inspectFeatures>
+}
+
+/** Registration-local transfer state borrows lifecycle and installation authority from PluginHost. */
+type IStorageNativeRegistrationContext = {
+  readonly definition: IStoragePluginDefinitionContext
+  readonly nativeCore: IStorageNativeCore
+  transferActive: boolean
+  transferred: boolean
+  expiredTransferConsumed: boolean
+}
+
+/** Author metadata is captured before asynchronous install or later caller descriptor mutation. */
+type IStorageNativeDescriptorContext = {
+  readonly registration: IStorageNativeRegistrationContext
+  readonly descriptor: IStorageNativePluginDescriptor
+  readonly kind?: IStorageBackendKind
+  readonly capabilityInstaller?: IStorageNativePluginDescriptor['capabilityInstaller']
+  readonly journalBinding?: IStorageNativePluginDescriptor['journalBinding']
+}
+
+/** Define one native plugin; original PluginHost remains the registration and lifecycle owner. */
 export const definePlugin: IStorageDefinePlugin = ((
   name: string,
   descriptorFactory: (core: IStoragePluginCore) => IStorageNativePluginDescriptor,
   features?: IFeatureRecord
 ) => {
   assertStorageBackendId(name)
-  /** Inspect the existing native dependency closure for target compatibility. */
-  const plan = features === undefined ? undefined : inspectFeatures(features)
-  /** The original PluginHost definition remains the registration and lifecycle owner. */
+  /** Inspect the existing dependency closure without running any Feature factory. */
+  const context: IStoragePluginDefinitionContext = {
+    name,
+    descriptorFactory,
+    features,
+    plan: features === undefined ? undefined : inspectFeatures(features)
+  }
+  /** Native invokes one bounded adapter for each actual registration. */
   const definition = defineNativePlugin(
     pluginNameFromBackendId(name),
-    (core) => {
-      /** Only the facade-issued native core can supply registration authority. */
-      const nativeCore = core as unknown as IStorageNativeCore
-      nativeCore.setStorageRegistrationCore(core)
-      /** Only the original install hook can transfer a completed store. */
-      let transferActive = false
-      /** A registration transfers ownership of its exact store at most once. */
-      let transferred = false
-      /** A late store may be cleaned up once after installation expiry. */
-      let expiredTransferConsumed = false
-      /** Forward original capabilities without exposing host mutation authority. */
-      const storageCore = {
-        get operation() {
-          return nativeCore.operation
-        },
-        get lifecycle() {
-          return nativeCore.lifecycle
-        },
-        onDispose: nativeCore.onDispose,
-        usePipeline: nativeCore.usePipeline,
-        useAsyncPipeline: nativeCore.useAsyncPipeline,
-        get defaultOrgId() {
-          return nativeCore.defaultOrgId
-        },
-        execution: nativeCore.execution,
-        journal: nativeCore.journal,
-        get hooks() {
-          return nativeCore.getStorageHooks()
-        },
-        get stageBindings() {
-          return nativeCore.getStageBindings()
-        },
-        emit: nativeCore.emit,
-        createKeyLockPort: nativeCore.createKeyLockPort,
-        createOrgAuthoringPort: nativeCore.createOrgAuthoringPort,
-        createTransactionApi: nativeCore.createTransactionApi,
-        getChainMethods: nativeCore.getChainMethods,
-        createRevisionPort: nativeCore.createRevisionPort,
-        createChangeController: nativeCore.createChangeController,
-        registerChangeController: nativeCore.registerChangeController,
-        registerValueCommit: nativeCore.registerValueCommit,
-        registerOrgBinding: nativeCore.registerOrgBinding,
-        registerFeatureClientResolver: nativeCore.registerFeatureClientResolver,
-        getOrgContext: nativeCore.getOrgContext,
-        getPublishedBackend: nativeCore.getPublishedBackend,
-        registerDetect: nativeCore.registerDetect,
-        registerStore: (store: IStorageBase) => {
-          if (transferred)
-            throw createStorageTypeError(
-              StorageErrorCode.backendPluginInvalid,
-              StorageErrorText.backendPluginInvalid
-            )
-          if (!transferActive) {
-            if (nativeCore.isStorageInstallExpired() && !expiredTransferConsumed) {
-              expiredTransferConsumed = true
-              nativeCore.registerStore(store)
-            }
-            throw createStorageTypeError(
-              StorageErrorCode.backendPluginInvalid,
-              StorageErrorText.backendPluginInvalid
-            )
-          }
-          nativeCore.registerStore(store)
-          transferred = true
-        },
-        getStore: () => nativeCore.getStore(),
-        getBackendId: () => nativeCore.getBackendId(),
-        get features() {
-          return nativeCore.features
-        },
-        get featureExpose() {
-          return nativeCore.featureExpose
-        }
-      } as unknown as IStoragePluginCore
-      /** Let the native snapshot validate the caller descriptor after its factory runs. */
-      const descriptor = descriptorFactory(storageCore)
-      /** Snapshot author-only fields once before running install or exposing native capabilities. */
-      const metadata: Record<string, unknown> = Object.create(null)
-      for (const key of STORAGE_DESCRIPTOR_METADATA) {
-        /** Snapshot author metadata before the native closed descriptor boundary. */
-        const property = Object.getOwnPropertyDescriptor(descriptor, key)
-        if (
-          property !== undefined &&
-          (!('value' in property) || (key !== 'kind' && typeof property.value !== 'function'))
-        )
-          throw createStorageTypeError(
-            StorageErrorCode.backendPluginInvalid,
-            StorageErrorText.backendPluginInvalid
-          )
-        metadata[key] = property?.value
-      }
-      /** Flat extension functions receive the same organization context as backend methods. */
-      const captureExtension = (key: PropertyKey, value: unknown, receiver: object) =>
-        nativeCore.captureStorageExtension(key, value, receiver)
-      /** Registration-local identity cannot be changed by later descriptor mutation. */
-      const kind = metadata.kind as IStorageBackendKind | undefined
-      /** The provider-issued installation port belongs to this exact backend construction. */
-      const capabilityInstaller =
-        metadata.capabilityInstaller as IStorageNativePluginDescriptor['capabilityInstaller']
-      /** The original descriptor factory grants journal access only after exact store admission. */
-      const journalBinding =
-        metadata.journalBinding as IStorageNativePluginDescriptor['journalBinding']
-
-      if (kind !== undefined && !kinds.has(kind))
-        throw createStorageTypeError(
-          StorageErrorCode.backendKindMismatch,
-          StorageErrorText.backendKindMismatch
-        )
-      for (const feature of plan?.ordered ?? []) {
-        /** Read private Feature identity metadata instead of public type fields. */
-        const expected = featureTargets.get(feature)
-        if (
-          kind !== undefined
-            ? expected === undefined || !expected.includes(kind)
-            : expected !== undefined
-        )
-          throw createStorageTypeError(
-            StorageErrorCode.backendKindMismatch,
-            StorageErrorText.backendKindMismatch
-          )
-      }
-      nativeCore.setStorageKind(kind)
-      return createNativeDescriptorProjection(descriptor, {
-        install: (install) => async () => {
-          transferActive = true
-          try {
-            return await nativeCore.runStorageInstall(async () => {
-              /** Capture the actual install result before native extension publication. */
-              const extensions = install === undefined ? {} : await install()
-              if (kind !== undefined && !transferred)
-                throw createStorageTypeError(
-                  StorageErrorCode.backendPluginInvalid,
-                  StorageErrorText.backendPluginInvalid
-                )
-              if (kind !== undefined && journalBinding !== undefined)
-                nativeCore.setStorageJournalBinding(
-                  Reflect.apply(journalBinding, descriptor, [nativeCore.getStore()])
-                )
-              if (kind !== undefined && features !== undefined) {
-                /** An empty selection creates neither a projection nor an extra cleanup closure. */
-                const projection = installStorageFeatures({
-                  name,
-                  store: nativeCore.getStore(),
-                  features: nativeCore.features,
-                  installer:
-                    capabilityInstaller === undefined
-                      ? undefined
-                      : Reflect.apply(capabilityInstaller, descriptor, [nativeCore.getStore()]),
-                  execution: nativeCore.execution,
-                  expose: nativeCore.featureExpose as Readonly<Record<string, Function>>,
-                  onDispose: nativeCore.onDispose,
-                  callContext: nativeCore.getOrgContext(nativeCore.defaultOrgId).callContext,
-                  clientResolver: nativeCore.getStorageFeatureClientResolver()
-                })
-                if (projection !== undefined) {
-                  /** Original registration cleanup drops only its own selected Feature projection. */
-                  nativeCore.onDispose(() => nativeCore.setStorageFeatureProjection(undefined))
-                  nativeCore.setStorageFeatureProjection(projection)
-                }
-              }
-              if (
-                extensions === null ||
-                typeof extensions !== 'object' ||
-                Array.isArray(extensions)
-              )
-                return extensions as never
-              /** Preserve caller extension descriptors rather than spreading away their behavior. */
-              const output = Object.create(null)
-              Object.setPrototypeOf(output, Object.getPrototypeOf(extensions))
-              Object.defineProperties(output, Object.getOwnPropertyDescriptors(extensions))
-              return createNativeDataProjection(output, {}, false, captureExtension)
-            })
-          } finally {
-            transferActive = false
-          }
-        },
-        expose: (hook) => () => {
-          /**
-           * Original extension publication remains native; only raw callable definitions are
-           * retained.
-           */
-          const value = hook === undefined ? {} : hook()
-          return createNativeDataProjection(value, {}, false, captureExtension)
-        },
-        featureExpose: (hook) => () => {
-          /** Keep native getters lazy until actual execution after store admission. */
-          const expose = hook === undefined ? {} : hook()
-          /** Authors cannot replace host-issued registration functions. */
-          const reserved = STORAGE_RESERVED_EXPOSE
-          if (
-            expose !== null &&
-            (typeof expose === 'object' || typeof expose === 'function') &&
-            reserved.some((key) => key in expose)
-          )
-            throw createStorageTypeError(
-              StorageErrorCode.backendPluginInvalid,
-              StorageErrorText.backendPluginInvalid
-            )
-          return createNativeDataProjection(
-            expose,
-            {
-              getKind: () => kind,
-              getChangeController: nativeCore.getChangeController,
-              getStore: () => nativeCore.getStore(),
-              getBackendId: () => nativeCore.getBackendId(),
-              getLifecycle: () => nativeCore.lifecycle,
-              onDispose: nativeCore.onDispose,
-              getScheduler: () => nativeCore.getScheduler(),
-              getPublishedBackend: nativeCore.getPublishedBackend,
-              emit: nativeCore.emit,
-              registerDetect: nativeCore.registerDetect
-            },
-            true
-          ) as never
-        }
-      }) as never
-    },
+    (core) => createStorageNativeRegistration(context, core as unknown as IStorageNativeCore),
     features as never
   )
-  /** Expose an immutable id while the native definition stays private. */
+  /** Public diagnostic identity retains no mutable registration authority. */
   const handle = { id: name }
   nativePluginDefinitions.set(handle, definition)
   nativePluginMetadata.set(handle, { id: name })
   return handle
 }) as IStorageDefinePlugin
+
+/** Create one explicit transfer owner before exposing the original native capabilities to authors. */
+function createStorageNativeRegistration(
+  definition: IStoragePluginDefinitionContext,
+  nativeCore: IStorageNativeCore
+): never {
+  nativeCore.setStorageRegistrationCore(nativeCore)
+  /** Transfer flags live only for this native registration, never on a public plugin definition. */
+  const registration: IStorageNativeRegistrationContext = {
+    definition,
+    nativeCore,
+    transferActive: false,
+    transferred: false,
+    expiredTransferConsumed: false
+  }
+  /**
+   * A factory remains an unbound callback, rather than acquiring this definition context as
+   * receiver.
+   */
+  const descriptorFactory = definition.descriptorFactory
+  /** Factory admission remains synchronous before native descriptor validation. */
+  const descriptor = descriptorFactory(createStorageRegistrationCore(registration))
+  /** Metadata must survive install awaits without rereading the caller's descriptor. */
+  const context = captureStorageDescriptor(registration, descriptor)
+  assertStorageFeatureTargets(context)
+  nativeCore.setStorageKind(context.kind)
+  return createNativeDescriptorProjection(descriptor, {
+    install: (install) => () => runStorageNativeInstall(context, install),
+    expose: (hook) => () => projectStorageNativeExpose(context, hook),
+    featureExpose: (hook) => () => projectStorageNativeFeatureExpose(context, hook)
+  }) as never
+}
+
+/** Forward lazy native capabilities; Feature and lifecycle getters must remain late native reads. */
+function createStorageRegistrationCore(
+  context: IStorageNativeRegistrationContext
+): IStoragePluginCore {
+  return {
+    get operation() {
+      return context.nativeCore.operation
+    },
+    get lifecycle() {
+      return context.nativeCore.lifecycle
+    },
+    onDispose: context.nativeCore.onDispose,
+    usePipeline: context.nativeCore.usePipeline,
+    useAsyncPipeline: context.nativeCore.useAsyncPipeline,
+    get defaultOrgId() {
+      return context.nativeCore.defaultOrgId
+    },
+    execution: context.nativeCore.execution,
+    journal: context.nativeCore.journal,
+    get hooks() {
+      return context.nativeCore.getStorageHooks()
+    },
+    get stageBindings() {
+      return context.nativeCore.getStageBindings()
+    },
+    emit: context.nativeCore.emit,
+    createKeyLockPort: context.nativeCore.createKeyLockPort,
+    createOrgAuthoringPort: context.nativeCore.createOrgAuthoringPort,
+    createTransactionApi: context.nativeCore.createTransactionApi,
+    getChainMethods: context.nativeCore.getChainMethods,
+    createRevisionPort: context.nativeCore.createRevisionPort,
+    createChangeController: context.nativeCore.createChangeController,
+    registerChangeController: context.nativeCore.registerChangeController,
+    registerValueCommit: context.nativeCore.registerValueCommit,
+    registerOrgBinding: context.nativeCore.registerOrgBinding,
+    registerFeatureClientResolver: context.nativeCore.registerFeatureClientResolver,
+    getOrgContext: context.nativeCore.getOrgContext,
+    getPublishedBackend: context.nativeCore.getPublishedBackend,
+    registerDetect: context.nativeCore.registerDetect,
+    registerStore: (store: IStorageBase) => registerStorageTransfer(context, store),
+    getStore: () => context.nativeCore.getStore(),
+    getBackendId: () => context.nativeCore.getBackendId(),
+    get features() {
+      return context.nativeCore.features
+    },
+    get featureExpose() {
+      return context.nativeCore.featureExpose
+    }
+  } as unknown as IStoragePluginCore
+}
+
+/** Accept one exact Store transfer, including one native cleanup handoff after install expiry. */
+function registerStorageTransfer(
+  context: IStorageNativeRegistrationContext,
+  store: IStorageBase
+): void {
+  if (context.transferred)
+    throw createStorageTypeError(
+      StorageErrorCode.backendPluginInvalid,
+      StorageErrorText.backendPluginInvalid
+    )
+  if (!context.transferActive) {
+    if (context.nativeCore.isStorageInstallExpired() && !context.expiredTransferConsumed) {
+      context.expiredTransferConsumed = true
+      context.nativeCore.registerStore(store)
+    }
+    throw createStorageTypeError(
+      StorageErrorCode.backendPluginInvalid,
+      StorageErrorText.backendPluginInvalid
+    )
+  }
+  context.nativeCore.registerStore(store)
+  context.transferred = true
+}
+
+/** Capture only author metadata; the original descriptor's remaining shape goes to native admission. */
+function captureStorageDescriptor(
+  registration: IStorageNativeRegistrationContext,
+  descriptor: IStorageNativePluginDescriptor
+): IStorageNativeDescriptorContext {
+  /** Stable metadata outlives factory return and asynchronous install. */
+  const metadata: Record<string, unknown> = Object.create(null)
+  for (const key of STORAGE_DESCRIPTOR_METADATA) {
+    /** Author-only data fields cannot inject execution through accessors. */
+    const property = Object.getOwnPropertyDescriptor(descriptor, key)
+    if (
+      property !== undefined &&
+      (!('value' in property) || (key !== 'kind' && typeof property.value !== 'function'))
+    )
+      throw createStorageTypeError(
+        StorageErrorCode.backendPluginInvalid,
+        StorageErrorText.backendPluginInvalid
+      )
+    metadata[key] = property?.value
+  }
+  return {
+    registration,
+    descriptor,
+    kind: metadata.kind as IStorageBackendKind | undefined,
+    capabilityInstaller:
+      metadata.capabilityInstaller as IStorageNativePluginDescriptor['capabilityInstaller'],
+    journalBinding: metadata.journalBinding as IStorageNativePluginDescriptor['journalBinding']
+  }
+}
+
+/** Check exact private kind identities before a Feature or native driver executes. */
+function assertStorageFeatureTargets(context: IStorageNativeDescriptorContext): void {
+  if (context.kind !== undefined && !kinds.has(context.kind))
+    throw createStorageTypeError(
+      StorageErrorCode.backendKindMismatch,
+      StorageErrorText.backendKindMismatch
+    )
+  for (const feature of context.registration.definition.plan?.ordered ?? []) {
+    /** Dependency compatibility belongs to original Feature identities, not public type metadata. */
+    const expected = featureTargets.get(feature)
+    if (
+      context.kind !== undefined
+        ? expected === undefined || !expected.includes(context.kind)
+        : expected !== undefined
+    )
+      throw createStorageTypeError(
+        StorageErrorCode.backendKindMismatch,
+        StorageErrorText.backendKindMismatch
+      )
+  }
+}
+
+/** Keep Store transfer admission active until the native installation owner settles. */
+async function runStorageNativeInstall(
+  context: IStorageNativeDescriptorContext,
+  install: IStorageDescriptorHook
+): Promise<unknown> {
+  context.registration.transferActive = true
+  try {
+    return await context.registration.nativeCore.runStorageInstall(() =>
+      finishStorageNativeInstall(context, install)
+    )
+  } finally {
+    context.registration.transferActive = false
+  }
+}
+
+/** Native install result settlement precedes journal, Feature, and extension publication in order. */
+async function finishStorageNativeInstall(
+  context: IStorageNativeDescriptorContext,
+  install: IStorageDescriptorHook
+): Promise<unknown> {
+  /** Await exactly the author's original install result before validating Store handoff. */
+  const extensions = install === undefined ? {} : await install()
+  if (context.kind !== undefined && !context.registration.transferred)
+    throw createStorageTypeError(
+      StorageErrorCode.backendPluginInvalid,
+      StorageErrorText.backendPluginInvalid
+    )
+  if (context.kind !== undefined && context.journalBinding !== undefined)
+    context.registration.nativeCore.setStorageJournalBinding(
+      Reflect.apply(context.journalBinding, context.descriptor, [
+        context.registration.nativeCore.getStore()
+      ])
+    )
+  publishStorageNativeFeatures(context)
+  if (extensions === null || typeof extensions !== 'object' || Array.isArray(extensions))
+    return extensions
+  /** Install definitions outlive this await and must not follow later mutations of the result. */
+  const definitions = Object.create(Object.getPrototypeOf(extensions))
+  Object.defineProperties(definitions, Object.getOwnPropertyDescriptors(extensions))
+  return projectStorageNativeExtensions(context, definitions)
+}
+
+/** Publish only selected roots after Store and optional journal admission. */
+function publishStorageNativeFeatures(context: IStorageNativeDescriptorContext): void {
+  if (context.kind === undefined || context.registration.definition.features === undefined) return
+  /** The original registration owns every provider and cleanup endpoint. */
+  const nativeCore = context.registration.nativeCore
+  /** Empty selection produces neither a projection nor a cleanup registration. */
+  const projection = installStorageFeatures({
+    name: context.registration.definition.name,
+    store: nativeCore.getStore(),
+    features: nativeCore.features,
+    installer:
+      context.capabilityInstaller === undefined
+        ? undefined
+        : Reflect.apply(context.capabilityInstaller, context.descriptor, [nativeCore.getStore()]),
+    execution: nativeCore.execution,
+    expose: nativeCore.featureExpose as Readonly<Record<string, Function>>,
+    onDispose: nativeCore.onDispose,
+    callContext: nativeCore.getOrgContext(nativeCore.defaultOrgId).callContext,
+    clientResolver: nativeCore.getStorageFeatureClientResolver()
+  })
+  if (projection !== undefined) {
+    nativeCore.onDispose(() => nativeCore.setStorageFeatureProjection(undefined))
+    nativeCore.setStorageFeatureProjection(projection)
+  }
+}
+
+/** Flat extension methods retain original callable definitions for organization projections. */
+function projectStorageNativeExtensions(
+  context: IStorageNativeDescriptorContext,
+  value: unknown
+): unknown {
+  return createNativeDataProjection(value, {}, false, (key, member, receiver) =>
+    context.registration.nativeCore.captureStorageExtension(key, member, receiver)
+  )
+}
+
+/** Native remains the single owner of optional public extension validation and publication. */
+function projectStorageNativeExpose(
+  context: IStorageNativeDescriptorContext,
+  hook: IStorageDescriptorHook
+): unknown {
+  return projectStorageNativeExtensions(context, hook === undefined ? {} : hook())
+}
+
+/**
+ * Add reserved registration capabilities without replacing the author's real Feature expose
+ * receiver.
+ */
+function projectStorageNativeFeatureExpose(
+  context: IStorageNativeDescriptorContext,
+  hook: IStorageDescriptorHook
+): unknown {
+  /** Native's Feature owner performs the final own-data method admission. */
+  const expose = hook === undefined ? {} : hook()
+  if (
+    expose !== null &&
+    (typeof expose === 'object' || typeof expose === 'function') &&
+    STORAGE_RESERVED_EXPOSE.some((key) => key in expose)
+  )
+    throw createStorageTypeError(
+      StorageErrorCode.backendPluginInvalid,
+      StorageErrorText.backendPluginInvalid
+    )
+  /** Lazy reads preserve pre-Feature initialization and later registration expiry semantics. */
+  const nativeCore = context.registration.nativeCore
+  return createNativeDataProjection(
+    expose,
+    {
+      getKind: () => context.kind,
+      getChangeController: nativeCore.getChangeController,
+      getStore: () => nativeCore.getStore(),
+      getBackendId: () => nativeCore.getBackendId(),
+      getLifecycle: () => nativeCore.lifecycle,
+      onDispose: nativeCore.onDispose,
+      getScheduler: () => nativeCore.getScheduler(),
+      getPublishedBackend: nativeCore.getPublishedBackend,
+      emit: nativeCore.emit,
+      registerDetect: nativeCore.registerDetect
+    },
+    true
+  )
+}
 /** Resolve trusted definition identity without exposing its mutable registration authority. */
 export const readStorageNativePluginMetadata = (plugin: object) => nativePluginMetadata.get(plugin)
 /** Only the facade can turn a public handle into its original PluginHost definition. */

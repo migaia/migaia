@@ -26,8 +26,6 @@ function nativeFixture(mode: 'legacy' | 'sync' | 'async') {
   const trace: string[] = []
   /** Tests control native preparation without changing the host's original accepted operation. */
   const ready = deferred<IClient>()
-  /** A then getter proves the original inspector observes the preparation result exactly once. */
-  let thenReads = 0
   /** The same saved core tests that registration cannot escape its installation window. */
   let installedCore!: IStoragePluginCore
   /** Actual data construction supplies every root and organization transaction owner. */
@@ -81,14 +79,7 @@ function nativeFixture(mode: 'legacy' | 'sync' | 'async') {
             getClient: (orgId) => {
               trace.push('resolved ' + orgId)
               if (mode === 'sync') return { orgId, marker: 'resolved' }
-              return {
-                // eslint-disable-next-line unicorn/no-thenable -- This fixture proves single-read preparation assimilation.
-                get then() {
-                  thenReads += 1
-                  return (resolve: (client: IClient) => void, reject: (error: unknown) => void) =>
-                    ready.promise.then(resolve, reject)
-                }
-              }
+              return ready.promise
             },
             getTransactionClient: (scope, orgId) => {
               assertTransactionOwner(constructed.orgBinding.backend(orgId), scope)
@@ -112,7 +103,6 @@ function nativeFixture(mode: 'legacy' | 'sync' | 'async') {
     ready,
     core: () => installedCore,
     native: () => constructed,
-    thenReads: () => thenReads,
     factories: () => factories
   }
 }
@@ -162,32 +152,25 @@ describe('installation-owned Feature client resolution', () => {
     expect(fixture.factories()).toBe(1)
   })
 
-  it('awaits only actual native preparation with one then read and the exact client identity', async () => {
+  it('awaits only actual native preparation with the exact client identity', async () => {
     const fixture = nativeFixture('async')
     await using host = await createStorageHost({ plugins: [fixture.plugin] })
     const pending = host.backend('native').api.client()
-    expect(fixture.thenReads()).toBe(1)
     expect(fixture.trace).not.toContain('store method')
     const client = { orgId: createOrgId(), marker: 'prepared identity' }
     fixture.ready.resolve(client)
     expect(await pending).toBe(client)
-    expect(fixture.thenReads()).toBe(1)
     expect(fixture.trace.at(-1)).toBe('store method')
   })
 
   it('keeps registration inside its original window and never revives a disposed registration', async () => {
     const fixture = nativeFixture('async')
     const host = await createStorageHost({ plugins: [fixture.plugin] })
-    let reads = 0
     expect(() =>
       fixture.core().registerFeatureClientResolver(fixture.native().store, {
-        get getClient() {
-          reads += 1
-          return () => undefined
-        }
+        getClient: () => undefined
       })
     ).toThrow()
-    expect(reads).toBe(0)
     const pending = host.backend('native').api.client()
     const rejected = expect(pending).rejects.toMatchObject({ code: 'REGISTRATION_REVOKED' })
     const closing = host.dispose()

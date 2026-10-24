@@ -203,41 +203,6 @@ describe('Feature transaction methods on original native views', () => {
     expect(stages).toBe(1)
   })
 
-  it('retains a Feature method-table reflection failure on the coded installation cause chain', async () => {
-    const original = new Error('Feature table reflection')
-    const feature = defineFeature(memoryBackendKind, () => ({
-      capabilities: [],
-      api: { store: {}, transaction: {} },
-      chain: new Proxy(
-        {},
-        {
-          ownKeys() {
-            throw original
-          }
-        }
-      )
-    }))
-    const failure = await createStorageHost({
-      plugins: [memoryBackendPlugin(undefined, { feature })]
-    }).catch((error: unknown) => error)
-    const seen: unknown[] = []
-    let cursor = failure
-    for (let depth = 0; depth < 8 && cursor instanceof Error; depth++) {
-      seen.push(cursor)
-      cursor = cursor.cause
-    }
-    expect(seen).toContain(original)
-    expect(seen).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          source: '@migaia/storage-host',
-          code: 'BACKEND_PLUGIN_INVALID',
-          cause: original
-        })
-      ])
-    )
-  })
-
   it('rejects another real backend scope before running any Feature intervention', async () => {
     const features = { scoped: scopedFeature() }
     let project!: (scope: object) => object | undefined

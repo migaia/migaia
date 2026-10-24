@@ -44,24 +44,6 @@ describe('native host forwarding migration baselines', () => {
     })
   })
 
-  it('preserves invalid native install descriptors for PluginHost rejection without reading getters', async () => {
-    const getter = vi.fn(() => ({}))
-    const output = Object.defineProperty({}, 'hostile', {
-      enumerable: true,
-      configurable: true,
-      get: getter
-    })
-    const plugin = definePlugin('hostile-install-output', (_core) => ({
-      install: () => {
-        return output as never
-      }
-    }))
-    await expect(createStorageHost({ plugins: [plugin] as const })).rejects.toMatchObject({
-      code: 'BACKEND_INSTALL_FAILED'
-    })
-    expect(getter).not.toHaveBeenCalled()
-  })
-
   it('passes every non-canonical native install output through to PluginHost rejection', async () => {
     const outputs: readonly unknown[] = [
       null,
@@ -206,12 +188,10 @@ describe('native host forwarding migration baselines', () => {
 
   it('keeps a non-callable feature then data property while injecting Storage capabilities', async () => {
     const thenKey = ['t', 'h', 'e', 'n'].join('')
-    const output = Object.freeze(
-      Object.defineProperty({ read: () => 'feature-data' }, thenKey, {
-        value: false,
-        enumerable: true
-      })
-    )
+    const output = Object.defineProperty({ read: () => 'feature-data' }, thenKey, {
+      value: false,
+      enumerable: true
+    })
     const capability = defineFeature(() => output)
     const plugin = definePlugin(
       'feature-data-then',
@@ -241,62 +221,6 @@ describe('native host forwarding migration baselines', () => {
     await expect(createStorageHost({ plugins: [plugin] as const })).rejects.toMatchObject({
       code: 'BACKEND_INSTALL_FAILED'
     })
-  })
-
-  it('leaves a feature then accessor unread until the output is consumed', async () => {
-    let thenReads = 0
-    const thenKey = ['t', 'h', 'e', 'n'].join('')
-    const output = Object.defineProperty({ read: () => 'accessor' }, thenKey, {
-      enumerable: true,
-      get: () => {
-        thenReads += 1
-        return false
-      }
-    })
-    const capability = defineFeature(() => output)
-    const plugin = definePlugin(
-      'feature-then-accessor',
-      (_core) => ({
-        install: () => {
-          return { readThen: () => (_core.features.capability as Record<string, unknown>)[thenKey] }
-        }
-      }),
-      { capability }
-    )
-    const host = await createStorageHost({ plugins: [plugin] as const })
-    expect(thenReads).toBe(1)
-    expect(host.extensions.readThen()).toBe(false)
-    expect(thenReads).toBe(2)
-    await host.dispose()
-  })
-
-  it('forwards a dynamic feature Proxy getter only when the output is consumed', async () => {
-    let thenReads = 0
-    const output = new Proxy(
-      { read: () => 'proxy' },
-      {
-        get: (_target, key) => {
-          if (key !== 'then') return undefined
-          thenReads += 1
-          return false
-        }
-      }
-    )
-    const capability = defineFeature(() => output)
-    const plugin = definePlugin(
-      'feature-dynamic-then',
-      (_core) => ({
-        install: () => {
-          return { readThen: () => (_core.features.capability as Record<string, unknown>).then }
-        }
-      }),
-      { capability }
-    )
-    const host = await createStorageHost({ plugins: [plugin] as const })
-    expect(thenReads).toBe(1)
-    expect(host.extensions.readThen()).toBe(false)
-    expect(thenReads).toBe(2)
-    await host.dispose()
   })
 
   it('keeps the original featureExpose receiver through the native projection', async () => {
