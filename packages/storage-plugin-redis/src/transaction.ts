@@ -9,6 +9,10 @@ import {
   type IStorageKey,
   type ILockKey
 } from '@migaia/storage-contract'
+import {
+  createStorageOperationReporter,
+  reportCleanupError
+} from '@migaia/storage-host/authoring/backend'
 import { planChannelWrite } from '@migaia/storage-host/authoring/backend'
 import type { IStorageJournalAttempt } from '@migaia/storage-host'
 import type { IRedisConnection, IRedisExecEntry } from './driver.js'
@@ -114,6 +118,8 @@ export class RedisDraft {
   readonly revisions = new Map<string, number>()
   /** Native HASH state belongs to this same transaction draft, never another attempt. */
   readonly hashes = new Map<string, IRedisHashEntry>()
+  /** Historical native Feature keys are deleted by this original WATCH/EXEC plan. */
+  readonly nativeRemovals = new Set<string>()
   /** Original native settlement alone delivers these finite commit/zero-write callbacks. */
   readonly terminal = {
     committed: new Set<() => void>(),
@@ -433,6 +439,42 @@ export class RedisDraft {
       }
     } while (cursor !== '0')
   }
+  /** Only known native business layouts participate; shared history and caller-native keys survive. */
+  async clearNativeOrg(): Promise<void> {
+    for (const channel of [RedisSuffix.streams, RedisSuffix.sorted, RedisSuffix.rate]) {
+      let cursor = '0'
+      do {
+        const reply = await this.send([
+          RedisCommand.scan,
+          cursor,
+          RedisCommand.match,
+          this.layout.tag + ':' + channel + ':*',
+          RedisCommand.count,
+          '256'
+        ])
+        if (!Array.isArray(reply) || reply.length !== 2 || !Array.isArray(reply[1]))
+          throw redisError(RedisErrorCode.decodeFailed, reply)
+        cursor = replyOptionalString(reply[0])!
+        if (cursor === undefined) throw redisError(RedisErrorCode.decodeFailed, reply)
+        for (const raw of reply[1]) {
+          const physical = replyOptionalString(raw)
+          if (physical === undefined) throw redisError(RedisErrorCode.decodeFailed, raw)
+          if (!this.layout.owns(physical)) continue
+          let name: IStorageKey
+          try {
+            name = this.layout.decode(physical.slice(physical.lastIndexOf(':') + 1))
+          } catch (cause) {
+            reportCleanupError(createStorageOperationReporter(), cause)
+            continue
+          }
+          if (typeof name !== 'string' || this.layout.feature(channel, name) !== physical) continue
+          await this.send([RedisCommand.watch, physical])
+          if (replyInteger(await this.send([RedisCommand.exists, physical])) !== 0)
+            this.nativeRemovals.add(physical)
+        }
+      } while (cursor !== '0')
+    }
+  }
   /** Range reads depend on the real native ordered index before enumeration starts. */
   async watchRange(channel: 'text' | 'record'): Promise<void> {
     if (this.ranges.has(channel)) return
@@ -478,13 +520,20 @@ export class RedisDraft {
         if ((deadline < 0 ? 0 : deadline) !== entry.originalDeadline) return false
       }
     }
+    for (const physical of this.nativeRemovals) {
+      await this.send([RedisCommand.watch, physical])
+      if (replyInteger(await this.send([RedisCommand.exists, physical])) === 0) return false
+    }
     for (const channel of this.ranges)
       await this.send([RedisCommand.watch, this.layout.index(channel)])
     return true
   }
   /** Fixed commands retain indexes, values and revisions in one atomic native execution. */
   commands(): IRedisCommand[] {
-    const commands: IRedisCommand[] = []
+    const commands: IRedisCommand[] = [...this.nativeRemovals].map((physical) => [
+      RedisCommand.del,
+      physical
+    ])
     for (const entry of this.entries.values()) {
       if (!entry.changed) continue
       if (

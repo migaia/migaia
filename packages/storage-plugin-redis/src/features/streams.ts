@@ -12,7 +12,7 @@ import {
   readStreamRows,
   blockingCommand
 } from '../feature-input.js'
-import { replyInteger, replyString } from '../layout.js'
+import { RedisSuffix, replyInteger, replyString } from '../layout.js'
 import { invalidArgument, redisError } from '../errors.js'
 import { RedisErrorCode } from '../error-code.js'
 /** Stream fields are independent byte values reconstructed from the canonical text wire. */
@@ -132,7 +132,7 @@ export function redisStreamsFeature() {
                 replyString(
                   await connection.command([
                     RedisCommand.xadd,
-                    layout.tag + ':streams:' + layout.encode(featureName(input.name)),
+                    layout.feature(RedisSuffix.streams, featureName(input.name)),
                     '*',
                     ...input.fields
                   ])
@@ -160,7 +160,7 @@ export function redisStreamsFeature() {
                 readStreamEntries(
                   await connection.command([
                     RedisCommand.xrange,
-                    layout.tag + ':streams:' + layout.encode(featureName(actual.name)),
+                    layout.feature(RedisSuffix.streams, featureName(actual.name)),
                     actual.start,
                     actual.end,
                     RedisCommand.count,
@@ -194,7 +194,7 @@ export function redisStreamsFeature() {
                     await connection.command([
                       RedisCommand.xgroup,
                       RedisCommand.create,
-                      layout.tag + ':streams:' + layout.encode(featureName(actual.name)),
+                      layout.feature(RedisSuffix.streams, featureName(actual.name)),
                       featureName(actual.group),
                       actual.start,
                       ...(actual.create ? [RedisCommand.mkstream] : [])
@@ -243,7 +243,7 @@ export function redisStreamsFeature() {
                     ? []
                     : [RedisCommand.block, String(featureInteger(actual.block))]),
                   RedisCommand.streams,
-                  layout.tag + ':streams:' + layout.encode(featureName(actual.name)),
+                  layout.feature(RedisSuffix.streams, featureName(actual.name)),
                   '>'
                 ]
                 const result =
@@ -262,7 +262,7 @@ export function redisStreamsFeature() {
                 return readStreamEntries(
                   readStreamRows(
                     result,
-                    layout.tag + ':streams:' + layout.encode(featureName(actual.name))
+                    layout.feature(RedisSuffix.streams, featureName(actual.name))
                   )
                 )
               },
@@ -291,7 +291,7 @@ export function redisStreamsFeature() {
                 replyInteger(
                   await connection.command([
                     RedisCommand.xack,
-                    layout.tag + ':streams:' + layout.encode(featureName(actual.name)),
+                    layout.feature(RedisSuffix.streams, featureName(actual.name)),
                     featureName(actual.group),
                     ...actual.ids.map(featureName)
                   ])
@@ -326,7 +326,7 @@ export function redisStreamsFeature() {
               async (actual, connection, layout) => {
                 const result = await connection.command([
                   RedisCommand.xautoclaim,
-                  layout.tag + ':streams:' + layout.encode(featureName(actual.name)),
+                  layout.feature(RedisSuffix.streams, featureName(actual.name)),
                   featureName(actual.group),
                   featureName(actual.consumer),
                   String(featureInteger(actual.idle, true)),

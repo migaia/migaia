@@ -485,7 +485,11 @@ export function createRedisStore(
               outcome = { status: 'committed', value }
               break
             }
-            if (changed.length !== 0 || [...draft.hashes.values()].some((entry) => entry.changed)) {
+            if (
+              changed.length !== 0 ||
+              [...draft.hashes.values()].some((entry) => entry.changed) ||
+              draft.nativeRemovals.size !== 0
+            ) {
               const sequence =
                 replyRevision(
                   await send([RedisCommand.hget, layout.revisions, RedisSuffix.sequence])
@@ -496,7 +500,8 @@ export function createRedisStore(
                 controller.origin,
                 sequence,
                 changed,
-                [...draft.hashes.values()].some((entry) => entry.changed)
+                [...draft.hashes.values()].some((entry) => entry.changed) ||
+                  draft.nativeRemovals.size !== 0
               )
               commands.push(
                 [RedisCommand.hset, layout.revisions, RedisSuffix.sequence, String(sequence)],
@@ -540,7 +545,11 @@ export function createRedisStore(
               backendId: core.getBackendId(),
               backend: RedisText.backend,
               orgId,
-              keyCount: draft.entries.size + draft.ranges.size + draft.hashes.size
+              keyCount:
+                draft.entries.size +
+                draft.ranges.size +
+                draft.hashes.size +
+                draft.nativeRemovals.size
             }))
             await locks.verify()
             if (!(await draft.unchanged())) {
@@ -1641,6 +1650,22 @@ export function createRedisStore(
       },
       report: (error) => reportCleanupError(report, error)
     }
+    /** Standard clear keeps its scope; org removal also covers every known native business layout. */
+    const clear = (native: boolean, ctx?: ITransactionOptions): Promise<void> =>
+      write(
+        RedisOperation.clearAll,
+        {},
+        ctx,
+        (input) => input,
+        () => [],
+        async (draft) => {
+          await removePrefix('text', undefined, draft)
+          await removePrefix('record', undefined, draft)
+          await clearBytes(draft)
+          await draft.clearVectorOrg()
+          if (native) await draft.clearNativeOrg()
+        }
+      )
     const base: IRedisNativeStore & { readonly [nativeFeaturePort]: IRedisNativeFeaturePort } = {
       [nativeFeaturePort]: native,
       backend: RedisText.backend,
@@ -1714,20 +1739,7 @@ export function createRedisStore(
             await removePrefix('record', undefined, draft)
           }
         ),
-      clearAll: (ctx) =>
-        write(
-          RedisOperation.clearAll,
-          {},
-          ctx,
-          (input) => input,
-          () => [],
-          async (draft) => {
-            await removePrefix('text', undefined, draft)
-            await removePrefix('record', undefined, draft)
-            await clearBytes(draft)
-            await draft.clearVectorOrg()
-          }
-        ),
+      clearAll: (ctx) => clear(false, ctx),
       iterateRecords: (range, ctx) => iterator(range, ctx),
       transaction,
       tx: () => {
@@ -2034,7 +2046,14 @@ export function createRedisStore(
         return { draft: binding.draft, info }
       }
     })
-    return { store, installer, configureFeatures, releaseFeatures, journal }
+    return {
+      store,
+      installer,
+      configureFeatures,
+      releaseFeatures,
+      journal,
+      drop: () => clear(true)
+    }
   }
   const root = forOrg(core.defaultOrgId, true)
   return {
@@ -2044,7 +2063,7 @@ export function createRedisStore(
     orgBinding: {
       backend: (orgId) => forOrg(orgId).store,
       drop: async (orgId) => {
-        await forOrg(orgId).store.clearAll()
+        await forOrg(orgId).drop()
       }
     },
     detect: async () => {
