@@ -11,8 +11,10 @@ import { invalidArgument } from './errors.js'
 
 /** Digest original bytes once; cache request identities and offloaded content share this primitive. */
 export async function hashCacheBytes(bytes: Uint8Array): Promise<string> {
-  /** A private native buffer keeps the digest independent of mutable shared input storage. */
-  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', new Uint8Array(bytes)))
+  /** The native digest captures these owned encoded bytes synchronously before its Promise settles. */
+  const digest = new Uint8Array(
+    await crypto.subtle.digest('SHA-256', bytes as Uint8Array<ArrayBuffer>)
+  )
   return Array.from(digest, (byte) => byte.toString(16).padStart(2, '0')).join('')
 }
 

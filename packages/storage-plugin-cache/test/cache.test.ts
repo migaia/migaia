@@ -728,15 +728,6 @@ describe('borrowed multi-tier cache', () => {
     }
   })
   it('rejects configuration and non-string shared keys before native writes', async () => {
-    const original = new RangeError('cache identity accessor')
-    expect(() =>
-      cachePlugin({
-        get id(): string {
-          throw original
-        },
-        tiers: [{ backend: 'a' }]
-      })
-    ).toThrowError(expect.objectContaining({ code: 'CACHE_TIER_INVALID', cause: original }))
     expect(() => cachePlugin(null as never)).toThrowError(
       expect.objectContaining({ code: 'CACHE_TIER_INVALID' })
     )

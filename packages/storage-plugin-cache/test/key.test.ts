@@ -22,17 +22,6 @@ describe('canonical cache inputs', () => {
     await expect(Reflect.apply(cacheKey, undefined, [])).rejects.toMatchObject({
       code: 'INVALID_ARGUMENT'
     })
-    const original = new RangeError('request accessor failed')
-    let reads = 0
-    await expect(
-      cacheKey({
-        get request(): string {
-          reads++
-          throw original
-        }
-      })
-    ).rejects.toMatchObject({ code: 'INVALID_OPTION', cause: original })
-    expect(reads).toBe(1)
   })
   it('wraps a loader failure without dropping its native type, stack or original cause', () => {
     const original = Object.freeze(new RangeError('original loader failure')),

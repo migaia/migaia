@@ -36,7 +36,7 @@ export async function encodeEntry(
           ? (value as string)
           : await configuration.codec.encode(value)
     if (data !== undefined && typeof data !== 'string') throw invalidArgument()
-    return Object.freeze({
+    return {
       v: 1,
       s: value === undefined ? 'neg' : 'hit',
       t: flat ? 's' : 'c',
@@ -45,7 +45,7 @@ export async function encodeEntry(
       ...(age === undefined ? {} : { x: written + shorten(configuration, age) }),
       ...(policy.meta === undefined ? {} : { m: policy.meta }),
       g: policy.tags
-    })
+    }
   } catch (error) {
     throw cacheError(CacheErrorCode.loadFailed, error)
   }
@@ -95,7 +95,7 @@ export async function entryInfo(
   const age = configuration.clock() - entry.w
   const value =
     entry.s === 'neg' ? undefined : entry.t === 's' ? data : await configuration.codec.decode(data!)
-  return Object.freeze({
+  return {
     value,
     tier,
     stale: staleAfterMs !== undefined && age >= staleAfterMs,
@@ -103,5 +103,5 @@ export async function entryInfo(
     ageMs: age,
     ...(entry.m === undefined ? {} : { meta: entry.m }),
     tags: entry.g ?? []
-  })
+  }
 }
