@@ -2,6 +2,8 @@ import assert from 'node:assert/strict'
 import { createStorageHost } from '@migaia/storage-host'
 import { asyncDisposeKey } from '@migaia/plugin-host'
 import { defineEntity } from '@migaia/storage-host/entity'
+import { entityQueryFeature } from '@migaia/storage-host/entity/query'
+import { entityMigrationFeature } from '@migaia/storage-host/entity/migration'
 import { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'
 import { createStore } from '@migaia/store-light'
 import { persist } from '@migaia/store-persist/light'
@@ -45,6 +47,7 @@ const handle = persist(state, { key: 'runtime-counter', storage, version: 1 })
 /** The same public entity definition drives root and native transaction views in every runtime. */
 const entities = defineEntity({
   name: 'runtime-entities',
+  features: [entityQueryFeature(), entityMigrationFeature()],
   key: 'id',
   version: 2,
   migrations: { 2: (value) => ({ ...value, score: 2 }) }
