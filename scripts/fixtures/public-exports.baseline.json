@@ -1777,10 +1777,12 @@
         "memoryBackendPlugin"
       ],
       "./authoring/backend": [
+        "StorageJournalLock",
         "assertKeyRange",
         "asyncDisposeKey",
         "collectUniqueIndexOwners",
         "createBackendChangeIterator",
+        "createBackendJournalNamespace",
         "createStorageOperationReporter",
         "createStorageOperationRuntime",
         "createStorageToken",
@@ -1798,6 +1800,7 @@
         "resolveStorageNamespace",
         "safeJsonPayloadByteLength",
         "snapshotKeyRange",
+        "storageJournalLockKey",
         "subscribeToAbort",
         "throwIfAborted",
         "withAbort"

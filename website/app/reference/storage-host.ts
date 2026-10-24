@@ -136,6 +136,50 @@ console.log(host.extensions.label('draft'))`
       example: storageHostCases.createBackendChangeIterator![0]!.example,
       cases: storageHostCases.createBackendChangeIterator
     },
+    storageJournalLockKey: {
+      role: 'operation',
+      purpose: t(
+        'Return the original canonical journal head or resource lock identity without acquiring it.',
+        '返回原 journal head 或 resource 规范锁身份，不获取锁。'
+      ),
+      params: {
+        prefix: t('Nonempty private namespace prefix.', '非空私有 namespace prefix。'),
+        part: t(
+          'StorageJournalLock.head or StorageJournalLock.resource.',
+          'StorageJournalLock.head 或 StorageJournalLock.resource。'
+        )
+      },
+      returns: t(
+        'ILockKey from the original key codec; invalid arguments reject with INVALID_ARGUMENT.',
+        '原 key codec 的 ILockKey，非法入参报 INVALID_ARGUMENT。'
+      )
+    },
+    StorageJournalLock: {
+      role: 'operation',
+      purpose: t(
+        'Canonical head and resource roles for the existing journal lock owner.',
+        '既有 journal 锁拥有者的 head 与 resource 规范角色。'
+      )
+    },
+    createBackendJournalNamespace: {
+      role: 'operation',
+      purpose: t(
+        'Reuse the original private namespace resource lifetime; backend owners retain data and actual native terminal decisions.',
+        '复用原私有 namespace 资源生命周期，数据与实际原生终态仍归后端拥有者。'
+      ),
+      params: {
+        options: t(
+          'Original assertLive/closingSignal/report, native facts, reservation, authenticated private transaction and native transaction entry.',
+          '原 assertLive/closingSignal/report、native 事实、reservation、认证私有事务与原生事务入口。'
+        )
+      },
+      returns: t(
+        'Promise of IStorageJournalNamespace. run and terminal subscriptions retain accepted work until actual onEnd; transactionInfo is a pure authenticated fact. No raw client, installer or backend close rights.',
+        'Promise<IStorageJournalNamespace>；run 与终态订阅保留已接纳工作直到实际 onEnd，transactionInfo 仅返回认证事实，不外露 raw client、installer 或后端关闭权。'
+      ),
+      example: storageHostCases.storageLogStore![0]!.example,
+      cases: storageHostCases.storageLogStore
+    },
     observeStorageBatch: {
       role: 'operation',
       purpose: t(
@@ -367,8 +411,8 @@ console.log(host.extensions.label('draft'))`,
   types: {
     IStorageJournalOptions: {
       summary: t(
-        'Borrow a logger with a stable namespace and explicit same-registration atomicBinlog/atomicUndo handles by backend id. telemetry=true requires the actual level plugin atLevel port and emits ordinary storage-category entries without changing payload/Error references.',
-        '借用 logger，固定 namespace，按 backend id 显式选择同 registration 的 atomicBinlog/atomicUndo；telemetry=true 要求真实 level 插件 atLevel 接点，沿普通 storage 分类条目交付 payload 与原 Error 引用。'
+        'Borrow a logger with a stable namespace and explicit same-registration atomicBinlog/atomicUndo handles by backend id. telemetry=true requires the actual level plugin atLevel port and emits ordinary storage-category entries without changing payload/Error references, including the first org endpoint after its original preparation.',
+        '借用 logger，固定 namespace，按 backend id 显式选择同 registration 的 atomicBinlog/atomicUndo；telemetry=true 要求真实 level 插件 atLevel 接点，沿普通 storage 分类条目交付 payload 与原 Error 引用，首组织终点也在原准备后记录。'
       ),
       members: {}
     },

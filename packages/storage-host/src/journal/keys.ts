@@ -1,4 +1,9 @@
-import { lockKey, type ILockKey } from '@migaia/storage-contract'
+import {
+  lockKey,
+  StorageContractError,
+  StorageContractErrorCode,
+  type ILockKey
+} from '@migaia/storage-contract'
 import { encodeFlatStorageKey } from '../core/key-domain.js'
 
 /** Fixed original metadata locks distinguish handle ownership from each native head update. */
@@ -11,5 +16,11 @@ export function storageJournalLockKey(
   prefix: string,
   part: (typeof StorageJournalLock)[keyof typeof StorageJournalLock]
 ): ILockKey {
+  if (
+    typeof prefix !== 'string' ||
+    prefix.length === 0 ||
+    (part !== StorageJournalLock.head && part !== StorageJournalLock.resource)
+  )
+    throw new StorageContractError(StorageContractErrorCode.invalidArgument)
   return lockKey.text(encodeFlatStorageKey(['storage.journal', prefix, part]))
 }

@@ -784,7 +784,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
                   invoke: (observing: boolean) => Promise<R>
                 ) =>
                   observeStorageTelemetry(
-                    this.#journalOrgs?.get(orgId)?.configuration,
+                    () => this.#journalOrgs?.get(orgId)?.configuration,
                     describe,
                     invoke,
                     () => this.#scheduler.now(),
