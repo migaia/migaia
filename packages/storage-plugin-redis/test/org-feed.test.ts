@@ -6,7 +6,7 @@ import { deferred } from '@migaia/utils/promise'
 import { redisBackendPlugin } from '../src/index.js'
 import { nodeRedisDriver } from '../src/adapters/node-redis.js'
 import { redisChangeStreamFeature } from '../src/features/change-stream.js'
-import { createRedisLayout } from '../src/layout.js'
+import { createRedisLayout, encodeRedisValue } from '../src/layout.js'
 
 /** Explicit default-org projections remain scoped, even though the root observes the shared Stream. */
 for (const url of [
@@ -63,6 +63,49 @@ for (const url of [
         expect(scoped.changes.every((change) => change.orgId === defaultOrg)).toBe(true)
         expect((await a.use(durableChangeFeed).readChanges()).changes).toHaveLength(1)
         expect((await b.use(durableChangeFeed).readChanges()).changes).toHaveLength(1)
+        await host.dispose()
+        const writer = await createStorageHost({
+          org: defaultOrg,
+          plugins: [
+            redisBackendPlugin(
+              { driver, prefix },
+              { history: redisChangeStreamFeature({ maxLen: 1000 }) }
+            )
+          ] as const
+        })
+        try {
+          for (let index = 0; index < 5; index++)
+            await writer.backend('redis').set('offline:' + index, 'new')
+        } finally {
+          await writer.dispose()
+        }
+        await driver.command([
+          'SET',
+          createRedisLayout(prefix, defaultOrg).value('text', 'native-only'),
+          encodeRedisValue('text', 'external')
+        ])
+        const reopened = await createStorageHost({
+          org: defaultOrg,
+          plugins: [
+            redisBackendPlugin(
+              { driver, prefix },
+              { history: redisChangeStreamFeature({ maxLen: 1000 }) }
+            )
+          ] as const
+        })
+        try {
+          const replay = await reopened
+            .backend('redis')
+            .use(durableChangeFeed)
+            .readChanges({ after: all.cursor })
+          expect(replay.changes).toHaveLength(5)
+          expect(replay.changes.flatMap((change) => change.keys ?? [])).toEqual(
+            Array.from({ length: 5 }, (_, index) => 'offline:' + index)
+          )
+        } finally {
+          await reopened.dispose()
+        }
+        expect(await pool.execute((client) => client.ping())).toBe('PONG')
       } finally {
         await host.dispose()
         let cursor = '0'

@@ -4,7 +4,7 @@ import { createOrgId, createStorageHost, definePlugin } from '@migaia/storage-ho
 import { kv, records, vector, snapshotConcurrencyLockKeys } from '@migaia/storage-contract'
 import { redisBackendPlugin, type IRedisDriver } from '../src/index.js'
 import { nodeRedisDriver } from '../src/adapters/node-redis.js'
-import { RedisText } from '../src/constants.js'
+import { RedisCommand, RedisText } from '../src/constants.js'
 import { redisStreamsFeature } from '../src/features/streams.js'
 import { redisSortedSetsFeature } from '../src/features/sorted-sets.js'
 import { redisRateLimitFeature } from '../src/features/rate-limit.js'
@@ -121,6 +121,61 @@ for (const service of ['MIGAIA_REDIS_URL', 'MIGAIA_VALKEY_URL'] as const) {
           await host.dispose()
           if (vectorIndex) await driver.command(['FT.DROPINDEX', vectorIndex])
         }
+      }
+    })
+    it('preserves a recreated point while pruning an observed missing ordered member', async () => {
+      if (!pool.isOpen) await pool.connect()
+      const original = nodeRedisDriver(pool),
+        prefix = crypto.randomUUID(),
+        org = createOrgId(),
+        layout = createRedisLayout(prefix, org),
+        physical = layout.value('text', 'recreated'),
+        writer = await createStorageHost({
+          org,
+          plugins: [redisBackendPlugin({ driver: original, prefix })] as const
+        })
+      let recreate = false,
+        prunes = 0
+      const observed: IRedisDriver = {
+        ...original,
+        withConnection: (run) =>
+          original.withConnection((connection) =>
+            run({
+              ...connection,
+              command: async (args) => {
+                const result = await connection.command(args)
+                if (args[0] === RedisCommand.eval && args.includes(layout.index('text'))) prunes++
+                if (
+                  recreate &&
+                  args[0] === RedisCommand.mget &&
+                  args.includes(physical) &&
+                  Array.isArray(result) &&
+                  result.includes(null)
+                ) {
+                  recreate = false
+                  await writer.backend('redis').set('recreated', 'new')
+                }
+                return result
+              }
+            })
+          )
+      }
+      const reader = await createStorageHost({
+        org,
+        plugins: [redisBackendPlugin({ driver: observed, prefix })] as const
+      })
+      try {
+        await writer.backend('redis').set('recreated', 'old')
+        await original.command([RedisCommand.del, physical])
+        recreate = true
+        expect(await reader.backend('redis').keys()).toEqual([])
+        expect(prunes).toBe(1)
+        expect(await reader.backend('redis').keys()).toEqual(['recreated'])
+        expect(await reader.backend('redis').get('recreated')).toBe('new')
+      } finally {
+        await writer.backend('redis').clearAll()
+        await reader.dispose()
+        await writer.dispose()
       }
     })
     it('uses one MGET, one EXEC and one pipeline while rejecting invalid tails before I/O', async () => {
