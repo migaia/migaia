@@ -141,6 +141,10 @@ export const storagePostgresQuantizedTypes: ILibraryReference['types'] = {
           '原布局准备后，在一条业务 SQL 中按选定量化距离召回 k 个候选，再按原向量精确排序取指定结果数。'
         ),
         params: {
+          this: t(
+            'The original bounded PostgreSQL vector query; its payload, grouping, explicit-vector and selected Feature states are preserved.',
+            '原有界 PostgreSQL 向量查询，保留其载荷、分组、显式向量及已选扩展状态。'
+          ),
           options: t(
             'Optional native topN; omission uses the original topK bound and invalid bounds reject before I/O.',
             '可选的原生精排数量，省略时使用原候选上限，非法上限在输入输出前拒绝。'

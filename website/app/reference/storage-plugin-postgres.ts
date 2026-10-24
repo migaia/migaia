@@ -1,5 +1,10 @@
 import type { ILibraryReference, IText } from './contract.js'
 import { storagePluginPostgresCases } from './storage-plugin-postgres-cases.js'
+import {
+  storagePostgresQuantizedExample,
+  storagePostgresQuantizedSymbols,
+  storagePostgresQuantizedTypes
+} from './storage-plugin-postgres-quantized.js'
 /** Bilingual documentation covers one finite native public surface. */
 const t = (en: string, zh: string): IText => ({ en, zh })
 /** Only explicit driver subpaths load their real peer clients. */
@@ -34,6 +39,13 @@ export const storagePluginPostgresReference: ILibraryReference = {
         en: 'Select native pgvector ranking for managed collections and separate caller-owned SQL tables.',
         zh: '选择原生向量排名，同时支持托管集合与独立的调用方数据库表。'
       }
+    },
+    'features/quantized': {
+      summary: t(
+        'Select native half-precision or binary expression recall and exact original-vector rescoring for the existing pgvector provider.',
+        '为既有原生向量能力选择半精度或二进制表达式召回，并对候选原向量精确重排。'
+      ),
+      example: storagePostgresQuantizedExample
     },
     'features/listen': {
       summary: {
@@ -250,7 +262,8 @@ export const storagePluginPostgresReference: ILibraryReference = {
           }
         }
       ]
-    }
+    },
+    ...storagePostgresQuantizedSymbols
   },
   types: {
     IPostgresOptions: {
@@ -1183,7 +1196,8 @@ export const storagePluginPostgresReference: ILibraryReference = {
           }
         }
       }
-    }
+    },
+    ...storagePostgresQuantizedTypes
   },
   enums: {
     PostgresErrorCode: {
