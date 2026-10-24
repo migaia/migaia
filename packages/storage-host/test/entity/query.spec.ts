@@ -57,7 +57,7 @@ it('keeps entity query deletion and text writes in the same authentic transactio
     .catch((error) => error)
   expect(walkErrorCauses(failed)).toContain(primary)
   expect(await repo.get('a')).toMatchObject({ score: 1 })
-  expect(await store.get('summary')).toBeUndefined()
+  expect(await store.get('summary')).toBeNull()
   await store.transaction(async (scope) => {
     expect(await repo.in(scope).query().where({ group: 'one' }).delete()).toBe(1)
     await scope.set('summary', 'removed')
