@@ -1,8 +1,27 @@
 import type { ICaseDoc, IText } from './contract.js'
 /** Keep the two languages attached to one runnable public-entry scenario. */
 const t = (en: string, zh: string): IText => ({ en, zh })
+/** Both author functions share one actual portable image round-trip scenario. */
+const portableImageCases: readonly ICaseDoc[] = [
+  {
+    title: t('Round-trip a portable native image', '往返可移植原生镜像'),
+    problem: t(
+      'Native adapters need the original durable codec without copying a memory implementation.',
+      '原生 adapter 需要原持久 codec，无需复制 memory 实现。'
+    ),
+    example: `import { encodeStorageJournalImage, decodeStorageJournalImage } from '@migaia/storage-host/authoring/backend'
+const image = encodeStorageJournalImage(true, { value: null })
+console.log(decodeStorageJournalImage(image).value)`,
+    result: t(
+      'Prints { value: null }; absence, bytes, codec identity/version and original codec errors retain their existing semantics.',
+      '输出 { value: null }；缺失、字节、codec 身份/版本及原 codec 错误保持原语义。'
+    )
+  }
+]
 /** Application extensions retain their exact inputs while the host owns installation and cleanup. */
 export const storageHostCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
+  encodeStorageJournalImage: portableImageCases,
+  decodeStorageJournalImage: portableImageCases,
   IStorageFeatureClientResolver: [
     {
       title: t('Declare a finite native client resolver', '声明有限原生客户端选择'),

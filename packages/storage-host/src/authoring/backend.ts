@@ -57,3 +57,5 @@ export type {
 } from '../journal/namespace-resource.js'
 
 export { storageJournalLockKey, StorageJournalLock } from '../journal/keys.js'
+
+export { encodeStorageJournalImage, decodeStorageJournalImage } from '../journal/image.js'
