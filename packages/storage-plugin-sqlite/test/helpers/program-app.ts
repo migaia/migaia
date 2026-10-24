@@ -6,6 +6,7 @@ import {
   type IBinlogExt
 } from '@migaia/logger/plugins/durable'
 import { defineEntity } from '@migaia/storage-host/entity'
+import { entityQueryFeature } from '@migaia/storage-host/entity/query'
 import { asRecordStore, kv, type IKeyValueStore } from '@migaia/storage-contract'
 import { lockKey } from '@migaia/storage-host/authoring/concurrency'
 import { useStorageCapability } from '@migaia/storage-host/authoring/capability'
@@ -27,7 +28,11 @@ export async function runStorageProgramApp(
   storage: IKeyValueStore
 ): Promise<IStorageProgramResult> {
   const store = asRecordStore<IProgramRow>(storage)
-  const repo = defineEntity<IProgramRow>()({ name: 'program-rows', key: 'id' }).connect(store)
+  const repo = defineEntity<IProgramRow>()({
+    features: [entityQueryFeature()],
+    name: 'program-rows',
+    key: 'id'
+  }).connect(store)
   const state = createStore({ count: 0 })
   const handle = persist(state, { key: 'program-state', storage: store, version: 1 })
   try {
