@@ -2619,6 +2619,10 @@ const optionTranslations: Readonly<
   'storage-web:plugins-cookies:cookieBackendPlugin:scope': {
     en: 'Fixed cookie scope reused for both writes and removals so cleanup targets the same physical cookie.'
   },
+  'storage-host:entity:defineEntity:features': {
+    en: 'Optional entity Feature factories selected before connection; omitted definitions support basic reads and writes only.',
+    zh: '连接前选择的实体特性工厂；省略时仅提供基础读写。'
+  },
   'storage-host:entity:defineEntity:name': {
     en: 'Stable entity namespace. Names beginning with the reserved double-underscore prefix are rejected.'
   },
@@ -6534,7 +6538,7 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
     purposeZh:
       '声明一个 versioned domain record，之后再把 immutable definition 连接到 concrete store。生成的 repository 统一负责 validation、codec selection、migration、entity-key isolation、index、list、stream 与 transactional batch behavior。',
     quickStart:
-      "import { createStorageHost } from '@migaia/storage-host'\nimport { defineEntity } from '@migaia/storage-host/entity'\nimport { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'\n\ntype IUser = { id: number; email: string }\nconst users = defineEntity<IUser>()({ name: 'users', key: 'id', indexes: { email: { path: 'email', unique: true } } })\nconst host = await createStorageHost({ plugins: [indexedDbBackendPlugin({ dbName: 'app' })] })\ntry {\n  const repository = users.connect(host.backend('indexed-db'))\n  await repository.put({ id: 1, email: 'ada@example.com' })\n  console.log(await repository.query().limit(20).all())\n} finally {\n  await host.dispose()\n}",
+      "import { entityQueryFeature } from '@migaia/storage-host/entity/query'\nimport { entityIndexesFeature } from '@migaia/storage-host/entity/indexes'\nimport { entityUniqueFeature } from '@migaia/storage-host/entity/unique'\nimport { indexedDbIndexesFeature } from '@migaia/storage-web/features/indexed-db-indexes'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { defineEntity } from '@migaia/storage-host/entity'\nimport { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'\n\ntype IUser = { id: number; email: string }\nconst users = defineEntity<IUser>()({ features: [entityQueryFeature(), entityIndexesFeature(), entityUniqueFeature()],  name: 'users', key: 'id', indexes: { email: { path: 'email', unique: true } } })\nconst host = await createStorageHost({ plugins: [indexedDbBackendPlugin({ dbName: 'app' }, { indexes: indexedDbIndexesFeature() })] })\ntry {\n  const repository = users.connect(host.backend('indexed-db'))\n  await repository.put({ id: 1, email: 'ada@example.com' })\n  console.log(await repository.query().limit(20).all())\n} finally {\n  await host.dispose()\n}",
     scenariosEn: [
       'Domain records need one backend-neutral repository contract.',
       'Persisted data requires validation and ordered version migration.',
@@ -7935,7 +7939,7 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
     purposeZh:
       '为明确后端种类的已有查询终点添加 live()。将特性记录作为后端插件第二参数传入，由调用方提供 Runtime，原宿主拥有来源清理。内存使用实例内推送；浏览器后端保留原生的最终可见性与轮询策略。',
     quickStart:
-      "import { createRuntime } from '@migaia/reactive'\nimport { records } from '@migaia/storage-contract'\nimport { createStorageHost, memoryBackendKind, memoryBackendPlugin } from '@migaia/storage-host'\nimport { reactiveFeature } from '@migaia/storage-web/features/reactive'\n\ntype IUser = { id: number; name: string }\nconst runtime = createRuntime()\nconst host = await createStorageHost({ plugins: [memoryBackendPlugin(undefined, { reactive: reactiveFeature(memoryBackendKind) })] })\ntry {\n  const store = host.backend('memory')\n  await store.putRecord({ id: 1, name: 'Ada' }, 1)\n  const users = store.use(records).query<IUser>().limit(20).live({ runtime })\n  try {\n    await users.ready\n    console.log(users.state.value)\n  } finally {\n    await users.dispose()\n  }\n} finally {\n  await host.dispose()\n}",
+      "import { memoryNotificationsFeature } from '@migaia/storage-host/features/memory-notifications'\nimport { memoryChangeFeedFeature } from '@migaia/storage-host/features/memory-change-feed'\nimport { createRuntime } from '@migaia/reactive'\nimport { records } from '@migaia/storage-contract'\nimport { createStorageHost, memoryBackendKind, memoryBackendPlugin } from '@migaia/storage-host'\nimport { reactiveFeature } from '@migaia/storage-web/features/reactive'\n\ntype IUser = { id: number; name: string }\nconst runtime = createRuntime()\nconst host = await createStorageHost({ plugins: [memoryBackendPlugin(undefined, {notifications: memoryNotificationsFeature(), changeFeed: memoryChangeFeedFeature(),  reactive: reactiveFeature(memoryBackendKind) })] })\ntry {\n  const store = host.backend('memory')\n  await store.putRecord({ id: 1, name: 'Ada' }, 1)\n  const users = store.use(records).query<IUser>().limit(20).live({ runtime })\n  try {\n    await users.ready\n    console.log(users.state.value)\n  } finally {\n    await users.dispose()\n  }\n} finally {\n  await host.dispose()\n}",
     scenariosEn: [
       'Several mounted views share one backend change source while keeping independent live results.',
       'Refresh a bounded record query after committed writes.',
@@ -11784,7 +11788,8 @@ export async function readByEmail(
       'Requires a base store to declare changeFeed and expose subscribeChanges, then narrows it to the post-commit invalidation channel. Missing support throws UNSUPPORTED before listener registration.',
     purposeZh:
       '要求 base store 声明 changeFeed 并暴露 subscribeChanges，再收窄为 post-commit invalidation channel。缺少支持时会在注册 listener 前抛出 UNSUPPORTED。',
-    quickStart: `import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { asChangeFeedStore } from '@migaia/storage-contract'\n\nconst host = await createStorageHost({ plugins: [memoryBackendPlugin()] })\nconst storage = host.backend('memory')\nconst changes = asChangeFeedStore(storage)\nconst invalidate = (keys: readonly unknown[] | undefined) => console.log('invalidate:', keys ?? 'all')\nconst unsubscribe = changes.subscribeChanges((change) => invalidate(change.keys))\ntry {\n  await storage.set('theme', 'dark')\n} finally {\n  unsubscribe()\n  await host.dispose()\n}`,
+    quickStart:
+      "import { memoryNotificationsFeature } from '@migaia/storage-host/features/memory-notifications'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { asChangeFeedStore } from '@migaia/storage-contract'\n\nconst host = await createStorageHost({ plugins: [memoryBackendPlugin(undefined, { notifications: memoryNotificationsFeature() })] })\nconst storage = host.backend('memory')\nconst changes = asChangeFeedStore(storage)\nconst invalidate = (keys: readonly unknown[] | undefined) => console.log('invalidate:', keys ?? 'all')\nconst unsubscribe = changes.subscribeChanges((change) => invalidate(change.keys))\ntry {\n  await storage.set('theme', 'dark')\n} finally {\n  unsubscribe()\n  await host.dispose()\n}",
     scenariosEn: [
       'A cache must observe committed external writes.',
       'Cross-context invalidation is mandatory.',
@@ -11833,7 +11838,8 @@ export async function readByEmail(
       'Boolean guard for post-commit change notifications. It first admits the full base store, then requires changeFeed === true and a callable subscribeChanges method.',
     purposeZh:
       'post-commit change notification 的 boolean guard。先接纳完整 base store，再要求 changeFeed === true 且 subscribeChanges callable。',
-    quickStart: `import { isChangeFeedStore } from '@migaia/storage-contract'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nconst host = await createStorageHost({ plugins: [memoryBackendPlugin()] })\nconst storage = host.backend('memory')\nconst refreshCache = (change: unknown) => console.log('refresh cache:', change)\nconst unsubscribe = isChangeFeedStore(storage)\n  ? storage.subscribeChanges(refreshCache)\n  : undefined\ntry {\n  console.log(Boolean(unsubscribe))\n} finally {\n  unsubscribe?.()\n  await host.dispose()\n}`,
+    quickStart:
+      "import { memoryNotificationsFeature } from '@migaia/storage-host/features/memory-notifications'\nimport { isChangeFeedStore } from '@migaia/storage-contract'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nconst host = await createStorageHost({ plugins: [memoryBackendPlugin(undefined, { notifications: memoryNotificationsFeature() })] })\nconst storage = host.backend('memory')\nconst refreshCache = (change: unknown) => console.log('refresh cache:', change)\nconst unsubscribe = isChangeFeedStore(storage)\n  ? storage.subscribeChanges(refreshCache)\n  : undefined\ntry {\n  console.log(Boolean(unsubscribe))\n} finally {\n  unsubscribe?.()\n  await host.dispose()\n}",
     scenariosEn: [
       'Selecting subscription or polling.',
       'Displaying whether live invalidation is available.',

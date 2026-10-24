@@ -1,3 +1,4 @@
+import { storageHostAssemblySymbols } from './storage-optional-assembly.js'
 import type { ILibraryReference, IMemberDoc, IOptionCaseDoc, IText, ITypeDoc } from './contract.js'
 import { storageContractReference } from './storage-contract.js'
 import { storageHostCases } from './storage-host-cases.js'
@@ -29,17 +30,8 @@ const entityConfiguration: IOptionCaseDoc = {
     '以显式格式、迁移路径和有界默认排序持久化领域值。'
   ),
   covers: ['name', 'key', 'schema', 'codec', 'version', 'migrations'],
-  example: `import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
-import { defineEntity, jsonCodec, passthrough } from '@migaia/storage-host/entity'
-type IOrder = { id: string; status: string; total: number }
-const definition = defineEntity<IOrder>()({
-  name: 'orders', key: 'id', schema: passthrough<IOrder>(), codec: jsonCodec,
-  version: 2, migrations: { 2: (state) => state }
-})
-await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
-const repo = definition.connect(host.backend('memory'))
-await repo.put({ id: 'a', status: 'paid', total: 200 })
-console.log(await repo.get('a'))`,
+  example:
+    "import { entityMigrationFeature } from '@migaia/storage-host/entity/migration'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { defineEntity, jsonCodec, passthrough } from '@migaia/storage-host/entity'\ntype IOrder = { id: string; status: string; total: number }\nconst definition = defineEntity<IOrder>()({ features: [entityMigrationFeature()], \n  name: 'orders', key: 'id', schema: passthrough<IOrder>(), codec: jsonCodec,\n  version: 2, migrations: { 2: (state) => state }\n})\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })\nconst repo = definition.connect(host.backend('memory'))\nawait repo.put({ id: 'a', status: 'paid', total: 200 })\nconsole.log(await repo.get('a'))",
   result: t(
     'Prints the stored order. Current-version writes are explicit; reads do not silently persist older-envelope migration.',
     '输出已存订单。写入显式使用当前版本，读取不会静默持久化旧封装的迁移结果。'
@@ -53,19 +45,8 @@ const entityIndexConfiguration: IOptionCaseDoc = {
     '选择字面量索引时保持读取校验，并报告扫描或 codec 回退诊断。'
   ),
   covers: ['validateOnRead', 'onDiagnostic', 'defaultOrderBy', 'indexes'],
-  example: `import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
-import { defineEntity } from '@migaia/storage-host/entity'
-type IOrder = { id: string; status: string; total: number }
-const definition = defineEntity<IOrder>()({
- name:'orders', key:'id', validateOnRead:true,
- onDiagnostic:(message)=>console.warn(message),
- defaultOrderBy:(left,right)=>left.total-right.total,
- indexes:{byStatus:{path:'status',revision:1}}
-})
-await using host = await createStorageHost({plugins:[memoryBackendPlugin()]})
-const repo = definition.connect(host.backend('memory'))
-await repo.put({id:'a',status:'paid',total:200})
-console.log(await repo.query().index('byStatus','paid').limit(10).all())`,
+  example:
+    "import { entityQueryFeature } from '@migaia/storage-host/entity/query'\nimport { entityIndexesFeature } from '@migaia/storage-host/entity/indexes'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { defineEntity } from '@migaia/storage-host/entity'\ntype IOrder = { id: string; status: string; total: number }\nconst definition = defineEntity<IOrder>()({ features: [entityQueryFeature(), entityIndexesFeature()], \n name:'orders', key:'id', validateOnRead:true,\n onDiagnostic:(message)=>console.warn(message),\n defaultOrderBy:(left,right)=>left.total-right.total,\n indexes:{byStatus:{path:'status',revision:1}}\n})\nawait using host = await createStorageHost({plugins:[memoryBackendPlugin()]})\nconst repo = definition.connect(host.backend('memory'))\nawait repo.put({id:'a',status:'paid',total:200})\nconsole.log(await repo.query().index('byStatus','paid').limit(10).all())",
   result: t(
     'Prints the matching order. The declared index key remains a string and the comparator keeps an explicit finite bound.',
     '输出匹配订单。已声明索引键保留字符串类型，比较器具有显式有限上限。'
@@ -88,6 +69,17 @@ const entityType = (en: string, zh: string, members: ITypeDoc['members']): IType
 
 /** Entity configuration is captured once before connecting to any backend. */
 const entityOptions: Readonly<Record<string, IMemberDoc>> = {
+  features: {
+    summary: t(
+      'Explicit entity capability factories selected before connection. Choose query, indexes, unique, migration or keyset only for operations the application uses.',
+      '连接前显式选择实体能力工厂，仅为业务使用的查询、索引、唯一约束、迁移或分页加入对应特性。'
+    ),
+    default: t(
+      'Omitted: definitions, connection and basic reads/writes only; optional calls reject ENTITY_FEATURE_REQUIRED.',
+      '省略时仅提供定义、连接与基础读写；调用未装配能力会报 `ENTITY_FEATURE_REQUIRED`。'
+    ),
+    example: storageHostAssemblySymbols.entityQueryFeature!.example
+  },
   name: field(
     'Caller-selected nonempty entity namespace; the reserved __ prefix is rejected.',
     '调用方选择的非空实体命名空间，保留的双下划线前缀不允许使用。'
@@ -527,8 +519,8 @@ export const storageHostEntitySymbols: NonNullable<ILibraryReference['symbols']>
   defineEntity: {
     role: 'factory',
     purpose: t(
-      'Capture a reusable typed entity definition, schema, codec and version plan before binding it to an admitted store.',
-      '在绑定已准入存储之前，捕获可复用且有精确类型的实体定义、schema、codec 与版本迁移计划。'
+      'Capture a reusable typed entity definition, schema and codec before binding it to an admitted store. Optional query, indexes, unique, migration and keyset operations require their explicit Feature factories.',
+      '在绑定已准入存储之前，捕获可复用且有精确类型的实体定义、校验与编解码配置；查询、索引、唯一约束、迁移和分页需显式选择对应特性。'
     ),
     params: {
       options: t(

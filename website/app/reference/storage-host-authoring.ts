@@ -11,32 +11,8 @@ export const storageHostInputExamples = {
 } as const
 
 /** One complete original-controller example covers this same options bag without fake resources. */
-const iteratorExample = `import {
-  createStorageHost, defineFeature, memoryBackendKind, memoryBackendPlugin
-} from '@migaia/storage-host'
-import { createBackendChangeIterator } from '@migaia/storage-host/authoring/backend'
-
-const changes = defineFeature(memoryBackendKind, ({ featureExpose }) => ({
-  capabilities: [], chain: {},
-  api: { store: {
-    async changes() {
-      return createBackendChangeIterator(featureExpose.getChangeController()!, {
-        orgId: this.orgId,
-        channel: 'value',
-        key: 'status',
-        ctx: { timeoutMs: 1_000 },
-        execute: (advance) => advance()
-      })
-    }
-  }, transaction: {} }
-}))
-await using host = await createStorageHost({
-  plugins: [memoryBackendPlugin(undefined, { changes })]
-})
-await using stream = await host.api.memory.changes()
-const next = stream.next()
-await host.backend('memory').set('status', 'ready')
-console.log((await next).value?.kind)`
+const iteratorExample =
+  "import { memoryNotificationsFeature } from '@migaia/storage-host/features/memory-notifications'\nimport {\n  createStorageHost, defineFeature, memoryBackendKind, memoryBackendPlugin\n} from '@migaia/storage-host'\nimport { createBackendChangeIterator } from '@migaia/storage-host/authoring/change-iterator'\n\nconst changes = defineFeature(memoryBackendKind, ({ featureExpose }) => ({\n  capabilities: [], chain: {},\n  api: { store: {\n    async changes() {\n      return createBackendChangeIterator(featureExpose.getChangeController()!, {\n        orgId: this.orgId,\n        channel: 'value',\n        key: 'status',\n        ctx: { timeoutMs: 1_000 },\n        execute: (advance) => advance()\n      })\n    }\n  }, transaction: {} }\n}))\nawait using host = await createStorageHost({\n  plugins: [memoryBackendPlugin(undefined, {notifications: memoryNotificationsFeature(),  changes })]\n})\nawait using stream = await host.api.memory.changes()\nconst next = stream.next()\nawait host.backend('memory').set('status', 'ready')\nconsole.log((await next).value?.kind)"
 
 /** Iterator author options are captured once before subscribing to the original controller. */
 export const storageHostChangeIteratorOptions = {

@@ -1,3 +1,9 @@
+import {
+  storageHostAssemblyModules,
+  storageHostAssemblySymbols,
+  storageHostAssemblyTypes,
+  storageHostAssemblyEnhancers
+} from './storage-optional-assembly.js'
 import { storageContractCases } from './storage-contract-cases.ts'
 import type { ILibraryReference, IText } from './contract.js'
 import { storageHostCases } from './storage-host-cases.js'
@@ -33,6 +39,7 @@ const t = (en: string, zh: string): IText => ({ en, zh })
 /** Neutral host and authoring entry, with no browser or native driver import. */
 export const storageHostReference: ILibraryReference = {
   modules: {
+    ...storageHostAssemblyModules,
     'authoring/migration': {
       summary: t(
         'Execute contiguous envelope recovery with the original cancellation and observation ports.',
@@ -56,8 +63,8 @@ export const storageHostReference: ILibraryReference = {
     },
     journal: {
       summary: t(
-        'Open a fixed-organization private log through its original admitted backend binding.',
-        '沿原已准入后端绑定打开固定组织私有日志，不获取业务后端关闭权限。'
+        'Select storageJournalPlugin before opening fixed-organization private logs or configuring automatic journaling. The base host does not include journal runtime.',
+        '先选择 `storageJournalPlugin`，再打开固定组织私有日志或配置自动日志；基础宿主不包含日志运行时。'
       ),
       example: storageHostCases.storageLogStore![0]!.example
     },
@@ -80,8 +87,8 @@ reportCleanupError(report, new Error('cleanup failed'))`
     },
     entity: {
       summary: t(
-        'Compose entity repositories through the original transaction scope, immutable versioned envelopes, bounded queries, neutral schema adapters and strict portable codecs.',
-        '实体仓储复用原事务scope、共享版本存档、有界查询、中立schema与严格portable codec。'
+        'Define and connect entities for basic reads and writes with neutral schema adapters and portable codecs. Import query, indexes, unique, migration and keyset factories from their own entity subpaths before selecting those operations.',
+        '定义并连接实体，以中立校验与可移植编解码执行基础读写；查询、索引、唯一约束、迁移和分页需从各自子路径导入工厂并显式选择。'
       ),
       example: `import { jsonCodec } from '@migaia/storage-host/entity'
 
@@ -103,6 +110,7 @@ console.log(host.extensions.label('draft'))`
     }
   },
   symbols: {
+    ...storageHostAssemblySymbols,
     createMigrationPlan: {
       role: 'operation',
       optionDocs: {
@@ -678,6 +686,7 @@ console.log(host.extensions.label('draft'))`,
     ...storageHostVectorSymbols
   },
   types: {
+    ...storageHostAssemblyTypes,
     IStorageJournalRedoAttempt: {
       summary: t(
         'Exact text-only txId and record(scope), authenticated by the original transaction owner without record/bytes placeholders.',
@@ -1263,5 +1272,5 @@ off()`
     ...storageHostRuntimeEnums,
     ...storageHostBackfillEnums
   },
-  enhancers: {}
+  enhancers: storageHostAssemblyEnhancers
 }
