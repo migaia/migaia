@@ -1,3 +1,4 @@
+import { indexedDbFeatureMissing } from '../backends/indexed-db-base-access.js'
 import type { IIndexedDbAssemblyPlan } from '../backends/indexed-db-assembly.js'
 import { readBuiltInPluginId } from './builtin-factory.js'
 import { indexedDbHost, type IIndexedDbOptions } from '../backends/indexed-db.js'
@@ -11,7 +12,7 @@ import {
 } from '@migaia/storage-host'
 import { StorageError, StorageErrorCode } from '../types/errors.js'
 import { StorageErrorText } from '../error-text.js'
-import { StorageBackend } from '../constants.js'
+import { StorageBackend, IndexedDbFeature } from '../constants.js'
 /** One installed backend owns its schema declarations and optional assembly selection. */
 class IndexedDbPluginInstallation<F extends IStorageFeatureRecord> {
   /** Borrowed validated options remain fixed for this installation. */
@@ -46,6 +47,8 @@ class IndexedDbPluginInstallation<F extends IStorageFeatureRecord> {
   /** Seal declared requirements, then let the native construction own rollback and disposal. */
   install(): Promise<{}> {
     this.#schemaSealed = true
+    if (this.#core.journal !== undefined && this.#assemblies.journal === undefined)
+      indexedDbFeatureMissing.fail(IndexedDbFeature.journal)
     this.#construction = indexedDbHost(
       this.#options,
       this.#core,

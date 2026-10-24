@@ -1,3 +1,4 @@
+import { entityTestFeatures } from './helpers/entity-features.js'
 import { describe, expect, it } from 'vitest'
 import { lengthPrefixedNamespaceCodec } from '../src/index.js'
 import { StorageError, StorageErrorCode } from '@migaia/storage-host'
@@ -35,6 +36,7 @@ describe('storage-web audit medium severity regressions', () => {
     try {
       /** This is a supported throwing schema, not a forged backend. */
       const repo = defineEntity<{ id: string }>({
+        features: entityTestFeatures,
         name: 'audit-error-chain',
         key: 'id',
         schema: {
@@ -66,9 +68,14 @@ describe('storage-web audit medium severity regressions', () => {
 
   it.each([undefined, {}])('keeps a current-only v2 plan explicit: %s', async (migrations) => {
     const store = await createMemoryTestStore()
-    const previous = defineEntity<{ id: string }>({ name: 'audit-graph', key: 'id' }).connect(store)
+    const previous = defineEntity<{ id: string }>({
+      features: entityTestFeatures,
+      name: 'audit-graph',
+      key: 'id'
+    }).connect(store)
     await previous.put({ id: 'old' })
     const current = defineEntity<{ id: string }>({
+      features: entityTestFeatures,
       name: 'audit-graph',
       key: 'id',
       version: 2,
@@ -123,7 +130,12 @@ describe('storage-web audit medium severity regressions', () => {
     const store = await createMemoryTestStore()
     try {
       /** Reads must preserve the host error, its stage and the original validator cause. */
-      const repository = defineEntity({ name: 'moved-schema', key: 'id', schema }).connect(store)
+      const repository = defineEntity({
+        features: entityTestFeatures,
+        name: 'moved-schema',
+        key: 'id',
+        schema
+      }).connect(store)
       await repository.put({ id: 'row' })
       rejectValidation = true
       /** The cause graph must retain the exact original rejection after stage enrichment. */

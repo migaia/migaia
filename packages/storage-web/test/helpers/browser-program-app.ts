@@ -1,3 +1,4 @@
+import { entityTestFeatures } from './entity-features.js'
 import { storageJournalPlugin } from '@migaia/storage-host/journal'
 import { indexedDbTestFeatures } from './indexed-db-features.js'
 import { createStorageHost, createOrgId, definePlugin } from '@migaia/storage-host'
@@ -56,6 +57,7 @@ window.runStorageProgramAutomaticIndex = async () => {
     const store = host.backend('indexed-db')
     /** The declared path is the only index available to the automatic source selector. */
     const repo = defineEntity<{ id: string; group: string }>()({
+      features: entityTestFeatures,
       name: 'program-automatic-index',
       key: 'id',
       indexes: { byGroup: { path: 'group' } }

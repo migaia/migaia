@@ -1,3 +1,4 @@
+import { entityTestFeatures } from './helpers/entity-features.js'
 /**
  * Round-1 hardening regressions. Most of these invariants now also have dedicated coverage under
  * test/conformance/; this file stays as the permanent record of the original adversarial findings
@@ -127,7 +128,11 @@ describe('#7 数组主键：get/list 可见性一致', () => {
   it('list() 包含数组 id 的记录', async () => {
     const store = await freshIdb()
     type IRow = { readonly id: readonly string[]; readonly n: number }
-    const repo = defineEntity<IRow>({ name: 'rows', key: 'id' }).connect(store)
+    const repo = defineEntity<IRow>({
+      features: entityTestFeatures,
+      name: 'rows',
+      key: 'id'
+    }).connect(store)
 
     await repo.put({ id: ['tenant-1', 'u1'], n: 1 })
     expect(await repo.get(['tenant-1', 'u1'])).toEqual({ id: ['tenant-1', 'u1'], n: 1 })
@@ -147,7 +152,12 @@ describe('#8 单条脏数据不阻断 list()', () => {
         return row
       }
     }
-    const repo = defineEntity<IRow>({ name: 'rows', key: 'id', schema }).connect(store)
+    const repo = defineEntity<IRow>({
+      features: entityTestFeatures,
+      name: 'rows',
+      key: 'id',
+      schema
+    }).connect(store)
 
     await store.putRecord({ version: 1, state: { id: 'good', n: 1 } }, ['rows', 'good'])
     await store.putRecord({ version: 1, state: { id: 'bad', n: 'oops' } }, ['rows', 'bad'])

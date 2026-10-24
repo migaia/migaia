@@ -1,3 +1,4 @@
+import { memoryTestFeatures } from '../helpers/memory-features.js'
 import { records } from '@migaia/storage-contract'
 import {
   createStorageHost,
@@ -22,8 +23,8 @@ describe('browser plugin materialization', () => {
     })
     await using host = await createStorageHost({
       plugins: [
-        memoryBackendPlugin({ id: 'custom' }, { identity }),
-        memoryBackendPlugin({ id: 'memory' }),
+        memoryBackendPlugin({ id: 'custom' }, { ...memoryTestFeatures, identity }),
+        memoryBackendPlugin({ id: 'memory' }, memoryTestFeatures),
         localStorageBackendPlugin({ id: 'local', storage: fakeWebStorage() }),
         sessionStorageBackendPlugin({ id: 'session', storage: fakeWebStorage() }),
         cookieBackendPlugin({ id: 'cookiesHost', document: fakeCookieDocument() })
