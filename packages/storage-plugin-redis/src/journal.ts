@@ -142,7 +142,7 @@ export function createRedisJournalBinding(input: {
             }),
           keys: () =>
             execute(async () =>
-              [...(await draft.journalHash(prefix)).fields.keys()].sort().map((field) => {
+              [...(await draft.journalHash(prefix)).fields.keys()].map((field) => {
                 const name = draft.layout.decode(field)
                 if (typeof name !== 'string') throw invalidArgument()
                 return name
