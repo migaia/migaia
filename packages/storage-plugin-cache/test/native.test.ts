@@ -13,9 +13,18 @@ import { redisBackendPlugin, type IRedisDriver } from '@migaia/storage-plugin-re
 import { nodeRedisDriver } from '@migaia/storage-plugin-redis/node-redis'
 import { redisChangeStreamFeature } from '@migaia/storage-plugin-redis/features/change-stream'
 import { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'
+import { pgvectorFeature } from '@migaia/storage-plugin-postgres/features/pgvector'
+import { rediSearchVectorFeature } from '@migaia/storage-plugin-redis/features/search'
+import { qdrantBackendPlugin, type IQdrantHttp } from '@migaia/storage-plugin-qdrant'
+import { fetchHttp } from '@migaia/storage-plugin-qdrant/http'
 import { pgDriver } from '@migaia/storage-plugin-postgres/pg'
 import { cachePlugin } from '../src/index.js'
-import { lockKey, type IStorageChange } from '@migaia/storage-contract'
+import {
+  vector,
+  lockKey,
+  type IStorageChange,
+  type IVectorCollection
+} from '@migaia/storage-contract'
 
 /** Required service fixtures are injected by the repository's sole native-service launcher. */
 const redisUrl = process.env.MIGAIA_REDIS_URL,
@@ -30,7 +39,88 @@ async function until(predicate: () => Promise<boolean>) {
   throw new Error('Native cache notification did not settle')
 }
 
+/** One portable business function leaves exact ranking and deletion to each original engine. */
+async function vectorApplication(collection: IVectorCollection<{ kind: string }>) {
+  const points = [
+    { id: 'first', vector: [4, 0], payload: { kind: 'keep' } },
+    { id: 'second', vector: [3, 0], payload: { kind: 'remove' } },
+    { id: 'third', vector: [2, 0], payload: { kind: 'remove' } },
+    { id: 'fourth', vector: [1, 0], payload: { kind: 'keep' } }
+  ]
+  await collection.upsert(points)
+  const hits = await collection.near([1, 0], { exact: true }).topK(3).all()
+  const counts: number[] = []
+  for (const count of [undefined, 'precount', 'scroll'] as const) {
+    counts.push(await collection.deleteWhere({ kind: 'remove' }, count ? { count } : undefined))
+    expect(
+      (await collection.near([1, 0], { exact: true }).topK(4).all()).map((hit) => hit.id)
+    ).toEqual(['first', 'fourth'])
+    await collection.upsert(points.slice(1, 3))
+  }
+  await collection.delete(points.map((point) => point.id))
+  return { hits, counts }
+}
+
 describe('native borrowed cache tiers', () => {
+  it('runs the same exact vector ranking and counted deletion on four native engines', async () => {
+    const stackUrl = process.env.MIGAIA_REDIS_STACK_URL,
+      qdrantUrl = process.env.MIGAIA_QDRANT_URL
+    if (!stackUrl || !qdrantUrl)
+      throw new Error('Vector checks require the storage service launcher')
+    const pool = createClientPool({ url: stackUrl }, { maximum: 8 }),
+      pg = new Pool({ connectionString: pgUrl }),
+      native = fetchHttp(qdrantUrl),
+      created: string[] = [],
+      prefix = 'integrated_' + crypto.randomUUID().slice(0, 8),
+      http: IQdrantHttp = {
+        ...native,
+        async createCollection(...args) {
+          const result = await native.createCollection(...args)
+          created.push(args[0])
+          return result
+        }
+      }
+    await pool.connect()
+    const host = await createStorageHost({
+      plugins: [
+        memoryBackendPlugin(),
+        postgresBackendPlugin({ driver: pgDriver(pg), prefix }, { vector: pgvectorFeature() }),
+        redisBackendPlugin(
+          { driver: nodeRedisDriver(pool), prefix },
+          { search: rediSearchVectorFeature() }
+        ),
+        qdrantBackendPlugin({ url: qdrantUrl, http, collectionPrefix: prefix })
+      ] as const
+    })
+    try {
+      await host.detect()
+      const apis = [
+        host.backend('memory').use(vector),
+        host.backend('postgres').use(vector),
+        host.backend('redis').use(vector),
+        host.backend('qdrant').use(vector)
+      ]
+      for (const api of apis) {
+        const result = await vectorApplication(
+          api.collection<{ kind: string }>('same-business', { dimensions: 2, metric: 'dot' })
+        )
+        expect(result.hits.map((hit) => hit.id)).toEqual(['first', 'second', 'third'])
+        expect(result.hits.map((hit) => hit.payload)).toEqual([
+          { kind: 'keep' },
+          { kind: 'remove' },
+          { kind: 'remove' }
+        ])
+        result.hits.forEach((hit, index) => expect(hit.score).toBeCloseTo(4 - index, 5))
+        expect(result.counts).toEqual([2, 2, 2])
+      }
+    } finally {
+      await host.dispose()
+      for (const name of created) await native.deleteCollection(name)
+      await pool.close()
+      await pg.end()
+    }
+  })
+
   it('shares one Redis source load across independent Node processes that both miss', async () => {
     const prefix = 'cache_process_' + crypto.randomUUID().replaceAll('-', ''),
       pool = createClientPool({ url: redisUrl }, { maximum: 8 })
