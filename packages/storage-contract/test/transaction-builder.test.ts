@@ -54,35 +54,19 @@ function fixture() {
 }
 
 describe('immutable transaction builder', () => {
-  it('delegates native unlocked run with exact scope, options, one-read descriptors and original Promise', async () => {
+  it('delegates native unlocked run with exact scope, options, original Promise', async () => {
     const { store, calls, scope } = fixture()
-    const transaction = store.transaction
-    let transactionReads = 0
-    Object.defineProperty(store, 'transaction', {
-      get: () => {
-        transactionReads++
-        return transaction
-      }
-    })
     const nativeTag = { value: 'native' }
     const policy = ConcurrencyPolicy.optimistic({ retries: 1 })
-    let optionReads = 0
-    let modeReads = 0
     const hint = () => 'kept' as const
     const root = createTransactionBuilder(
       store,
       {
-        get nativeTag() {
-          optionReads++
-          return nativeTag
-        }
+        nativeTag: nativeTag
       },
       { hint },
       {
-        get mode() {
-          modeReads++
-          return 'optimistic' as const
-        }
+        mode: 'optimistic' as const
       }
     )
     expect(root.hint).toBe(hint)
@@ -101,9 +85,7 @@ describe('immutable transaction builder', () => {
     expect(calls[0]!.options).toMatchObject({ nativeTag, concurrency: policy, timeoutMs: 1000 })
     expect(Object.hasOwn(calls[0]!.options as object, 'lock')).toBe(false)
     expect(root.hint()).toBe('kept')
-    expect(transactionReads).toBe(1)
-    expect(optionReads).toBe(1)
-    expect(modeReads).toBe(1)
+
     expectTypeOf(root).toMatchTypeOf<
       IOptimisticTransactionBuilder<typeof scope, { hint: typeof hint }>
     >()
@@ -127,14 +109,6 @@ describe('immutable transaction builder', () => {
     expect(() =>
       createTransactionBuilder(store, { lock: [] } as never, undefined, mode)
     ).toThrowError(expect.objectContaining({ code: 'UNSUPPORTED_CAPABILITY' }))
-    const cause = new Error('native mode getter failed')
-    expect(() =>
-      createTransactionBuilder(store, undefined, undefined, {
-        get mode(): 'optimistic' {
-          throw cause
-        }
-      })
-    ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT', cause }))
     expect(() => root.run(undefined as never)).toThrowError(
       expect.objectContaining({ code: 'INVALID_ARGUMENT' })
     )
@@ -193,17 +167,13 @@ describe('immutable transaction builder', () => {
   it('has no root execution method and delegates once with the actual scope, native options and original Promise', async () => {
     const { store, calls } = fixture()
     const nativeTag = { value: 'kept' }
-    let reads = 0
     const root = createTransactionBuilder(store, {
-      get nativeTag() {
-        reads++
-        return nativeTag
-      },
+      nativeTag: nativeTag,
       pageSize: 5
     })
     expect('run' in root).toBe(false)
     expect(calls).toEqual([])
-    expect(reads).toBe(1)
+
     const callback = (scope: { read: () => number; sql: (query: 'native') => 'native' }) => {
       expectTypeOf(scope.sql('native')).toEqualTypeOf<'native'>()
       return Promise.resolve(scope.read())
@@ -224,7 +194,6 @@ describe('immutable transaction builder', () => {
         { channel: 'record', key: 'z' }
       ]
     })
-    expect(reads).toBe(1)
   })
 
   it('keeps branches independent, snapshots only new mutable identities and never starts I/O in configuration', async () => {
