@@ -866,6 +866,24 @@ export function indexedDbHost<TValue = unknown>(
   initializeIndexedDbNativeState(indexedDbContext)
   indexedDbContext.store = createIndexedDbStore(indexedDbContext)
 
+  /** Exact-store registries bind the public execution projection before capability publication. */
+  indexedDbContext.store = bindBrowserExecution(indexedDbContext.store, indexedDbContext.runtime, [
+    'set',
+    'remove',
+    'setBytes',
+    'removeBytes',
+    'putRecord',
+    'deleteRecord',
+    'clearValues',
+    'clearAll',
+    'clearBytes',
+    'clearRecords',
+    'putIndexedRecord',
+    ...(indexedDbContext.runtime.journal === undefined
+      ? []
+      : ['get', 'has', 'keys', 'getBytes', 'getRecord'])
+  ])
+
   registerIndexedDbBackfill(indexedDbContext)
   indexedDbContext.recordApi = createIndexedDbRecordApi(indexedDbContext)
   indexedDbContext.ttlApi = createIndexedDbTtlApi(indexedDbContext)
@@ -3733,22 +3751,7 @@ function createIndexedDbConstruction<TValue>(
   indexedDbContext: IIndexedDbContext<TValue>
 ): IIndexedDbContext<TValue>['construction'] {
   return provideBackendConstruction(
-    bindBrowserExecution(indexedDbContext.store, indexedDbContext.runtime, [
-      'set',
-      'remove',
-      'setBytes',
-      'removeBytes',
-      'putRecord',
-      'deleteRecord',
-      'clearValues',
-      'clearAll',
-      'clearBytes',
-      'clearRecords',
-      'putIndexedRecord',
-      ...(indexedDbContext.runtime.journal === undefined
-        ? []
-        : ['get', 'has', 'keys', 'getBytes', 'getRecord'])
-    ]),
+    indexedDbContext.store,
     [
       implement(kv, browserKeyValueApi(indexedDbContext.store, indexedDbContext.batchApi), {
         forTransaction: (scope) => scope

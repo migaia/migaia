@@ -340,8 +340,14 @@ function assembleCookieConstruction(cookieContext: ICookieContext): ICookieConst
   cookieContext.redo = createCookieRedo(cookieContext)
   cookieContext.store = createCookieStore(cookieContext)
 
+  cookieContext.store = bindBrowserExecution(
+    cookieContext.store,
+    cookieContext.runtime,
+    [],
+    textExecutionKeys
+  )
   cookieContext.construction = provideBackendConstruction(
-    bindBrowserExecution(cookieContext.store, cookieContext.runtime, [], textExecutionKeys),
+    cookieContext.store,
     [
       implement(
         kv,

@@ -812,8 +812,14 @@ function createWebStorageStore(webStorageContext: IWebStorageContext): IWebStora
 function createWebStorageConstruction(
   webStorageContext: IWebStorageContext
 ): IWebStorageContext['construction'] {
+  webStorageContext.store = bindBrowserExecution(
+    webStorageContext.store,
+    webStorageContext.runtime,
+    [],
+    textExecutionKeys
+  )
   return provideBackendConstruction(
-    bindBrowserExecution(webStorageContext.store, webStorageContext.runtime, [], textExecutionKeys),
+    webStorageContext.store,
     [
       implement(
         kv,

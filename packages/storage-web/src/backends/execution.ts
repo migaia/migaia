@@ -38,9 +38,21 @@ export const textExecutionKeys = (name: string, args: readonly unknown[]): reado
     ? [lockKey.text(args[0])]
     : []
 
+/** One endpoint delegates through the original object, preserving native and class receivers. */
+type IBrowserEndpointBinding = {
+  readonly receiver: Record<string, (...args: unknown[]) => unknown>
+  readonly name: string
+  readonly contextIndex: number
+  readonly operation: string
+  readonly runtime: IBackendRuntime
+  readonly sync: boolean
+  readonly keyFacts?: (name: string, captured: readonly unknown[]) => readonly ILockKey[]
+}
+
 /**
- * Attach the host's existing execution boundary to concrete browser methods. This mutates the
- * original backend object before provider admission; it creates no executor, queue or lifetime.
+ * Publish the host execution boundary before provider admission. The original backend remains
+ * private, so its methods can be called directly without replacing or recursively re-entering
+ * them.
  */
 export function bindBrowserExecution<TStore extends IStorageBase>(
   store: TStore,
@@ -48,64 +60,100 @@ export function bindBrowserExecution<TStore extends IStorageBase>(
   ownExecution: readonly string[] = [],
   keyFacts?: (name: string, captured: readonly unknown[]) => readonly ILockKey[]
 ): TStore {
-  /** Methods are captured once while the concrete backend is still private to construction. */
-  const target = store as TStore & Record<string, unknown>
-  bindGroup(target, target, asyncEndpoints)
-  if (typeof target.metadata === 'object' && target.metadata !== null)
-    bindGroup(target.metadata, target.metadata, metadataEndpoints, 'metadata')
-  if (typeof target.sync === 'object' && target.sync !== null) {
-    /** Async business functions retain their private sync primitives and never re-enter this view. */
-    const original = target.sync
-    /** The public sync view delegates to the same primitive exactly once through the sync runner. */
-    const projection = Object.create(null) as Record<string, unknown>
-    bindGroup(original, projection, syncEndpoints, undefined, true)
-    Object.defineProperty(target, 'sync', {
-      value: projection,
+  /** This projection separates public execution ports from their original native receivers. */
+  const projection = { ...store } as TStore & Record<string, unknown>
+  bindGroup(store, projection, asyncEndpoints, store.backend, runtime, ownExecution, keyFacts)
+  /** Optional native groups are published on the same ordinary execution projection. */
+  const groups: Record<string, unknown> = projection
+  if (typeof groups.metadata === 'object' && groups.metadata !== null) {
+    /** Metadata keeps its original receiver while the public group enters the host once. */
+    const metadata = { ...groups.metadata }
+    bindGroup(
+      groups.metadata,
+      metadata,
+      metadataEndpoints,
+      store.backend,
+      runtime,
+      [],
+      keyFacts,
+      'metadata'
+    )
+    groups.metadata = metadata
+  }
+  if (typeof groups.sync === 'object' && groups.sync !== null) {
+    /** Native async methods retain their private synchronous primitives. */
+    const sync = Object.create(null) as Record<string, unknown>
+    bindGroup(
+      groups.sync,
+      sync,
+      syncEndpoints,
+      store.backend,
+      runtime,
+      [],
+      keyFacts,
+      undefined,
+      true
+    )
+    groups.sync = sync
+  }
+  return projection
+}
+
+/** A fixed endpoint table binds one native group to the existing host execution port. */
+function bindGroup(
+  receiver: object,
+  destination: object,
+  endpoints: Readonly<Record<string, number>>,
+  backend: IStorageBase['backend'],
+  runtime: IBackendRuntime,
+  ownExecution: readonly string[],
+  keyFacts?: IBrowserEndpointBinding['keyFacts'],
+  group?: string,
+  sync = false
+): void {
+  /** The native source is retained for direct method dispatch with its original receiver. */
+  const source = receiver as IBrowserEndpointBinding['receiver']
+  for (const [name, contextIndex] of Object.entries(endpoints)) {
+    if (!sync && group === undefined && ownExecution.includes(name)) continue
+    if (typeof source[name] !== 'function') continue
+    /** One published endpoint retains only its original source and execution facts. */
+    const binding: IBrowserEndpointBinding = {
+      receiver: source,
+      name,
+      contextIndex,
+      operation: storageBackendOperation(backend, name, group),
+      runtime,
+      sync,
+      keyFacts
+    }
+    Object.defineProperty(destination, name, {
+      configurable: true,
       enumerable: true,
-      configurable: true
+      writable: true,
+      value: (...args: unknown[]) => runBrowserEndpoint(binding, args)
     })
   }
-  return store
+}
 
-  /** A fixed method table supplies backend-specific arguments to the one host execution port. */
-  function bindGroup(
-    receiver: object,
-    destination: object,
-    endpoints: Readonly<Record<string, number>>,
-    group?: string,
-    sync = false
-  ): void {
-    for (const [name, contextIndex] of Object.entries(endpoints)) {
-      /** Native root coordinators already enclose their complete admission/terminal pipeline. */
-      if (!sync && group === undefined && ownExecution.includes(name)) continue
-      /** Absent optional native APIs remain absent rather than gaining a placeholder endpoint. */
-      const method = Reflect.get(receiver, name) as unknown
-      if (typeof method !== 'function') continue
-      /** Stable operation labels are formed in the package's existing contract-string owner. */
-      const operation = storageBackendOperation(store.backend, name, group)
-      Object.defineProperty(destination, name, {
-        configurable: true,
-        enumerable: true,
-        writable: true,
-        value: (...args: unknown[]) => {
-          /** The original context is borrowed, without cloning or reading any option getter here. */
-          let current = args
-          const request = {
-            operation,
-            input: args,
-            ctx: args[contextIndex] as IOperationContext,
-            ...(keyFacts === undefined ? {} : { keys: () => keyFacts(name, current) })
-          }
-          return sync
-            ? runtime.execution.runSync(request, (captured) =>
-                Reflect.apply(method, receiver, captured)
-              )
-            : runtime.execution.run(request, (captured) => {
-                current = captured
-                return Reflect.apply(method, receiver, captured) as Promise<unknown>
-              })
-        }
-      })
-    }
+/** Capture operation input through the host, then invoke the original method on its owner. */
+function runBrowserEndpoint(binding: IBrowserEndpointBinding, args: unknown[]): unknown {
+  /** The key projection follows the host-captured input chosen for this admitted operation. */
+  let current = args
+  /** The host alone owns input capture, cancellation, deadlines and operation completion. */
+  const request = {
+    operation: binding.operation,
+    input: args,
+    ctx: args[binding.contextIndex] as IOperationContext,
+    ...(binding.keyFacts === undefined
+      ? {}
+      : { keys: () => binding.keyFacts!(binding.name, current) })
   }
+  return binding.sync
+    ? binding.runtime.execution.runSync(request, (captured) =>
+        binding.receiver[binding.name]!(...captured)
+      )
+    : binding.runtime.execution.run(request, (captured) => {
+        current = captured
+        return binding.receiver[binding.name]!(...captured) as Promise<unknown>
+      })
 }
