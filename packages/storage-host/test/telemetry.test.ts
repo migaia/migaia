@@ -1,3 +1,4 @@
+import { storageJournalPlugin } from '../src/journal.js'
 import { describe, expect, it } from 'vitest'
 import { Logger, type ILogEntry } from '@migaia/logger'
 import { level } from '@migaia/logger/plugins'
@@ -18,7 +19,7 @@ describe('ordinary storage telemetry', () => {
     /** Every first endpoint shares the original once-per-org initializer. */
     const preparations = new Map<string, number>()
     await using host = await createStorageHost({
-      plugins: [memoryBackendPlugin()],
+      plugins: [storageJournalPlugin(), memoryBackendPlugin()],
       journal: ({ orgId }) => {
         preparations.set(orgId, (preparations.get(orgId) ?? 0) + 1)
         return { logger, namespace: 'telemetry', telemetry: true }
@@ -130,14 +131,14 @@ describe('ordinary storage telemetry', () => {
       }
     }
     await using disabled = await createStorageHost({
-      plugins: [memoryBackendPlugin()],
+      plugins: [storageJournalPlugin(), memoryBackendPlugin()],
       journal: { logger: borrowed, namespace: 'disabled' }
     })
     await disabled.backend('memory').set('key', 'value')
     expect(calls).toBe(0)
     const reports: unknown[] = []
     await using enabled = await createStorageHost({
-      plugins: [memoryBackendPlugin()],
+      plugins: [storageJournalPlugin(), memoryBackendPlugin()],
       journal: { logger, namespace: 'enabled', telemetry: true },
       report: (error) => {
         reports.push(error)

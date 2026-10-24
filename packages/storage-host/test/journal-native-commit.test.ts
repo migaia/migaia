@@ -1,3 +1,4 @@
+import { storageJournalPlugin } from '../src/journal.js'
 import { describe, expect, it } from 'vitest'
 import { Logger } from '@migaia/logger'
 import { binlog, undoLog, memoryLogStore } from '@migaia/logger/plugins/durable'
@@ -19,7 +20,9 @@ const execution = { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } as
 
 describe('native storage journal commit bridge', () => {
   it('commits real binlog and coalesced undo images with data and leaves every index unchanged on rollback', async () => {
-    await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+    await using host = await createStorageHost({
+      plugins: [storageJournalPlugin(), memoryBackendPlugin()]
+    })
     const store = host.backend('memory')
     const binlogStore = await storageLogStore(host, 'memory', { prefix: 'native-binlog' })
     const undoStore = await storageLogStore(host, 'memory', { prefix: 'native-undo' })
@@ -135,7 +138,9 @@ describe('native storage journal commit bridge', () => {
   })
 
   it('rejects foreign or uncertified native handles and preserves the logger exact-store check', async () => {
-    await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+    await using host = await createStorageHost({
+      plugins: [storageJournalPlugin(), memoryBackendPlugin()]
+    })
     const store = host.backend('memory')
     const selected = await storageLogStore(host, 'memory', { prefix: 'selected' })
     const actual = await storageLogStore(host, 'memory', { prefix: 'actual' })
@@ -154,7 +159,9 @@ describe('native storage journal commit bridge', () => {
           access: resolveStorageJournalBinding(host.org(createOrgId()), 'memory')
         })
       ).rejects.toMatchObject({ code: 'UNSUPPORTED_CAPABILITY' })
-      await using otherHost = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+      await using otherHost = await createStorageHost({
+        plugins: [storageJournalPlugin(), memoryBackendPlugin()]
+      })
       await expect(
         createStorageNativeJournal({
           ...options,

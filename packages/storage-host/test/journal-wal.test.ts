@@ -1,3 +1,4 @@
+import { storageJournalPlugin } from '../src/journal.js'
 import { describe, expect, it } from 'vitest'
 import { Logger } from '@migaia/logger'
 import {
@@ -54,7 +55,9 @@ describe('external storage WAL', () => {
       runtimeManager,
       plugins: [binlog({ store: records }), wal({ store: intents })]
     })
-    await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+    await using host = await createStorageHost({
+      plugins: [storageJournalPlugin(), memoryBackendPlugin()]
+    })
     const store = host.backend('memory')
     const access = resolveStorageJournalBinding(host, 'memory')
     const resources: IStorageResource[] = []
@@ -158,7 +161,7 @@ describe('external storage WAL', () => {
       plugins: [binlog({ store: records }), wal({ store: intents })]
     })
     await using host = await createStorageHost({
-      plugins: [memoryBackendPlugin()],
+      plugins: [storageJournalPlugin(), memoryBackendPlugin()],
       journal: { logger, namespace: 'automatic-wal' }
     })
     try {
@@ -204,7 +207,7 @@ describe('external storage WAL', () => {
       plugins: [undoLog({ store: images }), wal({ store: intents })]
     })
     await using host = await createStorageHost({
-      plugins: [memoryBackendPlugin()],
+      plugins: [storageJournalPlugin(), memoryBackendPlugin()],
       journal: { logger, namespace: 'external-undo-only' }
     })
     try {
@@ -241,7 +244,9 @@ describe('external storage WAL', () => {
       runtimeManager,
       plugins: [undoLog({ store: images }), wal({ store: intents })]
     })
-    await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+    await using host = await createStorageHost({
+      plugins: [storageJournalPlugin(), memoryBackendPlugin()]
+    })
     const store = host.backend('memory')
     await store.set('value', 'before')
     const access = resolveStorageJournalBinding(host, 'memory')
@@ -334,7 +339,9 @@ describe('external storage WAL', () => {
       runtimeManager,
       plugins: [binlog({ store: records }), wal({ store: intents })]
     })
-    await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+    await using host = await createStorageHost({
+      plugins: [storageJournalPlugin(), memoryBackendPlugin()]
+    })
     try {
       const access = resolveStorageJournalBinding(host, 'memory')
       const options = { access, backend: host.backend('memory').backend, namespace: 'bad', logger }

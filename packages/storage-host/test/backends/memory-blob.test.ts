@@ -1,3 +1,5 @@
+import { memoryNotificationsFeature } from '../../src/features/memory-notifications.js'
+import { memoryChangeFeedFeature } from '../../src/features/memory-change-feed.js'
 import { describe, expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import { blob, type IBlobApi, type IStorageChange } from '@migaia/storage-contract'
@@ -12,7 +14,14 @@ import { MemoryOperation } from '../../src/backends/memory-constants.js'
 /** Installed stores exercise the reference object backend through the authentic capability token. */
 describe('memory native objects', () => {
   it('detaches body and metadata snapshots, inclusive ranges and the one original content claim', async () => {
-    await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+    await using host = await createStorageHost({
+      plugins: [
+        memoryBackendPlugin(undefined, {
+          notifications: memoryNotificationsFeature(),
+          changeFeed: memoryChangeFeedFeature()
+        })
+      ]
+    })
     const store = host.backend('memory')
     const api = store.use(blob)
     const body = new Uint8Array([1, 2, 3, 4])
@@ -51,7 +60,14 @@ describe('memory native objects', () => {
   })
 
   it('checks native conditions before reader ownership and rechecks the generation after upload', async () => {
-    await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+    await using host = await createStorageHost({
+      plugins: [
+        memoryBackendPlugin(undefined, {
+          notifications: memoryNotificationsFeature(),
+          changeFeed: memoryChangeFeedFeature()
+        })
+      ]
+    })
     const api = host.backend('memory').use(blob)
     const initial = await api.put('key', new Uint8Array([1]))
     const rejected = new ReadableStream<Uint8Array>()
@@ -84,7 +100,14 @@ describe('memory native objects', () => {
   })
 
   it('cancels blocked uploads once, preserves abort causes and retains old data after native failure', async () => {
-    await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+    await using host = await createStorageHost({
+      plugins: [
+        memoryBackendPlugin(undefined, {
+          notifications: memoryNotificationsFeature(),
+          changeFeed: memoryChangeFeedFeature()
+        })
+      ]
+    })
     const api = host.backend('memory').use(blob)
     const initial = await api.put('key', new Uint8Array([1]))
     const read = deferred<void>()
@@ -124,7 +147,14 @@ describe('memory native objects', () => {
     expect(await api.head('key')).toEqual(initial)
     const closeRead = deferred<void>()
     const closeCancel = vi.fn()
-    const closingHost = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+    const closingHost = await createStorageHost({
+      plugins: [
+        memoryBackendPlugin(undefined, {
+          notifications: memoryNotificationsFeature(),
+          changeFeed: memoryChangeFeedFeature()
+        })
+      ]
+    })
     const closingUpload = new ReadableStream<Uint8Array>(
       {
         pull() {
@@ -149,7 +179,15 @@ describe('memory native objects', () => {
     const orgB = createOrgId()
     await using host = await createStorageHost({
       org: defaultOrg,
-      plugins: [memoryBackendPlugin({ namespace: 'objects' })]
+      plugins: [
+        memoryBackendPlugin(
+          { namespace: 'objects' },
+          {
+            notifications: memoryNotificationsFeature(),
+            changeFeed: memoryChangeFeedFeature()
+          }
+        )
+      ]
     })
     const root = host.backend('memory').use(blob)
     const a = host.org(orgA).backend('memory').use(blob)
@@ -182,7 +220,15 @@ describe('memory native objects', () => {
 
   it('accounts one native body per entry in the original cross-channel capacity and invalidation owner', async () => {
     await using host = await createStorageHost({
-      plugins: [memoryBackendPlugin({ capacity: { maxEntries: 2, maxBytes: 4 } })]
+      plugins: [
+        memoryBackendPlugin(
+          { capacity: { maxEntries: 2, maxBytes: 4 } },
+          {
+            notifications: memoryNotificationsFeature(),
+            changeFeed: memoryChangeFeedFeature()
+          }
+        )
+      ]
     })
     const store = host.backend('memory')
     const api = store.use(blob)
@@ -223,7 +269,15 @@ describe('memory native objects', () => {
         return {}
       }
     }))
-    await using host = await createStorageHost({ plugins: [memoryBackendPlugin(), intervene] })
+    await using host = await createStorageHost({
+      plugins: [
+        memoryBackendPlugin(undefined, {
+          notifications: memoryNotificationsFeature(),
+          changeFeed: memoryChangeFeedFeature()
+        }),
+        intervene
+      ]
+    })
     const api: IBlobApi = host.backend('memory').use(blob)
     await api.put('original', new Uint8Array([1]))
     expect(entries).toBe(1)

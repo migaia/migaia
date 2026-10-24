@@ -1,3 +1,5 @@
+import { memoryNotificationsFeature } from '../../src/features/memory-notifications.js'
+import { memoryChangeFeedFeature } from '../../src/features/memory-change-feed.js'
 import { describe, expect, it } from 'vitest'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { deferred } from '@migaia/utils/promise'
@@ -17,7 +19,14 @@ type IPayload = { group: string; order: number }
 /** Every scenario enters through an actually installed native memory backend. */
 describe('memory native vectors', () => {
   it('drains an accepted asynchronous reranker before host disposal completes', async () => {
-    const host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+    const host = await createStorageHost({
+      plugins: [
+        memoryBackendPlugin(undefined, {
+          notifications: memoryNotificationsFeature(),
+          changeFeed: memoryChangeFeedFeature()
+        })
+      ]
+    })
     const collection = host.backend('memory').use(vector).collection('rerank-drain', {
       dimensions: 1,
       metric: 'dot'
@@ -50,7 +59,14 @@ describe('memory native vectors', () => {
     expect(disposed).toBe(true)
   })
   it('ranks exact finite scores with UTF-16 ties and detached payload/vector output', async () => {
-    await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+    await using host = await createStorageHost({
+      plugins: [
+        memoryBackendPlugin(undefined, {
+          notifications: memoryNotificationsFeature(),
+          changeFeed: memoryChangeFeedFeature()
+        })
+      ]
+    })
     const store = host.backend('memory')
     expect(store.has(vector)).toBe(true)
     const collection = store
@@ -102,7 +118,14 @@ describe('memory native vectors', () => {
   })
 
   it('filters declarative payloads before topK and runs JavaScript only on bounded engine hits', async () => {
-    await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+    await using host = await createStorageHost({
+      plugins: [
+        memoryBackendPlugin(undefined, {
+          notifications: memoryNotificationsFeature(),
+          changeFeed: memoryChangeFeedFeature()
+        })
+      ]
+    })
     const collection = host
       .backend('memory')
       .use(vector)
@@ -146,7 +169,14 @@ describe('memory native vectors', () => {
   })
 
   it('uses shared similarTo/recommend sample semantics and rejects invalid directions', async () => {
-    await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+    await using host = await createStorageHost({
+      plugins: [
+        memoryBackendPlugin(undefined, {
+          notifications: memoryNotificationsFeature(),
+          changeFeed: memoryChangeFeedFeature()
+        })
+      ]
+    })
     const collection = host
       .backend('memory')
       .use(vector)
@@ -201,7 +231,15 @@ describe('memory native vectors', () => {
 
   it('shares vector TTL with the physical draft and preserves rollback, deadlines and conflict identity', async () => {
     const scheduler = createManualScheduler()
-    await using host = await createStorageHost({ scheduler, plugins: [memoryBackendPlugin()] })
+    await using host = await createStorageHost({
+      scheduler,
+      plugins: [
+        memoryBackendPlugin(undefined, {
+          notifications: memoryNotificationsFeature(),
+          changeFeed: memoryChangeFeedFeature()
+        })
+      ]
+    })
     const store = host.backend('memory')
     const collection = store.use(vector).collection('docs', { dimensions: 2, metric: 'dot' })
     const target = lockKey.vector('docs', 'a')
@@ -251,7 +289,15 @@ describe('memory native vectors', () => {
 
   it('validates k=0 without scanning and physically deletes expired matches with actual counts', async () => {
     const scheduler = createManualScheduler()
-    await using host = await createStorageHost({ scheduler, plugins: [memoryBackendPlugin()] })
+    await using host = await createStorageHost({
+      scheduler,
+      plugins: [
+        memoryBackendPlugin(undefined, {
+          notifications: memoryNotificationsFeature(),
+          changeFeed: memoryChangeFeedFeature()
+        })
+      ]
+    })
     const store = host.backend('memory')
     const collection = store
       .use(vector)
@@ -280,7 +326,14 @@ describe('memory native vectors', () => {
   })
 
   it('keeps org, notifications, extracted sources and lock admission on their original owner', async () => {
-    const host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+    const host = await createStorageHost({
+      plugins: [
+        memoryBackendPlugin(undefined, {
+          notifications: memoryNotificationsFeature(),
+          changeFeed: memoryChangeFeedFeature()
+        })
+      ]
+    })
     const first = createOrgId()
     const second = createOrgId()
     const left = host.org(first).backend('memory')
