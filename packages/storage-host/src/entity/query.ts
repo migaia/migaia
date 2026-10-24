@@ -65,6 +65,12 @@ export function createEntityQuery<
   selection: IEntityQuerySourceSelection<T> = {},
   sourceAllowed = true
 ): IEntityQuery<T, TIndexes, TContext, TMethods> {
+  /**
+   * One descriptor keeps its wrapped default callback identity across original keyset page
+   * signatures.
+   */
+  const defaultComparator =
+    input.defaultComparator === undefined ? undefined : input.comparator(input.defaultComparator)
   /** Every read delegates to the original terminal inside the existing entity operation owner. */
   const reads = <R>(
     prepare: (
@@ -230,9 +236,7 @@ export function createEntityQuery<
     if (bound === undefined) return input.missingLimit()
     const capacity = skip + bound
     if (!Number.isSafeInteger(capacity)) return input.invalidState()
-    const ordered = query
-      .orderByComparator(compared ?? input.comparator(input.defaultComparator!))
-      .limit(capacity)
+    const ordered = query.orderByComparator(compared ?? defaultComparator!).limit(capacity)
     return page(ordered as IRecordQuery<T, TContext, TMethods>, bound, skip)
   }
   /** Each branch retains the actual immutable core query rather than replaying its configuration. */

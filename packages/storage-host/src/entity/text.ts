@@ -1,5 +1,19 @@
 /** Stable entity boundary diagnostics remain shared across every root and transaction path. */
 export const EntityText = {
+  /** Pure index explanations distinguish declared candidates from physical readiness and fallback. */
+  queryIndexNoCandidate:
+    'No eligible leading declared-index condition; authoritative source remains',
+  /** User source selection wins over every automatic index candidate. */
+  queryIndexExplicit:
+    'Explicit source selection; native readiness or authoritative fallback is decided when opened',
+  /** Automatic ranges are candidate bounds, never a promise of ready physical filtering. */
+  queryIndexChosen: (rank: number) =>
+    `Static index priority ${rank} (${['unique eq', 'eq or shortest in', 'bounded range', 'one-sided range or startsWith'][rank]}); canonical candidate range with exact predicate recheck and possible authoritative fallback`,
+  /** Selector, multi-entry and unmatched paths cannot provide this scalar range restriction. */
+  queryIndexNotEligible: 'No eligible leading scalar path condition for this declaration',
+  /** Declaration order breaks equal static priority without statistics or additional I/O. */
+  queryIndexLowerPriority:
+    'Another declaration has higher static priority or earlier declaration order',
   /** Predicates are synchronous boolean decisions; async mapping belongs to select. */
   queryPredicateBoolean: 'Entity query predicate must return a synchronous boolean',
   /** Selector results belong to the existing portable key domain and cannot be asynchronous. */
