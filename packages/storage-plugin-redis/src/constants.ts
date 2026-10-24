@@ -18,6 +18,8 @@ export const RedisCommand = {
   hget: 'HGET',
   /** Native binary HASH capture for selected vector points. */
   hgetall: 'HGETALL',
+  /** Private namespace truncation removes only the fields accepted by its native draft. */
+  hdel: 'HDEL',
   /** Exact Redis absolute expiry preserves HASH deadlines across draft rewrites. */
   pexpiretime: 'PEXPIRETIME',
   /** Native HINCRBY protocol word used by fixed Redis endpoints. */
