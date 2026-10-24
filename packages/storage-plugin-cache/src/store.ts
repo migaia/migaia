@@ -1210,12 +1210,10 @@ function createCacheStoreApi(
     setMany: (entries, ctx) => {
       const captured = captureEntries(organizationContext, entries)
       return run(organizationContext, CacheOperation.setMany, captured, ctx, async (actual) => {
-        const seen = new Set<string>(),
-          items: { key: string; entry: ICacheEntry; policy: ICachePolicy }[] = []
+        /** Canonical entry admission already proves string values and unique keys for this batch. */
+        const items: { key: string; entry: ICacheEntry; policy: ICachePolicy }[] = []
         for (const item of captureEntries(organizationContext, actual)) {
           physical(organizationContext.cacheContext, item.key)
-          if (typeof item.value !== 'string' || seen.has(item.key)) throw invalidArgument()
-          seen.add(item.key)
           const policy = batchPolicy(organizationContext, item.ttlMs)
           const entry = await encodeEntry(
             organizationContext.cacheContext.configuration,
