@@ -217,3 +217,11 @@ try {
 IndexedDB 支持从 `@migaia/storage-host/journal` 调用 `storageLogStore(hostOrOrg, 'indexed-db', { prefix })`。私有行使用既有 META 对象仓库内的数组键命名空间。业务 `clearAll` 保留历史；删除组织使旧日志缓存句柄失效，原业务视图仍可重新打开。重新打开同一物理组织和前缀前须释放原日志。head、state 与记录随原生事务一同提交，缓存索引在真实 complete 事件内发布。
 
 对于当前 realm 的持久 IndexedDB factory，原生 Web Locks 在整个资源期间保证参与页面间独占；冲突打开报 LOCK_REJECTED。缺少 Web Locks 时，此缓存日志组合在恢复 I/O 前报 UNSUPPORTED_CAPABILITY，普通 IndexedDB 操作仍可使用。注入 factory 有原生 Web Locks 时同样使用该能力；缺少时，只有显式声明 `journalFactoryIsPrivate: true`、数据宇宙仅限当前 realm 且不转发共享持久库的组合，才复用原逻辑锁拥有者。对象身份本身不证明隔离。此命名空间支持本身不启用全局自动捕获或显式选择的 undo。
+
+## IndexedDB 全局日志与显式 undo
+
+在 Host 的 `journal` 初始化函数中，用当前组织的 `storageLogStore` 打开原生 binlog 与 undo 仓库，再将同一对象交给 logger 插件及 `atomicBinlog` / `atomicUndo`。选择带 undo 插件的 logger 时必须显式设置 `indexedDbUndo: true`；缺省或 false 在业务原生事务前报 `UNSUPPORTED_CAPABILITY`。通过 Host 配置得到的后端与组织视图可调用 `undo(txId)`，恢复由原事务 builder 执行。
+
+文本、字节、记录、清空与绝对 TTL 元数据的实际写入顺序保留在同一原生事务中；重复写入不按通道重排。原生 complete 才发布日志索引，回滚不增加日志序列。首次组织只读同样完成该组织的一次配置；惰性过期删除与日志一起提交。所有契约写入维护原生点修订，删除或清空后保留墓碑，因此其它无日志契约句柄的 clear/recreate 也会使旧 undo 报 `UNDO_CONFLICT`，在恢复任何目标前拒绝。undo 比对原物理镜像，恢复原绝对期限，不延长过期时间。
+
+原生 Feature 直接借用 IDBDatabase / IDBTransaction，超出当前文本、字节、记录镜像域。启用提交日志的组合在交出该原生句柄前报 `UNSUPPORTED_CAPABILITY`；普通与仅遥测配置下的 Blob / 自定义原生 Feature 保持可用。此有限组合仍待共享目标与 codec 方案复查。严格 IndexedDB 不声明允许最终镜像后等待外部 WAL 的能力，该组合在业务 I/O 前拒绝。

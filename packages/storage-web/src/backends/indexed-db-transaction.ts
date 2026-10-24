@@ -77,6 +77,8 @@ export async function runNativeIndexedDbTransaction<
   readonly registerNative: (scope: TScope, abort: () => void) => () => void
   /** Private journal observers receive only the actual native complete/abort decision. */
   readonly onNativeEnd?: (committed: boolean) => void
+  /** The same registered native view binds its commit bridge before the business callback. */
+  readonly onRegistered?: (scope: TScope) => void
   /** Final synchronous native decision, after the owner's actual finalizers and observers. */
   readonly validateCommit?: () => void
   readonly changedKeys: () => number
@@ -244,6 +246,7 @@ export async function runNativeIndexedDbTransaction<
         })
       )
     )
+    input.onRegistered?.(scope)
     unsubscribeAbort = subscribeToAbort(
       input.signal,
       () =>

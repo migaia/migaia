@@ -2324,7 +2324,7 @@ describe('indexedDbHost backend', () => {
   })
 
   it.each(['clearRecords', 'clearAll'] as const)(
-    '%s 保留 public metadata，清空 per-record revisions 但保留 global epoch',
+    '%s 保留 public metadata、global epoch 与防 ABA 墓碑，清空旧索引 revisions',
     async (operation) => {
       const factory = freshFactory()
       const dbName = `clear-scope-${operation}`
@@ -2340,8 +2340,8 @@ describe('indexedDbHost backend', () => {
       await expect(store.getRecord('record-1')).resolves.toBeUndefined()
       await store.dispose()
 
-      // Per-record/per-scope revisions to be cleared, not just the record itself —
-      // only the global epoch counter may survive.
+      // Original record/index revisions are cleared; complete point tombstones survive so an
+      // independently opened contract writer cannot reset a committed undo revision.
       const database = await new Promise<IDBDatabase>((resolve) => {
         const request = factory.open(dbName)
         request.onsuccess = () => resolve(request.result)
@@ -2352,7 +2352,11 @@ describe('indexedDbHost backend', () => {
         request.onsuccess = () => resolve(request.result as IDBValidKey[])
       })
       database.close()
-      expect(revisionKeys).toEqual(['__storage_web_record_epoch__'])
+      expect(revisionKeys).toEqual([
+        '__storage_web_record_epoch__',
+        ['__storage_web_internal__', 'journal-point', 'record', encodeFlatStorageKey('record-1')],
+        ['__storage_web_internal__', 'journal-point', 'record', encodeFlatStorageKey('record-2')]
+      ])
     }
   )
 

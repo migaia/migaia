@@ -1,5 +1,10 @@
 import { bindBrowserExecution } from './execution.js'
 import {
+  createIndexedDbJournalImages,
+  indexedDbJournalTarget,
+  isIndexedDbJournalRevision
+} from './indexed-db-images.js'
+import {
   createIndexedDbJournalTerminal,
   createIndexedDbJournalView,
   IndexedDbJournalLayout
@@ -59,6 +64,8 @@ import {
   createBackendJournalNamespace,
   storageJournalLockKey,
   StorageJournalLock,
+  encodeStorageJournalImage,
+  decodeStorageJournalImage,
   type IBackendJournalTransaction,
   createStorageOperationReporter,
   createStorageOperationRuntime,
@@ -66,7 +73,12 @@ import {
   resolveStorageNamespace,
   type IStorageOperationRuntime
 } from '@migaia/storage-host/authoring/backend'
-import type { IStorageJournalBackendBinding } from '@migaia/storage-host'
+import type {
+  IStorageJournalBackendBinding,
+  IStorageJournalImage,
+  IStorageJournalTarget,
+  IStorageJournalAttempt
+} from '@migaia/storage-host'
 import {
   createStorageAggregateError,
   StorageError,
@@ -304,6 +316,7 @@ type IIndexedDbStore<TValue> = Omit<
     ): Promise<Awaited<TResult>>
     tx(): ITransactionBuilder<IIndexedDbTransactionScope<TValue>>
     inspectLocks(ctx?: IOperationContext): Promise<readonly ILockHolding[]>
+    undo?(txId: string, ctx?: IOperationContext): Promise<{ readonly txId: string }>
   }
 
 /** Native views retain the exact records capability granted by their original backend. */
@@ -872,6 +885,7 @@ export const indexedDbHost = <TValue = unknown>(
     )) as IDBValidKey[]
     for (const key of keys) {
       if (key === RECORD_EPOCH_KEY) continue
+      if (isIndexedDbJournalRevision(key, INTERNAL_META_NAMESPACE)) continue
       revisionStore.delete(key)
     }
   }
@@ -2856,8 +2870,17 @@ export const indexedDbHost = <TValue = unknown>(
         scope: Omit<ITransactionScope, 'use'>,
         prefix: string
       ) => IBackendJournalTransaction
+      readonly images: {
+        readonly changes: ReturnType<typeof createIndexedDbJournalImages>['changes']
+        readImage(target: IStorageJournalTarget): Promise<IStorageJournalImage>
+        writeImage(target: IStorageJournalTarget, image: IStorageJournalImage): Promise<void>
+        readonly readRevision: (
+          target: IStorageJournalTarget
+        ) => ReturnType<ReturnType<typeof createIndexedDbJournalImages>['revision']>
+      }
       readonly abort: () => void
       readonly clearRoot: (channel: 'value' | 'bytes' | 'record' | undefined) => Promise<void>
+      readonly readKeys: () => Promise<string[]>
       readonly ttl: (scope: ITransactionScope) => ITransactionTtlApi
       readonly expiredRecord: (key: IStorageKey) => Promise<boolean>
       readonly recordEpoch: (
@@ -2869,15 +2892,27 @@ export const indexedDbHost = <TValue = unknown>(
       ) => Promise<number>
     }
   >()
+  /** Private journal methods authenticate exact live views through this original native registry. */
+  const journalNative = (scope: Omit<ITransactionScope, 'use'>) => {
+    const { id } = assertTransactionOwner(construction.store, scope)
+    const current = nativeTransactions.get(id)
+    if (current === undefined)
+      throw new StorageContractError(StorageContractErrorCode.invalidArgument)
+    return current
+  }
 
   /** Lazy expiry is a write only when a live native target is actually removed. */
-  const assertExpiryRemoval = (channel: 'value' | 'bytes' | 'record', key: IStorageKey): void => {
+  const assertExpiryRemoval = (
+    channel: 'value' | 'bytes' | 'record',
+    key: IStorageKey,
+    context?: Parameters<typeof coordination.keyPort.probe>[2]
+  ): void => {
     const lockChannel = channel === 'value' ? 'text' : channel
     const range = snapshotConcurrencyLockRange(
       { channel: lockChannel, prefix: key },
       StorageBackend.indexedDb
     )
-    const held = coordination.keyPort.probe([], [{ channel: lockChannel, ...range }])
+    const held = coordination.keyPort.probe([], [{ channel: lockChannel, ...range }], context)
     if (held !== undefined)
       throw new StorageContractError(StorageContractErrorCode.writeConflict, {
         backend: StorageBackend.indexedDb,
@@ -2901,6 +2936,28 @@ export const indexedDbHost = <TValue = unknown>(
     const changed = new Map<'value' | 'bytes' | 'record', Map<string, IStorageKey>>()
     /** Indexed writes update one scope epoch in this same transaction. */
     const indexedScopes = new Set<string>()
+    /**
+     * Complete point revisions share this existing native revision store, including non-journal
+     * writers.
+     */
+    const journalImages = createIndexedDbJournalImages({
+      namespace: INTERNAL_META_NAMESPACE,
+      revisions: native.objectStore(REVISIONS_STORE_NAME),
+      request,
+      read: async (channel, key) => {
+        const target = native.objectStore(
+          channel === 'value'
+            ? kvStoreName
+            : channel === 'bytes'
+              ? bytesStoreName
+              : recordsStoreName
+        )
+        const value: unknown = await request(() => target.get(toIdbKey(key)))
+        const present =
+          value !== undefined || (await request(() => target.getKey(toIdbKey(key)))) !== undefined
+        return { present, value: channel === 'bytes' ? readIndexedDbBytes(value) : value }
+      }
+    })
 
     /** Mark an actual mutation without publishing before native commit. */
     const markChanged = (channel: 'value' | 'bytes' | 'record', key: IStorageKey): void => {
@@ -2962,7 +3019,9 @@ export const indexedDbHost = <TValue = unknown>(
       const existing = await request(() => native.objectStore(name).getKey(toIdbKey(key)))
       if (existing === undefined) return
       assertRemoval?.(channel, key)
-      await request(() => native.objectStore(name).delete(toIdbKey(key)))
+      await journalImages.mutate(channel, key, false, undefined, () =>
+        request(() => native.objectStore(name).delete(toIdbKey(key)))
+      )
       markChanged(channel, key)
       if (channel === 'record') await reviseRecord(key, !(await deleteRecordSidecars(key)))
     }
@@ -2986,7 +3045,8 @@ export const indexedDbHost = <TValue = unknown>(
             .getKey(toIdbKey(key))
         )) !== undefined,
       remove: removeNative,
-      changed: markChanged
+      changed: markChanged,
+      deadline: journalImages.deadline
     })
 
     /** Scope epochs advance once per native transaction, including cursor-driven expiry. */
@@ -3006,6 +3066,7 @@ export const indexedDbHost = <TValue = unknown>(
       reviseRecord,
       deleteRecordSidecars,
       removeNative,
+      journalImages,
       ttlAccess,
       finishIndexes
     }
@@ -3013,6 +3074,8 @@ export const indexedDbHost = <TValue = unknown>(
 
   /** Native root calls retain only their original endpoint input, notification and lock derivation. */
   type IRootMode<R> = {
+    /** Read endpoints probe existing holders only when TTL actually removes a point. */
+    readonly read?: true
     readonly executeAttempt: (context: IWriteOptions, proceed: () => Promise<R>) => PromiseLike<R>
     readonly lock: (context: IWriteOptions) => readonly ILockKey[]
     readonly ranges: () => readonly {
@@ -3033,16 +3096,23 @@ export const indexedDbHost = <TValue = unknown>(
     options: ITransactionOptions | undefined,
     lease: IMutationLeaseContext,
     pipeline = true,
-    root?: IRootMode<Awaited<T>>
+    root?: IRootMode<Awaited<T>>,
+    journaled = true
   ): Promise<Awaited<T>> => {
     assertTransactionCallback(run, StorageBackend.indexedDb)
+    /** Private log transactions opt out before the original prepare and head-lock derivation. */
+    const selectedJournal = journaled ? runtime.journal : undefined
     /** The shared loop captures the raw option once and retains inherited attempt identity. */
     return runWithConcurrency(
       {
         store,
         options: options === undefined ? {} : options,
+        prepare: selectedJournal === undefined ? undefined : () => selectedJournal.prepare(),
         executeAttempt: root?.executeAttempt,
-        lock: root?.lock
+        lock:
+          selectedJournal === undefined
+            ? root?.lock
+            : (context) => [...(root?.lock(context) ?? []), ...selectedJournal.headLocks()]
       },
       {
         attempt: (context) =>
@@ -3129,6 +3199,8 @@ export const indexedDbHost = <TValue = unknown>(
                    * attempt.
                    */
                   let journalTerminal: ReturnType<typeof createIndexedDbJournalTerminal> | undefined
+                  /** Actual commit-only external work drains after this same native terminal. */
+                  let journalAttempt: IStorageJournalAttempt | undefined
                   /** One physical access owns all data/deadline mutations in this native attempt. */
                   const {
                     changed,
@@ -3137,9 +3209,44 @@ export const indexedDbHost = <TValue = unknown>(
                     reviseRecord,
                     deleteRecordSidecars,
                     removeNative,
+                    journalImages,
                     ttlAccess,
                     finishIndexes
-                  } = createNativeDataAccess(native, signal, operationRuntime, request)
+                  } = createNativeDataAccess(
+                    native,
+                    signal,
+                    operationRuntime,
+                    request,
+                    root?.read
+                      ? (channel, key) => assertExpiryRemoval(channel, key, context)
+                      : undefined
+                  )
+                  /**
+                   * The same physical writer owns data, image order, raw-record sidecars and
+                   * revisions.
+                   */
+                  const putNative = async (
+                    channel: 'value' | 'bytes' | 'record',
+                    key: IStorageKey,
+                    value: unknown,
+                    indexed = false
+                  ): Promise<void> => {
+                    const name =
+                      channel === 'value'
+                        ? kvStoreName
+                        : channel === 'bytes'
+                          ? bytesStoreName
+                          : recordsStoreName
+                    await journalImages.mutate(
+                      channel,
+                      key,
+                      true,
+                      channel === 'bytes' ? readIndexedDbBytes(value) : value,
+                      () => request(() => native.objectStore(name).put(value, toIdbKey(key)))
+                    )
+                    markChanged(channel, key)
+                    if (channel === 'record') await reviseRecord(key, !indexed)
+                  }
                   /** Resolve the existing cross-channel policy inside this same native transaction. */
                   const write = async (
                     channel: 'value' | 'bytes' | 'record',
@@ -3184,22 +3291,16 @@ export const indexedDbHost = <TValue = unknown>(
                           : removal === 'bytes'
                             ? bytesStoreName
                             : recordsStoreName
-                      await request(() => native.objectStore(name).delete(toIdbKey(key)))
+                      await journalImages.mutate(removal, key, false, undefined, () =>
+                        request(() => native.objectStore(name).delete(toIdbKey(key)))
+                      )
                       await ttlAccess.removed(removal, key)
                       markChanged(removal, key)
                       if (removal === 'record')
                         await reviseRecord(key, !(await deleteRecordSidecars(key)))
                     }
-                    const name =
-                      channel === 'value'
-                        ? kvStoreName
-                        : channel === 'bytes'
-                          ? bytesStoreName
-                          : recordsStoreName
-                    await request(() => native.objectStore(name).put(value, toIdbKey(key)))
+                    await putNative(channel, key, value, indexed)
                     await ttlAccess.written(channel, key)
-                    markChanged(channel, key)
-                    if (channel === 'record') await reviseRecord(key, !indexed)
                   }
                   /** Explicit removal clears the old target deadline in the same native transaction. */
                   const remove = async (
@@ -3229,8 +3330,11 @@ export const indexedDbHost = <TValue = unknown>(
                             ? bytesStoreName
                             : recordsStoreName
                       const physical = native.objectStore(name)
-                      const count = await request(() => physical.count())
-                      await request(() => physical.clear())
+                      const keys = await request(() => physical.getAllKeys())
+                      const count = keys.length
+                      await journalImages.clear(target, keys as IStorageKey[], () =>
+                        request(() => physical.clear())
+                      )
                       await ttlAccess.clear(target)
                       if (count > 0) changed.set(target, new Map())
                     }
@@ -3277,7 +3381,9 @@ export const indexedDbHost = <TValue = unknown>(
                     while (cursor !== null && prefix.matches(cursor.key as IStorageKey)) {
                       const key = cursor.key as IStorageKey
                       if (await ttlAccess.present(channel, key)) {
-                        await request(() => cursor!.delete())
+                        await journalImages.mutate(channel, key, false, undefined, () =>
+                          request(() => cursor!.delete())
+                        )
                         await ttlAccess.removed(channel, key)
                         markChanged(channel, key)
                         if (channel === 'record')
@@ -3786,7 +3892,9 @@ export const indexedDbHost = <TValue = unknown>(
                       Object.defineProperty(scope, 'api', { value: api, enumerable: true })
                     return Object.freeze(scope)
                   }
-                  return await runNativeIndexedDbTransaction({
+                  /** Original observer factories may synchronously start accepted scope operations. */
+                  if (selectedJournal?.active()) journalImages.changes()
+                  const result = await runNativeIndexedDbTransaction({
                     transaction: native,
                     guardStoreName: REVISIONS_STORE_NAME,
                     guardKey: RECORD_EPOCH_KEY,
@@ -3804,6 +3912,21 @@ export const indexedDbHost = <TValue = unknown>(
                       const { id } = assertTransactionOwner(store, scope)
                       nativeTransactions.set(id, {
                         native,
+                        readKeys: async () => {
+                          const keys = await request(() =>
+                            native.objectStore(kvStoreName).getAllKeys()
+                          )
+                          const live: string[] = []
+                          for (const key of keys) {
+                            assertStringStorageKey(
+                              key,
+                              StorageBackend.indexedDb,
+                              'persisted value key'
+                            )
+                            if (await ttlAccess.present('value', key)) live.push(key)
+                          }
+                          return live
+                        },
                         journal: (view, prefix) => {
                           journalTerminal ??= createIndexedDbJournalTerminal((error) =>
                             reportCleanupError(operationRuntime.reporter, error)
@@ -3822,6 +3945,68 @@ export const indexedDbHost = <TValue = unknown>(
                             onRollback: journalTerminal.onRollback,
                             onEnd: journalTerminal.onEnd,
                             run: (work) => runTransactionOperation(view, () => work(metadata))
+                          }
+                        },
+                        images: {
+                          changes: journalImages.changes,
+                          readImage: async (target) => {
+                            const row = indexedDbJournalTarget(target)
+                            if (row.metadata) {
+                              const deadline = await ttlAccess.deadline(row.channel, row.key)
+                              return encodeStorageJournalImage(deadline !== undefined, deadline)
+                            }
+                            const name =
+                              row.channel === 'value'
+                                ? kvStoreName
+                                : row.channel === 'bytes'
+                                  ? bytesStoreName
+                                  : recordsStoreName
+                            const targetStore = native.objectStore(name)
+                            const value: unknown = await request(() =>
+                              targetStore.get(toIdbKey(row.key))
+                            )
+                            const present =
+                              value !== undefined ||
+                              (await request(() => targetStore.getKey(toIdbKey(row.key)))) !==
+                                undefined
+                            return encodeStorageJournalImage(
+                              present,
+                              row.channel === 'bytes' ? readIndexedDbBytes(value) : value,
+                              row.channel === 'bytes'
+                            )
+                          },
+                          writeImage: async (target, image) => {
+                            const row = indexedDbJournalTarget(target)
+                            const decoded = decodeStorageJournalImage(
+                              image,
+                              row.channel === 'bytes' && !row.metadata
+                            )
+                            if (row.metadata) {
+                              if (
+                                decoded.present &&
+                                (typeof decoded.value !== 'number' ||
+                                  !Number.isFinite(decoded.value))
+                              )
+                                throw new StorageContractError(
+                                  StorageContractErrorCode.invalidArgument
+                                )
+                              await ttlAccess.restore(
+                                row.channel,
+                                row.key,
+                                decoded.present ? (decoded.value as number) : undefined
+                              )
+                            } else if (!decoded.present) await removeNative(row.channel, row.key)
+                            else {
+                              if (row.channel === 'value' && typeof decoded.value !== 'string')
+                                throw new StorageContractError(
+                                  StorageContractErrorCode.invalidArgument
+                                )
+                              await putNative(row.channel, row.key, decoded.value)
+                            }
+                          },
+                          readRevision: (target) => {
+                            const row = indexedDbJournalTarget(target)
+                            return journalImages.revision(row.channel, row.key)
                           }
                         },
                         abort,
@@ -3907,7 +4092,10 @@ export const indexedDbHost = <TValue = unknown>(
                       }
                     },
                     onNativeEnd: (committed) => journalTerminal?.complete(committed),
-                    beforeCommit: async () => {
+                    onRegistered: (scope) => {
+                      journalAttempt = selectedJournal?.begin(scope)
+                    },
+                    beforeCommit: async (scope) => {
                       for (const { handle, indexName, indexValue } of uniqueChecks.values()) {
                         const owners = await request(() =>
                           native
@@ -3933,6 +4121,7 @@ export const indexedDbHost = <TValue = unknown>(
                           )
                       }
                       await finishIndexes()
+                      await journalAttempt?.record(scope)
                     },
                     validateCommit: () => {
                       /** A retained value whose deadline elapsed cannot be committed as still live. */
@@ -4018,6 +4207,8 @@ export const indexedDbHost = <TValue = unknown>(
                       }
                     }
                   })
+                  await journalAttempt?.settle?.()
+                  return result
                 }
                 try {
                   const value = pipeline
@@ -4045,6 +4236,12 @@ export const indexedDbHost = <TValue = unknown>(
     )
   }
 
+  /**
+   * Iterator pages reuse the same optional backend journal port without shadowing operation
+   * runtime.
+   */
+  const runtimeJournal = runtime.journal
+
   /** Each real root attempt captures its payload before logical admission; acquire waits reuse it. */
   type IRootPrepared<R> = {
     readonly keys: readonly ILockKey[]
@@ -4057,7 +4254,8 @@ export const indexedDbHost = <TValue = unknown>(
     input: I,
     options: IWriteOptions | undefined,
     notification: IRootMode<Awaited<R>>['notification'],
-    prepare: (input: I, context: IWriteOptions) => IRootPrepared<R>
+    prepare: (input: I, context: IWriteOptions) => IRootPrepared<R>,
+    read = false
   ): Promise<Awaited<R>> => {
     /** Pipeline output is fixed before implicit key/range derivation can run. */
     let capturedInput = input
@@ -4065,6 +4263,7 @@ export const indexedDbHost = <TValue = unknown>(
     let prepared!: IRootPrepared<R>
     return withMutationLease((lease) =>
       runTransaction((scope) => prepared.run(scope), options, lease, false, {
+        ...(read ? { read: true as const } : {}),
         executeAttempt: (context, proceed) =>
           runtime.execution.run(
             {
@@ -4086,6 +4285,29 @@ export const indexedDbHost = <TValue = unknown>(
       })
     )
   }
+  /**
+   * Selected reads prepare the original org once and capture lazy expiry in the same native
+   * attempt.
+   */
+  const rootRead = <I, R>(
+    method: string,
+    input: I,
+    context: IOperationContext | undefined,
+    channel: 'value' | 'bytes' | 'record',
+    run: (scope: IIndexedDbTransactionScope<TValue>, input: I) => R
+  ): Promise<Awaited<R>> =>
+    rootMutation(
+      method,
+      input,
+      context,
+      { channel, kind: 'remove' },
+      (captured) => ({
+        keys: [],
+        run: (scope) => run(scope, captured)
+      }),
+      true
+    )
+
   /** Replace protects all channels that the existing native write may displace. */
   const rootKeys = (
     channel: 'value' | 'bytes' | 'record',
@@ -4469,6 +4691,32 @@ export const indexedDbHost = <TValue = unknown>(
           lease
         )
       ),
+    /** Only the original native builder executes restored images; core journal owns undo validation. */
+    ...(runtime.journal === undefined
+      ? {}
+      : {
+          undo: async (txId: string, ctx?: IOperationContext) => {
+            assertLive()
+            const release = controller.beginMutation()
+            return runWithConcurrency<{ readonly txId: string }>(
+              {
+                store,
+                options: ctx ?? {},
+                prepare: () => runtime.journal!.prepare()
+              },
+              {
+                attempt: async (context) => ({
+                  status: 'committed',
+                  value: await runtime.journal!.undo(txId, (keys, work) =>
+                    createTransactionBuilder(store, context, runtime.getChainMethods('tx'))
+                      .lock(keys[0]!, ...keys.slice(1))
+                      .run(work)
+                  )
+                })
+              }
+            ).finally(release)
+          }
+        }),
     // sync 未定义：IndexedDB 无同步 API。
 
     dispose: () => {
@@ -4482,19 +4730,21 @@ export const indexedDbHost = <TValue = unknown>(
         .catch((error) => reportCleanupError(createStorageOperationReporter(), error))),
 
     get: (key, ctx) =>
-      withAbort(ctx, async (signal, _context, runtime) => {
-        assertLive()
-        assertStringStorageKey(key, StorageBackend.indexedDb)
-        const value = await readFrom(
-          kvStoreName,
-          (store) => store.get(key) as IDBRequest<unknown>,
-          signal,
-          runtime,
-          async (value, access) =>
-            (await access.ttlAccess.present('value', key)) ? value : undefined
-        )
-        return typeof value === 'string' ? value : null
-      }),
+      runtime.journal !== undefined
+        ? rootRead('get', [key, ctx] as const, ctx, 'value', (scope, [key]) => scope.get(key))
+        : withAbort(ctx, async (signal, _context, runtime) => {
+            assertLive()
+            assertStringStorageKey(key, StorageBackend.indexedDb)
+            const value = await readFrom(
+              kvStoreName,
+              (store) => store.get(key) as IDBRequest<unknown>,
+              signal,
+              runtime,
+              async (value, access) =>
+                (await access.ttlAccess.present('value', key)) ? value : undefined
+            )
+            return typeof value === 'string' ? value : null
+          }),
     set: (key, value, ctx) =>
       rootMutation(
         'set',
@@ -4521,41 +4771,45 @@ export const indexedDbHost = <TValue = unknown>(
         return { keys: [lockKey.text(key)], run: (scope) => scope.remove(key) }
       }),
     has: (key, ctx) =>
-      withAbort(ctx, async (signal, _context, runtime) => {
-        assertLive()
-        assertStringStorageKey(key, StorageBackend.indexedDb)
-        const value = await readFrom(
-          kvStoreName,
-          (store) => store.get(key) as IDBRequest<unknown>,
-          signal,
-          runtime,
-          async (value, access) =>
-            (await access.ttlAccess.present('value', key)) ? value : undefined
-        )
-        return value !== undefined
-      }),
+      runtime.journal !== undefined
+        ? rootRead('has', [key, ctx] as const, ctx, 'value', (scope, [key]) => scope.has(key))
+        : withAbort(ctx, async (signal, _context, runtime) => {
+            assertLive()
+            assertStringStorageKey(key, StorageBackend.indexedDb)
+            const value = await readFrom(
+              kvStoreName,
+              (store) => store.get(key) as IDBRequest<unknown>,
+              signal,
+              runtime,
+              async (value, access) =>
+                (await access.ttlAccess.present('value', key)) ? value : undefined
+            )
+            return value !== undefined
+          }),
     keys: (ctx) =>
-      withAbort(ctx, async (signal, _context, runtime) => {
-        assertLive()
-        const raw = await readFrom(
-          kvStoreName,
-          (store) => store.getAllKeys(),
-          signal,
-          runtime,
-          async (keys, access) => {
-            const live: IDBValidKey[] = []
-            for (const key of keys) {
+      runtime.journal !== undefined
+        ? rootRead('keys', [ctx] as const, ctx, 'value', (scope) => journalNative(scope).readKeys())
+        : withAbort(ctx, async (signal, _context, runtime) => {
+            assertLive()
+            const raw = await readFrom(
+              kvStoreName,
+              (store) => store.getAllKeys(),
+              signal,
+              runtime,
+              async (keys, access) => {
+                const live: IDBValidKey[] = []
+                for (const key of keys) {
+                  assertStringStorageKey(key, StorageBackend.indexedDb, 'persisted value key')
+                  if (await access.ttlAccess.present('value', key)) live.push(key)
+                }
+                return live
+              }
+            )
+            return raw.map((key) => {
               assertStringStorageKey(key, StorageBackend.indexedDb, 'persisted value key')
-              if (await access.ttlAccess.present('value', key)) live.push(key)
-            }
-            return live
-          }
-        )
-        return raw.map((key) => {
-          assertStringStorageKey(key, StorageBackend.indexedDb, 'persisted value key')
-          return key
-        })
-      }),
+              return key
+            })
+          }),
     clearValues: (ctx) => rootClear('clearValues', 'value', ctx),
     clearAll: (ctx) => rootClear('clearAll', undefined, ctx),
     /**
@@ -4628,19 +4882,23 @@ export const indexedDbHost = <TValue = unknown>(
     },
 
     getBytes: (key, ctx) =>
-      withAbort(ctx, async (signal, _context, runtime) => {
-        assertLive()
-        assertStringStorageKey(key, StorageBackend.indexedDb)
-        const value = await readFrom(
-          bytesStoreName,
-          (store) => store.get(key) as IDBRequest<unknown>,
-          signal,
-          runtime,
-          async (value, access) =>
-            (await access.ttlAccess.present('bytes', key)) ? value : undefined
-        )
-        return readIndexedDbBytes(value)
-      }),
+      runtime.journal !== undefined
+        ? rootRead('getBytes', [key, ctx] as const, ctx, 'bytes', (scope, [key]) =>
+            scope.getBytes(key)
+          )
+        : withAbort(ctx, async (signal, _context, runtime) => {
+            assertLive()
+            assertStringStorageKey(key, StorageBackend.indexedDb)
+            const value = await readFrom(
+              bytesStoreName,
+              (store) => store.get(key) as IDBRequest<unknown>,
+              signal,
+              runtime,
+              async (value, access) =>
+                (await access.ttlAccess.present('bytes', key)) ? value : undefined
+            )
+            return readIndexedDbBytes(value)
+          }),
     setBytes: (key, value, ctx) =>
       rootMutation(
         'setBytes',
@@ -4671,18 +4929,22 @@ export const indexedDbHost = <TValue = unknown>(
     clearBytes: (ctx) => rootClear('clearBytes', 'bytes', ctx),
 
     getRecord: (key, ctx) =>
-      withAbort(ctx, async (signal, _context, runtime) => {
-        assertLive()
-        const keySnapshot = snapshotStorageKey(key, StorageBackend.indexedDb)
-        return readFrom(
-          recordsStoreName,
-          (store) => store.get(toIdbKey(keySnapshot)) as IDBRequest<TValue | undefined>,
-          signal,
-          runtime,
-          async (value, access) =>
-            (await access.ttlAccess.present('record', keySnapshot)) ? value : undefined
-        )
-      }),
+      runtime.journal !== undefined
+        ? rootRead('getRecord', [key, ctx] as const, ctx, 'record', (scope, [key]) =>
+            scope.getRecord(key)
+          )
+        : withAbort(ctx, async (signal, _context, runtime) => {
+            assertLive()
+            const keySnapshot = snapshotStorageKey(key, StorageBackend.indexedDb)
+            return readFrom(
+              recordsStoreName,
+              (store) => store.get(toIdbKey(keySnapshot)) as IDBRequest<TValue | undefined>,
+              signal,
+              runtime,
+              async (value, access) =>
+                (await access.ttlAccess.present('record', keySnapshot)) ? value : undefined
+            )
+          }),
     putRecord: (value, key, ctx) =>
       rootMutation(
         'putRecord',
@@ -4729,6 +4991,27 @@ export const indexedDbHost = <TValue = unknown>(
                       upperOpen: rangeSnapshot?.upperOpen
                     }
               const page = await withMutationLease(async (lease) => {
+                if (runtimeJournal !== undefined)
+                  return runTransaction(
+                    async (scope) => {
+                      const values: Array<[IStorageKey, TValue]> = []
+                      for await (const entry of scope.iterateRecords(pageRange)) {
+                        values.push(entry)
+                        if (values.length >= pageSize) break
+                      }
+                      return values
+                    },
+                    { ...context, signal },
+                    lease,
+                    false,
+                    {
+                      read: true,
+                      executeAttempt: (_context, proceed) => proceed(),
+                      lock: () => [],
+                      ranges: () => [],
+                      notification: { channel: 'record', kind: 'remove' }
+                    }
+                  )
                 const database = await open(runtime, lease)
                 assertLive()
                 const transaction = createTransaction(
@@ -5172,7 +5455,8 @@ export const indexedDbHost = <TValue = unknown>(
       'clearAll',
       'clearBytes',
       'clearRecords',
-      'putIndexedRecord'
+      'putIndexedRecord',
+      ...(runtime.journal === undefined ? [] : ['get', 'has', 'keys', 'getBytes', 'getRecord'])
     ]),
     [
       implement(kv, browserKeyValueApi(store, batchApi), { forTransaction: (scope) => scope }),
@@ -5251,7 +5535,16 @@ export const indexedDbHost = <TValue = unknown>(
   const physical: IIndexedDbPhysical<TValue> = {
     ...construction,
     journalBinding: {
+      requiresIndexedDbUndo: true,
       forOrg: (orgId) => (orgBinding?.resolve(orgId) ?? physical).journalBinding,
+      lockTarget: (target) => indexedDbJournalTarget(target).lock,
+      changes: (scope) => journalNative(scope).images.changes(),
+      readImage: (scope, target) =>
+        runTransactionOperation(scope, () => journalNative(scope).images.readImage(target)),
+      writeImage: (scope, target, image) =>
+        runTransactionOperation(scope, () => journalNative(scope).images.writeImage(target, image)),
+      readRevision: (scope, target) =>
+        runTransactionOperation(scope, () => journalNative(scope).images.readRevision(target)),
       openNamespace: async (prefix) => {
         assertLive()
         if (typeof prefix !== 'string' || prefix.length === 0)
@@ -5340,6 +5633,8 @@ export const indexedDbHost = <TValue = unknown>(
                 (scope) => work(authenticate(scope).port),
                 { lock: [storageJournalLockKey(prefix, StorageJournalLock.head)] },
                 lease,
+                false,
+                undefined,
                 false
               )
             )
@@ -5349,10 +5644,18 @@ export const indexedDbHost = <TValue = unknown>(
     dropData,
     getPreparedClient: () => {
       assertLive()
-      /** A prepared physical connection stays synchronous inside native transaction callbacks. */
-      if (prepareState === 'ready' && deleting === undefined && activeDatabase !== undefined)
-        return activeDatabase
-      return open(createStorageOperationRuntime())
+      /** The original Feature executor already awaits this accessor inside its operation budget. */
+      const prepared = () => {
+        if (runtime.journal?.active())
+          throw new StorageContractError(StorageContractErrorCode.unsupported, {
+            backend: StorageBackend.indexedDb
+          })
+        /** A prepared physical connection retains its original identity and synchronous fast path. */
+        if (prepareState === 'ready' && deleting === undefined && activeDatabase !== undefined)
+          return activeDatabase
+        return open(createStorageOperationRuntime())
+      }
+      return runtime.journal === undefined ? prepared() : runtime.journal.prepare().then(prepared)
     },
     getTransactionClient: (scope: object) => {
       /** Only the canonical owner can authorize a live view for this exact provided store. */
@@ -5361,6 +5664,11 @@ export const indexedDbHost = <TValue = unknown>(
       const native = nativeTransactions.get(id)
       if (native === undefined)
         throw new StorageContractError(StorageContractErrorCode.invalidArgument)
+      /** Raw native Feature writes cannot bypass the selected commit image protocol. */
+      if (runtime.journal?.active())
+        throw new StorageContractError(StorageContractErrorCode.unsupported, {
+          backend: StorageBackend.indexedDb
+        })
       return native.native
     }
   }

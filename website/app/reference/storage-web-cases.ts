@@ -74,6 +74,44 @@ try {
   ],
   indexedDbBackendPlugin: [
     {
+      title: t('Commit native history with opt-in undo', '提交原生历史并显式选择 undo'),
+      problem: t(
+        "Use the current org's original native log objects for data, binlog and undo to share the actual native terminal.",
+        '使用当前组织的原生日志对象，让业务、binlog 与 undo 共用真实原生终点。'
+      ),
+      example: `import { Logger } from '@migaia/logger'
+import { binlog, undoLog } from '@migaia/logger/plugins/durable'
+import { createStorageHost } from '@migaia/storage-host'
+import { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'
+let latest!: () => Promise<string>
+let shutdown!: () => Promise<void>
+const host = await createStorageHost({
+  plugins: [indexedDbBackendPlugin({ dbName: 'journalled-editor' })],
+  journal: async ({ storageLogStore }) => {
+    const records = await storageLogStore('indexed-db', { prefix: 'commits' })
+    const images = await storageLogStore('indexed-db', { prefix: 'undo' })
+    const logger = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+      plugins: [binlog({ store: records }), undoLog({ store: images })]
+    })
+    latest = async () => ((await logger.binlog.read(1))[0]!.payload as { txId: string }).txId
+    shutdown = () => logger.shutdown('manual')
+    return { logger, namespace: 'editor', indexedDbUndo: true,
+      atomicBinlog: { 'indexed-db': records }, atomicUndo: { 'indexed-db': images } }
+  }
+})
+try {
+  const store = host.backend('indexed-db')
+  await store.set('draft', 'saved')
+  await store.undo(await latest())
+  console.log(await store.get('draft'))
+} finally { await shutdown(); await host.dispose() }`,
+      result: t(
+        'Prints null. Native complete publishes both business and log state. Undo is checked before restoration; active commit journaling rejects native Feature handles outside the current image domain, while telemetry-only Features stay available.',
+        '输出 null；真实 complete 才发布业务与日志状态。undo 在恢复前完成比对；提交日志拒绝当前镜像域外的原生 Feature 句柄，仅遥测 Feature 保持可用。'
+      )
+    },
+    {
       title: t('Keep private history across business clear', '业务清理后保留私有历史'),
       problem: t(
         'A persistent log needs its own native metadata namespace and a lifetime-exclusive cached index.',
