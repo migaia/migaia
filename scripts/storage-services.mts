@@ -21,7 +21,6 @@ const Text = {
 type IComposeConfig = {
   services: Record<string, unknown>
   'x-storage-test-environment': Record<string, string>
-  'x-storage-init-services': readonly string[]
 }
 
 /** Runs the existing Docker Compose CLI, respecting the caller's Docker context. */
@@ -73,10 +72,8 @@ if (command === Command.env) {
   /** A missing image or failed service must not prevent independent services from starting. */
   let status = 0
   for (const service of Object.keys(config.services)) {
-    /** Jobs settle by exit status; server readiness stays owned by Compose health checks. */
-    const args = config['x-storage-init-services'].includes(service)
-      ? [Command.run, '--rm', '--no-deps', service]
-      : [Command.up, '-d', '--no-build', '--wait', '--wait-timeout', '120', service]
+    /** Every fixture now provisions its own identity and data inside its server process. */
+    const args = [Command.up, '-d', '--no-build', '--wait', '--wait-timeout', '120', service]
     /** Image builds belong in their existing exclusive window, outside this detached startup. */
     const result = compose(args)
     if (childStatus(result) !== 0) {
