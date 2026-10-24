@@ -452,6 +452,12 @@ console.log(host.extensions.label('draft'))`,
         '私有原生 run、真实 commit/rollback 回调和已接纳工作清理，不关闭其后端。'
       ),
       members: {
+        nativeAtomic: {
+          summary: t(
+            'Remains a strict original backend fact. False is admitted only for pure external commit-only binlog without WAL, undo or selected native log stores; their requirements remain true.',
+            '保留原后端严格事实；false 只用于没有 WAL、undo 或所选 native 日志载体的纯外置 commit-only binlog，其它保证仍要求 true。'
+          )
+        },
         indexExclusive: {
           summary: t(
             'Optional false fact rejects storageLogStore before recovery I/O or cached index construction. Native transaction/terminal authority remains available to the commit bridge; omission preserves existing binding semantics.',

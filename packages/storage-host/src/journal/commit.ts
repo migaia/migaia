@@ -132,7 +132,17 @@ export async function createStorageNativeJournal(options: {
     encodeFlatStorageKey([terminalNamespace, namespace, access.backendInstanceId])
   )
   try {
-    if (!terminal.nativeAtomic) throw new StorageContractError(StorageContractErrorCode.unsupported)
+    /** Pure commit-only external binlog needs authentic success, not rollback atomicity. */
+    const commitOnly =
+      binlog !== undefined &&
+      undo === undefined &&
+      logger.wal === undefined &&
+      atomicBinlog === undefined &&
+      atomicUndo === undefined
+    /** This original fact is captured once and never weakened for WAL, undo or native log stores. */
+    const nativeAtomic = terminal.nativeAtomic
+    if (nativeAtomic !== true && !(nativeAtomic === false && commitOnly))
+      throw new StorageContractError(StorageContractErrorCode.unsupported)
     access.retain(terminal)
     if (logger.wal !== undefined && binlogNative === undefined)
       wal = await createStorageExternalWal({
