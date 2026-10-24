@@ -8,7 +8,11 @@ import {
   type IStorageBase,
   type IKeyValueStore
 } from '@migaia/storage-contract'
-import type { IStoragePluginCore, IStorageOrgBinding } from '@migaia/storage-host'
+import type {
+  IStoragePluginCore,
+  IStorageOrgBinding,
+  IStorageJournalBackendBinding
+} from '@migaia/storage-host'
 import type {
   IBackendChangeController,
   IBackendValueCommit
@@ -72,6 +76,8 @@ export type IBackendConstruction<S extends IStorageBase, C> = {
   readonly orgBinding?: IStorageOrgBinding
   /** Physical deletion stays with the original native opener and keeps the borrowed store usable. */
   readonly dropData?: () => Promise<void>
+  /** Only the actual backend maps an original journal or redo binding. */
+  readonly journalBinding?: IStorageJournalBackendBinding
 }
 
 /** Publish the actual native descriptors without cloning their store or cleanup methods. */

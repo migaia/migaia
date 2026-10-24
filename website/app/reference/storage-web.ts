@@ -127,6 +127,17 @@ const webStorageFields = (storage: string): Readonly<Record<string, IMemberDoc>>
     summary: t('Logical namespace owned by this backend.', '该后端拥有的逻辑命名空间。'),
     default: t('`default`.', '默认 `default`。')
   },
+  redo: {
+    summary: t(
+      'Explicitly enables WAL-backed text transactions; requires native Web Locks and the selected original WAL object.',
+      '显式启用 WAL 文本事务；要求原生 Web Locks 与选定的原 WAL 对象。'
+    ),
+    default: t('Omitted; transactions remain disabled.', '省略时不启用事务。'),
+    whenToUse: t(
+      'All participating hosts must borrow one actual latest-pending WAL object. Matching names or independent caches do not establish cross-page recovery. Undo and raw native Feature clients are unavailable in this selected combination.',
+      '所有参与宿主必须借用同一个可见最新 pending 的真实 WAL 对象；同名或独立缓存不能证明跨页恢复。该组合不提供 undo 或 raw 原生 Feature 客户端。'
+    )
+  },
   namespaceCodec: {
     summary: t(
       'Encodes and decodes physical keys without touching foreign namespaces.',

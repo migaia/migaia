@@ -1,3 +1,4 @@
+import type { ITextRedoStore } from './text-redo.js'
 import {
   createWebStorageBackend,
   snapshotWebStorageOptions,
@@ -29,7 +30,7 @@ export const localStorageHost = (
   options: ILocalStorageOptions,
   runtime: IBackendRuntime
 ): IBackendConstruction<
-  IKeyValueBackendStore<ISyncCapableStore<IKeyValueStore> & ITextChangeFeedApi>,
+  IKeyValueBackendStore<ISyncCapableStore<IKeyValueStore> & ITextChangeFeedApi & ITextRedoStore>,
   IWebStorageLike
 > => {
   /** Capture namespace configuration before admitting either an injected or ambient port. */

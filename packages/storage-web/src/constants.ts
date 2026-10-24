@@ -90,6 +90,9 @@ export const storageBackendOperation = (backend: string, method: string, group?:
 /** One origin-wide Web Lock prevents separate KV-backed repositories from racing their commits. */
 export const ENTITY_UNIQUE_WRITE_LOCK = 'migaia:storage-web:entity-unique-write'
 
+/** Participating text redo hosts serialize one namespace through the native Web Locks owner. */
+export const TEXT_REDO_LOCK = 'migaia:storage-web:text-redo'
+
 /** Record channels used by value and binary storage implementations. */
 export const StorageChannel = { value: 'value', bytes: 'bytes' } as const
 

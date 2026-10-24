@@ -30,5 +30,6 @@ export const sessionStorageBackendPlugin = <
     sessionStorageBackendKind,
     readBuiltInPluginId(options, 'session', StorageBackend.session),
     (core) => sessionStorageHost(options, core),
-    features
+    features,
+    true
   )

@@ -22,6 +22,36 @@ export const storageWebCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
   ],
   localStorageBackendPlugin: [
     {
+      title: t('Apply one recoverable text draft', '应用可恢复的文本 draft'),
+      problem: t(
+        'Several text values need one recoverable WAL intent.',
+        '多个文本值需要共用可恢复 WAL intent。'
+      ),
+      example: `import { Logger } from '@migaia/logger'
+import { wal, memoryLogStore } from '@migaia/logger/plugins/durable'
+import { createStorageHost } from '@migaia/storage-host'
+import { localStorageBackendPlugin } from '@migaia/storage-web/local-storage'
+const logger = new Logger({
+  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+  plugins: [wal({ store: memoryLogStore() })]
+})
+const host = await createStorageHost({
+  plugins: [localStorageBackendPlugin({ namespace: 'draft', redo: true })],
+  journal: { logger, namespace: 'draft', redoWal: logger.wal }
+})
+try {
+  await host.backend('local').transaction(async (scope) => {
+    await scope.set('a', 'first')
+    await scope.set('b', 'second')
+  })
+  console.log(await host.backend('local').get('b'))
+} finally { await host.dispose(); await logger.shutdown('manual') }`,
+      result: t(
+        'Prints second. This memory WAL demonstrates same-owner recovery only while it stays alive. Crash recovery needs a separate persistent carrier such as an original IndexedDB storageLogStore, held by one owner; participating same-origin popups may directly borrow that exact logger/WAL object.',
+        '输出 second。示例 memory WAL 仅在对象存活时支持同拥有者恢复；崩溃恢复需独立持久载体，例如由一个拥有者持有的原 IndexedDB storageLogStore，同源 popup 可直接借用该精确 logger/WAL 对象。'
+      )
+    },
+    {
       title: t('Save namespaced browser preferences', '保存有命名空间的浏览器偏好'),
       problem: t(
         'Two parts of an application share localStorage. A namespace keeps their text keys separate while one host owns listeners and cleanup.',
