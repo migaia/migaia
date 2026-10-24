@@ -255,3 +255,5 @@ PENDING-USER-REVIEW：dropOrg 遇到存活的全局 journal 时，原私有 name
 `@migaia/storage-host/authoring/backend` 的 `createBackendJournalNamespace(options)` 复用原 namespace 资源 reservation、quiescence 排空和双释放 Promise；memory 的私有 namespace 已直接消费。`IBackendJournalNamespaceOptions` 只借用原 assertLive/closingSignal/report、nativeAtomic/indexExclusive、reserve、authenticate(scope) 和原 transaction。`IBackendJournalTransaction` 仅有私有 run(viewWork) 与 onCommit/onRollback/onEnd 观察，无原生句柄、commit 或后端关闭权；onEnd 在结果未知时也仅排空，不冒充 rollback。数据、代际、跨实例独占和实际终态仍归原后端。
 
 同作者入口重导原 `storageJournalLockKey(prefix, part)` 与 `StorageJournalLock`（head/resource）。后端把这一个规范身份交给原并发 provider，普通私有事务和同原生 append 共用相同 head，资源持有另用 resource；函数只产生只读逻辑 key，不授予获取锁、安装或关闭权限。空 prefix 或非法 part 按原 INVALID_ARGUMENT 拒绝，不复制锁元组编码。
+
+首个显式组织终点的 telemetry 等原操作内的 journal prepare 完成后，读取同一 org cell 的配置；观察本身不额外 prepare、不开新预算，首事务也不漏记。已经明确关闭时仍直接进入原工作且不生成普通日志条目。

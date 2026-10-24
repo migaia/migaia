@@ -15,9 +15,14 @@ describe('ordinary storage telemetry', () => {
     logger.useSink((entry) => {
       entries.push(entry)
     })
+    /** Every first endpoint shares the original once-per-org initializer. */
+    const preparations = new Map<string, number>()
     await using host = await createStorageHost({
       plugins: [memoryBackendPlugin()],
-      journal: { logger, namespace: 'telemetry', telemetry: true }
+      journal: ({ orgId }) => {
+        preparations.set(orgId, (preparations.get(orgId) ?? 0) + 1)
+        return { logger, namespace: 'telemetry', telemetry: true }
+      }
     })
     try {
       const store = host.backend('memory')
@@ -82,12 +87,29 @@ describe('ordinary storage telemetry', () => {
       entries.length = 0
       const orgId = createOrgId()
       const other = host.org(orgId).backend('memory')
-      await other.set('key', 'org')
+      await other.transaction(async (scope) => {
+        await scope.set('key', 'org')
+      })
       expect(entries).toHaveLength(1)
-      expect(entries[0]!.meta).toMatchObject({ orgId, payload: { key: 'key', value: 'org' } })
+      expect(entries[0]!.message).toBe('transaction')
+      expect(entries[0]!.meta).toMatchObject({
+        orgId,
+        keys: [lockKey.text('key'), lockKey.bytes('key'), lockKey.record('key')]
+      })
       const extracted = other.get
       expect(await extracted('key')).toBe('org')
       expect(entries[1]!.meta!.orgId).toBe(orgId)
+      expect(preparations.get(orgId)).toBe(1)
+      entries.length = 0
+      const readOrgId = createOrgId()
+      const readOnly = host.org(readOrgId).backend('memory')
+      expect(await readOnly.get('missing')).toBeNull()
+      expect(entries).toHaveLength(1)
+      expect(entries[0]).toMatchObject({
+        message: 'get',
+        meta: { orgId: readOrgId, keys: [lockKey.text('missing')], outcome: 'success' }
+      })
+      expect(preparations.get(readOrgId)).toBe(1)
     } finally {
       await logger.shutdown('manual')
     }
