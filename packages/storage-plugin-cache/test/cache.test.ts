@@ -7,6 +7,7 @@ import {
   type IStoragePluginCore
 } from '@migaia/storage-host'
 import { kv, ttl, lockKey, type IStorageBase } from '@migaia/storage-contract'
+import { deferred } from '@migaia/utils/promise'
 import { IdentifyError, walkErrorCauses } from '@migaia/utils/error'
 import { cachePlugin, CacheErrorCode, type ICacheOptions } from '../src/index.js'
 
@@ -158,18 +159,26 @@ describe('borrowed multi-tier cache', () => {
   it('coalesces thirty callers for each of three independent keys', async () => {
     const { host, cache } = await fixture()
     try {
+      /** All keys enter their shared loaders before any source result is released. */
+      const entered = deferred<void>()
+      /** One explicit source gate proves overlapping callers without sleeping. */
+      const release = deferred<void>()
       const loads = [0, 0, 0]
-      const results = await Promise.all(
+      const pending = Promise.all(
         [0, 1, 2].flatMap((key) =>
           Array.from({ length: 30 }, () =>
             cache.getOrLoad('key' + key, async () => {
               loads[key]!++
-              await new Promise((resolve) => setTimeout(resolve, 5))
+              if (loads.reduce((total, count) => total + count, 0) === 3) entered.resolve()
+              await release.promise
               return key
             })
           )
         )
       )
+      await entered.promise
+      release.resolve()
+      const results = await pending
       expect(loads).toEqual([1, 1, 1])
       expect(results).toEqual([0, 1, 2].flatMap((key) => Array(30).fill(key)))
     } finally {
@@ -179,9 +188,12 @@ describe('borrowed multi-tier cache', () => {
   it('keeps stale data after background failure and expires negative entries without caching failures', async () => {
     let now = 1000
     const reports: unknown[] = []
+    /** Existing report delivery proves the detached refresh has failed. */
+    const reported = deferred<void>()
     const base = await createStorageHost({
       report: (error) => {
         reports.push(error)
+        reported.resolve()
       },
       plugins: [memoryBackendPlugin({ id: 'tier' })]
     })
@@ -206,7 +218,7 @@ describe('borrowed multi-tier cache', () => {
           throw original
         })
       ).toBe('old')
-      await new Promise((resolve) => setTimeout(resolve, 5))
+      await reported.promise
       expect(reports).toEqual([
         expect.objectContaining({ code: 'CACHE_LOAD_FAILED', cause: original })
       ])
@@ -435,13 +447,17 @@ describe('borrowed multi-tier cache', () => {
         negative: true
       })
       now = 1021
+      /** Hold one public refresh promise while ordinary readers still receive the stale entry. */
+      const refreshValue = deferred<string>()
+      const refreshed = cache.getOrLoadEntry('a', () => refreshValue.promise, { mode: 'refresh' })
       expect(await cache.getOrLoadEntry('a', async () => 'refreshed')).toMatchObject({
         value: 'A',
         tier: 0,
         stale: true,
         negative: false
       })
-      await new Promise((resolve) => setTimeout(resolve, 5))
+      refreshValue.resolve('refreshed')
+      await refreshed
       await cache.invalidate('negative')
       expect(cache.stats()).toMatchObject({
         hits: [3, 2, 2],
@@ -525,16 +541,19 @@ describe('borrowed multi-tier cache', () => {
       const done = new Promise<string>((resolve) => {
         finish = resolve
       })
+      /** The shared loader confirms admission before a single caller is cancelled. */
+      const entered = deferred<void>()
       const load = async (input: AbortSignal) => {
         signal = input
         loads++
+        entered.resolve()
         return done
       }
       const abort = new AbortController()
       const first = cache.getOrLoad('a', load, { ctx: { signal: abort.signal } })
       const rejected = expect(first).rejects.toMatchObject({ code: 'ABORTED' })
       const others = Array.from({ length: 29 }, () => cache.getOrLoad('a', load))
-      await new Promise((resolve) => setTimeout(resolve, 10))
+      await entered.promise
       abort.abort('one caller')
       await rejected
       expect(signal.aborted).toBe(false)
@@ -571,7 +590,9 @@ describe('borrowed multi-tier cache', () => {
       const disposing = cache.dispose().then(() => {
         closed = true
       })
-      await new Promise((resolve) => setTimeout(resolve, 5))
+      expect(() => cache.get('after-dispose')).toThrowError(
+        expect.objectContaining({ code: 'STORE_DISPOSED' })
+      )
       expect(closed).toBe(false)
       finish('late true value')
       await disposing
@@ -586,14 +607,17 @@ describe('borrowed multi-tier cache', () => {
       const { host, cache } = await fixture()
       try {
         let finish!: (value: string) => void
+        /** Invalidation starts only after the old loader actually owns its source result. */
+        const entered = deferred<void>()
         const started = cache.getOrLoad(
           'a',
           () =>
             new Promise<string>((resolve) => {
               finish = resolve
+              entered.resolve()
             })
         )
-        await new Promise((resolve) => setTimeout(resolve, 5))
+        await entered.promise
         if (method === 'key') await cache.invalidate('a')
         else if (method === 'remove') await cache.remove('a')
         else await cache.invalidate({ prefix: 'a' })
@@ -624,11 +648,16 @@ describe('borrowed multi-tier cache', () => {
           finish = resolve
         })
       }
+      /**
+       * The public refresh result proves persistence without observing borrowed native tier
+       * internals.
+       */
+      const refreshed = cache.getOrLoad('a', load, { mode: 'refresh' })
       expect(await cache.getOrLoad('a', load)).toBe('one')
       expect(await cache.getOrLoad('a', load)).toBe('one')
       expect(loads).toBe(1)
       finish('two')
-      await new Promise((resolve) => setTimeout(resolve, 5))
+      await refreshed
       expect(await cache.peek('a')).toMatchObject({ value: 'two', stale: false })
       expect(await fast.use(ttl).remaining(lockKey.text('cache:cache:a'))).toBeLessThanOrEqual(100)
       now += 101
