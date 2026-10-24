@@ -10,6 +10,7 @@ import {
   createStorageBatchKeyProjection,
   assertStorageTtlDuration,
   snapshotStorageTtlTarget,
+  assertStorageTtlTarget,
   snapshotStorageCounterIncrement,
   encodeOrderedStorageKey,
   snapshotStorageKeyPrefix,
@@ -892,17 +893,18 @@ function sqliteCleanupExpiredRows<TValue>(
   if (state) reclaim(state)
   else sqliteSyncMutation(organization, reclaim, [], undefined, orgId)
 }
-/** Canonical target capture rejects unsupported vector storage before any native access. */
-function sqliteCaptureTtlTarget<TValue>(
-  organization: ISqliteOrganizationContext<TValue>,
-  input: ITtlTarget
-): ISqliteTtlTarget {
-  const target = snapshotStorageTtlTarget(input, SqliteNames.backend)
-  if (target.channel === 'text' || target.channel === 'bytes' || target.channel === 'record')
-    return target
-  throw new StorageContractError(StorageContractErrorCode.unsupported, {
-    backend: SqliteNames.backend
-  })
+/** TTL channel support adds only this backend's capability boundary to the canonical pure guard. */
+function sqliteAssertTtlTarget(input: ITtlTarget): asserts input is ISqliteTtlTarget {
+  assertStorageTtlTarget(input, SqliteNames.backend)
+  if (input.channel !== 'text' && input.channel !== 'bytes' && input.channel !== 'record')
+    throw new StorageContractError(StorageContractErrorCode.unsupported, {
+      backend: SqliteNames.backend
+    })
+}
+/** Capture target keys before middleware, logical locks or physical admission can await. */
+function sqliteCaptureTtlTarget(input: ITtlTarget): ISqliteTtlTarget {
+  sqliteAssertTtlTarget(input)
+  return snapshotStorageTtlTarget(input, SqliteNames.backend) as ISqliteTtlTarget
 }
 /** Deadline reads and writes share the original attempt's first live native observation. */
 function sqliteExpiration<TValue>(
@@ -1871,13 +1873,14 @@ function sqliteCreateScope<TValue>(
           scope,
           SqliteOperation.ttlExpire,
           () => {
-            const captured = sqliteCaptureTtlTarget(organization, target)
+            const captured = sqliteCaptureTtlTarget(target)
             assertStorageTtlDuration(ms, SqliteNames.backend)
             return { target: captured, ms }
           },
           (state, _current, input) => {
             const current = input as { target: ITtlTarget; ms: number }
-            const target = sqliteCaptureTtlTarget(organization, current.target)
+            const target = current.target
+            sqliteAssertTtlTarget(target)
             assertStorageTtlDuration(current.ms, SqliteNames.backend)
             return sqliteChangeDeadline(organization, target, state, current.ms)
           }
@@ -1887,14 +1890,15 @@ function sqliteCreateScope<TValue>(
           organization,
           scope,
           SqliteOperation.ttlRemaining,
-          () => sqliteCaptureTtlTarget(organization, target),
+          () => sqliteCaptureTtlTarget(target),
           (state, _current, input) => {
-            const row = sqliteExpiration(
-              organization,
-              sqliteCaptureTtlTarget(organization, input as ITtlTarget),
-              state.orgId,
-              state
-            )
+            /**
+             * Native expiry lookup runs before this terminal returns; no further await borrows
+             * input.
+             */
+            const target = input as ITtlTarget
+            sqliteAssertTtlTarget(target)
+            const row = sqliteExpiration(organization, target, state.orgId, state)
             return row?.expires_at == null
               ? undefined
               : Math.max(0, Number(row.expires_at) - Date.now())
@@ -1905,13 +1909,13 @@ function sqliteCreateScope<TValue>(
           organization,
           scope,
           SqliteOperation.ttlPersist,
-          () => sqliteCaptureTtlTarget(organization, target),
-          (state, _current, input) =>
-            sqliteChangeDeadline(
-              organization,
-              sqliteCaptureTtlTarget(organization, input as ITtlTarget),
-              state
-            )
+          () => sqliteCaptureTtlTarget(target),
+          (state, _current, input) => {
+            /** This synchronous native segment consumes the accepted target without another image. */
+            const target = input as ITtlTarget
+            sqliteAssertTtlTarget(target)
+            return sqliteChangeDeadline(organization, target, state)
+          }
         )
     },
     [counterOperations]: {
@@ -4078,7 +4082,7 @@ function createSqliteTtlApi<TValue>(organization: ISqliteOrganizationContext<TVa
   return {
     expire: async (target, ms, ctx) => {
       organization.controller.assertLive()
-      const captured = sqliteCaptureTtlTarget(organization, target)
+      const captured = sqliteCaptureTtlTarget(target)
       assertStorageTtlDuration(ms, SqliteNames.backend)
       return sqliteRootWrite(
         organization,
@@ -4086,7 +4090,7 @@ function createSqliteTtlApi<TValue>(organization: ISqliteOrganizationContext<TVa
         { target: captured, ms },
         ctx,
         (input) => {
-          const target = sqliteCaptureTtlTarget(organization, input.target)
+          const target = sqliteCaptureTtlTarget(input.target)
           assertStorageTtlDuration(input.ms, SqliteNames.backend)
           return {
             keys: [target],
@@ -4097,14 +4101,16 @@ function createSqliteTtlApi<TValue>(organization: ISqliteOrganizationContext<TVa
     },
     remaining: async (target, ctx) => {
       organization.controller.assertLive()
-      const captured = sqliteCaptureTtlTarget(organization, target)
+      const captured = sqliteCaptureTtlTarget(target)
       return sqliteRootRead(
         organization,
         SqliteOperation.ttlRemaining,
         captured,
         ctx,
         (orgId, input, observeKey, state) => {
-          const target = sqliteCaptureTtlTarget(organization, input as ITtlTarget)
+          /** Read admission and middleware have settled; this native lookup has no await. */
+          const target = input as ITtlTarget
+          sqliteAssertTtlTarget(target)
           observeKey?.(target)
           const row = sqliteExpiration(organization, target, orgId, state)
           return row?.expires_at == null
@@ -4115,9 +4121,9 @@ function createSqliteTtlApi<TValue>(organization: ISqliteOrganizationContext<TVa
     },
     persist: async (target, ctx) => {
       organization.controller.assertLive()
-      const captured = sqliteCaptureTtlTarget(organization, target)
+      const captured = sqliteCaptureTtlTarget(target)
       return sqliteRootWrite(organization, SqliteOperation.ttlPersist, captured, ctx, (input) => {
-        const target = sqliteCaptureTtlTarget(organization, input)
+        const target = sqliteCaptureTtlTarget(input)
         return { keys: [target], run: (state) => sqliteChangeDeadline(organization, target, state) }
       })
     }
