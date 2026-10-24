@@ -87,7 +87,14 @@ test('storage-host entity guide connects the concrete IndexedDB backend', () => 
     assert.match(guide.quickStart, /type IUser = \{ id: number; email: string \}/)
     assert.match(guide.quickStart, /defineEntity<IUser>/)
     assert.match(guide.quickStart, /users\.connect\(host\.backend\('indexed-db'\)\)/)
-    assert.match(guide.quickStart, /indexedDbBackendPlugin\(\{ dbName: 'app' \}\)/)
+    assert.match(
+      guide.quickStart,
+      /indexedDbBackendPlugin\(\{ dbName: 'app' \}, \{ indexes: indexedDbIndexesFeature\(\) \}\)/
+    )
+    assert.match(
+      guide.quickStart,
+      /features: \[entityQueryFeature\(\), entityIndexesFeature\(\), entityUniqueFeature\(\)\]/
+    )
     assert.match(guide.quickStart, /repository\.put\(/)
     assert.match(guide.quickStart, /await host\.dispose\(\)/)
     assert.doesNotMatch(guide.quickStart, /\buserSchema\b|\bmigrateUserV2\b|\bUser\b/)
