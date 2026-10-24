@@ -143,3 +143,7 @@ TRANSACTION_FAILED、DUPLICATE_KEY 或 DECODE_FAILED。原生/codec 错误保留
 事务首次读取的活值和期限保留原生快照；观察后到期由原提交检查交回既有并发策略，
 不能把已过期的观察当作有效提交。迭代跳过首次返回前到期的项，关闭计数只统计实际
 返回的项。
+
+全局 `journal` 配置按真实原生修改顺序记录日志，保留同键多写。SQLite 在原事务内保留完整原始值与绝对期限；undo 复用原键锁事务，先核对全部完整修订与 after 镜像，再恢复任一值。外置 binlog 与 undo 可使用既有 WAL；恢复只核对与数据同提交的 marker，不重放已提交的业务修改。文件 WAL 修订行保留不可变 birth，组织删除后重建不会让旧 undo 再次有效。`wal: false` 的修订身份归原存活本地 group，重开 group 会拒绝旧镜像。metadata 写入推进原私有 guard，不作为业务日志。
+
+内存连接可通过 initializer 的 `storageLogStore` 提供同库 binlog 与 undo；文件缓存日志索引仍拒绝，文件数据应配外置 Logger。raw SQL 没有完整共享镜像目标，启用提交日志时在原生执行前拒绝。全局 journal 配置沿宿主既有异步管线边界，所有同步入口报 `ASYNC_STAGE_IN_SYNC_ENTRY`；普通宿主仍保留同步 API。Logger 及日志载体继续归调用方释放。`UNDO_CONFLICT` 等宿主日志错误保留原 source 与 cause。
