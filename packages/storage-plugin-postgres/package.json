@@ -29,6 +29,10 @@
       "types": "./dist/bun.d.ts",
       "default": "./dist/bun.js"
     },
+    "./features/quantized": {
+      "types": "./dist/features/quantized.d.ts",
+      "default": "./dist/features/quantized.js"
+    },
     "./features/pgvector": {
       "types": "./dist/features/pgvector.d.ts",
       "default": "./dist/features/pgvector.js"

@@ -73,3 +73,8 @@ export const PgOperation = {
   tailChanges: 'durableChangeFeed.tailChanges',
   dropOrg: 'org.drop'
 } as const
+
+/** Opt-in native expression layouts; this domain is never a second vector provider. */
+export const PgQuantizedMode = { halfvec: 'halfvec', binary: 'binary_quantize' } as const
+/** Stable native layout prefix keeps expression index identities within PostgreSQL's name limit. */
+export const PgQuantizedIndexPrefix = 'storage_q_'
