@@ -1,6 +1,56 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import { recommendStorageVector } from '../src/authoring/vector.js'
 import { snapshotStorageVector } from '@migaia/storage-contract'
+import { mmr } from '../src/vector/mmr.js'
+
+describe('pure vector MMR reranker', () => {
+  it('encodes deterministic greedy selection order for lambda zero, one and one half', () => {
+    const input = {
+      origin: { kind: 'near' as const, vector: [1, 0] },
+      hits: [
+        { id: 'a', score: 3, vector: [1, 0] },
+        { id: 'b', score: 2, vector: [1, 0] },
+        { id: 'c', score: 1.5, vector: [0.6, 0.8] },
+        { id: 'd', score: 1, vector: [0, 1] }
+      ]
+    }
+    const ctx = { signal: new AbortController().signal }
+    expect(mmr({ lambda: 0 })(input, ctx)).toEqual([4, 1, 2, 3])
+    expect(mmr({ lambda: 1 })(input, ctx)).toEqual([4, 3, 2, 1])
+    expect(mmr({ lambda: 0.5 })(input, ctx)).toEqual([4, 3, 1, 2])
+    expect(mmr({ lambda: 0.5, topN: 2 })(input, ctx)).toEqual([4, 3, 2, 1])
+    expect(mmr({ lambda: 0.5, topN: 10 })(input, ctx)).toEqual([4, 3, 1, 2])
+    expect(mmr({ lambda: 0.5 })({ ...input, hits: [] }, ctx)).toEqual([])
+    expect(
+      mmr({ lambda: 0.5 })(
+        {
+          ...input,
+          hits: [
+            { id: 'a', score: 1, vector: [0, 0] },
+            { id: 'b', score: 1, vector: [0, 0] },
+            { id: 'c', score: 1, vector: [0, 0] }
+          ]
+        },
+        ctx
+      )
+    ).toEqual([3, 2, 1])
+    expect(() => mmr({ lambda: -1 })).toThrowError(
+      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+    )
+    expect(() => mmr({ lambda: NaN })).toThrowError(
+      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+    )
+    for (const topN of [0, -1, 1.5, NaN, Infinity])
+      expect(() => mmr({ lambda: 0.5, topN })).toThrowError(
+        expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+      )
+    function invalidTypes() {
+      // @ts-expect-error Diversity requires explicitly retrieved vectors.
+      mmr({ lambda: 0.5 })({ origin: input.origin, hits: [{ id: 'x', score: 1 }] }, ctx)
+    }
+    void invalidTypes
+  })
+})
 
 describe('native vector recommendation synthesis', () => {
   it('uses positive mean minus negative mean, with no negative samples contributing zero', () => {

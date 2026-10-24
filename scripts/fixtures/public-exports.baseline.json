@@ -1812,6 +1812,7 @@
       "./authoring/vector": [
         "recommendStorageVector"
       ],
+      "./vector/mmr": ["mmr"],
       "./journal": ["storageLogStore"],
       "./entity": [
         "REPOSITORY_KEY_PREFIX",

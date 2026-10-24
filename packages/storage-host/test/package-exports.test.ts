@@ -8,6 +8,21 @@ const baseline = JSON.parse(
   )
 ) as { packages: Record<string, Record<string, string[]>> }
 describe('storage host package exports', () => {
+  it('loads the pure MMR scorer only from its independent vector entry', async () => {
+    /** Real dist resolution verifies the neutral entry and the root's protected boundary. */
+    const runtime = await import('@migaia/storage-host/vector/mmr')
+    expect(Object.keys(runtime)).toEqual(baseline.packages['@migaia/storage-host']!['./vector/mmr'])
+    expect(await import('@migaia/storage-host')).not.toHaveProperty('mmr')
+    expect(
+      runtime.mmr({ lambda: 1 })(
+        {
+          origin: { kind: 'near', vector: [1] },
+          hits: [{ id: 'one', score: 1, vector: [1] }]
+        },
+        { signal: new AbortController().signal }
+      )
+    ).toEqual([1])
+  })
   it('exposes only the private log factory through its dedicated journal entry', async () => {
     const runtime = await import('@migaia/storage-host/journal')
     expect(Object.keys(runtime)).toEqual(baseline.packages['@migaia/storage-host']!['./journal'])

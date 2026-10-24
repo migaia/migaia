@@ -34,6 +34,10 @@
       "types": "./dist/authoring/vector.d.ts",
       "default": "./dist/authoring/vector.js"
     },
+    "./vector/mmr": {
+      "types": "./dist/vector/mmr.d.ts",
+      "default": "./dist/vector/mmr.js"
+    },
     "./authoring/backend": {
       "types": "./dist/authoring/backend.d.ts",
       "default": "./dist/authoring/backend.js"

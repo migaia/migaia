@@ -283,3 +283,19 @@ Entity `skip`, `limit`, `distinct`, `after`, and ordering branches retain `onInv
 The original planner's leading declarative `where` prefix selects a declared index using static priority: unique `eq`, other `eq` / shorter `in`, bounded ranges, then one-sided ranges / `startsWith`, with declaration order breaking ties. Explicit `index` / `range` wins. `explain()` performs no I/O and names the selected rule and other candidates, conservatively retaining `fullScan: true` because opening can still prepare indexes or use the authoritative fallback. Broad membership and string-prefix candidates are rechecked by the original condition compiler. Explicit selectors and later `where` steps retain shared-core declaration order; place `where` before `orderBy` to filter first.
 
 When the original native record feed exists and the type carries `changeFeed: true`, root entity queries expose the original `watch()` invalidations. This is neither a row stream nor reliable replay. Organization borrows forward their original native organization iterator, without modifying frozen raw stores. Transaction queries expose no watcher. Client lambdas, ordering, or pagination that cannot be fully pushed reject with the original core's `QUERY_NOT_PUSHABLE` before subscription. Native backend and iterator owners retain subscription cleanup.
+
+## Pure MMR reranking
+
+`@migaia/storage-host/vector/mmr` independently exports `mmr` and `IStorageMmrOptions`; the host root does not re-export them. It performs no network calls and adds no dependencies. The scorer reuses the original cosine arithmetic, taking relevance from the engine `score` and diversity from cosine similarity between hit vectors. Call `withVector()` explicitly.
+
+```ts
+import { mmr } from '@migaia/storage-host/vector/mmr'
+const hits = await collection
+  .near([1, 0], { exact: true })
+  .withVector()
+  .topK(20)
+  .rerank(mmr({ lambda: 0.5, topN: 5 }), { topN: 5 })
+  .all()
+```
+
+`lambda` must be finite and in [0,1]. At 1 selection follows engine relevance; at 0 selection after the first candidate uses diversity alone. Equal objectives retain engine order. The helper's `topN` bounds only the computed greedy prefix: it still returns one finite rank per candidate, placing the unselected tail in engine order. Only `rerank` owns truncation. Omitted topN computes every candidate, using O(n) state and worst-case O(n²d) time. Vectors must share dimensions; zero directions contribute zero cosine similarity, retaining engine order for ties. Cancellation uses the original signal without another budget, resource or background task.
