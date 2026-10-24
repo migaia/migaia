@@ -3,6 +3,9 @@ import { IndexedDbFeature } from '../constants.js'
 import {
   defineFeature,
   memoryBackendKind,
+  StorageError as HostStorageError,
+  StorageErrorCode as HostStorageErrorCode,
+  StorageErrorText as HostStorageErrorText,
   type IStorageBackendKind,
   type IStorageFeature,
   type IStorageFeatureExpose,
@@ -82,8 +85,15 @@ const nativeConsistency = (
   kind: IStorageBackendKind,
   hasController: boolean
 ): IStorageReactiveFeatureMetadata => {
-  if (kind === memoryBackendKind)
+  if (kind === memoryBackendKind) {
+    if (!hasController)
+      throw new HostStorageError(
+        HostStorageErrorCode.changeControllerNotAssembled,
+        {},
+        HostStorageErrorText.changeControllerNotAssembled
+      )
     return { mode: 'push', visibility: StorageReactiveVisibility.instance }
+  }
   if (kind === localStorageBackendKind)
     return {
       mode: 'hybrid',
