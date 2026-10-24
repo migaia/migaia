@@ -354,7 +354,7 @@ export function vectorCondition(
   if (condition.kind !== 'field') {
     const children = condition.conditions.map((item) => vectorCondition(item, fields))
     if (children.some((item) => item === undefined)) return undefined
-    if (!children.length) return condition.kind === 'and' ? '*' : absent
+    if (!children.length) return condition.kind === 'and' ? '-(' + absent + ')' : absent
     return '(' + children.join(condition.kind === 'and' ? ' ' : ' | ') + ')'
   }
   const { path, operator, value } = condition,
