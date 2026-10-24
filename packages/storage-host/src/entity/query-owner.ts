@@ -1,7 +1,7 @@
 import { EntityFeatureName } from './constants.js'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { asyncDisposeKey } from '@migaia/plugin-host'
-import { getBackendEntityQueryMethods } from '../core/change-controller.js'
+import { getBackendEntityQueryMethods } from '../core/backend-registry.js'
 import {
   StorageContractError,
   StorageContractErrorCode,
@@ -111,7 +111,7 @@ export class EntityQueryOwner<
   invalidAction = (
     issue: IInvalidRecordIssue<TDomain>,
     option: IListSnapshot<TDomain> | undefined
-  ): IInvalidRecordAction => this.#context.invokeInvalidHandler(option?.onInvalid, issue)
+  ): IInvalidRecordAction => this.invokeInvalidHandler(option?.onInvalid, issue)
   /** Reuse the original repository operation through its explicit owner context. */
   validateInvalidHandler = (handler: unknown): void => {
     if (
@@ -153,7 +153,7 @@ export class EntityQueryOwner<
         backend: this.#context.store.backend,
         cause: new TypeError(EntityText.listDirectionMustBeNextOrPrev)
       })
-    this.#context.validateInvalidHandler(onInvalid)
+    this.validateInvalidHandler(onInvalid)
     return { range: rangeSnapshot, limit, orderBy, direction, onInvalid }
   }
   /** Reuse the original repository operation through its explicit owner context. */
@@ -232,7 +232,7 @@ export class EntityQueryOwner<
 
     let count = 0
     try {
-      for await (const row of this.#context.orderedEntityCandidates(scan)) {
+      for await (const row of this.orderedEntityCandidates(scan)) {
         const raw =
           this.#context.recordStore !== undefined
             ? readView?.getRecord === undefined
@@ -260,8 +260,8 @@ export class EntityQueryOwner<
             stage: (cause as Partial<IStageFailure>).stage ?? StorageRecordStage.validate,
             cause
           }
-          if (this.#context.invalidAction(issue, options) === StorageInvalidRecordAction.throw)
-            this.#context.throwInvalid(issue)
+          if (this.invalidAction(issue, options) === StorageInvalidRecordAction.throw)
+            this.throwInvalid(issue)
           this.#context.emitDiagnostic(EntityText.invalidRecord(this.#context.name, row.id))
         }
         if (value !== undefined) {
@@ -375,8 +375,8 @@ export class EntityQueryOwner<
     >(
       source,
       (next, _fail, current) =>
-        this.#context.advanceScopedEntitySource(sourceContext, next, current as ITransactionScope),
-      () => this.#context.closeScopedEntitySource(sourceContext)
+        this.advanceScopedEntitySource(sourceContext, next, current as ITransactionScope),
+      () => this.closeScopedEntitySource(sourceContext)
     )
     return derived!
   }
@@ -448,11 +448,11 @@ export class EntityQueryOwner<
       elapsedMs: 0
     }
     const derived = deriveTransactionIterator(iterator, (next, _fail, current) =>
-      this.#context.advanceObservedEntityQuery(observation, next, current as ITransactionScope)
+      this.advanceObservedEntityQuery(observation, next, current as ITransactionScope)
     )
     if (derived !== undefined) return derived
     return {
-      next: () => this.#context.advanceObservedEntityQuery(observation, () => iterator.next()),
+      next: () => this.advanceObservedEntityQuery(observation, () => iterator.next()),
       return: iterator.return === undefined ? undefined : (value) => iterator.return!(value),
       dispose: () => iterator.dispose(),
       [asyncDisposeKey]: () => iterator[asyncDisposeKey](),
@@ -468,23 +468,22 @@ export class EntityQueryOwner<
     /** Synchronous terminal opening shares these facts with its actual source. */
     const execution: IEntityQueryExecution<TDomain> = { scope }
     return createEntityQuery<TDomain, TIndexes, C, TAugmentMethods>({
-      predicate: this.#context.queryPredicate,
+      predicate: this.queryPredicate,
       keyset: (invoke) => this.#context.runKeyset(invoke),
-      selector: this.#context.querySelector,
-      mapper: this.#context.queryMapper,
-      comparator: this.#context.queryComparator,
+      selector: this.querySelector,
+      mapper: this.queryMapper,
+      comparator: this.queryComparator,
       methods: getBackendEntityQueryMethods(this.#context.store) as TAugmentMethods | undefined,
       defaultComparator: this.#context.defaultOrderBy,
       run: (invoke, plan, selection, count) =>
-        this.#context.runEntityQuery(execution, invoke, plan, selection, count),
-      stream: (open, plan, selection) =>
-        this.#context.streamEntityQuery(execution, open, plan, selection),
-      missingLimit: this.#context.queryMissingLimit,
-      invalidState: this.#context.queryInvalidState,
-      invalid: this.#context.queryInvalid,
-      range: this.#context.queryRange,
+        this.runEntityQuery(execution, invoke, plan, selection, count),
+      stream: (open, plan, selection) => this.streamEntityQuery(execution, open, plan, selection),
+      missingLimit: this.queryMissingLimit,
+      invalidState: this.queryInvalidState,
+      invalid: this.queryInvalid,
+      range: this.queryRange,
       index: (name, match) => this.#context.queryIndex(name, match),
-      source: (selection) => this.#context.createEntitySource(execution, selection)
+      source: (selection) => this.createEntitySource(execution, selection)
     })
   }
   /** Reuse the original repository operation through its explicit owner context. */
@@ -578,7 +577,7 @@ export class EntityQueryOwner<
       execution.openingPlan = plan
       execution.openingSelection = selection
       try {
-        return this.#context.observeQueryRead(
+        return this.observeQueryRead(
           invoke,
           plan,
           selection,
@@ -613,7 +612,7 @@ export class EntityQueryOwner<
       execution.openingPlan = previous
       execution.openingSelection = previousSelection
     }
-    return this.#context.observeQueryStream(iterator, plan, selection, execution.opened)
+    return this.observeQueryStream(iterator, plan, selection, execution.opened)
   }
   /** Reuse the original repository operation through its explicit owner context. */
   queryMissingLimit: Parameters<
@@ -637,7 +636,7 @@ export class EntityQueryOwner<
   queryInvalid: Parameters<
     typeof createEntityQuery<TDomain, TIndexes, IOperationContext, TAugmentMethods>
   >[0]['invalid'] = (action) => {
-    this.#context.normalizeListOptions({ onInvalid: action as IInvalidRecordAction })
+    this.normalizeListOptions({ onInvalid: action as IInvalidRecordAction })
   }
   /** Reuse the original repository operation through its explicit owner context. */
   queryRange: Parameters<
@@ -669,8 +668,8 @@ export class EntityQueryOwner<
               this.#context.planEntitySource(sourceContext, conditions)
           }
         : {}),
-      mutate: (request, run) => this.#context.mutateEntitySource(sourceContext, request, run),
-      execute: (input) => this.#context.executeEntitySource(sourceContext, input)
+      mutate: (request, run) => this.mutateEntitySource(sourceContext, request, run),
+      execute: (input) => this.executeEntitySource(sourceContext, input)
     }
   }
   /** Reuse the original repository operation through its explicit owner context. */
@@ -706,13 +705,13 @@ export class EntityQueryOwner<
     }
     return sourceContext.execution.scope === undefined
       ? this.#context.recordStore.transaction(
-          (target) => this.#context.applyEntityQueryMutation(mutation, target),
+          (target) => this.applyEntityQueryMutation(mutation, target),
           {
             ...request.ctx,
             concurrency: request.concurrency
           }
         )
-      : this.#context.applyEntityQueryMutation(mutation, sourceContext.execution.scope)
+      : this.applyEntityQueryMutation(mutation, sourceContext.execution.scope)
   }
   /** Reuse the original repository operation through its explicit owner context. */
   executeEntitySource = (
@@ -741,7 +740,7 @@ export class EntityQueryOwner<
           }
     const orderedSource = sourceContext.execution.openingPlan?.hasOrder !== true
     if (sourceContext.execution.scope !== undefined)
-      return this.#context.scopedQuerySource(
+      return this.scopedQuerySource(
         sourceContext.execution.scope,
         selection,
         onRead,
@@ -807,7 +806,7 @@ export class EntityQueryOwner<
   boundQuery = (
     binding: IEntityRepositoryBinding
   ): ReturnType<IEntityTransactionScope<TDomain, TIndexes, TAugmentMethods>['query']> =>
-    this.#context.queryFor<undefined>(binding.scope)
+    this.queryFor<undefined>(binding.scope)
   /** Reuse the original repository operation through its explicit owner context. */
   boundList = (
     binding: IEntityRepositoryBinding,
@@ -835,7 +834,7 @@ export class EntityQueryOwner<
         (options as { readonly index?: string } | undefined)?.index === undefined
           ? undefined
           : this.#context.snapshotIndexedListOptions(options)
-      const normalized = indexed?.options ?? this.#context.normalizeListOptions(options)
+      const normalized = indexed?.options ?? this.normalizeListOptions(options)
       const counter = this.#context.queryStages === undefined ? undefined : { readCount: 0 }
       const onRead =
         counter === undefined
@@ -845,9 +844,9 @@ export class EntityQueryOwner<
             }
       const query =
         indexed === undefined
-          ? this.#context.listQuery(normalized, context, entityRuntime(current), view, onRead)
+          ? this.listQuery(normalized, context, entityRuntime(current), view, onRead)
           : this.#context.createIndexQuery(indexed, context, view, onRead)
-      return this.#context.observeQueryRead(
+      return this.observeQueryRead(
         () => query.all(context),
         {
           hasWhere: false,
@@ -862,7 +861,7 @@ export class EntityQueryOwner<
     })
   /** Reuse the original repository operation through its explicit owner context. */
   apiQuery: IRepository<TDomain, TIndexes, TChangeFeed, TAugmentMethods>['query'] = () =>
-    this.#context.queryFor<IOperationContext>() as ReturnType<
+    this.queryFor<IOperationContext>() as ReturnType<
       IRepository<TDomain, TIndexes, TChangeFeed, TAugmentMethods>['query']
     >
   /** Reuse the original repository operation through its explicit owner context. */
@@ -874,7 +873,7 @@ export class EntityQueryOwner<
       (options as { readonly index?: string } | undefined)?.index === undefined
         ? undefined
         : this.#context.snapshotIndexedListOptions(options)
-    const normalized = indexed?.options ?? this.#context.normalizeListOptions(options)
+    const normalized = indexed?.options ?? this.normalizeListOptions(options)
     const context = snapshotOperationContext(ctx)
     const counter = this.#context.queryStages === undefined ? undefined : { readCount: 0 }
     const onRead =
@@ -885,15 +884,9 @@ export class EntityQueryOwner<
           }
     const query =
       indexed === undefined
-        ? this.#context.listQuery(
-            normalized,
-            context,
-            createStorageOperationRuntime(),
-            undefined,
-            onRead
-          )
+        ? this.listQuery(normalized, context, createStorageOperationRuntime(), undefined, onRead)
         : this.#context.createIndexQuery(indexed, context, undefined, onRead)
-    return this.#context.observeQueryRead(
+    return this.observeQueryRead(
       () => query.all(context),
       {
         hasWhere: false,
@@ -915,7 +908,7 @@ export class EntityQueryOwner<
       (options as { readonly index?: string } | undefined)?.index === undefined
         ? undefined
         : this.#context.snapshotIndexedListOptions(options)
-    const normalized = indexed?.options ?? this.#context.normalizeListOptions(options)
+    const normalized = indexed?.options ?? this.normalizeListOptions(options)
     const context = snapshotOperationContext(ctx)
     const counter = this.#context.queryStages === undefined ? undefined : { readCount: 0 }
     const onRead =
@@ -926,15 +919,9 @@ export class EntityQueryOwner<
           }
     const query =
       indexed === undefined
-        ? this.#context.listQuery(
-            normalized,
-            context,
-            createStorageOperationRuntime(),
-            undefined,
-            onRead
-          )
+        ? this.listQuery(normalized, context, createStorageOperationRuntime(), undefined, onRead)
         : this.#context.createIndexQuery(indexed, context, undefined, onRead)
-    return this.#context.observeQueryStream(
+    return this.observeQueryStream(
       query.stream(context),
       {
         hasWhere: false,
@@ -995,10 +982,10 @@ export class EntityQueryOwner<
     scan: IEntityScanContext<TDomain>
   ): AsyncGenerator<IEntityScanCandidate, void, unknown> {
     if (!scan.applyOrdering) {
-      yield* this.#context.scanEntityCandidates(scan)
+      yield* this.scanEntityCandidates(scan)
       return
     }
-    for await (const candidate of this.#context.scanEntityCandidates(scan))
+    for await (const candidate of this.scanEntityCandidates(scan))
       scan.candidates.set(
         encodeOrderedStorageKey(candidate.id, this.#context.store.backend),
         candidate
@@ -1076,10 +1063,10 @@ export class EntityQueryOwner<
             cause
           }
           if (
-            this.#context.invalidAction(issue, { onInvalid: sourceContext.selection.onInvalid }) ===
+            this.invalidAction(issue, { onInvalid: sourceContext.selection.onInvalid }) ===
             StorageInvalidRecordAction.throw
           )
-            this.#context.throwInvalid(issue)
+            this.throwInvalid(issue)
           this.#context.emitDiagnostic(EntityText.invalidRecord(this.#context.name, physicalId))
         }
         if (value === undefined) continue
@@ -1105,11 +1092,11 @@ export class EntityQueryOwner<
               cause
             }
             if (
-              this.#context.invalidAction(issue, {
+              this.invalidAction(issue, {
                 onInvalid: sourceContext.selection.onInvalid
               }) === StorageInvalidRecordAction.throw
             )
-              this.#context.throwInvalid(issue)
+              this.throwInvalid(issue)
             this.#context.emitDiagnostic(EntityText.invalidRecord(this.#context.name, physicalId))
             continue
           }
@@ -1203,7 +1190,7 @@ export class EntityQueryOwner<
     const predicates = conditions.map((condition) =>
       compileStorageQueryCondition<TDomain>(condition)
     )
-    return this.#context.scopedQuerySource(
+    return this.scopedQuerySource(
       current,
       selection,
       mutation.onRead,
@@ -1256,10 +1243,9 @@ export class EntityQueryOwner<
       const physicalIds = new Map<string, IStorageKey>()
       try {
         return await mutation.run({
-          execute: (input) =>
-            this.#context.executeEntityMutationRows(mutation, current, physicalIds, input),
+          execute: (input) => this.executeEntityMutationRows(mutation, current, physicalIds, input),
           accept: (_key, value) =>
-            this.#context.acceptEntityMutationRow(mutation, current, physicalIds, value)
+            this.acceptEntityMutationRow(mutation, current, physicalIds, value)
         })
       } finally {
         physicalIds.clear()

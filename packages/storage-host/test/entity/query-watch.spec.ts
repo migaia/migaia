@@ -1,3 +1,7 @@
+import type { IMemoryBackendWithChangeFeed } from '../helpers/memory.js'
+import type { IStorageBorrowedBackend } from '../../src/types.js'
+import { memoryNotificationsFeature } from '../../src/features/memory-notifications.js'
+import { memoryChangeFeedFeature } from '../../src/features/memory-change-feed.js'
 import { entityQueryFeature } from '../../src/entity/query-feature.js'
 import { entityUniqueFeature } from '../../src/entity/unique-feature.js'
 import { entityMigrationFeature } from '../../src/entity/migration-feature.js'
@@ -50,11 +54,22 @@ it('uses the native watcher on a frozen raw base and rejects client predicates b
 })
 
 it('keeps the borrowed organization watcher on its original native organization', async () => {
-  await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })
+  await using host = await createStorageHost({
+    plugins: [
+      memoryBackendPlugin(undefined, {
+        notifications: memoryNotificationsFeature(),
+        changeFeed: memoryChangeFeedFeature()
+      })
+    ] as const
+  })
   const first = '00000000-0000-0000-0000-000000000001'
   const second = '00000000-0000-0000-0000-000000000002'
-  const left = definition.connect(host.org(first).backend('memory'))
-  const right = definition.connect(host.org(second).backend('memory'))
+  const left = definition.connect(
+    host.org(first).backend('memory') as IStorageBorrowedBackend<IMemoryBackendWithChangeFeed>
+  )
+  const right = definition.connect(
+    host.org(second).backend('memory') as IStorageBorrowedBackend<IMemoryBackendWithChangeFeed>
+  )
   const iterator = left.query().watch()
   let settled = false
   const next = iterator.next().then((value) => {

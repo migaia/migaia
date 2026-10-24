@@ -4,7 +4,7 @@ import {
 } from '../authoring/transaction.js'
 import type { ITransactionInfo } from '@migaia/storage-contract'
 import { entityRuntime } from './repository-shared.js'
-import { getBackendValueCommit } from '../core/change-controller.js'
+import { getBackendValueCommit } from '../core/backend-registry.js'
 import {
   StorageContractError,
   StorageContractErrorCode,
@@ -64,7 +64,7 @@ export class EntityUniqueOwner<
       this.#states.set(info, stateReference)
       registerTransactionFinalizer(scope, async (check) => {
         try {
-          await this.#context.validateUniqueRecordCommit(
+          await this.validateUniqueRecordCommit(
             check,
             changes,
             readTransactionOperationContext(check),
@@ -116,7 +116,7 @@ export class EntityUniqueOwner<
     for await (const value of this.#context.streamImpl(undefined, ctx, runtime, false, readView)) {
       /** Normal repository writes bind the domain key to the physical record identity. */
       const id = idOf(this.#context.name, this.#context.keyProp, value, this.#context.store.backend)
-      rows.push({ key: id, projection: this.#context.projectUniqueWrite(value) })
+      rows.push({ key: id, projection: this.projectUniqueWrite(value) })
     }
     for (const change of changes.values())
       if (change.projection !== undefined)
@@ -143,7 +143,7 @@ export class EntityUniqueOwner<
         encodeFlatStorageKey(composeStructuredKey(this.#context.name, change.id))
       ])
     )
-    await this.#context.validateUniqueRows(changes, ctx, runtime, {
+    await this.validateUniqueRows(changes, ctx, runtime, {
       getRecord: (key) =>
         replaced.has(encodeFlatStorageKey(key)) ? Promise.resolve(undefined) : tx.getRecord(key),
       iterateRecords: (range) => tx.iterateRecords(range),
@@ -192,15 +192,15 @@ export class EntityUniqueOwner<
           encodeFlatStorageKey(id),
           {
             id,
-            projection: this.#context.projectUniqueWrite(domain)
+            projection: this.projectUniqueWrite(domain)
           }
         ]
       ])
       /** Capture the exact raw values whose materialized projections are checked. */
-      const snapshot = await this.#context.snapshotUniqueValues(operation)
+      const snapshot = await this.snapshotUniqueValues(operation)
       /** The current primary key is not a competing owner. */
       const targetKey = composeFlatKey(this.#context.name, id)
-      await this.#context.validateUniqueRows(changes, operation, runtime, {
+      await this.validateUniqueRows(changes, operation, runtime, {
         keys: async () => [...snapshot.keys()].filter((key) => key !== targetKey),
         get: async (key) => snapshot.get(key) ?? null
       })

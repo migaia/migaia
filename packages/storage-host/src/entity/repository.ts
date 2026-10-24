@@ -5,7 +5,7 @@ import {
   type IBackendEntityAccess,
   type IEntityKeyValueMethods,
   type IEntityRecordMethods
-} from '../core/change-controller.js'
+} from '../core/backend-registry.js'
 import {
   StorageContractError,
   assertVersionedEnvelope,
@@ -66,7 +66,7 @@ import type { EntityMigrationOwner } from './migration-owner.js'
 import type { EntityUniqueOwner } from './unique-owner.js'
 import type { EntityIndexesOwner } from './indexes-owner.js'
 import type { EntityQueryOwner } from './query-owner.js'
-import type { EntityKeysetOwner } from './keyset.js'
+import type { IEntityKeysetOwner } from './keyset.js'
 import { missingEntityFeature } from './assembly.js'
 
 export class EntityRepositoryOwner<
@@ -490,19 +490,6 @@ export class EntityRepositoryOwner<
     >(EntityFeatureName.indexes).createIndexedListSnapshot
   }
 
-  /** Snapshot migration options once before checkpoint or record work begins. */
-  get #normalizeMigrateOptions(): EntityMigrationOwner<
-    TDomain,
-    TStored,
-    TIndexes,
-    TAugmentMethods,
-    TChangeFeed
-  >['normalizeMigrateOptions'] {
-    return this.#feature<
-      EntityMigrationOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
-    >(EntityFeatureName.migration).normalizeMigrateOptions
-  }
-
   /** Perform the repository invokeInvalidHandler operation using its own state. */
   get #invokeInvalidHandler(): EntityQueryOwner<
     TDomain,
@@ -588,19 +575,6 @@ export class EntityRepositoryOwner<
     return (...args) => feature.streamImpl(...args)
   }
 
-  /** Domain callbacks and bounded selection use the sole contract query executor. */
-  get #listQuery(): EntityQueryOwner<
-    TDomain,
-    TStored,
-    TIndexes,
-    TAugmentMethods,
-    TChangeFeed
-  >['listQuery'] {
-    return this.#feature<
-      EntityQueryOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
-    >(EntityFeatureName.query).listQuery
-  }
-
   /**
    * New fallback write checks reuse the existing extension boundary without changing native
    * backfill identity.
@@ -617,19 +591,6 @@ export class EntityRepositoryOwner<
     >(EntityFeatureName.unique).projectUniqueWrite
   }
 
-  /** Validate the final proposed rows through the same projection/ownership owner as native IDB. */
-  get #validateUniqueRows(): EntityUniqueOwner<
-    TDomain,
-    TStored,
-    TIndexes,
-    TAugmentMethods,
-    TChangeFeed
-  >['validateUniqueRows'] {
-    return this.#feature<
-      EntityUniqueOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
-    >(EntityFeatureName.unique).validateUniqueRows
-  }
-
   /** Use one normal record revision as a phantom barrier, with no sidecar or duplicate queue. */
   get #validateUniqueRecordCommit(): EntityUniqueOwner<
     TDomain,
@@ -641,22 +602,6 @@ export class EntityRepositoryOwner<
     return this.#feature<
       EntityUniqueOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
     >(EntityFeatureName.unique).validateUniqueRecordCommit
-  }
-
-  /**
-   * Capture only this entity's raw text; exact string equality avoids re-running codecs under a
-   * lock.
-   */
-  get #snapshotUniqueValues(): EntityUniqueOwner<
-    TDomain,
-    TStored,
-    TIndexes,
-    TAugmentMethods,
-    TChangeFeed
-  >['snapshotUniqueValues'] {
-    return this.#feature<
-      EntityUniqueOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
-    >(EntityFeatureName.unique).snapshotUniqueValues
   }
 
   /**
@@ -714,178 +659,8 @@ export class EntityRepositoryOwner<
     >(EntityFeatureName.indexes).createIndexQuery
   }
 
-  /** One scoped source remains registered through mapping, buffering and actual cleanup. */
-  get #scopedQuerySource(): EntityQueryOwner<
-    TDomain,
-    TStored,
-    TIndexes,
-    TAugmentMethods,
-    TChangeFeed
-  >['scopedQuerySource'] {
-    return this.#feature<
-      EntityQueryOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
-    >(EntityFeatureName.query).scopedQuerySource
-  }
-
-  /** Observation wraps the same original core for both fluent and legacy option adapters. */
-  get #observeQueryRead(): EntityQueryOwner<
-    TDomain,
-    TStored,
-    TIndexes,
-    TAugmentMethods,
-    TChangeFeed
-  >['observeQueryRead'] {
-    return this.#feature<
-      EntityQueryOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
-    >(EntityFeatureName.query).observeQueryRead
-  }
-
-  /** Perform the repository observeQueryStream operation using its own state. */
-  get #observeQueryStream(): EntityQueryOwner<
-    TDomain,
-    TStored,
-    TIndexes,
-    TAugmentMethods,
-    TChangeFeed
-  >['observeQueryStream'] {
-    return this.#feature<
-      EntityQueryOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
-    >(EntityFeatureName.query).observeQueryStream
-  }
-
   /** Source adaptation contributes no second AST or query executor. */
-  /** Bind one entity query to its original scope and observer facts. */
-  get #queryFor(): EntityQueryOwner<
-    TDomain,
-    TStored,
-    TIndexes,
-    TAugmentMethods,
-    TChangeFeed
-  >['queryFor'] {
-    return this.#feature<
-      EntityQueryOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
-    >(EntityFeatureName.query).queryFor
-  }
-  /** Adapt the application predicate callback at the entity boundary. */
-  get #queryPredicate(): EntityQueryOwner<
-    TDomain,
-    TStored,
-    TIndexes,
-    TAugmentMethods,
-    TChangeFeed
-  >['queryPredicate'] {
-    return this.#feature<
-      EntityQueryOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
-    >(EntityFeatureName.query).queryPredicate
-  }
-  /** Adapt the application selector callback at the entity boundary. */
-  get #querySelector(): EntityQueryOwner<
-    TDomain,
-    TStored,
-    TIndexes,
-    TAugmentMethods,
-    TChangeFeed
-  >['querySelector'] {
-    return this.#feature<
-      EntityQueryOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
-    >(EntityFeatureName.query).querySelector
-  }
-  /** Adapt the application mapper callback at the entity boundary. */
-  get #queryMapper(): EntityQueryOwner<
-    TDomain,
-    TStored,
-    TIndexes,
-    TAugmentMethods,
-    TChangeFeed
-  >['queryMapper'] {
-    return this.#feature<
-      EntityQueryOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
-    >(EntityFeatureName.query).queryMapper
-  }
-  /** Adapt the application comparator callback at the entity boundary. */
-  get #queryComparator(): EntityQueryOwner<
-    TDomain,
-    TStored,
-    TIndexes,
-    TAugmentMethods,
-    TChangeFeed
-  >['queryComparator'] {
-    return this.#feature<
-      EntityQueryOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
-    >(EntityFeatureName.query).queryComparator
-  }
-  /** Carry terminal observer facts through the original transaction operation. */
-  get #runEntityQuery(): EntityQueryOwner<
-    TDomain,
-    TStored,
-    TIndexes,
-    TAugmentMethods,
-    TChangeFeed
-  >['runEntityQuery'] {
-    return this.#feature<
-      EntityQueryOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
-    >(EntityFeatureName.query).runEntityQuery
-  }
-  /** Open one stream while publishing only its synchronous observer facts. */
-  get #streamEntityQuery(): EntityQueryOwner<
-    TDomain,
-    TStored,
-    TIndexes,
-    TAugmentMethods,
-    TChangeFeed
-  >['streamEntityQuery'] {
-    return this.#feature<
-      EntityQueryOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
-    >(EntityFeatureName.query).streamEntityQuery
-  }
-  /** Adapt the application missingLimit callback at the entity boundary. */
-  get #queryMissingLimit(): EntityQueryOwner<
-    TDomain,
-    TStored,
-    TIndexes,
-    TAugmentMethods,
-    TChangeFeed
-  >['queryMissingLimit'] {
-    return this.#feature<
-      EntityQueryOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
-    >(EntityFeatureName.query).queryMissingLimit
-  }
-  /** Adapt the application invalidState callback at the entity boundary. */
-  get #queryInvalidState(): EntityQueryOwner<
-    TDomain,
-    TStored,
-    TIndexes,
-    TAugmentMethods,
-    TChangeFeed
-  >['queryInvalidState'] {
-    return this.#feature<
-      EntityQueryOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
-    >(EntityFeatureName.query).queryInvalidState
-  }
-  /** Adapt the application invalid callback at the entity boundary. */
-  get #queryInvalid(): EntityQueryOwner<
-    TDomain,
-    TStored,
-    TIndexes,
-    TAugmentMethods,
-    TChangeFeed
-  >['queryInvalid'] {
-    return this.#feature<
-      EntityQueryOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
-    >(EntityFeatureName.query).queryInvalid
-  }
-  /** Adapt the application range callback at the entity boundary. */
-  get #queryRange(): EntityQueryOwner<
-    TDomain,
-    TStored,
-    TIndexes,
-    TAugmentMethods,
-    TChangeFeed
-  >['queryRange'] {
-    return this.#feature<
-      EntityQueryOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
-    >(EntityFeatureName.query).queryRange
-  }
+
   /** Adapt the application index callback at the entity boundary. */
   get #queryIndex(): EntityIndexesOwner<
     TDomain,
@@ -898,18 +673,7 @@ export class EntityRepositoryOwner<
       EntityIndexesOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
     >(EntityFeatureName.indexes).queryIndex
   }
-  /** A source owns one selection and borrows the descriptor execution facts. */
-  get #createEntitySource(): EntityQueryOwner<
-    TDomain,
-    TStored,
-    TIndexes,
-    TAugmentMethods,
-    TChangeFeed
-  >['createEntitySource'] {
-    return this.#feature<
-      EntityQueryOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
-    >(EntityFeatureName.query).createEntitySource
-  }
+
   /** Select the canonical index plan using explicit source facts. */
   get #planEntitySource(): EntityIndexesOwner<
     TDomain,
@@ -921,30 +685,6 @@ export class EntityRepositoryOwner<
     return this.#feature<
       EntityIndexesOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
     >(EntityFeatureName.indexes).planEntitySource
-  }
-  /** Run query writes in the original transaction using explicit source facts. */
-  get #mutateEntitySource(): EntityQueryOwner<
-    TDomain,
-    TStored,
-    TIndexes,
-    TAugmentMethods,
-    TChangeFeed
-  >['mutateEntitySource'] {
-    return this.#feature<
-      EntityQueryOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
-    >(EntityFeatureName.query).mutateEntitySource
-  }
-  /** Open the selected lazy native source using explicit source facts. */
-  get #executeEntitySource(): EntityQueryOwner<
-    TDomain,
-    TStored,
-    TIndexes,
-    TAugmentMethods,
-    TChangeFeed
-  >['executeEntitySource'] {
-    return this.#feature<
-      EntityQueryOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
-    >(EntityFeatureName.query).executeEntitySource
   }
 
   /** Perform the repository bindRepository operation using its own state. */
@@ -1201,78 +941,7 @@ export class EntityRepositoryOwner<
       EntityMigrationOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
     >(EntityFeatureName.migration).apiMigrate
   }
-  /** Scan canonical and legacy record phases without changing checkpoint order. */
-  get #scanMigrationRecords(): EntityMigrationOwner<
-    TDomain,
-    TStored,
-    TIndexes,
-    TAugmentMethods,
-    TChangeFeed
-  >['scanMigrationRecords'] {
-    return this.#feature<
-      EntityMigrationOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
-    >(EntityFeatureName.migration).scanMigrationRecords
-  }
-  /** Scan text records using the existing canonical ordered key index. */
-  get #scanMigrationValues(): EntityMigrationOwner<
-    TDomain,
-    TStored,
-    TIndexes,
-    TAugmentMethods,
-    TChangeFeed
-  >['scanMigrationValues'] {
-    return this.#feature<
-      EntityMigrationOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
-    >(EntityFeatureName.migration).scanMigrationValues
-  }
-  /** Apply a prepared batch against the current native transaction snapshot. */
-  get #executeMigrationBatch(): EntityMigrationOwner<
-    TDomain,
-    TStored,
-    TIndexes,
-    TAugmentMethods,
-    TChangeFeed
-  >['executeMigrationBatch'] {
-    return this.#feature<
-      EntityMigrationOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
-    >(EntityFeatureName.migration).executeMigrationBatch
-  }
-  /** Re-read one conflicted row in the original retry transaction. */
-  get #retryMigrationEntry(): EntityMigrationOwner<
-    TDomain,
-    TStored,
-    TIndexes,
-    TAugmentMethods,
-    TChangeFeed
-  >['retryMigrationEntry'] {
-    return this.#feature<
-      EntityMigrationOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
-    >(EntityFeatureName.migration).retryMigrationEntry
-  }
-  /** Write the existing migration checkpoint through its native metadata owner. */
-  get #writeMigrationCheckpoint(): EntityMigrationOwner<
-    TDomain,
-    TStored,
-    TIndexes,
-    TAugmentMethods,
-    TChangeFeed
-  >['writeMigrationCheckpoint'] {
-    return this.#feature<
-      EntityMigrationOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
-    >(EntityFeatureName.migration).writeMigrationCheckpoint
-  }
-  /** Commit one prepared migration batch and publish its durable progress. */
-  get #persistMigrationBatch(): EntityMigrationOwner<
-    TDomain,
-    TStored,
-    TIndexes,
-    TAugmentMethods,
-    TChangeFeed
-  >['persistMigrationBatch'] {
-    return this.#feature<
-      EntityMigrationOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
-    >(EntityFeatureName.migration).persistMigrationBatch
-  }
+
   /** Perform the public in operation using this repository state. */
   #apiIn: IRepository<TDomain, TIndexes, TChangeFeed, TAugmentMethods>['in'] = (scope) =>
     this.#bindRepository(scope)
@@ -1301,123 +970,9 @@ export class EntityRepositoryOwner<
     return this.#recordStore.transaction((scope) => run(this.#bindRepository(scope)), ctx)
   }
 
-  /** Read canonical and legacy physical rows with the existing deduplication policy. */
-  get #scanEntityCandidates(): EntityQueryOwner<
-    TDomain,
-    TStored,
-    TIndexes,
-    TAugmentMethods,
-    TChangeFeed
-  >['scanEntityCandidates'] {
-    const feature =
-      this.#feature<EntityQueryOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>>(
-        'query'
-      )
-    return (...args) => feature.scanEntityCandidates(...args)
-  }
-  /** Apply canonical key ordering only when the selected source requires it. */
-  get #orderedEntityCandidates(): EntityQueryOwner<
-    TDomain,
-    TStored,
-    TIndexes,
-    TAugmentMethods,
-    TChangeFeed
-  >['orderedEntityCandidates'] {
-    const feature =
-      this.#feature<EntityQueryOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>>(
-        'query'
-      )
-    return (...args) => feature.orderedEntityCandidates(...args)
-  }
-  /** Advance the same registered source through initialization, selection and ordered rows. */
-  get #advanceScopedEntitySource(): EntityQueryOwner<
-    TDomain,
-    TStored,
-    TIndexes,
-    TAugmentMethods,
-    TChangeFeed
-  >['advanceScopedEntitySource'] {
-    return this.#feature<
-      EntityQueryOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
-    >(EntityFeatureName.query).advanceScopedEntitySource
-  }
-  /** Release the native index cursor before clearing source-owned ordering and deduplication. */
-  get #closeScopedEntitySource(): EntityQueryOwner<
-    TDomain,
-    TStored,
-    TIndexes,
-    TAugmentMethods,
-    TChangeFeed
-  >['closeScopedEntitySource'] {
-    return this.#feature<
-      EntityQueryOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
-    >(EntityFeatureName.query).closeScopedEntitySource
-  }
-  /** Observe one advance using the actual transaction stages and original result. */
-  get #advanceObservedEntityQuery(): EntityQueryOwner<
-    TDomain,
-    TStored,
-    TIndexes,
-    TAugmentMethods,
-    TChangeFeed
-  >['advanceObservedEntityQuery'] {
-    return this.#feature<
-      EntityQueryOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
-    >(EntityFeatureName.query).advanceObservedEntityQuery
-  }
-
-  /** Decode one current backfill candidate under the original renewable session. */
-  get #prepareEntityBackfillCandidate(): EntityIndexesOwner<
-    TDomain,
-    TStored,
-    TIndexes,
-    TAugmentMethods,
-    TChangeFeed
-  >['prepareEntityBackfillCandidate'] {
-    return this.#feature<
-      EntityIndexesOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
-    >(EntityFeatureName.indexes).prepareEntityBackfillCandidate
-  }
-  /** Select mutation rows from the same authentic transaction and physical identity table. */
-  get #executeEntityMutationRows(): EntityQueryOwner<
-    TDomain,
-    TStored,
-    TIndexes,
-    TAugmentMethods,
-    TChangeFeed
-  >['executeEntityMutationRows'] {
-    return this.#feature<
-      EntityQueryOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
-    >(EntityFeatureName.query).executeEntityMutationRows
-  }
-  /** Write or remove a row only while its selected physical identity remains in the draft. */
-  get #acceptEntityMutationRow(): EntityQueryOwner<
-    TDomain,
-    TStored,
-    TIndexes,
-    TAugmentMethods,
-    TChangeFeed
-  >['acceptEntityMutationRow'] {
-    return this.#feature<
-      EntityQueryOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
-    >(EntityFeatureName.query).acceptEntityMutationRow
-  }
-  /** Run writes in the existing transaction operation, clearing its identity table on every exit. */
-  get #applyEntityQueryMutation(): EntityQueryOwner<
-    TDomain,
-    TStored,
-    TIndexes,
-    TAugmentMethods,
-    TChangeFeed
-  >['applyEntityQueryMutation'] {
-    return this.#feature<
-      EntityQueryOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
-    >(EntityFeatureName.query).applyEntityQueryMutation
-  }
-
   /** Keyset admission resolves only its explicit owner and preserves the original query result. */
-  get runKeyset(): EntityKeysetOwner['run'] {
-    return this.#feature<EntityKeysetOwner>(EntityFeatureName.keyset).run
+  get runKeyset(): IEntityKeysetOwner['run'] {
+    return this.#feature<IEntityKeysetOwner>(EntityFeatureName.keyset).run
   }
   /** Read only assembly presence; this never constructs another capability. */
   hasFeature(name: string): boolean {
@@ -1456,30 +1011,17 @@ export class EntityRepositoryOwner<
   get version() {
     return this.#version
   }
-  /** Internal port shares the original schema fact or operation with an assembled owner. */
-  get schema() {
-    return this.#schema
-  }
+
   /** Internal port shares the original migrationPlan fact or operation with an assembled owner. */
   get migrationPlan() {
     return this.#migrationPlan
   }
-  /** Internal port shares the original validateOnRead fact or operation with an assembled owner. */
-  get validateOnRead() {
-    return this.#validateOnRead
-  }
-  /** Internal port shares the original onDiagnostic fact or operation with an assembled owner. */
-  get onDiagnostic() {
-    return this.#onDiagnostic
-  }
+
   /** Internal port shares the original defaultOrderBy fact or operation with an assembled owner. */
   get defaultOrderBy() {
     return this.#defaultOrderBy
   }
-  /** Internal port shares the original codecStages fact or operation with an assembled owner. */
-  get codecStages() {
-    return this.#codecStages
-  }
+
   /** Internal port shares the original queryStages fact or operation with an assembled owner. */
   get queryStages() {
     return this.#queryStages
@@ -1488,10 +1030,7 @@ export class EntityRepositoryOwner<
   get recordStore() {
     return this.#recordStore
   }
-  /** Internal port shares the original records fact or operation with an assembled owner. */
-  get records() {
-    return this.#records
-  }
+
   /** Internal port shares the original uniqueIndexes fact or operation with an assembled owner. */
   get uniqueIndexes() {
     return this.#uniqueIndexes
@@ -1500,14 +1039,7 @@ export class EntityRepositoryOwner<
   get uniqueDefinitions() {
     return this.#uniqueDefinitions
   }
-  /** Internal port shares the original selectedCodec fact or operation with an assembled owner. */
-  get selectedCodec() {
-    return this.#selectedCodec
-  }
-  /** Internal port shares the original codecName fact or operation with an assembled owner. */
-  get codecName() {
-    return this.#codecName
-  }
+
   /**
    * Internal port shares the original migrationFingerprint fact or operation with an assembled
    * owner.
@@ -1523,10 +1055,7 @@ export class EntityRepositoryOwner<
   set readyHandle(value: IRecordIndexHandle | undefined) {
     this.#readyHandle = value
   }
-  /** Internal port shares the original repository fact or operation with an assembled owner. */
-  get repository() {
-    return this.#repository
-  }
+
   /** Internal port shares the original emitDiagnostic fact or operation with an assembled owner. */
   get emitDiagnostic() {
     return this.#emitDiagnostic
@@ -1539,17 +1068,7 @@ export class EntityRepositoryOwner<
   get writeEnvelopeAt() {
     return this.#writeEnvelopeAt
   }
-  /**
-   * Internal port shares the original writeEncodedEnvelopeAt fact or operation with an assembled
-   * owner.
-   */
-  get writeEncodedEnvelopeAt() {
-    return this.#writeEncodedEnvelopeAt
-  }
-  /** Internal port shares the original codecCall fact or operation with an assembled owner. */
-  get codecCall() {
-    return this.#codecCall
-  }
+
   /** Internal port shares the original encodeEnvelope fact or operation with an assembled owner. */
   get encodeEnvelope() {
     return this.#encodeEnvelope
@@ -1598,13 +1117,7 @@ export class EntityRepositoryOwner<
   get createIndexedListSnapshot() {
     return this.#createIndexedListSnapshot
   }
-  /**
-   * Internal port shares the original normalizeMigrateOptions fact or operation with an assembled
-   * owner.
-   */
-  get normalizeMigrateOptions() {
-    return this.#normalizeMigrateOptions
-  }
+
   /**
    * Internal port shares the original invokeInvalidHandler fact or operation with an assembled
    * owner.
@@ -1616,30 +1129,17 @@ export class EntityRepositoryOwner<
   get throwInvalid() {
     return this.#throwInvalid
   }
-  /** Internal port shares the original materializeForRead fact or operation with an assembled owner. */
-  get materializeForRead() {
-    return this.#materializeForRead
-  }
-  /** Internal port shares the original readEnvelope fact or operation with an assembled owner. */
-  get readEnvelope() {
-    return this.#readEnvelope
-  }
+
   /** Internal port shares the original streamImpl fact or operation with an assembled owner. */
   get streamImpl() {
     return this.#streamImpl
   }
-  /** Internal port shares the original listQuery fact or operation with an assembled owner. */
-  get listQuery() {
-    return this.#listQuery
-  }
+
   /** Internal port shares the original projectUniqueWrite fact or operation with an assembled owner. */
   get projectUniqueWrite() {
     return this.#projectUniqueWrite
   }
-  /** Internal port shares the original validateUniqueRows fact or operation with an assembled owner. */
-  get validateUniqueRows() {
-    return this.#validateUniqueRows
-  }
+
   /**
    * Internal port shares the original validateUniqueRecordCommit fact or operation with an
    * assembled owner.
@@ -1647,13 +1147,7 @@ export class EntityRepositoryOwner<
   get validateUniqueRecordCommit() {
     return this.#validateUniqueRecordCommit
   }
-  /**
-   * Internal port shares the original snapshotUniqueValues fact or operation with an assembled
-   * owner.
-   */
-  get snapshotUniqueValues() {
-    return this.#snapshotUniqueValues
-  }
+
   /** Internal port shares the original writeUniqueValue fact or operation with an assembled owner. */
   get writeUniqueValue() {
     return this.#writeUniqueValue
@@ -1670,261 +1164,20 @@ export class EntityRepositoryOwner<
   get createIndexQuery() {
     return this.#createIndexQuery
   }
-  /** Internal port shares the original scopedQuerySource fact or operation with an assembled owner. */
-  get scopedQuerySource() {
-    return this.#scopedQuerySource
-  }
-  /** Internal port shares the original observeQueryRead fact or operation with an assembled owner. */
-  get observeQueryRead() {
-    return this.#observeQueryRead
-  }
-  /** Internal port shares the original observeQueryStream fact or operation with an assembled owner. */
-  get observeQueryStream() {
-    return this.#observeQueryStream
-  }
-  /** Internal port shares the original queryFor fact or operation with an assembled owner. */
-  get queryFor() {
-    return this.#queryFor
-  }
-  /** Internal port shares the original queryPredicate fact or operation with an assembled owner. */
-  get queryPredicate() {
-    return this.#queryPredicate
-  }
-  /** Internal port shares the original querySelector fact or operation with an assembled owner. */
-  get querySelector() {
-    return this.#querySelector
-  }
-  /** Internal port shares the original queryMapper fact or operation with an assembled owner. */
-  get queryMapper() {
-    return this.#queryMapper
-  }
-  /** Internal port shares the original queryComparator fact or operation with an assembled owner. */
-  get queryComparator() {
-    return this.#queryComparator
-  }
-  /** Internal port shares the original runEntityQuery fact or operation with an assembled owner. */
-  get runEntityQuery() {
-    return this.#runEntityQuery
-  }
-  /** Internal port shares the original streamEntityQuery fact or operation with an assembled owner. */
-  get streamEntityQuery() {
-    return this.#streamEntityQuery
-  }
-  /** Internal port shares the original queryMissingLimit fact or operation with an assembled owner. */
-  get queryMissingLimit() {
-    return this.#queryMissingLimit
-  }
-  /** Internal port shares the original queryInvalidState fact or operation with an assembled owner. */
-  get queryInvalidState() {
-    return this.#queryInvalidState
-  }
-  /** Internal port shares the original queryInvalid fact or operation with an assembled owner. */
-  get queryInvalid() {
-    return this.#queryInvalid
-  }
-  /** Internal port shares the original queryRange fact or operation with an assembled owner. */
-  get queryRange() {
-    return this.#queryRange
-  }
+
   /** Internal port shares the original queryIndex fact or operation with an assembled owner. */
   get queryIndex() {
     return this.#queryIndex
   }
-  /** Internal port shares the original createEntitySource fact or operation with an assembled owner. */
-  get createEntitySource() {
-    return this.#createEntitySource
-  }
+
   /** Internal port shares the original planEntitySource fact or operation with an assembled owner. */
   get planEntitySource() {
     return this.#planEntitySource
   }
-  /** Internal port shares the original mutateEntitySource fact or operation with an assembled owner. */
-  get mutateEntitySource() {
-    return this.#mutateEntitySource
-  }
-  /**
-   * Internal port shares the original executeEntitySource fact or operation with an assembled
-   * owner.
-   */
-  get executeEntitySource() {
-    return this.#executeEntitySource
-  }
+
   /** Internal port shares the original bindRepository fact or operation with an assembled owner. */
   get bindRepository() {
     return this.#bindRepository
-  }
-  /** Internal port shares the original boundQuery fact or operation with an assembled owner. */
-  get boundQuery() {
-    return this.#boundQuery
-  }
-  /** Internal port shares the original boundGet fact or operation with an assembled owner. */
-  get boundGet() {
-    return this.#boundGet
-  }
-  /** Internal port shares the original boundPut fact or operation with an assembled owner. */
-  get boundPut() {
-    return this.#boundPut
-  }
-  /** Internal port shares the original boundRemove fact or operation with an assembled owner. */
-  get boundRemove() {
-    return this.#boundRemove
-  }
-  /** Internal port shares the original boundList fact or operation with an assembled owner. */
-  get boundList() {
-    return this.#boundList
-  }
-  /** Internal port shares the original createApi fact or operation with an assembled owner. */
-  get createApi() {
-    return this.#createApi
-  }
-  /** Internal port shares the original apiQuery fact or operation with an assembled owner. */
-  get apiQuery() {
-    return this.#apiQuery
-  }
-  /** Internal port shares the original apiGet fact or operation with an assembled owner. */
-  get apiGet() {
-    return this.#apiGet
-  }
-  /** Internal port shares the original apiPut fact or operation with an assembled owner. */
-  get apiPut() {
-    return this.#apiPut
-  }
-  /** Internal port shares the original apiRemove fact or operation with an assembled owner. */
-  get apiRemove() {
-    return this.#apiRemove
-  }
-  /** Internal port shares the original apiList fact or operation with an assembled owner. */
-  get apiList() {
-    return this.#apiList
-  }
-  /** Internal port shares the original apiStream fact or operation with an assembled owner. */
-  get apiStream() {
-    return this.#apiStream
-  }
-  /** Internal port shares the original apiFindBy fact or operation with an assembled owner. */
-  get apiFindBy() {
-    return this.#apiFindBy
-  }
-  /** Internal port shares the original apiMigrate fact or operation with an assembled owner. */
-  get apiMigrate() {
-    return this.#apiMigrate
-  }
-  /**
-   * Internal port shares the original scanMigrationRecords fact or operation with an assembled
-   * owner.
-   */
-  get scanMigrationRecords() {
-    return this.#scanMigrationRecords
-  }
-  /**
-   * Internal port shares the original scanMigrationValues fact or operation with an assembled
-   * owner.
-   */
-  get scanMigrationValues() {
-    return this.#scanMigrationValues
-  }
-  /**
-   * Internal port shares the original executeMigrationBatch fact or operation with an assembled
-   * owner.
-   */
-  get executeMigrationBatch() {
-    return this.#executeMigrationBatch
-  }
-  /**
-   * Internal port shares the original retryMigrationEntry fact or operation with an assembled
-   * owner.
-   */
-  get retryMigrationEntry() {
-    return this.#retryMigrationEntry
-  }
-  /**
-   * Internal port shares the original writeMigrationCheckpoint fact or operation with an assembled
-   * owner.
-   */
-  get writeMigrationCheckpoint() {
-    return this.#writeMigrationCheckpoint
-  }
-  /**
-   * Internal port shares the original persistMigrationBatch fact or operation with an assembled
-   * owner.
-   */
-  get persistMigrationBatch() {
-    return this.#persistMigrationBatch
-  }
-  /** Internal port shares the original apiIn fact or operation with an assembled owner. */
-  get apiIn() {
-    return this.#apiIn
-  }
-  /** Internal port shares the original apiLockKey fact or operation with an assembled owner. */
-  get apiLockKey() {
-    return this.#apiLockKey
-  }
-  /** Internal port shares the original apiBatch fact or operation with an assembled owner. */
-  get apiBatch() {
-    return this.#apiBatch
-  }
-  /**
-   * Internal port shares the original scanEntityCandidates fact or operation with an assembled
-   * owner.
-   */
-  get scanEntityCandidates() {
-    return this.#scanEntityCandidates
-  }
-  /**
-   * Internal port shares the original orderedEntityCandidates fact or operation with an assembled
-   * owner.
-   */
-  get orderedEntityCandidates() {
-    return this.#orderedEntityCandidates
-  }
-  /**
-   * Internal port shares the original advanceScopedEntitySource fact or operation with an assembled
-   * owner.
-   */
-  get advanceScopedEntitySource() {
-    return this.#advanceScopedEntitySource
-  }
-  /**
-   * Internal port shares the original closeScopedEntitySource fact or operation with an assembled
-   * owner.
-   */
-  get closeScopedEntitySource() {
-    return this.#closeScopedEntitySource
-  }
-  /**
-   * Internal port shares the original advanceObservedEntityQuery fact or operation with an
-   * assembled owner.
-   */
-  get advanceObservedEntityQuery() {
-    return this.#advanceObservedEntityQuery
-  }
-  /**
-   * Internal port shares the original prepareEntityBackfillCandidate fact or operation with an
-   * assembled owner.
-   */
-  get prepareEntityBackfillCandidate() {
-    return this.#prepareEntityBackfillCandidate
-  }
-  /**
-   * Internal port shares the original executeEntityMutationRows fact or operation with an assembled
-   * owner.
-   */
-  get executeEntityMutationRows() {
-    return this.#executeEntityMutationRows
-  }
-  /**
-   * Internal port shares the original acceptEntityMutationRow fact or operation with an assembled
-   * owner.
-   */
-  get acceptEntityMutationRow() {
-    return this.#acceptEntityMutationRow
-  }
-  /**
-   * Internal port shares the original applyEntityQueryMutation fact or operation with an assembled
-   * owner.
-   */
-  get applyEntityQueryMutation() {
-    return this.#applyEntityQueryMutation
   }
 }
 

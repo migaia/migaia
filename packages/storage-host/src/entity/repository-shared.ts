@@ -3,7 +3,7 @@ import {
   getBackendEntityAccess,
   snapshotBackendEntityRecordWatcher,
   type IBackendEntityAccess
-} from '../core/change-controller.js'
+} from '../core/backend-registry.js'
 import {
   type IVersionedEnvelope,
   type IMigrationPlan,

@@ -120,6 +120,20 @@ class EntityDefinition<TDomain, TStored> {
       invalidDefinition(EntityText.featuresMustBeArray)
     /** Index declaration errors retain their original precedence before scalar/migration admission. */
     const features = [...(options.features ?? [])]
+    /** Reject malformed or repeated explicit units before any definition callback executes. */
+    const declaredFeatures = new Set<string>()
+    for (const feature of features) {
+      if (
+        feature === null ||
+        typeof feature !== 'object' ||
+        typeof feature.name !== 'string' ||
+        typeof feature.create !== 'function' ||
+        (feature.configure !== undefined && typeof feature.configure !== 'function') ||
+        declaredFeatures.has(feature.name)
+      )
+        invalidDefinition(EntityText.featuresMustBeArray)
+      declaredFeatures.add(feature.name)
+    }
     if (
       options.indexes !== undefined &&
       !features.some((feature) => feature.name === EntityFeatureName.indexes)

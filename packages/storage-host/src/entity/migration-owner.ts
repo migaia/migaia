@@ -4,7 +4,7 @@ import {
   getBackendValueCommit,
   type IEntitySecondaryMethods,
   type IEntityRecordMethods
-} from '../core/change-controller.js'
+} from '../core/backend-registry.js'
 import { repositoryMigrationKey } from '../core/record-layout.js'
 import {
   StorageContractError,
@@ -113,7 +113,7 @@ export class EntityMigrationOwner<
     migration.context = snapshotOperationContext(ctx)
     migration.runtime = createStorageOperationRuntime()
     ;({ batchSize: migration.batchSize, onInvalid: migration.onInvalid } =
-      this.#context.normalizeMigrateOptions(options))
+      this.normalizeMigrateOptions(options))
     migration.migrationMetadata = this.#context.recordStore?.metadata
     migration.checkpointKey = repositoryMigrationKey(this.#context.name)
     migration.checkpoint = (await migration.migrationMetadata?.get(
@@ -140,10 +140,10 @@ export class EntityMigrationOwner<
       : StorageMigrationPhase.v2
     migration.batch = []
     if (this.#context.recordStore)
-      await this.#context.scanMigrationRecords(migration, this.#context.recordStore)
-    else await this.#context.scanMigrationValues(migration)
-    await this.#context.persistMigrationBatch(migration)
-    await this.#context.writeMigrationCheckpoint(migration, {
+      await this.scanMigrationRecords(migration, this.#context.recordStore)
+    else await this.scanMigrationValues(migration)
+    await this.persistMigrationBatch(migration)
+    await this.writeMigrationCheckpoint(migration, {
       status: StorageMigrationStatus.complete,
       phase: migration.phase,
       version: this.#context.version,
@@ -253,12 +253,12 @@ export class EntityMigrationOwner<
           migration.skipped += 1
         }
         if (migration.batch.length >= migration.batchSize)
-          await this.#context.persistMigrationBatch(migration)
+          await this.persistMigrationBatch(migration)
       }
       if (scanPhase === StorageMigrationPhase.v2 && phases.length > 1) {
         migration.phase = StorageMigrationPhase.legacy
         migration.lastPhysicalKey = undefined
-        await this.#context.writeMigrationCheckpoint(migration, {
+        await this.writeMigrationCheckpoint(migration, {
           status: StorageMigrationStatus.running,
           phase: migration.phase,
           version: this.#context.version,
@@ -329,8 +329,7 @@ export class EntityMigrationOwner<
         if (action === StorageInvalidRecordAction.throw) this.#context.throwInvalid(issue)
         migration.skipped += 1
       }
-      if (migration.batch.length >= migration.batchSize)
-        await this.#context.persistMigrationBatch(migration)
+      if (migration.batch.length >= migration.batchSize) await this.persistMigrationBatch(migration)
     }
   }
   /** Reuse the original repository operation through its explicit owner context. */
@@ -587,12 +586,7 @@ export class EntityMigrationOwner<
         /** One callback owns migration semantics; backend adapters only supply their scope. */
         const batchOutcome = await this.#context.recordStore.transaction(
           (tx) =>
-            this.#context.executeMigrationBatch(
-              migration,
-              indexedHandle,
-              tx,
-              indexedHandle !== undefined
-            ),
+            this.executeMigrationBatch(migration, indexedHandle, tx, indexedHandle !== undefined),
           migration.context
         )
         migration.migrated += batchOutcome.migrated
@@ -607,7 +601,7 @@ export class EntityMigrationOwner<
           for (const entry of migration.batch) {
             try {
               const retryOutcome = await this.#context.recordStore.transaction(
-                (tx) => this.#context.retryMigrationEntry(migration, indexedHandle, entry, tx),
+                (tx) => this.retryMigrationEntry(migration, indexedHandle, entry, tx),
                 migration.context
               )
               if (retryOutcome === 'migrated') migration.migrated += 1
@@ -638,7 +632,7 @@ export class EntityMigrationOwner<
         }
       }
     }
-    await this.#context.writeMigrationCheckpoint(migration, {
+    await this.writeMigrationCheckpoint(migration, {
       status: StorageMigrationStatus.running,
       phase: migration.phase,
       version: this.#context.version,

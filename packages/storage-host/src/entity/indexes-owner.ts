@@ -125,8 +125,7 @@ export class EntityIndexesOwner<
       while (!finished) {
         await session.renew(ctx)
         const batch = await session.readBatch(ctx, {
-          prepare: (candidate) =>
-            this.#context.prepareEntityBackfillCandidate(session, ctx, candidate)
+          prepare: (candidate) => this.prepareEntityBackfillCandidate(session, ctx, candidate)
         })
         if (
           batch.preparations === undefined ||
@@ -427,8 +426,7 @@ export class EntityIndexesOwner<
     const source = createRecordQuery<IMatch<TDomain>>({
       asyncDisposeKey,
       pushdown: { source: EntityState.querySource, operations: [], operators: [] },
-      execute: () =>
-        this.#context.indexRows(snapshot, ctx, readView, comparator === undefined, onRead)
+      execute: () => this.indexRows(snapshot, ctx, readView, comparator === undefined, onRead)
     })
     let query: IRecordQueryBase<IMatch<TDomain>, IOperationContext> = source
     if (comparator !== undefined)
@@ -468,7 +466,7 @@ export class EntityIndexesOwner<
         : isPlainObject(match) && ('lower' in match || 'upper' in match)
           ? match
           : { lower: match, upper: match }
-    const snapshot = this.#context.createIndexedListSnapshot(
+    const snapshot = this.createIndexedListSnapshot(
       index,
       range as import('@migaia/storage-contract').IKeyRange | undefined,
       undefined
@@ -530,11 +528,7 @@ export class EntityIndexesOwner<
   ) => {
     assertStorageKey(key, this.#context.store.backend, `entity "${this.#context.name}" index query`)
     const context = snapshotOperationContext(ctx)
-    const snapshot = this.#context.createIndexedListSnapshot(
-      index,
-      { lower: key, upper: key },
-      undefined
-    )
+    const snapshot = this.createIndexedListSnapshot(index, { lower: key, upper: key }, undefined)
     let matched = 0
     const runtime = createStorageOperationRuntime()
     /** One source scan caps its diagnostic count while the original heap retains one result. */
