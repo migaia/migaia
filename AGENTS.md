@@ -97,6 +97,54 @@ export type LogLevel = keyof typeof LogLevel;
 - Every function, method, callback with non-obvious behavior, and constructor must have JSDoc describing what it does, its important inputs/outputs, and lifecycle or failure semantics where applicable.
 - JSDoc must explain intent and ownership, not restate syntax or duplicate TypeScript types.
 
+## Abstraction Over Closures
+
+- **Named abstractions.** Model each concept as a named abstraction.
+  - Stores, views, sessions, scopes, bindings, feeds, sources and controllers are classes with `#` private fields, or modules with an explicit context type.
+  - Do not build a component as one factory function whose inner functions share captured variables.
+- **One named function per job.** Encoding, mapping, validation, retry, conflict detection and error normalization are separate functions. A function that does several jobs in sequence is split along those jobs.
+- **Explicit state.** A function receives what it needs as parameters or through its owning object. It does not reach into an enclosing scope for state that belongs to a component.
+- **Closures only where natural.** Use them for:
+  - small callbacks;
+  - event listeners;
+  - short local helpers;
+  - deliberately private module-level state.
+
+  A closure never forms the backbone of a component, and closures are not nested to build control flow. Retry and fallback logic is an explicit loop or a named state machine, not functions nested inside functions.
+
+- **Shared behaviour abstracted once.** When several packages or backends need the same logic, move it to its correct owner, such as an authoring subpath or a shared base type, instead of repeating it.
+- **Hard limit on function length.** No function may exceed 400 lines, counting its nested functions. A longer function must be split along its jobs.
+- **Review signals.** In review, each of these must be fixed or justified:
+  - a function over about 150 lines;
+  - function definitions nested more than two levels deep;
+  - a function that reads many variables (three or more) from an enclosing scope.
+
+  A justification states why the code is one indivisible job. Splitting code into arbitrary chunks to satisfy a number is not a fix.
+
+- **Scope.** New and modified code must follow these rules. Existing violations are migration debt: fix them when their owner is intentionally changed, not in unrelated scoped tasks.
+
+## Complexity Bound
+
+- **Linear bound.** On any input that can grow at runtime, one operation must do O(n) work or less. For batch operations the bound applies to the whole batch. O(n log n) and above are not allowed, including sorting a growable collection. Examples of growable inputs: peers, members, connections, pending requests, streams, frames, chunks, bytes, registered methods, plugins or features, exports, and registry entries.
+- **Logarithmic steps.** A single O(log n) step, such as one heap insertion, is allowed, as long as the operation's total work stays within O(n).
+- **Patterns to replace.**
+  - **Patterns:**
+    - nested loops over the same collection;
+    - `includes`, `indexOf`, `find`, `filter`, `some`, `splice` or `shift` inside a loop;
+    - `sort` on a growable collection, or any sort inside a loop;
+    - copying or spreading a whole collection repeatedly;
+    - concatenating strings or byte arrays in a loop;
+    - rebuilding a Map, Set or array for every element;
+    - revisiting the same node in a recursive walk.
+  - **Replacements:**
+    - Map or Set indexes and one-time precomputation;
+    - a queue cursor instead of `shift`;
+    - one final concatenation of collected chunks;
+    - insertion-ordered maps, incrementally maintained ordered structures, or bucketing by a bounded key instead of a full sort.
+- **Exception.** A collection whose size is fixed by a compile-time constant, such as the keys of an `as const` object, is exempt. A comment at the loop must state the bound and where it comes from. "Small in practice" is not an exception.
+- **No O(n) path.** If a contract requires an order or result that cannot be produced in O(n), state the input source and the options in the design document or review, and get a decision from the user. Do not ship it as a silent exception.
+- **Scope.** The same migration-debt rule as above applies: new and modified code must comply, and existing violations are fixed when their owner is intentionally changed.
+
 ## Architecture-First Work
 
 - Apply architecture-first reasoning to design, review, and implementation work. Before changing code, identify the owning package/layer, its public boundary, allowed dependency direction, and the existing abstraction that should own the behavior.
