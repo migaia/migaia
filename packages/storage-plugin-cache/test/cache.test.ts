@@ -1,3 +1,5 @@
+import { memoryNotificationsFeature } from '@migaia/storage-host/features/memory-notifications'
+import { memoryChangeFeedFeature } from '@migaia/storage-host/features/memory-change-feed'
 import { describe, it, expect } from 'vitest'
 import {
   createStorageHost,
@@ -58,7 +60,16 @@ describe('borrowed multi-tier cache', () => {
       { tiers: [{ backend: 'a', ttlMs: 100, write: 'back' as const }, { backend: 'b' }] }
     ] as const) {
       const host = await createStorageHost({
-        plugins: [memoryBackendPlugin({ id: 'a' }), memoryBackendPlugin({ id: 'b' })]
+        plugins: [
+          memoryBackendPlugin(
+            { id: 'a' },
+            { notifications: memoryNotificationsFeature(), changeFeed: memoryChangeFeedFeature() }
+          ),
+          memoryBackendPlugin(
+            { id: 'b' },
+            { notifications: memoryNotificationsFeature(), changeFeed: memoryChangeFeedFeature() }
+          )
+        ]
       })
       try {
         const failure = await host.use(cachePlugin(options)).catch((error) => error)
