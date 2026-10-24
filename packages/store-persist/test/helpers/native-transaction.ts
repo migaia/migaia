@@ -1,6 +1,7 @@
 import { createRuntime } from '@migaia/reactive'
 import { defineEntity } from '@migaia/storage-host/entity'
 import { entityIndexesFeature } from '@migaia/storage-host/entity/indexes'
+import { entityQueryFeature } from '@migaia/storage-host/entity/query'
 import { entityUniqueFeature } from '@migaia/storage-host/entity/unique'
 import type { IChangeFeedStore, ICodec, IRecordStore } from '@migaia/storage-contract'
 import { createManualScheduler } from '@migaia/utils/testing'
@@ -45,7 +46,7 @@ export async function runPersistNativeConsumerScenario(storage: INativeStore) {
   const scheduler = createManualScheduler()
   /** Real entity indexes are intentionally cold when the first transaction begins. */
   const repo = defineEntity<{ id: string; email: string }>()({
-    features: [entityIndexesFeature(), entityUniqueFeature()],
+    features: [entityQueryFeature(), entityIndexesFeature(), entityUniqueFeature()],
     name: 'persist-native-users',
     key: 'id',
     indexes: { email: { path: 'email', unique: true } }
