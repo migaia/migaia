@@ -369,6 +369,10 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
           await route(tiers[index]!.borrowed)
             .use(ttl)
             .expire(lockKey.text(physical(key)), ms)
+        else if (ms === undefined && tiers[index]!.borrowed.has(ttl))
+          await route(tiers[index]!.borrowed)
+            .use(ttl)
+            .persist(lockKey.text(physical(key)))
         return true
       } catch (error) {
         tierError(index, CacheOperation.set, error)
@@ -398,6 +402,7 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
           const target = [configuration.prefix, tag, key]
           await native.putRecord({ key }, target)
           if (maximum !== undefined) await borrowed.use(ttl).expire(lockKey.record(target), maximum)
+          else await borrowed.use(ttl).persist(lockKey.record(target))
         }
         return true
       } catch (error) {

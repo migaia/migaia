@@ -435,6 +435,30 @@ describe('cache policy composition', () => {
       await host.dispose()
     }
   })
+  it('clears an old tag deadline when a refreshed entry has no finite lifetime', async () => {
+    const base = await createStorageHost({
+      plugins: [memoryBackendPlugin({ id: 'tier' }), memoryBackendPlugin({ id: 'tags' })]
+    })
+    const host = await base.use(
+      cachePlugin({ propagate: false, tiers: [{ backend: 'tier' }], tagIndex: { backend: 'tags' } })
+    )
+    await host.detect()
+    try {
+      const cache = host.backend('cache'),
+        target = lockKey.record(['cache:cache:', 'doc', 'a'])
+      await cache.getOrLoad('a', async () => 'finite', { ttlMs: 10000, tags: ['doc'] })
+      expect(await base.backend('tags').use(ttl).remaining(target)).toBeGreaterThan(0)
+      await cache.getOrLoad('a', async () => 'unbounded', { mode: 'refresh', tags: ['doc'] })
+      expect(await base.backend('tags').use(ttl).remaining(target)).toBeUndefined()
+      expect(
+        await base.backend('tier').use(ttl).remaining(lockKey.text('cache:cache:a'))
+      ).toBeUndefined()
+      await cache.invalidate({ tag: 'doc' })
+      expect(await cache.peek('a')).toBeUndefined()
+    } finally {
+      await host.dispose()
+    }
+  })
   it('shares the original native key lock across two cache instances', async () => {
     const base = await createStorageHost({ plugins: [memoryBackendPlugin({ id: 'shared' })] })
     const options = {
