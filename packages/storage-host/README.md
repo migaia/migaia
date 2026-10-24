@@ -264,3 +264,5 @@ PENDING-USER-REVIEW：dropOrg 遇到存活的全局 journal 时，原私有 name
 原生 binding 可声明 `requiresIndexedDbUndo?: true`，原 descriptor 快照单读并冻结该事实。当借用 logger 含 undo 时，同一配置拥有者要求 `indexedDbUndo: true`，缺省或 false 在打开原生终点前报 UNSUPPORTED_CAPABILITY。其它后端 binding 保持原缺省语义，仅 binlog 或仅遥测的配置不要求 undo 选择。
 
 原生作者的 `core.emit` 在宿主 closing 期间跳过可选诊断，且不执行延迟 payload 工厂，避免用 HOST_DISPOSING 替换已准入原生操作的结算结果。open 期间仍复用原 registration 检查和原事件通道；完全 closed 或失效 registration 的旧句柄继续拒绝。宿主关闭事件本身仍由原宿主拥有者发布。
+
+普通插件返回嵌套API对象时，可在descriptor声明contextualExtensions: ['archive']，只让这些顶层键的一层自有方法取得原IStoragePluginCallContext。方法保原receiver和Promise身份并复用原registration guard；未选择的数据对象保持原身份。列表在安装前单次复制，所选API只接受自有数据属性，不递归投影或授予关闭权。

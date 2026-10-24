@@ -226,6 +226,64 @@ describe('immutable storage organizations', () => {
     await expect(query.all()).rejects.toBeDefined()
   })
 
+  it('projects explicitly selected nested extension methods through the original org context', async () => {
+    /** Only this finite API key opts in; ordinary caller-owned data retains its identity. */
+    const selected: string[] = []
+    /** The one descriptor snapshot must not reread a caller's selected-key getter. */
+    let reads = 0
+    Object.defineProperty(selected, '0', {
+      enumerable: true,
+      configurable: true,
+      get: () => {
+        reads += 1
+        return 'archive'
+      }
+    })
+    const data = Object.freeze({ value: 'original data' })
+    const marker = Object.freeze({ value: 'original API data' })
+    const plugin = definePlugin('nested', (core) => {
+      const memory = core.getPublishedBackend('memory')
+      return {
+        contextualExtensions: selected,
+        install: () => ({
+          archive: Object.freeze({
+            marker,
+            async put(this: IStoragePluginCallContext, key: string, value: string) {
+              await this.backend(memory).use(kv).set(key, value)
+              return this.orgId
+            }
+          }),
+          data
+        })
+      }
+    })
+    const base = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+    const host = await base.use(plugin)
+    expect(reads).toBe(1)
+    selected.push('data')
+    const first = createOrgId()
+    const second = createOrgId()
+    const left = host.org(first)
+    const right = host.org(second)
+    const put = left.extensions.archive.put
+    try {
+      expect(host.extensions.data).toBe(data)
+      expect(left.extensions.data).toBe(data)
+      expect(left.extensions.archive.marker).toBe(marker)
+      expect(await host.extensions.archive.put('key', 'root')).toBe(
+        '00000000-0000-0000-0000-000000000000'
+      )
+      expect(await put('key', 'left')).toBe(first)
+      expect(await right.extensions.archive.put('key', 'right')).toBe(second)
+      expect(await host.backend('memory').get('key')).toBe('root')
+      expect(await left.backend('memory').get('key')).toBe('left')
+      expect(await right.backend('memory').get('key')).toBe('right')
+    } finally {
+      await host.dispose()
+    }
+    expect(() => put('key', 'closed')).toThrow()
+  })
+
   it('attempts every target after one deletion fails and retains the original failure', async () => {
     const original = new Error('native deletion failed')
     const attempted: string[] = []
