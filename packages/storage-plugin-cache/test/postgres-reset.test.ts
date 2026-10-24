@@ -30,7 +30,9 @@ it('invalidates every cache org after the PostgreSQL root feed emits reset', asy
       )
     ] as const
   })
-  const host = await base.use(cachePlugin({ tiers: [{ backend: 'upper' }, { backend: 'lower' }] }))
+  const host = await base.use(
+    cachePlugin({ tiers: [{ backend: 'upper', ttlMs: 10000 }, { backend: 'lower' }] })
+  )
   try {
     await host.detect()
     const org = host.org(randomUUID())

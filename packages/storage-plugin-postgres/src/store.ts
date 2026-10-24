@@ -1374,7 +1374,7 @@ export async function createPostgresStore<T>(
         createDurableApi,
         reportReplication: (facts) => {
           if (facts.maxSlotWalKeepSize === '-1')
-            core.stageBindings.backendStages.report(PostgresErrorText.unlimitedSlotWal)
+            reportCleanupError(report, PostgresErrorText.unlimitedSlotWal)
           core.emit('onCapabilityProbe', () => ({
             backend: PgNames.backend,
             backendId: core.getBackendId(),

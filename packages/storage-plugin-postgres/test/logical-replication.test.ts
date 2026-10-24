@@ -18,13 +18,10 @@ it('resets root and routed consumers on TRUNCATE and exposes read-only WAL healt
   const pool = new Pool({ connectionString })
   const slot = 'pg_reset_' + randomUUID().replaceAll('-', '')
   const prefix = 'pg_reset_' + randomUUID().slice(0, 8)
-  /** Deployment warnings use the host's existing report callback. */
-  const reports: unknown[] = []
+  /** Deployment warnings use the backend's existing non-fatal diagnostic reporter. */
+  const reports = vi.spyOn(console, 'error').mockImplementation(() => {})
   await pool.query('SELECT pg_create_logical_replication_slot($1,$2)', [slot, 'pgoutput'])
   const host = await createStorageHost({
-    report: (warning) => {
-      reports.push(warning)
-    },
     plugins: [
       postgresBackendPlugin(
         { driver: pgDriver(pool), prefix },
@@ -35,6 +32,7 @@ it('resets root and routed consumers on TRUNCATE and exposes read-only WAL healt
     ] as const
   })
   onTestFinished(async () => {
+    reports.mockRestore()
     await host.dispose()
     await pool.query('SELECT pg_drop_replication_slot($1)', [slot])
     await pool.end()
@@ -121,7 +119,7 @@ it('resets root and routed consumers on TRUNCATE and exposes read-only WAL healt
     BigInt(facts.confirmedFlushLagBytes)
   )
   if (facts.maxSlotWalKeepSize === '-1')
-    expect(reports).toContain(
+    expect(reports.mock.calls.flat()).toContain(
       'PostgreSQL replication slot has unlimited WAL retention (max_slot_wal_keep_size=-1)'
     )
 })

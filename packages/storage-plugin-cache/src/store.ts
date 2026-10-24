@@ -1422,6 +1422,14 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
         }
         /** Only native cursor expiry restarts from now; disconnects never create a retry timer. */
         const onError = (error: unknown): void => {
+          // Closing this cache intentionally cancels the same durable tail's context.
+          if (
+            controller.closingSignal.aborted &&
+            error instanceof StorageContractError &&
+            error.code === StorageContractErrorCode.aborted &&
+            error.cause === controller.closingSignal.reason
+          )
+            return
           needsReset = true
           report(error)
           if (
