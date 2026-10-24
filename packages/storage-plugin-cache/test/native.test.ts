@@ -8,7 +8,12 @@ import { promisify } from 'node:util'
 import { Pool } from 'pg'
 import { createClientPool } from 'redis'
 import { describe, expect, it } from 'vitest'
-import { createStorageHost, memoryBackendPlugin, definePlugin } from '@migaia/storage-host'
+import {
+  createStorageHost,
+  memoryBackendPlugin,
+  definePlugin,
+  createOrgId
+} from '@migaia/storage-host'
 import { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'
 import { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'
 import { redisBackendPlugin, type IRedisDriver } from '@migaia/storage-plugin-redis'
@@ -61,6 +66,29 @@ async function vectorApplication(collection: IVectorCollection<{ kind: string }>
   }
   await collection.delete(points.map((point) => point.id))
   return { hits, counts }
+}
+
+/** One unchanged vector workflow distinguishes the default organization and two borrowed views. */
+async function vectorOrganizationApplication(
+  collections: readonly IVectorCollection<{ kind: string }>[],
+  drop: () => Promise<void>
+) {
+  /** Payload markers expose cross-organization visibility even though IDs and vectors are identical. */
+  const markers = ['default', 'one', 'two']
+  for (const [index, collection] of collections.entries())
+    await collection.upsert([{ id: 'same', vector: [1, 0], payload: { kind: markers[index]! } }])
+  /** The same exact query runs before and after deleting only the middle organization. */
+  const read = async () => {
+    const values: (string | null)[] = []
+    for (const collection of collections) {
+      const hits = await collection.near([1, 0], { exact: true }).topK(1).all()
+      values.push(hits[0]?.payload?.kind ?? null)
+    }
+    return values
+  }
+  const before = await read()
+  await drop()
+  return { before, after: await read() }
 }
 
 describe('native borrowed cache tiers', () => {
@@ -158,7 +186,10 @@ describe('native borrowed cache tiers', () => {
         }
       }
     await pool.connect()
+    /** An explicit configured default is also addressable through the original organization view. */
+    const defaultOrg = createOrgId()
     const host = await createStorageHost({
+      org: defaultOrg,
       plugins: [
         memoryBackendPlugin(),
         postgresBackendPlugin({ driver: pgDriver(pg), prefix }, { vector: pgvectorFeature() }),
@@ -189,6 +220,30 @@ describe('native borrowed cache tiers', () => {
         ])
         result.hits.forEach((hit, index) => expect(hit.score).toBeCloseTo(4 - index, 5))
         expect(result.counts).toEqual([2, 2, 2])
+      }
+      /** Resolve each concrete public token before combining heterogeneous backend implementations. */
+      const organizationSources = [
+        (org: ReturnType<typeof createOrgId>) => host.org(org).backend('memory').use(vector),
+        (org: ReturnType<typeof createOrgId>) => host.org(org).backend('postgres').use(vector),
+        (org: ReturnType<typeof createOrgId>) => host.org(org).backend('redis').use(vector),
+        (org: ReturnType<typeof createOrgId>) => host.org(org).backend('qdrant').use(vector)
+      ]
+      for (const source of organizationSources) {
+        /** Each engine receives the same default/two-organization function and logical collection. */
+        const one = createOrgId(),
+          two = createOrgId(),
+          apis = [source(defaultOrg), source(one), source(two)]
+        expect(
+          await vectorOrganizationApplication(
+            apis.map((api) =>
+              api.collection<{ kind: string }>('org-business', {
+                dimensions: 2,
+                metric: 'dot'
+              })
+            ),
+            () => host.dropOrg(one)
+          )
+        ).toEqual({ before: ['default', 'one', 'two'], after: ['default', null, 'two'] })
       }
     } finally {
       await host.dispose()

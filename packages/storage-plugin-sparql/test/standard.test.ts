@@ -1,6 +1,11 @@
 import { describe, expect, it, onTestFinished } from 'vitest'
 import { Store, quad as nativeQuad, namedNode, literal, defaultGraph } from 'oxigraph'
-import { createStorageHost, memoryBackendPlugin, defineFeature } from '@migaia/storage-host'
+import {
+  createStorageHost,
+  memoryBackendPlugin,
+  defineFeature,
+  createOrgId
+} from '@migaia/storage-host'
 import { rdf, sparql, term, type IQuad, type IRdfApi } from '@migaia/storage-contract'
 import { runConformance } from '@migaia/storage-contract/conformance'
 import { sparqlBackendPlugin, sparqlBackendKind } from '../src/index.js'
@@ -70,7 +75,66 @@ async function groundApplication(api: IRdfApi, input: readonly IQuad[]) {
   return { initial, selected, replaced, deleted, remaining, empty: await api.match({}).all() }
 }
 
+/** Identical quads and organization markers share one portable membership and deletion workflow. */
+async function groundOrganizationApplication(apis: readonly IRdfApi[], drop: () => Promise<void>) {
+  /** Both graph kinds keep their logical identity while native storage prefixes the organization. */
+  const shared: IQuad = {
+      subject: term.iri('urn:organizations:s'),
+      predicate: term.iri('urn:organizations:p'),
+      object: term.literal('common'),
+      graph: term.defaultGraph
+    },
+    graph = term.iri('urn:organizations:graph'),
+    markers = ['default', 'one', 'two']
+  for (const [index, api] of apis.entries())
+    await api.add([
+      shared,
+      { ...shared, graph },
+      { ...shared, graph, object: term.literal(markers[index]!) }
+    ])
+  /** Distinct marker rows detect leakage that de-duplication of the shared quad alone would hide. */
+  const read = async () => {
+    const values: string[][] = []
+    for (const api of apis)
+      values.push((await api.match({}).all()).map((q) => q.object.value).sort())
+    return values
+  }
+  const before = await read()
+  await drop()
+  return { before, after: await read() }
+}
+
 describe('native ground RDF reference behavior', () => {
+  it('runs unchanged ground organization membership and deletion on memory and Oxigraph', async () => {
+    /** The configured default and both peers pass through the same original organization view. */
+    const defaultOrg = createOrgId()
+    await using host = await createStorageHost({
+      org: defaultOrg,
+      plugins: [
+        memoryBackendPlugin(),
+        sparqlBackendPlugin({ endpoint: oxigraphEndpoint(new Store()) })
+      ] as const
+    })
+    /** Resolve concrete capability signatures before combining the two native API values. */
+    const sources = [
+      (org: ReturnType<typeof createOrgId>) => host.org(org).backend('memory').use(rdf),
+      (org: ReturnType<typeof createOrgId>) => host.org(org).backend('sparql').use(rdf)
+    ]
+    for (const source of sources) {
+      /** Each backend receives the same ground triples under the default and two borrowed views. */
+      const one = createOrgId(),
+        two = createOrgId(),
+        apis = [source(defaultOrg), source(one), source(two)]
+      expect(await groundOrganizationApplication(apis, () => host.dropOrg(one))).toEqual({
+        before: [
+          ['common', 'common', 'default'],
+          ['common', 'common', 'one'],
+          ['common', 'common', 'two']
+        ],
+        after: [['common', 'common', 'default'], [], ['common', 'common', 'two']]
+      })
+    }
+  })
   it('matches memory N-Quads and client filtering without changing language, datatype or safe literals', async () => {
     await using memory = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })
     await using native = await createStorageHost({
