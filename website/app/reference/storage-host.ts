@@ -109,8 +109,8 @@ console.log(host.extensions.label('draft'))`
           '具备真实私有 journal binding 的准确已安装后端 ID。'
         ),
         options: t(
-          'A nonempty private prefix, exclusive within this backend and organization.',
-          '在该后端与组织中独占的非空私有 prefix。'
+          'A nonempty private prefix in this backend/org. Cached mode reserves it for the handle lifetime; current-index mode serializes each operation in its original native transaction.',
+          '本后端及组织内的非空私有前缀；缓存模式保留资源期独占，现读索引模式逐操作沿原生事务串行化。'
         )
       },
       returns: t(
@@ -186,7 +186,7 @@ console.log(host.extensions.label('draft'))`
       )
     },
     StorageJournalLock: {
-      role: 'operation',
+      role: 'constant',
       purpose: t(
         'Canonical head and resource roles for the existing journal lock owner.',
         '既有日志锁拥有者的头记录与资源规范角色，读取角色本身不获取锁或提交权限。'
