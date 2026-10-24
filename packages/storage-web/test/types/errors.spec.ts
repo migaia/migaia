@@ -2,9 +2,37 @@ import { describe, expect, it } from 'vitest'
 import { StorageError, StorageErrorCode } from '../../src/types/errors'
 
 describe('StorageError', () => {
-  it('公开错误码集合保持 24 个稳定值且无重复', () => {
+  it('公开错误码集合保持 25 个稳定值且无重复', () => {
     const codes = Object.values(StorageErrorCode)
-    expect(codes).toHaveLength(24)
+    expect([...codes].sort()).toEqual(
+      [
+        'BACKEND_UNAVAILABLE',
+        'QUOTA_EXCEEDED',
+        'VALUE_TOO_LARGE',
+        'SERIALIZE_FAILED',
+        'DESERIALIZE_FAILED',
+        'TRANSACTION_FAILED',
+        'DUPLICATE_KEY',
+        'VERSION_UNSUPPORTED',
+        'EXTENSION_FAILED',
+        'WRITE_FAILED',
+        'COOKIE_SCOPE_AMBIGUOUS',
+        'INVALID_CONFIG',
+        'INDEX_ORPHAN',
+        'INDEX_UNIQUE_CONFLICT',
+        'INDEX_QUERY_INVALIDATED',
+        'LIVE_QUERY_DISPOSED',
+        'INDEX_BACKFILL_STALE',
+        'INDEX_BACKFILL_FAILED',
+        'LIVE_QUERY_DISPOSE_FAILED',
+        'REACTIVE_FEATURE_INVALID',
+        'REACTIVE_ADAPTER_NOT_INSTALLED',
+        'REACTIVE_ADAPTER_FAILED',
+        'REACTIVE_ADAPTER_DISPOSE_FAILED',
+        'BACKEND_DISPOSE_FAILED',
+        'INDEXED_DB_FEATURE_NOT_INSTALLED'
+      ].sort()
+    )
     expect(new Set(codes).size).toBe(codes.length)
   })
 
