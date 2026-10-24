@@ -3055,6 +3055,184 @@ function assertExpiryRemoval<TValue>(
  * Physical expiry reuses the original deletion, revision and sidecar primitives in its owning
  * native transaction.
  */
+/** Own physical data, revision, image and TTL ports for one already-open native transaction. */
+class IndexedDbNativeDataAccess<TValue> {
+  /** The original indexedDbContext port belongs to this physical native transaction. */
+  #indexedDbContext: IIndexedDbContext<TValue>
+  /** The original native port belongs to this physical native transaction. */
+  #native: IDBTransaction
+  /** The original signal port belongs to this physical native transaction. */
+  #signal: AbortSignal | undefined
+  /** The original operationRuntime port belongs to this physical native transaction. */
+  #operationRuntime: IStorageOperationRuntime
+  /** The original request port belongs to this physical native transaction. */
+  #request: <R>(make: () => IDBRequest<R>) => Promise<R>
+  /** The original assertRemoval port belongs to this physical native transaction. */
+  #assertRemoval: ((channel: 'value' | 'bytes' | 'record', key: IStorageKey) => void) | undefined
+
+  /** Per-channel insertion order gives one post-commit batch with no duplicate keys. */
+  readonly changed = new Map<'value' | 'bytes' | 'record', Map<string, IStorageKey>>()
+
+  /** Indexed writes update one scope epoch in this same transaction. */
+  readonly indexedScopes = new Set<string>()
+
+  /**
+   * Complete point revisions share this existing native revision store, including non-journal
+   * writers.
+   */
+  readonly journalImages: ReturnType<typeof createIndexedDbJournalImages>
+
+  /** Snapshot metadata borrows the same original physical request/deletion path. */
+  readonly ttlAccess: ReturnType<typeof createIndexedDbTtlAccess>
+  /** Initialize native image and deadline adapters on the same original physical request path. */
+  constructor(
+    indexedDbContext: IIndexedDbContext<TValue>,
+    native: IDBTransaction,
+    signal: AbortSignal | undefined,
+    operationRuntime: IStorageOperationRuntime,
+    request: <R>(make: () => IDBRequest<R>) => Promise<R>,
+    assertRemoval?: (channel: 'value' | 'bytes' | 'record', key: IStorageKey) => void
+  ) {
+    this.#indexedDbContext = indexedDbContext
+    this.#native = native
+    this.#signal = signal
+    this.#operationRuntime = operationRuntime
+    this.#request = request
+    this.#assertRemoval = assertRemoval
+
+    /**
+     * Complete point revisions share this existing native revision store, including non-journal
+     * writers.
+     */
+    this.journalImages = createIndexedDbJournalImages({
+      namespace: INTERNAL_META_NAMESPACE,
+      revisions: this.#native.objectStore(REVISIONS_STORE_NAME),
+      request: this.#request,
+      read: async (channel, key) => {
+        const target = this.#native.objectStore(
+          channel === 'value'
+            ? this.#indexedDbContext.kvStoreName
+            : channel === 'bytes'
+              ? this.#indexedDbContext.bytesStoreName
+              : this.#indexedDbContext.recordsStoreName
+        )
+        const value: unknown = await this.#request(() => target.get(toIdbKey(key)))
+        const present =
+          value !== undefined ||
+          (await this.#request(() => target.getKey(toIdbKey(key)))) !== undefined
+        return { present, value: channel === 'bytes' ? readIndexedDbBytes(value) : value }
+      }
+    })
+
+    /** Snapshot metadata borrows the same original physical request/deletion path. */
+    this.ttlAccess = createIndexedDbTtlAccess({
+      metadata: this.#native.objectStore(META_STORE_NAME),
+      namespace: INTERNAL_META_NAMESPACE,
+      keyRange: this.#indexedDbContext.keyRange,
+      request: this.#request,
+      now: this.#indexedDbContext.ttlNow,
+      present: async (channel, key) =>
+        (await this.#request(() =>
+          this.#native
+            .objectStore(
+              channel === 'value'
+                ? this.#indexedDbContext.kvStoreName
+                : channel === 'bytes'
+                  ? this.#indexedDbContext.bytesStoreName
+                  : this.#indexedDbContext.recordsStoreName
+            )
+            .getKey(toIdbKey(key))
+        )) !== undefined,
+      remove: this.removeNative,
+      changed: this.markChanged,
+      deadline: this.journalImages.deadline
+    })
+  }
+
+  /** Mark an actual mutation without publishing before native commit. */
+  markChanged = (channel: 'value' | 'bytes' | 'record', key: IStorageKey): void => {
+    let keys = this.changed.get(channel)
+    if (keys === undefined) {
+      keys = new Map()
+      this.changed.set(channel, keys)
+    }
+    keys.set(encodeFlatStorageKey(key), key)
+  }
+
+  /** Revisions and record invalidation retain their existing physical keys and firewall. */
+  reviseRecord = async (key: IStorageKey, raw: boolean): Promise<void> => {
+    const revisions = this.#native.objectStore(REVISIONS_STORE_NAME)
+    const revision = (await this.#request(() =>
+      revisions.get(recordRevisionKey(this.#indexedDbContext, key))
+    )) as number | undefined
+    revisions.put((revision ?? 0) + 1, recordRevisionKey(this.#indexedDbContext, key))
+    const epoch = (await this.#request(() => revisions.get(RECORD_EPOCH_KEY))) as number | undefined
+    revisions.put((epoch ?? 0) + 1, RECORD_EPOCH_KEY)
+    if (raw)
+      await applyRawMutationFirewall(
+        this.#indexedDbContext,
+        this.#native.objectStore(META_STORE_NAME),
+        revisions,
+        this.#native.objectStore(INDEX_RECORDS_STORE_NAME),
+        key,
+        this.#signal,
+        this.#operationRuntime
+      )
+  }
+
+  /** Canonical deletion can maintain existing sidecars without knowing a new projection. */
+  deleteRecordSidecars = async (key: IStorageKey): Promise<boolean> => {
+    /** Reuse the existing key classifier rather than granting a new indexed-delete mode. */
+    const authority = classifyLegacyMutationBatch([key])
+    if (authority.unscopedPresent) return false
+    for (const scope of authority.canonicalScopes) {
+      /** The current handle and its rows are read in this same native transaction. */
+      const state = (await this.#request(() =>
+        this.#native.objectStore(META_STORE_NAME).get(indexMetadataKey(scope))
+      )) as { handle?: IRecordIndexHandle } | undefined
+      const handle = state?.handle
+      if (handle === undefined) continue
+      /** The record index locates only this record's existing projected rows. */
+      const sidecar = this.#native.objectStore(INDEX_RECORDS_STORE_NAME)
+      const rows = await this.#request(() =>
+        sidecar.index('record').getAllKeys([scope, handle.generation, toIdbKey(key)])
+      )
+      for (const row of rows) await this.#request(() => sidecar.delete(row))
+      this.indexedScopes.add(scope)
+    }
+    return true
+  }
+
+  /** Missing entries do not mutate revisions or emit a post-commit batch. */
+  removeNative = async (channel: 'value' | 'bytes' | 'record', key: IStorageKey): Promise<void> => {
+    const name =
+      channel === 'value'
+        ? this.#indexedDbContext.kvStoreName
+        : channel === 'bytes'
+          ? this.#indexedDbContext.bytesStoreName
+          : this.#indexedDbContext.recordsStoreName
+    const existing = await this.#request(() => this.#native.objectStore(name).getKey(toIdbKey(key)))
+    if (existing === undefined) return
+    this.#assertRemoval?.(channel, key)
+    await this.journalImages.mutate(channel, key, false, undefined, () =>
+      this.#request(() => this.#native.objectStore(name).delete(toIdbKey(key)))
+    )
+    this.markChanged(channel, key)
+    if (channel === 'record') await this.reviseRecord(key, !(await this.deleteRecordSidecars(key)))
+  }
+
+  /** Scope epochs advance once per native transaction, including cursor-driven expiry. */
+  finishIndexes = async (): Promise<void> => {
+    const revisions = this.#native.objectStore(REVISIONS_STORE_NAME)
+    for (const scope of this.indexedScopes) {
+      const epoch = (await this.#request(() => revisions.get(indexScopeEpochKey(scope)))) as
+        | number
+        | undefined
+      revisions.put((epoch ?? 0) + 1, indexScopeEpochKey(scope))
+    }
+  }
+}
+/** Reuse the native transaction without creating another mutation or cleanup owner. */
 function createNativeDataAccess<TValue>(
   indexedDbContext: IIndexedDbContext<TValue>,
   native: IDBTransaction,
@@ -3063,149 +3241,14 @@ function createNativeDataAccess<TValue>(
   request: <R>(make: () => IDBRequest<R>) => Promise<R>,
   assertRemoval?: (channel: 'value' | 'bytes' | 'record', key: IStorageKey) => void
 ) {
-  /** Per-channel insertion order gives one post-commit batch with no duplicate keys. */
-  const changed = new Map<'value' | 'bytes' | 'record', Map<string, IStorageKey>>()
-  /** Indexed writes update one scope epoch in this same transaction. */
-  const indexedScopes = new Set<string>()
-  /**
-   * Complete point revisions share this existing native revision store, including non-journal
-   * writers.
-   */
-  const journalImages = createIndexedDbJournalImages({
-    namespace: INTERNAL_META_NAMESPACE,
-    revisions: native.objectStore(REVISIONS_STORE_NAME),
+  return new IndexedDbNativeDataAccess(
+    indexedDbContext,
+    native,
+    signal,
+    operationRuntime,
     request,
-    read: async (channel, key) => {
-      const target = native.objectStore(
-        channel === 'value'
-          ? indexedDbContext.kvStoreName
-          : channel === 'bytes'
-            ? indexedDbContext.bytesStoreName
-            : indexedDbContext.recordsStoreName
-      )
-      const value: unknown = await request(() => target.get(toIdbKey(key)))
-      const present =
-        value !== undefined || (await request(() => target.getKey(toIdbKey(key)))) !== undefined
-      return { present, value: channel === 'bytes' ? readIndexedDbBytes(value) : value }
-    }
-  })
-
-  /** Mark an actual mutation without publishing before native commit. */
-  const markChanged = (channel: 'value' | 'bytes' | 'record', key: IStorageKey): void => {
-    let keys = changed.get(channel)
-    if (keys === undefined) {
-      keys = new Map()
-      changed.set(channel, keys)
-    }
-    keys.set(encodeFlatStorageKey(key), key)
-  }
-  /** Revisions and record invalidation retain their existing physical keys and firewall. */
-  const reviseRecord = async (key: IStorageKey, raw: boolean): Promise<void> => {
-    const revisions = native.objectStore(REVISIONS_STORE_NAME)
-    const revision = (await request(() =>
-      revisions.get(recordRevisionKey(indexedDbContext, key))
-    )) as number | undefined
-    revisions.put((revision ?? 0) + 1, recordRevisionKey(indexedDbContext, key))
-    const epoch = (await request(() => revisions.get(RECORD_EPOCH_KEY))) as number | undefined
-    revisions.put((epoch ?? 0) + 1, RECORD_EPOCH_KEY)
-    if (raw)
-      await applyRawMutationFirewall(
-        indexedDbContext,
-        native.objectStore(META_STORE_NAME),
-        revisions,
-        native.objectStore(INDEX_RECORDS_STORE_NAME),
-        key,
-        signal,
-        operationRuntime
-      )
-  }
-  /** Canonical deletion can maintain existing sidecars without knowing a new projection. */
-  const deleteRecordSidecars = async (key: IStorageKey): Promise<boolean> => {
-    /** Reuse the existing key classifier rather than granting a new indexed-delete mode. */
-    const authority = classifyLegacyMutationBatch([key])
-    if (authority.unscopedPresent) return false
-    for (const scope of authority.canonicalScopes) {
-      /** The current handle and its rows are read in this same native transaction. */
-      const state = (await request(() =>
-        native.objectStore(META_STORE_NAME).get(indexMetadataKey(scope))
-      )) as { handle?: IRecordIndexHandle } | undefined
-      const handle = state?.handle
-      if (handle === undefined) continue
-      /** The record index locates only this record's existing projected rows. */
-      const sidecar = native.objectStore(INDEX_RECORDS_STORE_NAME)
-      const rows = await request(() =>
-        sidecar.index('record').getAllKeys([scope, handle.generation, toIdbKey(key)])
-      )
-      for (const row of rows) await request(() => sidecar.delete(row))
-      indexedScopes.add(scope)
-    }
-    return true
-  }
-  /** Missing entries do not mutate revisions or emit a post-commit batch. */
-  const removeNative = async (
-    channel: 'value' | 'bytes' | 'record',
-    key: IStorageKey
-  ): Promise<void> => {
-    const name =
-      channel === 'value'
-        ? indexedDbContext.kvStoreName
-        : channel === 'bytes'
-          ? indexedDbContext.bytesStoreName
-          : indexedDbContext.recordsStoreName
-    const existing = await request(() => native.objectStore(name).getKey(toIdbKey(key)))
-    if (existing === undefined) return
-    assertRemoval?.(channel, key)
-    await journalImages.mutate(channel, key, false, undefined, () =>
-      request(() => native.objectStore(name).delete(toIdbKey(key)))
-    )
-    markChanged(channel, key)
-    if (channel === 'record') await reviseRecord(key, !(await deleteRecordSidecars(key)))
-  }
-  /** Snapshot metadata borrows the same original physical request/deletion path. */
-  const ttlAccess = createIndexedDbTtlAccess({
-    metadata: native.objectStore(META_STORE_NAME),
-    namespace: INTERNAL_META_NAMESPACE,
-    keyRange: indexedDbContext.keyRange,
-    request,
-    now: indexedDbContext.ttlNow,
-    present: async (channel, key) =>
-      (await request(() =>
-        native
-          .objectStore(
-            channel === 'value'
-              ? indexedDbContext.kvStoreName
-              : channel === 'bytes'
-                ? indexedDbContext.bytesStoreName
-                : indexedDbContext.recordsStoreName
-          )
-          .getKey(toIdbKey(key))
-      )) !== undefined,
-    remove: removeNative,
-    changed: markChanged,
-    deadline: journalImages.deadline
-  })
-
-  /** Scope epochs advance once per native transaction, including cursor-driven expiry. */
-  const finishIndexes = async (): Promise<void> => {
-    const revisions = native.objectStore(REVISIONS_STORE_NAME)
-    for (const scope of indexedScopes) {
-      const epoch = (await request(() => revisions.get(indexScopeEpochKey(scope)))) as
-        | number
-        | undefined
-      revisions.put((epoch ?? 0) + 1, indexScopeEpochKey(scope))
-    }
-  }
-  return {
-    changed,
-    indexedScopes,
-    markChanged,
-    reviseRecord,
-    deleteRecordSidecars,
-    removeNative,
-    journalImages,
-    ttlAccess,
-    finishIndexes
-  }
+    assertRemoval
+  )
 }
 
 /** Run one genuine native attempt; no record draft or callback timeout owner remains here. */
