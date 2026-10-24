@@ -1,3 +1,4 @@
+/** Verify native parent-loss deadlines through the public process plugin and its real child. */
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import { matrixFixture } from './matrix-fixture.js'
@@ -31,6 +32,7 @@ describe('real Node parent-loss ownership', () => {
       })
       try {
         await test.host.use(plugin)
+        await vi.waitFor(() => expect(test.chunks.join('')).toContain('matrix:serving-ready'))
         if (mode === 'explicit') {
           await test.outlet.request('p', 'p.f.request', ['explicit-close'])
           await vi.waitFor(() => expect(test.chunks.join('')).toContain('matrix:explicit-closed'))
@@ -62,4 +64,50 @@ describe('real Node parent-loss ownership', () => {
     },
     20000
   )
+
+  it('parent loss during child preparation retains the original grace deadline', async () => {
+    /** The real service callback stays pending after its genuine Peer becomes ready. */
+    const test = await matrixFixture()
+    if (!test.spawn) throw new Error('spawn required')
+    /** The native child receives local control gates, with no replacement lifecycle or clock. */
+    const plugin = processPlugin({
+      ...test.settings,
+      spawn: {
+        ...test.spawn,
+        supervision: {
+          ...test.spawn.supervision,
+          spec: {
+            ...test.spec,
+            env: {
+              inherit: [],
+              set: {
+                RPC_PARENT_LOSS: 'hung',
+                RPC_SERVICE_GATE: join(test.directory, 'service'),
+                RPC_CLOCK_GATE: join(test.directory, 'clock99'),
+                RPC_CLOCK_FINAL_GATE: join(test.directory, 'clock100')
+              }
+            }
+          }
+        }
+      }
+    })
+    try {
+      await test.host.use(plugin)
+      await vi.waitFor(() => expect(test.chunks.join('')).toContain('matrix:service-prepared'))
+      expect(test.chunks.join('')).not.toContain('matrix:serving-ready')
+      await test.rawChannels[0]!.close()
+      await vi.waitFor(() => expect(test.chunks.join('')).toContain('matrix:grace-scheduled'))
+      await test.gate('clock99')
+      await vi.waitFor(() => expect(test.chunks.join('')).toContain('matrix:clock:99'))
+      expect(test.chunks.join('')).not.toContain('matrix:exit:')
+      await test.gate('clock100')
+      await vi.waitFor(() => expect(test.chunks.join('')).toContain('matrix:clock:100'))
+      expect(test.chunks.join('')).toContain('matrix:exit:1')
+      expect(test.chunks.join('').split('matrix:exit:').length - 1).toBe(1)
+      expect(test.chunks.join('').split('matrix:parent-lost').length - 1).toBe(1)
+    } finally {
+      await test.cleanup()
+    }
+    expect(test.budget.inUse).toBe(0)
+  })
 })

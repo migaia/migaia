@@ -1,3 +1,7 @@
+/**
+ * Own native process session acceptance, publication and shutdown for child and listener ingress.
+ * The supervision guard owns the parent-loss deadline; this module owns its session cleanup.
+ */
 import type { IAbortSignal, INativeAbortSignal } from '@migaia/utils/promise'
 import type {
   IAdapterListenerPreparation,
@@ -663,11 +667,9 @@ class ProcessSessionOwner {
       reportSafely(this.#state.report, error)
     }
   }
-  /**
-   * Establish and publish the sole child session, rolling back its original native channel on
-   * failure.
-   */
+  /** Track child preparation so parent-loss shutdown joins its original rollback before exiting. */
   #serveChild = async (ingress: IProcessServeChildIngress): Promise<IProcessSessionsHandle> => {
+    /** The existing guard bounds preparation and committed-session cleanup with one deadline. */
     const guard = createParentLossGuard({
       shutdown: () => this.#close(),
       exit: ingress.parentLoss.exit,
@@ -677,6 +679,27 @@ class ProcessSessionOwner {
       report: this.#state.report
     })
     this.#state.removeProbe = ingress.parentLoss.probe?.((reason) => guard.trigger(reason))
+    /** Failed preparation remains owned until its cleanup settles or the grace deadline exits. */
+    const preparing = this.#prepareChild(ingress, guard)
+    /** Shutdown joins either outcome without introducing another rejection owner. */
+    const accepting = preparing.then(
+      () => undefined,
+      () => undefined
+    )
+    this.#state.accepting.add(accepting)
+    void accepting.then(() => this.#state.accepting.delete(accepting))
+    return preparing
+  }
+  /**
+   * Establish and publish one child session, retaining its original rollback and resource order.
+   * Preparation and rollback form one acquisition transaction; local candidates stay together so
+   * their ownership transfers and release order remain explicit.
+   */
+  #prepareChild = async (
+    ingress: IProcessServeChildIngress,
+    guard: ReturnType<typeof createParentLossGuard>
+  ): Promise<IProcessSessionsHandle> => {
+    /** The acquired carrier is observed before handshake or service preparation can suspend. */
     let raw: IProcessByteChannel | IProcessMessageChannel | undefined
     /** Ownership transfers only after pending.accept fulfills. */
     let channel: IRemoteChannel | undefined
@@ -691,6 +714,8 @@ class ProcessSessionOwner {
       lease = this.#state.manager.claimConnection()
       const sessionInfo = Object.freeze({ connectionId: defaultRpcId(), sessionId: defaultRpcId() })
       const opened = await ingress.openRaw(this.#state.controller.signal)
+      raw = 'raw' in opened ? opened.raw : opened
+      this.#state.removeParentClose = raw.onClose((reason) => guard.trigger(reason))
       if (ingress.channelKind === ProcessPluginChannelKind.byte) {
         if (!('raw' in opened) || !('bootstrap' in opened)) {
           raw = opened
@@ -829,7 +854,6 @@ class ProcessSessionOwner {
       candidateService = undefined
       lease = undefined
       closeAdmission = undefined
-      this.#state.removeParentClose = raw.onClose((reason) => guard.trigger(reason))
       return Object.freeze({
         close: this.#close,
         closed: () => this.#state.closePromise !== undefined,

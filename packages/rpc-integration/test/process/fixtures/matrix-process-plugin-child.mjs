@@ -1,3 +1,4 @@
+/** Serve real process sessions and expose lifecycle markers and file gates for the native oracle. */
 import { access } from 'node:fs/promises'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { createManualScheduler } from '@migaia/utils/testing'
@@ -203,6 +204,10 @@ async function prepareService({ channel, endpoint }) {
     },
     { channel, endpoint }
   )
+  if (process.env.RPC_SERVICE_GATE) {
+    mark('service-prepared')
+    await gate(process.env.RPC_SERVICE_GATE)
+  }
   return {
     close: () => {
       mark('service-close')
@@ -275,6 +280,21 @@ const ingress = process.env.RPC_SOCKET
       }
     }
 
+/**
+ * Drive the original manual grace deadline independently of service preparation or rollback.
+ *
+ * @param {ReturnType<typeof createManualScheduler>} clock Original child-owned manual scheduler.
+ * @returns {Promise<void>} Settles after both parent-owned control gates have opened.
+ */
+async function advanceParentLossClock(clock) {
+  await gate(process.env.RPC_CLOCK_GATE)
+  clock.advance(99)
+  mark('clock:99')
+  await gate(process.env.RPC_CLOCK_FINAL_GATE)
+  clock.advance(1)
+  mark('clock:100')
+}
+
 if (scheduler) {
   /**
    * The real Node child drives the existing internal scheduler parameter, without a public API
@@ -284,6 +304,7 @@ if (scheduler) {
     scheduler: scheduler ?? systemScheduler,
     report: (error) => mark(`report:${error.code}`)
   })
+  void advanceParentLossClock(scheduler)
   serving = await serveProcessSessions(
     ingress,
     endpointFactory,
@@ -293,15 +314,6 @@ if (scheduler) {
     undefined,
     scheduler
   )
-  /** EOF starts shutdown; the local control gate advances exactly the original grace deadline. */
-  void (async () => {
-    await gate(process.env.RPC_CLOCK_GATE)
-    scheduler.advance(99)
-    mark('clock:99')
-    await gate(process.env.RPC_CLOCK_FINAL_GATE)
-    scheduler.advance(1)
-    mark('clock:100')
-  })()
 } else {
   /** The original session owner retains child bootstrap, listener authentication and rollback. */
   const resilience = createProcessResilience({
