@@ -1,3 +1,4 @@
+import { indexedDbTestFeatures } from '../helpers/indexed-db-features.js'
 // @vitest-environment node
 import { IDBFactory, IDBKeyRange, IDBObjectStore } from 'fake-indexeddb'
 import { describe, expect, it, vi } from 'vitest'
@@ -42,7 +43,7 @@ describe('native IndexedDB Blob Feature', () => {
       plugins: [
         indexedDbBackendPlugin(
           { factory, keyRange: IDBKeyRange, dbName: 'native-blobs' },
-          { blobs: indexedDbBlobFeature(), native }
+          { ...indexedDbTestFeatures, blobs: indexedDbBlobFeature(), native }
         )
       ]
     })
@@ -85,7 +86,7 @@ describe('native IndexedDB Blob Feature', () => {
       plugins: [
         indexedDbBackendPlugin(
           { factory, keyRange: IDBKeyRange },
-          { blobs: indexedDbBlobFeature({ storeName: 'attachments' }) }
+          { ...indexedDbTestFeatures, blobs: indexedDbBlobFeature({ storeName: 'attachments' }) }
         )
       ]
     })
@@ -131,7 +132,11 @@ describe('native IndexedDB Blob Feature', () => {
         plugins: [
           indexedDbBackendPlugin(
             { factory, keyRange: IDBKeyRange },
-            { first: indexedDbBlobFeature(), second: indexedDbBlobFeature() }
+            {
+              ...indexedDbTestFeatures,
+              first: indexedDbBlobFeature(),
+              second: indexedDbBlobFeature()
+            }
           )
         ]
       })

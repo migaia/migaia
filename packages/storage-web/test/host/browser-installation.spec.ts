@@ -1,3 +1,4 @@
+import { indexedDbTestFeatures } from '../helpers/indexed-db-features.js'
 import { walkErrorCauses } from '@migaia/utils/error'
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb'
 import { describe, expect, it, vi } from 'vitest'
@@ -56,7 +57,7 @@ describe('browser backend installation through the neutral host', () => {
         cookieBackendPlugin({ document }, { native: cookieClient }),
         indexedDbBackendPlugin(
           { factory, keyRange: IDBKeyRange, dbName: 'browser-installation' },
-          { native: databaseClient }
+          { ...indexedDbTestFeatures, native: databaseClient }
         )
       ]
     })
@@ -164,11 +165,11 @@ describe('browser backend installation through the neutral host', () => {
       plugins: [
         indexedDbBackendPlugin(
           { id: 'first', factory: new IDBFactory(), keyRange: IDBKeyRange },
-          { native: nativeFeature }
+          { ...indexedDbTestFeatures, native: nativeFeature }
         ),
         indexedDbBackendPlugin(
           { id: 'second', factory: new IDBFactory(), keyRange: IDBKeyRange },
-          { native: nativeFeature }
+          { ...indexedDbTestFeatures, native: nativeFeature }
         )
       ]
     })
@@ -209,7 +210,12 @@ describe('browser backend installation through the neutral host', () => {
     /** Native open remains the highest observable port for this construction requirement. */
     const open = vi.spyOn(factory, 'open')
     const failure: unknown = await createStorageHost({
-      plugins: [indexedDbBackendPlugin({ factory, keyRange: IDBKeyRange }, { collision })]
+      plugins: [
+        indexedDbBackendPlugin(
+          { factory, keyRange: IDBKeyRange },
+          { ...indexedDbTestFeatures, collision }
+        )
+      ]
     }).catch((cause: unknown) => cause)
     expect(failure).toMatchObject({
       source: '@migaia/storage-host',

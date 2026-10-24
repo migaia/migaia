@@ -1,3 +1,4 @@
+import { createBackendChangeController } from '@migaia/storage-host/authoring/change-controller'
 import { createTextRedo, type ITextPrepared, type ITextRedoStore } from './text-redo.js'
 import { bindBrowserExecution, textExecutionKeys } from './execution.js'
 import { createBrowserOrgBinding } from './organizations.js'
@@ -256,15 +257,18 @@ export function cookiesHost(
   configureCookieNamespace(cookieContext)
 
   /** Private commit-after controller shared by direct and Host-created exact stores. */
-  cookieContext.controller = cookieContext.runtime.createChangeController({
-    backend: StorageBackend.cookie,
-    platform: cookieContext.doc,
-    options: {
-      namespace: cookieContext.namespace,
-      namespaceCodec: cookieContext.namespaceCodec,
-      scope: cookieContext.scope
-    }
-  })
+  cookieContext.controller = cookieContext.runtime.createChangeController(
+    {
+      backend: StorageBackend.cookie,
+      platform: cookieContext.doc,
+      options: {
+        namespace: cookieContext.namespace,
+        namespaceCodec: cookieContext.namespaceCodec,
+        scope: cookieContext.scope
+      }
+    },
+    createBackendChangeController
+  )
   return assembleCookieConstruction(cookieContext)
 }
 

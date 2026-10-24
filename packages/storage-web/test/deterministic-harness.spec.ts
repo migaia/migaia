@@ -1,3 +1,4 @@
+import { indexedDbTestFeatures } from './helpers/indexed-db-features.js'
 import { createRuntime } from '@migaia/reactive'
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb'
 import { describe, expect, it } from 'vitest'
@@ -80,7 +81,7 @@ describe('deterministic shared harness', () => {
             factory: new IDBFactory(),
             keyRange: IDBKeyRange
           },
-          { reactive: reactiveFeature(indexedDbBackendKind) }
+          { ...indexedDbTestFeatures, reactive: reactiveFeature(indexedDbBackendKind) }
         )
       ] as const
     })

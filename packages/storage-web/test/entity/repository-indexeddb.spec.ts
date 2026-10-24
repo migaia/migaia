@@ -1,3 +1,4 @@
+import { indexedDbTestFeatures } from '../helpers/indexed-db-features.js'
 import { IDBFactory, IDBIndex, IDBKeyRange, IDBObjectStore } from 'fake-indexeddb'
 import { describe, expect, it, vi } from 'vitest'
 import { defineEntity, type IRecordIndexBackfillStore } from '@migaia/storage-host/entity'
@@ -118,8 +119,14 @@ describe('repository over real indexedDbHost backend', () => {
     }))
     await using host = await createStorageHost({
       plugins: [
-        indexedDbBackendPlugin({ id: 'holder', factory, keyRange: IDBKeyRange }),
-        indexedDbBackendPlugin({ id: 'writer', factory, keyRange: IDBKeyRange }),
+        indexedDbBackendPlugin(
+          { id: 'holder', factory, keyRange: IDBKeyRange },
+          indexedDbTestFeatures
+        ),
+        indexedDbBackendPlugin(
+          { id: 'writer', factory, keyRange: IDBKeyRange },
+          indexedDbTestFeatures
+        ),
         intervention
       ]
     })

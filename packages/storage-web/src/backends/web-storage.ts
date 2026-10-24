@@ -1,3 +1,5 @@
+import { createBackendChangeIterator } from '@migaia/storage-host/authoring/change-iterator'
+import { createBackendChangeController } from '@migaia/storage-host/authoring/change-controller'
 import { createTextRedo, type ITextRedoStore } from './text-redo.js'
 import { bindBrowserExecution, textExecutionKeys } from './execution.js'
 import { createTextBatchApi } from './batch.js'
@@ -15,7 +17,6 @@ import { lockKey } from '@migaia/storage-host/authoring/concurrency'
 import { snapshotSyncWriteOptions } from '@migaia/storage-host/authoring/context'
 import {
   resolveStorageNamespace,
-  createBackendChangeIterator,
   throwIfAborted,
   withAbort
 } from '@migaia/storage-host/authoring/backend'
@@ -294,15 +295,18 @@ function configureWebStorageNamespace(webStorageContext: IWebStorageContext): vo
 /** Bind the existing change controller to its one native source and derive truthful capabilities. */
 function attachWebStorageSource(webStorageContext: IWebStorageContext): void {
   /** Private commit-after controller shared by direct and Host-created exact stores. */
-  webStorageContext.controller = webStorageContext.runtime.createChangeController({
-    backend: webStorageContext.backend,
-    platform: webStorageContext.live,
-    options: {
-      namespace: webStorageContext.namespace,
-      namespaceCodec: webStorageContext.namespaceCodec
+  webStorageContext.controller = webStorageContext.runtime.createChangeController(
+    {
+      backend: webStorageContext.backend,
+      platform: webStorageContext.live,
+      options: {
+        namespace: webStorageContext.namespace,
+        namespaceCodec: webStorageContext.namespaceCodec
+      },
+      finalize: () => webStorageContext.releaseNativeEvents?.()
     },
-    finalize: () => webStorageContext.releaseNativeEvents?.()
-  })
+    createBackendChangeController
+  )
 
   if (webStorageContext.backend === StorageBackend.local)
     webStorageContext.releaseNativeEvents = subscribeLocalStorageEvents(

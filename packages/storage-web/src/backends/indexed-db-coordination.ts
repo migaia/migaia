@@ -1,3 +1,4 @@
+import { acquireIndexedDbLocks } from './indexed-db-locks.js'
 import { assertOperationContext, type IStorageChange } from '@migaia/storage-contract'
 import {
   createEventChannel,
@@ -13,7 +14,6 @@ import {
 import type { IBackendKeyLockPort } from '@migaia/storage-host/authoring/backend'
 import { StorageErrorText } from '../error-text.js'
 import { StorageErrorCode, createStorageTypeError } from '../types/errors.js'
-
 /** Versioned metadata-only message shape used by admitted IndexedDB transports. */
 type IIndexedDbWireHint = {
   readonly version: 1
@@ -364,6 +364,8 @@ type IIndexedDbCoordinationMember = {
 
 /** One coordination member owns only its existing registry row, subscription and cleanup result. */
 type IIndexedDbCoordinationMemberContext = {
+  /** Canonical physical lock borrow released with this member's notification subscription. */
+  locks: ReturnType<typeof acquireIndexedDbLocks>
   /** Original options is captured before native construction begins. */
   readonly options: IIndexedDbCoordinationOptions
 
@@ -405,6 +407,8 @@ export function acquireIndexedDbCoordination(
   /** Initialize native facts in original construction order before publishing any port. */
   const memberState = { options } as IIndexedDbCoordinationMemberContext
 
+  memberState.locks = acquireIndexedDbLocks(options)
+
   memberState.factoryObject = memberState.options.factory as unknown as object
 
   memberState.registry = factoryRegistries.get(memberState.factoryObject)
@@ -420,7 +424,7 @@ export function acquireIndexedDbCoordination(
   memberState.group = memberState.registry.get(memberState.options.dbName)
 
   if (memberState.group === undefined) {
-    memberState.group = { keyPort: memberState.options.createKeyLockPort(), layouts: new Map() }
+    memberState.group = { keyPort: memberState.locks.keyPort, layouts: new Map() }
     memberState.registry.set(memberState.options.dbName, memberState.group)
   }
 
@@ -488,7 +492,8 @@ function coordinationMemberDispose(memberState: IIndexedDbCoordinationMemberCont
   memberState.released = true
   memberState.subscription()
   memberState.entry!.memberCount -= 1
-  if (memberState.entry!.memberCount > 0) return (memberState.disposal = Promise.resolve())
+  if (memberState.entry!.memberCount > 0)
+    return (memberState.disposal = memberState.locks.dispose())
   memberState.entry!.disposed = true
   memberState.entry!.pending.length = 0
   memberState.entry!.pendingScopes.clear()
@@ -504,7 +509,8 @@ function coordinationMemberDispose(memberState: IIndexedDbCoordinationMemberCont
     }
   }
   memberState.group!.layouts.delete(memberState.entry!.registryKey)
-  if (memberState.group!.layouts.size > 0) return (memberState.disposal = Promise.resolve())
+  if (memberState.group!.layouts.size > 0)
+    return (memberState.disposal = memberState.locks.dispose())
   memberState.registry!.delete(memberState.options.dbName)
-  return (memberState.disposal = memberState.group!.keyPort.dispose())
+  return (memberState.disposal = memberState.locks.dispose())
 }

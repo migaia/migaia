@@ -1,3 +1,4 @@
+import type { IBackendLifecycleController } from '@migaia/storage-host/authoring/change-controller'
 import {
   kv,
   type ICapabilityImpl,
@@ -13,10 +14,7 @@ import type {
   IStorageOrgBinding,
   IStorageJournalBackendBinding
 } from '@migaia/storage-host'
-import type {
-  IBackendChangeController,
-  IBackendValueCommit
-} from '@migaia/storage-host/authoring/backend'
+import type { IBackendValueCommit } from '@migaia/storage-host/authoring/backend'
 
 /** Backend factories borrow the original registration's execution and controller ports. */
 export type IBackendRuntime = Pick<
@@ -66,7 +64,7 @@ export function browserKeyValueApi<S extends IKeyValueStore>(
 /** One construction closure holds the original store, controller and borrowed native client. */
 export type IBackendConstruction<S extends IStorageBase, C> = {
   readonly store: S
-  readonly controller: IBackendChangeController
+  readonly controller: IBackendLifecycleController
   readonly installer: ICapabilityInstallPort
   readonly getClient: () => C
   readonly prepare?: () => Promise<void>
@@ -88,7 +86,7 @@ export function provideBackendConstruction<
 >(
   base: S,
   implementations: TImplementations,
-  controller: IBackendChangeController,
+  controller: IBackendLifecycleController,
   getClient: () => C,
   prepare?: () => Promise<void>
 ): IBackendConstruction<
