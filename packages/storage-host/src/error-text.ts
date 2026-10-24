@@ -18,6 +18,8 @@ export const StorageErrorText = {
   memoryVectorArgument: 'memory vector collection configuration or sample is invalid',
   /** Standard recommendation requires nonempty positive samples with common finite dimensions. */
   vectorRecommendation: 'storage vector recommendation samples are invalid',
+  /** The pure MMR factory accepts a finite relevance weight and an optional greedy prefix bound. */
+  vectorMmr: 'storage MMR lambda, topN or hit vectors are invalid',
   /** Aggregate organization deletion retains successful targets and every original failed target. */
   orgDeleteFailed: 'storage organization deletion failed',
   /** Entity definitions capture a complete own upgrade graph before connecting to a backend. */

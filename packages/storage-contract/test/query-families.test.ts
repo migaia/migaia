@@ -2,6 +2,7 @@ import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import {
   createRdfQuery,
   createVectorQuery,
+  refineStorageVectorQuery,
   createStorageIteratorLifetime,
   QueryOperation,
   QueryOperator,
@@ -13,7 +14,10 @@ import {
   type IStorageKey,
   type IVectorHit,
   type IVectorQuerySource,
-  type IVectorQueryInput
+  type IVectorQueryInput,
+  type IVectorQuery,
+  type IVectorNativeQuery,
+  type IVectorReranker
 } from '../src/index.js'
 
 /** Original cursor ownership is shared by every family test, including early-exit cleanup. */
@@ -46,6 +50,254 @@ function rows<T>(
 }
 
 describe('shared vector query family', () => {
+  it('derives one native Feature fact on the same bounded source and reranks its returned topN', async () => {
+    /** The native Feature owns this already validated packet, not the common query core. */
+    const native = Object.freeze({ slot: 'extra', query: Object.freeze([1, 0]) })
+    /** A caller signal is captured once for both original engine execution and the scorer. */
+    const signal = new AbortController().signal
+    /** The author callback observes the actual canonical input, without creating a second query. */
+    const execute = vi.fn((input: IVectorQueryInput) => {
+      expect(input.topK).toBe(3)
+      expect(input.withVector).toBe(true)
+      expect(input.ctx?.signal).toBe(signal)
+      expect(input.conditions).toHaveLength(1)
+      if (input.native !== undefined) expect(input.native).toBe(native)
+      return rows([
+        { id: 'a', score: 3, vector: [1, 0] },
+        { id: 'b', score: 2, vector: [0, 1] }
+      ])
+    })
+    /** This is the actual native Feature author's generic receiver, with no parallel builder. */
+    type IMethods = {
+      label(): string
+      rescore<P, G extends boolean, V extends boolean, M extends object>(
+        this: IVectorQuery<P, G, V, M>,
+        options: { readonly query: readonly number[]; readonly topN?: number }
+      ): IVectorNativeQuery<P, G, V, M>
+    }
+    const methods: IMethods = {
+      label: () => 'native source',
+      rescore(options) {
+        return refineStorageVectorQuery(this, (topK) => ({
+          native: { query: options.query },
+          topN: options.topN ?? topK
+        }))
+      }
+    }
+    /** Only the explicit native source grants a finite author refinement closure. */
+    const builder = createVectorQuery<{ active: boolean }, true, IMethods>(
+      {
+        origin: { kind: 'near', vector: [1, 0] },
+        native: true,
+        groupBy: true,
+        pushdown: { source: 'native-refinement', operators: ['eq'], operations: ['where', 'topK'] },
+        execute
+      },
+      methods
+    )
+    /** The original k is immutable even though the native stage returns a smaller topN. */
+    const query = builder.where({ active: true }).withVector().topK(3)
+    /** Native options capture runs once at construction and never during execution or explain. */
+    const capture = vi.fn((topK: number) => {
+      expect(topK).toBe(3)
+      return { native, topN: 2 }
+    })
+    const refined = refineStorageVectorQuery(query, capture)
+    expect(capture).toHaveBeenCalledTimes(1)
+    expect(execute).not.toHaveBeenCalled()
+    expect(() => refined.rerank(() => [1, 2], { topN: 3 })).toThrowError(
+      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+    )
+    expect((await refined.rerank(() => [1, 2]).all({ signal })).map((hit) => hit.id)).toEqual([
+      'b',
+      'a'
+    ])
+    expect(await query.all({ signal })).toHaveLength(2)
+    expect(Object.hasOwn(execute.mock.calls[1]![0], 'native')).toBe(false)
+    expect(capture).toHaveBeenCalledTimes(1)
+    expect('delete' in refined).toBe(false)
+    expect('watch' in refined).toBe(false)
+    const typed = query
+      .rescore({ query: [1, 0], topN: 2 })
+      .withVector()
+      .rerank(({ hits }) => hits.map((hit) => hit.vector[0]!))
+    expectTypeOf(typed.label()).toEqualTypeOf<string>()
+    expect(() => refineStorageVectorQuery(builder as never, capture)).toThrowError(
+      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+    )
+    function invalidNativeTypes() {
+      // @ts-expect-error Native refinement cannot admit an unbounded builder.
+      refineStorageVectorQuery(builder, capture)
+      // @ts-expect-error Native Feature methods admit only bounded original queries.
+      builder.rescore({ query: [1, 0] })
+      // @ts-expect-error A native result cannot acquire a second native stage.
+      refined.rescore({ query: [1, 0] })
+      // @ts-expect-error A client ordering cannot acquire a native stage.
+      typed.rescore({ query: [1, 0] })
+      refineStorageVectorQuery(
+        // @ts-expect-error A completed client ordering cannot acquire a native stage.
+        refined.rerank(() => [1, 2]),
+        capture
+      )
+    }
+    void invalidNativeTypes
+  })
+
+  it('reranks original bounded hits once, preserves scores and stable ties, then groups topN', async () => {
+    const hits = [
+      { id: 'a', score: 9, payload: { group: 'one' }, vector: [1, 0] },
+      { id: 'b', score: 8, payload: { group: 'two' }, vector: [0, 1] },
+      { id: 'c', score: 7, payload: { group: 'one' }, vector: [1, 1] }
+    ]
+    const execute = vi.fn(() => rows(hits))
+    const builder = createVectorQuery<{ group: string }, true>({
+      pushdown: { source: 'rerank-native', operators: [], operations: ['topK'] },
+      origin: { kind: 'near', vector: [1, 0] },
+      groupBy: true,
+      execute
+    })
+    const scorer = vi.fn<IVectorReranker<{ group: string }, true>>(({ hits: input }) => {
+      expect(input.map((hit) => hit.id)).toEqual(['a', 'b', 'c'])
+      return [1, 3, 3]
+    })
+    const query = builder.withVector().topK(3).rerank(scorer, { topN: 2 })
+    expect(execute).not.toHaveBeenCalled()
+    const result = await query.all()
+    expect(result).toEqual([
+      { ...hits[1], rerankScore: 3 },
+      { ...hits[2], rerankScore: 3 }
+    ])
+    expect(scorer).toHaveBeenCalledTimes(1)
+    expect(scorer.mock.calls[0]![0].origin).toEqual({ kind: 'near', vector: [1, 0] })
+    expect(await query.groupBy('group', { perGroup: 1 }).all()).toEqual([
+      { group: 'two', hits: [{ ...hits[1], rerankScore: 3 }] },
+      { group: 'one', hits: [{ ...hits[2], rerankScore: 3 }] }
+    ])
+    for (const key of ['delete', 'watch', 'requirePushdown']) {
+      expect(key in query).toBe(false)
+      expect(key in query.select('id')).toBe(false)
+      expect(key in query.groupBy('group', { perGroup: 1 })).toBe(false)
+    }
+    expect(query.explain().client).toContainEqual({
+      operation: 'rerank',
+      reason: expect.any(String)
+    })
+    await expect(
+      builder
+        .topK(3)
+        .requirePushdown()
+        .rerank(() => [1, 2, 3])
+        .all()
+    ).rejects.toMatchObject({ code: 'QUERY_NOT_PUSHABLE' })
+    function invalidRerankTypes() {
+      // @ts-expect-error The engine must first bound the candidate set.
+      builder.rerank(() => [])
+      // @ts-expect-error A scorer requiring vectors cannot trigger implicit vector reads.
+      builder.topK(3).rerank(scorer)
+      // @ts-expect-error Reranked queries are read-only.
+      query.delete()
+      // @ts-expect-error Reranking cannot subscribe to a native watch.
+      query.watch()
+      // @ts-expect-error Reranking is always a client operation.
+      query.requirePushdown()
+    }
+    void invalidRerankTypes
+    expectTypeOf(result[0]!.rerankScore).toEqualTypeOf<number>()
+    expectTypeOf(result[0]!.vector).toEqualTypeOf<readonly number[]>()
+  })
+
+  it('validates rerank topN before I/O and retains exact scorer failures and invalid results', async () => {
+    const close = vi.fn()
+    const release = vi.fn()
+    const begin = vi.fn(() => release)
+    const execute = vi.fn(() => rows([{ id: 'a', score: 1 }], close))
+    const query = createVectorQuery({
+      pushdown: { source: 'rerank-failure', operators: [], operations: ['topK'] },
+      origin: { kind: 'similarTo', id: 'sample' },
+      beginOperation: begin,
+      execute
+    }).topK(1)
+    for (const topN of [0, -1, 1.5, 2, NaN, Infinity])
+      expect(() => query.rerank(() => [1], { topN })).toThrowError(
+        expect.objectContaining({ code: 'INVALID_ARGUMENT' })
+      )
+    expect(execute).not.toHaveBeenCalled()
+    expect(begin).not.toHaveBeenCalled()
+    const cause = new Error('reranker original failure')
+    await expect(
+      query
+        .rerank(() => {
+          throw cause
+        })
+        .all()
+    ).rejects.toMatchObject({
+      code: 'RERANK_FAILED',
+      cause
+    })
+    await expect(
+      query
+        .rerank(async () => {
+          throw cause
+        })
+        .all()
+    ).rejects.toMatchObject({
+      code: 'RERANK_FAILED',
+      cause
+    })
+    for (const result of [[], [1, 2], [NaN], [Infinity], 'wrong', new Float32Array([1])])
+      await expect(query.rerank(() => result as never).all()).rejects.toMatchObject({
+        code: 'RERANK_RESULT_INVALID'
+      })
+    expect(close).toHaveBeenCalledTimes(8)
+    expect(begin).toHaveBeenCalledTimes(8)
+    expect(release).toHaveBeenCalledTimes(8)
+    /** The author's original lease cleanup cannot replace the scorer's primary identity. */
+    const cleanup = new Error('rerank lease cleanup')
+    const failingRelease = createVectorQuery({
+      pushdown: { source: 'rerank-cleanup', operators: [], operations: ['topK'] },
+      origin: { kind: 'near', vector: [1] },
+      beginOperation: () => () => {
+        throw cleanup
+      },
+      execute
+    }).topK(1)
+    await expect(
+      failingRelease
+        .rerank(() => {
+          throw cause
+        })
+        .all()
+    ).rejects.toMatchObject({
+      errors: [expect.objectContaining({ code: 'RERANK_FAILED', cause }), cleanup]
+    })
+  })
+
+  it('passes the same cancellation signal and original recommendation identity to the scorer', async () => {
+    const controller = new AbortController()
+    const cause = new Error('rerank cancellation')
+    const release = vi.fn()
+    const query = createVectorQuery({
+      pushdown: { source: 'rerank-abort', operators: [], operations: ['topK'] },
+      origin: { kind: 'recommend', positive: ['one'], negative: ['two'] },
+      beginOperation: () => release,
+      execute: () => rows([{ id: 'a', score: 1 }])
+    }).topK(1)
+    await expect(
+      query
+        .rerank((input, ctx) => {
+          expect(input.origin).toEqual({ kind: 'recommend', positive: ['one'], negative: ['two'] })
+          expect(ctx.signal).toBe(controller.signal)
+          controller.abort(cause)
+          return [1]
+        })
+        .all({ signal: controller.signal })
+    ).rejects.toMatchObject({ code: 'ABORTED', cause })
+    expect(release).toHaveBeenCalledTimes(1)
+    await expect(query.rerank(() => [1]).all()).resolves.toMatchObject([
+      { id: 'a', score: 1, rerankScore: 1 }
+    ])
+  })
+
   it('reduces each native family through its original typed input and scalar cursor', async () => {
     const execute = vi.fn(() => rows([]))
     const close = vi.fn()

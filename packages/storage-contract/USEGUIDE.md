@@ -883,3 +883,21 @@ snapshotStorageOrgKeyPrefix(orgId, prefix, backend) 返回独立的原生半开�
 本次终点的原计划保存该选择，原 `execute`、`reduce`、事务内 mutation reader 和 `watch` 经同一个输入编译器取得同一 `selection` 身份；原生统计回退仍复用该计划。选择事实由原数据源作者保持不可变，契约不读取其内部字段、不另编码、不创建游标或重试器。`explain()` 只展示已选索引及独立冻结的理由元数据，不暴露选择事实；没有声明 `plan` 时保留原输入字段、原解释结果及回调语义。作者回调或元数据失败沿原查询错误边界，在原生 I/O 前拒绝。
 
 `IRecordQuerySourcePlan.fullScan?: true` 只允许保守地将解释结果标为可能全扫描，适用于原生索引仍可能回退的来源；不能传 `false` 伪造无扫描证据。条件下推、实际选源与资源路径不受该说明字段干预。
+
+## 向量候选重排
+
+只有 `topK(k)` 后可调用 `rerank(scorer, { topN? })`。评分器取得原请求的 `origin`、引擎实际候选 `hits` 与同一个调用方取消信号，返回按候选顺序的一组有限数字。结果按 `rerankScore` 降序排列，同分保留引擎顺序；原 `score` 保持不变。`topN` 缺省为 k，必须是正安全整数且不大于 k，否则在 I/O 前报 `INVALID_ARGUMENT`。
+
+```ts
+const hits = await collection
+  .near([1, 0], { exact: true })
+  .topK(20)
+  .rerank(({ hits }) => hits.map((hit) => hit.payload?.priority ?? 0), { topN: 5 })
+  .all()
+```
+
+评分器抛出或拒绝报 `RERANK_FAILED`，首层 `cause` 保留原错；非数组、长度不符、稀疏或非有限分数报 `RERANK_RESULT_INVALID`。取消仍使用 `ABORTED`。需要向量的评分器必须先 `withVector()`，不会隐式读取向量。重排后的链及投影、分组分支均无 `delete`、`watch`、`requirePushdown`；仅原生支持 `groupBy` 的来源可在重排后分组，分组只观察 topN。未发布 vector token 的后端不会因此获得向量引擎。
+
+原生作者在原 `IVectorQuerySource.origin` 提供已经捕获的 near 向量、similarTo ID 或 recommend 正负 ID。选择原生重评分的来源可声明 `native: true`，Feature 用 `refineStorageVectorQuery(query, k => ({ native: capturedOptions, topN }))` 派生同一个有界查询。仅该分支的原执行输入附带不透明 `native` 事实；原条件、k、上下文、源和资源拥有者不变。Feature 验证自己的参数，公共核只验证 topN 并维持只读链；原生结果仍可接通用 `rerank`。
+
+来源可省的 `beginOperation()` 作者接点只借用原 provider 的工作租约，返回原 release；构造、explain、读前错误及旧未重排路径不取租约。新重排终点持有至评分器和原清理实际完成后释放；stream 在首个实际 next 才接纳，后续缓冲读取不延长原生存活。接点单次捕获，不提供源、store 或关闭权限，也不增加生命周期拥有者。

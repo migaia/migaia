@@ -1,7 +1,8 @@
 import { ERROR_SOURCE } from '../src/error-code.js'
 import type { Schemas } from '@qdrant/js-client-rest'
 import { deferred } from '@migaia/utils/promise'
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, onTestFinished } from 'vitest'
+import { runConformance } from '@migaia/storage-contract/conformance'
 import {
   createStorageHost,
   memoryBackendPlugin,
@@ -51,6 +52,47 @@ function native() {
     }
   }
 }
+/** The portable stage runs against this backend's real declared vector and TTL capabilities. */
+describe.skipIf(!url)('Qdrant canonical vector subject', () => {
+  runConformance(
+    { describe, it, expect },
+    {
+      name: 'real Qdrant vector and TTL',
+      capabilities: [vector, ttl],
+      features: {
+        syncRead: false,
+        binary: false,
+        records: false,
+        transactions: false,
+        iteration: false,
+        secondaryIndexes: false,
+        changeFeed: false,
+        maxValueBytes: undefined,
+        opaqueEntries: false
+      },
+      create: async () => {
+        const fixture = native()
+        const host = await createStorageHost({
+          plugins: [
+            qdrantBackendPlugin({
+              url: url!,
+              collectionPrefix: crypto.randomUUID(),
+              http: fixture.http
+            })
+          ] as const
+        })
+        onTestFinished(async () => {
+          try {
+            await host.dispose()
+          } finally {
+            await fixture.close()
+          }
+        })
+        return host.backend('qdrant')
+      }
+    }
+  )
+})
 describe('real native vector backend', () => {
   it.skipIf(!url)(
     'shares dense ID and count capture while retaining native first-occurrence deletion',

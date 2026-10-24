@@ -94,6 +94,46 @@ function invalidVectorScore(): never {
     StorageErrorText.memoryVectorScore
   )
 }
+/** Original scaled cosine arithmetic serves native Memory ranking and the pure MMR scorer. */
+export function cosineStorageVectors(
+  left: readonly number[],
+  right: readonly number[],
+  zeroSimilarity = false
+): number {
+  /** Scaling avoids overflowing cosine's norms for otherwise valid finite directions. */
+  let leftScale = 0
+  /** Both vectors keep independent magnitude scales. */
+  let rightScale = 0
+  for (let index = 0; index < left.length; index++) {
+    leftScale = Math.max(leftScale, Math.abs(left[index]!))
+    rightScale = Math.max(rightScale, Math.abs(right[index]!))
+  }
+  if (leftScale === 0 || rightScale === 0) {
+    /** MMR treats an undefined zero direction as neutral; native cosine ranking still rejects it. */
+    if (zeroSimilarity) return 0
+    invalidVectorScore()
+  }
+  /** Scaled dot and square sums are bounded by the actual component count. */
+  let dot = 0
+  /** Independent squared lengths retain the exact reference direction. */
+  let leftNorm = 0
+  /** The second squared length uses the same scaled component turn. */
+  let rightNorm = 0
+  for (let index = 0; index < left.length; index++) {
+    /** Each admitted component participates once in this scoring pass. */
+    const a = left[index]! / leftScale
+    /** The candidate component is scaled only by its own vector magnitude. */
+    const b = right[index]! / rightScale
+    dot += a * b
+    leftNorm += a * a
+    rightNorm += b * b
+  }
+  /** The clamp absorbs floating point roundoff without changing a finite cosine direction. */
+  const score = Math.max(-1, Math.min(1, dot / (Math.sqrt(leftNorm) * Math.sqrt(rightNorm))))
+  if (!Number.isFinite(score)) invalidVectorScore()
+  return score
+}
+
 /** Memory-only exact scoring never becomes a server retrieval fallback or public authoring API. */
 function scoreMemoryVector(
   left: readonly number[],
@@ -102,33 +142,8 @@ function scoreMemoryVector(
 ): number {
   /** Only the final finite score enters the ordered index. */
   let score = 0
-  if (metric === 'cosine') {
-    /** Scaling avoids overflowing cosine's norms for otherwise valid finite directions. */
-    let leftScale = 0
-    /** Both vectors keep independent magnitude scales. */
-    let rightScale = 0
-    for (let index = 0; index < left.length; index++) {
-      leftScale = Math.max(leftScale, Math.abs(left[index]!))
-      rightScale = Math.max(rightScale, Math.abs(right[index]!))
-    }
-    if (leftScale === 0 || rightScale === 0) invalidVectorScore()
-    /** Scaled dot and square sums are bounded by the actual component count. */
-    let dot = 0
-    /** Independent squared lengths retain the exact reference direction. */
-    let leftNorm = 0
-    /** The second squared length uses the same scaled component turn. */
-    let rightNorm = 0
-    for (let index = 0; index < left.length; index++) {
-      /** Each admitted component participates once in this scoring pass. */
-      const a = left[index]! / leftScale
-      /** The candidate component is scaled only by its own vector magnitude. */
-      const b = right[index]! / rightScale
-      dot += a * b
-      leftNorm += a * a
-      rightNorm += b * b
-    }
-    score = Math.max(-1, Math.min(1, dot / (Math.sqrt(leftNorm) * Math.sqrt(rightNorm))))
-  } else if (metric === 'dot') {
+  if (metric === 'cosine') score = cosineStorageVectors(left, right)
+  else if (metric === 'dot') {
     for (let index = 0; index < left.length; index++) score += left[index]! * right[index]!
   } else {
     /** The native two-argument hypot avoids a spread argument limit and square overflow. */

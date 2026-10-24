@@ -1042,6 +1042,7 @@
         "TransactionBuilderMethod",
         "TransactionObservedStage",
         "VectorQueryMethod",
+        "VectorQueryOriginKind",
         "asChangeFeedStore",
         "asRecordStore",
         "asSecondaryIndexRecordStore",
@@ -1109,6 +1110,7 @@
         "readTransactionConflictPolicy",
         "readTransactionOperationContext",
         "records",
+        "refineStorageVectorQuery",
         "registerTransactionFinalizer",
         "resolveConcurrencyPolicy",
         "runTransactionOperation",
@@ -1810,6 +1812,7 @@
       "./authoring/vector": [
         "recommendStorageVector"
       ],
+      "./vector/mmr": ["mmr"],
       "./journal": ["storageLogStore"],
       "./entity": [
         "REPOSITORY_KEY_PREFIX",

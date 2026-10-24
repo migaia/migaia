@@ -19,7 +19,8 @@ export default defineConfig({
         entity: 'src/entity.ts',
         journal: 'src/journal.ts',
         'authoring/backend': 'src/authoring/backend.ts',
-        'authoring/vector': 'src/authoring/vector.ts'
+        'authoring/vector': 'src/authoring/vector.ts',
+        'vector/mmr': 'src/vector/mmr.ts'
       },
       formats: ['es'],
       fileName: (_format, name) => `${name}.js`

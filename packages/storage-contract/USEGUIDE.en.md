@@ -883,3 +883,21 @@ Record sources may declare an optional pure author callback, `plan(conditions)`.
 The original terminal plan retains that choice. The existing input compiler passes the same `selection` identity to `execute`, `reduce`, scoped mutation readers and `watch`; native reduction fallback also reuses this plan. The source author keeps the selection immutable. Contract does not inspect or encode its fields, open a cursor, or introduce retries. `explain()` exposes only the chosen index and detached frozen decision metadata. Omitting `plan` preserves legacy input fields, explanation fields and callback semantics. Author or metadata failures use the original query failure boundary before native I/O.
 
 `IRecordQuerySourcePlan.fullScan?: true` can only conservatively mark a possible full scan, for example when an indexed source can still fall back. It cannot accept `false` to invent evidence. This metadata does not change condition pushdown, source execution or resource ownership.
+
+## Rerank vector candidates
+
+`rerank(scorer, { topN? })` is available only after `topK(k)`. The scorer receives the original request `origin`, the engine's actual candidate `hits`, and the same caller abort signal. It returns one finite number per candidate. Results order by descending `rerankScore`, retaining engine order for ties and preserving the engine `score`. `topN` defaults to k and must be a positive safe integer no greater than k; invalid bounds reject with `INVALID_ARGUMENT` before I/O.
+
+```ts
+const hits = await collection
+  .near([1, 0], { exact: true })
+  .topK(20)
+  .rerank(({ hits }) => hits.map((hit) => hit.payload?.priority ?? 0), { topN: 5 })
+  .all()
+```
+
+A thrown or rejected scorer produces `RERANK_FAILED` with the original error as its immediate `cause`. Non-arrays, length mismatches, sparse results and non-finite scores produce `RERANK_RESULT_INVALID`; cancellation retains `ABORTED`. A scorer needing vectors requires explicit `withVector()`, with no implicit vector reads. Reranked, selected and grouped branches have no `delete`, `watch` or `requirePushdown`. Sources already supporting `groupBy` may group the retained topN. Backends without the vector token acquire no vector engine.
+
+Native authors supply the already captured near vector, similarTo ID or recommend ID sets through `IVectorQuerySource.origin`. A source opting into native refinement declares `native: true`; its Feature derives the same bounded query with `refineStorageVectorQuery(query, k => ({ native: capturedOptions, topN }))`. Only that branch adds the opaque `native` fact to the original execution input. Conditions, original k, context, source and resource ownership remain unchanged. Features validate their own options; the common core validates topN and retains the read-only chain. Native results remain eligible for portable `rerank`.
+
+The optional source author hook `beginOperation()` borrows only the provider's existing work lease and returns its original release. Construction, explain, pre-I/O rejection and old non-reranked paths acquire no lease. A new reranked terminal releases after the scorer and original cleanup actually settle; a stream accepts only its first real next, without retaining native liveness for later buffered reads. The hook is captured once and exposes no source, store or close authority, with no additional lifecycle owner.

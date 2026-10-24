@@ -54,6 +54,8 @@ export type IRedisNativeFeaturePort = {
   enableVector(create: (store: IRedisStore) => IRedisVectorBinding): void
   readonly layout: ReturnType<typeof createRedisLayout>
   assertLive(): void
+  /** A selected client rerank borrows this same controller's existing accepted-work lease. */
+  beginOperation(): () => void
   own(resource: IStorageResource): () => void
   chain(): Record<never, never> | undefined
   watch(ctx?: IOperationContext): IStorageIterator<IStorageChange>

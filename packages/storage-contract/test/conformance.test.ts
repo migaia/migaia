@@ -276,6 +276,7 @@ function vectorTtlFixture(mode?: 'ignore-expire' | 'ignore-persist') {
       const near = (query: readonly number[], options?: { readonly exact?: boolean }) => {
         exactRequests.push(options?.exact)
         return createVectorQuery<TPayload>({
+          origin: { kind: 'near', vector: query },
           pushdown: {
             source: 'vector-ttl-fixture',
             operators: [],
@@ -611,7 +612,7 @@ describe('public consumer-owned conformance', () => {
   it('uses exact native vector requests for deterministic standard assertions', async () => {
     const item = vectorTtlFixture()
     await cases(() => item.store, [vector, ttl])
-      .find((item) => item.name.startsWith('vector ·'))!
+      .find((item) => item.name.startsWith('vector · native rank'))!
       .run()
     expect(item.exactRequests).toEqual([true, true, true, true])
   })

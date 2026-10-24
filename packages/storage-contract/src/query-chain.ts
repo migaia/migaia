@@ -1,5 +1,6 @@
 import { asCodecValue, type ICodecValue } from '@migaia/serialize/codec'
 import type { IMaybe } from '@migaia/utils'
+import type { INativeAbortSignal } from '@migaia/utils/promise'
 import { immutableSnapshot } from '@migaia/utils/object'
 import {
   parseObjectPath,
@@ -24,6 +25,7 @@ import type { IOperationContext, IStorageKey } from './context.js'
 import type { IStorageChange } from './change-feed.js'
 import { createStorageIteratorLifetime, type IStorageIterator } from './resource.js'
 import { snapshotOperationContext } from './operation-context.js'
+import { snapshotStorageVector, snapshotStorageVectorIds } from './capabilities/vector.js'
 import { runTransactionIteratorOperation, deriveTransactionIterator } from './transaction.js'
 import { compareStorageKeys, snapshotStorageKey } from './key.js'
 import {
@@ -421,7 +423,8 @@ export const QueryOperation = Object.freeze({
   minScore: 'minScore',
   follow: 'follow',
   inverse: 'inverse',
-  groupBy: 'groupBy'
+  groupBy: 'groupBy',
+  rerank: 'rerank'
 } as const)
 /** Operation values and names intentionally share one planner namespace. */
 export type QueryOperation = keyof typeof QueryOperation
@@ -633,6 +636,105 @@ export type IVectorHit<TPayload, TWithVector extends boolean = false> = {
   readonly score: number
   readonly payload?: TPayload
 } & (TWithVector extends true ? { readonly vector: readonly number[] } : Record<never, never>)
+/** Origins describe the original user request, independently of backend sample resolution. */
+export const VectorQueryOriginKind = Object.freeze({
+  near: 'near',
+  similarTo: 'similarTo',
+  recommend: 'recommend'
+} as const)
+/** Canonical origin names share the same runtime/type namespace. */
+export type VectorQueryOriginKind = keyof typeof VectorQueryOriginKind
+/** Backend authors supply the already captured request without exposing a store or client. */
+export type IVectorQueryOrigin =
+  | { readonly kind: typeof VectorQueryOriginKind.near; readonly vector: readonly number[] }
+  | { readonly kind: typeof VectorQueryOriginKind.similarTo; readonly id: string }
+  | {
+      readonly kind: typeof VectorQueryOriginKind.recommend
+      readonly positive: readonly string[]
+      readonly negative: readonly string[]
+    }
+/** Only explicit withVector state grants vector access to a scorer. */
+export type IVectorRerankInput<TPayload, TWithVector extends boolean> = {
+  readonly origin: IVectorQueryOrigin
+  readonly hits: readonly IVectorHit<TPayload, TWithVector>[]
+}
+/** The scorer borrows the original caller signal; it owns no independent operation budget. */
+export type IVectorRerankContext = { readonly signal: INativeAbortSignal }
+/** Exactly one score corresponds to each hit in its original engine order. */
+export type IVectorReranker<TPayload, TWithVector extends boolean> = (
+  input: IVectorRerankInput<TPayload, TWithVector>,
+  ctx: IVectorRerankContext
+) => readonly number[] | Promise<readonly number[]>
+/** The original query remains the only owner of result truncation. */
+export type IVectorRerankOptions = { readonly topN?: number }
+/** Engine relevance remains intact alongside the independent client reranking score. */
+export type IVectorRerankedHit<TPayload, TWithVector extends boolean = false> = IVectorHit<
+  TPayload,
+  TWithVector
+> & { readonly rerankScore: number }
+/** Read-only stages do not regain write, subscription or strict-native methods via augmentation. */
+type IVectorReadonlyMethods<TMethods> = Omit<TMethods, 'delete' | 'watch' | 'requirePushdown'>
+/** Projection after a read-only vector stage retains only the original read terminals. */
+type IVectorReadonlyResult<R, TMethods> = IQueryRead<R> & IVectorReadonlyMethods<TMethods>
+/** Only sources that declare grouping grant a group terminal on the retained hit set. */
+type IVectorReadonlyGroups<
+  TPayload,
+  THit,
+  TGroupable extends boolean,
+  TMethods
+> = TGroupable extends true
+  ? {
+      groupBy<K extends Extract<keyof TPayload, string>>(
+        field: K,
+        options: { readonly perGroup: number }
+      ): IVectorReadonlyResult<
+        { readonly group: TPayload[K]; readonly hits: readonly THit[] },
+        TMethods
+      >
+    }
+  : Record<never, never>
+/** Reranking is a final read-only ordering; optional grouping observes only its topN. */
+export type IVectorRerankedQuery<
+  TPayload,
+  TGroupable extends boolean = false,
+  TWithVector extends boolean = false,
+  TMethods extends object = Record<never, never>
+> = IVectorReadonlyResult<IVectorRerankedHit<TPayload, TWithVector>, TMethods> &
+  IVectorReadonlyGroups<
+    TPayload,
+    IVectorRerankedHit<TPayload, TWithVector>,
+    TGroupable,
+    TMethods
+  > & {
+    select<const K extends Extract<keyof IVectorRerankedHit<TPayload, TWithVector>, string>>(
+      ...fields: readonly [K, ...K[]]
+    ): IVectorReadonlyResult<Pick<IVectorRerankedHit<TPayload, TWithVector>, K>, TMethods>
+    select<N>(
+      mapper: (hit: IVectorRerankedHit<TPayload, TWithVector>) => N
+    ): IVectorReadonlyResult<Awaited<N>, TMethods>
+  }
+/** Native Features capture their own validated opaque request, never a client or source handle. */
+export type IVectorQueryRefinement = { readonly native: unknown; readonly topN: number }
+/** A source-ranked native Feature result remains eligible for one portable reranking stage. */
+export type IVectorNativeQuery<
+  TPayload,
+  TGroupable extends boolean = false,
+  TWithVector extends boolean = false,
+  TMethods extends object = Record<never, never>
+> = IVectorReadonlyResult<IVectorHit<TPayload, TWithVector>, TMethods> &
+  IVectorReadonlyGroups<TPayload, IVectorHit<TPayload, TWithVector>, TGroupable, TMethods> & {
+    withVector(): IVectorNativeQuery<TPayload, TGroupable, true, TMethods>
+    rerank(
+      scorer: IVectorReranker<TPayload, TWithVector>,
+      options?: IVectorRerankOptions
+    ): IVectorRerankedQuery<TPayload, TGroupable, TWithVector, TMethods>
+    select<const K extends Extract<keyof IVectorHit<TPayload, TWithVector>, string>>(
+      ...fields: readonly [K, ...K[]]
+    ): IVectorReadonlyResult<Pick<IVectorHit<TPayload, TWithVector>, K>, TMethods>
+    select<N>(
+      mapper: (hit: IVectorHit<TPayload, TWithVector>) => N
+    ): IVectorReadonlyResult<Awaited<N>, TMethods>
+  }
 /** Vector builders expose no read terminal until a finite topK has been declared. */
 export interface IVectorQueryBuilderCore<
   TPayload,
@@ -668,6 +770,10 @@ export interface IVectorQueryBase<
   topK(count: number): this
   minScore(score: number): this
   withVector(): IVectorQuery<TPayload, TGroupable, true, TAugmentMethods>
+  rerank(
+    scorer: IVectorReranker<TPayload, TWithVector>,
+    options?: IVectorRerankOptions
+  ): IVectorRerankedQuery<TPayload, TGroupable, TWithVector, TAugmentMethods>
   delete(ctx?: IOperationContext & IWriteConcurrencyOptions): Promise<number>
 }
 /** Backend augmentation remains available during the pre-topK type state. */
@@ -761,6 +867,7 @@ export const VectorQueryMethod = Object.freeze({
   topK: 'topK',
   minScore: 'minScore',
   withVector: 'withVector',
+  rerank: 'rerank',
   groupBy: 'groupBy'
 } as const)
 /** RDF Feature admission reserves traversal methods before returning any native source. */
@@ -923,10 +1030,15 @@ export type IVectorQueryInput = {
   readonly topK: number
   readonly minScore: number | undefined
   readonly withVector: boolean
+  readonly native?: unknown
   readonly ctx: IOperationContext | undefined
 }
 /** Backend vector engines own scoring, organization/TTL filtering and score/id ranking. */
 export type IVectorQuerySource<TPayload, TGroupable extends boolean = false> = {
+  /** Borrow the original provider lease only while a new reranked operation is actually accepted. */
+  readonly beginOperation?: () => () => void
+  readonly origin?: IVectorQueryOrigin
+  readonly native?: true
   readonly pushdown: IQueryPushdown
   readonly asyncDisposeKey?: typeof Symbol.asyncDispose
   readonly exact?: boolean
@@ -1011,7 +1123,9 @@ type IQueryNode = {
         readonly operation: typeof QueryOperation.groupBy
         readonly field: string
         readonly perGroup: number
+        readonly compile: IVectorReaderCompiler
       }
+    | { readonly operation: typeof QueryOperation.rerank; readonly compile: IVectorReaderCompiler }
 }
 /** Captured author facts and methods remain independent of later source getter mutation. */
 type IQuerySourceSnapshot = {
@@ -1027,6 +1141,11 @@ type IQuerySourceSnapshot = {
   readonly nativeSteps: boolean
   readonly cursorSource: object
   readonly vector?: {
+    readonly beginOperation?: () => () => void
+    readonly origin?: IVectorQueryOrigin
+    readonly acceptsNative?: true
+    readonly native?: IVectorQueryRefinement
+    readonly reranked?: true
     readonly withVector: boolean
     readonly exact: boolean
     readonly groupBy: boolean
@@ -1619,10 +1738,13 @@ function planRecordQuery(
             step.operation === QueryOperation.mapper ||
             step.operation === QueryOperation.comparator ||
             (step.operation === QueryOperation.order && 'selector' in step) ||
-            step.operation === QueryOperation.groupBy
+            step.operation === QueryOperation.groupBy ||
+            step.operation === QueryOperation.rerank
           ? source.vector !== undefined && step.operation === QueryOperation.predicate
             ? StorageContractErrorText.queryVectorFunction
-            : StorageContractErrorText.queryFunction
+            : step.operation === QueryOperation.rerank
+              ? StorageContractErrorText.queryRerank
+              : StorageContractErrorText.queryFunction
           : (!source.nativeSteps &&
                 (step.operation === QueryOperation.limit ||
                   step.operation === QueryOperation.skip ||
@@ -1814,6 +1936,60 @@ function snapshotQueryOrder(
     direction: direction ?? QueryOrderDirection.asc
   }
 }
+/** A vector node compiles into the existing reader, never another source or lifetime. */
+type IVectorReaderCompiler = (
+  upstream: IQueryReader,
+  ctx: IOperationContext | undefined
+) => IQueryReader
+
+/** Original topK grouping is compiled only by vector nodes and retains the same Map pass. */
+function compileVectorGroupReader(
+  upstream: IQueryReader,
+  field: string,
+  perGroup: number
+): IQueryReader {
+  /** At most the already ranked topK hits enter this single grouping pass. */
+  let groups: readonly { readonly group: unknown; readonly hits: readonly unknown[] }[] | undefined
+  /** One initialization belongs to the same original accepted reader operation. */
+  let prepared: Promise<void> | undefined
+  /** Emission preserves each group's first best-hit position. */
+  let emitted = 0
+  return async (advance, currentScope) => {
+    await (prepared ??= (async () => {
+      /** Map uses SameValueZero, preserving number/string/boolean domains and equal zeroes. */
+      const grouped = new Map<string | number | boolean, unknown[]>()
+      while (true) {
+        /** No candidate outside the original engine topK is requested or scored. */
+        /** The original upstream advance remains accepted through native EOF and cleanup. */
+        const next = await upstream(advance, currentScope)
+        if (next.done) break
+        /** Missing or non-scalar own fields do not create a replacement group. */
+        const payload = (next.value as IVectorHit<unknown>).payload
+        if (typeof payload !== 'object' || payload === null || !Object.hasOwn(payload, field))
+          continue
+        /** The grouping field is read once from this accepted hit. */
+        const group = Reflect.get(payload, field)
+        if (
+          !(
+            typeof group === 'string' ||
+            typeof group === 'boolean' ||
+            (typeof group === 'number' && Number.isFinite(group))
+          )
+        )
+          continue
+        /** Retain only each group's caller-declared bounded prefix. */
+        const hits = grouped.get(group)
+        if (hits === undefined) grouped.set(group, [next.value])
+        else if (hits.length < perGroup) hits.push(next.value)
+      }
+      groups = [...grouped].map(([group, hits]) => ({ group, hits }))
+    })())
+    return emitted === groups!.length
+      ? { done: true, value: undefined }
+      : { done: false, value: groups![emitted++] }
+  }
+}
+
 /** Compiles the existing client plan once; comparator buffering is bounded by its explicit limit. */
 function compileRecordQueryReader(
   steps: readonly IQueryNode['step'][],
@@ -1891,6 +2067,7 @@ function compileRecordQueryReader(
       read = async (advance, currentScope) => {
         while (true) {
           /** Filtering discards each rejected row immediately. */
+          /** The original upstream advance remains accepted through native EOF and cleanup. */
           const next = await upstream(advance, currentScope)
           if (next.done) return next
           if (predicate(vector ? (next.value as IVectorHit<unknown>).payload : next.value)) {
@@ -1906,6 +2083,7 @@ function compileRecordQueryReader(
     ) {
       read = async (advance, currentScope) => {
         /** Projection consumes exactly one accepted upstream row. */
+        /** The original upstream advance remains accepted through native EOF and cleanup. */
         const next = await upstream(advance, currentScope)
         if (next.done) return next
         if (step.operation === QueryOperation.mapper) {
@@ -1967,6 +2145,7 @@ function compileRecordQueryReader(
         currentScope: object | undefined
       ): Promise<void> {
         while (true) {
+          /** The original upstream advance remains accepted through native EOF and cleanup. */
           const next = await upstream(advance, currentScope)
           if (next.done) {
             exhausted = true
@@ -2031,6 +2210,7 @@ function compileRecordQueryReader(
       read = async (advance, currentScope) => {
         while (true) {
           /** Keyset filtering seeks by the original full ordering tuple, never an offset counter. */
+          /** The original upstream advance remains accepted through native EOF and cleanup. */
           const next = await upstream(advance, currentScope)
           if (next.done) return next
           /**
@@ -2059,6 +2239,7 @@ function compileRecordQueryReader(
         while (remaining > 0) {
           remaining--
           /** EOF stops skipping immediately rather than repeatedly touching an exhausted source. */
+          /** The original upstream advance remains accepted through native EOF and cleanup. */
           const next = await upstream(advance, currentScope)
           if (next.done) return next
         }
@@ -2073,6 +2254,7 @@ function compileRecordQueryReader(
       read = async (advance, currentScope) => {
         while (true) {
           /** Only accepted distinct values survive downstream bounds and projections. */
+          /** The original upstream advance remains accepted through native EOF and cleanup. */
           const next = await upstream(advance, currentScope)
           if (next.done) return next
           /**
@@ -2118,6 +2300,7 @@ function compileRecordQueryReader(
           const entries: IOrderedEntry[] = []
           while (true) {
             /** Each native row enters this ordering stage once. */
+            /** The original upstream advance remains accepted through native EOF and cleanup. */
             const next = await upstream(advance, currentScope)
             if (next.done) break
             /** Prior selector stages retain their original keys across filters and bounds. */
@@ -2166,52 +2349,11 @@ function compileRecordQueryReader(
       let remaining = step.count
       read = async (advance, currentScope) =>
         remaining-- > 0 ? upstream(advance, currentScope) : { done: true, value: undefined }
-    } else if (step.operation === QueryOperation.groupBy) {
-      /** At most the already ranked topK hits enter this single grouping pass. */
-      let groups:
-        | readonly { readonly group: unknown; readonly hits: readonly unknown[] }[]
-        | undefined
-      /** One initialization belongs to the same original accepted reader operation. */
-      let prepared: Promise<void> | undefined
-      /** Emission preserves each group's first best-hit position. */
-      let emitted = 0
-      read = async (advance, currentScope) => {
-        await (prepared ??= (async () => {
-          /** Map uses SameValueZero, preserving number/string/boolean domains and equal zeroes. */
-          const grouped = new Map<string | number | boolean, unknown[]>()
-          while (true) {
-            /** No candidate outside the original engine topK is requested or scored. */
-            const next = await upstream(advance, currentScope)
-            if (next.done) break
-            /** Missing or non-scalar own fields do not create a replacement group. */
-            const payload = (next.value as IVectorHit<unknown>).payload
-            if (
-              typeof payload !== 'object' ||
-              payload === null ||
-              !Object.hasOwn(payload, step.field)
-            )
-              continue
-            /** The grouping field is read once from this accepted hit. */
-            const group = Reflect.get(payload, step.field)
-            if (
-              !(
-                typeof group === 'string' ||
-                typeof group === 'boolean' ||
-                (typeof group === 'number' && Number.isFinite(group))
-              )
-            )
-              continue
-            /** Retain only each group's caller-declared bounded prefix. */
-            const hits = grouped.get(group)
-            if (hits === undefined) grouped.set(group, [next.value])
-            else if (hits.length < step.perGroup) hits.push(next.value)
-          }
-          groups = [...grouped].map(([group, hits]) => ({ group, hits }))
-        })())
-        return emitted === groups!.length
-          ? { done: true, value: undefined }
-          : { done: false, value: groups![emitted++] }
-      }
+    } else if (
+      step.operation === QueryOperation.groupBy ||
+      step.operation === QueryOperation.rerank
+    ) {
+      read = step.compile(upstream, ctx)
     } else if (step.operation === QueryOperation.comparator) {
       /** Comparator admission already proved the immediately following bound. */
       const bound = steps[++index] as Extract<
@@ -2245,6 +2387,7 @@ function compileRecordQueryReader(
         let position = 0
         while (true) {
           /** Discarded rows become unreachable after this iteration. */
+          /** The original upstream advance remains accepted through native EOF and cleanup. */
           const next = await upstream(advance, currentScope)
           if (next.done) break
           /** Only this candidate and the retained heap are live during selection. */
@@ -2399,6 +2542,7 @@ function querySourceInput(
       topK: bounds.at(-1)!.count,
       minScore: scores.at(-1)?.score,
       withVector: source.vector.withVector,
+      ...(source.vector.native === undefined ? {} : { native: source.vector.native.native }),
       ctx: captured
     }
   } else if (source.rdf !== undefined) {
@@ -2419,6 +2563,32 @@ function querySourceInput(
     }
   return input
 }
+/** A new client stage borrows only the provider's existing accepted-work lease. */
+function beginVectorQueryOperation(source: IQuerySourceSnapshot): (() => void) | undefined {
+  if (!source.vector?.reranked || source.vector.beginOperation === undefined) return undefined
+  try {
+    const release = source.vector.beginOperation()
+    if (typeof release !== 'function')
+      throw invalidQueryCondition(undefined, StorageContractErrorText.queryArgument)
+    return release
+  } catch (cause) {
+    throw queryExecutionFailure(cause)
+  }
+}
+/** Original lease cleanup preserves an earlier query failure through the existing error owner. */
+function releaseVectorQueryOperation(
+  release: (() => void) | undefined,
+  primary?: { readonly error: unknown }
+): void {
+  try {
+    release?.()
+  } catch (cause) {
+    const cleanup = queryExecutionFailure(cause)
+    throw primary === undefined
+      ? cleanup
+      : queryExecutionFailure(attachSecondaryErrors(primary.error, [cleanup]))
+  }
+}
 /** Plans once and opens only the original native prefix; terminal adapters share this execution. */
 function openRecordQuery(
   source: IQuerySourceSnapshot,
@@ -2429,8 +2599,10 @@ function openRecordQuery(
   pageSize?: number,
   reduction?: INativeQueryReduction,
   prepared?: IPreparedQueryExecution,
-  retainKeys = false
+  retainKeys = false,
+  holdOperation = false
 ): {
+  readonly release?: () => void
   readonly iterator: IStorageIterator<readonly [IStorageKey, unknown]>
   readonly read: IQueryReader
   readonly close: ICompiledQueryReader['close']
@@ -2468,10 +2640,13 @@ function openRecordQuery(
     comparator,
     source
   )
+  /** Only the new reranked terminal borrows the existing provider lease after pure admission. */
+  const release = holdOperation ? beginVectorQueryOperation(source) : undefined
   try {
     /** The same native compiler is shared with direct native subscriptions. */
     const input = querySourceInput(source, plan, captured)
     return {
+      release,
       iterator:
         reduction === undefined
           ? Reflect.apply(source.execute, source.receiver, [input])
@@ -2486,7 +2661,9 @@ function openRecordQuery(
       mapper
     }
   } catch (cause) {
-    throw queryExecutionFailure(cause)
+    const primary = queryExecutionFailure(cause)
+    releaseVectorQueryOperation(release, { error: primary })
+    throw primary
   }
 }
 /** Records the original primary before awaiting original cursor cleanup on every read failure. */
@@ -2538,7 +2715,8 @@ async function consumeRecordQuery<R, TResult>(
     close,
     ctx: captured,
     signature,
-    mapper
+    mapper,
+    release
   } = openRecordQuery(
     source,
     node,
@@ -2548,33 +2726,50 @@ async function consumeRecordQuery<R, TResult>(
     pageSize,
     reduction,
     prepared,
-    retainKeys
+    retainKeys,
+    true
   )
-  return runTransactionIteratorOperation(iterator, async (advance, fail, currentScope) => {
-    /** The terminal's scalar, bounded chunk or explicit all result stays inside the same operation. */
-    let result: TResult
-    try {
-      result = await consume(
-        async () =>
-          (await read(advance, currentScope)) as IteratorResult<R> & {
-            readonly key?: IStorageKey
-            readonly keyBytes?: Uint8Array
-          },
-        captured,
-        pageSize === undefined ? undefined : { signature, mapper }
-      )
-    } catch (cause) {
-      return failedRecordQuery(iterator, fail, cause, close)
-    }
-    try {
-      await completeQueryCleanup(close, () => iterator.dispose())
-    } catch (cause) {
-      throw queryExecutionFailure(fail(queryExecutionFailure(cause)))
-    }
-    return result
-  })
+  /** A boxed failure also distinguishes a deliberately thrown undefined from success. */
+  let primary: { readonly error: unknown } | undefined
+  try {
+    /** Omitted/new-unused lease hooks preserve the original direct Promise adoption path. */
+    const pending = runTransactionIteratorOperation(
+      iterator,
+      async (advance, fail, currentScope) => {
+        /**
+         * The terminal's scalar, bounded chunk or explicit all result stays inside the same
+         * operation.
+         */
+        let result: TResult
+        try {
+          result = await consume(
+            async () =>
+              (await read(advance, currentScope)) as IteratorResult<R> & {
+                readonly key?: IStorageKey
+                readonly keyBytes?: Uint8Array
+              },
+            captured,
+            pageSize === undefined ? undefined : { signature, mapper }
+          )
+        } catch (cause) {
+          return failedRecordQuery(iterator, fail, cause, close)
+        }
+        try {
+          await completeQueryCleanup(close, () => iterator.dispose())
+        } catch (cause) {
+          throw queryExecutionFailure(fail(queryExecutionFailure(cause)))
+        }
+        return result
+      }
+    )
+    return release === undefined ? pending : await pending
+  } catch (error) {
+    primary = { error }
+    throw error
+  } finally {
+    releaseVectorQueryOperation(release, primary)
+  }
 }
-
 /** Captures write-only policy once while the existing context owner retains all other admission. */
 function queryWriteContext(
   ctx: (IOperationContext & IWriteConcurrencyOptions) | undefined
@@ -3059,18 +3254,36 @@ function streamRecordQuery<R>(
 ): IStorageIterator<R> {
   /** The source resource, including both cleanup Promises, remains the sole native cursor owner. */
   const { iterator, read, close, report } = openRecordQuery(source, node, strict, ctx)
-  /** Registered sources retain full mapped-next and buffered-result scope ownership. */
-  const derived = deriveTransactionIterator(
-    iterator,
-    async (advance, fail, currentScope) => {
+  /** Only the first accepted next can run the asynchronous scorer; buffered reads need no lease. */
+  let first = true
+  /** The original stream callback retains its scope authority and failure-before-cleanup order. */
+  const accepted = async (
+    advance: IQueryAdvance,
+    fail: (error: unknown) => unknown,
+    currentScope: object | undefined
+  ): Promise<IteratorResult<R>> => {
+    let release: (() => void) | undefined
+    /** Preserve the actual error after original source cleanup if release also fails. */
+    let primary: { readonly error: unknown } | undefined
+    try {
       try {
+        if (first) {
+          first = false
+          release = beginVectorQueryOperation(source)
+        }
         return (await read(advance, currentScope)) as IteratorResult<R>
       } catch (cause) {
-        return failedRecordQuery(iterator, fail, cause, close)
+        return await failedRecordQuery(iterator, fail, cause, close)
       }
-    },
-    close
-  )
+    } catch (error) {
+      primary = { error }
+      throw error
+    } finally {
+      releaseVectorQueryOperation(release, primary)
+    }
+  }
+  /** Registered sources retain full mapped-next and buffered-result scope ownership. */
+  const derived = deriveTransactionIterator(iterator, accepted, close)
   if (derived) return derived
   /** The mapped root and its diagnostic forwarding use the same original source resource key. */
   const asyncDisposeKey: typeof Symbol.asyncDispose = source.asyncDisposeKey!
@@ -3085,11 +3298,7 @@ function streamRecordQuery<R>(
       lifetime.advance(() =>
         runTransactionIteratorOperation(iterator, async (advance, fail, currentScope) => {
           if (lifetime.isClosing()) return { done: true, value: undefined }
-          try {
-            return (await read(advance, currentScope)) as IteratorResult<R>
-          } catch (cause) {
-            return failedRecordQuery(iterator, fail, cause, close)
-          }
+          return accepted(advance, fail, currentScope)
         })
       ),
     return: lifetime.returned,
@@ -3143,9 +3352,13 @@ function selectedRecordQuery<
   return Object.freeze({
     ...methods,
     ...familyQueryReads<R, TContext>(source, node, strict),
-    ...queryWatch(source, node),
-    requirePushdown: () =>
-      selectedRecordQuery<R, TContext, TAugmentMethods>(source, node, true, methods)
+    ...(source.vector?.reranked || source.vector?.native !== undefined
+      ? {}
+      : {
+          ...queryWatch(source, node),
+          requirePushdown: () =>
+            selectedRecordQuery<R, TContext, TAugmentMethods>(source, node, true, methods)
+        })
   }) as IQueryResult<R, TContext, true, TAugmentMethods>
 }
 /** Vector rows never gain numeric record statistics through a runtime spread or projection. */
@@ -3382,13 +3595,163 @@ export function createRecordQuery<
   )
 }
 
+/** Origin capture reuses the vector component/ID owners and never resolves samples or opens I/O. */
+function snapshotVectorQueryOrigin(
+  origin: IVectorQueryOrigin | undefined
+): IVectorQueryOrigin | undefined {
+  if (origin === undefined) return undefined
+  if (origin === null || typeof origin !== 'object')
+    throw invalidQueryCondition(undefined, StorageContractErrorText.queryRerankArgument)
+  /** The discriminator is a construction-time fact, never a scorer-time getter. */
+  const kind = origin.kind
+  if (kind === VectorQueryOriginKind.near)
+    return Object.freeze({ kind, vector: snapshotStorageVector(origin.vector) })
+  if (kind === VectorQueryOriginKind.similarTo) {
+    /** A sample ID getter participates only in construction, never again during a read. */
+    const id = origin.id
+    if (typeof id === 'string') return Object.freeze({ kind, id })
+  }
+  if (kind === VectorQueryOriginKind.recommend) {
+    /** Sample identities retain the canonical ID owner and original input order. */
+    const positive = snapshotStorageVectorIds(origin.positive)
+    /** Negative samples are captured independently without resolving native vectors. */
+    const negative = snapshotStorageVectorIds(origin.negative)
+    if (positive.length > 0) return Object.freeze({ kind, positive, negative })
+  }
+  throw invalidQueryCondition(undefined, StorageContractErrorText.queryRerankArgument)
+}
+
+/** One bounded scorer runs within the original accepted reader and shares its cleanup/failure path. */
+function compileVectorRerankReader(
+  upstream: IQueryReader,
+  ctx: IOperationContext | undefined,
+  origin: IVectorQueryOrigin,
+  scorer: IVectorReranker<unknown, boolean>,
+  topN: number
+): IQueryReader {
+  /** A shared initialization prevents concurrent pulls from invoking the scorer twice. */
+  let prepared: Promise<readonly Awaited<ReturnType<IQueryReader>>[]> | undefined
+  /** Results retain the original engine position only as a private stable tie key. */
+  let emitted = 0
+  return async (advance, currentScope) => {
+    /** All pulls share the sole scorer preparation, while each consumes its own stable output slot. */
+    const ranked = await (prepared ??= (async () => {
+      /** Native topK and existing payload predicates have already bounded this candidate list. */
+      const entries: Awaited<ReturnType<IQueryReader>>[] = []
+      while (true) {
+        /** The original upstream advance remains accepted through native EOF and cleanup. */
+        const next = await upstream(advance, currentScope)
+        if (next.done) break
+        entries.push(next)
+      }
+      /** The input container grants no mutation of the engine hit wrappers or their scores. */
+      const hits = Object.freeze(
+        entries.map((entry) => Object.freeze({ ...(entry.value as IVectorHit<unknown, boolean>) }))
+      )
+      /** An omitted caller signal needs no timer, listener, controller registration or new budget. */
+      const signal = (ctx?.signal ?? new AbortController().signal) as INativeAbortSignal
+      /** User output stays unknown until the one finite-score admission pass. */
+      let result: unknown
+      try {
+        assertQueryActive(ctx)
+        result = await scorer(Object.freeze({ origin, hits }), Object.freeze({ signal }))
+        assertQueryActive(ctx)
+      } catch (cause) {
+        assertQueryActive(ctx)
+        throw new StorageContractError(
+          StorageContractErrorCode.rerankFailed,
+          { cause },
+          StorageContractErrorText.queryRerankFailed
+        )
+      }
+      try {
+        if (!Array.isArray(result) || result.length !== hits.length)
+          throw new StorageContractError(
+            StorageContractErrorCode.rerankResultInvalid,
+            {},
+            StorageContractErrorText.queryRerankResult
+          )
+        /** The existing canonical numeric key codec and radix own descending scores and stable ties. */
+        const scored = entries.map((entry, position) => {
+          /** One score getter is read for each present engine position. */
+          const score = Object.hasOwn(result, position) ? result[position] : undefined
+          if (typeof score !== 'number' || !Number.isFinite(score))
+            throw new StorageContractError(
+              StorageContractErrorCode.rerankResultInvalid,
+              {},
+              StorageContractErrorText.queryRerankResult
+            )
+          return {
+            bytes: encodeOrderedStorageKey([-score, position], undefined),
+            row: { ...entry, value: Object.freeze({ ...hits[position]!, rerankScore: score }) }
+          }
+        })
+        return orderStorageKeysByBytes(scored, (entry) => entry.bytes)
+          .slice(0, topN)
+          .map((entry) => entry.row)
+      } catch (cause) {
+        if (
+          cause instanceof StorageContractError &&
+          cause.code === StorageContractErrorCode.rerankResultInvalid
+        )
+          throw cause
+        throw new StorageContractError(
+          StorageContractErrorCode.rerankResultInvalid,
+          { cause },
+          StorageContractErrorText.queryRerankResult
+        )
+      }
+    })())
+    assertQueryActive(ctx)
+    return emitted === ranked.length ? { done: true, value: undefined } : ranked[emitted++]!
+  }
+}
+
+/** The finite author closure derives an existing query; it grants no store, source or close handle. */
+const vectorQueryRefinement = Symbol()
+/** A source that explicitly accepts native facts can derive only its own already bounded query. */
+type IVectorQueryAuthor = (refine: (topK: number) => IVectorQueryRefinement) => object
+
+/**
+ * Native Feature authors retain this exact source and immutable nodes. Only the selected backend
+ * interprets its captured opaque fact; the common planner still owns conditions, context and
+ * reads.
+ */
+export function refineStorageVectorQuery<
+  TPayload,
+  TGroupable extends boolean,
+  TWithVector extends boolean,
+  TMethods extends object
+>(
+  query: IVectorQuery<TPayload, TGroupable, TWithVector, TMethods>,
+  refine: (topK: number) => IVectorQueryRefinement
+): IVectorNativeQuery<TPayload, TGroupable, TWithVector, TMethods> {
+  try {
+    if (typeof query !== 'object' || query === null || typeof refine !== 'function')
+      throw invalidQueryCondition(undefined, StorageContractErrorText.queryArgument)
+    /** This closure can derive only the original query that already granted it. */
+    const author: unknown = Reflect.get(query, vectorQueryRefinement)
+    if (typeof author !== 'function')
+      throw invalidQueryCondition(undefined, StorageContractErrorText.queryArgument)
+    return (author as IVectorQueryAuthor)(refine) as IVectorNativeQuery<
+      TPayload,
+      TGroupable,
+      TWithVector,
+      TMethods
+    >
+  } catch (cause) {
+    throw queryExecutionFailure(cause)
+  }
+}
+
 /** Family refinements retain the same nodes, planner, readers and accepted resource operations. */
 function familyQuery(
   source: IQuerySourceSnapshot,
   node: IQueryNode | undefined,
   strict: boolean,
   methods: object | undefined,
-  bounded: boolean
+  bounded: boolean,
+  bound?: number
 ): object {
   /** Appending one node never copies or scans the existing immutable history. */
   const append = (step: IQueryNode['step']): object =>
@@ -3397,7 +3760,8 @@ function familyQuery(
       { previous: node, step },
       strict,
       methods,
-      bounded || step.operation === QueryOperation.topK
+      bounded || step.operation === QueryOperation.topK,
+      step.operation === QueryOperation.topK ? step.count : bound
     )
   /** Selection terminates family refinements while retaining the same original read methods. */
   const select = (...args: readonly unknown[]): object => {
@@ -3412,26 +3776,109 @@ function familyQuery(
   const shared = {
     ...methods,
     where: (...args: readonly unknown[]) => append(snapshotQueryWhere(args)),
-    requirePushdown: () => familyQuery(source, node, true, methods, bounded)
+    requirePushdown: () => familyQuery(source, node, true, methods, bounded, bound)
   }
   if (source.vector !== undefined) {
-    /** The captured family facts cannot be changed by later author descriptor mutation. */
+    /** Captured facts and the current bound belong to this immutable branch alone. */
     const vector = source.vector
-    return Object.freeze({
+    /** Projection never introduces a second terminal executor or a writable post-stage view. */
+    const withVector = () =>
+      familyQuery(
+        { ...source, vector: { ...vector, withVector: true } },
+        node,
+        strict,
+        methods,
+        bounded,
+        bound
+      )
+    /** Scorer/options capture occurs at construction, before any source or callback work. */
+    const rerank = (scorer: IVectorReranker<unknown, boolean>, options?: IVectorRerankOptions) => {
+      /** A preceding native stage narrows the candidate bound without rewriting engine topK. */
+      const limit = vector.native?.topN ?? bound!
+      if (
+        typeof scorer !== 'function' ||
+        vector.origin === undefined ||
+        (options !== undefined &&
+          (typeof options !== 'object' || options === null || Array.isArray(options)))
+      )
+        throw invalidQueryCondition(undefined, StorageContractErrorText.queryRerankArgument)
+      /** The final bound is captured before any source or scorer execution. */
+      let topN: number
+      try {
+        /** An option accessor participates only in query construction. */
+        const requested = options?.topN
+        topN = requested === undefined ? limit : requested
+      } catch (cause) {
+        throw invalidQueryCondition(cause, StorageContractErrorText.queryRerankArgument)
+      }
+      if (!Number.isSafeInteger(topN) || topN <= 0 || topN > limit)
+        throw invalidQueryCondition(undefined, StorageContractErrorText.queryRerankArgument)
+      /** Each immutable branch retains the original already detached request. */
+      const origin = vector.origin
+      return familyQuery(
+        { ...source, vector: { ...vector, reranked: true } },
+        {
+          previous: node,
+          step: {
+            operation: QueryOperation.rerank,
+            compile: (upstream, ctx) =>
+              compileVectorRerankReader(upstream, ctx, origin, scorer, topN)
+          }
+        },
+        strict,
+        methods,
+        true,
+        bound
+      )
+    }
+    /** The existing single Map grouping pass is instantiated independently on every execution. */
+    const groups =
+      !bounded || !vector.groupBy
+        ? {}
+        : {
+            groupBy(field: string, options: { readonly perGroup: number }) {
+              assertQueryField(field)
+              let perGroup: number
+              try {
+                perGroup = options.perGroup
+              } catch (cause) {
+                throw invalidQueryCondition(cause, StorageContractErrorText.queryArgument)
+              }
+              if (!Number.isSafeInteger(perGroup) || perGroup <= 0)
+                throw invalidQueryCondition(undefined, StorageContractErrorText.queryArgument)
+              return selectedRecordQuery(
+                source,
+                {
+                  previous: node,
+                  step: {
+                    operation: QueryOperation.groupBy,
+                    field,
+                    perGroup,
+                    compile: (upstream) => compileVectorGroupReader(upstream, field, perGroup)
+                  }
+                },
+                strict,
+                methods
+              )
+            }
+          }
+    if (vector.reranked || vector.native !== undefined)
+      return Object.freeze({
+        ...methods,
+        ...familyQueryReads(source, node, strict),
+        select,
+        ...groups,
+        ...(vector.reranked ? {} : { withVector, rerank })
+      })
+    /** Ordinary vector branches retain the existing pre/post-topK runtime surface. */
+    const result = {
       ...shared,
       minScore(score: number) {
         if (typeof score !== 'number' || !Number.isFinite(score))
           throw invalidQueryCondition(undefined, StorageContractErrorText.queryArgument)
         return append({ operation: QueryOperation.minScore, score })
       },
-      withVector: () =>
-        familyQuery(
-          { ...source, vector: { ...vector, withVector: true } },
-          node,
-          strict,
-          methods,
-          bounded
-        ),
+      withVector,
       topK(count: number) {
         if (!Number.isSafeInteger(count) || count <= 0)
           throw invalidQueryCondition(undefined, StorageContractErrorText.queryArgument)
@@ -3447,38 +3894,36 @@ function familyQuery(
                 ...queryWriteContext(ctx)
               }),
             select,
+            rerank,
             distinct(field: string) {
               assertQueryField(field)
               return append({ operation: QueryOperation.distinct, field })
             },
-            ...(vector.groupBy
-              ? {
-                  groupBy(field: string, options: { readonly perGroup: number }) {
-                    assertQueryField(field)
-                    /** Only the declared per-group allocation bound is borrowed once. */
-                    let perGroup: number
-                    try {
-                      perGroup = options.perGroup
-                    } catch (cause) {
-                      throw invalidQueryCondition(cause, StorageContractErrorText.queryArgument)
-                    }
-                    if (!Number.isSafeInteger(perGroup) || perGroup <= 0)
-                      throw invalidQueryCondition(undefined, StorageContractErrorText.queryArgument)
-                    return selectedRecordQuery(
-                      source,
-                      {
-                        previous: node,
-                        step: { operation: QueryOperation.groupBy, field, perGroup }
-                      },
-                      strict,
-                      methods
-                    )
-                  }
-                }
-              : {})
+            ...groups
           }
         : {})
-    })
+    }
+    if (bounded && vector.acceptsNative)
+      Object.defineProperty(result, vectorQueryRefinement, {
+        value: (refine: (topK: number) => IVectorQueryRefinement) => {
+          /** Feature-owned options are captured by one callback, never during native execution. */
+          const captured = refine(bound!)
+          if (captured === null || typeof captured !== 'object')
+            throw invalidQueryCondition(undefined, StorageContractErrorText.queryArgument)
+          const { native, topN } = captured
+          if (native === undefined || !Number.isSafeInteger(topN) || topN <= 0 || topN > bound!)
+            throw invalidQueryCondition(undefined, StorageContractErrorText.queryArgument)
+          return familyQuery(
+            { ...source, vector: { ...vector, native: Object.freeze({ native, topN }) } },
+            node,
+            strict,
+            methods,
+            true,
+            bound
+          )
+        }
+      })
+    return Object.freeze(result)
   }
   return Object.freeze({
     ...shared,
@@ -3584,20 +4029,43 @@ export function createVectorQuery<
   let exact: boolean | undefined
   /** Group support is finite author metadata rather than another provider or runtime registry. */
   let groupBy: boolean | undefined
+  /** Origin and the finite native channel are optional author facts, not capability registration. */
+  let origin: IVectorQueryOrigin | undefined
+  /** The native extension channel is opt-in and carries no registration authority. */
+  let native: true | undefined
+  /** The finite original lease hook is captured without acquiring work during construction. */
+  let beginOperation: (() => () => void) | undefined
   try {
     ;({ exact, groupBy } = source)
+    if ('origin' in source) origin = source.origin
+    if ('native' in source) native = source.native
+    if ('beginOperation' in source) beginOperation = source.beginOperation
     if (
       (exact !== undefined && typeof exact !== 'boolean') ||
-      (groupBy !== undefined && typeof groupBy !== 'boolean')
+      (groupBy !== undefined && typeof groupBy !== 'boolean') ||
+      (native !== undefined && native !== true) ||
+      (beginOperation !== undefined && typeof beginOperation !== 'function')
     )
       throw new TypeError(StorageContractErrorText.queryArgument)
+    origin = snapshotVectorQueryOrigin(origin)
   } catch (cause) {
     throw invalidQueryCondition(cause, StorageContractErrorText.queryArgument)
   }
   return familyQuery(
     {
       ...captured,
-      vector: { exact: exact === true, groupBy: groupBy === true, withVector: false }
+      vector: {
+        exact: exact === true,
+        groupBy: groupBy === true,
+        withVector: false,
+        origin,
+        acceptsNative: native,
+        ...(beginOperation === undefined
+          ? {}
+          : {
+              beginOperation: () => Reflect.apply(beginOperation, source, [])
+            })
+      }
     },
     undefined,
     false,

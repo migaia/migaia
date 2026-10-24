@@ -18,6 +18,8 @@ import {
   snapshotStorageTtlTarget,
   assertStorageTtlDuration,
   createVectorQuery,
+  VectorQueryOriginKind,
+  type IVectorQueryOrigin,
   createStorageIteratorLifetime,
   compileStorageQueryCondition,
   snapshotStorageWhere,
@@ -484,11 +486,14 @@ export function createQdrantBackend(
       ) => Promise<{ query: readonly number[]; exclude: readonly string[] }>,
       exact: boolean,
       metric?: IStorageVectorConfiguration['metric'],
-      initialConditions: readonly IQueryCondition[] = []
+      initialConditions: readonly IQueryCondition[] = [],
+      origin?: IVectorQueryOrigin
     ) =>
       createVectorQuery<TPayload, true>(
         {
           exact,
+          origin,
+          beginOperation: () => controller.beginMutation(),
           groupBy: true,
           pushdown: {
             source: QdrantText.backend,
@@ -651,7 +656,9 @@ export function createQdrantBackend(
                 current,
                 async () => ({ query: direction, exclude: [] }),
                 exact,
-                metric
+                metric,
+                [],
+                { kind: VectorQueryOriginKind.near, vector: direction }
               )
             }),
           similarTo: (id) => {
@@ -664,7 +671,10 @@ export function createQdrantBackend(
                   throw invalidArgument()
                 return { query: sample(row.point, configuration), exclude: [id] }
               },
-              false
+              false,
+              undefined,
+              [],
+              { kind: VectorQueryOriginKind.similarTo, id }
             )
           },
           recommend: (examples) => {
@@ -700,7 +710,14 @@ export function createQdrantBackend(
                   exclude: [...captured.pos, ...captured.neg]
                 }
               },
-              false
+              false,
+              undefined,
+              [],
+              {
+                kind: VectorQueryOriginKind.recommend,
+                positive: captured.pos,
+                negative: captured.neg
+              }
             )
           },
           upsert: (points, ctx) => {

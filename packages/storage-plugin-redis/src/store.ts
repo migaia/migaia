@@ -1619,6 +1619,7 @@ export function createRedisStore(
       driver: nativeDriver,
       layout,
       assertLive: () => controller.assertLive(),
+      beginOperation: () => controller.beginMutation(),
       own: (resource) => {
         controller.assertLive()
         resources.add(resource)

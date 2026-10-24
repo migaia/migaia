@@ -283,3 +283,19 @@ redo 的显式后端选择缺少 WAL 时在安装阶段拒绝；replay 可返回
 声明式条件会在原 planner 的首段 `where` 内静态选择匹配的已声明索引：唯一 `eq`、其它 `eq` / 较短 `in`、双侧范围、单侧范围 / `startsWith` 依次优先，同级沿声明顺序；显式 `index` / `range` 优先。`explain()` 零 I/O 返回选中规则及未选候选，保守保留 `fullScan: true`，因为实际打开仍可能执行原索引准备或权威回退；`in` / 字符串前缀的宽候选用原条件编译器精确复核。显式 selector 与后续 `where` 保留共享核心的声明顺序；要先过滤，请把 `where` 放在 `orderBy` 前。
 
 原生记录 feed 可用且 `changeFeed` 的类型事实为 `true` 时，根实体查询提供原 `watch()` 失效通知；它不是结果行流，也不提供可靠重放。组织借用转发其原生组织 iterator，冻结 raw store 不会被修改。事务查询不暴露 watch；客户端 lambda、排序或分页等无法完整下推的链在订阅前沿原核心报 `QUERY_NOT_PUSHABLE`。订阅和释放均由原生后端及既有 iterator 生命周期负责。
+
+## 纯 MMR 重排
+
+`@migaia/storage-host/vector/mmr` 独立导出 `mmr` 与 `IStorageMmrOptions`，宿主根入口不重导。它不访问网络，不增加依赖；复用原向量余弦数值实现，为通用 `rerank` 生成确定性评分器。相关性使用引擎 `score`，多样性使用候选向量间的余弦相似度，所以必须显式 `withVector()`。
+
+```ts
+import { mmr } from '@migaia/storage-host/vector/mmr'
+const hits = await collection
+  .near([1, 0], { exact: true })
+  .withVector()
+  .topK(20)
+  .rerank(mmr({ lambda: 0.5, topN: 5 }), { topN: 5 })
+  .all()
+```
+
+`lambda` 是 [0,1] 内的有限数字；1 只按引擎相关性选择，0 在第一项后只选择多样性，目标相同保留引擎顺序。helper 的 `topN` 仅限制贪心前缀的计算，仍为全部候选返回等长有限分数，剩余项保留引擎顺序；真正截断只归 `rerank` 的 topN。缺省计算全部候选，保留 O(n) 状态，最坏 O(n²d) 时间。向量须维度一致；零向量的余弦多样性按 0 处理，同分保留引擎顺序。评分器取消继续使用原信号，不创建预算、资源或后台任务。
