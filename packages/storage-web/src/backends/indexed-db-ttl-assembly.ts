@@ -1,8 +1,5 @@
-import {
-  captureIndexedDbTtlClock,
-  createIndexedDbTtlAccess,
-  IndexedDbTtlLayout
-} from './indexed-db-ttl.js'
+import { IndexedDbTtlLayout } from './indexed-db-deadline-metadata.js'
+import { captureIndexedDbTtlClock, createIndexedDbTtlAccess } from './indexed-db-ttl.js'
 import {
   StorageContractError,
   StorageContractErrorCode,

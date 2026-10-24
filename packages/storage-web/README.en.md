@@ -81,9 +81,9 @@ try {
 }
 ```
 
-Select only required entries. Change feeds require an explicitly selected notifications Feature; they never install that prerequisite implicitly. IndexedDB `.live()` through `reactiveFeature` also requires notifications and reports a coded missing-assembly error instead of switching to polling. Calling an undeclared batch, journal, notification or change-feed entry reports `@migaia/storage-web / INDEXED_DB_FEATURE_NOT_INSTALLED` and identifies the required Feature. Without TTL, the canonical capability owner rejects `store.use(ttl)` with `@migaia/storage-contract / UNSUPPORTED_CAPABILITY`, identifying `ttl`. Basic `capabilities.secondaryIndexes`, `capabilities.batch` and `capabilities.changeFeed` are false. Selected change feeds still require the original native realm/BroadcastChannel admission. Keep the TTL Feature when reopening a database that uses deadlines; basic reads do not interpret expiry metadata.
+Select only required entries. Change feeds require an explicitly selected notifications Feature; they never install that prerequisite implicitly. IndexedDB `.live()` through `reactiveFeature` also requires notifications and reports a coded missing-assembly error instead of switching to polling. Memory `.live()` likewise requires explicit `memoryNotificationsFeature()` and rejects with `@migaia/storage-host / CHANGE_CONTROLLER_NOT_ASSEMBLED` before allocating an adapter or query when absent. Calling an undeclared batch, journal, notification or change-feed entry reports `@migaia/storage-web / INDEXED_DB_FEATURE_NOT_INSTALLED` and identifies the required Feature. Without TTL, the canonical capability owner rejects `store.use(ttl)` with `@migaia/storage-contract / UNSUPPORTED_CAPABILITY`, identifying `ttl`. Basic `capabilities.secondaryIndexes`, `capabilities.batch` and `capabilities.changeFeed` are false. Selected change feeds still require the original native realm/BroadcastChannel admission. Keep the TTL Feature when reopening a database that uses deadlines; basic reads do not interpret expiry metadata. A client without TTL clears inherited deadlines in the same native transaction when overwriting, deleting or clearing targets. Replacement values remain unlimited and another TTL client cannot remove them using the old deadlines.
 
-`indexedDbJournalFeature()` supplies native images, private log namespaces and undo. Global capture additionally requires `storageJournalPlugin()` from `@migaia/storage-host/journal`, explicitly installed before the backend in the same plugin list, plus the original `journal` configuration. Deadline images are maintained only with the TTL Feature. Basic writes retain physical mutation versions and tombstones so another journal-enabled instance can detect update/delete/recreate conflicts; they capture no images and create no log.
+`indexedDbJournalFeature()` supplies native images, private log namespaces and undo. Global capture additionally requires `storageJournalPlugin()` from `@migaia/storage-host/journal`, explicitly installed before the backend in the same plugin list, plus the original `journal` configuration. Journal images read and restore existing physical deadlines without enabling TTL expiry policy. Basic writes retain physical mutation versions and tombstones so another journal-enabled instance can detect update/delete/recreate conflicts; they capture no images and create no log.
 
 ## KV batches
 
@@ -130,13 +130,17 @@ import { records } from '@migaia/storage-contract'
 import { createStorageHost } from '@migaia/storage-host'
 import { indexedDbBackendKind, indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'
 import { reactiveFeature } from '@migaia/storage-web/features/reactive'
+import { indexedDbNotificationsFeature } from '@migaia/storage-web/features/indexed-db-notifications'
 
 const runtime = createRuntime()
 const host = await createStorageHost({
   plugins: [
     indexedDbBackendPlugin(
       { dbName: 'my-app' },
-      { reactive: reactiveFeature(indexedDbBackendKind) }
+      {
+        notifications: indexedDbNotificationsFeature(),
+        reactive: reactiveFeature(indexedDbBackendKind)
+      }
     )
   ]
 })
