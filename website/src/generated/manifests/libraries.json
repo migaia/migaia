@@ -46109,7 +46109,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "只在 `features` 中选择用到的单元：`/entity/query` 的 `entityQueryFeature()` 开启 query/list/stream；`/entity/indexes` 的 `entityIndexesFeature()` 开启索引声明和规划；`/entity/unique` 的 `entityUniqueFeature()` 开启唯一提交检查；`/entity/migration` 的 `entityMigrationFeature()` 开启版本计划和持久迁移；`/entity/keyset` 的 `entityKeysetFeature()` 准入 page/after。索引、unique 与持久迁移会复用查询操作，使用这些路径时也需声明 query；单元不会自动开启其他单元。"
+                  "text": "只在 `features` 中选择用到的单元：`/entity/query` 的 `entityQueryFeature()` 开启 query/list/stream；`/entity/indexes` 的 `entityIndexesFeature()` 开启索引声明和规划；`/entity/unique` 的 `entityUniqueFeature()` 开启唯一提交检查；`/entity/migration` 的 `entityMigrationFeature()` 开启版本计划和持久迁移；`/entity/keyset` 的 `entityKeysetFeature()` 准入 page/after。索引查询与唯一约束的回退校验还需要 query。没有索引或唯一约束的迁移直接扫描原生记录或文本键，不需要 query 或 unique。单元不会自动开启其他单元。"
                 },
                 {
                   "type": "paragraph",
@@ -46131,6 +46131,25 @@
                 {
                   "type": "paragraph",
                   "text": "查询的 `index` 或 `range` 要最先选择，且只能选一次；普通 `where`、`select`、`skip`、`limit` 会产生新分支。自定义比较器应搭配有限 `limit`，或使用 `first()`。`stream()` 返回可释放迭代器；提前停止时使用 `await using` 或显式 `dispose()`。`watch()` 是可用后端的失效通知，并非结果行流，也不保证重放。事务查询没有 `watch()`。"
+                }
+              ]
+            },
+            {
+              "id": "持久化版本迁移",
+              "heading": "持久化版本迁移",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "迁移没有索引或唯一约束的记录时，只需选择 migration 单元。读取旧记录会升级返回值；需要持久化新版本信封时，再调用 `migrate()`。内存记录的每个迁移批次沿用原生事务。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { defineEntity } from '@migaia/storage-host/entity'\nimport { entityMigrationFeature } from '@migaia/storage-host/entity/migration'\n\ntype IUser = { id: string; name: string }\nconst host = await createStorageHost({ plugins: [memoryBackendPlugin()] })\ntry {\n  const store = host.backend('memory')\n  const original = defineEntity<IUser>({ name: 'migration-users', key: 'id' }).connect(store)\n  await original.put({ id: 'ada', name: ' Ada ' })\n  await original.put({ id: 'lin', name: ' Lin ' })\n  const users = defineEntity<IUser>({\n    name: 'migration-users',\n    key: 'id',\n    version: 2,\n    features: [entityMigrationFeature()],\n    migrations: {\n      2: (previous) => {\n        const user = previous as IUser\n        return { ...user, name: user.name.trim() }\n      }\n    }\n  }).connect(store)\n  const result = await users.migrate({ batchSize: 1 })\n  console.log(result.migrated, (await users.get('ada'))?.name) // 2 Ada\n} finally {\n  await host.dispose()\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "声明唯一约束时仍需选择 unique 单元；其回退校验还需要 query。迁移不会隐式补装任何一个单元。"
                 }
               ]
             },
@@ -46655,7 +46674,7 @@
                   },
                   {
                     "type": "paragraph",
-                    "text": "Select only required units in `features`: `entityQueryFeature()` from `/entity/query` adds query/list/stream; `entityIndexesFeature()` from `/entity/indexes` adds index declaration/planning; `entityUniqueFeature()` from `/entity/unique` adds unique commit checks; `entityMigrationFeature()` from `/entity/migration` adds version plans and persisted migration; `entityKeysetFeature()` from `/entity/keyset` admits page/after. Index, unique and persisted migration paths reuse query operations, so also declare query for those paths. Units never enable another unit implicitly."
+                    "text": "Select only required units in `features`: `entityQueryFeature()` from `/entity/query` adds query/list/stream; `entityIndexesFeature()` from `/entity/indexes` adds index declaration/planning; `entityUniqueFeature()` from `/entity/unique` adds unique commit checks; `entityMigrationFeature()` from `/entity/migration` adds version plans and persisted migration; `entityKeysetFeature()` from `/entity/keyset` admits page/after. Index-backed queries and fallback uniqueness validation also require query. Migration without indexes or unique constraints scans native records or text keys directly and needs neither query nor unique. Units never enable another unit implicitly."
                   },
                   {
                     "type": "paragraph",
@@ -46677,6 +46696,25 @@
                   {
                     "type": "paragraph",
                     "text": "Select `index` or `range` first and only once. `where`, `select`, `skip` and `limit` create new query branches. Pair custom comparators with a finite `limit`, or use `first()`. `stream()` returns a disposable iterator; use `await using` or explicit `dispose()` if stopping early. When available, `watch()` supplies invalidation notifications, not result rows or reliable replay. Transaction queries do not expose `watch()`."
+                  }
+                ]
+              },
+              {
+                "id": "persist-versioned-records",
+                "heading": "Persist versioned records",
+                "blocks": [
+                  {
+                    "type": "paragraph",
+                    "text": "Select only migration when upgrading records without indexes or unique constraints. Reading an old record upgrades the returned value; call `migrate()` to persist the new envelopes. Each memory-record batch uses the original native transaction."
+                  },
+                  {
+                    "type": "code",
+                    "language": "ts",
+                    "code": "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { defineEntity } from '@migaia/storage-host/entity'\nimport { entityMigrationFeature } from '@migaia/storage-host/entity/migration'\n\ntype IUser = { id: string; name: string }\nconst host = await createStorageHost({ plugins: [memoryBackendPlugin()] })\ntry {\n  const store = host.backend('memory')\n  const original = defineEntity<IUser>({ name: 'migration-users', key: 'id' }).connect(store)\n  await original.put({ id: 'ada', name: ' Ada ' })\n  await original.put({ id: 'lin', name: ' Lin ' })\n  const users = defineEntity<IUser>({\n    name: 'migration-users',\n    key: 'id',\n    version: 2,\n    features: [entityMigrationFeature()],\n    migrations: {\n      2: (previous) => {\n        const user = previous as IUser\n        return { ...user, name: user.name.trim() }\n      }\n    }\n  }).connect(store)\n  const result = await users.migrate({ batchSize: 1 })\n  console.log(result.migrated, (await users.get('ada'))?.name) // 2 Ada\n} finally {\n  await host.dispose()\n}"
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Declaring unique constraints still requires the unique unit. Its fallback check also requires query; migration does not supply either unit implicitly."
                   }
                 ]
               },
@@ -52599,7 +52637,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "用运行时内置的 SQLite 保存本地设置、离线记录和缓存，让文本、记录、过期时间与应用 SQL 可以在同一个数据库事务内提交。选择运行时对应的驱动和数据库文件或内存库，再把插件安装到 host，无需另装 npm 原生数据库扩展；连接由应用创建和关闭，根入口不自动选择或加载驱动。"
+                  "text": "当本地设置、离线记录和缓存需要一起保存时，本包把文本、记录、过期时间与应用 SQL 统一放进运行时内置的 SQLite 事务，避免多个更新只成功一部分。选择 Node 或 Bun 对应的驱动和数据库文件，再把插件安装到 host；无需另装 npm 原生数据库扩展，连接由应用创建和关闭。"
                 }
               ]
             },
@@ -52942,7 +52980,7 @@
                   },
                   {
                     "type": "paragraph",
-                    "text": "Store local settings, offline records and caches with the runtime's built-in SQLite, combining text, records, expiry and application SQL in one database transaction. Select the driver for your runtime and a database file or in-memory database, then install the plugin in a host without adding an npm native database extension. Your application creates and closes the connection; the root import does not choose or load a driver automatically."
+                    "text": "When local settings, offline records and caches must be saved together, this module combines text, records, expiry and application SQL in the runtime's built-in SQLite transaction, avoiding partially saved updates. Choose the Node or Bun driver and a database file, then install the plugin in a host. No npm native database extension is needed; your application creates and closes the connection."
                   }
                 ]
               },
@@ -53299,6 +53337,13 @@
         ".",
         "./cookies",
         "./features/blobs",
+        "./features/indexed-db-batch",
+        "./features/indexed-db-change-feed",
+        "./features/indexed-db-indexes",
+        "./features/indexed-db-journal",
+        "./features/indexed-db-keyset",
+        "./features/indexed-db-notifications",
+        "./features/indexed-db-ttl",
         "./features/reactive",
         "./indexed-db",
         "./local-storage",
@@ -53377,7 +53422,7 @@
                       "`indexed-db`",
                       "`indexedDbBackendPlugin`",
                       "`indexed-db`",
-                      "文本、字节、记录、原生事务、索引"
+                      "文本、字节、记录、原生事务；索引需 Feature"
                     ]
                   ]
                 },
@@ -53392,6 +53437,41 @@
                 {
                   "type": "paragraph",
                   "text": "实体唯一约束写入需要真实 record 事务或后端原生原子 value 提交端点；内置浏览器后端均提供。自定义纯 value 后端未登记 `core.registerValueCommit` 时，唯一写入在 schema 执行和修改前报 `UNSUPPORTED_CAPABILITY`，普通 KV 不受影响。作者契约见 host 实体使用指南。"
+                }
+              ]
+            },
+            {
+              "id": "indexeddb-显式装配与迁移",
+              "heading": "IndexedDB 显式装配与迁移",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`indexedDbBackendPlugin` 默认只安装基础文本、字节、记录及原生事务。以前自动启用的原生索引/backfill、TTL、批量 KV、journal 镜像与 undo、提交后通知、变更流，现在各有独立 Feature；业务没有导入并声明的实现不会因这个后端的基础入口进入构建。这是有意的行为变更，用于让应用控制浏览器产物。迁移现有应用时，为实际使用的能力逐项增加下列声明；普通存读不需要增加声明。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'\nimport { indexedDbIndexesFeature } from '@migaia/storage-web/features/indexed-db-indexes'\nimport { indexedDbKeysetFeature } from '@migaia/storage-web/features/indexed-db-keyset'\nimport { indexedDbTtlFeature } from '@migaia/storage-web/features/indexed-db-ttl'\nimport { indexedDbBatchFeature } from '@migaia/storage-web/features/indexed-db-batch'\nimport { indexedDbJournalFeature } from '@migaia/storage-web/features/indexed-db-journal'\nimport { indexedDbNotificationsFeature } from '@migaia/storage-web/features/indexed-db-notifications'\nimport { indexedDbChangeFeedFeature } from '@migaia/storage-web/features/indexed-db-change-feed'\n\nconst host = await createStorageHost({\n  plugins: [\n    indexedDbBackendPlugin(\n      { dbName: 'my-app' },\n      {\n        indexes: indexedDbIndexesFeature(),\n        keyset: indexedDbKeysetFeature(),\n        ttl: indexedDbTtlFeature(),\n        batch: indexedDbBatchFeature(),\n        journal: indexedDbJournalFeature(),\n        notifications: indexedDbNotificationsFeature(),\n        changeFeed: indexedDbChangeFeedFeature()\n      }\n    )\n  ]\n})\ntry {\n  await host.backend('indexed-db').set('theme', 'dark')\n} finally {\n  await host.dispose()\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "只选择需要的条目。`changeFeed` 需要同时显式选择 `notifications`，但不会替调用方安装；选择 `reactiveFeature(indexedDbBackendKind)` 后的 `.live()` 也需要 `notifications`，缺少时编码拒绝，不切换为轮询。memory 的 `.live()` 同样要求显式 `memoryNotificationsFeature()`；缺少时在 adapter/query 分配前报 `@migaia/storage-host / CHANGE_CONTROLLER_NOT_ASSEMBLED`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "缺少批量、journal、通知或变更流装配时调用对应入口，报 `@migaia/storage-web / INDEXED_DB_FEATURE_NOT_INSTALLED` 并指出所需 Feature；缺少 TTL 时 `store.use(ttl)` 由规范 capability owner 报 `@migaia/storage-contract / UNSUPPORTED_CAPABILITY`，消息指出 `ttl`。基础 `capabilities.secondaryIndexes`、`capabilities.batch`、`capabilities.changeFeed` 均为 false。已选择变更流仍须通过原生 realm/BroadcastChannel 准入。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "重新打开曾使用 TTL 的数据库时保留 TTL Feature 声明；基础读取不解释到期元数据。未声明 TTL 的客户端覆盖、删除或清空目标时，会在同一原生事务清除该目标的旧期限；后续重建值不继承期限，也不会被另一 TTL 客户端按旧期限删除。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`indexedDbJournalFeature()` 提供原生镜像、私有日志 namespace 和 undo 端点；全局记录还须在同一插件列表的后端之前显式安装 `storageJournalPlugin()`（来自 `@migaia/storage-host/journal`），并保留原 `journal` 配置。journal 镜像读取和恢复原有物理期限，不替调用方启用 TTL 到期策略。物理写入版本与墓碑保留在基础写路径，使已装 journal 的其他实例仍可识别修改、删除和重建冲突；基础路径不捕获镜像或创建日志。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "原始 `store.use(records).query().page()` 与 `.after()` 另外需要在后端 Feature 配置中选择 `@migaia/storage-web/features/indexed-db-keyset` 的 `indexedDbKeysetFeature()`；基础 `.all()` 仍可使用。该单元借用 host 规范游标实现，不自动启用原生索引。缺少声明时，分页会在打开 reader 前报 `@migaia/storage-web / INDEXED_DB_FEATURE_NOT_INSTALLED` 并指出缺少的工厂。实体分页独立选择 `entityKeysetFeature()`，不要求这个原始查询 Feature。"
                 }
               ]
             },
@@ -53416,7 +53496,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { kv, records } from '@migaia/storage-contract'\nimport { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'\n\nconst host = await createStorageHost({\n  plugins: [indexedDbBackendPlugin({ dbName: 'my-app' })]\n})\ntry {\n  const store = host.backend('indexed-db')\n  await store.transaction(async (scope) => {\n    await scope.use(kv).setMany([\n      { key: ['settings', 'theme'], value: 'dark' },\n      { key: ['settings', 'language'], value: 'en' }\n    ])\n    await scope.setBytes('avatar', new Uint8Array([1, 2]))\n    await scope.putRecord({ id: 'a', name: 'Ada' }, ['users', 'a'])\n    console.log(await scope.use(records).query().all())\n  })\n} finally {\n  await host.dispose()\n}"
+                  "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { kv, records } from '@migaia/storage-contract'\nimport { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'\nimport { indexedDbBatchFeature } from '@migaia/storage-web/features/indexed-db-batch'\n\nconst host = await createStorageHost({\n  plugins: [indexedDbBackendPlugin({ dbName: 'my-app' }, { batch: indexedDbBatchFeature() })]\n})\ntry {\n  const store = host.backend('indexed-db')\n  await store.transaction(async (scope) => {\n    await scope.use(kv).setMany([\n      { key: ['settings', 'theme'], value: 'dark' },\n      { key: ['settings', 'language'], value: 'en' }\n    ])\n    await scope.setBytes('avatar', new Uint8Array([1, 2]))\n    await scope.putRecord({ id: 'a', name: 'Ada' }, ['users', 'a'])\n    console.log(await scope.use(records).query().all())\n  })\n} finally {\n  await host.dispose()\n}"
                 },
                 {
                   "type": "paragraph",
@@ -53435,7 +53515,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createRuntime } from '@migaia/reactive'\nimport { records } from '@migaia/storage-contract'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { indexedDbBackendKind, indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'\nimport { reactiveFeature } from '@migaia/storage-web/features/reactive'\n\nconst runtime = createRuntime()\nconst host = await createStorageHost({\n  plugins: [\n    indexedDbBackendPlugin(\n      { dbName: 'my-app' },\n      { reactive: reactiveFeature(indexedDbBackendKind) }\n    )\n  ]\n})\ntry {\n  const store = host.backend('indexed-db')\n  const live = store.use(records).query<{ name: string }>().live({ runtime })\n  try {\n    await live.ready\n    console.log(live.state.value)\n    await live.refresh()\n  } finally {\n    await live.dispose()\n  }\n} finally {\n  await host.dispose()\n}"
+                  "code": "import { createRuntime } from '@migaia/reactive'\nimport { records } from '@migaia/storage-contract'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { indexedDbBackendKind, indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'\nimport { reactiveFeature } from '@migaia/storage-web/features/reactive'\nimport { indexedDbNotificationsFeature } from '@migaia/storage-web/features/indexed-db-notifications'\n\nconst runtime = createRuntime()\nconst host = await createStorageHost({\n  plugins: [\n    indexedDbBackendPlugin(\n      { dbName: 'my-app' },\n      {\n        notifications: indexedDbNotificationsFeature(),\n        reactive: reactiveFeature(indexedDbBackendKind)\n      }\n    )\n  ]\n})\ntry {\n  const store = host.backend('indexed-db')\n  const live = store.use(records).query<{ name: string }>().live({ runtime })\n  try {\n    await live.ready\n    console.log(live.state.value)\n    await live.refresh()\n  } finally {\n    await live.dispose()\n  }\n} finally {\n  await host.dispose()\n}"
                 },
                 {
                   "type": "paragraph",
@@ -53465,11 +53545,11 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "IndexedDB 通过 `store.watch(key, ctx?)` 提供原生文本失效迭代器。仅当实例已准入当前 realm 的 IndexedDB 与 BroadcastChannel 时 `capabilities.changeFeed` 为 `true`；未准入时调用报 `UNSUPPORTED_CAPABILITY`。提示携带原宿主的组织 UUID，收到提示后重新读取已提交的原生值；这不提供历史重放或每次写入一条事件的保证。迭代器复用原资源清理，使用后调用 `dispose()`。"
+                  "text": "显式选择 `indexedDbNotificationsFeature()` 与 `indexedDbChangeFeedFeature()` 后，IndexedDB 通过 `store.watch(key, ctx?)` 提供原生文本失效迭代器。仅当实例已准入当前 realm 的 IndexedDB 与 BroadcastChannel 时 `capabilities.changeFeed` 为 `true`；未准入时调用报 `UNSUPPORTED_CAPABILITY`。提示携带原宿主的组织 UUID，收到提示后重新读取已提交的原生值；这不提供历史重放或每次写入一条事件的保证。迭代器复用原资源清理，使用后调用 `dispose()`。"
                 },
                 {
                   "type": "paragraph",
-                  "text": "IndexedDB 原生提供 `ttl`：`store.use(ttl)` 的 `expire`、`remaining`、`persist` 支持文本、字节和记录目标，事务内用 `scope.use(ttl)`。`setMany` 的 `ttlMs` 与值在同一个原生事务提交或回滚。缺省不设期限，到期的点读、枚举和索引查询视为缺失，并在原事务中惰性删除、更新修订与变更提示；不启动清理定时器。期限按安装时捕获的本地时钟锚点与原 scheduler 推进，使用缺省时钟时跨页面和重开保持可比较。IndexedDB 没有向量通道，向量 TTL 目标在 I/O 前报 `UNSUPPORTED_CAPABILITY`。"
+                  "text": "显式选择 `indexedDbTtlFeature()` 后，IndexedDB 提供 `ttl`：`store.use(ttl)` 的 `expire`、`remaining`、`persist` 支持文本、字节和记录目标，事务内用 `scope.use(ttl)`。`setMany` 的 `ttlMs` 与值在同一个原生事务提交或回滚。缺省不设期限，到期的点读、枚举和索引查询视为缺失，并在原事务中惰性删除、更新修订与变更提示；不启动清理定时器。期限按安装时捕获的本地时钟锚点与原 scheduler 推进，使用缺省时钟时跨页面和重开保持可比较。IndexedDB 没有向量通道，向量 TTL 目标在 I/O 前报 `UNSUPPORTED_CAPABILITY`。"
                 },
                 {
                   "type": "paragraph",
@@ -53496,7 +53576,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "IndexedDB 支持从 `@migaia/storage-host/journal` 调用 `storageLogStore(hostOrOrg, 'indexed-db', { prefix })`。私有行使用既有 META 对象仓库内的数组键命名空间。业务 `clearAll` 保留历史；删除组织使旧日志句柄失效，原业务视图仍可重新打开。缓存模式下，重新打开同一物理组织和前缀前须释放原日志。head、state 与记录随原生事务一同提交，缓存索引在真实 complete 事件内发布。"
+                  "text": "显式选择 `indexedDbJournalFeature()` 后，IndexedDB 支持从 `@migaia/storage-host/journal` 调用 `storageLogStore(hostOrOrg, 'indexed-db', { prefix })`。私有行使用既有 META 对象仓库内的数组键命名空间。业务 `clearAll` 保留历史；删除组织使旧日志句柄失效，原业务视图仍可重新打开。缓存模式下，重新打开同一物理组织和前缀前须释放原日志。head、state 与记录随原生事务一同提交，缓存索引在真实 complete 事件内发布。"
                 },
                 {
                   "type": "paragraph",
@@ -53538,7 +53618,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "普通 localStorage、sessionStorage 与 Cookie 声明 `capabilities.batch: false`；IndexedDB 与显式 redo/WAL 组合声明为 true。启用 commit journal 时不提供原生 IndexedDB 句柄，错误 source 为 `@migaia/storage-contract`、code 为 `UNSUPPORTED_CAPABILITY`。IndexedDB 不提供向量引擎。本仓库网站在新 host 包发布前继续使用已发布的 storage-web 0.0.8。"
+                  "text": "普通 localStorage、sessionStorage 与 Cookie 声明 `capabilities.batch: false`；显式选择 batch Feature 的 IndexedDB 与显式 redo/WAL 组合声明为 true。启用 commit journal 时不提供原生 IndexedDB 句柄，错误 source 为 `@migaia/storage-contract`、code 为 `UNSUPPORTED_CAPABILITY`。IndexedDB 不提供向量引擎。本仓库网站在新 host 包发布前继续使用已发布的 storage-web 0.0.8。"
                 }
               ]
             },
@@ -53637,6 +53717,41 @@
               ]
             },
             {
+              "id": "indexeddb-显式装配与迁移",
+              "heading": "IndexedDB 显式装配与迁移",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`indexedDbBackendPlugin` 默认只安装基础文本、字节、记录及原生事务。以前自动启用的原生索引/backfill、TTL、批量 KV、journal 镜像与 undo、提交后通知、变更流，现在各有独立 Feature；业务没有导入并声明的实现不会因这个后端的基础入口进入构建。这是有意的行为变更，用于让应用控制浏览器产物。迁移现有应用时，为实际使用的能力逐项增加下列声明；普通存读不需要增加声明。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'\nimport { indexedDbIndexesFeature } from '@migaia/storage-web/features/indexed-db-indexes'\nimport { indexedDbKeysetFeature } from '@migaia/storage-web/features/indexed-db-keyset'\nimport { indexedDbTtlFeature } from '@migaia/storage-web/features/indexed-db-ttl'\nimport { indexedDbBatchFeature } from '@migaia/storage-web/features/indexed-db-batch'\nimport { indexedDbJournalFeature } from '@migaia/storage-web/features/indexed-db-journal'\nimport { indexedDbNotificationsFeature } from '@migaia/storage-web/features/indexed-db-notifications'\nimport { indexedDbChangeFeedFeature } from '@migaia/storage-web/features/indexed-db-change-feed'\n\nconst host = await createStorageHost({\n  plugins: [\n    indexedDbBackendPlugin(\n      { dbName: 'my-app' },\n      {\n        indexes: indexedDbIndexesFeature(),\n        keyset: indexedDbKeysetFeature(),\n        ttl: indexedDbTtlFeature(),\n        batch: indexedDbBatchFeature(),\n        journal: indexedDbJournalFeature(),\n        notifications: indexedDbNotificationsFeature(),\n        changeFeed: indexedDbChangeFeedFeature()\n      }\n    )\n  ]\n})\ntry {\n  await host.backend('indexed-db').set('theme', 'dark')\n} finally {\n  await host.dispose()\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "只选择需要的条目。`changeFeed` 需要同时显式选择 `notifications`，但不会替调用方安装；选择 `reactiveFeature(indexedDbBackendKind)` 后的 `.live()` 也需要 `notifications`，缺少时编码拒绝，不切换为轮询。memory 的 `.live()` 同样要求显式 `memoryNotificationsFeature()`；缺少时在 adapter/query 分配前报 `@migaia/storage-host / CHANGE_CONTROLLER_NOT_ASSEMBLED`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "缺少批量、journal、通知或变更流装配时调用对应入口，报 `@migaia/storage-web / INDEXED_DB_FEATURE_NOT_INSTALLED` 并指出所需 Feature；缺少 TTL 时 `store.use(ttl)` 由规范 capability owner 报 `@migaia/storage-contract / UNSUPPORTED_CAPABILITY`，消息指出 `ttl`。基础 `capabilities.secondaryIndexes`、`capabilities.batch`、`capabilities.changeFeed` 均为 false。已选择变更流仍须通过原生 realm/BroadcastChannel 准入。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "重新打开曾使用 TTL 的数据库时保留 TTL Feature 声明；基础读取不解释到期元数据。未声明 TTL 的客户端覆盖、删除或清空目标时，会在同一原生事务清除该目标的旧期限；后续重建值不继承期限，也不会被另一 TTL 客户端按旧期限删除。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`indexedDbJournalFeature()` 提供原生镜像、私有日志 namespace 和 undo 端点；全局记录还须在同一插件列表的后端之前显式安装 `storageJournalPlugin()`（来自 `@migaia/storage-host/journal`），并保留原 `journal` 配置。journal 镜像读取和恢复原有物理期限，不替调用方启用 TTL 到期策略。物理写入版本与墓碑保留在基础写路径，使已装 journal 的其他实例仍可识别修改、删除和重建冲突；基础路径不捕获镜像或创建日志。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "原始 `store.use(records).query().page()` 与 `.after()` 另外需要在后端 Feature 配置中选择 `@migaia/storage-web/features/indexed-db-keyset` 的 `indexedDbKeysetFeature()`；基础 `.all()` 仍可使用。该单元借用 host 规范游标实现，不自动启用原生索引。缺少声明时，分页会在打开 reader 前报 `@migaia/storage-web / INDEXED_DB_FEATURE_NOT_INSTALLED` 并指出缺少的工厂。实体分页独立选择 `entityKeysetFeature()`，不要求这个原始查询 Feature。"
+                }
+              ]
+            },
+            {
               "id": "批量-kv-与结构键",
               "heading": "批量 KV 与结构键",
               "blocks": [
@@ -53661,7 +53776,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { kv, records } from '@migaia/storage-contract'\nimport { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'\n\nconst host = await createStorageHost({\n  plugins: [indexedDbBackendPlugin({ dbName: 'my-app' })]\n})\ntry {\n  const store = host.backend('indexed-db')\n  await store.transaction(async (scope) => {\n    await scope.use(kv).setMany([\n      { key: ['settings', 'theme'], value: 'dark' },\n      { key: ['settings', 'language'], value: 'en' }\n    ])\n    await scope.setBytes('avatar', new Uint8Array([1, 2]))\n    await scope.putRecord({ id: 'a', name: 'Ada' }, ['users', 'a'])\n    console.log(await scope.use(records).query().all())\n  })\n} finally {\n  await host.dispose()\n}"
+                  "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { kv, records } from '@migaia/storage-contract'\nimport { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'\nimport { indexedDbBatchFeature } from '@migaia/storage-web/features/indexed-db-batch'\n\nconst host = await createStorageHost({\n  plugins: [indexedDbBackendPlugin({ dbName: 'my-app' }, { batch: indexedDbBatchFeature() })]\n})\ntry {\n  const store = host.backend('indexed-db')\n  await store.transaction(async (scope) => {\n    await scope.use(kv).setMany([\n      { key: ['settings', 'theme'], value: 'dark' },\n      { key: ['settings', 'language'], value: 'en' }\n    ])\n    await scope.setBytes('avatar', new Uint8Array([1, 2]))\n    await scope.putRecord({ id: 'a', name: 'Ada' }, ['users', 'a'])\n    console.log(await scope.use(records).query().all())\n  })\n} finally {\n  await host.dispose()\n}"
                 },
                 {
                   "type": "paragraph",
@@ -53691,6 +53806,10 @@
               "blocks": [
                 {
                   "type": "paragraph",
+                  "text": "基础 `defineEntity` 只定义、连接和读写。查询在实体配置的 `features` 中选择 `entityQueryFeature()`（`@migaia/storage-host/entity/query`）；唯一约束选择 `/entity/unique` 的 `entityUniqueFeature()`；迁移选择 `/entity/migration` 的 `entityMigrationFeature()`；索引规划选择 `/entity/indexes` 的 `entityIndexesFeature()`；keyset 分页选择 `/entity/keyset` 的 `entityKeysetFeature()`。索引查询组合 query 与 indexes，分页组合 query 与 keyset；IndexedDB 原生索引还需后端的 `indexedDbIndexesFeature()`。各项独立声明，不会自动安装。"
+                },
+                {
+                  "type": "paragraph",
                   "text": "从 `@migaia/storage-host/entity` 导入中立仓储定义，并连接实际已安装的 IndexedDB 存储。"
                 },
                 {
@@ -53715,7 +53834,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createRuntime } from '@migaia/reactive'\nimport { records } from '@migaia/storage-contract'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { indexedDbBackendKind, indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'\nimport { reactiveFeature } from '@migaia/storage-web/features/reactive'\n\nconst runtime = createRuntime()\nconst host = await createStorageHost({\n  plugins: [\n    indexedDbBackendPlugin(\n      { dbName: 'my-app' },\n      { reactive: reactiveFeature(indexedDbBackendKind) }\n    )\n  ]\n})\ntry {\n  const store = host.backend('indexed-db')\n  const live = store.use(records).query<{ name: string }>().live({ runtime })\n  try {\n    await live.ready\n    console.log(live.state.value)\n    await live.refresh()\n  } finally {\n    await live.dispose()\n  }\n} finally {\n  await host.dispose()\n}"
+                  "code": "import { createRuntime } from '@migaia/reactive'\nimport { records } from '@migaia/storage-contract'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { indexedDbBackendKind, indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'\nimport { reactiveFeature } from '@migaia/storage-web/features/reactive'\nimport { indexedDbNotificationsFeature } from '@migaia/storage-web/features/indexed-db-notifications'\n\nconst runtime = createRuntime()\nconst host = await createStorageHost({\n  plugins: [\n    indexedDbBackendPlugin(\n      { dbName: 'my-app' },\n      {\n        notifications: indexedDbNotificationsFeature(),\n        reactive: reactiveFeature(indexedDbBackendKind)\n      }\n    )\n  ]\n})\ntry {\n  const store = host.backend('indexed-db')\n  const live = store.use(records).query<{ name: string }>().live({ runtime })\n  try {\n    await live.ready\n    console.log(live.state.value)\n    await live.refresh()\n  } finally {\n    await live.dispose()\n  }\n} finally {\n  await host.dispose()\n}"
                 },
                 {
                   "type": "paragraph",
@@ -53751,11 +53870,11 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "IndexedDB 通过 `store.watch(key, ctx?)` 提供原生文本失效迭代器。仅当实例已准入当前 realm 的 IndexedDB 与 BroadcastChannel 时 `capabilities.changeFeed` 为 `true`；未准入时调用报 `UNSUPPORTED_CAPABILITY`。提示携带原宿主的组织 UUID，收到提示后重新读取已提交的原生值；这不提供历史重放或每次写入一条事件的保证。迭代器复用原资源清理，使用后调用 `dispose()`。"
+                  "text": "显式选择 `indexedDbNotificationsFeature()` 与 `indexedDbChangeFeedFeature()` 后，IndexedDB 通过 `store.watch(key, ctx?)` 提供原生文本失效迭代器。仅当实例已准入当前 realm 的 IndexedDB 与 BroadcastChannel 时 `capabilities.changeFeed` 为 `true`；未准入时调用报 `UNSUPPORTED_CAPABILITY`。提示携带原宿主的组织 UUID，收到提示后重新读取已提交的原生值；这不提供历史重放或每次写入一条事件的保证。迭代器复用原资源清理，使用后调用 `dispose()`。"
                 },
                 {
                   "type": "paragraph",
-                  "text": "IndexedDB 原生提供 `ttl`：`store.use(ttl)` 的 `expire`、`remaining`、`persist` 支持文本、字节和记录目标，事务内用 `scope.use(ttl)`。`setMany` 的 `ttlMs` 与值在同一个原生事务提交或回滚。缺省不设期限，到期的点读、枚举和索引查询视为缺失，并在原事务中惰性删除、更新修订与变更提示；不启动清理定时器。期限按安装时捕获的本地时钟锚点与原 scheduler 推进，使用缺省时钟时跨页面和重开保持可比较。IndexedDB 没有向量通道，向量 TTL 目标在 I/O 前报 `UNSUPPORTED_CAPABILITY`。"
+                  "text": "显式选择 `indexedDbTtlFeature()` 后，IndexedDB 提供 `ttl`：`store.use(ttl)` 的 `expire`、`remaining`、`persist` 支持文本、字节和记录目标，事务内用 `scope.use(ttl)`。`setMany` 的 `ttlMs` 与值在同一个原生事务提交或回滚。缺省不设期限，到期的点读、枚举和索引查询视为缺失，并在原事务中惰性删除、更新修订与变更提示；不启动清理定时器。期限按安装时捕获的本地时钟锚点与原 scheduler 推进，使用缺省时钟时跨页面和重开保持可比较。IndexedDB 没有向量通道，向量 TTL 目标在 I/O 前报 `UNSUPPORTED_CAPABILITY`。"
                 },
                 {
                   "type": "paragraph",
@@ -53782,7 +53901,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "IndexedDB 支持从 `@migaia/storage-host/journal` 调用 `storageLogStore(hostOrOrg, 'indexed-db', { prefix })`。私有行使用既有 META 对象仓库内的数组键命名空间。业务 `clearAll` 保留历史；删除组织使旧日志句柄失效，原业务视图仍可重新打开。缓存模式下，重新打开同一物理组织和前缀前须释放原日志。head、state 与记录随原生事务一同提交，缓存索引在真实 complete 事件内发布。"
+                  "text": "显式选择 `indexedDbJournalFeature()` 后，IndexedDB 支持从 `@migaia/storage-host/journal` 调用 `storageLogStore(hostOrOrg, 'indexed-db', { prefix })`。私有行使用既有 META 对象仓库内的数组键命名空间。业务 `clearAll` 保留历史；删除组织使旧日志句柄失效，原业务视图仍可重新打开。缓存模式下，重新打开同一物理组织和前缀前须释放原日志。head、state 与记录随原生事务一同提交，缓存索引在真实 complete 事件内发布。"
                 },
                 {
                   "type": "paragraph",
@@ -53894,7 +54013,7 @@
                         "`indexed-db`",
                         "`indexedDbBackendPlugin`",
                         "`indexed-db`",
-                        "text, bytes, records, native transactions, indexes"
+                        "text, bytes, records, native transactions; indexes require a Feature"
                       ]
                     ]
                   },
@@ -53913,16 +54032,71 @@
                 ]
               },
               {
+                "id": "explicit-indexeddb-assembly-and-migration",
+                "heading": "Explicit IndexedDB assembly and migration",
+                "blocks": [
+                  {
+                    "type": "paragraph",
+                    "text": "`indexedDbBackendPlugin` installs basic text, bytes, records and native transactions. Native indexes/backfill, TTL, KV batches, journal images and undo, post-commit notifications, and change feeds each require their own Feature."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Previously these capabilities were automatic. This intentional behavior change lets applications control browser output: an undeclared Feature is not imported by the basic backend entry. Migrate existing applications by selecting each capability they actually use. Basic reads and writes need no additional declaration."
+                  },
+                  {
+                    "type": "code",
+                    "language": "ts",
+                    "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'\nimport { indexedDbIndexesFeature } from '@migaia/storage-web/features/indexed-db-indexes'\nimport { indexedDbKeysetFeature } from '@migaia/storage-web/features/indexed-db-keyset'\nimport { indexedDbTtlFeature } from '@migaia/storage-web/features/indexed-db-ttl'\nimport { indexedDbBatchFeature } from '@migaia/storage-web/features/indexed-db-batch'\nimport { indexedDbJournalFeature } from '@migaia/storage-web/features/indexed-db-journal'\nimport { indexedDbNotificationsFeature } from '@migaia/storage-web/features/indexed-db-notifications'\nimport { indexedDbChangeFeedFeature } from '@migaia/storage-web/features/indexed-db-change-feed'\n\nconst host = await createStorageHost({\n  plugins: [\n    indexedDbBackendPlugin(\n      { dbName: 'my-app' },\n      {\n        indexes: indexedDbIndexesFeature(),\n        keyset: indexedDbKeysetFeature(),\n        ttl: indexedDbTtlFeature(),\n        batch: indexedDbBatchFeature(),\n        journal: indexedDbJournalFeature(),\n        notifications: indexedDbNotificationsFeature(),\n        changeFeed: indexedDbChangeFeedFeature()\n      }\n    )\n  ]\n})\ntry {\n  await host.backend('indexed-db').set('theme', 'dark')\n} finally {\n  await host.dispose()\n}"
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Select only required entries. Change feeds require an explicitly selected notifications Feature; they never install that prerequisite implicitly. IndexedDB `.live()` through `reactiveFeature` also requires notifications and reports a coded missing-assembly error instead of switching to polling."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Memory `.live()` likewise requires explicit `memoryNotificationsFeature()` and rejects with `@migaia/storage-host` / `CHANGE_CONTROLLER_NOT_ASSEMBLED` before allocating an adapter or query when absent. Calling an undeclared batch, journal, notification or change-feed entry reports `@migaia/storage-web / INDEXED_DB_FEATURE_NOT_INSTALLED` and identifies the required Feature."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Without TTL, the canonical capability owner rejects `store.use(ttl)` with `@migaia/storage-contract / UNSUPPORTED_CAPABILITY`, identifying `ttl`. Basic `capabilities.secondaryIndexes`, `capabilities.batch` and `capabilities.changeFeed` are false. Selected change feeds still require the original native realm/BroadcastChannel admission."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Keep the TTL Feature when reopening a database that uses deadlines; basic reads do not interpret expiry metadata. A client without TTL clears inherited deadlines in the same native transaction when overwriting, deleting or clearing targets. Replacement values remain unlimited and another TTL client cannot remove them using the old deadlines."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "`indexedDbJournalFeature()` supplies native images, private log namespaces and undo. Global capture additionally requires `storageJournalPlugin()` from `@migaia/storage-host/journal`, explicitly installed before the backend in the same plugin list, plus the original `journal` configuration."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Journal images read and restore existing physical deadlines without enabling TTL expiry policy. Basic writes retain physical mutation versions and tombstones so another journal-enabled instance can detect update/delete/recreate conflicts; they capture no images and create no log."
+                  }
+                ]
+              },
+              {
                 "id": "kv-batches",
                 "heading": "KV batches",
                 "blocks": [
                   {
                     "type": "paragraph",
-                    "text": "`store.use(kv)` provides `getMany`, `setMany`, `removeMany`, and `removeByPrefix`. IndexedDB executes a batch in one native transaction and supports string, number, Date, binary, and tuple keys. String keys retain the same data as the original single-key methods. Reads preserve input order and duplicate positions, missing values are `undefined`, and deletion returns the actual count. Canonical duplicate write keys reject with `INVALID_ARGUMENT` before I/O. Empty batches enter neither the pipeline nor a native transaction."
+                    "text": "`store.use(kv)` provides `getMany`, `setMany`, `removeMany`, and `removeByPrefix`. IndexedDB executes a batch in one native transaction and supports string, number, Date, binary, and tuple keys. String keys retain the same data as the original single-key methods. Reads preserve input order and duplicate positions, missing values are `undefined`, and deletion returns the actual count."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Canonical duplicate write keys reject with `INVALID_ARGUMENT` before I/O. Empty batches enter neither the pipeline nor a native transaction."
                   },
                   {
                     "type": "paragraph",
                     "text": "localStorage, sessionStorage, and Cookie support batch reads. Multi-key writes require WAL and reject with `UNSUPPORTED_CAPABILITY` before mutation when it is absent. The default namespace codec retains the string `sw1` layout and uses a separate `sw2` layout for typed keys. `keys()` still lists strings; namespace cleanup covers both layouts. A custom codec must provide both `encodeStorageKey` and `decodeStorageKey` to read non-string batch keys; otherwise those keys reject before native I/O."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Raw `store.use(records).query().page()` and `.after()` additionally require `indexedDbKeysetFeature()` from `@migaia/storage-web/features/indexed-db-keyset` in the backend Feature record. Basic `.all()` remains available. This unit borrows the canonical host cursor implementation without enabling native indexes."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Omitted raw pagination rejects with `@migaia/storage-web / INDEXED_DB_FEATURE_NOT_INSTALLED` and names the missing factory before opening a reader. Entity pagination has its own `entityKeysetFeature()` declaration and does not require this raw-query Feature."
                   }
                 ]
               },
@@ -53933,7 +54107,7 @@
                   {
                     "type": "code",
                     "language": "ts",
-                    "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { kv, records } from '@migaia/storage-contract'\nimport { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'\n\nconst host = await createStorageHost({\n  plugins: [indexedDbBackendPlugin({ dbName: 'my-app' })]\n})\ntry {\n  const store = host.backend('indexed-db')\n  await store.transaction(async (scope) => {\n    await scope.use(kv).setMany([\n      { key: ['settings', 'theme'], value: 'dark' },\n      { key: ['settings', 'language'], value: 'en' }\n    ])\n    await scope.setBytes('avatar', new Uint8Array([1, 2]))\n    await scope.putRecord({ id: 'a', name: 'Ada' }, ['users', 'a'])\n    console.log(await scope.use(records).query().all())\n  })\n} finally {\n  await host.dispose()\n}"
+                    "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { kv, records } from '@migaia/storage-contract'\nimport { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'\nimport { indexedDbBatchFeature } from '@migaia/storage-web/features/indexed-db-batch'\n\nconst host = await createStorageHost({\n  plugins: [indexedDbBackendPlugin({ dbName: 'my-app' }, { batch: indexedDbBatchFeature() })]\n})\ntry {\n  const store = host.backend('indexed-db')\n  await store.transaction(async (scope) => {\n    await scope.use(kv).setMany([\n      { key: ['settings', 'theme'], value: 'dark' },\n      { key: ['settings', 'language'], value: 'en' }\n    ])\n    await scope.setBytes('avatar', new Uint8Array([1, 2]))\n    await scope.putRecord({ id: 'a', name: 'Ada' }, ['users', 'a'])\n    console.log(await scope.use(records).query().all())\n  })\n} finally {\n  await host.dispose()\n}"
                   },
                   {
                     "type": "paragraph",
@@ -53952,7 +54126,7 @@
                   {
                     "type": "code",
                     "language": "ts",
-                    "code": "import { createRuntime } from '@migaia/reactive'\nimport { records } from '@migaia/storage-contract'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { indexedDbBackendKind, indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'\nimport { reactiveFeature } from '@migaia/storage-web/features/reactive'\n\nconst runtime = createRuntime()\nconst host = await createStorageHost({\n  plugins: [\n    indexedDbBackendPlugin(\n      { dbName: 'my-app' },\n      { reactive: reactiveFeature(indexedDbBackendKind) }\n    )\n  ]\n})\ntry {\n  const store = host.backend('indexed-db')\n  const live = store.use(records).query<{ name: string }>().live({ runtime })\n  try {\n    await live.ready\n    console.log(live.state.value)\n    await live.refresh()\n  } finally {\n    await live.dispose()\n  }\n} finally {\n  await host.dispose()\n}"
+                    "code": "import { createRuntime } from '@migaia/reactive'\nimport { records } from '@migaia/storage-contract'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { indexedDbBackendKind, indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'\nimport { reactiveFeature } from '@migaia/storage-web/features/reactive'\nimport { indexedDbNotificationsFeature } from '@migaia/storage-web/features/indexed-db-notifications'\n\nconst runtime = createRuntime()\nconst host = await createStorageHost({\n  plugins: [\n    indexedDbBackendPlugin(\n      { dbName: 'my-app' },\n      {\n        notifications: indexedDbNotificationsFeature(),\n        reactive: reactiveFeature(indexedDbBackendKind)\n      }\n    )\n  ]\n})\ntry {\n  const store = host.backend('indexed-db')\n  const live = store.use(records).query<{ name: string }>().live({ runtime })\n  try {\n    await live.ready\n    console.log(live.state.value)\n    await live.refresh()\n  } finally {\n    await live.dispose()\n  }\n} finally {\n  await host.dispose()\n}"
                   },
                   {
                     "type": "paragraph",
@@ -53982,19 +54156,47 @@
                   },
                   {
                     "type": "paragraph",
-                    "text": "IndexedDB exposes native text invalidation through `store.watch(key, ctx?)`. Its `capabilities.changeFeed` is `true` only after the instance admits this realm's IndexedDB and BroadcastChannel; an unadmitted watch throws `UNSUPPORTED_CAPABILITY`. Hints carry the original host organization UUID and tell the consumer to reread committed native data. They provide neither historical replay nor one event per write. Dispose the iterator after use through its original `dispose()` method."
+                    "text": "With `indexedDbNotificationsFeature()` and `indexedDbChangeFeedFeature()` selected, IndexedDB exposes native text invalidation through `store.watch(key, ctx?)`. Its `capabilities.changeFeed` is `true` only after the instance admits this realm's IndexedDB and BroadcastChannel; an unadmitted watch throws `UNSUPPORTED_CAPABILITY`."
                   },
                   {
                     "type": "paragraph",
-                    "text": "IndexedDB natively provides `ttl`: `store.use(ttl)` exposes `expire`, `remaining` and `persist` for text, bytes and record targets; transactions use `scope.use(ttl)`. A `setMany` entry's `ttlMs` commits or rolls back with its value in the same native transaction. Entries have no deadline by default. Expired point reads, enumeration and index queries return absence and lazily remove data through the original transaction, revision and change paths; no cleanup timer runs. Deadlines advance through the installed scheduler from one local epoch anchor captured at installation. Default-clock deadlines remain comparable across pages and reopening. IndexedDB has no vector channel, so vector TTL targets fail before I/O with `UNSUPPORTED_CAPABILITY`."
+                    "text": "Hints carry the original host organization UUID and tell the consumer to reread committed native data. They provide neither historical replay nor one event per write. Dispose the iterator after use through its original `dispose()` method."
                   },
                   {
                     "type": "paragraph",
-                    "text": "Text organization views use the configured namespace for the host default and namespace + \"/\" + orgId for every other organization. The same captured native client, namespace codec and Cookie scope remain in use. A configured namespace ending in \"/\" plus a canonical UUID rejects before native I/O; a bare UUID remains valid. dropOrg clears only that target, preserves other organizations and plugin prefixes, and leaves existing views reusable. Borrowed entities retain the original native atomic unique writer. IndexedDB maps dbName by the same rule. dropOrg makes the target connection close-pending, drains native transactions, and waits for that target's deleteDatabase request. New opens wait for the same request; existing views reopen afterward. Other instances close through their original versionchange handler. A foreign connection that refuses to close keeps native deletion pending; the host never resumes opening early and lets a late deletion destroy new data."
+                    "text": "With `indexedDbTtlFeature()` selected, IndexedDB provides `ttl`: `store.use(ttl)` exposes `expire`, `remaining` and `persist` for text, bytes and record targets; transactions use `scope.use(ttl)`. A `setMany` entry's `ttlMs` commits or rolls back with its value in the same native transaction. Entries have no deadline by default."
                   },
                   {
                     "type": "paragraph",
-                    "text": "localStorage declares changeFeed:true only after registering the actual localStorage and storage event source of the same Window. A Storage-like injection alone remains false. Original watch/subscribeChanges combine committed writes from this instance with native cross-document events, filtered by storageArea, namespace codec, and organization; host disposal releases the listener. The receiving controller numbers hints locally, without a native writer history sequence. Reread current data: delivery is neither per-write nor a native notification for other instances in the same page. Organization views retain watch with runtime capability admission and no backend close authority."
+                    "text": "Expired point reads, enumeration and index queries return absence and lazily remove data through the original transaction, revision and change paths; no cleanup timer runs."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Deadlines advance through the installed scheduler from one local epoch anchor captured at installation. Default-clock deadlines remain comparable across pages and reopening. IndexedDB has no vector channel, so vector TTL targets fail before I/O with `UNSUPPORTED_CAPABILITY`."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Text organization views use the configured namespace for the host default and namespace + \"/\" + orgId for every other organization. The same captured native client, namespace codec and Cookie scope remain in use. A configured namespace ending in \"/\" plus a canonical UUID rejects before native I/O; a bare UUID remains valid."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "dropOrg clears only that target, preserves other organizations and plugin prefixes, and leaves existing views reusable. Borrowed entities retain the original native atomic unique writer."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "IndexedDB maps dbName by the same rule. dropOrg makes the target connection close-pending, drains native transactions, and waits for that target's deleteDatabase request. New opens wait for the same request; existing views reopen afterward. Other instances close through their original versionchange handler."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "A foreign connection that refuses to close keeps native deletion pending; the host never resumes opening early and lets a late deletion destroy new data."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "localStorage declares changeFeed:true only after registering the actual localStorage and storage event source of the same Window. A Storage-like injection alone remains false. Original watch/subscribeChanges combine committed writes from this instance with native cross-document events, filtered by storageArea, namespace codec, and organization; host disposal releases the listener."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "The receiving controller numbers hints locally, without a native writer history sequence. Reread current data: delivery is neither per-write nor a native notification for other instances in the same page. Organization views retain watch with runtime capability admission and no backend close authority."
                   }
                 ]
               },
@@ -54004,7 +54206,11 @@
                 "blocks": [
                   {
                     "type": "paragraph",
-                    "text": "Select `indexedDbBlobFeature` from the dedicated subpath. It adds `store.api.blobs` and `scope.api.blobs`. Blob/File values use native structured clone; File name, type and lastModified survive reopening. The default store is `__migaia_blobs__`. Declare a different name with `{ storeName }`; declaration collisions fail before opening. Blob requests share the original record transaction, cancellation, quota normalization and rollback. Organization views use their actual database and original transaction owner. The Feature grants no database disposal method."
+                    "text": "Select `indexedDbBlobFeature` from the dedicated subpath. It adds `store.api.blobs` and `scope.api.blobs`. Blob/File values use native structured clone; File name, type and lastModified survive reopening. The default store is `__migaia_blobs__`. Declare a different name with `{ storeName }`; declaration collisions fail before opening."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Blob requests share the original record transaction, cancellation, quota normalization and rollback. Organization views use their actual database and original transaction owner. The Feature grants no database disposal method."
                   },
                   {
                     "type": "code",
@@ -54013,11 +54219,27 @@
                   },
                   {
                     "type": "paragraph",
-                    "text": "IndexedDB supports `storageLogStore(hostOrOrg, 'indexed-db', { prefix })` from `@migaia/storage-host/journal`. Its private rows use an array-key namespace in the existing META store. Business `clearAll` leaves history intact; organization deletion invalidates old log handles, while the original business view can reopen. In cached mode, dispose a log before opening the same physical organization and prefix again. Native transactions commit head/state/records together and publish the cached index from the actual complete event."
+                    "text": "With `indexedDbJournalFeature()` selected, IndexedDB supports `storageLogStore(hostOrOrg, 'indexed-db', { prefix })` from `@migaia/storage-host/journal`. Its private rows use an array-key namespace in the existing META store. Business `clearAll` leaves history intact; organization deletion invalidates old log handles, while the original business view can reopen."
                   },
                   {
                     "type": "paragraph",
-                    "text": "Native Web Locks retain the original lifetime exclusion and cached path; a conflicting open reports LOCK_REJECTED. Without Web Locks or an actual private-factory declaration, the original namespace declares `indexExclusive:false`. storageLogStore remains available: each operation recovers/reads current lastSeq, state and records inside the original journal-store readwrite transaction, retaining no index across operations. Injected factories use the original cached path when Web Locks are available. `journalFactoryIsPrivate:true` applies only to an actual data universe confined to this realm without forwarding shared persistent storage; that path retains the original logical lock and cached owner. Object identity alone never proves isolation. This namespace support does not enable automatic global capture or opt-in undo by itself."
+                    "text": "In cached mode, dispose a log before opening the same physical organization and prefix again. Native transactions commit head/state/records together and publish the cached index from the actual complete event."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Native Web Locks retain the original lifetime exclusion and cached path; a conflicting open reports LOCK_REJECTED. Without Web Locks or an actual private-factory declaration, the original namespace declares `indexExclusive:false`."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "storageLogStore remains available: each operation recovers/reads current lastSeq, state and records inside the original journal-store readwrite transaction, retaining no index across operations."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Injected factories use the original cached path when Web Locks are available. `journalFactoryIsPrivate:true` applies only to an actual data universe confined to this realm without forwarding shared persistent storage; that path retains the original logical lock and cached owner."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Object identity alone never proves isolation. This namespace support does not enable automatic global capture or opt-in undo by itself."
                   }
                 ]
               },
@@ -54031,19 +54253,43 @@
                   },
                   {
                     "type": "paragraph",
-                    "text": "Text, bytes, records, clear and absolute TTL metadata retain their actual write order in one native transaction, including repeated writes. Only native complete publishes the log index; rollback does not advance its sequence. A first org read also prepares that org's once-only configuration, and lazy expiry deletion commits with its log. All contract writers maintain native point revisions and retain tombstones after delete or clear, so clear/recreate by another non-journal contract handle also rejects stale undo with `UNDO_CONFLICT` before restoring any target. Undo compares physical images and restores the original absolute deadline without extending expiry."
+                    "text": "Text, bytes, records, clear and absolute TTL metadata retain their actual write order in one native transaction, including repeated writes. Only native complete publishes the log index; rollback does not advance its sequence. A first org read also prepares that org's once-only configuration, and lazy expiry deletion commits with its log."
                   },
                   {
                     "type": "paragraph",
-                    "text": "Native Features borrow IDBDatabase / IDBTransaction directly, beyond the current text, bytes and record image domain. An active commit journal rejects this combination with `UNSUPPORTED_CAPABILITY` before handing out the native handle. Blob and custom native Features remain available without a journal and with telemetry-only configuration. This limited combination awaits review of shared targets and codecs. Strict IndexedDB does not declare support for external WAL I/O after final image capture; that combination rejects before business I/O."
+                    "text": "All contract writers maintain native point revisions and retain tombstones after delete or clear, so clear/recreate by another non-journal contract handle also rejects stale undo with `UNDO_CONFLICT` before restoring any target. Undo compares physical images and restores the original absolute deadline without extending expiry."
                   },
                   {
                     "type": "paragraph",
-                    "text": "localStorage/sessionStorage/Cookie explicitly enable text transactions and multi-key writes with `redo: true` plus `journal.redoWal: logger.wal`. Native Web Locks are required. Every participant borrows the same actual WAL object with current pending visibility; matching targets or separate memoryLogStore caches do not establish sharing. A same-origin popup can directly borrow its opener's exact Logger/WAL. For persistence, one owner may hold an original storageLogStore on a separate IndexedDB backend; the enhanced text backend cannot carry its own WAL."
+                    "text": "Native Features borrow IDBDatabase / IDBTransaction directly, beyond the current text, bytes and record image domain. An active commit journal rejects this combination with `UNSUPPORTED_CAPABILITY` before handing out the native handle. Blob and custom native Features remain available without a journal and with telemetry-only configuration."
                   },
                   {
                     "type": "paragraph",
-                    "text": "The original transaction owner manages the text-only scope and read-own-draft behavior. It finishes encoding before wal.begin, then applies ordered assignments, binlog and complete, and finally publishes one invalidation and success. Apply/completion failure seals that instance and preserves pending; reopening or an already-open participating peer recovers under native protection before reading. Callback rollback applies nothing. Ordinary scalar/sync behavior remains when redo is absent; selected asynchronous journaling retains the original ASYNC_STAGE_IN_SYNC_ENTRY guard. Redo does not claim native atomicity. Undo/atomicBinlog/atomicUndo and raw native Feature handles reject before mutation in this combination. Automatic cross-page recovery between independent WAL caches is not promised."
+                    "text": "This limited combination awaits review of shared targets and codecs. Strict IndexedDB does not declare support for external WAL I/O after final image capture; that combination rejects before business I/O."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "localStorage/sessionStorage/Cookie explicitly enable text transactions and multi-key writes with `redo: true` plus `journal.redoWal: logger.wal`. Native Web Locks are required. Every participant borrows the same actual WAL object with current pending visibility; matching targets or separate memoryLogStore caches do not establish sharing. A same-origin popup can directly borrow its opener's exact Logger/WAL."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "For persistence, one owner may hold an original storageLogStore on a separate IndexedDB backend; the enhanced text backend cannot carry its own WAL."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "The original transaction owner manages the text-only scope and read-own-draft behavior. It finishes encoding before wal.begin, then applies ordered assignments, binlog and complete, and finally publishes one invalidation and success."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Apply/completion failure seals that instance and preserves pending; reopening or an already-open participating peer recovers under native protection before reading. Callback rollback applies nothing."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Ordinary scalar/sync behavior remains when redo is absent; selected asynchronous journaling retains the original ASYNC_STAGE_IN_SYNC_ENTRY guard."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Redo does not claim native atomicity. Undo/atomicBinlog/atomicUndo and raw native Feature handles reject before mutation in this combination. Automatic cross-page recovery between independent WAL caches is not promised."
                   },
                   {
                     "type": "paragraph",
@@ -54051,11 +54297,19 @@
                   },
                   {
                     "type": "paragraph",
-                    "text": "Cookie `redo: true` reuses this same transaction/WAL protocol. Ordinary and redo writes share the original cookie encoding, 4096-byte limit, fixed scope and visibility checks. Batch reads still parse one native visible header and merge the current draft. Redo resolves maxAge to an absolute expiresAt image during preparation, so replay never renews it. Values outside the native Date domain reject before mutation only in this new combination; ordinary Cookie maxAge and Max-Age precedence remain unchanged. Only JS-visible cookies participate; original HttpOnly/unknown-scope limits remain."
+                    "text": "Cookie `redo: true` reuses this same transaction/WAL protocol. Ordinary and redo writes share the original cookie encoding, 4096-byte limit, fixed scope and visibility checks. Batch reads still parse one native visible header and merge the current draft."
                   },
                   {
                     "type": "paragraph",
-                    "text": "Ordinary localStorage, sessionStorage and Cookie stores declare `capabilities.batch: false`; IndexedDB and explicit redo/WAL stores declare it true. Native IndexedDB handles are unavailable with commit journaling and reject with source `@migaia/storage-contract`, code `UNSUPPORTED_CAPABILITY`. IndexedDB does not provide a vector engine. The repository website stays on published storage-web 0.0.8 until the new host module are published."
+                    "text": "Redo resolves maxAge to an absolute expiresAt image during preparation, so replay never renews it. Values outside the native Date domain reject before mutation only in this new combination; ordinary Cookie maxAge and Max-Age precedence remain unchanged."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Only JS-visible cookies participate; original HttpOnly/unknown-scope limits remain."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Ordinary localStorage, sessionStorage and Cookie stores declare `capabilities.batch: false`; IndexedDB with its batch Feature and explicit redo/WAL stores declare it true. Native IndexedDB handles are unavailable with commit journaling and reject with source `@migaia/storage-contract`, code `UNSUPPORTED_CAPABILITY`. IndexedDB does not provide a vector engine. The repository website stays on published storage-web 0.0.8 until the new host module are published."
                   }
                 ]
               },
@@ -54160,6 +54414,45 @@
                 ]
               },
               {
+                "id": "explicit-indexeddb-assembly-and-migration",
+                "heading": "Explicit IndexedDB assembly and migration",
+                "blocks": [
+                  {
+                    "type": "paragraph",
+                    "text": "`indexedDbBackendPlugin` installs basic text, bytes, records and native transactions. Native indexes/backfill, TTL, KV batches, journal images and undo, post-commit notifications, and change feeds each require their own Feature. Previously these capabilities were automatic. This intentional behavior change lets applications control browser output: an undeclared Feature is not imported by the basic backend entry. Migrate existing applications by selecting each capability they actually use. Basic reads and writes need no additional declaration."
+                  },
+                  {
+                    "type": "code",
+                    "language": "ts",
+                    "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'\nimport { indexedDbIndexesFeature } from '@migaia/storage-web/features/indexed-db-indexes'\nimport { indexedDbKeysetFeature } from '@migaia/storage-web/features/indexed-db-keyset'\nimport { indexedDbTtlFeature } from '@migaia/storage-web/features/indexed-db-ttl'\nimport { indexedDbBatchFeature } from '@migaia/storage-web/features/indexed-db-batch'\nimport { indexedDbJournalFeature } from '@migaia/storage-web/features/indexed-db-journal'\nimport { indexedDbNotificationsFeature } from '@migaia/storage-web/features/indexed-db-notifications'\nimport { indexedDbChangeFeedFeature } from '@migaia/storage-web/features/indexed-db-change-feed'\n\nconst host = await createStorageHost({\n  plugins: [\n    indexedDbBackendPlugin(\n      { dbName: 'my-app' },\n      {\n        indexes: indexedDbIndexesFeature(),\n        keyset: indexedDbKeysetFeature(),\n        ttl: indexedDbTtlFeature(),\n        batch: indexedDbBatchFeature(),\n        journal: indexedDbJournalFeature(),\n        notifications: indexedDbNotificationsFeature(),\n        changeFeed: indexedDbChangeFeedFeature()\n      }\n    )\n  ]\n})\ntry {\n  await host.backend('indexed-db').set('theme', 'dark')\n} finally {\n  await host.dispose()\n}"
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Select only required entries. Change feeds require an explicitly selected notifications Feature; they never install that prerequisite implicitly. IndexedDB `.live()` through `reactiveFeature` also requires notifications and reports a coded missing-assembly error instead of switching to polling."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Memory `.live()` likewise requires explicit `memoryNotificationsFeature()` and rejects with `@migaia/storage-host / CHANGE_CONTROLLER_NOT_ASSEMBLED` before allocating an adapter or query when absent. Calling an undeclared batch, journal, notification or change-feed entry reports `@migaia/storage-web / INDEXED_DB_FEATURE_NOT_INSTALLED` and identifies the required Feature."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Without TTL, the canonical capability owner rejects `store.use(ttl)` with `@migaia/storage-contract / UNSUPPORTED_CAPABILITY`, identifying `ttl`. Basic `capabilities.secondaryIndexes`, `capabilities.batch` and `capabilities.changeFeed` are false. Selected change feeds still require the original native realm/BroadcastChannel admission."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Keep the TTL Feature when reopening a database that uses deadlines; basic reads do not interpret expiry metadata. A client without TTL clears inherited deadlines in the same native transaction when overwriting, deleting or clearing targets. Replacement values remain unlimited and another TTL client cannot remove them using the old deadlines."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "`indexedDbJournalFeature()` supplies native images, private log namespaces and undo. Global capture additionally requires `storageJournalPlugin()` from `@migaia/storage-host/journal`, explicitly installed before the backend in the same plugin list, plus the original `journal` configuration."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Journal images read and restore existing physical deadlines without enabling TTL expiry policy. Basic writes retain physical mutation versions and tombstones so another journal-enabled instance can detect update/delete/recreate conflicts; they capture no images and create no log."
+                  }
+                ]
+              },
+              {
                 "id": "kv-batches-and-typed-keys",
                 "heading": "KV batches and typed keys",
                 "blocks": [
@@ -54184,7 +54477,7 @@
                   {
                     "type": "code",
                     "language": "ts",
-                    "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { kv, records } from '@migaia/storage-contract'\nimport { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'\n\nconst host = await createStorageHost({\n  plugins: [indexedDbBackendPlugin({ dbName: 'my-app' })]\n})\ntry {\n  const store = host.backend('indexed-db')\n  await store.transaction(async (scope) => {\n    await scope.use(kv).setMany([\n      { key: ['settings', 'theme'], value: 'dark' },\n      { key: ['settings', 'language'], value: 'en' }\n    ])\n    await scope.setBytes('avatar', new Uint8Array([1, 2]))\n    await scope.putRecord({ id: 'a', name: 'Ada' }, ['users', 'a'])\n    console.log(await scope.use(records).query().all())\n  })\n} finally {\n  await host.dispose()\n}"
+                    "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { kv, records } from '@migaia/storage-contract'\nimport { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'\nimport { indexedDbBatchFeature } from '@migaia/storage-web/features/indexed-db-batch'\n\nconst host = await createStorageHost({\n  plugins: [indexedDbBackendPlugin({ dbName: 'my-app' }, { batch: indexedDbBatchFeature() })]\n})\ntry {\n  const store = host.backend('indexed-db')\n  await store.transaction(async (scope) => {\n    await scope.use(kv).setMany([\n      { key: ['settings', 'theme'], value: 'dark' },\n      { key: ['settings', 'language'], value: 'en' }\n    ])\n    await scope.setBytes('avatar', new Uint8Array([1, 2]))\n    await scope.putRecord({ id: 'a', name: 'Ada' }, ['users', 'a'])\n    console.log(await scope.use(records).query().all())\n  })\n} finally {\n  await host.dispose()\n}"
                   },
                   {
                     "type": "paragraph",
@@ -54214,6 +54507,10 @@
                 "blocks": [
                   {
                     "type": "paragraph",
+                    "text": "Basic `defineEntity` supplies definition, connection and reads/writes. Select `entityQueryFeature()` from `@migaia/storage-host/entity/query` in the definition's `features` array for queries; `entityUniqueFeature()` from `/entity/unique` for uniqueness; `entityMigrationFeature()` from `/entity/migration` for migration; `entityIndexesFeature()` from `/entity/indexes` for index planning; and `entityKeysetFeature()` from `/entity/keyset` for keyset pages. Index queries combine query and indexes; pages combine query and keyset. Native IndexedDB indexes also require the backend's `indexedDbIndexesFeature()`. Each selection is explicit."
+                  },
+                  {
+                    "type": "paragraph",
                     "text": "Import the neutral repository owner from `@migaia/storage-host/entity` and connect it to the actual installed IndexedDB store."
                   },
                   {
@@ -54238,7 +54535,7 @@
                   {
                     "type": "code",
                     "language": "ts",
-                    "code": "import { createRuntime } from '@migaia/reactive'\nimport { records } from '@migaia/storage-contract'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { indexedDbBackendKind, indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'\nimport { reactiveFeature } from '@migaia/storage-web/features/reactive'\n\nconst runtime = createRuntime()\nconst host = await createStorageHost({\n  plugins: [\n    indexedDbBackendPlugin(\n      { dbName: 'my-app' },\n      { reactive: reactiveFeature(indexedDbBackendKind) }\n    )\n  ]\n})\ntry {\n  const store = host.backend('indexed-db')\n  const live = store.use(records).query<{ name: string }>().live({ runtime })\n  try {\n    await live.ready\n    console.log(live.state.value)\n    await live.refresh()\n  } finally {\n    await live.dispose()\n  }\n} finally {\n  await host.dispose()\n}"
+                    "code": "import { createRuntime } from '@migaia/reactive'\nimport { records } from '@migaia/storage-contract'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { indexedDbBackendKind, indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'\nimport { reactiveFeature } from '@migaia/storage-web/features/reactive'\nimport { indexedDbNotificationsFeature } from '@migaia/storage-web/features/indexed-db-notifications'\n\nconst runtime = createRuntime()\nconst host = await createStorageHost({\n  plugins: [\n    indexedDbBackendPlugin(\n      { dbName: 'my-app' },\n      {\n        notifications: indexedDbNotificationsFeature(),\n        reactive: reactiveFeature(indexedDbBackendKind)\n      }\n    )\n  ]\n})\ntry {\n  const store = host.backend('indexed-db')\n  const live = store.use(records).query<{ name: string }>().live({ runtime })\n  try {\n    await live.ready\n    console.log(live.state.value)\n    await live.refresh()\n  } finally {\n    await live.dispose()\n  }\n} finally {\n  await host.dispose()\n}"
                   },
                   {
                     "type": "paragraph",
@@ -54274,11 +54571,11 @@
                   },
                   {
                     "type": "paragraph",
-                    "text": "IndexedDB exposes native text invalidation through `store.watch(key, ctx?)`. Its `capabilities.changeFeed` is `true` only after the instance admits this realm's IndexedDB and BroadcastChannel; an unadmitted watch throws `UNSUPPORTED_CAPABILITY`. Hints carry the original host organization UUID and tell the consumer to reread committed native data. They provide neither historical replay nor one event per write. Dispose the iterator after use through its original `dispose()` method."
+                    "text": "With `indexedDbNotificationsFeature()` and `indexedDbChangeFeedFeature()` selected, IndexedDB exposes native text invalidation through `store.watch(key, ctx?)`. Its `capabilities.changeFeed` is `true` only after the instance admits this realm's IndexedDB and BroadcastChannel; an unadmitted watch throws `UNSUPPORTED_CAPABILITY`. Hints carry the original host organization UUID and tell the consumer to reread committed native data. They provide neither historical replay nor one event per write. Dispose the iterator after use through its original `dispose()` method."
                   },
                   {
                     "type": "paragraph",
-                    "text": "IndexedDB natively provides `ttl`: `store.use(ttl)` exposes `expire`, `remaining` and `persist` for text, bytes and record targets; transactions use `scope.use(ttl)`. A `setMany` entry's `ttlMs` commits or rolls back with its value in the same native transaction. Entries have no deadline by default. Expired point reads, enumeration and index queries return absence and lazily remove data through the original transaction, revision and change paths; no cleanup timer runs. Deadlines advance through the installed scheduler from one local epoch anchor captured at installation. Default-clock deadlines remain comparable across pages and reopening. IndexedDB has no vector channel, so vector TTL targets fail before I/O with `UNSUPPORTED_CAPABILITY`."
+                    "text": "With `indexedDbTtlFeature()` selected, IndexedDB provides `ttl`: `store.use(ttl)` exposes `expire`, `remaining` and `persist` for text, bytes and record targets; transactions use `scope.use(ttl)`. A `setMany` entry's `ttlMs` commits or rolls back with its value in the same native transaction. Entries have no deadline by default. Expired point reads, enumeration and index queries return absence and lazily remove data through the original transaction, revision and change paths; no cleanup timer runs. Deadlines advance through the installed scheduler from one local epoch anchor captured at installation. Default-clock deadlines remain comparable across pages and reopening. IndexedDB has no vector channel, so vector TTL targets fail before I/O with `UNSUPPORTED_CAPABILITY`."
                   },
                   {
                     "type": "paragraph",
@@ -54305,7 +54602,7 @@
                   },
                   {
                     "type": "paragraph",
-                    "text": "IndexedDB supports `storageLogStore(hostOrOrg, 'indexed-db', { prefix })` from `@migaia/storage-host/journal`. Its private rows use an array-key namespace in the existing META store. Business `clearAll` leaves history intact; organization deletion invalidates old log handles, while the original business view can reopen. In cached mode, dispose a log before opening the same physical organization and prefix again. Native transactions commit head/state/records together and publish the cached index from the actual complete event."
+                    "text": "With `indexedDbJournalFeature()` selected, IndexedDB supports `storageLogStore(hostOrOrg, 'indexed-db', { prefix })` from `@migaia/storage-host/journal`. Its private rows use an array-key namespace in the existing META store. Business `clearAll` leaves history intact; organization deletion invalidates old log handles, while the original business view can reopen. In cached mode, dispose a log before opening the same physical organization and prefix again. Native transactions commit head/state/records together and publish the cached index from the actual complete event."
                   },
                   {
                     "type": "paragraph",
@@ -54344,6 +54641,14 @@
                   {
                     "type": "paragraph",
                     "text": "Cookie `redo: true` reuses this same transaction/WAL protocol. Ordinary and redo writes share the original cookie encoding, 4096-byte limit, fixed scope and visibility checks. Batch reads still parse one native visible header and merge the current draft. Redo resolves maxAge to an absolute expiresAt image during preparation, so replay never renews it. Values outside the native Date domain reject before mutation only in this new combination; ordinary Cookie maxAge and Max-Age precedence remain unchanged. Only JS-visible cookies participate; original HttpOnly/unknown-scope limits remain."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Raw `store.use(records).query().page()` and `.after()` additionally require `indexedDbKeysetFeature()` from `@migaia/storage-web/features/indexed-db-keyset` in the backend Feature record. Basic `.all()` remains available. This unit borrows the canonical host cursor implementation without enabling native indexes."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Omitted raw pagination rejects with `@migaia/storage-web / INDEXED_DB_FEATURE_NOT_INSTALLED` and names the missing factory before opening a reader. Entity pagination has its own `entityKeysetFeature()` declaration and does not require this raw-query Feature."
                   }
                 ]
               }

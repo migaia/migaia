@@ -395,7 +395,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "只在 `features` 中选择用到的单元：`/entity/query` 的 `entityQueryFeature()` 开启 query/list/stream；`/entity/indexes` 的 `entityIndexesFeature()` 开启索引声明和规划；`/entity/unique` 的 `entityUniqueFeature()` 开启唯一提交检查；`/entity/migration` 的 `entityMigrationFeature()` 开启版本计划和持久迁移；`/entity/keyset` 的 `entityKeysetFeature()` 准入 page/after。索引、unique 与持久迁移会复用查询操作，使用这些路径时也需声明 query；单元不会自动开启其他单元。"
+                "text": "只在 `features` 中选择用到的单元：`/entity/query` 的 `entityQueryFeature()` 开启 query/list/stream；`/entity/indexes` 的 `entityIndexesFeature()` 开启索引声明和规划；`/entity/unique` 的 `entityUniqueFeature()` 开启唯一提交检查；`/entity/migration` 的 `entityMigrationFeature()` 开启版本计划和持久迁移；`/entity/keyset` 的 `entityKeysetFeature()` 准入 page/after。索引查询与唯一约束的回退校验还需要 query。没有索引或唯一约束的迁移直接扫描原生记录或文本键，不需要 query 或 unique。单元不会自动开启其他单元。"
               },
               {
                 "type": "paragraph",
@@ -417,6 +417,25 @@
               {
                 "type": "paragraph",
                 "text": "查询的 `index` 或 `range` 要最先选择，且只能选一次；普通 `where`、`select`、`skip`、`limit` 会产生新分支。自定义比较器应搭配有限 `limit`，或使用 `first()`。`stream()` 返回可释放迭代器；提前停止时使用 `await using` 或显式 `dispose()`。`watch()` 是可用后端的失效通知，并非结果行流，也不保证重放。事务查询没有 `watch()`。"
+              }
+            ]
+          },
+          {
+            "id": "持久化版本迁移",
+            "heading": "持久化版本迁移",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "迁移没有索引或唯一约束的记录时，只需选择 migration 单元。读取旧记录会升级返回值；需要持久化新版本信封时，再调用 `migrate()`。内存记录的每个迁移批次沿用原生事务。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { defineEntity } from '@migaia/storage-host/entity'\nimport { entityMigrationFeature } from '@migaia/storage-host/entity/migration'\n\ntype IUser = { id: string; name: string }\nconst host = await createStorageHost({ plugins: [memoryBackendPlugin()] })\ntry {\n  const store = host.backend('memory')\n  const original = defineEntity<IUser>({ name: 'migration-users', key: 'id' }).connect(store)\n  await original.put({ id: 'ada', name: ' Ada ' })\n  await original.put({ id: 'lin', name: ' Lin ' })\n  const users = defineEntity<IUser>({\n    name: 'migration-users',\n    key: 'id',\n    version: 2,\n    features: [entityMigrationFeature()],\n    migrations: {\n      2: (previous) => {\n        const user = previous as IUser\n        return { ...user, name: user.name.trim() }\n      }\n    }\n  }).connect(store)\n  const result = await users.migrate({ batchSize: 1 })\n  console.log(result.migrated, (await users.get('ada'))?.name) // 2 Ada\n} finally {\n  await host.dispose()\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "声明唯一约束时仍需选择 unique 单元；其回退校验还需要 query。迁移不会隐式补装任何一个单元。"
               }
             ]
           },
@@ -934,7 +953,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Select only required units in `features`: `entityQueryFeature()` from `/entity/query` adds query/list/stream; `entityIndexesFeature()` from `/entity/indexes` adds index declaration/planning; `entityUniqueFeature()` from `/entity/unique` adds unique commit checks; `entityMigrationFeature()` from `/entity/migration` adds version plans and persisted migration; `entityKeysetFeature()` from `/entity/keyset` admits page/after. Index, unique and persisted migration paths reuse query operations, so also declare query for those paths. Units never enable another unit implicitly."
+                  "text": "Select only required units in `features`: `entityQueryFeature()` from `/entity/query` adds query/list/stream; `entityIndexesFeature()` from `/entity/indexes` adds index declaration/planning; `entityUniqueFeature()` from `/entity/unique` adds unique commit checks; `entityMigrationFeature()` from `/entity/migration` adds version plans and persisted migration; `entityKeysetFeature()` from `/entity/keyset` admits page/after. Index-backed queries and fallback uniqueness validation also require query. Migration without indexes or unique constraints scans native records or text keys directly and needs neither query nor unique. Units never enable another unit implicitly."
                 },
                 {
                   "type": "paragraph",
@@ -956,6 +975,25 @@
                 {
                   "type": "paragraph",
                   "text": "Select `index` or `range` first and only once. `where`, `select`, `skip` and `limit` create new query branches. Pair custom comparators with a finite `limit`, or use `first()`. `stream()` returns a disposable iterator; use `await using` or explicit `dispose()` if stopping early. When available, `watch()` supplies invalidation notifications, not result rows or reliable replay. Transaction queries do not expose `watch()`."
+                }
+              ]
+            },
+            {
+              "id": "persist-versioned-records",
+              "heading": "Persist versioned records",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Select only migration when upgrading records without indexes or unique constraints. Reading an old record upgrades the returned value; call `migrate()` to persist the new envelopes. Each memory-record batch uses the original native transaction."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { defineEntity } from '@migaia/storage-host/entity'\nimport { entityMigrationFeature } from '@migaia/storage-host/entity/migration'\n\ntype IUser = { id: string; name: string }\nconst host = await createStorageHost({ plugins: [memoryBackendPlugin()] })\ntry {\n  const store = host.backend('memory')\n  const original = defineEntity<IUser>({ name: 'migration-users', key: 'id' }).connect(store)\n  await original.put({ id: 'ada', name: ' Ada ' })\n  await original.put({ id: 'lin', name: ' Lin ' })\n  const users = defineEntity<IUser>({\n    name: 'migration-users',\n    key: 'id',\n    version: 2,\n    features: [entityMigrationFeature()],\n    migrations: {\n      2: (previous) => {\n        const user = previous as IUser\n        return { ...user, name: user.name.trim() }\n      }\n    }\n  }).connect(store)\n  const result = await users.migrate({ batchSize: 1 })\n  console.log(result.migrated, (await users.get('ada'))?.name) // 2 Ada\n} finally {\n  await host.dispose()\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Declaring unique constraints still requires the unique unit. Its fallback check also requires query; migration does not supply either unit implicitly."
                 }
               ]
             },
@@ -1278,6 +1316,7 @@
             "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nconst original = await createStorageHost({\n  plugins: [memoryBackendPlugin({ id: 'session' })]\n})\ntry {\n  const host = await original.use(memoryBackendPlugin({ id: 'drafts' }))\n  await host.detect()\n  await host.backend('session').set('user', 'ada')\n  await host.backend('drafts').set('title', 'First draft')\n  console.log(await host.backend('session').get('user')) // ada\n  console.log(await host.backend('drafts').get('title')) // First draft\n} finally {\n  await original.dispose()\n}",
             "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { records } from '@migaia/storage-contract'\n\ntype IOrder = { state: string; total: number }\nconst host = await createStorageHost({ plugins: [memoryBackendPlugin()] })\ntry {\n  const memory = host.backend('memory')\n  await memory.transaction(async (tx) => {\n    await tx.set('status', 'ready')\n    await tx.setBytes('receipt', new Uint8Array([1, 2]))\n    await tx.putRecord({ state: 'paid', total: 20 }, 'order-1')\n  })\n  console.log(await memory.get('status')) // ready\n  const rows = await memory\n    .use(records)\n    .query<IOrder>()\n    .where({ state: 'paid' })\n    .select('total')\n    .all()\n  console.log(rows) // [{ total: 20 }]\n} finally {\n  await host.dispose()\n}",
             "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { defineEntity } from '@migaia/storage-host/entity'\nimport { entityQueryFeature } from '@migaia/storage-host/entity/query'\nimport { entityIndexesFeature } from '@migaia/storage-host/entity/indexes'\n\ntype IOrder = { id: string; state: string; total: number }\nconst host = await createStorageHost({ plugins: [memoryBackendPlugin()] })\ntry {\n  const orders = defineEntity<IOrder>()({\n    name: 'orders',\n    key: 'id',\n    features: [entityQueryFeature(), entityIndexesFeature()],\n    indexes: { byState: { path: 'state' } }\n  }).connect(host.backend('memory'))\n  await orders.put({ id: 'o1', state: 'paid', total: 20 })\n  console.log(await orders.get('o1'))\n  console.log(await orders.query().index('byState', 'paid').select('id', 'total').all())\n  // [{ id: 'o1', total: 20 }]\n} finally {\n  await host.dispose()\n}",
+            "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { defineEntity } from '@migaia/storage-host/entity'\nimport { entityMigrationFeature } from '@migaia/storage-host/entity/migration'\n\ntype IUser = { id: string; name: string }\nconst host = await createStorageHost({ plugins: [memoryBackendPlugin()] })\ntry {\n  const store = host.backend('memory')\n  const original = defineEntity<IUser>({ name: 'migration-users', key: 'id' }).connect(store)\n  await original.put({ id: 'ada', name: ' Ada ' })\n  await original.put({ id: 'lin', name: ' Lin ' })\n  const users = defineEntity<IUser>({\n    name: 'migration-users',\n    key: 'id',\n    version: 2,\n    features: [entityMigrationFeature()],\n    migrations: {\n      2: (previous) => {\n        const user = previous as IUser\n        return { ...user, name: user.name.trim() }\n      }\n    }\n  }).connect(store)\n  const result = await users.migrate({ batchSize: 1 })\n  console.log(result.migrated, (await users.get('ada'))?.name) // 2 Ada\n} finally {\n  await host.dispose()\n}",
             "import { createStorageHost, createOrgId, memoryBackendPlugin } from '@migaia/storage-host'\n\nconst host = await createStorageHost({ plugins: [memoryBackendPlugin()] })\ntry {\n  const orgA = createOrgId()\n  const orgB = createOrgId()\n  const a = host.org(orgA).backend('memory')\n  const b = host.org(orgB).backend('memory')\n  await a.set('name', 'Ada')\n  await b.set('name', 'Lin')\n  console.log(await a.get('name'), await b.get('name')) // Ada Lin\n  await host.dropOrg(orgA)\n  console.log(await b.get('name')) // Lin\n} finally {\n  await host.dispose()\n}",
             "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { storageLogStore, storageJournalPlugin } from '@migaia/storage-host/journal'\nimport { LogRecordState } from '@migaia/logger/plugins/durable'\n\nconst host = await createStorageHost({ plugins: [storageJournalPlugin(), memoryBackendPlugin()] })\ntry {\n  const log = await storageLogStore(host, 'memory', { prefix: 'history' })\n  try {\n    await log.append([{ kind: 'order.created', payload: { id: 'o1' } }])\n    await log.setState(1, LogRecordState.done)\n    console.log(await log.lastSeq()) // 1\n    console.log(await log.states(LogRecordState.pending)) // []\n  } finally {\n    await log.dispose()\n  }\n} finally {\n  await host.dispose()\n}",
             "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { memoryNotificationsFeature } from '@migaia/storage-host/features/memory-notifications'\nimport { memoryChangeFeedFeature } from '@migaia/storage-host/features/memory-change-feed'\n\nconst host = await createStorageHost({\n  plugins: [\n    memoryBackendPlugin(undefined, {\n      notifications: memoryNotificationsFeature(),\n      changeFeed: memoryChangeFeedFeature()\n    })\n  ]\n})\nawait host.dispose()",
@@ -1406,7 +1445,7 @@
           ],
           "identity": "packages/storage-host/dist/storage-host.d.ts:createStorageHost:export declare function createStorageHost<const TPlugins extends readonly IStorageBackendPluginHandle[] = readonly [], const TOptions extends Exclude<import('./journal/types.js').IStorageJournalConfiguration, Function> = Exclude<import('./journal/types.js').IStorageJournalConfiguration, Function>>(options: Omit<IStorageHostCreateOptions<TPlugins>, 'journal'> & { readonly journal: (context: import('./journal/types.js').IStorageJournalInitializerContext) => TOptions | PromiseLike<TOptions>; }): Promise<IStorageHost<TPlugins, (context: import('./journal/types.js').IStorageJournalInitializerContext) => TOptions | PromiseLike<TOptions>>>;\nexport declare function createStorageHost<const TPlugins extends readonly IStorageBackendPluginHandle[] = readonly [], const TOptions extends Exclude<import('./journal/types.js').IStorageJournalConfiguration, Function> = Exclude<import('./journal/types.js').IStorageJournalConfiguration, Function>>(options: Omit<IStorageHostCreateOptions<TPlugins>, 'journal'> & { readonly journal: TOptions; }): Promise<IStorageHost<TPlugins, TOptions>>;\nexport declare function createStorageHost<const TPlugins extends readonly IStorageBackendPluginHandle[] = readonly []>(options?: IStorageHostCreateOptions<TPlugins>): Promise<IStorageHost<TPlugins>>;",
           "guidance": [],
-          "usageScore": 112,
+          "usageScore": 126,
           "configuration": [
             {
               "name": "journal",
@@ -10558,6 +10597,7 @@
             "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nconst original = await createStorageHost({\n  plugins: [memoryBackendPlugin({ id: 'session' })]\n})\ntry {\n  const host = await original.use(memoryBackendPlugin({ id: 'drafts' }))\n  await host.detect()\n  await host.backend('session').set('user', 'ada')\n  await host.backend('drafts').set('title', 'First draft')\n  console.log(await host.backend('session').get('user')) // ada\n  console.log(await host.backend('drafts').get('title')) // First draft\n} finally {\n  await original.dispose()\n}",
             "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { records } from '@migaia/storage-contract'\n\ntype IOrder = { state: string; total: number }\nconst host = await createStorageHost({ plugins: [memoryBackendPlugin()] })\ntry {\n  const memory = host.backend('memory')\n  await memory.transaction(async (tx) => {\n    await tx.set('status', 'ready')\n    await tx.setBytes('receipt', new Uint8Array([1, 2]))\n    await tx.putRecord({ state: 'paid', total: 20 }, 'order-1')\n  })\n  console.log(await memory.get('status')) // ready\n  const rows = await memory\n    .use(records)\n    .query<IOrder>()\n    .where({ state: 'paid' })\n    .select('total')\n    .all()\n  console.log(rows) // [{ total: 20 }]\n} finally {\n  await host.dispose()\n}",
             "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { defineEntity } from '@migaia/storage-host/entity'\nimport { entityQueryFeature } from '@migaia/storage-host/entity/query'\nimport { entityIndexesFeature } from '@migaia/storage-host/entity/indexes'\n\ntype IOrder = { id: string; state: string; total: number }\nconst host = await createStorageHost({ plugins: [memoryBackendPlugin()] })\ntry {\n  const orders = defineEntity<IOrder>()({\n    name: 'orders',\n    key: 'id',\n    features: [entityQueryFeature(), entityIndexesFeature()],\n    indexes: { byState: { path: 'state' } }\n  }).connect(host.backend('memory'))\n  await orders.put({ id: 'o1', state: 'paid', total: 20 })\n  console.log(await orders.get('o1'))\n  console.log(await orders.query().index('byState', 'paid').select('id', 'total').all())\n  // [{ id: 'o1', total: 20 }]\n} finally {\n  await host.dispose()\n}",
+            "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { defineEntity } from '@migaia/storage-host/entity'\nimport { entityMigrationFeature } from '@migaia/storage-host/entity/migration'\n\ntype IUser = { id: string; name: string }\nconst host = await createStorageHost({ plugins: [memoryBackendPlugin()] })\ntry {\n  const store = host.backend('memory')\n  const original = defineEntity<IUser>({ name: 'migration-users', key: 'id' }).connect(store)\n  await original.put({ id: 'ada', name: ' Ada ' })\n  await original.put({ id: 'lin', name: ' Lin ' })\n  const users = defineEntity<IUser>({\n    name: 'migration-users',\n    key: 'id',\n    version: 2,\n    features: [entityMigrationFeature()],\n    migrations: {\n      2: (previous) => {\n        const user = previous as IUser\n        return { ...user, name: user.name.trim() }\n      }\n    }\n  }).connect(store)\n  const result = await users.migrate({ batchSize: 1 })\n  console.log(result.migrated, (await users.get('ada'))?.name) // 2 Ada\n} finally {\n  await host.dispose()\n}",
             "import { createStorageHost, createOrgId, memoryBackendPlugin } from '@migaia/storage-host'\n\nconst host = await createStorageHost({ plugins: [memoryBackendPlugin()] })\ntry {\n  const orgA = createOrgId()\n  const orgB = createOrgId()\n  const a = host.org(orgA).backend('memory')\n  const b = host.org(orgB).backend('memory')\n  await a.set('name', 'Ada')\n  await b.set('name', 'Lin')\n  console.log(await a.get('name'), await b.get('name')) // Ada Lin\n  await host.dropOrg(orgA)\n  console.log(await b.get('name')) // Lin\n} finally {\n  await host.dispose()\n}",
             "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { storageLogStore, storageJournalPlugin } from '@migaia/storage-host/journal'\nimport { LogRecordState } from '@migaia/logger/plugins/durable'\n\nconst host = await createStorageHost({ plugins: [storageJournalPlugin(), memoryBackendPlugin()] })\ntry {\n  const log = await storageLogStore(host, 'memory', { prefix: 'history' })\n  try {\n    await log.append([{ kind: 'order.created', payload: { id: 'o1' } }])\n    await log.setState(1, LogRecordState.done)\n    console.log(await log.lastSeq()) // 1\n    console.log(await log.states(LogRecordState.pending)) // []\n  } finally {\n    await log.dispose()\n  }\n} finally {\n  await host.dispose()\n}",
             "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { memoryNotificationsFeature } from '@migaia/storage-host/features/memory-notifications'\nimport { memoryChangeFeedFeature } from '@migaia/storage-host/features/memory-change-feed'\n\nconst host = await createStorageHost({\n  plugins: [\n    memoryBackendPlugin(undefined, {\n      notifications: memoryNotificationsFeature(),\n      changeFeed: memoryChangeFeedFeature()\n    })\n  ]\n})\nawait host.dispose()",
@@ -10721,7 +10761,7 @@
           ],
           "identity": "packages/storage-host/dist/backends/memory-plugin.d.ts:memoryBackendPlugin:export declare function memoryBackendPlugin(options?: IMemoryPluginOptions<'memory'> & { readonly id?: undefined; }, features?: undefined): IStorageBackendPlugin<typeof memoryBackendKind, 'memory', {}, IMemoryBackendStore>;\nexport declare function memoryBackendPlugin<const F extends IStorageFeatureRecord>(options: (IMemoryPluginOptions<'memory'> & { readonly id?: undefined; }) | undefined, features: F & IStorageFeatureStoreCompatibility<typeof memoryBackendKind, F, IMemoryBackendStore>): IStorageBackendPlugin<typeof memoryBackendKind, 'memory', F, IMemoryBackendStore>;\nexport declare function memoryBackendPlugin<const N extends string>(options: IMemoryPluginOptions<N> & { readonly id: N; }, features?: undefined): IStorageBackendPlugin<typeof memoryBackendKind, N, {}, IMemoryBackendStore>;\nexport declare function memoryBackendPlugin<const N extends string, const F extends IStorageFeatureRecord>(options: IMemoryPluginOptions<N> & { readonly id: N; }, features: F & IStorageFeatureStoreCompatibility<typeof memoryBackendKind, F, IMemoryBackendStore>): IStorageBackendPlugin<typeof memoryBackendKind, N, F, IMemoryBackendStore>;",
           "guidance": [],
-          "usageScore": 108,
+          "usageScore": 122,
           "configuration": [
             {
               "name": "id",
@@ -15041,7 +15081,7 @@
           "kind": "const",
           "signature": "export declare const isStorageKeyInRange: (key: IStorageKey, range: IKeyRange | undefined) => boolean;",
           "declarationLine": 3,
-          "source": "packages/storage-host/dist/core/query.d.ts",
+          "source": "packages/storage-host/dist/core/query-state.d.ts",
           "purpose": "Compare a validated key against the same canonical inclusive/open range semantics used by backend scans.",
           "core": "key: The already-admitted logical storage key.\nrange: Captured bounds, or undefined to accept every key.\nWhether the key satisfies every supplied bound.",
           "advanced": "",
@@ -15095,7 +15135,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-host/dist/core/query.d.ts:isStorageKeyInRange:export declare const isStorageKeyInRange: (key: IStorageKey, range: IKeyRange | undefined) => boolean;",
+          "identity": "packages/storage-host/dist/core/query-state.d.ts:isStorageKeyInRange:export declare const isStorageKeyInRange: (key: IStorageKey, range: IKeyRange | undefined) => boolean;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -22213,7 +22253,7 @@
           "name": "compileStorageQueryCondition",
           "kind": "function",
           "signature": "export declare function compileStorageQueryCondition<T>(condition: IQueryCondition): (value: T) => boolean;",
-          "declarationLine": 16,
+          "declarationLine": 19,
           "source": "packages/storage-host/dist/authoring/query.d.ts",
           "purpose": "Compile an already canonical source AST using the original condition compiler.",
           "core": "condition: Canonical AST from the original native execute callback, without another IWhere snapshot.\nThe original stateless predicate with unchanged operator and error semantics.",
@@ -22291,7 +22331,7 @@
           "name": "compileStorageWhere",
           "kind": "function",
           "signature": "export declare function compileStorageWhere<T>(where: IWhere<T>): (value: T) => boolean;",
-          "declarationLine": 10,
+          "declarationLine": 13,
           "source": "packages/storage-host/dist/authoring/query.d.ts",
           "purpose": "Capture the canonical declarative AST once and compile a stateless typed candidate predicate.",
           "core": "where: Typed IWhere<T> with nested fields, and/or/not and valid field operators; function predicates are not declarative input.\n(value:T)=>boolean with one-time membership Sets, captured Date bounds and noncoercive comparison. Invalid conditions or paths reject before reading a source.",
@@ -22369,7 +22409,7 @@
           "name": "createRdfQuery",
           "kind": "function",
           "signature": "export declare function createRdfQuery<TContext extends IOperationContext | undefined = IOperationContext, TAugmentMethods extends object = Record<never, never>, TOperationScope extends object = object>(source: IRdfQuerySource<TOperationScope> & { readonly watch: IQueryWatcher<IRdfQueryInput<TOperationScope>>; }, pattern: Partial<IQuad>, methods?: TAugmentMethods): IRdfQuery<TContext, TAugmentMethods & (TContext extends undefined ? Record<never, never> : IQueryWatch<TContext>)>;\nexport declare function createRdfQuery<TContext extends IOperationContext | undefined = IOperationContext, TAugmentMethods extends object = Record<never, never>, TOperationScope extends object = object>(source: IRdfQuerySource<TOperationScope>, pattern: Partial<IQuad>, methods?: TAugmentMethods): IRdfQuery<TContext, TAugmentMethods>;",
-          "declarationLine": 47,
+          "declarationLine": 263,
           "source": "packages/storage-host/dist/authoring/query.d.ts",
           "purpose": "Create a ground RDF read query with ordered native traversal steps.",
           "core": "source: IRdfQuerySource returns its original storage iterator from the ordered safe native prefix.\npattern: Canonical partial ground quad; omitted graph matches all graphs.\nmethods: Optional original pure Feature functions.\nIRdfQuery with common reads, projections, keyset pages, native/client ground follow/inverse, delete and replace through the original mutation owner.",
@@ -22501,7 +22541,7 @@
           "name": "createRecordQuery",
           "kind": "function",
           "signature": "export declare function createRecordQuery<T, TContext extends IOperationContext | undefined = IOperationContext, TAugmentMethods extends object = Record<never, never>>(source: IRecordQuerySource & { readonly watch: IQueryWatcher<IRecordQueryInput>; }, methods?: TAugmentMethods): IRecordQuery<T, TContext, TAugmentMethods & (TContext extends undefined ? Record<never, never> : IQueryWatch<TContext>)>;\nexport declare function createRecordQuery<T, TContext extends IOperationContext | undefined = IOperationContext, TAugmentMethods extends object = Record<never, never>>(source: IRecordQuerySource, methods?: TAugmentMethods): IRecordQuery<T, TContext, TAugmentMethods>;",
-          "declarationLine": 25,
+          "declarationLine": 224,
           "source": "packages/storage-host/dist/authoring/query.d.ts",
           "purpose": "Create the shared immutable record reader with conditions, projections, limit, bounded comparator ordering, all and stream over one original cursor.",
           "core": "source: IRecordQuerySource captures pushdown facts, execute and optional readonly asyncDisposeKey once. execute receives only safe-prefix conditions, optional fields and captured operation context; projected native rows are unknown. Pass the host's existing resource key when it supplies a fallback for native Symbol.asyncDispose.\nmethods: Optional Feature-owned pure method object; capture once and retain each function reference on every where/select/requirePushdown result.\nIRecordQuery<T,TContext,TAugmentMethods> with three where forms, one select, all, real stream, explain, requirePushdown, limit and orderByComparator(compare).limit(k). Missing comparator bounds and invalid limits reject before source execution. Selector ordering, distinct and skip share the same reader. Extended native controls require explicit nativeSteps:true; legacy limit/comparator behavior stays client-side. all synchronously admits its full mapper/cleanup lifetime to the original transaction iterator owner and retains its first failure before cleanup.",
@@ -22614,10 +22654,114 @@
           "fragment": "storage-host-authoring/query--createRecordQuery"
         },
         {
+          "name": "createRecordQueryWithoutKeyset",
+          "kind": "function",
+          "signature": "export declare function createRecordQueryWithoutKeyset<T, TContext extends IOperationContext | undefined = IOperationContext, TAugmentMethods extends object = Record<never, never>>(source: IRecordQuerySource, methods?: TAugmentMethods, missingKeyset?: () => never): IRecordQuery<T, TContext, TAugmentMethods>;",
+          "declarationLine": 245,
+          "source": "packages/storage-host/dist/authoring/query.d.ts",
+          "purpose": "Construct the canonical record query without retaining the keyset runtime. Basic where, select and all continue to use the original source and iterator cleanup. page and after invoke the supplied missingKeyset callback; an explicitly selected Feature may instead inject the full createRecordQuery creator. The existing createRecordQuery entry retains its original full behavior.",
+          "core": "source: Original native query source, support declaration and operation-owned cursor.\nmethods: Optional Feature methods captured once and retained by each query branch.\nmissingKeyset: Optional callback reporting the owning package’s registered missing-assembly error when page or after is requested.\nA record query using the same source lifetime; construction performs no native reads.",
+          "advanced": "",
+          "parameters": [
+            "source: IRecordQuerySource",
+            "methods: TAugmentMethods (optional)",
+            "missingKeyset: () => never (optional)"
+          ],
+          "parameterDetails": [
+            {
+              "name": "source",
+              "type": "IRecordQuerySource",
+              "optional": false
+            },
+            {
+              "name": "methods",
+              "type": "TAugmentMethods",
+              "optional": true,
+              "configurationType": "object"
+            },
+            {
+              "name": "missingKeyset",
+              "type": "() => never",
+              "optional": true
+            }
+          ],
+          "returns": "IRecordQuery<T, TContext, TAugmentMethods>",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "exportPath": "./authoring/query",
+          "overloadSignatures": [
+            "export declare function createRecordQueryWithoutKeyset<T, TContext extends IOperationContext | undefined = IOperationContext, TAugmentMethods extends object = Record<never, never>>(source: IRecordQuerySource, methods?: TAugmentMethods, missingKeyset?: () => never): IRecordQuery<T, TContext, TAugmentMethods>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "source",
+                "type": "IRecordQuerySource",
+                "optional": false
+              },
+              {
+                "name": "methods",
+                "type": "TAugmentMethods",
+                "optional": true,
+                "configurationType": "object"
+              },
+              {
+                "name": "missingKeyset",
+                "type": "() => never",
+                "optional": true
+              }
+            ]
+          ],
+          "overloadReturns": ["IRecordQuery<T, TContext, TAugmentMethods>"],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Construct the canonical record query without retaining the keyset runtime. Basic where, select and all continue to use the original source and iterator cleanup. page and after invoke the supplied missingKeyset callback; an explicitly selected Feature may instead inject the full createRecordQuery creator. The existing createRecordQuery entry retains its original full behavior."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createRecordQueryWithoutKeyset from @migaia/storage-host/authoring/query, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createRecordQueryWithoutKeyset when its function contract and declared inputs match the result you need. Choose a different public symbol when createRecordQueryWithoutKeyset does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "source: Original native query source, support declaration and operation-owned cursor.\nmethods: Optional Feature methods captured once and retained by each query branch.\nmissingKeyset: Optional callback reporting the owning package’s registered missing-assembly error when page or after is requested.\nA record query using the same source lifetime; construction performs no native reads."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-host/dist/authoring/query.d.ts:createRecordQueryWithoutKeyset:export declare function createRecordQueryWithoutKeyset<T, TContext extends IOperationContext | undefined = IOperationContext, TAugmentMethods extends object = Record<never, never>>(source: IRecordQuerySource, methods?: TAugmentMethods, missingKeyset?: () => never): IRecordQuery<T, TContext, TAugmentMethods>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-host-authoring/query--createRecordQueryWithoutKeyset"
+        },
+        {
           "name": "createVectorQuery",
           "kind": "function",
           "signature": "export declare function createVectorQuery<TPayload, TGroupable extends boolean = false, TAugmentMethods extends object = Record<never, never>>(source: IVectorQuerySource<TPayload, TGroupable> & { readonly watch: IQueryWatcher<IVectorQueryInput>; }, methods?: TAugmentMethods): IVectorQueryBuilder<TPayload, TGroupable, false, TAugmentMethods & IQueryWatch>;\nexport declare function createVectorQuery<TPayload, TGroupable extends boolean = false, TAugmentMethods extends object = Record<never, never>>(source: IVectorQuerySource<TPayload, TGroupable>, methods?: TAugmentMethods): IVectorQueryBuilder<TPayload, TGroupable, false, TAugmentMethods>;",
-          "declarationLine": 41,
+          "declarationLine": 257,
           "source": "packages/storage-host/dist/authoring/query.d.ts",
           "purpose": "Create an immutable pre-topK vector builder over the native ranking cursor.",
           "core": "source: IVectorQuerySource captures the original ranking cursor, exact/groupBy support and optional original request origin. Native Features require native: true; new reranked operations borrow the optional original beginOperation lease until scorer and cleanup settle.\nmethods: Optional original pure Feature functions; reserved names reject before I/O.\nIVectorQueryBuilder; topK enables shared reads and one optional portable rerank over actual bounded hits. Native filters precede ranking; client predicates never refill hits. Reranked results retain engine score and add rerankScore without write, watch or strict-pushdown methods.",
@@ -22730,10 +22874,1135 @@
           "fragment": "storage-host-authoring/query--createVectorQuery"
         },
         {
+          "name": "IFamilyReaderCompiler",
+          "kind": "type",
+          "signature": "export type IFamilyReaderCompiler = (compiler: IQueryCompileContext, step: IRdfQueryTraversal) => IQueryReader;",
+          "declarationLine": 171,
+          "source": "packages/storage-host/dist/authoring/query.d.ts",
+          "purpose": "Family nodes install only their declared reader and reuse the original cleanup owner.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IFamilyReaderCompiler.",
+          "advanced": "No additional advanced behavior is declared for IFamilyReaderCompiler.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IFamilyReaderCompiler."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IFamilyReaderCompiler.",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "exportPath": "./authoring/query",
+          "overloadSignatures": [
+            "export type IFamilyReaderCompiler = (compiler: IQueryCompileContext, step: IRdfQueryTraversal) => IQueryReader;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IFamilyReaderCompiler when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IFamilyReaderCompiler does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Family nodes install only their declared reader and reuse the original cleanup owner."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IFamilyReaderCompiler from @migaia/storage-host/authoring/query, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IFamilyReaderCompiler when its type contract and declared inputs match the result you need. Choose a different public symbol when IFamilyReaderCompiler does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IFamilyReaderCompiler."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IFamilyReaderCompiler."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-host/dist/authoring/query.d.ts:IFamilyReaderCompiler:export type IFamilyReaderCompiler = (compiler: IQueryCompileContext, step: IRdfQueryTraversal) => IQueryReader;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-host-authoring/query--IFamilyReaderCompiler"
+        },
+        {
+          "name": "IQueryAdvance",
+          "kind": "type",
+          "signature": "export type IQueryAdvance = () => Promise<IteratorResult<readonly [IStorageKey, unknown]>>;",
+          "declarationLine": 150,
+          "source": "packages/storage-host/dist/authoring/query.d.ts",
+          "purpose": "One pull stays inside the original source operation view supplied for this accepted read.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IQueryAdvance.",
+          "advanced": "No additional advanced behavior is declared for IQueryAdvance.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IQueryAdvance."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IQueryAdvance.",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "exportPath": "./authoring/query",
+          "overloadSignatures": [
+            "export type IQueryAdvance = () => Promise<IteratorResult<readonly [IStorageKey, unknown]>>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IQueryAdvance when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IQueryAdvance does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "One pull stays inside the original source operation view supplied for this accepted read."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IQueryAdvance from @migaia/storage-host/authoring/query, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IQueryAdvance when its type contract and declared inputs match the result you need. Choose a different public symbol when IQueryAdvance does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IQueryAdvance."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IQueryAdvance."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-host/dist/authoring/query.d.ts:IQueryAdvance:export type IQueryAdvance = () => Promise<IteratorResult<readonly [IStorageKey, unknown]>>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-host-authoring/query--IQueryAdvance"
+        },
+        {
+          "name": "IQueryCompileContext",
+          "kind": "type",
+          "signature": "export type IQueryCompileContext = { readonly owner: IQueryReaderOwner; readonly steps: readonly IQueryNode['step'][]; readonly source: IQuerySourceSnapshot | undefined; readonly comparator: ((left: unknown, right: unknown) => number) | undefined; readonly vector: boolean; index: number; read: IQueryReader; close: ICompiledQueryReader['close']; report: ICompiledQueryReader['report']; };",
+          "declarationLine": 187,
+          "source": "packages/storage-host/dist/authoring/query.d.ts",
+          "purpose": "Compilation follows the existing flat plan without factory-captured per-node mutable state.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IQueryCompileContext.",
+          "advanced": "No additional advanced behavior is declared for IQueryCompileContext.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IQueryCompileContext."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IQueryCompileContext.",
+          "examples": [],
+          "members": [
+            {
+              "name": "owner",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly owner: IQueryReaderOwner;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IQueryReaderOwner"
+            },
+            {
+              "name": "steps",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly steps: readonly IQueryNode['step'][];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly IQueryNode['step'][]"
+            },
+            {
+              "name": "source",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly source: IQuerySourceSnapshot | undefined;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IQuerySourceSnapshot | undefined"
+            },
+            {
+              "name": "comparator",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly comparator: ((left: unknown, right: unknown) => number) | undefined;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "((left: unknown, right: unknown) => number) | undefined"
+            },
+            {
+              "name": "vector",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly vector: boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "index",
+              "kind": "property",
+              "optional": false,
+              "signature": "index: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "read",
+              "kind": "property",
+              "optional": false,
+              "signature": "read: IQueryReader;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IQueryReader"
+            },
+            {
+              "name": "close",
+              "kind": "property",
+              "optional": false,
+              "signature": "close: ICompiledQueryReader['close'];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "ICompiledQueryReader['close']"
+            },
+            {
+              "name": "report",
+              "kind": "property",
+              "optional": false,
+              "signature": "report: ICompiledQueryReader['report'];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "ICompiledQueryReader['report']"
+            }
+          ],
+          "composes": [],
+          "exportPath": "./authoring/query",
+          "overloadSignatures": [
+            "export type IQueryCompileContext = { readonly owner: IQueryReaderOwner; readonly steps: readonly IQueryNode['step'][]; readonly source: IQuerySourceSnapshot | undefined; readonly comparator: ((left: unknown, right: unknown) => number) | undefined; readonly vector: boolean; index: number; read: IQueryReader; close: ICompiledQueryReader['close']; report: ICompiledQueryReader['report']; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IQueryCompileContext when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IQueryCompileContext does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Compilation follows the existing flat plan without factory-captured per-node mutable state."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IQueryCompileContext from @migaia/storage-host/authoring/query, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IQueryCompileContext when its type contract and declared inputs match the result you need. Choose a different public symbol when IQueryCompileContext does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IQueryCompileContext."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IQueryCompileContext."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-host/dist/authoring/query.d.ts:IQueryCompileContext:export type IQueryCompileContext = { readonly owner: IQueryReaderOwner; readonly steps: readonly IQueryNode['step'][]; readonly source: IQuerySourceSnapshot | undefined; readonly comparator: ((left: unknown, right: unknown) => number) | undefined; readonly vector: boolean; index: number; read: IQueryReader; close: ICompiledQueryReader['close']; report: ICompiledQueryReader['report']; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-host-authoring/query--IQueryCompileContext"
+        },
+        {
+          "name": "IQueryCursorSnapshot",
+          "kind": "type",
+          "signature": "export type IQueryCursorSnapshot = { readonly key: IStorageKey; readonly bytes: Uint8Array; readonly row?: unknown; readonly matches: (source: IQuerySourceSnapshot, steps: readonly IQueryNode['step'][], orgId: string | undefined) => boolean; };",
+          "declarationLine": 131,
+          "source": "packages/storage-host/dist/authoring/query.d.ts",
+          "purpose": "Detached cursor data and a Boolean identity check never return an underlying source object.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IQueryCursorSnapshot.",
+          "advanced": "No additional advanced behavior is declared for IQueryCursorSnapshot.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IQueryCursorSnapshot."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IQueryCursorSnapshot.",
+          "examples": [],
+          "members": [
+            {
+              "name": "key",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly key: IStorageKey;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IStorageKey"
+            },
+            {
+              "name": "bytes",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly bytes: Uint8Array;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Uint8Array"
+            },
+            {
+              "name": "row",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly row?: unknown;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "unknown"
+            },
+            {
+              "name": "matches",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly matches: (source: IQuerySourceSnapshot, steps: readonly IQueryNode['step'][], orgId: string | undefined) => boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "(source: IQuerySourceSnapshot, steps: readonly IQueryNode['step'][], orgId: string | undefined) => boolean"
+            }
+          ],
+          "composes": [],
+          "exportPath": "./authoring/query",
+          "overloadSignatures": [
+            "export type IQueryCursorSnapshot = { readonly key: IStorageKey; readonly bytes: Uint8Array; readonly row?: unknown; readonly matches: (source: IQuerySourceSnapshot, steps: readonly IQueryNode['step'][], orgId: string | undefined) => boolean; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IQueryCursorSnapshot when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IQueryCursorSnapshot does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Detached cursor data and a Boolean identity check never return an underlying source object."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IQueryCursorSnapshot from @migaia/storage-host/authoring/query, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IQueryCursorSnapshot when its type contract and declared inputs match the result you need. Choose a different public symbol when IQueryCursorSnapshot does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IQueryCursorSnapshot."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IQueryCursorSnapshot."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-host/dist/authoring/query.d.ts:IQueryCursorSnapshot:export type IQueryCursorSnapshot = { readonly key: IStorageKey; readonly bytes: Uint8Array; readonly row?: unknown; readonly matches: (source: IQuerySourceSnapshot, steps: readonly IQueryNode['step'][], orgId: string | undefined) => boolean; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-host-authoring/query--IQueryCursorSnapshot"
+        },
+        {
+          "name": "IQueryNode",
+          "kind": "type",
+          "signature": "export type IQueryNode = { readonly previous: IQueryNode | undefined; readonly step: { readonly operation: typeof QueryOperation.limit; readonly count: number; } | { readonly operation: typeof QueryOperation.skip; readonly count: number; } | { readonly operation: typeof QueryOperation.distinct; readonly field: string; } | { readonly operation: typeof QueryOperation.order; readonly selector: (row: unknown) => IStorageKey; readonly direction: 'asc' | 'desc'; } | { readonly operation: typeof QueryOperation.order; readonly by: 'key'; readonly direction: 'asc' | 'desc'; } | { readonly operation: typeof QueryOperation.after; readonly cursor: IQueryCursorSnapshot; readonly compile: (compiler: IQueryCompileContext) => IQueryReader; readonly native: (source: IQuerySourceSnapshot) => IQueryNativeStep; } | { readonly operation: typeof QueryOperation.comparator; readonly compare: (left: unknown, right: unknown) => number; } | { readonly operation: typeof QueryOperation.where; readonly condition: IQueryCondition; } | { readonly operation: typeof QueryOperation.predicate; readonly predicate: (row: unknown) => boolean; } | { readonly operation: typeof QueryOperation.select; readonly fields: readonly string[]; } | { readonly operation: typeof QueryOperation.mapper; readonly mapper: (row: unknown) => unknown; } | { readonly operation: typeof QueryOperation.topK; readonly count: number; } | { readonly operation: typeof QueryOperation.minScore; readonly score: number; } | (IRdfQueryTraversal & { readonly compile: IFamilyReaderCompiler; }) | { readonly operation: typeof QueryOperation.groupBy; readonly field: string; readonly perGroup: number; readonly compile: IVectorReaderCompiler; } | { readonly operation: typeof QueryOperation.rerank; readonly compile: IVectorReaderCompiler; }; };",
+          "declarationLine": 21,
+          "source": "packages/storage-host/dist/authoring/query.d.ts",
+          "purpose": "Nodes retain only their immediate predecessor, so deriving a branch never copies its history.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IQueryNode.",
+          "advanced": "No additional advanced behavior is declared for IQueryNode.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IQueryNode."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IQueryNode.",
+          "examples": [],
+          "members": [
+            {
+              "name": "previous",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly previous: IQueryNode | undefined;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IQueryNode | undefined"
+            },
+            {
+              "name": "step",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly step: { readonly operation: typeof QueryOperation.limit; readonly count: number; } | { readonly operation: typeof QueryOperation.skip; readonly count: number; } | { readonly operation: typeof QueryOperation.distinct; readonly field: string; } | { readonly operation: typeof QueryOperation.order; readonly selector: (row: unknown) => IStorageKey; readonly direction: 'asc' | 'desc'; } | { readonly operation: typeof QueryOperation.order; readonly by: 'key'; readonly direction: 'asc' | 'desc'; } | { readonly operation: typeof QueryOperation.after; readonly cursor: IQueryCursorSnapshot; readonly compile: (compiler: IQueryCompileContext) => IQueryReader; readonly native: (source: IQuerySourceSnapshot) => IQueryNativeStep; } | { readonly operation: typeof QueryOperation.comparator; readonly compare: (left: unknown, right: unknown) => number; } | { readonly operation: typeof QueryOperation.where; readonly condition: IQueryCondition; } | { readonly operation: typeof QueryOperation.predicate; readonly predicate: (row: unknown) => boolean; } | { readonly operation: typeof QueryOperation.select; readonly fields: readonly string[]; } | { readonly operation: typeof QueryOperation.mapper; readonly mapper: (row: unknown) => unknown; } | { readonly operation: typeof QueryOperation.topK; readonly count: number; } | { readonly operation: typeof QueryOperation.minScore; readonly score: number; } | (IRdfQueryTraversal & { readonly compile: IFamilyReaderCompiler; }) | { readonly operation: typeof QueryOperation.groupBy; readonly field: string; readonly perGroup: number; readonly compile: IVectorReaderCompiler; } | { readonly operation: typeof QueryOperation.rerank; readonly compile: IVectorReaderCompiler; };",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "{ readonly operation: typeof QueryOperation.limit; readonly count: number; } | { readonly operation: typeof QueryOperation.skip; readonly count: number; } | { readonly operation: typeof QueryOperation.distinct; readonly field: string; } | { readonly operation: typeof QueryOperation.order; readonly selector: (row: unknown) => IStorageKey; readonly direction: 'asc' | 'desc'; } | { readonly operation: typeof QueryOperation.order; readonly by: 'key'; readonly direction: 'asc' | 'desc'; } | { readonly operation: typeof QueryOperation.after; readonly cursor: IQueryCursorSnapshot; readonly compile: (compiler: IQueryCompileContext) => IQueryReader; readonly native: (source: IQuerySourceSnapshot) => IQueryNativeStep; } | { readonly operation: typeof QueryOperation.comparator; readonly compare: (left: unknown, right: unknown) => number; } | { readonly operation: typeof QueryOperation.where; readonly condition: IQueryCondition; } | { readonly operation: typeof QueryOperation.predicate; readonly predicate: (row: unknown) => boolean; } | { readonly operation: typeof QueryOperation.select; readonly fields: readonly string[]; } | { readonly operation: typeof QueryOperation.mapper; readonly mapper: (row: unknown) => unknown; } | { readonly operation: typeof QueryOperation.topK; readonly count: number; } | { readonly operation: typeof QueryOperation.minScore; readonly score: number; } | (IRdfQueryTraversal & { readonly compile: IFamilyReaderCompiler; }) | { readonly operation: typeof QueryOperation.groupBy; readonly field: string; readonly perGroup: number; readonly compile: IVectorReaderCompiler; } | { readonly operation: typeof QueryOperation.rerank; readonly compile: IVectorReaderCompiler; }"
+            }
+          ],
+          "composes": [],
+          "exportPath": "./authoring/query",
+          "overloadSignatures": [
+            "export type IQueryNode = { readonly previous: IQueryNode | undefined; readonly step: { readonly operation: typeof QueryOperation.limit; readonly count: number; } | { readonly operation: typeof QueryOperation.skip; readonly count: number; } | { readonly operation: typeof QueryOperation.distinct; readonly field: string; } | { readonly operation: typeof QueryOperation.order; readonly selector: (row: unknown) => IStorageKey; readonly direction: 'asc' | 'desc'; } | { readonly operation: typeof QueryOperation.order; readonly by: 'key'; readonly direction: 'asc' | 'desc'; } | { readonly operation: typeof QueryOperation.after; readonly cursor: IQueryCursorSnapshot; readonly compile: (compiler: IQueryCompileContext) => IQueryReader; readonly native: (source: IQuerySourceSnapshot) => IQueryNativeStep; } | { readonly operation: typeof QueryOperation.comparator; readonly compare: (left: unknown, right: unknown) => number; } | { readonly operation: typeof QueryOperation.where; readonly condition: IQueryCondition; } | { readonly operation: typeof QueryOperation.predicate; readonly predicate: (row: unknown) => boolean; } | { readonly operation: typeof QueryOperation.select; readonly fields: readonly string[]; } | { readonly operation: typeof QueryOperation.mapper; readonly mapper: (row: unknown) => unknown; } | { readonly operation: typeof QueryOperation.topK; readonly count: number; } | { readonly operation: typeof QueryOperation.minScore; readonly score: number; } | (IRdfQueryTraversal & { readonly compile: IFamilyReaderCompiler; }) | { readonly operation: typeof QueryOperation.groupBy; readonly field: string; readonly perGroup: number; readonly compile: IVectorReaderCompiler; } | { readonly operation: typeof QueryOperation.rerank; readonly compile: IVectorReaderCompiler; }; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IQueryNode when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IQueryNode does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Nodes retain only their immediate predecessor, so deriving a branch never copies its history."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IQueryNode from @migaia/storage-host/authoring/query, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IQueryNode when its type contract and declared inputs match the result you need. Choose a different public symbol when IQueryNode does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IQueryNode."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IQueryNode."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-host/dist/authoring/query.d.ts:IQueryNode:export type IQueryNode = { readonly previous: IQueryNode | undefined; readonly step: { readonly operation: typeof QueryOperation.limit; readonly count: number; } | { readonly operation: typeof QueryOperation.skip; readonly count: number; } | { readonly operation: typeof QueryOperation.distinct; readonly field: string; } | { readonly operation: typeof QueryOperation.order; readonly selector: (row: unknown) => IStorageKey; readonly direction: 'asc' | 'desc'; } | { readonly operation: typeof QueryOperation.order; readonly by: 'key'; readonly direction: 'asc' | 'desc'; } | { readonly operation: typeof QueryOperation.after; readonly cursor: IQueryCursorSnapshot; readonly compile: (compiler: IQueryCompileContext) => IQueryReader; readonly native: (source: IQuerySourceSnapshot) => IQueryNativeStep; } | { readonly operation: typeof QueryOperation.comparator; readonly compare: (left: unknown, right: unknown) => number; } | { readonly operation: typeof QueryOperation.where; readonly condition: IQueryCondition; } | { readonly operation: typeof QueryOperation.predicate; readonly predicate: (row: unknown) => boolean; } | { readonly operation: typeof QueryOperation.select; readonly fields: readonly string[]; } | { readonly operation: typeof QueryOperation.mapper; readonly mapper: (row: unknown) => unknown; } | { readonly operation: typeof QueryOperation.topK; readonly count: number; } | { readonly operation: typeof QueryOperation.minScore; readonly score: number; } | (IRdfQueryTraversal & { readonly compile: IFamilyReaderCompiler; }) | { readonly operation: typeof QueryOperation.groupBy; readonly field: string; readonly perGroup: number; readonly compile: IVectorReaderCompiler; } | { readonly operation: typeof QueryOperation.rerank; readonly compile: IVectorReaderCompiler; }; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-host-authoring/query--IQueryNode"
+        },
+        {
+          "name": "IQueryReader",
+          "kind": "type",
+          "signature": "export type IQueryReader = (advance: IQueryAdvance, currentScope?: object) => Promise<IteratorResult<unknown> & { readonly key?: IStorageKey; readonly keyBytes?: Uint8Array; readonly ordering?: readonly Uint8Array[]; readonly anchor?: unknown; }>;",
+          "declarationLine": 152,
+          "source": "packages/storage-host/dist/authoring/query.d.ts",
+          "purpose": "Each compiled node transforms one upstream pull without owning another cursor or queue.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IQueryReader.",
+          "advanced": "No additional advanced behavior is declared for IQueryReader.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IQueryReader."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IQueryReader.",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "exportPath": "./authoring/query",
+          "overloadSignatures": [
+            "export type IQueryReader = (advance: IQueryAdvance, currentScope?: object) => Promise<IteratorResult<unknown> & { readonly key?: IStorageKey; readonly keyBytes?: Uint8Array; readonly ordering?: readonly Uint8Array[]; readonly anchor?: unknown; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IQueryReader when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IQueryReader does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Each compiled node transforms one upstream pull without owning another cursor or queue."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IQueryReader from @migaia/storage-host/authoring/query, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IQueryReader when its type contract and declared inputs match the result you need. Choose a different public symbol when IQueryReader does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IQueryReader."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IQueryReader."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-host/dist/authoring/query.d.ts:IQueryReader:export type IQueryReader = (advance: IQueryAdvance, currentScope?: object) => Promise<IteratorResult<unknown> & { readonly key?: IStorageKey; readonly keyBytes?: Uint8Array; readonly ordering?: readonly Uint8Array[]; readonly anchor?: unknown; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-host-authoring/query--IQueryReader"
+        },
+        {
+          "name": "IQueryReaderInput",
+          "kind": "type",
+          "signature": "export type IQueryReaderInput = { readonly upstream: IQueryReader; readonly ctx: IOperationContext | undefined; };",
+          "declarationLine": 182,
+          "source": "packages/storage-host/dist/authoring/query.d.ts",
+          "purpose": "Every node borrows exactly its direct predecessor and accepted operation context.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IQueryReaderInput.",
+          "advanced": "No additional advanced behavior is declared for IQueryReaderInput.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IQueryReaderInput."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IQueryReaderInput.",
+          "examples": [],
+          "members": [
+            {
+              "name": "upstream",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly upstream: IQueryReader;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IQueryReader"
+            },
+            {
+              "name": "ctx",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly ctx: IOperationContext | undefined;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IOperationContext | undefined"
+            }
+          ],
+          "composes": [],
+          "exportPath": "./authoring/query",
+          "overloadSignatures": [
+            "export type IQueryReaderInput = { readonly upstream: IQueryReader; readonly ctx: IOperationContext | undefined; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IQueryReaderInput when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IQueryReaderInput does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Every node borrows exactly its direct predecessor and accepted operation context."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IQueryReaderInput from @migaia/storage-host/authoring/query, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IQueryReaderInput when its type contract and declared inputs match the result you need. Choose a different public symbol when IQueryReaderInput does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IQueryReaderInput."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IQueryReaderInput."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-host/dist/authoring/query.d.ts:IQueryReaderInput:export type IQueryReaderInput = { readonly upstream: IQueryReader; readonly ctx: IOperationContext | undefined; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-host-authoring/query--IQueryReaderInput"
+        },
+        {
+          "name": "IQueryReadResult",
+          "kind": "type",
+          "signature": "export type IQueryReadResult = Awaited<ReturnType<IQueryReader>>;",
+          "declarationLine": 173,
+          "source": "packages/storage-host/dist/authoring/query.d.ts",
+          "purpose": "The existing reader result carries private ordering metadata between named nodes.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IQueryReadResult.",
+          "advanced": "No additional advanced behavior is declared for IQueryReadResult.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IQueryReadResult."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IQueryReadResult.",
+          "examples": [],
+          "members": [],
+          "composes": ["Awaited"],
+          "exportPath": "./authoring/query",
+          "overloadSignatures": [
+            "export type IQueryReadResult = Awaited<ReturnType<IQueryReader>>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IQueryReadResult when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IQueryReadResult does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "The existing reader result carries private ordering metadata between named nodes."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IQueryReadResult from @migaia/storage-host/authoring/query, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IQueryReadResult when its type contract and declared inputs match the result you need. Choose a different public symbol when IQueryReadResult does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IQueryReadResult."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IQueryReadResult."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-host/dist/authoring/query.d.ts:IQueryReadResult:export type IQueryReadResult = Awaited<ReturnType<IQueryReader>>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-host-authoring/query--IQueryReadResult"
+        },
+        {
+          "name": "IQuerySourceSnapshot",
+          "kind": "type",
+          "signature": "export type IQuerySourceSnapshot = { readonly pushdown: IQueryPushdown; readonly asyncDisposeKey: typeof Symbol.asyncDispose | undefined; readonly tieBreakByKey: IRecordQuerySource['tieBreakByKey']; readonly execute: IRecordQuerySource['execute']; readonly reduce: IRecordQuerySource['reduce']; readonly mutate: IRecordQuerySource['mutate']; readonly watch: IRecordQuerySource['watch']; readonly plan: IRecordQuerySource['plan']; readonly receiver: IQuerySourcePort; readonly nativeSteps: boolean; readonly cursorSource: object; readonly keyset?: RecordQueryKeysetOwner; readonly missingKeyset?: () => never; readonly vector?: { readonly beginOperation?: () => () => void; readonly origin?: IVectorQueryOrigin; readonly acceptsNative?: true; readonly native?: IVectorQueryRefinement; readonly reranked?: true; readonly withVector: boolean; readonly exact: boolean; readonly groupBy: boolean; }; readonly rdf?: { readonly pattern: Readonly<Partial<IQuad>>; readonly condition: IQueryCondition; }; };",
+          "declarationLine": 87,
+          "source": "packages/storage-host/dist/authoring/query.d.ts",
+          "purpose": "Captured author facts and methods remain independent of later source option mutation.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IQuerySourceSnapshot.",
+          "advanced": "No additional advanced behavior is declared for IQuerySourceSnapshot.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IQuerySourceSnapshot."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IQuerySourceSnapshot.",
+          "examples": [],
+          "members": [
+            {
+              "name": "pushdown",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly pushdown: IQueryPushdown;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IQueryPushdown"
+            },
+            {
+              "name": "asyncDisposeKey",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly asyncDisposeKey: typeof Symbol.asyncDispose | undefined;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "typeof Symbol.asyncDispose | undefined"
+            },
+            {
+              "name": "tieBreakByKey",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly tieBreakByKey: IRecordQuerySource['tieBreakByKey'];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRecordQuerySource['tieBreakByKey']"
+            },
+            {
+              "name": "execute",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly execute: IRecordQuerySource['execute'];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRecordQuerySource['execute']"
+            },
+            {
+              "name": "reduce",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly reduce: IRecordQuerySource['reduce'];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRecordQuerySource['reduce']"
+            },
+            {
+              "name": "mutate",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly mutate: IRecordQuerySource['mutate'];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRecordQuerySource['mutate']"
+            },
+            {
+              "name": "watch",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly watch: IRecordQuerySource['watch'];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRecordQuerySource['watch']"
+            },
+            {
+              "name": "plan",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly plan: IRecordQuerySource['plan'];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRecordQuerySource['plan']"
+            },
+            {
+              "name": "receiver",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly receiver: IQuerySourcePort;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IQuerySourcePort"
+            },
+            {
+              "name": "nativeSteps",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly nativeSteps: boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "cursorSource",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly cursorSource: object;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "object"
+            },
+            {
+              "name": "keyset",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly keyset?: RecordQueryKeysetOwner;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "RecordQueryKeysetOwner"
+            },
+            {
+              "name": "missingKeyset",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly missingKeyset?: () => never;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "() => never"
+            },
+            {
+              "name": "vector",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly vector?: { readonly beginOperation?: () => () => void; readonly origin?: IVectorQueryOrigin; readonly acceptsNative?: true; readonly native?: IVectorQueryRefinement; readonly reranked?: true; readonly withVector: boolean; readonly exact: boolean; readonly groupBy: boolean; };",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "{ readonly beginOperation?: () => () => void; readonly origin?: IVectorQueryOrigin; readonly acceptsNative?: true; readonly native?: IVectorQueryRefinement; readonly reranked?: true; readonly withVector: boolean; readonly exact: boolean; readonly groupBy: boolean; }"
+            },
+            {
+              "name": "rdf",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly rdf?: { readonly pattern: Readonly<Partial<IQuad>>; readonly condition: IQueryCondition; };",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "{ readonly pattern: Readonly<Partial<IQuad>>; readonly condition: IQueryCondition; }"
+            }
+          ],
+          "composes": [],
+          "exportPath": "./authoring/query",
+          "overloadSignatures": [
+            "export type IQuerySourceSnapshot = { readonly pushdown: IQueryPushdown; readonly asyncDisposeKey: typeof Symbol.asyncDispose | undefined; readonly tieBreakByKey: IRecordQuerySource['tieBreakByKey']; readonly execute: IRecordQuerySource['execute']; readonly reduce: IRecordQuerySource['reduce']; readonly mutate: IRecordQuerySource['mutate']; readonly watch: IRecordQuerySource['watch']; readonly plan: IRecordQuerySource['plan']; readonly receiver: IQuerySourcePort; readonly nativeSteps: boolean; readonly cursorSource: object; readonly keyset?: RecordQueryKeysetOwner; readonly missingKeyset?: () => never; readonly vector?: { readonly beginOperation?: () => () => void; readonly origin?: IVectorQueryOrigin; readonly acceptsNative?: true; readonly native?: IVectorQueryRefinement; readonly reranked?: true; readonly withVector: boolean; readonly exact: boolean; readonly groupBy: boolean; }; readonly rdf?: { readonly pattern: Readonly<Partial<IQuad>>; readonly condition: IQueryCondition; }; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IQuerySourceSnapshot when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IQuerySourceSnapshot does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Captured author facts and methods remain independent of later source option mutation."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IQuerySourceSnapshot from @migaia/storage-host/authoring/query, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IQuerySourceSnapshot when its type contract and declared inputs match the result you need. Choose a different public symbol when IQuerySourceSnapshot does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IQuerySourceSnapshot."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IQuerySourceSnapshot."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-host/dist/authoring/query.d.ts:IQuerySourceSnapshot:export type IQuerySourceSnapshot = { readonly pushdown: IQueryPushdown; readonly asyncDisposeKey: typeof Symbol.asyncDispose | undefined; readonly tieBreakByKey: IRecordQuerySource['tieBreakByKey']; readonly execute: IRecordQuerySource['execute']; readonly reduce: IRecordQuerySource['reduce']; readonly mutate: IRecordQuerySource['mutate']; readonly watch: IRecordQuerySource['watch']; readonly plan: IRecordQuerySource['plan']; readonly receiver: IQuerySourcePort; readonly nativeSteps: boolean; readonly cursorSource: object; readonly keyset?: RecordQueryKeysetOwner; readonly missingKeyset?: () => never; readonly vector?: { readonly beginOperation?: () => () => void; readonly origin?: IVectorQueryOrigin; readonly acceptsNative?: true; readonly native?: IVectorQueryRefinement; readonly reranked?: true; readonly withVector: boolean; readonly exact: boolean; readonly groupBy: boolean; }; readonly rdf?: { readonly pattern: Readonly<Partial<IQuad>>; readonly condition: IQueryCondition; }; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-host-authoring/query--IQuerySourceSnapshot"
+        },
+        {
+          "name": "IRecordExecutionPlan",
+          "kind": "type",
+          "signature": "export type IRecordExecutionPlan = { readonly sourcePlan?: IRecordQuerySourcePlan; readonly explanation: IQueryPlan; readonly pushed: readonly IQueryNode['step'][]; readonly client: readonly IQueryNode['step'][]; readonly signature: readonly IQueryNode['step'][]; };",
+          "declarationLine": 138,
+          "source": "packages/storage-host/dist/authoring/query.d.ts",
+          "purpose": "Planning retains the actual nodes so native and client execution cannot diverge from explain.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRecordExecutionPlan.",
+          "advanced": "No additional advanced behavior is declared for IRecordExecutionPlan.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRecordExecutionPlan."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRecordExecutionPlan.",
+          "examples": [],
+          "members": [
+            {
+              "name": "sourcePlan",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly sourcePlan?: IRecordQuerySourcePlan;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRecordQuerySourcePlan"
+            },
+            {
+              "name": "explanation",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly explanation: IQueryPlan;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IQueryPlan"
+            },
+            {
+              "name": "pushed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly pushed: readonly IQueryNode['step'][];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly IQueryNode['step'][]"
+            },
+            {
+              "name": "client",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly client: readonly IQueryNode['step'][];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly IQueryNode['step'][]"
+            },
+            {
+              "name": "signature",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly signature: readonly IQueryNode['step'][];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly IQueryNode['step'][]"
+            }
+          ],
+          "composes": [],
+          "exportPath": "./authoring/query",
+          "overloadSignatures": [
+            "export type IRecordExecutionPlan = { readonly sourcePlan?: IRecordQuerySourcePlan; readonly explanation: IQueryPlan; readonly pushed: readonly IQueryNode['step'][]; readonly client: readonly IQueryNode['step'][]; readonly signature: readonly IQueryNode['step'][]; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRecordExecutionPlan when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRecordExecutionPlan does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Planning retains the actual nodes so native and client execution cannot diverge from explain."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRecordExecutionPlan from @migaia/storage-host/authoring/query, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRecordExecutionPlan when its type contract and declared inputs match the result you need. Choose a different public symbol when IRecordExecutionPlan does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRecordExecutionPlan."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRecordExecutionPlan."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-host/dist/authoring/query.d.ts:IRecordExecutionPlan:export type IRecordExecutionPlan = { readonly sourcePlan?: IRecordQuerySourcePlan; readonly explanation: IQueryPlan; readonly pushed: readonly IQueryNode['step'][]; readonly client: readonly IQueryNode['step'][]; readonly signature: readonly IQueryNode['step'][]; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-host-authoring/query--IRecordExecutionPlan"
+        },
+        {
+          "name": "IRecordQueryKeysetContext",
+          "kind": "type",
+          "signature": "export type IRecordQueryKeysetContext = { readonly invalid: typeof invalidQueryCondition; readonly sameCondition: typeof sameQueryCondition; readonly orderingBytes: typeof queryOrderingBytes; readonly sourceKey: typeof snapshotQuerySourceKey; readonly consume: typeof consumeRecordQuery; readonly active: typeof assertQueryActive; readonly keyDirection: typeof QueryKeyDirection; readonly orderDirection: typeof QueryOrderDirection; readonly orderField: typeof QueryOrderField; };",
+          "declarationLine": 230,
+          "source": "packages/storage-host/dist/authoring/query.d.ts",
+          "purpose": "The keyset owner borrows finite pure helpers and the original accepted terminal runner.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRecordQueryKeysetContext.",
+          "advanced": "No additional advanced behavior is declared for IRecordQueryKeysetContext.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IRecordQueryKeysetContext."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRecordQueryKeysetContext.",
+          "examples": [],
+          "members": [
+            {
+              "name": "invalid",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly invalid: typeof invalidQueryCondition;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "typeof invalidQueryCondition"
+            },
+            {
+              "name": "sameCondition",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly sameCondition: typeof sameQueryCondition;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "typeof sameQueryCondition"
+            },
+            {
+              "name": "orderingBytes",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly orderingBytes: typeof queryOrderingBytes;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "typeof queryOrderingBytes"
+            },
+            {
+              "name": "sourceKey",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly sourceKey: typeof snapshotQuerySourceKey;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "typeof snapshotQuerySourceKey"
+            },
+            {
+              "name": "consume",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly consume: typeof consumeRecordQuery;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "typeof consumeRecordQuery"
+            },
+            {
+              "name": "active",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly active: typeof assertQueryActive;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "typeof assertQueryActive"
+            },
+            {
+              "name": "keyDirection",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly keyDirection: typeof QueryKeyDirection;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "typeof QueryKeyDirection"
+            },
+            {
+              "name": "orderDirection",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly orderDirection: typeof QueryOrderDirection;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "typeof QueryOrderDirection"
+            },
+            {
+              "name": "orderField",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly orderField: typeof QueryOrderField;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "typeof QueryOrderField"
+            }
+          ],
+          "composes": [],
+          "exportPath": "./authoring/query",
+          "overloadSignatures": [
+            "export type IRecordQueryKeysetContext = { readonly invalid: typeof invalidQueryCondition; readonly sameCondition: typeof sameQueryCondition; readonly orderingBytes: typeof queryOrderingBytes; readonly sourceKey: typeof snapshotQuerySourceKey; readonly consume: typeof consumeRecordQuery; readonly active: typeof assertQueryActive; readonly keyDirection: typeof QueryKeyDirection; readonly orderDirection: typeof QueryOrderDirection; readonly orderField: typeof QueryOrderField; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IRecordQueryKeysetContext when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IRecordQueryKeysetContext does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "The keyset owner borrows finite pure helpers and the original accepted terminal runner."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRecordQueryKeysetContext from @migaia/storage-host/authoring/query, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRecordQueryKeysetContext when its type contract and declared inputs match the result you need. Choose a different public symbol when IRecordQueryKeysetContext does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRecordQueryKeysetContext."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IRecordQueryKeysetContext."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-host/dist/authoring/query.d.ts:IRecordQueryKeysetContext:export type IRecordQueryKeysetContext = { readonly invalid: typeof invalidQueryCondition; readonly sameCondition: typeof sameQueryCondition; readonly orderingBytes: typeof queryOrderingBytes; readonly sourceKey: typeof snapshotQuerySourceKey; readonly consume: typeof consumeRecordQuery; readonly active: typeof assertQueryActive; readonly keyDirection: typeof QueryKeyDirection; readonly orderDirection: typeof QueryOrderDirection; readonly orderField: typeof QueryOrderField; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-host-authoring/query--IRecordQueryKeysetContext"
+        },
+        {
           "name": "refineStorageVectorQuery",
           "kind": "function",
           "signature": "export declare function refineStorageVectorQuery<TPayload, TGroupable extends boolean, TWithVector extends boolean, TMethods extends object>(query: IVectorQuery<TPayload, TGroupable, TWithVector, TMethods>, refine: (topK: number) => IVectorQueryRefinement): IVectorNativeQuery<TPayload, TGroupable, TWithVector, TMethods>;",
-          "declarationLine": 35,
+          "declarationLine": 251,
           "source": "packages/storage-host/dist/authoring/query.d.ts",
           "purpose": "Let a selected native Feature derive the same already bounded vector source with one captured opaque native request, preserving original query planning, context and resource ownership.",
           "core": "query: Original post-topK query from a source declaring native: true; builders, reranked results and sources without that fact are rejected.\nrefine: Pure author callback invoked once with the original k; return captured native data and a positive safe topN no greater than k.\nA new immutable IVectorNativeQuery using the exact original execute source. Only its execution input adds native; it remains read-only and may be reranked. Invalid refinement rejects before I/O.",
@@ -22824,7 +24093,7 @@
           "name": "snapshotStorageWhere",
           "kind": "function",
           "signature": "export declare function snapshotStorageWhere(where: unknown): IQueryCondition;",
-          "declarationLine": 3,
+          "declarationLine": 6,
           "source": "packages/storage-host/dist/authoring/query.d.ts",
           "purpose": "Capture the canonical query AST for native translation; reuse the same condition parser, field validation and INVALID_ARGUMENT cause.",
           "core": "where: Declarative IWhere input; field accessors are captured once.\nThe canonical IQueryCondition domain supplied to native source callbacks; no I/O, compiler or owner is created.",
@@ -27314,7 +28583,8 @@
           "lifecycleConcurrency": "",
           "examples": [
             "import { defineEntity } from '@migaia/storage-host/entity'\nconst users = defineEntity<{ id: string; name: string }>({ name: 'users', key: 'id' }).connect(\n  store\n)\nawait users.put({ id: 'u1', name: 'Ada' })\nconsole.log(await users.get('u1'))",
-            "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { defineEntity } from '@migaia/storage-host/entity'\nimport { entityQueryFeature } from '@migaia/storage-host/entity/query'\nimport { entityIndexesFeature } from '@migaia/storage-host/entity/indexes'\n\ntype IOrder = { id: string; state: string; total: number }\nconst host = await createStorageHost({ plugins: [memoryBackendPlugin()] })\ntry {\n  const orders = defineEntity<IOrder>()({\n    name: 'orders',\n    key: 'id',\n    features: [entityQueryFeature(), entityIndexesFeature()],\n    indexes: { byState: { path: 'state' } }\n  }).connect(host.backend('memory'))\n  await orders.put({ id: 'o1', state: 'paid', total: 20 })\n  console.log(await orders.get('o1'))\n  console.log(await orders.query().index('byState', 'paid').select('id', 'total').all())\n  // [{ id: 'o1', total: 20 }]\n} finally {\n  await host.dispose()\n}"
+            "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { defineEntity } from '@migaia/storage-host/entity'\nimport { entityQueryFeature } from '@migaia/storage-host/entity/query'\nimport { entityIndexesFeature } from '@migaia/storage-host/entity/indexes'\n\ntype IOrder = { id: string; state: string; total: number }\nconst host = await createStorageHost({ plugins: [memoryBackendPlugin()] })\ntry {\n  const orders = defineEntity<IOrder>()({\n    name: 'orders',\n    key: 'id',\n    features: [entityQueryFeature(), entityIndexesFeature()],\n    indexes: { byState: { path: 'state' } }\n  }).connect(host.backend('memory'))\n  await orders.put({ id: 'o1', state: 'paid', total: 20 })\n  console.log(await orders.get('o1'))\n  console.log(await orders.query().index('byState', 'paid').select('id', 'total').all())\n  // [{ id: 'o1', total: 20 }]\n} finally {\n  await host.dispose()\n}",
+            "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { defineEntity } from '@migaia/storage-host/entity'\nimport { entityMigrationFeature } from '@migaia/storage-host/entity/migration'\n\ntype IUser = { id: string; name: string }\nconst host = await createStorageHost({ plugins: [memoryBackendPlugin()] })\ntry {\n  const store = host.backend('memory')\n  const original = defineEntity<IUser>({ name: 'migration-users', key: 'id' }).connect(store)\n  await original.put({ id: 'ada', name: ' Ada ' })\n  await original.put({ id: 'lin', name: ' Lin ' })\n  const users = defineEntity<IUser>({\n    name: 'migration-users',\n    key: 'id',\n    version: 2,\n    features: [entityMigrationFeature()],\n    migrations: {\n      2: (previous) => {\n        const user = previous as IUser\n        return { ...user, name: user.name.trim() }\n      }\n    }\n  }).connect(store)\n  const result = await users.migrate({ batchSize: 1 })\n  console.log(result.migrated, (await users.get('ada'))?.name) // 2 Ada\n} finally {\n  await host.dispose()\n}"
           ],
           "members": [],
           "composes": [],
@@ -27442,23 +28712,23 @@
           ],
           "identity": "packages/storage-host/dist/entity/define.d.ts:defineEntity:export declare function defineEntity<TDomain, TStored = TDomain>(options: IEntityOptions<TDomain, TStored, never> & { readonly indexes?: undefined; }): IEntityDefinition<TDomain>;\nexport declare function defineEntity<TDomain, TStored = TDomain>(): IDefineEntityBuilder<TDomain, TStored>;",
           "guidance": [],
-          "usageScore": 26,
+          "usageScore": 44,
           "configuration": [
             {
               "name": "indexes",
               "type": "TIndexes",
               "optional": true,
-              "description": "只在 `features` 中选择用到的单元：`/entity/query` 的 `entityQueryFeature()` 开启 query/list/stream；`/entity/indexes` 的 `entityIndexesFeature()` 开启索引声明和规划；`/entity/unique` 的 `entityUniqueFeature()` 开启唯一提交检查；`/entity/migration` 的 `entityMigrationFeature()` 开启版本计划和持久迁移；`/entity/keyset` 的 `entityKeysetFeature()` 准入 page/after。索引、unique 与持久迁移会复用查询操作，使用这些路径时也需声明 query；单元不会自动开启其他单元。",
+              "description": "只在 `features` 中选择用到的单元：`/entity/query` 的 `entityQueryFeature()` 开启 query/list/stream；`/entity/indexes` 的 `entityIndexesFeature()` 开启索引声明和规划；`/entity/unique` 的 `entityUniqueFeature()` 开启唯一提交检查；`/entity/migration` 的 `entityMigrationFeature()` 开启版本计划和持久迁移；`/entity/keyset` 的 `entityKeysetFeature()` 准入 page/after。索引查询与唯一约束的回退校验还需要 query。没有索引或唯一约束的迁移直接扫描原生记录或文本键，不需要 query 或 unique。单元不会自动开启其他单元。",
               "descriptionEn": "Secondary projections are entity-owned and backend-neutral.",
-              "descriptionZh": "只在 `features` 中选择用到的单元：`/entity/query` 的 `entityQueryFeature()` 开启 query/list/stream；`/entity/indexes` 的 `entityIndexesFeature()` 开启索引声明和规划；`/entity/unique` 的 `entityUniqueFeature()` 开启唯一提交检查；`/entity/migration` 的 `entityMigrationFeature()` 开启版本计划和持久迁移；`/entity/keyset` 的 `entityKeysetFeature()` 准入 page/after。索引、unique 与持久迁移会复用查询操作，使用这些路径时也需声明 query；单元不会自动开启其他单元。"
+              "descriptionZh": "只在 `features` 中选择用到的单元：`/entity/query` 的 `entityQueryFeature()` 开启 query/list/stream；`/entity/indexes` 的 `entityIndexesFeature()` 开启索引声明和规划；`/entity/unique` 的 `entityUniqueFeature()` 开启唯一提交检查；`/entity/migration` 的 `entityMigrationFeature()` 开启版本计划和持久迁移；`/entity/keyset` 的 `entityKeysetFeature()` 准入 page/after。索引查询与唯一约束的回退校验还需要 query。没有索引或唯一约束的迁移直接扫描原生记录或文本键，不需要 query 或 unique。单元不会自动开启其他单元。"
             },
             {
               "name": "features",
               "type": "readonly IEntityFeature[]",
               "optional": true,
-              "description": "只在 `features` 中选择用到的单元：`/entity/query` 的 `entityQueryFeature()` 开启 query/list/stream；`/entity/indexes` 的 `entityIndexesFeature()` 开启索引声明和规划；`/entity/unique` 的 `entityUniqueFeature()` 开启唯一提交检查；`/entity/migration` 的 `entityMigrationFeature()` 开启版本计划和持久迁移；`/entity/keyset` 的 `entityKeysetFeature()` 准入 page/after。索引、unique 与持久迁移会复用查询操作，使用这些路径时也需声明 query；单元不会自动开启其他单元。",
+              "description": "只在 `features` 中选择用到的单元：`/entity/query` 的 `entityQueryFeature()` 开启 query/list/stream；`/entity/indexes` 的 `entityIndexesFeature()` 开启索引声明和规划；`/entity/unique` 的 `entityUniqueFeature()` 开启唯一提交检查；`/entity/migration` 的 `entityMigrationFeature()` 开启版本计划和持久迁移；`/entity/keyset` 的 `entityKeysetFeature()` 准入 page/after。索引查询与唯一约束的回退校验还需要 query。没有索引或唯一约束的迁移直接扫描原生记录或文本键，不需要 query 或 unique。单元不会自动开启其他单元。",
               "descriptionEn": "Explicit optional units imported from the entity capability subpaths; omitted means basic reads and writes only.",
-              "descriptionZh": "只在 `features` 中选择用到的单元：`/entity/query` 的 `entityQueryFeature()` 开启 query/list/stream；`/entity/indexes` 的 `entityIndexesFeature()` 开启索引声明和规划；`/entity/unique` 的 `entityUniqueFeature()` 开启唯一提交检查；`/entity/migration` 的 `entityMigrationFeature()` 开启版本计划和持久迁移；`/entity/keyset` 的 `entityKeysetFeature()` 准入 page/after。索引、unique 与持久迁移会复用查询操作，使用这些路径时也需声明 query；单元不会自动开启其他单元。"
+              "descriptionZh": "只在 `features` 中选择用到的单元：`/entity/query` 的 `entityQueryFeature()` 开启 query/list/stream；`/entity/indexes` 的 `entityIndexesFeature()` 开启索引声明和规划；`/entity/unique` 的 `entityUniqueFeature()` 开启唯一提交检查；`/entity/migration` 的 `entityMigrationFeature()` 开启版本计划和持久迁移；`/entity/keyset` 的 `entityKeysetFeature()` 准入 page/after。索引查询与唯一约束的回退校验还需要 query。没有索引或唯一约束的迁移直接扫描原生记录或文本键，不需要 query 或 unique。单元不会自动开启其他单元。"
             },
             {
               "name": "name",
@@ -34015,7 +35285,7 @@
           "name": "entityKeysetFeature",
           "kind": "function",
           "signature": "export declare function entityKeysetFeature(): IEntityFeature;",
-          "declarationLine": 10,
+          "declarationLine": 13,
           "source": "packages/storage-host/dist/entity/keyset.d.ts",
           "purpose": "Enable bounded entity pages and continuation cursors on the original canonical query owner. Select it in defineEntity features; omitted calls reject ENTITY_FEATURE_REQUIRED.",
           "core": "A Feature definition selected explicitly in its owning configuration; it does not open storage by itself.\nEnable bounded entity pages and continuation cursors on the original canonical query owner. Select it in defineEntity features; omitted calls reject ENTITY_FEATURE_REQUIRED.",
@@ -34077,7 +35347,7 @@
           "name": "IEntityKeysetOwner",
           "kind": "type",
           "signature": "export type IEntityKeysetOwner = EntityKeysetOwner;",
-          "declarationLine": 8,
+          "declarationLine": 11,
           "source": "packages/storage-host/dist/entity/keyset.d.ts",
           "purpose": "The selected keyset assembly delegates bounded page work to the original query owner.",
           "core": "run: Invoke the admitted page operation without replacing its cursor or failure.\nrun.invoke: Original query operation supplied by the connected repository.\nThe exact result of the original operation.",
@@ -34089,6 +35359,15 @@
           "lifecycleConcurrency": "",
           "examples": [],
           "members": [
+            {
+              "name": "query",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly query: typeof createRecordQuery;",
+              "description": "Selecting this unit is the sole entity path retaining the canonical pagination engine.",
+              "parameterDetails": [],
+              "returns": "typeof createRecordQuery"
+            },
             {
               "name": "run",
               "kind": "property",
@@ -34178,7 +35457,9 @@
           "returns": "IEntityFeature",
           "errors": [],
           "lifecycleConcurrency": "",
-          "examples": [],
+          "examples": [
+            "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { defineEntity } from '@migaia/storage-host/entity'\nimport { entityMigrationFeature } from '@migaia/storage-host/entity/migration'\n\ntype IUser = { id: string; name: string }\nconst host = await createStorageHost({ plugins: [memoryBackendPlugin()] })\ntry {\n  const store = host.backend('memory')\n  const original = defineEntity<IUser>({ name: 'migration-users', key: 'id' }).connect(store)\n  await original.put({ id: 'ada', name: ' Ada ' })\n  await original.put({ id: 'lin', name: ' Lin ' })\n  const users = defineEntity<IUser>({\n    name: 'migration-users',\n    key: 'id',\n    version: 2,\n    features: [entityMigrationFeature()],\n    migrations: {\n      2: (previous) => {\n        const user = previous as IUser\n        return { ...user, name: user.name.trim() }\n      }\n    }\n  }).connect(store)\n  const result = await users.migrate({ batchSize: 1 })\n  console.log(result.migrated, (await users.get('ada'))?.name) // 2 Ada\n} finally {\n  await host.dispose()\n}"
+          ],
           "members": [],
           "composes": [],
           "aliasOf": "entityMigrationFeature",
@@ -34225,7 +35506,7 @@
           "declaredConfiguration": [],
           "identity": "packages/storage-host/dist/entity/migration-feature.d.ts:entityMigrationFeature:export declare function entityMigrationFeature(): IEntityFeature;",
           "guidance": [],
-          "usageScore": 4,
+          "usageScore": 18,
           "configuration": [],
           "fragment": "storage-host-entity/migration--entityMigrationFeature"
         }
