@@ -47,6 +47,43 @@ const hits = await collection.near([1, 0, 0], { exact: true }).where('ready', 'e
       )
     }
   ],
+  pgCopyFeature: [
+    {
+      title: t('Stream into the current transaction', '流式写入当前事务'),
+      problem: t(
+        'COPY must drain before rollback or connection return.',
+        'COPY 必须在回滚或归还连接前真实排空。'
+      ),
+      example: `// Select pgCopyFeature() on postgresBackendPlugin first.
+await store.transaction(async tx => {
+  await tx.api.copy.from({ table: ['events'], columns: ['id'] }, async function* () {
+    yield new TextEncoder().encode('1\\n2\\n')
+  })
+})`,
+      result: t(
+        'The original reserved connection streams STDIN with native backpressure.',
+        '原借用连接沿原生背压流式消费 STDIN。'
+      )
+    }
+  ],
+  pgListenFeature: [
+    {
+      title: t('Observe committed notifications', '观察已提交通知'),
+      problem: t(
+        'A subscription must retain only its own native resource.',
+        '订阅只应持有自身原生资源。'
+      ),
+      example: `// Select pgListenFeature() on postgresBackendPlugin first.
+await using subscription = await store.api.notifications.listen('events', payload => {
+  console.log(payload)
+})
+await store.transaction(tx => tx.api.notifications.notify('events', 'committed'))`,
+      result: t(
+        'Disposal releases this subscription; the injected client remains caller-owned.',
+        '释放只结束该订阅；注入客户端仍归调用方。'
+      )
+    }
+  ],
   pgLogicalReplicationFeature: [
     {
       title: t('Persist processed WAL progress', '保存已处理 WAL 进度'),
