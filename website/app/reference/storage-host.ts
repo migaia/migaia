@@ -161,6 +161,44 @@ console.log(host.extensions.label('draft'))`
         '既有 journal 锁拥有者的 head 与 resource 规范角色。'
       )
     },
+    encodeStorageJournalImage: {
+      role: 'operation',
+      purpose: t(
+        'Encode an absent or portable value through the original durable image codec.',
+        '沿原持久镜像 codec 编码缺失或可移植值。'
+      ),
+      params: {
+        present: t(
+          'Preserve absence independently from a present null.',
+          '缺失与存在的 null 独立保留。'
+        ),
+        value: t('The original portable value or byte array.', '原可移植值或字节数组。'),
+        bytes: t('Use the original base64 representation for bytes.', '字节使用原 base64 表示。')
+      },
+      returns: t(
+        'A frozen present/absent image with the original codec identity and version.',
+        '保留原 codec 身份和版本的冻结存在/缺失镜像。'
+      ),
+      example: storageHostCases.encodeStorageJournalImage![0]!.example,
+      cases: storageHostCases.encodeStorageJournalImage
+    },
+    decodeStorageJournalImage: {
+      role: 'operation',
+      purpose: t(
+        'Decode only the original versioned durable image and preserve codec failures on cause.',
+        '仅解码原版本化持久镜像，并在 cause 保留 codec 错误。'
+      ),
+      params: {
+        image: t('One original present/absent image.', '一个原存在/缺失镜像。'),
+        bytes: t('Decode the original base64 byte representation.', '解码原 base64 字节表示。')
+      },
+      returns: t(
+        'Absence or the decoded portable value; malformed owned wire reports JOURNAL_RECORD_INVALID.',
+        '缺失或解码后的可移植值；损坏的自有 wire 报 JOURNAL_RECORD_INVALID。'
+      ),
+      example: storageHostCases.decodeStorageJournalImage![0]!.example,
+      cases: storageHostCases.decodeStorageJournalImage
+    },
     createBackendJournalNamespace: {
       role: 'operation',
       purpose: t(
