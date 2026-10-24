@@ -96,6 +96,41 @@ describe('borrowed multi-tier cache', () => {
       await host.dispose()
     }
   })
+  it('drains bypass work after its sole caller aborts', async () => {
+    const { host, cache } = await fixture()
+    try {
+      let finish!: (value: string) => void, started!: () => void
+      const began = new Promise<void>((resolve) => {
+        started = resolve
+      })
+      const abort = new AbortController()
+      const result = cache.getOrLoad(
+        'bypass',
+        async () => {
+          started()
+          return new Promise<string>((resolve) => {
+            finish = resolve
+          })
+        },
+        { mode: 'bypass', ctx: { signal: abort.signal } }
+      )
+      const failed = expect(result).rejects.toMatchObject({ code: 'ABORTED' })
+      await began
+      abort.abort('caller only')
+      await failed
+      let closed = false
+      const disposing = cache.dispose().then(() => {
+        closed = true
+      })
+      await new Promise((resolve) => setTimeout(resolve, 5))
+      expect(closed).toBe(false)
+      finish('late true value')
+      await disposing
+      expect(closed).toBe(true)
+    } finally {
+      await host.dispose()
+    }
+  })
   it('supersedes a detached old flight and does not store its late result', async () => {
     const { host, cache } = await fixture()
     try {

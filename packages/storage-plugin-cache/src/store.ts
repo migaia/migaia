@@ -237,7 +237,9 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
       controller.assertLive()
       const context = snapshotOperationContext(ctx),
         release = controller.beginMutation()
+      let started = false
       return withAbort(context, async (signal) => {
+        started = true
         const work = prepare()
           .then(() => ports.execution.run({ operation, input, ctx: context }, invoke))
           .finally(release)
@@ -252,7 +254,7 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
           throw error
         }
       }).catch((error) => {
-        release()
+        if (!started) release()
         throw error
       })
     }
