@@ -1017,13 +1017,16 @@ export async function runWithConcurrency<TResult>(
   const originalLocks = locks
   /** Context snapshots preserve original signal identity, field causes, org identity and omission. */
   const context = snapshotOperationContext(request.options)
-  /** Every path derives only after its pipeline has fixed the current segment's input. */
-  function derivePreparedLocks(): void {
+  /**
+   * Prepared paths reuse their original frozen native fields; early unprepared admission stays
+   * unchanged.
+   */
+  function derivePreparedLocks(captured = context!): void {
     if (!deriveLocks) return
     /** Only new keys are captured and encoded; inherited normalized entries remain unchanged. */
     let additional: readonly ILockKey[]
     try {
-      additional = deriveLocks(context!)
+      additional = deriveLocks(captured)
     } catch (cause) {
       if (IdentifyError.identityOf(cause)) throw cause
       throw invalidConcurrencyArgument(cause)
@@ -1089,7 +1092,7 @@ export async function runWithConcurrency<TResult>(
   }
   /** The same frozen captured fields and budget signal are reused by every actual segment. */
   const executionContext = executeAttempt
-    ? Object.freeze({ ...context, signal: budget.cancellation.signal })
+    ? Object.freeze({ ...extensions, ...context, signal: budget.cancellation.signal })
     : undefined
   /** Only an active segment is retained; a completed conflict releases it before replay. */
   let execution: IAttemptExecution | undefined
@@ -1128,7 +1131,7 @@ export async function runWithConcurrency<TResult>(
             const aborted = concurrencyAbort(budget, false)
             if (aborted) return Promise.reject(aborted)
             locks = originalLocks
-            derivePreparedLocks()
+            derivePreparedLocks(executionContext!)
             identities =
               locks === inherited?.locks && inherited
                 ? inherited.identities
@@ -1163,12 +1166,16 @@ export async function runWithConcurrency<TResult>(
        * The original fields stay captured; only this owner supplies the running cancellation
        * signal.
        */
-      const preparationContext = Object.freeze({ ...context, signal: budget.cancellation.signal })
+      const preparationContext = Object.freeze({
+        ...extensions,
+        ...context,
+        signal: budget.cancellation.signal
+      })
       await prepare(preparationContext)
       /** Accepted preparation settles before cancellation can release this call's signal owner. */
       const afterPreparation = concurrencyAbort(budget, false)
       if (afterPreparation) throw afterPreparation
-      if (!execute && !executeAttempt) derivePreparedLocks()
+      if (!execute && !executeAttempt) derivePreparedLocks(preparationContext)
       identities =
         locks === inherited?.locks && inherited
           ? inherited.identities
@@ -1187,7 +1194,7 @@ export async function runWithConcurrency<TResult>(
         /** Expired preparation or before-next work cannot derive keys or start native admission. */
         const aborted = concurrencyAbort(budget, false)
         if (aborted) return Promise.reject(aborted)
-        derivePreparedLocks()
+        derivePreparedLocks(executionContext)
         identities =
           locks === inherited?.locks && inherited
             ? inherited.identities
@@ -1195,7 +1202,11 @@ export async function runWithConcurrency<TResult>(
         return runOriginalLoop()
       }
       /** After-next and catch stay around actual native settlement under the original call budget. */
-      const executionContext = Object.freeze({ ...context, signal: budget.cancellation.signal })
+      const executionContext = Object.freeze({
+        ...extensions,
+        ...context,
+        signal: budget.cancellation.signal
+      })
       return (await execute(executionContext, invokeOriginalLoop)) as Awaited<TResult>
     }
     return await runOriginalLoop()
