@@ -33,3 +33,5 @@ collection 在执行前是纯描述。Cosine 使用原生搜索槽与原样本�
 仅提供 `vector` 与 vector 目标的 `ttl`。没有 KV、records、RDF、事务、二级索引、change feed 或原生 live 查询；需要轮询时使用既有 host reactive Feature。显式锁与并发策略组合在原生修改前拒绝。
 
 删除计数、TTL、组织隔离、检测及失败边界见 [USEGUIDE.md](./USEGUIDE.md)。
+
+删除与标准推荐通过共享向量输入拥有者捕获稠密字符串 ID 数组；原生请求仍按首次出现去重。删除计数选项复用同一准入，不改变 precount 或 scroll 行为。

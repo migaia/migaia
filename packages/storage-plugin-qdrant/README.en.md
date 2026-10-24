@@ -33,3 +33,5 @@ Collections are pure descriptors until execution. Cosine uses native search and 
 Only `vector` and vector-target `ttl` are provided. KV, records, RDF, transactions, secondary indexes, change feeds and native live queries are absent. Use the existing host reactive Feature when polling is needed. Explicit lock/concurrency combinations are rejected before native modification.
 
 Read [USEGUIDE.en.md](./USEGUIDE.en.md) for deletion counts, TTL, organization isolation, detection and failure boundaries.
+
+Deletion and standard recommendation capture dense string ID arrays through the shared vector input owner. Native requests retain first-occurrence ID deduplication. Deletion count options use the same shared admission without changing precount or scroll behavior.

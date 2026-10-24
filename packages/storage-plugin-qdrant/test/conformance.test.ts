@@ -49,6 +49,91 @@ function native() {
 }
 describe('real native vector backend', () => {
   it.skipIf(!url)(
+    'shares dense ID and count capture while retaining native first-occurrence deletion',
+    async () => {
+      const fixture = native(),
+        host = await createStorageHost({
+          plugins: [
+            qdrantBackendPlugin({
+              url: url!,
+              collectionPrefix: crypto.randomUUID(),
+              http: fixture.http
+            })
+          ] as const
+        }),
+        collection = host.backend('qdrant').use(vector).collection('capture', {
+          dimensions: 1,
+          metric: 'dot'
+        })
+      try {
+        await collection.upsert([
+          { id: 'source', vector: [1] },
+          { id: 'candidate', vector: [2] }
+        ])
+        expect(
+          (
+            await collection
+              .recommend({ positive: ['source', 'source'] })
+              .topK(10)
+              .all()
+          ).map((hit) => hit.id)
+        ).toEqual(['candidate'])
+        let lengths = 0,
+          reads = 0,
+          counts = 0
+        const ids = new Proxy(['candidate', 'candidate'], {
+          get(target, property, receiver) {
+            if (property === 'length') lengths += 1
+            if (property === '0' || property === '1') reads += 1
+            return Reflect.get(target, property, receiver)
+          }
+        })
+        await collection.delete(ids)
+        expect(lengths).toBe(1)
+        expect(reads).toBe(2)
+        expect(
+          fixture.requests.filter((request) => request.operation === 'delete').at(-1)?.args[1]
+        ).toMatchObject({
+          filter: { must: expect.arrayContaining([{ must: [{ has_id: [expect.any(String)] }] }]) },
+          wait: true
+        })
+        expect(
+          await collection.deleteWhere(
+            {},
+            {
+              get count() {
+                counts += 1
+                return DeleteCountMode.scroll
+              }
+            }
+          )
+        ).toBe(1)
+        expect(counts).toBe(1)
+        const before = fixture.calls.length
+        const sparse: string[] = []
+        sparse.length = 1
+        await expect(async () => collection.delete(sparse)).rejects.toMatchObject({
+          code: 'INVALID_ARGUMENT'
+        })
+        await expect(async () =>
+          collection.deleteWhere(
+            {},
+            {
+              // The runtime boundary must reject values outside the public enum before native work.
+              // @ts-expect-error Deliberate invalid caller input.
+              count: 'unknown'
+            }
+          )
+        ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' })
+        expect(fixture.calls).toHaveLength(before)
+      } finally {
+        await host.dispose()
+        await fixture.close()
+      }
+    },
+    30_000
+  )
+  it.skipIf(!url)(
     'detects required standard methods and rejects missing optional native methods only on use',
     async () => {
       const fixture = native(),
