@@ -2675,9 +2675,9 @@ function createIndexedDbPhysical<TValue>(
 ): IIndexedDbContext<TValue>['physical'] {
   return {
     ...indexedDbContext.construction,
-    ...(indexedDbContext.assemblies.journal === undefined
-      ? {}
-      : { journalBinding: indexedDbContext.assemblies.journal.binding(indexedDbContext) }),
+    journalBinding:
+      indexedDbContext.assemblies.journal?.binding(indexedDbContext) ??
+      indexedDbFeatureMissing.binding(),
     dropData: () => dropData(indexedDbContext),
     getPreparedClient: () => {
       assertLive(indexedDbContext)
