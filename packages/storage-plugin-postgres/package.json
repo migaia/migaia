@@ -1,0 +1,80 @@
+{
+  "name": "@migaia/storage-plugin-postgres",
+  "version": "0.0.0",
+  "private": true,
+  "description": "PostgreSQL storage backend with native transactions and optional pgvector",
+  "files": [
+    "dist",
+    "README.md",
+    "README.en.md",
+    "USEGUIDE.md",
+    "USEGUIDE.en.md"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./pg": {
+      "types": "./dist/pg.d.ts",
+      "default": "./dist/pg.js"
+    },
+    "./postgres-js": {
+      "types": "./dist/postgres-js.d.ts",
+      "default": "./dist/postgres-js.js"
+    },
+    "./bun": {
+      "types": "./dist/bun.d.ts",
+      "default": "./dist/bun.js"
+    },
+    "./features/pgvector": {
+      "types": "./dist/features/pgvector.d.ts",
+      "default": "./dist/features/pgvector.js"
+    },
+    "./features/listen": {
+      "types": "./dist/features/listen.d.ts",
+      "default": "./dist/features/listen.js"
+    },
+    "./features/copy": {
+      "types": "./dist/features/copy.d.ts",
+      "default": "./dist/features/copy.js"
+    },
+    "./features/logical-replication": {
+      "types": "./dist/features/logical-replication.d.ts",
+      "default": "./dist/features/logical-replication.js"
+    }
+  },
+  "scripts": {
+    "fmt": "oxfmt src test README.md README.en.md USEGUIDE.md USEGUIDE.en.md package.json",
+    "lint": "oxlint src test",
+    "typecheck": "bun check -p tsconfig.json",
+    "typecheck:test": "bun check -p tsconfig.test.json",
+    "build": "node ../../scripts/dist-stamp.mjs clean && vite build && tsc -p tsconfig.json --emitDeclarationOnly && node ../../scripts/dist-stamp.mjs write",
+    "test": "pnpm run build && vitest run"
+  },
+  "dependencies": {
+    "@migaia/lifecycle": "workspace:^",
+    "@migaia/serialize": "workspace:^",
+    "@migaia/storage-contract": "workspace:^",
+    "@migaia/utils": "workspace:^"
+  },
+  "devDependencies": {
+    "@migaia/logger": "workspace:^",
+    "@types/bun": "1.4.3",
+    "@types/pg": "8.23.1",
+    "@types/pg-copy-streams": "1.2.5",
+    "pg": "8.23.1",
+    "pg-copy-streams": "7.0.0",
+    "pg-logical-replication": "2.6.0",
+    "postgres": "3.4.9"
+  },
+  "peerDependencies": {
+    "@migaia/storage-host": "workspace:^",
+    "pg": "^8.23.1",
+    "pg-copy-streams": "^7.0.0",
+    "pg-logical-replication": ">=2.6.0 <3",
+    "postgres": "^3.4.9"
+  }
+}

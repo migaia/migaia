@@ -1,7 +1,9 @@
 import { createEventChannel } from '@migaia/event-subscriber'
-import { createQuiescenceTracker } from '@migaia/lifecycle'
-import { deferred, type INativeAbortSignal } from '@migaia/utils/promise'
-import { subscribeToAbort } from '../core/operation.js'
+import type { INativeAbortSignal } from '@migaia/utils/promise'
+import {
+  createBackendJournalNamespace,
+  type IBackendJournalTransaction
+} from '../journal/namespace-resource.js'
 import {
   StorageContractError,
   StorageContractErrorCode,
@@ -192,134 +194,44 @@ export function createMemoryJournalData(options: {
     }
   }
 
-  /**
-   * A handle drains accepted ordinary work and authentic transaction terminals through lifecycle's
-   * tracker.
-   */
+  /** Fixed-prefix I/O and native terminal channels remain on the original memory draft. */
+  const project = (
+    prefix: string,
+    port: IMemoryJournalTransaction
+  ): IBackendJournalTransaction => ({
+    run: (work) => port.run(prefix, work),
+    onCommit: port.onCommit,
+    onRollback: port.onRollback,
+    onEnd: (effect) => {
+      const offCommit = port.onCommit(effect)
+      const offRollback = port.onRollback(effect)
+      return () => {
+        offCommit()
+        offRollback()
+      }
+    }
+  })
+  /** The shared original resource algorithm borrows only this fixed native namespace. */
   async function open(prefix: string): Promise<IStorageJournalNamespace> {
     options.assertLive()
     assertText(prefix)
     if (prefix.length === 0)
       throw new StorageContractError(StorageContractErrorCode.invalidArgument)
-    /** The original lock attempt spans this namespace resource's actual lifetime. */
-    const acquired = deferred<void>()
-    /** Disposal settles the existing held attempt instead of inventing another release protocol. */
-    const releaseOwner = deferred<void>()
-    const reservation = options.reserve(prefix, async () => {
-      acquired.resolve()
-      await releaseOwner.promise
-    })
-    void reservation.then(undefined, acquired.reject)
-    await acquired.promise
-    /** Drop replaces this original private Map; an old log cannot reuse cached deleted history. */
     const generation = namespaces
-    const lifetime = createQuiescenceTracker<object>()
-    const resource = Object.freeze({})
-    const attempts = new Map<string, () => void>()
-    let main: Promise<void> | undefined
-    let symbolic: Promise<void> | undefined
-    /** The original backend close signal also releases unretained partial-construction handles. */
-    let unsubscribe = () => undefined as void
-    /** Closing this handle never closes its original backend or another namespace handle. */
-    const assertOpen = (): void => {
-      options.assertLive()
-      if (lifetime.isSealed(resource) || generation !== namespaces)
-        throw new StorageContractError(StorageContractErrorCode.disposed)
-    }
-    /** A current native transaction retains the handle until its actual commit or rollback. */
-    const transaction = (scope: Omit<ITransactionScope, 'use'>) => {
-      options.assertLive()
-      const current = options.scope(scope)
-      if (!attempts.has(current.info.id)) {
-        assertOpen()
-        const release = lifetime.retain(resource)
-        let offCommit: (() => void) | undefined
-        let offRollback: (() => void) | undefined
-        const finish = () => {
-          offCommit?.()
-          offRollback?.()
-          attempts.delete(current.info.id)
-          release()
-        }
-        attempts.set(current.info.id, finish)
-        offCommit = current.port.onCommit(finish)
-        offRollback = current.port.onRollback(finish)
-      }
-      return current.port
-    }
-    const dispose = (): Promise<void> => {
-      if (main !== undefined) return main
-      lifetime.seal(resource)
-      main = lifetime
-        .whenZero(resource)
-        .then(async () => {
-          releaseOwner.resolve()
-          await reservation
-        })
-        .finally(() => unsubscribe())
-      return main
-    }
-    unsubscribe = subscribeToAbort(
-      options.closingSignal,
-      () => {
-        void dispose().catch(options.report)
-      },
-      options.report
-    )
-    /** An optional publication belongs to this same native terminal, not the outer result Promise. */
-    const run = <R>(
-      work: (view: IStorageJournalNamespaceView) => Promise<R>,
-      scope?: Omit<ITransactionScope, 'use'>,
-      committed?: (value: R) => void
-    ): Promise<R> => {
-      try {
-        assertOpen()
-        if (typeof work !== 'function')
-          throw new StorageContractError(StorageContractErrorCode.invalidArgument)
-        const invoke = (port: IMemoryJournalTransaction): Promise<R> =>
-          committed === undefined
-            ? port.run(prefix, work)
-            : port.run(prefix, (view) =>
-                work(view).then((value) => {
-                  port.onCommit(() => committed(value))
-                  return value
-                })
-              )
-        if (scope !== undefined) return invoke(transaction(scope))
-        const release = lifetime.retain(resource)
-        return options.transaction(prefix, invoke).finally(release)
-      } catch (error) {
-        return Promise.reject(error)
-      }
-    }
-    return Object.freeze({
+    return createBackendJournalNamespace({
+      ...options,
       nativeAtomic: true,
-      assertLive: assertOpen,
-      transactionInfo: (scope: Omit<ITransactionScope, 'use'>) => {
-        assertOpen()
-        return options.scope(scope).info
+      assertLive: () => {
+        options.assertLive()
+        if (generation !== namespaces)
+          throw new StorageContractError(StorageContractErrorCode.disposed)
       },
-      run,
-      runCommitted: <R>(
-        work: (view: IStorageJournalNamespaceView) => Promise<R>,
-        committed: (value: R) => void
-      ): Promise<R> => {
-        if (typeof committed !== 'function')
-          return Promise.reject(new StorageContractError(StorageContractErrorCode.invalidArgument))
-        return run(work, undefined, committed)
+      reserve: (hold) => options.reserve(prefix, hold),
+      authenticate: (scope) => {
+        const current = options.scope(scope)
+        return { info: current.info, port: project(prefix, current.port) }
       },
-      onCommit: (scope: Omit<ITransactionScope, 'use'>, effect: () => void) => {
-        if (typeof effect !== 'function')
-          throw new StorageContractError(StorageContractErrorCode.invalidArgument)
-        return transaction(scope).onCommit(effect)
-      },
-      onRollback: (scope: Omit<ITransactionScope, 'use'>, effect: () => void) => {
-        if (typeof effect !== 'function')
-          throw new StorageContractError(StorageContractErrorCode.invalidArgument)
-        return transaction(scope).onRollback(effect)
-      },
-      dispose,
-      [Symbol.asyncDispose]: () => (symbolic ??= dispose().catch(options.report))
+      transaction: (work) => options.transaction(prefix, (port) => work(project(prefix, port)))
     })
   }
   return {

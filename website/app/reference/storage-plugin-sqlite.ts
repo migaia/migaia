@@ -38,8 +38,8 @@ export const storagePluginSqliteReference: ILibraryReference = {
         '为存储宿主定义一个借用调用方 driver 的后端。'
       ),
       returns: t(
-        'An exact-id backend plugin. File databases verify WAL by default; memory defaults to wal:false.',
-        '具有精确 id 的后端插件。文件库缺省确认 WAL；内存库缺省 wal:false。'
+        'An exact-id backend plugin. File databases verify WAL by default; memory defaults to wal:false and can reserve private native log namespaces.',
+        '具有精确 id 的后端插件。文件库缺省确认 WAL；内存库缺省 wal:false，可独占原生私有日志 namespace。'
       ),
       cases: storagePluginSqliteCases.sqliteBackendPlugin
     },

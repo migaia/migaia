@@ -20,6 +20,7 @@ import {
   useTransactionCapability,
   createTransactionBuilder,
   runWithConcurrency,
+  ConcurrencyPolicy,
   readConcurrencyLockIdentities,
   snapshotConcurrencyLockKeys,
   snapshotConcurrencyLockRange,
@@ -34,6 +35,8 @@ import {
   counter,
   createRecordQuery,
   type IStorageKey,
+  type IStorageBase,
+  type ITransactionScope,
   type IStorageBatchKey,
   type IKeyValueApi,
   type ITtlApi,
@@ -58,8 +61,14 @@ import {
 import { asyncDisposeKey } from '@migaia/plugin-host'
 import { createAbortController } from '@migaia/lifecycle'
 import { walkErrorCauses } from '@migaia/utils/error'
-import type { IStoragePluginCore } from '@migaia/storage-host'
+import type {
+  IStoragePluginCore,
+  IStorageJournalBackendBinding,
+  IStorageJournalNamespaceView
+} from '@migaia/storage-host'
 import {
+  createBackendJournalNamespace,
+  type IBackendJournalTransaction,
   createStorageOperationReporter,
   reportCleanupError,
   throwIfAborted,
@@ -97,6 +106,7 @@ import { SqliteErrorCode } from './error-code.js'
 import { SqliteErrorText } from './error-text.js'
 import { decodeKey, decodeHexKey, keyHex } from './key-codec.js'
 import { createSqliteStatements, createSqliteExecutor } from './sql.js'
+import type { ISqliteJournalTerminal } from './journal.js'
 import type {
   ISqliteOptions,
   ISqliteStore,
@@ -138,6 +148,10 @@ type INativeState = {
   readonly expiresAt: number | undefined
   mode: 'deferred' | 'immediate'
   failure: unknown
+  /** Only routing metadata; authorization still comes from the original transaction owner. */
+  scopeStore?: IStorageBase
+  /** Allocated only when a private namespace joins this actual native attempt. */
+  journalTerminal?: ISqliteJournalTerminal
 }
 /** All organization scopes retain the original connection admission and current native attempt. */
 type ISqlitePhysicalState = {
@@ -173,6 +187,8 @@ type IWriteGuard = {
 type IRootMutation<R> = {
   readonly keys: readonly ILockKey[]
   readonly guard?: IWriteGuard
+  /** Publish owner facts only after this mutation's actual native COMMIT. */
+  readonly committed?: () => void
   run(state: INativeState): R
 }
 /** Native batch rows retain the one canonical key capture and detached text payload. */
@@ -199,6 +215,8 @@ export type ISqliteRuntime = {
   readonly orgId: string
   /** The original installation ensures a requested root context uses its existing org group. */
   readonly ensureOrg?: (orgId: string) => void
+  /** Root and its explicit default view share this existing organization's private log generation. */
+  readonly journalGeneration?: { value: object }
 }
 /** Construction returns only exact provider/controller handles needed for original host admission. */
 export type ISqliteConstruction<TValue> = {
@@ -206,6 +224,7 @@ export type ISqliteConstruction<TValue> = {
   readonly client: ISqliteDriver
   readonly controller: IBackendChangeController
   readonly installer: ICapabilityInstallPort
+  readonly journal: Omit<IStorageJournalBackendBinding, 'forOrg'>
   getTransactionClient(scope: ISqliteTransactionScope): ISqliteDriver
   /** Private organization construction reuses this exact physical owner and captured layout. */
   createOrg(orgId: string, core: IStoragePluginCore): ISqliteConstruction<TValue>
@@ -251,6 +270,8 @@ export function createSqliteStore<TValue>(
   if (shared === undefined) claimedDrivers.add(driver)
   /** Original host observation and execution ports carry no backend-owned subscriber registry. */
   const { core } = runtime
+  /** A committed org drop invalidates only already-open private indexes for this fixed org. */
+  const journalGeneration = runtime.journalGeneration ?? { value: {} }
   /** Batch durations use the existing host clock without introducing a backend timer. */
   const scheduler = core.featureExpose.getScheduler()
   /** One final reporting boundary observes cleanup and observer failures. */
@@ -467,8 +488,8 @@ export function createSqliteStore<TValue>(
     if (physicalState.active) throw sqliteError(SqliteErrorCode.transactionFailed)
   }
   /** Scope authorization returns the existing native attempt, never a copy or public marker. */
-  const nativeFor = (scope: object): INativeState => {
-    assertTransactionOwner(store, scope)
+  const nativeFor = (scope: object, expectedStore: IStorageBase = store): INativeState => {
+    assertTransactionOwner(expectedStore, scope)
     if (!physicalState.active || physicalState.active === SQLITE_CONTROL_ACTIVE)
       throw sqliteError(SqliteErrorCode.transactionFailed)
     throwIfAborted(physicalState.active.context?.signal)
@@ -478,6 +499,46 @@ export function createSqliteStore<TValue>(
     )
       throw new StorageContractError(StorageContractErrorCode.lockLost)
     return physicalState.active
+  }
+  /** Only the original active transaction owner authenticates a namespace's exact fixed org. */
+  const journalScope = (scope: Omit<ITransactionScope, 'use'>) => {
+    const state = physicalState.active
+    if (!state || state === SQLITE_CONTROL_ACTIVE || !state.scopeStore)
+      throw new StorageContractError(StorageContractErrorCode.invalidArgument)
+    nativeFor(scope, state.scopeStore)
+    const info = assertTransactionOwner(state.scopeStore, scope)
+    if (state.orgId !== runtime.orgId)
+      throw new StorageContractError(StorageContractErrorCode.invalidArgument)
+    state.journalTerminal ??= { committed: new Set(), rolledBack: new Set(), ended: new Set() }
+    return { state, info, terminal: state.journalTerminal }
+  }
+  /**
+   * Actual data outcome and native resource completion are separate facts, including unknown
+   * failures.
+   */
+  const finishJournal = (state: INativeState, success?: boolean): void => {
+    const terminal = state.journalTerminal
+    if (terminal === undefined) return
+    if (success !== undefined)
+      for (const effect of success ? terminal.committed : terminal.rolledBack) {
+        try {
+          const result = effect()
+          observeThenableRejection(result, inspectThenable(result), report)
+        } catch (error) {
+          reportCleanupError(report, error)
+        }
+      }
+    for (const effect of terminal.ended) {
+      try {
+        effect()
+      } catch (error) {
+        reportCleanupError(report, error)
+      }
+    }
+    terminal.committed.clear()
+    terminal.rolledBack.clear()
+    terminal.ended.clear()
+    state.journalTerminal = undefined
   }
   /** Package SQL errors stay coded, and only native write BUSY can enter recovery. */
   const statement = <R>(
@@ -1105,7 +1166,8 @@ export function createSqliteStore<TValue>(
                   context.lock ?? [],
                   guard,
                   operationOrg(context),
-                  context
+                  context,
+                  mutation.committed
                 ) as Awaited<R>
               return wal
                 ? await physicalRun(context, () =>
@@ -2045,6 +2107,7 @@ export function createSqliteStore<TValue>(
             }
           }
         }
+        state.scopeStore = store
         const scope = createScope()
         registration = transactionOwner.register(scope, {
           createScope,
@@ -2083,6 +2146,7 @@ export function createSqliteStore<TValue>(
         await control(SqliteControl.commit, context, false, () => {
           begun = false
           advanceRevisions(state)
+          finishJournal(state, true)
         })
         let changedKeys = 0
         for (const keys of state.changed.values()) changedKeys += keys.size
@@ -2132,6 +2196,7 @@ export function createSqliteStore<TValue>(
           }
         throw normalizeTransactionFailure(failure)
       } finally {
+        finishJournal(state, begun ? undefined : false)
         registration?.close()
         if (registration) observe(terminal, 'onTransactionClose')
         /** Failed rollback keeps actual unknown native ownership sealed against root access. */
@@ -2303,7 +2368,8 @@ export function createSqliteStore<TValue>(
     keys: readonly ILockKey[] = [],
     guard?: IWriteGuard,
     orgId = runtime.orgId,
-    context?: IConcurrencyAttemptContext
+    context?: IConcurrencyAttemptContext,
+    committed?: () => void
   ): R => {
     assertRoot()
     /** Synchronous entry cannot wait or invoke a user strategy while another logical holder exists. */
@@ -2380,6 +2446,7 @@ export function createSqliteStore<TValue>(
         statements.get(SqliteControl.commit).run()
         physicalState.active = undefined
         advanceRevisions(state)
+        committed?.()
       } catch (error) {
         throw normalizeSqliteFailure(error)
       }
@@ -3007,20 +3074,198 @@ export function createSqliteStore<TValue>(
       normalizeTransactionFailure,
       { activityMode: 'managed', asyncDisposeKey, defaultPolicy: concurrency, concurrencyStages }
     )
+    /** Fixed native namespaces use the existing private journal table and original scope runner. */
+    const journal: Omit<IStorageJournalBackendBinding, 'forOrg'> = {
+      openNamespace: async (prefix) => {
+        controller.assertLive()
+        if (typeof prefix !== 'string' || prefix.length === 0)
+          throw new StorageContractError(StorageContractErrorCode.invalidArgument)
+        const bounds = snapshotStorageKeyPrefix([prefix], SqliteNames.backend)
+        const lower = keyHex(bounds.lower)
+        const upper = keyHex(bounds.upper)
+        const namespaceKey = (input: unknown): string => {
+          if (typeof input !== 'string')
+            throw new StorageContractError(StorageContractErrorCode.invalidArgument)
+          return keyHex(encodeOrderedStorageKey([prefix, input], SqliteNames.backend))
+        }
+        /** Each extracted private operation checks the original scope before touching native rows. */
+        const view = (scope: Omit<ITransactionScope, 'use'>): IStorageJournalNamespaceView => {
+          const execute = <R>(invoke: (state: INativeState) => R) =>
+            runTransactionOperation(scope, () => invoke(journalScope(scope).state))
+          const clear = () =>
+            execute((state) => {
+              statement(
+                'DELETE FROM ' + tables.journal + ' WHERE org_id=? AND key>=? AND key<?',
+                [state.orgId, lower, upper],
+                'run',
+                state
+              )
+            })
+          return Object.freeze({
+            get: (key: string) =>
+              execute((state) => {
+                const row = statement<ISqliteRow | undefined>(
+                  'SELECT value FROM ' + tables.journal + ' WHERE org_id=? AND key=?',
+                  [state.orgId, namespaceKey(key)],
+                  'get',
+                  state
+                )
+                if (row === undefined) return null
+                try {
+                  const value = textCodec.decode(row.value as string)
+                  if (typeof value !== 'string') throw sqliteError(SqliteErrorCode.decodeFailed)
+                  return value
+                } catch (cause) {
+                  throw sqliteError(SqliteErrorCode.decodeFailed, cause)
+                }
+              }),
+            has: (key: string) =>
+              execute(
+                (state) =>
+                  statement<ISqliteRow | undefined>(
+                    'SELECT key FROM ' + tables.journal + ' WHERE org_id=? AND key=?',
+                    [state.orgId, namespaceKey(key)],
+                    'get',
+                    state
+                  ) !== undefined
+              ),
+            set: (key: string, value: string) =>
+              execute((state) => {
+                if (typeof value !== 'string')
+                  throw new StorageContractError(StorageContractErrorCode.invalidArgument)
+                statement(
+                  'INSERT INTO ' +
+                    tables.journal +
+                    '(org_id,key,value) VALUES(?,?,?) ON CONFLICT(org_id,key) DO UPDATE SET value=excluded.value',
+                  [state.orgId, namespaceKey(key), textCodec.encode(value)],
+                  'run',
+                  state
+                )
+              }),
+            remove: (key: string) =>
+              execute((state) => {
+                statement(
+                  'DELETE FROM ' + tables.journal + ' WHERE org_id=? AND key=?',
+                  [state.orgId, namespaceKey(key)],
+                  'run',
+                  state
+                )
+              }),
+            keys: () =>
+              execute((state) =>
+                statement<readonly ISqliteRow[]>(
+                  'SELECT key FROM ' +
+                    tables.journal +
+                    ' WHERE org_id=? AND key>=? AND key<? ORDER BY key',
+                  [state.orgId, lower, upper],
+                  'all',
+                  state
+                ).map((row) => {
+                  const key = decodeHexKey(row.key as string)
+                  if (
+                    !Array.isArray(key) ||
+                    key.length !== 2 ||
+                    key[0] !== prefix ||
+                    typeof key[1] !== 'string'
+                  )
+                    throw sqliteError(SqliteErrorCode.decodeFailed)
+                  return key[1]
+                })
+              ),
+            clearValues: clear,
+            clearAll: clear
+          })
+        }
+        /** Cached native indexes must never survive an actual deletion of their private rows. */
+        const openedGeneration = journalGeneration.value
+        /** Native terminal sets stay on this exact original transaction, not the shared resource. */
+        const project = (scope: Omit<ITransactionScope, 'use'>): IBackendJournalTransaction => {
+          const terminal = journalScope(scope).terminal
+          const listen = (effects: Set<() => void>, effect: () => void) => {
+            effects.add(effect)
+            return () => {
+              effects.delete(effect)
+            }
+          }
+          return {
+            run: (work) => work(view(scope)),
+            onCommit: (effect) => listen(terminal.committed, effect),
+            onRollback: (effect) => listen(terminal.rolledBack, effect),
+            onEnd: (effect) => listen(terminal.ended, effect)
+          }
+        }
+        const exclusive = !wal && typeof physical !== 'string'
+        return createBackendJournalNamespace({
+          assertLive: () => {
+            controller.assertLive()
+            if (openedGeneration !== journalGeneration.value)
+              throw new StorageContractError(StorageContractErrorCode.disposed, {
+                backend: SqliteNames.backend
+              })
+          },
+          closingSignal: controller.closingSignal,
+          report: (error) => reportCleanupError(report, error),
+          /** Only this caller-owned memory connection has reliable lifetime exclusivity. */
+          nativeAtomic: true,
+          ...(exclusive ? {} : { indexExclusive: false as const }),
+          backend: SqliteNames.backend,
+          reserve: (hold) =>
+            !exclusive
+              ? hold()
+              : runWithConcurrency(
+                  {
+                    store,
+                    options: { lock: [lockKey.record([SqliteNames.journalOwner, prefix])] },
+                    policy: ConcurrencyPolicy.fail()
+                  },
+                  {
+                    attempt: (context) =>
+                      localGroup(runtime.orgId).locks.attemptMetadata(
+                        context,
+                        {
+                          owner: controller.origin,
+                          since: Date.now(),
+                          status: 'held',
+                          scope: 'local'
+                        },
+                        {
+                          attempt: async () => {
+                            await hold()
+                            return { status: 'committed', value: undefined }
+                          }
+                        },
+                        concurrencyStages,
+                        controller.closingSignal
+                      )
+                  }
+                ),
+          authenticate: (scope) => ({ info: journalScope(scope).info, port: project(scope) }),
+          transaction: (work) => transact((scope) => work(project(scope)))
+        })
+      }
+    }
     return {
       store,
       client,
       controller,
       installer,
+      journal,
       createOrg: (orgId, orgCore) =>
         createSqliteStore<TValue>(
           { driver, table, concurrency, owner: { label }, maxLockMs, wal },
-          { core: orgCore, orgId },
+          {
+            core: orgCore,
+            orgId,
+            ...(orgId === runtime.orgId ? { journalGeneration } : {})
+          },
           physicalState
         ),
       dropOrg: () =>
         rootWrite(SqliteOperation.dropOrg, undefined, undefined, () => ({
           keys: [],
+          committed: () => {
+            journalGeneration.value = {}
+          },
           guard: { channels: ['text', 'bytes', 'record'] },
           run: (state) => {
             clear(['text', 'bytes', 'record'], state)

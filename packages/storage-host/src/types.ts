@@ -21,6 +21,7 @@ import type {
 } from './core/change-controller.js'
 import type {
   IOperationContext,
+  ILockKey,
   IStorageBase,
   IStorageStore,
   ICapabilityImpl,
@@ -60,9 +61,18 @@ export type IStorageExecutionRequest<TInput> = Readonly<{
   input: TInput
   ctx?: IOperationContext
   scope?: object
+  /** Original backend facts, evaluated only when telemetry emits its completed endpoint. */
+  keys?: () => readonly ILockKey[]
+  /** Private journal work or a child already covered by its original public boundary. */
+  internal?: true
 }>
 /** The storage boundary requires the terminal to run; intercepted operations reject as aborted. */
 export type IStorageExecutionPort = {
+  /** Observe the original complete retry loop without running or registering another pipeline. */
+  observe?<TResult>(
+    describe: () => IStorageExecutionRequest<unknown>,
+    invoke: (observing: boolean) => Promise<TResult>
+  ): Promise<TResult>
   run<TInput, TResult>(
     request: IStorageExecutionRequest<TInput>,
     invoke: (input: TInput) => Promise<TResult>
@@ -331,7 +341,7 @@ export type IStorageFeatureStoreCompatibility<
 }
 // Preserve the existing core fields at implementation; this changed-surface projection has no new execution mechanism.
 export type IStoragePipelineInput = IStorageExecutionRequest<unknown> &
-  Readonly<{ backendId: string; backend: string }>
+  Readonly<{ backendId: string; backend: string; orgId: string }>
 export type IStoragePluginCore<F extends IStorageFeatureRecord = {}> = Pick<
   IPluginHostCore<IStoragePipelineInput>,
   'operation' | 'lifecycle' | 'onDispose' | 'usePipeline' | 'useAsyncPipeline'

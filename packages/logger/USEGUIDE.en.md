@@ -589,3 +589,5 @@ const batch = prepareLogAppend(
 )
 console.log(index.lastSeq, batch[0]?.seq) // 0 1: preparation is not a commit.
 ```
+
+`level()` also supplies `atLevel(level, entry)`. The entry keeps its category tag, normal `dispatchRaw` payload and original Error references while passing through the same level threshold and filters. For example, `log.atLevel('debug', { tag: 'storage', message: 'get', meta: { operation: 'get' } })` uses the original asyncOutput and output resources. Ordinary unknown tags retain their existing filter-only policy; debug/error and other existing methods keep their behavior.

@@ -578,6 +578,22 @@ const levelExt: Readonly<Record<string, IMemberDoc & { call: string }>> = Object
 /** All methods `level()` adds. */
 const levelMembers: Readonly<Record<string, IMemberDoc & { call: string }>> = {
   ...levelExt,
+  atLevel: {
+    call: '(level, entry)',
+    summary: t(
+      'Dispatch a normal raw entry with a category tag through the same original level threshold and filters. Payload and Error references remain unchanged.',
+      '让自带分类 tag 的普通 raw 条目经过同一原 level 门槛和过滤器，保留 payload 与原 Error 引用。'
+    ),
+    params: {
+      level: t('debug, info, warn, error or fatal.', 'debug、info、warn、error 或 fatal。'),
+      entry: t('The existing IRawEntryInput schema.', '既有 IRawEntryInput schema。')
+    },
+    returns: t(
+      'Nothing; uses the original asyncOutput policy.',
+      '无返回值，复用原 asyncOutput 策略。'
+    ),
+    example: `log.atLevel('debug', { tag: 'storage', message: 'get' })`
+  },
   setLevel: {
     call: '(level)',
     summary: t(

@@ -9,6 +9,8 @@ export const SqliteNames = {
   locks: 'locks',
   revisions: 'revisions',
   journal: 'journal',
+  /** Private lifetime reservations are distinct from the shared journal's commit head locks. */
+  journalOwner: 'storage.sqlite.journal.owner',
   markers: 'commit_markers'
 } as const
 /** Trusted native control statements bypass only the public SQL composition entry. */
