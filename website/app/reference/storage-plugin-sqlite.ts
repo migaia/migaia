@@ -1,7 +1,93 @@
-import type { ILibraryReference, IText } from './contract.js'
+import type { ILibraryReference, IMemberDoc, IText } from './contract.js'
 import { storagePluginSqliteCases } from './storage-plugin-sqlite-cases.js'
 /** Bilingual descriptions share the same exact public module inventory. */
 const t = (en: string, zh: string): IText => ({ en, zh })
+/** Full public lifecycle for an explicitly configured in-memory connection. */
+const sqliteConfiguredExample = `import { createStorageHost } from '@migaia/storage-host'
+import { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'
+import { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'
+
+await using connection = nodeSqliteDriver(':memory:')
+await using host = await createStorageHost({
+  plugins: [sqliteBackendPlugin({
+    id: 'application', driver: connection, table: 'settings', wal: false,
+    owner: { label: 'settings-owner' }, maxLockMs: 10000
+  })] as const
+})
+await host.backend('application').set('theme', 'dark')
+console.log(await host.backend('application').get('theme'))`
+
+/** Policy selection remains in the shared concurrency owner, not the native driver. */
+const sqliteConcurrencyExample = `import { ConcurrencyPolicy } from '@migaia/storage-contract'
+import { createStorageHost } from '@migaia/storage-host'
+import { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'
+import { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'
+
+await using connection = nodeSqliteDriver(':memory:')
+await using host = await createStorageHost({
+  plugins: [sqliteBackendPlugin({
+    driver: connection, concurrency: ConcurrencyPolicy.wait({ timeoutMs: 200 })
+  })] as const
+})
+await host.backend('sqlite').set('theme', 'dark')
+console.log(await host.backend('sqlite').get('theme'))`
+
+/** One canonical option table serves the public options type and its anonymous id extension. */
+const sqliteOptionMembers: Readonly<Record<string, IMemberDoc>> = {
+  driver: {
+    summary: t(
+      'Caller-owned native connection, exclusive to one installed store until that store drains.',
+      '调用方拥有的原生连接；在已安装 store 排空前由其独占。'
+    )
+  },
+  table: {
+    summary: t(
+      'Physical table prefix, quoted as complete SQL identifiers.',
+      '物理表前缀，作为完整 SQL 标识符引用。'
+    ),
+    default: t(
+      'migaia, with separate channel and control tables.',
+      'migaia，使用独立通道表和控制表。'
+    )
+  },
+  concurrency: {
+    summary: t(
+      'Default policy resolved by the shared concurrency owner.',
+      '由共同并发 owner 解析的缺省策略。'
+    ),
+    default: t('The shared default concurrency policy.', '共同缺省并发策略。'),
+    whenToUse: t(
+      'Choose a logical acquisition budget instead of changing native SQLite timeouts.',
+      '需要调整逻辑锁获取预算时使用，不改变 SQLite 原生超时。'
+    ),
+    example: sqliteConcurrencyExample
+  },
+  owner: {
+    summary: t(
+      'Optional diagnostic owner label; it grants no authority.',
+      '可选诊断 owner 标签，不授予权限。'
+    ),
+    default: t('No custom owner label.', '无自定义 owner 标签。')
+  },
+  maxLockMs: {
+    summary: t(
+      'Maximum native WAL lock lease; expiration rejects continued transaction use.',
+      '原生 WAL 锁的最长租期；过期后拒绝继续使用事务。'
+    ),
+    default: t('30000 milliseconds.', '缺省租期为 30000 毫秒。')
+  },
+  wal: {
+    summary: t(
+      'Select native cross-connection WAL locks or the original in-process shared lock port.',
+      '选择原生跨连接 WAL 锁或原进程内共享锁端口。'
+    ),
+    default: t(
+      'true for file databases; false for memory databases. A requested WAL mode must be confirmed by SQLite.',
+      '文件库 true，内存库 false；请求的 WAL 模式必须由 SQLite 确认。'
+    )
+  }
+}
+
 /** Explicit native subpaths keep the package root independent of runtime builtin modules. */
 export const storagePluginSqliteReference: ILibraryReference = {
   modules: {
@@ -14,19 +100,19 @@ export const storagePluginSqliteReference: ILibraryReference = {
     node: {
       summary: t(
         'Node and Deno builtin node:sqlite connection ownership.',
-        'Node 与 Deno 的内置 node:sqlite 连接资源。'
+        '使用 Node 与 Deno 的内置 node:sqlite，创建需要调用方显式释放的原生连接。'
       )
     },
     bun: {
       summary: t(
         'Bun builtin SQLite with exact integer reads.',
-        'Bun 内置 SQLite，保留精确整数读取。'
+        '使用 Bun 内置 SQLite 创建调用方拥有的连接，读取大整数时保留精确值。'
       )
     },
     'features/maintenance': {
       summary: t(
         'Back up and vacuum through the original installed SQL endpoint.',
-        '通过原已安装 SQL 终点执行备份与整理。'
+        '通过原已安装且经过准入的 SQL 终点执行原生备份与数据库整理。'
       )
     }
   },
@@ -35,19 +121,61 @@ export const storagePluginSqliteReference: ILibraryReference = {
       role: 'factory',
       purpose: t(
         'Define one caller-owned driver backend for the storage host.',
-        '为存储宿主定义一个借用调用方 driver 的后端。'
+        '为存储宿主定义一个借用调用方原生连接的 SQLite 后端，安装后共用原事务边界。'
       ),
       returns: t(
         'An exact-id backend plugin. File databases verify WAL by default; memory defaults to wal:false and can reserve private native log namespaces.',
         '具有精确 id 的后端插件。文件库缺省确认 WAL；内存库缺省 wal:false，可独占原生私有日志 namespace。'
       ),
+      params: {
+        options: t(
+          'Captured driver and backend configuration.',
+          '一次捕获的原生 driver 与后端配置。'
+        ),
+        features: t(
+          'Optional exact-kind Feature definitions keyed by installed API name.',
+          '按安装 API 名称命名的可选精确 kind Feature 定义。'
+        )
+      },
+      optionDocs: {
+        ...sqliteOptionMembers,
+        id: {
+          summary: t(
+            'Literal backend id selected by host.backend.',
+            '宿主按字面量后端标识选择这个已安装实例。'
+          ),
+          default: t('sqlite.', '缺省标识为 sqlite。')
+        },
+        'owner.label': {
+          summary: t(
+            'Diagnostic text for the existing concurrency owner.',
+            '既有并发 owner 使用的诊断标签文本。'
+          ),
+          default: t('No custom label.', '无自定义标签。')
+        }
+      },
+      optionCases: [
+        {
+          title: t('Own a configured application connection', '拥有已配置的业务连接'),
+          problem: t(
+            'Use a named backend and table with explicit memory-mode locking; release the host before its connection.',
+            '使用具名后端与业务表，明确选择内存库锁模式，并在连接之前释放宿主。'
+          ),
+          example: sqliteConfiguredExample,
+          result: t(
+            'Prints dark. Private logs in memory may cache an exclusive index; file connections reread current log state inside each native transaction.',
+            '输出 dark。内存私有日志可以缓存独占索引；文件连接在每次原生事务内读取当前日志状态。'
+          ),
+          covers: ['id', 'driver', 'table', 'wal', 'owner', 'maxLockMs']
+        }
+      ],
       cases: storagePluginSqliteCases.sqliteBackendPlugin
     },
     sqliteBackendKind: {
       role: 'constant',
       purpose: t(
         'Authenticate SQLite Feature targets by exact kind identity.',
-        '通过精确 kind 身份校验 SQLite Feature 目标。'
+        '通过精确 kind 令牌身份校验 SQLite Feature 的安装目标，错误目标在访问连接之前拒绝。'
       ),
       returns: t(
         'A neutral kind token; it owns no connection and grants no close authority.',
@@ -58,31 +186,43 @@ export const storagePluginSqliteReference: ILibraryReference = {
       role: 'factory',
       purpose: t(
         'Open the native Node/Deno SQLite connection with exact integers.',
-        '打开保留精确整数的 Node/Deno 原生 SQLite 连接。'
+        '打开调用方拥有的 Node/Deno 原生 SQLite 连接，大整数读取保持精确，需显式释放。'
       ),
       returns: t(
         'A caller-owned synchronous driver and storage resource, without a public native Database or close method.',
         '调用方拥有的同步 driver 与存储资源，不公开原生 Database 或 close 方法。'
       ),
+      params: {
+        path: t(
+          'Native database filename or :memory: for a private memory database.',
+          '原生数据库文件路径，或以 :memory: 创建私有内存库。'
+        )
+      },
       cases: storagePluginSqliteCases.nodeSqliteDriver
     },
     bunSqliteDriver: {
       role: 'factory',
       purpose: t(
         'Open bun:sqlite with safeIntegers enabled before statements run.',
-        '在执行语句前启用 safeIntegers，打开 bun:sqlite。'
+        '打开调用方拥有的 Bun 原生 SQLite 连接，在任何语句执行之前启用精确整数读取。'
       ),
       returns: t(
         'A caller-owned connection; disposal uses native close(true).',
         '调用方拥有的连接；释放使用原生 close(true)。'
       ),
+      params: {
+        path: t(
+          'Native database filename or :memory: for a private memory database.',
+          '原生数据库文件路径，或以 :memory: 创建私有内存库。'
+        )
+      },
       cases: storagePluginSqliteCases.bunSqliteDriver
     },
     sqliteMaintenanceFeature: {
       role: 'factory',
       purpose: t(
         'Add backup and vacuum only to the installed store API.',
-        '只向已安装 store API 增加 backup 与 vacuum。'
+        '通过 Feature 向已安装的根存储增加原生备份与整理能力，事务视图不公开维护操作。'
       ),
       returns: t(
         'A SQLite Feature. Transactions expose neither maintenance operation.',
@@ -94,7 +234,7 @@ export const storagePluginSqliteReference: ILibraryReference = {
       role: 'constant',
       purpose: t(
         'Identify SQLite native, transaction, channel-conflict and decode failures.',
-        '标识 SQLite 原生、事务、通道冲突及解码失败。'
+        '使用规范错误码区分 SQLite 原生操作、事务、跨通道键冲突及保存数据解码失败。'
       ),
       returns: t(
         'SQLITE_FAILED, TRANSACTION_FAILED, DUPLICATE_KEY and DECODE_FAILED, retaining original errors through cause or AggregateError.errors.',
@@ -135,6 +275,13 @@ export const storagePluginSqliteReference: ILibraryReference = {
       }
     },
     ISqliteStatement: {
+      scenarios: [
+        t(
+          'Bind values through a caller-owned prepared statement and read exact native integers.',
+          '通过调用方拥有的预编译语句绑定值，并读取精确的原生整数。'
+        )
+      ],
+      example: storagePluginSqliteCases.nodeSqliteDriver![0]!.example,
       summary: t(
         'A synchronous prepared native statement borrowed from its connection. Disposal of that connection seals captured statements too.',
         '从连接借用的同步原生预编译语句；连接释放后，已捕获语句也不可再执行。'
@@ -217,6 +364,13 @@ export const storagePluginSqliteReference: ILibraryReference = {
       }
     },
     ISqliteConnection: {
+      scenarios: [
+        t(
+          'Give the host a borrowed connection and keep disposal in the creating application.',
+          '向宿主提供借用连接，由创建连接的应用保留最终释放权。'
+        )
+      ],
+      example: sqliteConfiguredExample,
       summary: t(
         'The creating caller owns this driver and storage resource. Dispose the host before the connection; backend disposal never closes it.',
         '创建调用方拥有的 driver 与存储资源。先释放 host，再释放连接；后端释放不会关闭连接。'
@@ -260,8 +414,8 @@ export const storagePluginSqliteReference: ILibraryReference = {
     },
     ISqliteCapabilities: {
       summary: t(
-        'The current exact capability token union, kv and records.',
-        '当前精确能力令牌联合：kv 与 records。'
+        'The exact built-in capability token union: kv, records, sql, ttl and counter.',
+        '内置精确能力令牌联合：kv、records、sql、ttl 与 counter。'
       ),
       members: {}
     },
@@ -274,8 +428,8 @@ export const storagePluginSqliteReference: ILibraryReference = {
     },
     ISqliteStore: {
       summary: t(
-        'The installed native store combines text, bytes, typed records, sync access, private metadata, SQL and kv/records capabilities. Root access rejects while a transaction owns its connection.',
-        '已安装原生 store 集合文本、二进制、类型记录、同步访问、私有元数据、SQL 及 kv/records 能力。事务占用连接时，根访问拒绝。'
+        'The installed native store combines text, bytes, typed records, sync access, private metadata, SQL and kv/records/sql/ttl/counter capabilities. Root access rejects while a transaction owns its connection.',
+        '已安装原生 store 集合文本、二进制、类型记录、同步访问、私有元数据、SQL 及 kv/records/sql/ttl/counter 能力。事务占用连接时，根访问拒绝。'
       ),
       members: {}
     },
@@ -284,55 +438,7 @@ export const storagePluginSqliteReference: ILibraryReference = {
         'Installation settings captured by sqliteBackendPlugin before native work begins.',
         'sqliteBackendPlugin 在原生工作开始前捕获的安装配置。'
       ),
-      members: {
-        driver: {
-          summary: t(
-            'Caller-owned native connection, exclusive to one installed store until that store drains.',
-            '调用方拥有的原生连接；在已安装 store 排空前由其独占。'
-          )
-        },
-        table: {
-          summary: t(
-            'Physical table prefix, quoted as complete SQL identifiers.',
-            '物理表前缀，作为完整 SQL 标识符引用。'
-          ),
-          default: t(
-            'migaia, with separate channel and control tables.',
-            'migaia，使用独立通道表和控制表。'
-          )
-        },
-        concurrency: {
-          summary: t(
-            'Default policy resolved by the shared concurrency owner.',
-            '由共同并发 owner 解析的缺省策略。'
-          ),
-          default: t('The shared default concurrency policy.', '共同缺省并发策略。')
-        },
-        owner: {
-          summary: t(
-            'Optional diagnostic owner label; it grants no authority.',
-            '可选诊断 owner 标签，不授予权限。'
-          ),
-          default: t('No custom owner label.', '无自定义 owner 标签。')
-        },
-        maxLockMs: {
-          summary: t(
-            'Maximum native WAL lock lease; expiration rejects continued transaction use.',
-            '原生 WAL 锁的最长租期；过期后拒绝继续使用事务。'
-          ),
-          default: t('30000 milliseconds.', '30000 毫秒。')
-        },
-        wal: {
-          summary: t(
-            'Select native cross-connection WAL locks or the original in-process shared lock port.',
-            '选择原生跨连接 WAL 锁或原进程内共享锁端口。'
-          ),
-          default: t(
-            'true for file databases; false for memory databases. A requested WAL mode must be confirmed by SQLite.',
-            '文件库 true，内存库 false；请求的 WAL 模式必须由 SQLite 确认。'
-          )
-        }
-      }
+      members: sqliteOptionMembers
     },
     ISqliteMaintenanceApi: {
       summary: t(
@@ -356,7 +462,10 @@ export const storagePluginSqliteReference: ILibraryReference = {
           example: "await store.api.maintenance.backup('./backup.sqlite')"
         },
         vacuum: {
-          summary: t('Run native VACUUM on the original connection.', '在原连接执行原生 VACUUM。'),
+          summary: t(
+            'Run native VACUUM on the original connection.',
+            '在原连接上执行原生数据库整理，活动事务期间拒绝执行。'
+          ),
           params: { ctx: t('Optional operation cancellation context.', '可选操作取消上下文。') },
           returns: t(
             'Resolves after native maintenance; an active transaction rejects.',
@@ -369,7 +478,7 @@ export const storagePluginSqliteReference: ILibraryReference = {
     ISqliteErrorCode: {
       summary: t(
         'The value union of the canonical SqliteErrorCode table.',
-        '规范 SqliteErrorCode 表的值联合。'
+        '规范错误码表的值联合，用于对外分类原生操作与事务等失败。'
       ),
       members: {}
     }

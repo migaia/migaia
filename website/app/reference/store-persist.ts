@@ -327,6 +327,10 @@ const unitOptions: Readonly<Record<string, IMemberDoc>> = {
     )
   },
   codecStages: {
+    default: t(
+      'Omitted: no explicit codec-stage observer is installed.',
+      '省略时不安装显式编解码阶段观察者。'
+    ),
     summary: t(
       'Optional store-bound observer from host.codecStages(storage). Each actual conversion emits once; observer failures only report and never delay conversion.',
       '可选的 host.codecStages(storage) 接点，绑定真实 store。每次实际转换只观察一次；失败只报告，不等待或改变编解码。'
@@ -335,12 +339,16 @@ const unitOptions: Readonly<Record<string, IMemberDoc>> = {
       "const handle = persist(state, { key: 'state', storage, codecStages: host.codecStages(storage) })"
   },
   transactionStages: {
+    default: t(
+      'Omitted: no explicit transactional flush observer is installed.',
+      '省略时不安装显式事务刷新观察者。'
+    ),
     summary: t(
       'Optional host.transactionStages(storage) observer. Emits before/afterPersistFlush using the actual operation view; after means request completion, and observer failures only report.',
       '可选的 host.transactionStages(storage) 观察接点，绑定实际操作视图。只发出 before/afterPersistFlush；after 表示请求完成，观察失败只报告。'
     ),
     example:
-      "const handle = persist(state, { key: 'state', storage, transactionStages: host.transactionStages(storage) })"
+      "const handle = persist(state, {\n  key: 'state', storage,\n  transactionStages: host.transactionStages(storage)\n})"
   },
   version: {
     summary: t(

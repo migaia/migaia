@@ -61,8 +61,8 @@ await history.append([{ kind: 'application', payload: { count: 1 } }])
 await host.backend('sqlite').clearAll()
 console.log(await history.lastSeq(), await host.backend('sqlite').keys())`,
       result: t(
-        'Prints 1 []. The memory connection reserves this private namespace; lifetime-cached file indexes reject before reading log rows.',
-        '输出 1 []。内存连接独占此私有 namespace；文件连接的生存期缓存索引在读取日志前拒绝。'
+        'Prints 1 []. The memory connection reserves this private namespace. File connections keep no cross-operation index cache and reread lastSeq and states inside each native transaction.',
+        '输出 1 []。内存连接独占此私有 namespace。文件连接不缓存跨操作索引，每次在原生事务内读取 lastSeq 与 states。'
       )
     },
     {
