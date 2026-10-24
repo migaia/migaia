@@ -85,6 +85,10 @@
     "./features/indexed-db-indexes": {
       "types": "./dist/features/indexed-db-indexes.d.ts",
       "default": "./dist/features/indexed-db-indexes.js"
+    },
+    "./features/indexed-db-keyset": {
+      "types": "./dist/features/indexed-db-keyset.d.ts",
+      "default": "./dist/features/indexed-db-keyset.js"
     }
   },
   "publishConfig": {

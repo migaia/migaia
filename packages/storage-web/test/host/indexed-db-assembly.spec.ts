@@ -1,3 +1,4 @@
+import { indexedDbKeysetFeature } from '../../src/features/indexed-db-keyset.js'
 import { indexedDbIndexesFeature } from '../../src/features/indexed-db-indexes.js'
 import { indexedDbJournalFeature } from '../../src/features/indexed-db-journal.js'
 import { storageJournalPlugin, storageLogStore } from '@migaia/storage-host/journal'
@@ -26,6 +27,11 @@ describe('explicit IndexedDB assembly', () => {
       await store.putRecord({ value: 1 }, 'row')
       expect(await store.getRecord('row')).toEqual({ value: 1 })
       expect(await store.use(records).query().all()).toHaveLength(1)
+      await expect(store.use(records).query().page(1)).rejects.toMatchObject({
+        source: STORAGE_WEB_SOURCE,
+        code: StorageErrorCode.indexedDbFeatureNotInstalled,
+        message: expect.stringContaining('indexedDbKeysetFeature')
+      })
       expect(await store.transaction((scope) => scope.getRecord('row'))).toEqual({ value: 1 })
       expect(store.capabilities.batch).toBe(false)
       expect(store.capabilities.secondaryIndexes).toBe(false)
@@ -39,12 +45,10 @@ describe('explicit IndexedDB assembly', () => {
         () => store.subscribeChanges(() => undefined),
         () => store.undo!('missing')
       ]) {
-        expect(invoke).toThrowError(
-          expect.objectContaining({
-            source: STORAGE_WEB_SOURCE,
-            code: StorageErrorCode.indexedDbFeatureNotInstalled
-          })
-        )
+        await expect(Promise.resolve().then<unknown>(() => invoke())).rejects.toMatchObject({
+          source: STORAGE_WEB_SOURCE,
+          code: StorageErrorCode.indexedDbFeatureNotInstalled
+        })
       }
     } finally {
       await host.dispose()
@@ -119,6 +123,24 @@ describe('explicit IndexedDB assembly', () => {
 
 /** Independent assemblies keep their original native owners without selecting unrelated Features. */
 describe('independent IndexedDB native owners', () => {
+  it('uses canonical raw keyset pagination only when its independent Feature is selected', async () => {
+    await using host = await createStorageHost({
+      plugins: [indexedDbBackendPlugin(options(), { keyset: indexedDbKeysetFeature() })]
+    })
+    /** The native store retains the original committed record owner. */
+    const store = host.backend('indexed-db')
+    await store.putRecord({ value: 1 }, 'one')
+    await store.putRecord({ value: 2 }, 'two')
+    /** One persistent query owns the cursor source identity across its successive branches. */
+    const query = store.use(records).query()
+    /** The first page provides the canonical opaque cursor without borrowing another source. */
+    const first = await query.page(1)
+    expect(first.items).toEqual([{ value: 1 }])
+    expect(first.next).toBeDefined()
+    expect((await query.after(first.next!).page(1)).items).toEqual([{ value: 2 }])
+    expect(store.capabilities.secondaryIndexes).toBe(false)
+  })
+
   it('uses native index projection and cursor with only its indexes Feature', async () => {
     await using host = await createStorageHost({
       plugins: [indexedDbBackendPlugin(options(), { indexes: indexedDbIndexesFeature() })]
@@ -182,10 +204,16 @@ describe('independent IndexedDB native owners', () => {
     await using host = await createStorageHost({
       plugins: [storageJournalPlugin(), indexedDbBackendPlugin(options())]
     })
-    await expect(storageLogStore(host, 'indexed-db', { prefix: 'missing' })).rejects.toMatchObject({
-      source: STORAGE_WEB_SOURCE,
-      code: StorageErrorCode.indexedDbFeatureNotInstalled,
-      message: expect.stringContaining('indexedDbJournalFeature')
-    })
+    /** Recovery keeps its original wrapper while the cause identifies the missing native unit. */
+    const failure = await storageLogStore(host, 'indexed-db', { prefix: 'missing' }).catch(
+      (error: unknown) => error
+    )
+    expect([...walkErrorCauses(failure)]).toContainEqual(
+      expect.objectContaining({
+        source: STORAGE_WEB_SOURCE,
+        code: StorageErrorCode.indexedDbFeatureNotInstalled,
+        message: expect.stringContaining('indexedDbJournalFeature')
+      })
+    )
   })
 })

@@ -26,6 +26,10 @@ import type { IIndexedDbContext, IIndexedDbStore } from './indexed-db.js'
 import type { IStorageChange } from '@migaia/storage-contract'
 /** Installation-local Feature owners; absent entries do not import optional implementations. */
 export type IIndexedDbAssemblyPlan = {
+  /** Only this explicit owner imports the full canonical record-query keyset implementation. */
+  keyset?: {
+    readonly query: typeof import('@migaia/storage-host/authoring/query').createRecordQuery
+  }
   indexes?: {
     readonly assertHandle: typeof import('./indexed-db-indexes-assembly.js').assertHandle
     readonly initialize: typeof import('./indexed-db-indexes-assembly.js').IndexedDbIndexesAssembly.prototype.initialize

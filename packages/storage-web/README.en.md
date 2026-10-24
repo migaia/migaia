@@ -53,6 +53,7 @@ Unique entity writes require a real record transaction or the backend’s native
 import { createStorageHost } from '@migaia/storage-host'
 import { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'
 import { indexedDbIndexesFeature } from '@migaia/storage-web/features/indexed-db-indexes'
+import { indexedDbKeysetFeature } from '@migaia/storage-web/features/indexed-db-keyset'
 import { indexedDbTtlFeature } from '@migaia/storage-web/features/indexed-db-ttl'
 import { indexedDbBatchFeature } from '@migaia/storage-web/features/indexed-db-batch'
 import { indexedDbJournalFeature } from '@migaia/storage-web/features/indexed-db-journal'
@@ -65,6 +66,7 @@ const host = await createStorageHost({
       { dbName: 'my-app' },
       {
         indexes: indexedDbIndexesFeature(),
+        keyset: indexedDbKeysetFeature(),
         ttl: indexedDbTtlFeature(),
         batch: indexedDbBatchFeature(),
         journal: indexedDbJournalFeature(),
@@ -90,6 +92,8 @@ Select only required entries. Change feeds require an explicitly selected notifi
 `store.use(kv)` provides `getMany`, `setMany`, `removeMany`, and `removeByPrefix`. IndexedDB executes a batch in one native transaction and supports string, number, Date, binary, and tuple keys. String keys retain the same data as the original single-key methods. Reads preserve input order and duplicate positions, missing values are `undefined`, and deletion returns the actual count. Canonical duplicate write keys reject with `INVALID_ARGUMENT` before I/O. Empty batches enter neither the pipeline nor a native transaction.
 
 localStorage, sessionStorage, and Cookie support batch reads. Multi-key writes require WAL and reject with `UNSUPPORTED_CAPABILITY` before mutation when it is absent. The default namespace codec retains the string `sw1` layout and uses a separate `sw2` layout for typed keys. `keys()` still lists strings; namespace cleanup covers both layouts. A custom codec must provide both `encodeStorageKey` and `decodeStorageKey` to read non-string batch keys; otherwise those keys reject before native I/O.
+
+Raw `store.use(records).query().page()` and `.after()` additionally require `indexedDbKeysetFeature()` from `@migaia/storage-web/features/indexed-db-keyset` in the backend Feature record. Basic `.all()` remains available. This unit borrows the canonical host cursor implementation without enabling native indexes. Omitted raw pagination rejects with `@migaia/storage-web / INDEXED_DB_FEATURE_NOT_INSTALLED` and names the missing factory before opening a reader. Entity pagination has its own `entityKeysetFeature()` declaration and does not require this raw-query Feature.
 
 ## IndexedDB transactions
 
