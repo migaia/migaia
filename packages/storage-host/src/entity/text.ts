@@ -2,6 +2,10 @@
 export const EntityText = {
   /** Predicates are synchronous boolean decisions; async mapping belongs to select. */
   queryPredicateBoolean: 'Entity query predicate must return a synchronous boolean',
+  /** Selector results belong to the existing portable key domain and cannot be asynchronous. */
+  querySelectorKey: 'Entity query selector must return a synchronous storage key',
+  /** Source and ordering controls cannot be repeated or mixed outside their fluent state. */
+  queryState: 'Entity query state or page bound is invalid',
   /** Query patches preserve their selected physical identity instead of moving or replacing a row. */
   queryIdentityChanged: 'Entity query update cannot change the record identity',
 

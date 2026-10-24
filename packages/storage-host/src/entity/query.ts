@@ -3,9 +3,9 @@ import {
   type IOperationContext,
   type IRecordQuery,
   type IRecordQueryBase,
-  type IRecordQueryNeedsLimit,
   type IQueryRead,
   type IQueryStatistics,
+  type IQueryPages,
   type IQueryResult,
   type IRecordQuerySource,
   type IStorageKey,
@@ -15,6 +15,7 @@ import {
 import type {
   IEntityQuery,
   IEntityQueryNarrowed,
+  IEntityQueryNeedsLimit,
   IInvalidRecordHandler,
   IInvalidRecordAction
 } from './types.js'
@@ -55,19 +56,33 @@ export function createEntityQuery<
     ) => IStorageIterator<R>
     readonly defaultComparator?: (left: T, right: T) => number
     readonly missingLimit: () => never
+    readonly invalidState: (cause?: unknown) => never
+    readonly selector: (fn: (value: T) => IStorageKey) => (value: T) => IStorageKey
     readonly predicate: (fn: (value: T) => unknown) => (value: T) => boolean
     readonly mapper: (fn: (value: T) => unknown) => (value: T) => Promise<unknown>
     readonly comparator: (fn: (left: T, right: T) => number) => (left: T, right: T) => number
   },
-  selection: IEntityQuerySourceSelection<T> = {}
+  selection: IEntityQuerySourceSelection<T> = {},
+  sourceAllowed = true
 ): IEntityQuery<T, TIndexes, TContext, TMethods> {
   /** Every read delegates to the original terminal inside the existing entity operation owner. */
   const reads = <R>(
-    prepare: (first?: true) => IQueryRead<R, TContext> & IQueryStatistics<R, TContext>,
+    prepare: (
+      first?: true
+    ) => IQueryRead<R, TContext> & IQueryStatistics<R, TContext> & IQueryPages<R, TContext>,
     plan: IEntityQueryPlan,
     invalid: IInvalidRecordAction | IInvalidRecordHandler<T> | undefined,
     countQuery = () => prepare()
-  ): Omit<IQueryRead<R, TContext>, 'explain'> & IQueryStatistics<R, TContext> => ({
+  ): Omit<IQueryRead<R, TContext>, 'explain'> &
+    IQueryStatistics<R, TContext> &
+    IQueryPages<R, TContext> => ({
+    page: (size, ctx) =>
+      input.run(
+        () => prepare().page(size, ctx),
+        plan,
+        { ...selection, onInvalid: invalid },
+        (page) => page.items.length
+      ),
     all: (ctx) =>
       input.run(
         () => prepare().all(ctx),
@@ -172,22 +187,53 @@ export function createEntityQuery<
     Object.freeze({
       ...query,
       ...reads(prepareResult, plan, invalid, () => query),
+      // Hidden type-state methods reject dynamic JavaScript use before any source is opened.
+      index: () => input.invalidState(),
+      range: () => input.invalidState(),
+      where: () => input.invalidState(),
+      select: () => input.invalidState(),
+      distinct: () => input.invalidState(),
+      skip: () => input.invalidState(),
+      after: () => input.invalidState(),
+      limit: () => input.invalidState(),
+      orderBy: () => input.invalidState(),
+      orderByComparator: () => input.invalidState(),
+      onInvalid: () => input.invalidState(),
       explain: () => prepareResult().explain(),
       requirePushdown: (): IQueryResult<R, TContext, true, TMethods> =>
         result(query.requirePushdown(), plan, invalid, (first) =>
           prepareResult(first).requirePushdown()
         )
     }) as IQueryResult<R, TContext, true, TMethods>
-  /** A default comparator is an entity option; the original query heap performs its actual work. */
+  /** Bounds are one finite entity fact; the original query applies them after filtering and order. */
+  const page = (
+    query: IRecordQuery<T, TContext, TMethods>,
+    limit: number | undefined,
+    skip: number
+  ): IRecordQuery<T, TContext, TMethods> => {
+    const offset = skip === 0 ? query : query.skip(skip)
+    return limit === undefined ? offset : offset.limit(limit)
+  }
+  /** The original bounded heap receives the page capacity, including the requested offset. */
   const prepare = (
     query: IRecordQuery<T, TContext, TMethods>,
     limit: number | undefined,
     explicit: boolean,
+    skip: number,
+    compared: ((left: T, right: T) => number) | undefined,
     first?: true
   ): IRecordQueryBase<T, TContext, TMethods> => {
-    if (explicit || input.defaultComparator === undefined) return query
-    if (limit === undefined && first !== true) return input.missingLimit()
-    return query.orderByComparator(input.comparator(input.defaultComparator)).limit(limit ?? 1)
+    const bound = first === true ? Math.min(limit ?? 1, 1) : limit
+    if (bound === 0) return query.limit(0)
+    if (!compared && (explicit || input.defaultComparator === undefined))
+      return page(query, bound, skip)
+    if (bound === undefined) return input.missingLimit()
+    const capacity = skip + bound
+    if (!Number.isSafeInteger(capacity)) return input.invalidState()
+    const ordered = query
+      .orderByComparator(compared ?? input.comparator(input.defaultComparator!))
+      .limit(capacity)
+    return page(ordered as IRecordQuery<T, TContext, TMethods>, bound, skip)
   }
   /** Each branch retains the actual immutable core query rather than replaying its configuration. */
   const wrap = (
@@ -199,7 +245,10 @@ export function createEntityQuery<
       hasOrder: input.defaultComparator !== undefined,
       hasLimit: false
     },
-    invalid = selection.onInvalid
+    invalid = selection.onInvalid,
+    skip = 0,
+    compared: ((left: T, right: T) => number) | undefined = undefined,
+    sourceOpen = false
   ): IEntityQueryNarrowed<T, TIndexes, TContext, TMethods> => {
     /** Preserve the original overloads and their canonical argument snapshots. */
     const where = ((...args: readonly unknown[]) =>
@@ -212,105 +261,150 @@ export function createEntityQuery<
         limit,
         explicit,
         { ...plan, hasWhere: true },
-        invalid
+        invalid,
+        skip,
+        compared
       )) as IEntityQueryNarrowed<T, TIndexes, TContext, TMethods>['where']
     const select = ((...args: readonly unknown[]) => {
       /** Public projection arguments are validated now; its wrapped mapper is captured once. */
       const captured =
         typeof args[0] === 'function' ? [input.mapper(args[0] as (value: T) => unknown)] : args
       /** Count keeps the current page without introducing the unused default comparator. */
-      const unprepared =
-        input.defaultComparator !== undefined && !explicit && limit !== undefined
-          ? query.limit(limit)
-          : query
+      const unprepared = page(query, limit, skip)
       /** This immutable canonical branch retains the validated fields and original augmentation. */
       const selected = Reflect.apply(unprepared.select, unprepared, captured)
       return result(selected, plan, invalid, (first) => {
-        if (input.defaultComparator === undefined || explicit) return selected
+        if ((input.defaultComparator === undefined || explicit) && !compared) return selected
         /** Other reads retain the original pre-projection bounded ordering and limit error. */
-        const prepared = prepare(query, limit, explicit, first)
+        const prepared = prepare(query, limit, explicit, skip, compared, first)
         return Reflect.apply(prepared.select, prepared, captured)
       })
     }) as IEntityQueryNarrowed<T, TIndexes, TContext, TMethods>['select']
     return Object.freeze({
       ...query,
       ...reads(
-        (first) => prepare(query, limit, explicit, first),
+        (first) => prepare(query, limit, explicit, skip, compared, first),
         plan,
         invalid,
-        () => (limit === undefined ? query : query.limit(limit))
+        () => page(query, limit, skip)
       ),
       where,
       select,
+      explain: () => prepare(query, limit, explicit, skip, compared).explain(),
       delete: (ctx) =>
         input.run(
-          () => prepare(query, limit, explicit).delete(ctx),
+          () => prepare(query, limit, explicit, skip, compared).delete(ctx),
           plan,
           { ...selection, onInvalid: invalid },
           (count) => count
         ),
       update: (patch, ctx) =>
         input.run(
-          () => prepare(query, limit, explicit).update(patch, ctx),
+          () => prepare(query, limit, explicit, skip, compared).update(patch, ctx),
           plan,
           { ...selection, onInvalid: invalid },
           (count) => count
         ),
+      /** Source controls remain guarded at runtime even when JavaScript bypasses the type state. */
+      index: (name: string, match?: unknown) => {
+        if (!sourceOpen) return input.invalidState()
+        return createEntityQuery(input, { ...selection, ...input.index(name, match) }, false)
+      },
+      range: (range: IKeyRange) => {
+        if (!sourceOpen) return input.invalidState()
+        return createEntityQuery(input, { ...selection, range: input.range(range) }, false)
+      },
       limit: (count: number) => {
-        const bounded = query.limit(count)
-        return wrap(
-          input.defaultComparator !== undefined && !explicit ? query : bounded,
-          count,
-          explicit,
-          { ...plan, hasLimit: true },
-          invalid
-        )
+        try {
+          query.limit(count)
+        } catch (cause) {
+          return input.invalidState(cause)
+        }
+        return wrap(query, count, explicit, { ...plan, hasLimit: true }, invalid, skip, compared)
+      },
+      skip: (count: number) => {
+        try {
+          query.skip(count)
+        } catch (cause) {
+          return input.invalidState(cause)
+        }
+        return wrap(query, limit, explicit, plan, invalid, count, compared)
+      },
+      after: (cursor: Parameters<typeof query.after>[0]) =>
+        wrap(query.after(cursor), limit, explicit, plan, invalid, skip, compared),
+      distinct: (field: Extract<keyof T, string>) =>
+        wrap(query.distinct(field), limit, explicit, plan, invalid, skip, compared),
+      orderBy: (selector: (value: T) => IStorageKey, direction?: 'asc' | 'desc') => {
+        if (compared || typeof query.orderBy !== 'function') return input.invalidState()
+        let ordered: IRecordQuery<T, TContext, TMethods>
+        try {
+          ordered = query.orderBy(
+            typeof selector === 'function' ? input.selector(selector) : selector,
+            direction
+          ) as IRecordQuery<T, TContext, TMethods>
+        } catch (cause) {
+          return input.invalidState(cause)
+        }
+        return wrap(ordered, limit, true, { ...plan, hasOrder: true }, invalid, skip)
       },
       orderByComparator: (
         compare: (left: T, right: T) => number
-      ): IRecordQueryNeedsLimit<T, TContext, TMethods> => {
-        const pending = query.orderByComparator(
-          typeof compare === 'function' ? input.comparator(compare) : compare
-        )
-        return {
+      ): IEntityQueryNeedsLimit<T, TContext, TMethods> => {
+        if (explicit || typeof query.orderByComparator !== 'function') return input.invalidState()
+        /**
+         * Retain only this callback declaration; the canonical comparator is added at its terminal
+         * bound.
+         */
+        const captured = typeof compare === 'function' ? input.comparator(compare) : compare
+        try {
+          query.orderByComparator(captured)
+        } catch (cause) {
+          return input.invalidState(cause)
+        }
+        return Object.freeze({
+          ...input.methods,
           first: (ctx?: TContext) =>
             input.run(
-              () => pending.first(ctx),
+              () => prepare(query, limit, true, skip, captured, true).first(ctx),
               { ...plan, hasOrder: true, hasLimit: true },
               { ...selection, onInvalid: invalid },
               (row) => (row === undefined ? 0 : 1)
             ),
-          limit: (count: number) =>
-            wrap(
-              pending.limit(count) as IRecordQuery<T, TContext, TMethods>,
+          limit: (count: number) => {
+            try {
+              query.limit(count)
+            } catch (cause) {
+              return input.invalidState(cause)
+            }
+            return wrap(
+              query,
               count,
               true,
-              {
-                ...plan,
-                hasOrder: true,
-                hasLimit: true
-              },
-              invalid
+              { ...plan, hasOrder: true, hasLimit: true },
+              invalid,
+              skip,
+              captured
             )
-        }
+          }
+        })
       },
       onInvalid: (action: IInvalidRecordAction | IInvalidRecordHandler<T>) => {
         input.invalid(action)
-        return wrap(query, limit, explicit, plan, action)
+        return wrap(query, limit, explicit, plan, action, skip, compared)
       },
-      requirePushdown: () => wrap(query.requirePushdown(), limit, explicit, plan, invalid)
+      requirePushdown: () =>
+        wrap(query.requirePushdown(), limit, explicit, plan, invalid, skip, compared)
     }) as IEntityQueryNarrowed<T, TIndexes, TContext, TMethods>
   }
-  /** Source selection precedes conditions; selecting it allocates no native cursor or I/O. */
-  const query = wrap(
-    createRecordQuery<T, TContext, TMethods>(input.source(selection), input.methods)
-  )
-  return Object.freeze({
-    ...query,
-    index: (name: string, match?: unknown) =>
-      createEntityQuery(input, { ...selection, ...input.index(name, match) }),
-    range: (range: IKeyRange) =>
-      createEntityQuery(input, { ...selection, range: input.range(range) }),
-    onInvalid: query.onInvalid
-  }) as IEntityQuery<T, TIndexes, TContext, TMethods>
+  /** The root alone can select a source; every later immutable adapter retains its guarded state. */
+  return wrap(
+    createRecordQuery<T, TContext, TMethods>(input.source(selection), input.methods),
+    undefined,
+    false,
+    undefined,
+    selection.onInvalid,
+    0,
+    undefined,
+    sourceAllowed
+  ) as IEntityQuery<T, TIndexes, TContext, TMethods>
 }

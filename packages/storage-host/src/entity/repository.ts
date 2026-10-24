@@ -30,6 +30,7 @@ import {
   type ICodecStageObserver,
   type IQueryStageObserver,
   snapshotRecordStore,
+  snapshotStorageKey,
   assertTransactionOwner,
   runTransactionOperation,
   readTransactionOperationContext,
@@ -1798,6 +1799,29 @@ export const createRepository = <
           })
         }
       },
+      selector: (fn) => (value) => {
+        try {
+          const result = fn(value)
+          const inspected = inspectThenable(result)
+          if ('error' in inspected) throw inspected.error
+          if (inspected.then !== undefined) {
+            observeThenableRejection(result, inspected, createStorageOperationRuntime().reporter)
+            throw new TypeError(EntityText.querySelectorKey)
+          }
+          try {
+            return snapshotStorageKey(result, store.backend)
+          } catch (cause) {
+            throw new TypeError(EntityText.querySelectorKey, { cause })
+          }
+        } catch (cause) {
+          throw new StorageError(StorageErrorCode.extensionFailed, {
+            backend: store.backend,
+            cause,
+            operation: StorageOperation.querySelector,
+            extensionStage: 'selector'
+          })
+        }
+      },
       mapper: (fn) => async (value) => {
         try {
           return await fn(value)
@@ -1868,6 +1892,12 @@ export const createRepository = <
         throw new StorageError(StorageErrorCode.invalidConfig, {
           backend: store.backend,
           cause: new TypeError(EntityText.comparatorLimit)
+        })
+      },
+      invalidState: (cause) => {
+        throw new StorageError(StorageErrorCode.invalidConfig, {
+          backend: store.backend,
+          cause: cause ?? new TypeError(EntityText.queryState)
         })
       },
       invalid: (action) => {
