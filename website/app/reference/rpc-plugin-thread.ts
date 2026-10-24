@@ -15,26 +15,6 @@ export const rpcThreadsReference: ILibraryReference = {
       },
       example:
         "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'\n\nif (await isThreadChild()) {\n  await createRpcHost({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const host = await createRpcHost<{ double(value: number): number }>({\n    plugins: [threadPlugin({ spawn: true, connect: { timeoutMs: 1500 } })]\n  })\n  try {\n    console.log(await host.request('double', 21))\n  } finally {\n    await host.close()\n  }\n}"
-    },
-    'adapters/electron-main': {
-      summary: {
-        en: 'Use this subpath for Electron main process `worker_threads` when building a full `spawn` source that explicitly supplies worker launching and communication. `createElectronMainThreadLauncher()` starts the worker, while `createElectronMainThreadChannelFactory()` opens its RPC channel.\n\nPass both to `createRpcHost()` from the root with the rest of the source options. Ordinary URL or path shorthand selects the platform adapter automatically, so it does not need these explicit factories.',
-        zh: '需要自行指定工作线程的启动方式和通信方式时，使用这个子路径。`createElectronMainThreadLauncher()` 负责启动线程，`createElectronMainThreadChannelFactory()` 负责打开远程调用通道。将两者连同其余来源选项交给根入口的 `createRpcHost()`，即可为 `Electron` 主进程中的 `worker_threads` 提供完整的 `spawn` 配置。普通网址或路径简写会自动选择平台适配器，无须显式使用这两个工厂。'
-      },
-      example: {
-        en: "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'\n\nif (await isThreadChild()) {\n  await createRpcHost({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const host = await createRpcHost<{ double(value: number): number }>({\n    plugins: [threadPlugin({ spawn: true, connect: { timeoutMs: 1500 } })]\n  })\n  try {\n    console.log(await host.request('double', 21))\n  } finally {\n    await host.close()\n  }\n}",
-        zh: "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'\n\nif (await isThreadChild()) {\n  await createRpcHost({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const host = await createRpcHost<{ double(value: number): number }>({\n    plugins: [threadPlugin({ spawn: true, connect: { timeoutMs: 1500 } })]\n  })\n  try {\n    console.log(await host.request('double', 21))\n  } finally {\n    await host.close()\n  }\n}"
-      }
-    },
-    'adapters/node': {
-      summary: {
-        en: 'Use this subpath for Node `worker_threads` when building a full `spawn` source that explicitly supplies worker launching and communication. `createNodeThreadLauncher()` starts the worker, while `createNodeThreadChannelFactory()` opens its RPC channel.\n\nPass both to `createRpcHost()` from the root with the rest of the source options. Ordinary URL or path shorthand selects the platform adapter automatically, so it does not need these explicit factories.',
-        zh: '需要自行指定工作线程的启动方式和通信方式时，使用这个子路径。`createNodeThreadLauncher()` 负责启动线程，`createNodeThreadChannelFactory()` 负责打开远程调用通道。将两者连同其余来源选项交给根入口的 `createRpcHost()`，即可为 `Node` `worker_threads` 提供完整的 `spawn` 配置。普通网址或路径简写会自动选择平台适配器，无须显式使用这两个工厂。'
-      },
-      example: {
-        en: "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'\n\nif (await isThreadChild()) {\n  await createRpcHost({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const host = await createRpcHost<{ double(value: number): number }>({\n    plugins: [threadPlugin({ spawn: true, connect: { timeoutMs: 1500 } })]\n  })\n  try {\n    console.log(await host.request('double', 21))\n  } finally {\n    await host.close()\n  }\n}",
-        zh: "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'\n\nif (await isThreadChild()) {\n  await createRpcHost({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const host = await createRpcHost<{ double(value: number): number }>({\n    plugins: [threadPlugin({ spawn: true, connect: { timeoutMs: 1500 } })]\n  })\n  try {\n    console.log(await host.request('double', 21))\n  } finally {\n    await host.close()\n  }\n}"
-      }
     }
   },
   symbols: {
@@ -79,112 +59,7 @@ export const rpcThreadsReference: ILibraryReference = {
         zh: "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'\n\nif (await isThreadChild()) {\n  await createRpcHost({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const host = await createRpcHost<{ double(value: number): number }>({\n    plugins: [threadPlugin({ spawn: true, connect: { timeoutMs: 1500 } })]\n  })\n  try {\n    console.log(await host.request('double', 21))\n  } finally {\n    await host.close()\n  }\n}"
       }
     },
-    createElectronMainThreadLauncher: {
-      role: 'factory',
-      purpose: {
-        en: 'Creates the launcher that starts Electron main process `worker_threads` for a full `spawn` source. Termination, exit observation and heap limits are declared unsupported; requesting termination does not prove execution stopped.',
-        zh: '创建为完整 `spawn` 来源启动Electron 主进程中的 `worker_threads`的 launcher。终止确认、退出观察与堆限制均声明为不支持；请求终止不能证明代码已经停止。'
-      },
-      returns: {
-        en: 'An `IThreadLauncher` from `@migaia/supervision/threads`, used as `spawn.launcher`.',
-        zh: '来自 `@migaia/supervision/threads` 的 `IThreadLauncher`，用作 `spawn.launcher`。'
-      },
-      example: {
-        en: "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'\n\nif (await isThreadChild()) {\n  await createRpcHost({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const host = await createRpcHost<{ double(value: number): number }>({\n    plugins: [threadPlugin({ spawn: true, connect: { timeoutMs: 1500 } })]\n  })\n  try {\n    console.log(await host.request('double', 21))\n  } finally {\n    await host.close()\n  }\n}",
-        zh: "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'\n\nif (await isThreadChild()) {\n  await createRpcHost({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const host = await createRpcHost<{ double(value: number): number }>({\n    plugins: [threadPlugin({ spawn: true, connect: { timeoutMs: 1500 } })]\n  })\n  try {\n    console.log(await host.request('double', 21))\n  } finally {\n    await host.close()\n  }\n}"
-      }
-    },
-    createElectronMainThreadChannelFactory: {
-      options: 'IThreadChannelOptions',
-      role: 'factory',
-      purpose: {
-        en: 'Creates the channel factory paired with `createElectronMainThreadLauncher()`: it opens the RPC channel on each launched Worker port.',
-        zh: '创建与 `createElectronMainThreadLauncher()` 配套的通道工厂：在每个已启动 Worker 的端口上打开 RPC 通道。'
-      },
-      params: {
-        options: {
-          en: '`{ scheduler, capabilities? }`: use the same `scheduler` as the source; `capabilities` intersects the actual launch offer; only the peer acknowledgement establishes the agreed result.',
-          zh: '`{ scheduler, capabilities? }`：`scheduler` 必须与 source 使用同一个；`capabilities` 与实际启动提议取交集，最终协商结果仍须由对端确认。'
-        }
-      },
-      returns: {
-        en: 'A channel factory with `open(handle, signal)`.',
-        zh: '带 `open(handle, signal)` 的通道工厂。'
-      },
-      example: {
-        en: "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'\n\nif (await isThreadChild()) {\n  await createRpcHost({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const host = await createRpcHost<{ double(value: number): number }>({\n    plugins: [threadPlugin({ spawn: true, connect: { timeoutMs: 1500 } })]\n  })\n  try {\n    console.log(await host.request('double', 21))\n  } finally {\n    await host.close()\n  }\n}",
-        zh: "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'\n\nif (await isThreadChild()) {\n  await createRpcHost({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const host = await createRpcHost<{ double(value: number): number }>({\n    plugins: [threadPlugin({ spawn: true, connect: { timeoutMs: 1500 } })]\n  })\n  try {\n    console.log(await host.request('double', 21))\n  } finally {\n    await host.close()\n  }\n}"
-      }
-    },
-    createNodeThreadLauncher: {
-      role: 'factory',
-      purpose: {
-        en: 'Creates the launcher that starts Node `worker_threads` for a full `spawn` source. Exits are observed, so termination is confirmed.',
-        zh: '创建为完整 `spawn` 来源启动Node `worker_threads`的 launcher。可以观察到退出，因此终止可被确认。'
-      },
-      optionDocs: {
-        runtimeApi: {
-          summary: {
-            en: 'Advanced `IRuntimePeerSourceContext` supplied by the Core source owner; per-launch held metadata takes precedence over this configured context.',
-            zh: '核心来源所有者提供的高级 `IRuntimePeerSourceContext`；每次启动持有的元数据优先于此配置上下文。'
-          },
-          default: {
-            en: 'Omitted: only private per-launch metadata can supply runtime API bootstrap.',
-            zh: '省略时仅可由每次启动的私有元数据提供运行时接口启动信息。'
-          },
-          example:
-            "import { createNodeThreadLauncher } from '@migaia/rpc-plugin-thread/adapters/node'\n\nconst session = await openNodeReportSession((context) => createNodeThreadLauncher({\n  runtimeApi: context,\n  execArgv: []\n}))\ntry {\n  showDownload(await session.peer.request('reports.render', reportId))\n} finally {\n  await session.close()\n}"
-        },
-        execArgv: {
-          summary: {
-            en: 'Caller-selected runtime argument list copied for each native Worker. If new Worker throws synchronously, launch rejects with Core INVALID_CONFIG. An existing native code such as ERR_WORKER_INVALID_EXEC_ARGV is not overwritten: the original Error, code, name, message and stack remain on cause under the established conflict policy. This classification does not cover later asynchronous Worker business failures.',
-            zh: '调用方指定的运行时参数列表，每次复制后传给原生 Worker。new Worker 同步抛错时，launch 以 Core INVALID_CONFIG 拒绝；已有 ERR_WORKER_INVALID_EXEC_ARGV 等原生 code 时，不覆盖它，而是按既有冲突策略包装，原 Error、code、name、message、stack 保留在 cause 上。此分类不适用于 Worker 之后的异步业务失败。'
-          },
-          default: {
-            en: 'Omitted: preserve Node’s native execution-argument inheritance.',
-            zh: '省略时保留宿主原生的执行参数继承行为。'
-          },
-          example:
-            "import { createNodeThreadLauncher } from '@migaia/rpc-plugin-thread/adapters/node'\n\nconst session = await openNodeReportSession((context) => createNodeThreadLauncher({\n  runtimeApi: context,\n  execArgv: []\n}))\ntry {\n  showDownload(await session.peer.request('reports.render', reportId))\n} finally {\n  await session.close()\n}"
-        }
-      },
-      params: {
-        options: {
-          en: 'Optional `{ runtimeApi?, execArgv? }`: `execArgv` sets runtime flags for the Worker; omitted, Node inheritance applies.',
-          zh: '可选的 `{ runtimeApi?, execArgv? }`：`execArgv` 为 Worker 设置运行时参数；省略时沿用 Node 的继承规则。'
-        }
-      },
-      returns: {
-        en: 'An `IThreadLauncher` from `@migaia/supervision/threads`, used as `spawn.launcher`.',
-        zh: '来自 `@migaia/supervision/threads` 的 `IThreadLauncher`，用作 `spawn.launcher`。'
-      },
-      example: {
-        en: "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'\n\nif (await isThreadChild()) {\n  await createRpcHost({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const host = await createRpcHost<{ double(value: number): number }>({\n    plugins: [threadPlugin({ spawn: true, connect: { timeoutMs: 1500 } })]\n  })\n  try {\n    console.log(await host.request('double', 21))\n  } finally {\n    await host.close()\n  }\n}",
-        zh: "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'\n\nif (await isThreadChild()) {\n  await createRpcHost({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const host = await createRpcHost<{ double(value: number): number }>({\n    plugins: [threadPlugin({ spawn: true, connect: { timeoutMs: 1500 } })]\n  })\n  try {\n    console.log(await host.request('double', 21))\n  } finally {\n    await host.close()\n  }\n}"
-      }
-    },
-    createNodeThreadChannelFactory: {
-      options: 'IThreadChannelOptions',
-      role: 'factory',
-      purpose: {
-        en: 'Creates the channel factory paired with `createNodeThreadLauncher()`: it opens the RPC channel on each launched Worker port.',
-        zh: '创建与 `createNodeThreadLauncher()` 配套的通道工厂：在每个已启动 Worker 的端口上打开 RPC 通道。'
-      },
-      params: {
-        options: {
-          en: '`{ scheduler, capabilities? }`: use the same `scheduler` as the source; `capabilities` intersects the actual launch offer; only the peer acknowledgement establishes the agreed result.',
-          zh: '`{ scheduler, capabilities? }`：`scheduler` 必须与 source 使用同一个；`capabilities` 与实际启动提议取交集，最终协商结果仍须由对端确认。'
-        }
-      },
-      returns: {
-        en: 'A channel factory with `open(handle, signal)`.',
-        zh: '带 `open(handle, signal)` 的通道工厂。'
-      },
-      example: {
-        en: "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'\n\nif (await isThreadChild()) {\n  await createRpcHost({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const host = await createRpcHost<{ double(value: number): number }>({\n    plugins: [threadPlugin({ spawn: true, connect: { timeoutMs: 1500 } })]\n  })\n  try {\n    console.log(await host.request('double', 21))\n  } finally {\n    await host.close()\n  }\n}",
-        zh: "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'\n\nif (await isThreadChild()) {\n  await createRpcHost({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const host = await createRpcHost<{ double(value: number): number }>({\n    plugins: [threadPlugin({ spawn: true, connect: { timeoutMs: 1500 } })]\n  })\n  try {\n    console.log(await host.request('double', 21))\n  } finally {\n    await host.close()\n  }\n}"
-      }
-    },
+
     threadPlugin: {
       role: 'enhancer',
       purpose: {
@@ -201,40 +76,6 @@ export const rpcThreadsReference: ILibraryReference = {
     }
   },
   types: {
-    IThreadChannelOptions: {
-      summary: {
-        en: 'Borrowed scheduler and local capability policy for native channel factories.',
-        zh: '原生通道工厂借用的调度器及本地能力策略。'
-      },
-      members: {
-        scheduler: {
-          summary: {
-            en: 'Borrow the same scheduler instance used by the owning supervisor and connection budget; channel construction does not acquire a new scheduler.',
-            zh: '借用与所属监督器及连接预算相同的调度器实例，通道构造不会获取新调度器。'
-          }
-        },
-        capabilities: {
-          summary: {
-            en: 'Restrict the local proposal. Fixed-profile subsets remain synchronous; runtime extensions require an actual bilateral ACK and grant no trust by declaration alone.',
-            zh: '限制本地能力提议；固定配置的子集保持同步，运行时扩展必须得到真实双向确认，单方面声明不授予信任。'
-          },
-          default: {
-            en: 'Omitted: use the original synchronous fixed capability profile.',
-            zh: '省略时使用原同步固定能力配置。'
-          }
-        },
-        timeoutMs: {
-          summary: {
-            en: 'Feed the original capability-acknowledgement deadline when expanded capabilities require a handshake; it is separate from call and shutdown timeouts.',
-            zh: '扩展能力需要握手时传给原能力确认期限，与调用及关闭超时分开。'
-          },
-          default: {
-            en: 'Omitted: keep the original channel opening budget.',
-            zh: '省略时保留原通道打开预算。'
-          }
-        }
-      }
-    },
     IRpcThreadErrorCode: {
       summary: {
         en: 'Union of `RpcThreadErrorCode` values.',

@@ -1047,6 +1047,25 @@ const controlUtilsApiGuides: Readonly<Record<string, Readonly<Record<IGuideLocal
     avoidEn: 'A production telemetry or domain reporter can preserve richer operation context.',
     avoidZh: 'production telemetry 或 domain reporter 可以保留更丰富 operation context。'
   }),
+  'utils:string:orderStringKeys': utilsGuide({
+    purposeEn:
+      'Returns a fresh string array in stable UTF-16 code-unit order without mutating the input. Empty strings precede other keys, prefixes precede their continuations, and duplicate strings are retained in their original relative order. Work and memory are linear in the total UTF-16 units plus key count; no locale, normalization or custom comparator changes the order.',
+    purposeZh:
+      '按 UTF-16 码元顺序返回新的字符串数组，不修改输入。空字符串排在其他键之前，前缀排在其后续字符串之前，重复字符串全部保留并保持原相对次序。时间与内存开销随总 UTF-16 码元数和键数量线性增长，不进行地区排序、文本归一化或自定义比较。',
+    quickStart: `import { orderStringKeys } from '@migaia/utils/string'
+
+const keys = ['b', 'a', 'a', '', '\\uE000', '😀'] as const
+const ordered = orderStringKeys(keys)
+console.log(ordered) // ['', 'a', 'a', 'b', '😀', '\\uE000']
+console.log(keys[0]) // 'b': the original array is unchanged
+console.log(ordered.filter((key) => key === 'a').length) // 2: duplicates remain`,
+    useEn:
+      'Wire encoders and fingerprints need the same deterministic string-key order across consumers while retaining the caller’s original list.',
+    useZh: '线编码器和指纹计算需要跨消费者一致的确定性字符串键顺序，同时保留调用者的原列表。',
+    avoidEn:
+      'The application needs locale-aware collation, numeric ordering or a comparator over arbitrary records; this operation orders strings only by UTF-16 code units.',
+    avoidZh: '需要地区排序、数字顺序或任意记录比较器时不适用；本操作仅按 UTF-16 码元排列字符串。'
+  }),
   'utils:string:format': utilsGuide({
     purposeEn:
       'Interpolates safe object paths into a string with explicit delimiter, missing-value, and nullish-value policies.',
@@ -1764,10 +1783,11 @@ const errorChainUtilsApiGuides: Readonly<
   ])
 )
 
-export const utilsApiGuides = {
+/** Preserve the complete guide-map contract when indexed families are combined with literal keys. */
+export const utilsApiGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, IApiGuide>>>> = {
   ...foundationalUtilsApiGuides,
   ...dataUtilsApiGuides,
   ...controlUtilsApiGuides,
   ...safeValueUtilsApiGuides,
   ...errorChainUtilsApiGuides
-} as const
+}

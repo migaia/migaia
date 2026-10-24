@@ -50,7 +50,7 @@ function scalar(name: string, en: string, zh: string, example = `console.log(${n
   symbols[name] = { role: 'constant', purpose: t(en, zh), example }
 }
 /** Shared examples retain actual paired protocols and explicit completion. */
-const handshakeExample = `import { createRpcHello, acceptRpcHandshake, completeRpcHandshake } from '@migaia/rpc-contract/handshake'
+const handshakeExample = `import { createRpcHello, acceptRpcHandshake, completeRpcHandshake } from '@migaia/rpc-contract'
 const first = { versions: [{ major: 1, minor: 1 }], codecs: ['json'], capabilities: [], peer: { id: 'a', runtime: 'node' } }
 const second = { ...first, peer: { id: 'b', runtime: 'node' } }
 const accepted = acceptRpcHandshake(second, createRpcHello(first))
@@ -2237,20 +2237,8 @@ const binaryParams = {
 }
 /** Captured binary ownership remains separate from any physical transfer decision. */
 const binaryExample =
-  'const captured = captureRpcBinaryData(message, "inline"); const prepared = await captured.prepare(); const restored = await restoreRpcBinary(prepared.manifest, "inline", prepared.sidecars); console.log(restored.kind)'
-symbols.captureRpcBinaryData = {
-  role: 'factory',
-  purpose: t(
-    'Synchronously captures the original protocol graph and backing references at the caller-selected snapshot point. Pair with restoreRpcBinary for a complete inline round trip; preparation can finish later.',
-    '在调用方选择的快照时点同步捕获原始协议图和背板引用。搭配 `restoreRpcBinary` 完成内联往返，准备可以稍后完成。'
-  ),
-  params: binaryParams,
-  returns: t(
-    'IRpcCapturedBinaryData; malformed graph, backing or budget throws INVALID_ENVELOPE synchronously.',
-    '返回 `IRpcCapturedBinaryData`；图、背板或预算异常时同步抛信封非法错误。'
-  ),
-  example: binaryExample
-}
+  'const prepared = await prepareRpcBinary(message, "inline"); const restored = await restoreRpcBinary(prepared.manifest, "inline", prepared.sidecars); console.log(restored.kind)'
+
 operation(
   'prepareRpcBinary',
   'Captures one canonical runtime envelope before yielding, then finishes manifest encoding and complete-backing digests. Pair with restoreRpcBinary; no endpoint, replay or execution state is changed.',
@@ -3940,23 +3928,7 @@ Object.assign(types, {
     {},
     'const digest = async (backing: ArrayBuffer) => Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", backing)), (byte) => byte.toString(16).padStart(2, "0")).join("")'
   ),
-  IRpcCapturedBinaryData: typeDoc(
-    'Synchronous original graph/backing snapshot retained until canonical preparation is requested.',
-    '同步原图和背板快照，保留到请求规范准备时使用。',
-    {
-      prepare: m(
-        'Finishes the captured original graph through the canonical encoding and digest owner, without another application graph scan.',
-        '通过规范编码及摘要所有者完成捕获原图，不再扫描应用图。',
-        {},
-        t(
-          'Promise of IRpcPreparedBinary; original codec/digest failure rejects with INVALID_ENVELOPE.',
-          '返回准备结果承诺；原编解码或摘要失败以信封非法错误拒绝。'
-        ),
-        binaryExample
-      )
-    },
-    binaryExample
-  ),
+
   IRpcBinaryDataCodec: typeDoc(
     'Application-held data encoding capability used only at original capture and quota points; it conveys no prehash coordination authority.',
     '应用持有的数据编码能力，只用于原始捕获及配额时点，不赋予摘要前协调权限。',
@@ -4676,7 +4648,7 @@ const rpcOptionExamples = {
   handshakeResponder:
     "import { createRpcHandshakeFrameReceiver } from '@migaia/rpc-contract/framing/stream'\n\nconst receiver = createRpcHandshakeFrameReceiver({ role: 'responder' })\nreceiver.accept(helloPayload)\nconst reply = await prepareServiceHandshake(await receiver.readHandshakeFrame())\nreceiver.beginAccept()\nawait sendHandshakeReply(reply)\nreceiver.activate()\nonCarrierClosed((reason) => receiver.close(reason))",
   handshakeUnknown:
-    "import { normalizeRpcHandshake } from '@migaia/rpc-contract/handshake'\n\nconst hello = normalizeRpcHandshake(receivedHello, {\n  onUnknownField: (pointer, field) => reportProtocolChange(pointer, field)\n})\ninspectPricingHello(hello)",
+    "import { normalizeRpcHandshake } from '@migaia/rpc-contract'\n\nconst hello = normalizeRpcHandshake(receivedHello, {\n  onUnknownField: (pointer, field) => reportProtocolChange(pointer, field)\n})\ninspectPricingHello(hello)",
   envelopeUnknown:
     "import { normalizeRpcEnvelope } from '@migaia/rpc-contract/v1'\n\nconst request = normalizeRpcEnvelope(receivedRequest, {\n  onUnknownField: (pointer, field) => reportProtocolChange(pointer, field)\n})\nrouteCheckoutRequest(request)",
   runtimeOrder:
@@ -4936,7 +4908,7 @@ const rpcOptionCases: Readonly<Record<string, readonly IOptionCaseDoc[]>> = {
         zh: '新版价格服务给握手增加可选字段。在规范化时记录其位置，让升级监控获知变化，同时继续使用已知握手数据。'
       },
       example:
-        "import { normalizeRpcHandshake } from '@migaia/rpc-contract/handshake'\n\nconst hello = normalizeRpcHandshake(receivedHello, {\n  onUnknownField: (pointer, field) => reportProtocolChange(pointer, field)\n})\ninspectPricingHello(hello)",
+        "import { normalizeRpcHandshake } from '@migaia/rpc-contract'\n\nconst hello = normalizeRpcHandshake(receivedHello, {\n  onUnknownField: (pointer, field) => reportProtocolChange(pointer, field)\n})\ninspectPricingHello(hello)",
       result: {
         en: 'Known handshake fields remain available and additive fields reach rollout monitoring.',
         zh: '已知握手字段仍可使用，新增字段交给升级监控。'
@@ -5319,39 +5291,26 @@ runtimeOptions.timeoutMs = {
 const modules: ILibraryReference['modules'] = {
   index: {
     summary: t(
-      'Core pure protocol tools and common root aliases; start with createDescriptor or import the canonical handshake, framing, errors and runtime subpaths.',
-      '基础纯协议工具及常用根别名；从 `createDescriptor` 开始，或使用规范握手、分帧、错误及运行子入口。'
+      'Core pure protocol tools and common root aliases; start with createDescriptor or import the root handshake tools plus canonical framing, errors and runtime subpaths.',
+      '基础纯协议工具及常用根别名；从 `createDescriptor` 开始，或使用根入口握手工具及规范分帧、错误和运行子入口。'
     ),
     example: handshakeExample
   },
-  binary: {
-    summary: t(
-      'Use this entry when RPC messages contain byte buffers that must survive transport. `prepareRpcBinary` produces a description of the data and any separately carried buffers; `restoreRpcBinary` checks that description and restores the message.\n\nImport this subpath for the complete binary preparation and restoration workflow, which the root does not export. Use `binary/capture` when you need to capture data now and prepare it later.',
-      '当远程调用消息包含需要跨连接传递的字节缓冲区时，使用此入口。`prepareRpcBinary` 生成数据清单及需单独传递的缓冲区，`restoreRpcBinary` 校验清单并还原消息。\n\n根入口不导出这套完整的二进制准备与还原操作，因此从此子路径导入。若需要先捕获数据、稍后准备发送，使用 `binary/capture`。'
-    ),
-    example: binaryExample
-  },
-  'binary/capture': {
-    summary: t(
-      'Use this entry when the data must be captured before asynchronous encoding begins. `captureRpcBinaryData` captures the message synchronously; calling `prepare()` on its result later produces the binary description and buffers to send.\n\nImport this subpath for capture alone rather than the broader root API. Receiving and restoring those buffers belongs to `binary` or `binary/lazy`.',
-      '需要在异步编码开始前确定数据内容时，使用此入口。`captureRpcBinaryData` 同步捕获消息，稍后调用返回值的 `prepare()`，再生成待发送的数据清单和缓冲区。\n\n只需要捕获操作时，可直接导入此子路径，不必从根入口寻找相关能力。接收后的校验与还原由 `binary` 或 `binary/lazy` 提供。'
-    ),
-    example: binaryExample
-  },
+
   'binary/inspect': {
     summary: t(
-      'Use this entry to inspect a received native binary frame before decoding its message. `readRpcNativeBinary` checks the outer structure and counts the full underlying buffers against a size limit; `rpcBinaryView` reads a byte view’s offset and length.\n\nImport this inspection subpath because these operations are not exported by the root. Inspection does not encode data or verify its digest; use `binary` for preparation and restoration.',
-      '需要在解码消息前检查收到的原生二进制帧时，使用此入口。`readRpcNativeBinary` 检查外层结构，并按完整底层缓冲区核对大小上限；`rpcBinaryView` 读取字节视图的偏移与长度。\n\n根入口不导出这些检查操作，因此从此子路径导入。这里不编码数据，也不校验摘要；准备与还原消息请使用 `binary`。'
+      'Use this entry to inspect a received native binary frame before decoding its message. `readRpcNativeBinary` checks the outer structure and counts the full underlying buffers against a size limit; `rpcBinaryView` reads a byte view’s offset and length.\n\nImport this inspection subpath because these operations are not exported by the root. Inspection does not encode data or verify its digest; use `binary/lazy` for preparation and restoration.',
+      '需要在解码消息前检查收到的原生二进制帧时，使用此入口。`readRpcNativeBinary` 检查外层结构，并按完整底层缓冲区核对大小上限；`rpcBinaryView` 读取字节视图的偏移与长度。\n\n根入口不导出这些检查操作，因此从此子路径导入。这里不编码数据，也不校验摘要；准备与还原消息请使用 `binary/lazy`。'
     ),
     example: 'const selected = readRpcNativeBinary(frame, limit)'
   },
   'binary/lazy': {
     summary: t(
-      'Use this entry to defer loading the binary codec until preparation or restoration needs it. `prepareRpcBinary` captures the message before loading the codec; `restoreRpcBinary` checks the binary description and restores the received data.\n\nImport this subpath for that loading behavior rather than the root, which does not expose these functions. Use `binary` when you want the ordinary entry without deferred codec loading.',
-      '希望等到准备或还原二进制消息时才加载编解码器，可使用此入口。`prepareRpcBinary` 在加载前先捕获消息，`restoreRpcBinary` 则校验二进制清单并还原收到的数据。\n\n根入口不提供这些函数；此子路径还明确选择了按需加载方式。无需延迟加载时，使用 `binary`。'
+      'Use this entry to defer loading the binary codec until preparation or restoration needs it. `prepareRpcBinary` captures the message before loading the codec; `restoreRpcBinary` checks the binary description and restores the received data.\n\nImport this subpath for that loading behavior rather than the root, which does not expose these functions. The same canonical owner captures data before codec loading and retains original binary budgets.',
+      '希望等到准备或还原二进制消息时才加载编解码器，可使用此入口。`prepareRpcBinary` 在加载前先捕获消息，`restoreRpcBinary` 则校验二进制清单并还原收到的数据。\n\n根入口不提供这些函数；此子路径还明确选择了按需加载方式。同一规范所有者在加载编解码器前捕获数据，并保留原二进制预算。'
     ),
     example:
-      "import { captureRpcBinaryData } from '@migaia/rpc-contract/binary/capture'\nimport { restoreRpcBinary } from '@migaia/rpc-contract/binary/lazy'\n" +
+      "import { prepareRpcBinary } from '@migaia/rpc-contract/binary/lazy'\nimport { restoreRpcBinary } from '@migaia/rpc-contract/binary/lazy'\n" +
       binaryExample
   },
   errors: {
@@ -5389,13 +5348,7 @@ const modules: ILibraryReference['modules'] = {
     ),
     example: 'const frames = messageFramer.frame(message, context); messageFramer.close()'
   },
-  handshake: {
-    summary: t(
-      'Use this entry to agree on a protocol version, data format and shared capabilities before exchanging RPC messages. `createRpcHello` creates the initiator’s opening message; `acceptRpcHandshake` selects compatible settings and creates the reply.\n\nThe initiator then validates that reply with `completeRpcHandshake`. These functions also exist at the root; this subpath groups the negotiation tools, while the connection owner remains responsible for checking credentials.',
-      '交换远程调用消息前，需要先约定协议版本、数据格式和共同支持的能力，可使用此入口。`createRpcHello` 生成发起方的开场消息，`acceptRpcHandshake` 选择双方兼容的设置并生成回复。\n\n发起方随后用 `completeRpcHandshake` 校验回复。根入口也提供这些函数；此子路径集中提供协商工具，凭据校验仍由连接的管理方负责。'
-    ),
-    example: handshakeExample
-  },
+
   portable: {
     summary: t(
       'Use this entry to convert application data into the restricted values accepted by the portable RPC format. `normalizePortable` copies supported records and arrays, freezes the resulting data, and converts byte views to tagged data.\n\nThe root also exports this function; import this subpath when your task is data normalization alone. It does not validate a complete RPC message or accept arbitrary class instances.',

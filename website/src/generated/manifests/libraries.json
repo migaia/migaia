@@ -22615,8 +22615,6 @@
       "version": "0.0.11",
       "exports": [
         ".",
-        "./binary",
-        "./binary/capture",
         "./binary/inspect",
         "./binary/lazy",
         "./errors",
@@ -22624,7 +22622,6 @@
         "./framing/jsonrpc",
         "./framing/stream",
         "./framing/v1",
-        "./handshake",
         "./portable",
         "./remote",
         "./runtime",
@@ -22831,7 +22828,6 @@
                     ["`./wire`", "线上常量和类型，也含 measurePortableStreamValue 等纯数据操作"],
                     ["`./portable`", "wire portable 规范化与深度常量"],
                     ["`./errors`", "错误树序列化、还原、校验、JSON-RPC 转换与本地分类"],
-                    ["`./handshake`", "hello/accept/reject 的构造、协商与校验"],
                     ["`./v1`、`./framing/v1`", "协议 1.x 信封与消息 framer"],
                     ["`./framing`", "字符串/二进制消息分片、重组、物理帧检查"],
                     ["`./framing/stream`", "四字节大端长度前缀及 bootstrap/handshake 接收器"],
@@ -22846,15 +22842,15 @@
                     ],
                     ["`./stream`", "流负载、序号、进度、额度和控制状态检查"],
                     [
-                      "`./binary`、`./binary/lazy`、`./binary/capture`、`./binary/inspect`",
-                      "二进制捕获、准备、还原、清单、完整性与大小检查"
+                      "`./binary/lazy`、`./binary/inspect`",
+                      "按需二进制准备/还原、清单、完整性与大小检查"
                     ],
                     ["`./schema/wire-error`", "随包发布的错误树 JSON Schema"]
                   ]
                 },
                 {
                   "type": "paragraph",
-                  "text": "以上共根入口及 19 个子入口，最后一项是 JSON 文件。不要导入内部文件。`./v1` 使用具名 rpcProtocol 与 normalizeRpcEnvelope，没有 default 聚合；根入口以 rpcProtocolV1 提供该协议对象。`createReassembler` / `IRpcReassembler` 已移除，直接使用原 framer.accept/close，或 Pick 相应方法类型。完整字符串统一用 remoteProcessStringFramer，bare processStringFramer 不再公开，没有兼容别名。"
+                  "text": "以上共根入口及 16 个子入口，最后一项是 JSON 文件。不要导入内部文件。`./v1` 使用具名 rpcProtocol 与 normalizeRpcEnvelope，没有 default 聚合；根入口以 rpcProtocolV1 提供该协议对象。`createReassembler` / `IRpcReassembler` 已移除，直接使用原 framer.accept/close，或 Pick 相应方法类型。完整字符串统一用 remoteProcessStringFramer，bare processStringFramer 不再公开，没有兼容别名。"
                 }
               ]
             },
@@ -23061,7 +23057,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "prepareRpcBinary(envelope, storage, limit?, digest?, codec?) 生成二进制清单、sidecar 与总量；restoreRpcBinary 校验清单与完整性后还原，Decoded 版有前述信任限制。captureRpcBinaryData 同步捕获，稍后 prepare，适用于捕获时间早于编码；binary/lazy 同名操作在完整 codec 加载前捕获数据，并在需要摘要的 native 分支计算首个摘要。"
+                  "text": "prepareRpcBinary(envelope, storage, limit?, digest?, codec?) 生成二进制清单、sidecar 与总量；restoreRpcBinary 校验清单与完整性后还原，Decoded 版有前述信任限制。binary/lazy 在完整 codec 加载前捕获数据，并在需要摘要的 native 分支计算首个摘要。"
                 },
                 {
                   "type": "paragraph",
@@ -23497,7 +23493,6 @@
                     ["`./wire`", "线上常量和类型，也含 measurePortableStreamValue 等纯数据操作"],
                     ["`./portable`", "wire portable 规范化与深度常量"],
                     ["`./errors`", "错误树序列化、还原、校验、JSON-RPC 转换与本地分类"],
-                    ["`./handshake`", "hello/accept/reject 的构造、协商与校验"],
                     ["`./v1`、`./framing/v1`", "协议 1.x 信封与消息 framer"],
                     ["`./framing`", "字符串/二进制消息分片、重组、物理帧检查"],
                     ["`./framing/stream`", "四字节大端长度前缀及 bootstrap/handshake 接收器"],
@@ -23512,15 +23507,15 @@
                     ],
                     ["`./stream`", "流负载、序号、进度、额度和控制状态检查"],
                     [
-                      "`./binary`、`./binary/lazy`、`./binary/capture`、`./binary/inspect`",
-                      "二进制捕获、准备、还原、清单、完整性与大小检查"
+                      "`./binary/lazy`、`./binary/inspect`",
+                      "按需二进制准备/还原、清单、完整性与大小检查"
                     ],
                     ["`./schema/wire-error`", "随包发布的错误树 JSON Schema"]
                   ]
                 },
                 {
                   "type": "paragraph",
-                  "text": "以上共根入口及 19 个子入口，最后一项是 JSON 文件。不要导入内部文件。`./v1` 使用具名 rpcProtocol 与 normalizeRpcEnvelope，没有 default 聚合；根入口以 rpcProtocolV1 提供该协议对象。`createReassembler` / `IRpcReassembler` 已移除，直接使用原 framer.accept/close，或 Pick 相应方法类型。完整字符串统一用 remoteProcessStringFramer，bare processStringFramer 不再公开，没有兼容别名。"
+                  "text": "以上共根入口及 16 个子入口，最后一项是 JSON 文件。不要导入内部文件。`./v1` 使用具名 rpcProtocol 与 normalizeRpcEnvelope，没有 default 聚合；根入口以 rpcProtocolV1 提供该协议对象。`createReassembler` / `IRpcReassembler` 已移除，直接使用原 framer.accept/close，或 Pick 相应方法类型。完整字符串统一用 remoteProcessStringFramer，bare processStringFramer 不再公开，没有兼容别名。"
                 }
               ]
             },
@@ -23727,7 +23722,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "prepareRpcBinary(envelope, storage, limit?, digest?, codec?) 生成二进制清单、sidecar 与总量；restoreRpcBinary 校验清单与完整性后还原，Decoded 版有前述信任限制。captureRpcBinaryData 同步捕获，稍后 prepare，适用于捕获时间早于编码；binary/lazy 同名操作在完整 codec 加载前捕获数据，并在需要摘要的 native 分支计算首个摘要。"
+                  "text": "prepareRpcBinary(envelope, storage, limit?, digest?, codec?) 生成二进制清单、sidecar 与总量；restoreRpcBinary 校验清单与完整性后还原，Decoded 版有前述信任限制。binary/lazy 在完整 codec 加载前捕获数据，并在需要摘要的 native 分支计算首个摘要。"
                 },
                 {
                   "type": "paragraph",
@@ -24075,10 +24070,6 @@
                         "`./errors`",
                         "Error projection, restoration, validation, JSON-RPC mapping, and local classification"
                       ],
-                      [
-                        "`./handshake`",
-                        "Hello/accept/reject construction, negotiation, and validation"
-                      ],
                       ["`./v1`, `./framing/v1`", "Protocol 1.x envelopes and message framing"],
                       [
                         "`./framing`",
@@ -24102,15 +24093,15 @@
                         "Stream payload, sequence, progress, credit, and control-state checks"
                       ],
                       [
-                        "`./binary`, `./binary/lazy`, `./binary/capture`, `./binary/inspect`",
-                        "Binary capture, preparation, restoration, manifests, integrity, and size"
+                        "`./binary/lazy`, `./binary/inspect`",
+                        "Lazy binary preparation/restoration, manifests, integrity, and size"
                       ],
                       ["`./schema/wire-error`", "Published wire-error JSON Schema"]
                     ]
                   },
                   {
                     "type": "paragraph",
-                    "text": "These are the root and 19 subentries; the schema entry is a JSON file. Do not import internals. V1 uses named rpcProtocol and normalizeRpcEnvelope exports without a default aggregate; the root calls its protocol object rpcProtocolV1. createReassembler and IRpcReassembler were removed: use the original framer.accept/close or Pick their method types. Complete-string carriers use remoteProcessStringFramer. The bare processStringFramer is internal, without a compatibility alias."
+                    "text": "These are the root and 16 subentries; the schema entry is a JSON file. Do not import internals. V1 uses named rpcProtocol and normalizeRpcEnvelope exports without a default aggregate; the root calls its protocol object rpcProtocolV1. createReassembler and IRpcReassembler were removed: use the original framer.accept/close or Pick their method types. Complete-string carriers use remoteProcessStringFramer. The bare processStringFramer is internal, without a compatibility alias."
                   }
                 ]
               },
@@ -24324,7 +24315,7 @@
                 "blocks": [
                   {
                     "type": "paragraph",
-                    "text": "prepareRpcBinary(envelope, storage, limit?, digest?, codec?) creates manifests, native sidecars, and totals. restoreRpcBinary validates manifests/integrity before restoring data. Its Decoded variant has the preceding trust restriction. captureRpcBinaryData captures synchronously for later prepare. The lazy entry captures data before loading the full codec and computes its first digest when the native branch requires one."
+                    "text": "prepareRpcBinary(envelope, storage, limit?, digest?, codec?) creates manifests, native sidecars, and totals. restoreRpcBinary validates manifests/integrity before restoring data. Its Decoded variant has the preceding trust restriction. The binary/lazy entry captures data before loading the full codec and computes its first digest when the native branch requires one."
                   },
                   {
                     "type": "paragraph",
@@ -24791,10 +24782,6 @@
                         "`./errors`",
                         "Error projection, restoration, validation, JSON-RPC mapping, and local classification"
                       ],
-                      [
-                        "`./handshake`",
-                        "Hello/accept/reject construction, negotiation, and validation"
-                      ],
                       ["`./v1`, `./framing/v1`", "Protocol 1.x envelopes and message framing"],
                       [
                         "`./framing`",
@@ -24818,15 +24805,15 @@
                         "Stream payload, sequence, progress, credit, and control-state checks"
                       ],
                       [
-                        "`./binary`, `./binary/lazy`, `./binary/capture`, `./binary/inspect`",
-                        "Binary capture, preparation, restoration, manifests, integrity, and size"
+                        "`./binary/lazy`, `./binary/inspect`",
+                        "Lazy binary preparation/restoration, manifests, integrity, and size"
                       ],
                       ["`./schema/wire-error`", "Published wire-error JSON Schema"]
                     ]
                   },
                   {
                     "type": "paragraph",
-                    "text": "These are the root and 19 subentries; the schema entry is a JSON file. Do not import internals. V1 uses named rpcProtocol and normalizeRpcEnvelope exports without a default aggregate; the root calls its protocol object rpcProtocolV1. createReassembler and IRpcReassembler were removed: use the original framer.accept/close or Pick their method types. Complete-string carriers use remoteProcessStringFramer. The bare processStringFramer is internal, without a compatibility alias."
+                    "text": "These are the root and 16 subentries; the schema entry is a JSON file. Do not import internals. V1 uses named rpcProtocol and normalizeRpcEnvelope exports without a default aggregate; the root calls its protocol object rpcProtocolV1. createReassembler and IRpcReassembler were removed: use the original framer.accept/close or Pick their method types. Complete-string carriers use remoteProcessStringFramer. The bare processStringFramer is internal, without a compatibility alias."
                   }
                 ]
               },
@@ -25040,7 +25027,7 @@
                 "blocks": [
                   {
                     "type": "paragraph",
-                    "text": "prepareRpcBinary(envelope, storage, limit?, digest?, codec?) creates manifests, native sidecars, and totals. restoreRpcBinary validates manifests/integrity before restoring data. Its Decoded variant has the preceding trust restriction. captureRpcBinaryData captures synchronously for later prepare. The lazy entry captures data before loading the full codec and computes its first digest when the native branch requires one."
+                    "text": "prepareRpcBinary(envelope, storage, limit?, digest?, codec?) creates manifests, native sidecars, and totals. restoreRpcBinary validates manifests/integrity before restoring data. Its Decoded variant has the preceding trust restriction. The binary/lazy entry captures data before loading the full codec and computes its first digest when the native branch requires one."
                   },
                   {
                     "type": "paragraph",
@@ -25166,7 +25153,6 @@
       "version": "0.0.11",
       "exports": [
         ".",
-        "./adapters/memory",
         "./features",
         "./features/auth",
         "./features/chunk",
@@ -25174,9 +25160,7 @@
         "./features/timeout",
         "./features/typegen",
         "./plugin",
-        "./probe",
-        "./stream",
-        "./testing"
+        "./probe"
       ],
       "readmeLocales": ["zh", "en"],
       "documentation": {
@@ -25360,6 +25344,10 @@
                 },
                 {
                   "type": "paragraph",
+                  "text": "公开子路径为 `/probe`、`/plugin` 和 `/features` 及其功能子路径。`/probe` 编译观察定义；把定义交给 `/plugin` 的 `defineFeaturePlugin({ name, probe })` 安装到同一个 host。观察器只借用该 host 的调用与物理连接，不创建额外端点。"
+                },
+                {
+                  "type": "paragraph",
                   "text": "更多调用、取消与迁移说明见使用指南。"
                 }
               ]
@@ -25493,6 +25481,25 @@
                 {
                   "type": "paragraph",
                   "text": "把 declarations 安装进 plugins。write 是应用拥有的输出能力，上例显示文件名与文本；实际文件系统 I/O 由应用决定。生成器订阅已接受目录，不依赖对端语言；方法 input/output/yield schema 来自真实 contract 描述，新代只在接受后写入。feature 卸载后停止写入，写入失败走 host.report。"
+                }
+              ]
+            },
+            {
+              "id": "在同一个-host-上观察",
+              "heading": "在同一个 host 上观察",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "观察定义通过真实 feature 安装，借用 host 已有端点。只保留需要的字段；事件视图只在 emit 调用期间有效，延后读取时由应用复制。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { defineProbe } from '@migaia/rpc-host/probe'\nimport { defineFeaturePlugin } from '@migaia/rpc-host/plugin'\n\nexport const observation = defineFeaturePlugin({\n  name: 'application-observer',\n  probe: defineProbe({\n    stages: ['message', 'peer'],\n    emit: (view) => console.log({ ...view })\n  })\n})"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "把 observation 与传输一起放入 host 的 plugins。host 关闭时释放对应观察订阅；观察器失败仍走原 report 通道，不接管业务资源。"
                 }
               ]
             },
@@ -25799,6 +25806,10 @@
                   },
                   {
                     "type": "paragraph",
+                    "text": "Public subpaths are `/probe`, `/plugin`, and `/features` with its feature subpaths. `/probe` compiles observation definitions; install them on the same host through `/plugin` with `defineFeaturePlugin({ name, probe })`. Observers borrow that host’s calls and physical connections without creating another endpoint."
+                  },
+                  {
+                    "type": "paragraph",
                     "text": "See the usage guide for calls, cancellation, and migration."
                   }
                 ]
@@ -25936,6 +25947,25 @@
                 ]
               },
               {
+                "id": "observe-the-same-host",
+                "heading": "Observe the same host",
+                "blocks": [
+                  {
+                    "type": "paragraph",
+                    "text": "Install an observation definition through a genuine feature, borrowing the host’s existing endpoint. Keep only needed fields. Event views are valid during `emit`; copy fields before retaining them for later use."
+                  },
+                  {
+                    "type": "code",
+                    "language": "ts",
+                    "code": "import { defineProbe } from '@migaia/rpc-host/probe'\nimport { defineFeaturePlugin } from '@migaia/rpc-host/plugin'\n\nexport const observation = defineFeaturePlugin({\n  name: 'application-observer',\n  probe: defineProbe({\n    stages: ['message', 'peer'],\n    emit: (view) => console.log({ ...view })\n  })\n})"
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Include observation alongside the transport in the host’s plugins. Host closure releases its observation subscriptions. Observer failures use the existing report channel without taking ownership of business resources."
+                  }
+                ]
+              },
+              {
                 "id": "migrating-from-old-module",
                 "heading": "Migrating from old module",
                 "blocks": [
@@ -26043,17 +26073,7 @@
       "slug": "rpc-plugin-browser",
       "description": "RPC browser owner.",
       "version": "0.0.11",
-      "exports": [
-        ".",
-        "./adapters/broadcast-channel",
-        "./adapters/message-port",
-        "./adapters/rtc-data-channel",
-        "./adapters/service-worker",
-        "./adapters/shared-worker",
-        "./adapters/web-transport",
-        "./adapters/web-worker",
-        "./adapters/window"
-      ],
+      "exports": ["."],
       "readmeLocales": ["zh", "en"],
       "documentation": {
         "readme": {
@@ -26207,7 +26227,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "根入口导出七个 plugin、选项类型与错误身份。`/adapters/window`、`shared-worker`、`service-worker`、`broadcast-channel`、`web-transport`、`rtc-data-channel`、`message-port`、`web-worker` 为明确需要低级载体的作者保留；应用直接把对应 plugin 安装进 host。更多场景见使用指南。"
+                  "text": "根入口导出七个 plugin、选项类型与错误身份。载体实现由各 plugin 在包内复用；自定义原始部署使用 `@migaia/rpc-host/plugin` SDK。更多场景见使用指南。"
                 }
               ]
             }
@@ -26380,7 +26400,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "普通 `PluginHost` 可安装同一传输定义，`name`/`expose` 用于该安装的注册与公开业务。需要编写载体的作者可使用本包八个 `/adapters/*` 入口与 host `/plugin` SDK 的安全原始部署工具；应用无需另建 endpoint 或调用底层工厂。"
+                  "text": "普通 `PluginHost` 可安装同一传输定义，`name`/`expose` 用于该安装的注册与公开业务。自定义载体使用 host `/plugin` SDK 的原始部署工具；应用直接安装对应 browser plugin。"
                 }
               ]
             }
@@ -26538,7 +26558,7 @@
                   },
                   {
                     "type": "paragraph",
-                    "text": "The root exports seven plugins, options, and error identity. `/adapters/window`, `shared-worker`, `service-worker`, `broadcast-channel`, `web-transport`, `rtc-data-channel`, `message-port`, and `web-worker` remain author entries for explicit lower-level carrier work. Applications install the matching plugin directly on a host. See the usage guide."
+                    "text": "The root exports seven plugins, options, and error identity. Plugins reuse module-owned carrier implementations internally; custom raw deployments use the `@migaia/rpc-host/plugin` SDK. See the usage guide."
                   }
                 ]
               }
@@ -26711,7 +26731,7 @@
                   },
                   {
                     "type": "paragraph",
-                    "text": "An ordinary PluginHost can install the same transport definition; name/expose control its registration and exposed methods. Carrier authors can use this module's eight /adapters/* entries and the host /plugin SDK's safe raw deployment tools. Applications need no separate endpoint factory."
+                    "text": "An ordinary PluginHost can install the same transport definition; name/expose control its registration and exposed methods. Custom carriers use the host `/plugin` SDK raw deployment tools. Applications install the matching browser plugin."
                   }
                 ]
               }
@@ -27245,7 +27265,7 @@
       "slug": "rpc-plugin-devtools",
       "description": "RPC probe, service and offline record contracts.",
       "version": "0.0.11",
-      "exports": [".", "./contract", "./hub", "./log"],
+      "exports": ["."],
       "readmeLocales": ["zh", "en"],
       "documentation": {
         "readme": {
@@ -27256,7 +27276,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "把真实 host 调用观察为有界事件、累计统计、增量 watch、独立录制和离线时间线。"
+                  "text": "把真实 host 调用观察为有界事件、累计统计、增量 watch、独立录制和记录导入/导出。"
                 },
                 {
                   "type": "paragraph",
@@ -27274,7 +27294,7 @@
                     "事件淘汰不减掉已累计的调用统计；clear 不结束独立录制。",
                     "一个 `devtoolsPlugin` 直接向 host 安装原 collector，不另建业务连接或转发 emitter。",
                     "可明确选择逻辑或物理阶段；内容捕获、脱敏与远程公开各自显式控制。",
-                    "原 NDJSON codec 保留字节和错误链；Hub 借用已有 client 或离线记录，不负责创建连接。"
+                    "collector 的 NDJSON 记录导入/导出保留字节和错误链，可在本地读取已有记录。"
                   ]
                 }
               ]
@@ -27359,19 +27379,11 @@
                 {
                   "type": "table",
                   "headers": ["入口", "用途"],
-                  "rows": [
-                    ["根入口", "`devtoolsPlugin`、collector/选项类型、错误身份"],
-                    ["`/contract`", "wire/service/record 类型、NDJSON format 与 encode/decode"],
-                    [
-                      "`/hub`",
-                      "`createRpcDevtoolsHub`，注册已有 client、时钟对齐、timeline/interactions 与离线导入"
-                    ],
-                    ["`/log`", "`createRpcLogProbe`，向应用提供的结构化 logger 同步交付合格字段"]
-                  ]
+                  "rows": [["根入口", "`devtoolsPlugin`、collector/选项类型、错误身份"]]
                 },
                 {
                   "type": "paragraph",
-                  "text": "record v1 的 format 仍是 `migaia-rpc-devtools`；包改名不改变记录格式。Hub 不关闭借入 client，不补造缺失事件，也不重放业务。Log probe 不拥有文件、批处理或 flush；logger 自己负责实际 I/O 与最终 shutdown。"
+                  "text": "record v1 的 format 仍是 `migaia-rpc-devtools`；包改名不改变记录格式。使用同一 collector 的 exportRecord/importRecord 处理记录。"
                 }
               ]
             },
@@ -27385,7 +27397,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "本包 source 为 `rpc.devtools`。INVALID_OPTION、CLOSED、RECORD_ACTIVE/RECORD_NOT_ACTIVE、RECORD_FORMAT_INVALID、REDACT_FAILED、TARGET_DUPLICATE/TARGET_UNKNOWN、TARGET_RELEASE_FAILED、SERVICE_RESULT_INVALID 保持原生类型和原 cause。诊断回调失败走报告，不改变已完成的业务结果。更多完整场景见使用指南。"
+                  "text": "本包 source 为 `rpc.devtools`。INVALID_OPTION、CLOSED、RECORD_ACTIVE/RECORD_NOT_ACTIVE、RECORD_FORMAT_INVALID、REDACT_FAILED、SERVICE_RESULT_INVALID 保持原生类型和原 cause。诊断回调失败走报告，不改变已完成的业务结果。更多完整场景见使用指南。"
                 }
               ]
             }
@@ -27491,7 +27503,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "record v1 的头保持 `{ format: 'migaia-rpc-devtools', version: 1 }`，包改名不改变格式。`/contract` 提供 encodeRpcDevtoolsRecord、decodeRpcDevtoolsRecord 和相关类型。字节采用保留的 `$bytes` 语法及规范 base64；原生错误恢复名称、stack 与原因链，不重新生成远端 stack。格式不承诺任意 JS 类实例图往返。"
+                  "text": "record v1 的头保持 `{ format: 'migaia-rpc-devtools', version: 1 }`，包改名不改变格式。collector.exportRecord/importRecord 负责记录编解码。字节采用保留的 `$bytes` 语法及规范 base64；原生错误恢复名称、stack 与原因链，不重新生成远端 stack。格式不承诺任意 JS 类实例图往返。"
                 }
               ]
             },
@@ -27515,48 +27527,16 @@
               ]
             },
             {
-              "id": "hub-与结构化日志",
-              "heading": "Hub 与结构化日志",
-              "blocks": [
-                {
-                  "type": "paragraph",
-                  "text": "`/hub` 的 createRpcDevtoolsHub 接收已有 client 的 request/stream 或离线记录，不替应用创建连接。注册名是 Hub 的本地标签，不是 endpoint 身份。"
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "import { createRpcDevtoolsHub } from '@migaia/rpc-plugin-devtools/hub'\n\nexport async function inspectRecord(text: string) {\n  const hub = createRpcDevtoolsHub({ maxEvents: 5000 })\n  try {\n    hub.importRecord('offline', text)\n    return hub.timeline({ targets: ['offline'], limit: 100 })\n  } finally {\n    await hub.close()\n  }\n}"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "在线对齐取五次采样中最小 RTT 估计偏移与不确定性，不保证网络对称。Hub 先订阅再补历史，按原序列去重；interaction 只关联已观察到的 trace 或 sender/message 身份，oneSided 不补造缺失一端。关闭 Hub 只 return 自己的 watch、取消自己的定时器，不关闭借入 client。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`/log` 的 createRpcLogProbe 接收实现 debug/info/warn/error 的结构化 logger。需要安装时，把返回 probe 放进作者 SDK 的 feature 定义："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "import { defineFeaturePlugin } from '@migaia/rpc-host/plugin'\nimport { createRpcLogProbe, type IRpcLogSink } from '@migaia/rpc-plugin-devtools/log'\n\nconst logger: IRpcLogSink = {\n  debug: (message, fields) => console.debug(message, fields),\n  info: (message, fields) => console.info(message, fields),\n  warn: (message, fields) => console.warn(message, fields),\n  error: (message, fields) => console.error(message, fields)\n}\nexport const logging = defineFeaturePlugin({\n  name: 'app-logging',\n  probe: createRpcLogProbe(logger, { slowMs: 100 })\n})"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "将 logging 与实际传输安装到 host。log probe 只选择 message/peer，不拥有文件、缓冲、批处理或 flush；logger 应避免阻塞，并自行负责 shutdown。logger/格式化失败走 onError，不改变业务结算。"
-                }
-              ]
-            },
-            {
               "id": "最终清理与错误",
               "heading": "最终清理与错误",
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "先 return 自己的 watch，停止 recording，关闭业务 host，再关闭仍由应用拥有的 collector/Hub/logger。collector.close 幂等且不关闭业务 host；host.close 同样不关闭 collector。"
+                  "text": "先 return 自己的 watch，停止 recording，关闭业务 host，再关闭仍由应用拥有的 collector。collector.close 幂等且不关闭业务 host；host.close 同样不关闭 collector。"
                 },
                 {
                   "type": "paragraph",
-                  "text": "本包 source 为 rpc.devtools。INVALID_OPTION、CLOSED、RECORD_ACTIVE、RECORD_NOT_ACTIVE、RECORD_FORMAT_INVALID、REDACT_FAILED、TARGET_DUPLICATE、TARGET_UNKNOWN、TARGET_RELEASE_FAILED、SERVICE_RESULT_INVALID 保留原生错误类型与原 cause。诊断与清理错误需要处理或报告，不能用采集失败替换原业务错误。"
+                  "text": "本包 source 为 rpc.devtools。INVALID_OPTION、CLOSED、RECORD_ACTIVE、RECORD_NOT_ACTIVE、RECORD_FORMAT_INVALID、REDACT_FAILED、SERVICE_RESULT_INVALID 保留原生错误类型与原 cause。诊断与清理错误需要处理或报告，不能用采集失败替换原业务错误。"
                 }
               ]
             }
@@ -27571,7 +27551,7 @@
                 "blocks": [
                   {
                     "type": "paragraph",
-                    "text": "Observe real host calls through bounded events, cumulative statistics, incremental watches, independent recording, and offline timelines."
+                    "text": "Observe real host calls through bounded events, cumulative statistics, incremental watches, independent recording, and record import/export."
                   },
                   {
                     "type": "paragraph",
@@ -27589,7 +27569,7 @@
                       "Event eviction does not subtract cumulative calls, and clear does not stop independent recording.",
                       "A `devtoolsPlugin` installs the original collector on the host without another business connection or forwarding emitter.",
                       "Logical/physical stages, content capture, redaction, and remote content exposure remain explicit choices.",
-                      "The existing NDJSON codec retains bytes and error chains. Hub borrows existing clients or offline records without creating connections."
+                      "Collector NDJSON import/export retains bytes and error chains for local record inspection."
                     ]
                   }
                 ]
@@ -27693,24 +27673,12 @@
                     "type": "table",
                     "headers": ["Entry", "Purpose"],
                     "rows": [
-                      ["Root", "`devtoolsPlugin`, collector/options types, and error identity"],
-                      [
-                        "`/contract`",
-                        "Wire/service/record types, NDJSON format, and encode/decode"
-                      ],
-                      [
-                        "`/hub`",
-                        "`createRpcDevtoolsHub`: existing clients, clock alignment, timeline/interactions, and offline import"
-                      ],
-                      [
-                        "`/log`",
-                        "`createRpcLogProbe`: synchronous qualifying fields for an application-owned structured logger"
-                      ]
+                      ["Root", "`devtoolsPlugin`, collector/options types, and error identity"]
                     ]
                   },
                   {
                     "type": "paragraph",
-                    "text": "Record v1 retains format `migaia-rpc-devtools`; module renaming does not change the recording grammar. Hub does not close borrowed clients, invent missing events, or replay business calls. Log probe owns no files, batching, or flush; the logger owns actual I/O and final shutdown."
+                    "text": "Record v1 retains format `migaia-rpc-devtools`; module renaming does not change the recording grammar. Use the same collector's exportRecord/importRecord operations."
                   }
                 ]
               },
@@ -27724,7 +27692,7 @@
                   },
                   {
                     "type": "paragraph",
-                    "text": "The source is `rpc.devtools`. INVALID_OPTION, CLOSED, RECORD_ACTIVE/RECORD_NOT_ACTIVE, RECORD_FORMAT_INVALID, REDACT_FAILED, TARGET_DUPLICATE/TARGET_UNKNOWN, TARGET_RELEASE_FAILED, and SERVICE_RESULT_INVALID preserve native types and original causes. Diagnostic callback failures are reported without changing completed business results. See the usage guide."
+                    "text": "The source is `rpc.devtools`. INVALID_OPTION, CLOSED, RECORD_ACTIVE/RECORD_NOT_ACTIVE, RECORD_FORMAT_INVALID, REDACT_FAILED, and SERVICE_RESULT_INVALID preserve native types and original causes. Diagnostic callback failures are reported without changing completed business results. See the usage guide."
                   }
                 ]
               }
@@ -27830,7 +27798,7 @@
                   },
                   {
                     "type": "paragraph",
-                    "text": "The v1 header remains { format: 'migaia-rpc-devtools', version: 1 }; module renaming does not change it. /contract exports encodeRpcDevtoolsRecord, decodeRpcDevtoolsRecord, and types. Bytes use reserved $bytes syntax with canonical base64. Native errors restore names, stacks, and cause chains without generating replacement remote stacks. The format does not promise arbitrary JavaScript class-graph round trips."
+                    "text": "The v1 header remains { format: 'migaia-rpc-devtools', version: 1 }; module renaming does not change it. collector.exportRecord/importRecord own record encoding and decoding. Bytes use reserved $bytes syntax with canonical base64. Native errors restore names, stacks, and cause chains without generating replacement remote stacks. The format does not promise arbitrary JavaScript class-graph round trips."
                   }
                 ]
               },
@@ -27854,48 +27822,16 @@
                 ]
               },
               {
-                "id": "hub-and-structured-logs",
-                "heading": "Hub and structured logs",
-                "blocks": [
-                  {
-                    "type": "paragraph",
-                    "text": "/hub exports createRpcDevtoolsHub. It accepts an existing client's request/stream interface or offline records and creates no connection. Registration names are local Hub labels, not endpoint identities."
-                  },
-                  {
-                    "type": "code",
-                    "language": "ts",
-                    "code": "import { createRpcDevtoolsHub } from '@migaia/rpc-plugin-devtools/hub'\n\nexport async function inspectRecord(text: string) {\n  const hub = createRpcDevtoolsHub({ maxEvents: 5000 })\n  try {\n    hub.importRecord('offline', text)\n    return hub.timeline({ targets: ['offline'], limit: 100 })\n  } finally {\n    await hub.close()\n  }\n}"
-                  },
-                  {
-                    "type": "paragraph",
-                    "text": "Live alignment selects minimum RTT from five samples to estimate offset and uncertainty; network symmetry is not guaranteed. The Hub subscribes before catching up history and deduplicates by original sequence. Interactions use observed trace or sender/message identity; oneSided does not invent a missing side. Hub close returns its watches and cancels its timers, leaving borrowed clients open."
-                  },
-                  {
-                    "type": "paragraph",
-                    "text": "/log exports createRpcLogProbe for a structured logger implementing debug/info/warn/error. Install its probe through an author-SDK feature definition:"
-                  },
-                  {
-                    "type": "code",
-                    "language": "ts",
-                    "code": "import { defineFeaturePlugin } from '@migaia/rpc-host/plugin'\nimport { createRpcLogProbe, type IRpcLogSink } from '@migaia/rpc-plugin-devtools/log'\n\nconst logger: IRpcLogSink = {\n  debug: (message, fields) => console.debug(message, fields),\n  info: (message, fields) => console.info(message, fields),\n  warn: (message, fields) => console.warn(message, fields),\n  error: (message, fields) => console.error(message, fields)\n}\nexport const logging = defineFeaturePlugin({\n  name: 'app-logging',\n  probe: createRpcLogProbe(logger, { slowMs: 100 })\n})"
-                  },
-                  {
-                    "type": "paragraph",
-                    "text": "Install logging beside the actual transport. The log probe supports message/peer stages and owns no files, buffering, batching, or flush. Keep the logger nonblocking and own its shutdown. Logger/formatting failures enter onError without changing business settlement."
-                  }
-                ]
-              },
-              {
                 "id": "final-cleanup-and-errors",
                 "heading": "Final cleanup and errors",
                 "blocks": [
                   {
                     "type": "paragraph",
-                    "text": "Return owned watches, stop recording, close business hosts, then close the remaining application-owned collector, Hub, and logger. collector.close is idempotent and leaves business hosts open; host.close likewise leaves the collector open."
+                    "text": "Return owned watches, stop recording, close business hosts, then close the remaining application-owned collector. collector.close is idempotent and leaves business hosts open; host.close likewise leaves the collector open."
                   },
                   {
                     "type": "paragraph",
-                    "text": "The source is rpc.devtools. INVALID_OPTION, CLOSED, RECORD_ACTIVE, RECORD_NOT_ACTIVE, RECORD_FORMAT_INVALID, REDACT_FAILED, TARGET_DUPLICATE, TARGET_UNKNOWN, TARGET_RELEASE_FAILED, and SERVICE_RESULT_INVALID preserve native error types and original causes. Handle or report diagnostic and cleanup failures without replacing the original business failure."
+                    "text": "The source is rpc.devtools. INVALID_OPTION, CLOSED, RECORD_ACTIVE, RECORD_NOT_ACTIVE, RECORD_FORMAT_INVALID, REDACT_FAILED, and SERVICE_RESULT_INVALID preserve native error types and original causes. Handle or report diagnostic and cleanup failures without replacing the original business failure."
                   }
                 ]
               }
@@ -28473,14 +28409,6 @@
       "version": "0.0.11",
       "exports": [
         ".",
-        "./adapters/bun-socket",
-        "./adapters/bun-spawn",
-        "./adapters/deno-command",
-        "./adapters/deno-socket",
-        "./adapters/electron-utility-process",
-        "./adapters/node-child-process",
-        "./adapters/node-socket",
-        "./adapters/windows-job",
         "./features",
         "./features/flow-control",
         "./features/log",
@@ -28613,18 +28541,12 @@
                     [
                       "`/features`",
                       "`sendQueueFeature`、`ipcLogFeature` 与原 flow-control 常量/类型，配置原 IPC owner"
-                    ],
-                    [
-                      "`/adapters/node-child-process`、`/adapters/node-socket`",
-                      "Node 原生进程与 socket"
-                    ],
-                    ["`/adapters/bun-spawn`、`/adapters/bun-socket`", "Bun 原生启动与 socket"],
-                    ["`/adapters/deno-command`、`/adapters/deno-socket`", "Deno 原生启动与 socket"],
-                    [
-                      "`/adapters/electron-utility-process`、`/adapters/windows-job`",
-                      "Electron utility process 与 Windows Job 专用接入"
                     ]
                   ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "原生进程和 socket 实现由包内对应 owner 使用。应用选择既有短配置或完整部署配置；载体作者使用 host `/plugin` 部署 SDK。"
                 },
                 {
                   "type": "paragraph",
@@ -28772,7 +28694,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "原生错误 source 为 rpc.transport.process，host/调用和托管错误仍可能来自 rpc.endpoint/rpc.remote。按 source/code 判断，不按文本匹配；保留原生 TypeError/AbortError 等类型和完整原因链。Node/Bun/Deno、Electron utility process、Windows Job 的能力取决于实际适配器；权限或资源参数不创造原生不存在的隔离。"
+                  "text": "原生错误 source 为 rpc.transport.process，host/调用和托管错误仍可能来自 rpc.endpoint/rpc.remote。按 source/code 判断，不按文本匹配；保留原生 TypeError/AbortError 等类型和完整原因链。Node/Bun/Deno 的能力取决于实际适配器；Electron 沿用 Node I/O 路径。权限或资源参数不创造原生不存在的隔离。"
                 }
               ]
             }
@@ -28908,24 +28830,12 @@
                       [
                         "`/features`",
                         "`sendQueueFeature`, `ipcLogFeature`, and original flow-control constants/types configure existing IPC owners"
-                      ],
-                      [
-                        "`/adapters/node-child-process`, `/adapters/node-socket`",
-                        "Native Node process and socket"
-                      ],
-                      [
-                        "`/adapters/bun-spawn`, `/adapters/bun-socket`",
-                        "Native Bun launch and socket"
-                      ],
-                      [
-                        "`/adapters/deno-command`, `/adapters/deno-socket`",
-                        "Native Deno launch and socket"
-                      ],
-                      [
-                        "`/adapters/electron-utility-process`, `/adapters/windows-job`",
-                        "Electron utility processes and Windows Jobs"
                       ]
                     ]
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Native process/socket implementations remain module-owned. Applications select the existing short or full deployment recipe; carrier authors use the host `/plugin` deployment SDK."
                   },
                   {
                     "type": "paragraph",
@@ -29073,7 +28983,7 @@
                   },
                   {
                     "type": "paragraph",
-                    "text": "Native errors use rpc.transport.process; host/call and managed failures can retain rpc.endpoint/rpc.remote. Branch on source/code rather than text and preserve native TypeError/AbortError and the whole cause chain. Node/Bun/Deno, Electron utility process, and Windows Job behavior depends on real adapter capabilities; permissions/limits do not invent native isolation."
+                    "text": "Native errors use rpc.transport.process; host/call and managed failures can retain rpc.endpoint/rpc.remote. Branch on source/code rather than text and preserve native TypeError/AbortError and the whole cause chain. Node/Bun/Deno behavior depends on real adapter capabilities; Electron uses the Node I/O path. Permissions/limits do not invent native isolation."
                   }
                 ]
               }
@@ -29086,7 +28996,7 @@
       "slug": "rpc-plugin-thread",
       "description": "RPC threads owner.",
       "version": "0.0.11",
-      "exports": [".", "./adapters/electron-main", "./adapters/node"],
+      "exports": ["."],
       "readmeLocales": ["zh", "en"],
       "documentation": {
         "readme": {
@@ -29200,7 +29110,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "根入口提供 `threadPlugin`、`isThreadChild`、公开选项类型和错误身份。`/adapters/node` 与 `/adapters/electron-main` 是需要显式原生 launcher/channel 的作者入口；应用通常使用短 spawn 配置。"
+                  "text": "根入口提供 `threadPlugin`、`isThreadChild`、公开选项类型和错误身份。原生 launcher/channel 由包内对应 owner 使用；应用通过短 spawn 或完整原生监督配置选择来源。自定义原始载体使用 `@migaia/rpc-host/plugin` 的部署 SDK。"
                 },
                 {
                   "type": "paragraph",
@@ -29326,7 +29236,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "根入口是 threadPlugin/isThreadChild、选项与错误；/adapters/node、/adapters/electron-main 供确需原生 launcher/channel 的作者使用。短配置覆盖常见应用，浏览器必须使用 browser plugin。"
+                  "text": "本包仅提供根入口的 threadPlugin/isThreadChild、选项与错误。短配置覆盖常见应用；自定义原始部署由 host `/plugin` SDK 接纳。浏览器使用 browser plugin。"
                 }
               ]
             }
@@ -29450,7 +29360,7 @@
                 "blocks": [
                   {
                     "type": "paragraph",
-                    "text": "The root provides `threadPlugin`, `isThreadChild`, public options, and error identity. `/adapters/node` and `/adapters/electron-main` serve authors needing explicit native launchers/channels; ordinary applications can use short spawn configuration."
+                    "text": "The root provides `threadPlugin`, `isThreadChild`, public options, and error identity. module-owned launchers and channels remain internal. Applications select short spawn or a full native supervision recipe; custom raw carriers use the deployment SDK in `@migaia/rpc-host/plugin`."
                   },
                   {
                     "type": "paragraph",
@@ -29576,7 +29486,7 @@
                   },
                   {
                     "type": "paragraph",
-                    "text": "The root exposes threadPlugin/isThreadChild, options, and errors. /adapters/node and /adapters/electron-main support authors needing native launcher/channel integration. Short options cover ordinary applications; browsers use browser plugins."
+                    "text": "The module exposes only its root: threadPlugin/isThreadChild, options, and errors. Short options cover ordinary applications; custom raw deployments use the host `/plugin` SDK. Browsers use browser plugins."
                   }
                 ]
               }
@@ -74800,6 +74710,10 @@
                 },
                 {
                   "type": "paragraph",
+                  "text": "每次 `combineConfig` 调用会在合并来源前读取每条规则的 `prefix` 和 `strategies` 一次并建立索引；相同前缀以输入中最先声明的规则为准。规则描述必须稳定：不支持依赖 getter 每次返回不同描述，或在合并过程中修改规则来影响后续属性。"
+                },
+                {
+                  "type": "paragraph",
                   "text": "当某个键在双方都存在、且不属于以上任何自动合并分支（例如两侧都是不可合并的原始值）时，若提供了 `onConflict`，会调用它并传入 `IConfigConflictContext`（`path`：当前键的完整路径；`left`：左侧/已有值；`right`：右侧/新值），其返回值 `IConfigConflictDecision` 决定最终结果：`{ kind: 'left' }` 保留左值、`{ kind: 'right' }` 采用右值、`{ kind: 'delete' }` 删除该键、`{ kind: 'value', value }` 采用自定义值。`onConflict` 必须同步返回（返回 Promise 会抛 `code: 'CONFIG_CONFLICT'`；返回值不是上述四种 `kind` 之一同样抛 `CONFIG_CONFLICT`）。未提供 `onConflict` 时右侧直接覆盖左侧（标准合并语义）。`right === CONFIG_DELETE` 会删除目标键（可用于合并阶段裁剪掉某个来源写入的默认值）。"
                 },
                 {
@@ -78028,6 +77942,10 @@
                   {
                     "type": "paragraph",
                     "text": "`strategies` are the global defaults; `pathRules` is a list of `{ prefix, strategies }` matched by `prefix` (a key path from the root) against the key path currently being merged. The rule with the longer (more specific) `prefix` wins, and a matching rule is merged with the global `strategies` (fields the rule declares override the global ones; fields it does not declare keep the global values)."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Each `combineConfig` call reads every rule's `prefix` and `strategies` once and builds an index before merging sources. For equal prefixes, the first declaration in the input wins. Rule descriptions must remain stable: getters returning changing descriptions and rule mutations during a merge cannot influence later properties and are unsupported."
                   },
                   {
                     "type": "paragraph",

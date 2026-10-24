@@ -264,7 +264,7 @@ const rpcErrorCatalogGuides = {
 const rpcProtocolGuideContexts = {
   binary: {
     quickStart:
-      "import { captureRpcBinaryData, prepareRpcBinary, RpcBinaryStorage } from '@migaia/rpc-contract/binary'\nimport { prepareRpcBinary as prepareColdRpcBinary, restoreRpcBinary } from '@migaia/rpc-contract/binary/lazy'\nimport type { IRpcRuntimeEnvelope } from '@migaia/rpc-contract/runtime'\n\n/** Capture at the application's chosen point, then finish that same snapshot later. */\nexport async function captureOutgoing(envelope: IRpcRuntimeEnvelope) {\n  const captured = captureRpcBinaryData(envelope, RpcBinaryStorage.inline, 1_048_576)\n  return await captured.prepare()\n}\n\n/** The eager entry prepares this actual outgoing envelope. */\nexport async function prepareOutgoing(envelope: IRpcRuntimeEnvelope) {\n  return await prepareRpcBinary(envelope, RpcBinaryStorage.inline, 1_048_576)\n}\n\n/** A carrier that chooses the light entry uses the same canonical operation name. */\nexport async function prepareColdOutgoing(envelope: IRpcRuntimeEnvelope) {\n  return await prepareColdRpcBinary(envelope, RpcBinaryStorage.inline, 1_048_576)\n}\n/** Restore an actual received inline manifest at the receiver's existing asynchronous stage. */\nexport async function restoreIncoming(manifest: unknown) {\n  return await restoreRpcBinary(manifest, RpcBinaryStorage.inline, [])\n}\n// The carrier sends manifest and sidecars from the returned preparation result.\n// Native storage additionally needs the authentication owner's whole-backing digest.",
+      "import { prepareRpcBinary, restoreRpcBinary, RpcBinaryStorage } from '@migaia/rpc-contract/binary/lazy'\nimport type { IRpcRuntimeEnvelope } from '@migaia/rpc-contract/runtime'\n\n/** Prepare the actual outgoing snapshot at the application's existing capture point. */\nexport async function prepareOutgoing(envelope: IRpcRuntimeEnvelope) {\n  return await prepareRpcBinary(envelope, RpcBinaryStorage.inline, 1_048_576)\n}\n\n/** Restore the received manifest at the receiver's existing asynchronous stage. */\nexport async function restoreIncoming(manifest: unknown) {\n  return await restoreRpcBinary(manifest, RpcBinaryStorage.inline, [])\n}\n// The carrier sends the returned manifest and sidecars.\n// Native storage additionally needs the authentication owner's whole-backing digest.",
     useEn: [
       'An independent carrier needs the canonical manifest and actual binary backing accounting.',
       'The application must preserve the existing capture point before cold loading or asynchronous preparation.'
@@ -424,7 +424,7 @@ const rpcProtocolGuideContexts = {
   },
   handshakeData: {
     quickStart:
-      "import { RpcCodecId, RpcPeerRuntime, RpcProtocol } from '@migaia/rpc-contract'\nimport { acceptRpcHandshake, completeRpcHandshake, createRpcHello, normalizeRpcHandshake } from '@migaia/rpc-contract/handshake'\n\nconst client = {\n  peer: { id: 'client', runtime: RpcPeerRuntime.node },\n  versions: [{ major: RpcProtocol.major, minor: RpcProtocol.minor }],\n  codecs: [RpcCodecId.json], capabilities: []\n}\nconst service = { ...client, peer: { id: 'service', runtime: RpcPeerRuntime.node } }\nconst hello = createRpcHello(client)\nconst received = normalizeRpcHandshake(hello)\nconst acceptance = acceptRpcHandshake(service, hello)\nif (!acceptance.ok) throw acceptance.error\nconst agreement = completeRpcHandshake(client, acceptance.reply)\nconsole.log(received.step, agreement.codec)\n// These are protocol proposals and negotiated data. The real carrier still owns authentication.",
+      "import { RpcCodecId, RpcPeerRuntime, RpcProtocol } from '@migaia/rpc-contract'\nimport { acceptRpcHandshake, completeRpcHandshake, createRpcHello, normalizeRpcHandshake } from '@migaia/rpc-contract'\n\nconst client = {\n  peer: { id: 'client', runtime: RpcPeerRuntime.node },\n  versions: [{ major: RpcProtocol.major, minor: RpcProtocol.minor }],\n  codecs: [RpcCodecId.json], capabilities: []\n}\nconst service = { ...client, peer: { id: 'service', runtime: RpcPeerRuntime.node } }\nconst hello = createRpcHello(client)\nconst received = normalizeRpcHandshake(hello)\nconst acceptance = acceptRpcHandshake(service, hello)\nif (!acceptance.ok) throw acceptance.error\nconst agreement = completeRpcHandshake(client, acceptance.reply)\nconsole.log(received.step, agreement.codec)\n// These are protocol proposals and negotiated data. The real carrier still owns authentication.",
     useEn: [
       'An independent protocol carrier exchanges the actual hello and accept/reject messages.',
       'An initiator or responder needs the exact common version/codec/capability result.'
@@ -569,68 +569,7 @@ const rpcProtocolToolkitGuides = {
       '把不受支持的 runtime-envelope union 交给 protocol-1 validator。'
     ]
   }),
-  'rpc-contract:binary:captureRpcBinaryData': guide({
-    ...rpcProtocolGuideContexts.binary,
-    purposeEn:
-      'Captures one actual runtime envelope synchronously and returns an opaque resource whose prepare() finishes that same snapshot later. Inline bytes are copied at capture; native backings retain their original identities.',
-    purposeZh:
-      '同步捕获一个实际 runtime envelope，返回只能通过 prepare() 完成同一快照的不透明资源。inline 字节在捕获时复制，native backing 保留原身份；不开放可变 scratch 或传输授信。'
-  }),
-  'rpc-contract:binary:prepareRpcBinary': guide({
-    ...rpcProtocolGuideContexts.binary,
-    purposeEn:
-      'Prepares a runtime envelope with the selected storage profile and actual codec, returning its canonical manifest, ordered native sidecars and complete backing-byte count. The caller supplies a whole-backing digest for native storage.',
-    purposeZh:
-      '按实际 storage profile 与持有的 codec 准备 runtime envelope，返回规范 manifest、按序 native sidecar 和完整 backing 字节数。native storage 的完整 backing 摘要由原鉴权 owner 提供。'
-  }),
-  'rpc-contract:binary:restoreRpcBinary': guide({
-    ...rpcProtocolGuideContexts.binary,
-    purposeEn:
-      'Restores a received canonical binary manifest using the already loaded codec. Native storage verifies the actual whole-backing digest and preserves backing identities; this protocol data operation does not authenticate or authorize a transport.',
-    purposeZh:
-      '用已加载的规范 codec 恢复收到的 binary manifest。native storage 校验实际完整 backing 摘要并保留 backing 身份；此协议数据操作不负责鉴权或授予 transport 权限。',
-    quickStart:
-      "import { restoreRpcBinary, RpcBinaryStorage, type IRpcBinaryDigest } from '@migaia/rpc-contract/binary'\n\n/** Restore the actual inline metadata after its carrier admits and authenticates the frame. */\nexport async function restoreInline(manifest: unknown) {\n  return await restoreRpcBinary(manifest, RpcBinaryStorage.inline, [])\n}\n\n/** The carrier supplies the real native sidecars and its actual whole-backing SHA-256 digest. */\nexport async function restoreNative(\n  manifest: unknown, sidecars: readonly ArrayBuffer[], digest: IRpcBinaryDigest\n) {\n  return await restoreRpcBinary(manifest, RpcBinaryStorage.native, sidecars, undefined, digest)\n}\n// Retain the actual backing references; restoration does not create transfer or execution rights."
-  }),
-  'rpc-contract:binary:restoreRpcBinaryDecoded': guide({
-    purposeEn:
-      'Restores binary metadata only from canonical codec output, preserving the existing digest and Promise boundary. Reading own enumerable metadata properties executes getters. This entry does not accept or validate caller-constructed objects; use restoreRpcBinary from the same subpath for strict object validation.',
-    purposeZh:
-      '仅恢复 canonical codec 输出中的 binary metadata，保留既有摘要与 Promise 边界。读取自有可枚举 metadata 属性会执行 getter。此入口不接受、不校验调用方构造的对象；严格对象校验使用同一子路径的 restoreRpcBinary。',
-    quickStart: `import { restoreRpcBinaryDecoded, restoreRpcBinary, RpcBinaryStorage } from '@migaia/rpc-contract/binary'
-import { defineJsonCodec } from '@migaia/serialize/codecs/json'
 
-/** Retain the canonical JSON decoder at the actual receive boundary. */
-const codec = defineJsonCodec({ version: 1 })
-
-/** Decode actual received inline metadata before selecting decoded admission. */
-export async function restoreReceivedText(text: string) {
-  return await restoreRpcBinaryDecoded(codec.decode(text), RpcBinaryStorage.inline, [])
-}
-
-/** Caller-constructed manifests require strict object admission. */
-export async function restoreCallerManifest(manifest: unknown) {
-  return await restoreRpcBinary(manifest, RpcBinaryStorage.inline, [])
-}
-// Native storage also requires the actual sidecars and the owner's whole-backing digest.
-// Codec provenance does not authenticate a carrier or authorize transfer.`,
-    useEn: [
-      'The actual receive owner holds output produced by its canonical JSON or native structured-clone decoder.',
-      'The receiver retains its existing binary budget, sidecars and native whole-backing integrity stage.'
-    ],
-    useZh: [
-      '实际接收 owner 持有 canonical JSON 或原生结构化克隆 decoder 产生的输出。',
-      '接收端需要保留既有 binary 预算、sidecar 与 native 完整 backing 校验阶段。'
-    ],
-    avoidEn: [
-      'Caller-constructed objects or custom codec output require restoreRpcBinary from @migaia/rpc-contract/binary.',
-      'Do not treat metadata admission as authentication, replay admission or transfer permission.'
-    ],
-    avoidZh: [
-      '调用方构造的对象或自定义 codec 输出应使用 @migaia/rpc-contract/binary 的 restoreRpcBinary。',
-      '不能把 metadata 准入当作鉴权、replay 准入或 transfer 权限。'
-    ]
-  }),
   'rpc-contract:binary-inspect:assertRpcNativeBinaryFrameSize': guide({
     ...rpcProtocolGuideContexts.nativeInspection,
     purposeEn:
@@ -845,28 +784,28 @@ export async function restoreCallerManifest(manifest: unknown) {
     purposeZh:
       '使用调用者实际 text encoder 生成最终长度前缀进程帧，可复用提供的 storage。返回字节保持连接原 backing 所有权与物理消息边界；函数本身不发送或关闭连接。'
   }),
-  'rpc-contract:handshake:acceptRpcHandshake': guide({
+  'rpc-contract:index:acceptRpcHandshake': guide({
     ...rpcProtocolGuideContexts.handshakeData,
     purposeEn:
       "Negotiates common protocol version, codec and capabilities from the responder's actual offer and received hello. It returns an acceptance reply/agreement or a rejection reply/original error without retaining the received input in diagnostics.",
     purposeZh:
       '按 responder 的实际 offer 与收到的 hello 协商共同协议版本、codec 和 capabilities，返回 acceptance reply/agreement 或 rejection reply/原错误。诊断不保留收到的输入；仍需实际载体鉴权。'
   }),
-  'rpc-contract:handshake:completeRpcHandshake': guide({
+  'rpc-contract:index:completeRpcHandshake': guide({
     ...rpcProtocolGuideContexts.handshakeData,
     purposeEn:
       "Verifies a responder's actual reply against the initiator's retained local offer and returns the negotiated agreement. Unsupported choices reject at the canonical Contract boundary without creating channel or execution authority.",
     purposeZh:
       '按 initiator 保留的本地 offer 验证 responder 实际 reply，返回协商 agreement。无法接受的选择在规范 Contract 边界拒绝，不因此创建通道或执行权限。'
   }),
-  'rpc-contract:handshake:createRpcHello': guide({
+  'rpc-contract:index:createRpcHello': guide({
     ...rpcProtocolGuideContexts.handshakeData,
     purposeEn:
       "Encodes the initiator's local protocol offer into the first-channel UTF-8 JSON hello text. Invalid offers preserve the bounded redacted failure policy instead of retaining the caller's original token or data subtree.",
     purposeZh:
       '把 initiator 本地协议 offer 编码为首通道 UTF-8 JSON hello 文本。非法 offer 保留有界脱敏失败策略，不保留调用者原 token 或数据子树；返回文本供实际载体发送。'
   }),
-  'rpc-contract:handshake:normalizeRpcHandshake': guide({
+  'rpc-contract:index:normalizeRpcHandshake': guide({
     ...rpcProtocolGuideContexts.handshakeData,
     purposeEn:
       'Validates received first-channel handshake text or bytes into the closed hello/accept/reject union. Invalid syntax or fields retain only the bounded diagnostic summary; normalization itself grants no authenticated peer identity.',
@@ -1436,9 +1375,9 @@ console.log(IpcReporterContext)`,
   }),
   'rpc-host:probe:defineProbe': guide({
     purposeEn:
-      'Validates and compiles Probe options. The optional host receives Probe fields and private registration, is frozen and returns unchanged by identity; no host copy is made. Pass the handle to a Peer probe option or install it with probePlugin on an Endpoint.',
+      'Validates and compiles Probe options. The optional host receives Probe fields and private registration, is frozen and returns unchanged by identity; no host copy is made. Pass the handle through the Host probe option.',
     purposeZh:
-      '验证并编译 Probe 配置；可选 host 直接接收 Probe 字段与私有注册，随后冻结并返回同一引用，不复制 host。把 handle 交给 Peer 的 probe 选项，或通过 probePlugin 在 Endpoint 上安装。',
+      '验证并编译 Probe 配置；可选 host 直接接收 Probe 字段与私有注册，随后冻结并返回同一引用，不复制 host。把 handle 交给 Host 的 probe 选项。',
     quickStart: `import { defineProbe, RpcProbeStageName } from '@migaia/rpc-host/probe'
 
 /** Existing extra members stay on this same object, which definition freezes. */
@@ -1462,49 +1401,15 @@ probe.setStages(['message', 'frame'])`,
       '从 message/envelope 的 IRpcProbeEventView.variation 读取 control subtype；abort 的 kind 为 cancel，其余 variation 为 control，request/response 与其它阶段为 undefined。'
     ],
     avoidEn: [
-      'Retaining a reusable view after emit returns without an explicit snapshotProbeEvent request.',
+      'Retaining a reusable view after emit returns without copying the required fields inside emit; copies are shallow and nested content stays application-owned.',
       'Applying methods to frame-level events or expecting it to remove methodless variations: it filters only method-bearing message/envelope events; other stages use sampling.'
     ],
     avoidZh: [
-      '在 emit 返回后直接保留复用 view，而没有显式调用 snapshotProbeEvent。',
+      '在 emit 返回后直接保留复用 view，而没有在回调内复制需要保留的字段；浅复制不转移嵌套内容的所有权。',
       '把 methods 过滤应用到帧层或期望它删除没有 method 的 variation：它只过滤携带 method 的 message/envelope，其它阶段只受采样控制。'
     ]
   }),
-  'rpc-host:probe:snapshotProbeEvent': guide({
-    purposeEn:
-      'Explicitly copies reusable Probe metadata so top-level fields, including variation, survive emit. Detail, error and content keep their original references; later caller mutation remains visible until a real codec boundary converts them.',
-    purposeZh:
-      '显式复制复用 Probe 的顶层元数据，包括 variation，使字段在 emit 返回后有效；detail、error、content 保留原引用，调用方后续修改仍可见，直到真实 codec 边界转换表示。',
-    quickStart: `import { defineProbe, snapshotProbeEvent, type IRpcProbeEventView } from '@migaia/rpc-host/probe'
 
-/** Retained snapshots belong to this diagnostic consumer. */
-const saved: Readonly<IRpcProbeEventView>[] = []
-/** Allocate snapshots only at the consumer boundary. */
-const probe = defineProbe({
-  stages: ['message'],
-  emit(view) {
-    // Explicitly retain top-level metadata, preserving nested references.
-    saved.push(snapshotProbeEvent(view))
-  }
-})
-console.log(probe.stageMask)`,
-    useEn: [
-      'Retain selected events after emit returns for a later diagnostic read.',
-      'Take an explicit object copy at a consumer boundary that allows allocation.'
-    ],
-    useZh: [
-      '需要在 emit 返回后保留选定事件，供稍后的诊断读取。',
-      '消费者出口允许分配对象，需要明确复制当前事件字段。'
-    ],
-    avoidEn: [
-      'Using snapshots for every collector ingest event defeats its allocation-free storage contract.',
-      'Assuming nested content or the referenced error becomes an independent deep copy.'
-    ],
-    avoidZh: [
-      '每次 collector 摄取事件都创建快照，会违反其不分配事件对象的存储契约。',
-      '认为嵌套 content 或引用的 error 已经变为完全独立的深复制。'
-    ]
-  }),
   'rpc-host:probe:rpcProbeSampleKey': guide({
     purposeEn:
       'Returns the FNV-1a 32-bit key over UTF-8 senderId plus messageId. Both observed sides use the same identifiers to reach a deterministic sampling decision without shared state.',
@@ -1534,10 +1439,10 @@ console.log(rpcProbeSampleKey('caller', 'request-1'))`,
 
 const rpcDevtoolsErrorGuide = guide({
   purposeEn:
-    'Provides the canonical rpc-plugin-devtools source and nine semantic error codes shared by codec, collector, portable service and hub. Configuration, lifecycle and conversion failures keep their registered identity and original cause.',
+    'Provides the canonical rpc.devtools source and seven semantic error codes shared by the collector, portable service and record conversion. Configuration, lifecycle and conversion failures keep their registered identity and original cause.',
   purposeZh:
-    '提供 codec、collector、portable service 与 hub 共用的 rpc-plugin-devtools source 和九个语义错误码；配置、生命周期与转换失败保留注册身份与原 cause。',
-  quickStart: `import { RPC_DEVTOOLS_SOURCE, RpcDevtoolsErrorCode } from '@migaia/rpc-plugin-devtools/contract'
+    '提供 collector、portable service 与录制转换共用的 rpc.devtools source 和七个语义错误码；配置、生命周期与转换失败保留注册身份与原 cause。',
+  quickStart: `import { RPC_DEVTOOLS_SOURCE, RpcDevtoolsErrorCode } from '@migaia/rpc-plugin-devtools'
 
 console.log(RPC_DEVTOOLS_SOURCE, RpcDevtoolsErrorCode)`,
   useEn: [
@@ -1559,336 +1464,8 @@ console.log(RPC_DEVTOOLS_SOURCE, RpcDevtoolsErrorCode)`,
 })
 
 const rpcDevtoolsGuides = {
-  'rpc-plugin-devtools:log:createRpcLogProbe': guide({
-    purposeEn:
-      'Creates a first-party logging Probe for a structural debug/info/warn/error logger. Integer filtering precedes allocation, and qualifying events become independent fields objects before the reusable view changes; the logger owns all buffering, output and flush.',
-    purposeZh:
-      '为具有 debug/info/warn/error 的结构化 logger 创建日志 Probe。先用整数判断，再为合格事件提取独立字段对象，避免复用 view 被覆写；缓冲、输出与 flush 全部由 logger 拥有。',
-    quickStart: `import { createRpcLogProbe } from '@migaia/rpc-plugin-devtools/log'
-
-/** A recording sink demonstrates nonblocking admission without performing I/O. */
-const entries: object[] = []
-/** An existing logger owns this queue and its eventual output. */
-const logger = {
-  debug(_message: string, fields: object) { entries.push(fields) },
-  info(_message: string, fields: object) { entries.push(fields) },
-  warn(_message: string, fields: object) { entries.push(fields) },
-  error(_message: string, fields: object) { entries.push(fields) }
-}
-/** Pass this Probe to an existing host; successful calls under 200 ms stay silent. */
-const probe = createRpcLogProbe(logger, { slowMs: 200, levels: { rejected: 'off' } })
-console.log(probe.stageMask, entries.length)`,
-    options: [
-      {
-        name: 'slowMs',
-        whenToUse:
-          'Include settled calls that exceed the application latency budget. / 记录超过应用延迟预算的 settled 调用。',
-        description:
-          'Settled calls at or above this finite nonnegative threshold log warn. / settled 达到有限非负阈值后记 warn。'
-      },
-      {
-        name: 'sample',
-        whenToUse: 'Reduce admitted diagnostic events before logging. / 在日志决策前减少诊断事件。',
-        description:
-          'Compile sampling before fields objects are created. / 创建字段对象前使用编译后的采样。'
-      },
-      {
-        name: 'methods',
-        whenToUse: 'Restrict call logging to selected methods. / 限制日志涉及的方法。',
-        description: 'Compile a method whitelist at construction. / 构造时编译方法白名单。'
-      },
-      {
-        name: 'stages',
-        whenToUse:
-          'Select call observations, peer lifecycle, or both. / 选择调用观察、peer 生命周期或两者。',
-        description:
-          'Message/peer subscriptions; these are the default stages. / 订阅 message/peer，默认选择两者。'
-      },
-      {
-        name: 'capture',
-        whenToUse: 'Select explicit content stages before logging. / 在日志前明确选择内容阶段。',
-        description:
-          'Forward the original capture list to defineProbe; default content remains absent. / 把原 capture 列表交给 defineProbe，默认不输出内容。'
-      },
-      {
-        name: 'redact',
-        whenToUse:
-          'Remove sensitive fields in the canonical emitter before logging. / 在规范 emitter 中脱敏后再输出日志。',
-        description:
-          'Forward the original synchronous redactor without adding a parallel capture path. / 转发原同步 redactor，不添加平行捕获路径。'
-      },
-      {
-        name: 'content',
-        whenToUse:
-          'Include explicitly approved payload content in a diagnostic sink. / 将明确允许的内容输出给诊断 sink。',
-        description:
-          'Request capture for subscribed stages; emitter-owned capture/redaction supplies view.content. / 为订阅阶段请求捕获，view.content 来自 emitter 的捕获/脱敏路径。'
-      },
-      {
-        name: 'levels',
-        whenToUse:
-          'Adjust severity or suppress a known category with off. / 调整级别或用 off 抑制指定类别。',
-        description:
-          'Override failed/rejected/timeout/aborted/slow/lifecycle levels; off disables. / 覆盖对应事件日志级别，off 禁用。'
-      },
-      {
-        name: 'message',
-        whenToUse:
-          'Supply an application message while the view remains valid. / 在 view 有效期间生成应用 message。',
-        description:
-          'Build a custom message synchronously from the current view. / 同步读取当前 view 创建自定义 message。'
-      },
-      {
-        name: 'onError',
-        whenToUse:
-          'Observe logger failures without changing business settlement. / 观察 logger 失败，不改变业务结算。',
-        description:
-          'Report throws and rejected thenables without changing RPC flow. / 报告抛错及 rejected thenable，不改变 RPC 流程。'
-      }
-    ],
-    useEn: [
-      'Log failures and rejections by default, and opt in to slow settled calls with slowMs.',
-      'Use @migaia/logger level({ asyncOutput: true }), batch and file to enqueue asynchronously; put batch before file and await logger.flush/shutdown at application teardown.'
-    ],
-    useZh: [
-      '默认记录失败与拒绝，用 slowMs 显式记录慢 settled 调用。',
-      '使用 @migaia/logger level({ asyncOutput: true })、batch 与 file 异步入队；batch 放在 file 前，应用收尾等待 logger.flush/shutdown。'
-    ],
-    avoidEn: [
-      'Handing the reusable view to an asynchronous logger; later events overwrite its fields.',
-      'Using a synchronous file-writing logger on the RPC path, or adding another buffering/rotation/flush pipeline inside devtools.'
-    ],
-    avoidZh: [
-      '把复用 view 交给异步 logger；后续事件会覆写其字段。',
-      '在 RPC 路径使用同步文件 logger，或在 devtools 内另建缓冲、轮转与 flush 管线。'
-    ]
-  }),
-  'rpc-plugin-devtools:hub:createRpcDevtoolsHub': guide({
-    purposeEn:
-      'Aggregates supplied devtools service clients and offline recordings into aligned timelines and incrementally indexed interactions. It aligns live clocks using the smallest round trip of five samples, retains event references, and creates no transports or Peers.',
-    purposeZh:
-      '把调用方提供的 devtools service client 与离线录制聚合为对齐后的 timeline 和增量索引 interaction。实时连接从五次采样中选择最小 RTT 对齐时钟，保留事件引用，不创建 transport 或 Peer。',
-    quickStart: `import { createRpcDevtoolsHub } from '@migaia/rpc-plugin-devtools/hub'
-import { RpcDevtoolsRecordFormat, encodeRpcDevtoolsRecord } from '@migaia/rpc-plugin-devtools/contract'
-
-/** A codec-produced recording needs no live collector or transport. */
-const text = encodeRpcDevtoolsRecord({
-  header: RpcDevtoolsRecordFormat,
-  events: [{ seq: 1, at: 100, endpointId: 'parent', stage: 'message', direction: 'outbound', senderId: 'parent', messageId: 'm1', trace: 'T1' }]
-})
-/** The caller owns the hub lifetime; each target retains at most maxEvents. */
-const hub = createRpcDevtoolsHub({ maxEvents: 50_000 })
-try {
-  hub.importRecord('recording', text)
-  console.log(hub.timeline({ trace: 'T1' })[0]?.alignedAt) // 100
-  console.log(hub.interactions('T1')[0]?.oneSided) // true
-} finally {
-  await hub.close()
-}`,
-    options: [
-      {
-        name: 'maxEvents',
-        description:
-          'Maximum retained events per target; eviction removes the oldest events from correlation indexes.',
-        defaultValue: '50_000',
-        whenToUse: 'Set a smaller retention bound when several targets share the hub memory budget.'
-      },
-      {
-        name: 'realignMs',
-        description:
-          'Optional clock realignment period in milliseconds; stored timeline references receive updated alignedAt values.',
-        whenToUse:
-          'Enable periodic samples when a long-lived target needs its clock offset refreshed.'
-      },
-      {
-        name: 'onError',
-        description:
-          'Reports original client, watch and listener failures and collected watch-release errors without replacing their identity.',
-        whenToUse:
-          'Route hub runtime failures to the application reporter while preserving original errors.'
-      }
-    ],
-    examplesEn: [
-      {
-        id: 'existing-service-clients',
-        title: 'Aggregate existing service clients',
-        description:
-          'Supply bound clients whose request/stream method names match IRpcDevtoolsServiceApi. The hub catches up through query before watch and never creates the underlying connections.',
-        code: `import { createRpcDevtoolsHub, type IRpcDevtoolsTargetClient } from '@migaia/rpc-plugin-devtools/hub'
-
-/** Existing clients already map describe/query/stats/watch to their service. */
-export async function inspectHosts(parent: IRpcDevtoolsTargetClient, worker: IRpcDevtoolsTargetClient) {
-  /** Report runtime failures while the caller owns hub cleanup. */
-  const hub = createRpcDevtoolsHub({ realignMs: 30_000, onError: (error) => console.error(error) })
-  /** Unsubscribe before closing the hub. */
-  const unsubscribe = hub.on('status', (name, status) => console.log(name, status))
-  try {
-    await hub.addTarget('parent', parent)
-    await hub.addTarget('worker', worker)
-    console.log(hub.timeline({ trace: 'T1', limit: 100 }))
-    console.log(hub.interactions('T1'))
-    console.log(await hub.stats())
-  } finally {
-    unsubscribe()
-    await hub.close()
-  }
-}`
-      }
-    ],
-    examplesZh: [
-      {
-        id: 'existing-service-clients',
-        title: '聚合已有 service client',
-        description:
-          '交入 request/stream 方法名符合 IRpcDevtoolsServiceApi 的已绑定 client。Hub 先用 query 追上，再跟随 watch；底层连接始终由调用方管理。',
-        code: `import { createRpcDevtoolsHub, type IRpcDevtoolsTargetClient } from '@migaia/rpc-plugin-devtools/hub'
-
-/** 已有 client 把 describe/query/stats/watch 映射到各自 service。 */
-export async function inspectHosts(parent: IRpcDevtoolsTargetClient, worker: IRpcDevtoolsTargetClient) {
-  /** 报告运行时失败，hub 关闭由调用方负责。 */
-  const hub = createRpcDevtoolsHub({ realignMs: 30_000, onError: (error) => console.error(error) })
-  /** 关闭前解除状态监听。 */
-  const unsubscribe = hub.on('status', (name, status) => console.log(name, status))
-  try {
-    await hub.addTarget('parent', parent)
-    await hub.addTarget('worker', worker)
-    console.log(hub.timeline({ trace: 'T1', limit: 100 }))
-    console.log(hub.interactions('T1'))
-    console.log(await hub.stats())
-  } finally {
-    unsubscribe()
-    await hub.close()
-  }
-}`
-      }
-    ],
-    useEn: [
-      'Inspect explicit traces across already-created service clients, with uncertaintyMs retained alongside each aligned event.',
-      'Import codec-produced NDJSON as offline targets, query stored timeline references, or merge live target histograms bucket by bucket.'
-    ],
-    useZh: [
-      '通过已有 service client 检查跨宿主显式 trace，每个对齐事件保留 uncertaintyMs。',
-      '把 codec 生成的 NDJSON 导入 offline target，查询已存储 timeline 引用，或逐桶合并实时 target 的直方图。'
-    ],
-    avoidEn: [
-      'Expecting the hub to create transports, reconnect a broken watch, invent a missing observation side or propagate trace automatically.',
-      'Treating results as immutable snapshots: captured content/detail/error retain references, and realignment updates stored alignedAt values.'
-    ],
-    avoidZh: [
-      '期待 hub 创建 transport、重连中断的 watch、补造缺失侧的观察事件或自动传播 trace。',
-      '把结果当成不可变快照：content/detail/error 保留引用，重新对齐会更新已存储的 alignedAt。'
-    ]
-  }),
-  'rpc-plugin-devtools:hub:RpcDevtoolsTargetStatus': guide({
-    purposeEn:
-      'Defines the connecting, connected, disconnected, offline and removed target states shared by hub consumers. These values describe lifecycle events and never stand in for thrown error codes.',
-    purposeZh:
-      '定义 hub 消费者共用的 connecting、connected、disconnected、offline 与 removed 状态；这些值描述生命周期事件，不作为抛出的错误码。',
-    quickStart: `import { RpcDevtoolsTargetStatus } from '@migaia/rpc-plugin-devtools/hub'
-
-console.log(RpcDevtoolsTargetStatus.offline)`,
-    useEn: [
-      "Render or branch on states returned by hub.status or published through hub.on('status').",
-      'Distinguish imported offline records from live connected targets.'
-    ],
-    useZh: [
-      "显示 hub.status 返回或 hub.on('status') 发布的 target 状态，或据此进行分支。",
-      '区分导入的离线录制与实时连接中的 target。'
-    ],
-    avoidEn: [
-      'Throwing lifecycle status values as semantic error codes.',
-      'Inferring unseen events or successful reconnection from a disconnected state.'
-    ],
-    avoidZh: [
-      '把生命周期状态值作为语义错误码抛出。',
-      '根据 disconnected 状态推断未观察到的事件或已经重连成功。'
-    ]
-  }),
-  'rpc-plugin-devtools:contract:RpcDevtoolsRecordFormat': guide({
-    purposeEn:
-      'Owns the exact NDJSON header format migaia-rpc-devtools and version 1. Collector export and hub offline import reuse this object rather than maintaining separate recording format identifiers.',
-    purposeZh:
-      '统一维护 NDJSON header 的准确格式名 migaia-rpc-devtools 与版本 1；collector 导出及 hub 离线导入复用该对象，避免各自维护格式标识。',
-    quickStart: `import { RpcDevtoolsRecordFormat } from '@migaia/rpc-plugin-devtools/contract'
-
-console.log(RpcDevtoolsRecordFormat.format, RpcDevtoolsRecordFormat.version)`,
-    useEn: [
-      'Construct a version 1 recording header from its canonical package-owned value.',
-      'Identify the supported codec format before passing recording data to another consumer.'
-    ],
-    useZh: [
-      '使用包内唯一维护的规范值构造版本 1 的录制 header。',
-      '在向其它消费者交入录制数据之前，明确所支持的 codec 格式。'
-    ],
-    avoidEn: [
-      'Changing version or format to make incompatible input appear supported.',
-      'Adding private metadata requirements that the frozen minimal header does not define.'
-    ],
-    avoidZh: [
-      '修改版本或格式名，使不兼容的输入表面上看起来受到支持。',
-      '为冻结的最小 header 增加没有定义的私有元数据要求。'
-    ]
-  }),
-  'rpc-plugin-devtools:contract:encodeRpcDevtoolsRecord': guide({
-    purposeEn:
-      'Purely encodes a version 1 offline record as UTF-8 NDJSON text, one header followed by event lines. Native and already-serialized errors reuse the RPC codec; bytes use base64 markers without a collector or transport.',
-    purposeZh:
-      '把版本 1 离线 record 纯函数编码为 UTF-8 NDJSON 文本，第一行为 header，后续每行一个事件；原生与已序列化错误复用 RPC codec，字节使用 base64 标记，不创建 collector 或 transport。',
-    quickStart: `import { encodeRpcDevtoolsRecord, RpcDevtoolsRecordFormat } from '@migaia/rpc-plugin-devtools/contract'
-
-/** The caller owns storage of this pure codec result. */
-const text = encodeRpcDevtoolsRecord({ header: RpcDevtoolsRecordFormat, events: [] })
-console.log(text)`,
-    useEn: [
-      'Export already-collected events for the same offline sequence on another machine.',
-      'Keep source, code, name, message, stack and the cause chain when recording errors.',
-      'Preserve the optional IRpcDevtoolsWireEvent.variation subtype on message/envelope controls through record export and import.'
-    ],
-    useZh: [
-      '导出已经采集的事件，在另一台机器还原同一离线序列。',
-      '录制错误时保留 source、code、name、message、stack 与 cause 链。',
-      '录制导出与导入保留 message/envelope control 上可选的 IRpcDevtoolsWireEvent.variation subtype。'
-    ],
-    avoidEn: [
-      'Expecting the codec to collect events, write files or open a remote service.',
-      'Assuming a recording export redacts payloads that were already captured without redaction.'
-    ],
-    avoidZh: [
-      '期待 codec 采集事件、写入文件或打开远程 service。',
-      '认为录制导出会自动脱敏此前未经 redact 就已捕获的 payload。'
-    ]
-  }),
-  'rpc-plugin-devtools:contract:decodeRpcDevtoolsRecord': guide({
-    purposeEn:
-      'Purely decodes version 1 NDJSON into offline record events with restored bytes and native errors. It rejects invalid format, version, header or JSON with RECORD_FORMAT_INVALID and keeps the original failure on cause.',
-    purposeZh:
-      '把版本 1 NDJSON 纯函数解码为离线 record 事件，还原字节与原生错误；非法格式、版本、header 或 JSON 以 RECORD_FORMAT_INVALID 拒绝，原始失败保留在 cause。',
-    quickStart: `import { decodeRpcDevtoolsRecord, encodeRpcDevtoolsRecord, RpcDevtoolsRecordFormat } from '@migaia/rpc-plugin-devtools/contract'
-
-/** Offline event errors are restored without a live collector. */
-const record = decodeRpcDevtoolsRecord(encodeRpcDevtoolsRecord({
-  header: RpcDevtoolsRecordFormat, events: []
-}))
-console.log(record.header.version)`,
-    useEn: [
-      'Import a recording for offline inspection while retaining its original event sequence.',
-      'Restore recorded errors without regenerating their original stack or cause-chain diagnostics.'
-    ],
-    useZh: [
-      '导入录制数据进行离线检查，并保持其原始事件序列。',
-      '还原录制错误时不重新生成原始 stack 或 cause 链诊断。'
-    ],
-    avoidEn: [
-      'Accepting a different format or version by silently rewriting its header.',
-      'Treating an offline native Error as a service wire error without explicit RPC serialization.'
-    ],
-    avoidZh: [
-      '通过静默改写 header，接纳其它格式或版本的数据。',
-      '没有显式 RPC 序列化，就把离线原生 Error 当作 service wire error。'
-    ]
-  }),
-  'rpc-plugin-devtools:contract:RpcDevtoolsErrorCode': rpcDevtoolsErrorGuide,
-  'rpc-plugin-devtools:contract:RPC_DEVTOOLS_SOURCE': rpcDevtoolsErrorGuide
+  'rpc-plugin-devtools:index:RpcDevtoolsErrorCode': rpcDevtoolsErrorGuide,
+  'rpc-plugin-devtools:index:RPC_DEVTOOLS_SOURCE': rpcDevtoolsErrorGuide
 } satisfies Readonly<Record<string, Readonly<Record<IGuideLocale, IApiGuide>>>>
 
 /** Maintained guides use the host, transport plugins, features, and retained author contracts. */
@@ -2283,54 +1860,7 @@ const rpcPublicAuthorGuides = {
       '沿用上述原生所有者；该操作不构造应用宿主，也不转移其物理所有权。'
     ]
   }),
-  'rpc-host:plugin:validateAdapterPeerTimeout': guide({
-    purposeEn:
-      'Validate the local default timeout before discovery, listener installation or native launch. Validated default milliseconds, using the canonical default when omitted; invalid input throws before resource acquisition.',
-    purposeZh:
-      '在发现、安装监听或原生启动前验证本地默认期限。返回验证后的默认毫秒，省略时用原默认，非法输入在获取资源前抛错。',
-    quickStart:
-      "import { validateAdapterPeerTimeout } from '@migaia/rpc-host/plugin'\n\n/** Validate local policy before discovery or native launch starts. */\nexport function readCallBudget(options: Parameters<typeof validateAdapterPeerTimeout>[0]) {\n  return validateAdapterPeerTimeout(options)\n}",
-    useEn: [
-      'Validate the local default timeout before discovery, listener installation or native launch.',
-      'The input boundary is options. Validated default milliseconds, using the canonical default when omitted; invalid input throws before resource acquisition.'
-    ],
-    useZh: [
-      '在发现、安装监听或原生启动前验证本地默认期限。',
-      '输入边界为 options。返回验证后的默认毫秒，省略时用原默认，非法输入在获取资源前抛错。'
-    ],
-    avoidEn: [
-      'Do not treat this returned diagnostic or local data as proof of an accepted remote capability.',
-      'Keep native I/O and cleanup at their existing owner; this operation does not acquire them.'
-    ],
-    avoidZh: [
-      '不要把返回的诊断或本地数据当作已接纳远端能力的证明。',
-      '原生输入输出及清理仍由既有所有者负责；此操作不获取这些资源。'
-    ]
-  }),
-  'rpc-host:plugin:validateAdapterPeerMethods': guide({
-    purposeEn:
-      'Compile actual own local provider descriptors before installing bootstrap listeners; preserve original getter/trap failure causes. Readonly canonical method entries. Compilation grants no remote channel capability and invokes no provider business method.',
-    purposeZh:
-      '在安装启动监听前编译实际本地自有提供方描述，保留原访问器或代理失败原因。返回只读规范方法项，编译不授予远端通道能力，也不调用业务方法。',
-    quickStart:
-      "import { validateAdapterPeerMethods } from '@migaia/rpc-host/plugin'\n\nconst methods = validateAdapterPeerMethods({\n  readTotal: () => ({ currency: 'USD', amount: 42 })\n})\n// Compilation reads declarations; it does not execute readTotal.\nconsole.log(methods.length)",
-    useEn: [
-      'Compile actual own local provider descriptors before installing bootstrap listeners; preserve original getter/trap failure causes.',
-      'The input boundary is args. Readonly canonical method entries. Compilation grants no remote channel capability and invokes no provider business method.'
-    ],
-    useZh: [
-      '在安装启动监听前编译实际本地自有提供方描述，保留原访问器或代理失败原因。',
-      '输入边界为 args。返回只读规范方法项，编译不授予远端通道能力，也不调用业务方法。'
-    ],
-    avoidEn: [
-      'Do not treat this returned diagnostic or local data as proof of an accepted remote capability.',
-      'Keep native I/O and cleanup at their existing owner; this operation does not acquire them.'
-    ],
-    avoidZh: [
-      '不要把返回的诊断或本地数据当作已接纳远端能力的证明。',
-      '原生输入输出及清理仍由既有所有者负责；此操作不获取这些资源。'
-    ]
-  }),
+
   'rpc-host:plugin:createAdapterConfigurationError': guide({
     purposeEn:
       'Attach the established invalid-configuration identity to a new canonical diagnostic. RpcError with INVALID_CONFIG; no live resource registration is minted.',
@@ -2451,30 +1981,7 @@ const rpcPublicAuthorGuides = {
       '沿用上述原生所有者；该操作不构造应用宿主，也不转移其物理所有权。'
     ]
   }),
-  'rpc-host:plugin:holdAdapterRegistration': guide({
-    purposeEn:
-      'Retain one original registration across prevalidation and native plugin installation without accepting a prepared holder from the caller. Held prepare/plugin/release operations using the same generation holder; release preserves original close Promise and ordering.',
-    purposeZh:
-      '跨预验证及原生插件安装保留同一原登记，不接受调用者提交已准备持有器。返回使用同一代次持有器的准备、安装及释放操作，释放保留原关闭承诺及顺序。',
-    quickStart:
-      "import { holdAdapterRegistration } from '@migaia/rpc-host/plugin'\n\n/** Retain the actual binding across validation and ordinary Host installation. */\nexport function retainRegistration(options: Parameters<typeof holdAdapterRegistration>[0]) {\n  return holdAdapterRegistration(options)\n}\n// Use the held registration's prepare/plugin/release operations; do not copy its identity.",
-    useEn: [
-      'Prevalidation and plugin installation must retain one original generation holder.',
-      'The input boundary is options. Held prepare/plugin/release operations using the same generation holder; release preserves original close Promise and ordering.'
-    ],
-    useZh: [
-      '预验证与插件安装必须保留同一原代次持有器。',
-      '输入边界为 options。返回使用同一代次持有器的准备、安装及释放操作，释放保留原关闭承诺及顺序。'
-    ],
-    avoidEn: [
-      'Do not replace this operation with caller-supplied accepted identity or copied resource tokens.',
-      'Use the native owner described above; this helper does not construct an application host or transfer its physical ownership.'
-    ],
-    avoidZh: [
-      '不要用调用者提交的已接纳身份或复制的资源令牌替代此操作。',
-      '沿用上述原生所有者；该操作不构造应用宿主，也不转移其物理所有权。'
-    ]
-  }),
+
   'rpc-host:plugin:createRuntimeByteConnection': guide({
     purposeEn:
       'Perform original framed control negotiation over real ordered byte I/O and retain its accepted connection. Promise of negotiated IRuntimeByteConnection; its original close releases connection cleanup before physical close. It creates no host endpoint.',
@@ -3159,51 +2666,7 @@ const rpcPublicAuthorGuides = {
     ],
     avoidZh: ['不要由此诊断判断推导非幂等工作的重试权限。', '分类后不要替换或丢弃原始错误。']
   }),
-  'rpc-host:adapters-memory:createMemoryTransportPair': guide({
-    purposeEn:
-      'Create two same-process borrowed transports with queued delivery. Closing either side retires the whole pair; endpoint disposal does not own physical pair closure.',
-    purposeZh:
-      '创建在同一进程内排队投递的两个借用传输。关闭任一侧会退休整个通道对；端点释放不拥有物理通道对的关闭。',
-    quickStart:
-      "import { createMemoryTransportPair } from '@migaia/rpc-host/adapters/memory'\n\nconst [left, right] = createMemoryTransportPair()\nconst stop = right.subscribe(message => console.log(message.data))\ntry {\n  await left.send({ orderId: 'order-1' })\n} finally {\n  stop()\n  left.close() // closes both physical sides\n}",
-    useEn: [
-      'A transport author needs real queued message delivery in the same process.',
-      'A test owns the complete carrier pair and can explicitly retire both sides.'
-    ],
-    useZh: ['传输作者需要同一进程内的真实排队消息投递。', '测试拥有完整载体对，并能显式退休两端。'],
-    avoidEn: [
-      'Do not use this pair as a native worker or cross-process transport.',
-      'Do not expect endpoint disposal to close this borrowed pair.'
-    ],
-    avoidZh: [
-      '不要把此通道对当作原生 Worker 或跨进程传输。',
-      '不要期待端点释放会关闭借用的通道对。'
-    ]
-  }),
-  'rpc-host:probe:probePlugin': guide({
-    purposeEn:
-      'Create the low-level probe contribution for an author-composed RPC pipeline. It uses the installed endpoint clock and owns only probe subscriptions; application hosts can instead use a feature carrying probes.',
-    purposeZh:
-      '为作者组合的底层 RPC 管线创建探针贡献，使用已安装端点时钟，只拥有探针订阅；应用宿主也可以使用携带探针的 feature。',
-    quickStart:
-      "import { probePlugin, defineProbe } from '@migaia/rpc-host/probe'\n\nconst stages: number[] = []\nconst observer = defineProbe({ stages: ['peer'], emit: event => { stages.push(event.stage) } })\n// Supply this contribution only to the author's existing low-level plugin composition.\nexport const observation = probePlugin(observer)",
-    useEn: [
-      'An author composes a low-level pipeline and needs the canonical probe emitter.',
-      'The existing endpoint clock must timestamp probe events without another timer.'
-    ],
-    useZh: [
-      '作者组合底层管线时需要规范探针发射器。',
-      '探针事件必须使用既有端点时钟，不另建定时器。'
-    ],
-    avoidEn: [
-      'Do not pass this low-level contribution as an IRpcFeaturePlugin to createRpcHost.',
-      'Do not let observation close a collector or the borrowed native transport.'
-    ],
-    avoidZh: [
-      '不要把此底层贡献当成 IRpcFeaturePlugin 传给 createRpcHost。',
-      '不要让观察逻辑关闭收集器或借用的原生传输。'
-    ]
-  }),
+
   'rpc-contract:framing-jsonrpc:checkJsonRpcDescription': guide({
     purposeEn:
       'Validate an untrusted JSON-RPC method directory as portable protocol data. A success returns the checked snapshot; a failure returns a structured reason and path without constructing a host.',
@@ -3322,198 +2785,6 @@ const rpcPublicAuthorGuides = {
 
 /** Native author guides describe the actual carrier and launcher ownership boundary. */
 const rpcNativeAuthorGuides = {
-  'rpc-plugin-browser:adapters-broadcast-channel:createBroadcastChannelTransport': guide({
-    purposeEn:
-      "Adapts an existing BroadcastChannel to borrowed, one-to-many structured-clone transport I/O. It adds neither peer discovery nor an RPC handshake; the channel's creator retains physical close ownership.",
-    purposeZh:
-      '把已有 BroadcastChannel 适配为借用的一对多结构化克隆传输。它不负责发现 peer 或建立 RPC 握手，原生 channel 仍由创建方关闭。',
-    quickStart:
-      "import { createBroadcastChannelTransport } from '@migaia/rpc-plugin-browser/adapters/broadcast-channel'\n\n/** Join a raw same-origin channel until the returned disposer is called. */\nexport function joinChannel(name: string, receive: (data: unknown) => void) {\n  /** This function owns the native channel, while the transport borrows it. */\n  const channel = new BroadcastChannel(name)\n  /** The adapter preserves broadcast delivery rather than selecting a destination. */\n  const transport = createBroadcastChannelTransport(channel)\n  /** Detach logical delivery before releasing the underlying channel. */\n  const stop = transport.subscribe(({ data }) => receive(data))\n  transport.send({ type: 'joined' })\n  return () => {\n    stop()\n    channel.close()\n  }\n}",
-    useEn: [
-      'A custom protocol already owns a same-origin BroadcastChannel and needs raw transport send/subscribe operations.',
-      'Several tabs or workers need the same structured-clone publication without transferring buffer ownership.'
-    ],
-    useZh: [
-      '自定义协议已经持有同源 BroadcastChannel，需要原始 transport 的发送和订阅操作。',
-      '多个标签页或 Worker 要接收同一条结构化克隆消息，并且不转移 buffer 所有权。'
-    ],
-    avoidEn: [
-      'Application RPC needs peer identities, join/leave events and targeted calls; use broadcastChannelPlugin with createRpcHost.',
-      'A transfer list, private point-to-point delivery or crash detection is required; this borrowed broadcast adapter supplies none of them.'
-    ],
-    avoidZh: [
-      '应用 RPC 需要 peer 身份、加入/离开事件和定向调用；应使用 createRpcHost 与 broadcastChannelPlugin。',
-      '需要 transfer list、私有点对点投递或崩溃检测；此借用式广播适配器不提供这些能力。'
-    ]
-  }),
-  'rpc-plugin-browser:adapters-message-port:createBrowserMessagePortTransport': guide({
-    purposeEn:
-      'Wraps a real browser MessagePort with lazy message listeners and native transfer semantics. Ownership defaults to owned, so transport.close closes that port; explicitly borrowed wrappers only retire their own listeners.',
-    purposeZh:
-      '用延迟注册的消息监听包装真实浏览器 MessagePort，并保留原生 transfer 语义。默认 owned，transport.close 会关闭该 port；显式 borrowed 时只释放包装器自己的监听。',
-    quickStart:
-      "import { createBrowserMessagePortTransport } from '@migaia/rpc-plugin-browser/adapters/message-port'\n\n/** The two actual ports belong to this example. */\nconst ports = new MessageChannel()\n/** This adapter takes close ownership of port1. */\nconst transport = createBrowserMessagePortTransport(ports.port1, { ownership: 'owned' })\n/** Subscribing starts queued MessagePort delivery. */\nconst stop = transport.subscribe(({ data }) => console.log(data))\nports.port2.postMessage({ type: 'hello' })\n\n/** Invoke when the surrounding page/component no longer uses this channel. */\nexport async function disposeChannel() {\n  stop()\n  await transport.close?.()\n  ports.port2.close()\n}",
-    useEn: [
-      'A protocol integration receives a real MessagePort and needs queued native messages activated on first subscription.',
-      'The application must explicitly choose whether endpoint disposal may physically close the supplied port.'
-    ],
-    useZh: [
-      '协议集成拿到真实 MessagePort，需要在首次订阅时启动原生排队消息。',
-      '应用必须明确指定端点销毁是否可以物理关闭传入的 port。'
-    ],
-    avoidEn: [
-      'A Node worker_threads.MessagePort is supplied; it uses the Node EventEmitter lifecycle rather than this browser EventTarget surface.',
-      'The application only needs host-level RPC; use messagePortPlugin rather than assembling a raw transport and protocol.'
-    ],
-    avoidZh: [
-      '传入的是 Node worker_threads.MessagePort；其生命周期是 Node EventEmitter，而不是此处的浏览器 EventTarget 接口。',
-      '应用只需要 host 层 RPC；应使用 messagePortPlugin，而不是自行组装原始传输和协议。'
-    ]
-  }),
-  'rpc-plugin-browser:adapters-rtc-data-channel:createRtcDataChannelTransport': guide({
-    purposeEn:
-      'Borrows an already-open RTCDataChannel as an exclusive string transport. Strings pass through unchanged, other outgoing values use JSON.stringify, and incoming data remains undecoded. The caller keeps both DataChannel and RTCPeerConnection lifetimes.',
-    purposeZh:
-      '把已打开的 RTCDataChannel 借用为独占字符串传输。字符串原样发送，其他出站值经 JSON.stringify，入站数据不自动解码。DataChannel 和 RTCPeerConnection 的生命周期仍归调用方。',
-    quickStart:
-      "import { createRtcDataChannelTransport } from '@migaia/rpc-plugin-browser/adapters/rtc-data-channel'\n\n/** Call after native signaling completes and channel.readyState becomes open. */\nexport function attachDataChannel(channel: RTCDataChannel) {\n  /** The transport borrows this native channel; it does not close the peer connection. */\n  const transport = createRtcDataChannelTransport(channel)\n  /** Raw inbound strings still require the application's own decoder. */\n  const stop = transport.subscribe(({ data }) => console.log(data))\n  transport.send({ type: 'status' })\n  return stop\n}\n// On application shutdown: call the returned disposer, then channel.close().\n// The RTCPeerConnection owner separately calls its own close().",
-    useEn: [
-      'WebRTC signaling has already produced an open DataChannel for a custom string protocol.',
-      'The caller needs native closing/close/error notification without transferring physical channel ownership.'
-    ],
-    useZh: [
-      'WebRTC 信令已经产生打开的 DataChannel，要承载自定义字符串协议。',
-      '调用方需要原生 closing/close/error 通知，同时保留物理通道所有权。'
-    ],
-    avoidEn: [
-      'The channel is still connecting or closing; construction rejects those states instead of waiting for open.',
-      'An RPC session needs reliability admission or JSON decoding; the raw adapter does not check ordered/retransmit settings or decode messages, so use rtcDataChannelPlugin.'
-    ],
-    avoidZh: [
-      'channel 仍处于 connecting 或 closing；构造会拒绝这些状态，不会等待 open。',
-      'RPC 会话需要可靠性准入或 JSON 解码；原始适配器不校验有序/重传设置也不解码，应使用 rtcDataChannelPlugin。'
-    ]
-  }),
-  'rpc-plugin-browser:adapters-service-worker:createServiceWorkerTransport': guide({
-    purposeEn:
-      "Borrows an explicit ServiceWorker/Client target and message receiver. It preserves source metadata and supplies sourceProof, while raw subscribers must still apply their protocol's admission policy. No worker, registration or client is closed.",
-    purposeZh:
-      '借用显式的 ServiceWorker/Client 目标和消息接收方。它保留来源元数据并提供 sourceProof，但原始订阅方仍须执行自身协议的准入策略；不会关闭 Worker、registration 或 client。',
-    quickStart:
-      "import { createServiceWorkerTransport } from '@migaia/rpc-plugin-browser/adapters/service-worker'\n\n/** Attach from a controlled page; registration/worker lifetime stays with the application. */\nexport async function attachActiveServiceWorker() {\n  /** Wait for the browser's real active registration. */\n  const registration = await navigator.serviceWorker.ready\n  /** An active target is required; no global target is fabricated. */\n  const target = registration.active\n  if (!target) return\n  /** Outgoing and incoming native owners are deliberately separate. */\n  const transport = createServiceWorkerTransport({\n    target,\n    receiver: navigator.serviceWorker\n  })\n  /** Raw subscribe also exposes unproved sources, so filter before consuming this protocol. */\n  const stop = transport.subscribe((message) => {\n    if (transport.sourceProof?.(message.source)) console.log(message.data)\n  })\n  transport.send({ type: 'status' })\n  return stop\n}",
-    useEn: [
-      'A page sends through its selected active ServiceWorker and receives through navigator.serviceWorker.',
-      'A ServiceWorker-side protocol already owns a concrete Client and wants stable Client-id source verification.'
-    ],
-    useZh: [
-      '页面通过选定的 active ServiceWorker 发送，并从 navigator.serviceWorker 接收。',
-      'ServiceWorker 端协议已经持有真实 Client，需要按稳定 Client id 校验来源。'
-    ],
-    avoidEn: [
-      'There is no explicit target/receiver pair, or the caller expects raw subscription itself to reject every unproved source.',
-      'Application RPC needs registration activation, route discovery and session cleanup; use serviceWorkerPlugin and keep registration ownership explicit.'
-    ],
-    avoidZh: [
-      '没有显式 target/receiver，或误以为原始订阅会自行拒绝所有未经证明的来源。',
-      '应用 RPC 需要 registration 激活、路由发现与会话清理；应使用 serviceWorkerPlugin，并明确 registration 的所有权。'
-    ]
-  }),
-  'rpc-plugin-browser:adapters-shared-worker:createSharedWorkerTransport': guide({
-    purposeEn:
-      'Adapts an existing SharedWorker port as borrowed exclusive structured-clone I/O. First subscription starts the port; the final disposer removes adapter listeners without closing the native port.',
-    purposeZh:
-      '把已有 SharedWorker port 适配为借用的独占结构化克隆 I/O。首次订阅会启动 port，最后一个 disposer 只移除适配器监听，不会关闭原生 port。',
-    quickStart:
-      "import { createSharedWorkerTransport } from '@migaia/rpc-plugin-browser/adapters/shared-worker'\n\n/** Open this page's connection to an application-provided SharedWorker module. */\nexport function openSharedWorker(moduleUrl: URL) {\n  /** This function owns the new native port. */\n  const worker = new SharedWorker(moduleUrl, { type: 'module' })\n  /** The raw adapter only borrows that port. */\n  const transport = createSharedWorkerTransport(worker.port)\n  /** Subscribing installs message/messageerror hooks and starts queued delivery. */\n  const stop = transport.subscribe(({ data }) => console.log(data))\n  transport.send({ type: 'status' })\n  return () => {\n    stop()\n    worker.port.close()\n  }\n}",
-    useEn: [
-      'A custom protocol already has a SharedWorker.port or a worker-side connected port.',
-      'Several logical subscribers should share native listener registration while port close stays with the application.'
-    ],
-    useZh: [
-      '自定义协议已经持有 SharedWorker.port 或 Worker 端的连接 port。',
-      '多个逻辑订阅需要共享原生监听注册，而 port 关闭仍由应用负责。'
-    ],
-    avoidEn: [
-      'The caller expects this factory to create or terminate a SharedWorker; it only adapts a supplied port.',
-      'The goal is host RPC across SharedWorker connections; sharedWorkerPlugin owns the session integration.'
-    ],
-    avoidZh: [
-      '希望工厂创建或终止 SharedWorker；它只适配传入的 port。',
-      '目标是通过 SharedWorker 连接开展 host RPC；应使用 sharedWorkerPlugin 负责会话集成。'
-    ]
-  }),
-  'rpc-plugin-browser:adapters-web-transport:createWebTransportDatagramTransport': guide({
-    purposeEn:
-      'Owns the reader/writer of supplied WebTransport datagram streams as Uint8Array transport I/O. It does not own the WebTransport session, add a codec/framer, or turn unordered unreliable datagrams into a Runtime Peer channel.',
-    purposeZh:
-      '持有所提供 WebTransport datagram 流的 reader/writer，提供 Uint8Array 传输 I/O。它不持有 WebTransport session，不添加 codec/framer，也不会把无序不可靠 datagram 变成 Runtime Peer 通道。',
-    quickStart:
-      "import {\n  createWebTransportDatagramTransport,\n  type IWebTransportDatagrams\n} from '@migaia/rpc-plugin-browser/adapters/web-transport'\n\n/** Pass the datagrams from a ready native session; this operation consumes their writer. */\nexport async function sendDatagram(datagrams: IWebTransportDatagrams, packet: Uint8Array) {\n  /** The adapter owns these stream locks, while the caller still owns the native session. */\n  const transport = createWebTransportDatagramTransport(datagrams)\n  try {\n    await transport.send(packet)\n  } finally {\n    await transport.close?.()\n  }\n}\n// After all application stream work, the WebTransport session owner closes its session.",
-    useEn: [
-      'A custom datagram protocol already supplies its own byte encoding and loss/order semantics.',
-      'The caller wants one owner to cancel/join the native reader and close/release the writer during teardown.'
-    ],
-    useZh: [
-      '自定义 datagram 协议已经定义字节编码以及丢包、乱序语义。',
-      '需要单一所有者在清理时取消并等待原生 reader，同时关闭并释放 writer。'
-    ],
-    avoidEn: [
-      'The application requires the reliable ordered channel expected by Runtime Peer; datagrams do not satisfy that contract.',
-      'A stream already has an independent reader/writer, or the caller expects this adapter to close the entire WebTransport session.'
-    ],
-    avoidZh: [
-      '应用需要 Runtime Peer 要求的可靠有序通道；datagram 不满足该契约。',
-      '流已经存在独立 reader/writer，或希望适配器关闭整个 WebTransport session。'
-    ]
-  }),
-  'rpc-plugin-browser:adapters-web-worker:createWebWorkerTransport': guide({
-    purposeEn:
-      'Wraps a real Worker-like EventTarget as raw message transport without creating or terminating it. Native error/messageerror events use onTransportError; optional peer/capability metadata is deployment data, not authentication.',
-    purposeZh:
-      '把真实 Worker 类 EventTarget 包装为原始消息传输，不创建或终止 Worker。原生 error/messageerror 经 onTransportError 通知；可选 peer/capability 元数据只是部署资料，不是认证。',
-    quickStart:
-      "import { createWebWorkerTransport } from '@migaia/rpc-plugin-browser/adapters/web-worker'\n\n/** Attach to an existing dedicated Worker whose script handles this message shape. */\nexport function attachWorker(worker: Worker) {\n  /** Native Worker ownership remains with the caller. */\n  const transport = createWebWorkerTransport(worker)\n  /** Receive native structured-clone messages without claiming an RPC handshake. */\n  const stop = transport.subscribe(({ data }) => console.log(data))\n  /** Script/clone failures are separate from ordinary message payloads. */\n  const stopErrors = transport.onTransportError?.((error) => console.error(error))\n  transport.send({ type: 'status' })\n  return async () => {\n    stop()\n    stopErrors?.()\n    await transport.close?.()\n  }\n}\n// After detaching, the Worker owner may call worker.terminate().",
-    useEn: [
-      'A custom protocol already owns a dedicated Worker or compatible EventTarget message port.',
-      'Native script or structured-clone failures must be observed separately from received message payloads.'
-    ],
-    useZh: [
-      '自定义协议已经持有 dedicated Worker 或兼容 EventTarget 的消息 port。',
-      '需要将原生脚本或结构化克隆失败与收到的普通消息载荷分开处理。'
-    ],
-    avoidEn: [
-      'The application wants the complete host/Worker connection; use webWorkerPlugin.',
-      'Copied peerId/capabilities metadata is being treated as proof of a negotiated or authenticated peer.'
-    ],
-    avoidZh: [
-      '应用要建立完整的 host/Worker 连接；应使用 webWorkerPlugin。',
-      '把复制来的 peerId/capabilities 元数据当作已协商或已认证 peer 的证明。'
-    ]
-  }),
-  'rpc-plugin-browser:adapters-window:createWindowMessageTransport': guide({
-    purposeEn:
-      'Borrows a selected Window target and receiving realm for multiplexed postMessage I/O. Its sourceProof combines exact native source identity and expected origin; raw subscription still leaves admission to its protocol owner.',
-    purposeZh:
-      '借用指定 Window 目标和接收 realm，提供复用的 postMessage I/O。sourceProof 同时校验原生 source 身份与预期 origin；原始订阅仍由协议所有者执行准入。',
-    quickStart:
-      "import { createWindowMessageTransport } from '@migaia/rpc-plugin-browser/adapters/window'\n\n/** Pass an actual iframe.contentWindow or popup plus its exact expected origin. */\nexport function attachWindow(target: Window, targetOrigin: string) {\n  /** This adapter borrows both Windows and never closes either one. */\n  const transport = createWindowMessageTransport({\n    target,\n    receiver: window,\n    targetOrigin\n  })\n  /** Reject unrelated page messages before handing them to this raw protocol. */\n  const stop = transport.subscribe((message) => {\n    if (transport.sourceProof?.(message.source, message.origin)) console.log(message.data)\n  })\n  transport.send({ type: 'status' })\n  return stop\n}",
-    useEn: [
-      'A custom iframe/popup protocol needs an explicit outgoing target and exact origin rule.',
-      'Several native message sources share one receiving Window and admission must preserve source/origin metadata.'
-    ],
-    useZh: [
-      '自定义 iframe/popup 协议需要显式出站目标与精确 origin 规则。',
-      '多个原生消息源共享同一个接收 Window，准入时必须保留 source/origin 元数据。'
-    ],
-    avoidEn: [
-      "A wildcard targetOrigin is used casually; '*' requires explicit allowUnsafeTargetOrigin and never removes source-identity verification.",
-      'Application RPC needs the complete Window session negotiation; use windowPlugin rather than treating raw postMessage as an authenticated call.'
-    ],
-    avoidZh: [
-      "随意使用通配 targetOrigin；'*' 必须显式设置 allowUnsafeTargetOrigin，而且仍要校验 source 身份。",
-      '应用 RPC 需要完整 Window 会话协商；应使用 windowPlugin，不要把原始 postMessage 当成已认证调用。'
-    ]
-  }),
   'rpc-plugin-process:index:isProcessChild': guide({
     purposeEn:
       "Synchronously classifies whether this entry was launched with the library's process bootstrap marker, so a self-spawning entry can choose parent or child work. It remembers an observed marker after discovery consumes it; it does not authenticate the parent.",
@@ -3538,247 +2809,7 @@ const rpcNativeAuthorGuides = {
       '把返回值用于认证或授予来源权限；真实 bootstrap 和握手准入仍然不可省略。'
     ]
   }),
-  'rpc-plugin-process:adapters-bun-spawn:createBunProcessLauncher': guide({
-    purposeEn:
-      "Creates a reusable Bun launcher over Bun's Node-compatible process streams. Construction is cold; each shell-free launch uses an explicit environment allowlist and drains selected output. Direct callers own termination until actual exit.",
-    purposeZh:
-      '基于 Bun 的 Node 兼容进程流创建可复用 launcher。构造不启动进程；每次无 shell 启动都使用显式环境白名单，并持续读取选定输出。直接调用方须持有进程直到实际退出。',
-    quickStart:
-      "import process from 'node:process'\nimport { createBunProcessLauncher } from '@migaia/rpc-plugin-process/adapters/bun-spawn'\n\n/** Run this module under Bun so process.execPath names the Bun executable. */\nconst launcher = createBunProcessLauncher()\n/** A finite child demonstrates raw launch without installing an RPC bootstrap. */\nconst child = await launcher.launch({\n  command: process.execPath,\n  args: ['-e', 'console.log(\"child ready\")'],\n  env: { inherit: [], set: {} },\n  stdio: { stdin: 'ignore', stdout: 'drain', stderr: 'drain' }\n}, {\n  signal: new AbortController().signal,\n  output(stream, chunk) { console.log(stream, new TextDecoder().decode(chunk)) }\n})\nconsole.log(await child.exited) // Includes completion of launcher-owned output drains.",
-    useEn: [
-      'A supervision integration running on Bun needs the existing raw launcher and its backpressured native streams.',
-      'An explicit shell-free process specification must control which environment variables enter the child.'
-    ],
-    useZh: [
-      '运行在 Bun 的监督集成需要已有原始 launcher 及其带背压的原生流。',
-      '需要通过显式、无 shell 的进程规格控制哪些环境变量进入子进程。'
-    ],
-    avoidEn: [
-      'The goal is application RPC spawn/restart; processPlugin owns bootstrap, supervision and host session assembly.',
-      'The deployment requires guaranteed whole-process-tree termination; this launcher does not advertise that guarantee.'
-    ],
-    avoidZh: [
-      '目标是应用 RPC 的启动和重启；processPlugin 已负责 bootstrap、监督与 host 会话组装。',
-      '部署要求保证终止整棵进程树；此 launcher 不声明该保证。'
-    ]
-  }),
-  'rpc-plugin-process:adapters-deno-command:createDenoProcessLauncher': guide({
-    purposeEn:
-      'Creates a cold Deno.Command launcher with explicit environment inheritance and early output draining. Native launch requires Deno and applicable run/env permissions; only stdin bootstrap is supported, and whole-tree termination is unsupported.',
-    purposeZh:
-      '创建冷启动的 Deno.Command launcher，显式继承环境并从启动初期持续读取输出。原生启动要求 Deno 及相应 run/env 权限；只支持 stdin bootstrap，不支持整棵进程树终止保证。',
-    quickStart:
-      "import { createDenoProcessLauncher } from '@migaia/rpc-plugin-process/adapters/deno-command'\n\n/** Invoke under Deno with run permission for the supplied Deno executable. */\nexport async function runDeno(executable: string) {\n  /** Factory construction does not create a child. */\n  const launcher = createDenoProcessLauncher()\n  /** This finite child needs no bootstrap or independently owned channel. */\n  const child = await launcher.launch({\n    command: executable,\n    args: ['eval', 'console.log(\"child ready\")'],\n    env: { inherit: [], set: {} },\n    stdio: { stdin: 'ignore', stdout: 'drain', stderr: 'drain' }\n  }, {\n    signal: new AbortController().signal,\n    output(stream, chunk) { console.log(stream, new TextDecoder().decode(chunk)) }\n  })\n  return await child.exited\n}",
-    useEn: [
-      'A Deno-native supervision integration needs raw Deno.Command launch and actual exit observation.',
-      'The child environment and output drain policy must be explicit before process creation.'
-    ],
-    useZh: [
-      'Deno 原生监督集成需要直接启动 Deno.Command，并观察实际退出。',
-      '必须在创建进程前明确子进程环境和输出读取策略。'
-    ],
-    avoidEn: [
-      'The program runs outside Deno or cannot grant the native permissions needed for its command/environment.',
-      'A dedicated-fd bootstrap or guaranteed whole-tree termination is required; these are not implemented by this launcher.'
-    ],
-    avoidZh: [
-      '程序不在 Deno 中运行，或不能授予命令、环境所需的原生权限。',
-      '需要专用 fd bootstrap 或整棵进程树终止保证；此 launcher 没有实现这些能力。'
-    ]
-  }),
-  'rpc-plugin-process:adapters-deno-command:openProcessStdioChannel': guide({
-    purposeEn:
-      "Opens the current Deno process's standard streams and optionally consumes the first stdin bootstrap frame using the decoder retained for handshake. The caller owns the returned byte channel and must not acquire competing stream readers/writers.",
-    purposeZh:
-      '打开当前 Deno 进程的标准流，并可通过握手将继续使用的同一个 decoder 读取首个 stdin bootstrap 帧。返回的字节通道归调用方，不能再为这些流申请竞争的 reader/writer。',
-    quickStart:
-      "import { openProcessStdioChannel } from '@migaia/rpc-plugin-process/adapters/deno-command'\n\n/** Use only in a Deno child whose stdin/stdout are reserved for this byte protocol. */\nexport async function receiveStdio(receive: (chunk: Uint8Array) => void) {\n  /** No bootstrap prefix is expected by this custom protocol. */\n  const { channel } = await openProcessStdioChannel({ bootstrap: 'none' })\n  /** Chunk boundaries remain stream chunks, not complete protocol messages. */\n  const stop = channel.onData(receive)\n  return async () => {\n    stop()\n    await channel.close()\n  }\n}\n// Do not write diagnostic text to protocol stdout; use stderr.",
-    useEn: [
-      'A custom child-side byte protocol explicitly owns Deno stdin/stdout.',
-      'A real launcher writes a stdin bootstrap prefix that must be consumed once before the same decoder continues into handshake.'
-    ],
-    useZh: [
-      '自定义子端字节协议明确独占 Deno 的 stdin/stdout。',
-      '真实 launcher 写入 stdin bootstrap 前缀，需要只消费一次，并由同一 decoder 继续握手。'
-    ],
-    avoidEn: [
-      'The application already uses processPlugin({connectToParent:true}); opening stdio again would compete with its owner.',
-      "The protocol requires bootstrap:'fd'; Deno's adapter rejects that selection, and omitting bootstrapTimeoutMs installs no deadline."
-    ],
-    avoidZh: [
-      '应用已经使用 processPlugin({connectToParent:true})；再次打开 stdio 会与现有所有者竞争。',
-      "协议需要 bootstrap:'fd'；Deno 适配器会拒绝该选择，而省略 bootstrapTimeoutMs 不会自动添加期限。"
-    ]
-  }),
-  'rpc-plugin-process:adapters-deno-socket:dialProcessByteChannel': guide({
-    purposeEn:
-      "Dials a local TCP/Unix address through Deno's Node-compatible socket implementation and owns only the resulting local socket. The operation does not authenticate a peer, retry, or install a dial timeout; named pipes are unsupported.",
-    purposeZh:
-      '通过 Deno 的 Node 兼容 socket 实现连接本地 TCP/Unix 地址，仅持有得到的本地 socket。此操作不认证 peer、不重试，也不添加拨号超时；不支持 Windows named pipe。',
-    quickStart:
-      "import { dialProcessByteChannel } from '@migaia/rpc-plugin-process/adapters/deno-socket'\n\n/** Invoke under Deno with network permission for the already-listening local service. */\nexport async function sendLocalBytes(address: string, bytes: Uint8Array) {\n  /** address is an absolute Unix path or numeric loopback TCP URL with an explicit port. */\n  const channel = await dialProcessByteChannel({ address })\n  try {\n    await channel.write(bytes)\n  } finally {\n    await channel.close()\n  }\n}\n// The remote service owns framing/authentication; this example writes only raw bytes.",
-    useEn: [
-      'A Deno custom protocol needs one connection to a known Unix socket or numeric loopback TCP service.',
-      'An existing owner will supply framing, handshake, cancellation policy and reconnection above raw socket I/O.'
-    ],
-    useZh: [
-      'Deno 自定义协议需要连接已知 Unix socket 或数字回环 TCP 服务。',
-      '现有上层所有者将负责原始 socket I/O 之上的分帧、握手、取消策略和重连。'
-    ],
-    avoidEn: [
-      'The address is remote/nonlocal, or a Windows named pipe is required; validation rejects those inputs.',
-      'The caller expects an authenticated RPC session or automatic reconnect; use processPlugin({connect:{...}}).'
-    ],
-    avoidZh: [
-      '地址是远端、非本地地址，或需要 Windows named pipe；这些输入会被校验拒绝。',
-      '希望获得认证后的 RPC 会话或自动重连；应使用 processPlugin({connect:{...}})。'
-    ]
-  }),
-  'rpc-plugin-process:adapters-electron-utility-process:createElectronUtilityProcessLauncher':
-    guide({
-      purposeEn:
-        'Creates a lazy Electron main-process utility launcher. Launch requires app readiness, ignored stdin and no secret bootstrap. Its handle exposes whole-message I/O; closing that channel does not terminate the native utility process.',
-      purposeZh:
-        '创建延迟加载的 Electron 主进程 utility launcher。启动要求 app ready、忽略 stdin 且无秘密 bootstrap。handle 暴露整消息 I/O；关闭该 channel 不会终止原生 utility process。',
-      quickStart:
-        "import {\n  createElectronUtilityProcessLauncher,\n  type IElectronProcessHandle\n} from '@migaia/rpc-plugin-process/adapters/electron-utility-process'\n\n/** Call from Electron main after app.whenReady(); modulePath is a real utility module. */\nexport async function withUtilityProcess(\n  modulePath: string,\n  use: (channel: IElectronProcessHandle['channel']) => Promise<void>\n) {\n  /** The optional Electron peer is resolved only when launch is invoked. */\n  const launcher = createElectronUtilityProcessLauncher()\n  /** Direct launch makes this function responsible for native termination and actual exit. */\n  const child = await launcher.launch({\n    command: modulePath,\n    args: [],\n    env: { inherit: [], set: {} },\n    stdio: { stdin: 'ignore', stdout: 'drain', stderr: 'drain' }\n  }, {\n    signal: new AbortController().signal,\n    output(stream, chunk) { console.log(stream, new TextDecoder().decode(chunk)) }\n  })\n  try {\n    await use(child.channel)\n  } finally {\n    try {\n      await child.channel.close()\n    } finally {\n      child.terminate('force')\n      await child.exited\n    }\n  }\n}",
-      useEn: [
-        'An Electron main-process supervision integration needs utilityProcess.fork and its native whole-message channel.',
-        'The application already has an app-ready boundary and can keep channel release distinct from native termination.'
-      ],
-      useZh: [
-        'Electron 主进程监督集成需要 utilityProcess.fork 及其原生整消息通道。',
-        '应用已经有 app-ready 边界，并能区分 channel 释放与原生进程终止。'
-      ],
-      avoidEn: [
-        'The caller runs in a renderer or before app readiness; launch rejects unsupported ownership/environment.',
-        'The launch requires stdin or secret bootstrap, or assumes an advertised guarantee of whole-tree termination.'
-      ],
-      avoidZh: [
-        '调用方位于 renderer 或 app 尚未 ready；启动会拒绝不支持的所有权或环境。',
-        '启动需要 stdin、秘密 bootstrap，或假定 launcher 保证终止整棵进程树。'
-      ]
-    }),
-  'rpc-plugin-process:adapters-node-child-process:createAdapterChildStdio': guide({
-    purposeEn:
-      'Adapts the actual stdout/stdin pipes of an existing Node child into an ordered byte channel with native write backpressure. Channel close destroys those two pipes; it does not kill or reap the child process.',
-    purposeZh:
-      '把已有 Node 子进程真实的 stdout/stdin 管道适配为带原生写入背压的有序字节通道。channel.close 销毁这两根管道，不负责 kill 或等待子进程退出。',
-    quickStart:
-      "import {\n  createAdapterChildStdio,\n  type IAdapterChildStdio\n} from '@migaia/rpc-plugin-process/adapters/node-child-process'\n\n/** Pass a real child created with piped stdin/stdout; its process owner still supervises exit. */\nexport async function writeChildBytes(child: IAdapterChildStdio, bytes: Uint8Array) {\n  /** Incoming bytes are child.stdout; outgoing bytes go to child.stdin. */\n  const channel = createAdapterChildStdio(child)\n  try {\n    await channel.write(bytes)\n  } finally {\n    await channel.close()\n  }\n}\n// The native child owner separately terminates/waits for that child when required.",
-    useEn: [
-      'An external process owner already spawned a child with independent piped stdin/stdout.',
-      'A custom byte protocol needs to preserve Node Writable drain without creating another process or RPC endpoint.'
-    ],
-    useZh: [
-      '外部进程所有者已经创建具有独立 stdin/stdout 管道的子进程。',
-      '自定义字节协议需要保留 Node Writable drain，同时不创建另一个进程或 RPC endpoint。'
-    ],
-    avoidEn: [
-      'Only a high-level RPC child is needed; processPlugin owns the native launch and raw binding.',
-      'The caller expects close() to terminate/reap the process, or another consumer already reads these same pipes.'
-    ],
-    avoidZh: [
-      '只需要高层 RPC 子进程；processPlugin 已负责原生启动和原始 binding。',
-      '希望 close() 终止并等待进程，或其他消费者已在读取相同管道。'
-    ]
-  }),
-  'rpc-plugin-process:adapters-node-child-process:createAdapterProcessStdio': guide({
-    purposeEn:
-      "Adapts the current process's stdin/stdout as a raw byte channel. Closing pauses stdin and ends stdout without terminating the process; reserving these streams for the protocol is the caller's responsibility.",
-    purposeZh:
-      '把当前进程的 stdin/stdout 适配为原始字节通道。关闭会暂停 stdin 并结束 stdout，不终止进程；调用方须将这些流保留给该协议。',
-    quickStart:
-      "import process from 'node:process'\nimport { createAdapterProcessStdio } from '@migaia/rpc-plugin-process/adapters/node-child-process'\n\n/** Start only in a child entry whose standard streams belong to this byte protocol. */\nexport function startByteEcho() {\n  /** Preserve the current process's native pause/end cleanup behavior. */\n  const channel = createAdapterProcessStdio({\n    stdin: process.stdin,\n    stdout: process.stdout\n  })\n  /** Echo raw chunks; failures are diagnosed on stderr, never protocol stdout. */\n  const stop = channel.onData((chunk) => {\n    void channel.write(chunk).catch((error) => console.error(error))\n  })\n  return async () => {\n    stop()\n    await channel.close()\n  }\n}",
-    useEn: [
-      "A child-side custom byte protocol owns the current process's standard streams.",
-      "Cleanup must retain native pause/end behavior instead of destroying the process's global streams."
-    ],
-    useZh: [
-      '子端自定义字节协议持有当前进程的标准流。',
-      '清理必须保留原生 pause/end 行为，而不是销毁进程的全局流。'
-    ],
-    avoidEn: [
-      'processPlugin already owns connectToParent stdio; attaching another reader/writer would compete with it.',
-      'The program still logs application text to stdout or treats each incoming stream chunk as one complete frame.'
-    ],
-    avoidZh: [
-      'processPlugin 已持有 connectToParent stdio；再添加 reader/writer 会发生竞争。',
-      '程序仍向 stdout 输出应用文本，或把每个流 chunk 当成一个完整帧。'
-    ]
-  }),
-  'rpc-plugin-process:adapters-node-socket:createAdapterSocketByteIO': guide({
-    purposeEn:
-      'Turns an already-connected Node Duplex socket into ordered byte I/O with native backpressure. The returned channel owns local socket destruction, without dialing, authenticating, retrying or terminating the remote process.',
-    purposeZh:
-      '把已连接的 Node Duplex socket 适配为带原生背压的有序字节 I/O。返回的 channel 负责销毁本地 socket，但不拨号、认证、重试或终止远端进程。',
-    quickStart:
-      "import type { Socket } from 'node:net'\nimport { createAdapterSocketByteIO } from '@migaia/rpc-plugin-process/adapters/node-socket'\n\n/** The caller passes a real connected socket and transfers its byte-I/O lifetime here. */\nexport async function writeSocketBytes(socket: Socket, bytes: Uint8Array) {\n  /** No second connection or handshake is created by this wrapper. */\n  const channel = createAdapterSocketByteIO(socket)\n  try {\n    await channel.write(bytes)\n  } finally {\n    await channel.close()\n  }\n}",
-    useEn: [
-      'A native server or connector already owns a connected Duplex socket to hand to a custom protocol.',
-      "Write completion must reflect the existing Node stream's backpressure rather than a second send queue."
-    ],
-    useZh: [
-      '原生 server 或 connector 已持有已连接 Duplex socket，要交给自定义协议。',
-      '写入完成必须反映已有 Node 流的背压，而不是另建发送队列。'
-    ],
-    avoidEn: [
-      'The application needs address validation and dialing; use dialProcessByteChannel instead.',
-      'Other code still owns reads/close on the same socket, or the caller expects this wrapper to authenticate RPC traffic.'
-    ],
-    avoidZh: [
-      '应用还需要地址校验和拨号；应使用 dialProcessByteChannel。',
-      '其他代码仍持有相同 socket 的读取、关闭权，或希望此包装器认证 RPC 流量。'
-    ]
-  }),
-  'rpc-plugin-process:adapters-node-socket:dialProcessByteChannel': guide({
-    purposeEn:
-      'Opens one local Node socket for an absolute Unix path, supported Windows pipe or numeric loopback TCP URL. It returns unauthenticated ordered bytes; dial cancellation is detached after connection and does not become channel lifetime.',
-    purposeZh:
-      '为绝对 Unix 路径、受支持 Windows pipe 或数字回环 TCP URL 打开一个本地 Node socket。返回未经认证的有序字节；连接后会移除拨号取消监听，不把它变成 channel 生命周期。',
-    quickStart:
-      "import { dialProcessByteChannel } from '@migaia/rpc-plugin-process/adapters/node-socket'\n\n/** The local service must already be listening and understand these exact raw bytes. */\nexport async function sendToLocalService(bytes: Uint8Array, signal: AbortSignal) {\n  /** Only numeric loopback TCP with an explicit port is accepted here. */\n  const channel = await dialProcessByteChannel({\n    address: 'tcp://127.0.0.1:9000',\n    signal\n  })\n  try {\n    await channel.write(bytes)\n  } finally {\n    await channel.close()\n  }\n}\n// Aborting signal after dial succeeds does not close the returned channel.",
-    useEn: [
-      'A custom local protocol needs one validated Unix/pipe/loopback connection.',
-      'The caller already owns authentication/framing and wants dial cancellation without imposing a channel-lifetime signal.'
-    ],
-    useZh: [
-      '自定义本地协议需要建立一个经过校验的 Unix/pipe/回环连接。',
-      '调用方已经负责认证、分帧，只需要拨号取消，不想强加 channel 生命周期 signal。'
-    ],
-    avoidEn: [
-      'The address is a hostname or nonlocal TCP endpoint; those inputs are rejected before opening a socket.',
-      'Automatic reconnect, dial timeout or host RPC is required; this primitive supplies none, while processPlugin manages an RPC connection.'
-    ],
-    avoidZh: [
-      '地址是主机名或非本地 TCP 端点；这些输入会在打开 socket 前被拒绝。',
-      '需要自动重连、拨号超时或 host RPC；此原语均不提供，RPC 连接应由 processPlugin 管理。'
-    ]
-  }),
-  'rpc-plugin-process:adapters-windows-job:createWindowsJobProcessLauncher': guide({
-    purposeEn:
-      'Returns an explicitly unsupported Windows Job launcher. Every capability is unsupported and launch rejects PROCESS_CHANNEL_CONNECT_FAILED; creating it loads no native Job implementation and establishes no isolation guarantee.',
-    purposeZh:
-      '返回明确标记为不支持的 Windows Job launcher。所有 capability 均为 unsupported，launch 会拒绝并携带 PROCESS_CHANNEL_CONNECT_FAILED；创建它不会加载原生 Job 实现，也不建立隔离保证。',
-    quickStart:
-      "import { createWindowsJobProcessLauncher } from '@migaia/rpc-plugin-process/adapters/windows-job'\n\n/** Construction is side-effect free: no Job handle or native isolation is created. */\nconst launcher = createWindowsJobProcessLauncher()\nconsole.log(launcher.capabilities) // Every declared capability is 'unsupported'.\n// Do not launch through this placeholder expecting a working Windows Job.\n// Select an implemented native launcher and admit its actual capabilities instead.",
-    useEn: [
-      'A capability-selection UI must accurately display that the Windows Job implementation is unavailable.',
-      'An integration needs the explicit unsupported declaration before choosing an implemented launcher.'
-    ],
-    useZh: [
-      '能力选择界面必须准确显示 Windows Job 实现当前不可用。',
-      '集成需要先读取明确的不支持声明，再选择已实现的 launcher。'
-    ],
-    avoidEn: [
-      'The deployment requires an actual Windows Job process; this factory does not implement it.',
-      'A working launch, native resource limit, permission boundary or process-tree termination is expected.'
-    ],
-    avoidZh: [
-      '部署需要实际 Windows Job 进程；此工厂没有实现它。',
-      '希望它提供有效启动、原生资源限制、权限边界或整棵进程树终止。'
-    ]
-  }),
+
   'rpc-plugin-thread:index:isThreadChild': guide({
     purposeEn:
       'Asynchronously identifies a genuine library-launched native thread child before a self-spawning entry chooses its branch. Node uses actual parentPort/workerData; Bun/Deno workers may first await captured bootstrap. This is discovery, not capability authority.',

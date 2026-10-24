@@ -85,8 +85,6 @@
       "version": "0.0.11",
       "exports": [
         ".",
-        "./binary",
-        "./binary/capture",
         "./binary/inspect",
         "./binary/lazy",
         "./errors",
@@ -94,7 +92,6 @@
         "./framing/jsonrpc",
         "./framing/stream",
         "./framing/v1",
-        "./handshake",
         "./portable",
         "./remote",
         "./runtime",
@@ -113,7 +110,6 @@
       "version": "0.0.11",
       "exports": [
         ".",
-        "./adapters/memory",
         "./features",
         "./features/auth",
         "./features/chunk",
@@ -121,9 +117,7 @@
         "./features/timeout",
         "./features/typegen",
         "./plugin",
-        "./probe",
-        "./stream",
-        "./testing"
+        "./probe"
       ],
       "readmeLocales": ["zh", "en"]
     },
@@ -131,17 +125,7 @@
       "slug": "rpc-plugin-browser",
       "description": "RPC browser owner.",
       "version": "0.0.11",
-      "exports": [
-        ".",
-        "./adapters/broadcast-channel",
-        "./adapters/message-port",
-        "./adapters/rtc-data-channel",
-        "./adapters/service-worker",
-        "./adapters/shared-worker",
-        "./adapters/web-transport",
-        "./adapters/web-worker",
-        "./adapters/window"
-      ],
+      "exports": ["."],
       "readmeLocales": ["zh", "en"]
     },
     {
@@ -155,7 +139,7 @@
       "slug": "rpc-plugin-devtools",
       "description": "RPC probe, service and offline record contracts.",
       "version": "0.0.11",
-      "exports": [".", "./contract", "./hub", "./log"],
+      "exports": ["."],
       "readmeLocales": ["zh", "en"]
     },
     {
@@ -171,14 +155,6 @@
       "version": "0.0.11",
       "exports": [
         ".",
-        "./adapters/bun-socket",
-        "./adapters/bun-spawn",
-        "./adapters/deno-command",
-        "./adapters/deno-socket",
-        "./adapters/electron-utility-process",
-        "./adapters/node-child-process",
-        "./adapters/node-socket",
-        "./adapters/windows-job",
         "./features",
         "./features/flow-control",
         "./features/log",
@@ -190,7 +166,7 @@
       "slug": "rpc-plugin-thread",
       "description": "RPC threads owner.",
       "version": "0.0.11",
-      "exports": [".", "./adapters/electron-main", "./adapters/node"],
+      "exports": ["."],
       "readmeLocales": ["zh", "en"]
     },
     {

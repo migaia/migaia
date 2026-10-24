@@ -466,7 +466,8 @@ test('renders empty and unknown search states without errors', { timeout: 90_000
       assert.equal(await input.inputValue(), '')
       await page.getByRole('listbox').waitFor()
       assert.ok((await page.getByRole('listbox').getByRole('option').count()) > 0)
-      await input.fill('zzunmatchedq7j4vx9k2')
+      /** Exact search prevents Pagefind's prefix fallback from matching an existing single letter. */
+      await input.fill('"zzunmatchedsentinelqjxv"')
       await page
         .getByText('No page matches this query. Try a library or API name.', { exact: true })
         .waitFor()
@@ -1074,8 +1075,8 @@ test('keeps each prose recipe within the 72ch line bound', { timeout: 120_000 },
 
 test(
   'checks every immutable fragment inventory member independently',
-  /** Bound the whole inventory separately while each action retains its existing deadline. */
-  { timeout: 600_000 },
+  /** Retain the original 300000 ms deadline: the inventory shrank from 4508 members to4212. */
+  { timeout: 300_000 },
   async () => {
     const fragmentInventory = Object.freeze(
       ['en', 'zh'].flatMap((locale) =>
@@ -1165,10 +1166,11 @@ test(
               for (const member of route.members) {
                 try {
                   const modulePath = route.module === 'index' ? '' : `/${route.module}`
-                  const path =
-                    member.kind === 'type' || member.kind === 'interface'
-                      ? `/${route.locale}/docs/${route.library}/api${modulePath}`
-                      : `/${route.locale}/docs/${route.library}/api${modulePath}/${apiSymbolPath(member, route.members)}`
+                  /**
+                   * Canonical member pages avoid the legacy type-fragment redirect covered
+                   * separately.
+                   */
+                  const path = `/${route.locale}/docs/${route.library}/api${modulePath}/${apiSymbolPath(member, route.members)}`
                   const fragmentUrl = `${pageUrl(path)}#${member.fragment}`
                   await boundedA29Action(
                     'goto fragment',

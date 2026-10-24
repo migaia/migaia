@@ -8,6 +8,7 @@
 import type { ILibraryReference, IMemberDoc, IOptionCaseDoc, IText, ITypeDoc } from './contract.js'
 import { utilsCases } from './utils-cases.js'
 import { utilsFacadeEnums, utilsFacadeSymbols, utilsFacadeTypes } from './utils-facades.js'
+import { utilsApiGuides } from '../utils-api-guides.js'
 
 /** Builds one bilingual text. */
 const t = (en: string, zh: string): IText => ({ en, zh })
@@ -3048,6 +3049,24 @@ const task = systemScheduler.schedule(() => console.log(systemScheduler.now() - 
         '纪元时钟：`timestamp()` 返回 `Date.now()`。只用于诊断时间戳，不要用于计算截止时间。'
       ),
       example: `log({ at: systemWallClock.timestamp() })`
+    },
+    orderStringKeys: {
+      role: 'operation',
+      purpose: t(
+        'Returns a fresh array in stable UTF-16 code-unit order. Empty strings and shorter prefixes come first; duplicates remain in original relative order and the input is unchanged. Work and memory are O(total UTF-16 units + key count), with no locale or custom-comparator policy.',
+        '按稳定的 UTF-16 码元顺序返回新数组。空字符串和较短前缀在前，重复值保持原相对次序，输入不变。时间与内存开销为 O(总 UTF-16 码元数 + 键数量)，不采用地区或自定义比较器策略。'
+      ),
+      params: {
+        values: t(
+          'Readonly list of strings to order; keys are not normalized, coerced or deduplicated.',
+          '需要排序的只读字符串列表；不进行文本归一化、类型转换或去重。'
+        )
+      },
+      returns: t(
+        'A new string[] preserving every input occurrence, ordered by UTF-16 code units rather than Unicode code points or numeric value.',
+        '返回保留每个输入元素的新 string[]，按 UTF-16 码元排列，不采用 Unicode 码点或数值顺序。'
+      ),
+      example: utilsApiGuides['utils:string:orderStringKeys'].en.quickStart!
     },
     format: {
       role: 'operation',

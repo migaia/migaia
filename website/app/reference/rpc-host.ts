@@ -3,6 +3,10 @@ import { findApiGuide } from '../api-guides.js'
 import { rpcApiGuides } from '../rpc-api-guides.js'
 import type { ILibraryReference, IMemberDoc } from './contract.js'
 
+/** Canonical public SDK example shared by raw transport fields and lifecycle methods. */
+const rpcRawCarrierExample =
+  "import { MessageChannel } from 'node:worker_threads'\nimport { createEventEmitterMessageResource } from '@migaia/rpc-host/plugin'\nimport { RpcCapability } from '@migaia/rpc-contract'\nimport { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\nconst ports = new MessageChannel()\nconst resources = [\n  createEventEmitterMessageResource(ports.port1),\n  createEventEmitterMessageResource(ports.port2)\n]\nconst channels = await Promise.all(resources.map((resource, index) => resource.open({\n  peerId: index === 0 ? 'right' : 'left',\n  scheduler: systemScheduler,\n  offer: [RpcCapability.runtimeApi, RpcCapability.batch],\n  control: rpcMessageCapabilityControl\n})))\nconst [left, right] = channels\nlet received!: () => void\nconst delivered = new Promise<void>((resolve) => { received = resolve })\nconst off = right!.transport.subscribe((message) => {\n  console.log(message.data)\n  received()\n})\ntry {\n  await left!.transport.send('hello')\n  await delivered\n} finally {\n  off()\n  await Promise.all(channels.map((channel) => channel.close?.()))\n  ports.port1.close()\n  ports.port2.close()\n}"
+
 /** Exact SDK option documentation shared only by APIs consuming the same original contracts. */
 const sdkOptions: Readonly<Record<string, IMemberDoc>> = {
   role: {
@@ -348,38 +352,16 @@ export const rpcHostReference: ILibraryReference = {
       example:
         "import assert from 'node:assert/strict'\nimport { createRpcHost } from '@migaia/rpc-host'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    }),\n    timeoutFeature({ ms: 1500 })\n  ]\n})\ntry {\n  const value = await host.request('double', 21)\n  assert.equal(value, 42)\n  console.log(value)\n} finally {\n  await host.close()\n}"
     },
-    stream: {
-      summary: {
-        en: 'Author-facing low-level stream composition tools reusing the canonical outbound/provider owners. Ordinary createRpcHost already provides stream and does not require this manual composition. Use this entry only when implementing a plugin or testing that lower-level boundary.',
-        zh: '面向作者的底层流组合工具，复用原出站及提供方所有者。普通宿主已提供流调用，无需手动组合；仅在编写插件或测试该底层边界时使用此入口。'
-      },
-      example:
-        "import assert from 'node:assert/strict'\nimport { createRpcHost } from '@migaia/rpc-host'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    }),\n    timeoutFeature({ ms: 1500 })\n  ]\n})\ntry {\n  const value = await host.request('double', 21)\n  assert.equal(value, 42)\n  console.log(value)\n} finally {\n  await host.close()\n}"
-    },
-    testing: {
-      summary: {
-        en: 'Dedicated same-process testing entry. createPeerPair builds two actual canonical assemblies over the original memory carrier and infers remote methods from the opposite provide object. Close both handles. It cannot prove native ownership transfer or worker/process isolation.',
-        zh: '同进程专用测试入口，双端测试助手经原内存载体创建两个实际规范装配，并从对端提供方法推导类型。使用后关闭双方，不能据此证明原生所有权转移或进程线程隔离。'
-      },
-      example:
-        "import { createPeerPair } from '@migaia/rpc-host/testing'\nconst pair = await createPeerPair({ a: { provide: {} }, b: { provide: { echo: (text: string) => text } } })\ntry { console.log(await pair.a.request('echo', 'hello')) }\nfinally { await pair.a.close(); await pair.b.close() }"
-    },
+
     probe: {
       summary: {
         en: 'Observe original logical/carrier stages with defineProbe. Views are reused, so snapshot before retaining one. Install through defineFeaturePlugin; bounded collection and queries belong to rpc-plugin-devtools.',
         zh: '通过 `defineProbe` 观察原逻辑及载体阶段。视图会复用，保存前先取快照，再通过 `defineFeaturePlugin` 安装；有界采集和查询由观察插件负责。'
       },
       example:
-        "import { defineProbe, snapshotProbeEvent } from '@migaia/rpc-host/probe'\nimport { defineFeaturePlugin } from '@migaia/rpc-host/plugin'\n\nexport const observation = defineFeaturePlugin({\n  name: 'application-observer',\n  probe: defineProbe({\n    stages: ['message', 'peer'],\n    emit: (view) => console.log(snapshotProbeEvent(view))\n  })\n})"
+        "import { defineProbe } from '@migaia/rpc-host/probe'\nimport { defineFeaturePlugin } from '@migaia/rpc-host/plugin'\n\nexport const observation = defineFeaturePlugin({\n  name: 'application-observer',\n  probe: defineProbe({\n    stages: ['message', 'peer'],\n    emit: (view) => console.log(Object.freeze({ ...view }))\n  })\n})"
     },
-    'adapters/memory': {
-      summary: {
-        en: 'Author and testing memory carrier primitive. createMemoryTransportPair returns borrowed transport sides for a raw deployment or the dedicated testing assembly. Values keep shared references and delivery is queued; this does not create ready business hosts or prove structured-clone transfer.',
-        zh: '作者及测试使用的内存载体原语，返回供原始部署或专用测试装配借入的两侧载体。值保留共享引用并排队交付，不创建可调用业务宿主，也不能证明结构化克隆转移。'
-      },
-      example:
-        "import { createMemoryTransportPair } from '@migaia/rpc-host/adapters/memory'\nconst [left, right] = createMemoryTransportPair()\nconst off = right.subscribe((message) => console.log(message))\nleft.send('hello')\nawait Promise.resolve()\noff()\nleft.close()"
-    },
+
     plugin: {
       summary: {
         en: 'Author SDK for genuine transport/feature definitions and cold raw deployments. Submit original channels, listener receipts, or managed bindings rather than complete callable objects. Native first-frame holders establish child identity before endpoint construction.',
@@ -494,14 +476,7 @@ export const rpcHostReference: ILibraryReference = {
       },
       example: 'console.log(RpcTransportTopology)'
     },
-    RpcEndpointStatus: {
-      role: 'constant',
-      purpose: {
-        en: 'Endpoint admission status carried by actual transport diagnostics. The stable values below select actual contract behavior; declarations alone grant no capability.',
-        zh: '实际传输对象诊断携带的端点准入状态。以下稳定取值选择实际契约行为；单独声明这些值不会赋予能力。'
-      },
-      example: 'console.log(RpcEndpointStatus)'
-    },
+
     RpcOperation: {
       role: 'constant',
       purpose: {
@@ -765,8 +740,8 @@ export const rpcHostReference: ILibraryReference = {
         zh: '返回带有界截断标记的 `IRpcSerializedError`，不存在共享上次结果状态。'
       },
       example: {
-        en: "import { serializeRpcError, deserializeRpcError } from '@migaia/rpc-host'\n\nconst original = new RangeError('limit exceeded')\nObject.defineProperties(original, { source: { value: 'example' }, code: { value: 'LIMIT' } })\nconst primary = new TypeError('request failed', { cause: original })\nObject.defineProperties(primary, { source: { value: 'example' }, code: { value: 'REQUEST' } })\nconst reports: unknown[] = []\nconst wire = serializeRpcError(primary, { report: (failure) => { reports.push(failure) } })\nconst restored = deserializeRpcError(wire)\nconsole.log(restored instanceof TypeError, restored.cause instanceof RangeError)\nconsole.log(restored.stack === primary.stack, (restored.cause as Error).stack === original.stack)\nconsole.log((restored as Error & { code: string }).code,\n  (restored.cause as Error & { code: string }).code, reports.length)",
-        zh: "import { serializeRpcError, deserializeRpcError } from '@migaia/rpc-host'\n\nconst original = new RangeError('超过限制')\nObject.defineProperties(original, { source: { value: 'example' }, code: { value: 'LIMIT' } })\nconst primary = new TypeError('请求失败', { cause: original })\nObject.defineProperties(primary, { source: { value: 'example' }, code: { value: 'REQUEST' } })\nconst reports: unknown[] = []\nconst wire = serializeRpcError(primary, { report: (failure) => { reports.push(failure) } })\nconst restored = deserializeRpcError(wire)\nconsole.log(restored instanceof TypeError, restored.cause instanceof RangeError)\nconsole.log(restored.stack === primary.stack, (restored.cause as Error).stack === original.stack)\nconsole.log((restored as Error & { code: string }).code,\n  (restored.cause as Error & { code: string }).code, reports.length)"
+        en: "import { serializeRpcError, deserializeRpcError } from '@migaia/rpc-host/plugin'\n\nconst original = new RangeError('limit exceeded')\nObject.defineProperties(original, { source: { value: 'example' }, code: { value: 'LIMIT' } })\nconst primary = new TypeError('request failed', { cause: original })\nObject.defineProperties(primary, { source: { value: 'example' }, code: { value: 'REQUEST' } })\nconst reports: unknown[] = []\nconst wire = serializeRpcError(primary, { report: (failure) => { reports.push(failure) } })\nconst restored = deserializeRpcError(wire)\nconsole.log(restored instanceof TypeError, restored.cause instanceof RangeError)\nconsole.log(restored.stack === primary.stack, (restored.cause as Error).stack === original.stack)\nconsole.log((restored as Error & { code: string }).code,\n  (restored.cause as Error & { code: string }).code, reports.length)",
+        zh: "import { serializeRpcError, deserializeRpcError } from '@migaia/rpc-host/plugin'\n\nconst original = new RangeError('超过限制')\nObject.defineProperties(original, { source: { value: 'example' }, code: { value: 'LIMIT' } })\nconst primary = new TypeError('请求失败', { cause: original })\nObject.defineProperties(primary, { source: { value: 'example' }, code: { value: 'REQUEST' } })\nconst reports: unknown[] = []\nconst wire = serializeRpcError(primary, { report: (failure) => { reports.push(failure) } })\nconst restored = deserializeRpcError(wire)\nconsole.log(restored instanceof TypeError, restored.cause instanceof RangeError)\nconsole.log(restored.stack === primary.stack, (restored.cause as Error).stack === original.stack)\nconsole.log((restored as Error & { code: string }).code,\n  (restored.cause as Error & { code: string }).code, reports.length)"
       },
       exampleIntro: {
         en: 'A remote operation fails with a TypeError caused by a RangeError. The receiver needs both semantic codes and the original stacks to understand which operation failed and why.\n\nSending only error.message drops the cause tree, native classes and stacks. Creating a fresh local error from that text assigns a receiving-side stack that hides the original failure location.\n\nserializeRpcError projects a bounded coded tree, and deserializeRpcError validates it before restoring native classes. Supply the required report callback to retain any fields that cannot be read or normalized.',
@@ -787,8 +762,8 @@ export const rpcHostReference: ILibraryReference = {
             zh: '远端操作因范围错误而抛出类型错误，接收方需要两层语义码和原始堆栈，才能辨认失败操作及根因。\n\n只发送错误消息会丢掉原因树、原生类型与堆栈，用该文字在本地重建错误，又会生成接收端堆栈并掩盖原始失败位置。\n\n`serializeRpcError` 投影有界带码树，`deserializeRpcError` 校验后恢复原生类型，须提供 `report` 回调以保留无法读取或规范化字段的失败。'
           },
           example: {
-            en: "import { serializeRpcError, deserializeRpcError } from '@migaia/rpc-host'\n\nconst original = new RangeError('limit exceeded')\nObject.defineProperties(original, { source: { value: 'example' }, code: { value: 'LIMIT' } })\nconst primary = new TypeError('request failed', { cause: original })\nObject.defineProperties(primary, { source: { value: 'example' }, code: { value: 'REQUEST' } })\nconst reports: unknown[] = []\nconst wire = serializeRpcError(primary, { report: (failure) => { reports.push(failure) } })\nconst restored = deserializeRpcError(wire)\nconsole.log(restored instanceof TypeError, restored.cause instanceof RangeError)\nconsole.log(restored.stack === primary.stack, (restored.cause as Error).stack === original.stack)\nconsole.log((restored as Error & { code: string }).code,\n  (restored.cause as Error & { code: string }).code, reports.length)",
-            zh: "import { serializeRpcError, deserializeRpcError } from '@migaia/rpc-host'\n\nconst original = new RangeError('超过限制')\nObject.defineProperties(original, { source: { value: 'example' }, code: { value: 'LIMIT' } })\nconst primary = new TypeError('请求失败', { cause: original })\nObject.defineProperties(primary, { source: { value: 'example' }, code: { value: 'REQUEST' } })\nconst reports: unknown[] = []\nconst wire = serializeRpcError(primary, { report: (failure) => { reports.push(failure) } })\nconst restored = deserializeRpcError(wire)\nconsole.log(restored instanceof TypeError, restored.cause instanceof RangeError)\nconsole.log(restored.stack === primary.stack, (restored.cause as Error).stack === original.stack)\nconsole.log((restored as Error & { code: string }).code,\n  (restored.cause as Error & { code: string }).code, reports.length)"
+            en: "import { serializeRpcError, deserializeRpcError } from '@migaia/rpc-host/plugin'\n\nconst original = new RangeError('limit exceeded')\nObject.defineProperties(original, { source: { value: 'example' }, code: { value: 'LIMIT' } })\nconst primary = new TypeError('request failed', { cause: original })\nObject.defineProperties(primary, { source: { value: 'example' }, code: { value: 'REQUEST' } })\nconst reports: unknown[] = []\nconst wire = serializeRpcError(primary, { report: (failure) => { reports.push(failure) } })\nconst restored = deserializeRpcError(wire)\nconsole.log(restored instanceof TypeError, restored.cause instanceof RangeError)\nconsole.log(restored.stack === primary.stack, (restored.cause as Error).stack === original.stack)\nconsole.log((restored as Error & { code: string }).code,\n  (restored.cause as Error & { code: string }).code, reports.length)",
+            zh: "import { serializeRpcError, deserializeRpcError } from '@migaia/rpc-host/plugin'\n\nconst original = new RangeError('超过限制')\nObject.defineProperties(original, { source: { value: 'example' }, code: { value: 'LIMIT' } })\nconst primary = new TypeError('请求失败', { cause: original })\nObject.defineProperties(primary, { source: { value: 'example' }, code: { value: 'REQUEST' } })\nconst reports: unknown[] = []\nconst wire = serializeRpcError(primary, { report: (failure) => { reports.push(failure) } })\nconst restored = deserializeRpcError(wire)\nconsole.log(restored instanceof TypeError, restored.cause instanceof RangeError)\nconsole.log(restored.stack === primary.stack, (restored.cause as Error).stack === original.stack)\nconsole.log((restored as Error & { code: string }).code,\n  (restored.cause as Error & { code: string }).code, reports.length)"
           },
           result: {
             en: 'Prints `true true`, `true true`, then `REQUEST LIMIT 0`. Both native classes and stack strings survive the round trip, both semantic codes remain present, and no field failures are reported.\n\nRestoration creates new Error objects, so cross-boundary object identity is not preserved. The tree is bounded and can carry cause, AggregateError errors and a truncation marker; no connection or request is executed by these functions.',
@@ -805,8 +780,8 @@ export const rpcHostReference: ILibraryReference = {
             zh: '诊断序列化遇到消息访问器会抛错的错误对象，丢弃整条诊断会同时掩盖原操作与新的字段读取失败。\n\n构建 JSON 对象时直接读取属性，会让访问器异常逃出日志路径，若忽略该异常，又会丢失字段被省略的依据。\n\n`serializeRpcError` 捕获支持字段，并把被省略的读取失败交给 `report`；本例先保存错误堆栈，再设置会抛错的消息访问器，收集报告记录供检查。'
           },
           example: {
-            en: "import { serializeRpcError } from '@migaia/rpc-host'\nimport type { IRpcWireErrorFailure } from '@migaia/rpc-contract/errors'\n\nconst original = new TypeError('message access failed')\nconst failure = new Error('unreadable message')\nvoid failure.stack\nObject.defineProperty(failure, 'message', { get: () => { throw original } })\nconst reports: IRpcWireErrorFailure[] = []\nconst wire = serializeRpcError(failure, { report: (entry) => { reports.push(entry) } })\nconsole.log(wire.name, wire.code)\nconsole.log(reports.length, reports[0]?.field, reports[0]?.error === original)",
-            zh: "import { serializeRpcError } from '@migaia/rpc-host'\nimport type { IRpcWireErrorFailure } from '@migaia/rpc-contract/errors'\n\nconst original = new TypeError('消息读取失败')\nconst failure = new Error('不可读消息')\nvoid failure.stack\nObject.defineProperty(failure, 'message', { get: () => { throw original } })\nconst reports: IRpcWireErrorFailure[] = []\nconst wire = serializeRpcError(failure, { report: (entry) => { reports.push(entry) } })\nconsole.log(wire.name, wire.code)\nconsole.log(reports.length, reports[0]?.field, reports[0]?.error === original)"
+            en: "import { serializeRpcError } from '@migaia/rpc-host/plugin'\nimport type { IRpcWireErrorFailure } from '@migaia/rpc-contract/errors'\n\nconst original = new TypeError('message access failed')\nconst failure = new Error('unreadable message')\nvoid failure.stack\nObject.defineProperty(failure, 'message', { get: () => { throw original } })\nconst reports: IRpcWireErrorFailure[] = []\nconst wire = serializeRpcError(failure, { report: (entry) => { reports.push(entry) } })\nconsole.log(wire.name, wire.code)\nconsole.log(reports.length, reports[0]?.field, reports[0]?.error === original)",
+            zh: "import { serializeRpcError } from '@migaia/rpc-host/plugin'\nimport type { IRpcWireErrorFailure } from '@migaia/rpc-contract/errors'\n\nconst original = new TypeError('消息读取失败')\nconst failure = new Error('不可读消息')\nvoid failure.stack\nObject.defineProperty(failure, 'message', { get: () => { throw original } })\nconst reports: IRpcWireErrorFailure[] = []\nconst wire = serializeRpcError(failure, { report: (entry) => { reports.push(entry) } })\nconsole.log(wire.name, wire.code)\nconsole.log(reports.length, reports[0]?.field, reports[0]?.error === original)"
           },
           result: {
             en: 'Prints `Error UNKNOWN` and `1 message true`. A wire error is still returned, and the report identifies the unreadable message field with the exact original TypeError.\n\nreport is required and receives pointer, field and the original failure synchronously. These records are local diagnostic evidence, not extra wire fields. Untagged errors use the unknown source/code fallback; unreadable fields follow the bounded serializer policy.',
@@ -850,7 +825,7 @@ export const rpcHostReference: ILibraryReference = {
         zh: '返回恢复的原生错误树；异常输入在恢复前抛出线上错误非法错误。'
       },
       example:
-        "import { serializeRpcError, deserializeRpcError } from '@migaia/rpc-host'\nconst original = new Error('Application failure')\nconst wire = serializeRpcError(original, { report: (error) => console.error(error) })\nconst restored = deserializeRpcError(wire)\nconsole.log(restored.message)",
+        "import { serializeRpcError, deserializeRpcError } from '@migaia/rpc-host/plugin'\nconst original = new Error('Application failure')\nconst wire = serializeRpcError(original, { report: (error) => console.error(error) })\nconst restored = deserializeRpcError(wire)\nconsole.log(restored.message)",
       optionDocs: {
         unknownFields: {
           summary: {
@@ -876,7 +851,7 @@ export const rpcHostReference: ILibraryReference = {
             zh: '需要严格接收错误结构时用 reject，它也是默认值。仅允许丢弃新增字段时用 ignore。观察回调不选择或改变策略。'
           },
           example:
-            "import { deserializeRpcError } from '@migaia/rpc-host'\n\nconst failure = deserializeRpcError(receivedError, { unknownFields: 'ignore' })\nshowConnectionError(failure.message)"
+            "import { deserializeRpcError } from '@migaia/rpc-host/plugin'\n\nconst failure = deserializeRpcError(receivedError, { unknownFields: 'ignore' })\nshowConnectionError(failure.message)"
         },
         onUnknownField: {
           summary: {
@@ -892,145 +867,11 @@ export const rpcHostReference: ILibraryReference = {
             zh: '使用 unknownFields ignore 接收新版本对端错误时，用它记录丢弃字段。省略时没有观察者；默认 reject 策略仍拒绝未知字段。'
           },
           example:
-            "import { deserializeRpcError } from '@migaia/rpc-host'\n\nconst failure = deserializeRpcError(receivedError, {\n  unknownFields: 'ignore',\n  onUnknownField: (pointer, field) => reportDroppedErrorField(pointer, field)\n})\nshowConnectionError(failure.message)"
+            "import { deserializeRpcError } from '@migaia/rpc-host/plugin'\n\nconst failure = deserializeRpcError(receivedError, {\n  unknownFields: 'ignore',\n  onUnknownField: (pointer, field) => reportDroppedErrorField(pointer, field)\n})\nshowConnectionError(failure.message)"
         }
       }
     },
-    createCanonicalChunkFeature: {
-      role: 'enhancer',
-      purpose: {
-        en: 'Creates the original canonical chunk attachment token; allocation is deferred until the endpoint preparation scope owns it.',
-        zh: '创建原规范分片附件令牌，分配推迟到端点准备作用域取得所有权。'
-      },
-      params: {},
-      returns: {
-        en: 'Genuine native IRpcFeature token; endpoint composition owns installation, rollback and final disposal.',
-        zh: '返回真实原生功能令牌，端点组合拥有安装、回滚及最终释放。'
-      },
-      example:
-        "import assert from 'node:assert/strict'\nimport { createRpcHost } from '@migaia/rpc-host'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    }),\n    timeoutFeature({ ms: 1500 })\n  ]\n})\ntry {\n  const value = await host.request('double', 21)\n  assert.equal(value, 42)\n  console.log(value)\n} finally {\n  await host.close()\n}"
-    },
-    createStreamFeature: {
-      role: 'enhancer',
-      purpose: {
-        en: 'Creates optional streaming execution over the exact original outbound/provider owners and optional actual negotiated capability port.',
-        zh: '在精确原出站及提供方所有者和可选实际协商能力端口上创建流执行。'
-      },
-      params: {
-        outboundCapability: {
-          en: 'Exact original outbound token used by the matching provider token.',
-          zh: '匹配提供方令牌使用的精确原出站令牌。'
-        },
-        providerCapability: {
-          en: 'Exact createProviderFeature token depending on that same outbound owner.',
-          zh: '依赖相同出站所有者的精确提供方功能令牌。'
-        }
-      },
-      optionDocs: {
-        capability: {
-          summary: {
-            en: 'Actual IRpcStreamCapabilityPort owned by the accepted connection; supports(peerId) synchronously returns actual negotiated stream availability.',
-            zh: '已接受连接拥有的实际流能力端口，同步支持查询返回实际协商流可用性。'
-          },
-          default: {
-            en: 'Absent: this original legacy stream composition is not restricted by an injected negotiation port.',
-            zh: '默认原传统流组合不受注入协商端口限制。'
-          }
-        }
-      },
-      returns: {
-        en: 'Genuine native IRpcFeature token; endpoint composition owns installation, rollback and final disposal.',
-        zh: '返回真实原生功能令牌，端点组合拥有安装、回滚及最终释放。'
-      },
-      example:
-        "import assert from 'node:assert/strict'\nimport { createRpcHost } from '@migaia/rpc-host'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    }),\n    timeoutFeature({ ms: 1500 })\n  ]\n})\ntry {\n  const value = await host.request('double', 21)\n  assert.equal(value, 42)\n  console.log(value)\n} finally {\n  await host.close()\n}",
-      optionCases: [
-        {
-          title: {
-            en: 'Advertise the channel’s stream agreement',
-            zh: '声明通道约定的流能力'
-          },
-          problem: {
-            en: 'An export link has already agreed its stream limits. Install that exact capability so streaming uses the carrier’s supported modes and limits.',
-            zh: '导出链路已约定流限制。安装该能力，让流操作使用载体支持的模式与限制。'
-          },
-          example:
-            "import { createStreamFeature } from '@migaia/rpc-host/stream'\n\nconst streams = createStreamFeature(outbound, provider, { capability: agreedStreamCapability })",
-          result: {
-            en: 'The stream feature follows the capability supplied by the real channel agreement.',
-            zh: '流功能遵守真实通道约定提供的能力。'
-          },
-          covers: ['capability']
-        },
-        {
-          title: {
-            en: 'Keep a scalar-only link scalar',
-            zh: '保持标量链路的能力边界'
-          },
-          problem: {
-            en: 'A legacy price service supports only scalar replies. Do not invent stream support in the wrapper; pass its unavailable capability so unsupported stream calls are refused.',
-            zh: '旧价格服务只支持标量答复。包装层不应虚构流支持；传入不可用能力，让不受支持的流调用被拒绝。'
-          },
-          example:
-            "import { createStreamFeature } from '@migaia/rpc-host/stream'\n\nconst streams = createStreamFeature(outbound, provider, {\n  capability: { supports: () => false }\n})",
-          result: {
-            en: 'Unsupported stream work is refused instead of being sent through a scalar-only carrier.',
-            zh: '不受支持的流任务会被拒绝，而非发往只支持标量的载体。'
-          },
-          covers: ['capability']
-        }
-      ]
-    },
-    createPeerPair: {
-      role: 'factory',
-      purpose: {
-        en: 'Constructs two genuine typed runtime peers over the reference memory carrier. Portable binary is restored inline; explicit transfer is unsupported and fails before detach. Failed pair construction closes successful peers and preserves the original failure.',
-        zh: '在参考内存传输对象上构造两个真实类型运行对端，可移植二进制以内联恢复，显式转移在分离前拒绝，构造失败关闭已成功对端并保留原始失败。'
-      },
-      options: 'IPeerPairOptions',
-      returns: {
-        en: 'Readonly {a,b} of IRuntimeTypedPeer; each side exposes the other provide type. Close both original peers when finished.',
-        zh: '返回含两端类型运行对端的只读对象，各端公开另一端提供类型，用完须关闭两个原对端。'
-      },
-      example:
-        "import { createPeerPair } from '@migaia/rpc-host/testing'\nconst pair = await createPeerPair({ a: { provide: {} }, b: { provide: { echo: (text: string) => text } } })\ntry { console.log(await pair.a.request('echo', 'hello')) }\nfinally { await pair.a.close(); await pair.b.close() }",
-      optionCases: [
-        {
-          title: {
-            en: 'Call a local pricing service',
-            zh: '调用进程内的价格服务'
-          },
-          problem: {
-            en: 'Two application modules need request semantics without a native worker. Register the pricing function on one peer and call it from the other; close both peers when their owner leaves.',
-            zh: '两个应用模块需要请求语义，却不需要原生线程。在一端登记价格函数，再从另一端调用；所有者退出时关闭两端。'
-          },
-          example:
-            "import { createPeerPair } from '@migaia/rpc-host/testing'\n\nconst pair = await createPeerPair({\n  a: { provide: {} },\n  b: { provide: { prices: () => fetchPrices() } }\n})\ntry {\n  renderPrices(await pair.a.request('prices'))\n} finally {\n  await pair.a.close()\n  await pair.b.close()\n}",
-          result: {
-            en: 'The caller receives the pricing function’s result through the local RPC pair.',
-            zh: '调用方通过进程内 RPC 通道取得价格函数的结果。'
-          },
-          covers: ['a', 'b']
-        },
-        {
-          title: {
-            en: 'Share local diagnostics and timing',
-            zh: '共用本地诊断与时钟'
-          },
-          problem: {
-            en: 'An application owns both peers and already has a monotonic scheduler and monitoring sink. Pass them to the pair so local RPC work follows the application’s timing and reporting policy.',
-            zh: '应用同时拥有两端，并已有单调调度器和监控接收器。将它们传给通道对，使本地 RPC 使用应用的计时与上报策略。'
-          },
-          example:
-            "import { createPeerPair } from '@migaia/rpc-host/testing'\n\nconst pair = await createPeerPair({\n  scheduler: applicationScheduler,\n  report: (error) => reportToMonitoring(error),\n  a: { provide: {} },\n  b: { provide: { prices: () => fetchPrices() } }\n})",
-          result: {
-            en: 'Both peers use the selected scheduler and route background failures to monitoring.',
-            zh: '两端共用所选调度器，并把后台失败交给监控。'
-          },
-          covers: ['scheduler', 'report']
-        }
-      ]
-    },
+
     RpcProbeStage: {
       role: 'constant',
       purpose: {
@@ -1132,8 +973,8 @@ export const rpcHostReference: ILibraryReference = {
     defineProbe: {
       role: 'factory',
       purpose: {
-        en: 'Compiles a validated standalone probe, or attaches the five reserved fields to an extensible host and freezes that same host. It emits nothing until installed with probePlugin.',
-        zh: '编译已校验独立探针，或向可扩展宿主附加五个保留字段并冻结同一宿主；搭配 `probePlugin` 安装后才产生观察。'
+        en: 'Compiles a validated standalone probe, or attaches the five reserved fields to an extensible host and freezes that same host. It emits nothing until supplied through the Host probe option.',
+        zh: '编译已校验独立探针，或向可扩展宿主附加五个保留字段并冻结同一宿主；交给 Host 的 probe 选项后才产生观察。'
       },
       params: {
         definition: {
@@ -1153,44 +994,7 @@ export const rpcHostReference: ILibraryReference = {
       example:
         "import assert from 'node:assert/strict'\nimport { createRpcHost } from '@migaia/rpc-host'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    }),\n    timeoutFeature({ ms: 1500 })\n  ]\n})\ntry {\n  const value = await host.request('double', 21)\n  assert.equal(value, 42)\n  console.log(value)\n} finally {\n  await host.close()\n}"
     },
-    probePlugin: {
-      role: 'enhancer',
-      purpose: {
-        en: 'Installs genuine defineProbe handles in one endpoint-owned emitter; subscriptions cannot enable unavailable physical stages, and endpoint disposal releases the emitter.',
-        zh: '把真实探针句柄安装到一个端点拥有的发射器，订阅不能启用不可用物理阶段，端点释放时释放发射器。'
-      },
-      params: {
-        probes: {
-          en: 'Actual handles returned by defineProbe, passed as variadic arguments rather than copied structural objects.',
-          zh: '由探针定义工厂返回的实际句柄，以可变实参数量传入，不传复制的结构对象。'
-        }
-      },
-      returns: {
-        en: 'IRpcPlugin definition for the endpoint middleware tuple.',
-        zh: '返回用于端点中间件元组的插件定义。'
-      },
-      example:
-        "import assert from 'node:assert/strict'\nimport { createRpcHost } from '@migaia/rpc-host'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    }),\n    timeoutFeature({ ms: 1500 })\n  ]\n})\ntry {\n  const value = await host.request('double', 21)\n  assert.equal(value, 42)\n  console.log(value)\n} finally {\n  await host.close()\n}"
-    },
-    snapshotProbeEvent: {
-      role: 'operation',
-      purpose: {
-        en: 'Makes a frozen field snapshot while a reused event view is valid. Nested content, error and detail retain exact reference ownership and are not cloned.',
-        zh: '在复用事件视图有效时创建冻结字段快照，嵌套内容、错误及细节仍保留原引用所有权，不执行克隆。'
-      },
-      params: {
-        view: {
-          en: 'Current view passed synchronously to the installed emit callback.',
-          zh: '已安装发射回调同步传入的当前视图。'
-        }
-      },
-      returns: {
-        en: 'Readonly IRpcProbeEventView whose top-level fields no longer change on the next emit.',
-        zh: '返回只读观察视图，下一次发射不会改变其顶层字段。'
-      },
-      example:
-        "import assert from 'node:assert/strict'\nimport { createRpcHost } from '@migaia/rpc-host'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    }),\n    timeoutFeature({ ms: 1500 })\n  ]\n})\ntry {\n  const value = await host.request('double', 21)\n  assert.equal(value, 42)\n  console.log(value)\n} finally {\n  await host.close()\n}"
-    },
+
     readProbeStages: {
       role: 'operation',
       purpose: {
@@ -1404,56 +1208,7 @@ export const rpcHostReference: ILibraryReference = {
         }
       ]
     },
-    createMemoryTransportPair: {
-      role: 'factory',
-      purpose: {
-        en: 'One end of the original queued memory pair; it shares the same values without structured cloning and closing either end closes both.',
-        zh: '内存载体对的一端；消息排队交付且不做结构化克隆，关闭任一端都会关闭两端。'
-      },
-      options: 'IMemoryTransportOptions',
-      returns: {
-        en: 'Readonly pair of borrowed, exclusive Memory transports; caller owns final pair close. No native transfer is performed.',
-        zh: '返回只读的内存载体对，拓扑为 `exclusive`、所有权为 `borrowed`；最终由调用方关闭，不执行原生对象转移。'
-      },
-      example:
-        "import { createMemoryTransportPair } from '@migaia/rpc-host/adapters/memory'\nconst [left, right] = createMemoryTransportPair()\nconst off = right.subscribe((message) => console.log(message.data))\nleft.send('hello')\nawait Promise.resolve()\noff()\nleft.close()",
-      optionCases: [
-        {
-          title: {
-            en: 'Schedule local notifications with the application',
-            zh: '用应用调度器发送本地通知'
-          },
-          problem: {
-            en: 'An editor routes local document notifications through the same scheduler as its other deferred work. Supply that scheduler when creating the memory pair and let the document owner close it.',
-            zh: '编辑器希望本地文档通知与其他延迟任务共用调度器。创建内存通道对时传入应用调度器，再由文档所有者负责关闭。'
-          },
-          example:
-            "import { createMemoryTransportPair } from '@migaia/rpc-host/adapters/memory'\n\nconst [sender, receiver] = createMemoryTransportPair({\n  scheduler: applicationScheduler\n})\nconst stop = receiver.subscribe(({ data }) => applyDocumentChange(data))\nsender.send({ documentId: 'draft-1', state: 'saved' })\nonDocumentClosed(() => {\n  stop()\n  sender.close()\n})",
-          result: {
-            en: 'Document changes arrive through the selected scheduler; closing the document releases the pair.',
-            zh: '文档变更由所选调度器交付；关闭文档时释放通道对。'
-          },
-          covers: ['scheduler']
-        },
-        {
-          title: {
-            en: 'Retire pending local notifications on close',
-            zh: '关闭时结束待交付的本地通知'
-          },
-          problem: {
-            en: 'A preview can close before its queued update arrives. Close its memory pair as part of preview cleanup so the abandoned preview does not receive later queued updates.',
-            zh: '预览可能在排队更新交付前关闭。清理预览时关闭内存通道对，已退出的预览便不会再收到这些待交付更新。'
-          },
-          example:
-            "import { createMemoryTransportPair } from '@migaia/rpc-host/adapters/memory'\n\nconst [sender, receiver] = createMemoryTransportPair({\n  scheduler: applicationScheduler\n})\nreceiver.subscribe(({ data }) => renderPreview(data))\nsender.send(latestDocument)\nonPreviewClosed(() => sender.close())",
-          result: {
-            en: 'Closing the pair removes subscriptions and drops messages that have not been delivered.',
-            zh: '关闭通道对会移除订阅，并丢弃尚未交付的消息。'
-          },
-          covers: ['scheduler']
-        }
-      ]
-    },
+
     createBrowserMessagePortTransport: {
       role: 'enhancer',
       purpose: {
@@ -2412,7 +2167,7 @@ export const rpcHostReference: ILibraryReference = {
         zh: '返回精确登记的令牌或定义，此时不打开原生连接。'
       },
       example:
-        "import { defineProbe, snapshotProbeEvent } from '@migaia/rpc-host/probe'\nimport { defineFeaturePlugin } from '@migaia/rpc-host/plugin'\n\nexport const observation = defineFeaturePlugin({\n  name: 'application-observer',\n  probe: defineProbe({\n    stages: ['message', 'peer'],\n    emit: (view) => console.log(snapshotProbeEvent(view))\n  })\n})"
+        "import { defineProbe } from '@migaia/rpc-host/probe'\nimport { defineFeaturePlugin } from '@migaia/rpc-host/plugin'\n\nexport const observation = defineFeaturePlugin({\n  name: 'application-observer',\n  probe: defineProbe({\n    stages: ['message', 'peer'],\n    emit: (view) => console.log(Object.freeze({ ...view }))\n  })\n})"
     },
     createAdapterDeployment: {
       role: 'factory',
@@ -2656,48 +2411,7 @@ export const rpcHostReference: ILibraryReference = {
         zh: '返回原取消原因或规范回退值，仅借用信号，读取不会取消它。'
       }
     },
-    validateAdapterPeerTimeout: {
-      example: {
-        en: rpcApiGuides['rpc-host:plugin:validateAdapterPeerTimeout'].en.quickStart!,
-        zh: rpcApiGuides['rpc-host:plugin:validateAdapterPeerTimeout'].zh.quickStart!
-      },
-      role: 'operation',
-      purpose: {
-        en: 'Validate the local default timeout before discovery, listener installation or native launch.',
-        zh: '在发现、安装监听或原生启动前校验本地默认期限，返回有效毫秒值，非法输入在获取资源前抛错。'
-      },
-      params: {
-        options: {
-          en: 'Configuration carrying optional defaultTimeoutMs. An explicit value must be positive and finite.',
-          zh: '含可选默认期限的配置，显式值必须为正有限数。'
-        }
-      },
-      returns: {
-        en: 'Validated default milliseconds, using the canonical default when omitted; invalid input throws before resource acquisition.',
-        zh: '返回验证后的默认毫秒，省略时用原默认，非法输入在获取资源前抛错。'
-      }
-    },
-    validateAdapterPeerMethods: {
-      example: {
-        en: rpcApiGuides['rpc-host:plugin:validateAdapterPeerMethods'].en.quickStart!,
-        zh: rpcApiGuides['rpc-host:plugin:validateAdapterPeerMethods'].zh.quickStart!
-      },
-      role: 'operation',
-      purpose: {
-        en: 'Compile actual own local provider descriptors before installing bootstrap listeners; preserve original getter/trap failure causes.',
-        zh: '在安装启动监听前编译实际本地自有提供方描述，保留原访问器或代理失败原因。'
-      },
-      params: {
-        args: {
-          en: 'Original input provider object (default empty), optional advanced contract and optional retainIndex callback receiving the compiled map.',
-          zh: '原提供方对象，默认空对象；可附高级契约及接收编译映射的保留索引回调。'
-        }
-      },
-      returns: {
-        en: 'Readonly canonical method entries. Compilation grants no remote channel capability and invokes no provider business method.',
-        zh: '返回只读规范方法项，编译不授予远端通道能力，也不调用业务方法。'
-      }
-    },
+
     createAdapterConfigurationError: {
       example: {
         en: rpcApiGuides['rpc-host:plugin:createAdapterConfigurationError'].en.quickStart!,
@@ -2807,39 +2521,7 @@ export const rpcHostReference: ILibraryReference = {
         zh: '返回原包装、当前请求跟踪及排空操作，并登记精确排空身份，替换不会继承旧代工作。'
       }
     },
-    holdAdapterRegistration: {
-      example: {
-        en: rpcApiGuides['rpc-host:plugin:holdAdapterRegistration'].en.quickStart!,
-        zh: rpcApiGuides['rpc-host:plugin:holdAdapterRegistration'].zh.quickStart!
-      },
-      optionDocs: {
-        name: sdkOptions['name']!,
-        contract: sdkOptions['contract']!,
-        host: sdkOptions['host']!,
-        binding: sdkOptions['binding']!,
-        endpointFactory: sdkOptions['endpointFactory']!,
-        report: sdkOptions['report']!,
-        keyFactory: sdkOptions['keyFactory']!,
-        retryPort: sdkOptions['retryPort']!,
-        callDeadlineCapMs: sdkOptions['callDeadlineCapMs']!,
-        callGuard: sdkOptions['callGuard']!
-      },
-      role: 'factory',
-      purpose: {
-        en: 'Retain one original registration across prevalidation and native plugin installation without accepting a prepared holder from the caller.',
-        zh: '跨预验证及原生插件安装保留同一原登记，不接受调用者提交已准备持有器。'
-      },
-      params: {
-        options: {
-          en: 'Original remote plugin configuration containing its real binding and reporter.',
-          zh: '含真实绑定及报告器的原远端插件配置。'
-        }
-      },
-      returns: {
-        en: 'Held prepare/plugin/release operations using the same generation holder; release preserves original close Promise and ordering.',
-        zh: '返回使用同一代次持有器的准备、安装及释放操作，释放保留原关闭承诺及顺序。'
-      }
-    },
+
     createRuntimeByteConnection: {
       example: {
         en: rpcApiGuides['rpc-host:plugin:createRuntimeByteConnection'].en.quickStart!,
@@ -4412,7 +4094,7 @@ export const rpcHostReference: ILibraryReference = {
             zh: '需要保密时配置 `encrypt` 与 `decrypt`，需要完整性时配置 `sign` 与 `verify`；`encodedType` 声明真实受保护表示。'
           },
           example:
-            "import { authentication } from '@migaia/rpc-host'\n\nconst privateOrders = authentication({\n  encrypt: (value) => encryptOrderMessage(value),\n  decrypt: (value) => decryptOrderMessage(value),\n  sign: (value) => signOrderMessage(value),\n  verify: (value) => verifyOrderMessage(value),\n  encodedType: 'string'\n})"
+            "import type { IRpcAuthenticationConfig } from '@migaia/rpc-host'\n\nconst privateOrders: IRpcAuthenticationConfig = {\n  encrypt: (value) => encryptOrderMessage(value),\n  decrypt: (value) => decryptOrderMessage(value),\n  sign: (value) => signOrderMessage(value),\n  verify: (value) => verifyOrderMessage(value),\n  encodedType: 'string'\n}\n// Pass this configuration through the Host authentication option."
         },
         decrypt: {
           summary: {
@@ -4442,7 +4124,7 @@ export const rpcHostReference: ILibraryReference = {
             zh: '需要保密时配置 `encrypt` 与 `decrypt`，需要完整性时配置 `sign` 与 `verify`；`encodedType` 声明真实受保护表示。'
           },
           example:
-            "import { authentication } from '@migaia/rpc-host'\n\nconst privateOrders = authentication({\n  encrypt: (value) => encryptOrderMessage(value),\n  decrypt: (value) => decryptOrderMessage(value),\n  sign: (value) => signOrderMessage(value),\n  verify: (value) => verifyOrderMessage(value),\n  encodedType: 'string'\n})"
+            "import type { IRpcAuthenticationConfig } from '@migaia/rpc-host'\n\nconst privateOrders: IRpcAuthenticationConfig = {\n  encrypt: (value) => encryptOrderMessage(value),\n  decrypt: (value) => decryptOrderMessage(value),\n  sign: (value) => signOrderMessage(value),\n  verify: (value) => verifyOrderMessage(value),\n  encodedType: 'string'\n}\n// Pass this configuration through the Host authentication option."
         },
         sign: {
           summary: {
@@ -4472,7 +4154,7 @@ export const rpcHostReference: ILibraryReference = {
             zh: '需要保密时配置 `encrypt` 与 `decrypt`，需要完整性时配置 `sign` 与 `verify`；`encodedType` 声明真实受保护表示。'
           },
           example:
-            "import { authentication } from '@migaia/rpc-host'\n\nconst signedMessages = authentication({\n  sign: (value) => signCheckoutMessage(value),\n  verify: (value) => verifyCheckoutMessage(value),\n  encodedType: 'string'\n})"
+            "import type { IRpcAuthenticationConfig } from '@migaia/rpc-host'\n\nconst signedMessages: IRpcAuthenticationConfig = {\n  sign: (value) => signCheckoutMessage(value),\n  verify: (value) => verifyCheckoutMessage(value),\n  encodedType: 'string'\n}\n// Pass this configuration through the Host authentication option."
         },
         verify: {
           summary: {
@@ -4502,7 +4184,7 @@ export const rpcHostReference: ILibraryReference = {
             zh: '需要保密时配置 `encrypt` 与 `decrypt`，需要完整性时配置 `sign` 与 `verify`；`encodedType` 声明真实受保护表示。'
           },
           example:
-            "import { authentication } from '@migaia/rpc-host'\n\nconst signedMessages = authentication({\n  sign: (value) => signCheckoutMessage(value),\n  verify: (value) => verifyCheckoutMessage(value),\n  encodedType: 'string'\n})"
+            "import type { IRpcAuthenticationConfig } from '@migaia/rpc-host'\n\nconst signedMessages: IRpcAuthenticationConfig = {\n  sign: (value) => signCheckoutMessage(value),\n  verify: (value) => verifyCheckoutMessage(value),\n  encodedType: 'string'\n}\n// Pass this configuration through the Host authentication option."
         },
         encodedType: {
           summary: {
@@ -4532,7 +4214,7 @@ export const rpcHostReference: ILibraryReference = {
             zh: '需要保密时配置 `encrypt` 与 `decrypt`，需要完整性时配置 `sign` 与 `verify`；`encodedType` 声明真实受保护表示。'
           },
           example:
-            "import { authentication } from '@migaia/rpc-host'\n\nconst signedMessages = authentication({\n  sign: (value) => signCheckoutMessage(value),\n  verify: (value) => verifyCheckoutMessage(value),\n  encodedType: 'string'\n})"
+            "import type { IRpcAuthenticationConfig } from '@migaia/rpc-host'\n\nconst signedMessages: IRpcAuthenticationConfig = {\n  sign: (value) => signCheckoutMessage(value),\n  verify: (value) => verifyCheckoutMessage(value),\n  encodedType: 'string'\n}\n// Pass this configuration through the Host authentication option."
         }
       },
       scenarios: [
@@ -4554,7 +4236,7 @@ export const rpcHostReference: ILibraryReference = {
             zh: '结算消息需要完整性保护。在两端配置应用的签名与验证函数；它们必须编码并恢复 Core 交给它们的完整值，encodedType 声明保护后的表示形式。'
           },
           example:
-            "import { authentication } from '@migaia/rpc-host'\n\nconst signedMessages = authentication({\n  sign: (value) => signCheckoutMessage(value),\n  verify: (value) => verifyCheckoutMessage(value),\n  encodedType: 'string'\n})",
+            "import type { IRpcAuthenticationConfig } from '@migaia/rpc-host'\n\nconst signedMessages: IRpcAuthenticationConfig = {\n  sign: (value) => signCheckoutMessage(value),\n  verify: (value) => verifyCheckoutMessage(value),\n  encodedType: 'string'\n}\n// Pass this configuration through the Host authentication option.",
           result: {
             en: 'Both endpoints authenticate signed messages before business handlers receive them.',
             zh: '两端会先验证消息签名，再将消息交给业务处理函数。'
@@ -4571,7 +4253,7 @@ export const rpcHostReference: ILibraryReference = {
             zh: '订单载荷还包含私密信息。给同一签名管线加上应用的加解密函数；出站先加密再签名，入站先验证再解密。'
           },
           example:
-            "import { authentication } from '@migaia/rpc-host'\n\nconst privateOrders = authentication({\n  encrypt: (value) => encryptOrderMessage(value),\n  decrypt: (value) => decryptOrderMessage(value),\n  sign: (value) => signOrderMessage(value),\n  verify: (value) => verifyOrderMessage(value),\n  encodedType: 'string'\n})",
+            "import type { IRpcAuthenticationConfig } from '@migaia/rpc-host'\n\nconst privateOrders: IRpcAuthenticationConfig = {\n  encrypt: (value) => encryptOrderMessage(value),\n  decrypt: (value) => decryptOrderMessage(value),\n  sign: (value) => signOrderMessage(value),\n  verify: (value) => verifyOrderMessage(value),\n  encodedType: 'string'\n}\n// Pass this configuration through the Host authentication option.",
           result: {
             en: 'Order values cross the carrier in the application’s protected representation.',
             zh: '订单值以应用约定的受保护表示经过载体。'
@@ -5765,248 +5447,7 @@ export const rpcHostReference: ILibraryReference = {
       example:
         "import assert from 'node:assert/strict'\nimport { createRpcHost } from '@migaia/rpc-host'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    }),\n    timeoutFeature({ ms: 1500 })\n  ]\n})\ntry {\n  const value = await host.request('double', 21)\n  assert.equal(value, 42)\n  console.log(value)\n} finally {\n  await host.close()\n}"
     },
-    IRpcStreamCapabilityPort: {
-      summary: {
-        en: 'Original connection owner answers whether the actual peer negotiated stream@1; method names cannot grant support.',
-        zh: '由现有连接判断对端是否已协商流协议第一版；仅使用某个方法名不会获得该能力。'
-      },
-      members: {
-        supports: {
-          summary: {
-            en: 'Synchronously checks actual negotiated stream support for a real connected peer.',
-            zh: '同步检查真实连接对端实际协商的流支持。'
-          },
-          params: {
-            peerId: {
-              en: 'Actual peer identifier returned by the original accepted connection owner.',
-              zh: '原已接受连接所有者返回的实际对端标识。'
-            }
-          },
-          returns: {
-            en: 'True only for the actual peer whose accepted agreement includes stream@1.',
-            zh: '只有实际对端认可约定包含流第一版时为真。'
-          },
-          example:
-            "import assert from 'node:assert/strict'\nimport { createRpcHost } from '@migaia/rpc-host'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    }),\n    timeoutFeature({ ms: 1500 })\n  ]\n})\ntry {\n  const value = await host.request('double', 21)\n  assert.equal(value, 42)\n  console.log(value)\n} finally {\n  await host.close()\n}"
-        }
-      },
-      scenarios: [
-        {
-          en: 'Compose actual endpoint or runtime peers while keeping transport and lifecycle ownership with their canonical owners.',
-          zh: '组合实际端点或运行对端，并由规范所有者保持传输对象与生命周期所有权。'
-        }
-      ],
-      example:
-        "import assert from 'node:assert/strict'\nimport { createRpcHost } from '@migaia/rpc-host'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    }),\n    timeoutFeature({ ms: 1500 })\n  ]\n})\ntry {\n  const value = await host.request('double', 21)\n  assert.equal(value, 42)\n  console.log(value)\n} finally {\n  await host.close()\n}"
-    },
-    IRpcStreamRun: {
-      summary: {
-        en: 'Application producer receives original params and { signal, context }; returns an Iterable or AsyncIterable of portable values. Iteration failures become stream failure and cancellation closes the original iterator.',
-        zh: '应用生产者接收原参数及取消信号、调用上下文，返回可移植值同步或异步可迭代对象；迭代失败成为流失败，取消关闭原迭代器。'
-      },
-      members: {},
-      scenarios: [
-        {
-          en: 'Compose actual endpoint or runtime peers while keeping transport and lifecycle ownership with their canonical owners.',
-          zh: '组合实际端点或运行对端，并由规范所有者保持传输对象与生命周期所有权。'
-        }
-      ],
-      example:
-        "import assert from 'node:assert/strict'\nimport { createRpcHost } from '@migaia/rpc-host'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    }),\n    timeoutFeature({ ms: 1500 })\n  ]\n})\ntry {\n  const value = await host.request('double', 21)\n  assert.equal(value, 42)\n  console.log(value)\n} finally {\n  await host.close()\n}"
-    },
-    IRpcStreamRuntime: {
-      summary: {
-        en: 'Optional original stream owner reuses outbound/provider execution and exposes async iteration only to consumers.',
-        zh: '可选原流所有者复用出站及提供方执行，只向消费方公开异步迭代。'
-      },
-      members: {
-        open: {
-          summary: {
-            en: 'Opens one original stream; pair with provide on the receiving stream owner and consume or close the iterator.',
-            zh: '打开一个原始流，须搭配接收流所有者的 `provide`，并消费或关闭迭代器。'
-          },
-          params: {
-            targetId: {
-              en: 'Target base identifier selected by the application in targetIds or returned by endpoint discovery/server-list metadata.',
-              zh: '应用在目标列表中指定，或从端点发现及服务列表元数据取得的目标基础标识。'
-            },
-            method: {
-              en: 'Application method name registered by the receiving endpoint provide or declared in the actual remote contract.',
-              zh: '接收端提供方法登记或实际远端契约声明的应用方法名称。'
-            },
-            params: {
-              en: 'Original application input passed to the actual registered IRpcStreamRun producer.',
-              zh: '传给实际已登记流生产者的原应用输入。'
-            },
-            options: {
-              en: 'Optional explicit local signal and finite nonnegative timeoutMs/false; producer lifetime remains owned by this stream.',
-              zh: '可选显式本地信号及有限非负超时或`false`，生产者生命周期仍由此流拥有。'
-            }
-          },
-          returns: {
-            en: 'AsyncIterableIterator of rpc-contract portable values; next/return/throw preserve original stream lifetime, late physical uncertainty fails STREAM_RESULT_UNKNOWN.',
-            zh: '返回可移植值异步迭代器，其迭代、返回及抛出保留原流生命周期，迟到物理不确定性以流结果未知失败。'
-          },
-          example:
-            "import assert from 'node:assert/strict'\nimport { createRpcHost } from '@migaia/rpc-host'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    }),\n    timeoutFeature({ ms: 1500 })\n  ]\n})\ntry {\n  const value = await host.request('double', 21)\n  assert.equal(value, 42)\n  console.log(value)\n} finally {\n  await host.close()\n}"
-        },
-        provide: {
-          summary: {
-            en: 'Registers one original stream producer; duplicate methods reject PROVIDER_DUPLICATED.',
-            zh: '登记一个原流生产者，重复方法拒绝提供方重复错误。'
-          },
-          params: {
-            method: {
-              en: 'Application method name registered by the receiving endpoint provide or declared in the actual remote contract.',
-              zh: '接收端提供方法登记或实际远端契约声明的应用方法名称。'
-            },
-            run: {
-              en: 'Application callback receives params and {signal,context}, returns Iterable/AsyncIterable of portable values; throws and iterator rejections become contained stream failures.',
-              zh: '应用回调接收参数及信号、上下文，返回可移植值同步或异步迭代对象，抛错及迭代拒绝成为受控流失败。'
-            }
-          },
-          returns: {
-            en: 'Idempotent unregistration removes only this original producer.',
-            zh: '返回幂等注销函数，只移除此原生产者。'
-          },
-          example:
-            "import assert from 'node:assert/strict'\nimport { createRpcHost } from '@migaia/rpc-host'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    }),\n    timeoutFeature({ ms: 1500 })\n  ]\n})\ntry {\n  const value = await host.request('double', 21)\n  assert.equal(value, 42)\n  console.log(value)\n} finally {\n  await host.close()\n}"
-        },
-        dispose: {
-          summary: {
-            en: 'Closes this original stream runtime, cancels its owned active streams and removes its original providers.',
-            zh: '关闭此原流运行时，取消拥有的活动流并移除原提供方。'
-          },
-          params: {},
-          returns: {
-            en: 'Promise joins original stream cleanup; endpoint disposal also owns this same release.',
-            zh: 'Promise 加入原流清理，端点释放也拥有同一释放。'
-          },
-          example:
-            "import assert from 'node:assert/strict'\nimport { createRpcHost } from '@migaia/rpc-host'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    }),\n    timeoutFeature({ ms: 1500 })\n  ]\n})\ntry {\n  const value = await host.request('double', 21)\n  assert.equal(value, 42)\n  console.log(value)\n} finally {\n  await host.close()\n}"
-        }
-      },
-      scenarios: [
-        {
-          en: 'Compose actual endpoint or runtime peers while keeping transport and lifecycle ownership with their canonical owners.',
-          zh: '组合实际端点或运行对端，并由规范所有者保持传输对象与生命周期所有权。'
-        }
-      ],
-      example:
-        "import assert from 'node:assert/strict'\nimport { createRpcHost } from '@migaia/rpc-host'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    }),\n    timeoutFeature({ ms: 1500 })\n  ]\n})\ntry {\n  const value = await host.request('double', 21)\n  assert.equal(value, 42)\n  console.log(value)\n} finally {\n  await host.close()\n}"
-    },
-    IRpcStreamSurface: {
-      summary: {
-        en: 'Selected stream projection uses its own stream key to avoid collisions with scalar provide/dispose.',
-        zh: '所选流投影使用专属流键，避免与标量提供及释放冲突。'
-      },
-      members: {
-        stream: {
-          summary: {
-            en: 'Original IRpcStreamRuntime prepared from the selected stream feature.',
-            zh: '从所选流功能准备的原流运行时。'
-          }
-        }
-      },
-      scenarios: [
-        {
-          en: 'Compose actual endpoint or runtime peers while keeping transport and lifecycle ownership with their canonical owners.',
-          zh: '组合实际端点或运行对端，并由规范所有者保持传输对象与生命周期所有权。'
-        }
-      ],
-      example:
-        "import assert from 'node:assert/strict'\nimport { createRpcHost } from '@migaia/rpc-host'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    }),\n    timeoutFeature({ ms: 1500 })\n  ]\n})\ntry {\n  const value = await host.request('double', 21)\n  assert.equal(value, 42)\n  console.log(value)\n} finally {\n  await host.close()\n}"
-    },
-    IPeerPairOptions: {
-      summary: {
-        en: 'Two real same-process runtime peer sides use the original memory carrier and canonical method/deadline/admission policy; no fake endpoint or scheduler is introduced.',
-        zh: '两个真实同进程运行对端使用原内存传输对象及规范方法、截止和准入策略，不引入伪端点或调度器。'
-      },
-      members: {
-        a: {
-          summary: {
-            en: 'Application first-side provide map plus optional defaultTimeoutMs, providerLimits and contract; provide must be an actual method map.',
-            zh: '应用第一端提供映射及可选默认超时、提供方限制和契约，提供配置须为实际方法映射。'
-          }
-        },
-        b: {
-          summary: {
-            en: 'Application second-side provide map plus optional defaultTimeoutMs, providerLimits and contract; each side compiles its own actual offer.',
-            zh: '应用第二端提供映射及可选默认超时、提供方限制和契约，每端编译自身实际提议。'
-          }
-        },
-        scheduler: {
-          summary: {
-            en: 'Application monotonic IScheduler shared by endpoint deadlines and PluginHost; now must be finite nonnegative milliseconds.',
-            zh: '应用单调调度器由端点截止及插件宿主共用，当前时间须为有限非负毫秒。'
-          },
-          default: {
-            en: 'systemScheduler uses host monotonic time and timers.',
-            zh: '默认使用宿主单调时间和计时器。'
-          }
-        },
-        report: {
-          summary: {
-            en: 'Application synchronous background failure sink receives original unknown errors; synchronous report or fallback throws remain observable through hostRethrowReporter without replacing the original operation result.',
-            zh: '应用同步后台失败接收器接收原未知错误；同步报告或回退抛错仍经规范宿主报告可观察，不替换原逻辑结果。'
-          },
-          default: {
-            en: 'defaultRpcReporter writes the original error to console.error.',
-            zh: '默认上报函数把原错误写入控制台错误输出。'
-          },
-          whenToUse: {
-            en: 'Collect background diagnostics in the application that owns both local peers.',
-            zh: '由同时拥有两端的应用收集后台诊断。'
-          },
-          example:
-            "import { createPeerPair } from '@migaia/rpc-host/testing'\n\nconst pair = await createPeerPair({\n  scheduler: applicationScheduler,\n  report: (error) => reportToMonitoring(error),\n  a: { provide: {} },\n  b: { provide: { prices: () => fetchPrices() } }\n})"
-        }
-      },
-      scenarios: [
-        {
-          en: 'Compose actual endpoint or runtime peers while keeping transport and lifecycle ownership with their canonical owners.',
-          zh: '组合实际端点或运行对端，并由规范所有者保持传输对象与生命周期所有权。'
-        }
-      ],
-      example:
-        "import { createPeerPair } from '@migaia/rpc-host/testing'\nconst pair = await createPeerPair({ a: { provide: {} }, b: { provide: { echo: (text: string) => text } } })\ntry { console.log(await pair.a.request('echo', 'hello')) }\nfinally { await pair.a.close(); await pair.b.close() }",
-      optionCases: [
-        {
-          title: {
-            en: 'Call a local pricing service',
-            zh: '调用进程内的价格服务'
-          },
-          problem: {
-            en: 'Two application modules need request semantics without a native worker. Register the pricing function on one peer and call it from the other; close both peers when their owner leaves.',
-            zh: '两个应用模块需要请求语义，却不需要原生线程。在一端登记价格函数，再从另一端调用；所有者退出时关闭两端。'
-          },
-          example:
-            "import { createPeerPair } from '@migaia/rpc-host/testing'\n\nconst pair = await createPeerPair({\n  a: { provide: {} },\n  b: { provide: { prices: () => fetchPrices() } }\n})\ntry {\n  renderPrices(await pair.a.request('prices'))\n} finally {\n  await pair.a.close()\n  await pair.b.close()\n}",
-          result: {
-            en: 'The caller receives the pricing function’s result through the local RPC pair.',
-            zh: '调用方通过进程内 RPC 通道取得价格函数的结果。'
-          },
-          covers: ['a', 'b']
-        },
-        {
-          title: {
-            en: 'Share local diagnostics and timing',
-            zh: '共用本地诊断与时钟'
-          },
-          problem: {
-            en: 'An application owns both peers and already has a monotonic scheduler and monitoring sink. Pass them to the pair so local RPC work follows the application’s timing and reporting policy.',
-            zh: '应用同时拥有两端，并已有单调调度器和监控接收器。将它们传给通道对，使本地 RPC 使用应用的计时与上报策略。'
-          },
-          example:
-            "import { createPeerPair } from '@migaia/rpc-host/testing'\n\nconst pair = await createPeerPair({\n  scheduler: applicationScheduler,\n  report: (error) => reportToMonitoring(error),\n  a: { provide: {} },\n  b: { provide: { prices: () => fetchPrices() } }\n})",
-          result: {
-            en: 'Both peers use the selected scheduler and route background failures to monitoring.',
-            zh: '两端共用所选调度器，并把后台失败交给监控。'
-          },
-          covers: ['scheduler', 'report']
-        }
-      ]
-    },
+
     IRpcProbeDefinition: {
       summary: {
         en: 'Application definition captured and compiled once; the original callbacks do not become mutable host configuration.',
@@ -6291,8 +5732,8 @@ export const rpcHostReference: ILibraryReference = {
     },
     IRpcProbeEventView: {
       summary: {
-        en: 'Emitter-owned reused record valid only during emit; snapshotProbeEvent makes a frozen shallow field copy.',
-        zh: '发射器拥有并复用的记录，只在回调期间有效，快照函数生成冻结浅字段副本。'
+        en: 'Emitter-owned reused record valid only during emit; copy the required fields inside emit before retaining them; copies are shallow and nested content stays application-owned.',
+        zh: '发射器拥有并复用的记录，只在回调期间有效；在回调内复制需要保留的字段，浅复制不转移嵌套内容的所有权。'
       },
       members: {
         seq: {
@@ -6866,8 +6307,7 @@ export const rpcHostReference: ILibraryReference = {
           zh: '对接已有端口或连接，由 Core 处理 RPC 协议和资源释放。'
         }
       ],
-      example:
-        "import { createMemoryTransportPair } from '@migaia/rpc-host/adapters/memory'\nconst [left, right] = createMemoryTransportPair()\nconst off = right.subscribe((message) => console.log(message.data))\nleft.send('hello')\nawait Promise.resolve()\noff()\nleft.close()",
+      example: rpcRawCarrierExample,
       members: {
         send: {
           summary: {
@@ -6888,8 +6328,7 @@ export const rpcHostReference: ILibraryReference = {
             en: 'Void or Promise<void> from the physical owner; native message-port and Worker send failures retain native Error/DOMException type and stack. Mutable unclassified errors gain Core TRANSPORT in place; foreign semantic identities stay unchanged, and immutable values remain on cause.',
             zh: '返回物理所有者的空值或承诺，原生消息端口及工作者发送失败保留原生错误类型及堆栈；可修改且未分类的错误原位附加核心 `TRANSPORT`，外部语义身份保持不变，不可修改的值保留在原因链。'
           },
-          example:
-            "import { createMemoryTransportPair } from '@migaia/rpc-host/adapters/memory'\nconst [left, right] = createMemoryTransportPair()\nconst off = right.subscribe((message) => console.log(message.data))\nleft.send('hello')\nawait Promise.resolve()\noff()\nleft.close()"
+          example: rpcRawCarrierExample
         },
         subscribe: {
           summary: {
@@ -6906,8 +6345,7 @@ export const rpcHostReference: ILibraryReference = {
             en: 'Idempotent removal of this registration; native cleanup failure may throw and preserve retry ownership.',
             zh: '返回仅取消这次订阅的函数，可重复调用；底层监听移除失败时可能抛错，尚未释放的部分仍可重试。'
           },
-          example:
-            "import { createMemoryTransportPair } from '@migaia/rpc-host/adapters/memory'\nconst [left, right] = createMemoryTransportPair()\nconst off = right.subscribe((message) => console.log(message.data))\nleft.send('hello')\nawait Promise.resolve()\noff()\nleft.close()"
+          example: rpcRawCarrierExample
         },
         close: {
           summary: {
@@ -6919,8 +6357,7 @@ export const rpcHostReference: ILibraryReference = {
             en: 'Void or Promise<void>; actual native cleanup failures remain observable. Consult the adapter-specific close policy.',
             zh: '返回 `void` 或 `Promise<void>`，清理失败仍会报告；底层资源的关闭规则见具体适配器。'
           },
-          example:
-            "import { createMemoryTransportPair } from '@migaia/rpc-host/adapters/memory'\nconst [left, right] = createMemoryTransportPair()\nconst off = right.subscribe((message) => console.log(message.data))\nleft.send('hello')\nawait Promise.resolve()\noff()\nleft.close()"
+          example: rpcRawCarrierExample
         },
         onTransportError: {
           summary: {
@@ -6937,8 +6374,7 @@ export const rpcHostReference: ILibraryReference = {
             en: 'Removal releases this failure observer only.',
             zh: '返回仅取消这次错误订阅的函数。'
           },
-          example:
-            "import { createMemoryTransportPair } from '@migaia/rpc-host/adapters/memory'\nconst [left, right] = createMemoryTransportPair()\nconst off = right.subscribe((message) => console.log(message.data))\nleft.send('hello')\nawait Promise.resolve()\noff()\nleft.close()"
+          example: rpcRawCarrierExample
         },
         onListenerError: {
           summary: {
@@ -6955,8 +6391,7 @@ export const rpcHostReference: ILibraryReference = {
             en: 'Removal releases this diagnostic observer and may surface collected reporter failures.',
             zh: '返回取消这次诊断订阅的函数，取消时可能报告已收集的上报器错误。'
           },
-          example:
-            "import { createMemoryTransportPair } from '@migaia/rpc-host/adapters/memory'\nconst [left, right] = createMemoryTransportPair()\nconst off = right.subscribe((message) => console.log(message.data))\nleft.send('hello')\nawait Promise.resolve()\noff()\nleft.close()"
+          example: rpcRawCarrierExample
         },
         observe: {
           summary: {
@@ -6973,8 +6408,7 @@ export const rpcHostReference: ILibraryReference = {
             en: 'Disposer retires only this observation generation, including when the same probe was later reinstalled.',
             zh: '返回只移除本次安装的函数；同一个探针后来重新安装时，不会被旧函数误删。'
           },
-          example:
-            "import { createMemoryTransportPair } from '@migaia/rpc-host/adapters/memory'\nconst [left, right] = createMemoryTransportPair()\nconst off = right.subscribe((message) => console.log(message.data))\nleft.send('hello')\nawait Promise.resolve()\noff()\nleft.close()"
+          example: rpcRawCarrierExample
         },
         peerId: {
           summary: {
@@ -7049,8 +6483,7 @@ export const rpcHostReference: ILibraryReference = {
           zh: '对接已有端口或连接，由 Core 处理 RPC 协议和资源释放。'
         }
       ],
-      example:
-        "import { createMemoryTransportPair } from '@migaia/rpc-host/adapters/memory'\nconst [left, right] = createMemoryTransportPair()\nconst off = right.subscribe((message) => console.log(message.data))\nleft.send('hello')\nawait Promise.resolve()\noff()\nleft.close()",
+      example: rpcRawCarrierExample,
       members: {
         transfer: {
           summary: {
@@ -7064,251 +6497,7 @@ export const rpcHostReference: ILibraryReference = {
         }
       }
     },
-    IMemoryTransport: {
-      summary: {
-        en: 'One end of the original queued memory pair; it shares the same values without structured cloning and closing either end closes both.',
-        zh: '内存载体对的一端；消息排队交付且不做结构化克隆，关闭任一端都会关闭两端。'
-      },
-      scenarios: [
-        {
-          en: 'Use the original physical I/O and let Core retain protocol and lifecycle ownership.',
-          zh: '对接已有端口或连接，由 Core 处理 RPC 协议和资源释放。'
-        }
-      ],
-      example:
-        "import { createMemoryTransportPair } from '@migaia/rpc-host/adapters/memory'\nconst [left, right] = createMemoryTransportPair()\nconst off = right.subscribe((message) => console.log(message.data))\nleft.send('hello')\nawait Promise.resolve()\noff()\nleft.close()",
-      members: {
-        send: {
-          summary: {
-            en: 'Sends one actual carrier value; completion means the physical boundary completed, not that a remote provider executed.',
-            zh: '发送一条底层消息；返回或完成承诺只说明发送操作已完成，不说明对端的业务函数已执行。'
-          },
-          params: {
-            message: {
-              en: 'Original complete message value accepted by this actual carrier domain.',
-              zh: '交给底层载体的完整消息值，必须属于该载体支持的类型。'
-            },
-            options: {
-              en: 'Optional IRpcSendOptions supplies original physical transfer references.',
-              zh: '可选的 `IRpcSendOptions`，其中 `transfer` 指定本次发送要转移的对象。'
-            }
-          },
-          returns: {
-            en: 'Void or Promise<void> from the physical owner; native message-port and Worker send failures retain native Error/DOMException type and stack. Mutable unclassified errors gain Core TRANSPORT in place; foreign semantic identities stay unchanged, and immutable values remain on cause.',
-            zh: '返回物理所有者的空值或承诺，原生消息端口及工作者发送失败保留原生错误类型及堆栈；可修改且未分类的错误原位附加核心 `TRANSPORT`，外部语义身份保持不变，不可修改的值保留在原因链。'
-          },
-          example:
-            "import { createMemoryTransportPair } from '@migaia/rpc-host/adapters/memory'\nconst [left, right] = createMemoryTransportPair()\nconst off = right.subscribe((message) => console.log(message.data))\nleft.send('hello')\nawait Promise.resolve()\noff()\nleft.close()"
-        },
-        subscribe: {
-          summary: {
-            en: 'Subscribes to actual inbound messages; the original native registration is detached when its last logical listener leaves.',
-            zh: '订阅收到的消息；最后一个逻辑订阅被移除时，适配器才移除底层事件监听。'
-          },
-          params: {
-            listener: {
-              en: 'Application callback receives a record containing data and optional actual peerId/origin/source; return void. Adapter-owned listener errors use onListenerError.',
-              zh: '回调收到含 `data` 的记录，并可能带有 `peerId`、`origin`、`source`，返回 `void`；回调失败由 `onListenerError` 观察。'
-            }
-          },
-          returns: {
-            en: 'Idempotent removal of this registration; native cleanup failure may throw and preserve retry ownership.',
-            zh: '返回仅取消这次订阅的函数，可重复调用；底层监听移除失败时可能抛错，尚未释放的部分仍可重试。'
-          },
-          example:
-            "import { createMemoryTransportPair } from '@migaia/rpc-host/adapters/memory'\nconst [left, right] = createMemoryTransportPair()\nconst off = right.subscribe((message) => console.log(message.data))\nleft.send('hello')\nawait Promise.resolve()\noff()\nleft.close()"
-        },
-        close: {
-          summary: {
-            en: 'Idempotently closes both original memory ends; queued messages not yet delivered are dropped.',
-            zh: '关闭内存载体对的两端，可重复调用；尚未交付的排队消息会被丢弃。'
-          },
-          params: {},
-          returns: {
-            en: 'Both ends reject later sends and clear existing listeners. Later subscribe calls can still register but receive no delivery; cleanup failures may throw or settle asynchronously.',
-            zh: '两端停止接受发送并清空已有监听；之后仍可登记订阅，但不会再收到消息。清理失败可能同步抛出，也可能通过承诺报告。'
-          },
-          example:
-            "import { createMemoryTransportPair } from '@migaia/rpc-host/adapters/memory'\nconst [left, right] = createMemoryTransportPair()\nconst off = right.subscribe((message) => console.log(message.data))\nleft.send('hello')\nawait Promise.resolve()\noff()\nleft.close()"
-        },
-        onTransportError: {
-          summary: {
-            en: 'Subscribes to original physical/read/terminal failures without treating them as application provider results.',
-            zh: '观察底层读写和连接终止的失败；这些错误与对端业务函数的返回值分开处理。'
-          },
-          params: {
-            listener: {
-              en: 'Application callback receives original unknown error, returns void; secondary failure is retained by the adapter reporter boundary.',
-              zh: '回调接收原始错误并返回 `void`；若回调自身也失败，适配器会保留并报告这次次级失败。'
-            }
-          },
-          returns: {
-            en: 'Removal releases this failure observer only.',
-            zh: '返回仅取消这次错误订阅的函数。'
-          },
-          example:
-            "import { createMemoryTransportPair } from '@migaia/rpc-host/adapters/memory'\nconst [left, right] = createMemoryTransportPair()\nconst off = right.subscribe((message) => console.log(message.data))\nleft.send('hello')\nawait Promise.resolve()\noff()\nleft.close()"
-        },
-        onListenerError: {
-          summary: {
-            en: 'Subscribes to original message-listener or physical-observer callback failures independently of transport failure.',
-            zh: '观察消息监听器或载体探针回调抛出的错误，与底层连接错误分开处理。'
-          },
-          params: {
-            listener: {
-              en: 'Application callback receives original listener error and returns void; its own failure is collected by the original adapter.',
-              zh: '回调收到原始监听错误并返回 `void`；回调自身的失败仍由适配器收集。'
-            }
-          },
-          returns: {
-            en: 'Removal releases this diagnostic observer and may surface collected reporter failures.',
-            zh: '返回取消这次诊断订阅的函数，取消时可能报告已收集的上报器错误。'
-          },
-          example:
-            "import { createMemoryTransportPair } from '@migaia/rpc-host/adapters/memory'\nconst [left, right] = createMemoryTransportPair()\nconst off = right.subscribe((message) => console.log(message.data))\nleft.send('hello')\nawait Promise.resolve()\noff()\nleft.close()"
-        },
-        observe: {
-          summary: {
-            en: 'Installs original physical observation; replacing it retires the preceding observation generation without acquiring lifecycle ownership.',
-            zh: '安装载体探针；替换探针后，旧安装失效，但探针不会接管载体的关闭责任。'
-          },
-          params: {
-            probe: {
-              en: 'Actual IRpcCarrierProbe port supplied by the installed endpoint emitter.',
-              zh: '由端点的观察模块提供的 `IRpcCarrierProbe`，用于接收底层发送与接收观察。'
-            }
-          },
-          returns: {
-            en: 'Disposer retires only this observation generation, including when the same probe was later reinstalled.',
-            zh: '返回只移除本次安装的函数；同一个探针后来重新安装时，不会被旧函数误删。'
-          },
-          example:
-            "import { createMemoryTransportPair } from '@migaia/rpc-host/adapters/memory'\nconst [left, right] = createMemoryTransportPair()\nconst off = right.subscribe((message) => console.log(message.data))\nleft.send('hello')\nawait Promise.resolve()\noff()\nleft.close()"
-        },
-        peerId: {
-          summary: {
-            en: 'Optional original peer identity attributed by the actual adapter; caller labels do not grant verified identity.',
-            zh: '适配器记录的可选对端标识；调用方填写这个标签并不等于对端身份已经验证。'
-          }
-        },
-        origin: {
-          summary: {
-            en: 'Optional actual origin attributed by the adapter, not a caller assertion of trust.',
-            zh: '适配器记录的可选来源域；它是来源信息，不能单独用作信任凭据。'
-          }
-        },
-        platform: {
-          summary: {
-            en: 'Actual carrier platform label for presentation and diagnostics.',
-            zh: '载体的平台标签，用于展示和诊断。'
-          },
-          values: {
-            enum: 'RpcPlatform'
-          }
-        },
-        topology: {
-          summary: {
-            en: 'Actual peer topology supplied by the adapter.',
-            zh: '适配器提供的连接拓扑，说明载体怎样连接对端。'
-          },
-          values: {
-            enum: 'RpcTransportTopology'
-          }
-        },
-        encodedType: {
-          summary: {
-            en: 'Actual accepted carrier encoding domain.',
-            zh: '载体接受的数据表示类型。'
-          },
-          values: {
-            enum: 'RpcTransportEncoding'
-          }
-        },
-        ownership: {
-          summary: {
-            en: 'Actual original physical ownership determining cleanup responsibility.',
-            zh: '底层资源的所有权标记，用来决定谁负责关闭。'
-          },
-          values: {
-            enum: 'RpcTransportOwnership'
-          }
-        },
-        sourceProof: {
-          summary: {
-            en: 'Optional original adapter callback receives native source and optional origin, synchronously returns boolean; labels alone cannot replace this proof.',
-            zh: '可选的来源检查函数，接收原生 `source` 和可选 `origin`，同步返回布尔值；标识标签不能代替这项检查。'
-          }
-        },
-        closed: {
-          summary: {
-            en: 'True only when this adapter can prove no future message delivery; logical detach alone is insufficient.',
-            zh: '只有适配器确认不会再交付消息时才为 `true`；仅移除一层逻辑监听不代表底层已关闭。'
-          }
-        }
-      }
-    },
-    IMemoryTransportOptions: {
-      summary: {
-        en: 'Optional delivery scheduler for the memory carrier only; endpoint deadline clocks are configured separately.',
-        zh: '可选的内存消息交付调度器，只控制这对载体的排队任务；端点的超时时钟另行配置。'
-      },
-      scenarios: [
-        {
-          en: 'Use the original physical I/O and let Core retain protocol and lifecycle ownership.',
-          zh: '对接已有端口或连接，由 Core 处理 RPC 协议和资源释放。'
-        }
-      ],
-      example:
-        "import { createMemoryTransportPair } from '@migaia/rpc-host/adapters/memory'\nconst [left, right] = createMemoryTransportPair()\nconst off = right.subscribe((message) => console.log(message.data))\nleft.send('hello')\nawait Promise.resolve()\noff()\nleft.close()",
-      members: {
-        scheduler: {
-          summary: {
-            en: 'Application IScheduler passed to deferTask for actual queued memory delivery.',
-            zh: '调用方提供的 `IScheduler`，供 `deferTask` 安排这对载体的消息交付。'
-          },
-          default: {
-            en: 'Absent: delivery uses the host microtask queue.',
-            zh: '默认使用宿主微任务队列交付。'
-          }
-        }
-      },
-      optionCases: [
-        {
-          title: {
-            en: 'Schedule local notifications with the application',
-            zh: '用应用调度器发送本地通知'
-          },
-          problem: {
-            en: 'An editor routes local document notifications through the same scheduler as its other deferred work. Supply that scheduler when creating the memory pair and let the document owner close it.',
-            zh: '编辑器希望本地文档通知与其他延迟任务共用调度器。创建内存通道对时传入应用调度器，再由文档所有者负责关闭。'
-          },
-          example:
-            "import { createMemoryTransportPair } from '@migaia/rpc-host/adapters/memory'\n\nconst [sender, receiver] = createMemoryTransportPair({\n  scheduler: applicationScheduler\n})\nconst stop = receiver.subscribe(({ data }) => applyDocumentChange(data))\nsender.send({ documentId: 'draft-1', state: 'saved' })\nonDocumentClosed(() => {\n  stop()\n  sender.close()\n})",
-          result: {
-            en: 'Document changes arrive through the selected scheduler; closing the document releases the pair.',
-            zh: '文档变更由所选调度器交付；关闭文档时释放通道对。'
-          },
-          covers: ['scheduler']
-        },
-        {
-          title: {
-            en: 'Retire pending local notifications on close',
-            zh: '关闭时结束待交付的本地通知'
-          },
-          problem: {
-            en: 'A preview can close before its queued update arrives. Close its memory pair as part of preview cleanup so the abandoned preview does not receive later queued updates.',
-            zh: '预览可能在排队更新交付前关闭。清理预览时关闭内存通道对，已退出的预览便不会再收到这些待交付更新。'
-          },
-          example:
-            "import { createMemoryTransportPair } from '@migaia/rpc-host/adapters/memory'\n\nconst [sender, receiver] = createMemoryTransportPair({\n  scheduler: applicationScheduler\n})\nreceiver.subscribe(({ data }) => renderPreview(data))\nsender.send(latestDocument)\nonPreviewClosed(() => sender.close())",
-          result: {
-            en: 'Closing the pair removes subscriptions and drops messages that have not been delivered.',
-            zh: '关闭通道对会移除订阅，并丢弃尚未交付的消息。'
-          },
-          covers: ['scheduler']
-        }
-      ]
-    },
+
     IBrowserMessagePortLike: {
       summary: {
         en: 'Original browser MessagePort structural surface with explicit start/close and optional raw physical observation.',
@@ -7434,8 +6623,7 @@ export const rpcHostReference: ILibraryReference = {
             en: 'Removal releases this failure observer only.',
             zh: '返回仅取消这次错误订阅的函数。'
           },
-          example:
-            "import { createMemoryTransportPair } from '@migaia/rpc-host/adapters/memory'\nconst [left, right] = createMemoryTransportPair()\nconst off = right.subscribe((message) => console.log(message.data))\nleft.send('hello')\nawait Promise.resolve()\noff()\nleft.close()"
+          example: rpcRawCarrierExample
         },
         observe: {
           summary: {
@@ -7452,8 +6640,7 @@ export const rpcHostReference: ILibraryReference = {
             en: 'Disposer retires only this observation generation, including when the same probe was later reinstalled.',
             zh: '返回只移除本次安装的函数；同一个探针后来重新安装时，不会被旧函数误删。'
           },
-          example:
-            "import { createMemoryTransportPair } from '@migaia/rpc-host/adapters/memory'\nconst [left, right] = createMemoryTransportPair()\nconst off = right.subscribe((message) => console.log(message.data))\nleft.send('hello')\nawait Promise.resolve()\noff()\nleft.close()"
+          example: rpcRawCarrierExample
         }
       }
     },
@@ -7753,8 +6940,7 @@ export const rpcHostReference: ILibraryReference = {
           zh: '对接已有端口或连接，由 Core 处理 RPC 协议和资源释放。'
         }
       ],
-      example:
-        "import { createMemoryTransportPair } from '@migaia/rpc-host/adapters/memory'\nconst [left, right] = createMemoryTransportPair()\nconst off = right.subscribe((message) => console.log(message.data))\nleft.send('hello')\nawait Promise.resolve()\noff()\nleft.close()",
+      example: rpcRawCarrierExample,
       members: {
         send: {
           summary: {
@@ -7775,8 +6961,7 @@ export const rpcHostReference: ILibraryReference = {
             en: 'Void or Promise<void> from the physical owner; native message-port and Worker send failures retain native Error/DOMException type and stack. Mutable unclassified errors gain Core TRANSPORT in place; foreign semantic identities stay unchanged, and immutable values remain on cause.',
             zh: '返回物理所有者的空值或承诺，原生消息端口及工作者发送失败保留原生错误类型及堆栈；可修改且未分类的错误原位附加核心 `TRANSPORT`，外部语义身份保持不变，不可修改的值保留在原因链。'
           },
-          example:
-            "import { createMemoryTransportPair } from '@migaia/rpc-host/adapters/memory'\nconst [left, right] = createMemoryTransportPair()\nconst off = right.subscribe((message) => console.log(message.data))\nleft.send('hello')\nawait Promise.resolve()\noff()\nleft.close()"
+          example: rpcRawCarrierExample
         },
         subscribe: {
           summary: {
@@ -7793,8 +6978,7 @@ export const rpcHostReference: ILibraryReference = {
             en: 'Idempotent removal of this registration; native cleanup failure may throw and preserve retry ownership.',
             zh: '返回仅取消这次订阅的函数，可重复调用；底层监听移除失败时可能抛错，尚未释放的部分仍可重试。'
           },
-          example:
-            "import { createMemoryTransportPair } from '@migaia/rpc-host/adapters/memory'\nconst [left, right] = createMemoryTransportPair()\nconst off = right.subscribe((message) => console.log(message.data))\nleft.send('hello')\nawait Promise.resolve()\noff()\nleft.close()"
+          example: rpcRawCarrierExample
         },
         close: {
           summary: {
@@ -7806,8 +6990,7 @@ export const rpcHostReference: ILibraryReference = {
             en: 'Void or Promise<void>; actual native cleanup failures remain observable. Consult the adapter-specific close policy.',
             zh: '返回 `void` 或 `Promise<void>`，清理失败仍会报告；底层资源的关闭规则见具体适配器。'
           },
-          example:
-            "import { createMemoryTransportPair } from '@migaia/rpc-host/adapters/memory'\nconst [left, right] = createMemoryTransportPair()\nconst off = right.subscribe((message) => console.log(message.data))\nleft.send('hello')\nawait Promise.resolve()\noff()\nleft.close()"
+          example: rpcRawCarrierExample
         },
         onTransportError: {
           summary: {
@@ -7824,8 +7007,7 @@ export const rpcHostReference: ILibraryReference = {
             en: 'Removal releases this failure observer only.',
             zh: '返回仅取消这次错误订阅的函数。'
           },
-          example:
-            "import { createMemoryTransportPair } from '@migaia/rpc-host/adapters/memory'\nconst [left, right] = createMemoryTransportPair()\nconst off = right.subscribe((message) => console.log(message.data))\nleft.send('hello')\nawait Promise.resolve()\noff()\nleft.close()"
+          example: rpcRawCarrierExample
         },
         onListenerError: {
           summary: {
@@ -7842,8 +7024,7 @@ export const rpcHostReference: ILibraryReference = {
             en: 'Removal releases this diagnostic observer and may surface collected reporter failures.',
             zh: '返回取消这次诊断订阅的函数，取消时可能报告已收集的上报器错误。'
           },
-          example:
-            "import { createMemoryTransportPair } from '@migaia/rpc-host/adapters/memory'\nconst [left, right] = createMemoryTransportPair()\nconst off = right.subscribe((message) => console.log(message.data))\nleft.send('hello')\nawait Promise.resolve()\noff()\nleft.close()"
+          example: rpcRawCarrierExample
         },
         observe: {
           summary: {
@@ -7860,8 +7041,7 @@ export const rpcHostReference: ILibraryReference = {
             en: 'Disposer retires only this observation generation, including when the same probe was later reinstalled.',
             zh: '返回只移除本次安装的函数；同一个探针后来重新安装时，不会被旧函数误删。'
           },
-          example:
-            "import { createMemoryTransportPair } from '@migaia/rpc-host/adapters/memory'\nconst [left, right] = createMemoryTransportPair()\nconst off = right.subscribe((message) => console.log(message.data))\nleft.send('hello')\nawait Promise.resolve()\noff()\nleft.close()"
+          example: rpcRawCarrierExample
         },
         peerId: {
           summary: {
@@ -7937,8 +7117,7 @@ export const rpcHostReference: ILibraryReference = {
           zh: '对接已有端口或连接，由 Core 处理 RPC 协议和资源释放。'
         }
       ],
-      example:
-        "import { createMemoryTransportPair } from '@migaia/rpc-host/adapters/memory'\nconst [left, right] = createMemoryTransportPair()\nconst off = right.subscribe((message) => console.log(message.data))\nleft.send('hello')\nawait Promise.resolve()\noff()\nleft.close()",
+      example: rpcRawCarrierExample,
       members: {
         send: {
           summary: {
@@ -7959,8 +7138,7 @@ export const rpcHostReference: ILibraryReference = {
             en: 'Void or Promise<void> from the physical owner; native message-port and Worker send failures retain native Error/DOMException type and stack. Mutable unclassified errors gain Core TRANSPORT in place; foreign semantic identities stay unchanged, and immutable values remain on cause.',
             zh: '返回物理所有者的空值或承诺，原生消息端口及工作者发送失败保留原生错误类型及堆栈；可修改且未分类的错误原位附加核心 `TRANSPORT`，外部语义身份保持不变，不可修改的值保留在原因链。'
           },
-          example:
-            "import { createMemoryTransportPair } from '@migaia/rpc-host/adapters/memory'\nconst [left, right] = createMemoryTransportPair()\nconst off = right.subscribe((message) => console.log(message.data))\nleft.send('hello')\nawait Promise.resolve()\noff()\nleft.close()"
+          example: rpcRawCarrierExample
         },
         subscribe: {
           summary: {
@@ -7977,8 +7155,7 @@ export const rpcHostReference: ILibraryReference = {
             en: 'Idempotent removal of this registration; native cleanup failure may throw and preserve retry ownership.',
             zh: '返回仅取消这次订阅的函数，可重复调用；底层监听移除失败时可能抛错，尚未释放的部分仍可重试。'
           },
-          example:
-            "import { createMemoryTransportPair } from '@migaia/rpc-host/adapters/memory'\nconst [left, right] = createMemoryTransportPair()\nconst off = right.subscribe((message) => console.log(message.data))\nleft.send('hello')\nawait Promise.resolve()\noff()\nleft.close()"
+          example: rpcRawCarrierExample
         },
         close: {
           summary: {
@@ -7990,8 +7167,7 @@ export const rpcHostReference: ILibraryReference = {
             en: 'Void or Promise<void>; actual native cleanup failures remain observable. Consult the adapter-specific close policy.',
             zh: '返回 `void` 或 `Promise<void>`，清理失败仍会报告；底层资源的关闭规则见具体适配器。'
           },
-          example:
-            "import { createMemoryTransportPair } from '@migaia/rpc-host/adapters/memory'\nconst [left, right] = createMemoryTransportPair()\nconst off = right.subscribe((message) => console.log(message.data))\nleft.send('hello')\nawait Promise.resolve()\noff()\nleft.close()"
+          example: rpcRawCarrierExample
         },
         onTransportError: {
           summary: {
@@ -8008,8 +7184,7 @@ export const rpcHostReference: ILibraryReference = {
             en: 'Removal releases this failure observer only.',
             zh: '返回仅取消这次错误订阅的函数。'
           },
-          example:
-            "import { createMemoryTransportPair } from '@migaia/rpc-host/adapters/memory'\nconst [left, right] = createMemoryTransportPair()\nconst off = right.subscribe((message) => console.log(message.data))\nleft.send('hello')\nawait Promise.resolve()\noff()\nleft.close()"
+          example: rpcRawCarrierExample
         },
         onListenerError: {
           summary: {
@@ -8026,8 +7201,7 @@ export const rpcHostReference: ILibraryReference = {
             en: 'Removal releases this diagnostic observer and may surface collected reporter failures.',
             zh: '返回取消这次诊断订阅的函数，取消时可能报告已收集的上报器错误。'
           },
-          example:
-            "import { createMemoryTransportPair } from '@migaia/rpc-host/adapters/memory'\nconst [left, right] = createMemoryTransportPair()\nconst off = right.subscribe((message) => console.log(message.data))\nleft.send('hello')\nawait Promise.resolve()\noff()\nleft.close()"
+          example: rpcRawCarrierExample
         },
         observe: {
           summary: {
@@ -8044,8 +7218,7 @@ export const rpcHostReference: ILibraryReference = {
             en: 'Disposer retires only this observation generation, including when the same probe was later reinstalled.',
             zh: '返回只移除本次安装的函数；同一个探针后来重新安装时，不会被旧函数误删。'
           },
-          example:
-            "import { createMemoryTransportPair } from '@migaia/rpc-host/adapters/memory'\nconst [left, right] = createMemoryTransportPair()\nconst off = right.subscribe((message) => console.log(message.data))\nleft.send('hello')\nawait Promise.resolve()\noff()\nleft.close()"
+          example: rpcRawCarrierExample
         },
         peerId: {
           summary: {
@@ -8410,8 +7583,7 @@ export const rpcHostReference: ILibraryReference = {
             en: 'Removal releases this failure observer only.',
             zh: '返回仅取消这次错误订阅的函数。'
           },
-          example:
-            "import { createMemoryTransportPair } from '@migaia/rpc-host/adapters/memory'\nconst [left, right] = createMemoryTransportPair()\nconst off = right.subscribe((message) => console.log(message.data))\nleft.send('hello')\nawait Promise.resolve()\noff()\nleft.close()"
+          example: rpcRawCarrierExample
         },
         observe: {
           summary: {
@@ -8428,8 +7600,7 @@ export const rpcHostReference: ILibraryReference = {
             en: 'Disposer retires only this observation generation, including when the same probe was later reinstalled.',
             zh: '返回只移除本次安装的函数；同一个探针后来重新安装时，不会被旧函数误删。'
           },
-          example:
-            "import { createMemoryTransportPair } from '@migaia/rpc-host/adapters/memory'\nconst [left, right] = createMemoryTransportPair()\nconst off = right.subscribe((message) => console.log(message.data))\nleft.send('hello')\nawait Promise.resolve()\noff()\nleft.close()"
+          example: rpcRawCarrierExample
         },
         listenerCount: {
           summary: {
@@ -9403,52 +8574,7 @@ export const rpcHostReference: ILibraryReference = {
         }
       }
     },
-    IRemotePluginHostPort: {
-      summary: {
-        en: 'Local enablement operations used to suspend and resume the exact remote plugin registration.',
-        zh: '用于挂起及恢复精确远程插件登记的本地启停操作。'
-      },
-      members: {
-        disable: {
-          summary: {
-            en: 'Suspends the named registration through the original Host.',
-            zh: '通过原宿主挂起具名登记。'
-          },
-          params: {
-            name: {
-              en: 'Name selected in createRpcHost options.',
-              zh: '在 `createRpcHost()` 选项中指定的名称。'
-            },
-            options: {
-              en: 'Explicit suspension policy.',
-              zh: '显式挂起策略。'
-            }
-          },
-          returns: {
-            en: 'Promise of the Host operation result.',
-            zh: '返回宿主操作结果的 Promise。'
-          },
-          example: "await hostPort.disable('math', { policy: 'suspend' })"
-        },
-        enable: {
-          summary: {
-            en: 'Resumes the named registration through the original Host.',
-            zh: '通过原宿主恢复具名登记。'
-          },
-          params: {
-            name: {
-              en: 'Name selected in createRpcHost options.',
-              zh: '在 `createRpcHost()` 选项中指定的名称。'
-            }
-          },
-          returns: {
-            en: 'Promise of the Host operation result.',
-            zh: '返回宿主操作结果的 Promise。'
-          },
-          example: "await hostPort.enable('math')"
-        }
-      }
-    },
+
     IRuntimePeer: {
       summary: {
         en: 'One accepted logical Peer exposing local identity, calls, passive events and deterministic connection cleanup.',
@@ -10101,531 +9227,7 @@ export const rpcHostReference: ILibraryReference = {
         }
       ]
     },
-    IRuntimePluginOptions: {
-      summary: {
-        en: 'Symmetric plugin configuration combining a source and explicit Host exposure whitelist.',
-        zh: '对称插件配置，将来源与显式宿主暴露白名单组合。'
-      },
-      members: {
-        endpointFactory: {
-          summary: {
-            en: 'Advanced synchronous invocation of an async endpoint factory with this acquired channel and native abort signal; its Promise must resolve an IRemoteServeEndpoint. Failure triggers construction rollback.',
-            zh: '高级端点工厂在取得通道后接收该通道与原生中止信号，其 Promise 须返回 `IRemoteServeEndpoint`，失败会触发构造回滚。'
-          },
-          params: {
-            channel: {
-              en: 'IRemoteChannelResources acquired by the selected platform source; ownership remains with the original construction.',
-              zh: '由所选平台来源取得的 `IRemoteChannelResources`，所有权仍归原始构造流程。'
-            },
-            signal: {
-              en: 'Native construction cancellation signal supplied by the peer owner.',
-              zh: '由连接拥有者提供的原生构造取消信号。'
-            }
-          },
-          returns: {
-            en: 'Promise of the endpoint assembled for this exact channel; throw or rejection preserves the original construction failure.',
-            zh: '返回为此精确通道组装的端点 Promise，抛错或拒绝保留原始构造失败。'
-          },
-          default: {
-            en: 'Omitted: the canonical runtime endpoint is assembled from the acquired channel and common options.',
-            zh: '省略时根据已取得通道与通用选项组装规范运行时端点。'
-          },
-          whenToUse: {
-            en: 'Reuse actual Host integration and original channel resources; local callbacks retain acquisition, resolution and diagnostic ownership.',
-            zh: '复用实际宿主集成与原通道资源，由本地回调保留取得资源、解析和诊断所有权。'
-          },
-          example:
-            "import assert from 'node:assert/strict'\nimport { createRpcHost } from '@migaia/rpc-host'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    }),\n    timeoutFeature({ ms: 1500 })\n  ]\n})\ntry {\n  const value = await host.request('double', 21)\n  assert.equal(value, 42)\n  console.log(value)\n} finally {\n  await host.close()\n}"
-        },
-        self: {
-          summary: {
-            en: 'Application-supplied safe identity with nonempty name and instanceId; neither credentials nor arbitrary properties are published.',
-            zh: '应用提供的安全身份，含非空名称与实例标识，不会发布凭据或任意额外属性。'
-          },
-          default: {
-            en: 'Omitted: the core uses RUNTIME_PEER_DEFAULT_NAME and a generated defaultRpcId; trusted platform bootstrap may supply its own identity.',
-            zh: '省略时核心使用默认连接名称常量与自动生成的实例标识，可信平台启动数据也可提供自身身份。'
-          }
-        },
-        provide: {
-          summary: {
-            en: 'Application-provided local methods, descriptors or allowed runtime forwarding entries compiled into the accepted directory; methods receive the remote payload and preserve synchronous or async failures.',
-            zh: '应用提供的本端方法、描述符或获准运行时转发条目，会编译为已接受目录；方法接收远端载荷，同步或异步失败均保留。'
-          },
-          default: {
-            en: 'Omitted: this side publishes no application methods.',
-            zh: '省略时本端不发布任何应用方法。'
-          }
-        },
-        providerLimits: {
-          summary: {
-            en: 'Provider admission policy forwarded to the canonical endpoint; it does not alter transport framing or acquire another provider registry.',
-            zh: '转交规范端点的提供方接纳策略，不改变传输分帧，也不另建提供方登记表。'
-          },
-          default: {
-            en: 'Omitted: the original endpoint or listener admission owner supplies its standard provider limits.',
-            zh: '省略时由原端点或监听接纳拥有者提供标准提供方限制。'
-          }
-        },
-        authentication: {
-          summary: {
-            en: 'Original signing, verification and optional encryption configuration installed into canonical endpoint assembly; invalid credentials reject construction before publication.',
-            zh: '安装到规范端点组装的原始签名、校验与可选加密配置，非法凭据会在发布前拒绝构造。'
-          },
-          default: {
-            en: 'Omitted: no authentication middleware is added by these options.',
-            zh: '省略时不通过本选项增加认证中间件。'
-          },
-          whenToUse: {
-            en: 'Use the application’s paired protection functions on both endpoints. Encryption requires decrypt and the sign/verify pair for replay protection; signing alone needs verify. encodedType must describe the protected frame. Omit authentication only when the carrier’s trust policy permits it.',
-            zh: '在两端使用应用配套的保护函数：加密 `encrypt` 须配合 `decrypt` 及 `sign`/`verify` 防重放，单独签名也须配合 `verify`；encodedType 必须对应受保护帧。仅当载体信任策略允许时才省略认证。'
-          },
-          example:
-            "import assert from 'node:assert/strict'\nimport { createRpcHost } from '@migaia/rpc-host'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    }),\n    timeoutFeature({ ms: 1500 })\n  ]\n})\ntry {\n  const value = await host.request('double', 21)\n  assert.equal(value, 42)\n  console.log(value)\n} finally {\n  await host.close()\n}"
-        },
-        probe: {
-          summary: {
-            en: 'One IRpcProbe or an array of probes from the application, installed as endpoint-local synchronous observers without selecting a different pipeline.',
-            zh: '应用提供的一个或多个 `IRpcProbe`，安装为端点本地同步观察者，不会据此选择另一套管线。'
-          },
-          default: {
-            en: 'Omitted: no observer is added by this field.',
-            zh: '省略时不通过此字段增加观察者。'
-          },
-          whenToUse: {
-            en: 'Attach the application’s message probe when this connection needs diagnostic tracing; omit it for an unobserved connection.',
-            zh: '这条连接需要诊断追踪时附加应用的消息 probe；无需观察时省略。'
-          },
-          example:
-            "import assert from 'node:assert/strict'\nimport { createRpcHost } from '@migaia/rpc-host'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    }),\n    timeoutFeature({ ms: 1500 })\n  ]\n})\ntry {\n  const value = await host.request('double', 21)\n  assert.equal(value, 42)\n  console.log(value)\n} finally {\n  await host.close()\n}"
-        },
-        defaultTimeoutMs: {
-          summary: {
-            en: 'Finite positive millisecond default for request and stream calls, validated before acquiring source resources; it does not extend the notify or group timeout scope.',
-            zh: '请求与流调用使用的有限正毫秒默认值，在取得来源资源前校验，不扩展通知或分组操作的超时作用域。'
-          },
-          default: {
-            en: '30000 ms for request and stream in the original timeout scope.',
-            zh: '默认三万毫秒，仅用于原有请求与流超时作用域。'
-          }
-        },
-        contract: {
-          summary: {
-            en: 'Optional IRemoteContract with explicit method schemas, supported modes and idempotency declarations, compiled by the original remote contract owner.',
-            zh: '可选的 `IRemoteContract`，提供显式方法模式、支持的调用方式与幂等声明，由原远端契约拥有者编译。'
-          },
-          default: {
-            en: 'Omitted: provided method definitions supply the normal inferred runtime directory.',
-            zh: '省略时根据已提供的方法定义推导通常的运行时目录。'
-          }
-        },
-        report: {
-          summary: {
-            en: 'Synchronous callback receives background or contained failures as error; no return is consumed, and failure handling stays with the original runtime reporter owner.',
-            zh: '同步回调以错误参数接收后台或隔离的失败，不消费返回值，失败处理仍归既有运行时报告拥有者。'
-          },
-          params: {
-            error: {
-              en: 'Original background or secondary failure supplied by the runtime owner.',
-              zh: '来自运行时拥有者的原始后台或次级失败。'
-            }
-          },
-          returns: {
-            en: 'No result is used; reporter errors are contained by the reporting boundary.',
-            zh: '不使用返回结果，报告函数失败由报告边界隔离。'
-          },
-          default: {
-            en: 'Omitted: defaultRpcReporter reports to console.error.',
-            zh: '省略时默认报告函数输出到控制台错误通道。'
-          },
-          whenToUse: {
-            en: 'Reuse actual Host integration and original channel resources; local callbacks retain acquisition, resolution and diagnostic ownership.',
-            zh: '复用实际宿主集成与原通道资源，由本地回调保留取得资源、解析和诊断所有权。'
-          },
-          example:
-            "import assert from 'node:assert/strict'\nimport { createRpcHost } from '@migaia/rpc-host'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    }),\n    timeoutFeature({ ms: 1500 })\n  ]\n})\ntry {\n  const value = await host.request('double', 21)\n  assert.equal(value, 42)\n  console.log(value)\n} finally {\n  await host.close()\n}"
-        },
-        keyFactory: {
-          summary: {
-            en: 'Advanced remote-proxy key callback returning an application string for automatically keyed retry paths. The direct createRpcHost assembly does not read this inherited field itself.',
-            zh: '高级远程代理键回调，返回应用字符串供自动分配键的重试路径使用；直接运行时连接组装本身不读取这个继承字段。'
-          },
-          default: {
-            en: 'Omitted: proxy paths use defaultRpcId when generating keys; direct peer call keys retain their own call-option semantics.',
-            zh: '省略时代理生成键使用默认标识工厂，直接连接调用仍按自身调用选项处理幂等键。'
-          },
-          whenToUse: {
-            en: 'Supply local logical-key or retry policy only for the actual installed dispatch path; direct borrowed Peer dispatch may leave them unused.',
-            zh: '只为实际安装的派发路径提供本地逻辑键或重试策略；直接借入 Peer 的派发可能不使用它们。'
-          },
-          example:
-            "import assert from 'node:assert/strict'\nimport { createRpcHost } from '@migaia/rpc-host'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    }),\n    timeoutFeature({ ms: 1500 })\n  ]\n})\ntry {\n  const value = await host.request('double', 21)\n  assert.equal(value, 42)\n  console.log(value)\n} finally {\n  await host.close()\n}"
-        },
-        retryPort: {
-          summary: {
-            en: 'Advanced application-supplied retry dispatch port for remote-proxy paths; it receives the original retry input and returns the selected dispatch result. Direct createRpcHost assembly does not read it itself.',
-            zh: '高级应用重试派发端口，供远程代理路径接收原始重试输入并返回所选派发结果；直接运行时连接组装本身不读取它。'
-          },
-          default: {
-            en: 'Omitted: the remote proxy keeps its original retry dispatch owner; no second retry policy is installed by a direct peer.',
-            zh: '省略时远程代理保留原重试派发拥有者，直接连接不会额外安装另一套重试策略。'
-          },
-          whenToUse: {
-            en: 'Supply local logical-key or retry policy only for the actual installed dispatch path; direct borrowed Peer dispatch may leave them unused.',
-            zh: '只为实际安装的派发路径提供本地逻辑键或重试策略；直接借入 Peer 的派发可能不使用它们。'
-          },
-          example:
-            "import assert from 'node:assert/strict'\nimport { createRpcHost } from '@migaia/rpc-host'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    }),\n    timeoutFeature({ ms: 1500 })\n  ]\n})\ntry {\n  const value = await host.request('double', 21)\n  assert.equal(value, 42)\n  console.log(value)\n} finally {\n  await host.close()\n}"
-        },
-        'authentication.encrypt': {
-          summary: {
-            en: 'Outbound sync/async encryption runs after the endpoint wraps its encoded value with replay metadata and before signing. Throw/rejection normally becomes AUTHENTICATION_FAILED with its cause.',
-            zh: '出站同步或异步加密在端点为编码值包装重放元数据后、签名前执行；抛错或拒绝通常成为保留原因的认证失败。'
-          },
-          params: {
-            value: {
-              en: 'Replay-bound authentication envelope produced by the endpoint, including its encoded payload; not the bare application payload.',
-              zh: '端点生成、绑定重放信息的认证消息封装，包含编码载荷，不是裸应用负载。'
-            },
-            context: {
-              en: 'IRpcAuthenticationContext issued by the endpoint: direction is outbound/inbound, endpointId is its local identifier and platform is its configured IRpcPlatformValue.',
-              zh: '端点签发的认证上下文：方向为出站或入站，端点标识来自本端，平台为已配置的 `IRpcPlatformValue`。'
-            }
-          },
-          returns: {
-            en: 'Encrypted value or its Promise, passed unchanged into sign.',
-            zh: '返回加密值或其 Promise，原样传入签名阶段。'
-          },
-          default: {
-            en: 'Leave encrypt and decrypt out together when messages need signatures but not encryption. In that case, sign receives the unencrypted authentication envelope: the message data together with the information used to detect replay. Omitting encryption does not remove signing or verification.',
-            zh: '消息只需要签名、不需要加密时，应同时省略 encrypt 和 decrypt。此时 sign 直接接收未加密的认证数据封装，其中包含消息数据和用于识别重复发送的信息。省略加密不会省去签名与验证。'
-          },
-          whenToUse: {
-            en: 'Use the application’s paired protection functions on both endpoints. Encryption requires decrypt and the sign/verify pair for replay protection; signing alone needs verify. encodedType must describe the protected frame. Omit authentication only when the carrier’s trust policy permits it.',
-            zh: '在两端使用应用配套的保护函数：加密 `encrypt` 须配合 `decrypt` 及 `sign`/`verify` 防重放，单独签名也须配合 `verify`；encodedType 必须对应受保护帧。仅当载体信任策略允许时才省略认证。'
-          },
-          example:
-            "import assert from 'node:assert/strict'\nimport { createRpcHost } from '@migaia/rpc-host'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    }),\n    timeoutFeature({ ms: 1500 })\n  ]\n})\ntry {\n  const value = await host.request('double', 21)\n  assert.equal(value, 42)\n  console.log(value)\n} finally {\n  await host.close()\n}"
-        },
-        'authentication.decrypt': {
-          summary: {
-            en: 'Inbound sync/async decryption runs on the value recovered by verify. The endpoint then validates the recovered authentication envelope and replay binding.',
-            zh: '入站同步或异步解密处理验证阶段恢复的值；随后端点校验恢复的认证消息封装与重放绑定。'
-          },
-          params: {
-            value: {
-              en: 'Verified protected value returned by verify.',
-              zh: '验证阶段返回的已验证受保护值。'
-            },
-            context: {
-              en: 'IRpcAuthenticationContext issued by the endpoint: direction is outbound/inbound, endpointId is its local identifier and platform is its configured IRpcPlatformValue.',
-              zh: '端点签发的认证上下文：方向为出站或入站，端点标识来自本端，平台为已配置的 `IRpcPlatformValue`。'
-            }
-          },
-          returns: {
-            en: 'Recovered replay-bound authentication envelope or its Promise; throw/rejection normally becomes AUTHENTICATION_FAILED with the original cause.',
-            zh: '返回恢复的重放绑定认证消息封装或其 Promise；抛错或拒绝通常成为保留原始原因的认证失败。'
-          },
-          default: {
-            en: 'Omit decrypt only when encrypt is also omitted. After verify checks the signature and recovers the inner value, the endpoint directly checks that value as the authentication envelope, including its replay information. It does not try to decrypt the value.',
-            zh: '只有同时省略 encrypt 时，才可以省略 decrypt。verify 验证签名并恢复内部值后，端点会直接检查该值是否符合认证数据封装格式，并检查用于识别重复发送的信息，不再进行解密。'
-          },
-          whenToUse: {
-            en: 'Use the application’s paired protection functions on both endpoints. Encryption requires decrypt and the sign/verify pair for replay protection; signing alone needs verify. encodedType must describe the protected frame. Omit authentication only when the carrier’s trust policy permits it.',
-            zh: '在两端使用应用配套的保护函数：加密 `encrypt` 须配合 `decrypt` 及 `sign`/`verify` 防重放，单独签名也须配合 `verify`；encodedType 必须对应受保护帧。仅当载体信任策略允许时才省略认证。'
-          },
-          example:
-            "import assert from 'node:assert/strict'\nimport { createRpcHost } from '@migaia/rpc-host'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    }),\n    timeoutFeature({ ms: 1500 })\n  ]\n})\ntry {\n  const value = await host.request('double', 21)\n  assert.equal(value, 42)\n  console.log(value)\n} finally {\n  await host.close()\n}"
-        },
-        'authentication.sign': {
-          summary: {
-            en: 'Outbound sync/async signing runs after optional encryption and returns the complete protected frame representation. Signing and verification are required even without encryption.',
-            zh: '出站同步或异步签名在可选加密后执行，返回完整受保护帧表示；即使不加密，也必须配置签名与验证。'
-          },
-          params: {
-            value: {
-              en: 'Encrypted value when encrypt exists, otherwise the replay-bound authentication envelope.',
-              zh: '存在加密阶段时接收加密值，否则接收重放绑定认证消息封装。'
-            },
-            context: {
-              en: 'IRpcAuthenticationContext issued by the endpoint: direction is outbound/inbound, endpointId is its local identifier and platform is its configured IRpcPlatformValue.',
-              zh: '端点签发的认证上下文：方向为出站或入站，端点标识来自本端，平台为已配置的 `IRpcPlatformValue`。'
-            }
-          },
-          returns: {
-            en: 'Signed representation or its Promise; throw/rejection normally becomes AUTHENTICATION_FAILED. Keep the declared encodedType output domain.',
-            zh: '返回签名表示或其 Promise；抛错或拒绝通常成为认证失败，输出须符合声明的编码值域。'
-          },
-          default: {
-            en: 'There is no default signing function. Provide sign together with verify whenever authentication is enabled. This remains required when encrypt and decrypt are configured: encryption alone is insufficient, and omitting sign rejects the configuration.',
-            zh: '没有默认签名函数。启用认证时，必须同时提供 sign 和 verify。即使已经配置 encrypt 和 decrypt，也仍然需要签名；只加密而省略 sign 会使配置被拒绝。'
-          },
-          whenToUse: {
-            en: 'Use the application’s paired protection functions on both endpoints. Encryption requires decrypt and the sign/verify pair for replay protection; signing alone needs verify. encodedType must describe the protected frame. Omit authentication only when the carrier’s trust policy permits it.',
-            zh: '在两端使用应用配套的保护函数：加密 `encrypt` 须配合 `decrypt` 及 `sign`/`verify` 防重放，单独签名也须配合 `verify`；encodedType 必须对应受保护帧。仅当载体信任策略允许时才省略认证。'
-          },
-          example:
-            "import assert from 'node:assert/strict'\nimport { createRpcHost } from '@migaia/rpc-host'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    }),\n    timeoutFeature({ ms: 1500 })\n  ]\n})\ntry {\n  const value = await host.request('double', 21)\n  assert.equal(value, 42)\n  console.log(value)\n} finally {\n  await host.close()\n}"
-        },
-        'authentication.verify': {
-          summary: {
-            en: 'Inbound sync/async verification receives the protected frame and must recover its authenticated inner value; returning a boolean is not a verification verdict protocol.',
-            zh: '入站同步或异步验证接收受保护帧，必须恢复其经过认证的内部值；布尔返回值不是验证结论协议。'
-          },
-          params: {
-            value: {
-              en: 'Protected value received at the authentication pipeline edge.',
-              zh: '从认证管线边界接收到的受保护值。'
-            },
-            context: {
-              en: 'IRpcAuthenticationContext issued by the endpoint: direction is outbound/inbound, endpointId is its local identifier and platform is its configured IRpcPlatformValue.',
-              zh: '端点签发的认证上下文：方向为出站或入站，端点标识来自本端，平台为已配置的 `IRpcPlatformValue`。'
-            }
-          },
-          returns: {
-            en: 'Authenticated inner value or its Promise, passed to decrypt when configured; reject or throw on invalid signatures. Local reporting retains the original verification failure, which may be sensitive; the peer receives a sanitized summary. Other returned values still undergo envelope/replay validation.',
-            zh: '返回认证内部值或其 Promise，配置了解密时传给解密；签名非法时应拒绝或抛错，本地报告保留可能敏感的原校验失败，对端只接收净化摘要，其它返回值仍需通过消息封装及重放校验。'
-          },
-          default: {
-            en: 'There is no default verification function. Provide verify together with sign so incoming protected messages can be checked and their inner values recovered. If sign is supplied without verify, construction rejects the configuration before the endpoint becomes active.',
-            zh: '没有默认验证函数。必须把 verify 与 sign 配套提供，才能检查收到的受保护消息并恢复其内部值。提供 sign 却缺少 verify 时，构造会在端点启用前拒绝配置。'
-          },
-          whenToUse: {
-            en: 'Use the application’s paired protection functions on both endpoints. Encryption requires decrypt and the sign/verify pair for replay protection; signing alone needs verify. encodedType must describe the protected frame. Omit authentication only when the carrier’s trust policy permits it.',
-            zh: '在两端使用应用配套的保护函数：加密 `encrypt` 须配合 `decrypt` 及 `sign`/`verify` 防重放，单独签名也须配合 `verify`；encodedType 必须对应受保护帧。仅当载体信任策略允许时才省略认证。'
-          },
-          example:
-            "import assert from 'node:assert/strict'\nimport { createRpcHost } from '@migaia/rpc-host'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    }),\n    timeoutFeature({ ms: 1500 })\n  ]\n})\ntry {\n  const value = await host.request('double', 21)\n  assert.equal(value, 42)\n  console.log(value)\n} finally {\n  await host.close()\n}"
-        },
-        'authentication.encodedType': {
-          summary: {
-            en: 'Declared protected-output domain must match the next physical pipeline edge. Encrypt/decrypt and sign/verify are complete pairs, at least signing is required, and encryption additionally requires signing.',
-            zh: '声明的受保护输出域须匹配后续物理管线边界；加解密与签名验证各自须完整，至少配置签名，加密还必须有签名。'
-          },
-          default: {
-            en: 'any: do not impose a declared protected-output value category.',
-            zh: '`any`：不声明额外受保护输出值类别。'
-          },
-          values: {
-            any: {
-              en: 'Leave the declared output domain unconstrained; transforms may still change representation.',
-              zh: '不限制声明输出值域，转换仍可改变表示。'
-            },
-            string: {
-              en: 'Declare that the protected output is text for the subsequent pipeline edge.',
-              zh: '声明受保护输出为文本，供后续管线边界使用。'
-            },
-            uint8array: {
-              en: 'Declare that the protected output is a byte array for the subsequent pipeline edge.',
-              zh: '声明受保护输出为字节数组，供后续管线边界使用。'
-            }
-          },
-          whenToUse: {
-            en: 'Use the application’s paired protection functions on both endpoints. Encryption requires decrypt and the sign/verify pair for replay protection; signing alone needs verify. encodedType must describe the protected frame. Omit authentication only when the carrier’s trust policy permits it.',
-            zh: '在两端使用应用配套的保护函数：加密 `encrypt` 须配合 `decrypt` 及 `sign`/`verify` 防重放，单独签名也须配合 `verify`；encodedType 必须对应受保护帧。仅当载体信任策略允许时才省略认证。'
-          },
-          example:
-            "import assert from 'node:assert/strict'\nimport { createRpcHost } from '@migaia/rpc-host'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    }),\n    timeoutFeature({ ms: 1500 })\n  ]\n})\ntry {\n  const value = await host.request('double', 21)\n  assert.equal(value, 42)\n  console.log(value)\n} finally {\n  await host.close()\n}"
-        },
-        spawn: {
-          summary: {
-            en: 'Application source callback receiving the safe local identity and capability offer; choose exactly one source.',
-            zh: '应用来源回调接收安全本端身份及能力提议；只能选择一种来源。'
-          },
-          default: {
-            en: 'Omitting spawn means this Peer starts no execution unit through that source. Select connect to reach an existing peer, or listen to accept one; exactly one source is required.',
-            zh: '省略 spawn 时，Peer 不会通过此来源启动执行单元。应选择 connect 连接已有对端，或选择 listen 接收对端；三种来源必须且只能选择一种。'
-          },
-          params: {
-            context: {
-              en: 'IRuntimePeerSourceContext from this preparation, containing its self identity and actual offered capabilities; no public abort signal is added to this context.',
-              zh: '本次准备提供的来源上下文，含本端身份与实际提议能力，不向此公开上下文额外添加中止信号。'
-            }
-          },
-          returns: {
-            en: 'Promise of a complete IRuntimePeerSourceResult with agreed pipeline and features; failure rejects construction and rolls back resources already acquired.',
-            zh: '返回完整来源结果的 Promise，包含已约定管线与特性；失败拒绝构造，并回滚已经取得的资源。'
-          },
-          whenToUse: {
-            en: 'Use the platform adapter original raw source/integration owner; a complete callable object is not a deployment source.',
-            zh: '使用平台适配器原始来源及集成所有者，完整调用对象不是部署来源。'
-          },
-          example:
-            "import assert from 'node:assert/strict'\nimport { createRpcHost } from '@migaia/rpc-host'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    }),\n    timeoutFeature({ ms: 1500 })\n  ]\n})\ntry {\n  const value = await host.request('double', 21)\n  assert.equal(value, 42)\n  console.log(value)\n} finally {\n  await host.close()\n}"
-        },
-        connect: {
-          summary: {
-            en: 'Application source callback opening a channel to an existing peer; choose exactly one source.',
-            zh: '应用来源回调打开通往已有对端的通道；只能选择一种来源。'
-          },
-          default: {
-            en: 'Omitting connect means no outgoing connection is opened through this source. Choose spawn to start a peer or listen to accept one instead; exactly one source is required.',
-            zh: '省略 connect 时，不会通过此来源主动打开连接。应改选 spawn 启动对端，或选择 listen 接收连接；三种来源必须且只能选择一种。'
-          },
-          params: {
-            context: {
-              en: 'IRuntimePeerSourceContext from this preparation, containing its self identity and actual offered capabilities; no public abort signal is added to this context.',
-              zh: '本次准备提供的来源上下文，含本端身份与实际提议能力，不向此公开上下文额外添加中止信号。'
-            }
-          },
-          returns: {
-            en: 'Promise of a complete IRuntimePeerSourceResult with agreed pipeline and features; failure rejects construction and rolls back resources already acquired.',
-            zh: '返回完整来源结果的 Promise，包含已约定管线与特性；失败拒绝构造，并回滚已经取得的资源。'
-          },
-          whenToUse: {
-            en: 'Reuse actual Host integration and original channel resources; local callbacks retain acquisition, resolution and diagnostic ownership.',
-            zh: '复用实际宿主集成与原通道资源，由本地回调保留取得资源、解析和诊断所有权。'
-          },
-          example:
-            "import assert from 'node:assert/strict'\nimport { createRpcHost } from '@migaia/rpc-host'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    }),\n    timeoutFeature({ ms: 1500 })\n  ]\n})\ntry {\n  const value = await host.request('double', 21)\n  assert.equal(value, 42)\n  console.log(value)\n} finally {\n  await host.close()\n}"
-        },
-        listen: {
-          summary: {
-            en: 'Application source callback accepting a negotiated peer channel; choose exactly one source.',
-            zh: '应用来源回调接受协商后的对端通道；只能选择一种来源。'
-          },
-          default: {
-            en: 'Omitting listen means this Peer does not accept incoming connections through this source. Choose spawn or connect for the initiating side; exactly one source is required.',
-            zh: '省略 listen 时，Peer 不会通过此来源接收传入连接。主动建立连接的一端应选择 spawn 或 connect；三种来源必须且只能选择一种。'
-          },
-          params: {
-            context: {
-              en: 'IRuntimePeerSourceContext from this preparation, containing its self identity and actual offered capabilities; no public abort signal is added to this context.',
-              zh: '本次准备提供的来源上下文，含本端身份与实际提议能力，不向此公开上下文额外添加中止信号。'
-            }
-          },
-          returns: {
-            en: 'Promise of a complete IRuntimePeerSourceResult with agreed pipeline and features; failure rejects construction and rolls back resources already acquired.',
-            zh: '返回完整来源结果的 Promise，包含已约定管线与特性；失败拒绝构造，并回滚已经取得的资源。'
-          },
-          whenToUse: {
-            en: 'Use the platform adapter original raw source/integration owner; a complete callable object is not a deployment source.',
-            zh: '使用平台适配器原始来源及集成所有者，完整调用对象不是部署来源。'
-          },
-          example:
-            "import assert from 'node:assert/strict'\nimport { createRpcHost } from '@migaia/rpc-host'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    }),\n    timeoutFeature({ ms: 1500 })\n  ]\n})\ntry {\n  const value = await host.request('double', 21)\n  assert.equal(value, 42)\n  console.log(value)\n} finally {\n  await host.close()\n}"
-        },
-        name: {
-          summary: {
-            en: 'Caller-selected nonempty registration name copied when constructing the cold plugin; use the same name when addressing the installed runtime outlet.',
-            zh: '调用方选择的非空登记名称，在构造冷插件时复制；通过已安装的运行时出口寻址时使用同名。'
-          }
-        },
-        expose: {
-          summary: {
-            en: 'Distinct nonempty paths explicitly exposing current Host feature methods, runtime connection routes or the reserved host control entry. Only this snapshotted whitelist becomes remotely callable.',
-            zh: '显式暴露当前宿主特性方法、运行时连接路由或保留宿主控制入口的路径，不得重复或为空；只有此快照白名单可被远程调用。'
-          },
-          default: {
-            en: 'Omitted: an empty whitelist; only provide methods are published.',
-            zh: '省略时白名单为空，仅发布显式提供的方法。'
-          }
-        },
-        host: {
-          summary: {
-            en: 'The same actual PluginHost handle into which this plugin is installed, supplying use, unUse, plugin and revision for explicit host exposure.',
-            zh: '安装本插件的同一真实插件宿主句柄，为显式宿主暴露提供安装、移除、插件检查与版本端口。'
-          },
-          default: {
-            en: 'Omitted: allowed unless expose contains host; explicit host exposure requires host, catalog and resolvePlugin together.',
-            zh: '省略时可正常使用，但白名单含宿主控制入口时必须同时提供宿主、目录和插件解析器。'
-          }
-        },
-        catalog: {
-          summary: {
-            en: 'Application-authored IRemoteHostCatalog declaring the only plugin contracts available through explicitly exposed host control.',
-            zh: '应用编写的远程宿主目录，声明显式宿主控制可使用的插件契约范围。'
-          },
-          default: {
-            en: 'Omitted: no host-control catalog; required when expose contains host.',
-            zh: '省略时没有宿主控制目录；白名单包含宿主入口时必填。'
-          }
-        },
-        resolvePlugin: {
-          summary: {
-            en: 'Synchronous local resolver invoked by the canonical host-control owner after catalog admission; definitions remain local and are installed through the original Host.',
-            zh: '同步本地解析器，在目录接纳后由规范宿主控制拥有者调用；定义保留本地，通过原宿主安装。'
-          },
-          params: {
-            name: {
-              en: 'Plugin name admitted by the declared catalog.',
-              zh: '已通过声明目录接纳的插件名称。'
-            },
-            config: {
-              en: 'Optional portable configuration from the remote host-use request.',
-              zh: '来自远程宿主安装请求的可选可移植配置。'
-            }
-          },
-          returns: {
-            en: 'Local plugin definition accepted by the Host; a thrown error rejects the host-use request.',
-            zh: '返回宿主可接受的本地插件定义；抛错会拒绝远程安装请求。'
-          },
-          default: {
-            en: 'Omitted: no local resolver; required when expose contains host.',
-            zh: '省略时没有本地解析器；白名单包含宿主入口时必填。'
-          },
-          whenToUse: {
-            en: 'Reuse actual Host integration and original channel resources; local callbacks retain acquisition, resolution and diagnostic ownership.',
-            zh: '复用实际宿主集成与原通道资源，由本地回调保留取得资源、解析和诊断所有权。'
-          },
-          example:
-            "import assert from 'node:assert/strict'\nimport { createRpcHost } from '@migaia/rpc-host'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    }),\n    timeoutFeature({ ms: 1500 })\n  ]\n})\ntry {\n  const value = await host.request('double', 21)\n  assert.equal(value, 42)\n  console.log(value)\n} finally {\n  await host.close()\n}"
-        }
-      },
-      optionCases: [
-        {
-          title: {
-            en: 'Install a platform link in the host',
-            zh: '在宿主安装平台链路'
-          },
-          problem: {
-            en: 'A transport author joins the existing ordinary Host runtime slot through original adapter integration and cold native acquisition. Local name and accepted self remain distinct.',
-            zh: '传输作者通过原适配器集成及冷原生获取接入已有普通宿主运行时槽，本地登记名与已接纳自身身份分开。'
-          },
-          example:
-            "import assert from 'node:assert/strict'\nimport { createRpcHost } from '@migaia/rpc-host'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    }),\n    timeoutFeature({ ms: 1500 })\n  ]\n})\ntry {\n  const value = await host.request('double', 21)\n  assert.equal(value, 42)\n  console.log(value)\n} finally {\n  await host.close()\n}",
-          result: {
-            en: 'The host owns the installed platform outlet and releases the shared link with its lifecycle.',
-            zh: '宿主拥有安装后的平台出口，并在自身生命周期结束时释放共享链路。'
-          },
-          covers: ['name', 'self', 'connect', 'report']
-        },
-        {
-          title: {
-            en: 'Serve the host’s approved catalog over the link',
-            zh: '通过链路服务宿主的获准目录'
-          },
-          problem: {
-            en: 'A platform link must allow remote administration of a specific local host. Expose host controls only with that host’s declared catalog and application resolver.',
-            zh: '平台链路需要允许远端管理指定本地宿主。仅对该宿主声明的目录和应用解析器公开 host 控制。'
-          },
-          example:
-            "import assert from 'node:assert/strict'\nimport { createRpcHost } from '@migaia/rpc-host'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    }),\n    timeoutFeature({ ms: 1500 })\n  ]\n})\ntry {\n  const value = await host.request('double', 21)\n  assert.equal(value, 42)\n  console.log(value)\n} finally {\n  await host.close()\n}",
-          result: {
-            en: 'Remote administration is limited to the declared catalog of the selected local host.',
-            zh: '远端管理范围限于所选本地宿主声明的目录。'
-          },
-          covers: ['expose', 'host', 'catalog', 'resolvePlugin']
-        },
-        {
-          title: {
-            en: 'Bound callbacks into the local host',
-            zh: '限制对本地宿主的回调'
-          },
-          problem: {
-            en: 'The platform peer also serves a small checkout callback API. Register its contract and limit concurrent provider work so remote lookups do not overwhelm the local host.',
-            zh: '平台对端还需要提供小范围结算回调接口。登记其契约并限制处理任务并发，避免远端查询压满本地宿主。'
-          },
-          example:
-            "import assert from 'node:assert/strict'\nimport { createRpcHost } from '@migaia/rpc-host'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    }),\n    timeoutFeature({ ms: 1500 })\n  ]\n})\ntry {\n  const value = await host.request('double', 21)\n  assert.equal(value, 42)\n  console.log(value)\n} finally {\n  await host.close()\n}",
-          result: {
-            en: 'The callback API keeps its declared shape and provider concurrency budget.',
-            zh: '回调接口保持声明的形状，并使用设定的处理并发预算。'
-          },
-          covers: ['provide', 'contract', 'providerLimits', 'defaultTimeoutMs']
-        }
-      ]
-    },
+
     IRuntimePeerIdentity: {
       summary: {
         en: 'Frozen display name and per-instance identity, separate from authentication principal.',
@@ -12014,18 +10616,7 @@ export const rpcHostReference: ILibraryReference = {
         }
       }
     },
-    RpcEndpointStatus: {
-      summary: {
-        en: 'Endpoint admission status carried by actual transport diagnostics.',
-        zh: '实际传输对象诊断携带的端点准入状态。'
-      },
-      values: {
-        active: {
-          en: 'The original endpoint remains active for admitted work.',
-          zh: '原始端点仍活动并可以准入工作。'
-        }
-      }
-    },
+
     RpcOperation: {
       summary: {
         en: 'Single-target operation category supplied to the actual receiver selector.',
@@ -12624,89 +11215,6 @@ export const rpcHostReference: ILibraryReference = {
     }
   },
   enhancers: {
-    createCanonicalChunkFeature: {
-      kind: 'feature',
-      target: 'IRpcEndpoint',
-      summary: {
-        en: 'Creates the original canonical chunk attachment token; allocation is deferred until the endpoint preparation scope owns it.',
-        zh: '创建原规范分片附件令牌，分配推迟到端点准备作用域取得所有权。'
-      },
-      install:
-        "import assert from 'node:assert/strict'\nimport { createRpcHost } from '@migaia/rpc-host'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    }),\n    timeoutFeature({ ms: 1500 })\n  ]\n})\ntry {\n  const value = await host.request('double', 21)\n  assert.equal(value, 42)\n  console.log(value)\n} finally {\n  await host.close()\n}",
-      grants: [],
-      behaviors: [
-        {
-          en: 'Only explicitly selected public roots are projected; private dependency ownership is reused.',
-          zh: '只投影显式所选公开功能入口，并复用私有依赖所有权。'
-        }
-      ],
-      scenarios: [
-        {
-          en: 'Compose the exact endpoint execution capabilities the application needs.',
-          zh: '组合应用需要的精确端点执行能力。'
-        }
-      ],
-      example:
-        "import assert from 'node:assert/strict'\nimport { createRpcHost } from '@migaia/rpc-host'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    }),\n    timeoutFeature({ ms: 1500 })\n  ]\n})\ntry {\n  const value = await host.request('double', 21)\n  assert.equal(value, 42)\n  console.log(value)\n} finally {\n  await host.close()\n}"
-    },
-    createStreamFeature: {
-      kind: 'feature',
-      target: 'IRpcEndpoint',
-      summary: {
-        en: 'Creates optional streaming execution over the exact original outbound/provider owners and optional actual negotiated capability port.',
-        zh: '在精确原出站及提供方所有者和可选实际协商能力端口上创建流执行。'
-      },
-      install:
-        "import assert from 'node:assert/strict'\nimport { createRpcHost } from '@migaia/rpc-host'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    }),\n    timeoutFeature({ ms: 1500 })\n  ]\n})\ntry {\n  const value = await host.request('double', 21)\n  assert.equal(value, 42)\n  console.log(value)\n} finally {\n  await host.close()\n}",
-      grants: [
-        {
-          summary: {
-            en: 'Original IRpcStreamRuntime prepared from the selected stream feature.',
-            zh: '从所选流功能准备的原流运行时。'
-          },
-          signature: 'endpoint.stream'
-        }
-      ],
-      behaviors: [
-        {
-          en: 'Only explicitly selected public roots are projected; private dependency ownership is reused.',
-          zh: '只投影显式所选公开功能入口，并复用私有依赖所有权。'
-        }
-      ],
-      scenarios: [
-        {
-          en: 'Compose the exact endpoint execution capabilities the application needs.',
-          zh: '组合应用需要的精确端点执行能力。'
-        }
-      ],
-      example:
-        "import assert from 'node:assert/strict'\nimport { createRpcHost } from '@migaia/rpc-host'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    }),\n    timeoutFeature({ ms: 1500 })\n  ]\n})\ntry {\n  const value = await host.request('double', 21)\n  assert.equal(value, 42)\n  console.log(value)\n} finally {\n  await host.close()\n}"
-    },
-    probePlugin: {
-      kind: 'middleware',
-      target: 'IRpcEndpoint',
-      summary: {
-        en: 'Installs genuine defineProbe handles in one endpoint-owned emitter; subscriptions cannot enable unavailable physical stages, and endpoint disposal releases the emitter.',
-        zh: '把真实探针句柄安装到一个端点拥有的发射器，订阅不能启用不可用物理阶段，端点释放时释放发射器。'
-      },
-      install:
-        "import assert from 'node:assert/strict'\nimport { createRpcHost } from '@migaia/rpc-host'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    }),\n    timeoutFeature({ ms: 1500 })\n  ]\n})\ntry {\n  const value = await host.request('double', 21)\n  assert.equal(value, 42)\n  console.log(value)\n} finally {\n  await host.close()\n}",
-      grants: [],
-      behaviors: [
-        {
-          en: 'Observes only selected actual stages; observer failures do not replace business settlement.',
-          zh: '只观察选定实际阶段，观察失败不替换业务结算。'
-        }
-      ],
-      scenarios: [
-        {
-          en: 'Capture or export diagnostics from original RPC owners.',
-          zh: '从原远程调用所有者捕获或导出诊断。'
-        }
-      ],
-      example:
-        "import assert from 'node:assert/strict'\nimport { createRpcHost } from '@migaia/rpc-host'\nimport { timeoutFeature } from '@migaia/rpc-host/features'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst host = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      spawn: async ({ connect, signal }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    }),\n    timeoutFeature({ ms: 1500 })\n  ]\n})\ntry {\n  const value = await host.request('double', 21)\n  assert.equal(value, 42)\n  console.log(value)\n} finally {\n  await host.close()\n}"
-    },
     createIpcSendQueueFeature: {
       kind: 'feature',
       target: 'IRpcEndpoint',
@@ -13075,7 +11583,7 @@ export const rpcHostReference: ILibraryReference = {
         zh: '按原插件宿主生命周期登记策略、观察、安装或装配。'
       },
       install:
-        "import { defineProbe, snapshotProbeEvent } from '@migaia/rpc-host/probe'\nimport { defineFeaturePlugin } from '@migaia/rpc-host/plugin'\n\nexport const observation = defineFeaturePlugin({\n  name: 'application-observer',\n  probe: defineProbe({\n    stages: ['message', 'peer'],\n    emit: (view) => console.log(snapshotProbeEvent(view))\n  })\n})",
+        "import { defineProbe } from '@migaia/rpc-host/probe'\nimport { defineFeaturePlugin } from '@migaia/rpc-host/plugin'\n\nexport const observation = defineFeaturePlugin({\n  name: 'application-observer',\n  probe: defineProbe({\n    stages: ['message', 'peer'],\n    emit: (view) => console.log(Object.freeze({ ...view }))\n  })\n})",
       grants: [],
       behaviors: [],
       scenarios: [
@@ -13085,7 +11593,7 @@ export const rpcHostReference: ILibraryReference = {
         }
       ],
       example:
-        "import { defineProbe, snapshotProbeEvent } from '@migaia/rpc-host/probe'\nimport { defineFeaturePlugin } from '@migaia/rpc-host/plugin'\n\nexport const observation = defineFeaturePlugin({\n  name: 'application-observer',\n  probe: defineProbe({\n    stages: ['message', 'peer'],\n    emit: (view) => console.log(snapshotProbeEvent(view))\n  })\n})"
+        "import { defineProbe } from '@migaia/rpc-host/probe'\nimport { defineFeaturePlugin } from '@migaia/rpc-host/plugin'\n\nexport const observation = defineFeaturePlugin({\n  name: 'application-observer',\n  probe: defineProbe({\n    stages: ['message', 'peer'],\n    emit: (view) => console.log(Object.freeze({ ...view }))\n  })\n})"
     }
   }
 }
