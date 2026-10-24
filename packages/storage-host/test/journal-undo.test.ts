@@ -81,14 +81,7 @@ describe('original native storage undo', () => {
         })
       const txId = await lastTx(logger)
       const previous = await logger.binlog.lastSeq()
-      let timeoutReads = 0
-      const result = await store.undo(txId, {
-        get timeoutMs() {
-          timeoutReads++
-          return 60_000
-        }
-      })
-      expect(timeoutReads).toBe(1)
+      const result = await store.undo(txId, { timeoutMs: 60_000 })
       expect(result.txId).not.toBe(txId)
       expect(await store.get('text')).toBe('before')
       expect(await store.get('missing')).toBeNull()

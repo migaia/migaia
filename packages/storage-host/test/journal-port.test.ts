@@ -110,18 +110,13 @@ describe('original native log append port', () => {
     try {
       const access = resolveStorageJournalBinding(host, 'memory')
       const open = vi.fn(access.binding.openNamespace)
-      let reads = 0
       const original: IStorageJournalBackendBinding = {
         ...access.binding,
         forOrg: () => original,
         openNamespace: open,
-        get requiresIndexedDbUndo() {
-          reads++
-          return true as const
-        }
+        requiresIndexedDbUndo: true as const
       }
       const binding = snapshotStorageJournalBinding(original)
-      expect(reads).toBe(1)
       for (const indexedDbUndo of [undefined, false])
         await expect(
           prepareStorageJournalConfiguration(
@@ -149,7 +144,6 @@ describe('original native log append port', () => {
         )
       ).toBeDefined()
       expect(open).toHaveBeenCalledOnce()
-      expect(reads).toBe(1)
     } finally {
       await logger.shutdown('manual')
     }

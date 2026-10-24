@@ -155,7 +155,7 @@ describe('global native storage journal', () => {
             return result
           }
         }
-        const borrowed = Object.freeze({
+        const borrowed = {
           dispatchRaw: original.dispatchRaw,
           onFailure: original.onFailure,
           hook: original.hook,
@@ -163,7 +163,7 @@ describe('global native storage journal', () => {
           defer: original.defer,
           binlog,
           undo: original.undo
-        })
+        }
         return {
           logger: borrowed,
           namespace: 'capacity',

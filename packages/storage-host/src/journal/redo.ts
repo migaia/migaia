@@ -24,7 +24,7 @@ import { StorageErrorText } from '../error-text.js'
 import { createStorageOperationReporter, reportCleanupError } from '../core/operation-reporter.js'
 
 /** Redo borrows the original WAL index and text draft; it owns no queue or native terminal. */
-export async function createStorageRedoJournal(options: {
+type IStorageRedoOptions = {
   readonly access: IStorageJournalBackendAccess
   readonly backend: IBackendKind
   readonly namespace: string
@@ -35,138 +35,168 @@ export async function createStorageRedoJournal(options: {
   readonly beforeRecover?: () => void
   readonly afterRecover?: (count: number, elapsedMs: number) => void
   readonly onRecoverError?: (error: unknown) => void
-}) {
+}
+/** Redo retains one original text binding and borrowed WAL, never a second terminal or queue. */
+type IStorageRedoContext = {
+  readonly options: IStorageRedoOptions
+  readonly binding: NonNullable<IStorageJournalBackendAccess['binding']['redo']>
+  readonly wal: NonNullable<IWalExt['wal']>
+  readonly binlog: IBinlogExt['binlog'] | undefined
+  readonly target: {
+    readonly namespace: string
+    readonly backendInstanceId: string
+    readonly orgId: string
+  }
+}
+/** A possibly applied draft or durable completion never becomes a false rollback. */
+function failStorageRedo(context: IStorageRedoContext, cause: unknown): never {
+  const error =
+    cause instanceof StorageError && cause.code === StorageErrorCode.journalRecordInvalid
+      ? cause
+      : new StorageError(
+          StorageErrorCode.journalRecoveryFailed,
+          { cause },
+          StorageErrorText.journalRecoveryFailed
+        )
+  context.binding.seal(error)
+  throw error
+}
+/** Replay and publication share the original pending record; duplicate binlog is allowed by txId. */
+async function publishStorageRedo(
+  context: IStorageRedoContext,
+  pending: ReturnType<typeof readStorageJournalIntent>
+) {
+  if (!pending.binlog) return
+  if (context.binlog === undefined)
+    throw new StorageContractError(StorageContractErrorCode.unsupported)
+  try {
+    await context.binlog.append(StorageJournalKind.commit, pending.commit)
+  } catch (error) {
+    context.options.onBinlogAppendError?.(pending.txId, error)
+    throw error
+  }
+}
+/** Called only inside this original text owner's protection, including already-open readers. */
+async function recoverStorageRedo(context: IStorageRedoContext): Promise<void> {
+  const started = Date.now()
+  let count = 0
+  context.options.beforeRecover?.()
+  try {
+    for (const row of await context.wal.pending()) {
+      if (row.kind !== StorageJournalKind.redo) continue
+      if (!storageJournalTargetsMatch(readStorageJournalIntentTarget(row.payload), context.target))
+        continue
+      const pending = readStorageJournalIntent(row.payload, context.options.backend, true)
+      const notify = context.binding.replay(pending.changes!)
+      await publishStorageRedo(context, pending)
+      await context.wal.complete(row.seq)
+      if (notify !== undefined)
+        try {
+          notify()
+        } catch (error) {
+          reportCleanupError(context.options.report ?? createStorageOperationReporter(), error)
+        }
+      count += 1
+    }
+    context.options.afterRecover?.(count, Date.now() - started)
+  } catch (cause) {
+    try {
+      failStorageRedo(context, cause)
+    } catch (error) {
+      context.options.onRecoverError?.(error)
+      throw error
+    }
+  }
+}
+/** Detach one ordered native draft before WAL I/O, then apply and durably complete it. */
+async function recordStorageRedo(
+  context: IStorageRedoContext,
+  txId: string,
+  current: object
+): Promise<void> {
+  if (context.binding.transactionInfo(current).id !== txId)
+    throw new StorageContractError(StorageContractErrorCode.invalidArgument)
+  const changes = context.binding.changes(current)
+  if (changes.length === 0) return
+  /** Every target and full image is detached before WAL or the first physical assignment. */
+  const payload = snapshotLogRecords([
+    {
+      kind: StorageJournalKind.redo,
+      payload: {
+        version: 1,
+        target: context.target,
+        txId: txId,
+        binlog: context.binlog !== undefined,
+        undo: false,
+        commit: {
+          version: 1,
+          target: context.target,
+          txId: txId,
+          changes: changes.map((change) => ({
+            target: storageJournalTargetWire(change.target),
+            present: change.after.present,
+            ...(context.options.binlogValues && change.after.present
+              ? { value: change.after.value }
+              : {})
+          }))
+        },
+        changes: changes.map((change) => ({
+          target: storageJournalTargetWire(change.target),
+          before: change.before,
+          after: change.after,
+          afterRevision: change.afterRevision
+        }))
+      }
+    }
+  ])[0]!.payload
+  const pending = readStorageJournalIntent(payload, context.options.backend, true)
+  try {
+    const sequence = await context.wal.begin(StorageJournalKind.redo, payload as ILogPayload)
+    context.binding.apply(current)
+    await publishStorageRedo(context, pending)
+    await context.wal.complete(sequence)
+  } catch (cause) {
+    failStorageRedo(context, cause)
+  }
+}
+/** Activate capture only on the text owner's authentic original scope. */
+function beginStorageRedo(context: IStorageRedoContext, scope: object) {
+  const info = context.binding.transactionInfo(scope)
+  context.binding.changes(scope)
+  return {
+    txId: info.id,
+    record: (current: object) => recordStorageRedo(context, info.id, current)
+  }
+}
+/** Initial recovery finishes before publication; native protection still encloses all later work. */
+export async function createStorageRedoJournal(options: IStorageRedoOptions) {
   const { access, logger } = options
   const binding = access.binding.redo
   const wal = logger.wal
   const binlog = logger.binlog
   if (binding === undefined || wal === undefined)
     throw new StorageContractError(StorageContractErrorCode.unsupported)
-  const target = {
-    namespace: options.namespace,
-    backendInstanceId: access.backendInstanceId,
-    orgId: access.orgId
+  const context: IStorageRedoContext = {
+    options,
+    binding,
+    wal,
+    binlog,
+    target: {
+      namespace: options.namespace,
+      backendInstanceId: access.backendInstanceId,
+      orgId: access.orgId
+    }
   }
   await Promise.all([wal.ready(), binlog?.ready()])
-  /** A possibly applied draft or durable completion never becomes a false rollback. */
-  const failed = (cause: unknown): never => {
-    const error =
-      cause instanceof StorageError && cause.code === StorageErrorCode.journalRecordInvalid
-        ? cause
-        : new StorageError(
-            StorageErrorCode.journalRecoveryFailed,
-            { cause },
-            StorageErrorText.journalRecoveryFailed
-          )
-    binding.seal(error)
-    throw error
-  }
-  /** Replay and publication share the original pending record; duplicate binlog is allowed by txId. */
-  const publish = async (pending: ReturnType<typeof readStorageJournalIntent>) => {
-    if (!pending.binlog) return
-    if (binlog === undefined) throw new StorageContractError(StorageContractErrorCode.unsupported)
-    try {
-      await binlog.append(StorageJournalKind.commit, pending.commit)
-    } catch (error) {
-      options.onBinlogAppendError?.(pending.txId, error)
-      throw error
-    }
-  }
-  /** Called only inside this original text owner's protection, including already-open readers. */
-  const recover = async (): Promise<void> => {
-    const started = Date.now()
-    let count = 0
-    options.beforeRecover?.()
-    try {
-      for (const row of await wal.pending()) {
-        if (row.kind !== StorageJournalKind.redo) continue
-        if (!storageJournalTargetsMatch(readStorageJournalIntentTarget(row.payload), target))
-          continue
-        const pending = readStorageJournalIntent(row.payload, options.backend, true)
-        const notify = binding.replay(pending.changes!)
-        await publish(pending)
-        await wal.complete(row.seq)
-        if (notify !== undefined)
-          try {
-            notify()
-          } catch (error) {
-            reportCleanupError(options.report ?? createStorageOperationReporter(), error)
-          }
-        count += 1
-      }
-      options.afterRecover?.(count, Date.now() - started)
-    } catch (cause) {
-      try {
-        failed(cause)
-      } catch (error) {
-        options.onRecoverError?.(error)
-        throw error
-      }
-    }
-  }
-  /** Initial recovery finishes before the original host publishes this selected configuration. */
-  await binding.protect(recover)
+  await binding.protect(() => recoverStorageRedo(context))
   return {
     headLocks: [] as readonly ILockKey[],
     undo: undefined,
-    /** There is no second admission queue: native protection encloses recovery plus original work. */
     runRedo: <R>(run: () => Promise<R>, signal?: IOperationContext['signal']): Promise<R> =>
       binding.protect(async () => {
-        await recover()
+        await recoverStorageRedo(context)
         return run()
       }, signal),
-    begin: (scope: object) => {
-      const info = binding.transactionInfo(scope)
-      binding.changes(scope)
-      return {
-        txId: info.id,
-        record: async (current: object): Promise<void> => {
-          if (binding.transactionInfo(current).id !== info.id)
-            throw new StorageContractError(StorageContractErrorCode.invalidArgument)
-          const changes = binding.changes(current)
-          if (changes.length === 0) return
-          /** Every target and full image is detached before WAL or the first physical assignment. */
-          const payload = snapshotLogRecords([
-            {
-              kind: StorageJournalKind.redo,
-              payload: {
-                version: 1,
-                target,
-                txId: info.id,
-                binlog: binlog !== undefined,
-                undo: false,
-                commit: {
-                  version: 1,
-                  target,
-                  txId: info.id,
-                  changes: changes.map((change) => ({
-                    target: storageJournalTargetWire(change.target),
-                    present: change.after.present,
-                    ...(options.binlogValues && change.after.present
-                      ? { value: change.after.value }
-                      : {})
-                  }))
-                },
-                changes: changes.map((change) => ({
-                  target: storageJournalTargetWire(change.target),
-                  before: change.before,
-                  after: change.after,
-                  afterRevision: change.afterRevision
-                }))
-              }
-            }
-          ])[0]!.payload
-          const pending = readStorageJournalIntent(payload, options.backend, true)
-          try {
-            const sequence = await wal.begin(StorageJournalKind.redo, payload as ILogPayload)
-            binding.apply(current)
-            await publish(pending)
-            await wal.complete(sequence)
-          } catch (cause) {
-            failed(cause)
-          }
-        }
-      }
-    }
+    begin: (scope: object) => beginStorageRedo(context, scope)
   }
 }

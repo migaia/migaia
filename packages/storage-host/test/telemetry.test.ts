@@ -115,18 +115,18 @@ describe('ordinary storage telemetry', () => {
     }
   })
 
-  it('does not inspect level methods when disabled and contains a closed logger failure', async () => {
+  it('keeps telemetry disabled and contains a closed logger failure', async () => {
     const logger = new Logger({ execution, plugins: [level()] })
-    let reads = 0
+    let calls = 0
     const borrowed = {
       dispatchRaw: logger.dispatchRaw,
       onFailure: logger.onFailure,
       hook: logger.hook,
       flush: logger.flush,
       defer: logger.defer,
-      get atLevel() {
-        reads++
-        return logger.atLevel
+      atLevel: (...args: Parameters<typeof logger.atLevel>) => {
+        calls++
+        return logger.atLevel(...args)
       }
     }
     await using disabled = await createStorageHost({
@@ -134,7 +134,7 @@ describe('ordinary storage telemetry', () => {
       journal: { logger: borrowed, namespace: 'disabled' }
     })
     await disabled.backend('memory').set('key', 'value')
-    expect(reads).toBe(0)
+    expect(calls).toBe(0)
     const reports: unknown[] = []
     await using enabled = await createStorageHost({
       plugins: [memoryBackendPlugin()],

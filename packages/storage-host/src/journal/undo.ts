@@ -170,13 +170,59 @@ export function readStorageUndoRows(
 }
 
 /** Undo borrows original committed images and executes only the backend's original lock builder. */
-export function createStorageJournalUndo(options: {
+type IStorageUndoOptions = {
   readonly access: IStorageJournalBackendAccess
   readonly backend: IBackendKind
   readonly target: Readonly<{ namespace: string; backendInstanceId: string; orgId: string }>
   readonly undo: IUndoLogExt['undo']
   readonly terminal: IStorageJournalNamespace
-}) {
+}
+/** Fixed-org undo authority remains borrowed from the original logger and backend terminal. */
+type IStorageUndoContext = {
+  readonly options: IStorageUndoOptions
+  readonly binding: IStorageJournalBackendAccess['binding']
+}
+/** Restore only after all revisions and semantic images match under the original business locks. */
+async function executeStorageJournalUndo(
+  context: IStorageUndoContext,
+  txId: string,
+  run: IStorageJournalUndoRunner
+): Promise<{ readonly txId: string }> {
+  if (typeof txId !== 'string' || txId.length === 0)
+    throw new StorageContractError(StorageContractErrorCode.invalidArgument)
+  /** The borrowed logger returns only its original committed transaction index entry. */
+  const stored = await context.options.undo.get(txId)
+  if (stored === undefined)
+    throw new StorageError(StorageErrorCode.undoNotFound, {}, StorageErrorText.undoNotFound)
+  /** All mirror validation completes before the original business locks are acquired. */
+  const rows = readStorageUndoRows(stored, context.options.target, context.options.backend)
+  /** The backend maps metadata onto its existing point; canonical ordering remains in tx().lock. */
+  const keys = snapshotConcurrencyLockKeys(
+    rows.map((row) => context.binding.lockTarget!(row.target)),
+    context.options.backend
+  ).keys
+  return run(keys, async (scope) => {
+    /** A successful undo returns the actual new native transaction identity. */
+    const info = context.options.terminal.transactionInfo(scope)
+    /** Check every complete revision and current semantic image before staging any restore. */
+    for (const row of rows) {
+      /** Clear epochs and tombstones remain opaque complete facts from the original backend. */
+      const revision = await context.binding.readRevision!(scope, row.target)
+      /** Compare the same codec wire and presence that were persisted at the original commit. */
+      const current = await context.binding.readImage!(scope, row.target)
+      if (
+        !equalStorageJournalPayload(revision, row.afterRevision) ||
+        current.present !== row.after.present ||
+        (current.present && row.after.present && current.value !== row.after.value)
+      )
+        throw new StorageError(StorageErrorCode.undoConflict, {}, StorageErrorText.undoConflict)
+    }
+    for (const row of rows) await context.binding.writeImage!(scope, row.target, row.before)
+    return { txId: info.id }
+  })
+}
+/** Admit native restore methods once and expose the same single callable undo entry. */
+export function createStorageJournalUndo(options: IStorageUndoOptions) {
   const { binding } = options.access
   if (
     binding.readImage === undefined ||
@@ -185,41 +231,7 @@ export function createStorageJournalUndo(options: {
     binding.lockTarget === undefined
   )
     throw new StorageContractError(StorageContractErrorCode.unsupported)
-  return async (
-    txId: string,
-    run: IStorageJournalUndoRunner
-  ): Promise<{ readonly txId: string }> => {
-    if (typeof txId !== 'string' || txId.length === 0)
-      throw new StorageContractError(StorageContractErrorCode.invalidArgument)
-    /** The borrowed logger returns only its original committed transaction index entry. */
-    const stored = await options.undo.get(txId)
-    if (stored === undefined)
-      throw new StorageError(StorageErrorCode.undoNotFound, {}, StorageErrorText.undoNotFound)
-    /** All mirror validation completes before the original business locks are acquired. */
-    const rows = readStorageUndoRows(stored, options.target, options.backend)
-    /** The backend maps metadata onto its existing point; canonical ordering remains in tx().lock. */
-    const keys = snapshotConcurrencyLockKeys(
-      rows.map((row) => binding.lockTarget!(row.target)),
-      options.backend
-    ).keys
-    return run(keys, async (scope) => {
-      /** A successful undo returns the actual new native transaction identity. */
-      const info = options.terminal.transactionInfo(scope)
-      /** Check every complete revision and current semantic image before staging any restore. */
-      for (const row of rows) {
-        /** Clear epochs and tombstones remain opaque complete facts from the original backend. */
-        const revision = await binding.readRevision!(scope, row.target)
-        /** Compare the same codec wire and presence that were persisted at the original commit. */
-        const current = await binding.readImage!(scope, row.target)
-        if (
-          !equalStorageJournalPayload(revision, row.afterRevision) ||
-          current.present !== row.after.present ||
-          (current.present && row.after.present && current.value !== row.after.value)
-        )
-          throw new StorageError(StorageErrorCode.undoConflict, {}, StorageErrorText.undoConflict)
-      }
-      for (const row of rows) await binding.writeImage!(scope, row.target, row.before)
-      return { txId: info.id }
-    })
-  }
+  const context: IStorageUndoContext = { options, binding }
+  return (txId: string, run: IStorageJournalUndoRunner) =>
+    executeStorageJournalUndo(context, txId, run)
 }

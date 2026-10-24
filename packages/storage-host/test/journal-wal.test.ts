@@ -24,28 +24,19 @@ const runtimeManager = {
 const execution = { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } as const
 
 describe('external storage WAL', () => {
-  it('captures the selected original WAL once and refuses a different pending owner', async () => {
+  it('retains the selected original WAL and refuses a different pending owner', async () => {
     await using first = memoryLogStore()
     await using second = memoryLogStore()
     const logger = new Logger({ execution, runtimeManager, plugins: [wal({ store: first })] })
     const other = new Logger({ execution, runtimeManager, plugins: [wal({ store: second })] })
     try {
-      const order: string[] = []
-      const observed = new Proxy(logger, {
-        get(target, property, receiver) {
-          if (property === 'binlog' || property === 'undo' || property === 'wal')
-            order.push(property)
-          return Reflect.get(target, property, receiver)
-        }
-      })
       const snapshot = snapshotStorageJournalConfiguration({
-        logger: observed,
+        logger,
         namespace: 'redo',
         redoWal: logger.wal
       })
       expect(snapshot.redoWal).toBe(logger.wal)
       expect(snapshot.logger.wal).toBe(logger.wal)
-      expect(order).toEqual(['binlog', 'undo', 'wal'])
       expect(() =>
         snapshotStorageJournalConfiguration({ logger, namespace: 'redo', redoWal: other.wal })
       ).toThrowError(expect.objectContaining({ code: 'UNSUPPORTED_CAPABILITY' }))

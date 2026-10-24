@@ -5,7 +5,6 @@ import {
   type ILockKey,
   type ITransactionScope
 } from '@migaia/storage-contract'
-import { isStorageErrorFamily } from '../core/error-family.js'
 import type { IStorageJournalBackendAccess } from './binding.js'
 
 /**
@@ -23,15 +22,10 @@ export type IStorageLogNativeAccess = {
 }
 /** Native atomic configuration must select the exact original canonical log object. */
 export function resolveStorageLogNativeAccess(store: ILogStore): IStorageLogNativeAccess {
-  try {
-    const resolve = (store as ILogStore & { [storageLogNativeAccess]?: unknown })[
-      storageLogNativeAccess
-    ]
-    if (typeof resolve !== 'function')
-      throw new StorageContractError(StorageContractErrorCode.unsupported)
-    return Reflect.apply(resolve, store, [store]) as IStorageLogNativeAccess
-  } catch (cause) {
-    if (isStorageErrorFamily(cause)) throw cause
-    throw new StorageContractError(StorageContractErrorCode.invalidArgument, { cause })
+  const owner = store as ILogStore & {
+    [storageLogNativeAccess]?: (candidate: ILogStore) => IStorageLogNativeAccess
   }
+  if (typeof owner[storageLogNativeAccess] !== 'function')
+    throw new StorageContractError(StorageContractErrorCode.unsupported)
+  return owner[storageLogNativeAccess](store)
 }

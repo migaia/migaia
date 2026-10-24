@@ -41,77 +41,96 @@ export type IBackendJournalNamespaceOptions = {
   readonly transaction: <R>(work: (port: IBackendJournalTransaction) => Promise<R>) => Promise<R>
 }
 
-/** Reuse the original namespace reservation, quiescence and dual-disposal resource algorithm. */
-export async function createBackendJournalNamespace(
-  options: IBackendJournalNamespaceOptions
-): Promise<IStorageJournalNamespace> {
-  options.assertLive()
-  /** The backend's original reservation owns acquisition and eventual release. */
-  const acquired = deferred<void>()
-  const released = deferred<void>()
-  const reservation = options.reserve(async () => {
-    acquired.resolve()
-    await released.promise
-  })
-  void reservation.then(undefined, acquired.reject)
-  await acquired.promise
-  /** Accepted I/O and native terminals share lifecycle's original drain owner. */
-  const lifetime = createQuiescenceTracker<object>()
-  const resource = {}
-  const attempts = new Map<string, () => void>()
-  let main: Promise<void> | undefined
-  let symbolic: Promise<void> | undefined
-  let unsubscribe = () => undefined as void
-  const assertOpen = (): void => {
-    options.assertLive()
-    if (lifetime.isSealed(resource))
+/** One namespace owns only its original reservation, accepted work and cached disposal promises. */
+class BackendJournalNamespace implements IStorageJournalNamespace {
+  /** Native authority and quiescence remain borrowed from their original owners. */
+  readonly #options: IBackendJournalNamespaceOptions
+  /** The original backend reservation stays held until all retained native work has ended. */
+  readonly #released: ReturnType<typeof deferred<void>>
+  /** The original reservation reports eventual release failure on explicit disposal. */
+  readonly #reservation: Promise<void>
+  /** Lifecycle's tracker counts accepted I/O and real native attempts only. */
+  readonly #lifetime = createQuiescenceTracker<object>()
+  /** This namespace is the tracker key; it carries no independent generation or lease system. */
+  readonly #resource = {}
+  /** Authenticated native attempts retain one original quiescence hold until their actual end. */
+  readonly #attempts = new Map<string, () => void>()
+  /** Explicit cleanup caches the original rejecting completion. */
+  #main: Promise<void> | undefined
+  /** Symbol cleanup caches its separately reported completion. */
+  #symbolic: Promise<void> | undefined
+  /** The original backend close signal has one listener, removed after disposal settles. */
+  #unsubscribe = () => undefined as void
+  /** Native atomicity is an admitted fact, never inferred from a backend label. */
+  readonly nativeAtomic: boolean
+  /** Nonexclusive namespaces cannot retain a private cached log index. */
+  declare readonly indexExclusive?: false
+
+  /** Adopt an acquired reservation without creating another native or lifecycle owner. */
+  constructor(
+    options: IBackendJournalNamespaceOptions,
+    released: ReturnType<typeof deferred<void>>,
+    reservation: Promise<void>
+  ) {
+    this.#options = options
+    this.#released = released
+    this.#reservation = reservation
+    this.nativeAtomic = options.nativeAtomic
+    if (options.indexExclusive !== undefined) this.indexExclusive = options.indexExclusive
+    this.#unsubscribe = subscribeToAbort(
+      options.closingSignal,
+      () => {
+        void this.dispose().catch(options.report)
+      },
+      options.report
+    )
+  }
+  /** Native work rechecks the backend owner and this namespace's original sealed state. */
+  readonly assertLive = (): void => {
+    this.#options.assertLive()
+    if (this.#lifetime.isSealed(this.#resource))
       throw new StorageContractError(StorageContractErrorCode.disposed, {
-        backend: options.backend
+        backend: this.#options.backend
       })
   }
-  /** Retain only real native work; a transactionInfo lookup itself grants no retained work. */
-  const transaction = (scope: Omit<ITransactionScope, 'use'>): IBackendJournalTransaction => {
-    const current = options.authenticate(scope)
-    if (!attempts.has(current.info.id)) {
-      assertOpen()
-      const release = lifetime.retain(resource)
+  /** Retain real native work; transactionInfo alone does not extend resource lifetime. */
+  #transaction(scope: Omit<ITransactionScope, 'use'>): IBackendJournalTransaction {
+    const current = this.#options.authenticate(scope)
+    if (!this.#attempts.has(current.info.id)) {
+      this.assertLive()
+      const release = this.#lifetime.retain(this.#resource)
       let off: (() => void) | undefined
       const finish = () => {
         off?.()
-        attempts.delete(current.info.id)
+        this.#attempts.delete(current.info.id)
         release()
       }
-      attempts.set(current.info.id, finish)
+      this.#attempts.set(current.info.id, finish)
       off = current.port.onEnd(finish)
     }
     return current.port
   }
-  const dispose = (): Promise<void> => {
-    if (main !== undefined) return main
-    lifetime.seal(resource)
-    main = lifetime
-      .whenZero(resource)
+  /** Explicit disposal waits for accepted work and returns the same original completion. */
+  readonly dispose = (): Promise<void> => {
+    if (this.#main !== undefined) return this.#main
+    this.#lifetime.seal(this.#resource)
+    this.#main = this.#lifetime
+      .whenZero(this.#resource)
       .then(async () => {
-        released.resolve()
-        await reservation
+        this.#released.resolve()
+        await this.#reservation
       })
-      .finally(() => unsubscribe())
-    return main
+      .finally(() => this.#unsubscribe())
+    return this.#main
   }
-  unsubscribe = subscribeToAbort(
-    options.closingSignal,
-    () => {
-      void dispose().catch(options.report)
-    },
-    options.report
-  )
-  const run = <R>(
+  /** Public native execution retains original transaction and post-commit publication order. */
+  readonly run = <R>(
     work: (view: IStorageJournalNamespaceView) => Promise<R>,
     scope?: Omit<ITransactionScope, 'use'>,
     committed?: (value: R) => void
   ): Promise<R> => {
     try {
-      assertOpen()
+      this.assertLive()
       if (typeof work !== 'function')
         throw new StorageContractError(StorageContractErrorCode.invalidArgument)
       const invoke = (port: IBackendJournalTransaction): Promise<R> =>
@@ -123,41 +142,55 @@ export async function createBackendJournalNamespace(
                 return value
               })
             )
-      if (scope !== undefined) return invoke(transaction(scope))
-      const release = lifetime.retain(resource)
-      return options.transaction(invoke).finally(release)
+      if (scope !== undefined) return invoke(this.#transaction(scope))
+      const release = this.#lifetime.retain(this.#resource)
+      return this.#options.transaction(invoke).finally(release)
     } catch (error) {
       return Promise.reject(error)
     }
   }
-  const listen = (scope: Omit<ITransactionScope, 'use'>, effect: () => void, success: boolean) => {
+  /** Terminal observers remain registered on the original authenticated attempt. */
+  #listen(scope: Omit<ITransactionScope, 'use'>, effect: () => void, success: boolean) {
     if (typeof effect !== 'function')
       throw new StorageContractError(StorageContractErrorCode.invalidArgument)
-    const port = transaction(scope)
+    const port = this.#transaction(scope)
     return success ? port.onCommit(effect) : port.onRollback(effect)
   }
-  return {
-    nativeAtomic: options.nativeAtomic,
-    ...(options.indexExclusive === undefined ? {} : { indexExclusive: options.indexExclusive }),
-    assertLive: assertOpen,
-    transactionInfo: (scope: Omit<ITransactionScope, 'use'>) => {
-      assertOpen()
-      return options.authenticate(scope).info
-    },
-    run,
-    runCommitted: <R>(
-      work: (view: IStorageJournalNamespaceView) => Promise<R>,
-      committed: (value: R) => void
-    ) => {
-      if (typeof committed !== 'function')
-        return Promise.reject(new StorageContractError(StorageContractErrorCode.invalidArgument))
-      return run(work, undefined, committed)
-    },
-    onCommit: (scope: Omit<ITransactionScope, 'use'>, effect: () => void) =>
-      listen(scope, effect, true),
-    onRollback: (scope: Omit<ITransactionScope, 'use'>, effect: () => void) =>
-      listen(scope, effect, false),
-    dispose,
-    [asyncDisposeKey]: () => (symbolic ??= dispose().catch(options.report))
+  /** Information lookup authenticates the scope without retaining native work. */
+  readonly transactionInfo = (scope: Omit<ITransactionScope, 'use'>) => {
+    this.assertLive()
+    return this.#options.authenticate(scope).info
   }
+  /** Publish inside the original commit terminal before its head reservation is released. */
+  readonly runCommitted = <R>(
+    work: (view: IStorageJournalNamespaceView) => Promise<R>,
+    committed: (value: R) => void
+  ) => {
+    if (typeof committed !== 'function')
+      return Promise.reject(new StorageContractError(StorageContractErrorCode.invalidArgument))
+    return this.run(work, undefined, committed)
+  }
+  /** A successful native commit alone invokes this observer. */
+  readonly onCommit = (scope: Omit<ITransactionScope, 'use'>, effect: () => void) =>
+    this.#listen(scope, effect, true)
+  /** A known native rollback alone invokes this observer. */
+  readonly onRollback = (scope: Omit<ITransactionScope, 'use'>, effect: () => void) =>
+    this.#listen(scope, effect, false)
+  /** Symbol disposal reports the original explicit error and caches its own stable promise. */
+  readonly [asyncDisposeKey] = () => (this.#symbolic ??= this.dispose().catch(this.#options.report))
+}
+/** Acquire the backend's original reservation before exposing the named namespace resource. */
+export async function createBackendJournalNamespace(
+  options: IBackendJournalNamespaceOptions
+): Promise<IStorageJournalNamespace> {
+  options.assertLive()
+  const acquired = deferred<void>()
+  const released = deferred<void>()
+  const reservation = options.reserve(async () => {
+    acquired.resolve()
+    await released.promise
+  })
+  void reservation.then(undefined, acquired.reject)
+  await acquired.promise
+  return new BackendJournalNamespace(options, released, reservation)
 }
