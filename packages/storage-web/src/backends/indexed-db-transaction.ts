@@ -75,6 +75,8 @@ export async function runNativeIndexedDbTransaction<
   readonly observer?: ITransactionStageObserver
   readonly waitPhysical: <T>(pending: Promise<T>) => Promise<T>
   readonly registerNative: (scope: TScope, abort: () => void) => () => void
+  /** Private journal observers receive only the actual native complete/abort decision. */
+  readonly onNativeEnd?: (committed: boolean) => void
   /** Final synchronous native decision, after the owner's actual finalizers and observers. */
   readonly validateCommit?: () => void
   readonly changedKeys: () => number
@@ -127,6 +129,7 @@ export async function runNativeIndexedDbTransaction<
         input.transaction,
         () => {
           nativeEnded = true
+          input.onNativeEnd?.(true)
           if (!commitChosen) {
             fail(new Error(StorageErrorText.indexedDbTransactionEndedEarly))
             reject(primary)
@@ -137,6 +140,7 @@ export async function runNativeIndexedDbTransaction<
         },
         () => {
           nativeEnded = true
+          input.onNativeEnd?.(false)
           guardRunning = false
           fail(primary ?? readIdbTransactionError(input.transaction))
           reject(primary)
@@ -149,6 +153,7 @@ export async function runNativeIndexedDbTransaction<
       void aborted.then(
         () => {
           nativeEnded = true
+          input.onNativeEnd?.(false)
           reject(primary)
         },
         (observationFailure) => {

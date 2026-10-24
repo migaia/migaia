@@ -1,5 +1,10 @@
 import { bindBrowserExecution } from './execution.js'
 import {
+  createIndexedDbJournalTerminal,
+  createIndexedDbJournalView,
+  IndexedDbJournalLayout
+} from './indexed-db-journal.js'
+import {
   captureIndexedDbTtlClock,
   createIndexedDbTtlAccess,
   IndexedDbTtlLayout
@@ -33,6 +38,7 @@ import {
   TransactionBeforeStage,
   TransactionObservedStage,
   ConcurrencyHolderState,
+  ConcurrencyPolicy,
   type ITransactionOptions,
   type IConcurrencyAttempt,
   type ILockKey,
@@ -50,12 +56,17 @@ import {
 import { isStorageErrorFamily, type IStorageErrorFamily } from './errors.js'
 import {
   createBackendChangeIterator,
+  createBackendJournalNamespace,
+  storageJournalLockKey,
+  StorageJournalLock,
+  type IBackendJournalTransaction,
   createStorageOperationReporter,
   createStorageOperationRuntime,
   reportCleanupError,
   resolveStorageNamespace,
   type IStorageOperationRuntime
 } from '@migaia/storage-host/authoring/backend'
+import type { IStorageJournalBackendBinding } from '@migaia/storage-host'
 import {
   createStorageAggregateError,
   StorageError,
@@ -264,6 +275,7 @@ type IIndexedDbPhysical<TValue> = IBackendConstruction<
   IIndexedDbProvidedStore<TValue>,
   IDBDatabase
 > & {
+  readonly journalBinding: IStorageJournalBackendBinding
   getPreparedClient(): IDBDatabase | Promise<IDBDatabase>
   getTransactionClient(scope: object): IDBTransaction
 }
@@ -652,6 +664,13 @@ export const indexedDbHost = <TValue = unknown>(
       .BroadcastChannel
   } catch {
     broadcastChannel = undefined
+  }
+  /** Real persistent databases need the browser's native lifetime lock across participating pages. */
+  let webLocks: LockManager | undefined
+  try {
+    webLocks = globalThis.navigator?.locks
+  } catch {
+    webLocks = undefined
   }
   const dbName = configuredDbName === undefined ? 'storage-web' : configuredDbName
   const kvStoreName = configuredKvStoreName === undefined ? 'kv' : configuredKvStoreName
@@ -1836,6 +1855,8 @@ export const indexedDbHost = <TValue = unknown>(
   const assertLive = (): void => {
     controller.assertLive()
   }
+  /** Physical deletion invalidates cached private log indexes without replacing the borrowed view. */
+  let journalGeneration = Object.freeze({})
 
   /** Private commit-after controller shared by direct and Host-created exact stores. */
   const controller = runtime.createChangeController({
@@ -2533,6 +2554,7 @@ export const indexedDbHost = <TValue = unknown>(
         try {
           // 别的标签页要升级时必须让路，否则对方会一直 blocked。
           connected.onversionchange = () => {
+            journalGeneration = Object.freeze({})
             try {
               connected.close()
             } catch {
@@ -2815,6 +2837,10 @@ export const indexedDbHost = <TValue = unknown>(
     string,
     {
       readonly native: IDBTransaction
+      readonly journal: (
+        scope: Omit<ITransactionScope, 'use'>,
+        prefix: string
+      ) => IBackendJournalTransaction
       readonly abort: () => void
       readonly clearRoot: (channel: 'value' | 'bytes' | 'record' | undefined) => Promise<void>
       readonly ttl: (scope: ITransactionScope) => ITransactionTtlApi
@@ -3083,6 +3109,11 @@ export const indexedDbHost = <TValue = unknown>(
                     fromIdbRequest(make(), { signal }, operationRuntime).catch((cause) => {
                       throw attemptFailure ?? cause
                     })
+                  /**
+                   * Allocate terminal channels only when an admitted private namespace borrows this
+                   * attempt.
+                   */
+                  let journalTerminal: ReturnType<typeof createIndexedDbJournalTerminal> | undefined
                   /** One physical access owns all data/deadline mutations in this native attempt. */
                   const {
                     changed,
@@ -3758,6 +3789,26 @@ export const indexedDbHost = <TValue = unknown>(
                       const { id } = assertTransactionOwner(store, scope)
                       nativeTransactions.set(id, {
                         native,
+                        journal: (view, prefix) => {
+                          journalTerminal ??= createIndexedDbJournalTerminal((error) =>
+                            reportCleanupError(operationRuntime.reporter, error)
+                          )
+                          /** No raw native handle or commit right leaves this physical owner. */
+                          const metadata = createIndexedDbJournalView({
+                            scope: view,
+                            metadata: native.objectStore(META_STORE_NAME),
+                            namespace: INTERNAL_META_NAMESPACE,
+                            prefix,
+                            keyRange: keyRange!,
+                            request
+                          })
+                          return {
+                            onCommit: journalTerminal.onCommit,
+                            onRollback: journalTerminal.onRollback,
+                            onEnd: journalTerminal.onEnd,
+                            run: (work) => runTransactionOperation(view, () => work(metadata))
+                          }
+                        },
                         abort,
                         clearRoot,
                         expiredRecord: (key) => ttlAccess.expired('record', key),
@@ -3840,6 +3891,7 @@ export const indexedDbHost = <TValue = unknown>(
                         nativeTransactions.delete(id)
                       }
                     },
+                    onNativeEnd: (committed) => journalTerminal?.complete(committed),
                     beforeCommit: async () => {
                       for (const { handle, indexName, indexValue } of uniqueChecks.values()) {
                         const owners = await request(() =>
@@ -5172,6 +5224,7 @@ export const indexedDbHost = <TValue = unknown>(
             StorageOperation.indexedDbDelete
           )
         })
+        journalGeneration = Object.freeze({})
         publishChange({ channel: 'all', kind: 'clear' })
       })
       .finally(() => {
@@ -5182,6 +5235,102 @@ export const indexedDbHost = <TValue = unknown>(
   /** Retain the original provider, transaction owner, and native deletion closure for every org. */
   const physical: IIndexedDbPhysical<TValue> = {
     ...construction,
+    journalBinding: {
+      forOrg: (orgId) => (orgBinding?.resolve(orgId) ?? physical).journalBinding,
+      openNamespace: async (prefix) => {
+        assertLive()
+        if (typeof prefix !== 'string' || prefix.length === 0)
+          throw new StorageContractError(StorageContractErrorCode.invalidArgument)
+        if (keyRange === undefined)
+          throw new StorageContractError(StorageContractErrorCode.unsupported)
+        /** Private methods and cached index reads retain this original physical generation. */
+        const generation = journalGeneration
+        const authenticate = (scope: Omit<ITransactionScope, 'use'>) => {
+          const info = assertTransactionOwner(construction.store, scope)
+          const current = nativeTransactions.get(info.id)
+          if (current === undefined)
+            throw new StorageContractError(StorageContractErrorCode.invalidArgument)
+          return { info, port: current.journal(scope, prefix) }
+        }
+        return createBackendJournalNamespace({
+          assertLive: () => {
+            assertLive()
+            if (generation !== journalGeneration)
+              throw new StorageContractError(StorageContractErrorCode.disposed)
+          },
+          closingSignal: controller.closingSignal,
+          backend: StorageBackend.indexedDb,
+          report: (error) => reportCleanupError(coordinationReporter, error),
+          nativeAtomic: true,
+          indexExclusive:
+            factory === realmDefaultFactory && webLocks === undefined ? false : undefined,
+          reserve: (hold) =>
+            runWithConcurrency(
+              {
+                store,
+                options: { lock: [storageJournalLockKey(prefix, StorageJournalLock.resource)] },
+                policy: ConcurrencyPolicy.fail()
+              },
+              {
+                attempt: (context) =>
+                  coordination.keyPort.attemptMetadata(
+                    context,
+                    {
+                      status: ConcurrencyHolderState.held,
+                      owner: controller.origin,
+                      label: ownerLabel,
+                      scope: 'local',
+                      since: Date.now()
+                    },
+                    {
+                      attempt: async () => {
+                        if (factory === realmDefaultFactory && webLocks !== undefined) {
+                          /**
+                           * Native Web Locks owns lifetime exclusion; no expiring metadata lease is
+                           * substituted.
+                           */
+                          const name = encodeFlatStorageKey([
+                            IndexedDbJournalLayout.resource,
+                            dbName,
+                            prefix
+                          ])
+                          await webLocks
+                            .request(
+                              name,
+                              { mode: 'exclusive', ifAvailable: true },
+                              async (lock) => {
+                                if (lock === null)
+                                  throw new StorageContractError(
+                                    StorageContractErrorCode.lockRejected
+                                  )
+                                await hold()
+                              }
+                            )
+                            .catch((cause: unknown) => {
+                              throw normalizeIndexedDbOperationError(cause)
+                            })
+                        } else await hold()
+                        return { status: 'committed', value: undefined }
+                      }
+                    },
+                    runtime.stageBindings.concurrencyStages(construction.store),
+                    controller.closingSignal
+                  )
+              }
+            ),
+          authenticate,
+          transaction: (work) =>
+            withMutationLease((lease) =>
+              runTransaction(
+                (scope) => work(authenticate(scope).port),
+                { lock: [storageJournalLockKey(prefix, StorageJournalLock.head)] },
+                lease,
+                false
+              )
+            )
+        })
+      }
+    },
     dropData,
     getPreparedClient: () => {
       assertLive()

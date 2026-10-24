@@ -159,3 +159,7 @@ try {
   await host.dispose()
 }
 ```
+
+IndexedDB 支持从 `@migaia/storage-host/journal` 调用 `storageLogStore(hostOrOrg, 'indexed-db', { prefix })`。私有行使用既有 META 对象仓库内的数组键命名空间。业务 `clearAll` 保留历史；删除组织使旧日志缓存句柄失效，原业务视图仍可重新打开。重新打开同一物理组织和前缀前须释放原日志。head、state 与记录随原生事务一同提交，缓存索引在真实 complete 事件内发布。
+
+对于当前 realm 的持久 IndexedDB factory，原生 Web Locks 在整个资源期间保证参与页面间独占；冲突打开报 LOCK_REJECTED。缺少 Web Locks 时，此缓存日志组合在恢复 I/O 前报 UNSUPPORTED_CAPABILITY，普通 IndexedDB 操作仍可使用。注入 factory 复用既有同数据域的逻辑锁拥有者。此命名空间支持本身不启用全局自动捕获或显式选择的 undo。

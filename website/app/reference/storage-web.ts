@@ -907,8 +907,8 @@ console.error(error.source, error.code)`,
     },
     IIndexedDbOptions: {
       summary: t(
-        'Native database preparation and physical layout options.',
-        '原生数据库准备与物理布局选项。'
+        'Native database preparation and physical layout options. Private storageLogStore history shares the original META store; persistent cached indexes require native Web Locks lifetime exclusion.',
+        '原生数据库准备与物理布局选项；私有 storageLogStore 历史复用原 META 仓库，持久缓存索引要求原生 Web Locks 全资源期独占。'
       ),
       members: indexedDbFields,
       optionCases: optionCases('indexed-db', 'indexedDbBackendPlugin', 'indexed-db')
