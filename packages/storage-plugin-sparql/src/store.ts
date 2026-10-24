@@ -126,16 +126,19 @@ export function createSparqlBackend(endpoint: ISparqlEndpoint, core: IStoragePlu
     string,
     { store: ISparqlStore; installer: ICapabilityInstallPort; drop: () => Promise<void> }
   >()
-  backendContext.controller = backendContext.core.createChangeController({
-    backend: SparqlText.backend,
-    finalize: async () => {
-      try {
-        await backendContext.resources.dispose()
-      } finally {
-        backendContext.stores.clear()
+  backendContext.controller = backendContext.core.createChangeController(
+    {
+      backend: SparqlText.backend,
+      finalize: async () => {
+        try {
+          await backendContext.resources.dispose()
+        } finally {
+          backendContext.stores.clear()
+        }
       }
-    }
-  }, createBackendChangeController)
+    },
+    createBackendChangeController
+  )
   backendContext.root = forOrg(backendContext, backendContext.core.defaultOrgId)
   return {
     ...backendContext.root,

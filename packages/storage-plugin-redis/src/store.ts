@@ -2728,13 +2728,16 @@ function createRedisEnvironment(
     vectorFactory: undefined,
     controller: undefined!
   }
-  environment.controller = core.createChangeController({
-    backend: RedisText.backend,
-    platform: driver,
-    options,
-    origin: crypto.randomUUID(),
-    finalize: () => disposeRedisEnvironment(environment)
-  }, createBackendChangeController)
+  environment.controller = core.createChangeController(
+    {
+      backend: RedisText.backend,
+      platform: driver,
+      options,
+      origin: crypto.randomUUID(),
+      finalize: () => disposeRedisEnvironment(environment)
+    },
+    createBackendChangeController
+  )
   return environment
 }
 /** Build one pure native organization projection without a second resource owner. */
