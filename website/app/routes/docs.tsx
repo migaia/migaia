@@ -2079,6 +2079,11 @@ function classMemberGroups(members: readonly IApiMember[]) {
   })
 }
 
+/** Computed symbol names contain a dot but still identify one direct member. */
+function isDirectMemberName(name: string): boolean {
+  return !name.includes('.') || /^\[[^\]]+\]$/.test(name)
+}
+
 /**
  * Renders every public instance method and property of one instance surface: a class, an
  * object-shaped type, or the result type a factory returns. For an audited library every sentence
@@ -2137,7 +2142,7 @@ function ClassMemberReference({
 }) {
   /** Documented members the resolved surface does not list; dotted keys render under their parent. */
   const documentedOnly = Object.entries(documented ?? guide?.members ?? {}).filter(
-    ([name]) => !name.includes('.') && !members.some((member) => member.name === name)
+    ([name]) => isDirectMemberName(name) && !members.some((member) => member.name === name)
   )
   if (members.length === 0 && bases.length === 0 && !guide && documentedOnly.length === 0)
     return null
@@ -2371,7 +2376,7 @@ function parameterFieldsDocFor(
     ? instanceGuideFor(reference, module, parameterTypeName(parameter.type))
     : undefined
   /** Dotted entries are subordinate to their top-level field. */
-  const fields = Object.keys(typeDoc?.members ?? {}).filter((name) => !name.includes('.'))
+  const fields = Object.keys(typeDoc?.members ?? {}).filter(isDirectMemberName)
   return fields.length > 0 && fields.every((name) => optionNames.has(name)) ? undefined : typeDoc
 }
 
@@ -3426,6 +3431,13 @@ function SingleApiReference({
           id={`${symbol.fragment}--quick-start`}
         >
           <h2>{locale === 'zh' ? '最小示例' : 'Minimal example'}</h2>
+          {symbolDoc?.exampleIntro ? (
+            <ReferenceParagraphs
+              library={library.slug}
+              locale={locale}
+              text={symbolDoc.exampleIntro}
+            />
+          ) : null}
           {leadCase ? (
             // The first case already is the minimal example; it renders here once with its anchor.
             <div className="reference-case" id={`${symbol.fragment}--case-1`}>
@@ -3436,13 +3448,6 @@ function SingleApiReference({
               <CodeBlock code={quickExample} label={symbol.name} locale={locale} />
               <ReferenceParagraphs library={library.slug} locale={locale} text={leadCase.result} />
             </div>
-          ) : null}
-          {!leadCase && symbolDoc?.exampleIntro ? (
-            <ReferenceParagraphs
-              library={library.slug}
-              locale={locale}
-              text={symbolDoc.exampleIntro}
-            />
           ) : null}
           {leadCase ? null : <CodeBlock code={quickExample} label={symbol.name} locale={locale} />}
           {!leadCase && symbolDoc?.exampleResult ? (
