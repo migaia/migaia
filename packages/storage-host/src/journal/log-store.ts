@@ -104,6 +104,8 @@ export async function openStorageLogStore(
   }
   const report = createStorageOperationReporter()
   let index: ReturnType<typeof createLogStoreIndex> | undefined
+  /** Only a proven lifetime-exclusive namespace may retain the logger index between operations. */
+  let indexExclusive: boolean
   /** Native append composition requires the original owner's pre-release publication callback. */
   let runCommitted: IStorageJournalNamespace['runCommitted']
   /** This descriptor fact is read once before exposing any native append composition. */
@@ -111,13 +113,10 @@ export async function openStorageLogStore(
   /** The original namespace alone can invalidate a cached index after physical organization drop. */
   let assertNamespaceLive: (() => void) | undefined
   try {
-    /** Native commit/terminal authority alone does not prove a lifetime-exclusive cached index. */
-    const indexExclusive = namespace.indexExclusive
-    if (indexExclusive !== undefined) {
-      if (indexExclusive !== false)
-        throw new StorageContractError(StorageContractErrorCode.invalidArgument)
-      throw new StorageContractError(StorageContractErrorCode.unsupported)
-    }
+    const exclusive = namespace.indexExclusive
+    if (exclusive !== undefined && exclusive !== false)
+      throw new StorageContractError(StorageContractErrorCode.invalidArgument)
+    indexExclusive = exclusive !== false
     const assertLive = namespace.assertLive
     if (assertLive !== undefined) {
       if (typeof assertLive !== 'function')
@@ -130,7 +129,8 @@ export async function openStorageLogStore(
     runCommitted = namespace.runCommitted
     if (runCommitted !== undefined && typeof runCommitted !== 'function')
       throw new StorageContractError(StorageContractErrorCode.invalidArgument)
-    index = createLogStoreIndex(await namespace.run(recoverStorageLog))
+    const recovered = await namespace.run(recoverStorageLog)
+    if (indexExclusive) index = createLogStoreIndex(recovered)
   } catch (cause) {
     try {
       await namespace.dispose()
@@ -206,14 +206,16 @@ export async function openStorageLogStore(
   /** Publish all same-attempt batches after their original native owner has actually committed. */
   const committed = (plans: readonly IStorageLogAppend[]): void => {
     let count = 0
+    let lastSeq = 0
     for (const plan of plans) {
       if (plan.batch.length === 0) continue
-      index!.applyAppend(plan.batch)
+      if (indexExclusive) index!.applyAppend(plan.batch)
+      lastSeq = plan.head.lastSeq
       count += plan.batch.length
     }
     if (count === 0) return
     try {
-      appended.publish(Object.freeze({ lastSeq: index!.lastSeq, count }))
+      appended.publish(Object.freeze({ lastSeq, count }))
     } catch (cause) {
       reportCleanupError(report, cause)
     }
@@ -295,9 +297,15 @@ export async function openStorageLogStore(
       return run(async () => {
         if (captured.length === 0) return []
         /** Pure logger admission precedes native wrapping and consults its clock exactly once. */
-        const prepared = prepareLogAppend(captured, index!)
+        const prepared = indexExclusive ? prepareLogAppend(captured, index!) : undefined
         const plan = await write(
-          (view, beforeWrite) => appendStorageLog(view, captured, prepared, beforeWrite),
+          async (view, beforeWrite) => {
+            /** Nonexclusive admission and preparation share the backend's actual write transaction. */
+            const current = indexExclusive
+              ? prepared
+              : prepareLogAppend(captured, await recoverStorageLog(view))
+            return appendStorageLog(view, captured, current, beforeWrite)
+          },
           (plan) => committed([plan])
         )
         return plan.batch.map((row) => row.seq)
@@ -310,9 +318,20 @@ export async function openStorageLogStore(
       } catch (cause) {
         return Promise.reject(cause)
       }
-      return run(() => index!.read(fromSeq, limit))
+      return run(() =>
+        indexExclusive
+          ? index!.read(fromSeq, limit)
+          : namespace.run(async (view) =>
+              createLogStoreIndex(await recoverStorageLog(view)).read(fromSeq, limit)
+            )
+      )
     },
-    lastSeq: () => run(() => index!.lastSeq),
+    lastSeq: () =>
+      run(() =>
+        indexExclusive
+          ? index!.lastSeq
+          : namespace.run(async (view) => (await recoverStorageLog(view)).lastSeq)
+      ),
     onAppend: (listener) => {
       admit()
       if (typeof listener !== 'function')
@@ -326,13 +345,32 @@ export async function openStorageLogStore(
         return Promise.reject(cause)
       }
       return run(async () => {
-        if (!index!.checkTruncate(beforeSeq)) return
+        if (indexExclusive && !index!.checkTruncate(beforeSeq)) return
         const truncated = await write(
-          (view, beforeWrite) => truncateStorageLog(view, beforeSeq, beforeWrite),
-          () => index!.applyTruncate(beforeSeq)
+          async (view, beforeWrite) => {
+            if (
+              !indexExclusive &&
+              !createLogStoreIndex(await recoverStorageLog(view)).checkTruncate(beforeSeq)
+            )
+              return undefined
+            return truncateStorageLog(view, beforeSeq, beforeWrite)
+          },
+          () => {
+            if (indexExclusive) index!.applyTruncate(beforeSeq)
+          }
         )
-        /** Cleanup runs after the floor's real commit, even when native transactions are available. */
-        await write((view, beforeWrite) => reclaimStorageLogRows(view, truncated, beforeWrite))
+        if (truncated === undefined) return
+        /**
+         * A peer may append after the floor commits; cleanup must use this transaction's current
+         * head.
+         */
+        await write(async (view, beforeWrite) =>
+          reclaimStorageLogRows(
+            view,
+            indexExclusive ? truncated : await readStorageLogHead(view),
+            beforeWrite
+          )
+        )
       })
     },
     setState: (seq, state) => {
@@ -344,17 +382,32 @@ export async function openStorageLogStore(
         return Promise.reject(cause)
       }
       return run(async () => {
-        if (!index!.checkState(seq, state)) return
+        if (indexExclusive && !index!.checkState(seq, state)) return
         await write(
-          (view, beforeWrite) => setStorageLogState(view, seq, state, beforeWrite),
-          () => index!.applyState(seq, state)
+          async (view, beforeWrite) => {
+            if (
+              !indexExclusive &&
+              !createLogStoreIndex(await recoverStorageLog(view)).checkState(seq, state)
+            )
+              return
+            await setStorageLogState(view, seq, state, beforeWrite)
+          },
+          () => {
+            if (indexExclusive) index!.applyState(seq, state)
+          }
         )
       })
     },
     states: (filter) =>
       filter !== LogRecordState.pending
         ? Promise.reject(new StorageContractError(StorageContractErrorCode.invalidArgument))
-        : run(() => index!.pending()),
+        : run(() =>
+            indexExclusive
+              ? index!.pending()
+              : namespace.run(async (view) =>
+                  createLogStoreIndex(await recoverStorageLog(view)).pending()
+                )
+          ),
     dispose: () => {
       if (main !== undefined) return main
       const completion = deferred<void>()
