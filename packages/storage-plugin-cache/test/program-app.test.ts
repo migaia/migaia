@@ -1,3 +1,4 @@
+import { storageJournalPlugin } from '@migaia/storage-host/journal'
 import { Pool } from 'pg'
 import { createClientPool } from 'redis'
 import { expect, it } from 'vitest'
@@ -56,7 +57,7 @@ it.each(['memory', 'sqlite', 'redis', 'postgres'] as const)(
             : postgresBackendPlugin({ id: 'data', driver: pgDriver(pg), prefix })
     const host = await createStorageHost({
       org: createOrgId(),
-      plugins: [selectPlugin(), observed],
+      plugins: [storageJournalPlugin(), selectPlugin(), observed],
       hooks: {
         beforeStorageOperation: ({ operation }) => events.push('before:' + operation),
         afterStorageOperation: ({ operation }) => events.push('after:' + operation),

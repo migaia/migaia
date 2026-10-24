@@ -1,3 +1,4 @@
+import { storageJournalPlugin } from '@migaia/storage-host/journal'
 import { Logger } from '@migaia/logger'
 import { binlog, wal, undoLog, memoryLogStore } from '@migaia/logger/plugins/durable'
 import { mkdtemp, rm } from 'node:fs/promises'
@@ -105,6 +106,7 @@ describe('native borrowed cache tiers', () => {
       }),
       host = await createStorageHost({
         plugins: [
+          storageJournalPlugin(),
           memoryBackendPlugin(),
           sqliteBackendPlugin({ driver: connection }),
           postgresBackendPlugin({
