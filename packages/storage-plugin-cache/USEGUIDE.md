@@ -55,3 +55,5 @@ try {
 观察事件为 `onCacheHit`、`onCacheMiss`、`onCacheLoad`、`onCacheInvalidate`、`onCacheTierError`、`onCacheWriteBackDropped`，只含数量与身份，不含键值。层失败降级为未命中或跳过写入，经宿主报告原诊断。组织视图把所有层路由到同一不可变宿主组织上下文。
 
 带计数的 KV `removeByPrefix` 仅单层可用；多层在 I/O 前报 `UNSUPPORTED_CAPABILITY`，因为原生计数无法识别跨层重复逻辑副本。多层无计数删除使用 `invalidate({ prefix })` 或清空方法。`removeMany` 按已给出的不同逻辑键计数，多个副本只计一次。
+
+各层条目同时以该层采样后的有效硬期限限制自身到期时间。原生 `expire` 失败会报告，不能留下可无限命中的副本。正数单次 TTL 在回源或写入前要求所有目标层具有 TTL 能力；共享 KV `setMany` 保留非负有限 TTL 域，零表示立即删除。

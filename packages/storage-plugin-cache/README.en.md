@@ -41,3 +41,5 @@ The cache is eventually consistent with invalidation notifications; it has no cr
 Logical keys are strings. Flat `get` sees only entries written by flat `set`; codec values and negative entries are available through `getOrLoad`, `getOrLoadEntry` and `peek`. `cacheKey` uses the original portable serializer and SHA-256, preserving field-order equivalence and original serializer errors.
 
 The counted KV `removeByPrefix` is available for one tier. With multiple tiers it rejects `UNSUPPORTED_CAPABILITY` before I/O: native counts cannot identify duplicate logical copies across tiers. Use `invalidate({ prefix })` or clear methods for multi-tier deletion without a count. `removeMany` counts distinct supplied logical keys, even when several copies are removed.
+
+Each stored envelope also caps its expiry at that layer's sampled effective hard deadline. A failed native `expire` is reported and cannot leave an unlimited valid cache copy. Positive per-call TTL requires each target tier's TTL capability before loading or writing. Shared KV `setMany` retains its finite nonnegative TTL domain: zero removes immediately.

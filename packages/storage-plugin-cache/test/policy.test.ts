@@ -164,7 +164,7 @@ describe('cache policy composition', () => {
     try {
       const cache = host.backend('cache')
       await cache.getOrLoad('a', async () => 'A', { maxAgeMs: 400, ttlMs: 400 })
-      expect(JSON.parse((await host.backend('tier').get('cache:cache:a'))!).x).toBe(10200)
+      expect(JSON.parse((await host.backend('tier').get('cache:cache:a'))!).x).toBe(10100)
       expect(
         await host.backend('tier').use(ttl).remaining(lockKey.text('cache:cache:a'))
       ).toBeLessThanOrEqual(100)
@@ -363,6 +363,75 @@ describe('cache policy composition', () => {
       expect(await base.backend('fast').get('cache:cache:a')).toContain('newest')
     } finally {
       finish()
+      await host.dispose()
+    }
+  })
+  it('bounds a cache copy even when the native expiry operation fails', async () => {
+    let now = 1000
+    const reports: unknown[] = []
+    const observer = definePlugin('failed-expiry', (core) => ({
+      install() {
+        core.useAsyncPipeline((input, next) => {
+          if (input.backendId === 'tier' && input.operation === 'ttl.expire')
+            throw new RangeError('native expiry failed')
+          return next(input)
+        })
+        return {}
+      }
+    }))
+    const base = await createStorageHost({
+      report: (error) => {
+        reports.push(error)
+      },
+      plugins: [memoryBackendPlugin({ id: 'tier' }), observer]
+    })
+    const host = await base.use(
+      cachePlugin({ propagate: false, clock: () => now, tiers: [{ backend: 'tier', ttlMs: 100 }] })
+    )
+    await host.detect()
+    try {
+      const cache = host.backend('cache'),
+        tier = base.backend('tier')
+      expect(await cache.getOrLoad('a', async () => 'value')).toBe('value')
+      expect(JSON.parse((await tier.get('cache:cache:a'))!).x).toBe(1100)
+      expect(await tier.use(ttl).remaining(lockKey.text('cache:cache:a'))).toBeUndefined()
+      expect(reports).toHaveLength(1)
+      now += 101
+      expect(await cache.peek('a')).toBeUndefined()
+      expect(await tier.get('cache:cache:a')).toBeNull()
+    } finally {
+      await host.dispose()
+    }
+  })
+  it('admits native batch immediate expiry without granting positive call TTL on a non-TTL tier', async () => {
+    const base = await createStorageHost({ plugins: [memoryBackendPlugin({ id: 'memory' })] })
+    const inner = await base.use(
+      cachePlugin({ id: 'inner', propagate: false, tiers: [{ backend: 'memory' }] })
+    )
+    const host = await inner.use(
+      cachePlugin({ id: 'outer', propagate: false, tiers: [{ backend: 'inner' }] })
+    )
+    await host.detect()
+    try {
+      const cache = host.backend('outer')
+      let loads = 0
+      expect(() =>
+        cache.getOrLoad(
+          'a',
+          async () => {
+            loads++
+            return 'wrong'
+          },
+          { ttlMs: 10 }
+        )
+      ).toThrowError(expect.objectContaining({ code: 'UNSUPPORTED_CAPABILITY' }))
+      expect(loads).toBe(0)
+      expect(await base.backend('memory').keys()).toEqual([])
+      await cache.set('a', 'value')
+      expect(await cache.get('a')).toBe('value')
+      await cache.setMany([{ key: 'a', value: 'ignored', ttlMs: 0 }])
+      expect(await cache.get('a')).toBeNull()
+    } finally {
       await host.dispose()
     }
   })

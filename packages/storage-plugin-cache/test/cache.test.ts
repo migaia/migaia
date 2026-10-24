@@ -51,7 +51,9 @@ describe('borrowed multi-tier cache', () => {
       expect(await cache.get('text')).toBe('hello')
       await fast.remove('cache:cache:text')
       expect(await cache.get('text')).toBe('hello')
-      expect(await fast.get('cache:cache:text')).toBe(await slow.get('cache:cache:text'))
+      expect(JSON.parse((await fast.get('cache:cache:text'))!).d).toBe(
+        JSON.parse((await slow.get('cache:cache:text'))!).d
+      )
       expect(await cache.keys()).toEqual(['text'])
       expect(await cache.removeMany(['text', 'text'])).toBe(1)
       expect(cache.has(kv)).toBe(true)

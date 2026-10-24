@@ -7,6 +7,7 @@ import {
   implement,
   provideCapabilities,
   assertStringStorageKey,
+  assertStorageTtlDuration,
   snapshotOperationContext,
   lockKey,
   ConcurrencyPolicy,
@@ -273,12 +274,13 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
     const deadline = (
       index: number,
       entry: ICacheEntry,
-      policy: ICachePolicy
+      policy: ICachePolicy,
+      now: number
     ): number | undefined => {
       const milliseconds = Math.min(
         configuration.tiers[index]!.ttlMs ?? Infinity,
         policy.ttlMs ?? Infinity,
-        entry.x === undefined ? Infinity : Math.max(0, entry.x - configuration.clock())
+        entry.x === undefined ? Infinity : Math.max(0, entry.x - now)
       )
       return milliseconds === Infinity ? undefined : milliseconds
     }
@@ -286,7 +288,7 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
     const plan = (entry: ICacheEntry, policy: ICachePolicy): readonly (number | undefined)[] => {
       const now = configuration.clock()
       return configuration.tiers.map((_, index) => {
-        const ms = deadline(index, entry, policy)
+        const ms = deadline(index, entry, policy, now)
         return ms === undefined ? undefined : now + shorten(configuration, ms)
       })
     }
@@ -298,6 +300,32 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
       expires[index] === undefined
         ? undefined
         : Math.max(0, expires[index]! - configuration.clock())
+    /** A layer's exact sampled hard bound survives an unavailable native expiry endpoint. */
+    const bounded = (
+      entry: ICacheEntry,
+      expires: readonly (number | undefined)[],
+      index: number
+    ): ICacheEntry =>
+      expires[index] === undefined
+        ? entry
+        : { ...entry, x: Math.min(entry.x ?? Infinity, expires[index]!) }
+    /** Positive per-call native TTLs are admitted before any source call or tier modification. */
+    const admitPolicy = (policy: ICachePolicy): ICachePolicy => {
+      if (policy.ttlMs !== undefined && policy.ttlMs > 0)
+        for (const [index, tier] of tiers.entries())
+          if (!tier.borrowed.has(ttl)) missingCapability(index, ttl.name)
+      return policy
+    }
+    /** Shared batch TTL uses its original finite nonnegative domain, including immediate removal. */
+    const batchPolicy = (ttlMs: number | undefined): ICachePolicy => {
+      if (ttlMs !== undefined) assertStorageTtlDuration(ttlMs, CacheText.backend)
+      if (
+        ttlMs !== undefined &&
+        configuration.tiers.some((tier) => tier.ttlMs !== undefined && ttlMs > tier.ttlMs)
+      )
+        throw cacheError(CacheErrorCode.tierInvalid)
+      return admitPolicy(Object.freeze({ ...snapshotCachePolicy(configuration), ttlMs }))
+    }
     /** Object offload writes only encoded content and refreshes the native modification timestamp. */
     const stored = async (index: number, entry: ICacheEntry): Promise<string> => {
       let actual = entry
@@ -321,18 +349,23 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
       expires: readonly (number | undefined)[] = plan(entry, policy)
     ): Promise<boolean> => {
       try {
-        const maximum = configuration.tiers[index]!.maxEntryBytes
+        const ms = remaining(expires, index)
+        if (ms === 0) {
+          await apiAt(index).remove(physical(key))
+          return true
+        }
+        const actual = bounded(entry, expires, index),
+          maximum = configuration.tiers[index]!.maxEntryBytes
         if (
           maximum !== undefined &&
-          new TextEncoder().encode(JSON.stringify(entry)).byteLength > maximum
+          new TextEncoder().encode(JSON.stringify(actual)).byteLength > maximum
         ) {
           counts.skipped[index]!++
           return true
         }
-        const raw = await stored(index, entry),
-          ms = remaining(expires, index)
+        const raw = await stored(index, actual)
         await apiAt(index).set(physical(key), raw)
-        if (ms !== undefined)
+        if (ms !== undefined && tiers[index]!.borrowed.has(ttl))
           await route(tiers[index]!.borrowed)
             .use(ttl)
             .expire(lockKey.text(physical(key)), ms)
@@ -452,7 +485,12 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
         let found: ICacheFound | undefined
         if (configuration.tiers[index]!.write === CacheWriteMode.back && pending.has(key)) {
           const item = pending.get(key)!
-          found = await decode(index, key, JSON.stringify(item.entry), policy.staleAfterMs)
+          found = await decode(
+            index,
+            key,
+            JSON.stringify(bounded(item.entry, item.expires, index)),
+            policy.staleAfterMs
+          )
         } else {
           try {
             found = await decode(
@@ -562,9 +600,13 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
                   maximum === undefined ||
                   new TextEncoder().encode(JSON.stringify(entry)).byteLength <= maximum
                 ) {
-                  await tx.set(physical(key), await stored(lockIndex, entry))
+                  await tx.set(
+                    physical(key),
+                    await stored(lockIndex, bounded(entry, expires!, lockIndex))
+                  )
                   const ms = remaining(expires!, lockIndex)
-                  if (ms !== undefined) await tx.use(ttl).expire(lockKey.text(physical(key)), ms)
+                  if (ms !== undefined && tiers[lockIndex]!.borrowed.has(ttl))
+                    await tx.use(ttl).expire(lockKey.text(physical(key)), ms)
                 } else counts.skipped[lockIndex]!++
               }
               return { entry, value, cached: undefined, expires }
@@ -709,7 +751,7 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
           const { key, value, ttlMs } = item
           assertStringStorageKey(key, CacheText.backend)
           if (typeof value !== 'string' || seen.has(key)) throw invalidArgument()
-          snapshotCachePolicy(configuration, { ttlMs })
+          batchPolicy(ttlMs)
           seen.add(key)
           return { key, value, ttlMs }
         })
@@ -801,7 +843,7 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
             physical(item.key)
             if (typeof item.value !== 'string' || seen.has(item.key)) throw invalidArgument()
             seen.add(item.key)
-            const policy = snapshotCachePolicy(configuration, { ttlMs: item.ttlMs })
+            const policy = batchPolicy(item.ttlMs)
             const entry = await encodeEntry(configuration, item.value, policy, true)
             items.push({ key: item.key, entry: entry!, policy })
           }
@@ -849,14 +891,14 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
         store.getOrLoadEntry(key, load, options).then((info) => info.value),
       getOrLoadEntry: (key, load, options) => {
         physical(key)
-        const policy = snapshotCachePolicy(configuration, options)
+        const policy = admitPolicy(snapshotCachePolicy(configuration, options))
         return run(CacheOperation.getOrLoad, { key, load }, policy.ctx, (actual) =>
           loadEntry(actual.key, actual.load, policy)
         )
       },
       getOrLoadMany: (keys, load, options) => {
         const captured = [...new Set(captureKeys(keys))],
-          policy = snapshotCachePolicy(configuration, options)
+          policy = admitPolicy(snapshotCachePolicy(configuration, options))
         return run(CacheOperation.getOrLoadMany, captured, policy.ctx, (actual) =>
           loadMany(captureKeys(actual), load, policy)
         )
@@ -976,15 +1018,21 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
             continue
           }
           try {
-            const maximum = configuration.tiers[index]!.maxEntryBytes
+            const ms = remaining(item.expires, index)
+            if (ms === 0) {
+              entries.push({ key: physical(item.key), value: '', ttlMs: 0 })
+              continue
+            }
+            const actual = bounded(item.entry, item.expires, index),
+              maximum = configuration.tiers[index]!.maxEntryBytes
             if (
               maximum !== undefined &&
-              new TextEncoder().encode(JSON.stringify(item.entry)).byteLength > maximum
+              new TextEncoder().encode(JSON.stringify(actual)).byteLength > maximum
             ) {
               counts.skipped[index]!++
               continue
             }
-            const value = await stored(index, item.entry)
+            const value = await stored(index, actual)
             entries.push({
               key: physical(item.key),
               value,
@@ -1036,7 +1084,7 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
             match = await decode(
               index,
               key,
-              item ? JSON.stringify(item.entry) : nativeRows.get(key),
+              item ? JSON.stringify(bounded(item.entry, item.expires, index)) : nativeRows.get(key),
               policy.staleAfterMs
             )
           if (match) {
@@ -1183,9 +1231,12 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
                       counts.skipped[lockIndex]!++
                       continue
                     }
-                    await tx.set(physical(item.key), await stored(lockIndex, item.entry))
+                    await tx.set(
+                      physical(item.key),
+                      await stored(lockIndex, bounded(item.entry, expires, lockIndex))
+                    )
                     const ms = remaining(expires, lockIndex)
-                    if (ms !== undefined)
+                    if (ms !== undefined && tiers[lockIndex]!.borrowed.has(ttl))
                       await tx.use(ttl).expire(lockKey.text(physical(item.key)), ms)
                   }
                   for (const [key, hit] of existing)
