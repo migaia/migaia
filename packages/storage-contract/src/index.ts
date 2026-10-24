@@ -245,6 +245,7 @@ export type {
   IFieldOps,
   IWhere,
   IQueryCondition,
+  IQueryConditions,
   IQueryPlanStep,
   IQueryPlan,
   IQueryPushdown,
