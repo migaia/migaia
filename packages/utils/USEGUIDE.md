@@ -1671,6 +1671,8 @@ type IConfigConflictDecision =
 
 `strategies` 是全局默认策略；`pathRules` 是一组 `{ prefix, strategies }`，按 `prefix`（从根开始的键路径）匹配当前正在合并的键路径，`prefix` 更长（更具体）的规则优先生效，命中的规则会与全局 `strategies` 合并（规则内声明的字段覆盖全局同名字段，规则未声明的字段沿用全局值）。
 
+每次 `combineConfig` 调用会在合并来源前读取每条规则的 `prefix` 和 `strategies` 一次并建立索引；相同前缀以输入中最先声明的规则为准。规则描述必须稳定：不支持依赖 getter 每次返回不同描述，或在合并过程中修改规则来影响后续属性。
+
 当某个键在双方都存在、且不属于以上任何自动合并分支（例如两侧都是不可合并的原始值）时，若提供了 `onConflict`，会调用它并传入 `IConfigConflictContext`（`path`：当前键的完整路径；`left`：左侧/已有值；`right`：右侧/新值），其返回值 `IConfigConflictDecision` 决定最终结果：`{ kind: 'left' }` 保留左值、`{ kind: 'right' }` 采用右值、`{ kind: 'delete' }` 删除该键、`{ kind: 'value', value }` 采用自定义值。`onConflict` 必须**同步**返回（返回 Promise 会抛 `code: 'CONFIG_CONFLICT'`；返回值不是上述四种 `kind` 之一同样抛 `CONFIG_CONFLICT`）。未提供 `onConflict` 时右侧直接覆盖左侧（标准合并语义）。`right === CONFIG_DELETE` 会删除目标键（可用于合并阶段裁剪掉某个来源写入的默认值）。
 
 ```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"

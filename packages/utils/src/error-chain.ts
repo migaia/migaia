@@ -1,6 +1,7 @@
 import { attachErrorIdentity, tryReadProperty } from './error.js'
 import { ERROR_SOURCE, UtilsErrorCode } from './error-code.js'
 import { UtilsErrorText } from './error-text.js'
+import { orderCodePointKeys } from './internal/string-order.js'
 import {
   ErrorChainFallback,
   ErrorChainField,
@@ -85,84 +86,100 @@ function snapshotError(
   return { fields, failed, truncated: failed.size > 0 }
 }
 
-/** Projects any thrown value into a bounded, frozen, language-neutral error tree. */
-export function serializeErrorChain(
-  value: unknown,
-  strategy: IErrorChainStrategy = {},
-  options: ISerializeErrorChainOptions = {}
-): ISerializedErrorChain {
-  /** Per-invocation resolved policy keeps all budgets isolated across reentrant getter calls. */
-  const limits = { ...ErrorChainLimit, ...strategy.limits }
-  /** Fallback is diagnostic presentation, never local package authority. */
-  const fallback = { ...ErrorChainFallback, ...strategy.fallback }
-  /** Optional fields excluded by the whitelist are never projected or traversed. */
-  const admitted = new Set<string>(strategy.fields ?? ErrorChainField)
-  /** Caller owns privacy transforms; the default preserves scalar-safe bounded UTF-8 text. */
-  const sanitize = (text: string, truncate = true): IErrorChainText =>
-    strategy.sanitizeText?.(text, truncate) ??
-    sanitizeErrorText(text, limits.maxStringBytes, truncate)
-  /** Boundary data conversion stays outside the generic graph algorithm. */
-  const normalizeData = (input: unknown, depth: number): IErrorChainData =>
-    strategy.normalizeData
-      ? strategy.normalizeData(input, depth)
-      : normalizePlainData(input, depth, limits)
-  /** Each invocation owns its path and budget, including reentrant calls from getters. */
-  const active = new Set<object>()
-  /** Occurrence and text budgets belong to this invocation and are debited in output order. */
-  const budget = { nodes: 0, bytes: 0 }
+/** Snapshot classification is retained while text budgeting and descendant projection run. */
+type IErrorNodeProjection = {
+  readonly node: IWireNode
+  readonly source: IErrorSnapshot | undefined
+  readonly errorLike: boolean
+  readonly summaryOnly: boolean
+}
+
+/** One serialization owns its budgets and active ancestors, including reentrant getter calls. */
+class ErrorChainSerializer {
+  /** Caller policy is retained for presentation, normalization and error classification. */
+  #strategy: IErrorChainStrategy
+  /** Reporting remains local to this invocation. */
+  #options: ISerializeErrorChainOptions
+  /** Resolved limits isolate this serialization from concurrent invocations. */
+  #limits: IErrorChainLimits
+  /** Presentation fallback never supplies local package authority. */
+  #fallback: { [K in keyof typeof ErrorChainFallback]: string }
+  /** Excluded optional fields are never traversed. */
+  #admitted: Set<string>
+  /** Active ancestors reject cycles while allowing shared descendant occurrences. */
+  #active = new Set<object>()
+  /** Occurrence and text budgets are debited in output order. */
+  #budget = { nodes: 0, bytes: 0 }
+
+  /** Resolve per-invocation policy before touching input fields. */
+  constructor(strategy: IErrorChainStrategy, options: ISerializeErrorChainOptions) {
+    this.#limits = { ...ErrorChainLimit, ...strategy.limits }
+    this.#fallback = { ...ErrorChainFallback, ...strategy.fallback }
+    this.#admitted = new Set<string>(strategy.fields ?? ErrorChainField)
+    this.#strategy = strategy
+    this.#options = options
+  }
+
+  /** The caller's privacy transform retains its original call timing and receiver. */
+  #sanitize = (text: string, truncate = true): IErrorChainText =>
+    this.#strategy.sanitizeText?.(text, truncate) ??
+    sanitizeErrorText(text, this.#limits.maxStringBytes, truncate)
+
+  /** Boundary conversion remains outside the generic error graph grammar. */
+  #normalizeData(input: unknown, depth: number): IErrorChainData {
+    return this.#strategy.normalizeData
+      ? this.#strategy.normalizeData(input, depth)
+      : new PlainDataNormalizer(this.#limits).normalize(input, depth)
+  }
+
+  /** Project one root after construction has isolated all policy and budget state. */
+  serialize(value: unknown): ISerializedErrorChain {
+    return this.#visit(value, '', 0)!
+  }
 
   /** Report a caught input failure exactly once, preserving the thrown value. */
-  function report(
+  #report = (
     pointer: string,
     field: string,
     error: unknown,
     violation: ErrorChainViolation = ErrorChainViolation.read
-  ): void {
-    if (options.report) options.report({ pointer, field, error })
-    else throw createViolation(strategy, error, `${pointer}/${field}`, violation)
+  ): void => {
+    if (this.#options.report) this.#options.report({ pointer, field, error })
+    else throw createViolation(this.#strategy, error, `${pointer}/${field}`, violation)
   }
 
   /** Try a portable data projection and its separate byte budget. */
-  function projectData(raw: unknown, pointer: string, node: IWireNode, depth: number): void {
+  #projectData(raw: unknown, pointer: string, node: IWireNode, depth: number): void {
     if (raw === undefined) return
     /** The selected data codec snapshots input before any sanitization or text budgeting. */
     let portable: IErrorChainData
     try {
-      portable = normalizeData(raw, depth)
+      portable = this.#normalizeData(raw, depth)
     } catch (error) {
       node.truncated = true
-      report(pointer, 'data', error, ErrorChainViolation.dataPortable)
+      this.#report(pointer, 'data', error, ErrorChainViolation.dataPortable)
       return
     }
     /** Sanitization also detects key collisions introduced by replacement. */
-    const sanitized = sanitizeData(portable, sanitize, strategy)
+    const sanitized = sanitizeData(portable, this.#sanitize, this.#strategy)
     if (sanitized === undefined) {
       node.truncated = true
       return
     }
     if (sanitized.replaced) node.truncated = true
     if (
-      sanitized.bytes > limits.maxStringBytes ||
-      budget.bytes + sanitized.bytes > limits.maxBytes
+      sanitized.bytes > this.#limits.maxStringBytes ||
+      this.#budget.bytes + sanitized.bytes > this.#limits.maxBytes
     ) {
       node.truncated = true
       return
     }
-    budget.bytes += sanitized.bytes
+    this.#budget.bytes += sanitized.bytes
     node.data = sanitized.value
   }
 
-  /** Admit a node only after its own five fields fit the remaining total budget. */
-  function visit(
-    input: unknown,
-    pointer: string,
-    depth: number
-  ): ISerializedErrorChain | undefined {
-    if (depth > limits.maxNesting - 1 || budget.nodes >= limits.maxNodes) return undefined
-    if ((typeof input === 'object' && input !== null) || typeof input === 'function') {
-      if (active.has(input)) return undefined
-      active.add(input)
-    }
+  /** Snapshot one input and select diagnostic presentation without traversing graph descendants. */
+  #snapshot(input: unknown, pointer: string): IErrorNodeProjection {
     /** Primitives and arrays do not expose named error fields. */
     const object = (typeof input === 'object' && input !== null) || typeof input === 'function'
     /**
@@ -177,16 +194,18 @@ export function serializeErrorChain(
         array = Array.isArray(input)
       } catch (error) {
         classificationFailed = true
-        report(pointer, 'data', error)
+        this.#report(pointer, 'data', error)
       }
     }
     /** Exact held Error references select presentation; a wire property cannot supply this policy. */
-    const localSummary = strategy.presentation?.(input)
+    const localSummary = this.#strategy.presentation?.(input)
     /** Opt-in applies to this exact local node; each descendant makes its own secrecy decision. */
     const summaryOnly = localSummary !== undefined && localSummary.preserveSerializedError !== true
     /** Hold the one-read field snapshot while classifying and traversing this exact input object. */
     const source =
-      object && !array ? snapshotError(input, pointer, report, summaryOnly, strategy) : undefined
+      object && !array
+        ? snapshotError(input, pointer, this.#report, summaryOnly, this.#strategy)
+        : undefined
     /** Native errors remain error-like even when a diagnostic field getter is missing or malformed. */
     let nativeError = false
     if (source) {
@@ -194,7 +213,7 @@ export function serializeErrorChain(
         nativeError = input instanceof Error
       } catch (error) {
         classificationFailed = true
-        report(pointer, 'name', error)
+        this.#report(pointer, 'name', error)
       }
     }
     /**
@@ -216,23 +235,23 @@ export function serializeErrorChain(
           : ''
         : typeof input === 'string'
           ? input
-          : fallback.nonErrorMessage)
+          : this.#fallback.nonErrorMessage)
     /** Retain the incoming diagnostic name; unclassified values use the fallback native error name. */
     const name =
       errorLike && typeof source.fields.name === 'string' && source.fields.name.length > 0
         ? source.fields.name
-        : fallback.name
+        : this.#fallback.name
     /** Property insertion order is stable: own diagnostic fields precede data and graph descendants. */
     const node: IWireNode = {
       source:
         errorLike && typeof source.fields.source === 'string' && source.fields.source.length > 0
           ? source.fields.source
-          : fallback.source,
+          : this.#fallback.source,
       code:
         localSummary?.code ??
         (errorLike && typeof source.fields.code === 'string' && source.fields.code.length > 0
           ? source.fields.code
-          : fallback.code),
+          : this.#fallback.code),
       name,
       message,
       stack:
@@ -242,6 +261,21 @@ export function serializeErrorChain(
     }
     if (classificationFailed || source?.truncated || source?.fields.truncated === true)
       node.truncated = true
+    return { node, source, errorLike, summaryOnly }
+  }
+
+  /** Admit a node only after its own five fields fit the remaining total budget. */
+  #visit(input: unknown, pointer: string, depth: number): ISerializedErrorChain | undefined {
+    if (depth > this.#limits.maxNesting - 1 || this.#budget.nodes >= this.#limits.maxNodes)
+      return undefined
+    if ((typeof input === 'object' && input !== null) || typeof input === 'function') {
+      if (this.#active.has(input)) return undefined
+      this.#active.add(input)
+    }
+    /** Classification snapshots fields once before debiting text or following descendants. */
+    const { node, source, errorLike, summaryOnly } = this.#snapshot(input, pointer)
+    /** Active object identities are released after their complete output occurrence. */
+    const object = (typeof input === 'object' && input !== null) || typeof input === 'function'
     /** Own text is accepted before data and descendants. */
     let ownBytes = 0
     for (const key of ['source', 'code', 'name', 'message', 'stack'] as const) {
@@ -249,33 +283,33 @@ export function serializeErrorChain(
        * The text strategy reports both replacement and UTF-8 size without modifying the original
        * input.
        */
-      const text = sanitize(node[key])
+      const text = this.#sanitize(node[key])
       node[key] = text.value
       ownBytes += text.bytes
       if (text.changed) node.truncated = true
     }
-    if (depth > 0 && budget.bytes + ownBytes > limits.maxBytes) {
-      if (object) active.delete(input)
+    if (depth > 0 && this.#budget.bytes + ownBytes > this.#limits.maxBytes) {
+      if (object) this.#active.delete(input)
       return undefined
     }
-    if (depth === 0 && ownBytes > limits.maxBytes)
-      throw createViolation(strategy, input, pointer, ErrorChainViolation.totalBytes)
-    budget.bytes += ownBytes
-    budget.nodes += 1
+    if (depth === 0 && ownBytes > this.#limits.maxBytes)
+      throw createViolation(this.#strategy, input, pointer, ErrorChainViolation.totalBytes)
+    this.#budget.bytes += ownBytes
+    this.#budget.nodes += 1
 
     /** Exact-object presentation may hide all secret-bearing descendants of this node. */
     if (errorLike && !summaryOnly) {
-      if (admitted.has('data')) projectData(source.fields.data, pointer, node, depth)
-      for (const extension of strategy.extensions ?? []) {
-        if (!admitted.has(extension.field)) continue
-        if (source.fields[extension.field] === undefined) continue
+      if (this.#admitted.has('data')) this.#projectData(source!.fields.data, pointer, node, depth)
+      for (const extension of this.#strategy.extensions ?? []) {
+        if (!this.#admitted.has(extension.field)) continue
+        if (source!.fields[extension.field] === undefined) continue
         try {
           /** Extension grammars own their field shape and contribute to the shared text budget. */
           const projected = extension.normalize(
-            source.fields[extension.field],
+            source!.fields[extension.field],
             `${pointer}/${extension.field}`
           )
-          if (budget.bytes + projected.bytes > limits.maxBytes) node.truncated = true
+          if (this.#budget.bytes + projected.bytes > this.#limits.maxBytes) node.truncated = true
           else {
             Object.defineProperty(node, extension.field, {
               value: projected.value,
@@ -283,34 +317,41 @@ export function serializeErrorChain(
               enumerable: true,
               writable: true
             })
-            budget.bytes += projected.bytes
+            this.#budget.bytes += projected.bytes
           }
         } catch (error) {
           node.truncated = true
-          report(pointer, extension.field, error)
+          this.#report(pointer, extension.field, error)
         }
       }
-      if (admitted.has('cause') && source.fields.cause !== undefined) {
+      if (this.#admitted.has('cause') && source!.fields.cause !== undefined) {
         /** Cause edges add one nesting level and are admitted before aggregate children. */
-        const cause = visit(source.fields.cause, `${pointer}/cause`, depth + 1)
+        const cause = this.#visit(source!.fields.cause, `${pointer}/cause`, depth + 1)
         if (cause) node.cause = cause
         else node.truncated = true
       }
       /** Errors keep a prefix when a child cannot be admitted. */
       const children: unknown[] = []
       if (
-        admitted.has('errors') &&
-        appendChildren(source.fields.errors, pointer, 'errors', children, report, limits.maxObjects)
+        this.#admitted.has('errors') &&
+        appendChildren(
+          source!.fields.errors,
+          pointer,
+          'errors',
+          children,
+          this.#report,
+          this.#limits.maxObjects
+        )
       )
         node.truncated = true
       if (
-        admitted.has('errors') &&
+        this.#admitted.has('errors') &&
         appendCleanupChildren(
-          source.fields.cleanupErrors,
+          source!.fields.cleanupErrors,
           pointer,
           children,
-          report,
-          limits.maxObjects
+          this.#report,
+          this.#limits.maxObjects
         )
       )
         node.truncated = true
@@ -318,7 +359,7 @@ export function serializeErrorChain(
       const output: ISerializedErrorChain[] = []
       for (let index = 0; index < children.length; index += 1) {
         /** Each child occurrence is projected independently; only active ancestors count as cycles. */
-        const child = visit(children[index], `${pointer}/errors/${index}`, depth + 2)
+        const child = this.#visit(children[index], `${pointer}/errors/${index}`, depth + 2)
         if (!child) {
           node.truncated = true
           break
@@ -327,7 +368,7 @@ export function serializeErrorChain(
       }
       if (output.length > 0) node.errors = Object.freeze(output)
     } else if (
-      admitted.has('data') &&
+      this.#admitted.has('data') &&
       !summaryOnly &&
       input !== undefined &&
       typeof input !== 'string'
@@ -342,7 +383,7 @@ export function serializeErrorChain(
         } catch (error) {
           enumerated = false
           node.truncated = true
-          report(pointer, 'data', error)
+          this.#report(pointer, 'data', error)
           keys = []
         }
         /** Fresh null-prototype data records keep source keys inert and preserve insertion order. */
@@ -355,18 +396,26 @@ export function serializeErrorChain(
             const read = tryReadProperty(input as Record<string, unknown>, key)
             if (read.threw) {
               node.truncated = true
-              report(pointer, key, read.error)
+              this.#report(pointer, key, read.error)
             } else record[key] = read.value
           }
         }
-        if (enumerated) projectData(record, pointer, node, depth)
-      } else projectData(input, pointer, node, depth)
+        if (enumerated) this.#projectData(record, pointer, node, depth)
+      } else this.#projectData(input, pointer, node, depth)
     }
-    if (object) active.delete(input)
-    if (!admitted.has('truncated')) delete node.truncated
+    if (object) this.#active.delete(input)
+    if (!this.#admitted.has('truncated')) delete node.truncated
     return Object.freeze(node)
   }
-  return visit(value, '', 0)!
+}
+
+/** Projects any thrown value into a bounded, frozen, language-neutral error tree. */
+export function serializeErrorChain(
+  value: unknown,
+  strategy: IErrorChainStrategy = {},
+  options: ISerializeErrorChainOptions = {}
+): ISerializedErrorChain {
+  return new ErrorChainSerializer(strategy, options).serialize(value)
 }
 
 /** Walk the same graph edges without the wire depth limit, deduplicating object identities. */
@@ -603,90 +652,155 @@ function appendCleanupChildren(
   return failed
 }
 
-/** Validate and freeze a fresh wire error tree before any receiver uses its fields. */
-export function normalizeSerializedErrorChain(
-  value: unknown,
-  strategy: IErrorChainStrategy = {},
-  options: INormalizeErrorChainOptions = {}
-): ISerializedErrorChain {
-  /** Receive validation counts the consumer's canonical tree grammar and byte bounds. */
-  const limits = { ...ErrorChainLimit, ...strategy.limits }
-  /** Whitelist order is consumer-owned so the first invalid field remains deterministic. */
-  const fieldOrder = strategy.fields ?? ErrorChainField
-  /** Plain-data defaults are used only when the boundary has not selected its own portable codec. */
-  const normalizeData = (input: unknown, depth: number): IErrorChainData =>
-    strategy.normalizeData
-      ? strategy.normalizeData(input, depth)
-      : normalizePlainData(input, depth, limits)
-  /** Node and text budgets count occurrences in the incoming tree. */
-  const budget = { nodes: 0, bytes: 0 }
-  /** Current ancestors reject cyclic input without rejecting shared subtrees. */
-  const active = new Set<object>()
-  /** The receive default rejects extensions that the caller has not explicitly admitted. */
-  const unknownFields = options.unknownFields ?? ErrorChainUnknownFields.reject
+/** One receive validation owns its canonical grammar, first-error order and occurrence budgets. */
+class ErrorChainNormalizer {
+  /** The original input remains the default reachable cause for grammar failures. */
+  #value: unknown
+  /** Caller-selected boundary codecs retain their original receiver. */
+  #strategy: IErrorChainStrategy
+  /** Receive reporting options remain attached to this invocation. */
+  #options: INormalizeErrorChainOptions
+  /** Resolved receive limits are isolated from reentrant normalizations. */
+  #limits: IErrorChainLimits
+  /** Whitelist order determines which input field fails first. */
+  #fieldOrder: readonly string[]
+  /** Occurrences and portable text debit this one tree budget. */
+  #budget = { nodes: 0, bytes: 0 }
+  /** Active ancestors distinguish cycles from shared subtrees. */
+  #active = new Set<object>()
+  /** Unknown-field handling is captured before input traversal. */
+  #unknownFields: (typeof ErrorChainUnknownFields)[keyof typeof ErrorChainUnknownFields]
+
+  /** Resolve receive policy before any untrusted field is read. */
+  constructor(value: unknown, strategy: IErrorChainStrategy, options: INormalizeErrorChainOptions) {
+    this.#value = value
+    this.#limits = { ...ErrorChainLimit, ...strategy.limits }
+    this.#fieldOrder = strategy.fields ?? ErrorChainField
+    this.#strategy = strategy
+    this.#options = options
+    this.#unknownFields = options.unknownFields ?? ErrorChainUnknownFields.reject
+  }
+
+  /** Decode portable boundary data independently of the error-tree grammar. */
+  #normalizeData(input: unknown, depth: number): IErrorChainData {
+    return this.#strategy.normalizeData
+      ? this.#strategy.normalizeData(input, depth)
+      : new PlainDataNormalizer(this.#limits).normalize(input, depth)
+  }
+
+  /** Normalize the original root after policy has been captured. */
+  normalize(): ISerializedErrorChain {
+    return this.#visit(this.#value, '', 0)
+  }
 
   /** Raise the first wire violation with a reachable original input. */
-  function invalid(pointer: string, violation: ErrorChainViolation, cause: unknown = value): never {
-    throw createViolation(strategy, cause, pointer, violation)
+  #invalid(pointer: string, violation: ErrorChainViolation, cause: unknown = this.#value): never {
+    throw createViolation(this.#strategy, cause, pointer, violation)
   }
 
   /** Keep all mandatory property reads on the same wire-error path. */
-  function readOrInvalid<T extends object, K extends keyof T>(
-    target: T,
-    key: K,
-    pointer: string
-  ): T[K] {
+  #readOrInvalid<T extends object, K extends keyof T>(target: T, key: K, pointer: string): T[K] {
     /** Read once with the original receiver; keep a thrown getter value reachable through reporting. */
     const read = tryReadProperty(target, key)
-    if (read.threw) invalid(pointer, ErrorChainViolation.read, read.error)
+    if (read.threw) this.#invalid(pointer, ErrorChainViolation.read, read.error)
     return read.value
   }
 
   /** Check one well-formed UTF-8 text unit and optionally debit the payload budget. */
-  function countText(unit: string, pointer: string, debit = true): number {
-    if (!isWellFormed(unit)) invalid(pointer, ErrorChainViolation.surrogate)
+  #countText(unit: string, pointer: string, debit = true): number {
+    if (!isWellFormed(unit)) this.#invalid(pointer, ErrorChainViolation.surrogate)
     /** The scalar-safe UTF-8 width is checked before debiting the relevant text budget. */
     const size = utf8Bytes(unit)
-    if (size > limits.maxStringBytes) invalid(pointer, ErrorChainViolation.stringBytes)
-    if (debit) budget.bytes += size
-    if (debit && budget.bytes > limits.maxBytes) invalid(pointer, ErrorChainViolation.totalBytes)
+    if (size > this.#limits.maxStringBytes) this.#invalid(pointer, ErrorChainViolation.stringBytes)
+    if (debit) this.#budget.bytes += size
+    if (debit && this.#budget.bytes > this.#limits.maxBytes)
+      this.#invalid(pointer, ErrorChainViolation.totalBytes)
     return size
   }
 
-  /** Count only the language-neutral text units of a normalized portable value. */
-  function countData(data: IErrorChainData, pointer: string): void {
-    /** The scalar-safe UTF-8 width is checked before debiting the relevant text budget. */
-    let size = 0
-    /** Visit plain data, with atomic text representations selected only by the boundary strategy. */
-    function visit(child: IErrorChainData, path: string): void {
-      if (typeof child === 'string') {
-        size += countText(child, path, false)
-      } else if (Array.isArray(child)) {
-        child.forEach((item, index) => visit(item, `${path}/${index}`))
-      } else if (child !== null && typeof child === 'object') {
-        /** Protocol-owned atomic representations contribute only their selected text unit. */
-        const leaf = strategy.dataTextLeaf?.(child as Readonly<Record<string, IErrorChainData>>)
-        if (leaf) {
-          size += countText(leaf.text, `${path}/${escapePointer(leaf.key)}`, false)
-        } else {
-          for (const [key, item] of Object.entries(child)) {
-            size += countText(key, `${path}/${escapePointer(key)}`, false)
-            visit(item, `${path}/${escapePointer(key)}`)
-          }
+  /** Count normalized portable text with one explicit subtotal for this data field. */
+  #countData(data: IErrorChainData, pointer: string): void {
+    /** A single field has its own byte ceiling before debiting the shared error-tree budget. */
+    const subtotal = { bytes: 0 }
+    this.#countDataValue(data, pointer, pointer, subtotal)
+    this.#budget.bytes += subtotal.bytes
+    if (this.#budget.bytes > this.#limits.maxBytes)
+      this.#invalid(pointer, ErrorChainViolation.totalBytes)
+  }
+
+  /** Visit plain data, with atomic text representations selected only by the boundary strategy. */
+  #countDataValue(
+    child: IErrorChainData,
+    path: string,
+    pointer: string,
+    subtotal: { bytes: number }
+  ): void {
+    if (typeof child === 'string') {
+      subtotal.bytes += this.#countText(child, path, false)
+    } else if (Array.isArray(child)) {
+      child.forEach((item, index) =>
+        this.#countDataValue(item, `${path}/${index}`, pointer, subtotal)
+      )
+    } else if (child !== null && typeof child === 'object') {
+      /** Protocol-owned atomic representations contribute only their selected text unit. */
+      const leaf = this.#strategy.dataTextLeaf?.(child as Readonly<Record<string, IErrorChainData>>)
+      if (leaf) {
+        subtotal.bytes += this.#countText(leaf.text, `${path}/${escapePointer(leaf.key)}`, false)
+      } else {
+        for (const [key, item] of Object.entries(child)) {
+          subtotal.bytes += this.#countText(key, `${path}/${escapePointer(key)}`, false)
+          this.#countDataValue(item, `${path}/${escapePointer(key)}`, pointer, subtotal)
         }
       }
-      if (size > limits.maxStringBytes) invalid(pointer, ErrorChainViolation.dataBytes)
     }
-    visit(data, pointer)
-    budget.bytes += size
-    if (budget.bytes > limits.maxBytes) invalid(pointer, ErrorChainViolation.totalBytes)
+    if (subtotal.bytes > this.#limits.maxStringBytes)
+      this.#invalid(pointer, ErrorChainViolation.dataBytes)
+  }
+
+  /** Read and validate one node's own fields once before decoding any descendants. */
+  #readFields(input: object, pointer: string): Record<string, unknown> {
+    /** Own fields are enumerated once, then read once in canonical field order. */
+    let keys: string[]
+    try {
+      keys = Object.keys(input)
+    } catch (error) {
+      this.#invalid(pointer, ErrorChainViolation.read, error)
+    }
+    /** The strategy whitelist defines accepted own fields before any receiver getter is read. */
+    const known = new Set<string>(this.#fieldOrder)
+    for (const key of orderCodePointKeys(keys.filter((entry) => !known.has(entry)))) {
+      if (this.#unknownFields === ErrorChainUnknownFields.reject)
+        this.#invalid(pointer, ErrorChainViolation.unknownField)
+      this.#options.onUnknownField?.(pointer, key)
+    }
+    /** Read each present property once, including optional properties. */
+    const fields: Record<string, unknown> = Object.create(null) as Record<string, unknown>
+    for (const [index, key] of this.#fieldOrder.entries()) {
+      if (!keys.includes(key)) {
+        if (index < 5) this.#invalid(`${pointer}/${key}`, ErrorChainViolation.required)
+        continue
+      }
+      fields[key] = this.#readOrInvalid(input as Record<string, unknown>, key, `${pointer}/${key}`)
+      if (['source', 'code', 'name', 'message', 'stack'].includes(key)) {
+        /**
+         * Validate this held field once, preserving first-error order and mandatory text
+         * requirements.
+         */
+        const field = fields[key]
+        if (typeof field !== 'string' || (key !== 'message' && field.length === 0))
+          this.#invalid(`${pointer}/${key}`, ErrorChainViolation.type)
+        this.#countText(field, `${pointer}/${key}`)
+      }
+    }
+    return fields
   }
 
   /** Snapshot one node in the documented first-error order. */
-  function visit(input: unknown, pointer: string, depth: number): ISerializedErrorChain {
-    budget.nodes += 1
-    if (budget.nodes > limits.maxNodes) invalid(pointer, ErrorChainViolation.nodes)
-    if (depth > limits.maxNesting - 1) invalid(pointer, ErrorChainViolation.depth)
+  #visit(input: unknown, pointer: string, depth: number): ISerializedErrorChain {
+    this.#budget.nodes += 1
+    if (this.#budget.nodes > this.#limits.maxNodes)
+      this.#invalid(pointer, ErrorChainViolation.nodes)
+    if (depth > this.#limits.maxNesting - 1) this.#invalid(pointer, ErrorChainViolation.depth)
     /**
      * Arrays never supply named error fields; classification failures follow the caller report
      * policy.
@@ -695,45 +809,14 @@ export function normalizeSerializedErrorChain(
     try {
       array = Array.isArray(input)
     } catch (error) {
-      invalid(pointer, ErrorChainViolation.read, error)
+      this.#invalid(pointer, ErrorChainViolation.read, error)
     }
     if (typeof input !== 'object' || input === null || array)
-      invalid(pointer, ErrorChainViolation.type)
-    if (active.has(input)) invalid(pointer, ErrorChainViolation.type)
-    active.add(input)
-    /** Own fields are enumerated once, then read once in canonical field order. */
-    let keys: string[]
-    try {
-      keys = Object.keys(input)
-    } catch (error) {
-      invalid(pointer, ErrorChainViolation.read, error)
-    }
-    /** The strategy whitelist defines accepted own fields before any receiver getter is read. */
-    const known = new Set<string>(fieldOrder)
-    for (const key of keys.filter((entry) => !known.has(entry)).sort(compareCodePoints)) {
-      if (unknownFields === ErrorChainUnknownFields.reject)
-        invalid(pointer, ErrorChainViolation.unknownField)
-      options.onUnknownField?.(pointer, key)
-    }
-    /** Read each present property once, including optional properties. */
-    const fields: Record<string, unknown> = Object.create(null) as Record<string, unknown>
-    for (const [index, key] of fieldOrder.entries()) {
-      if (!keys.includes(key)) {
-        if (index < 5) invalid(`${pointer}/${key}`, ErrorChainViolation.required)
-        continue
-      }
-      fields[key] = readOrInvalid(input as Record<string, unknown>, key, `${pointer}/${key}`)
-      if (['source', 'code', 'name', 'message', 'stack'].includes(key)) {
-        /**
-         * Validate this held field once, preserving first-error order and mandatory text
-         * requirements.
-         */
-        const field = fields[key]
-        if (typeof field !== 'string' || (key !== 'message' && field.length === 0))
-          invalid(`${pointer}/${key}`, ErrorChainViolation.type)
-        countText(field, `${pointer}/${key}`)
-      }
-    }
+      this.#invalid(pointer, ErrorChainViolation.type)
+    if (this.#active.has(input)) this.#invalid(pointer, ErrorChainViolation.type)
+    this.#active.add(input)
+    /** Field enumeration and validation retain the original deterministic first-error order. */
+    const fields = this.#readFields(input, pointer)
     /** A fresh output retains the fixed property order and cannot inherit source object behavior. */
     const result: IWireNode = {
       source: fields.source as string,
@@ -748,10 +831,10 @@ export function normalizeSerializedErrorChain(
       try {
         causeArray = Array.isArray(fields.cause)
       } catch (error) {
-        invalid(`${pointer}/cause`, ErrorChainViolation.read, error)
+        this.#invalid(`${pointer}/cause`, ErrorChainViolation.read, error)
       }
       if (typeof fields.cause !== 'object' || fields.cause === null || causeArray)
-        invalid(`${pointer}/cause`, ErrorChainViolation.type)
+        this.#invalid(`${pointer}/cause`, ErrorChainViolation.type)
     }
     /** Snapshot aggregate length once before validating any entries. */
     let errorsLength = 0
@@ -761,35 +844,39 @@ export function normalizeSerializedErrorChain(
       try {
         errorsArray = Array.isArray(fields.errors)
       } catch (error) {
-        invalid(`${pointer}/errors`, ErrorChainViolation.read, error)
+        this.#invalid(`${pointer}/errors`, ErrorChainViolation.read, error)
       }
-      if (!errorsArray) invalid(`${pointer}/errors`, ErrorChainViolation.type)
-      errorsLength = readOrInvalid(fields.errors as unknown[], 'length', `${pointer}/errors/length`)
-      if (errorsLength === 0) invalid(`${pointer}/errors`, ErrorChainViolation.emptyErrors)
+      if (!errorsArray) this.#invalid(`${pointer}/errors`, ErrorChainViolation.type)
+      errorsLength = this.#readOrInvalid(
+        fields.errors as unknown[],
+        'length',
+        `${pointer}/errors/length`
+      )
+      if (errorsLength === 0) this.#invalid(`${pointer}/errors`, ErrorChainViolation.emptyErrors)
     }
     if (Object.hasOwn(fields, 'data')) {
       try {
-        result.data = normalizeData(fields.data, depth)
+        result.data = this.#normalizeData(fields.data, depth)
       } catch (error) {
-        invalid(`${pointer}/data`, ErrorChainViolation.dataPortable, error)
+        this.#invalid(`${pointer}/data`, ErrorChainViolation.dataPortable, error)
       }
-      countData(result.data, `${pointer}/data`)
+      this.#countData(result.data, `${pointer}/data`)
     }
     if (Object.hasOwn(fields, 'truncated')) {
       if (fields.truncated !== true)
-        invalid(`${pointer}/truncated`, ErrorChainViolation.truncatedValue)
+        this.#invalid(`${pointer}/truncated`, ErrorChainViolation.truncatedValue)
       result.truncated = true
     }
-    for (const extension of strategy.extensions ?? []) {
+    for (const extension of this.#strategy.extensions ?? []) {
       if (!Object.hasOwn(fields, extension.field)) continue
       /** Boundary extension normalization keeps its own public failure semantics. */
       const projected = extension.normalize(
         fields[extension.field],
         `${pointer}/${extension.field}`
       )
-      budget.bytes += projected.bytes
-      if (budget.bytes > limits.maxBytes)
-        invalid(`${pointer}/${extension.field}`, ErrorChainViolation.totalBytes)
+      this.#budget.bytes += projected.bytes
+      if (this.#budget.bytes > this.#limits.maxBytes)
+        this.#invalid(`${pointer}/${extension.field}`, ErrorChainViolation.totalBytes)
       Object.defineProperty(result, extension.field, {
         value: projected.value,
         configurable: true,
@@ -798,7 +885,7 @@ export function normalizeSerializedErrorChain(
       })
     }
     if (Object.hasOwn(fields, 'cause'))
-      result.cause = visit(fields.cause, `${pointer}/cause`, depth + 1)
+      result.cause = this.#visit(fields.cause, `${pointer}/cause`, depth + 1)
     if (Object.hasOwn(fields, 'errors')) {
       /** An errors edge adds both the array and entry depth. */
       const children = fields.errors as unknown[]
@@ -811,15 +898,23 @@ export function normalizeSerializedErrorChain(
          */
         const childPointer = `${pointer}/errors/${index}`
         normalized.push(
-          visit(readOrInvalid(children, index, childPointer), childPointer, depth + 2)
+          this.#visit(this.#readOrInvalid(children, index, childPointer), childPointer, depth + 2)
         )
       }
       result.errors = Object.freeze(normalized)
     }
-    active.delete(input)
+    this.#active.delete(input)
     return Object.freeze(result)
   }
-  return visit(value, '', 0)
+}
+
+/** Validate and freeze a fresh wire error tree before any receiver uses its fields. */
+export function normalizeSerializedErrorChain(
+  value: unknown,
+  strategy: IErrorChainStrategy = {},
+  options: INormalizeErrorChainOptions = {}
+): ISerializedErrorChain {
+  return new ErrorChainNormalizer(value, strategy, options).normalize()
 }
 
 /** Rebuild a native error graph after validating the entire untrusted tree. */
@@ -876,22 +971,6 @@ function restore(value: ISerializedErrorChain, strategy: IErrorChainStrategy): E
 /** Escape an RFC 6901 pointer segment without interpreting the source key. */
 function escapePointer(value: string): string {
   return value.replaceAll('~', '~0').replaceAll('/', '~1')
-}
-
-/** Sort unknown keys by Unicode code point, independent of locale. */
-function compareCodePoints(left: string, right: string): number {
-  /** Compare Unicode scalars rather than locale collation or UTF-16 surrogate ordering. */
-  const a = Array.from(left)
-  /** The second scalar sequence uses the same stable unknown-field ordering. */
-  const b = Array.from(right)
-  for (let index = 0; index < Math.min(a.length, b.length); index += 1) {
-    /** Scalar values determine deterministic field precedence independent of host locale. */
-    const x = a[index]!.codePointAt(0)!
-    /** The right scalar is compared at the same ordinal position. */
-    const y = b[index]!.codePointAt(0)!
-    if (x !== y) return x - y
-  }
-  return a.length - b.length
 }
 
 /** Reject lone UTF-16 surrogate halves instead of silently replacing them on receive. */
@@ -968,36 +1047,47 @@ function createViolation(
  * symbols, class instances, cycles, and exceeded tree limits are rejected rather than silently lost
  * by JSON. Getter failures retain their exact value as the coded violation cause.
  */
-function normalizePlainData(
-  value: unknown,
-  depth: number,
-  limits: IErrorChainLimits
-): IErrorChainData {
-  /** Each projection owns its active path and occurrence budget, including repeated shared objects. */
-  const active = new Set<object>()
-  /** Plain data uses the same configured occurrence bound as the enclosing error tree. */
-  let nodes = 0
-
-  /**
-   * Reject at the exact data location while keeping the offending input or getter failure
-   * reachable.
-   */
-  function invalid(input: unknown, pointer: string, violation: ErrorChainViolation): never {
+/** Snapshot one plain-data tree with explicit cycle and occurrence ownership. */
+class PlainDataNormalizer {
+  /** Active ancestors reject cycles while repeated shared values count as distinct occurrences. */
+  #active = new Set<object>()
+  /** Every admitted scalar/container consumes the configured occurrence budget. */
+  #nodes = 0
+  /** The enclosing error projection supplies its original limits without another policy. */
+  #limits: IErrorChainLimits
+  /** Capture the existing projection policy before any input getter executes. */
+  constructor(limits: IErrorChainLimits) {
+    this.#limits = limits
+  }
+  /** Retain the original root pointer and nesting offset of this plain-data projection. */
+  normalize(value: unknown, depth: number): IErrorChainData {
+    return this.#visit(value, '', depth + 1)
+  }
+  /** Reject at the original pointer while retaining the offending value or getter failure. */
+  #invalid(input: unknown, pointer: string, violation: ErrorChainViolation): never {
     throw createViolation({}, input, pointer, violation)
   }
-
-  /** Walk only plain JSON shapes, reading each admitted key or array position once. */
-  function visit(input: unknown, pointer: string, nesting: number): IErrorChainData {
-    if (++nodes > limits.maxNodes) invalid(input, pointer, ErrorChainViolation.nodes)
-    if (nesting > limits.maxNesting - 1) invalid(input, pointer, ErrorChainViolation.depth)
+  /** Read each admitted property once and retain its exact thrown cause. */
+  #read(target: object, key: string | number, path: string): unknown {
+    /** A fresh output retains the fixed property order and cannot inherit source object behavior. */
+    const result = tryReadProperty(target as Record<string | number, unknown>, key)
+    if (result.threw) this.#invalid(result.error, path, ErrorChainViolation.read)
+    return result.value
+  }
+  /** Walk plain shapes in their original property order with one active-path owner. */
+  #visit(input: unknown, pointer: string, nesting: number): IErrorChainData {
+    if (++this.#nodes > this.#limits.maxNodes)
+      this.#invalid(input, pointer, ErrorChainViolation.nodes)
+    if (nesting > this.#limits.maxNesting - 1)
+      this.#invalid(input, pointer, ErrorChainViolation.depth)
     if (input === null || typeof input === 'string' || typeof input === 'boolean') return input
     if (typeof input === 'number') {
-      if (!Number.isFinite(input)) invalid(input, pointer, ErrorChainViolation.type)
+      if (!Number.isFinite(input)) this.#invalid(input, pointer, ErrorChainViolation.type)
       return input
     }
-    if (typeof input !== 'object') invalid(input, pointer, ErrorChainViolation.type)
-    if (active.has(input)) invalid(input, pointer, ErrorChainViolation.type)
-    active.add(input)
+    if (typeof input !== 'object') this.#invalid(input, pointer, ErrorChainViolation.type)
+    if (this.#active.has(input)) this.#invalid(input, pointer, ErrorChainViolation.type)
+    this.#active.add(input)
     /** Read failures occur before children and retain their original exception identity. */
     let array: boolean
     /** Hold the enumerated own keys so no property is rediscovered while getters execute. */
@@ -1006,7 +1096,7 @@ function normalizePlainData(
       array = Array.isArray(input)
       keys = array ? [] : Object.keys(input)
     } catch (error) {
-      invalid(error, pointer, ErrorChainViolation.read)
+      this.#invalid(error, pointer, ErrorChainViolation.read)
     }
     /**
      * JSON admits only plain records and string-owned properties; no class serialization is
@@ -1017,19 +1107,14 @@ function normalizePlainData(
       Object.getPrototypeOf(input) !== null &&
       Object.getPrototypeOf(input) !== Object.prototype
     )
-      invalid(input, pointer, ErrorChainViolation.type)
+      this.#invalid(input, pointer, ErrorChainViolation.type)
     if (Object.getOwnPropertySymbols(input).length > 0)
-      invalid(input, pointer, ErrorChainViolation.type)
+      this.#invalid(input, pointer, ErrorChainViolation.type)
     /** Require a successful one-read snapshot before visiting a child. */
-    function read(target: object, key: string | number, path: string): unknown {
-      /** A fresh output retains the fixed property order and cannot inherit source object behavior. */
-      const result = tryReadProperty(target as Record<string | number, unknown>, key)
-      if (result.threw) invalid(result.error, path, ErrorChainViolation.read)
-      return result.value
-    }
+
     if (array) {
       /** Array length is held before iteration so getter side effects cannot change traversal shape. */
-      const length = read(input, 'length', `${pointer}/length`) as number
+      const length = this.#read(input, 'length', `${pointer}/length`) as number
       /**
        * Dense output rejects unsupported undefined and sparse entries instead of converting to
        * null.
@@ -1038,9 +1123,9 @@ function normalizePlainData(
       for (let index = 0; index < length; index += 1) {
         /** Keep each dense data entry associated with its original pointer while reading it once. */
         const path = `${pointer}/${index}`
-        result.push(visit(read(input, index, path), path, nesting + 1))
+        result.push(this.#visit(this.#read(input, index, path), path, nesting + 1))
       }
-      active.delete(input)
+      this.#active.delete(input)
       return Object.freeze(result)
     }
     /** Null prototypes keep received `__proto__` and `constructor` keys as inert data. */
@@ -1051,10 +1136,9 @@ function normalizePlainData(
     for (const key of keys) {
       /** Keys are escaped only for diagnostics; their stored bytes remain unchanged. */
       const path = `${pointer}/${escapePointer(key)}`
-      result[key] = visit(read(input, key, path), path, nesting + 1)
+      result[key] = this.#visit(this.#read(input, key, path), path, nesting + 1)
     }
-    active.delete(input)
+    this.#active.delete(input)
     return Object.freeze(result)
   }
-  return visit(value, '', depth + 1)
 }

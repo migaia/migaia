@@ -328,183 +328,282 @@ function admitSignal(value: unknown): IAbortSignal {
 /** Host callback typed loosely; every call goes through `Reflect.apply` with the host receiver. */
 type IHostFunction = (...args: unknown[]) => unknown
 
-/**
- * Registers `run` on one concrete strategy's queue and returns a cancel function. `delay` is
- * already validated; strategies without native delay wait on a timer first.
- */
+/** Native channel shape used solely for one message-channel task. */
+type ITaskMessageChannel = {
+  readonly port1: { onmessage: unknown; close(): void }
+  readonly port2: { postMessage(value: unknown): void; close(): void }
+}
+
+/** One concrete dispatch owns its native registration, cancellation marker and optional delay stage. */
+class TaskDispatch {
+  /** One host snapshot pairs native registration and cancellation. */
+  #globals = host()
+  /** Concrete queue was selected before this native registration. */
+  #strategy: IConcreteAsyncTaskStrategy
+  /** The original caller owns callback result settlement. */
+  #run: (context: Record<string, unknown>) => void
+  /** Shared diagnostic context records the selected queue. */
+  #base: Record<string, unknown>
+  /** Already-admitted delay is consumed by the native or preliminary timer. */
+  #delay: number
+  /** Optional idle deadline is forwarded only to idle registration. */
+  #idleTimeout: number | undefined
+  /** Non-cancellable callbacks consult this marker before running. */
+  #cancelled = false
+  /** A preliminary delay hands cancellation to its subsequently registered inner queue. */
+  #cancelInner: (() => void) | undefined
+  /** Only a message-channel strategy owns this pair of native ports. */
+  #channel: ITaskMessageChannel | undefined
+
+  /** Capture the concrete operation without touching its native queue yet. */
+  constructor(
+    strategy: IConcreteAsyncTaskStrategy,
+    run: (context: Record<string, unknown>) => void,
+    delay: number,
+    idleTimeout: number | undefined
+  ) {
+    this.#strategy = strategy
+    this.#run = run
+    this.#base = { strategy }
+    this.#delay = delay
+    this.#idleTimeout = idleTimeout
+  }
+
+  /** Invoke host functions with their exact required receiver. */
+  #call(name: string, args: unknown[]): unknown {
+    return Reflect.apply(member(this.#globals, name) as IHostFunction, this.#globals, args)
+  }
+
+  /** Choose one actual native registration, keeping fallback outside this concrete owner. */
+  register(): () => void {
+    /** Timeout and postTask already implement their own native delay. */
+    const nativeDelay = this.#strategy === 'timeout' || this.#strategy in POST_TASK_PRIORITY
+    if (this.#delay > 0 && !nativeDelay) return this.#registerDelay()
+    switch (this.#strategy) {
+      case 'promise':
+      case 'microtask':
+      case 'nextTick':
+      case 'schedulerYield':
+        return this.#registerDeferred()
+      case 'timeout':
+        return this.#registerTimer('setTimeout', 'clearTimeout', this.#delay)
+      case 'immediate':
+        return this.#registerTimer('setImmediate', 'clearImmediate')
+      case 'messageChannel':
+        return this.#registerChannel()
+      case 'animationFrame': {
+        /** The frame callback retains the original native timestamp conversion. */
+        const id = this.#call('requestAnimationFrame', [
+          (frameTime: unknown) => this.#run({ ...this.#base, frameTime: Number(frameTime) })
+        ])
+        return () => {
+          this.#call('cancelAnimationFrame', [id])
+        }
+      }
+      case 'idleCallback':
+        return this.#registerIdle()
+      case 'postTaskUserBlocking':
+      case 'postTaskUserVisible':
+      case 'postTaskBackground':
+        return this.#registerPosted(this.#strategy)
+    }
+  }
+
+  /** A preliminary timer yields cancellation to the second stage only after it is registered. */
+  #registerDelay(): () => void {
+    /** This first stage owns only its own native timer. */
+    const handle = this.#call('setTimeout', [
+      () => {
+        this.#cancelInner = dispatch(this.#strategy, this.#run, 0, this.#idleTimeout)
+      },
+      this.#delay
+    ])
+    return () => {
+      if (this.#cancelInner) this.#cancelInner()
+      else this.#call('clearTimeout', [handle])
+    }
+  }
+
+  /** Non-cancellable microtask/tick/continuation registrations share one cancellation marker. */
+  #registerDeferred(): () => void {
+    switch (this.#strategy) {
+      case 'promise':
+        void Promise.resolve().then(this.#runIfOpen)
+        break
+      case 'microtask':
+        this.#call('queueMicrotask', [this.#runIfOpen])
+        break
+      case 'nextTick': {
+        /** Node-compatible process is the native nextTick receiver. */
+        const processHost = member(this.#globals, 'process')
+        Reflect.apply(member(processHost, 'nextTick') as IHostFunction, processHost, [
+          this.#runIfOpen
+        ])
+        break
+      }
+      case 'schedulerYield': {
+        /** The host scheduler owns its continuation queue. */
+        const schedulerHost = member(this.#globals, 'scheduler')
+        void Promise.resolve(
+          Reflect.apply(member(schedulerHost, 'yield') as IHostFunction, schedulerHost, [])
+        ).then(this.#runIfOpen)
+        break
+      }
+    }
+    return () => {
+      this.#cancelled = true
+    }
+  }
+
+  /** Callback admission for queues that cannot unregister a native job. */
+  #runIfOpen = (): void => {
+    if (!this.#cancelled) this.#run(this.#base)
+  }
+
+  /** Timer and immediate registration share native-handle cancellation, preserving argument count. */
+  #registerTimer(register: string, cancel: string, delay?: number): () => void {
+    /** Native delay is supplied only by timeout, as in the original call. */
+    const handle = this.#call(register, [
+      () => this.#run(this.#base),
+      ...(delay === undefined ? [] : [delay])
+    ])
+    return () => {
+      this.#call(cancel, [handle])
+    }
+  }
+
+  /** A fresh channel belongs to this task and closes on run or cancellation. */
+  #registerChannel(): () => void {
+    this.#channel = new (member(this.#globals, 'MessageChannel') as new () => ITaskMessageChannel)()
+    this.#channel.port1.onmessage = () => {
+      this.#closeChannel()
+      this.#run(this.#base)
+    }
+    this.#channel.port2.postMessage(undefined)
+    return this.#closeChannel
+  }
+
+  /** Release the original two ports and detach their message callback. */
+  #closeChannel = (): void => {
+    this.#channel!.port1.onmessage = null
+    this.#channel!.port1.close()
+    this.#channel!.port2.close()
+  }
+
+  /** Idle callbacks expose the original native deadline receiver lazily. */
+  #registerIdle(): () => void {
+    /** Cancellation uses the exact id returned by native registration. */
+    const id = this.#call('requestIdleCallback', [
+      (deadline: { readonly didTimeout?: unknown; timeRemaining?: () => number }) =>
+        this.#run({
+          ...this.#base,
+          didTimeout: deadline?.didTimeout === true,
+          timeRemaining: () =>
+            typeof deadline?.timeRemaining === 'function' ? deadline.timeRemaining() : 0
+        }),
+      ...(this.#idleTimeout === undefined ? [] : [{ timeout: this.#idleTimeout }])
+    ])
+    return () => {
+      this.#call('cancelIdleCallback', [id])
+    }
+  }
+
+  /** Native postTask owns cancellation; unexpected native rejections still reach the host. */
+  #registerPosted(strategy: keyof typeof POST_TASK_PRIORITY): () => void {
+    /** The host scheduler must remain the receiver of postTask. */
+    const schedulerHost = member(this.#globals, 'scheduler')
+    /** This native controller cancels only the posted task. */
+    const controller = new (member(this.#globals, 'AbortController') as new () => {
+      readonly signal: unknown
+      abort(): void
+    })()
+    /** Preserve the original host promise and its optional then surface. */
+    const posted = Reflect.apply(
+      member(schedulerHost, 'postTask') as IHostFunction,
+      schedulerHost,
+      [
+        () => this.#run(this.#base),
+        { priority: POST_TASK_PRIORITY[strategy], delay: this.#delay, signal: controller.signal }
+      ]
+    ) as PromiseLike<unknown> | undefined
+    posted?.then(undefined, (error: unknown) => {
+      if (!this.#cancelled)
+        this.#call('queueMicrotask', [
+          () => {
+            throw error
+          }
+        ])
+    })
+    return () => {
+      this.#cancelled = true
+      controller.abort()
+    }
+  }
+}
+
+/** Register one concrete queue; its named owner retains cancellation and native handles. */
 function dispatch(
   strategy: IConcreteAsyncTaskStrategy,
   run: (context: Record<string, unknown>) => void,
   delay: number,
   idleTimeout: number | undefined
 ): () => void {
-  /** Host snapshot used for both registration and cancellation. */
-  const globals = host()
-  /** Calls one host function with `globalThis` as receiver. */
-  const call = (name: string, args: unknown[]): unknown =>
-    Reflect.apply(member(globals, name) as IHostFunction, globals, args)
-  /** Native-delay strategies schedule directly; others wait on a timer first. */
-  const nativeDelay = strategy === 'timeout' || strategy in POST_TASK_PRIORITY
-  if (delay > 0 && !nativeDelay) {
-    /** Cancel of the second stage, set once the timer fired. */
-    let cancelInner: (() => void) | undefined
-    /** Timer handle of the delay stage. */
-    const handle = call('setTimeout', [
-      () => {
-        cancelInner = dispatch(strategy, run, 0, idleTimeout)
-      },
-      delay
-    ])
-    return () => {
-      if (cancelInner) cancelInner()
-      else call('clearTimeout', [handle])
-    }
+  return new TaskDispatch(strategy, run, delay, idleTimeout).register()
+}
+
+/** Own one scheduled callback's admission, cancellation and settlement. */
+class ScheduledCallback<S extends AsyncTaskStrategy, R> {
+  /** Callback start and prior cancellation share the original single terminal transition. */
+  #settled = false
+  /** The admitted user function is invoked with its original plain receiver. */
+  #callback: (context: IAsyncTaskContext<S>) => R | PromiseLike<R>
+  /** The original structural signal owns cancellation only before callback start. */
+  #signal: IAbortSignal | undefined
+  /** The dispatch owner returns the exact host registration cancellation receipt. */
+  #cancel!: () => void
+  /** Native settlement preserves user values, thenables and thrown reason identity. */
+  #resolve!: (value: Awaited<R> | PromiseLike<Awaited<R>>) => void
+  /** Registration and callback failures keep their original rejection object. */
+  #reject!: (reason?: unknown) => void
+  /** Callers observe the one native result Promise for this registration. */
+  readonly promise: Promise<Awaited<R>>
+  /** Register only after synchronous validation and initial abort observation succeed. */
+  constructor(
+    concrete: IConcreteAsyncTaskStrategy,
+    callback: (context: IAsyncTaskContext<S>) => R | PromiseLike<R>,
+    delay: number,
+    idleTimeout: number | undefined,
+    signal: IAbortSignal | undefined
+  ) {
+    this.#callback = callback
+    this.#signal = signal
+    this.promise = new Promise<Awaited<R>>((resolve, reject) => {
+      this.#resolve = resolve
+      this.#reject = reject
+      this.#cancel = dispatch(concrete, this.#run, delay, idleTimeout)
+      signal?.addEventListener('abort', this.#onAbort, { once: true })
+    })
   }
-  /** Context common to every strategy. */
-  const base = { strategy }
-  switch (strategy) {
-    case 'promise': {
-      /** Microtasks cannot be unregistered; the flag drops a cancelled run. */
-      let cancelled = false
-      void Promise.resolve().then(() => {
-        if (!cancelled) run(base)
-      })
-      return () => {
-        cancelled = true
-      }
-    }
-    case 'microtask': {
-      /** Microtasks cannot be unregistered; the flag drops a cancelled run. */
-      let cancelled = false
-      call('queueMicrotask', [
-        () => {
-          if (!cancelled) run(base)
-        }
-      ])
-      return () => {
-        cancelled = true
-      }
-    }
-    case 'nextTick': {
-      /** Tick callbacks cannot be unregistered; the flag drops a cancelled run. */
-      let cancelled = false
-      /** Node-compatible process object, the required receiver of `nextTick`. */
-      const processHost = member(globals, 'process')
-      Reflect.apply(member(processHost, 'nextTick') as IHostFunction, processHost, [
-        () => {
-          if (!cancelled) run(base)
-        }
-      ])
-      return () => {
-        cancelled = true
-      }
-    }
-    case 'timeout': {
-      /** Native timer handle. */
-      const handle = call('setTimeout', [() => run(base), delay])
-      return () => {
-        call('clearTimeout', [handle])
-      }
-    }
-    case 'immediate': {
-      /** Native immediate handle. */
-      const handle = call('setImmediate', [() => run(base)])
-      return () => {
-        call('clearImmediate', [handle])
-      }
-    }
-    case 'messageChannel': {
-      /** Fresh channel per task, closed on run or cancel so it never keeps a host alive. */
-      const channel = new (member(globals, 'MessageChannel') as new () => {
-        readonly port1: { onmessage: unknown; close(): void }
-        readonly port2: { postMessage(value: unknown): void; close(): void }
-      })()
-      /** Closes both ports exactly once. */
-      const close = (): void => {
-        channel.port1.onmessage = null
-        channel.port1.close()
-        channel.port2.close()
-      }
-      channel.port1.onmessage = () => {
-        close()
-        run(base)
-      }
-      channel.port2.postMessage(undefined)
-      return close
-    }
-    case 'animationFrame': {
-      /** Native frame request id. */
-      const id = call('requestAnimationFrame', [
-        (frameTime: unknown) => run({ ...base, frameTime: Number(frameTime) })
-      ])
-      return () => {
-        call('cancelAnimationFrame', [id])
-      }
-    }
-    case 'idleCallback': {
-      /** Native idle request id. */
-      const id = call('requestIdleCallback', [
-        (deadline: { readonly didTimeout?: unknown; timeRemaining?: () => number }) =>
-          run({
-            ...base,
-            didTimeout: deadline?.didTimeout === true,
-            timeRemaining: () =>
-              typeof deadline?.timeRemaining === 'function' ? deadline.timeRemaining() : 0
-          }),
-        ...(idleTimeout === undefined ? [] : [{ timeout: idleTimeout }])
-      ])
-      return () => {
-        call('cancelIdleCallback', [id])
-      }
-    }
-    case 'postTaskUserBlocking':
-    case 'postTaskUserVisible':
-    case 'postTaskBackground': {
-      /** Host scheduler, the required receiver of `postTask`. */
-      const schedulerHost = member(globals, 'scheduler')
-      /** Host controller whose signal cancels the posted task. */
-      const controller = new (member(globals, 'AbortController') as new () => {
-        readonly signal: unknown
-        abort(): void
-      })()
-      /** Set on cancel so the expected abort rejection of `postTask` is recognized. */
-      let cancelled = false
-      /** Promise returned by `postTask`; it rejects only when cancelled. */
-      const posted = Reflect.apply(
-        member(schedulerHost, 'postTask') as IHostFunction,
-        schedulerHost,
-        [
-          () => run(base),
-          { priority: POST_TASK_PRIORITY[strategy], delay, signal: controller.signal }
-        ]
-      ) as PromiseLike<unknown> | undefined
-      posted?.then(undefined, (error: unknown) => {
-        // Cancellation rejections are this module's own request; anything else reaches the host.
-        if (!cancelled)
-          call('queueMicrotask', [
-            () => {
-              throw error
-            }
-          ])
-      })
-      return () => {
-        cancelled = true
-        controller.abort()
-      }
-    }
-    case 'schedulerYield': {
-      /** Continuations cannot be unregistered; the flag drops a cancelled run. */
-      let cancelled = false
-      /** Host scheduler, the required receiver of `yield`. */
-      const schedulerHost = member(globals, 'scheduler')
-      void Promise.resolve(
-        Reflect.apply(member(schedulerHost, 'yield') as IHostFunction, schedulerHost, [])
-      ).then(() => {
-        if (!cancelled) run(base)
-      })
-      return () => {
-        cancelled = true
-      }
+  /** Abort before callback start cancels the same host registration and retains its reason. */
+  #onAbort = (): void => {
+    if (this.#settled) return
+    this.#settled = true
+    this.#cancel()
+    /** The signal's reason getter is observed once and its failure remains reachable. */
+    const reason = tryReadProperty(this.#signal as { reason?: unknown }, 'reason')
+    this.#reject(new UtilsAbortError(reason.threw ? reason.error : reason.value))
+  }
+  /** Callback start retires cancellation before adopting the original user outcome. */
+  #run = (context: Record<string, unknown>): void => {
+    if (this.#settled) return
+    this.#settled = true
+    this.#signal?.removeEventListener('abort', this.#onAbort)
+    try {
+      /** Reading the function into a local preserves its original unbound invocation. */
+      const callback = this.#callback
+      this.#resolve(callback(context as IAsyncTaskContext<S>) as Awaited<R>)
+    } catch (error) {
+      this.#reject(error)
     }
   }
 }
@@ -563,33 +662,7 @@ export function asyncTask<const S extends AsyncTaskStrategy, R>(
     const reason = tryReadProperty(signal as { reason?: unknown }, 'reason')
     return Promise.reject(new UtilsAbortError(reason.threw ? reason.error : reason.value))
   }
-  return new Promise<Awaited<R>>((resolve, reject) => {
-    /** True once the callback started or the task was cancelled. */
-    let settled = false
-    /** Abort listener; removed as soon as the task settles. */
-    const onAbort = (): void => {
-      if (settled) return
-      settled = true
-      cancel()
-      /** Abort reason read once through a guarded getter. */
-      const reason = tryReadProperty(signal as { reason?: unknown }, 'reason')
-      reject(new UtilsAbortError(reason.threw ? reason.error : reason.value))
-    }
-    /** Runs the callback once and adopts its outcome. */
-    const run = (context: Record<string, unknown>): void => {
-      if (settled) return
-      settled = true
-      signal?.removeEventListener('abort', onAbort)
-      try {
-        resolve(callback(context as IAsyncTaskContext<S>) as Awaited<R>)
-      } catch (error) {
-        reject(error)
-      }
-    }
-    /** Host registration cancel. */
-    const cancel = dispatch(concrete, run, delay, idleTimeout)
-    signal?.addEventListener('abort', onAbort, { once: true })
-  })
+  return new ScheduledCallback<S, R>(concrete, callback, delay, idleTimeout, signal).promise
 }
 
 /**

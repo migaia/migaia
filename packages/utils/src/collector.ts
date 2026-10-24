@@ -290,7 +290,12 @@ function acceptsStage<T>(source: T, stage: ICollectStage<T>): boolean | 'termina
   }
 }
 
-/** Executes arbitrary ordered stages in one source pass with copy-on-first-rejection output. */
+/**
+ * Executes arbitrary ordered stages in one source pass with copy-on-first-rejection output. For N
+ * values and S independent user predicates, required N*S callback invocations belong to caller work
+ * (2026-10-24 ruling); this does not permit extra member scans or copies per stage. Membership
+ * remains indexed, and output is copied at most once before appending accepted values.
+ */
 function evaluateOrderedPipeline<T>(
   source: readonly T[],
   stages: readonly ICollectStage<T>[]

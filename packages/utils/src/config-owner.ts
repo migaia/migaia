@@ -5,6 +5,7 @@ import { isPlainObject } from './object.js'
 import type { IObjectPath, IObjectPathValue, IObjectPathWriteValue } from './object-path.js'
 import { reportUnhandledError } from './host-report.js'
 import { raceWithAbort, withTimeout, type IAbortSignal } from './promise.js'
+import { orderStringKeys } from './internal/string-order.js'
 import {
   CONFIG_DELETE,
   combineConfig,
@@ -545,7 +546,7 @@ export class ConfigOwner<T extends IConfigRecord = IConfigRecord> {
       )
     /** Nested root built from every matching key. */
     let root: unknown = {}
-    for (const name of Object.keys(env).sort()) {
+    for (const name of orderStringKeys(Object.keys(env))) {
       /** Raw string value; non-strings are skipped like unset variables. */
       const raw = env[name]
       if (typeof raw !== 'string' || !name.startsWith(prefix)) continue
@@ -556,16 +557,18 @@ export class ConfigOwner<T extends IConfigRecord = IConfigRecord> {
         .map((segment) => key(segment))
       /** Validated segments; invalid names throw `CONFIG_PATH_INVALID`. */
       const path = toSegments(segments)
-      /** Existing value along the path, used to detect leaf/record conflicts. */
+      /** One cursor visits each prefix once; no repeated slicing or retraversal. */
+      let prefixNode = root
       for (let index = 1; index <= path.length; index += 1) {
-        /** Existing node at this prefix length. */
-        const existing = rawAt(root, path.slice(0, index))
+        /** Descriptor probing preserves the original own-data conflict policy. */
+        const existing = ownValue(prefixNode, path[index - 1]!)
         if (existing.found && (index === path.length || !isPlainObject(existing.value)))
           throw ownerError(
             TypeError,
             UtilsErrorCode.configConflict,
             UtilsErrorText.configConflict(path.slice(0, index).join('.'), `environment key ${name}`)
           )
+        prefixNode = existing.value
       }
       root = rebuild(root, path, coerce ? coerce(raw, path) : raw, 'env')
     }

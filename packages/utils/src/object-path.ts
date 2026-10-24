@@ -361,19 +361,50 @@ export function set<T, const P extends IObjectPathInput<T>>(
   return update(object, 0) as T
 }
 
-/** Creates a reusable accessor whose immutable root advances after each successful set. */
-export function createPathAccessor<T>(
-  object: T,
-  options: IPathAccessorOptions<T> = {}
-): IPathAccessor<T> {
-  let current = object
-  const { ifMissing, ifBlocked, ifFailed, onGet, onSet } = options
-  const notifyFailure = (probe: IPathProbe<T, IObjectPathInput<T>>): void => {
-    if (probe.kind === 'missing') ifMissing?.(probe)
-    else if (probe.kind === 'blocked') ifBlocked?.(probe)
-    else if (probe.kind === 'failed') ifFailed?.(probe)
+/** One reusable accessor owns the latest immutable root and its captured observation hooks. */
+class PathAccessor<T> implements IPathAccessor<T> {
+  /** Successful writes replace this root without mutating earlier values. */
+  #current: T
+  /** Failure notifications preserve the original captured option reads. */
+  #ifMissing: IPathAccessorOptions<T>['ifMissing']
+  /** Blocked paths may be observed without forcing a write. */
+  #ifBlocked: IPathAccessorOptions<T>['ifBlocked']
+  /** Getter failures remain reachable through the original failure hook. */
+  #ifFailed: IPathAccessorOptions<T>['ifFailed']
+  /** A get hook may replace only the current read result. */
+  #onGet: IPathAccessorOptions<T>['onGet']
+  /** A set hook transforms one proposed immutable write. */
+  #onSet: IPathAccessorOptions<T>['onSet']
+
+  /** Capture the root and hooks once, preserving option read order. */
+  constructor(object: T, options: IPathAccessorOptions<T>) {
+    this.#current = object
+    const { ifMissing, ifBlocked, ifFailed, onGet, onSet } = options
+    this.#ifMissing = ifMissing
+    this.#ifBlocked = ifBlocked
+    this.#ifFailed = ifFailed
+    this.#onGet = onGet
+    this.#onSet = onSet
   }
-  const transformGet = <P extends IObjectPathInput<T>>(
+
+  /** Route one failure observation without changing a captured callback's receiver. */
+  #notifyFailure = (probe: IPathProbe<T, IObjectPathInput<T>>): void => {
+    if (probe.kind === 'missing') {
+      /** Invoke the original optional callback as a plain function. */
+      const notify = this.#ifMissing
+      notify?.(probe)
+    } else if (probe.kind === 'blocked') {
+      /** Blocked observations share no mutable callback receiver. */
+      const notify = this.#ifBlocked
+      notify?.(probe)
+    } else if (probe.kind === 'failed') {
+      /** Keep the original thrown value in the unchanged probe. */
+      const notify = this.#ifFailed
+      notify?.(probe)
+    }
+  }
+  /** A short event-local replacement callback transforms one get result. */
+  #transformGet = <P extends IObjectPathInput<T>>(
     value: IObjectPathValue<T, P>,
     probe: IPathValueProbe<T, P>,
     hook: IPathAccessorOptions<T>['onGet']
@@ -391,7 +422,8 @@ export function createPathAccessor<T>(
     hook?.(event as IStringGetEvent<T> | ITupleGetEvent<T>)
     return transformed
   }
-  const transformSet = <P extends IObjectPathInput<T>>(
+  /** A short event-local replacement callback transforms one proposed write. */
+  #transformSet = <P extends IObjectPathInput<T>>(
     value: IObjectPathWriteValue<T, P>,
     probe: IPathValueProbe<T, P>,
     hook: IPathAccessorOptions<T>['onSet']
@@ -409,34 +441,52 @@ export function createPathAccessor<T>(
     hook?.(event as IStringSetEvent<T> | ITupleSetEvent<T>)
     return transformed
   }
-  return {
-    get value() {
-      return current
-    },
-    get: (path) => {
-      const probe = probeObjectPath(current, path)
-      if (probe.kind !== 'value') {
-        notifyFailure(probe)
-        if (probe.kind === 'failed') throw probe.error
-        return undefined
-      }
-      return transformGet(probe.value, probe, onGet)
-    },
-    set: (path, value) => {
-      const before = probeObjectPath(current, path)
-      if (before.kind !== 'value') notifyFailure(before)
-      if (before.kind === 'failed') throw before.error
-      if (before.kind === 'blocked') return set(current, path, value)
-      const synthetic: IPathValueProbe<T, typeof path> = {
-        kind: 'value',
-        originKey: path,
-        segments: before.segments,
-        value: value as IObjectPathValue<T, typeof path>
-      }
-      current = set(current, path, transformSet(value, synthetic, onSet))
-      return current
-    },
-    probeValue: (path) => probeObjectPath(current, path),
-    parsePath: (path) => parseObjectPath(path)
+
+  /** Expose the root produced by the latest successful write. */
+  get value(): T {
+    return this.#current
   }
+
+  /** Probe before applying the captured get transform; preserve original getter failures. */
+  get: IPathAccessor<T>['get'] = (path) => {
+    /** One probe carries both the value and diagnostic path identity. */
+    const probe = probeObjectPath(this.#current, path)
+    if (probe.kind !== 'value') {
+      this.#notifyFailure(probe)
+      if (probe.kind === 'failed') throw probe.error
+      return undefined
+    }
+    return this.#transformGet(probe.value, probe, this.#onGet)
+  }
+
+  /** Advance the immutable root only after admission and the set transform succeed. */
+  set: IPathAccessor<T>['set'] = (path, value) => {
+    /** The original root supplies failure observations before a synthetic write probe is built. */
+    const before = probeObjectPath(this.#current, path)
+    if (before.kind !== 'value') this.#notifyFailure(before)
+    if (before.kind === 'failed') throw before.error
+    if (before.kind === 'blocked') return set(this.#current, path, value)
+    /** Hooks observe the proposed value with the original path segments. */
+    const synthetic: IPathValueProbe<T, typeof path> = {
+      kind: 'value',
+      originKey: path,
+      segments: before.segments,
+      value: value as IObjectPathValue<T, typeof path>
+    }
+    this.#current = set(this.#current, path, this.#transformSet(value, synthetic, this.#onSet))
+    return this.#current
+  }
+
+  /** Probe against the current immutable root without applying value transforms. */
+  probeValue: IPathAccessor<T>['probeValue'] = (path) => probeObjectPath(this.#current, path)
+  /** Parsing remains the canonical path grammar and never reads accessor state. */
+  parsePath: IPathAccessor<T>['parsePath'] = (path) => parseObjectPath(path)
+}
+
+/** Creates a reusable accessor whose immutable root advances after each successful set. */
+export function createPathAccessor<T>(
+  object: T,
+  options: IPathAccessorOptions<T> = {}
+): IPathAccessor<T> {
+  return new PathAccessor(object, options)
 }

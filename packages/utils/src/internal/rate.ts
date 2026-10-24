@@ -167,96 +167,147 @@ export function debounce<F extends (...args: never[]) => unknown>(
   wait: number,
   options: IDebounceOptions = {}
 ): IControlledFunction<F> {
-  admitFunction(fn, 'fn')
-  /** Validated inputs. */
-  const delay = admitWait(wait, 'wait')
-  const maxWait = options.maxWait === undefined ? undefined : admitWait(options.maxWait, 'maxWait')
-  const leading = options.leading === true
-  const trailing = options.trailing !== false
-  const scheduler = admitScheduler(options.scheduler)
-  const signal = admitSignal(options.signal)
-  /** Arguments of the latest call not yet delivered. */
-  let pendingArgs: Parameters<F> | undefined
-  /** Result of the last invocation, returned by an idle `flush()`. */
-  let lastResult: ReturnType<F> | undefined
-  /** Quiet-period timer; its presence means a burst is active. */
-  let waitTask: IScheduledTask | undefined
-  /** `maxWait` timer for the current burst. */
-  let maxTask: IScheduledTask | undefined
-  /** Set permanently by abort. */
-  let disposed = false
-  /** Invokes with the pending arguments and clears them. */
-  const invoke = (): ReturnType<F> | undefined => {
-    /** Arguments consumed by this invocation. */
-    const args = pendingArgs
-    pendingArgs = undefined
-    if (args === undefined) return lastResult
-    lastResult = fn(...args) as ReturnType<F>
-    return lastResult
+  return new DebouncedFunction(fn, wait, options).controlled
+}
+
+/** One pending invocation owns the latest arguments and completed result for either rate control. */
+class PendingInvocation<F extends (...args: never[]) => unknown> {
+  /** User callback is invoked as a plain function, preserving its original receiver semantics. */
+  #fn: F
+  /** The newest undelivered call replaces earlier arguments. */
+  #args: Parameters<F> | undefined
+  /** Idle flush returns the most recent successful result. */
+  #result: ReturnType<F> | undefined
+  /** Capture the already-admitted callback without invoking it. */
+  constructor(fn: F) {
+    this.#fn = fn
   }
-  /** Timer-driven invocation; there is no caller, so failures are reported. */
-  const invokeFromTimer = (): void => {
+  /** Replace the one pending call. */
+  stage(args: Parameters<F>): void {
+    this.#args = args
+  }
+  /** Cancel arguments while retaining the last result. */
+  clear(): void {
+    this.#args = undefined
+  }
+  /** Whether one call remains undelivered. */
+  get pending(): boolean {
+    return this.#args !== undefined
+  }
+  /** Consume before invoking so reentrant calls create a fresh pending call. */
+  invoke(): ReturnType<F> | undefined {
+    /** One invocation consumes this exact argument list before user code runs. */
+    const args = this.#args
+    this.#args = undefined
+    if (args === undefined) return this.#result
+    this.#result = Reflect.apply(this.#fn, undefined, args) as ReturnType<F>
+    return this.#result
+  }
+}
+
+/** One debounce burst owns its quiet/max timers and terminal abort marker. */
+class DebouncedFunction<F extends (...args: never[]) => unknown> {
+  /** Shared invocation owner preserves reentrant argument and result behavior. */
+  #invocation: PendingInvocation<F>
+  /** Validated quiet-period duration. */
+  #delay: number
+  /** Optional upper bound for a continuous burst. */
+  #maxWait: number | undefined
+  /** Leading calls run only when there is no active quiet timer. */
+  #leading: boolean
+  /** Trailing delivery defaults to enabled. */
+  #trailing: boolean
+  /** Timer registration and cancellation retain their canonical scheduler. */
+  #scheduler: IScheduler
+  /** Quiet timer also identifies whether a burst is active. */
+  #waitTask: IScheduledTask | undefined
+  /** Continuous bursts share one maximum-wait timer. */
+  #maxTask: IScheduledTask | undefined
+  /** Abort permanently fences later calls. */
+  #disposed = false
+  /** The frozen callable retains the original public API shape. */
+  readonly controlled: IControlledFunction<F>
+
+  /** Admit configuration in the original read order, then expose one controlled callable. */
+  constructor(fn: F, wait: number, options: IDebounceOptions) {
+    admitFunction(fn, 'fn')
+    this.#delay = admitWait(wait, 'wait')
+    this.#maxWait =
+      options.maxWait === undefined ? undefined : admitWait(options.maxWait, 'maxWait')
+    this.#leading = options.leading === true
+    this.#trailing = options.trailing !== false
+    this.#scheduler = admitScheduler(options.scheduler)
+    /** Subscription admission remains after scheduler admission. */
+    const signal = admitSignal(options.signal)
+    this.#invocation = new PendingInvocation(fn)
+    /** The callable is a receipt for this owner, not a second state container. */
+    const controlled = this.#call as IControlledFunction<F>
+    controlled.cancel = this.#cancel
+    controlled.flush = this.#flush
+    controlled.pending = () => this.#waitTask !== undefined && this.#invocation.pending
+    controlled[Symbol.dispose] = this.#cancel
+    if (signal) {
+      if (signal.aborted) this.#abort()
+      else signal.addEventListener('abort', this.#abort, { once: true })
+    }
+    this.controlled = Object.freeze(controlled)
+  }
+
+  /** Timer-driven callbacks have no caller; preserve host reporting of thrown failures. */
+  #invokeFromTimer(): void {
     try {
-      invoke()
+      this.#invocation.invoke()
     } catch (error) {
       reportUnhandledError(error)
     }
   }
-  /** Ends the burst and clears both timers. */
-  const clearTimers = (): void => {
-    waitTask?.cancel()
-    maxTask?.cancel()
-    waitTask = undefined
-    maxTask = undefined
+  /** End a burst and release both timer handles. */
+  #clearTimers(): void {
+    this.#waitTask?.cancel()
+    this.#maxTask?.cancel()
+    this.#waitTask = undefined
+    this.#maxTask = undefined
   }
-  /** Quiet period elapsed. */
-  const onWait = (): void => {
-    waitTask = undefined
-    maxTask?.cancel()
-    maxTask = undefined
-    if (trailing) invokeFromTimer()
-    else pendingArgs = undefined
+  /** A quiet period ends the burst and optionally delivers its latest call. */
+  #onWait = (): void => {
+    this.#waitTask = undefined
+    this.#maxTask?.cancel()
+    this.#maxTask = undefined
+    if (this.#trailing) this.#invokeFromTimer()
+    else this.#invocation.clear()
   }
-  /** `maxWait` elapsed during a continuous burst. */
-  const onMaxWait = (): void => {
-    maxTask = undefined
-    // The next call of a still-running burst arms a fresh maxWait window.
-    if (pendingArgs !== undefined) invokeFromTimer()
+  /** A continuing burst can arm a fresh maximum window on its next call. */
+  #onMaxWait = (): void => {
+    this.#maxTask = undefined
+    if (this.#invocation.pending) this.#invokeFromTimer()
   }
-  /** Public wrapper. */
-  const controlled = ((...args: Parameters<F>): void => {
-    if (disposed) return
-    /** Whether this call starts a new burst. */
-    const idle = waitTask === undefined
-    pendingArgs = args
-    waitTask?.cancel()
-    waitTask = scheduler.schedule(onWait, delay)
-    if (maxWait !== undefined && maxTask === undefined)
-      maxTask = scheduler.schedule(onMaxWait, maxWait)
-    if (idle && leading) invoke()
-  }) as IControlledFunction<F>
-  /** Cancels the pending invocation. */
-  const cancel = (): void => {
-    clearTimers()
-    pendingArgs = undefined
+  /** Replace pending arguments and rearm the quiet period before a possible leading invocation. */
+  #call = (...args: Parameters<F>): void => {
+    if (this.#disposed) return
+    /** Leading admission observes the previous burst marker. */
+    const idle = this.#waitTask === undefined
+    this.#invocation.stage(args)
+    this.#waitTask?.cancel()
+    this.#waitTask = this.#scheduler.schedule(this.#onWait, this.#delay)
+    if (this.#maxWait !== undefined && this.#maxTask === undefined)
+      this.#maxTask = this.#scheduler.schedule(this.#onMaxWait, this.#maxWait)
+    if (idle && this.#leading) this.#invocation.invoke()
   }
-  controlled.cancel = cancel
-  controlled.flush = () => {
-    clearTimers()
-    return invoke()
+  /** Cancellation drops pending work without erasing the last completed result. */
+  #cancel = (): void => {
+    this.#clearTimers()
+    this.#invocation.clear()
   }
-  controlled.pending = () => waitTask !== undefined && pendingArgs !== undefined
-  controlled[Symbol.dispose] = cancel
-  if (signal) {
-    /** Abort disposes permanently. */
-    const onAbort = (): void => {
-      disposed = true
-      cancel()
-    }
-    if (signal.aborted) onAbort()
-    else signal.addEventListener('abort', onAbort, { once: true })
+  /** Explicit flush throws directly to its caller. */
+  #flush = (): ReturnType<F> | undefined => {
+    this.#clearTimers()
+    return this.#invocation.invoke()
   }
-  return Object.freeze(controlled)
+  /** External abort is terminal, unlike ordinary cancellation. */
+  #abort = (): void => {
+    this.#disposed = true
+    this.#cancel()
+  }
 }
 
 /**
@@ -275,7 +326,7 @@ export function throttle<F extends (...args: never[]) => unknown>(
   options: IThrottleOptions = {}
 ): IControlledFunction<F> {
   if (wait !== 'animationFrame') {
-    /** Validated window; `maxWait = wait` turns the debounce into a throttle. */
+    /** Numeric throttle remains the canonical debounce with one bounded maximum window. */
     const window = admitWait(wait, 'wait')
     return debounce(fn, window, {
       leading: options.leading !== false,
@@ -285,70 +336,74 @@ export function throttle<F extends (...args: never[]) => unknown>(
       scheduler: options.scheduler
     })
   }
-  admitFunction(fn, 'fn')
-  /** Validated signal. */
-  const signal = admitSignal(options.signal)
-  /** Latest arguments waiting for the next frame. */
-  let pendingArgs: Parameters<F> | undefined
-  /** Result of the last invocation. */
-  let lastResult: ReturnType<F> | undefined
-  /** Cancels the requested frame. */
-  let frame: { abort(): void } | undefined
-  /** Set permanently by abort. */
-  let disposed = false
-  /** Invokes with the pending arguments. */
-  const invoke = (): ReturnType<F> | undefined => {
-    /** Arguments consumed by this invocation. */
-    const args = pendingArgs
-    pendingArgs = undefined
-    if (args === undefined) return lastResult
-    lastResult = fn(...args) as ReturnType<F>
-    return lastResult
+  return new FrameThrottledFunction(fn, options).controlled
+}
+
+/** One frame throttle owns its frame request and terminal abort state. */
+class FrameThrottledFunction<F extends (...args: never[]) => unknown> {
+  /** Invocation semantics are shared with numeric debounce. */
+  #invocation: PendingInvocation<F>
+  /** Cancels this owner's single pending frame. */
+  #frame: AbortController | undefined
+  /** External abort permanently fences later calls. */
+  #disposed = false
+  /** The frozen callable is the only public receipt. */
+  readonly controlled: IControlledFunction<F>
+
+  /** Capture the admitted signal before creating the callable and installing its observer. */
+  constructor(fn: F, options: IThrottleOptions) {
+    admitFunction(fn, 'fn')
+    /** Frame throttling does not read unrelated numeric scheduler options. */
+    const signal = admitSignal(options.signal)
+    this.#invocation = new PendingInvocation(fn)
+    /** All attached operations share this one frame owner. */
+    const controlled = this.#call as IControlledFunction<F>
+    controlled.cancel = this.#cancel
+    controlled.flush = this.#flush
+    controlled.pending = () => this.#frame !== undefined
+    controlled[Symbol.dispose] = this.#cancel
+    if (signal) {
+      if (signal.aborted) this.#abort()
+      else signal.addEventListener('abort', this.#abort, { once: true })
+    }
+    this.controlled = Object.freeze(controlled)
   }
-  /** Cancels the pending frame and arguments. */
-  const cancel = (): void => {
-    frame?.abort()
-    frame = undefined
-    pendingArgs = undefined
-  }
-  /** Public wrapper. */
-  const controlled = ((...args: Parameters<F>): void => {
-    if (disposed) return
-    pendingArgs = args
-    if (frame) return
-    /** Controller owning this frame request. */
+  /** Stage the newest arguments and request at most one native frame. */
+  #call = (...args: Parameters<F>): void => {
+    if (this.#disposed) return
+    this.#invocation.stage(args)
+    if (this.#frame) return
+    /** Cancellation belongs to this exact frame registration. */
     const controller = new AbortController()
-    frame = controller
+    this.#frame = controller
     asyncTask(
       'animationFrame',
       () => {
-        frame = undefined
-        invoke()
+        this.#frame = undefined
+        this.#invocation.invoke()
       },
       { signal: controller.signal }
     ).then(undefined, (error: unknown) => {
-      // Our own cancellation is expected; anything else had no caller and is reported.
       if (!controller.signal.aborted) reportUnhandledError(error)
     })
-  }) as IControlledFunction<F>
-  controlled.cancel = cancel
-  controlled.flush = () => {
-    frame?.abort()
-    frame = undefined
-    return invoke()
   }
-  controlled.pending = () => frame !== undefined
-  controlled[Symbol.dispose] = cancel
-  if (signal) {
-    /** Abort disposes permanently. */
-    const onAbort = (): void => {
-      disposed = true
-      cancel()
-    }
-    if (signal.aborted) onAbort()
-    else signal.addEventListener('abort', onAbort, { once: true })
+  /** Drop the pending frame and its arguments. */
+  #cancel = (): void => {
+    this.#frame?.abort()
+    this.#frame = undefined
+    this.#invocation.clear()
   }
-  return Object.freeze(controlled)
+  /** Flush cancels the native frame before invoking synchronously. */
+  #flush = (): ReturnType<F> | undefined => {
+    this.#frame?.abort()
+    this.#frame = undefined
+    return this.#invocation.invoke()
+  }
+  /** External abort is terminal. */
+  #abort = (): void => {
+    this.#disposed = true
+    this.#cancel()
+  }
 }
 
 /**
@@ -367,44 +422,70 @@ export function coalesce<A extends unknown[]>(
   fn: (calls: readonly A[]) => void,
   strategy: AsyncTaskStrategy | readonly AsyncTaskStrategy[] = 'microtask'
 ): ICoalescedFunction<A> {
-  admitFunction(fn, 'fn')
-  /** Calls queued for the next delivery. */
-  let queue: A[] = []
-  /** Cancels the scheduled delivery. */
-  let scheduled: { abort(): void } | undefined
-  /** Delivers and clears the queue. */
-  const deliver = (): void => {
-    scheduled = undefined
-    /** Calls delivered now; a fresh queue collects calls made during delivery. */
-    const calls = queue
-    queue = []
-    if (calls.length > 0) fn(Object.freeze(calls))
+  return new CoalescedFunction(fn, strategy).coalesced
+}
+
+/** One coalesced batch owns pending calls and its sole scheduled delivery. */
+class CoalescedFunction<A extends unknown[]> {
+  /** User callback receives a frozen batch as a plain function call. */
+  #fn: (calls: readonly A[]) => void
+  /** Caller-selected queue/fallback policy is retained by identity. */
+  #strategy: AsyncTaskStrategy | readonly AsyncTaskStrategy[]
+  /** A fresh queue collects reentrant calls during delivery. */
+  #queue: A[] = []
+  /** This controller cancels only the pending delivery. */
+  #scheduled: AbortController | undefined
+  /** Frozen callable retains the public size getter. */
+  readonly coalesced: ICoalescedFunction<A>
+
+  /** Admit the callback before publishing its callable receipt. */
+  constructor(
+    fn: (calls: readonly A[]) => void,
+    strategy: AsyncTaskStrategy | readonly AsyncTaskStrategy[]
+  ) {
+    admitFunction(fn, 'fn')
+    this.#fn = fn
+    this.#strategy = strategy
+    /** Methods and size reflect the same queue owner. */
+    const coalesced = this.#call as ICoalescedFunction<A>
+    coalesced.flush = this.#flush
+    coalesced.cancel = this.#cancel
+    Object.defineProperty(coalesced, 'size', { get: () => this.#queue.length, enumerable: true })
+    this.coalesced = Object.freeze(coalesced)
   }
-  /** Public wrapper. */
-  const coalesced = ((...args: A): void => {
-    queue.push(args)
-    if (scheduled) return
-    /** Controller owning this delivery. */
+  /** Swap the batch before user code so reentrant calls cannot enter the delivered array. */
+  #deliver = (): void => {
+    this.#scheduled = undefined
+    /** One immutable batch preserves original call order. */
+    const calls = this.#queue
+    this.#queue = []
+    if (calls.length > 0) Reflect.apply(this.#fn, undefined, [Object.freeze(calls)])
+  }
+  /** Schedule at most one delivery for the current queue. */
+  #call = (...args: A): void => {
+    this.#queue.push(args)
+    if (this.#scheduled) return
+    /** The error observer distinguishes this owner's expected cancellation. */
     const controller = new AbortController()
-    scheduled = controller
-    asyncTask(strategy, deliver, { signal: controller.signal }).then(
+    this.#scheduled = controller
+    asyncTask(this.#strategy, this.#deliver, { signal: controller.signal }).then(
       undefined,
       (error: unknown) => {
         if (!controller.signal.aborted) reportUnhandledError(error)
       }
     )
-  }) as ICoalescedFunction<A>
-  coalesced.flush = () => {
-    scheduled?.abort()
-    deliver()
   }
-  coalesced.cancel = () => {
-    scheduled?.abort()
-    scheduled = undefined
-    queue = []
+  /** Flush still delivers calls queued after a prior scheduled delivery was cancelled. */
+  #flush = (): void => {
+    this.#scheduled?.abort()
+    this.#deliver()
   }
-  Object.defineProperty(coalesced, 'size', { get: () => queue.length, enumerable: true })
-  return Object.freeze(coalesced)
+  /** Cancellation drops the batch without invoking user code. */
+  #cancel = (): void => {
+    this.#scheduled?.abort()
+    this.#scheduled = undefined
+    this.#queue = []
+  }
 }
 
 /**
@@ -427,86 +508,133 @@ export function repeat(
   interval: number,
   options: IRepeatOptions = {}
 ): IRepeatHandle {
-  admitFunction(task, 'task')
-  /** Validated inputs. */
-  const period = admitWait(interval, 'interval')
-  const scheduler = admitScheduler(options.scheduler)
-  const signal = admitSignal(options.signal)
-  const maxIterations = options.maxIterations ?? Number.POSITIVE_INFINITY
-  if (typeof maxIterations !== 'number' || Number.isNaN(maxIterations) || maxIterations < 0)
-    throw argumentError(RangeError, 'maxIterations', 'a non-negative number')
-  if (options.onError !== undefined && options.onError !== 'stop' && options.onError !== 'continue')
-    throw argumentError(TypeError, 'onError', "'stop' or 'continue'")
-  /** Error policy. */
-  const stopOnError = options.onError !== 'continue'
-  /** Controller whose signal each iteration receives. */
-  const controller = new AbortController()
-  /** Completed iterations. */
-  let iteration = 0
-  /** Whether the loop still runs. */
-  let running = true
-  /** Next planned start on the scheduler clock. */
-  let nextDue = scheduler.now() + (options.immediate ? 0 : period)
-  /** Pending timer. */
-  let timer: IScheduledTask | undefined
-  /** Settles `done`. */
-  let resolveDone!: () => void
-  let rejectDone!: (error: unknown) => void
-  /** Completion Promise. */
-  const done = new Promise<void>((resolve, reject) => {
-    resolveDone = resolve
-    rejectDone = reject
-  })
+  return new RepeatingTask(task, interval, options).handle
+}
+
+/** One non-overlapping repetition owns its clock position, pending timer and completion receipt. */
+class RepeatingTask {
+  /** User code is called once per admitted iteration. */
+  #task: (context: IRepeatContext) => unknown
+  /** Validated period determines the next drift-corrected start. */
+  #period: number
+  /** Scheduler owns actual timer registration. */
+  #scheduler: IScheduler
+  /** External cancellation stops this loop without replacing the iteration signal. */
+  #signal: IAbortSignal | undefined
+  /** Existing iteration cap may be unbounded. */
+  #maxIterations: number
+  /** Failure policy is captured before the first iteration. */
+  #stopOnError: boolean
+  /** Each admitted iteration receives this same cooperative signal. */
+  #controller: AbortController
+  /** Completed iterations determine the next public iteration index. */
+  #iteration = 0
+  /** Terminal admission fences future schedules. */
+  #running = true
+  /** Absolute planned start is advanced before invoking user code. */
+  #nextDue: number
+  /** The single pending timer belongs to this loop. */
+  #timer: IScheduledTask | undefined
+  /** Normal stop settles the original completion promise. */
+  #resolveDone!: () => void
+  /** Stop-on-error rejects with the original thrown value. */
+  #rejectDone!: (error: unknown) => void
+  /** The public receipt exposes no mutable state authority. */
+  readonly handle: IRepeatHandle
+
+  /** Preserve validation and option-read order before timer/subscription admission. */
+  constructor(
+    task: (context: IRepeatContext) => unknown,
+    interval: number,
+    options: IRepeatOptions
+  ) {
+    admitFunction(task, 'task')
+    this.#period = admitWait(interval, 'interval')
+    this.#scheduler = admitScheduler(options.scheduler)
+    this.#signal = admitSignal(options.signal)
+    this.#maxIterations = options.maxIterations ?? Number.POSITIVE_INFINITY
+    if (
+      typeof this.#maxIterations !== 'number' ||
+      Number.isNaN(this.#maxIterations) ||
+      this.#maxIterations < 0
+    )
+      throw argumentError(RangeError, 'maxIterations', 'a non-negative number')
+    if (
+      options.onError !== undefined &&
+      options.onError !== 'stop' &&
+      options.onError !== 'continue'
+    )
+      throw argumentError(TypeError, 'onError', "'stop' or 'continue'")
+    this.#stopOnError = options.onError !== 'continue'
+    this.#controller = new AbortController()
+    this.#task = task
+    this.#nextDue = this.#scheduler.now() + (options.immediate ? 0 : this.#period)
+    /** Completion is allocated before subscriptions may synchronously stop the loop. */
+    const done = new Promise<void>((resolve, reject) => {
+      this.#resolveDone = resolve
+      this.#rejectDone = reject
+    })
+    if (this.#signal?.aborted) this.#finish()
+    else {
+      this.#signal?.addEventListener('abort', this.#onExternalAbort, { once: true })
+      this.#scheduleNext()
+    }
+    /** The receipt exposes a live getter without sharing component state through a factory scope. */
+    const handle = {
+      stop: this.#onExternalAbort,
+      done,
+      [Symbol.dispose]: this.#onExternalAbort
+    } as IRepeatHandle
+    Object.defineProperty(handle, 'running', {
+      get: () => this.#running,
+      enumerable: true,
+      configurable: true
+    })
+    this.handle = Object.freeze(handle)
+  }
+
   /** Ends the loop and settles `done`. */
-  const finish = (error?: { readonly value: unknown }): void => {
-    if (!running) return
-    running = false
-    timer?.cancel()
-    timer = undefined
-    controller.abort(new UtilsAbortError())
-    signal?.removeEventListener('abort', onExternalAbort)
-    if (error) rejectDone(error.value)
-    else resolveDone()
+  #finish = (error?: { readonly value: unknown }): void => {
+    if (!this.#running) return
+    this.#running = false
+    this.#timer?.cancel()
+    this.#timer = undefined
+    this.#controller.abort(new UtilsAbortError())
+    this.#signal?.removeEventListener('abort', this.#onExternalAbort)
+    if (error) this.#rejectDone(error.value)
+    else this.#resolveDone()
   }
   /** External abort stops the loop. */
-  const onExternalAbort = (): void => finish()
+  #onExternalAbort = (): void => this.#finish()
   /** Schedules the next iteration at its drift-corrected time. */
-  const scheduleNext = (): void => {
-    if (!running) return
-    if (iteration >= maxIterations) {
-      finish()
+  #scheduleNext = (): void => {
+    if (!this.#running) return
+    if (this.#iteration >= this.#maxIterations) {
+      this.#finish()
       return
     }
     /** Current clock reading. */
-    const now = scheduler.now()
-    if (nextDue < now) nextDue = now
-    timer = scheduler.schedule(tick, Math.min(MAXIMUM_DELAY, nextDue - now))
+    const now = this.#scheduler.now()
+    if (this.#nextDue < now) this.#nextDue = now
+    this.#timer = this.#scheduler.schedule(this.#tick, Math.min(MAXIMUM_DELAY, this.#nextDue - now))
   }
   /** Runs one iteration and schedules the next after it settles. */
-  const tick = (): void => {
-    timer = undefined
-    if (!running) return
+  #tick = (): void => {
+    this.#timer = undefined
+    if (!this.#running) return
     /** Context for this iteration. */
-    const context: IRepeatContext = Object.freeze({ iteration, signal: controller.signal })
-    nextDue += period
-    /** Handles one iteration failure according to the policy. */
-    const fail = (error: unknown): void => {
-      if (!running) return
-      if (stopOnError) finish({ value: error })
-      else reportUnhandledError(error)
-    }
-    /** Continues the loop after one iteration. */
-    const after = (): void => {
-      iteration += 1
-      scheduleNext()
-    }
+    const context: IRepeatContext = Object.freeze({
+      iteration: this.#iteration,
+      signal: this.#controller.signal
+    })
+    this.#nextDue += this.#period
     /** Synchronous result or thenable of the iteration. */
     let result: unknown
     try {
-      result = task(context)
+      result = Reflect.apply(this.#task, undefined, [context])
     } catch (error) {
-      fail(error)
-      after()
+      this.#fail(error)
+      this.#after()
       return
     }
     /** Guarded `then` read; a hostile getter is an iteration failure. */
@@ -517,28 +645,25 @@ export function repeat(
       'then'
     )
     if (then.threw) {
-      fail(then.error)
-      after()
+      this.#fail(then.error)
+      this.#after()
     } else if (typeof then.value === 'function')
-      Promise.resolve(result as PromiseLike<unknown>).then(after, (error: unknown) => {
-        fail(error)
-        after()
+      Promise.resolve(result as PromiseLike<unknown>).then(this.#after, (error: unknown) => {
+        this.#fail(error)
+        this.#after()
       })
-    else after()
+    else this.#after()
   }
-  if (signal?.aborted) finish()
-  else {
-    signal?.addEventListener('abort', onExternalAbort, { once: true })
-    scheduleNext()
+
+  /** Handle one iteration failure under the original stop/continue reporting policy. */
+  #fail(error: unknown): void {
+    if (!this.#running) return
+    if (this.#stopOnError) this.#finish({ value: error })
+    else reportUnhandledError(error)
   }
-  /** Public handle. */
-  const handle: IRepeatHandle = {
-    stop: () => finish(),
-    done,
-    get running() {
-      return running
-    },
-    [Symbol.dispose]: () => finish()
+  /** Continue only after the current iteration settles. */
+  #after = (): void => {
+    this.#iteration++
+    this.#scheduleNext()
   }
-  return Object.freeze(handle)
 }

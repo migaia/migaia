@@ -50,6 +50,11 @@ export const UtilsErrorText = {
   configUnsupported: (path: string, reason: string) =>
     `[utils] unsupported config value at ${path}: ${reason}`,
   configReadonly: (path: string) => `[utils] readonly config mutation is not allowed at ${path}`,
+  /**
+   * Set union rejects deletion markers; config conflict formatting retains this original stable
+   * reason.
+   */
+  configSetDeleteReason: 'delete is not valid in Set',
   configConflict: (path: string, reason: string) => `[utils] config conflict at ${path}: ${reason}`,
   configLimitExceeded: (limit: string, path: string) =>
     `[utils] config ${limit} limit exceeded at ${path}`,

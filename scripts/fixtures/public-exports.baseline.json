@@ -1533,6 +1533,7 @@
         "observeThenableRejection",
         "once",
         "onceAsync",
+        "orderStringKeys",
         "ownConfig",
         "parseConfigPath",
         "parseObjectPath",
@@ -1694,6 +1695,7 @@
       ],
       "./string": [
         "format",
+        "orderStringKeys",
         "tryString"
       ],
       "./number": [

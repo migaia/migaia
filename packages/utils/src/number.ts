@@ -1,6 +1,7 @@
 import { ERROR_SOURCE, UtilsErrorCode } from './error-code.js'
 import { UtilsErrorText } from './error-text.js'
 import { attachErrorIdentity } from './error.js'
+import { orderStringKeys } from './internal/string-order.js'
 
 /** Builds a native argument error while retaining an injected random callback's thrown value. */
 function jitterArgumentError(message: string, cause?: unknown): RangeError {
@@ -82,7 +83,7 @@ function snapshotNumberFormat(options: INumberFormatOptions | undefined): INumbe
     locales === undefined
       ? []
       : Intl.getCanonicalLocales(Array.isArray(locales) ? locales.map(String) : [String(locales)])
-  const keys = Object.keys(source).sort()
+  const keys = orderStringKeys(Object.keys(source))
   const format: Record<string, unknown> = {}
   const entries: Array<readonly [string, unknown]> = []
   for (const key of keys) {

@@ -202,6 +202,96 @@ class NativeTaskReference extends class {
   }
 }
 
+/** One native timer owns segmented delay, cancellation and liveness without shared closure state. */
+class NativeTimerTask {
+  /** The caller's original function runs with the same plain-call receiver. */
+  #callback: () => void
+  /** Native registration is captured with the corresponding cancellation operation. */
+  #set: IHostSetTimeout
+  /** Native cancellation remains paired with this task's host snapshot. */
+  #clear: IHostClearTimeout
+  /** Long delays retain only their unarmed remainder. */
+  #remaining: number
+  /** The current native segment is also the receiver for optional ref/unref hints. */
+  #handle: unknown
+  /** Completion and cancellation share an at-most-once fence. */
+  #settled = false
+  /** Every later segment inherits a previously requested unref hint. */
+  #unrefRequested = false
+  /** Preserve the existing plain public handle and detached cancel/unref methods. */
+  readonly task: IScheduledTask
+
+  /** Arm before publishing the original plain handle, preserving registration failure timing. */
+  constructor(
+    callback: () => void,
+    delayMs: number,
+    set: IHostSetTimeout,
+    clear: IHostClearTimeout
+  ) {
+    this.#callback = callback
+    this.#set = set
+    this.#clear = clear
+    this.#remaining = delayMs
+    this.#arm()
+    this.task = { cancel: () => this.#cancel(), unref: () => this.#unref() }
+    new NativeTaskReference(this.task, () => this.#reference())
+  }
+
+  /** A segment consumes only the native maximum; each firing arms at most one successor. */
+  #arm(): void {
+    if (this.#settled) return
+    /** Native hosts bound one segment to their signed 32-bit delay domain. */
+    const segment = Math.min(this.#remaining, MAXIMUM_TIMER_DELAY)
+    this.#remaining -= segment
+    /** Keep the original receiver-free invocation of the captured native function. */
+    const set = this.#set
+    this.#handle = set(() => this.#fire(), segment)
+    if (this.#unrefRequested) this.#applyUnref()
+  }
+
+  /** Complete only after all segments and before invoking a possibly reentrant caller. */
+  #fire(): void {
+    if (this.#settled) return
+    if (this.#remaining > 0) this.#arm()
+    else {
+      this.#settled = true
+      /** Caller callbacks are plain calls rather than methods on the timer owner. */
+      const callback = this.#callback
+      callback()
+    }
+  }
+
+  /** Cancel the current segment once, including after repeated detached calls. */
+  #cancel(): void {
+    if (this.#settled) return
+    this.#settled = true
+    /** Cancellation preserves the same receiver-free native operation. */
+    const clear = this.#clear
+    clear(this.#handle)
+  }
+
+  /** Apply a liveness hint now and carry it into any later segment. */
+  #unref(): void {
+    this.#unrefRequested = true
+    this.#applyUnref()
+  }
+
+  /** Browser numeric handles have no hint; Node/Bun retain the native timer receiver. */
+  #applyUnref(): void {
+    /** Only the existing handle supplies its optional native unref method. */
+    const timer = this.#handle as { readonly unref?: unknown } | null | undefined
+    if (typeof timer?.unref === 'function') Reflect.apply(timer.unref, timer, [])
+  }
+
+  /** Shared-deadline ownership can restore this exact native task's reference hint. */
+  #reference(): void {
+    this.#unrefRequested = false
+    /** Browsers retain their original numeric handle behavior. */
+    const timer = this.#handle as { readonly ref?: unknown } | null | undefined
+    if (typeof timer?.ref === 'function') Reflect.apply(timer.ref, timer, [])
+  }
+}
+
 /** One logical deadline owns its callback and independent native-liveness request. */
 type ISharedDeadline = {
   readonly due: number
@@ -209,113 +299,128 @@ type ISharedDeadline = {
   unreferenced: boolean
 }
 
-/** Shares exact absolute deadlines through the existing native timer owner, without quantization. */
-function sharedScheduler(receiver: object): IScheduler {
-  /** Each derived receiver belongs to one endpoint and never shares tasks across endpoints. */
-  const existing = sharedSchedulers.get(receiver)
-  if (existing) return existing
-  /** Set insertion order is the FIFO tie breaker for exactly equal deadlines. */
-  const deadlines = new Set<ISharedDeadline>()
-  /** Sole active host registration for all pending deadlines of this endpoint. */
-  let armed: IScheduledTask | undefined
-  /** Absolute wakeup time of the current native task, including retained earlier idle ticks. */
-  let armedDue = Number.POSITIVE_INFINITY
-  /** Avoids duplicate native ref/unref while mirroring every logical task's liveness. */
-  let armedUnreferenced = false
+/** One derived scheduler shares exact deadlines through the canonical native timer owner. */
+class SharedScheduler implements IScheduler {
+  /** Set insertion order supplies FIFO ties for exactly equal deadlines. */
+  #deadlines = new Set<ISharedDeadline>()
+  /** Sole active native timer serving this endpoint. */
+  #armed: IScheduledTask | undefined
+  /** An earlier idle wakeup may be retained after cancellation. */
+  #armedDue = Number.POSITIVE_INFINITY
+  /** Avoid duplicate native ref/unref while reflecting each logical task's liveness. */
+  #armedUnreferenced = false
+
+  /** Clock substitution remains observable through the original scheduler owner. */
+  now = (): number => systemScheduler.now()
+
   /** Selects the earliest live task; strict comparison preserves insertion order for exact ties. */
-  const first = (): ISharedDeadline | undefined => {
+  #first = (): ISharedDeadline | undefined => {
     /** Earliest task observed while walking the endpoint's bounded live task set. */
     let next: ISharedDeadline | undefined
-    for (const entry of deadlines) if (next === undefined || entry.due < next.due) next = entry
+    for (const entry of this.#deadlines)
+      if (next === undefined || entry.due < next.due) next = entry
     return next
   }
   /** The native task may be unreferenced only when every remaining logical task is unreferenced. */
-  const syncReference = (): void => {
-    if (!armed || deadlines.size === 0) return
+  #syncReference = (): void => {
+    if (!this.#armed || this.#deadlines.size === 0) return
     /** Any referenced logical deadline must keep the same host liveness as its own native timer. */
     let unreferenced = true
-    for (const entry of deadlines)
+    for (const entry of this.#deadlines)
       if (!entry.unreferenced) {
         unreferenced = false
         break
       }
-    if (unreferenced === armedUnreferenced) return
-    armedUnreferenced = unreferenced
-    if (unreferenced) armed.unref?.()
-    else NativeTaskReference.restore(armed)
+    if (unreferenced === this.#armedUnreferenced) return
+    this.#armedUnreferenced = unreferenced
+    if (unreferenced) this.#armed.unref?.()
+    else NativeTaskReference.restore(this.#armed)
   }
   /** Reuses an earlier armed wakeup; native flush will re-check exact due time before execution. */
-  const arm = (): void => {
+  #arm = (): void => {
     /** An earlier native tick is retained even if its original logical deadline was cancelled. */
-    const next = first()
+    const next = this.#first()
     if (!next) return
-    if (armed && armedDue <= next.due) {
-      syncReference()
+    if (this.#armed && this.#armedDue <= next.due) {
+      this.#syncReference()
       return
     }
-    armed?.cancel()
-    armed = undefined
-    armedDue = next.due
-    armed = systemScheduler.schedule(flush, Math.max(0, next.due - systemScheduler.now()))
-    armedUnreferenced = false
-    syncReference()
+    this.#armed?.cancel()
+    this.#armed = undefined
+    this.#armedDue = next.due
+    this.#armed = systemScheduler.schedule(
+      this.#flush,
+      Math.max(0, next.due - systemScheduler.now())
+    )
+    this.#armedUnreferenced = false
+    this.#syncReference()
   }
   /** Executes one callback per native task, preserving Promise reactions before the next callback. */
-  const flush = (): void => {
-    armed = undefined
-    armedDue = Number.POSITIVE_INFINITY
-    armedUnreferenced = false
+  #flush = (): void => {
+    this.#armed = undefined
+    this.#armedDue = Number.POSITIVE_INFINITY
+    this.#armedUnreferenced = false
     /** A retained earlier tick never authorizes firing another deadline early. */
-    const next = first()
+    const next = this.#first()
     if (!next) return
     if (next.due > systemScheduler.now()) {
-      arm()
+      this.#arm()
       return
     }
-    deadlines.delete(next)
+    this.#deadlines.delete(next)
     /** Clear callback ownership before reentrant cancellation or new registrations. */
     const callback = next.callback
     next.callback = undefined
     try {
       callback?.()
     } finally {
-      arm()
+      this.#arm()
     }
   }
-  /** Receiver-local strategy delegates clocks and actual host registration to the canonical owner. */
-  const scheduler: IScheduler = {
-    now: () => systemScheduler.now(),
-    schedule(callback, delayMs) {
-      assertDelay(delayMs, 'delayMs')
-      /** Shared deadlines use the existing finite absolute-clock admission and error identity. */
-      const due = addVirtualTime(systemScheduler.now(), delayMs, 'delayMs')
-      /** A handle cancels exactly its own callback, not its siblings. */
-      const entry: ISharedDeadline = { due, callback, unreferenced: false }
-      deadlines.add(entry)
-      try {
-        arm()
-      } catch (error) {
-        deadlines.delete(entry)
-        throw error
-      }
-      return {
-        cancel: () => {
-          entry.callback = undefined
-          deadlines.delete(entry)
-          if (deadlines.size === 0) {
-            armed?.cancel()
-            armed = undefined
-            armedDue = Number.POSITIVE_INFINITY
-            armedUnreferenced = false
-          } else syncReference()
-        },
-        unref: () => {
-          entry.unreferenced = true
-          syncReference()
-        }
+
+  /** Admit one deadline and roll back only its own registration if native scheduling fails. */
+  schedule = (callback: () => void, delayMs: number): IScheduledTask => {
+    assertDelay(delayMs, 'delayMs')
+    /** Finite absolute-clock admission precedes mutation. */
+    const due = addVirtualTime(systemScheduler.now(), delayMs, 'delayMs')
+    /** This handle owns exactly one logical deadline. */
+    const entry: ISharedDeadline = { due, callback, unreferenced: false }
+    this.#deadlines.add(entry)
+    try {
+      this.#arm()
+    } catch (error) {
+      this.#deadlines.delete(entry)
+      throw error
+    }
+    return {
+      cancel: () => this.#cancel(entry),
+      unref: () => {
+        entry.unreferenced = true
+        this.#syncReference()
       }
     }
   }
+
+  /** Cancel one logical callback; native cancellation occurs only when no siblings remain. */
+  #cancel(entry: ISharedDeadline): void {
+    entry.callback = undefined
+    this.#deadlines.delete(entry)
+    if (this.#deadlines.size === 0) {
+      this.#armed?.cancel()
+      this.#armed = undefined
+      this.#armedDue = Number.POSITIVE_INFINITY
+      this.#armedUnreferenced = false
+    } else this.#syncReference()
+  }
+}
+
+/** Endpoint identity selects one named scheduler without sharing deadlines across endpoints. */
+function sharedScheduler(receiver: object): IScheduler {
+  /** Reuse the endpoint's original scheduling strategy. */
+  const existing = sharedSchedulers.get(receiver)
+  if (existing) return existing
+  /** This owner alone manages the receiver's native timer. */
+  const scheduler = new SharedScheduler()
   sharedSchedulers.set(receiver, scheduler)
   return scheduler
 }
@@ -390,105 +495,52 @@ export const systemScheduler: IScheduler = {
     const set = setCandidate as IHostSetTimeout
     /** Admitted host cancellation function, always paired with `set`. */
     const clear = clearCandidate as IHostClearTimeout
-    /** Delay still to wait after the currently armed segment. */
-    let remaining = delayMs
-    /** Native handle of the currently armed segment; the receiver `unref` needs. */
-    let handle: unknown
-    /** True once the task was cancelled or its callback started; blocks further segments. */
-    let settled = false
-    /** Whether `unref()` was requested, so every later segment is unref'd as well. */
-    let unrefRequested = false
-    /** Applies the unref hint to the current native timer with the timer as receiver. */
-    const applyUnref = (): void => {
-      /** Native timer viewed structurally; browsers return numbers without `unref`. */
-      const timer = handle as { readonly unref?: unknown } | null | undefined
-      if (typeof timer?.unref === 'function') Reflect.apply(timer.unref, timer, [])
-    }
-    /** Arms the next segment; long delays re-arm until nothing remains. */
-    const arm = (): void => {
-      if (settled) return
-      /** Length of this segment, bounded by the host timer maximum. */
-      const segment = Math.min(remaining, MAXIMUM_TIMER_DELAY)
-      remaining -= segment
-      handle = set(() => {
-        if (settled) return
-        if (remaining > 0) arm()
-        else {
-          settled = true
-          callback()
-        }
-      }, segment)
-      if (unrefRequested) applyUnref()
-    }
-    arm()
-    /** The existing public handle also anchors a private reference-restoration capability. */
-    const task: IScheduledTask = {
-      cancel() {
-        if (settled) return
-        settled = true
-        clear(handle)
-      },
-      unref() {
-        unrefRequested = true
-        applyUnref()
-      }
-    }
-    new NativeTaskReference(task, () => {
-      unrefRequested = false
-      /** Node/Bun timer handles have ref; browsers retain their original numeric handle behavior. */
-      const timer = handle as { readonly ref?: unknown } | null | undefined
-      if (typeof timer?.ref === 'function') Reflect.apply(timer.ref, timer, [])
-    })
-    return task
+    return new NativeTimerTask(callback, delayMs, set, clear).task
   }
 }
 
-/**
- * Creates a deterministic scheduler over a virtual clock that starts at `0`. Due callbacks run in
- * ascending due time and, for equal due times, registration order; callbacks scheduled during an
- * `advance()` that fall due within it run in the same `advance()`. Arguments are validated and
- * overflow is rejected before any state changes; nested `advance()` calls are rejected so `now()`
- * never moves backwards.
- */
-export function createManualScheduler(): IManualScheduler {
-  /** Current virtual time in milliseconds. */
-  let current = 0
-  /** Registration counter that orders tasks with equal due times. */
-  let sequence = 0
-  /** Whether an `advance()` is flushing callbacks; guards against reentrant advances. */
-  let advancing = false
-  /** One registered task inside the min-heap. */
-  type IManualTask = {
-    readonly due: number
-    readonly order: number
-    index: number
-    callback: (() => void) | undefined
-  }
-  /** Min-heap of pending tasks ordered by due time, then registration order. */
-  const tasks: IManualTask[] = []
+/** One heap entry carries its cancellation index and FIFO tie-breaker. */
+type IManualTask = {
+  readonly due: number
+  readonly order: number
+  index: number
+  callback: (() => void) | undefined
+}
+
+/** One virtual clock owns its task heap and reentrancy fence. */
+class ManualScheduler implements IManualScheduler {
+  /** Virtual time starts at zero and never moves backwards. */
+  #current = 0
+  /** Registration order breaks equal-deadline ties. */
+  #sequence = 0
+  /** Nested advances cannot rewind the outer clock. */
+  #advancing = false
+  /** Indexed min-heap supports one insertion or cancellation in O(log n). */
+  #tasks: IManualTask[] = []
+
   /** Heap ordering: earlier due time first, then earlier registration. */
-  const compareTasks = (left: IManualTask, right: IManualTask): number =>
+  #compareTasks = (left: IManualTask, right: IManualTask): number =>
     left.due - right.due || left.order - right.order
   /** Exchanges two heap entries and keeps cancellation handles synchronized with their indexes. */
-  const swapTasks = (left: number, right: number): void => {
-    ;[tasks[left], tasks[right]] = [tasks[right]!, tasks[left]!]
-    tasks[left]!.index = left
-    tasks[right]!.index = right
+  #swapTasks = (left: number, right: number): void => {
+    ;[this.#tasks[left], this.#tasks[right]] = [this.#tasks[right]!, this.#tasks[left]!]
+    this.#tasks[left]!.index = left
+    this.#tasks[right]!.index = right
   }
   /** Restores heap order toward the root after an indexed insertion or removal. */
-  const siftUp = (start: number): void => {
+  #siftUp = (start: number): void => {
     /** Heap slot currently being compared with its parent. */
     let index = start
     while (index > 0) {
       /** Parent slot of `index` in the implicit binary heap. */
       const parent = Math.floor((index - 1) / 2)
-      if (compareTasks(tasks[parent]!, tasks[index]!) <= 0) break
-      swapTasks(parent, index)
+      if (this.#compareTasks(this.#tasks[parent]!, this.#tasks[index]!) <= 0) break
+      this.#swapTasks(parent, index)
       index = parent
     }
   }
   /** Restores heap order toward the leaves after a root or indexed removal. */
-  const siftDown = (start: number): void => {
+  #siftDown = (start: number): void => {
     /** Heap slot currently being compared with its children. */
     let index = start
     while (true) {
@@ -498,90 +550,115 @@ export function createManualScheduler(): IManualScheduler {
       const right = left + 1
       /** Slot holding the earliest task among `index` and its children. */
       let smallest = index
-      if (left < tasks.length && compareTasks(tasks[left]!, tasks[smallest]!) < 0) smallest = left
-      if (right < tasks.length && compareTasks(tasks[right]!, tasks[smallest]!) < 0)
+      if (
+        left < this.#tasks.length &&
+        this.#compareTasks(this.#tasks[left]!, this.#tasks[smallest]!) < 0
+      )
+        smallest = left
+      if (
+        right < this.#tasks.length &&
+        this.#compareTasks(this.#tasks[right]!, this.#tasks[smallest]!) < 0
+      )
         smallest = right
       if (smallest === index) break
-      swapTasks(index, smallest)
+      this.#swapTasks(index, smallest)
       index = smallest
     }
   }
   /** Removes one task by its handle index in O(log n); a no-op for tasks already removed. */
-  const removeTask = (task: IManualTask): void => {
+  #removeTask = (task: IManualTask): void => {
     /** Heap slot recorded on the task handle. */
     const index = task.index
-    if (index < 0 || tasks[index] !== task) return
+    if (index < 0 || this.#tasks[index] !== task) return
     /** Last heap entry, moved into the freed slot. */
-    const last = tasks.pop()!
+    const last = this.#tasks.pop()!
     task.index = -1
-    if (index === tasks.length) return
-    tasks[index] = last
+    if (index === this.#tasks.length) return
+    this.#tasks[index] = last
     last.index = index
-    if (index > 0 && compareTasks(tasks[Math.floor((index - 1) / 2)]!, last) > 0) siftUp(index)
-    else siftDown(index)
+    if (index > 0 && this.#compareTasks(this.#tasks[Math.floor((index - 1) / 2)]!, last) > 0)
+      this.#siftUp(index)
+    else this.#siftDown(index)
   }
-  /** Public capabilities share this instance's one existing task heap. */
-  const scheduler: IManualScheduler = {
-    now: () => current,
-    schedule(callback, delayMs) {
-      assertDelay(delayMs, 'delayMs')
-      /** Absolute due time; overflow is rejected before the heap changes. */
-      const due = addVirtualTime(current, delayMs, 'delayMs')
-      /** Heap entry owned by the returned handle. */
-      const task: IManualTask = { due, order: sequence++, index: tasks.length, callback }
-      tasks.push(task)
-      siftUp(task.index)
-      return {
-        cancel() {
-          task.callback = undefined
-          removeTask(task)
-        },
-        unref: () => undefined
-      }
-    },
-    /** Reuse the captured registration method; replacing the public slot cannot redirect this job. */
-    defer: (callback) => {
-      schedule(callback, 0)
-    },
-    advance(ms) {
-      if (advancing)
-        throw schedulerError(TypeError, UtilsErrorCode.reentrantCall, UtilsErrorText.reentrantCall)
-      assertDelay(ms, 'ms')
-      /** Virtual time reached when this advance completes; overflow rejected before flushing. */
-      const target = addVirtualTime(current, ms, 'ms')
-      /** Callbacks flushed by this advance, bounded by the runaway guard. */
-      let count = 0
-      advancing = true
-      try {
-        while (true) {
-          /** Earliest pending task, if any. */
-          const next = tasks[0]
-          if (next === undefined || next.due > target) break
-          if (++count > MAXIMUM_ADVANCE_FLUSH)
-            throw schedulerError(
-              RangeError,
-              UtilsErrorCode.schedulerRunaway,
-              UtilsErrorText.schedulerRunaway
-            )
-          removeTask(next)
-          current = next.due
-          /** Callback detached before running so it can run at most once. */
-          const callback = next.callback
-          next.callback = undefined
-          callback?.()
-        }
-        current = target
-      } finally {
-        advancing = false
-      }
-    },
-    get pendingCount() {
-      return tasks.length
+
+  /** Read the current monotonic virtual clock. */
+  now = (): number => this.#current
+
+  /** Register a task against this clock without depending on the replaceable public method slot. */
+  #register = (callback: () => void, delayMs: number): IScheduledTask => {
+    assertDelay(delayMs, 'delayMs')
+    /** Reject overflow before touching the heap. */
+    const due = addVirtualTime(this.#current, delayMs, 'delayMs')
+    /** The handle's index follows every heap exchange. */
+    const task: IManualTask = { due, order: this.#sequence++, index: this.#tasks.length, callback }
+    this.#tasks.push(task)
+    this.#siftUp(task.index)
+    return {
+      cancel: () => {
+        task.callback = undefined
+        this.#removeTask(task)
+      },
+      unref: () => undefined
     }
   }
-  /** Deferred work retains the original queue method even after a caller replaces the public slot. */
-  const schedule = scheduler.schedule
-  return scheduler
+
+  /** Public registration retains detached-call behavior and the original callable identity. */
+  schedule = this.#register
+
+  /** Deferral retains the captured registration even if a caller replaces schedule. */
+  defer = (callback: () => void): void => {
+    this.#register(callback, 0)
+  }
+
+  /** Flush due callbacks in deadline/FIFO order, stopping at the existing fixed runaway bound. */
+  advance = (ms: number): void => {
+    if (this.#advancing)
+      throw schedulerError(TypeError, UtilsErrorCode.reentrantCall, UtilsErrorText.reentrantCall)
+    assertDelay(ms, 'ms')
+    /** Validate the final clock value before any callback runs. */
+    const target = addVirtualTime(this.#current, ms, 'ms')
+    /**
+     * MAXIMUM_ADVANCE_FLUSH is a compile-time 10000 bound, so one advance performs O(log n) heap
+     * work.
+     */
+    let count = 0
+    this.#advancing = true
+    try {
+      while (true) {
+        /** Earliest pending deadline is always the heap root. */
+        const next = this.#tasks[0]
+        if (next === undefined || next.due > target) break
+        if (++count > MAXIMUM_ADVANCE_FLUSH)
+          throw schedulerError(
+            RangeError,
+            UtilsErrorCode.schedulerRunaway,
+            UtilsErrorText.schedulerRunaway
+          )
+        this.#removeTask(next)
+        this.#current = next.due
+        /** Detach before reentrant cancellation or scheduling. */
+        const callback = next.callback
+        next.callback = undefined
+        callback?.()
+      }
+      this.#current = target
+    } finally {
+      this.#advancing = false
+    }
+  }
+
+  /** Cancelled and completed tasks are absent from the heap. */
+  get pendingCount(): number {
+    return this.#tasks.length
+  }
+}
+
+/**
+ * Create a deterministic clock. Callbacks scheduled during advance may run in that same advance;
+ * argument overflow and reentrant advances fail before clock/heap mutation.
+ */
+export function createManualScheduler(): IManualScheduler {
+  return new ManualScheduler()
 }
 
 /** Default wall clock: `Date.now()` epoch milliseconds, for diagnostic timestamps only. */

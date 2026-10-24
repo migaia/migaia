@@ -10,6 +10,40 @@ import {
 } from '../src/config.js'
 
 describe('config primitives', () => {
+  it('[BC-PATH-RULE-SNAPSHOT] reads each rule descriptor once and keeps longest-prefix declaration order', () => {
+    /** Stable accessors expose exactly how often the input rule description is captured. */
+    let prefixReads = 0
+    /** Strategy access belongs to the same one-time snapshot, not each visited source property. */
+    let strategyReads = 0
+    /** Distinct sibling and nested arrays prove fallback, longest-prefix and equal-prefix behavior. */
+    const combined = combineConfig(
+      [
+        ownConfig({ a: [1], b: [2], nested: { items: [3] } }),
+        ownConfig({ a: [4], b: [5], nested: { items: [6] } })
+      ],
+      {
+        pathRules: [
+          { prefix: [], strategies: { array: 'concat' } },
+          {
+            get prefix() {
+              prefixReads++
+              return ['b']
+            },
+            get strategies() {
+              strategyReads++
+              return { array: 'replace' as const }
+            }
+          },
+          { prefix: ['b'], strategies: { array: 'concat' } },
+          { prefix: ['nested', 'items'], strategies: { array: 'replace' } }
+        ]
+      }
+    )
+    expect(prefixReads).toBe(1)
+    expect(strategyReads).toBe(1)
+    expect(combined).toEqual({ a: [1, 4], b: [5], nested: { items: [6] } })
+  })
+
   it('rejects setMilliseconds through every readonly Date entry', () => {
     /** Both accessors must protect the same owned Date from supported native mutators. */
     const owned = ownConfig({ when: new Date(0) })

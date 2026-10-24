@@ -115,19 +115,25 @@ export function observeThenableRejection(
   }
 }
 
-/**
- * Wraps a synchronous function so its body runs only on the first call; later calls return the
- * first result or rethrow the first error. Calling the wrapper again from inside the running body
- * throws `REENTRANT_CALL`. Each `once(fn)` has its own cache.
- */
-export function once<T extends (...args: never[]) => unknown>(functionValue: T): T {
-  let state: 'idle' | 'running' | 'done' = 'idle'
-  let result: unknown
-  let failure: unknown
-  const noFailure = Symbol('no failure')
-  failure = noFailure
-  return ((...args: never[]) => {
-    if (state === 'running') {
+/** Own the first synchronous invocation and its exact cached result or thrown reason. */
+class OnceInvocation<T extends (...args: never[]) => unknown> {
+  /** Reentrant calls reject while the original invocation is running. */
+  #state: 'idle' | 'running' | 'done' = 'idle'
+  /** The original result is returned by identity after successful completion. */
+  #result: unknown
+  /** A private sentinel distinguishes no failure from a callback throwing undefined. */
+  #noFailure = Symbol('no failure')
+  /** The original thrown value is remembered without normalization or wrapping. */
+  #failure: unknown = this.#noFailure
+  /** The original callback is invoked with its original plain receiver. */
+  #functionValue: T
+  /** Capture one callback without invoking it during wrapper construction. */
+  constructor(functionValue: T) {
+    this.#functionValue = functionValue
+  }
+  /** One stable callback preserves detached invocation and the first outcome. */
+  readonly invoke = (...args: never[]): unknown => {
+    if (this.#state === 'running') {
       const error = new TypeError(UtilsErrorText.reentrantCall)
       Object.defineProperty(error, 'source', { value: ERROR_SOURCE, enumerable: true })
       Object.defineProperty(error, 'code', {
@@ -136,21 +142,71 @@ export function once<T extends (...args: never[]) => unknown>(functionValue: T):
       })
       throw error
     }
-    if (state === 'done') {
-      if (failure !== noFailure) throw failure
-      return result
+    if (this.#state === 'done') {
+      if (this.#failure !== this.#noFailure) throw this.#failure
+      return this.#result
     }
-    state = 'running'
+    this.#state = 'running'
     try {
-      result = functionValue(...args)
-      state = 'done'
-      return result
+      this.#result = Reflect.apply(this.#functionValue, undefined, args)
+      this.#state = 'done'
+      return this.#result
     } catch (error) {
-      failure = error
-      state = 'done'
+      this.#failure = error
+      this.#state = 'done'
       throw error
     }
-  }) as T
+  }
+}
+
+/**
+ * Wraps a synchronous function so its body runs only on the first call; later calls return the
+ * first result or rethrow the first error. Calling the wrapper again from inside the running body
+ * throws `REENTRANT_CALL`. Each `once(fn)` has its own cache.
+ */
+export function once<T extends (...args: never[]) => unknown>(functionValue: T): T {
+  return new OnceInvocation(functionValue).invoke as T
+}
+
+/** Construct the existing invalid-thenable error without replacing its native type. */
+function onceAsyncResultError(): TypeError {
+  /** The same semantic identity is attached to the original native error. */
+  const error = new TypeError(
+    UtilsErrorText.invalidArgument('onceAsync result', 'a Promise or PromiseLike')
+  )
+  Object.defineProperty(error, 'source', { value: ERROR_SOURCE, enumerable: true })
+  Object.defineProperty(error, 'code', { value: UtilsErrorCode.invalidArgument, enumerable: true })
+  return error
+}
+
+/** Own the exact first asynchronous Promise, including a remembered rejection. */
+class OnceAsyncInvocation<T> {
+  /** Every concurrent or later call returns this exact Promise after first admission. */
+  #promise: Promise<T> | undefined
+  /** The user callback is read once from construction and invoked without a receiver. */
+  #functionValue: () => PromiseLike<T>
+  /** Capture the callback without starting an asynchronous operation. */
+  constructor(functionValue: () => PromiseLike<T>) {
+    this.#functionValue = functionValue
+  }
+  /** Start in the original microtask and memoize before user code can reenter. */
+  readonly invoke = (): Promise<T> => {
+    this.#promise ??= Promise.resolve().then(() => this.#start())
+    return this.#promise
+  }
+  /** Admit the original then protocol once before using the canonical assimilation owner. */
+  #start(): Promise<T> {
+    /** The original callback receives no wrapper instance as its receiver. */
+    const functionValue = this.#functionValue
+    /** User results retain their original thenable object identity during assimilation. */
+    const result: unknown = functionValue()
+    if (result === null || (typeof result !== 'object' && typeof result !== 'function'))
+      throw onceAsyncResultError()
+    /** One property read preserves hostile getter failures and prevents a second admission read. */
+    const then: unknown = Reflect.get(result, 'then')
+    if (typeof then !== 'function') throw onceAsyncResultError()
+    return assimilateCapturedThen<T>(then as (resolve: unknown, reject: unknown) => void, result)
+  }
 }
 
 /**
@@ -160,52 +216,5 @@ export function once<T extends (...args: never[]) => unknown>(functionValue: T):
  * `INVALID_ARGUMENT`.
  */
 export function onceAsync<T>(functionValue: () => PromiseLike<T>): () => Promise<T> {
-  let promise: Promise<T> | undefined
-  return () => {
-    if (promise === undefined)
-      promise = Promise.resolve().then(() => {
-        const result: unknown = functionValue()
-        if (result === null || (typeof result !== 'object' && typeof result !== 'function')) {
-          const error = new TypeError(
-            UtilsErrorText.invalidArgument('onceAsync result', 'a Promise or PromiseLike')
-          )
-          Object.defineProperty(error, 'source', { value: ERROR_SOURCE, enumerable: true })
-          Object.defineProperty(error, 'code', {
-            value: UtilsErrorCode.invalidArgument,
-            enumerable: true
-          })
-          throw error
-        }
-        let then: unknown
-        // Read the then protocol exactly once so a hostile or stateful getter cannot alter
-        // admission between validation and assimilation.
-        then = Reflect.get(result, 'then')
-        if (typeof then !== 'function') {
-          const error = new TypeError(
-            UtilsErrorText.invalidArgument('onceAsync result', 'a Promise or PromiseLike')
-          )
-          Object.defineProperty(error, 'source', { value: ERROR_SOURCE, enumerable: true })
-          Object.defineProperty(error, 'code', {
-            value: UtilsErrorCode.invalidArgument,
-            enumerable: true
-          })
-          throw error
-        }
-        return new Promise<T>((resolve, reject) => {
-          try {
-            Reflect.apply(
-              then as (
-                resolve: (value: unknown) => void,
-                reject: (reason: unknown) => void
-              ) => void,
-              result,
-              [resolve, reject]
-            )
-          } catch (error) {
-            reject(error)
-          }
-        })
-      })
-    return promise
-  }
+  return new OnceAsyncInvocation(functionValue).invoke
 }

@@ -2,6 +2,9 @@ import { ERROR_SOURCE, UtilsErrorCode } from './error-code.js'
 import { UtilsErrorText } from './error-text.js'
 import { attachErrorIdentity } from './error.js'
 
+/** Wire and fingerprint consumers share the same stable, linear UTF-16 key ordering. */
+export { orderStringKeys } from './internal/string-order.js'
+
 /** Outcome of one conversion; failures retain the exact value thrown by user coercion. */
 export type IStringConversion =
   | { readonly threw: false; readonly value: string }
