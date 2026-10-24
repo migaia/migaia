@@ -80,6 +80,7 @@ import {
   type IStorageJournalConfigurationSnapshot
 } from './journal/configuration.js'
 import type { IStorageJournalConfiguration, IStorageJournalExecutionPort } from './journal/types.js'
+import { observeStorageTelemetry } from './journal/telemetry.js'
 
 /** Minimal PluginHost domain core; storage materializers do not expose host mutation to plugins. */
 type IStorageHostCore = object
@@ -99,6 +100,11 @@ type IStorageDetectCheck = {
 /** One native registration's single-assignment store bridge into its PluginHost core. */
 type IStorageNativeRegistrationContext = {
   readonly getJournal: (orgId: string) => IStorageJournalExecutionPort | undefined
+  readonly observeExecution?: <R>(
+    orgId: string,
+    describe: () => IStoragePipelineInput,
+    invoke: (observing: boolean) => Promise<R>
+  ) => Promise<R>
   readonly id: string
   readonly defaultOrgId: string
   readonly assertCurrent: () => void
@@ -345,10 +351,19 @@ export function createStoragePluginHost(options: IPluginHostOptions): IStoragePl
           context.emit(name, payload)
         }) satisfies IStorageHookEmitter,
         setStorageKind: context.setKind,
-        execution: forwardStorageExecution(host, context.assertExecution, () => ({
-          backendId: context.id,
-          backend: context.getKind()?.name ?? context.id
-        })),
+        execution: forwardStorageExecution(
+          host,
+          context.assertExecution,
+          () => ({
+            backendId: context.id,
+            backend: context.getKind()?.name ?? context.id,
+            orgId: context.defaultOrgId
+          }),
+          context.observeExecution === undefined
+            ? undefined
+            : (describe, invoke) =>
+                context.observeExecution!(context.defaultOrgId, describe, invoke)
+        ),
         runStorageInstall: context.runInstall,
         isStorageInstallExpired: context.isInstallExpired,
         registerStore: (store: IStorageBase) => {
@@ -463,6 +478,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
         string,
         {
           readonly options: Promise<IStorageJournalConfigurationSnapshot>
+          configuration?: IStorageJournalConfigurationSnapshot
           readonly backends: Map<
             IStorageStoreCell,
             {
@@ -759,6 +775,22 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
           })
         /** Bind the next domain core to its matching entry in this install batch. */
         const context: IStorageNativeRegistrationContext = {
+          ...(this.#journal === undefined
+            ? {}
+            : {
+                observeExecution: <R>(
+                  orgId: string,
+                  describe: () => IStoragePipelineInput,
+                  invoke: (observing: boolean) => Promise<R>
+                ) =>
+                  observeStorageTelemetry(
+                    this.#journalOrgs?.get(orgId)?.configuration,
+                    describe,
+                    invoke,
+                    () => this.#scheduler.now(),
+                    this.#report
+                  )
+              }),
           getJournal: (orgId) => this.#journalPort(context, orgId),
           id: native.id,
           defaultOrgId: this.#orgId,
@@ -770,10 +802,18 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
               ...observerBinding,
               identity: () => ({ ...observerBinding.identity(), orgId })
             }
-            const execution = forwardStorageExecution(this.#inner, context.assertExecution, () => ({
-              backendId: native.id,
-              backend: kind?.name ?? native.id
-            }))
+            const execution = forwardStorageExecution(
+              this.#inner,
+              context.assertExecution,
+              () => ({
+                backendId: native.id,
+                backend: kind?.name ?? native.id,
+                orgId
+              }),
+              context.observeExecution === undefined
+                ? undefined
+                : (describe, invoke) => context.observeExecution!(orgId, describe, invoke)
+            )
             const contextForOrg = callContext(orgId)
             const observe = (store: IStorageBase) => createStorageObservers(binding, () => store)
             return Object.freeze({
@@ -1349,7 +1389,10 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
     const source = this.#journal!
     const options = Promise.resolve().then(async () => {
       this.#assertOpen()
-      if (typeof source !== 'function') return source
+      if (typeof source !== 'function') {
+        this.#journalOrgs!.get(orgId)!.configuration = source
+        return source
+      }
       const configured = await source(
         Object.freeze({
           orgId,
@@ -1376,7 +1419,9 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
         })
       )
       this.#assertOpen()
-      return snapshotStorageJournalConfiguration(configured)
+      const snapshot = snapshotStorageJournalConfiguration(configured)
+      this.#journalOrgs!.get(orgId)!.configuration = snapshot
+      return snapshot
     })
     ;(this.#journalOrgs ??= new Map()).set(orgId, { options, backends: new Map() })
     return options

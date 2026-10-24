@@ -231,7 +231,7 @@ console.log(await log.lastSeq(), await log.states(LogRecordState.pending)) // 1 
 
 全局 `journal` 接受借用 logger 配置或 `async ({orgId,storageLogStore}) => 配置`。缺省组织由原安装批次最后的 bootstrap 准备；后续组织在首次受支持异步终点准备一次，共享同一 Promise，准备时间计入原操作预算并由原 controller 排空。配置在后续 use 中固定，准备失败也不重新执行 initializer；宿主不会 shutdown 借用 logger。`atomicBinlog[id]`、`atomicUndo[id]` 必须选择同一真实 registration 的载体，head 锁加入原第一次规范取锁。
 
-当前自动 memory 单元覆盖根 text/bytes/record 写入、批量、前缀删除、counter/TTL、vector/RDF、clear、查询写及显式 native 事务；原 draft 在修改前捕获 portable 镜像。capacity victim 同属该 draft 的镜像，异步追加后重查原修订和实际容量计划；victim 改变沿原 commit conflict 回滚暂存日志。真实数据和 victim 完成后才发布已提交日志索引，原淘汰通知顺序保持。空写不生成 storage.commit，选中异步 journal 时同步入口沿原 guard 拒绝。clear 按实际删除项捕获镜像，保留原通道 epoch 重置与一次粗粒度 clear 通知；空 clear 不生成 storage.commit。blob 写暂在修改前报 UNSUPPORTED_CAPABILITY，不接管上传 reader，不伪造 blob 锁或镜像格式。telemetry、其它后端全局路由、外置 undo 镜像与 redo 仍待完成；缺失的已选保证明确拒绝，不静默漏记。
+当前自动 memory 单元覆盖根 text/bytes/record 写入、批量、前缀删除、counter/TTL、vector/RDF、clear、查询写及显式 native 事务；原 draft 在修改前捕获 portable 镜像。capacity victim 同属该 draft 的镜像，异步追加后重查原修订和实际容量计划；victim 改变沿原 commit conflict 回滚暂存日志。真实数据和 victim 完成后才发布已提交日志索引，原淘汰通知顺序保持。空写不生成 storage.commit，选中异步 journal 时同步入口沿原 guard 拒绝。clear 按实际删除项捕获镜像，保留原通道 epoch 重置与一次粗粒度 clear 通知；空 clear 不生成 storage.commit。blob 写暂在修改前报 UNSUPPORTED_CAPABILITY，不接管上传 reader，不伪造 blob 锁或镜像格式。其它后端全局路由与 redo 仍待完成；缺失的已选保证明确拒绝，不静默漏记。
 
 未选 `atomicBinlog[id]` 的 memory backend 使用外置 binlog：仅在原生 COMMIT 后追加，原操作等该追加结算；失败通过宿主原 `report` 和 `onBinlogAppendError` 元数据观察事件报告，已提交数据和成功结果不回滚，后续写入仍可继续。回滚与空写不追加。仅当未选 WAL、undo、atomicBinlog 和 atomicUndo 时，纯外置 binlog 可借用 nativeAtomic:false 的真实成功 terminal；其原 fact 不变，仍由原 onCommit 决定追加，凡涉及其它日志保证均要求原 nativeAtomic:true。后端作者的 `IStorageJournalAttempt.settle?()` 只用于排空原 terminal 已启动的外置工作；同原生追加路径不增加该等待。外置 WAL 使用下述原 intent/marker 协议。
 
@@ -239,8 +239,16 @@ console.log(await log.lastSeq(), await log.states(LogRecordState.pending)) // 1 
 
 选中实际 logger.undo 的全局配置为已接线 memory 提供 `store.undo(txId, ctx?)`，返回本次撤销的新 txId；未选 journal、只有 binlog 或宽化为旧单参数 Host 类型时不静态声称存在该方法。直接配置与 initializer 保留所选 logger 的真实类型，组织借用视图的提取方法仍固定原组织且没有关闭权。全局准备要求原 physical backend 自己提供 callable undo，缺少时在业务准入前拒绝该组合，宿主不改 frozen/raw base 或替换 root store。
 
-undo 从原 logger 读取已提交镜像，使用后端的原 tx().lock(...).run 一次取得全部锁。私有 deadline 目标由 binding.lockTarget 映射回原点锁；不建锁表。先比较全部完整 afterRevision（含 clear epoch/墓碑）及当前编码值和存在性，再写任一 before；冲突报 UNDO_CONFLICT、无记录报 UNDO_NOT_FOUND，foreign target 或重复的规范镜像身份报 JOURNAL_RECORD_INVALID；合法 value/deadline 两镜像仍保持不同身份并共享原点锁。撤销继续沿原 draft/修订/容量/单 pipeline 提交，生成一条新 storage.commit 与新的 undo 镜像；并发或净零事务不能双重撤销，原 ctx getter 单读并继承原预算。当前已验证 memory 的 text/bytes/record/null/缺失/TTL/vector/RDF 与原组织隔离；外置 undo 镜像、其它后端接线和 redo 仍待完成。
+undo 从原 logger 读取已提交镜像，使用后端的原 tx().lock(...).run 一次取得全部锁。私有 deadline 目标由 binding.lockTarget 映射回原点锁；不建锁表。先比较全部完整 afterRevision（含 clear epoch/墓碑）及当前编码值和存在性，再写任一 before；冲突报 UNDO_CONFLICT、无记录报 UNDO_NOT_FOUND，foreign target 或重复的规范镜像身份报 JOURNAL_RECORD_INVALID；合法 value/deadline 两镜像仍保持不同身份并共享原点锁。撤销继续沿原 draft/修订/容量/单 pipeline 提交，生成一条新 storage.commit 与新的 undo 镜像；并发或净零事务不能双重撤销，原 ctx getter 单读并继承原预算。当前已验证 memory 的 text/bytes/record/null/缺失/TTL/vector/RDF 与原组织隔离；其它后端接线和 redo 仍待完成。
 
 PENDING-USER-REVIEW：dropOrg 遇到存活的全局 journal 时，原私有 namespace generation 失效；storageLogStore 缓存读取与旧 native port 均报 STORE_DISPOSED，后续选中 journal 的写入在修改前拒绝，普通未选 journal 的 org 视图仍可复用。同一借用 logger 在 drop 后继续，需要原 logger 的正式 reset 契约；宿主不重跑一次性 initializer、不替换或关闭 logger。比较隐式复用缓存、重跑 initializer 与安全隔离后选择安全隔离，保数据/日志一致；回退只能撤回新增全局组合，或由原 owner 显式 reset 协议替换隔离。
 
 后端作者可在原安装窗口调用 core.registerFeatureClientResolver(store, resolver)，为精确已登记 store 提供组织原生客户端选择。resolver.getClient(orgId) 可先沿原 opener 准备再返回客户端；只有真实异步结果才等待，完成后再次核对原 registration。可选 getTransactionClient(scope, orgId) 必须同步返回该原认证 scope 已打开的事务，不得另开或等待。未登记 resolver 时，原 Feature 的 getClient/getTransactionClient 调用顺序与行为保持。resolver 只占原 storeCell 的一个可选字段，业务视图不能登记或获得该接点，Feature factory 不重跑。
+
+外置 undo 必须选中真实 `logger.wal`，并由原 binding 同时提供 `nativeAtomic:true`、`externalWal:true` 与提交 marker；没有 atomicUndo 又没有 WAL 时在业务准入前拒绝。undo-only 或与 binlog 共用同一 storage.binlog-intent，完整按序变更沿原归并算法生成首次 before/最终 after/完整 afterRevision，提交后补镜像再 complete 和回收 marker。已提交数据不因镜像发布失败而回滚；原 report 保留错误，pending 与 marker 保持以便重开恢复。同 txId 已有镜像只有完整内容相等时才略过，差异报 JOURNAL_RECORD_INVALID，不覆盖借用日志。严格 IDB 不提供外部等待事实，继续只接原同库 atomicUndo 路径。
+
+`journal.telemetry:true` 要求真实 `level()` 的 `atLevel` 接点。普通操作沿原 logger schema 输出 tag 为 `storage` 的条目，成功按 debug、失败按 error 经过原门槛与 filters；meta 含 backend/orgId/operation、原后端提供的 keys、durationMs/outcome/source/code/level 和正常 payload，args 保留原错误，不增加字段屏蔽或脱敏。失败与关闭的 logger 只走宿主 report，不改变存储结果；宿主不关闭借用 logger。关闭 telemetry 不读取 atLevel、不生成日志数据。
+
+后端作者的原 `execution` 接点可用 `keys?:()=>readonly ILockKey[]` 提供已规范的原生身份，`internal?:true` 排除私有日志及已由外层覆盖的执行；orgId 由原不可变闭包补入。需要多次原 attempt 的终点用可选 `execution.observe(describe, invoke)` 包住原完整循环，invoke 的 boolean 仅表示是否需要采集观察事实，未启用时直接调用原工作；内层原 pipeline 保持且标 internal。memory 已验证一次真实重试只输出一个事务条目、无子操作重复。其它后端继续由各自原 owner 提供完整事实。
+
+`@migaia/storage-host/authoring/backend` 的 `createBackendJournalNamespace(options)` 复用原 namespace 资源 reservation、quiescence 排空和双释放 Promise；memory 的私有 namespace 已直接消费。`IBackendJournalNamespaceOptions` 只借用原 assertLive/closingSignal/report、nativeAtomic/indexExclusive、reserve、authenticate(scope) 和原 transaction。`IBackendJournalTransaction` 仅有私有 run(viewWork) 与 onCommit/onRollback/onEnd 观察，无原生句柄、commit 或后端关闭权；onEnd 在结果未知时也仅排空，不冒充 rollback。数据、代际、跨实例独占和实际终态仍归原后端。

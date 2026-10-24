@@ -19,6 +19,14 @@ describe('durable package entries', () => {
       'wal'
     ])
     expect(Object.keys(await import('../dist/plugins/durable/file.js'))).toEqual(['fileLogStore'])
+    const { Logger } = await import('../dist/index.js')
+    const { level } = await import('../dist/plugins/index.js')
+    const categorized = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+      plugins: [level()]
+    })
+    expect(typeof categorized.atLevel).toBe('function')
+    await categorized.shutdown('manual')
     const manifest = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'))
     expect(manifest.exports['./plugins/durable/file'].browser).toBe(
       './dist/plugins/durable/file.browser.js'

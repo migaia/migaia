@@ -23,6 +23,7 @@ describe('storage host package exports', () => {
     expect(runtime).not.toHaveProperty('getBackendChangeController')
     expect(runtime).not.toHaveProperty('createBackendKeyLockPort')
     expect(runtime.observeStorageBatch).toBeTypeOf('function')
+    expect(runtime.createBackendJournalNamespace).toBeTypeOf('function')
     expect(runtime.asyncDisposeKey).toBe((await import('@migaia/plugin-host')).asyncDisposeKey)
   })
   it('publishes only query vector synthesis from the dedicated vector authoring entry', async () => {

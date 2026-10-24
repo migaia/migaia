@@ -49,3 +49,9 @@ export type {
 export type { IBackendKeyLockPort } from '../backends/key-locks.js'
 
 export type { IBackendRevisionPort } from '../backends/revisions.js'
+
+export { createBackendJournalNamespace } from '../journal/namespace-resource.js'
+export type {
+  IBackendJournalNamespaceOptions,
+  IBackendJournalTransaction
+} from '../journal/namespace-resource.js'

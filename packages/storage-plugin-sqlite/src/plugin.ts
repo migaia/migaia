@@ -4,7 +4,8 @@ import {
   type IStorageBackendPlugin,
   type IStorageFeatureRecord,
   type IStorageFeatureStoreCompatibility,
-  type IStoragePluginCore
+  type IStoragePluginCore,
+  type IStorageJournalBackendBinding
 } from '@migaia/storage-host'
 import {
   StorageContractError,
@@ -49,10 +50,18 @@ export function sqliteBackendPlugin<
   const descriptorFactory = (core: IStoragePluginCore<F>) => {
     /** Each actual host installation gets its own store/owner, never a module singleton. */
     let construction: ISqliteConstruction<TValue>
+    /** Context redirects reuse the same organization constructor installed below. */
+    let ensureOrg: (orgId: string) => void
+    /** The existing physical organization constructor also supplies exact private journal ports. */
+    let organization: (orgId: string) => ISqliteConstruction<TValue>
     return {
       kind: sqliteBackendKind,
       install() {
-        construction = createSqliteStore<TValue>(captured, { core, orgId: core.defaultOrgId })
+        construction = createSqliteStore<TValue>(captured, {
+          core,
+          orgId: core.defaultOrgId,
+          ensureOrg: (orgId) => ensureOrg(orgId)
+        })
         core.registerStore(construction.store)
         core.registerChangeController(construction.store, construction.controller)
         /** Capture late construction authority after the root resource so children drain first. */
@@ -72,6 +81,10 @@ export function sqliteBackendPlugin<
           author.registerChangeController(child.store, child.controller)
           organizations.set(orgId, child)
           return child
+        }
+        organization = forOrg
+        ensureOrg = (orgId) => {
+          forOrg(orgId)
         }
         core.registerOrgBinding(construction.store, {
           backend: (orgId) => forOrg(orgId).store,
@@ -102,6 +115,13 @@ export function sqliteBackendPlugin<
           captured.driver.prepare('SELECT 1').get()
         })
         return {}
+      },
+      journalBinding: () => {
+        const binding = (orgId: string): IStorageJournalBackendBinding => ({
+          ...(orgId === core.defaultOrgId ? construction : organization(orgId)).journal,
+          forOrg: binding
+        })
+        return binding(core.defaultOrgId)
       },
       capabilityInstaller: (_store: ISqliteStore<TValue>): ICapabilityInstallPort =>
         construction.installer,
