@@ -74,6 +74,51 @@ describe('explicit entity assembly', () => {
     expect(() => repository.query()).toThrow(expect.objectContaining(missing('query')))
   })
 
+  it('persists migration-only memory records across native batches without unique or query units', async () => {
+    /** The basic public repository creates the original persisted version-one envelopes. */
+    const store = await memoryBackend()
+    const original = defineEntity<IRow>({ name: 'persisted-migration-only', key: 'id' }).connect(
+      store
+    )
+    for (const id of ['a', 'b', 'c']) await original.put({ id, group: 'one' })
+    /** Only migration is selected; two native batches must not resolve another optional owner. */
+    const repository = defineEntity<IRow>({
+      name: 'persisted-migration-only',
+      key: 'id',
+      version: 2,
+      features: [entityMigrationFeature()],
+      migrations: { 2: (state) => ({ ...(state as IRow), group: 'migrated' }) }
+    }).connect(store)
+    await expect(repository.migrate({ batchSize: 2 })).resolves.toEqual({
+      scanned: 3,
+      eligible: 3,
+      migrated: 3,
+      alreadyCurrent: 0,
+      skipped: 0,
+      conflicted: 0
+    })
+    /** Inspect persisted native envelopes so lazy read migration cannot satisfy this assertion. */
+    const persisted: unknown[] = []
+    for await (const [, envelope] of store.iterateRecords()) persisted.push(envelope)
+    expect(persisted).toEqual(
+      ['a', 'b', 'c'].map((id) => ({ version: 2, state: { id, group: 'migrated' } }))
+    )
+    expect(() => repository.query()).toThrow(expect.objectContaining(missing('query')))
+  })
+
+  it('still rejects a migration declaration with unique constraints but no unique unit', () => {
+    expect(() =>
+      defineEntity<IRow>()({
+        name: 'migration-missing-unique',
+        key: 'id',
+        version: 2,
+        features: [entityMigrationFeature(), entityIndexesFeature()],
+        indexes: { group: { path: 'group', unique: true } },
+        migrations: { 2: (state) => state }
+      })
+    ).toThrow(expect.objectContaining(missing('unique')))
+  })
+
   it('never hides a missing migration assembly behind the invalid-record skip policy', async () => {
     const store = await memoryBackend()
     await store.putRecord({ version: 2, state: { id: 'a', group: 'one' } }, ['query-version', 'a'])

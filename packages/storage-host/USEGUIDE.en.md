@@ -84,7 +84,7 @@ await users.put({ id: 'u1', name: 'Ada' })
 console.log(await users.get('u1'))
 ```
 
-Select only required units in `features`: `entityQueryFeature()` from `/entity/query` adds query/list/stream; `entityIndexesFeature()` from `/entity/indexes` adds index declaration/planning; `entityUniqueFeature()` from `/entity/unique` adds unique commit checks; `entityMigrationFeature()` from `/entity/migration` adds version plans and persisted migration; `entityKeysetFeature()` from `/entity/keyset` admits page/after. Index, unique and persisted migration paths reuse query operations, so also declare query for those paths. Units never enable another unit implicitly.
+Select only required units in `features`: `entityQueryFeature()` from `/entity/query` adds query/list/stream; `entityIndexesFeature()` from `/entity/indexes` adds index declaration/planning; `entityUniqueFeature()` from `/entity/unique` adds unique commit checks; `entityMigrationFeature()` from `/entity/migration` adds version plans and persisted migration; `entityKeysetFeature()` from `/entity/keyset` admits page/after. Index-backed queries and fallback uniqueness validation also require query. Migration without indexes or unique constraints scans native records or text keys directly and needs neither query nor unique. Units never enable another unit implicitly.
 
 The unique unit captures its own constraint projections without enabling index planning. Unique write checks alone do not require the indexes unit.
 
@@ -117,6 +117,43 @@ try {
 The repository does not close its backend. Use `orders.in(tx)` inside a transaction; `orders.batch(...)` uses one native record transaction. Schemas and codecs perform runtime validation and conversion; TypeScript types alone do not validate external input. `fromStandardSchema` is available from the same `/entity` entry. Conversion failures retain the original error through `cause`.
 
 Select `index` or `range` first and only once. `where`, `select`, `skip` and `limit` create new query branches. Pair custom comparators with a finite `limit`, or use `first()`. `stream()` returns a disposable iterator; use `await using` or explicit `dispose()` if stopping early. When available, `watch()` supplies invalidation notifications, not result rows or reliable replay. Transaction queries do not expose `watch()`.
+
+### Persist versioned records
+
+Select only migration when upgrading records without indexes or unique constraints. Reading an old record upgrades the returned value; call `migrate()` to persist the new envelopes. Each memory-record batch uses the original native transaction.
+
+```ts doc-test=run
+import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { defineEntity } from '@migaia/storage-host/entity'
+import { entityMigrationFeature } from '@migaia/storage-host/entity/migration'
+
+type IUser = { id: string; name: string }
+const host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+try {
+  const store = host.backend('memory')
+  const original = defineEntity<IUser>({ name: 'migration-users', key: 'id' }).connect(store)
+  await original.put({ id: 'ada', name: ' Ada ' })
+  await original.put({ id: 'lin', name: ' Lin ' })
+  const users = defineEntity<IUser>({
+    name: 'migration-users',
+    key: 'id',
+    version: 2,
+    features: [entityMigrationFeature()],
+    migrations: {
+      2: (previous) => {
+        const user = previous as IUser
+        return { ...user, name: user.name.trim() }
+      }
+    }
+  }).connect(store)
+  const result = await users.migrate({ batchSize: 1 })
+  console.log(result.migrated, (await users.get('ada'))?.name) // 2 Ada
+} finally {
+  await host.dispose()
+}
+```
+
+Declaring unique constraints still requires the unique unit. Its fallback check also requires query; migration does not supply either unit implicitly.
 
 ## Separate organization data
 

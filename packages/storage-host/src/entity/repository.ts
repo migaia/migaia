@@ -44,7 +44,10 @@ import type {
   IEntityTransactionScope,
   IEntityConnectOptions,
   IRepository,
-  IEntityConnectStore
+  IEntityConnectStore,
+  IInvalidRecordAction,
+  IInvalidRecordHandler,
+  IInvalidRecordIssue
 } from './types.js'
 import type { ISnapshotEntityIndexes } from './index-projection.js'
 
@@ -438,17 +441,18 @@ export class EntityRepositoryOwner<
     >(EntityFeatureName.query).invalidAction
   }
 
-  /** Perform the repository validateInvalidHandler operation using its own state. */
-  get #validateInvalidHandler(): EntityQueryOwner<
-    TDomain,
-    TStored,
-    TIndexes,
-    TAugmentMethods,
-    TChangeFeed
-  >['validateInvalidHandler'] {
-    return this.#feature<
-      EntityQueryOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
-    >(EntityFeatureName.query).validateInvalidHandler
+  /** Own shared invalid-record policy without requiring optional query assembly. */
+  #validateInvalidHandler = (handler: unknown): void => {
+    if (
+      handler !== undefined &&
+      handler !== 'skip' &&
+      handler !== 'throw' &&
+      typeof handler !== 'function'
+    )
+      throw new StorageError(StorageErrorCode.invalidConfig, {
+        backend: this.#store.backend,
+        cause: new TypeError(EntityText.oninvalidMustBeSkipThrowOrAHandler)
+      })
   }
 
   /** Detach list bounds before the lazy source opens and awaits native reads. */
@@ -490,30 +494,59 @@ export class EntityRepositoryOwner<
     >(EntityFeatureName.indexes).createIndexedListSnapshot
   }
 
-  /** Perform the repository invokeInvalidHandler operation using its own state. */
-  get #invokeInvalidHandler(): EntityQueryOwner<
-    TDomain,
-    TStored,
-    TIndexes,
-    TAugmentMethods,
-    TChangeFeed
-  >['invokeInvalidHandler'] {
-    return this.#feature<
-      EntityQueryOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
-    >(EntityFeatureName.query).invokeInvalidHandler
+  /** Own shared invalid-record policy without requiring optional query assembly. */
+  #invokeInvalidHandler = (
+    handler: IInvalidRecordAction | IInvalidRecordHandler<TDomain> | undefined,
+    issue: IInvalidRecordIssue<TDomain>
+  ): IInvalidRecordAction => {
+    /** Missing assembly is an operation failure, never corrupt data eligible for skipping. */
+    if (
+      isStorageErrorFamily(issue.cause) &&
+      issue.cause.code === StorageErrorCode.entityFeatureRequired
+    )
+      throw issue.cause
+    if (handler === undefined || handler === 'skip' || handler === 'throw') return handler ?? 'skip'
+    if (typeof handler !== 'function')
+      throw new StorageError(StorageErrorCode.invalidConfig, {
+        backend: this.#store.backend,
+        key: issue.key,
+        cause: new TypeError(EntityText.oninvalidMustBeSkipThrowOrAHandler)
+      })
+    try {
+      const action = handler(issue)
+      if (action !== 'skip' && action !== 'throw')
+        throw new StorageError(StorageErrorCode.invalidConfig, {
+          backend: this.#store.backend,
+          key: issue.key,
+          cause: new TypeError(EntityText.oninvalidHandlerMustReturnSkipOrThrow)
+        })
+      return action
+    } catch (cause) {
+      if (isStorageErrorFamily(cause) && cause.code === StorageErrorCode.invalidConfig) throw cause
+      throw new StorageError(StorageErrorCode.validationFailed, {
+        backend: this.#store.backend,
+        key: issue.key,
+        cause
+      })
+    }
   }
 
-  /** Perform the repository throwInvalid operation using its own state. */
-  get #throwInvalid(): EntityQueryOwner<
-    TDomain,
-    TStored,
-    TIndexes,
-    TAugmentMethods,
-    TChangeFeed
-  >['throwInvalid'] {
-    return this.#feature<
-      EntityQueryOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
-    >(EntityFeatureName.query).throwInvalid
+  /** Own shared invalid-record policy without requiring optional query assembly. */
+  #throwInvalid = (issue: IInvalidRecordIssue<TDomain>): never => {
+    /* c8 ignore start -- all current decode/migrate/validate stages normalize to StorageError. */
+    if (isStorageErrorFamily(issue.cause)) throw issue.cause
+    const code =
+      issue.stage === StorageRecordStage.migrate
+        ? StorageErrorCode.migrationFailed
+        : issue.stage === StorageRecordStage.decode
+          ? StorageErrorCode.deserializeFailed
+          : StorageErrorCode.validationFailed
+    throw new StorageError(code, {
+      backend: this.#store.backend,
+      key: issue.key,
+      cause: issue.cause
+    })
+    /* c8 ignore stop */
   }
 
   /** Perform the repository materializeForRead operation using its own state. */

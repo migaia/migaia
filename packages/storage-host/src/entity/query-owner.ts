@@ -21,7 +21,6 @@ import {
   readTransactionOperationContext
 } from '../authoring/transaction.js'
 
-import { isStorageErrorFamily } from '../core/error-family.js'
 import { StorageError, StorageErrorCode, createStorageTypeError } from '../errors.js'
 import { StorageErrorText } from '../error-text.js'
 import { readStorageHookFailureCode } from '../hooks.js'
@@ -120,18 +119,7 @@ export class EntityQueryOwner<
     option: IListSnapshot<TDomain> | undefined
   ): IInvalidRecordAction => this.invokeInvalidHandler(option?.onInvalid, issue)
   /** Reuse the original repository operation through its explicit owner context. */
-  validateInvalidHandler = (handler: unknown): void => {
-    if (
-      handler !== undefined &&
-      handler !== 'skip' &&
-      handler !== 'throw' &&
-      typeof handler !== 'function'
-    )
-      throw new StorageError(StorageErrorCode.invalidConfig, {
-        backend: this.#context.store.backend,
-        cause: new TypeError(EntityText.oninvalidMustBeSkipThrowOrAHandler)
-      })
-  }
+  validateInvalidHandler = (handler: unknown): void => this.#context.validateInvalidHandler(handler)
   /** Reuse the original repository operation through its explicit owner context. */
   normalizeListOptions = (
     options:
@@ -167,55 +155,9 @@ export class EntityQueryOwner<
   invokeInvalidHandler = (
     handler: IInvalidRecordAction | IInvalidRecordHandler<TDomain> | undefined,
     issue: IInvalidRecordIssue<TDomain>
-  ): IInvalidRecordAction => {
-    /** Missing assembly is an operation failure, never corrupt data eligible for skipping. */
-    if (
-      isStorageErrorFamily(issue.cause) &&
-      issue.cause.code === StorageErrorCode.entityFeatureRequired
-    )
-      throw issue.cause
-    if (handler === undefined || handler === 'skip' || handler === 'throw') return handler ?? 'skip'
-    if (typeof handler !== 'function')
-      throw new StorageError(StorageErrorCode.invalidConfig, {
-        backend: this.#context.store.backend,
-        key: issue.key,
-        cause: new TypeError(EntityText.oninvalidMustBeSkipThrowOrAHandler)
-      })
-    try {
-      const action = handler(issue)
-      if (action !== 'skip' && action !== 'throw')
-        throw new StorageError(StorageErrorCode.invalidConfig, {
-          backend: this.#context.store.backend,
-          key: issue.key,
-          cause: new TypeError(EntityText.oninvalidHandlerMustReturnSkipOrThrow)
-        })
-      return action
-    } catch (cause) {
-      if (isStorageErrorFamily(cause) && cause.code === StorageErrorCode.invalidConfig) throw cause
-      throw new StorageError(StorageErrorCode.validationFailed, {
-        backend: this.#context.store.backend,
-        key: issue.key,
-        cause
-      })
-    }
-  }
+  ): IInvalidRecordAction => this.#context.invokeInvalidHandler(handler, issue)
   /** Reuse the original repository operation through its explicit owner context. */
-  throwInvalid = (issue: IInvalidRecordIssue<TDomain>): never => {
-    /* c8 ignore start -- all current decode/migrate/validate stages normalize to StorageError. */
-    if (isStorageErrorFamily(issue.cause)) throw issue.cause
-    const code =
-      issue.stage === StorageRecordStage.migrate
-        ? StorageErrorCode.migrationFailed
-        : issue.stage === StorageRecordStage.decode
-          ? StorageErrorCode.deserializeFailed
-          : StorageErrorCode.validationFailed
-    throw new StorageError(code, {
-      backend: this.#context.store.backend,
-      key: issue.key,
-      cause: issue.cause
-    })
-    /* c8 ignore stop */
-  }
+  throwInvalid = (issue: IInvalidRecordIssue<TDomain>): never => this.#context.throwInvalid(issue)
   /** Reuse the original repository operation through its explicit owner context. */
   async *streamImpl(
     options: IListSnapshot<TDomain> | undefined,

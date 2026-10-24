@@ -84,7 +84,7 @@ await users.put({ id: 'u1', name: 'Ada' })
 console.log(await users.get('u1'))
 ```
 
-只在 `features` 中选择用到的单元：`/entity/query` 的 `entityQueryFeature()` 开启 query/list/stream；`/entity/indexes` 的 `entityIndexesFeature()` 开启索引声明和规划；`/entity/unique` 的 `entityUniqueFeature()` 开启唯一提交检查；`/entity/migration` 的 `entityMigrationFeature()` 开启版本计划和持久迁移；`/entity/keyset` 的 `entityKeysetFeature()` 准入 page/after。索引、unique 与持久迁移会复用查询操作，使用这些路径时也需声明 query；单元不会自动开启其他单元。
+只在 `features` 中选择用到的单元：`/entity/query` 的 `entityQueryFeature()` 开启 query/list/stream；`/entity/indexes` 的 `entityIndexesFeature()` 开启索引声明和规划；`/entity/unique` 的 `entityUniqueFeature()` 开启唯一提交检查；`/entity/migration` 的 `entityMigrationFeature()` 开启版本计划和持久迁移；`/entity/keyset` 的 `entityKeysetFeature()` 准入 page/after。索引查询与唯一约束的回退校验还需要 query。没有索引或唯一约束的迁移直接扫描原生记录或文本键，不需要 query 或 unique。单元不会自动开启其他单元。
 
 unique 单元能单独捕获约束投影，不会因此开启索引规划；仅做唯一写入检查时不需 indexes 单元。
 
@@ -117,6 +117,43 @@ try {
 实体不会关闭传入的后端。事务中使用 `orders.in(tx)`；`orders.batch(...)` 使用一个原生记录事务。schema 与 codec 用于运行时校验和转换，TypeScript 类型本身不校验外部输入。需要外部 schema 时，可从同一 `/entity` 入口使用 `fromStandardSchema`；转换失败保留原错误在 `cause` 中。
 
 查询的 `index` 或 `range` 要最先选择，且只能选一次；普通 `where`、`select`、`skip`、`limit` 会产生新分支。自定义比较器应搭配有限 `limit`，或使用 `first()`。`stream()` 返回可释放迭代器；提前停止时使用 `await using` 或显式 `dispose()`。`watch()` 是可用后端的失效通知，并非结果行流，也不保证重放。事务查询没有 `watch()`。
+
+### 持久化版本迁移
+
+迁移没有索引或唯一约束的记录时，只需选择 migration 单元。读取旧记录会升级返回值；需要持久化新版本信封时，再调用 `migrate()`。内存记录的每个迁移批次沿用原生事务。
+
+```ts doc-test=run
+import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { defineEntity } from '@migaia/storage-host/entity'
+import { entityMigrationFeature } from '@migaia/storage-host/entity/migration'
+
+type IUser = { id: string; name: string }
+const host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+try {
+  const store = host.backend('memory')
+  const original = defineEntity<IUser>({ name: 'migration-users', key: 'id' }).connect(store)
+  await original.put({ id: 'ada', name: ' Ada ' })
+  await original.put({ id: 'lin', name: ' Lin ' })
+  const users = defineEntity<IUser>({
+    name: 'migration-users',
+    key: 'id',
+    version: 2,
+    features: [entityMigrationFeature()],
+    migrations: {
+      2: (previous) => {
+        const user = previous as IUser
+        return { ...user, name: user.name.trim() }
+      }
+    }
+  }).connect(store)
+  const result = await users.migrate({ batchSize: 1 })
+  console.log(result.migrated, (await users.get('ada'))?.name) // 2 Ada
+} finally {
+  await host.dispose()
+}
+```
+
+声明唯一约束时仍需选择 unique 单元；其回退校验还需要 query。迁移不会隐式补装任何一个单元。
 
 ## 隔离组织数据
 

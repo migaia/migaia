@@ -437,7 +437,7 @@ export class EntityMigrationOwner<
         })
       if (entry.migrationRequired) counts.migrated += 1
     }
-    if (!currentIndexed)
+    if (!currentIndexed && this.#context.uniqueDefinitions.length > 0)
       await this.#context.validateUniqueRecordCommit(
         tx,
         uniqueChanges,
@@ -505,7 +505,7 @@ export class EntityMigrationOwner<
         conflictPolicy: 'replace'
       })
     if (entry.legacy) await tx.deleteRecord(entry.physicalKey)
-    if (!currentIndexed)
+    if (!currentIndexed && this.#context.uniqueDefinitions.length > 0)
       await this.#context.validateUniqueRecordCommit(
         tx,
         new Map([
