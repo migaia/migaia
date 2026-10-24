@@ -419,8 +419,8 @@ console.log(host.extensions.label('draft'))`,
       members: {
         journal: {
           summary: t(
-            'Optional global journal configuration; omitted configurations leave the original execution path unchanged. Memory external WAL uses the original intent/marker protocol when its binding explicitly supports external awaits. Native memory undo checks all original revisions and values before restoring through the original locked transaction. Redo, blob capture, external undo and other-backend wiring remain unfinished.',
-            '可选全局 journal；省略时保持原路径。memory 外置 WAL 在原 binding 显式允许外部等待时使用原 intent/marker 协议；memory 原生 undo 比较全部原修订和值，再沿原加锁事务恢复；redo、blob 捕获、外置 undo 和其它后端接线尚未完成。'
+            'Optional global journal configuration; omitted configurations leave the original execution path unchanged. Memory external WAL uses the original intent/marker protocol when its binding explicitly supports external awaits. Native memory undo checks all original revisions and values before restoring through the original locked transaction. External undo uses the same full-image WAL/marker protocol with exact-only repeated mirror publication. Redo, blob capture and other-backend wiring remain unfinished.',
+            '可选全局 journal；省略时保持原路径。memory 外置 WAL 在原 binding 显式允许外部等待时使用原 intent/marker 协议；memory 原生 undo 比较全部原修订和值，再沿原加锁事务恢复；外置 undo 复用完整镜像 WAL/marker 协议，仅完整相同的已发布镜像可幂等略过；redo、blob 捕获和其它后端接线尚未完成。'
           )
         }
       }

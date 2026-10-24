@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { Logger } from '@migaia/logger'
-import { binlog, wal, memoryLogStore, type ILogPayloadInput } from '@migaia/logger/plugins/durable'
+import {
+  binlog,
+  undoLog,
+  wal,
+  memoryLogStore,
+  type ILogPayloadInput
+} from '@migaia/logger/plugins/durable'
 import { lockKey, ttl, type IStorageResource } from '@migaia/storage-contract'
 import { createStorageHost, createOrgId, memoryBackendPlugin } from '../src/index.js'
 import { resolveStorageJournalBinding } from '../src/journal/binding.js'
@@ -161,6 +167,137 @@ describe('external storage WAL', () => {
       expect(await logger.wal.pending()).toEqual([])
       expect(await store.get('key')).toBe('committed')
       expect(await logger.binlog.read(1)).toHaveLength(1)
+    } finally {
+      await logger.shutdown('manual')
+    }
+  })
+
+  it('publishes external undo through the same global WAL and records undo as a new native commit', async () => {
+    await using images = memoryLogStore()
+    await using intents = memoryLogStore()
+    const logger = new Logger({
+      execution,
+      runtimeManager,
+      plugins: [undoLog({ store: images }), wal({ store: intents })]
+    })
+    await using host = await createStorageHost({
+      plugins: [memoryBackendPlugin()],
+      journal: { logger, namespace: 'external-undo-only' }
+    })
+    try {
+      const store = host.backend('memory')
+      await store.set('value', 'before')
+      await store
+        .tx()
+        .lock(lockKey.text('value'))
+        .run(async (scope) => {
+          await scope.set('value', 'intermediate')
+          await scope.set('value', 'after')
+          await scope.use(ttl).expire({ channel: 'text', key: 'value' }, 60_000)
+        })
+      const txId = (await logger.undo.list())[0]!.txId
+      expect(JSON.stringify(await logger.undo.get(txId))).toContain('before')
+      expect(JSON.stringify(await logger.undo.get(txId))).toContain('after')
+      expect(await logger.wal.pending()).toEqual([])
+      const restored = await store.undo(txId)
+      expect(restored.txId).not.toBe(txId)
+      expect(await store.get('value')).toBe('before')
+      expect(await store.use(ttl).remaining({ channel: 'text', key: 'value' })).toBeUndefined()
+      expect(await logger.undo.get(restored.txId)).toBeDefined()
+      expect(await logger.wal.pending()).toEqual([])
+    } finally {
+      await logger.shutdown('manual')
+    }
+  })
+
+  it('recovers an external mirror after publication failure and skips only an identical already-published mirror', async () => {
+    await using images = memoryLogStore()
+    await using intents = memoryLogStore()
+    const logger = new Logger({
+      execution,
+      runtimeManager,
+      plugins: [undoLog({ store: images }), wal({ store: intents })]
+    })
+    await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+    const store = host.backend('memory')
+    await store.set('value', 'before')
+    const access = resolveStorageJournalBinding(host, 'memory')
+    const resources: IStorageResource[] = []
+    const reports: unknown[] = []
+    const original = new RangeError('external undo publication failed after commit')
+    const completeFailure = new RangeError('intent completion failed after mirror publication')
+    let failRecord = true
+    let failComplete = true
+    const selected = {
+      undo: {
+        ...logger.undo,
+        record: (...args: Parameters<typeof logger.undo.record>) =>
+          failRecord ? Promise.reject(original) : logger.undo.record(...args)
+      },
+      wal: {
+        ...logger.wal,
+        complete: (seq: number) =>
+          failComplete ? Promise.reject(completeFailure) : logger.wal.complete(seq)
+      }
+    }
+    const options = {
+      access: {
+        ...access,
+        retain: (resource: IStorageResource) => {
+          resources.push(resource)
+          return access.retain(resource)
+        }
+      },
+      backend: store.backend,
+      namespace: 'recover-external-undo',
+      logger: selected,
+      report: (error: unknown) => {
+        reports.push(error)
+      }
+    }
+    try {
+      const bridge = await createStorageNativeJournal(options)
+      let attempt: ReturnType<typeof bridge.begin> | undefined
+      await store
+        .tx()
+        .lock(lockKey.text('value'))
+        .run(async (scope) => {
+          attempt = bridge.begin(scope)
+          await scope.set('value', 'after')
+          await attempt.record(scope)
+        })
+      await attempt!.settle?.()
+      expect(await store.get('value')).toBe('after')
+      expect(await logger.undo.get(attempt!.txId)).toBeUndefined()
+      expect(reports).toEqual([original])
+      expect(await access.binding.hasCommitMarker!(attempt!.txId)).toBe(true)
+      expect(await logger.wal.pending()).toHaveLength(1)
+      await resources[0]!.dispose()
+      failRecord = false
+      await expect(createStorageNativeJournal(options)).rejects.toMatchObject({
+        code: 'JOURNAL_RECOVERY_FAILED',
+        cause: completeFailure
+      })
+      const committedImages = (await logger.undo.get(attempt!.txId))!
+      expect(committedImages).toBeDefined()
+      expect(await logger.wal.pending()).toHaveLength(1)
+      failComplete = false
+      /** A borrowed logger cannot silently replace this target's recovery mirror. */
+      await logger.undo.forget(attempt!.txId)
+      await logger.undo.record(attempt!.txId, [
+        { ...committedImages[0]!, before: { present: false } }
+      ])
+      await expect(createStorageNativeJournal(options)).rejects.toMatchObject({
+        code: 'JOURNAL_RECORD_INVALID'
+      })
+      expect(await logger.wal.pending()).toHaveLength(1)
+      expect(await store.get('value')).toBe('after')
+      await logger.undo.forget(attempt!.txId)
+      await logger.undo.record(attempt!.txId, committedImages)
+      await createStorageNativeJournal(options)
+      expect(await logger.undo.list()).toHaveLength(1)
+      expect(await logger.wal.pending()).toEqual([])
+      expect(await access.binding.hasCommitMarker!(attempt!.txId)).toBe(false)
     } finally {
       await logger.shutdown('manual')
     }
