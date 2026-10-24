@@ -124,3 +124,16 @@ export type IStorageMigrationPhase =
 
 /** Default native object store owned only by the explicitly selected IndexedDB Blob Feature. */
 export const INDEXED_DB_BLOB_STORE = '__migaia_blobs__'
+
+/** Explicit IDB assembly identities appear in Feature registration and missing-assembly diagnostics. */
+export const IndexedDbFeature = {
+  indexes: 'indexes',
+  /** Selects canonical cursor pagination for raw records queries independently of native indexes. */
+  keyset: 'keyset',
+  ttl: 'ttl',
+  batch: 'batch',
+  journal: 'journal',
+  notifications: 'notifications',
+  changeFeed: 'changeFeed',
+  hostJournal: 'host journal plugin'
+} as const

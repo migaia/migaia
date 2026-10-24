@@ -1,3 +1,4 @@
+import { entityTestFeatures } from './helpers/entity-features.js'
 import { describe, expect, it } from 'vitest'
 import { createMemoryTestStore } from './helpers/installed-backends.js'
 import { defineEntity } from '@migaia/storage-host/entity'
@@ -53,12 +54,14 @@ describe('storage-web audit high severity regressions', () => {
     try {
       /** Initial v1 data is eligible for migration. */
       const old = defineEntity<{ id: string; value: string }>({
+        features: entityTestFeatures,
         name: 'audit-race',
         key: 'id'
       }).connect(store)
       await old.put({ id: 'row', value: 'old' })
       /** The complete v2 graph is valid independently of the race. */
       const upgraded = defineEntity<{ id: string; value: string }>({
+        features: entityTestFeatures,
         name: 'audit-race',
         key: 'id',
         version: 2,
@@ -96,6 +99,7 @@ describe('storage-web audit high severity regressions', () => {
     try {
       /** Both writes use the public curried index definition and ordinary repository. */
       const users = defineEntity<{ id: string; email: string }>()({
+        features: entityTestFeatures,
         name: 'audit-unique',
         key: 'id',
         indexes: { byEmail: { path: 'email', unique: true } },

@@ -1,3 +1,8 @@
+import { entityQueryFeature } from '../../src/entity/query-feature.js'
+import { entityUniqueFeature } from '../../src/entity/unique-feature.js'
+import { entityMigrationFeature } from '../../src/entity/migration-feature.js'
+import { entityIndexesFeature } from '../../src/entity/indexes-feature.js'
+import { entityKeysetFeature } from '../../src/entity/keyset.js'
 import { expect, it, vi } from 'vitest'
 import { asyncDisposeKey } from '@migaia/plugin-host'
 import { deferred } from '@migaia/utils/promise'
@@ -75,6 +80,13 @@ it('binds codec conversions and whole queries to the actual store and current tr
   })
   const store = host.backend('observed-memory')
   const repo = defineEntity<{ id: string; score: number }>({
+    features: [
+      entityQueryFeature(),
+      entityUniqueFeature(),
+      entityMigrationFeature(),
+      entityIndexesFeature(),
+      entityKeysetFeature()
+    ],
     name: 'observed-rows',
     key: 'id'
   }).connect(store, fixture.ports())
@@ -146,17 +158,31 @@ it('reports explicit observer failures without changing results and rejects cros
   const failure = new Error('observer rejection')
   const report = vi.fn(() => undefined)
   const query = { ...ports.queryStages, beforeQuery: () => Promise.reject(failure), report }
-  const repo = defineEntity<{ id: string }>({ name: 'observer-failures', key: 'id' }).connect(
-    host.backend('observed-memory'),
-    { queryStages: query }
-  )
+  const repo = defineEntity<{ id: string }>({
+    features: [
+      entityQueryFeature(),
+      entityUniqueFeature(),
+      entityMigrationFeature(),
+      entityIndexesFeature(),
+      entityKeysetFeature()
+    ],
+    name: 'observer-failures',
+    key: 'id'
+  }).connect(host.backend('observed-memory'), { queryStages: query })
   expect(await repo.query().all()).toEqual([])
   await Promise.resolve()
   expect(report).toHaveBeenCalledWith(failure)
   expect(() =>
-    defineEntity<{ id: string }>({ name: 'wrong-port', key: 'id' }).connect(
-      host.backend('observed-memory'),
-      { codecStages: ports.queryStages as never }
-    )
+    defineEntity<{ id: string }>({
+      features: [
+        entityQueryFeature(),
+        entityUniqueFeature(),
+        entityMigrationFeature(),
+        entityIndexesFeature(),
+        entityKeysetFeature()
+      ],
+      name: 'wrong-port',
+      key: 'id'
+    }).connect(host.backend('observed-memory'), { codecStages: ports.queryStages as never })
   ).toThrowError(expect.objectContaining({ code: 'INVALID_CONFIG' }))
 })

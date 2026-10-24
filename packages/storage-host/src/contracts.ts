@@ -182,6 +182,7 @@ export const defineFeature: IStorageDefineFeature = ((
 }) as unknown as IStorageDefineFeature
 /** Installation-local native additions come from the original facade, never public object fields. */
 type IStorageNativeCore = IPluginHostCore<IStoragePipelineInput> & {
+  readonly registerJournalRuntime: IStoragePluginCore['registerJournalRuntime']
   readonly journal: IStoragePluginCore['journal']
   setStorageRegistrationCore(core: object): void
   runStorageInstall<T>(operation: () => Promise<T>): Promise<T>
@@ -324,6 +325,7 @@ function createStorageRegistrationCore(
       return context.nativeCore.defaultOrgId
     },
     execution: context.nativeCore.execution,
+    registerJournalRuntime: context.nativeCore.registerJournalRuntime,
     journal: context.nativeCore.journal,
     get hooks() {
       return context.nativeCore.getStorageHooks()
@@ -460,12 +462,13 @@ async function finishStorageNativeInstall(
       StorageErrorCode.backendPluginInvalid,
       StorageErrorText.backendPluginInvalid
     )
-  if (context.kind !== undefined && context.journalBinding !== undefined)
-    context.registration.nativeCore.setStorageJournalBinding(
-      Reflect.apply(context.journalBinding, context.descriptor, [
-        context.registration.nativeCore.getStore()
-      ])
-    )
+  if (context.kind !== undefined && context.journalBinding !== undefined) {
+    /** A selected backend Feature may omit journal ownership on its basic storage path. */
+    const binding = Reflect.apply(context.journalBinding, context.descriptor, [
+      context.registration.nativeCore.getStore()
+    ])
+    if (binding !== undefined) context.registration.nativeCore.setStorageJournalBinding(binding)
+  }
   publishStorageNativeFeatures(context)
   if (extensions === null || typeof extensions !== 'object' || Array.isArray(extensions))
     return extensions

@@ -1,3 +1,4 @@
+import { createBackendChangeController } from '../src/core/change-controller.js'
 import { describe, expect, it, vi } from 'vitest'
 import {
   createStorageHost,
@@ -35,12 +36,15 @@ describe('controlled backend change authoring', () => {
           capabilityInstaller: (_store: ReturnType<typeof catalog>['store']) => state.installer,
           install: () => {
             state = catalog(core)
-            controller = core.createChangeController({
-              backend: 'catalog',
-              finalize: () => {
-                throw original
-              }
-            })
+            controller = core.createChangeController(
+              {
+                backend: 'catalog',
+                finalize: () => {
+                  throw original
+                }
+              },
+              createBackendChangeController
+            )
             core.registerStore(state.store)
             core.registerChangeController(state.store, controller)
             return {}
@@ -102,7 +106,10 @@ describe('controlled backend change authoring', () => {
           state = catalog(core)
           /** Preserve the real native cleanup while its resource boundary moves into the controller. */
           const dispose = state.store.dispose
-          controller = core.createChangeController({ backend: 'catalog', finalize: dispose })
+          controller = core.createChangeController(
+            { backend: 'catalog', finalize: dispose },
+            createBackendChangeController
+          )
           state.store.dispose = () => controller.dispose()
           core.registerStore(state.store)
           core.registerChangeController(state.store, controller)
@@ -119,9 +126,9 @@ describe('controlled backend change authoring', () => {
       plugins: [definePlugin('catalog', descriptor, { feature })]
     })
     expect(await host.backend('catalog').api.controller()).toBe(controller)
-    expect(() => retained.createChangeController({ backend: 'catalog' })).toThrowError(
-      expect.objectContaining({ code: 'RESOURCE_OUTSIDE_INSTALL' })
-    )
+    expect(() =>
+      retained.createChangeController({ backend: 'catalog' }, createBackendChangeController)
+    ).toThrowError(expect.objectContaining({ code: 'RESOURCE_OUTSIDE_INSTALL' }))
     expect(() => retained.registerChangeController(state.store, controller)).toThrowError(
       expect.objectContaining({ code: 'RESOURCE_OUTSIDE_INSTALL' })
     )
@@ -181,7 +188,7 @@ describe('controlled backend change authoring', () => {
         }
         options = input
         /** Both registration and rollback retain this exact original controller. */
-        const controller = core.createChangeController(input)
+        const controller = core.createChangeController(input, createBackendChangeController)
         /** The actual provider store is legal, while the copied object has no handoff authority. */
         state = catalog(core)
         core.registerStore(state.store)

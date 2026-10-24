@@ -1,7 +1,14 @@
+import { memoryTestFeatures } from '../helpers/memory-features.js'
 import { createRuntime } from '@migaia/reactive'
 import { asyncDisposeKey } from '@migaia/plugin-host'
 import { records } from '@migaia/storage-contract'
-import { createStorageHost, memoryBackendKind, memoryBackendPlugin } from '@migaia/storage-host'
+import {
+  createStorageHost,
+  memoryBackendKind,
+  memoryBackendPlugin,
+  STORAGE_HOST_SOURCE,
+  StorageErrorCode
+} from '@migaia/storage-host'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { describe, expect, it, vi } from 'vitest'
 import { reactiveFeature } from '../../src/features/reactive.js'
@@ -24,8 +31,8 @@ describe('reactive Feature', () => {
       const feature = reactiveFeature(memoryBackendKind)
       const host = await createStorageHost({
         plugins: [
-          memoryBackendPlugin({ id: 'first' }, { reactive: feature }),
-          memoryBackendPlugin({ id: 'second' }, { reactive: feature })
+          memoryBackendPlugin({ id: 'first' }, { ...memoryTestFeatures, reactive: feature }),
+          memoryBackendPlugin({ id: 'second' }, { ...memoryTestFeatures, reactive: feature })
         ]
       })
       expect(services).toHaveLength(2)
@@ -54,9 +61,51 @@ describe('reactive Feature', () => {
     }
   })
 
+  it('rejects memory live without notifications before adapter or query admission', async () => {
+    /** Capture the actual service so absence is proven before its original adapter allocation. */
+    const services: reactiveModule.IStorageReactiveService[] = []
+    const create = reactiveModule.createStorageReactiveService
+    const factory = vi
+      .spyOn(reactiveModule, 'createStorageReactiveService')
+      .mockImplementation((scheduler) => {
+        const service = create(scheduler)
+        services.push(service)
+        return service
+      })
+    try {
+      const host = await createStorageHost({
+        plugins: [memoryBackendPlugin(undefined, { reactive: reactiveFeature(memoryBackendKind) })]
+      })
+      try {
+        const register = vi.spyOn(services[0]!, 'registerAdapter')
+        const createQuery = vi.spyOn(services[0]!, 'createQuery')
+        const store = host.backend('memory')
+        await store.putRecord({ value: 'base remains usable' }, 'record')
+        await expect(store.getRecord('record')).resolves.toEqual({ value: 'base remains usable' })
+        expect(() => store.use(records).query().live({ runtime: createRuntime() })).toThrow(
+          expect.objectContaining({
+            source: STORAGE_HOST_SOURCE,
+            code: StorageErrorCode.changeControllerNotAssembled
+          })
+        )
+        expect(register).not.toHaveBeenCalled()
+        expect(createQuery).not.toHaveBeenCalled()
+      } finally {
+        await host.dispose()
+      }
+    } finally {
+      factory.mockRestore()
+    }
+  })
+
   it('preserves equal settled identity across invalidation', async () => {
     const host = await createStorageHost({
-      plugins: [memoryBackendPlugin(undefined, { reactive: reactiveFeature(memoryBackendKind) })]
+      plugins: [
+        memoryBackendPlugin(undefined, {
+          ...memoryTestFeatures,
+          reactive: reactiveFeature(memoryBackendKind)
+        })
+      ]
     })
     const store = host.backend('memory')
     await store.putRecord({ value: 'initial' }, 'record')
@@ -81,7 +130,12 @@ describe('reactive Feature', () => {
 
   it('rejects invalid live options before any source subscription', async () => {
     const host = await createStorageHost({
-      plugins: [memoryBackendPlugin(undefined, { reactive: reactiveFeature(memoryBackendKind) })]
+      plugins: [
+        memoryBackendPlugin(undefined, {
+          ...memoryTestFeatures,
+          reactive: reactiveFeature(memoryBackendKind)
+        })
+      ]
     })
     expect(() =>
       host
@@ -97,7 +151,12 @@ describe('reactive Feature', () => {
     const scheduler = createManualScheduler()
     const host = await createStorageHost({
       scheduler,
-      plugins: [memoryBackendPlugin(undefined, { reactive: reactiveFeature(memoryBackendKind) })]
+      plugins: [
+        memoryBackendPlugin(undefined, {
+          ...memoryTestFeatures,
+          reactive: reactiveFeature(memoryBackendKind)
+        })
+      ]
     })
     const store = host.backend('memory')
     await store.putRecord({ value: 'initial' }, 'record')

@@ -116,3 +116,20 @@ describe('atomic consumer and artifact correction', () => {
     }
   })
 })
+
+/** Optional IDB behavior is selected through its own public runtime entry. */
+describe('explicit IndexedDB Feature subpaths', () => {
+  it.each([
+    ['ttl', 'indexedDbTtlFeature'],
+    ['batch', 'indexedDbBatchFeature'],
+    ['journal', 'indexedDbJournalFeature'],
+    ['notifications', 'indexedDbNotificationsFeature'],
+    ['change-feed', 'indexedDbChangeFeedFeature'],
+    ['indexes', 'indexedDbIndexesFeature']
+  ])('publishes only the %s assembly factory', async (path, factory) => {
+    const entry = await import(`../dist/features/indexed-db-${path}.js`)
+    expect(Object.keys(entry)).toEqual([factory])
+    expect(entry[factory]).toBeTypeOf('function')
+    expect(Object.hasOwn(storageWeb, factory)).toBe(false)
+  })
+})

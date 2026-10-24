@@ -1,3 +1,4 @@
+import { storageJournalPlugin } from '../src/journal.js'
 import { describe, expect, it } from 'vitest'
 import { Logger } from '@migaia/logger'
 import { binlog, undoLog, type ILogStore } from '@migaia/logger/plugins/durable'
@@ -26,7 +27,7 @@ const createLogger = (records: ILogStore, images: ILogStore) =>
 async function fixture() {
   const loggers = new Map<string, ReturnType<typeof createLogger>>()
   const host = await createStorageHost({
-    plugins: [memoryBackendPlugin()],
+    plugins: [storageJournalPlugin(), memoryBackendPlugin()],
     journal: async ({ orgId, storageLogStore }) => {
       const records = await storageLogStore('memory', { prefix: 'undo-binlog' })
       const images = await storageLogStore('memory', { prefix: 'undo-images' })

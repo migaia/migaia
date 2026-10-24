@@ -5,7 +5,7 @@ import { storageHostCases } from './storage-host-cases.js'
 const t = (en: string, zh: string): IText => ({ en, zh })
 /** Examples accept authentic ports from their original author callback, not forged native stores. */
 const coreExample = (statement: string): string =>
-  `import type { IStoragePluginCore } from '@migaia/storage-host'\nfunction configure(core: IStoragePluginCore) {\n  ${statement}\n}\nconsole.log(typeof configure)`
+  `${statement.includes('createChangeController') ? "import { createBackendChangeController } from '@migaia/storage-host/authoring/change-controller'\n" : ''}import type { IStoragePluginCore } from '@migaia/storage-host'\nfunction configure(core: IStoragePluginCore) {\n  ${statement}\n}\nconsole.log(typeof configure)`
 /** Each method describes its actual parameters and original owner rather than a substitute API. */
 const method = (
   summary: IText,
@@ -62,6 +62,10 @@ const orgAuthorMembers: Readonly<Record<string, IMemberDoc>> = {
       '为本物理目标构造原已准入修改与通知拥有者。'
     ),
     {
+      factory: t(
+        'Explicit controller constructor imported from the optional change-controller entry.',
+        '从可选通知控制器入口导入的显式构造函数。'
+      ),
       options: t(
         'Captured backend kind, optional native snapshot/origin and original finalizer.',
         '捕获的后端种类、可选原生快照与来源及原清理回调。'
@@ -72,7 +76,7 @@ const orgAuthorMembers: Readonly<Record<string, IMemberDoc>> = {
       '返回原控制器，由本登记已有清理拥有者保留。'
     ),
     coreExample(
-      'const controller = core.createChangeController({ backend: "memory" })\n  console.log(controller.origin)'
+      'const controller = core.createChangeController({ backend: "memory" }, createBackendChangeController)\n  console.log(controller.origin)'
     )
   ),
   registerChangeController: method(
@@ -91,7 +95,7 @@ const orgAuthorMembers: Readonly<Record<string, IMemberDoc>> = {
       'No result; the existing registry row and release order are retained.',
       '无返回值，继续使用既有登记行与释放顺序。'
     ),
-    `import type { IStorageOrgAuthoringPort } from '@migaia/storage-host'\nimport type { IStorageBase } from '@migaia/storage-contract'\nfunction register(port: IStorageOrgAuthoringPort, store: IStorageBase) {\n  const controller = port.createChangeController({ backend: 'memory' })\n  port.registerChangeController(store, controller)\n}\nconsole.log(typeof register)`
+    "import { createBackendChangeController } from '@migaia/storage-host/authoring/change-controller'\nimport type { IStorageOrgAuthoringPort } from '@migaia/storage-host'\nimport type { IStorageBase } from '@migaia/storage-contract'\nfunction register(port: IStorageOrgAuthoringPort, store: IStorageBase) {\n  const controller = port.createChangeController(\n    { backend: 'memory' },\n    createBackendChangeController,\n  )\n  port.registerChangeController(store, controller)\n}\nconsole.log(typeof register)"
   ),
   registerValueCommit: method(
     t(
@@ -109,7 +113,7 @@ const orgAuthorMembers: Readonly<Record<string, IMemberDoc>> = {
       'No result; no fake transaction or close handle is introduced.',
       '无返回值，不引入伪事务或关闭句柄。'
     ),
-    `import type { IStorageOrgAuthoringPort } from '@migaia/storage-host'\nimport type { IBackendValueCommit } from '@migaia/storage-host/authoring/backend'\nimport type { IStorageBase } from '@migaia/storage-contract'\nfunction register(port: IStorageOrgAuthoringPort, store: IStorageBase, commit: IBackendValueCommit) {\n  port.registerValueCommit(store, commit)\n}\nconsole.log(typeof register)`
+    "import { createBackendChangeController } from '@migaia/storage-host/authoring/change-controller'\nimport type { IStorageOrgAuthoringPort } from '@migaia/storage-host'\nimport type { IBackendValueCommit } from '@migaia/storage-host/authoring/backend'\nimport type { IStorageBase } from '@migaia/storage-contract'\nfunction register(\n  port: IStorageOrgAuthoringPort,\n  store: IStorageBase,\n  commit: IBackendValueCommit,\n) {\n  port.registerValueCommit(store, commit)\n}\nconsole.log(typeof register)"
   )
 }
 /** An exact borrowed business view omits resource ownership and preserves original token lookup. */
@@ -238,6 +242,28 @@ export const storageHostPluginTypes: Readonly<Record<string, ITypeDoc>> = {
       '来自原安装窗口的有限作者核心，已发布业务视图始终不取得此登记或清理权限。'
     ),
     members: {
+      registerJournalRuntime: method(
+        t(
+          'Admit the runtime supplied by the selected journal plugin in the original installation scope.',
+          '在原安装作用域内接纳所选日志插件提供的运行时，应用使用 `storageJournalPlugin()` 选择该能力。'
+        ),
+        {
+          runtime: t(
+            'Opaque function table supplied by storageJournalPlugin; callers do not construct it.',
+            '由 `storageJournalPlugin` 提供的不透明函数表，调用方不自行构造。'
+          )
+        },
+        t(
+          'Registers the selected journal runtime until its original plugin registration is disposed.',
+          '登记所选日志运行时，生命周期跟随原插件登记。'
+        ),
+        `import type { IStoragePluginCore } from '@migaia/storage-host'
+function install(
+  core: IStoragePluginCore,
+  runtime: Parameters<IStoragePluginCore['registerJournalRuntime']>[0]
+) { core.registerJournalRuntime(runtime) }
+console.log(typeof install)`
+      ),
       ...orgAuthorMembers,
       journal: {
         summary: t(

@@ -16,6 +16,10 @@ export default defineConfig({
     lib: {
       entry: {
         index: 'src/index.ts',
+        'features/memory-notifications': 'src/features/memory-notifications.ts',
+        'features/memory-change-feed': 'src/features/memory-change-feed.ts',
+        'authoring/change-controller': 'src/authoring/change-controller.ts',
+        'authoring/change-iterator': 'src/authoring/change-iterator.ts',
         'authoring/capability': 'src/authoring/capability.ts',
         'authoring/store': 'src/authoring/store.ts',
         'authoring/blob': 'src/authoring/blob.ts',
@@ -31,6 +35,11 @@ export default defineConfig({
         'authoring/transaction': 'src/authoring/transaction.ts',
         'authoring/concurrency': 'src/authoring/concurrency.ts',
         entity: 'src/entity.ts',
+        'entity/query': 'src/entity/query.ts',
+        'entity/unique': 'src/entity/unique.ts',
+        'entity/migration': 'src/entity/migration.ts',
+        'entity/indexes': 'src/entity/indexes.ts',
+        'entity/keyset': 'src/entity/keyset.ts',
         journal: 'src/journal.ts',
         'authoring/backend': 'src/authoring/backend.ts',
         'authoring/codec': 'src/authoring/codec.ts',

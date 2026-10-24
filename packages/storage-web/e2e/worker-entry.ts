@@ -1,3 +1,5 @@
+import { memoryTestFeatures } from '../test/helpers/memory-features.js'
+import { indexedDbTestFeatures } from '../test/helpers/indexed-db-features.js'
 import { walkErrorCauses } from '@migaia/utils/error'
 import { STORAGE_WEB_SOURCE } from '../src/index.js'
 import { cookieBackendPlugin } from '../src/cookies.js'
@@ -33,11 +35,15 @@ const getFailureCode = async (
 }
 
 self.onmessage = async (): Promise<void> => {
-  const memoryHost = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+  const memoryHost = await createStorageHost({
+    plugins: [memoryBackendPlugin({}, memoryTestFeatures)]
+  })
   const memory = memoryHost.backend('memory')
   await memory.set('worker-memory', 'ok')
   const databaseHost = await createStorageHost({
-    plugins: [indexedDbBackendPlugin({ dbName: `worker-${crypto.randomUUID()}` })]
+    plugins: [
+      indexedDbBackendPlugin({ dbName: `worker-${crypto.randomUUID()}` }, indexedDbTestFeatures)
+    ]
   })
   const database = databaseHost.backend('indexed-db')
   await database.set('worker-indexeddb', 'ok')

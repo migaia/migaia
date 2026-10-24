@@ -1,3 +1,6 @@
+import { memoryTestFeatures } from './helpers/memory-features.js'
+import { entityTestFeatures } from './helpers/entity-features.js'
+import { indexedDbTestFeatures } from './helpers/indexed-db-features.js'
 import { createRuntime } from '@migaia/reactive'
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb'
 import { describe, expect, it } from 'vitest'
@@ -47,7 +50,7 @@ describe('deterministic shared harness', () => {
       plugins: [
         memoryBackendPlugin(
           { id: 'five-memory' },
-          { reactive: reactiveFeature(memoryBackendKind) }
+          { ...memoryTestFeatures, reactive: reactiveFeature(memoryBackendKind) }
         ),
         localStorageBackendPlugin(
           {
@@ -80,7 +83,7 @@ describe('deterministic shared harness', () => {
             factory: new IDBFactory(),
             keyRange: IDBKeyRange
           },
-          { reactive: reactiveFeature(indexedDbBackendKind) }
+          { ...indexedDbTestFeatures, reactive: reactiveFeature(indexedDbBackendKind) }
         )
       ] as const
     })
@@ -96,6 +99,7 @@ describe('deterministic shared harness', () => {
       for (const backendId of backendIds) {
         const store = host.backend(backendId)
         const repository = defineEntity<{ id: string; value: string }>({
+          features: entityTestFeatures,
           name: 'live-fixture',
           key: 'id'
         }).connect(store)

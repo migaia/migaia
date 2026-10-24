@@ -1,3 +1,4 @@
+import { createBackendChangeController } from '@migaia/storage-host/authoring/change-controller'
 import { createLifecycleScope, createAbortController } from '@migaia/lifecycle'
 import {
   blob,
@@ -103,10 +104,13 @@ class ObjectBackend {
     this.reads = createLifecycleScope()
     this.#locks = core.createKeyLockPort()
     this.identity = crypto.randomUUID()
-    this.controller = core.createChangeController({
-      backend: ObjectNames.backend,
-      finalize: () => this.#finalize()
-    })
+    this.controller = core.createChangeController(
+      {
+        backend: ObjectNames.backend,
+        finalize: () => this.#finalize()
+      },
+      createBackendChangeController
+    )
     this.#root = this.#forOrg(core.defaultOrgId)
   }
   /** Return the admitted default-org store without granting driver ownership. */

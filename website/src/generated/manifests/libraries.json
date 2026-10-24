@@ -45723,6 +45723,8 @@
         "./authoring/backend",
         "./authoring/blob",
         "./authoring/capability",
+        "./authoring/change-controller",
+        "./authoring/change-iterator",
         "./authoring/codec",
         "./authoring/concurrency",
         "./authoring/context",
@@ -45739,6 +45741,13 @@
         "./authoring/ttl",
         "./authoring/vector",
         "./entity",
+        "./entity/indexes",
+        "./entity/keyset",
+        "./entity/migration",
+        "./entity/query",
+        "./entity/unique",
+        "./features/memory-change-feed",
+        "./features/memory-notifications",
         "./journal",
         "./vector/mmr"
       ],
@@ -45975,6 +45984,41 @@
                 {
                   "type": "paragraph",
                   "text": "完整路径和依赖说明见 storage-contract。旧 contract 根入口不保留这些运行时导出。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "实体装配变更：`/entity` 提供基础读写。旧版自动包含的查询、索引、unique 检查、迁移和 keyset，现需在 `features` 中声明对应 `/entity/*` 单元；业务只导入需要的单元。缺少时抛出 `ENTITY_FEATURE_REQUIRED`。迁移方式见实体仓储。"
+                }
+              ]
+            },
+            {
+              "id": "显式装配可选能力",
+              "heading": "显式装配可选能力",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "基础宿主不导入 journal runtime、通知控制器或变更迭代器。此前 journal 选项会自动加载日志实现，memory 默认提供变更通知和 watch；现在这些能力由业务显式选择，避免基础存读包含未使用代码。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "使用 journal 选项或 `storageLogStore()` 前，在同一插件列表中把从 `@migaia/storage-host/journal` 导入的 `storageJournalPlugin()` 放到后端前。缺少插件时报 `JOURNAL_NOT_ASSEMBLED`。配置格式、日志内容和事务提交语义保持原契约。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "memory 通知和变更流分别由两个 Feature 装配："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { memoryNotificationsFeature } from '@migaia/storage-host/features/memory-notifications'\nimport { memoryChangeFeedFeature } from '@migaia/storage-host/features/memory-change-feed'\n\nconst host = await createStorageHost({\n  plugins: [\n    memoryBackendPlugin(undefined, {\n      notifications: memoryNotificationsFeature(),\n      changeFeed: memoryChangeFeedFeature()\n    })\n  ]\n})\nawait host.dispose()"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "未选择变更流时，memory 的 `capabilities.changeFeed` 为 `false`；调用 watch 报 `CHANGE_ITERATOR_NOT_ASSEMBLED`。只选通知可调用 `subscribeChanges()`；变更流依赖通知，缺少通知时报 `CHANGE_CONTROLLER_NOT_ASSEMBLED`。基础读写与物理资源关闭仍由轻量生命周期 owner 负责。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "后端作者从 `/authoring/change-controller` 导入通知工厂，并显式传给 `core.createChangeController(options, createBackendChangeController)`。基础物理资源可使用同入口的 `createBackendLifecycleController`。变更迭代器改从 `/authoring/change-iterator` 导入，不再从 `/authoring/backend` 转出。"
                 }
               ]
             }
@@ -46056,12 +46100,29 @@
               "blocks": [
                 {
                   "type": "paragraph",
+                  "text": "`/entity` 现在只包含定义、连接和基础读写。附加能力需从独立子路径显式装配；缺少装配时抛出 `source: @migaia/storage-host`、`code: ENTITY_FEATURE_REQUIRED`，消息写明所需导入。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { defineEntity } from '@migaia/storage-host/entity'\nconst users = defineEntity<{ id: string; name: string }>({ name: 'users', key: 'id' }).connect(\n  store\n)\nawait users.put({ id: 'u1', name: 'Ada' })\nconsole.log(await users.get('u1'))"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "只在 `features` 中选择用到的单元：`/entity/query` 的 `entityQueryFeature()` 开启 query/list/stream；`/entity/indexes` 的 `entityIndexesFeature()` 开启索引声明和规划；`/entity/unique` 的 `entityUniqueFeature()` 开启唯一提交检查；`/entity/migration` 的 `entityMigrationFeature()` 开启版本计划和持久迁移；`/entity/keyset` 的 `entityKeysetFeature()` 准入 page/after。索引、unique 与持久迁移会复用查询操作，使用这些路径时也需声明 query；单元不会自动开启其他单元。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "unique 单元能单独捕获约束投影，不会因此开启索引规划；仅做唯一写入检查时不需 indexes 单元。"
+                },
+                {
+                  "type": "paragraph",
                   "text": "`defineEntity<T>()({...})` 声明对象的主键与索引，`connect(store)` 连接实际后端。下面先写入，再用同一声明查询。"
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { defineEntity } from '@migaia/storage-host/entity'\n\ntype IOrder = { id: string; state: string; total: number }\nconst host = await createStorageHost({ plugins: [memoryBackendPlugin()] })\ntry {\n  const orders = defineEntity<IOrder>()({\n    name: 'orders',\n    key: 'id',\n    indexes: { byState: { path: 'state' } }\n  }).connect(host.backend('memory'))\n  await orders.put({ id: 'o1', state: 'paid', total: 20 })\n  console.log(await orders.get('o1'))\n  console.log(await orders.query().index('byState', 'paid').select('id', 'total').all())\n  // [{ id: 'o1', total: 20 }]\n} finally {\n  await host.dispose()\n}"
+                  "code": "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { defineEntity } from '@migaia/storage-host/entity'\nimport { entityQueryFeature } from '@migaia/storage-host/entity/query'\nimport { entityIndexesFeature } from '@migaia/storage-host/entity/indexes'\n\ntype IOrder = { id: string; state: string; total: number }\nconst host = await createStorageHost({ plugins: [memoryBackendPlugin()] })\ntry {\n  const orders = defineEntity<IOrder>()({\n    name: 'orders',\n    key: 'id',\n    features: [entityQueryFeature(), entityIndexesFeature()],\n    indexes: { byState: { path: 'state' } }\n  }).connect(host.backend('memory'))\n  await orders.put({ id: 'o1', state: 'paid', total: 20 })\n  console.log(await orders.get('o1'))\n  console.log(await orders.query().index('byState', 'paid').select('id', 'total').all())\n  // [{ id: 'o1', total: 20 }]\n} finally {\n  await host.dispose()\n}"
                 },
                 {
                   "type": "paragraph",
@@ -46107,7 +46168,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { storageLogStore } from '@migaia/storage-host/journal'\nimport { LogRecordState } from '@migaia/logger/plugins/durable'\n\nconst host = await createStorageHost({ plugins: [memoryBackendPlugin()] })\ntry {\n  const log = await storageLogStore(host, 'memory', { prefix: 'history' })\n  try {\n    await log.append([{ kind: 'order.created', payload: { id: 'o1' } }])\n    await log.setState(1, LogRecordState.done)\n    console.log(await log.lastSeq()) // 1\n    console.log(await log.states(LogRecordState.pending)) // []\n  } finally {\n    await log.dispose()\n  }\n} finally {\n  await host.dispose()\n}"
+                  "code": "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { storageLogStore, storageJournalPlugin } from '@migaia/storage-host/journal'\nimport { LogRecordState } from '@migaia/logger/plugins/durable'\n\nconst host = await createStorageHost({ plugins: [storageJournalPlugin(), memoryBackendPlugin()] })\ntry {\n  const log = await storageLogStore(host, 'memory', { prefix: 'history' })\n  try {\n    await log.append([{ kind: 'order.created', payload: { id: 'o1' } }])\n    await log.setState(1, LogRecordState.done)\n    console.log(await log.lastSeq()) // 1\n    console.log(await log.states(LogRecordState.pending)) // []\n  } finally {\n    await log.dispose()\n  }\n} finally {\n  await host.dispose()\n}"
                 },
                 {
                   "type": "paragraph",
@@ -46115,7 +46176,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "打开日志不等于开启自动业务日志。自动记录需要 `createStorageHost({ journal: ... })`；配置可以直接提供 `{ logger, namespace, ... }`，或用异步初始化函数为每个组织准备配置。初始化函数接收 `orgId` 和异步 `storageLogStore(id, { prefix })`。宿主借用 logger，不负责 shutdown。"
+                  "text": "打开日志不等于开启自动业务日志。自动记录需要 `createStorageHost({ plugins: [storageJournalPlugin(), backend], journal: ... })`；配置可以直接提供 `{ logger, namespace, ... }`，或用异步初始化函数为每个组织准备配置。初始化函数接收 `orgId` 和异步 `storageLogStore(id, { prefix })`。宿主借用 logger，不负责 shutdown。"
                 },
                 {
                   "type": "paragraph",
@@ -46159,6 +46220,37 @@
                 {
                   "type": "paragraph",
                   "text": "后端实现者的运行时导入变更见 README 迁移表 与 contract 入口表。"
+                }
+              ]
+            },
+            {
+              "id": "显式装配可选能力",
+              "heading": "显式装配可选能力",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "基础宿主不导入 journal runtime、通知控制器或变更迭代器。此前 journal 选项会自动加载日志实现，memory 默认提供变更通知和 watch；现在这些能力由业务显式选择，避免基础存读包含未使用代码。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "使用 journal 选项或 `storageLogStore()` 前，在同一插件列表中把从 `@migaia/storage-host/journal` 导入的 `storageJournalPlugin()` 放到后端前。缺少插件时报 `JOURNAL_NOT_ASSEMBLED`。配置格式、日志内容和事务提交语义保持原契约。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "memory 通知和变更流分别由两个 Feature 装配："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { memoryNotificationsFeature } from '@migaia/storage-host/features/memory-notifications'\nimport { memoryChangeFeedFeature } from '@migaia/storage-host/features/memory-change-feed'\n\nconst host = await createStorageHost({\n  plugins: [\n    memoryBackendPlugin(undefined, {\n      notifications: memoryNotificationsFeature(),\n      changeFeed: memoryChangeFeedFeature()\n    })\n  ]\n})\nawait host.dispose()"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "未选择变更流时，memory 的 `capabilities.changeFeed` 为 `false`；调用 watch 报 `CHANGE_ITERATOR_NOT_ASSEMBLED`。只选通知可调用 `subscribeChanges()`；变更流依赖通知，缺少通知时报 `CHANGE_CONTROLLER_NOT_ASSEMBLED`。基础读写与物理资源关闭仍由轻量生命周期 owner 负责。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "后端作者从 `/authoring/change-controller` 导入通知工厂，并显式传给 `core.createChangeController(options, createBackendChangeController)`。基础物理资源可使用同入口的 `createBackendLifecycleController`。变更迭代器改从 `/authoring/change-iterator` 导入，不再从 `/authoring/backend` 转出。"
                 }
               ]
             }
@@ -46432,6 +46524,41 @@
                   {
                     "type": "paragraph",
                     "text": "See storage-contract for full paths and dependencies. The old contract root no longer exports these runtime tools."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Entity assembly changes: `/entity` provides basic reads/writes. Previously automatic query, indexes, unique checks, migration and keyset now require their own `/entity/*` units in `features`. Import only the units used by the application; missing units throw `ENTITY_FEATURE_REQUIRED`. See entity setup."
+                  }
+                ]
+              },
+              {
+                "id": "assemble-optional-capabilities-explicitly",
+                "heading": "Assemble optional capabilities explicitly",
+                "blocks": [
+                  {
+                    "type": "paragraph",
+                    "text": "The base host does not import journal runtime, notification controllers or change iterators. Previously journal options loaded logging automatically and memory enabled notifications and watch by default. Applications now select these capabilities so basic reads and writes do not include unused code."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Before using journal options or `storageLogStore()`, import `storageJournalPlugin()` from `@migaia/storage-host/journal` and place it before the backend in the same plugin list. Missing assembly raises `JOURNAL_NOT_ASSEMBLED`. Journal configuration, stored records and transaction semantics retain their existing contract."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Memory notifications and feeds use separate Feature roots:"
+                  },
+                  {
+                    "type": "code",
+                    "language": "ts",
+                    "code": "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { memoryNotificationsFeature } from '@migaia/storage-host/features/memory-notifications'\nimport { memoryChangeFeedFeature } from '@migaia/storage-host/features/memory-change-feed'\n\nconst host = await createStorageHost({\n  plugins: [\n    memoryBackendPlugin(undefined, {\n      notifications: memoryNotificationsFeature(),\n      changeFeed: memoryChangeFeedFeature()\n    })\n  ]\n})\nawait host.dispose()"
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Without the feed Feature, memory reports `capabilities.changeFeed: false` and watch raises `CHANGE_ITERATOR_NOT_ASSEMBLED`. Notifications alone enable `subscribeChanges()`. The feed requires notifications; omitting them raises `CHANGE_CONTROLLER_NOT_ASSEMBLED`. A lightweight lifecycle owner still closes physical resources and drains accepted writes."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Backend authors import the controller factory from `/authoring/change-controller` and pass it explicitly to `core.createChangeController(options, createBackendChangeController)`. Basic physical resources can use `createBackendLifecycleController` from that entry. Import change iterators from `/authoring/change-iterator`; `/authoring/backend` no longer re-exports them."
                   }
                 ]
               }
@@ -46519,12 +46646,29 @@
                 "blocks": [
                   {
                     "type": "paragraph",
+                    "text": "`/entity` provides definition, connection and basic reads/writes. Optional operations require explicit subpath units. Missing units throw `ENTITY_FEATURE_REQUIRED` with `source: @migaia/storage-host` and name the required import."
+                  },
+                  {
+                    "type": "code",
+                    "language": "ts",
+                    "code": "import { defineEntity } from '@migaia/storage-host/entity'\nconst users = defineEntity<{ id: string; name: string }>({ name: 'users', key: 'id' }).connect(\n  store\n)\nawait users.put({ id: 'u1', name: 'Ada' })\nconsole.log(await users.get('u1'))"
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Select only required units in `features`: `entityQueryFeature()` from `/entity/query` adds query/list/stream; `entityIndexesFeature()` from `/entity/indexes` adds index declaration/planning; `entityUniqueFeature()` from `/entity/unique` adds unique commit checks; `entityMigrationFeature()` from `/entity/migration` adds version plans and persisted migration; `entityKeysetFeature()` from `/entity/keyset` admits page/after. Index, unique and persisted migration paths reuse query operations, so also declare query for those paths. Units never enable another unit implicitly."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "The unique unit captures its own constraint projections without enabling index planning. Unique write checks alone do not require the indexes unit."
+                  },
+                  {
+                    "type": "paragraph",
                     "text": "`defineEntity<T>()({...})` declares an object's primary key and indexes. `connect(store)` attaches it to a backend. This example writes first, then queries through the same definition."
                   },
                   {
                     "type": "code",
                     "language": "ts",
-                    "code": "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { defineEntity } from '@migaia/storage-host/entity'\n\ntype IOrder = { id: string; state: string; total: number }\nconst host = await createStorageHost({ plugins: [memoryBackendPlugin()] })\ntry {\n  const orders = defineEntity<IOrder>()({\n    name: 'orders',\n    key: 'id',\n    indexes: { byState: { path: 'state' } }\n  }).connect(host.backend('memory'))\n  await orders.put({ id: 'o1', state: 'paid', total: 20 })\n  console.log(await orders.get('o1'))\n  console.log(await orders.query().index('byState', 'paid').select('id', 'total').all())\n  // [{ id: 'o1', total: 20 }]\n} finally {\n  await host.dispose()\n}"
+                    "code": "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { defineEntity } from '@migaia/storage-host/entity'\nimport { entityQueryFeature } from '@migaia/storage-host/entity/query'\nimport { entityIndexesFeature } from '@migaia/storage-host/entity/indexes'\n\ntype IOrder = { id: string; state: string; total: number }\nconst host = await createStorageHost({ plugins: [memoryBackendPlugin()] })\ntry {\n  const orders = defineEntity<IOrder>()({\n    name: 'orders',\n    key: 'id',\n    features: [entityQueryFeature(), entityIndexesFeature()],\n    indexes: { byState: { path: 'state' } }\n  }).connect(host.backend('memory'))\n  await orders.put({ id: 'o1', state: 'paid', total: 20 })\n  console.log(await orders.get('o1'))\n  console.log(await orders.query().index('byState', 'paid').select('id', 'total').all())\n  // [{ id: 'o1', total: 20 }]\n} finally {\n  await host.dispose()\n}"
                   },
                   {
                     "type": "paragraph",
@@ -46570,7 +46714,7 @@
                   {
                     "type": "code",
                     "language": "ts",
-                    "code": "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { storageLogStore } from '@migaia/storage-host/journal'\nimport { LogRecordState } from '@migaia/logger/plugins/durable'\n\nconst host = await createStorageHost({ plugins: [memoryBackendPlugin()] })\ntry {\n  const log = await storageLogStore(host, 'memory', { prefix: 'history' })\n  try {\n    await log.append([{ kind: 'order.created', payload: { id: 'o1' } }])\n    await log.setState(1, LogRecordState.done)\n    console.log(await log.lastSeq()) // 1\n    console.log(await log.states(LogRecordState.pending)) // []\n  } finally {\n    await log.dispose()\n  }\n} finally {\n  await host.dispose()\n}"
+                    "code": "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { storageLogStore, storageJournalPlugin } from '@migaia/storage-host/journal'\nimport { LogRecordState } from '@migaia/logger/plugins/durable'\n\nconst host = await createStorageHost({ plugins: [storageJournalPlugin(), memoryBackendPlugin()] })\ntry {\n  const log = await storageLogStore(host, 'memory', { prefix: 'history' })\n  try {\n    await log.append([{ kind: 'order.created', payload: { id: 'o1' } }])\n    await log.setState(1, LogRecordState.done)\n    console.log(await log.lastSeq()) // 1\n    console.log(await log.states(LogRecordState.pending)) // []\n  } finally {\n    await log.dispose()\n  }\n} finally {\n  await host.dispose()\n}"
                   },
                   {
                     "type": "paragraph",
@@ -46578,7 +46722,7 @@
                   },
                   {
                     "type": "paragraph",
-                    "text": "Opening a log does not enable automatic business logging. Configure `createStorageHost({ journal: ... })` for that. Supply `{ logger, namespace, ... }` directly, or use an asynchronous initializer for each organization. The initializer receives `orgId` and asynchronous `storageLogStore(id, { prefix })`. The host borrows the logger and does not shut it down."
+                    "text": "Opening a log does not enable automatic business logging. Configure `createStorageHost({ plugins: [storageJournalPlugin(), backend], journal: ... })` for that. Supply `{ logger, namespace, ... }` directly, or use an asynchronous initializer for each organization. The initializer receives `orgId` and asynchronous `storageLogStore(id, { prefix })`. The host borrows the logger and does not shut it down."
                   },
                   {
                     "type": "paragraph",
@@ -46631,6 +46775,37 @@
                   {
                     "type": "paragraph",
                     "text": "For backend implementations, see the README migration table and contract entry table."
+                  }
+                ]
+              },
+              {
+                "id": "assemble-optional-capabilities-explicitly",
+                "heading": "Assemble optional capabilities explicitly",
+                "blocks": [
+                  {
+                    "type": "paragraph",
+                    "text": "The base host does not import journal runtime, notification controllers or change iterators. Previously journal options loaded logging automatically and memory enabled notifications and watch by default. Applications now select these capabilities so basic reads and writes do not include unused code."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Before using journal options or `storageLogStore()`, import `storageJournalPlugin()` from `@migaia/storage-host/journal` and place it before the backend in the same plugin list. Missing assembly raises `JOURNAL_NOT_ASSEMBLED`. Journal configuration, stored records and transaction semantics retain their existing contract."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Memory notifications and feeds use separate Feature roots:"
+                  },
+                  {
+                    "type": "code",
+                    "language": "ts",
+                    "code": "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { memoryNotificationsFeature } from '@migaia/storage-host/features/memory-notifications'\nimport { memoryChangeFeedFeature } from '@migaia/storage-host/features/memory-change-feed'\n\nconst host = await createStorageHost({\n  plugins: [\n    memoryBackendPlugin(undefined, {\n      notifications: memoryNotificationsFeature(),\n      changeFeed: memoryChangeFeedFeature()\n    })\n  ]\n})\nawait host.dispose()"
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Without the feed Feature, memory reports `capabilities.changeFeed: false` and watch raises `CHANGE_ITERATOR_NOT_ASSEMBLED`. Notifications alone enable `subscribeChanges()`. The feed requires notifications; omitting them raises `CHANGE_CONTROLLER_NOT_ASSEMBLED`. A lightweight lifecycle owner still closes physical resources and drains accepted writes."
+                  },
+                  {
+                    "type": "paragraph",
+                    "text": "Backend authors import the controller factory from `/authoring/change-controller` and pass it explicitly to `core.createChangeController(options, createBackendChangeController)`. Basic physical resources can use `createBackendLifecycleController` from that entry. Import change iterators from `/authoring/change-iterator`; `/authoring/backend` no longer re-exports them."
                   }
                 ]
               }

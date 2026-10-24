@@ -61,6 +61,34 @@
     "./features/blobs": {
       "types": "./dist/features/blobs.d.ts",
       "default": "./dist/features/blobs.js"
+    },
+    "./features/indexed-db-ttl": {
+      "types": "./dist/features/indexed-db-ttl.d.ts",
+      "default": "./dist/features/indexed-db-ttl.js"
+    },
+    "./features/indexed-db-batch": {
+      "types": "./dist/features/indexed-db-batch.d.ts",
+      "default": "./dist/features/indexed-db-batch.js"
+    },
+    "./features/indexed-db-journal": {
+      "types": "./dist/features/indexed-db-journal.d.ts",
+      "default": "./dist/features/indexed-db-journal.js"
+    },
+    "./features/indexed-db-notifications": {
+      "types": "./dist/features/indexed-db-notifications.d.ts",
+      "default": "./dist/features/indexed-db-notifications.js"
+    },
+    "./features/indexed-db-change-feed": {
+      "types": "./dist/features/indexed-db-change-feed.d.ts",
+      "default": "./dist/features/indexed-db-change-feed.js"
+    },
+    "./features/indexed-db-indexes": {
+      "types": "./dist/features/indexed-db-indexes.d.ts",
+      "default": "./dist/features/indexed-db-indexes.js"
+    },
+    "./features/indexed-db-keyset": {
+      "types": "./dist/features/indexed-db-keyset.d.ts",
+      "default": "./dist/features/indexed-db-keyset.js"
     }
   },
   "publishConfig": {

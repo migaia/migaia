@@ -1,3 +1,8 @@
+import { entityQueryFeature } from '../../src/entity/query-feature.js'
+import { entityUniqueFeature } from '../../src/entity/unique-feature.js'
+import { entityMigrationFeature } from '../../src/entity/migration-feature.js'
+import { entityIndexesFeature } from '../../src/entity/indexes-feature.js'
+import { entityKeysetFeature } from '../../src/entity/keyset.js'
 import { describe, expect, it } from 'vitest'
 import { defineEntity } from '../../src/entity.js'
 import { memoryBackend } from '../helpers/memory.js'
@@ -18,6 +23,13 @@ describe('defineEntity runtime contract', () => {
   it('retains parsed indexes and rejects ambiguous declarations', () => {
     expect(() =>
       defineEntity<{ id: string; profile: { email: string } }>()({
+        features: [
+          entityQueryFeature(),
+          entityUniqueFeature(),
+          entityMigrationFeature(),
+          entityIndexesFeature(),
+          entityKeysetFeature()
+        ],
         name: 'indexed-users',
         key: 'id',
         indexes: {
@@ -31,6 +43,13 @@ describe('defineEntity runtime contract', () => {
     ).not.toThrow()
     expect(() =>
       defineEntity<{ id: string }>()({
+        features: [
+          entityQueryFeature(),
+          entityUniqueFeature(),
+          entityMigrationFeature(),
+          entityIndexesFeature(),
+          entityKeysetFeature()
+        ],
         name: 'ambiguous-index',
         key: 'id',
         indexes: {
@@ -43,6 +62,13 @@ describe('defineEntity runtime contract', () => {
     ).toThrowError(expect.objectContaining({ code: StorageErrorCode.invalidConfig }))
     expect(() =>
       defineEntity<{ id: string }>()({
+        features: [
+          entityQueryFeature(),
+          entityUniqueFeature(),
+          entityMigrationFeature(),
+          entityIndexesFeature(),
+          entityKeysetFeature()
+        ],
         name: 'unversioned-selector',
         key: 'id',
         indexes: {
@@ -57,9 +83,19 @@ describe('defineEntity runtime contract', () => {
     ['', 'entity name must be non-empty'],
     ['__internal', 'entity name uses reserved prefix']
   ])('rejects reserved or empty name: %s', (name) => {
-    expect(() => defineEntity<{ id: string }>({ name, key: 'id' })).toThrow(
-      StorageErrorCode.invalidConfig
-    )
+    expect(() =>
+      defineEntity<{ id: string }>({
+        features: [
+          entityQueryFeature(),
+          entityUniqueFeature(),
+          entityMigrationFeature(),
+          entityIndexesFeature(),
+          entityKeysetFeature()
+        ],
+        name,
+        key: 'id'
+      })
+    ).toThrow(StorageErrorCode.invalidConfig)
   })
 
   it('rejects invalid version and incomplete migration graph', () => {
@@ -67,10 +103,28 @@ describe('defineEntity runtime contract', () => {
       StorageErrorCode.invalidConfig
     )
     expect(() =>
-      defineEntity<{ id: string }>({ name: 'invalid-version', key: 'id', version: 0 })
+      defineEntity<{ id: string }>({
+        features: [
+          entityQueryFeature(),
+          entityUniqueFeature(),
+          entityMigrationFeature(),
+          entityIndexesFeature(),
+          entityKeysetFeature()
+        ],
+        name: 'invalid-version',
+        key: 'id',
+        version: 0
+      })
     ).toThrowError(expect.objectContaining({ code: StorageErrorCode.invalidConfig }))
     expect(() =>
       defineEntity<{ id: string }>({
+        features: [
+          entityQueryFeature(),
+          entityUniqueFeature(),
+          entityMigrationFeature(),
+          entityIndexesFeature(),
+          entityKeysetFeature()
+        ],
         name: 'missing-migration',
         key: 'id',
         version: 3,
@@ -79,6 +133,13 @@ describe('defineEntity runtime contract', () => {
     ).toThrowError(expect.objectContaining({ code: StorageErrorCode.invalidConfig }))
     expect(() =>
       defineEntity<{ id: string }>({
+        features: [
+          entityQueryFeature(),
+          entityUniqueFeature(),
+          entityMigrationFeature(),
+          entityIndexesFeature(),
+          entityKeysetFeature()
+        ],
         name: 'unsafe-version',
         key: 'id',
         version: Number.MAX_SAFE_INTEGER + 1
@@ -86,6 +147,13 @@ describe('defineEntity runtime contract', () => {
     ).toThrowError(expect.objectContaining({ code: StorageErrorCode.invalidConfig }))
     expect(() =>
       defineEntity<{ id: string }>({
+        features: [
+          entityQueryFeature(),
+          entityUniqueFeature(),
+          entityMigrationFeature(),
+          entityIndexesFeature(),
+          entityKeysetFeature()
+        ],
         name: 'unsafe-migration-version',
         key: 'id',
         version: Number.MAX_SAFE_INTEGER,
@@ -94,6 +162,13 @@ describe('defineEntity runtime contract', () => {
     ).toThrowError(expect.objectContaining({ code: StorageErrorCode.invalidConfig }))
     expect(() =>
       defineEntity<{ id: string }>({
+        features: [
+          entityQueryFeature(),
+          entityUniqueFeature(),
+          entityMigrationFeature(),
+          entityIndexesFeature(),
+          entityKeysetFeature()
+        ],
         name: 'sparse-huge-version',
         key: 'id',
         version: Number.MAX_SAFE_INTEGER,
@@ -110,7 +185,17 @@ describe('defineEntity runtime contract', () => {
   })
 
   it('normalizes invalid connected stores to INVALID_ARGUMENT', async () => {
-    const entity = defineEntity<{ id: string }>({ name: 'store-guard', key: 'id' })
+    const entity = defineEntity<{ id: string }>({
+      features: [
+        entityQueryFeature(),
+        entityUniqueFeature(),
+        entityMigrationFeature(),
+        entityIndexesFeature(),
+        entityKeysetFeature()
+      ],
+      name: 'store-guard',
+      key: 'id'
+    })
     for (const store of [null, undefined, [], {}, { backend: 'memory' }])
       expect(() => entity.connect(store as never)).toThrowError(
         expect.objectContaining({ code: StorageErrorCode.invalidConfig })
@@ -164,6 +249,13 @@ describe('defineEntity runtime contract', () => {
       )
     expect(() =>
       defineEntity<{ id: string }>({
+        features: [
+          entityQueryFeature(),
+          entityUniqueFeature(),
+          entityMigrationFeature(),
+          entityIndexesFeature(),
+          entityKeysetFeature()
+        ],
         name: 'valid-codec',
         key: 'id',
         codec: {
@@ -194,6 +286,13 @@ describe('defineEntity runtime contract', () => {
       }
     }
     const definition = defineEntity<{ id: string }>({
+      features: [
+        entityQueryFeature(),
+        entityUniqueFeature(),
+        entityMigrationFeature(),
+        entityIndexesFeature(),
+        entityKeysetFeature()
+      ],
       name: 'valid-schema',
       key: 'id',
       schema: new ValidSchema()
@@ -212,9 +311,19 @@ describe('defineEntity runtime contract', () => {
   })
 
   it('rejects malformed key, diagnostic, ordering, and schema contracts', () => {
-    expect(() => defineEntity({ name: 'invalid-key', key: '' })).toThrow(
-      StorageErrorCode.invalidConfig
-    )
+    expect(() =>
+      defineEntity({
+        features: [
+          entityQueryFeature(),
+          entityUniqueFeature(),
+          entityMigrationFeature(),
+          entityIndexesFeature(),
+          entityKeysetFeature()
+        ],
+        name: 'invalid-key',
+        key: ''
+      })
+    ).toThrow(StorageErrorCode.invalidConfig)
     expect(() =>
       defineEntity({ name: 'invalid-diagnostic', key: 'id', onDiagnostic: 'warn' } as never)
     ).toThrowError(expect.objectContaining({ code: StorageErrorCode.invalidConfig }))
@@ -234,7 +343,13 @@ describe('defineEntity runtime contract', () => {
   it('rejects malformed migration containers at definition time', () => {
     for (const migrations of [null, [], 'migrations', 42])
       expect(() =>
-        defineEntity({ name: 'migration-guard', key: 'id', version: 1, migrations } as never)
+        defineEntity({
+          features: [entityMigrationFeature()],
+          name: 'migration-guard',
+          key: 'id',
+          version: 1,
+          migrations
+        } as never)
       ).toThrowError(expect.objectContaining({ code: StorageErrorCode.invalidConfig }))
   })
 
@@ -244,7 +359,19 @@ describe('defineEntity runtime contract', () => {
       (value: unknown) => Promise<unknown>
     >
     expect(() =>
-      defineEntity({ name: 'prototype-migration', key: 'id', version: 2, migrations })
+      defineEntity({
+        features: [
+          entityQueryFeature(),
+          entityUniqueFeature(),
+          entityMigrationFeature(),
+          entityIndexesFeature(),
+          entityKeysetFeature()
+        ],
+        name: 'prototype-migration',
+        key: 'id',
+        version: 2,
+        migrations
+      })
     ).not.toThrow()
   })
 })

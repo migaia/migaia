@@ -1,3 +1,6 @@
+import { entityTestFeatures } from './entity-features.js'
+import { storageJournalPlugin } from '@migaia/storage-host/journal'
+import { indexedDbTestFeatures } from './indexed-db-features.js'
 import { createStorageHost, createOrgId, definePlugin } from '@migaia/storage-host'
 import { defineEntity } from '@migaia/storage-host/entity'
 import { indexedDbBackendPlugin } from '../../src/indexed-db.js'
@@ -38,7 +41,13 @@ window.runStorageProgramAutomaticIndex = async () => {
   const readCounts: number[] = []
   /** A fresh physical database keeps the twelve fixture rows independent of other cases. */
   const host = await createStorageHost({
-    plugins: [indexedDbBackendPlugin({ dbName: 'program-index-' + crypto.randomUUID() })],
+    plugins: [
+      storageJournalPlugin(),
+      indexedDbBackendPlugin(
+        { dbName: 'program-index-' + crypto.randomUUID() },
+        indexedDbTestFeatures
+      )
+    ],
     hooks: {
       afterQuery: ({ stats }) => readCounts.push(stats.readCount)
     }
@@ -48,6 +57,7 @@ window.runStorageProgramAutomaticIndex = async () => {
     const store = host.backend('indexed-db')
     /** The declared path is the only index available to the automatic source selector. */
     const repo = defineEntity<{ id: string; group: string }>()({
+      features: entityTestFeatures,
       name: 'program-automatic-index',
       key: 'id',
       indexes: { byGroup: { path: 'group' } }
@@ -96,7 +106,11 @@ window.runStorageProgramApplication = async () => {
   }))
   const host = await createStorageHost({
     org: createOrgId(),
-    plugins: [indexedDbBackendPlugin({ dbName: 'program-' + crypto.randomUUID() }), observed],
+    plugins: [
+      storageJournalPlugin(),
+      indexedDbBackendPlugin({ dbName: 'program-' + crypto.randomUUID() }, indexedDbTestFeatures),
+      observed
+    ],
     hooks: {
       beforeStorageOperation: ({ operation }) => events.push('before:' + operation),
       afterStorageOperation: ({ operation }) => events.push('after:' + operation),
@@ -115,7 +129,13 @@ window.runStorageProgramApplication = async () => {
     await host.dispose()
     const plain = await createStorageHost({
       org: createOrgId(),
-      plugins: [indexedDbBackendPlugin({ dbName: 'program-org-' + crypto.randomUUID() })]
+      plugins: [
+        storageJournalPlugin(),
+        indexedDbBackendPlugin(
+          { dbName: 'program-org-' + crypto.randomUUID() },
+          indexedDbTestFeatures
+        )
+      ]
     })
     let organizations: Awaited<ReturnType<typeof runStorageProgramOrgs>>
     try {

@@ -16,8 +16,8 @@ const hostOptionsExample = (options: string): string =>
 const hostOptions: Readonly<Record<string, IMemberDoc>> = {
   journal: {
     summary: t(
-      'Borrow an immutable per-org logger configuration or once initializer. Commit capture selects an asynchronous stage; sync writes then reject before their native terminal.',
-      '借用不可变的逐组织日志配置或一次初始化器；提交捕获选择异步阶段，同步写入随后在原生终点之前拒绝。'
+      'Borrow an immutable per-org logger configuration or once initializer after installing storageJournalPlugin in the same batch before the backend. Commit capture uses an asynchronous stage; sync writes reject before their native terminal.',
+      '在同一批次中先于后端安装 `storageJournalPlugin`，再借用不可变的逐组织日志配置或一次初始化器；提交捕获使用异步阶段，同步写入在原生终点之前拒绝。'
     ),
     default: t(
       'Omitted: no global journal stage or logger is installed.',
@@ -931,6 +931,22 @@ export const storageHostRuntimeEnums: Readonly<Record<string, IEnumDoc>> = {
       '稳定宿主失败场景保留原生错误与原始原因，这些语义码不是生命周期状态。'
     ),
     values: {
+      journalNotAssembled: t(
+        'Install storageJournalPlugin before journal options or private log access; no automatic runtime is loaded.',
+        '配置日志或打开私有日志之前安装 `storageJournalPlugin`，基础宿主不再自动加载实现。'
+      ),
+      changeControllerNotAssembled: t(
+        'Select the backend notification Feature or supply the explicit controller factory before subscribing.',
+        '订阅之前选择后端通知特性，或在作者入口提供显式通知控制器工厂。'
+      ),
+      changeIteratorNotAssembled: t(
+        'Select memoryChangeFeedFeature and its notification producer before calling memory watch.',
+        '调用内存监听之前选择 `memoryChangeFeedFeature` 及其通知生产者。'
+      ),
+      entityFeatureRequired: t(
+        'Select the entity Feature named by the message before calling its optional operation.',
+        '调用可选实体操作之前，选择诊断中指出的实体特性。'
+      ),
       backendIdInvalid: t(
         'Repair the plugin’s bounded ASCII id before installing.',
         '安装前修正插件的有界后端编号。'

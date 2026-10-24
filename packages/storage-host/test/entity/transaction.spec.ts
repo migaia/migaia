@@ -1,3 +1,8 @@
+import { entityQueryFeature } from '../../src/entity/query-feature.js'
+import { entityUniqueFeature } from '../../src/entity/unique-feature.js'
+import { entityMigrationFeature } from '../../src/entity/migration-feature.js'
+import { entityIndexesFeature } from '../../src/entity/indexes-feature.js'
+import { entityKeysetFeature } from '../../src/entity/keyset.js'
 import { describe, expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import { subscribeToAbort, readAbortReason } from '../../src/authoring/backend.js'
@@ -10,6 +15,13 @@ import { memoryBackend } from '../helpers/memory.js'
 /** Real unique records share one namespace and one native transaction owner. */
 type IUser = { id: string; email: string; score: number }
 const users = defineEntity<IUser>()({
+  features: [
+    entityQueryFeature(),
+    entityUniqueFeature(),
+    entityMigrationFeature(),
+    entityIndexesFeature(),
+    entityKeysetFeature()
+  ],
   name: 'users',
   key: 'id',
   indexes: { email: { path: 'email', unique: true } },
@@ -30,6 +42,13 @@ describe('entity composition through original transaction views', () => {
       let expected: unknown
       let observed: unknown
       const repo = defineEntity<{ id: string }>({
+        features: [
+          entityQueryFeature(),
+          entityUniqueFeature(),
+          entityMigrationFeature(),
+          entityIndexesFeature(),
+          entityKeysetFeature()
+        ],
         name: 'cancel-preparation',
         key: 'id',
         schema: {
@@ -70,9 +89,17 @@ describe('entity composition through original transaction views', () => {
   it('composes repositories with all native channels and reads actual draft cursors', async () => {
     const store = await memoryBackend()
     const first = users.connect(store)
-    const second = defineEntity<{ id: string; name: string }>({ name: 'teams', key: 'id' }).connect(
-      store
-    )
+    const second = defineEntity<{ id: string; name: string }>({
+      features: [
+        entityQueryFeature(),
+        entityUniqueFeature(),
+        entityMigrationFeature(),
+        entityIndexesFeature(),
+        entityKeysetFeature()
+      ],
+      name: 'teams',
+      key: 'id'
+    }).connect(store)
     await store
       .tx()
       .lock(first.lockKey('a'))
@@ -117,6 +144,13 @@ describe('entity composition through original transaction views', () => {
     const entered = deferred<void>()
     const ready = deferred<void>()
     const repo = defineEntity<{ id: string }>({
+      features: [
+        entityQueryFeature(),
+        entityUniqueFeature(),
+        entityMigrationFeature(),
+        entityIndexesFeature(),
+        entityKeysetFeature()
+      ],
       name: 'delayed',
       key: 'id',
       schema: {

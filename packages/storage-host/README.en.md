@@ -127,3 +127,33 @@ Paths beginning `/authoring/...` below are prefixed with `@migaia/storage-host`.
 | SQL, SPARQL and channel tools                | `/authoring/sql`, `/authoring/sparql`, and the respective channel entry |
 
 See [storage-contract](../storage-contract/README.en.md#entries-and-dependency-direction) for full paths and dependencies. The old contract root no longer exports these runtime tools.
+
+Entity assembly changes: `/entity` provides basic reads/writes. Previously automatic query, indexes, unique checks, migration and keyset now require their own `/entity/*` units in `features`. Import only the units used by the application; missing units throw `ENTITY_FEATURE_REQUIRED`. See [entity setup](./USEGUIDE.en.md#use-an-entity-repository).
+
+## Assemble optional capabilities explicitly
+
+The base host does not import journal runtime, notification controllers or change iterators. Previously journal options loaded logging automatically and memory enabled notifications and watch by default. Applications now select these capabilities so basic reads and writes do not include unused code.
+
+Before using journal options or `storageLogStore()`, import `storageJournalPlugin()` from `@migaia/storage-host/journal` and place it before the backend in the same plugin list. Missing assembly raises `JOURNAL_NOT_ASSEMBLED`. Journal configuration, stored records and transaction semantics retain their existing contract.
+
+Memory notifications and feeds use separate Feature roots:
+
+```ts
+import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { memoryNotificationsFeature } from '@migaia/storage-host/features/memory-notifications'
+import { memoryChangeFeedFeature } from '@migaia/storage-host/features/memory-change-feed'
+
+const host = await createStorageHost({
+  plugins: [
+    memoryBackendPlugin(undefined, {
+      notifications: memoryNotificationsFeature(),
+      changeFeed: memoryChangeFeedFeature()
+    })
+  ]
+})
+await host.dispose()
+```
+
+Without the feed Feature, memory reports `capabilities.changeFeed: false` and watch raises `CHANGE_ITERATOR_NOT_ASSEMBLED`. Notifications alone enable `subscribeChanges()`. The feed requires notifications; omitting them raises `CHANGE_CONTROLLER_NOT_ASSEMBLED`. A lightweight lifecycle owner still closes physical resources and drains accepted writes.
+
+Backend authors import the controller factory from `/authoring/change-controller` and pass it explicitly to `core.createChangeController(options, createBackendChangeController)`. Basic physical resources can use `createBackendLifecycleController` from that entry. Import change iterators from `/authoring/change-iterator`; `/authoring/backend` no longer re-exports them.

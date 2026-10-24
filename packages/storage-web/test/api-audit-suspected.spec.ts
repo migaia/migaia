@@ -1,3 +1,4 @@
+import { entityTestFeatures } from './helpers/entity-features.js'
 import { describe, expect, it, vi } from 'vitest'
 import { IDBFactory, IDBKeyRange, IDBObjectStore } from 'fake-indexeddb'
 import { createRuntime } from '@migaia/reactive'
@@ -48,7 +49,11 @@ describe('storage-web confirmed audit suspicions', () => {
     /** Preserve the exact built-in receiver semantics for unaffected object-store writes. */
     const originalPut = IDBObjectStore.prototype.put
     try {
-      await defineEntity<{ id: string; value: string }>({ name: 'audit-double', key: 'id' })
+      await defineEntity<{ id: string; value: string }>({
+        features: entityTestFeatures,
+        name: 'audit-double',
+        key: 'id'
+      })
         .connect(store)
         .put({ id: 'row', value: 'saved' })
       IDBObjectStore.prototype.put = function (
@@ -73,6 +78,7 @@ describe('storage-web confirmed audit suspicions', () => {
       }
       /** An ordinary indexed read drives the real repository backfill path. */
       const repo = defineEntity<{ id: string; value: string }>()({
+        features: entityTestFeatures,
         name: 'audit-double',
         key: 'id',
         indexes: { byValue: { path: 'value' } },
@@ -143,6 +149,7 @@ describe('storage-web confirmed audit suspicions', () => {
     try {
       /** The normal repository is the only producer of index projection rows. */
       const repo = defineEntity<{ id: string; value: string }>()({
+        features: entityTestFeatures,
         name: 'audit-iterator',
         key: 'id',
         indexes: { byValue: { path: 'value' } },

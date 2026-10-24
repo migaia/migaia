@@ -1,5 +1,12 @@
 /** Stable entity boundary diagnostics remain shared across every root and transaction path. */
 export const EntityText = {
+  /** Explicit entity assembly is an ordered list of units, never an implicit truthy flag. */
+  featuresMustBeArray: 'entity features must be an array of distinct explicit assembly units',
+
+  /** Missing assembly names tell callers the exact explicit entity subpath to import. */
+  featureRequired: (name: string): string =>
+    `entity feature "${name}" requires explicit assembly from @migaia/storage-host/entity/${name}`,
+
   /** Pure index explanations distinguish declared candidates from physical readiness and fallback. */
   queryIndexNoCandidate:
     'No eligible leading declared-index condition; authoritative source remains',

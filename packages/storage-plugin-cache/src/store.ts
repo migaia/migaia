@@ -1,3 +1,4 @@
+import { createBackendChangeController } from '@migaia/storage-host/authoring/change-controller'
 import {
   kv,
   ttl,
@@ -192,21 +193,24 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
   cacheContext.projections = new Map<string, IProjection>()
   cacheContext.untrustedFeeds = new Set<number>()
   cacheContext.subscriptions = []
-  cacheContext.controller = cacheContext.core.createChangeController({
-    backend: CacheText.backend,
-    finalize: async () => {
-      cacheContext.timer?.cancel()
-      for (const projection of cacheContext.projections.values()) await projection.flush()
-      for (const close of cacheContext.subscriptions.reverse()) {
-        try {
-          await close()
-        } catch (error) {
-          report(cacheContext, error)
+  cacheContext.controller = cacheContext.core.createChangeController(
+    {
+      backend: CacheText.backend,
+      finalize: async () => {
+        cacheContext.timer?.cancel()
+        for (const projection of cacheContext.projections.values()) await projection.flush()
+        for (const close of cacheContext.subscriptions.reverse()) {
+          try {
+            await close()
+          } catch (error) {
+            report(cacheContext, error)
+          }
         }
+        cacheContext.projections.clear()
       }
-      cacheContext.projections.clear()
-    }
-  })
+    },
+    createBackendChangeController
+  )
   cacheContext.root = bind(cacheContext, cacheContext.core.defaultOrgId)
 
   /** Durable consumers start in the original detect window after their earlier backends are ready. */

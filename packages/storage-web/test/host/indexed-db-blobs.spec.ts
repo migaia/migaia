@@ -1,3 +1,5 @@
+import { memoryTestFeatures } from '../helpers/memory-features.js'
+import { indexedDbTestFeatures } from '../helpers/indexed-db-features.js'
 // @vitest-environment node
 import { IDBFactory, IDBKeyRange, IDBObjectStore } from 'fake-indexeddb'
 import { describe, expect, it, vi } from 'vitest'
@@ -42,7 +44,7 @@ describe('native IndexedDB Blob Feature', () => {
       plugins: [
         indexedDbBackendPlugin(
           { factory, keyRange: IDBKeyRange, dbName: 'native-blobs' },
-          { blobs: indexedDbBlobFeature(), native }
+          { ...indexedDbTestFeatures, blobs: indexedDbBlobFeature(), native }
         )
       ]
     })
@@ -85,7 +87,7 @@ describe('native IndexedDB Blob Feature', () => {
       plugins: [
         indexedDbBackendPlugin(
           { factory, keyRange: IDBKeyRange },
-          { blobs: indexedDbBlobFeature({ storeName: 'attachments' }) }
+          { ...indexedDbTestFeatures, blobs: indexedDbBlobFeature({ storeName: 'attachments' }) }
         )
       ]
     })
@@ -131,7 +133,11 @@ describe('native IndexedDB Blob Feature', () => {
         plugins: [
           indexedDbBackendPlugin(
             { factory, keyRange: IDBKeyRange },
-            { first: indexedDbBlobFeature(), second: indexedDbBlobFeature() }
+            {
+              ...indexedDbTestFeatures,
+              first: indexedDbBlobFeature(),
+              second: indexedDbBlobFeature()
+            }
           )
         ]
       })
@@ -140,7 +146,7 @@ describe('native IndexedDB Blob Feature', () => {
     await expect(
       createStorageHost({
         // @ts-expect-error Blob Feature targets only the authentic IndexedDB kind token.
-        plugins: [memoryBackendPlugin({}, { blobs: indexedDbBlobFeature() })]
+        plugins: [memoryBackendPlugin({}, { ...memoryTestFeatures, blobs: indexedDbBlobFeature() })]
       })
     ).rejects.toBeDefined()
     expect(open).not.toHaveBeenCalled()

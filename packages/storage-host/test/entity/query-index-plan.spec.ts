@@ -1,3 +1,8 @@
+import { entityQueryFeature } from '../../src/entity/query-feature.js'
+import { entityUniqueFeature } from '../../src/entity/unique-feature.js'
+import { entityMigrationFeature } from '../../src/entity/migration-feature.js'
+import { entityIndexesFeature } from '../../src/entity/indexes-feature.js'
+import { entityKeysetFeature } from '../../src/entity/keyset.js'
 import { expect, it } from 'vitest'
 import { createStorageHost, memoryBackendPlugin } from '../../src/index.js'
 import { defineEntity } from '../../src/entity.js'
@@ -6,6 +11,13 @@ import { memoryBackend } from '../helpers/memory.js'
 /** Declared-path choices reach the actual original index reader and materializer. */
 type IRow = { id: string; group: string; score: number; email: string }
 const definition = defineEntity<IRow>()({
+  features: [
+    entityQueryFeature(),
+    entityUniqueFeature(),
+    entityMigrationFeature(),
+    entityIndexesFeature(),
+    entityKeysetFeature()
+  ],
   name: 'automatic-index',
   key: 'id',
   onDiagnostic: () => {},
@@ -139,6 +151,13 @@ it('uses the same planned selection for draft reads and committed query mutation
 
 it('reuses the same default comparator identity across original keyset pages', async () => {
   const repo = defineEntity<IRow>()({
+    features: [
+      entityQueryFeature(),
+      entityUniqueFeature(),
+      entityMigrationFeature(),
+      entityIndexesFeature(),
+      entityKeysetFeature()
+    ],
     name: 'default-cursor',
     key: 'id',
     defaultOrderBy: (left, right) => right.score - left.score
@@ -158,6 +177,13 @@ it('reuses the same default comparator identity across original keyset pages', a
 
 it('uses a full compound equality tuple without parsing projection callbacks', async () => {
   const repo = defineEntity<IRow>()({
+    features: [
+      entityQueryFeature(),
+      entityUniqueFeature(),
+      entityMigrationFeature(),
+      entityIndexesFeature(),
+      entityKeysetFeature()
+    ],
     name: 'compound-source',
     key: 'id',
     onDiagnostic: () => {},

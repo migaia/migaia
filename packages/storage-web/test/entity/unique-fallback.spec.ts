@@ -1,3 +1,4 @@
+import { entityTestFeatures } from '../helpers/entity-features.js'
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest'
 import type { IKeyValueStore } from '@migaia/storage-contract'
@@ -31,6 +32,7 @@ const factories: ReadonlyArray<{ name: string; create: () => Promise<IKeyValueSt
 
 /** Both independently connected repositories use the same public definition. */
 const users = defineEntity<IUser>()({
+  features: entityTestFeatures,
   name: 'unique-users',
   key: 'id',
   indexes: { byEmail: { path: 'email', unique: true } },
@@ -51,6 +53,7 @@ describe('authoritative fallback unique writes', () => {
       try {
         /** The definition must remain valid even when evaluating a particular value fails. */
         const repo = defineEntity<IUser>()({
+          features: entityTestFeatures,
           name: 'failed-projection',
           key: 'id',
           onDiagnostic: () => {},
@@ -89,6 +92,7 @@ describe('authoritative fallback unique writes', () => {
     })
     try {
       repo = defineEntity<IUser>()({
+        features: entityTestFeatures,
         name: 'nested-users',
         key: 'id',
         onDiagnostic: () => {},
@@ -170,6 +174,7 @@ describe('authoritative fallback unique writes', () => {
       let reads = 0
       /** Shared indexes are declared identically by both public repositories. */
       const definition = defineEntity<IUser>()({
+        features: entityTestFeatures,
         name: 'parallel-users',
         key: 'id',
         indexes: { byEmail: { path: 'email', unique: true } },

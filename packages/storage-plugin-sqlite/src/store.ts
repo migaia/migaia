@@ -1,3 +1,4 @@
+import { createBackendChangeController } from '@migaia/storage-host/authoring/change-controller'
 import {
   StorageContractError,
   StorageContractErrorCode,
@@ -4770,12 +4771,15 @@ function createSqliteContext<TValue>(
     runtime: runtime,
     shared: shared
   }
-  organization.controller = core.createChangeController({
-    backend: SqliteNames.backend,
-    platform: driver,
-    options: input,
-    finalize: () => disposeSqliteOrganization(organization)
-  })
+  organization.controller = core.createChangeController(
+    {
+      backend: SqliteNames.backend,
+      platform: driver,
+      options: input,
+      finalize: () => disposeSqliteOrganization(organization)
+    },
+    createBackendChangeController
+  )
   organization.textCodec = defineJsonCodec({ version: 1 })
   organization.recordCodec = defineCollectionsJsonCodec({ version: 1 })
   return organization

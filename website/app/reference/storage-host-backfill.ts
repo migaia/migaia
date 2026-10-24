@@ -4,26 +4,8 @@ import type { ILibraryReference, IText } from './contract.js'
 const t = (en: string, zh: string): IText => ({ en, zh })
 
 /** Applications trigger the original registered provider through the public entity repository. */
-const entityBackfillExample = `import { createStorageHost } from '@migaia/storage-host'
-import { defineEntity } from '@migaia/storage-host/entity'
-import { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'
-
-type IUser = { id: string; email: string }
-await using host = await createStorageHost({
-  plugins: [indexedDbBackendPlugin({ dbName: 'backfill-reference' })]
-})
-const store = host.backend('indexed-db')
-const baseline = defineEntity<IUser>({ name: 'users', key: 'id' }).connect(store)
-await baseline.put({ id: 'ada', email: 'ada@example.com' })
-await baseline.migrate()
-const users = defineEntity<IUser>()({
-  name: 'users', key: 'id', indexes: { email: { path: 'email', unique: true } }
-}).connect(store)
-console.log(await users.query().index('email', 'ada@example.com').all())
-const handle = await store.ensureRecordIndexes('users', [
-  { name: 'email', unique: true, multiEntry: false, revision: 1 }
-])
-console.log((await store.getRecordIndexReadiness(handle)).status)`
+const entityBackfillExample =
+  "import { indexedDbIndexesFeature } from '@migaia/storage-web/features/indexed-db-indexes'\nimport { entityQueryFeature } from '@migaia/storage-host/entity/query'\nimport { entityIndexesFeature } from '@migaia/storage-host/entity/indexes'\nimport { entityUniqueFeature } from '@migaia/storage-host/entity/unique'\nimport { entityMigrationFeature } from '@migaia/storage-host/entity/migration'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { defineEntity } from '@migaia/storage-host/entity'\nimport { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'\n\ntype IUser = { id: string; email: string }\nawait using host = await createStorageHost({\n  plugins: [\n    indexedDbBackendPlugin(\n      { dbName: 'backfill-reference' },\n      { indexes: indexedDbIndexesFeature() },\n    ),\n  ],\n})\nconst store = host.backend('indexed-db')\nconst baseline = defineEntity<IUser>({\n  features: [\n    entityQueryFeature(),\n    entityIndexesFeature(),\n    entityUniqueFeature(),\n    entityMigrationFeature(),\n  ],\n  name: 'users',\n  key: 'id',\n}).connect(store)\nawait baseline.put({ id: 'ada', email: 'ada@example.com' })\nawait baseline.migrate()\nconst users = defineEntity<IUser>()({\n  features: [\n    entityQueryFeature(),\n    entityIndexesFeature(),\n    entityUniqueFeature(),\n    entityMigrationFeature(),\n  ],\n  name: 'users',\n  key: 'id',\n  indexes: { email: { path: 'email', unique: true } },\n}).connect(store)\nconsole.log(await users.query().index('email', 'ada@example.com').all())\nconst handle = await store.ensureRecordIndexes('users', [\n  { name: 'email', unique: true, multiEntry: false, revision: 1 },\n])\nconsole.log((await store.getRecordIndexReadiness(handle)).status)"
 
 /** Backend authors register their captured provider; this example supplies no fabricated store. */
 const registerExample = `import {

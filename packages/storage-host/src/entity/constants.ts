@@ -50,3 +50,14 @@ export type IStorageMigrationPhase =
 
 /** Common entity candidate sources report their actual client execution without native pushdown. */
 export const EntityState = { querySource: 'entity-records' } as const
+
+/** Each optional unit owns one explicit entity subpath and never enables another unit implicitly. */
+export const EntityFeatureName = {
+  query: 'query',
+  unique: 'unique',
+  migration: 'migration',
+  indexes: 'indexes',
+  keyset: 'keyset'
+} as const
+/** Stable assembly names are shared by declaration admission and operation diagnostics. */
+export type EntityFeatureName = keyof typeof EntityFeatureName

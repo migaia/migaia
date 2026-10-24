@@ -1,3 +1,5 @@
+import { memoryNotificationsFeature } from '../../src/features/memory-notifications.js'
+import { memoryChangeFeedFeature } from '../../src/features/memory-change-feed.js'
 import { describe, expect, it } from 'vitest'
 import { isPlainObject } from '@migaia/utils/object'
 import { utf8ByteLength } from '@migaia/utils/bytes'
@@ -22,7 +24,13 @@ describe('owner convergence', () => {
       return { capabilities: [], chain: {}, api: { store: {}, transaction: {} } }
     })
     await using _host = await createStorageHost({
-      plugins: [memoryBackendPlugin(undefined, { probe })]
+      plugins: [
+        memoryBackendPlugin(undefined, {
+          probe,
+          notifications: memoryNotificationsFeature(),
+          changeFeed: memoryChangeFeedFeature()
+        })
+      ]
     })
     const controller = getController()!
     const changes: unknown[] = []

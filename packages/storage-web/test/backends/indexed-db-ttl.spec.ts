@@ -1,3 +1,5 @@
+import { entityTestFeatures } from '../helpers/entity-features.js'
+import { indexedDbTestFeatures } from '../helpers/indexed-db-features.js'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb'
 import { ttl, kv } from '@migaia/storage-contract'
@@ -5,6 +7,7 @@ import { createManualScheduler } from '@migaia/utils/testing'
 import { createStorageHost } from '@migaia/storage-host'
 import { defineEntity } from '@migaia/storage-host/entity'
 import { indexedDbBackendPlugin } from '../../src/indexed-db.js'
+import { indexedDbTtlFeature } from '../../src/features/indexed-db-ttl.js'
 
 /** The real public installation owns native transactions, scopes and cleanup for every TTL case. */
 async function setup() {
@@ -12,11 +15,14 @@ async function setup() {
   const host = await createStorageHost({
     scheduler,
     plugins: [
-      indexedDbBackendPlugin({
-        factory: new IDBFactory(),
-        keyRange: IDBKeyRange,
-        dbName: `ttl-${crypto.randomUUID()}`
-      })
+      indexedDbBackendPlugin(
+        {
+          factory: new IDBFactory(),
+          keyRange: IDBKeyRange,
+          dbName: `ttl-${crypto.randomUUID()}`
+        },
+        indexedDbTestFeatures
+      )
     ]
   })
   onTestFinished(() => host.dispose())
@@ -54,6 +60,52 @@ describe('native IndexedDB TTL', () => {
     await expect(store.set('record', 'reused')).resolves.toBeUndefined()
   })
 
+  it('clears inherited deadlines when a basic client overwrites, deletes or clears the same database', async () => {
+    /** Both supported profiles share physical rows, while only one selects expiration policy. */
+    const factory = new IDBFactory()
+    const scheduler = createManualScheduler()
+    const dbName = `ttl-basic-${crypto.randomUUID()}`
+    const expiringHost = await createStorageHost({
+      scheduler,
+      plugins: [
+        indexedDbBackendPlugin(
+          { factory, keyRange: IDBKeyRange, dbName },
+          { ttl: indexedDbTtlFeature() }
+        )
+      ]
+    })
+    onTestFinished(() => expiringHost.dispose())
+    const basicHost = await createStorageHost({
+      scheduler,
+      plugins: [indexedDbBackendPlugin({ factory, keyRange: IDBKeyRange, dbName })]
+    })
+    onTestFinished(() => basicHost.dispose())
+    const expiring = expiringHost.backend('indexed-db')
+    const basic = basicHost.backend('indexed-db')
+    const expiry = expiring.use(ttl)
+    await expiring.set('text', 'old')
+    await expiring.setBytes('bytes', new Uint8Array([1]))
+    await expiring.putRecord({ value: 'old' }, 'record')
+    await expiry.expire({ channel: 'text', key: 'text' }, 10)
+    await expiry.expire({ channel: 'bytes', key: 'bytes' }, 10)
+    await expiry.expire({ channel: 'record', key: 'record' }, 10)
+    scheduler.advance(11)
+    await basic.set('text', 'replacement')
+    await basic.removeBytes('bytes')
+    await basic.setBytes('bytes', new Uint8Array([2]))
+    await basic.clearRecords()
+    await basic.putRecord({ value: 'replacement' }, 'record')
+    await expect(expiring.get('text')).resolves.toBe('replacement')
+    await expect(expiring.getBytes('bytes')).resolves.toEqual(new Uint8Array([2]))
+    await expect(expiring.getRecord('record')).resolves.toEqual({ value: 'replacement' })
+    for (const target of [
+      { channel: 'text', key: 'text' },
+      { channel: 'bytes', key: 'bytes' },
+      { channel: 'record', key: 'record' }
+    ] as const)
+      await expect(expiry.remaining(target)).resolves.toBeUndefined()
+  })
+
   it('writes batch deadlines in the same original native transaction and rolls TTL drafts back', async () => {
     const { store } = await setup()
     await store.use(kv).setMany([{ key: 'immediate', value: 'gone', ttlMs: 0 }])
@@ -77,6 +129,7 @@ describe('native IndexedDB TTL', () => {
   it('removes expired indexed records through the original sidecar, revision and post-commit paths', async () => {
     const { scheduler, store } = await setup()
     const repository = defineEntity<{ id: string; score: number }>()({
+      features: entityTestFeatures,
       name: 'ttl-index',
       key: 'id',
       indexes: { score: { path: 'score' } }
@@ -103,14 +156,18 @@ describe('native IndexedDB TTL', () => {
     const factory = new IDBFactory()
     const dbName = `ttl-reopen-${crypto.randomUUID()}`
     const first = await createStorageHost({
-      plugins: [indexedDbBackendPlugin({ factory, keyRange: IDBKeyRange, dbName })]
+      plugins: [
+        indexedDbBackendPlugin({ factory, keyRange: IDBKeyRange, dbName }, indexedDbTestFeatures)
+      ]
     })
     const firstStore = first.backend('indexed-db')
     await firstStore.set('kept', 'value')
     await firstStore.use(ttl).expire({ channel: 'text', key: 'kept' }, 60_000)
     await first.dispose()
     const second = await createStorageHost({
-      plugins: [indexedDbBackendPlugin({ factory, keyRange: IDBKeyRange, dbName })]
+      plugins: [
+        indexedDbBackendPlugin({ factory, keyRange: IDBKeyRange, dbName }, indexedDbTestFeatures)
+      ]
     })
     onTestFinished(() => second.dispose())
     const secondStore = second.backend('indexed-db')

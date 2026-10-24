@@ -1,3 +1,8 @@
+import { entityQueryFeature } from '../src/entity/query-feature.js'
+import { entityUniqueFeature } from '../src/entity/unique-feature.js'
+import { entityIndexesFeature } from '../src/entity/indexes-feature.js'
+import { memoryNotificationsFeature } from '../src/features/memory-notifications.js'
+import { memoryChangeFeedFeature } from '../src/features/memory-change-feed.js'
 import { describe, expect, it } from 'vitest'
 import {
   kv,
@@ -29,8 +34,20 @@ describe('immutable storage organizations', () => {
     await using host = await createStorageHost({
       org: defaultOrg,
       plugins: [
-        memoryBackendPlugin({ id: 'prefs', namespace: 'preferences' }),
-        memoryBackendPlugin({ id: 'cache', namespace: 'cache' })
+        memoryBackendPlugin(
+          { id: 'prefs', namespace: 'preferences' },
+          {
+            notifications: memoryNotificationsFeature(),
+            changeFeed: memoryChangeFeedFeature()
+          }
+        ),
+        memoryBackendPlugin(
+          { id: 'cache', namespace: 'cache' },
+          {
+            notifications: memoryNotificationsFeature(),
+            changeFeed: memoryChangeFeedFeature()
+          }
+        )
       ]
     })
     const first = createOrgId()
@@ -83,7 +100,15 @@ describe('immutable storage organizations', () => {
 
   it('publishes root changes across organizations and filters each captured organization subscription', async () => {
     await using host = await createStorageHost({
-      plugins: [memoryBackendPlugin({ namespace: 'notifications' })]
+      plugins: [
+        memoryBackendPlugin(
+          { namespace: 'notifications' },
+          {
+            notifications: memoryNotificationsFeature(),
+            changeFeed: memoryChangeFeedFeature()
+          }
+        )
+      ]
     })
     const first = createOrgId()
     const second = createOrgId()
@@ -162,7 +187,15 @@ describe('immutable storage organizations', () => {
         })
       }
     })
-    const base = await createStorageHost({ plugins: [memoryBackendPlugin(undefined, { feature })] })
+    const base = await createStorageHost({
+      plugins: [
+        memoryBackendPlugin(undefined, {
+          feature,
+          notifications: memoryNotificationsFeature(),
+          changeFeed: memoryChangeFeedFeature()
+        })
+      ]
+    })
     const host = await base.use(composition)
     const first = createOrgId()
     const second = createOrgId()
@@ -202,8 +235,20 @@ describe('immutable storage organizations', () => {
   it('attempts every target after one deletion fails and retains the original failure', async () => {
     const original = new Error('native deletion failed')
     const attempted: string[] = []
-    const first = memoryBackendPlugin({ id: 'first' })
-    const third = memoryBackendPlugin({ id: 'third' })
+    const first = memoryBackendPlugin(
+      { id: 'first' },
+      {
+        notifications: memoryNotificationsFeature(),
+        changeFeed: memoryChangeFeedFeature()
+      }
+    )
+    const third = memoryBackendPlugin(
+      { id: 'third' },
+      {
+        notifications: memoryNotificationsFeature(),
+        changeFeed: memoryChangeFeedFeature()
+      }
+    )
     const kind = defineStorageBackendKind<ReturnType<typeof catalog>['store']>()('catalog')
     const broken = definePlugin('broken', (core: IStoragePluginCore) => ({
       kind,
@@ -236,11 +281,19 @@ describe('immutable storage organizations', () => {
   })
 
   it('connects entity business access only to exact authenticated organization views', async () => {
-    const host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+    const host = await createStorageHost({
+      plugins: [
+        memoryBackendPlugin(undefined, {
+          notifications: memoryNotificationsFeature(),
+          changeFeed: memoryChangeFeedFeature()
+        })
+      ]
+    })
     /** Identical entity layouts remain isolated by the original native namespace. */
     const users = defineEntity<{ id: string; email: string }>()({
       name: 'users',
       key: 'id',
+      features: [entityQueryFeature(), entityUniqueFeature(), entityIndexesFeature()],
       indexes: { email: { path: 'email', unique: true } }
     })
     const first = createOrgId()

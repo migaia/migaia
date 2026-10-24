@@ -1,3 +1,4 @@
+import { entityTestFeatures } from '../helpers/entity-features.js'
 import { describe, expect, it } from 'vitest'
 import { defineEntity } from '@migaia/storage-host/entity'
 import { createLocalTestStore } from '../helpers/installed-backends.js'
@@ -10,7 +11,7 @@ import type { IStorageKey } from '@migaia/storage-contract'
  */
 type IUser = { id: string; name: string; email: string }
 
-const users = defineEntity<IUser>({ name: 'users', key: 'id' })
+const users = defineEntity<IUser>({ features: entityTestFeatures, name: 'users', key: 'id' })
 
 const backends = [
   {
@@ -116,7 +117,11 @@ for (const { label, create } of backends) {
 
     it('list/stream 不会读到其他 entity 的记录', async () => {
       const store = await create()
-      const posts = defineEntity<{ id: string; title: string }>({ name: 'posts', key: 'id' })
+      const posts = defineEntity<{ id: string; title: string }>({
+        features: entityTestFeatures,
+        name: 'posts',
+        key: 'id'
+      })
       const userRepo = users.connect(store)
       const postRepo = posts.connect(store)
       await userRepo.put({ id: 'shared-id', name: 'Ada', email: 'a@b.c' })
@@ -133,6 +138,7 @@ describe('value-only entity repository', () => {
   it('KV-only list/stream 触发一次 diagnostic 告警', async () => {
     const diagnosed: string[] = []
     const diagnosedEntity = defineEntity<IUser>({
+      features: entityTestFeatures,
       name: 'users-diag',
       key: 'id',
       onDiagnostic: (message) => diagnosed.push(message)
@@ -148,6 +154,7 @@ describe('value-only entity repository', () => {
 
   it('KV-only diagnostic 抛错不阻断 list', async () => {
     const entity = defineEntity<IUser>({
+      features: entityTestFeatures,
       name: 'users-diag-throw',
       key: 'id',
       onDiagnostic: () => {
@@ -183,6 +190,7 @@ describe('value-only entity repository', () => {
       storage: fakeWebStorage()
     })
     const v1 = defineEntity<{ id: string; name: string }>({
+      features: entityTestFeatures,
       name: 'people',
       key: 'id',
       version: 1
@@ -190,6 +198,7 @@ describe('value-only entity repository', () => {
     await v1.connect(store).put({ id: 'u1', name: 'Ada' })
 
     const v2 = defineEntity<{ id: string; displayName: string }>({
+      features: entityTestFeatures,
       name: 'people',
       key: 'id',
       version: 2,
@@ -201,10 +210,15 @@ describe('value-only entity repository', () => {
 
   it('KV-only migrate 按批次写回新版本', async () => {
     const store = await createLocalTestStore({ namespace: 'kv-migrate', storage: fakeWebStorage() })
-    await defineEntity<{ id: string; name: string }>({ name: 'kv-people', key: 'id' })
+    await defineEntity<{ id: string; name: string }>({
+      features: entityTestFeatures,
+      name: 'kv-people',
+      key: 'id'
+    })
       .connect(store)
       .put({ id: 'u1', name: 'Ada' })
     const v2 = defineEntity<{ id: string; displayName: string }>({
+      features: entityTestFeatures,
       name: 'kv-people',
       key: 'id',
       version: 2,
@@ -222,6 +236,7 @@ describe('value-only entity repository', () => {
       storage: fakeWebStorage()
     })
     const current = defineEntity<{ id: string; name: string }>({
+      features: entityTestFeatures,
       name: 'kv-migrate-stats',
       key: 'id',
       version: 2,
@@ -230,6 +245,7 @@ describe('value-only entity repository', () => {
     await current.connect(store).put({ id: 'current', name: 'Current' })
 
     const legacy = defineEntity<{ id: string; name: string }>({
+      features: entityTestFeatures,
       name: 'kv-migrate-stats',
       key: 'id'
     })
@@ -237,6 +253,7 @@ describe('value-only entity repository', () => {
     await store.set(String(current.connect(store).lockKey('bad').key), '{broken-json')
 
     const migrated = defineEntity<{ id: string; name: string }>({
+      features: entityTestFeatures,
       name: 'kv-migrate-stats',
       key: 'id',
       version: 2,
@@ -267,6 +284,7 @@ describe('value-only entity repository', () => {
 
   it('handler can skip an invalid KV record and reports its decoded key', async () => {
     const entity = defineEntity<{ id: string; n: number }>({
+      features: entityTestFeatures,
       name: 'handler-users',
       key: 'id',
       schema: {

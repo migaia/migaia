@@ -1,3 +1,5 @@
+import { createBackendChangeIterator } from '@migaia/storage-host/authoring/change-iterator'
+import { createBackendChangeController } from '@migaia/storage-host/authoring/change-controller'
 import { RedisCommand, RedisOperation } from './constants.js'
 import {
   StorageContractErrorCode,
@@ -83,7 +85,6 @@ import {
   throwIfAborted,
   snapshotKeyRange,
   observeStorageBatch,
-  createBackendChangeIterator,
   normalizeError,
   type IBackendChangeController
 } from '@migaia/storage-host/authoring/backend'
@@ -2727,13 +2728,16 @@ function createRedisEnvironment(
     vectorFactory: undefined,
     controller: undefined!
   }
-  environment.controller = core.createChangeController({
-    backend: RedisText.backend,
-    platform: driver,
-    options,
-    origin: crypto.randomUUID(),
-    finalize: () => disposeRedisEnvironment(environment)
-  })
+  environment.controller = core.createChangeController(
+    {
+      backend: RedisText.backend,
+      platform: driver,
+      options,
+      origin: crypto.randomUUID(),
+      finalize: () => disposeRedisEnvironment(environment)
+    },
+    createBackendChangeController
+  )
   return environment
 }
 /** Build one pure native organization projection without a second resource owner. */
