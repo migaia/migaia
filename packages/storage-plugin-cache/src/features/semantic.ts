@@ -358,7 +358,7 @@ export function semanticCacheFeature(options: ISemanticCacheOptions) {
         tierFailure(context, CacheOperation.get, cause)
         return undefined
       }
-      for (const item of [...hits].sort((a, b) => b.score - a.score)) {
+      for (const item of hits) {
         /** Malformed physical envelopes cannot escape as application values. */
         let hit: ISemanticHit<T>
         try {
