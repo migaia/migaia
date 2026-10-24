@@ -261,6 +261,7 @@ export type {
   IQueryResult,
   IQueryChain,
   IRecordQuerySource,
+  IRecordQuerySourcePlan,
   IQueryNativeStep,
   IRecordQueryInput,
   IQueryWriteContext,
