@@ -3,7 +3,7 @@ import { indexedDbTestFeatures } from '../helpers/indexed-db-features.js'
 import { IDBFactory, IDBKeyRange, IDBObjectStore } from 'fake-indexeddb'
 import { describe, expect, it, vi } from 'vitest'
 import { createOrgId, createStorageHost } from '@migaia/storage-host'
-import { storageLogStore } from '@migaia/storage-host/journal'
+import { storageLogStore, storageJournalPlugin } from '@migaia/storage-host/journal'
 import { LogRecordState } from '@migaia/logger/plugins/durable'
 import { walkErrorCauses } from '@migaia/utils/error'
 import { indexedDbBackendPlugin } from '../../src/indexed-db.js'
@@ -23,6 +23,7 @@ describe('native IndexedDB private journal namespaces', () => {
       }
       await using host = await createStorageHost({
         plugins: [
+          storageJournalPlugin(),
           indexedDbBackendPlugin(
             { keyRange: IDBKeyRange, dbName: 'no-web-locks' },
             indexedDbTestFeatures
@@ -31,6 +32,7 @@ describe('native IndexedDB private journal namespaces', () => {
       })
       await using peer = await createStorageHost({
         plugins: [
+          storageJournalPlugin(),
           indexedDbBackendPlugin(
             {
               factory: wrapper,
@@ -80,6 +82,7 @@ describe('native IndexedDB private journal namespaces', () => {
     const factory = new IDBFactory()
     await using host = await createStorageHost({
       plugins: [
+        storageJournalPlugin(),
         indexedDbBackendPlugin(
           {
             factory,
@@ -128,6 +131,7 @@ describe('native IndexedDB private journal namespaces', () => {
     const factory = new IDBFactory()
     await using host = await createStorageHost({
       plugins: [
+        storageJournalPlugin(),
         indexedDbBackendPlugin(
           {
             factory,
@@ -182,11 +186,11 @@ describe('native IndexedDB private journal namespaces', () => {
     const orgId = createOrgId()
     await using host = await createStorageHost({
       org: orgId,
-      plugins: [indexedDbBackendPlugin(options, indexedDbTestFeatures)]
+      plugins: [storageJournalPlugin(), indexedDbBackendPlugin(options, indexedDbTestFeatures)]
     })
     await using peer = await createStorageHost({
       org: orgId,
-      plugins: [indexedDbBackendPlugin(options, indexedDbTestFeatures)]
+      plugins: [storageJournalPlugin(), indexedDbBackendPlugin(options, indexedDbTestFeatures)]
     })
     const log = await storageLogStore(host, 'indexed-db', { prefix: 'history' })
     await log.append([{ kind: 'old', payload: null }])

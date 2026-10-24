@@ -1,3 +1,5 @@
+import { indexedDbFeatureMissing } from '../backends/indexed-db-base-access.js'
+import { IndexedDbFeature } from '../constants.js'
 import {
   defineFeature,
   memoryBackendKind,
@@ -240,6 +242,8 @@ function createReactiveLiveQuery<TQuery extends IQueryShape>(
   if (context.adapter === undefined) {
     try {
       const controller = context.featureExpose.getChangeController()
+      if (context.featureExpose.getKind() === indexedDbBackendKind && controller === undefined)
+        indexedDbFeatureMissing.fail(IndexedDbFeature.notifications)
       context.adapter = context.service.registerAdapter({
         backendId,
         store,

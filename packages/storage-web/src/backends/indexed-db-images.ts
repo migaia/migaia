@@ -116,7 +116,7 @@ type IIndexedDbImageAccess = {
     after: number | undefined,
     run: () => Promise<R>
   ): Promise<R>
-  revision(channel: IIndexedDbImageChannel, key: IStorageKey): Promise<IIndexedDbImageRevision>
+  revision(channel: IIndexedDbImageChannel, key: IStorageKey): Promise<IIndexedDbPointRevision>
   changes(): readonly IStorageJournalChange[]
 }
 

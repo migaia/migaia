@@ -1,3 +1,4 @@
+import { entityTestFeatures } from '../helpers/entity-features.js'
 import {
   kv,
   isChangeFeedStore,
@@ -59,7 +60,9 @@ const createBackfillDb = (
 
 /** Native key fixtures derive canonical identity through the same actual public repository. */
 const entityRecordKey = (store: IKeyValueStore, scope: string, id: IStorageKey): IStorageKey =>
-  defineEntity<{ id: IStorageKey }>({ name: scope, key: 'id' }).connect(store).lockKey(id).key
+  defineEntity<{ id: IStorageKey }>({ features: entityTestFeatures, name: scope, key: 'id' })
+    .connect(store)
+    .lockKey(id).key
 
 /** These explicit bounds select the known native canonical-key fixture prefix. */
 const canonicalFixtureRange = (scope: string) => ({

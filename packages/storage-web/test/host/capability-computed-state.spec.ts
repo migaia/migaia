@@ -1,3 +1,4 @@
+import { memoryTestFeatures } from '../helpers/memory-features.js'
 import { createRuntime } from '@migaia/reactive'
 import { describe, expect, it } from 'vitest'
 import { createStorageHost, memoryBackendKind, memoryBackendPlugin } from '@migaia/storage-host'
@@ -9,12 +10,19 @@ import { records } from '@migaia/storage-contract'
 /** Proves the public Host capability projection and runtime guard remain exact. */
 describe('Host capability and computed state', () => {
   it('adds live only to actual query chains selected by the reactive Feature', async () => {
-    const plain = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+    const plain = await createStorageHost({
+      plugins: [memoryBackendPlugin({}, memoryTestFeatures)]
+    })
     expect(plain).not.toHaveProperty('liveQuery')
     expect(plain.backend('memory').use(records).query()).not.toHaveProperty('live')
     await plain.dispose()
     const host = await createStorageHost({
-      plugins: [memoryBackendPlugin(undefined, { reactive: reactiveFeature(memoryBackendKind) })]
+      plugins: [
+        memoryBackendPlugin(undefined, {
+          ...memoryTestFeatures,
+          reactive: reactiveFeature(memoryBackendKind)
+        })
+      ]
     })
     const query = host.backend('memory').use(records).query().live({ runtime: createRuntime() })
     await query.ready
@@ -26,7 +34,7 @@ describe('Host capability and computed state', () => {
   it('supports dynamic use after the facade is made non-extensible', async () => {
     const host = await createStorageHost()
     Object.preventExtensions(host)
-    const plugins = [memoryBackendPlugin({ id: 'dynamic-use' })] as const
+    const plugins = [memoryBackendPlugin({ id: 'dynamic-use' }, memoryTestFeatures)] as const
     const installed = await host.use(...plugins)
     const installedBackends = installed.backends() as ReadonlyMap<string, unknown>
     const originalBackends = host.backends() as ReadonlyMap<string, unknown>

@@ -1,3 +1,4 @@
+import { entityTestFeatures } from './entity-features.js'
 import { createStorageHost, createOrgId } from '@migaia/storage-host'
 import { defineEntity } from '@migaia/storage-host/entity'
 import { localStorageBackendPlugin } from '../../src/local-storage.js'
@@ -23,6 +24,7 @@ export async function runBrowserTextOrgScenario() {
   }
   /** The same public entity definition exercises each original value-commit implementation. */
   const users = defineEntity<{ id: string; email: string }>()({
+    features: entityTestFeatures,
     name: 'browser-org-users',
     key: 'id',
     indexes: { byEmail: { path: 'email', unique: true } },

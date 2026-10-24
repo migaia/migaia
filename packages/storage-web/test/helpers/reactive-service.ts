@@ -1,3 +1,4 @@
+import { memoryTestFeatures } from './memory-features.js'
 import {
   createStorageHost,
   defineFeature,
@@ -60,7 +61,7 @@ export async function createReactiveServiceFixture(options: {
   const host = await createStorageHost({
     scheduler: options.scheduler,
     report: options.report,
-    plugins: [memoryBackendPlugin(undefined, { fixture })]
+    plugins: [memoryBackendPlugin(undefined, { ...memoryTestFeatures, fixture })]
   })
   onTestFinished(() => host.dispose())
   attach()
