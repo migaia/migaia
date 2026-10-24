@@ -1,6 +1,11 @@
 import { isUint8Array } from '@migaia/utils/bytes'
 import { prefixStorageOrgKey } from './org.js'
-import { snapshotStorageKey, assertStringStorageKey, KEY_DOMAIN_LIMITS } from './key.js'
+import {
+  snapshotStorageKey,
+  assertStorageKey,
+  assertStringStorageKey,
+  KEY_DOMAIN_LIMITS
+} from './key.js'
 import type { IBackendKind } from './capabilities.js'
 import type { IStorageKey } from './context.js'
 import { StorageContractError, StorageContractErrorCode } from './errors.js'
@@ -264,91 +269,117 @@ export function decodeStorageOrgKey(
 export function storageKeyBytesIdentity(encoded: Uint8Array): string {
   return Array.from(encoded, (byte) => byte.toString(16).padStart(2, '0')).join('')
 }
-/** One detached position retains the canonical identity and its first equivalent input position. */
+/** One native batch position retains canonical identity and its first equivalent input position. */
 export type IStorageBatchKey = {
   readonly key: IStorageKey
   readonly identity: string
   readonly firstIndex: number
 }
-/** One pure native-batch capture detaches keys in the caller's existing per-entry access order. */
+/** Native authors choose capture across awaits or projection within one synchronous terminal. */
 export type IStorageBatchKeyCapture = (key: IStorageKey) => IStorageBatchKey
-/**
- * Owns only this batch's temporary equality facts. Native authors choose when to reject a duplicate
- * from firstIndex, preserving their existing key/value/TTL getter order and original error owner.
- */
+/** One batch's equality facts belong to this short-lived projector, never a backend cache. */
+class StorageBatchKeyProjector {
+  /** Canonical validation errors retain the requesting backend's identity. */
+  readonly #backend: IBackendKind | undefined
+  /** Only equivalent keys in this admitted batch share a first position. */
+  readonly #firstPositions = new Map<string, number>()
+  /** Failed key validation never consumes a successful input position. */
+  #position = 0
+  /** Keep key admission and identity projection in their one existing owner. */
+  constructor(backend: IBackendKind | undefined) {
+    this.#backend = backend
+  }
+  /** Compute metadata from an admitted key using the original canonical writer. */
+  #projectKey(key: IStorageKey): IStorageBatchKey {
+    /** Typed equality uses the original ordered writer rather than object or string identity. */
+    const identity = storageKeyBytesIdentity(encodeKeySnapshot(key, false))
+    /** Native position remains stable when structurally equivalent keys repeat. */
+    const firstIndex = this.#firstPositions.get(identity) ?? this.#position
+    if (firstIndex === this.#position) this.#firstPositions.set(identity, this.#position)
+    this.#position++
+    return { key, identity, firstIndex }
+  }
+  /** Detach caller keys when native admission or middleware can await before use. */
+  capture(input: IStorageKey): IStorageBatchKey {
+    return this.#projectKey(snapshotStorageKey(input, this.#backend))
+  }
+  /** Borrow validated keys only for a synchronous native terminal with no intervening await. */
+  project(input: IStorageKey): IStorageBatchKey {
+    assertStorageKey(input, this.#backend)
+    return this.#projectKey(input)
+  }
+}
+/** Capture per-entry keys before deferred native work while preserving canonical equality. */
 export function createStorageBatchKeyCapture(
   backend: IBackendKind | undefined
 ): IStorageBatchKeyCapture {
-  /** Only this pure call owns the temporary equality index; no backend state is retained. */
-  const firstPositions = new Map<string, number>()
-  /** Successful captures retain caller order without reading any later input position. */
-  let position = 0
-  return (input) => {
-    /** The original key owner validates and detaches this position exactly once. */
-    const key = snapshotStorageKey(input, backend)
-    /** The same private writer consumes only the detached snapshot. */
-    const identity = storageKeyBytesIdentity(encodeKeySnapshot(key, false))
-    /** Equal signed zero, dates, buffers and tuples share the original canonical identity. */
-    const firstIndex = firstPositions.get(identity) ?? position
-    if (firstIndex === position) firstPositions.set(identity, position)
-    position++
-    return Object.freeze({ key, identity, firstIndex })
-  }
+  /** The short-lived owner belongs only to this admitted batch. */
+  const projector = new StorageBatchKeyProjector(backend)
+  return (input) => projector.capture(input)
 }
-/**
- * Captures a native batch before I/O. Reads preserve duplicates; native removals use firstIndex,
- * while atomic writes reject equivalent keys when rejectDuplicates is requested.
- */
+/** Recompute transformed batch metadata without copying keys in a synchronous native terminal. */
+export function createStorageBatchKeyProjection(
+  backend: IBackendKind | undefined
+): IStorageBatchKeyCapture {
+  /** Only the synchronous terminal owns these recomputed first-position facts. */
+  const projector = new StorageBatchKeyProjector(backend)
+  return (input) => projector.project(input)
+}
+/** Validate one batch and project its original order and optional duplicate rejection once. */
+function prepareStorageBatchKeys(
+  keys: readonly IStorageKey[],
+  backend: IBackendKind | undefined,
+  options: { readonly rejectDuplicates?: boolean } | undefined,
+  project: IStorageBatchKeyCapture
+): readonly IStorageBatchKey[] {
+  if (
+    !Array.isArray(keys) ||
+    (options !== undefined &&
+      (typeof options !== 'object' || options === null || Array.isArray(options)))
+  )
+    throw new StorageContractError(
+      StorageContractErrorCode.invalidArgument,
+      { backend },
+      StorageContractErrorText.batchKeys
+    )
+  /** Duplicate rejection remains optional for read and remove batches. */
+  const rejectDuplicates = options?.rejectDuplicates
+  if (rejectDuplicates !== undefined && typeof rejectDuplicates !== 'boolean')
+    throw new StorageContractError(
+      StorageContractErrorCode.invalidArgument,
+      { backend },
+      StorageContractErrorText.batchKeys
+    )
+  /** Metadata retains native request order, including repeated positions. */
+  const result: IStorageBatchKey[] = []
+  for (let index = 0; index < keys.length; index++) {
+    /** Both projection modes reuse the same canonical equality and identity rule. */
+    const fact = project(keys[index]!)
+    if (fact.firstIndex !== index && rejectDuplicates)
+      throw new StorageContractError(
+        StorageContractErrorCode.invalidArgument,
+        { backend },
+        StorageContractErrorText.batchDuplicate
+      )
+    result.push(fact)
+  }
+  return result
+}
+/** Detach caller keys before middleware, logical locks or physical native admission can await. */
 export function snapshotStorageBatchKeys(
   keys: readonly IStorageKey[],
   backend: IBackendKind | undefined,
   options?: { readonly rejectDuplicates?: boolean }
 ): readonly IStorageBatchKey[] {
-  try {
-    if (
-      !Array.isArray(keys) ||
-      (options !== undefined &&
-        (typeof options !== 'object' || options === null || Array.isArray(options)))
-    )
-      throw new StorageContractError(
-        StorageContractErrorCode.invalidArgument,
-        { backend },
-        StorageContractErrorText.batchKeys
-      )
-    /** Options and array length are captured once before any input key is traversed. */
-    const rejectDuplicates = options?.rejectDuplicates
-    if (rejectDuplicates !== undefined && typeof rejectDuplicates !== 'boolean')
-      throw new StorageContractError(
-        StorageContractErrorCode.invalidArgument,
-        { backend },
-        StorageContractErrorText.batchKeys
-      )
-    /** Eager array capture and ordered native authors reuse the very same key/equality owner. */
-    const capture = createStorageBatchKeyCapture(backend)
-    /** Each returned position owns the detached snapshot used to derive its exact identity. */
-    const result: IStorageBatchKey[] = []
-    /** Caller mutation cannot extend the admitted operation while a key getter is evaluated. */
-    const length = keys.length
-    for (let index = 0; index < length; index++) {
-      /** Only this position is read before its independent canonical capture. */
-      const captured = capture(keys[index]!)
-      if (captured.firstIndex !== index && rejectDuplicates)
-        throw new StorageContractError(
-          StorageContractErrorCode.invalidArgument,
-          { backend },
-          StorageContractErrorText.batchDuplicate
-        )
-      result.push(captured)
-    }
-    return Object.freeze(result)
-  } catch (cause) {
-    if (cause instanceof StorageContractError) throw cause
-    throw new StorageContractError(
-      StorageContractErrorCode.invalidArgument,
-      { backend, cause },
-      StorageContractErrorText.batchKeys
-    )
-  }
+  return prepareStorageBatchKeys(keys, backend, options, createStorageBatchKeyCapture(backend))
+}
+/** Borrow keys only while a synchronous terminal recomputes metadata after middleware rewrites. */
+export function projectStorageBatchKeys(
+  keys: readonly IStorageKey[],
+  backend: IBackendKind | undefined,
+  options?: { readonly rejectDuplicates?: boolean }
+): readonly IStorageBatchKey[] {
+  return prepareStorageBatchKeys(keys, backend, options, createStorageBatchKeyProjection(backend))
 }
 /** Pure prefix projection supports native lower-bound cursors and canonical encoded range lookup. */
 export type IStorageKeyPrefix = {

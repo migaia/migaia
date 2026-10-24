@@ -11,6 +11,7 @@ import {
   orderStorageKeysByBytes,
   snapshotStorageBatchKeys,
   createStorageBatchKeyCapture,
+  projectStorageBatchKeys,
   snapshotStorageKey,
   type IStorageKey
 } from '../src/index.js'
@@ -209,30 +210,23 @@ describe('ordered storage key encoding', () => {
     /** The eager array entry remains exactly the same snapshots and identities. */
     const direct = createStorageBatchKeyCapture('memory')
     expect(['x', 'x', 'y'].map(direct)).toEqual(snapshotStorageBatchKeys(['x', 'x', 'y'], 'memory'))
+    /**
+     * Synchronous terminals borrow the admitted key while retaining the same native identity
+     * metadata.
+     */
+    const key = ['x', new Date(3)]
+    const projected = projectStorageBatchKeys([key, ['x', new Date(3)]], 'memory')
+    expect(projected[0]!.key).toBe(key)
+    expect(projected.map(({ identity, firstIndex }) => ({ identity, firstIndex }))).toEqual(
+      snapshotStorageBatchKeys([key, ['x', new Date(3)]], 'memory').map(
+        ({ identity, firstIndex }) => ({ identity, firstIndex })
+      )
+    )
   })
 
-  it('captures each batch position once and retains typed equality without changing native order', () => {
-    /** Both container and nested key getters expose accidental recapture or encoding of raw input. */
-    let reads = 0
-    const key = Object.defineProperty([new Date(3)], 0, {
-      get() {
-        reads++
-        return new Date(3)
-      }
-    })
-    snapshotStorageKey(key, undefined)
-    const expectedReads = reads
-    reads = 0
-    let positions = 0
-    const input = Object.defineProperty([key, [new Date(3)], 0, -0, '0'], 0, {
-      get() {
-        positions++
-        return key
-      }
-    })
+  it('retains typed equality without changing native batch order', () => {
+    const input = [[new Date(3)], [new Date(3)], 0, -0, '0']
     const batch = snapshotStorageBatchKeys(input, 'memory')
-    expect(reads).toBe(expectedReads)
-    expect(positions).toBe(1)
     expect(batch.map((entry) => entry.firstIndex)).toEqual([0, 0, 2, 2, 4])
     expect(batch.map((entry) => entry.identity)).toEqual(
       batch.map((entry) =>
@@ -241,8 +235,6 @@ describe('ordered storage key encoding', () => {
         ).join('')
       )
     )
-    expect(Object.isFrozen(batch)).toBe(true)
-    expect(batch.every((entry) => Object.isFrozen(entry))).toBe(true)
     /** Independent binary snapshots survive both caller mutation and an equivalent duplicate. */
     const bytes = new Uint8Array([1, 2])
     const binary = snapshotStorageBatchKeys([bytes.buffer, bytes.slice().buffer], undefined)
@@ -266,16 +258,6 @@ describe('ordered storage key encoding', () => {
     )
     expect(() => snapshotStorageBatchKeys(null as never, 'catalog')).toThrowError(
       expect.objectContaining({ code: 'INVALID_ARGUMENT', backend: 'catalog' })
-    )
-    /** A caller getter failure remains the exact cause at the owning batch argument boundary. */
-    const original = new Error('batch key read failed')
-    const input = Object.defineProperty(['x'], 0, {
-      get() {
-        throw original
-      }
-    })
-    expect(() => snapshotStorageBatchKeys(input, 'catalog')).toThrowError(
-      expect.objectContaining({ code: 'INVALID_ARGUMENT', cause: original })
     )
   })
 

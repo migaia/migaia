@@ -181,7 +181,12 @@ export {
   decodeStorageOrgKey,
   snapshotStorageOrgKeyPrefix
 } from './key-order.js'
-export { snapshotStorageBatchKeys, createStorageBatchKeyCapture } from './key-order.js'
+export {
+  snapshotStorageBatchKeys,
+  createStorageBatchKeyCapture,
+  projectStorageBatchKeys,
+  createStorageBatchKeyProjection
+} from './key-order.js'
 export type { IStorageBatchKey, IStorageBatchKeyCapture } from './key-order.js'
 
 export {
