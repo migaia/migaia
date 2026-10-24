@@ -132,3 +132,7 @@ With id archive, the functions are archiveRun, archiveGet and archiveSweep. With
 Memory, SQLite and PostgreSQL can supply hot storage. IndexedDB cannot perform cold I/O during its transaction and rejects installation before cold I/O. Cold storage must supply blob. The plugin creates no drivers and does not replace hot transactions or independently close borrowed backends.
 
 Segments commit separately; later failures do not roll back earlier segments. Explicit Sweep removes unreferenced cold objects. Get does not restore by default. Sweep neither archives nor deletes records by age. Error source is storage.backend.archive. See the [usage guide](./USEGUIDE.en.md) for rules, cancellation and failure progress.
+
+## Migrating nested extension calls
+
+Earlier drafts used `host.extensions.archive.run()`, `.get()` and `.sweep()`. Replace them with `host.extensions.archiveRun()`, `archiveGet()` and `archiveSweep()`. An `id: 'history'` configuration uses `historyRun`, `historyGet` and `historySweep`. Organization views expose the same flat functions through `host.org(id).extensions`. Arguments and results retain each operation's contract. There is no old nested object or compatibility alias; the host still owns resource cleanup.

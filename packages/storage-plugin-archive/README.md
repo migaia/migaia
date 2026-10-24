@@ -132,3 +132,7 @@ id 为 archive 时仅公开 archiveRun、archiveGet、archiveSweep；id 为 hist
 Memory、SQLite、PostgreSQL 可作热层；IndexedDB 热层不支持在事务期间执行冷层 I/O，安装时在冷 I/O 前拒绝。冷层需提供 blob。插件不创建驱动、不替换热层事务，也不独立关闭借用的后端。
 
 归档按段提交，后续段失败不会回滚先前段；未被引用的冷对象由显式 Sweep 清理。Get 默认不恢复，Sweep 不执行归档或按时间删除记录。错误 source 为 storage.backend.archive；完整规则、取消与错误进度边界见[使用指南](./USEGUIDE.md)。
+
+## 从嵌套扩展迁移
+
+此前草案中的 `host.extensions.archive.run()`、`.get()`、`.sweep()` 改为 `host.extensions.archiveRun()`、`archiveGet()`、`archiveSweep()`。把三种调用分别替换为当前平铺函数；配置 `id: 'history'` 时使用 `historyRun`、`historyGet`、`historySweep`。组织视图同样从 `host.org(id).extensions` 调用。参数与返回值沿用各自操作的契约，不提供旧嵌套对象或兼容别名；资源仍由宿主释放。
