@@ -1,5 +1,26 @@
 import type { ILibraryReference, IText } from './contract.js'
 import { storageHostCases } from './storage-host-cases.js'
+import {
+  storageHostAuthoringSymbols,
+  storageHostAuthoringTypes,
+  storageHostChangeIteratorOptions
+} from './storage-host-authoring.js'
+import { storageHostJournalTypes } from './storage-host-journal.js'
+import {
+  storageHostRuntimeSymbols,
+  storageHostRuntimeTypes,
+  storageHostInstanceTypes,
+  storageHostRuntimeEnums,
+  storageHostFactoryOptionDocs
+} from './storage-host-runtime.js'
+import { storageHostPluginTypes } from './storage-host-plugins.js'
+import { storageHostHookTypes } from './storage-host-hooks.js'
+import {
+  storageHostBackfillSymbols,
+  storageHostBackfillTypes,
+  storageHostBackfillEnums
+} from './storage-host-backfill.js'
+import { storageHostNativeAuthorTypes } from './storage-host-native-authors.js'
 /** Shared bilingual text keeps the reference descriptions aligned. */
 const t = (en: string, zh: string): IText => ({ en, zh })
 /** Neutral host and authoring entry, with no browser or native driver import. */
@@ -8,14 +29,14 @@ export const storageHostReference: ILibraryReference = {
     journal: {
       summary: t(
         'Open a fixed-organization private log through its original admitted backend binding.',
-        '沿原已准入后端绑定打开固定组织私有日志。'
+        '沿原已准入后端绑定打开固定组织私有日志，不获取业务后端关闭权限。'
       ),
       example: storageHostCases.storageLogStore![0]!.example
     },
     'authoring/vector': {
       summary: t(
         'Expose only standard query vector synthesis; memory scoring and ranking remain private.',
-        '只公开标准查询向量合成；memory 评分与排名仍私有。'
+        '只公开标准查询向量合成；内存后端的评分与排名算法仍保留在原私有拥有者。'
       ),
       example: storageHostCases.recommendStorageVector![0]!.example
     },
@@ -64,6 +85,15 @@ console.log(host.extensions.label('draft'))`
       cases: storageHostCases.asyncDisposeKey
     },
     storageLogStore: {
+      optionDocs: {
+        prefix: {
+          summary: t(
+            'Nonempty private prefix selected for this exact backend and org. Nonexclusive native namespaces read the current index per operation.',
+            '为本准确后端及组织选择的非空私有前缀，非独占原生命名空间逐操作读取当前索引。'
+          ),
+          example: storageHostCases.storageLogStore![0]!.example
+        }
+      },
       role: 'factory',
       purpose: t(
         'Recover a caller-closeable private ILogStore without granting raw backend or host authority. Native selection certifies the exact original registration, including across hosts with matching ids and orgs.',
@@ -94,7 +124,7 @@ console.log(host.extensions.label('draft'))`
       role: 'operation',
       purpose: t(
         'Compute positive mean minus negative mean for native retrieval.',
-        '为原生检索计算正均值减负均值。'
+        '为原生检索计算正样本均值减负样本均值，不另行实现后端的评分与排名算法。'
       ),
       params: {
         positive: t(
@@ -114,6 +144,7 @@ console.log(host.extensions.label('draft'))`
       cases: storageHostCases.recommendStorageVector
     },
     createBackendChangeIterator: {
+      optionDocs: storageHostChangeIteratorOptions,
       role: 'operation',
       purpose: t(
         'Bridge the installed controller to its original iterator lifetime with one pending invalidation slot.',
@@ -140,13 +171,13 @@ console.log(host.extensions.label('draft'))`
       role: 'operation',
       purpose: t(
         'Return the original canonical journal head or resource lock identity without acquiring it.',
-        '返回原 journal head 或 resource 规范锁身份，不获取锁。'
+        '返回原日志头记录或资源的规范锁身份，编码复用原拥有者且本函数不获取锁。'
       ),
       params: {
         prefix: t('Nonempty private namespace prefix.', '非空私有 namespace prefix。'),
         part: t(
           'StorageJournalLock.head or StorageJournalLock.resource.',
-          'StorageJournalLock.head 或 StorageJournalLock.resource。'
+          '由 `StorageJournalLock.head` 或 `StorageJournalLock.resource` 选择头记录或资源身份。'
         )
       },
       returns: t(
@@ -158,14 +189,14 @@ console.log(host.extensions.label('draft'))`
       role: 'operation',
       purpose: t(
         'Canonical head and resource roles for the existing journal lock owner.',
-        '既有 journal 锁拥有者的 head 与 resource 规范角色。'
+        '既有日志锁拥有者的头记录与资源规范角色，读取角色本身不获取锁或提交权限。'
       )
     },
     encodeStorageJournalImage: {
       role: 'operation',
       purpose: t(
         'Encode an absent or portable value through the original durable image codec.',
-        '沿原持久镜像 codec 编码缺失或可移植值。'
+        '沿原持久镜像编解码器编码缺失或可移植值，保留唯一编码身份与版本。'
       ),
       params: {
         present: t(
@@ -186,7 +217,7 @@ console.log(host.extensions.label('draft'))`
       role: 'operation',
       purpose: t(
         'Decode only the original versioned durable image and preserve codec failures on cause.',
-        '仅解码原版本化持久镜像，并在 cause 保留 codec 错误。'
+        '仅解码原版本化持久镜像，并在原因链保留编解码器原错误，不重新解释另一种格式。'
       ),
       params: {
         image: t('One original present/absent image.', '一个原存在/缺失镜像。'),
@@ -200,6 +231,7 @@ console.log(host.extensions.label('draft'))`
       cases: storageHostCases.decodeStorageJournalImage
     },
     createBackendJournalNamespace: {
+      options: 'IBackendJournalNamespaceOptions',
       role: 'operation',
       purpose: t(
         'Reuse the original private namespace resource lifetime; backend owners retain data and actual native terminal decisions.',
@@ -222,7 +254,7 @@ console.log(host.extensions.label('draft'))`
       role: 'operation',
       purpose: t(
         'Observe one already-admitted native batch through the original operation stages and scheduler.',
-        '借用原operation stages与scheduler观察一个已准入的原生批量操作。'
+        '借用原操作观察与调度器观察一个已准入原生批量操作，既不重跑也不取得提交权。'
       ),
       params: {
         stages: t(
@@ -302,6 +334,17 @@ console.log(host.extensions.label('draft'))`
       cases: storageHostCases.defineEntity
     },
     memoryBackendPlugin: {
+      params: {
+        options: t(
+          'Caller-selected native memory options; no backend opens until installation.',
+          '调用方选择的原生内存选项，安装之前不打开后端。'
+        ),
+        features: t(
+          'Explicit named Feature record from defineFeature, passed as the separate final argument.',
+          '来自 `defineFeature` 的显式具名特性记录，作为独立最后参数传入。'
+        )
+      },
+      optionDocs: storageHostFactoryOptionDocs.memory,
       role: 'factory',
       purpose: t(
         'Define an isolated memory backend without acquiring data before installation. Optional namespace-local capacity captures positive maxEntries/maxBytes and lru (default) or lfu once. Linked policy nodes and the original deadline radix select committed victims; native transactions and root writes share the original owner, budget and victim locks. onEvict reports only per-channel counts after commit. Explicit maxBytes requires a real canonical encoding; unsupported records reject before mutation. Omitted capacity and maxEntries preserve the original structuredClone domain.',
@@ -321,7 +364,7 @@ console.log(host.extensions.label('draft'))`
       role: 'constant',
       purpose: t(
         'Target memory Features using exact backend kind identity.',
-        '以准确后端种类身份绑定memory Feature。'
+        '以准确后端种类身份绑定内存特性，同名种类对象不能代替真实的目标身份。'
       ),
       returns: t(
         'The authentic memory kind; its client is undefined and its transaction client checks the original scope and returns undefined.',
@@ -329,6 +372,20 @@ console.log(host.extensions.label('draft'))`
       )
     },
     resolveStorageNamespace: {
+      params: {
+        configured: t(
+          'Namespace or database name captured from native plugin options.',
+          '来自原生插件配置选项的命名空间或数据库名称。'
+        ),
+        orgId: t(
+          'Canonical organization id returned by the original host context.',
+          '来自原宿主上下文返回的规范组织编号。'
+        ),
+        defaultOrgId: t(
+          'Default organization id from the original host installation.',
+          '来自原宿主安装过程捕获的缺省组织编号。'
+        )
+      },
       role: 'operation',
       purpose: t(
         'Resolve one configured backend namespace while keeping each instance prefix and canonical organization identity.',
@@ -344,7 +401,7 @@ console.log(host.extensions.label('draft'))`
       role: 'factory',
       purpose: t(
         'Generate a lowercase UUID using the host native crypto.randomUUID capability.',
-        '通过宿主原生crypto.randomUUID能力生成小写UUID。'
+        '通过宿主原生 `crypto.randomUUID` 能力生成规范小写组织编号，不使用自制随机替代算法。'
       ),
       returns: t(
         'A canonical UUID string. Missing native UUID support rejects with UNSUPPORTED_CAPABILITY and preserves the original cause.',
@@ -383,6 +440,13 @@ console.log(repositoryMigrationKey('users'))`,
       cases: storageHostCases.jsonCodec
     },
     createStorageHost: {
+      params: {
+        options: t(
+          'Initial plugin tuple and captured lifecycle/configuration options.',
+          '初始插件元组以及单次捕获的生命周期与配置选项。'
+        )
+      },
+      options: 'IStorageHostCreateOptions',
       role: 'factory',
       purpose: t(
         'Create the original PluginHost-backed storage lifecycle and atomically install its initial tuple. Backend lookup retains the exact admitted object.',
@@ -435,16 +499,22 @@ console.log(host.extensions.label('draft'))`,
       )
     },
     assertStorageBackendId: {
+      params: {
+        id: t('Candidate backend id supplied by the plugin author.', '插件作者提供的候选后端编号。')
+      },
       role: 'operation',
       purpose: t(
         'Reject an invalid bounded ASCII backend id before installation changes membership.',
-        '安装改变成员前拒绝非法的有界ASCII后端id。'
+        '在安装改变成员之前拒绝非法的有界后端编号，调用方应修正编号后重试。'
       ),
       returns: t(
         'Returns void for valid input; invalid input throws a coded native TypeError.',
         '合法输入返回void；非法输入抛带语义码的原生TypeError。'
       )
-    }
+    },
+    ...storageHostAuthoringSymbols,
+    ...storageHostRuntimeSymbols,
+    ...storageHostBackfillSymbols
   },
   types: {
     IStorageJournalRedoAttempt: {
@@ -526,20 +596,6 @@ console.log(host.extensions.label('draft'))`,
           summary: t(
             'Optional global journal configuration; omitted configurations leave the original execution path unchanged. Memory external WAL uses the original intent/marker protocol when its binding explicitly supports external awaits. Native memory undo checks all original revisions and values before restoring through the original locked transaction. External undo uses the same full-image WAL/marker protocol with exact-only repeated mirror publication. Redo, blob capture and other-backend wiring remain unfinished.',
             '可选全局 journal；省略时保持原路径。memory 外置 WAL 在原 binding 显式允许外部等待时使用原 intent/marker 协议；memory 原生 undo 比较全部原修订和值，再沿原加锁事务恢复；外置 undo 复用完整镜像 WAL/marker 协议，仅完整相同的已发布镜像可幂等略过；redo、blob 捕获和其它后端接线尚未完成。'
-          )
-        }
-      }
-    },
-    IBackendKeyLockPort: {
-      summary: t(
-        'Installation-issued canonical key locks shared by native backends.',
-        '原安装窗口提供的规范键锁，由原生后端共享。'
-      ),
-      members: {
-        attemptMetadata: {
-          summary: t(
-            'Hold only private metadata through the original point-lock owner; business clear ranges exclude this row.',
-            '仅通过原点锁拥有者持有私有元数据；业务 clear 范围排除该行。'
           )
         }
       }
@@ -880,8 +936,8 @@ console.log(host.extensions.label('draft'))`,
           ),
           params: {
             orgId: t(
-              'Canonical UUID validated by the host organization boundary.',
-              '已由宿主组织边界校验的规范UUID。'
+              'Canonical UUID from the host organization boundary.',
+              '来自宿主组织边界校验的规范组织编号。'
             )
           },
           returns: t(
@@ -895,7 +951,10 @@ console.log(host.extensions.label('draft'))`,
             '只删除请求的物理组织，不改变其它目标。'
           ),
           params: {
-            orgId: t('Canonical UUID supplied to host.dropOrg.', '传给host.dropOrg的规范UUID。')
+            orgId: t(
+              'Canonical UUID from the caller supplied to host.dropOrg.',
+              '来自调用方并传给 `host.dropOrg` 的规范组织编号。'
+            )
           },
           returns: t(
             'Completion of that native target deletion; failures retain the original error.',
@@ -1056,7 +1115,15 @@ await host.dispose()
 off()`
         }
       }
-    }
+    },
+    ...storageHostAuthoringTypes,
+    ...storageHostJournalTypes,
+    ...storageHostRuntimeTypes,
+    ...storageHostInstanceTypes,
+    ...storageHostPluginTypes,
+    ...storageHostHookTypes,
+    ...storageHostBackfillTypes,
+    ...storageHostNativeAuthorTypes
   },
   enums: {
     StorageErrorCode: {
@@ -1070,7 +1137,9 @@ off()`
           '尝试全部后端后仍有组织目标删除失败；检查所有原错误并重试，不回滚已成功删除。'
         )
       }
-    }
+    },
+    ...storageHostRuntimeEnums,
+    ...storageHostBackfillEnums
   },
   enhancers: {}
 }

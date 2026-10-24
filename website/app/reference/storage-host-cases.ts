@@ -472,7 +472,7 @@ console.log(await jsonCodec.decode(encoded))`,
       example: `import { Logger } from '@migaia/logger'
 import { binlog } from '@migaia/logger/plugins/durable'
 import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
-const borrowed: Array<{ shutdown(reason: 'manual'): Promise<void> }> = []
+const borrowed: Array<{ shutdown(reason: 'manual'): Promise<unknown> }> = []
 await using host = await createStorageHost({
   plugins: [memoryBackendPlugin()],
   journal: async ({storageLogStore}) => {
