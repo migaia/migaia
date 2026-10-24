@@ -47,7 +47,7 @@ export default defineConfig(withDistFreshness({
   },
   cacheDir: fileURLToPath(new URL('../../node_modules/.vite/plugin-host', import.meta.url)),
   build: {
-    target: 'es2020',
+    target: 'es2022',
     lib: {
       entry: {
         index: 'src/index.ts',

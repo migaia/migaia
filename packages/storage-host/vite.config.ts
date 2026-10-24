@@ -12,7 +12,7 @@ const dependencies = [
 /** Emit a browser-safe host without bundling another lifecycle or capability owner. */
 export default defineConfig({
   build: {
-    target: 'es2020',
+    target: 'es2022',
     lib: {
       entry: {
         index: 'src/index.ts',

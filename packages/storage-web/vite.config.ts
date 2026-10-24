@@ -22,7 +22,7 @@ const isRuntimeExternal = (id: string): boolean =>
 export default defineConfig({
   cacheDir: fileURLToPath(new URL('../../node_modules/.vite/storage-web', import.meta.url)),
   build: {
-    target: 'es2020',
+    target: 'es2022',
     lib: {
       entry: {
         index: 'src/index.ts',
