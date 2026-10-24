@@ -7789,7 +7789,8 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
     optionsEn: [
       {
         name: 'features',
-        description: 'Selected Feature record, passed separately after native backend options.',
+        description:
+          'Selected Feature record, passed separately after native backend options. TTL, batch, journal, notifications, change feed, indexes and raw record keyset pagination each have an independent factory.',
         defaultValue: 'undefined',
         type: 'IStorageFeatureRecord',
         whenToUse: 'Attach only Features targeting this backend kind.',
@@ -7864,7 +7865,8 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
     optionsZh: [
       {
         name: 'features',
-        description: '作为原生后端选项之后的独立第二参数传入的特性记录。',
+        description:
+          '作为原生后端选项之后的独立第二参数传入的特性记录；期限、批量、日志、通知、变更流、索引与原始记录游标分页各有独立工厂。',
         defaultValue: 'undefined',
         type: 'IStorageFeatureRecord',
         whenToUse: '仅安装目标包含当前后端种类的特性。',

@@ -42,6 +42,12 @@ const units = [
     'indexedDbIndexesFeature',
     'Provide native secondary-index declarations, readiness and backfill through the original IndexedDB owner.',
     '通过原索引数据库拥有者提供原生次级索引声明、就绪状态与回填能力。'
+  ],
+  [
+    'keyset',
+    'indexedDbKeysetFeature',
+    'Enable page and after on raw record queries through the canonical cursor owner, without selecting native secondary indexes. Basic all queries remain available; entity pagination selects its separate entityKeysetFeature.',
+    '通过规范游标拥有者为原始记录查询启用 page 与 after，不启用原生次级索引。基础 all 查询仍可用；实体分页选择独立的 entityKeysetFeature。'
   ]
 ] as const
 /** Every Feature has a complete program exercising the capability it installs. */
@@ -56,7 +62,9 @@ const examples: Readonly<Record<string, string>> = {
   'change-feed':
     "import { createStorageHost } from '@migaia/storage-host'\nimport { asChangeFeedStore } from '@migaia/storage-contract'\nimport { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'\nimport { indexedDbNotificationsFeature } from '@migaia/storage-web/features/indexed-db-notifications'\nimport { indexedDbChangeFeedFeature } from '@migaia/storage-web/features/indexed-db-change-feed'\n\nawait using host = await createStorageHost({\n  plugins: [\n    indexedDbBackendPlugin(\n      { dbName: 'draft-changes' },\n      {\n        notifications: indexedDbNotificationsFeature(),\n        changeFeed: indexedDbChangeFeedFeature(),\n      },\n    ),\n  ],\n})\nconst drafts = asChangeFeedStore(host.backend('indexed-db'))\nawait using changes = drafts.watch('one')\nconst next = changes.next()\nawait drafts.set('one', 'saved')\nconsole.log((await next).value?.kind)",
   indexes:
-    "import { createStorageHost } from '@migaia/storage-host'\nimport { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'\nimport { indexedDbIndexesFeature } from '@migaia/storage-web/features/indexed-db-indexes'\n\nawait using host = await createStorageHost({\n  plugins: [\n    indexedDbBackendPlugin(\n      { dbName: 'indexed-orders' },\n      { indexes: indexedDbIndexesFeature() },\n    ),\n  ],\n})\nconst orders = host.backend('indexed-db')\nconst handle = await orders.ensureRecordIndexes('orders', [\n  { name: 'status', unique: false, multiEntry: false, revision: 1 },\n])\nconsole.log((await orders.getRecordIndexReadiness(handle)).status)"
+    "import { createStorageHost } from '@migaia/storage-host'\nimport { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'\nimport { indexedDbIndexesFeature } from '@migaia/storage-web/features/indexed-db-indexes'\n\nawait using host = await createStorageHost({\n  plugins: [\n    indexedDbBackendPlugin(\n      { dbName: 'indexed-orders' },\n      { indexes: indexedDbIndexesFeature() },\n    ),\n  ],\n})\nconst orders = host.backend('indexed-db')\nconst handle = await orders.ensureRecordIndexes('orders', [\n  { name: 'status', unique: false, multiEntry: false, revision: 1 },\n])\nconsole.log((await orders.getRecordIndexReadiness(handle)).status)",
+  keyset:
+    "import { createStorageHost } from '@migaia/storage-host'\nimport { records } from '@migaia/storage-contract'\nimport { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'\nimport { indexedDbKeysetFeature } from '@migaia/storage-web/features/indexed-db-keyset'\n\nawait using host = await createStorageHost({\n  plugins: [\n    indexedDbBackendPlugin(\n      { dbName: 'paged-orders' },\n      { keyset: indexedDbKeysetFeature() },\n    ),\n  ],\n})\nconst orders = host.backend('indexed-db')\nawait orders.putRecord({ id: 1, status: 'paid' }, 1)\nawait orders.putRecord({ id: 2, status: 'pending' }, 2)\nconst query = orders.use(records).query<{ id: number; status: string }>().orderBy('id')\nconst first = await query.page(1)\nconsole.log(first.items)\nif (first.next) console.log((await query.after(first.next).page(1)).items)"
 }
 /** Module descriptions identify the exact first factory imported by application code. */
 export const storageWebAssemblyModules: Readonly<Record<string, IModuleDoc>> = Object.fromEntries(
