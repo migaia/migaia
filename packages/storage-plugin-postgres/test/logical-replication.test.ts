@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { Pool } from 'pg'
+import { Pool, type QueryArrayConfig } from 'pg'
 import { it, expect, onTestFinished, vi } from 'vitest'
 import { createStorageHost } from '@migaia/storage-host'
 import { durableChangeFeed } from '@migaia/storage-contract'
@@ -324,14 +324,8 @@ for (const mode of ['pid-query', 'abort', 'ready-query-abort'] as const) {
     const observedPool = new Proxy(pool, {
       get(target, key, receiver) {
         if (key !== 'query') return Reflect.get(target, key, receiver)
-        return async (...args: unknown[]) => {
-          const input = args[0]
-          const text =
-            typeof input === 'string'
-              ? input
-              : input !== null && typeof input === 'object'
-                ? Reflect.get(input, 'text')
-                : undefined
+        return async (input: QueryArrayConfig) => {
+          const text = input.text
           if (
             mode === 'pid-query' &&
             typeof text === 'string' &&
@@ -342,15 +336,16 @@ for (const mode of ['pid-query', 'abort', 'ready-query-abort'] as const) {
             mode === 'ready-query-abort' &&
             typeof text === 'string' &&
             text.includes('SELECT active_pid')
-          if (waiting && input !== null && typeof input === 'object')
-            args[0] = {
-              ...input,
-              text: text.replace(
-                'FROM pg_replication_slots',
-                'FROM pg_replication_slots CROSS JOIN pg_sleep(0.075)'
-              )
-            }
-          const pending = Reflect.apply(target.query, target, args)
+          const prepared = waiting
+            ? {
+                ...input,
+                text: text.replace(
+                  'FROM pg_replication_slots',
+                  'FROM pg_replication_slots CROSS JOIN pg_sleep(0.075)'
+                )
+              }
+            : input
+          const pending = target.query(prepared)
           if (waiting) cancellation.abort(original)
           const result = await pending
           if (waiting) startupSettled = true

@@ -3,10 +3,10 @@ import { PgNames, PgQuantizedMode, PgQuantizedIndexPrefix } from './constants.js
 import type { IPgQuantizedOptions } from './features/quantized.js'
 import type { IStorageVectorConfiguration, IOperationContext } from '@migaia/storage-contract'
 import { quotePgIdentifier } from './copy-command.js'
-import { capture, invalidArgument, postgresError } from './errors.js'
+import { invalidArgument, postgresError } from './errors.js'
 import { PostgresErrorCode } from './error-code.js'
 import { PostgresErrorText } from './error-text.js'
-/** Captured configuration contains no mutable caller getters after the plugin factory returns. */
+/** Fixed deployment metadata remains stable while installation probes and DDL await. */
 export type IPgConfiguration = {
   readonly driver: IPgDriver
   readonly server: IPgServer
@@ -16,39 +16,40 @@ export type IPgConfiguration = {
   readonly label: string | undefined
   readonly maxLockMs: number
 }
-/** Capture public configuration before any native connection or DDL is allowed. */
+/**
+ * Validate and capture deployment fields before awaited native installation can observe caller
+ * mutation.
+ */
 export function snapshotPostgresOptions(input: IPostgresOptions<IPgServer>): IPgConfiguration {
-  return capture(() => {
-    const {
-      driver,
-      server = PgNames.backend,
-      schema = PgNames.schema,
-      prefix = PgNames.prefix,
-      concurrency,
-      owner,
-      maxLockMs = 60000
-    } = input
-    const label = owner?.label
-    if (
-      driver === null ||
-      typeof driver !== 'object' ||
-      typeof driver.query !== 'function' ||
-      typeof driver.connect !== 'function' ||
-      (server !== 'postgres' && server !== 'cockroach' && server !== 'yugabyte') ||
-      typeof schema !== 'string' ||
-      typeof prefix !== 'string' ||
-      !schema ||
-      schema.includes('\0') ||
-      prefix.includes('\0') ||
-      !schema.isWellFormed() ||
-      !prefix.isWellFormed() ||
-      (label !== undefined && typeof label !== 'string') ||
-      !Number.isSafeInteger(maxLockMs) ||
-      maxLockMs < 1
-    )
-      throw invalidArgument(new TypeError(PostgresErrorText.invalidOptions))
-    return Object.freeze({ driver, server, schema, prefix, concurrency, label, maxLockMs })
-  })
+  const {
+    driver,
+    server = PgNames.backend,
+    schema = PgNames.schema,
+    prefix = PgNames.prefix,
+    concurrency,
+    owner,
+    maxLockMs = 60000
+  } = input
+  const label = owner?.label
+  if (
+    driver === null ||
+    typeof driver !== 'object' ||
+    typeof driver.query !== 'function' ||
+    typeof driver.connect !== 'function' ||
+    (server !== 'postgres' && server !== 'cockroach' && server !== 'yugabyte') ||
+    typeof schema !== 'string' ||
+    typeof prefix !== 'string' ||
+    !schema ||
+    schema.includes('\0') ||
+    prefix.includes('\0') ||
+    !schema.isWellFormed() ||
+    !prefix.isWellFormed() ||
+    (label !== undefined && typeof label !== 'string') ||
+    !Number.isSafeInteger(maxLockMs) ||
+    maxLockMs < 1
+  )
+    throw invalidArgument(new TypeError(PostgresErrorText.invalidOptions))
+  return { driver, server, schema, prefix, concurrency, label, maxLockMs }
 }
 /** These finite physical table names are quoted once, after native identifier-limit admission. */
 export function postgresTables(options: IPgConfiguration, maxIdentifierBytes: number) {
@@ -72,7 +73,7 @@ export function postgresTables(options: IPgConfiguration, maxIdentifierBytes: nu
       throw invalidArgument(new TypeError(PostgresErrorText.invalidIdentifier))
     result[key] = quotePgIdentifier(options.schema) + '.' + quotePgIdentifier(name)
   }
-  return Object.freeze(result)
+  return result
 }
 /** One admitted physical layout is reused by every bound organization and transaction. */
 export type IPgTables = ReturnType<typeof postgresTables>

@@ -7,7 +7,6 @@ import { decodePgRows } from './result.js'
 import { pgResource } from './driver-resource.js'
 import { copyCommand } from './copy-command.js'
 import { normalizePostgresError } from './errors.js'
-import { inspectThenable, observeThenableRejection } from '@migaia/utils/function'
 import {
   throwIfAborted,
   subscribeToAbort,
@@ -96,9 +95,7 @@ export function postgresJsDriver(client: Sql): IPgDriver {
         const subscription = await client.listen(channel, (payload) => {
           try {
             const result = listener(payload)
-            observeThenableRejection(result, inspectThenable(result), (cause) =>
-              reportCleanupError(report, cause)
-            )
+            void Promise.resolve(result).catch((cause) => reportCleanupError(report, cause))
           } catch (cause) {
             reportCleanupError(report, cause)
           }

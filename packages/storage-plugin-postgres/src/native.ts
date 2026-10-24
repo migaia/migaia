@@ -52,6 +52,7 @@ export type IPgState = {
 }
 /** Channel labels distinguish revision tombstones while key bytes keep the sole canonical identity. */
 export function pgIdentity(channel: IPgMutationChannel, key: IStorageKey): string {
+  /** Canonical lock projection owns channel identity encoding; this is not another input snapshot. */
   return channel === 'metadata'
     ? PgNames.metadataRevisionPrefix + pgKey(key).hex
     : snapshotConcurrencyLockKeys([pgLockKey(channel, key)], PgNames.backend).identities[0]!
@@ -174,6 +175,10 @@ export function markPgChanged(
     changed = new Map()
     state.changed.set(channel, changed)
   }
+  /**
+   * PutRecord returns its compound key before the transaction awaits commit; retain an independent
+   * ledger key.
+   */
   changed.set(pgKey(key).hex, snapshotStorageKey(key, PgNames.backend))
   state.journal?.stage(channel, key, after)
 }
@@ -706,6 +711,7 @@ export async function removePrefixPg(
   channel: 'text' | 'record',
   prefix: IStorageKey
 ): Promise<number> {
+  /** The canonical prefix projection owns native ordered bounds used across scan and delete awaits. */
   const range = snapshotStorageKeyPrefix(prefix, PgNames.backend)
   await observePgRange(state, tables, channel)
   await state.guardRange(channel, range.key)

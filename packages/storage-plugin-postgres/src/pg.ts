@@ -8,7 +8,6 @@ import { decodePgRows } from './result.js'
 import { pgResource } from './driver-resource.js'
 import { copyCommand, quotePgIdentifier } from './copy-command.js'
 import { normalizePostgresError } from './errors.js'
-import { inspectThenable, observeThenableRejection } from '@migaia/utils/function'
 import { createPgReplication } from './pg-replication.js'
 import {
   throwIfAborted,
@@ -109,9 +108,7 @@ export function pgDriver(pool: Pool): IPgDriver {
         if (message.channel !== channel) return
         try {
           const result = listener(message.payload ?? '')
-          observeThenableRejection(result, inspectThenable(result), (cause) =>
-            reportCleanupError(report, cause)
-          )
+          void Promise.resolve(result).catch((cause) => reportCleanupError(report, cause))
         } catch (cause) {
           reportCleanupError(report, cause)
         }

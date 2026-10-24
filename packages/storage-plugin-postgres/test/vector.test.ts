@@ -531,14 +531,6 @@ it('rejects malformed modes before installation and requires the selected origin
   expect(() => pgQuantizedFeature({ mode: 'other' as never })).toThrowError(
     expect.objectContaining({ code: 'INVALID_ARGUMENT' })
   )
-  const original = new Error('quantized-mode-getter')
-  expect(() =>
-    pgQuantizedFeature({
-      get mode(): never {
-        throw original
-      }
-    })
-  ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT', cause: original }))
   const pool = new Pool({ connectionString })
   const native = pgDriver(pool)
   let reads = 0

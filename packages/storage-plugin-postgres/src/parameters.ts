@@ -1,6 +1,6 @@
 import type { ISqlValue } from '@migaia/storage-contract'
 import type { IPgNativeArrayParameter, IPgNativeParameter } from './types.js'
-import { capture, invalidArgument } from './errors.js'
+import { invalidArgument } from './errors.js'
 import { PostgresErrorText } from './error-text.js'
 /** One array-text encoder is used by all three actual adapters and both root/transaction batches. */
 function arrayText(input: IPgNativeArrayParameter): string {
@@ -28,19 +28,18 @@ function arrayText(input: IPgNativeArrayParameter): string {
 }
 /** Capture native arguments before I/O and bind arrays as ordinary strings, never SQL fragments. */
 export function encodePgParameters(input: readonly IPgNativeParameter[]): readonly ISqlValue[] {
-  return capture(() => {
-    const parameters: ISqlValue[] = []
-    for (const value of input) {
-      if (value instanceof Uint8Array) {
-        parameters.push(value.slice())
-        continue
-      }
-      if (value !== null && typeof value === 'object') {
-        parameters.push(arrayText(value))
-        continue
-      }
-      parameters.push(value)
+  const parameters: ISqlValue[] = []
+  for (const value of input) {
+    if (value instanceof Uint8Array) {
+      /** Native adapters may queue a query across an await before serializing caller bytes. */
+      parameters.push(value.slice())
+      continue
     }
-    return parameters
-  })
+    if (value !== null && typeof value === 'object') {
+      parameters.push(arrayText(value))
+      continue
+    }
+    parameters.push(value)
+  }
+  return parameters
 }

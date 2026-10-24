@@ -2,10 +2,10 @@ import type { Pool, ClientBase } from 'pg'
 import type { Pgoutput } from 'pg-logical-replication'
 import { deferred, sleep } from '@migaia/utils/promise'
 import { attachSecondaryErrors } from '@migaia/utils/error'
-import { inspectThenable, observeThenableRejection } from '@migaia/utils/function'
 import {
   StorageContractError,
   StorageContractErrorCode,
+  type IOperationContext,
   type IDurableStorageChange
 } from '@migaia/storage-contract'
 import {
@@ -163,24 +163,25 @@ class PgCommitAccumulator {
     return undefined
   }
 }
-/** Only the pg adapter loads this peer; ordinary backend imports stay independent from replication. */
-export function createPgReplication(
-  pool: Pool,
-  query: (
+/** Immutable native ports shared by polling reads and independently owned live sessions. */
+type IPgReplicationContext = {
+  readonly pool: Pool
+  readonly query: (
     client: Pool | ClientBase,
     text: string,
     params: readonly IPgNativeParameter[]
   ) => Promise<IPgResult>
-): IPgLogicalReplicationPort {
-  const report = createStorageOperationReporter()
-  /** Native facts are read-only and contain no caller credentials. */
-  const inspect = async (
-    options: { slot: string; publication: string } & IPgLogicalReplicationRoute,
-    cursor?: IPgCursor
-  ) => {
-    const result = await query(
-      pool,
-      `SELECT current_database() AS database,d.oid::text AS database_oid,
+  readonly report: ReturnType<typeof createStorageOperationReporter>
+}
+/** Inspect the existing slot and WAL retention without changing deployment configuration. */
+async function inspectPgReplication(
+  context: IPgReplicationContext,
+  options: IPgLogicalReplicationOptions & IPgLogicalReplicationRoute,
+  cursor?: IPgCursor
+) {
+  const result = await context.query(
+    context.pool,
+    `SELECT current_database() AS database,d.oid::text AS database_oid,
       inet_server_addr()::text AS address,inet_server_port()::text AS port,
       s.confirmed_flush_lsn::text AS confirmed,s.restart_lsn::text AS restart,s.wal_status,
       pg_wal_lsn_diff(pg_current_wal_lsn(),s.confirmed_flush_lsn)::text AS flush_lag,
@@ -191,323 +192,437 @@ export function createPgReplication(
       FROM pg_database d JOIN pg_roles r ON r.rolname=current_user
       LEFT JOIN pg_replication_slots s ON s.slot_name=$1
       LEFT JOIN pg_publication p ON p.pubname=$2 WHERE d.datname=current_database()`,
-      [options.slot, options.publication]
+    [options.slot, options.publication]
+  )
+  const row = result.rows[0]
+  if (
+    !row ||
+    row.plugin !== 'pgoutput' ||
+    row.temporary !== false ||
+    row.puballtables !== true ||
+    row.wal_level !== 'logical' ||
+    row.replication !== true ||
+    row.slot_database !== row.database
+  )
+    throw unsupported()
+  if (
+    row.wal_status === 'lost' ||
+    typeof row.restart !== 'string' ||
+    typeof row.confirmed !== 'string'
+  )
+    throw expired()
+  const identity = JSON.stringify([
+    row.database,
+    row.database_oid,
+    row.address,
+    row.port,
+    options.schema,
+    options.prefix,
+    options.slot,
+    options.orgId ?? null
+  ])
+  if (cursor !== undefined && cursor.identity !== identity) throw invalidArgument()
+  if (
+    cursor !== undefined &&
+    (position(cursor.end) < position(row.confirmed) ||
+      (cursor.ordinal > 0 && position(cursor.end) === position(row.confirmed)))
+  )
+    throw expired()
+  return {
+    identity,
+    confirmed: row.confirmed,
+    maxSlotWalKeepSize: String(row.max_keep),
+    confirmedFlushLagBytes: String(row.flush_lag),
+    retainedWalBytes: String(row.retained_wal)
+  }
+}
+/** Confirm only a complete position that the caller already persisted. */
+async function confirmPgReplication(
+  context: IPgReplicationContext,
+  slot: string,
+  confirmed: string,
+  cursor: IPgCursor | undefined
+) {
+  if (cursor !== undefined && cursor.ordinal === 0 && position(cursor.end) > position(confirmed))
+    await context.query(
+      context.pool,
+      'SELECT end_lsn::text FROM pg_replication_slot_advance($1,$2::pg_lsn)',
+      [slot, cursor.end]
     )
-    const row = result.rows[0]
-    if (
-      !row ||
-      row.plugin !== 'pgoutput' ||
-      row.temporary !== false ||
-      row.puballtables !== true ||
-      row.wal_level !== 'logical' ||
-      row.replication !== true ||
-      row.slot_database !== row.database
-    )
-      throw unsupported()
-    if (
-      row.wal_status === 'lost' ||
-      typeof row.restart !== 'string' ||
-      typeof row.confirmed !== 'string'
-    )
-      throw expired()
-    const identity = JSON.stringify([
-      row.database,
-      row.database_oid,
-      row.address,
-      row.port,
-      options.schema,
-      options.prefix,
-      options.slot,
-      options.orgId ?? null
-    ])
-    if (cursor !== undefined && cursor.identity !== identity) throw invalidArgument()
-    if (
-      cursor !== undefined &&
-      (position(cursor.end) < position(row.confirmed) ||
-        (cursor.ordinal > 0 && position(cursor.end) === position(row.confirmed)))
-    )
-      throw expired()
-    return {
+}
+/** Produce bounded invalidations and opaque transaction positions without retaining business values. */
+function pgCommitChanges(
+  identity: string,
+  end: string,
+  orgs: readonly (string | undefined)[],
+  start: number,
+  reset: boolean
+): readonly IDurableStorageChange[] {
+  return orgs.slice(start).map((orgId, index) => ({
+    sequence: start + index + 1,
+    origin: PgNames.backend + ':wal',
+    ...(orgId === undefined ? {} : { orgId }),
+    channel: 'all',
+    kind: reset ? 'reset' : 'batch',
+    cursor: encode({
+      version: 1,
       identity,
-      confirmed: row.confirmed,
-      maxSlotWalKeepSize: String(row.max_keep),
-      confirmedFlushLagBytes: String(row.flush_lag),
-      retainedWalBytes: String(row.retained_wal)
+      end,
+      ordinal: start + index + 1 === orgs.length ? 0 : start + index + 1
+    })
+  }))
+}
+/** Peek bounded native pages; the next persisted cursor alone advances the slot. */
+async function readPgReplication(
+  context: IPgReplicationContext,
+  options: Parameters<IPgLogicalReplicationPort['read']>[0],
+  ctx: IOperationContext | undefined
+) {
+  const cursor = decode(options.after)
+  const limit = options.limit ?? 100
+  if (!Number.isSafeInteger(limit) || limit < 1) throw invalidArgument()
+  throwIfAborted(ctx?.signal)
+  const facts = await inspectPgReplication(context, options, cursor)
+  await confirmPgReplication(context, options.slot, facts.confirmed, cursor)
+  const { PgoutputPlugin } = await import('pg-logical-replication')
+  const decoder = new PgoutputPlugin({
+    protoVersion: 1,
+    publicationNames: [quotePgIdentifier(options.publication).replaceAll("'", "''")]
+  })
+  const commits = new PgCommitAccumulator(options)
+  const client = await context.pool.connect()
+  let begun = false
+  const outcome = await (async () => {
+    await context.query(client, 'BEGIN READ ONLY', [])
+    begun = true
+    // The SQL SRF peeks, never consumes. FETCH bounds client buffering; native pgoutput owns decoding.
+    await context.query(
+      client,
+      `DECLARE storage_wal_read NO SCROLL CURSOR FOR
+          SELECT data FROM pg_logical_slot_peek_binary_changes($1,pg_current_wal_lsn(),NULL,
+          'proto_version','1','publication_names',$2)`,
+      [options.slot, quotePgIdentifier(options.publication)]
+    )
+    for (;;) {
+      throwIfAborted(ctx?.signal)
+      const rows = (await context.query(client, 'FETCH FORWARD 128 FROM storage_wal_read', [])).rows
+      if (rows.length === 0)
+        return {
+          changes: [],
+          cursor:
+            options.after ??
+            encode({ version: 1, identity: facts.identity, end: facts.confirmed, ordinal: 0 })
+        }
+      for (const row of rows) {
+        if (!(row.data instanceof Uint8Array)) throw unsupported()
+        const commit = commits.accept(decoder.parse(Buffer.from(row.data)))
+        if (commit === undefined || commit.orgs.length === 0) continue
+        if (
+          cursor !== undefined &&
+          (position(commit.end) < position(cursor.end) ||
+            (cursor.ordinal === 0 && position(commit.end) === position(cursor.end)))
+        )
+          continue
+        const start = cursor !== undefined && commit.end === cursor.end ? cursor.ordinal : 0
+        if (
+          cursor !== undefined &&
+          cursor.ordinal > 0 &&
+          position(commit.end) > position(cursor.end)
+        )
+          throw expired()
+        if (start >= commit.orgs.length) throw invalidArgument()
+        const selected = pgCommitChanges(
+          facts.identity,
+          commit.end,
+          commit.orgs,
+          start,
+          commit.reset
+        ).slice(0, limit)
+        return { changes: selected, cursor: selected.at(-1)!.cursor }
+      }
+    }
+  })().then(
+    (value) => ({ failed: false as const, value }),
+    (cause: unknown) => ({ failed: true as const, cause: normalizePostgresError(cause) })
+  )
+  try {
+    if (begun) await context.query(client, 'ROLLBACK', [])
+  } catch (cause) {
+    throw normalizePostgresError(
+      outcome.failed ? attachSecondaryErrors(outcome.cause, [cause]) : cause
+    )
+  } finally {
+    client.release()
+  }
+  if (outcome.failed) throw outcome.cause
+  return outcome.value
+}
+/** One native live session owns startup, acknowledgement and native connection disposal. */
+class PgLiveFeed {
+  /** Immutable native pool and query ports are borrowed from the original driver. */
+  readonly #context: IPgReplicationContext
+  /** The selected slot, route and callbacks stay fixed for this session. */
+  readonly #options: Parameters<IPgLogicalReplicationPort['open']>[0]
+  /** Caller cancellation follows the original storage operation context. */
+  readonly #operation: IOperationContext | undefined
+  /** The real peer alone owns replication transport and explicit acknowledgements. */
+  readonly #service: import('pg-logical-replication').LogicalReplicationService
+  /** The original peer parser supplies ordered pgoutput transactions. */
+  readonly #decoder: import('pg-logical-replication').PgoutputPlugin
+  /** Readiness settles only after the actual slot backend is identified. */
+  readonly #ready = deferred<void>()
+  /** Only routing scalars survive native row decoding. */
+  readonly #commits: PgCommitAccumulator
+  /** One original resource serializes accepted callbacks and stable disposal promises. */
+  readonly #resource: ReturnType<typeof pgResource>
+  /** A partial cursor is applied once before later commits follow normally. */
+  #resume: IPgCursor | undefined
+  /** The first failure stops new deliveries and is reported once. */
+  #failed = false
+  /** Native abort subscription belongs to this session and is removed at shutdown. */
+  #stopAbort: () => void = () => {}
+  /** The peer's streaming promise drains before connection cleanup completes. */
+  #streaming: Promise<unknown> | undefined
+  /** Accepted readiness work also drains during failed startup. */
+  #startup: Promise<void> | undefined
+  /** Cleanup waits for this exact native backend, never another consumer using the same slot. */
+  #nativePid: number | undefined
+
+  /** Bind the real peer without loading it from the runtime-neutral package root. */
+  constructor(
+    context: IPgReplicationContext,
+    options: Parameters<IPgLogicalReplicationPort['open']>[0],
+    operation: IOperationContext | undefined,
+    peer: typeof import('pg-logical-replication'),
+    cursor: IPgCursor | undefined
+  ) {
+    this.#context = context
+    this.#options = options
+    this.#operation = operation
+    this.#resume = cursor
+    this.#commits = new PgCommitAccumulator(options)
+    this.#service = new peer.LogicalReplicationService(context.pool.options, {
+      acknowledge: { auto: false, timeoutSeconds: 0 },
+      flowControl: { enabled: true }
+    })
+    this.#decoder = createTrackedPgOutput(peer.PgoutputPlugin, options.publication, (client) =>
+      this.#identify(client)
+    )
+    this.#resource = pgResource(() => this.#close())
+    this.#service.on('error', (cause) => this.#fail(cause))
+    this.#service.on('start', () => this.#started())
+    this.#service.on('data', (_lsn: string, message: Pgoutput.Message) => this.#receive(message))
+  }
+  /** Capture the peer's actual client before COPY begins. */
+  async #identify(
+    client: Parameters<import('pg-logical-replication').PgoutputPlugin['start']>[0]
+  ): Promise<void> {
+    const row = (await this.#context.query(client, 'SELECT pg_backend_pid() AS native_pid', []))
+      .rows[0]
+    if (typeof row?.native_pid !== 'number') throw unsupported()
+    this.#nativePid = row.native_pid
+  }
+  /** Confirm this session's original backend owns the selected slot before reporting readiness. */
+  #started(): void {
+    this.#startup = (async () => {
+      const row = (
+        await this.#context.query(
+          this.#context.pool,
+          'SELECT active_pid FROM pg_replication_slots WHERE slot_name=$1',
+          [this.#options.slot]
+        )
+      ).rows[0]
+      if (row?.active_pid !== this.#nativePid) throw unsupported()
+      this.#ready.resolve()
+    })().catch((cause) => this.#fail(cause))
+  }
+  /** Report the first failure and close the existing resource without acknowledging its commit. */
+  #fail(cause: unknown): void {
+    if (this.#failed) return
+    this.#failed = true
+    const error = normalizePostgresError(cause)
+    this.#ready.reject(error)
+    try {
+      if (this.#options.onError === undefined) reportCleanupError(this.#context.report, error)
+      else
+        void Promise.resolve(this.#options.onError(error)).catch((secondary) =>
+          reportCleanupError(this.#context.report, secondary)
+        )
+    } catch (secondary) {
+      reportCleanupError(this.#context.report, secondary)
+    }
+    void this.#resource
+      .dispose()
+      .catch((secondary) => reportCleanupError(this.#context.report, secondary))
+  }
+  /** Native flow control awaits each original callback before requesting more peer data. */
+  #receive(message: Pgoutput.Message): Promise<void> | undefined {
+    if (this.#failed) return
+    return this.#resource.run(async () => {
+      try {
+        await this.#deliver(message)
+      } catch (cause) {
+        this.#fail(cause)
+      }
+    })
+  }
+  /** Only a complete, successfully processed commit advances its exclusive native end. */
+  async #deliver(message: Pgoutput.Message): Promise<void> {
+    const commit = this.#commits.accept(message)
+    if (commit === undefined) return
+    const resume = this.#resume
+    if (
+      resume !== undefined &&
+      (position(commit.end) < position(resume.end) ||
+        (resume.ordinal === 0 && position(commit.end) === position(resume.end)))
+    )
+      return
+    const start = resume !== undefined && commit.end === resume.end ? resume.ordinal : 0
+    if (resume !== undefined && resume.ordinal > 0 && position(commit.end) > position(resume.end))
+      throw expired()
+    if (start > commit.orgs.length) throw invalidArgument()
+    for (const change of pgCommitChanges(
+      this.#identity,
+      commit.end,
+      commit.orgs,
+      start,
+      commit.reset
+    ))
+      await this.#options.onChange(change)
+    await this.#service.acknowledge(commit.end)
+    this.#resume = undefined
+  }
+  /** The native inspection supplies the opaque cursor identity before streaming begins. */
+  #identity = ''
+  /** Start at the original native checkpoint and reject only after failed startup drains. */
+  async open(
+    facts: Awaited<ReturnType<typeof inspectPgReplication>>
+  ): Promise<Awaited<ReturnType<IPgLogicalReplicationPort['open']>>> {
+    this.#identity = facts.identity
+    const cursor = this.#resume
+    const from =
+      this.#options.from === 'now'
+        ? (
+            await this.#context.query(
+              this.#context.pool,
+              'SELECT pg_current_wal_lsn()::text AS lsn',
+              []
+            )
+          ).rows[0]?.lsn
+        : cursor !== undefined && cursor.ordinal === 0
+          ? cursor.end
+          : facts.confirmed
+    if (typeof from !== 'string') throw unsupported()
+    this.#streaming = this.#service
+      .subscribe(this.#decoder, this.#options.slot, from)
+      .catch((cause) => this.#fail(cause))
+    try {
+      this.#stopAbort = subscribeToAbort(
+        this.#operation?.signal,
+        () => {
+          try {
+            throwIfAborted(this.#operation?.signal)
+          } catch (cause) {
+            this.#fail(cause)
+          }
+        },
+        this.#context.report
+      )
+      await this.#ready.promise
+    } catch (cause) {
+      try {
+        await this.#resource.dispose()
+      } catch (secondary) {
+        throw normalizePostgresError(attachSecondaryErrors(cause, [secondary]))
+      }
+      throw cause
+    }
+    return {
+      dispose: this.#resource.dispose,
+      [Symbol.asyncDispose]: this.#resource[Symbol.asyncDispose],
+      acknowledge: async (end) => {
+        position(end)
+        await this.#service.acknowledge(end)
+      }
     }
   }
-  /** Caller-persisted complete positions alone may advance the original native slot. */
-  const confirm = async (slot: string, confirmed: string, cursor: IPgCursor | undefined) => {
-    if (cursor !== undefined && cursor.ordinal === 0 && position(cursor.end) > position(confirmed))
-      await query(pool, 'SELECT end_lsn::text FROM pg_replication_slot_advance($1,$2::pg_lsn)', [
-        slot,
-        cursor.end
-      ])
+  /** Drain only this session's accepted I/O and release the peer's original listeners. */
+  async #close(): Promise<void> {
+    this.#stopAbort()
+    await this.#service.stop()
+    await this.#streaming
+    await this.#startup
+    while (
+      this.#nativePid !== undefined &&
+      (
+        await this.#context.query(
+          this.#context.pool,
+          'SELECT pid FROM pg_stat_activity WHERE pid=$1',
+          [this.#nativePid]
+        )
+      ).rows.length !== 0
+    )
+      await sleep(1)
+    this.#service.removeAllListeners()
   }
-  /** Summaries are broad invalidations, never decoded business values. */
-  const changes = (
-    identity: string,
-    end: string,
-    orgs: readonly (string | undefined)[],
-    start: number,
-    reset: boolean
-  ): readonly IDurableStorageChange[] =>
-    orgs.slice(start).map((orgId, index) => ({
-      sequence: start + index + 1,
-      origin: PgNames.backend + ':wal',
-      ...(orgId === undefined ? {} : { orgId }),
-      channel: 'all',
-      kind: reset ? 'reset' : 'batch',
-      cursor: encode({
-        version: 1,
-        identity,
-        end,
-        ordinal: start + index + 1 === orgs.length ? 0 : start + index + 1
+}
+
+/** A native subclass preserves receiver semantics while observing the peer's original start. */
+function createTrackedPgOutput(
+  Peer: typeof import('pg-logical-replication').PgoutputPlugin,
+  publication: string,
+  beforeStart: (
+    client: Parameters<import('pg-logical-replication').PgoutputPlugin['start']>[0]
+  ) => Promise<void>
+): import('pg-logical-replication').PgoutputPlugin {
+  class PgTrackedOutput extends Peer {
+    /** The callback records the native backend and does not own another connection. */
+    readonly #beforeStart: typeof beforeStart
+    /** Keep peer options and the native identity observation with the actual parser instance. */
+    constructor() {
+      super({
+        protoVersion: 1,
+        publicationNames: [quotePgIdentifier(publication).replaceAll("'", "''")]
       })
-    }))
+      this.#beforeStart = beforeStart
+    }
+    /** Continue the inherited peer start after identifying the original client. */
+    override async start(
+      client: Parameters<import('pg-logical-replication').PgoutputPlugin['start']>[0],
+      slot: string,
+      lastLsn: string
+    ) {
+      await this.#beforeStart(client)
+      return super.start(client, slot, lastLsn)
+    }
+  }
+  return new PgTrackedOutput()
+}
+
+/** Only the pg adapter loads replication; the package root remains client independent. */
+export function createPgReplication(
+  pool: Pool,
+  query: IPgReplicationContext['query']
+): IPgLogicalReplicationPort {
+  const context: IPgReplicationContext = { pool, query, report: createStorageOperationReporter() }
   return {
     detect: async (options, ctx) => {
       throwIfAborted(ctx?.signal)
-      /** Public diagnostics omit the cursor's private store and native slot identity. */
-      const facts = await inspect(options)
+      const facts = await inspectPgReplication(context, options)
       return {
         maxSlotWalKeepSize: facts.maxSlotWalKeepSize,
         confirmedFlushLagBytes: facts.confirmedFlushLagBytes,
         retainedWalBytes: facts.retainedWalBytes
       }
     },
-    read: async (options, ctx) => {
-      const cursor = decode(options.after)
-      const limit = options.limit ?? 100
-      if (!Number.isSafeInteger(limit) || limit < 1) throw invalidArgument()
-      throwIfAborted(ctx?.signal)
-      const facts = await inspect(options, cursor)
-      await confirm(options.slot, facts.confirmed, cursor)
-      const { PgoutputPlugin } = await import('pg-logical-replication')
-      const decoder = new PgoutputPlugin({
-        protoVersion: 1,
-        publicationNames: [quotePgIdentifier(options.publication).replaceAll("'", "''")]
-      })
-      const commits = new PgCommitAccumulator(options)
-      const client = await pool.connect()
-      let begun = false
-      const outcome = await (async () => {
-        await query(client, 'BEGIN READ ONLY', [])
-        begun = true
-        // The SQL SRF peeks, never consumes. FETCH bounds client buffering; native pgoutput owns decoding.
-        await query(
-          client,
-          `DECLARE storage_wal_read NO SCROLL CURSOR FOR
-          SELECT data FROM pg_logical_slot_peek_binary_changes($1,pg_current_wal_lsn(),NULL,
-          'proto_version','1','publication_names',$2)`,
-          [options.slot, quotePgIdentifier(options.publication)]
-        )
-        for (;;) {
-          throwIfAborted(ctx?.signal)
-          const rows = (await query(client, 'FETCH FORWARD 128 FROM storage_wal_read', [])).rows
-          if (rows.length === 0)
-            return {
-              changes: [],
-              cursor:
-                options.after ??
-                encode({ version: 1, identity: facts.identity, end: facts.confirmed, ordinal: 0 })
-            }
-          for (const row of rows) {
-            if (!(row.data instanceof Uint8Array)) throw unsupported()
-            const commit = commits.accept(decoder.parse(Buffer.from(row.data)))
-            if (commit === undefined || commit.orgs.length === 0) continue
-            if (
-              cursor !== undefined &&
-              (position(commit.end) < position(cursor.end) ||
-                (cursor.ordinal === 0 && position(commit.end) === position(cursor.end)))
-            )
-              continue
-            const start = cursor !== undefined && commit.end === cursor.end ? cursor.ordinal : 0
-            if (
-              cursor !== undefined &&
-              cursor.ordinal > 0 &&
-              position(commit.end) > position(cursor.end)
-            )
-              throw expired()
-            if (start >= commit.orgs.length) throw invalidArgument()
-            const selected = changes(
-              facts.identity,
-              commit.end,
-              commit.orgs,
-              start,
-              commit.reset
-            ).slice(0, limit)
-            return { changes: selected, cursor: selected.at(-1)!.cursor }
-          }
-        }
-      })().then(
-        (value) => ({ failed: false as const, value }),
-        (cause: unknown) => ({ failed: true as const, cause: normalizePostgresError(cause) })
-      )
-      try {
-        if (begun) await query(client, 'ROLLBACK', [])
-      } catch (cause) {
-        throw normalizePostgresError(
-          outcome.failed ? attachSecondaryErrors(outcome.cause, [cause]) : cause
-        )
-      } finally {
-        client.release()
-      }
-      if (outcome.failed) throw outcome.cause
-      return outcome.value
-    },
+    read: (options, ctx) => readPgReplication(context, options, ctx),
     open: async (options, ctx) => {
       const cursor = options.from === 'now' ? undefined : decode(options.from)
       throwIfAborted(ctx?.signal)
-      const facts = await inspect(options, cursor)
-      await confirm(options.slot, facts.confirmed, cursor)
-      const { LogicalReplicationService, PgoutputPlugin } = await import('pg-logical-replication')
-      const service = new LogicalReplicationService(pool.options, {
-        acknowledge: { auto: false, timeoutSeconds: 0 },
-        flowControl: { enabled: true }
-      })
-      const ready = deferred<void>()
-      const commits = new PgCommitAccumulator(options)
-      /** A partial item position applies once, then the live stream follows later commits normally. */
-      let resume = cursor
-      let failed = false
-      let stopAbort = () => {}
-      let streaming: Promise<unknown> | undefined
-      /** Accepted readiness I/O drains before this original resource reports startup failure. */
-      let startup: Promise<void> | undefined
-      /**
-       * The original peer start port identifies this backend before readiness can fail; cleanup
-       * never waits for a successor consuming the same slot.
-       */
-      let nativePid: number | undefined
-      const resource = pgResource(async () => {
-        stopAbort()
-        await service.stop()
-        await streaming
-        await startup
-        while (
-          nativePid !== undefined &&
-          (await query(pool, 'SELECT pid FROM pg_stat_activity WHERE pid=$1', [nativePid])).rows
-            .length !== 0
-        )
-          await sleep(1)
-        service.removeAllListeners()
-      })
-      /** Stop after the original callback drains; the failed commit remains unacknowledged. */
-      const fail = (cause: unknown) => {
-        if (failed) return
-        failed = true
-        const error = normalizePostgresError(cause)
-        ready.reject(error)
-        try {
-          if (options.onError === undefined) reportCleanupError(report, error)
-          else {
-            const result = options.onError(error)
-            observeThenableRejection(result, inspectThenable(result), (secondary) =>
-              reportCleanupError(report, secondary)
-            )
-          }
-        } catch (secondary) {
-          reportCleanupError(report, secondary)
-        }
-        void resource.dispose().catch((secondary) => reportCleanupError(report, secondary))
-      }
-      service.on('error', fail)
-      service.on('start', () => {
-        startup = (async () => {
-          const row = (
-            await query(pool, 'SELECT active_pid FROM pg_replication_slots WHERE slot_name=$1', [
-              options.slot
-            ])
-          ).rows[0]
-          if (row?.active_pid !== nativePid) throw unsupported()
-          ready.resolve()
-        })().catch(fail)
-      })
-      service.on('data', (_lsn: string, message: Pgoutput.Message) => {
-        if (failed) return
-        return resource.run(async () => {
-          try {
-            const commit = commits.accept(message)
-            if (commit === undefined) return
-            if (
-              resume !== undefined &&
-              (position(commit.end) < position(resume.end) ||
-                (resume.ordinal === 0 && position(commit.end) === position(resume.end)))
-            )
-              return
-            const start = resume !== undefined && commit.end === resume.end ? resume.ordinal : 0
-            if (
-              resume !== undefined &&
-              resume.ordinal > 0 &&
-              position(commit.end) > position(resume.end)
-            )
-              throw expired()
-            if (start > commit.orgs.length) throw invalidArgument()
-            for (const change of changes(
-              facts.identity,
-              commit.end,
-              commit.orgs,
-              start,
-              commit.reset
-            ))
-              await options.onChange(change)
-            await service.acknowledge(commit.end)
-            resume = undefined
-          } catch (cause) {
-            fail(cause)
-          }
-        })
-      })
-      const from =
-        options.from === 'now'
-          ? (await query(pool, 'SELECT pg_current_wal_lsn()::text AS lsn', [])).rows[0]?.lsn
-          : cursor !== undefined && cursor.ordinal === 0
-            ? cursor.end
-            : facts.confirmed
-      if (typeof from !== 'string') throw unsupported()
-      /** The public peer start port supplies the exact native client before COPY starts. */
-      const decoder = new PgoutputPlugin({
-        protoVersion: 1,
-        publicationNames: [quotePgIdentifier(options.publication).replaceAll("'", "''")]
-      })
-      /** Preserve the original decoder, receiver and replication start implementation. */
-      const start = decoder.start
-      decoder.start = async (client, slot, lastLsn) => {
-        const row = (await query(client, 'SELECT pg_backend_pid() AS native_pid', [])).rows[0]
-        if (typeof row?.native_pid !== 'number') throw unsupported()
-        nativePid = row.native_pid
-        return Reflect.apply(start, decoder, [client, slot, lastLsn])
-      }
-      streaming = service.subscribe(decoder, options.slot, from).catch(fail)
-      try {
-        stopAbort = subscribeToAbort(
-          ctx?.signal,
-          () => {
-            try {
-              throwIfAborted(ctx?.signal)
-            } catch (cause) {
-              fail(cause)
-            }
-          },
-          report
-        )
-        await ready.promise
-      } catch (cause) {
-        try {
-          await resource.dispose()
-        } catch (secondary) {
-          throw normalizePostgresError(attachSecondaryErrors(cause, [secondary]))
-        }
-        throw cause
-      }
-      return {
-        dispose: resource.dispose,
-        [Symbol.asyncDispose]: resource[Symbol.asyncDispose],
-        acknowledge: async (end) => {
-          position(end)
-          await service.acknowledge(end)
-        }
-      }
+      const facts = await inspectPgReplication(context, options, cursor)
+      await confirmPgReplication(context, options.slot, facts.confirmed, cursor)
+      const peer = await import('pg-logical-replication')
+      return new PgLiveFeed(context, options, ctx, peer, cursor).open(facts)
     },
     dropSlot: async (slot, ctx) => {
       throwIfAborted(ctx?.signal)

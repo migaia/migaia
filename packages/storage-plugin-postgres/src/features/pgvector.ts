@@ -33,7 +33,7 @@ export function pgvectorFeature() {
     const standard: IVectorApi<true> = {
       collection(...args) {
         const api = core.createVectorApi()
-        return Reflect.apply(api.collection, api, args)
+        return api.collection(...args)
       }
     }
     core.registerDetect(async (signal) => {

@@ -16,7 +16,10 @@ import { PgNames, PgOperation, PgTruncatePolicy } from './constants.js'
 export type IPgReplicationSelection = IPgLogicalReplicationOptions & {
   own(resource: IStorageResource): IStorageResource
 }
-/** Native names are captured at definition; slot syntax is PostgreSQL's actual slot-name domain. */
+/**
+ * Capture deployment names before deferred installation can await; use PostgreSQL's actual
+ * slot-name domain.
+ */
 export function snapshotPgReplication(
   options: IPgLogicalReplicationOptions
 ): IPgLogicalReplicationOptions {

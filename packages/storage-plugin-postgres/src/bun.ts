@@ -11,7 +11,6 @@ import {
   readAbortReason,
   throwIfAborted
 } from '@migaia/storage-host/authoring/backend'
-import { inspectThenable, observeThenableRejection } from '@migaia/utils/function'
 import { attachSecondaryErrors } from '@migaia/utils/error'
 import type { IPgDriver, IPgConnection, IPgResult, IPgNativeParameter } from './types.js'
 import { encodePgParameters } from './parameters.js'
@@ -66,9 +65,8 @@ function connection(client: ReservedSQL): IPgConnection {
       resource.run(async () => {
         throwIfAborted(ctx?.signal)
         const pending = client.unsafe(copyCommand(target, options))
-        const writable: unknown = Reflect.get(pending, 'writable')
-        if (typeof writable !== 'function') throw unsupported()
-        const stream: unknown = Reflect.apply(writable, pending, [])
+        if (!('writable' in pending) || typeof pending.writable !== 'function') throw unsupported()
+        const stream: unknown = pending.writable()
         if (!(stream instanceof WritableStream)) throw unsupported()
         const writer = stream.getWriter()
         const report = createStorageOperationReporter()
@@ -151,9 +149,7 @@ export function bunSqlDriver(client: SQL): IPgDriver {
         const subscription = await client.listen(channel, (payload) => {
           try {
             const result = listener(payload)
-            observeThenableRejection(result, inspectThenable(result), (cause) =>
-              reportCleanupError(report, cause)
-            )
+            void Promise.resolve(result).catch((cause) => reportCleanupError(report, cause))
           } catch (cause) {
             reportCleanupError(report, cause)
           }

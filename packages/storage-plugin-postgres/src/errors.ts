@@ -58,20 +58,11 @@ export function normalizeTransactionFailure(
     return cause as Error & { readonly source: string; readonly code: string }
   return postgresError(PostgresErrorCode.transactionFailed, cause)
 }
-/** Public structural/getter failures use the canonical argument error and retain the cause. */
+/** Public invalid arguments use the canonical argument error and retain the cause. */
 export function invalidArgument(cause?: unknown): StorageContractError {
   return new StorageContractError(
     StorageContractErrorCode.invalidArgument,
     { backend: PgNames.backend, cause },
     PostgresErrorText.invalidArgument
   )
-}
-/** Capture a public object once before awaiting any native operation. */
-export function capture<T>(read: () => T): T {
-  try {
-    return read()
-  } catch (cause) {
-    if (cause instanceof StorageContractError) throw cause
-    throw invalidArgument(cause)
-  }
 }

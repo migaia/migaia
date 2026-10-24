@@ -26,10 +26,7 @@ function pathSupported(path: readonly string[]): boolean {
       (!/^-?\d+$/.test(part) || (/^(?:0|[1-9]\d*)$/.test(part) && Number(part) <= 2147483647))
   )
 }
-/**
- * Translate only the canonical source AST; no original getters, parser or second query evaluator
- * runs.
- */
+/** Translate only the canonical source AST; parsing and query evaluation remain with their owners. */
 export function pgVectorCondition(
   condition: IQueryCondition,
   params: IPgNativeParameter[],

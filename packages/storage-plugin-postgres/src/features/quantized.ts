@@ -6,7 +6,7 @@ import {
 } from '@migaia/storage-contract'
 import { postgresBackendKind } from '../plugin.js'
 import { PgQuantizedMode } from '../constants.js'
-import { capture, invalidArgument } from '../errors.js'
+import { invalidArgument } from '../errors.js'
 
 /** The selected expression layout preserves the original full-precision vector column. */
 export type IPgQuantizedOptions = {
@@ -24,11 +24,8 @@ export type IPgQuantizedQueryMethods = {
 /** Select quantized recall and exact native rescoring without publishing another capability. */
 export function pgQuantizedFeature(options: IPgQuantizedOptions) {
   /** Only captured finite modes reach native schema preparation or execution. */
-  const mode = capture(() => {
-    const { mode } = options
-    if (mode !== PgQuantizedMode.halfvec && mode !== PgQuantizedMode.binary) throw invalidArgument()
-    return mode
-  })
+  const { mode } = options
+  if (mode !== PgQuantizedMode.halfvec && mode !== PgQuantizedMode.binary) throw invalidArgument()
   return defineFeature<
     typeof postgresBackendKind,
     {},
@@ -42,14 +39,12 @@ export function pgQuantizedFeature(options: IPgQuantizedOptions) {
     /** The canonical refiner owns topology, safe bounds and the original source identity. */
     const methods: IPgQuantizedQueryMethods = {
       rescore(options) {
-        const topN = capture(() => {
-          if (options === undefined) return undefined
-          if (options === null || typeof options !== 'object') throw invalidArgument()
-          return options.topN
-        })
+        if (options !== undefined && (options === null || typeof options !== 'object'))
+          throw invalidArgument()
+        const topN = options?.topN
         return refineStorageVectorQuery(this, (topK) => {
           const resolved = topN === undefined ? topK : topN
-          return { native: Object.freeze({ mode, topN: resolved }), topN: resolved }
+          return { native: { mode, topN: resolved }, topN: resolved }
         })
       }
     }

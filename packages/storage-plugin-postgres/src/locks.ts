@@ -42,7 +42,7 @@ const channelRanges = (['text', 'bytes', 'record', 'vector'] as const).map((chan
   channel,
   ...snapshotConcurrencyLockRange({ channel }, PgNames.backend)
 }))
-/** Only the canonical key decoder interprets the bytes following the canonical channel prefix. */
+/** Decode native identities through canonical key and lock admission; no caller storage is borrowed. */
 function decodeLock(id: string): ILockKey {
   const range = channelRanges.find((entry) => id >= entry.lower && id < entry.upper)
   if (!range) throw postgresError(PostgresErrorCode.decodeFailed)
@@ -208,6 +208,7 @@ export async function guardPgKeys(
   lease: IPgLockLease | undefined,
   keys: readonly ILockKey[]
 ): Promise<void> {
+  /** Canonical lock projection sorts identities and holds the same key set across two native awaits. */
   const captured = snapshotConcurrencyLockKeys(keys, PgNames.backend)
   await keyGuard(client, tables, orgId, captured.identities)
   const rows = (
@@ -231,6 +232,7 @@ export async function guardPgRange(
   channel: 'text' | 'bytes' | 'record',
   prefix?: IStorageKey
 ): Promise<void> {
+  /** Canonical lock projection owns the channel/prefix bounds used after the table-lock await. */
   const range = snapshotConcurrencyLockRange({ channel, prefix }, PgNames.backend)
   await client.query('LOCK TABLE ' + tables.locks + ' IN SHARE MODE', [])
   const rows = (
@@ -259,6 +261,7 @@ export async function inspectPgLocks(
       [orgId]
     )
   ).rows
+  /** Canonical projection validates and sorts native inspection facts; no caller input is copied. */
   return snapshotConcurrencyLockHoldings(
     rows.map((row) => ({
       key: decodeLock(String(row.key)),
