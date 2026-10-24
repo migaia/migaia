@@ -1865,23 +1865,26 @@ export async function createPostgresStore<T>(
   let changes: Awaited<ReturnType<typeof createPgChanges>> | undefined
   /** Logical organization closures release together with the original physical controller. */
   let releaseOrganizations = () => {}
-  const controller = core.createChangeController({
-    backend: PgNames.backend,
-    origin:
-      PgNames.backend +
-      ':' +
-      String(
-        (await configuration.driver.query('SELECT gen_random_uuid()::text AS origin', [])).rows[0]
-          ?.origin
-      ),
-    finalize: async () => {
-      try {
-        await changes?.resource?.dispose()
-      } finally {
-        releaseOrganizations()
+  const controller = core.createChangeController(
+    {
+      backend: PgNames.backend,
+      origin:
+        PgNames.backend +
+        ':' +
+        String(
+          (await configuration.driver.query('SELECT gen_random_uuid()::text AS origin', [])).rows[0]
+            ?.origin
+        ),
+      finalize: async () => {
+        try {
+          await changes?.resource?.dispose()
+        } finally {
+          releaseOrganizations()
+        }
       }
-    }
-  }, createBackendChangeController)
+    },
+    createBackendChangeController
+  )
   try {
     if (configuration.server === 'postgres' && configuration.driver.listen === undefined)
       throw new StorageContractError(StorageContractErrorCode.unsupported, {

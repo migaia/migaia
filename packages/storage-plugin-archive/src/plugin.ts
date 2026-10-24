@@ -177,7 +177,10 @@ export function archivePlugin<const N extends string, T = ICollectionsCodecValue
           unsupported(cause)
         }
       })
-      const controller = core.createChangeController({ backend: Archive.backend }, createBackendChangeController)
+      const controller = core.createChangeController(
+        { backend: Archive.backend },
+        createBackendChangeController
+      )
       /** One named archive owns the borrowed backends; each flat function receives its org. */
       const archive = new ArchiveOperations(
         configuration,

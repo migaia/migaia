@@ -104,10 +104,13 @@ class ObjectBackend {
     this.reads = createLifecycleScope()
     this.#locks = core.createKeyLockPort()
     this.identity = crypto.randomUUID()
-    this.controller = core.createChangeController({
-      backend: ObjectNames.backend,
-      finalize: () => this.#finalize()
-    }, createBackendChangeController)
+    this.controller = core.createChangeController(
+      {
+        backend: ObjectNames.backend,
+        finalize: () => this.#finalize()
+      },
+      createBackendChangeController
+    )
     this.#root = this.#forOrg(core.defaultOrgId)
   }
   /** Return the admitted default-org store without granting driver ownership. */
