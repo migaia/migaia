@@ -8,6 +8,12 @@ const t = (en: string, zh: string): IText => ({ en, zh })
  */
 export const storagePluginRedisReference: ILibraryReference = {
   modules: {
+    'features/search': {
+      summary: t(
+        'Standard vector through native FLOAT32 HNSW/FLAT Search indices.',
+        '通过原生 FLOAT32 HNSW/FLAT 索引提供标准向量能力。'
+      )
+    },
     'features/streams': {
       summary: t(
         'Native Streams and consumer groups with dedicated drained leases.',
@@ -50,6 +56,14 @@ export const storagePluginRedisReference: ILibraryReference = {
     }
   },
   symbols: {
+    rediSearchVectorFeature: {
+      role: 'factory',
+      purpose: t(
+        'Install standard vector with native module and binary-port detection.',
+        '检测真实模块与二进制端口后安装标准 vector。'
+      ),
+      cases: storagePluginRedisCases.rediSearchVectorFeature
+    },
     redisStreamsFeature: {
       role: 'factory',
       purpose: t(
@@ -139,6 +153,13 @@ export const storagePluginRedisReference: ILibraryReference = {
     }
   },
   types: {
+    IRedisVectorFeatureOutput: {
+      summary: t(
+        'The original three-field Feature output with standard vector and change watch.',
+        '标准 vector 与变更观察的原三字段 Feature 输出。'
+      ),
+      members: {}
+    },
     IRedisStreamEntry: {
       summary: t('Exact native Feature declaration.', '精确原生 Feature 声明。'),
       members: {}

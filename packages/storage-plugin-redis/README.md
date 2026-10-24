@@ -56,13 +56,15 @@ try {
 
 P 是原规范 prefix 编码生成的非空 `{hex}` hash tag，所有键同槽。键尾逻辑身份含组织段，缺省组织也隔离。
 
-| 数据           | 原生结构 | 物理键                               |
-| -------------- | -------- | ------------------------------------ |
-| 文本/字节/记录 | STRING   | P:t:orgKey / P:b:orgKey / P:r:orgKey |
-| 文本/记录顺序  | ZSET     | P:t:index / P:r:index                |
-| 修订           | HASH     | P:rev                                |
-| 锁             | STRING   | P:lock:orgId:identity                |
-| 提交提示       | Pub/Sub  | P:changes                            |
+| 数据                        | 原生结构     | 物理键                               |
+| --------------------------- | ------------ | ------------------------------------ |
+| 文本/字节/记录              | STRING       | P:t:orgKey / P:b:orgKey / P:r:orgKey |
+| 文本/记录顺序               | ZSET         | P:t:index / P:r:index                |
+| Vector points / 向量点      | HASH         | P:v:collectionHex:orgId:idHex        |
+| Search schema / 检索 schema | native index | P:vi:collectionHex                   |
+| 修订                        | HASH         | P:rev                                |
+| 锁                          | STRING       | P:lock:orgId:identity                |
+| 提交提示                    | Pub/Sub      | P:changes                            |
 
 前缀删除通过 ZRANGEBYLEX 取匹配成员，跳过过期值并重新检查残留。`inspectLocks`/字节清空用 SCAN，成本包含全库扫描候选。变更提示是 best-effort，不承诺外部原生命令、断连重放或过期即时通知。`dispose()` 返回缓存主 Promise；符号释放返回另一个缓存 Promise，清理失败只报告。两者只清理自有订阅和租约，不关闭注入客户端。
 
@@ -77,6 +79,7 @@ P 是原规范 prefix 编码生成的非空 `{hex}` hash tag，所有键同槽�
 | `/features/sorted-sets`   | `redisSortedSetsFeature()`，`api.sortedSets.add/rank/top`                              | 有限 score；top10、升序；同分按原 UTF16 键序；空 add 零命令                                                |
 | `/features/rate-limit`    | `redisRateLimitFeature({limit,windowMs})`，`api.rateLimit.consume`                     | 正安全整数；cost1；原子拒绝不增加计数；resetAfterMs 为原生 PTTL                                            |
 | `/features/change-stream` | `redisChangeStreamFeature({maxLen})`，`use(durableChangeFeed).readChanges/tailChanges` | maxLen 正安全整数；read limit100；原生 Stream ID；数据和 XADD 同 EXEC                                      |
+| `/features/search`        | `rediSearchVectorFeature()`，`use(vector).collection(name,options)`                    | 真实模块/二进制端口；默认 HNSW、exact 用 FLAT；vector TTL 同原 draft                                       |
 
 Streams group 阻塞读取使用专用真实连接。每条原生 BLOCK 最多1000ms；仅收到原生空结果才继续等待，原生错误立即拒绝、不重放。取消与关闭排空当前阻塞片后归还连接。订阅资源的取消预算持续到释放；回调拒绝只报告，不改变已提交写入。
 
@@ -125,6 +128,54 @@ try {
   await store.set('checkpoint', 'ready')
   console.log((await store.use(durableChangeFeed).readChanges()).changes.length)
 } finally {
+  await host.dispose()
+  await pool.close()
+}
+```
+
+## 原生向量检索
+
+从 `/features/search` 选择 `rediSearchVectorFeature()` 安装 `vector`。检测要求真实 Search 模块与二进制 connection/EXEC 端口；Bun 内置驱动只拒绝所选向量 Feature，基础 KV 仍可用。Redis 8 可能已含 Search，缺模块的 Valkey 拒绝该 Feature。工厂与检测不创建 collection；新 collection 显式给 dimensions/metric，后续宿主通过 FT.INFO 取得真实 schema。
+
+托管点使用原生 HASH，同一 EXEC 将相同 FLOAT32 字节写入 HNSW 与 FLAT 字段；`exact:true` 选择 FLAT。cosine/dot 分数均为 `1-distance`，euclid 为 `-sqrt(distance)`。FLOAT32 溢出或转换后成为零 cosine 方向时，在修改点前拒绝。payload 真值沿原便携 codec；新 scalar 路径在 upsert 前由 FT.ALTER 建 TAG/NUMERIC 字段，不新增 schema 注册表。索引及点名复用规范 namespace 和 collection/id 的原便携编码，保留任意 UTF16 字符串身份。
+
+组织 TAG 与期限 NUMERIC 在 KNN 排名前过滤。scalar 等值、成员、存在性及数值范围使用忠实原生过滤；其它条件及函数只处理引擎命中、不补搜，`requirePushdown()` 在原生 I/O 前拒绝。`minScore` 为有界客户端阈值，explain 如实标识。similar/recommend 仅按 ID 读取样本，原推荐助手合成方向后仍走同一原生查询。
+
+vector TTL 与其它通道共用原 WATCH draft/锁拥有者。Redis TIME 产生一份绝对 deadline，同 EXEC 写 HASH expiry 与 PEXPIREAT；普通 upsert 保留期限，persist 同批写 expiry=0 与 PERSIST。根及真实事务 TTL 均支持 vector target；vector collection 不获得通用事务能力。成功向量写发布原 all 失效，并进入已选可靠流的同一提交摘要。
+
+Search 将 TAG token 截断到 4096 字节，因此超过此长度的规范 scalar 等值/成员条件不声明原生下推。`.near().where(...)` 仍只在原生 topK 命中后过滤、不补搜；`requirePushdown()` 报 `QUERY_NOT_PUSHABLE`，`deleteWhere` 和原生 `search.filter` 在 I/O 前报 `UNSUPPORTED_CAPABILITY`。该长值原生过滤组合等待用户复核。完整 payload、ID 与物理键不截断。样本排除使用完整原 ID codec 字节的 SHA-256 短 TAG；它只是索引投影，不是可逆 ID 编码，也不承诺数学上零碰撞。
+
+`deleteWhere(where,{count?})` 默认 precount，两模式都沿 FT.SEARCH 分页收集后进入原 attempt，只计实际存在且提交删除的点，不额外 count、不加 expiry 过滤。原生已过期 HASH 不存在且不计数；不支持的条件在原生 I/O 前拒绝。`dropOrg` 只删除该组织的托管 HASH，保留共享 schema；重启后未选择 Search 或没有二进制端口时也清除历史点，只沿原身份元数据、WATCH/修订与同一 EXEC。检索成本为原生计划加返回命中字节；删除成本包含真实分页与选中点 draft。
+
+```ts
+import { createClientPool } from 'redis'
+import { createStorageHost } from '@migaia/storage-host'
+import { vector, ttl } from '@migaia/storage-contract'
+import { redisBackendPlugin } from '@migaia/storage-plugin-redis'
+import { nodeRedisDriver } from '@migaia/storage-plugin-redis/node-redis'
+import { rediSearchVectorFeature } from '@migaia/storage-plugin-redis/features/search'
+const pool = createClientPool({ url: process.env.MIGAIA_REDIS_STACK_URL! }, { maximum: 8 })
+await pool.connect()
+const host = await createStorageHost({
+  plugins: [
+    redisBackendPlugin(
+      { driver: nodeRedisDriver(pool), prefix: crypto.randomUUID() },
+      { search: rediSearchVectorFeature() }
+    )
+  ] as const
+})
+const store = host.backend('redis')
+try {
+  const items = store
+    .use(vector)
+    .collection<{ group: string }>('items', { dimensions: 2, metric: 'cosine' })
+  await items.upsert([{ id: 'one', vector: [1, 0], payload: { group: 'docs' } }])
+  console.log(
+    (await items.near([1, 0], { exact: true }).where({ group: 'docs' }).topK(1).all())[0]?.id
+  )
+  await store.use(ttl).expire({ channel: 'vector', collection: 'items', id: 'one' }, 60000)
+} finally {
+  await store.clearAll()
   await host.dispose()
   await pool.close()
 }

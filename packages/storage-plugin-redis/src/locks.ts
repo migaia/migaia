@@ -45,8 +45,10 @@ type IRedisLockValue = {
   readonly owner: string
   readonly token: string
   readonly orgId: string
-  readonly key: string
-  readonly channel: 'text' | 'bytes' | 'record'
+  readonly key?: string
+  readonly collection?: string
+  readonly id?: string
+  readonly channel: 'text' | 'bytes' | 'record' | 'vector'
   readonly since: number
   readonly label?: string
 }
@@ -61,8 +63,10 @@ function decode(value: string): IRedisLockValue {
       typeof record.owner !== 'string' ||
       typeof record.token !== 'string' ||
       typeof record.orgId !== 'string' ||
-      typeof record.key !== 'string' ||
-      !['text', 'bytes', 'record'].includes(record.channel as string) ||
+      !['text', 'bytes', 'record', 'vector'].includes(record.channel as string) ||
+      (record.channel === 'vector'
+        ? typeof record.collection !== 'string' || typeof record.id !== 'string'
+        : typeof record.key !== 'string') ||
       typeof record.since !== 'number' ||
       !Number.isSafeInteger(record.since) ||
       (record.label !== undefined && typeof record.label !== 'string')
@@ -148,13 +152,15 @@ export function createRedisLocks(options: {
           const since = await time()
           for (let index = 0; index < identities.length; index++) {
             const key = context.lock![index]!
-            if (key.channel === 'rdf' || key.channel === 'vector') unsupported()
+            if (key.channel === 'rdf') unsupported()
             const physical = layout.lock(identities[index]!),
               value = codec.encode({
                 owner,
                 token,
                 orgId: layout.orgId,
-                key: layout.encode(key.key),
+                ...(key.channel === 'vector'
+                  ? { collection: key.collection, id: key.id }
+                  : { key: layout.encode(key.key) }),
                 channel: key.channel,
                 since,
                 ...(label === undefined ? {} : { label })
@@ -202,6 +208,11 @@ export function createRedisLocks(options: {
       const captured = snapshotConcurrencyLockKeys([{ channel, key }], RedisText.backend)
       await check(captured.keys[0]!, captured.identities[0]!)
     },
+    /** Native vector writes use the same canonical identity and remote lease admission. */
+    guardVector: async (key: Extract<ILockKey, { channel: 'vector' }>): Promise<void> => {
+      const captured = snapshotConcurrencyLockKeys([key], RedisText.backend)
+      await check(captured.keys[0]!, captured.identities[0]!)
+    },
     /** Lock loss takes priority over WATCH write conflicts, including after an EXEC null. */
     verify: async (): Promise<void> => {
       for (let index = 0; index < identities.length; index++) {
@@ -242,7 +253,11 @@ export function createRedisLocks(options: {
           if (remaining < 0) continue
           rows.push({
             key: snapshotConcurrencyLockKeys(
-              [{ channel: value.channel, key: layout.decode(value.key) }],
+              [
+                value.channel === 'vector'
+                  ? { channel: 'vector', collection: value.collection!, id: value.id! }
+                  : { channel: value.channel, key: layout.decode(value.key!) }
+              ],
               RedisText.backend
             ).keys[0]!,
             holder: holder(value),

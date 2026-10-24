@@ -59,9 +59,10 @@ export function invalidArgument(cause?: unknown): StorageContractError {
   )
 }
 /** A missing genuine binary port remains an explicit capability boundary. */
-export function unsupported(): never {
+export function unsupported(cause?: unknown): never {
   throw new StorageContractError(StorageContractErrorCode.unsupported, {
-    backend: RedisText.backend
+    backend: RedisText.backend,
+    cause
   })
 }
 

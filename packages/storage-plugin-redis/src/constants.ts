@@ -16,6 +16,10 @@ export const RedisCommand = {
   group: 'GROUP',
   /** Native HGET protocol word used by fixed Redis endpoints. */
   hget: 'HGET',
+  /** Native binary HASH capture for selected vector points. */
+  hgetall: 'HGETALL',
+  /** Exact Redis absolute expiry preserves HASH deadlines across draft rewrites. */
+  pexpiretime: 'PEXPIRETIME',
   /** Native HINCRBY protocol word used by fixed Redis endpoints. */
   hincrby: 'HINCRBY',
   /** Native HMGET protocol word used by fixed Redis endpoints. */
@@ -183,6 +187,11 @@ export const RedisOperation = {
   watch: 'watch.next',
   queryDelete: 'query.delete',
   queryUpdate: 'query.update',
+  /** Standard vector endpoints retain one original pipeline each. */
+  vectorUpsert: 'vector.upsert',
+  vectorDelete: 'vector.delete',
+  vectorDeleteWhere: 'vector.deleteWhere',
+  vectorSearch: 'vector.search',
   onRedisCommand: 'onRedisCommand',
   onWatchConflict: 'onWatchConflict'
 } as const

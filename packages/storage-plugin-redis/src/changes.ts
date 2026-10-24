@@ -17,23 +17,29 @@ export function encodeRedisChange(
   layout: ReturnType<typeof createRedisLayout>,
   origin: string,
   sequence: number,
-  changed: readonly IRedisDraftEntry[]
+  changed: readonly IRedisDraftEntry[],
+  broad = false
 ): { readonly wire: string; readonly change: IStorageChange } {
   const channels = new Set(changed.map((entry) => entry.channel)),
     channel =
-      channels.size === 1
+      !broad && channels.size === 1
         ? changed[0]!.channel === 'text'
           ? 'value'
           : changed[0]!.channel
         : 'all',
-    kind = changed.length === 1 ? (changed[0]!.value === undefined ? 'remove' : 'put') : 'batch',
+    kind =
+      !broad && changed.length === 1
+        ? changed[0]!.value === undefined
+          ? 'remove'
+          : 'put'
+        : 'batch',
     wire = codec.encode({
       sequence,
       origin,
       orgId: layout.orgId,
       channel,
       kind,
-      ...(changed.length <= 128 ? { keys: changed.map((entry) => entry.encoded) } : {})
+      ...(!broad && changed.length <= 128 ? { keys: changed.map((entry) => entry.encoded) } : {})
     })
   return { wire, change: decodeRedisChange(wire) }
 }

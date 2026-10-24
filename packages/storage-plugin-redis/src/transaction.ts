@@ -1,3 +1,4 @@
+import { isUint8Array } from '@migaia/utils/bytes'
 import { RedisCommand } from './constants.js'
 import {
   StorageContractError,
@@ -5,7 +6,8 @@ import {
   snapshotStorageCounterIncrement,
   type IConcurrencyAttemptContext,
   type IConflictPolicy,
-  type IStorageKey
+  type IStorageKey,
+  type ILockKey
 } from '@migaia/storage-contract'
 import { planChannelWrite } from '@migaia/storage-host/authoring/backend'
 import type { IRedisConnection, IRedisExecEntry } from './driver.js'
@@ -14,6 +16,7 @@ import { RedisErrorCode } from './error-code.js'
 import { RedisText, redisExecCause } from './constants.js'
 import {
   createRedisLayout,
+  RedisSuffix,
   decodeRedisValue,
   encodeRedisValue,
   replyOptionalString,
@@ -33,6 +36,63 @@ export type IRedisDraftEntry = {
   changed: boolean
   expiry: 'keep' | 'persist' | number
 }
+/** Selected native HASH points stay in the same original WATCH draft and EXEC. */
+export type IRedisHashEntry = {
+  readonly physical: string
+  readonly lock: Extract<ILockKey, { channel: 'vector' }>
+  readonly original: ReadonlyMap<string, Uint8Array>
+  /** Org cleanup observes identity, not vector content; binary Search is not required. */
+  readonly identityOnly?: true
+  fields: ReadonlyMap<string, Uint8Array>
+  deadline: number
+  changed: boolean
+}
+/** Binary protocol text is UTF-8; application strings remain with the original JSON codec. */
+const utf8 = new TextEncoder(),
+  text = new TextDecoder('utf-8', { fatal: true })
+/** Native HASH fields are fixed protocol strings, with arbitrary bytes preserved as values. */
+export function readRedisHash(reply: unknown): ReadonlyMap<string, Uint8Array> {
+  const result = new Map<string, Uint8Array>()
+  const add = (key: unknown, value: unknown): void => {
+    let field: string | undefined
+    try {
+      field = typeof key === 'string' ? key : isUint8Array(key) ? text.decode(key) : undefined
+    } catch (cause) {
+      throw redisError(RedisErrorCode.decodeFailed, cause)
+    }
+    if (
+      field === undefined ||
+      result.has(field) ||
+      !(typeof value === 'string' || isUint8Array(value))
+    )
+      throw redisError(RedisErrorCode.decodeFailed, reply)
+    result.set(field, typeof value === 'string' ? utf8.encode(value) : value.slice())
+  }
+  if (Array.isArray(reply)) {
+    if (reply.length % 2 !== 0) throw redisError(RedisErrorCode.decodeFailed, reply)
+    for (let index = 0; index < reply.length; index += 2) add(reply[index], reply[index + 1])
+  } else if (reply && typeof reply === 'object') {
+    for (const [key, value] of Object.entries(reply)) add(key, value)
+  } else throw redisError(RedisErrorCode.decodeFailed, reply)
+  return result
+}
+/** Native HASH baselines compare original bytes without another application codec. */
+function sameHash(
+  left: ReadonlyMap<string, Uint8Array>,
+  right: ReadonlyMap<string, Uint8Array>
+): boolean {
+  if (left.size !== right.size) return false
+  for (const [key, value] of left) {
+    const other = right.get(key)
+    if (
+      !other ||
+      other.length !== value.length ||
+      value.some((byte, index) => byte !== other[index])
+    )
+      return false
+  }
+  return true
+}
 /** Redis commands and EXEC outcomes stay with the same borrowed connection. */
 export type IRedisCommand = readonly (string | Uint8Array)[]
 /** A draft is private to its original transaction owner and is never a public scope credential. */
@@ -47,6 +107,8 @@ export class RedisDraft {
   readonly entries = new Map<string, IRedisDraftEntry>()
   /** Original revision fields distinguish logical conflicts from unrelated shared WATCH aborts. */
   readonly revisions = new Map<string, number>()
+  /** Native HASH state belongs to this same transaction draft, never another attempt. */
+  readonly hashes = new Map<string, IRedisHashEntry>()
   /** Read ranges retain their original revision field without a parallel query engine. */
   readonly ranges = new Set<'text' | 'record'>()
   /** Native fixed-command observation wraps the same connection, never another lease. */
@@ -62,7 +124,8 @@ export class RedisDraft {
     layout: ReturnType<typeof createRedisLayout>,
     context: IConcurrencyAttemptContext,
     send: (args: readonly string[]) => Promise<unknown>,
-    guard: (channel: IRedisChannel, key: IStorageKey) => Promise<void>
+    guard: (channel: IRedisChannel, key: IStorageKey) => Promise<void>,
+    readonly guardVector: (key: Extract<ILockKey, { channel: 'vector' }>) => Promise<void>
   ) {
     this.connection = connection
     this.layout = layout
@@ -224,6 +287,116 @@ export class RedisDraft {
       throw redisError(RedisErrorCode.decodeFailed, value)
     return now
   }
+  /** WATCH precedes native binary HASH capture and its exact absolute deadline. */
+  async hash(
+    physical: string,
+    lock: Extract<ILockKey, { channel: 'vector' }>
+  ): Promise<IRedisHashEntry> {
+    const existing = this.hashes.get(physical)
+    if (existing) return existing
+    if (!this.connection.binaryCommand) throw invalidArgument()
+    await this.send([RedisCommand.watch, physical])
+    await this.captureRevision(physical)
+    const fields = readRedisHash(
+      await this.connection.binaryCommand([RedisCommand.hgetall, physical])
+    )
+    const deadline =
+      fields.size === 0 ? 0 : replyInteger(await this.send([RedisCommand.pexpiretime, physical]))
+    const entry: IRedisHashEntry = {
+      physical,
+      lock,
+      original: fields,
+      fields,
+      deadline: deadline < 0 ? 0 : deadline,
+      changed: false
+    }
+    this.hashes.set(physical, entry)
+    return entry
+  }
+  /** Fixed managed metadata is textual even when binary vector content cannot be read. */
+  async hashIdentity(physical: string): Promise<ReadonlyMap<string, Uint8Array>> {
+    const names = [RedisSuffix.vectorId, RedisSuffix.vectorCollection, RedisSuffix.vectorOrg],
+      reply = await this.send([RedisCommand.hmget, physical, ...names])
+    if (!Array.isArray(reply) || reply.length !== names.length)
+      throw redisError(RedisErrorCode.decodeFailed, reply)
+    if (reply.every((value) => value === null)) {
+      if (replyInteger(await this.send([RedisCommand.exists, physical])) !== 0)
+        throw redisError(RedisErrorCode.decodeFailed, reply)
+      return new Map()
+    }
+    return new Map(
+      names.map((name, index) => [
+        name,
+        utf8.encode(
+          replyOptionalString(reply[index]) ??
+            (() => {
+              throw redisError(RedisErrorCode.decodeFailed, reply)
+            })()
+        )
+      ])
+    )
+  }
+  /**
+   * Historical managed vectors are removed through this original attempt, even without Search
+   * selected.
+   */
+  async clearVectorOrg(): Promise<void> {
+    let cursor = '0'
+    do {
+      const reply = await this.send([
+        RedisCommand.scan,
+        cursor,
+        RedisCommand.match,
+        this.layout.vectorPattern,
+        RedisCommand.count,
+        '256'
+      ])
+      if (!Array.isArray(reply) || reply.length !== 2 || !Array.isArray(reply[1]))
+        throw redisError(RedisErrorCode.decodeFailed, reply)
+      cursor = replyOptionalString(reply[0])!
+      if (cursor === undefined) throw redisError(RedisErrorCode.decodeFailed, reply)
+      for (const raw of reply[1]) {
+        const physical = replyOptionalString(raw)
+        if (physical === undefined) throw redisError(RedisErrorCode.decodeFailed, raw)
+        const existing = this.hashes.get(physical)
+        if (existing) {
+          if (existing.fields.size) {
+            existing.fields = new Map()
+            existing.changed = true
+          }
+          continue
+        }
+        await this.send([RedisCommand.watch, physical])
+        await this.captureRevision(physical)
+        const metadata = await this.hashIdentity(physical)
+        if (!metadata.size) continue
+        const id = decodeRedisValue('record', text.decode(metadata.get(RedisSuffix.vectorId))),
+          collection = decodeRedisValue(
+            'record',
+            text.decode(metadata.get(RedisSuffix.vectorCollection))
+          ),
+          orgId = text.decode(metadata.get(RedisSuffix.vectorOrg))
+        if (
+          typeof id !== 'string' ||
+          typeof collection !== 'string' ||
+          orgId !== this.layout.orgId ||
+          this.layout.vectorPoint(collection, id) !== physical
+        )
+          throw redisError(RedisErrorCode.decodeFailed, metadata)
+        const key = { channel: 'vector', collection, id } as const
+        await this.guardVector(key)
+        this.hashes.set(physical, {
+          physical,
+          lock: key,
+          original: metadata,
+          identityOnly: true,
+          fields: new Map(),
+          deadline: 0,
+          changed: true
+        })
+      }
+    } while (cursor !== '0')
+  }
   /** Range reads depend on the real native ordered index before enumeration starts. */
   async watchRange(channel: 'text' | 'record'): Promise<void> {
     if (this.ranges.has(channel)) return
@@ -249,6 +422,15 @@ export class RedisDraft {
         replyOptionalString(await this.send([RedisCommand.get, entry.physical])) !== entry.original
       )
         return false
+    }
+    for (const entry of this.hashes.values()) {
+      await this.send([RedisCommand.watch, entry.physical])
+      const current = entry.identityOnly
+        ? await this.hashIdentity(entry.physical)
+        : readRedisHash(
+            await this.connection.binaryCommand!([RedisCommand.hgetall, entry.physical])
+          )
+      if (!sameHash(current, entry.original)) return false
     }
     for (const channel of this.ranges)
       await this.send([RedisCommand.watch, this.layout.index(channel)])
@@ -291,6 +473,22 @@ export class RedisDraft {
         this.layout.rangeRevision(entry.channel),
         '1'
       ])
+    }
+    for (const entry of this.hashes.values()) {
+      if (!entry.changed) continue
+      if (!Number.isSafeInteger(entry.deadline) || entry.deadline < 0) throw invalidArgument()
+      commands.push([RedisCommand.del, entry.physical])
+      if (entry.fields.size !== 0) {
+        commands.push([
+          RedisCommand.hset,
+          entry.physical,
+          ...[...entry.fields].flatMap(([key, value]) => [key, value])
+        ])
+        if (entry.deadline !== 0)
+          commands.push([RedisCommand.pexpireat, entry.physical, String(entry.deadline)])
+        else commands.push([RedisCommand.persist, entry.physical])
+      }
+      commands.push([RedisCommand.hincrby, this.layout.revisions, entry.physical, '1'])
     }
     for (const [channel, members] of this.prunes)
       if (members.size !== 0)

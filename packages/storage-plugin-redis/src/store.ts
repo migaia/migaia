@@ -6,6 +6,7 @@ import {
   ttl,
   counter,
   durableChangeFeed,
+  vector,
   type IDurableChangeFeedApi,
   provideCapabilities,
   implement,
@@ -110,7 +111,11 @@ import {
 } from './types.js'
 import type { IRedisConnection, IRedisDriver } from './driver.js'
 import type {} from './hooks.js'
-import { nativeFeaturePort, type IRedisNativeFeaturePort } from './native-feature.js'
+import {
+  nativeFeaturePort,
+  type IRedisNativeFeaturePort,
+  type IRedisVectorBinding
+} from './native-feature.js'
 
 /**
  * This maintenance script rechecks actual existence atomically before deleting stale ordered
@@ -183,6 +188,8 @@ export function createRedisStore(
   let durableMaxLen: number | undefined
   /** The selected module supplies this finite org API factory; provider ownership stays original. */
   let durableFactory: ((store: IRedisStore) => IDurableChangeFeedApi) | undefined
+  /** Selected vector behavior remains with its module; original org installers own publication. */
+  let vectorFactory: ((store: IRedisStore) => IRedisVectorBinding) | undefined
   const controller = core.createChangeController({
     backend: RedisText.backend,
     platform: driver,
@@ -376,7 +383,11 @@ export function createRedisStore(
       run: (draft: RedisDraft) => Promise<R>
     ): Promise<IConcurrencyAttempt<R>> => {
       assertWrite()
-      if (context.lock?.some((key) => key.channel === 'rdf' || key.channel === 'vector'))
+      if (
+        context.lock?.some(
+          (key) => key.channel === 'rdf' || (key.channel === 'vector' && !vectorFactory)
+        )
+      )
         unsupported()
       return driver.withConnection(async (connection) => {
         const send = (args: readonly string[]) => command(connection, args, orgId),
@@ -388,7 +399,14 @@ export function createRedisStore(
             maxLockMs,
             send
           }),
-          draft = new RedisDraft(connection, layout, context, send, locks.guard)
+          draft = new RedisDraft(
+            observedConnection(connection),
+            layout,
+            context,
+            send,
+            locks.guard,
+            locks.guardVector
+          )
         let outcome: IConcurrencyAttempt<R> | undefined,
           primary: unknown,
           failed = false
@@ -403,6 +421,8 @@ export function createRedisStore(
             // EXEC null clears every WATCH, including the guards from the original draft writes.
             for (const entry of draft.entries.values())
               if (entry.changed) await locks.guard(entry.channel, entry.key)
+            for (const entry of draft.hashes.values())
+              if (entry.changed) await locks.guardVector(entry.lock)
             throwIfAborted(context.signal)
             const commands = draft.commands(),
               changed = [...draft.entries.values()].filter((entry) => entry.changed)
@@ -411,13 +431,19 @@ export function createRedisStore(
               outcome = { status: 'committed', value }
               break
             }
-            if (changed.length !== 0) {
+            if (changed.length !== 0 || [...draft.hashes.values()].some((entry) => entry.changed)) {
               const sequence =
                 replyRevision(
                   await send([RedisCommand.hget, layout.revisions, RedisSuffix.sequence])
                 ) + 1
               if (!Number.isSafeInteger(sequence)) throw redisError(RedisErrorCode.decodeFailed)
-              change = encodeRedisChange(layout, controller.origin, sequence, changed)
+              change = encodeRedisChange(
+                layout,
+                controller.origin,
+                sequence,
+                changed,
+                [...draft.hashes.values()].some((entry) => entry.changed)
+              )
               commands.push(
                 [RedisCommand.hset, layout.revisions, RedisSuffix.sequence, String(sequence)],
                 [RedisCommand.publish, layout.changes, change.wire]
@@ -457,13 +483,13 @@ export function createRedisStore(
               backendId: core.getBackendId(),
               backend: RedisText.backend,
               orgId,
-              keyCount: draft.entries.size + draft.ranges.size
+              keyCount: draft.entries.size + draft.ranges.size + draft.hashes.size
             }))
             await locks.verify()
             if (!(await draft.unchanged())) {
-              const keys =
-                context.lock ??
-                [...draft.entries.values()].flatMap((entry) =>
+              const keys = context.lock ?? [
+                ...[...draft.hashes.values()].map((entry) => entry.lock),
+                ...[...draft.entries.values()].flatMap((entry) =>
                   entry.channel === 'bytes' && typeof entry.key !== 'string'
                     ? []
                     : snapshotConcurrencyLockKeys(
@@ -471,6 +497,7 @@ export function createRedisStore(
                         RedisText.backend
                       ).keys
                 )
+              ]
               outcome = { status: 'conflict', phase: 'commit', keys, holder: undefined }
               break
             }
@@ -907,9 +934,9 @@ export function createRedisStore(
         )
       })
     /** TTL target capture admits only channels actually implemented by this backend. */
-    const ttlTarget = (target: ITtlTarget): Exclude<ITtlTarget, { channel: 'vector' }> => {
+    const ttlTarget = (target: ITtlTarget): ITtlTarget => {
       const captured = snapshotStorageTtlTarget(target, RedisText.backend)
-      if (captured.channel === 'vector') unsupported()
+      if (captured.channel === 'vector' && !vectorFactory) unsupported()
       return captured
     }
     /** Query writes reuse the original query selection core and this same native draft. */
@@ -1186,7 +1213,9 @@ export function createRedisStore(
               (actual) => {
                 const target = ttlTarget(actual.target)
                 assertStorageTtlDuration(actual.ms, RedisText.backend)
-                return draft.expire(target.channel, target.key, actual.ms)
+                return target.channel === 'vector'
+                  ? selectedVector().expire(draft, target, actual.ms)
+                  : draft.expire(target.channel, target.key, actual.ms)
               }
             ),
           remaining: (target) =>
@@ -1197,7 +1226,9 @@ export function createRedisStore(
               () => ttlTarget(target),
               (actual) => {
                 const target = ttlTarget(actual)
-                return draft.remaining(target.channel, target.key)
+                return target.channel === 'vector'
+                  ? selectedVector().remaining(draft, target)
+                  : draft.remaining(target.channel, target.key)
               }
             ),
           persist: (target) =>
@@ -1208,7 +1239,9 @@ export function createRedisStore(
               () => ttlTarget(target),
               (actual) => {
                 const target = ttlTarget(actual)
-                return draft.expire(target.channel, target.key)
+                return target.channel === 'vector'
+                  ? selectedVector().expire(draft, target)
+                  : draft.expire(target.channel, target.key)
               }
             )
         },
@@ -1418,6 +1451,23 @@ export function createRedisStore(
     }
     const native: IRedisNativeFeaturePort = {
       driver: nativeDriver,
+      layout,
+      assertLive: () => controller.assertLive(),
+      own: (resource) => {
+        controller.assertLive()
+        resources.add(resource)
+        return () => {
+          resources.delete(resource)
+        }
+      },
+      chain: () => core.getChainMethods('vector') as Record<never, never> | undefined,
+      watch: (ctx) => createBackendChangeIterator(controller, { orgId, channel: 'all', ctx }),
+      mutate: (name, input, ctx, capture, keys, run, policy) =>
+        write(name, input, ctx, capture, keys, run, undefined, policy),
+      enableVector: (create) => {
+        vectorFactory = create
+        vectorBinding ??= create(store)
+      },
       now: () => core.featureExpose.getScheduler().now(),
       closingSignal: controller.closingSignal,
       allOrganizations,
@@ -1603,6 +1653,7 @@ export function createRedisStore(
             await removePrefix('text', undefined, draft)
             await removePrefix('record', undefined, draft)
             await clearBytes(draft)
+            await draft.clearVectorOrg()
           }
         ),
       iterateRecords: (range, ctx) => iterator(range, ctx),
@@ -1774,21 +1825,26 @@ export function createRedisStore(
             return { target, ms: actual.ms }
           },
           (actual) => [actual.target],
-          (draft, actual) => draft.expire(actual.target.channel, actual.target.key, actual.ms),
+          (draft, actual) =>
+            actual.target.channel === 'vector'
+              ? selectedVector().expire(draft, actual.target, actual.ms)
+              : draft.expire(actual.target.channel, actual.target.key, actual.ms),
           1
         )
       },
       remaining: (input, ctx) => {
         const target = ttlTarget(input)
+        if (target.channel === 'vector') return selectedVector().remainingRoot(target, ctx)
         return read(
           RedisOperation.remaining,
           target,
           ctx,
           async (actual, send) => {
-            const target = ttlTarget(actual),
-              value = replyInteger(
-                await send([RedisCommand.pttl, layout.value(target.channel, target.key)])
-              )
+            const target = ttlTarget(actual)
+            if (target.channel === 'vector') unsupported()
+            const value = replyInteger(
+              await send([RedisCommand.pttl, layout.value(target.channel, target.key)])
+            )
             return value < 0 ? undefined : value
           },
           1
@@ -1802,7 +1858,10 @@ export function createRedisStore(
           ctx,
           ttlTarget,
           (actual) => [actual],
-          (draft, actual) => draft.expire(actual.channel, actual.key),
+          (draft, actual) =>
+            actual.channel === 'vector'
+              ? selectedVector().expire(draft, actual)
+              : draft.expire(actual.channel, actual.key),
           1
         )
       }
@@ -1856,8 +1915,19 @@ export function createRedisStore(
       }
     )
     /** Child providers publish the selected factory through their original installer only. */
+    let vectorBinding: IRedisVectorBinding | undefined
+    /**
+     * Capture one selected API for this exact original org store without rerunning a Feature
+     * factory.
+     */
+    const selectedVector = (): IRedisVectorBinding => (vectorBinding ??= vectorFactory!(store))
+    let vectorPublication: ReturnType<ICapabilityInstallPort['prepare']> | undefined
     let durablePublication: ReturnType<ICapabilityInstallPort['prepare']> | undefined
     const configureFeatures = (): void => {
+      if (!allOrganizations && vectorFactory && !vectorPublication) {
+        vectorPublication = installer.prepare([implement(vector, selectedVector().api)])
+        vectorPublication.publish()
+      }
       if (!allOrganizations && durableFactory && !durablePublication) {
         durablePublication = installer.prepare([
           implement(durableChangeFeed, durableFactory(store))
@@ -1867,6 +1937,7 @@ export function createRedisStore(
     }
     const releaseFeatures = (): void => {
       durablePublication?.release()
+      vectorPublication?.release()
     }
     return { store, installer, configureFeatures, releaseFeatures }
   }
