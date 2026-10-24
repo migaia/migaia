@@ -750,3 +750,9 @@ snapshotStorageOrgKeyPrefix(orgId, prefix, backend) 返回独立的原生半开�
 `snapshotStorageVectorIds(ids, backend?, rejectDuplicates = false)` 捕获并冻结稠密字符串 ID 批次，默认保序保重复；推荐输入可选拒绝重复，不施加存储键大小限制。`snapshotStorageDeleteCountMode(value, backend?)` 将省略值归为 `DeleteCountMode.precount`，只接受 `precount`/`scroll`；非法输入沿原 `INVALID_ARGUMENT` 边界。两者不做原生 I/O，也不改变引擎实际删除计数策略。
 
 并发循环在 prepare、execute 或 executeAttempt 路径中，把原生选项字段与 symbol 扩展的一次捕获值转发到同一冻结上下文及锁键推导。调用方 getter 不会重读，后续原生 attempt 保留这些字段。没有准备阶段的原准入顺序不变。
+
+记录数据源可以提供可省的纯 `plan(conditions)` 作者接点。原规划器只传入已经捕获的连续规范 `where` 前缀；遇到函数谓词、排序、分页、去重或投影即停止，不读取用户条件的 getter，不跨屏障缩小数据源。回调返回 `IRecordQuerySourcePlan`：本次原生 `pushdown` 声明、可省的不可变 `selection`，以及可省的 `sourceReason` 和 `sourceCandidates` 说明。静态声明和动态声明使用同一准入实现。
+
+本次终点的原计划保存该选择，原 `execute`、`reduce`、事务内 mutation reader 和 `watch` 经同一个输入编译器取得同一 `selection` 身份；原生统计回退仍复用该计划。选择事实由原数据源作者保持不可变，契约不读取其内部字段、不另编码、不创建游标或重试器。`explain()` 只展示已选索引及独立冻结的理由元数据，不暴露选择事实；没有声明 `plan` 时保留原输入字段、原解释结果及回调语义。作者回调或元数据失败沿原查询错误边界，在原生 I/O 前拒绝。
+
+`IRecordQuerySourcePlan.fullScan?: true` 只允许保守地将解释结果标为可能全扫描，适用于原生索引仍可能回退的来源；不能传 `false` 伪造无扫描证据。条件下推、实际选源与资源路径不受该说明字段干预。
