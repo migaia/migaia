@@ -243,7 +243,7 @@ console.log(await log.lastSeq(), await log.states(LogRecordState.pending)) // 1 
 
 undo 从原 logger 读取已提交镜像，使用后端的原 tx().lock(...).run 一次取得全部锁。私有 deadline 目标由 binding.lockTarget 映射回原点锁；不建锁表。先比较全部完整 afterRevision（含 clear epoch/墓碑）及当前编码值和存在性，再写任一 before；冲突报 UNDO_CONFLICT、无记录报 UNDO_NOT_FOUND，foreign target 或重复的规范镜像身份报 JOURNAL_RECORD_INVALID；合法 value/deadline 两镜像仍保持不同身份并共享原点锁。撤销继续沿原 draft/修订/容量/单 pipeline 提交，生成一条新 storage.commit 与新的 undo 镜像；并发或净零事务不能双重撤销，原 ctx getter 单读并继承原预算。当前已验证 memory 的 text/bytes/record/null/缺失/TTL/vector/RDF 与原组织隔离；其它后端接线和 redo 仍待完成。
 
-PENDING-USER-REVIEW：dropOrg 遇到存活的全局 journal 时，原私有 namespace generation 失效；storageLogStore 缓存读取与旧 native port 均报 STORE_DISPOSED，后续选中 journal 的写入在修改前拒绝，普通未选 journal 的 org 视图仍可复用。同一借用 logger 在 drop 后继续，需要原 logger 的正式 reset 契约；宿主不重跑一次性 initializer、不替换或关闭 logger。比较隐式复用缓存、重跑 initializer 与安全隔离后选择安全隔离，保数据/日志一致；回退只能撤回新增全局组合，或由原 owner 显式 reset 协议替换隔离。
+dropOrg 后，旧日志句柄以 source `@migaia/storage-contract`、code `STORE_DISPOSED` 拒绝访问。关闭旧句柄并重新打开日志后再继续。
 
 后端作者可在原安装窗口调用 core.registerFeatureClientResolver(store, resolver)，为精确已登记 store 提供组织原生客户端选择。resolver.getClient(orgId) 可先沿原 opener 准备再返回客户端；只有真实异步结果才等待，完成后再次核对原 registration。可选 getTransactionClient(scope, orgId) 必须同步返回该原认证 scope 已打开的事务，不得另开或等待。未登记 resolver 时，原 Feature 的 getClient/getTransactionClient 调用顺序与行为保持。resolver 只占原 storeCell 的一个可选字段，业务视图不能登记或获得该接点，Feature factory 不重跑。
 

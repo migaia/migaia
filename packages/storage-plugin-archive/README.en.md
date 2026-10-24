@@ -35,3 +35,5 @@ try {
 `sweep()` follows opaque blob pages and point-checks segment directories under the same original control lock. It removes only unreferenced objects with this plugin's prefix and format/version metadata. It never scans every manifest. All methods use the current host organization, and closing drains accepted work without closing borrowed storage independently.
 
 Errors use `storage.backend.archive`: `INVALID_OPTION`, `INVALID_ARGUMENT`, `ARCHIVE_OPERATION_FAILED`, `ARCHIVE_SEGMENT_INVALID`. Original causes remain reachable. Host admission/close, contract capability, conflict and coded cancellation errors preserve their identity. Archive-owned run failures expose only certainly committed `{ archived, skipped, segments }` progress; frozen original conflicts keep their identity and expose these counts through `onArchiveRunError`.
+
+Frozen contract errors keep their original identity, including source `@migaia/storage-contract` and code `WRITE_CONFLICT`; use `onArchiveRunError` to read committed progress.

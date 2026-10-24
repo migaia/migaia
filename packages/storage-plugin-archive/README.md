@@ -35,3 +35,5 @@ try {
 `sweep()` 使用原 blob opaque 分页，在同一控制锁内点读段目录，只移除本插件前缀且 format/version 元数据匹配的无引用对象，不逐段扫描全部清单。所有方法使用当前宿主组织。关闭排空已接受工作，插件不独立关闭借用对象。
 
 错误 source 为 `storage.backend.archive`，码为 `INVALID_OPTION`、`INVALID_ARGUMENT`、`ARCHIVE_OPERATION_FAILED`、`ARCHIVE_SEGMENT_INVALID`，原错误保留在原因链。宿主准入/关闭、contract 能力/冲突/已编码取消保留原对象。本包拥有的 run 失败提供仅含确定已提交数量的 `progress`；冻结的原冲突保持身份，数量由 `onArchiveRunError` 提供。
+
+冻结的 contract 错误保持原对象及 source `@migaia/storage-contract`、code `WRITE_CONFLICT`；通过 `onArchiveRunError` 读取已提交进度。

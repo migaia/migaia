@@ -84,3 +84,5 @@ console.log(hits.map((hit) => ({ id: hit.id, score: hit.score })))
 Qdrant 1.15.5 必须在集合首次创建时声明额外槽，不能在线给旧集合补槽。已有缺槽或配置不符集合的新操作报 `UNSUPPORTED_CAPABILITY`，原标准读写保持可用；不会重建集合或迁移数据。标准 upsert 仍整点替换，可能清除额外槽，应用需在其后重写额外向量。移除 Feature 后标准读写仍保留此原替换语义。额外槽检索及分数由 Qdrant 完成，不在 JavaScript 评分。
 
 Qdrant 1.15.5 对首行全为非负整数的两行多向量矩阵存在原生 JSON 歧义：它可能把矩阵解码为 sparse vector 并拒绝。适配器保留原 QDRANT_REQUEST_FAILED 证据，不变形向量或重试；本版本的三行矩阵与 dense 向量已实际验证。
+
+原生 filter 无法精确表达的条件在 precount 或 management `deleteByFilter` 前以 source `@migaia/storage-contract`、code `UNSUPPORTED_CAPABILITY` 拒绝。显式 `count: 'scroll'` 通过扫描当前组织支持共享条件；`requirePushdown()` 对客户端条件仍报 `QUERY_NOT_PUSHABLE`。
