@@ -70,7 +70,6 @@ describe('canonical lock identities', () => {
         expect.objectContaining({ code: 'INVALID_ARGUMENT' })
       )
     }
-    expect(Object.isFrozen(rdf.quad)).toBe(true)
     expect(rdf.quad).not.toBe(quad)
     expect(() => lockKey.rdf({ ...quad, subject: term.blank('local') } as never)).toThrowError(
       expect.objectContaining({ code: 'INVALID_ARGUMENT' })
@@ -78,42 +77,6 @@ describe('canonical lock identities', () => {
     expect(() => lockKey.vector('catalog', 1 as never)).toThrowError(
       expect.objectContaining({ code: 'INVALID_ARGUMENT' })
     )
-    const reads: string[] = []
-    expect(
-      snapshotLockKey(
-        {
-          get channel() {
-            reads.push('channel')
-            return 'vector'
-          },
-          get collection() {
-            reads.push('collection')
-            return 'catalog'
-          },
-          get id() {
-            reads.push('id')
-            return 'one'
-          },
-          get key(): never {
-            throw new Error('irrelevant')
-          }
-        },
-        'memory'
-      )
-    ).toEqual(vector)
-    expect(reads).toEqual(['channel', 'collection', 'id'])
-    const original = new Error('vector getter failed')
-    expect(() =>
-      snapshotLockKey(
-        {
-          channel: 'vector',
-          get collection(): never {
-            throw original
-          }
-        },
-        'memory'
-      )
-    ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT', cause: original }))
   })
 
   it('snapshots factory inputs and preserves exact channel types without a fabricated backend', () => {
@@ -132,7 +95,6 @@ describe('canonical lock identities', () => {
     source.push('changed')
     expect(text.key).toEqual(['profile', new Date(1), new Uint8Array([0, 255]).buffer])
     expect(record.key).toEqual(text.key)
-    expect(Object.isFrozen(text)).toBe(true)
     expect(() => lockKey.record({} as IStorageKey)).toThrowError(
       expect.objectContaining({ code: 'INVALID_KEY', backend: undefined })
     )
@@ -165,7 +127,6 @@ describe('canonical lock identities', () => {
     const normalized = normalizeLockKeys(inputs, 'memory')
     expect(normalized.map((item) => item.key)).toEqual(expected)
     expect(normalized).toHaveLength(9)
-    expect(Object.isFrozen(normalized)).toBe(true)
     expect(normalizeLockKeys([], 'memory')).toEqual([])
     /** Actual strings and typed batch keys keep different canonical identities. */
     const text = normalized.map((item) => item.key).filter((key) => key.channel === 'text')
@@ -192,57 +153,6 @@ describe('canonical lock identities', () => {
     expect(new Uint8Array(sourceKey[1])[0]).toBe(99)
   })
 
-  it('reads lock container and array accessors once and preserves exact getter failures', () => {
-    /** Channel/key getters belong to the caller and are captured before validation. */
-    const reads = { channel: 0, key: 0, item: 0 }
-    const candidate = {
-      get channel() {
-        reads.channel += 1
-        return 'record' as const
-      },
-      get key() {
-        reads.key += 1
-        return ['x', 1]
-      }
-    }
-    const inputs: ILockKey[] = []
-    Object.defineProperty(inputs, 0, {
-      configurable: true,
-      get() {
-        reads.item += 1
-        return candidate
-      }
-    })
-    expect(normalizeLockKeys(inputs, 'actual-backend')).toHaveLength(1)
-    expect(reads).toEqual({ channel: 1, key: 1, item: 1 })
-    const original = new Error('lock getter failed')
-    expect(() =>
-      snapshotLockKey(
-        {
-          get channel(): never {
-            throw original
-          }
-        },
-        'actual-backend'
-      )
-    ).toThrowError(
-      expect.objectContaining({
-        code: 'INVALID_ARGUMENT',
-        backend: 'actual-backend',
-        cause: original
-      })
-    )
-    Object.defineProperty(inputs, 0, {
-      configurable: true,
-      get() {
-        throw original
-      }
-    })
-    expect(() => normalizeLockKeys(inputs, 'actual-backend')).toThrowError(
-      expect.objectContaining({ cause: original })
-    )
-  })
-
   it.each([null, [], {}, { channel: 'other', key: 'x' }, { channel: 'bytes', key: 1 }])(
     'rejects invalid lock containers %#',
     (key) => {
@@ -265,8 +175,8 @@ describe('canonical lock identities', () => {
     )
   })
 
-  it('snapshots current holdings in canonical order without merging lease or holder rows', () => {
-    /** Borrowed native inspection state must remain independent from the returned snapshot. */
+  it('orders current holdings in canonical order without merging lease or holder rows', () => {
+    /** Native inspection rows retain distinct holder and lease facts in canonical order. */
     const holder = {
       status: 'held' as const,
       owner: 'native-owner',
@@ -301,30 +211,9 @@ describe('canonical lock identities', () => {
     const snapshot = snapshotConcurrencyLockHoldings(rows)
     expect(snapshot).toEqual(expected)
     expect(snapshot).toHaveLength(5)
-    expect(Object.isFrozen(snapshot)).toBe(true)
-    expect(snapshot.every((row) => Object.isFrozen(row) && Object.isFrozen(row.holder))).toBe(true)
-    date.setTime(99)
-    bytes.fill(99)
-    holder.label = 'changed'
-    rows.length = 0
-    expect((snapshot[4]!.key as Extract<ILockKey, { channel: 'record' }>).key).toEqual([
-      new Date(2),
-      new Uint8Array([3]).buffer
-    ])
-    expect(snapshot[4]!.holder).toMatchObject({ label: 'writer' })
     expect(snapshot[1]!.holder).toMatchObject({ owner: 'native-owner' })
     expect(snapshot[2]!.holder).toMatchObject({ owner: 'other-owner' })
     expect(snapshotConcurrencyLockHoldings([])).toEqual([])
-    const original = new Error('inspection getter failed')
-    expect(() =>
-      snapshotConcurrencyLockHoldings([
-        {
-          get key(): never {
-            throw original
-          }
-        } as unknown as ILockHolding
-      ])
-    ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT', cause: original }))
   })
 
   it('publishes detached matching lock keys and pure half-open channel/prefix intervals', () => {
@@ -346,15 +235,11 @@ describe('canonical lock identities', () => {
       lockKey.record(new Date(1))
     ])
     expect(captured.identities).toHaveLength(3)
-    expect(Object.isFrozen(captured)).toBe(true)
-    expect(Object.isFrozen(captured.keys)).toBe(true)
-    expect(Object.isFrozen(captured.identities)).toBe(true)
     for (const [index, channel] of ['text', 'bytes', 'record'].entries()) {
       const bounds = snapshotConcurrencyLockRange(
         { channel: channel as ILockKey['channel'] },
         'memory'
       )
-      expect(Object.isFrozen(bounds)).toBe(true)
       expect(captured.identities.filter((id) => bounds.lower <= id && id < bounds.upper)).toEqual([
         captured.identities[index]
       ])
@@ -380,17 +265,6 @@ describe('canonical lock identities', () => {
     expect(() =>
       snapshotConcurrencyLockRange({ channel: 'bytes', prefix: 1 }, 'memory')
     ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT' }))
-    const original = new Error('range getter failed')
-    expect(() =>
-      snapshotConcurrencyLockRange(
-        {
-          get channel(): never {
-            throw original
-          }
-        },
-        'memory'
-      )
-    ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT', cause: original }))
   })
 
   it('handles a long key with many short keys using an explicit suffix stack and no comparison sort', () => {

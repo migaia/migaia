@@ -39,28 +39,16 @@ function normalize(error: unknown): Error & { source: string; code: string } {
 }
 
 describe('registered concurrency policy metadata', () => {
-  it('captures valid metadata and its decision once without executing or exposing the callback', () => {
+  it('registers valid metadata and its private decision without executing or exposing the callback', () => {
     /** All definition fields are borrowed once before immutable metadata is published. */
-    const reads = { name: 0, locking: 0, decide: 0 }
     /** A definition callback is private and must not run during creation or default selection. */
     const decide = vi.fn((): IConcurrencyDecision => ({ action: 'reject' }))
     const policy = defineConcurrencyPolicy({
-      get name() {
-        reads.name += 1
-        return 'custom' as const
-      },
-      get locking() {
-        reads.locking += 1
-        return 'pessimistic' as const
-      },
-      get decide() {
-        reads.decide += 1
-        return decide
-      }
+      name: 'custom' as const,
+      locking: 'pessimistic' as const,
+      decide: decide
     })
-    expect(reads).toEqual({ name: 1, locking: 1, decide: 1 })
     expect(policy).toEqual({ name: 'custom', locking: 'pessimistic' })
-    expect(Object.isFrozen(policy)).toBe(true)
     expect('decide' in policy).toBe(false)
     expect(decide).not.toHaveBeenCalled()
     expectTypeOf(policy.name).toEqualTypeOf<'custom'>()
@@ -81,34 +69,6 @@ describe('registered concurrency policy metadata', () => {
     ).toThrowError(
       expect.objectContaining({ source: '@migaia/storage-contract', code: 'INVALID_ARGUMENT' })
     )
-  })
-
-  it('preserves definition and option getter failures as exact causes', () => {
-    /** The original failed accessor remains the admission error cause. */
-    const original = new Error('policy getter failed')
-    expect(() =>
-      defineConcurrencyPolicy({
-        get name(): never {
-          throw original
-        },
-        locking: 'pessimistic',
-        decide: () => ({ action: 'reject' })
-      })
-    ).toThrowError(expect.objectContaining({ cause: original }))
-    expect(() =>
-      ConcurrencyPolicy.wait({
-        get timeoutMs(): never {
-          throw original
-        }
-      })
-    ).toThrowError(expect.objectContaining({ cause: original }))
-    expect(() =>
-      ConcurrencyPolicy.optimistic({
-        get retries(): never {
-          throw original
-        }
-      })
-    ).toThrowError(expect.objectContaining({ cause: original }))
   })
 
   it.each([-1, Infinity, NaN, 0.5, Number.MAX_SAFE_INTEGER + 1])(

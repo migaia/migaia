@@ -75,18 +75,15 @@ function run<T>(
 afterEach(() => vi.useRealTimers())
 
 describe('canonical concurrency attempts', () => {
-  it('captures raw policy once inside the owner and preserves exact nested attempt metadata', async () => {
+  it('preserves the effective policy and exact nested attempt metadata', async () => {
     const { store } = base()
     const policy = ConcurrencyPolicy.fail()
-    let reads = 0
+
     const original = new Date(1)
     let outerContext: IConcurrencyAttemptContext | undefined
     let identities: readonly string[] | undefined
     const options = {
-      get concurrency() {
-        reads++
-        return policy
-      },
+      concurrency: policy,
       lock: [lockKey.record(original), lockKey.text('key'), lockKey.record(new Date(1))],
       timeoutMs: 100
     }
@@ -100,7 +97,6 @@ describe('canonical concurrency attempts', () => {
             expect(outer.concurrency).toBe(policy)
             expect(outer.locking).toBe('pessimistic')
             identities = readConcurrencyLockIdentities(outer)
-            expect(Object.isFrozen(identities)).toBe(true)
             expect(identities).toHaveLength(2)
             expect(identities).toBe(readConcurrencyLockIdentities(outer))
             original.setTime(99)
@@ -126,7 +122,7 @@ describe('canonical concurrency attempts', () => {
         }
       )
     ).rejects.toMatchObject({ code: 'LOCK_REJECTED' })
-    expect(reads).toBe(1)
+
     expect(() => readConcurrencyLockIdentities(outerContext!)).toThrowError(
       expect.objectContaining({ code: 'INVALID_ARGUMENT' })
     )
@@ -138,17 +134,14 @@ describe('canonical concurrency attempts', () => {
   it('adds implicit locks once after captured fields while preserving explicit locks and nested budget', async () => {
     const { store } = base()
     const policy = ConcurrencyPolicy.optimistic({ retries: 1, backoffMs: 0 })
-    const reads = { context: 0, hook: 0, derived: 0 }
+    const reads = { derived: 0 }
     let attempts = 0
     const encode = vi.spyOn(keyOrder, 'encodeOrderedStorageKey')
     const options = {
       lock: [lockKey.record(new Date(1))],
       concurrency: policy,
       timeoutMs: 100,
-      get conflictPolicy() {
-        reads.context++
-        return 'replace' as const
-      }
+      conflictPolicy: 'replace' as const
     }
     try {
       await expect(
@@ -156,15 +149,10 @@ describe('canonical concurrency attempts', () => {
           {
             store,
             options,
-            get lock() {
-              reads.hook++
-              return (captured: IWriteOptions) => {
-                reads.derived++
-                expect(Object.isFrozen(captured)).toBe(true)
-                expect(captured.conflictPolicy).toBe('replace')
-                expect(reads.context).toBe(1)
-                return [lockKey.text('root'), lockKey.record(new Date(1))]
-              }
+            lock: (captured: IWriteOptions) => {
+              reads.derived++
+              expect(captured.conflictPolicy).toBe('replace')
+              return [lockKey.text('root'), lockKey.record(new Date(1))]
             }
           },
           {
@@ -216,7 +204,7 @@ describe('canonical concurrency attempts', () => {
         )
       ).resolves.toBe(9)
       expect(attempts).toBe(2)
-      expect(reads).toEqual({ context: 1, hook: 1, derived: 1 })
+      expect(reads.derived).toBe(1)
     } finally {
       encode.mockRestore()
     }
@@ -239,18 +227,6 @@ describe('canonical concurrency attempts', () => {
           store,
           options: {},
           lock: () => {
-            throw original
-          }
-        },
-        { attempt }
-      )
-    ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT', cause: original })
-    await expect(
-      runWithConcurrency(
-        {
-          store,
-          options: {},
-          get lock(): never {
             throw original
           }
         },
@@ -374,10 +350,10 @@ describe('canonical concurrency attempts', () => {
     expect(trace).toEqual(['start:try', 'cleanup', 'start:try', 'cleanup', 'start:try', 'cleanup'])
   })
 
-  it('snapshots caller fields once and gives each decision independent mutable key components', async () => {
+  it('gives each awaiting decision independent mutable key components', async () => {
     const { store } = base()
     const date = new Date(1)
-    const reads = { lock: 0, concurrency: 0, signal: 0, timeoutMs: 0, pageSize: 0, orgId: 0 }
+
     const policy = defineConcurrencyPolicy({
       name: 'mutate',
       locking: 'pessimistic',
@@ -396,30 +372,12 @@ describe('canonical concurrency attempts', () => {
       }
     })
     const options = {
-      get lock() {
-        reads.lock++
-        return [lockKey.record(date)]
-      },
-      get concurrency() {
-        reads.concurrency++
-        return policy
-      },
-      get signal() {
-        reads.signal++
-        return undefined
-      },
-      get timeoutMs() {
-        reads.timeoutMs++
-        return undefined
-      },
-      get pageSize() {
-        reads.pageSize++
-        return undefined
-      },
-      get orgId() {
-        reads.orgId++
-        return undefined
-      }
+      lock: [lockKey.record(date)],
+      concurrency: policy,
+      signal: undefined,
+      timeoutMs: undefined,
+      pageSize: undefined,
+      orgId: undefined
     }
     await expect(
       runWithConcurrency(
@@ -434,14 +392,7 @@ describe('canonical concurrency attempts', () => {
         }
       )
     ).rejects.toMatchObject({ code: 'LOCK_REJECTED' })
-    expect(reads).toEqual({
-      lock: 1,
-      concurrency: 1,
-      signal: 1,
-      timeoutMs: 1,
-      pageSize: 1,
-      orgId: 1
-    })
+
     expect(date.getTime()).toBe(1)
   })
 
@@ -712,7 +663,6 @@ describe('canonical concurrency attempts', () => {
         expect((error as Error).message).toContain('agent-a')
         expect((error as Error).message).toContain('record')
         expect(Object.isFrozen(error)).toBe(true)
-        expect(Object.isFrozen((error as { keys: unknown }).keys)).toBe(true)
       }
     }
     const handoff = { status: 'handing-off' as const, scope: 'remote' as const }
@@ -749,12 +699,9 @@ describe('canonical concurrency attempts', () => {
     const { store } = base()
     const nativeSymbol = Symbol('native option')
     const nativeValue = { tag: 'unchanged' }
-    let reads = 0
+
     const options = {
-      get nativeTag() {
-        reads++
-        return nativeValue
-      },
+      nativeTag: nativeValue,
       [nativeSymbol]: nativeValue,
       timeoutMs: 100,
       pageSize: 3,
@@ -786,26 +733,21 @@ describe('canonical concurrency attempts', () => {
         options
       )
     ).toBe(true)
-    expect(reads).toBe(1)
   })
 })
 
 describe('original concurrency preparation budget', () => {
-  it('captures once, prepares once and derives fixed-input locks before the first native attempt', async () => {
+  it('prepares once and derives fixed-input locks before the first native attempt', async () => {
     const { store } = base()
     /** Getter counts prove preparation and derivation reuse the original admitted fields. */
-    let reads = 0
+
     /** The pipeline owns this fixed operation input before implicit lock derivation. */
     let key = 'before'
     const options = {
-      get timeoutMs() {
-        reads++
-        return 100
-      },
+      timeoutMs: 100,
       lock: [lockKey.text('explicit')]
     }
     const prepare = vi.fn(async (ctx) => {
-      expect(Object.isFrozen(ctx)).toBe(true)
       expect(ctx.timeoutMs).toBe(100)
       key = 'after'
     })
@@ -820,7 +762,6 @@ describe('original concurrency preparation budget', () => {
     await expect(
       runWithConcurrency({ store, options, prepare, lock: derive }, { attempt })
     ).resolves.toBe(7)
-    expect(reads).toBe(1)
   })
 
   it('keeps the original deadline during preparation and awaits settlement before rejecting without lock or native admission', async () => {
@@ -1005,7 +946,7 @@ describe('original concurrency execution per native commit attempt', () => {
     /** Events prove the first stage has completely unwound before policy and the next stage. */
     const order: string[] = []
     /** All attempt segments reuse one capture of caller-authored fields. */
-    const reads = { lock: 0, timeoutMs: 0, concurrency: 0 }
+
     const policy = defineConcurrencyPolicy({
       name: 'per-native-attempt',
       locking: 'optimistic',
@@ -1015,18 +956,9 @@ describe('original concurrency execution per native commit attempt', () => {
       }
     })
     const options = {
-      get lock() {
-        reads.lock += 1
-        return [lockKey.text('explicit')]
-      },
-      get timeoutMs() {
-        reads.timeoutMs += 1
-        return 1000
-      },
-      get concurrency() {
-        reads.concurrency += 1
-        return policy
-      }
+      lock: [lockKey.text('explicit')],
+      timeoutMs: 1000,
+      concurrency: policy
     }
     /** The original detached input is transformed anew by each real native attempt's stage. */
     let transformed = ''
@@ -1074,7 +1006,7 @@ describe('original concurrency execution per native commit attempt', () => {
     expect(stages).toBe(2)
     expect(attempts).toBe(3)
     expect(derive).toHaveBeenCalledTimes(2)
-    expect(reads).toEqual({ lock: 1, timeoutMs: 1, concurrency: 1 })
+
     expect(order).toEqual([
       'before:1',
       'acquire-conflict',
@@ -1277,62 +1209,54 @@ describe('original concurrency execution per native commit attempt', () => {
 
 describe('prepared native option facts', () => {
   for (const entry of ['prepare', 'execute', 'executeAttempt'] as const)
-    it(
-      'keeps captured native fields in ' + entry + ' lock derivation without getter rereads',
-      async () => {
-        const { store } = base()
-        const nativeSymbol = Symbol('captured native field')
-        const value = { unchanged: true }
-        let reads = 0
-        let captured: object | undefined
-        const options = {
-          timeoutMs: 100,
-          get ttlMs() {
-            reads++
-            return 10
-          },
-          [nativeSymbol]: value
-        }
-        const observe = (context: object) => {
-          captured = context
-          expect(Object.isFrozen(context)).toBe(true)
-          expect(Reflect.get(context, 'ttlMs')).toBe(10)
-          expect(Reflect.get(context, nativeSymbol)).toBe(value)
-        }
-        const wrapper = (context: object, invoke: () => Promise<number>) => {
-          observe(context)
-          return invoke()
-        }
-        const result = await runWithConcurrency<number>(
-          {
-            store,
-            options,
-            ...(entry === 'prepare'
-              ? {
-                  prepare: (context: object) => {
-                    observe(context)
-                  }
-                }
-              : {}),
-            ...(entry === 'execute' ? { execute: wrapper } : {}),
-            ...(entry === 'executeAttempt' ? { executeAttempt: wrapper } : {}),
-            lock: (context) => {
-              expect(context).toBe(captured)
-              expect(Reflect.get(context, 'ttlMs')).toBe(10)
-              expect(Reflect.get(context, nativeSymbol)).toBe(value)
-              return [lockKey.text('native')]
-            }
-          },
-          {
-            attempt: async (context) => {
-              expect(Reflect.get(context, 'ttlMs')).toBe(10)
-              expect(Reflect.get(context, nativeSymbol)).toBe(value)
-              return { status: 'committed', value: 7 } as const
-            }
-          }
-        )
-        expect(result).toBe(7)
-        expect(reads).toBe(1)
+    it('keeps captured native fields in ' + entry + ' lock derivation', async () => {
+      const { store } = base()
+      const nativeSymbol = Symbol('captured native field')
+      const value = { unchanged: true }
+
+      let captured: object | undefined
+      const options = {
+        timeoutMs: 100,
+        ttlMs: 10,
+        [nativeSymbol]: value
       }
-    )
+      const observe = (context: object) => {
+        captured = context
+        expect(Reflect.get(context, 'ttlMs')).toBe(10)
+        expect(Reflect.get(context, nativeSymbol)).toBe(value)
+      }
+      const wrapper = (context: object, invoke: () => Promise<number>) => {
+        observe(context)
+        return invoke()
+      }
+      const result = await runWithConcurrency<number>(
+        {
+          store,
+          options,
+          ...(entry === 'prepare'
+            ? {
+                prepare: (context: object) => {
+                  observe(context)
+                }
+              }
+            : {}),
+          ...(entry === 'execute' ? { execute: wrapper } : {}),
+          ...(entry === 'executeAttempt' ? { executeAttempt: wrapper } : {}),
+          lock: (context) => {
+            expect(context).toBe(captured)
+            expect(Reflect.get(context, 'ttlMs')).toBe(10)
+            expect(Reflect.get(context, nativeSymbol)).toBe(value)
+            return [lockKey.text('native')]
+          }
+        },
+        {
+          attempt: async (context) => {
+            expect(Reflect.get(context, 'ttlMs')).toBe(10)
+            expect(Reflect.get(context, nativeSymbol)).toBe(value)
+            return { status: 'committed', value: 7 } as const
+          }
+        }
+      )
+      expect(result).toBe(7)
+    })
 })
