@@ -269,3 +269,5 @@ PENDING-USER-REVIEW：dropOrg 遇到存活的全局 journal 时，原私有 name
 文本后端作者可在原 `journalBinding` 提供可选 `redo: IStorageJournalRedoBinding`：`transactionInfo` 认证原 text-only scope，`changes` 捕获同一 draft，`protect` 委托原物理保护，`apply` 同步应用已准备 draft，`replay` 按原完整镜像恢复，`seal` 在不确定应用/完成后停准入。可选 `core.journal.beginRedo(scope)` / `runRedo(work, signal?)` 将原 attempt 取消信号交原物理锁，并在同一保护内恢复当前原 WAL pending 后执行原操作；不增加 FIFO、提交权或 nativeAtomic 保证。原 WAL 与 redo 共用 target/镜像解析。选择该路径须 `redoWal === logger.wal`，所有参与者借用同一个真实、可见最新 pending 的原对象；仅同名目标或分别创建的缓存不能证明共享。该对象选择不授予私有日志权限。undo 与 atomicBinlog/atomicUndo 的非原生组合仍在业务前拒绝；具体 Web 适配接线与跨页面证据单独验收。
 
 redo 的显式后端选择缺少 WAL 时在安装阶段拒绝；replay 可返回原通知回调，只在 WAL complete 成功后派发，通知失败仅报告，不改变已完成结果。
+
+没有原 native changes 或 redo 接点的后端不能仅因 WAL 插件存在而准入；该组合在配置准备阶段报 UNSUPPORTED_CAPABILITY，避免原普通写绕过所选恢复。

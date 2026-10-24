@@ -119,6 +119,9 @@ export function prepareStorageJournalConfiguration(
       ...observation
     })
   }
+  /** An unselected text owner must not silently accept WAL while bypassing redo capture. */
+  if (options.logger.wal !== undefined && access.binding.changes === undefined)
+    return Promise.reject(new StorageContractError(StorageContractErrorCode.unsupported))
   if (options.logger.binlog === undefined && options.logger.undo === undefined)
     return Promise.resolve(undefined)
   if (
