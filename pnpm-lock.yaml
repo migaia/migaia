@@ -810,6 +810,9 @@ importers:
       '@migaia/storage-plugin-postgres':
         specifier: workspace:^
         version: link:../storage-plugin-postgres
+      '@migaia/storage-plugin-qdrant':
+        specifier: workspace:^
+        version: link:../storage-plugin-qdrant
       '@migaia/storage-plugin-redis':
         specifier: workspace:^
         version: link:../storage-plugin-redis

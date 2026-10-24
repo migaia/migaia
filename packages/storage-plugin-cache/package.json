@@ -16,6 +16,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./features/semantic": {
+      "types": "./dist/features/semantic.d.ts",
+      "default": "./dist/features/semantic.js"
     }
   },
   "scripts": {
@@ -33,6 +37,7 @@
   },
   "devDependencies": {
     "@migaia/storage-plugin-postgres": "workspace:^",
+    "@migaia/storage-plugin-qdrant": "workspace:^",
     "@migaia/storage-plugin-redis": "workspace:^",
     "@migaia/storage-plugin-sqlite": "workspace:^",
     "@types/pg": "8.23.1",
