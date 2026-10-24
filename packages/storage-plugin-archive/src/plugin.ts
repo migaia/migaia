@@ -28,14 +28,20 @@ import { compileStorageWhere } from '@migaia/storage-host/authoring/query'
 import { ConcurrencyPolicy, lockKey } from '@migaia/storage-host/authoring/concurrency'
 import type { ICollectionsCodecValue } from '@migaia/serialize/codecs/collections-json'
 import { Archive } from './constants.js'
-import { tryReadProperty } from '@migaia/utils/error'
-import { ArchiveErrorCode, ERROR_SOURCE } from './error-code.js'
-import { archiveError, invalidSegment, unsupported, transactionArchiveError } from './errors.js'
+import { ArchiveErrorCode } from './error-code.js'
+import {
+  archiveError,
+  invalidSegment,
+  unsupported,
+  transactionArchiveError,
+  isArchiveError
+} from './errors.js'
 import { snapshotArchiveOptions, prefixUpper, type IArchiveConfiguration } from './policy.js'
 import {
   archivePrefix,
   finishArchiveResource,
   captureRow,
+  encodeArchiveRow,
   normalizeValue,
   readSegment,
   segmentStream,
@@ -75,6 +81,13 @@ type IArchiveRunBatch = {
   bytes: number
   readonly progress: { archived: number; skipped: number; segments: number }
 }
+/** One explicit run shares cutoff, candidate membership and certainly committed counts across rules. */
+type IArchiveRuleExecution = {
+  readonly now: number
+  readonly seen: Set<string>
+  readonly progress: IArchiveRunBatch['progress']
+  readonly limit: number | undefined
+}
 /** Capture the finite run input once, also admitting replacement input from the original pipeline. */
 function captureRunInput(configuration: IArchiveConfiguration, input: unknown) {
   if (input !== undefined && (typeof input !== 'object' || input === null || Array.isArray(input)))
@@ -92,7 +105,7 @@ function captureRunInput(configuration: IArchiveConfiguration, input: unknown) {
   if (selected.length === 0) throw archiveError(ArchiveErrorCode.invalidArgument)
   return {
     selected,
-    request: Object.freeze({ rule: rule as string | undefined, limit: limit as number | undefined })
+    request: { rule: rule as string | undefined, limit: limit as number | undefined }
   }
 }
 /**
@@ -105,14 +118,14 @@ function captureGetInput(input: unknown) {
   const { key, restore } = input as { readonly key?: unknown; readonly restore?: unknown }
   if (typeof key !== 'string' || (restore !== undefined && typeof restore !== 'boolean'))
     throw archiveError(ArchiveErrorCode.invalidArgument)
-  return Object.freeze({ key, restore: restore === true })
+  return { key, restore: restore === true }
 }
 /** Preserve coded native failures and attach certain committed progress without exposing records. */
 function runFailure(cause: unknown, progress: IArchiveRunResult): Error {
   const error = archiveError(ArchiveErrorCode.operationFailed, cause)
   if (Object.isExtensible(error))
     Object.defineProperty(error, 'progress', {
-      value: Object.freeze({ ...progress }),
+      value: { ...progress },
       enumerable: true
     })
   return error
@@ -136,7 +149,7 @@ function admitHot(borrowed: IStorageBorrowedBackend): IArchiveHot {
     'transaction',
     'tx'
   ] as const)
-    if (typeof Reflect.get(borrowed, name) !== 'function') unsupported()
+    if (typeof (borrowed as unknown as Record<string, unknown>)[name] !== 'function') unsupported()
   return borrowed as unknown as IArchiveHot
 }
 /**
@@ -246,10 +259,7 @@ class ArchiveOperations {
           try {
             return await run(tx)
           } catch (cause) {
-            if (cause instanceof Error) {
-              const source = tryReadProperty(cause as { source?: unknown }, 'source')
-              if (!source.threw && source.value === ERROR_SOURCE) declared = cause
-            }
+            if (isArchiveError(cause)) declared = cause
             throw cause
           }
         })
@@ -320,85 +330,101 @@ class ArchiveOperations {
     try {
       captured = captureRunInput(this.#configuration, options)
     } catch (cause) {
-      return Promise.reject(archiveError(ArchiveErrorCode.invalidArgument, cause))
+      // Finite argument failures reject; unsupported accessors are not normalized here.
+      if (isArchiveError(cause)) return Promise.reject(cause)
+      throw cause
     }
-    const call = {
-        orgId: callContext.orgId,
-        backend: <S extends IStorageBorrowedBackend>(borrowed: S): S =>
-          callContext.backend(borrowed)
-      },
-      progress = { archived: 0, skipped: 0, segments: 0 }
-    return this.#execute(
-      call,
-      Archive.run,
-      captured.request,
-      options,
-      async (hot, cold, ctx, input) => {
-        const {
-          selected,
-          request: { limit }
-        } = input === captured.request ? captured : captureRunInput(this.#configuration, input)
-        this.#core.emit(Archive.beforeRun, () => ({
-          ...this.#identity(call),
-          ruleCount: selected.length,
-          ...(limit === undefined ? {} : { limit })
-        }))
-        try {
-          const now = Date.now(),
-            seen = new Set<string>()
-          for (const rule of selected) {
-            const predicate = compileStorageWhere<ICollectionsCodecValue>(
-                rule.where(now - rule.olderThanMs)
-              ),
-              upper = prefixUpper(rule.prefix)
-            const iterator = hot.iterateRecords(
-              { lower: rule.prefix, ...(upper === undefined ? {} : { upper, upperOpen: true }) },
-              ctx
-            )
-            /** Per-rule segment state stays explicit across uploads and native commits. */
-            const batch: IArchiveRunBatch = { rows: [], bytes: 0, progress }
-            /** Cleanup retains the first work failure if iterator disposal also fails. */
-            let primary: unknown,
-              failed = false
-            try {
-              for await (const [key, value] of iterator) {
-                throwIfAborted(ctx.signal)
-                if (typeof key !== 'string' || !key.startsWith(rule.prefix)) break
-                if (seen.has(key) || !predicate(value)) continue
-                if (limit !== undefined && seen.size >= limit) break
-                const row = captureRow(key, value)
-                if (batch.rows.length > 0 && batch.bytes + row.bytes.byteLength > rule.segmentBytes)
-                  await this.#flushSegment(hot, cold, ctx, rule, predicate, batch)
-                seen.add(key)
-                batch.rows.push(row)
-                batch.bytes += row.bytes.byteLength
-                if (batch.bytes >= rule.segmentBytes)
-                  await this.#flushSegment(hot, cold, ctx, rule, predicate, batch)
-                if (limit !== undefined && seen.size >= limit) break
-              }
-              await this.#flushSegment(hot, cold, ctx, rule, predicate, batch)
-            } catch (cause) {
-              failed = true
-              primary = cause
-              throw cause
-            } finally {
-              await finishArchiveResource(() => iterator.dispose(), failed, primary)
-            }
-            if (limit !== undefined && seen.size >= limit) break
-          }
-          this.#core.emit(Archive.afterRun, () => ({ ...this.#identity(call), ...progress }))
-          return { ...progress }
-        } catch (cause) {
-          const error = runFailure(cause, progress)
-          this.#core.emit(Archive.runError, () => ({
-            ...this.#identity(call),
-            ...progress,
-            code: Reflect.get(error, 'code') as string | undefined
-          }))
-          throw error
-        }
-      }
+    // The host already owns this immutable org identity and genuine backend projection.
+    const call = callContext
+    const progress = { archived: 0, skipped: 0, segments: 0 }
+    return this.#execute(call, Archive.run, captured.request, options, (hot, cold, ctx, input) =>
+      this.#runRules(call, hot, cold, ctx, input, progress)
     )
+  }
+
+  /** Compile each selected ordered rule once, publish only committed counts and preserve errors. */
+  async #runRules(
+    call: IStoragePluginCallContext,
+    hot: IArchiveHot,
+    cold: IBlobApi,
+    ctx: IOperationContext,
+    input: unknown,
+    progress: IArchiveRunBatch['progress']
+  ): Promise<IArchiveRunResult> {
+    // The original pipeline may rewrite scalar request fields in place before this native job.
+    const {
+      selected,
+      request: { limit }
+    } = captureRunInput(this.#configuration, input)
+    this.#core.emit(Archive.beforeRun, () => ({
+      ...this.#identity(call),
+      ruleCount: selected.length,
+      ...(limit === undefined ? {} : { limit })
+    }))
+    try {
+      const now = Date.now(),
+        seen = new Set<string>()
+      for (const rule of selected) {
+        await this.#runRule(hot, cold, ctx, rule, { now, seen, progress, limit })
+        if (limit !== undefined && seen.size >= limit) break
+      }
+      this.#core.emit(Archive.afterRun, () => ({ ...this.#identity(call), ...progress }))
+      return { ...progress }
+    } catch (cause) {
+      const error = runFailure(cause, progress)
+      this.#core.emit(Archive.runError, () => ({
+        ...this.#identity(call),
+        ...progress,
+        code: (error as Error & { code?: string }).code
+      }))
+      throw error
+    }
+  }
+  /** The original iterator and cold/hot terminals own one rule's bounded native work. */
+  async #runRule(
+    hot: IArchiveHot,
+    cold: IBlobApi,
+    ctx: IOperationContext,
+    rule: IArchiveConfiguration['rules'][number],
+    state: IArchiveRuleExecution
+  ): Promise<void> {
+    const predicate = compileStorageWhere<ICollectionsCodecValue>(
+        rule.where(state.now - rule.olderThanMs)
+      ),
+      upper = prefixUpper(rule.prefix)
+    const iterator = hot.iterateRecords(
+      { lower: rule.prefix, ...(upper === undefined ? {} : { upper, upperOpen: true }) },
+      ctx
+    )
+    /** Per-rule segment state stays explicit across uploads and native commits. */
+    const batch: IArchiveRunBatch = { rows: [], bytes: 0, progress: state.progress }
+    /** Cleanup retains the first work failure if iterator disposal also fails. */
+    let primary: unknown,
+      failed = false
+    try {
+      for await (const [key, value] of iterator) {
+        throwIfAborted(ctx.signal)
+        if (typeof key !== 'string' || !key.startsWith(rule.prefix)) break
+        if (state.seen.has(key) || !predicate(value)) continue
+        if (state.limit !== undefined && state.seen.size >= state.limit) break
+        const row = captureRow(key, value)
+        if (batch.rows.length > 0 && batch.bytes + row.bytes.byteLength > rule.segmentBytes)
+          await this.#flushSegment(hot, cold, ctx, rule, predicate, batch)
+        state.seen.add(key)
+        batch.rows.push(row)
+        batch.bytes += row.bytes.byteLength
+        if (batch.bytes >= rule.segmentBytes)
+          await this.#flushSegment(hot, cold, ctx, rule, predicate, batch)
+        if (state.limit !== undefined && state.seen.size >= state.limit) break
+      }
+      await this.#flushSegment(hot, cold, ctx, rule, predicate, batch)
+    } catch (cause) {
+      failed = true
+      primary = cause
+      throw cause
+    } finally {
+      await finishArchiveResource(() => iterator.dispose(), failed, primary)
+    }
   }
   /** Upload one segment, commit unchanged rows once, then advance this operation's batch. */
   async #flushSegment(
@@ -441,7 +467,7 @@ class ArchiveOperations {
           current = await tx.getRecord(row.key)
         if (
           current === undefined ||
-          captureRow(row.key, current).encoded !== row.encoded ||
+          encodeArchiveRow(row.key, current) !== row.encoded ||
           !predicate(current)
         ) {
           skipped++
@@ -472,113 +498,122 @@ class ArchiveOperations {
     try {
       captured = captureGetInput({ key, restore: options?.restore })
     } catch (cause) {
-      return Promise.reject(archiveError(ArchiveErrorCode.invalidArgument, cause))
+      if (isArchiveError(cause)) return Promise.reject(cause)
+      throw cause
     }
-    const call = {
-      orgId: callContext.orgId,
-      backend: <S extends IStorageBorrowedBackend>(borrowed: S): S => callContext.backend(borrowed)
-    }
-    return this.#execute(
-      call,
-      Archive.get,
-      captured,
-      options,
-      async (hot, cold, ctx, input, reporter) => {
-        const { key, restore } = input === captured ? captured : captureGetInput(input)
+    // The host already owns this immutable org identity and genuine backend projection.
+    const call = callContext
+    return this.#execute(call, Archive.get, captured, options, (hot, cold, ctx, input, reporter) =>
+      this.#readRecord(call, hot, cold, ctx, input, reporter)
+    )
+  }
+  /** Resolve a hot record or immutable manifest under the original finite restore race protocol. */
+  async #readRecord(
+    call: IStoragePluginCallContext,
+    hot: IArchiveHot,
+    cold: IBlobApi,
+    ctx: IOperationContext,
+    input: unknown,
+    reporter: IStorageOperationReporter
+  ): Promise<ICollectionsCodecValue | undefined> {
+    // Revalidate the admitted pipeline output rather than relying on mutable request identity.
+    const { key, restore } = captureGetInput(input)
+    try {
+      const current = await hot.getRecord(key, ctx)
+      if (current !== undefined) {
+        if (restore)
+          this.#core.emit(Archive.afterRestore, () => ({
+            ...this.#identity(call),
+            restored: false
+          }))
+        return normalizeValue(current)
+      }
+      const manifest = readManifest(await hot.getRecord(manifestKey(this.#id, key), ctx))
+      let value: ICollectionsCodecValue | undefined,
+        segmentFailure: unknown,
+        segmentFailed = false
+      if (manifest) {
         try {
-          const current = await hot.getRecord(key, ctx)
-          if (current !== undefined) {
-            if (restore)
-              this.#core.emit(Archive.afterRestore, () => ({
-                ...this.#identity(call),
-                restored: false
-              }))
-            return normalizeValue(current)
-          }
-          const manifest = readManifest(await hot.getRecord(manifestKey(this.#id, key), ctx))
-          let value: ICollectionsCodecValue | undefined,
-            segmentFailure: unknown,
-            segmentFailed = false
-          if (manifest) {
-            try {
-              const object = await cold.get(this.#prefix + manifest.segmentId, { ctx })
-              if (!object) throw invalidSegment()
-              value = await readSegment(object, key, manifest.line, ctx, reporter)
-            } catch (cause) {
-              segmentFailure = cause
-              segmentFailed = true
-            }
-          }
-          const result = await this.#transaction(hot, ctx, async (tx) => {
-            const latest = await tx.getRecord(key)
-            if (latest !== undefined) return { value: normalizeValue(latest), restored: false }
-            const next = readManifest(await tx.getRecord(manifestKey(this.#id, key)))
-            if (next === undefined) return { value: undefined, restored: false }
-            if (manifest === undefined || !sameManifest(next, manifest))
-              throw archiveError(ArchiveErrorCode.operationFailed)
-            if (segmentFailed) throw segmentFailure
-            if (restore) {
-              await tx.putRecord(value!, key, { conflictPolicy: ConflictPolicy.replace })
-              await tx.deleteRecord(manifestKey(this.#id, key))
-              await changeRefs(tx, this.#id, manifest.segmentId, -1)
-            }
-            return { value, restored: restore }
-          })
-          if (restore)
-            this.#core.emit(Archive.afterRestore, () => ({
-              ...this.#identity(call),
-              restored: result.restored
-            }))
-          return result.value
+          const object = await cold.get(this.#prefix + manifest.segmentId, { ctx })
+          if (!object) throw invalidSegment()
+          value = await readSegment(object, key, manifest.line, ctx, reporter)
         } catch (cause) {
-          throw archiveError(ArchiveErrorCode.operationFailed, cause)
+          segmentFailure = cause
+          segmentFailed = true
         }
       }
-    )
+      const result = await this.#transaction(hot, ctx, async (tx) => {
+        const latest = await tx.getRecord(key)
+        if (latest !== undefined) return { value: normalizeValue(latest), restored: false }
+        const next = readManifest(await tx.getRecord(manifestKey(this.#id, key)))
+        if (next === undefined) return { value: undefined, restored: false }
+        if (manifest === undefined || !sameManifest(next, manifest))
+          throw archiveError(ArchiveErrorCode.operationFailed)
+        if (segmentFailed) throw segmentFailure
+        if (restore) {
+          await tx.putRecord(value!, key, { conflictPolicy: ConflictPolicy.replace })
+          await tx.deleteRecord(manifestKey(this.#id, key))
+          await changeRefs(tx, this.#id, manifest.segmentId, -1)
+        }
+        return { value, restored: restore }
+      })
+      if (restore)
+        this.#core.emit(Archive.afterRestore, () => ({
+          ...this.#identity(call),
+          restored: result.restored
+        }))
+      return result.value
+    } catch (cause) {
+      throw archiveError(ArchiveErrorCode.operationFailed, cause)
+    }
   }
   /** Remove unreferenced archive segments for the invoking organization. */
   sweep(callContext: IStoragePluginCallContext, context?: IOperationContext) {
-    const call = {
-      orgId: callContext.orgId,
-      backend: <S extends IStorageBorrowedBackend>(borrowed: S): S => callContext.backend(borrowed)
-    }
-    return this.#execute(call, Archive.sweep, undefined, context, async (hot, cold, ctx) => {
-      let after: string | undefined,
-        scanned = 0,
-        removed = 0
-      try {
-        do {
-          throwIfAborted(ctx.signal)
-          const page = await cold.list(
-            { prefix: this.#prefix, after, limit: Archive.pageSize },
-            ctx
+    // The host already owns this immutable org identity and genuine backend projection.
+    const call = callContext
+    return this.#execute(call, Archive.sweep, undefined, context, (hot, cold, ctx) =>
+      this.#sweepSegments(call, hot, cold, ctx)
+    )
+  }
+  /** Native opaque pages and the original control transaction define each actual removal. */
+  async #sweepSegments(
+    call: IStoragePluginCallContext,
+    hot: IArchiveHot,
+    cold: IBlobApi,
+    ctx: IOperationContext
+  ): Promise<import('./types.js').IArchiveSweepResult> {
+    let after: string | undefined,
+      scanned = 0,
+      removed = 0
+    try {
+      do {
+        throwIfAborted(ctx.signal)
+        const page = await cold.list({ prefix: this.#prefix, after, limit: Archive.pageSize }, ctx)
+        for (const info of page.items) {
+          scanned++
+          if (
+            !info.key.startsWith(this.#prefix) ||
+            info.metadata.format !== Archive.format ||
+            info.metadata.version !== String(Archive.version)
           )
-          for (const info of page.items) {
-            scanned++
-            if (
-              !info.key.startsWith(this.#prefix) ||
-              info.metadata.format !== Archive.format ||
-              info.metadata.version !== String(Archive.version)
+            continue
+          const segmentId = info.key.slice(this.#prefix.length)
+          if (
+            await this.#transaction(hot, ctx, async (tx) =>
+              readRefs(await tx.getRecord(directoryKey(this.#id, segmentId))) > 0
+                ? false
+                : cold.remove(info.key, ctx)
             )
-              continue
-            const segmentId = info.key.slice(this.#prefix.length)
-            if (
-              await this.#transaction(hot, ctx, async (tx) =>
-                readRefs(await tx.getRecord(directoryKey(this.#id, segmentId))) > 0
-                  ? false
-                  : cold.remove(info.key, ctx)
-              )
-            )
-              removed++
-          }
-          after = page.next
-        } while (after !== undefined)
-        const result = { scanned, removed }
-        this.#core.emit(Archive.afterSweep, () => ({ ...this.#identity(call), ...result }))
-        return result
-      } catch (cause) {
-        throw archiveError(ArchiveErrorCode.operationFailed, cause)
-      }
-    })
+          )
+            removed++
+        }
+        after = page.next
+      } while (after !== undefined)
+      const result = { scanned, removed }
+      this.#core.emit(Archive.afterSweep, () => ({ ...this.#identity(call), ...result }))
+      return result
+    } catch (cause) {
+      throw archiveError(ArchiveErrorCode.operationFailed, cause)
+    }
   }
 }

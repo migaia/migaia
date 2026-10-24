@@ -5,11 +5,17 @@ import {
 } from '@migaia/storage-contract'
 import { PluginHostError } from '@migaia/plugin-host'
 import { StorageError, StorageErrorCode } from '@migaia/storage-host'
-import { attachErrorIdentity, tryReadProperty } from '@migaia/utils/error'
+import { attachErrorIdentity } from '@migaia/utils/error'
 import { ArchiveErrorCode, ERROR_SOURCE, type IArchiveErrorCode } from './error-code.js'
 import { Archive } from './constants.js'
 import { ArchiveText } from './error-text.js'
 
+/** The existing archive source marks declared validation failures without accessor normalization. */
+export function isArchiveError(
+  value: unknown
+): value is Error & { readonly code: IArchiveErrorCode } {
+  return value instanceof Error && (value as { source?: unknown }).source === ERROR_SOURCE
+}
 /** Existing coded native/contract failures cross unchanged; uncoded failures retain their class. */
 export function archiveError(code: IArchiveErrorCode, cause?: unknown): Error {
   if (
@@ -27,10 +33,7 @@ export function archiveError(code: IArchiveErrorCode, cause?: unknown): Error {
   )
     return cause
   if (cause instanceof PluginHostError) return cause
-  if (cause instanceof Error) {
-    const source = tryReadProperty(cause as { source?: unknown }, 'source')
-    if (!source.threw && source.value === ERROR_SOURCE) return cause
-  }
+  if (isArchiveError(cause)) return cause
   return createArchiveError(code, cause)
 }
 /** Preserve native failure classes while the exact original native object remains first cause. */
@@ -70,5 +73,5 @@ export function unsupported(cause?: unknown): never {
 
 /** Re-expose an archive validation scenario after the native transaction has rolled back. */
 export function transactionArchiveError(original: Error, cause: unknown): Error {
-  return createArchiveError(Reflect.get(original, 'code') as IArchiveErrorCode, cause, original)
+  return createArchiveError((original as Error & { code: IArchiveErrorCode }).code, cause, original)
 }

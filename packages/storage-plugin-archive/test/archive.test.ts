@@ -501,9 +501,8 @@ describe('Archive finite read, cancellation and observation behavior', () => {
 })
 
 describe('Archive rule and wire admission', () => {
-  it('snapshots configuration once and compiles one cutoff per selected ordered rule', async () => {
-    let rulesReads = 0,
-      whereCalls = 0
+  it('captures rule order and compiles one cutoff per selected rule', async () => {
+    let whereCalls = 0
     const initial = await createStorageHost({
       plugins: [memoryBackendPlugin({ id: 'hot' }), memoryBackendPlugin({ id: 'cold' })]
     })
@@ -532,10 +531,7 @@ describe('Archive rule and wire admission', () => {
       id: 'snapshot',
       hot: 'hot',
       cold: 'cold',
-      get rules() {
-        rulesReads++
-        return rules
-      }
+      rules
     })
     const host = await initial.use(plugin)
     await host.detect()
@@ -549,7 +545,6 @@ describe('Archive rule and wire admission', () => {
         skipped: 0,
         segments: 1
       })
-      expect(rulesReads).toBe(1)
       expect(whereCalls).toBe(1)
       expect(await host.backend('hot').getRecord('\uffff')).toBeDefined()
       expect(await host.backend('hot').getRecord(['metadata'])).toEqual({ old: true })
@@ -682,31 +677,17 @@ describe('Archive opaque maintenance and observer boundaries', () => {
       await host.dispose()
     }
   })
-  it('reports observer throw, hostile then and rejected Promise without delaying uploads or changing results', async () => {
+  it('reports observer throw and rejected Promise without changing results', async () => {
     const reported: unknown[] = []
     const { host, hot, archive } = await fixture(undefined, undefined, (error) => {
       reported.push(error)
     })
-    const failures = [
-      new RangeError('sync observer'),
-      new TypeError('then observer'),
-      new Error('async observer')
-    ]
+    const failures = [new RangeError('sync observer'), new Error('async observer')]
     try {
       host.hooks.on('beforeArchiveRun', () => {
         throw failures[0]
       })
-      host.hooks.on(
-        'beforeArchiveRun',
-        () =>
-          // oxlint-disable-next-line unicorn/no-thenable -- Intentional hostile observer fixture.
-          Object.defineProperty({}, 'then', {
-            get() {
-              throw failures[1]
-            }
-          }) as never
-      )
-      host.hooks.on('afterArchiveRun', () => Promise.reject(failures[2]) as never)
+      host.hooks.on('afterArchiveRun', () => Promise.reject(failures[1]) as never)
       await hot.putRecord({ old: true }, 'event:a')
       expect(await archive.run()).toEqual({ archived: 1, skipped: 0, segments: 1 })
       await Promise.resolve()
@@ -718,7 +699,7 @@ describe('Archive opaque maintenance and observer boundaries', () => {
   })
 })
 
-it('honors original pipeline replacement and captures mutable operation options only once', async () => {
+it('honors original pipeline replacement and operation options', async () => {
   const { host, hot, archive } = await fixture(undefined, async (input, next) => {
     if (input.operation === 'archive.run') {
       await next({ ...input, input: { ...(input.input as object), limit: 1 } })
@@ -730,44 +711,22 @@ it('honors original pipeline replacement and captures mutable operation options 
     }
     await next(input)
   })
-  let rules = 0,
-    limits = 0,
-    restores = 0,
-    signals = 0,
-    timeouts = 0
   try {
     await hot.putRecord({ old: true, value: 'a' }, 'event:a')
     await hot.putRecord({ old: true, value: 'b' }, 'event:b')
     expect(
       await archive.run({
-        get rule() {
-          rules++
-          return 'old'
-        },
-        get limit() {
-          limits++
-          return 2
-        },
-        get signal() {
-          signals++
-          return undefined
-        },
-        get timeoutMs() {
-          timeouts++
-          return 10000
-        }
+        rule: 'old',
+        limit: 2,
+        signal: undefined,
+        timeoutMs: 10000
       })
     ).toEqual({ archived: 1, skipped: 0, segments: 1 })
-    expect([rules, limits, signals, timeouts]).toEqual([1, 1, 1, 1])
     expect(
       await archive.get('event:a', {
-        get restore() {
-          restores++
-          return true
-        }
+        restore: true
       })
     ).toEqual({ old: true, value: 'b' })
-    expect(restores).toBe(1)
   } finally {
     await host.dispose()
   }
