@@ -2,7 +2,7 @@
 
 [中文](./README.md)
 
-Store local settings, offline records and caches with the runtime's built-in SQLite, combining text, records, expiry and application SQL in one database transaction. Select the driver for your runtime and a database file or in-memory database, then install the plugin in a host without adding an npm native database extension. Your application creates and closes the connection; the root import does not choose or load a driver automatically.
+When local settings, offline records and caches must be saved together, this package combines text, records, expiry and application SQL in the runtime's built-in SQLite transaction, avoiding partially saved updates. Choose the Node or Bun driver and a database file, then install the plugin in a host. No npm native database extension is needed; your application creates and closes the connection.
 
 ## Sound familiar?
 
