@@ -183,7 +183,7 @@ try {
 
 ## 提交后外置日志
 
-宿主 `journal` 可借用仅安装 `binlog` 的原 Logger，且不配置 WAL、undo 或 atomic log stores。每个组织经原 journalBinding 捕获最终 draft；只有原生 EXEC 所有项成功才触发原 onCommit，操作等待原 settle 完成。回调在 EXEC 前失败不写业务或日志；部分执行或回复未知不追加成功日志、不重放，并封闭后续写入。外置 append 失败沿原宿主报告，已经提交的数据不改为失败回滚，仍存在既定提交后日志窗口。
+宿主 `journal` 可借用仅安装 `binlog` 的原 Logger，且不配置 WAL、undo 或 atomic log stores。每个组织经原 journalBinding 捕获有序 draft 修改；只有原生 EXEC 所有项成功才触发原 onCommit，操作等待原 settle 完成。回调在 EXEC 前失败不写业务或日志；部分执行或回复未知不追加成功日志、不重放，并封闭后续写入。外置 append 失败沿原宿主报告，已经提交的数据不改为失败回滚，仍存在既定提交后日志窗口。
 
 该终端如实声明 `nativeAtomic:false`，不把 Redis 执行隔离冒充失败回滚。标准值、字节、记录和向量的 image 使用原便携 codec，保留实际 wire 与绝对期限；仅日志启用时额外读取原生 PEXPIRETIME。历史向量删除的完整 before image 需要原二进制端口；缺少时该新增日志组合在修改前 `UNSUPPORTED_CAPABILITY`，普通历史删除不受影响。
 
