@@ -78,16 +78,6 @@ export function invalidArgument(cause?: unknown): StorageContractError {
     QdrantErrorText.argument
   )
 }
-/** Reflection occurs once before native work and preserves its original cause. */
-export function capture<T>(read: () => T): T {
-  try {
-    return read()
-  } catch (cause) {
-    if (cause instanceof StorageContractError) throw cause
-    throw invalidArgument(cause)
-  }
-}
-
 /** Uncoded logical execution failures are extension failures, never invented network outages. */
 export function normalizeOperationError(error: unknown, operation: string): Error {
   return normalizeError(

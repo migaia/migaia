@@ -7,7 +7,7 @@ import {
   snapshotRescorePoints,
   snapshotRescoreVector
 } from '../feature-input.js'
-import { capture, invalidArgument } from '../errors.js'
+import { invalidArgument } from '../errors.js'
 import { QdrantText } from '../constants.js'
 import type {
   IQdrantRescoreOptions,
@@ -32,15 +32,15 @@ export function qdrantRescoreFeature(options: IQdrantRescoreOptions) {
       chain: {
         vector: {
           rescore(options) {
-            const captured = capture(() => {
+            const captured = (function readAcceptedInput() {
               const { query, topN } = options
               return { query: snapshotRescoreVector(query), topN }
-            })
+            })()
             return refineStorageVectorQuery(this, (topK) => {
               const topN = captured.topN === undefined ? topK : captured.topN
               if (!Number.isSafeInteger(topN) || topN < 1 || topN > topK) throw invalidArgument()
               return {
-                native: Object.freeze({ kind: QdrantText.rescore, query: captured.query, topN }),
+                native: { kind: QdrantText.rescore, query: captured.query, topN },
                 topN
               }
             })

@@ -3,14 +3,14 @@ import { throwIfAborted } from '@migaia/storage-host/authoring/backend'
 import { QdrantRoute, QdrantText } from './constants.js'
 import { QdrantErrorCode } from './error-code.js'
 import { QdrantErrorText } from './error-text.js'
-import { capture, invalidArgument, normalizeQdrantError, qdrantError } from './errors.js'
+import { invalidArgument, normalizeQdrantError, qdrantError } from './errors.js'
 import { nativeResult } from './protocol.js'
 import { nativeHttp } from './native.js'
 import { qdrantWireValue } from './wire.js'
 import type { IQdrantHttp, IQdrantOperationName } from './types.js'
 /** Runtime fetch is the only native transport loaded by this explicit HTTP entry. */
 export function fetchHttp(url: string, apiKey?: string): IQdrantHttp {
-  const base = capture(() => new URL(url))
+  const base = parseQdrantUrl(url)
   if (
     !['http:', 'https:'].includes(base.protocol) ||
     base.username ||
@@ -18,8 +18,24 @@ export function fetchHttp(url: string, apiKey?: string): IQdrantHttp {
     (apiKey !== undefined && (typeof apiKey !== 'string' || /[\r\n]/.test(apiKey)))
   )
     throw invalidArgument()
-  /** One request consumes its complete response once and never follows mutation redirects. */
-  const request = async (
+  /** One named transport owns URL selection; the SDK/public client lifetime stays outside it. */
+  const transport = new QdrantFetchTransport(base, apiKey)
+  return nativeHttp(transport.invoke, transport.version)
+}
+
+/** Native fetch routing owns one validated endpoint and its original per-request jobs. */
+class QdrantFetchTransport {
+  /** URL copies remain request-local so routing never mutates the configured endpoint. */
+  readonly #base: URL
+  /** Header data is private to the transport and never enters hooks. */
+  readonly #apiKey: string | undefined
+  /** Bind validated endpoint data without issuing a request. */
+  constructor(base: URL, apiKey: string | undefined) {
+    this.#base = base
+    this.#apiKey = apiKey
+  }
+  /** Consume one native response without replaying a mutation or following a redirect. */
+  #request = async (
     target: URL,
     method: string,
     body: unknown,
@@ -33,7 +49,7 @@ export function fetchHttp(url: string, apiKey?: string): IQdrantHttp {
         headers: {
           Accept: QdrantText.json,
           ...(body === undefined ? {} : { 'Content-Type': QdrantText.json }),
-          ...(apiKey === undefined ? {} : { [QdrantText.apiKey]: apiKey })
+          ...(this.#apiKey === undefined ? {} : { [QdrantText.apiKey]: this.#apiKey })
         },
         ...(body === undefined ? {} : { body: JSON.stringify(qdrantWireValue(body)) }),
         signal: ctx?.signal as AbortSignal | undefined,
@@ -57,24 +73,22 @@ export function fetchHttp(url: string, apiKey?: string): IQdrantHttp {
       throw qdrantError(QdrantErrorCode.responseInvalid, cause)
     }
   }
-  const invoke = async <K extends IQdrantOperationName>(
+  /** Map canonical route arguments into this transport's one native request. */
+  invoke = async <K extends IQdrantOperationName>(
     operation: K,
     args: readonly unknown[],
     ctx: IOperationContext | undefined
   ): Promise<Awaited<ReturnType<IQdrantHttp[K]>>> => {
     const route = QdrantRoute[operation],
-      target = new URL(base),
+      target = new URL(this.#base),
       collection = route.collection ? args[0] : undefined
     if (route.collection && typeof collection !== 'string') throw invalidArgument()
     target.pathname =
-      base.pathname.replace(/\/$/, '') +
+      this.#base.pathname.replace(/\/$/, '') +
       '/' +
       route.path.replace(':collection', encodeURIComponent(collection as string))
     const parameters = route.parameters ? (args[route.collection ? 1 : 0] ?? {}) : undefined,
-      fields =
-        parameters === undefined
-          ? undefined
-          : capture(() => Object.fromEntries(Object.entries(parameters)))
+      fields = parameters === undefined ? undefined : Object.fromEntries(Object.entries(parameters))
     for (const field of route.query) {
       const value = fields?.[field]
       if (value !== undefined && value !== null) target.searchParams.set(field, String(value))
@@ -86,7 +100,7 @@ export function fetchHttp(url: string, apiKey?: string): IQdrantHttp {
       (fields !== undefined && Object.keys(fields).length === 0)
         ? undefined
         : fields
-    const response = await request(target, route.method, body, ctx)
+    const response = await this.#request(target, route.method, body, ctx)
     if (
       !response ||
       typeof response !== 'object' ||
@@ -95,8 +109,9 @@ export function fetchHttp(url: string, apiKey?: string): IQdrantHttp {
       throw qdrantError(QdrantErrorCode.responseInvalid)
     return nativeResult(operation, Reflect.get(response, 'result'))
   }
-  return nativeHttp(invoke, async (ctx) => {
-    const response = await request(new URL(base), 'GET', undefined, ctx)
+  /** Read the server version through the original read-only endpoint. */
+  version = async (ctx: IOperationContext | undefined) => {
+    const response = await this.#request(new URL(this.#base), 'GET', undefined, ctx)
     if (
       !response ||
       typeof response !== 'object' ||
@@ -105,5 +120,17 @@ export function fetchHttp(url: string, apiKey?: string): IQdrantHttp {
     )
       throw qdrantError(QdrantErrorCode.responseInvalid)
     return response.version
-  })
+  }
+}
+
+/**
+ * URL syntax is a real public input contract; retain the native parse failure on the argument
+ * error.
+ */
+function parseQdrantUrl(url: string): URL {
+  try {
+    return new URL(url)
+  } catch (cause) {
+    throw invalidArgument(cause)
+  }
 }

@@ -10,7 +10,7 @@ export function nativeHttp(
   ) => Promise<Awaited<ReturnType<IQdrantHttp[K]>>>,
   getVersion: IQdrantHttp['getVersion']
 ): IQdrantHttp {
-  return Object.freeze({
+  return {
     scroll: (collection, parameters, ctx) =>
       invoke(QdrantRoute.scroll.name, [collection, parameters], ctx),
     upsert: (collection, parameters, ctx) =>
@@ -46,5 +46,5 @@ export function nativeHttp(
     deletePayload: (collection, parameters, ctx) =>
       invoke(QdrantRoute.deletePayload.name, [collection, parameters], ctx),
     getVersion
-  } satisfies IQdrantHttp)
+  } satisfies IQdrantHttp
 }

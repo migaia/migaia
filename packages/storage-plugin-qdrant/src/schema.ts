@@ -72,7 +72,7 @@ export function readCollectionConfiguration(
     throw invalidArgument()
   if (requested && (requested.dimensions !== search.size || requested.metric !== metric))
     throw invalidArgument()
-  return Object.freeze({ dimensions: search.size, metric })
+  return { dimensions: search.size, metric }
 }
 /** Only new Feature operations require this slot; standard reads keep their existing schema. */
 export function readCollectionRescore(
@@ -95,9 +95,9 @@ export function readCollectionRescore(
     (slot.multivector_config != null && slot.multivector_config.comparator !== 'max_sim')
   )
     return undefined
-  return Object.freeze({
+  return {
     dimensions: slot.size,
     metric,
     ...(slot.multivector_config == null ? {} : { multivector: 'max_sim' as const })
-  })
+  }
 }

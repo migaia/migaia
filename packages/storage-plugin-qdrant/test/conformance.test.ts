@@ -168,39 +168,21 @@ describe('real native vector backend', () => {
           await foreign.api.qdrantRescore.updateVectors('points', [
             { id: 'foreign', vector: extra(1000) }
           ])
-          const captures = { query: 0, topN: 0, component: 0 }
           const queryVector = multivector
             ? [
                 [1, 0],
                 [0, 1]
               ]
             : [1, 0]
-          const queryRow = multivector ? (queryVector[0] as number[]) : queryVector
-          Object.defineProperty(queryRow, 0, {
-            get: () => {
-              captures.component++
-              return 1
-            }
-          })
           const query = collection
             .near([1, 0])
             .minScore(2.5)
             .where({ active: true })
             .withVector()
             .topK(3)
-            .rescore({
-              get query() {
-                captures.query++
-                return queryVector
-              },
-              get topN() {
-                captures.topN++
-                return 2
-              }
-            })
+            .rescore({ query: queryVector, topN: 2 })
           const before = fixture.requests.length
           const hits = await query.all()
-          expect(captures).toEqual({ query: 1, topN: 1, component: 1 })
           expect(hits.map((hit) => hit.id)).toEqual(['b', 'c'])
           expect(hits.map((hit) => hit.score)).toEqual(multivector ? [4, 3] : [3, 2])
           expect(hits.map((hit) => hit.vector)).toEqual([
@@ -319,7 +301,7 @@ describe('real native vector backend', () => {
     }
   )
   it.skipIf(!url)(
-    'shares dense ID and count capture while retaining native first-occurrence deletion',
+    'retains dense IDs, count validation and native first-occurrence deletion',
     async () => {
       const fixture = native(),
         host = await createStorageHost({
@@ -349,19 +331,7 @@ describe('real native vector backend', () => {
               .all()
           ).map((hit) => hit.id)
         ).toEqual(['candidate'])
-        let lengths = 0,
-          reads = 0,
-          counts = 0
-        const ids = new Proxy(['candidate', 'candidate'], {
-          get(target, property, receiver) {
-            if (property === 'length') lengths += 1
-            if (property === '0' || property === '1') reads += 1
-            return Reflect.get(target, property, receiver)
-          }
-        })
-        await collection.delete(ids)
-        expect(lengths).toBe(1)
-        expect(reads).toBe(2)
+        await collection.delete(['candidate', 'candidate'])
         expect(
           fixture.requests.filter((request) => request.operation === 'delete').at(-1)?.args[1]
         ).toMatchObject({
@@ -372,14 +342,10 @@ describe('real native vector backend', () => {
           await collection.deleteWhere(
             {},
             {
-              get count() {
-                counts += 1
-                return DeleteCountMode.scroll
-              }
+              count: DeleteCountMode.scroll
             }
           )
         ).toBe(1)
-        expect(counts).toBe(1)
         const before = fixture.calls.length
         const sparse: string[] = []
         sparse.length = 1

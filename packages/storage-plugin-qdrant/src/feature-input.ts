@@ -2,11 +2,12 @@ import { asCodecValue, toPortableValue } from '@migaia/serialize/codec'
 import {
   snapshotStorageVector,
   snapshotStorageVectorCollection,
-  snapshotStorageVectorIds,
+  assertStorageVectorIds,
+  assertStorageVector,
   assertStringStorageKey
 } from '@migaia/storage-contract'
 import type { Schemas } from '@qdrant/js-client-rest'
-import { capture, invalidArgument } from './errors.js'
+import { invalidArgument } from './errors.js'
 import { QdrantText } from './constants.js'
 import type {
   IQdrantRescoreOptions,
@@ -14,72 +15,72 @@ import type {
   IQdrantRescoreVector,
   IQdrantRescorePoint
 } from './feature-types.js'
-/** Installation captures each caller property once and delegates names, metric and dimensions. */
+/**
+ * Lazy installation retains configured schemas across later native discovery; canonical validation
+ * owns dimensions and metric.
+ */
 export function snapshotRescoreOptions(
   options: IQdrantRescoreOptions
 ): IQdrantRescoreConfiguration {
-  return capture(() => {
-    const { collections } = options
-    if (collections === null || typeof collections !== 'object' || Array.isArray(collections))
-      throw invalidArgument()
-    return Object.freeze(
-      Object.fromEntries(
-        Object.entries(collections).map(([name, slot]) => {
-          const { dimensions, metric = 'cosine', multivector } = slot
-          if (multivector !== undefined && multivector !== 'max_sim') throw invalidArgument()
-          const configuration = snapshotStorageVectorCollection(
-            name,
-            { dimensions, metric },
-            QdrantText.backend
-          ).options!
-          return [
-            name,
-            Object.freeze({
-              ...configuration,
-              ...(multivector === undefined ? {} : { multivector })
-            })
-          ]
-        })
-      )
-    )
-  })
+  const { collections } = options
+  if (collections === null || typeof collections !== 'object' || Array.isArray(collections))
+    throw invalidArgument()
+  return Object.fromEntries(
+    Object.entries(collections).map(([name, slot]) => {
+      const { dimensions, metric = 'cosine', multivector } = slot
+      if (multivector !== undefined && multivector !== 'max_sim') throw invalidArgument()
+      const configuration = snapshotStorageVectorCollection(
+        name,
+        { dimensions, metric },
+        QdrantText.backend
+      ).options!
+      return [
+        name,
+        {
+          ...configuration,
+          ...(multivector === undefined ? {} : { multivector })
+        }
+      ]
+    })
+  )
 }
 /** This protocol-specific matrix shape reuses the canonical dense-vector component snapshot. */
 export function snapshotRescoreVector(value: IQdrantRescoreVector): IQdrantRescoreVector {
-  return capture(() => {
-    if (!Array.isArray(value) || value.length === 0) throw invalidArgument()
-    const captured = Array.from(value)
-    if (!Array.isArray(captured[0]))
-      return snapshotStorageVector(captured as readonly number[], undefined, QdrantText.backend)
-    const vectors = captured.map((row) =>
-      snapshotStorageVector(row as readonly number[], undefined, QdrantText.backend)
-    )
-    if (vectors.some((row) => row.length !== vectors[0]!.length)) throw invalidArgument()
-    return Object.freeze(vectors)
-  })
+  if (!Array.isArray(value) || value.length === 0) throw invalidArgument()
+  if (!Array.isArray(value[0]))
+    return snapshotStorageVector(value as readonly number[], undefined, QdrantText.backend)
+  const vectors = value.map((row) =>
+    snapshotStorageVector(row as readonly number[], undefined, QdrantText.backend)
+  )
+  if (vectors.some((row) => row.length !== vectors[0]!.length)) throw invalidArgument()
+  return vectors
 }
-/** One native write batch has dense unique logical IDs and detached vectors before any I/O. */
+/**
+ * Native writes detach IDs/vectors before asynchronous schema lookup so caller mutation cannot
+ * alter accepted points.
+ */
 export function snapshotRescorePoints(
   points: readonly IQdrantRescorePoint[]
 ): readonly IQdrantRescorePoint[] {
-  return capture(() => {
-    if (!Array.isArray(points)) throw invalidArgument()
-    const captured = Array.from(points, (point) => {
-      const { id, vector } = point
-      assertStringStorageKey(id, QdrantText.backend)
-      return Object.freeze({ id, vector: snapshotRescoreVector(vector) })
-    })
-    snapshotStorageVectorIds(
-      captured.map((point) => point.id),
-      QdrantText.backend,
-      true
-    )
-    return Object.freeze(captured)
+  if (!Array.isArray(points)) throw invalidArgument()
+  const captured = Array.from(points, (point) => {
+    const { id, vector } = point
+    assertStringStorageKey(id, QdrantText.backend)
+    return { id, vector: snapshotRescoreVector(vector) }
   })
+  assertStorageVectorIds(
+    captured.map((point) => point.id),
+    QdrantText.backend,
+    true
+  )
+  return captured
 }
-/** Native request snapshots use the original portable owner, never a second JSON validator. */
+/**
+ * Native requests retain portable input across async schema reads; the original serializer owns
+ * projection.
+ */
 export function nativeRequest<T extends object>(request: T): T {
-  return capture(() => asCodecValue(toPortableValue(request)) as T)
+  return asCodecValue(toPortableValue(request)) as T
 }
 /** Sparse indices are one finite native input with a single uniqueness pass. */
 export function validateSparse(vector: Schemas['SparseVector']): void {
@@ -114,7 +115,7 @@ export function validateBranch(
     if (typeof query === 'object' && query !== null && !Array.isArray(query))
       throw invalidArgument()
     if (Array.isArray(query))
-      snapshotStorageVector(
+      assertStorageVector(
         query as readonly number[],
         {
           dimensions: configuration.size,

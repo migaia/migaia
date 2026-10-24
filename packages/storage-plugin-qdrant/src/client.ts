@@ -4,85 +4,113 @@ import { throwIfAborted } from '@migaia/storage-host/authoring/backend'
 import { nativeHttp } from './native.js'
 import { nativeResult } from './protocol.js'
 import { qdrantWireValue } from './wire.js'
-import { capture, normalizeQdrantError } from './errors.js'
+import { normalizeQdrantError } from './errors.js'
 import { QdrantRoute } from './constants.js'
 import { QdrantErrorCode } from './error-code.js'
 import { qdrantError } from './errors.js'
 import type { IQdrantHttp, IQdrantOperationName } from './types.js'
 /** Borrow one real SDK client; its timeout/configuration and lifetime remain caller-owned. */
 export function qdrantClientHttp(client: QdrantClient): IQdrantHttp {
-  const points = capture(() => client.api('points')),
-    collections = capture(() => client.api('collections')),
-    snapshots = capture(() => client.api('snapshots'))
-  const writes = capture(() => ({
-    upsert: points.upsertPoints,
-    delete: points.deletePoints,
-    updateVectors: points.updateVectors,
-    createCollection: collections.createCollection,
-    deleteCollection: collections.deleteCollection,
-    updateCollectionAliases: collections.updateAliases,
-    createSnapshot: snapshots.createSnapshot,
-    createPayloadIndex: collections.createFieldIndex,
-    setPayload: points.setPayload,
-    deletePayload: points.deletePayload
-  }))
-  const reads = capture(() => ({
-    scroll: client.scroll,
-    retrieve: client.retrieve,
-    getCollection: client.getCollection,
-    getCollections: client.getCollections,
-    query: client.query,
-    recommend: client.recommend,
-    searchPointGroups: client.searchPointGroups,
-    count: client.count,
-    versionInfo: client.versionInfo
-  }))
+  /** Borrowed client ports belong to one named adapter, never a second client or cleanup owner. */
+  const adapter = new QdrantSdkTransport(client)
+  return nativeHttp(adapter.invoke, adapter.version)
+}
+
+/** Resolve the official generated APIs once while preserving direct method receivers. */
+function readQdrantSdkPorts(client: QdrantClient) {
+  return {
+    points: client.api('points'),
+    collections: client.api('collections'),
+    snapshots: client.api('snapshots')
+  }
+}
+
+/** The SDK adapter borrows the real client and applies command-local wire/redirect rules. */
+class QdrantSdkTransport {
+  /** Native client configuration and destruction remain caller-owned. */
+  readonly #client: QdrantClient
+  /** Official generated mutation APIs preserve SDK request semantics. */
+  readonly #ports: ReturnType<typeof readQdrantSdkPorts>
+  /** Tiny mutation adapters retain each generated object's required receiver. */
+  readonly #writes = {
+    upsert: (body: never, options: never) => this.#ports.points.upsertPoints(body, options),
+    delete: (body: never, options: never) => this.#ports.points.deletePoints(body, options),
+    updateVectors: (body: never, options: never) => this.#ports.points.updateVectors(body, options),
+    createCollection: (body: never, options: never) =>
+      this.#ports.collections.createCollection(body, options),
+    deleteCollection: (body: never, options: never) =>
+      this.#ports.collections.deleteCollection(body, options),
+    updateCollectionAliases: (body: never, options: never) =>
+      this.#ports.collections.updateAliases(body, options),
+    createSnapshot: (body: never, options: never) =>
+      this.#ports.snapshots.createSnapshot(body, options),
+    createPayloadIndex: (body: never, options: never) =>
+      this.#ports.collections.createFieldIndex(body, options),
+    setPayload: (body: never, options: never) => this.#ports.points.setPayload(body, options),
+    deletePayload: (body: never, options: never) => this.#ports.points.deletePayload(body, options)
+  }
+  /** Select existing generated API objects without issuing native requests. */
+  constructor(client: QdrantClient) {
+    this.#client = client
+    this.#ports = readQdrantSdkPorts(client)
+  }
   /**
-   * The original generated method accepts per-request redirect control without reconfiguring the
-   * SDK.
+   * Native mutations use one generated call with manual redirect handling; reads retain client
+   * methods.
    */
-  const invoke = async <K extends IQdrantOperationName>(
+  invoke = async <K extends IQdrantOperationName>(
     operation: K,
     args: readonly unknown[],
     ctx: IOperationContext | undefined
   ): Promise<Awaited<ReturnType<IQdrantHttp[K]>>> => {
     throwIfAborted(ctx?.signal)
     try {
-      if (Object.hasOwn(writes, operation)) {
-        const route = QdrantRoute[operation],
-          parameters = qdrantWireValue(args[route.collection ? 1 : 0] ?? {}),
-          body = {
-            ...(route.collection ? { collection_name: args[0] } : {}),
-            ...(parameters as object)
-          },
-          method = Reflect.get(writes, operation) as (
-            ...args: unknown[]
+      if (Object.hasOwn(this.#writes, operation)) {
+        /** Route metadata determines body shape before the one native mutation call. */
+        const route = QdrantRoute[operation]
+        /** Float wire projection preserves integer multivectors on the official SDK path. */
+        const parameters = qdrantWireValue(args[route.collection ? 1 : 0] ?? {})
+        /** The original generated API expects the collection in its request object. */
+        const body = {
+          ...(route.collection ? { collection_name: args[0] } : {}),
+          ...(parameters as object)
+        }
+        /** The membership check above admits only an existing finite generated mutation port. */
+        const ports = this.#writes as unknown as Record<
+          IQdrantOperationName,
+          (
+            body: unknown,
+            options: { redirect: 'manual' }
           ) => Promise<{ readonly data: { readonly result?: unknown } }>
-        const response = await method(body, { redirect: 'manual' })
+        >
+        /** Direct dispatch keeps the adapter/native API receiver and does not retry. */
+        const response = await ports[operation](body, { redirect: 'manual' })
         return nativeResult(operation, response.data.result)
       }
-      const method = Reflect.get(reads, operation) as (...args: unknown[]) => Promise<unknown>
+      /** Read dispatch uses the actual borrowed client as receiver. */
+      const client = this.#client as unknown as Record<
+        IQdrantOperationName,
+        (...args: unknown[]) => Promise<unknown>
+      >
       return nativeResult(
         operation,
-        await Reflect.apply(
-          method,
-          client,
-          args.map((arg) => qdrantWireValue(arg))
-        )
+        await client[operation](...args.map((arg) => qdrantWireValue(arg)))
       )
     } catch (cause) {
       throw normalizeQdrantError(cause)
     }
   }
-  return nativeHttp(invoke, async (ctx) => {
+  /** Version inspection stays on the actual borrowed SDK client. */
+  version = async (ctx: IOperationContext | undefined) => {
     throwIfAborted(ctx?.signal)
     try {
-      const info = await Reflect.apply(reads.versionInfo, client, [])
+      /** Only the server-provided version can satisfy the supported protocol check. */
+      const info = await this.#client.versionInfo()
       if (!info || typeof info.version !== 'string')
         throw qdrantError(QdrantErrorCode.responseInvalid)
       return info.version
     } catch (cause) {
       throw normalizeQdrantError(cause)
     }
-  })
+  }
 }
