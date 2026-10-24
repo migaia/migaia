@@ -1,3 +1,4 @@
+import '../test/helpers/browser-program-app.js'
 import { walkErrorCauses } from '@migaia/utils/error'
 import { STORAGE_WEB_SOURCE } from '../src/index.js'
 import './native-transaction-scenario.js'
