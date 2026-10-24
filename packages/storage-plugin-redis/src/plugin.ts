@@ -16,6 +16,40 @@ import { RedisText } from './constants.js'
 export const redisBackendKind = defineStorageBackendKind<IRedisStore, IRedisDriver>()(
   RedisText.backend
 )
+/** One plugin installation owns the selected construction and borrowed driver metadata. */
+class RedisInstallation<F extends IStorageFeatureRecord> {
+  /** Captured deployment options remain stable until deferred installation. */
+  readonly #options: IRedisOptions
+  /** Existing host core owns registration, detection and close order. */
+  readonly #core: IStoragePluginCore<F>
+  /** Install creates exactly one construction borrowed by finite descriptor ports. */
+  #construction!: IRedisConstruction
+  /** Capture descriptor inputs without native work or another lifetime. */
+  constructor(options: IRedisOptions, core: IStoragePluginCore<F>) {
+    this.#options = options
+    this.#core = core
+  }
+  /** Kind is an own descriptor field consumed by original host projection. */
+  readonly kind = redisBackendKind
+  /** Install remains an own port, preserving the host's existing finite descriptor shape. */
+  readonly install = () => {
+    this.#construction = createRedisStore(this.#options, this.#core)
+    this.#core.registerStore(this.#construction.store)
+    this.#core.registerChangeController(this.#construction.store, this.#construction.controller)
+    this.#core.registerOrgBinding(this.#construction.store, this.#construction.orgBinding)
+    this.#core.registerDetect(async (signal) => {
+      if (!signal.aborted) await this.#construction.detect()
+    })
+    return {}
+  }
+  /** Journal selection borrows this exact native construction. */
+  readonly journalBinding = (_store: IRedisStore) => this.#construction.journalBinding
+  /** Publish through the original installer without another registry. */
+  readonly capabilityInstaller = (_store: IRedisStore): ICapabilityInstallPort =>
+    this.#construction.installer
+  /** Features receive the original borrowed driver identity. */
+  readonly featureExpose = () => ({ getClient: () => this.#options.driver })
+}
 /** Capture pure configuration; the original host alone owns detection, installation and cleanup. */
 export function redisBackendPlugin<
   const TId extends string = 'redis',
@@ -33,24 +67,6 @@ export function redisBackendPlugin<
       maxLockMs: options.maxLockMs
     },
     id = (options.id ?? RedisText.backend) as TId
-  const descriptor = (core: IStoragePluginCore<F>) => {
-    let construction: IRedisConstruction
-    return {
-      kind: redisBackendKind,
-      install() {
-        construction = createRedisStore(captured, core)
-        core.registerStore(construction.store)
-        core.registerChangeController(construction.store, construction.controller)
-        core.registerOrgBinding(construction.store, construction.orgBinding)
-        core.registerDetect(async (signal) => {
-          if (!signal.aborted) await construction.detect()
-        })
-        return {}
-      },
-      journalBinding: (_store: IRedisStore) => construction.journalBinding,
-      capabilityInstaller: (_store: IRedisStore): ICapabilityInstallPort => construction.installer,
-      featureExpose: () => ({ getClient: () => captured.driver })
-    }
-  }
+  const descriptor = (core: IStoragePluginCore<F>) => new RedisInstallation(captured, core)
   return definePlugin<TId, typeof descriptor, F>(id, descriptor, features)
 }

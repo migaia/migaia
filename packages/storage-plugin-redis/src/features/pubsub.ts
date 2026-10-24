@@ -3,7 +3,6 @@ import { RedisCommand } from '../constants.js'
 import { defineFeature, type IStorageFeatureOutput } from '@migaia/storage-host'
 import type { IOperationContext, IStorageResource } from '@migaia/storage-contract'
 import { encodeUtf8 } from '@migaia/utils/bytes'
-import { inspectThenable, observeThenableRejection } from '@migaia/utils/function'
 import { redisBackendKind } from '../plugin.js'
 import { readNativeFeaturePort } from '../native-feature.js'
 import { featureName, featureInteger, featureBytes, readFeatureBytes } from '../feature-input.js'
@@ -77,7 +76,7 @@ export function redisPubSubFeature() {
                   (wire) => {
                     try {
                       const result: unknown = listener(readFeatureBytes(wire))
-                      observeThenableRejection(result, inspectThenable(result), port.report)
+                      void Promise.resolve(result).catch(port.report)
                     } catch (error) {
                       port.report(error)
                     }
@@ -115,7 +114,7 @@ export function redisPubSubFeature() {
                       return
                     try {
                       const result: unknown = listener(encodeUtf8(wire))
-                      observeThenableRejection(result, inspectThenable(result), port.report)
+                      void Promise.resolve(result).catch(port.report)
                     } catch (error) {
                       port.report(error)
                     }

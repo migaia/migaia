@@ -87,186 +87,195 @@ function holder(value: IRedisLockValue): IConcurrencyHolder {
     ...(value.label === undefined ? {} : { label: value.label })
   }
 }
-/**
- * This attempt's native lease is released by its existing connection callback, without another
- * owner.
- */
-export function createRedisLocks(options: {
+/** Exact inputs for the original native lease; no queue or second logical lock owner. */
+type IRedisLockOptions = {
   readonly layout: ReturnType<typeof createRedisLayout>
   readonly context: IConcurrencyAttemptContext
   readonly owner: string
   readonly label: string | undefined
   readonly maxLockMs: number
   readonly send: (args: readonly string[]) => Promise<unknown>
-}) {
-  const { layout, context, owner, label, maxLockMs, send } = options,
-    owned = new Map<string, string>(),
-    identities = readConcurrencyLockIdentities(context),
-    token = crypto.randomUUID()
-  /** Redis TIME supplies inspectable creation metadata and never a client-side expiry timer. */
-  const time = async (): Promise<number> => {
-    const value = await send([RedisCommand.time])
+}
+/** One attempt owns its original acquired values and the unique token used for late-safe release. */
+class RedisLocks {
+  /** Native layout and original policy context remain fixed for this attempt. */
+  readonly #options: IRedisLockOptions
+  /** Only values actually acquired by this attempt authorize release. */
+  readonly #owned = new Map<string, string>()
+  /** Canonical identity order is borrowed from the original logical context. */
+  readonly #identities: readonly string[]
+  /** A fresh attempt token prevents late release from deleting a successor lease. */
+  readonly #token = crypto.randomUUID()
+  /** Capture existing native attempt inputs without I/O. */
+  constructor(options: IRedisLockOptions) {
+    this.#options = options
+    this.#identities = readConcurrencyLockIdentities(options.context)
+  }
+  /** Execute time against this original native attempt and complete owner/token evidence. */
+  async #time(): Promise<number> {
+    const value = await this.#options.send([RedisCommand.time])
     if (!Array.isArray(value) || value.length !== 2)
       throw redisError(RedisErrorCode.decodeFailed, value)
     return replyRevision(value[0]) * 1000 + Math.floor(replyRevision(value[1]) / 1000)
   }
-  /**
-   * Only this attempt's complete values can be removed; late release leaves replacement owners
-   * intact.
-   */
-  const release = async (): Promise<void> => {
+  /** Execute release against this original native attempt and complete owner/token evidence. */
+  readonly release = async (): Promise<void> => {
     const failures: unknown[] = []
-    for (const [key, value] of owned) {
+    for (const [key, value] of this.#owned) {
       try {
-        replyInteger(await send([RedisCommand.eval, releaseScript, '1', key, value]))
+        replyInteger(await this.#options.send([RedisCommand.eval, releaseScript, '1', key, value]))
       } catch (error) {
         failures.push(error)
       }
     }
-    owned.clear()
+    this.#owned.clear()
     if (failures.length !== 0)
       throw redisError(
         RedisErrorCode.failed,
         new AggregateError(failures, RedisText.failed, { cause: failures[0] })
       )
   }
-  /** WATCH precedes GET, so both lock takeover and expiry invalidate the same native EXEC. */
-  const check = async (key: ILockKey, identity: string): Promise<void> => {
-    const physical = layout.lock(identity)
-    await send([RedisCommand.watch, physical])
-    const current = replyOptionalString(await send([RedisCommand.get, physical])),
-      expected = owned.get(physical)
+  /** Execute check against this original native attempt and complete owner/token evidence. */
+  async #check(key: ILockKey, identity: string): Promise<void> {
+    const physical = this.#options.layout.lock(identity)
+    await this.#options.send([RedisCommand.watch, physical])
+    const current = replyOptionalString(await this.#options.send([RedisCommand.get, physical])),
+      expected = this.#owned.get(physical)
     if (expected !== undefined) {
       if (current !== expected) throw lockLost()
       return
     }
     if (current !== undefined) throw new RedisLockConflict([key], holder(decode(current)))
   }
-  return {
-    /** The original policy decides whether a refusal retries in waiting admission. */
-    acquire: async (): Promise<void> => {
-      if (context.locking !== 'pessimistic' || identities.length === 0) return
-      for (;;) {
-        throwIfAborted(context.signal)
-        try {
-          const since = await time()
-          for (let index = 0; index < identities.length; index++) {
-            const key = context.lock![index]!
-            if (key.channel === 'rdf') unsupported()
-            const physical = layout.lock(identities[index]!),
-              value = codec.encode({
-                owner,
-                token,
-                orgId: layout.orgId,
-                ...(key.channel === 'vector'
-                  ? { collection: key.collection, id: key.id }
-                  : { key: layout.encode(key.key) }),
-                channel: key.channel,
-                since,
-                ...(label === undefined ? {} : { label })
-              }),
-              result = await send([
-                RedisCommand.set,
-                physical,
-                value,
-                RedisCommand.nx,
-                RedisCommand.px,
-                String(maxLockMs)
-              ])
-            if (result === null) {
-              const current = replyOptionalString(await send([RedisCommand.get, physical]))
-              throw new RedisLockConflict(
-                [key],
-                current === undefined
-                  ? { status: ConcurrencyHolderState.handingOff, scope: 'remote' }
-                  : holder(decode(current))
-              )
-            }
-            if (result !== RedisReply.ok) throw redisError(RedisErrorCode.decodeFailed, result)
-            owned.set(physical, value)
-          }
-          for (let index = 0; index < identities.length; index++)
-            await check(context.lock![index]!, identities[index]!)
-          return
-        } catch (error) {
-          try {
-            await release()
-          } catch (cleanup) {
-            throw redisError(
-              RedisErrorCode.failed,
-              new AggregateError([error, cleanup], RedisText.failed, { cause: error })
+  /** Execute acquire against this original native attempt and complete owner/token evidence. */
+  readonly acquire = async (): Promise<void> => {
+    if (this.#options.context.locking !== 'pessimistic' || this.#identities.length === 0) return
+    for (;;) {
+      throwIfAborted(this.#options.context.signal)
+      try {
+        const since = await this.#time()
+        for (let index = 0; index < this.#identities.length; index++) {
+          const key = this.#options.context.lock![index]!
+          if (key.channel === 'rdf') unsupported()
+          const physical = this.#options.layout.lock(this.#identities[index]!),
+            value = codec.encode({
+              owner: this.#options.owner,
+              token: this.#token,
+              orgId: this.#options.layout.orgId,
+              ...(key.channel === 'vector'
+                ? { collection: key.collection, id: key.id }
+                : { key: this.#options.layout.encode(key.key) }),
+              channel: key.channel,
+              since,
+              ...(this.#options.label === undefined ? {} : { label: this.#options.label })
+            }),
+            result = await this.#options.send([
+              RedisCommand.set,
+              physical,
+              value,
+              RedisCommand.nx,
+              RedisCommand.px,
+              String(this.#options.maxLockMs)
+            ])
+          if (result === null) {
+            const current = replyOptionalString(
+              await this.#options.send([RedisCommand.get, physical])
+            )
+            throw new RedisLockConflict(
+              [key],
+              current === undefined
+                ? { status: ConcurrencyHolderState.handingOff, scope: 'remote' }
+                : holder(decode(current))
             )
           }
-          await send([RedisCommand.unwatch])
-          if (!(error instanceof RedisLockConflict) || context.admission !== 'wait') throw error
-          await context.wait(sleep(10, { signal: context.signal }))
+          if (result !== RedisReply.ok) throw redisError(RedisErrorCode.decodeFailed, result)
+          this.#owned.set(physical, value)
         }
-      }
-    },
-    /** Implicit writes use the original canonical lock identity and respect a live remote holder. */
-    guard: async (channel: IRedisChannel, key: IStorageKey): Promise<void> => {
-      const captured = snapshotConcurrencyLockKeys([{ channel, key }], RedisText.backend)
-      await check(captured.keys[0]!, captured.identities[0]!)
-    },
-    /** Native vector writes use the same canonical identity and remote lease admission. */
-    guardVector: async (key: Extract<ILockKey, { channel: 'vector' }>): Promise<void> => {
-      const captured = snapshotConcurrencyLockKeys([key], RedisText.backend)
-      await check(captured.keys[0]!, captured.identities[0]!)
-    },
-    /** Lock loss takes priority over WATCH write conflicts, including after an EXEC null. */
-    verify: async (): Promise<void> => {
-      for (let index = 0; index < identities.length; index++) {
-        if (owned.size === 0) break
-        await check(context.lock![index]!, identities[index]!)
-      }
-    },
-    release,
-    /** Only actual existing locks become rows; expired native keys have no invented history. */
-    inspect: async (): Promise<readonly ILockHolding[]> => {
-      const rows: ILockHolding[] = []
-      let cursor = '0'
-      do {
-        const result = await send([
-          RedisCommand.scan,
-          cursor,
-          RedisCommand.match,
-          layout.lockPattern,
-          RedisCommand.count,
-          '100'
-        ])
-        if (
-          !Array.isArray(result) ||
-          result.length !== 2 ||
-          typeof result[0] !== 'string' ||
-          !Array.isArray(result[1])
-        )
-          throw redisError(RedisErrorCode.decodeFailed, result)
-        cursor = result[0]
-        for (const key of result[1]) {
-          if (typeof key !== 'string') throw redisError(RedisErrorCode.decodeFailed, key)
-          const raw = replyOptionalString(await send([RedisCommand.get, key]))
-          if (raw === undefined) continue
-          const value = decode(raw)
-          if (value.orgId !== layout.orgId) continue
-          const now = await time(),
-            remaining = replyInteger(await send([RedisCommand.pttl, key]))
-          if (remaining < 0) continue
-          rows.push({
-            key: snapshotConcurrencyLockKeys(
-              [
-                value.channel === 'vector'
-                  ? { channel: 'vector', collection: value.collection!, id: value.id! }
-                  : { channel: value.channel, key: layout.decode(value.key!) }
-              ],
-              RedisText.backend
-            ).keys[0]!,
-            holder: holder(value),
-            expired: remaining === 0,
-            expiresAt: now + remaining
-          })
+        for (let index = 0; index < this.#identities.length; index++)
+          await this.#check(this.#options.context.lock![index]!, this.#identities[index]!)
+        return
+      } catch (error) {
+        try {
+          await this.release()
+        } catch (cleanup) {
+          throw redisError(
+            RedisErrorCode.failed,
+            new AggregateError([error, cleanup], RedisText.failed, { cause: error })
+          )
         }
-      } while (cursor !== '0')
-      return snapshotConcurrencyLockHoldings(rows)
+        await this.#options.send([RedisCommand.unwatch])
+        if (!(error instanceof RedisLockConflict) || this.#options.context.admission !== 'wait')
+          throw error
+        await this.#options.context.wait(sleep(10, { signal: this.#options.context.signal }))
+      }
     }
   }
+  /** Execute guard against this original native attempt and complete owner/token evidence. */
+  readonly guard = async (channel: IRedisChannel, key: IStorageKey): Promise<void> => {
+    const captured = snapshotConcurrencyLockKeys([{ channel, key }], RedisText.backend)
+    await this.#check(captured.keys[0]!, captured.identities[0]!)
+  }
+  /** Execute guardVector against this original native attempt and complete owner/token evidence. */
+  readonly guardVector = async (key: Extract<ILockKey, { channel: 'vector' }>): Promise<void> => {
+    const captured = snapshotConcurrencyLockKeys([key], RedisText.backend)
+    await this.#check(captured.keys[0]!, captured.identities[0]!)
+  }
+  /** Execute verify against this original native attempt and complete owner/token evidence. */
+  readonly verify = async (): Promise<void> => {
+    for (let index = 0; index < this.#identities.length; index++) {
+      if (this.#owned.size === 0) break
+      await this.#check(this.#options.context.lock![index]!, this.#identities[index]!)
+    }
+  }
+  /** Execute inspect against this original native attempt and complete owner/token evidence. */
+  readonly inspect = async (): Promise<readonly ILockHolding[]> => {
+    const rows: ILockHolding[] = []
+    let cursor = '0'
+    do {
+      const result = await this.#options.send([
+        RedisCommand.scan,
+        cursor,
+        RedisCommand.match,
+        this.#options.layout.lockPattern,
+        RedisCommand.count,
+        '100'
+      ])
+      if (
+        !Array.isArray(result) ||
+        result.length !== 2 ||
+        typeof result[0] !== 'string' ||
+        !Array.isArray(result[1])
+      )
+        throw redisError(RedisErrorCode.decodeFailed, result)
+      cursor = result[0]
+      for (const key of result[1]) {
+        if (typeof key !== 'string') throw redisError(RedisErrorCode.decodeFailed, key)
+        const raw = replyOptionalString(await this.#options.send([RedisCommand.get, key]))
+        if (raw === undefined) continue
+        const value = decode(raw)
+        if (value.orgId !== this.#options.layout.orgId) continue
+        const now = await this.#time(),
+          remaining = replyInteger(await this.#options.send([RedisCommand.pttl, key]))
+        if (remaining < 0) continue
+        rows.push({
+          key: snapshotConcurrencyLockKeys(
+            [
+              value.channel === 'vector'
+                ? { channel: 'vector', collection: value.collection!, id: value.id! }
+                : { channel: value.channel, key: this.#options.layout.decode(value.key!) }
+            ],
+            RedisText.backend
+          ).keys[0]!,
+          holder: holder(value),
+          expired: remaining === 0,
+          expiresAt: now + remaining
+        })
+      }
+    } while (cursor !== '0')
+    return snapshotConcurrencyLockHoldings(rows)
+  }
+}
+/** Create only native lease evidence inside the existing borrowed-connection callback. */
+export function createRedisLocks(options: IRedisLockOptions) {
+  return new RedisLocks(options)
 }

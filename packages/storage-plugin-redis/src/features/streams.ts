@@ -98,7 +98,7 @@ function readStreamEntries(value: unknown): readonly IRedisStreamEntry[] {
         enumerable: true
       })
     }
-    return Object.freeze({ id: replyString(row[0]), fields: Object.freeze(fields) })
+    return { id: replyString(row[0]), fields: fields }
   })
 }
 /** Streams retain native IDs, consumer-group ownership and the driver's real blocking lease. */

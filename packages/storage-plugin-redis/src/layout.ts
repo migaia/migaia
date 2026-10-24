@@ -79,7 +79,7 @@ export function createRedisLayout(prefix: string, orgId: string) {
         throw redisError(RedisErrorCode.decodeFailed, error)
       }
     }
-  return Object.freeze({
+  return {
     tag,
     orgId,
     owns: (physical: string): boolean => {
@@ -123,7 +123,7 @@ export function createRedisLayout(prefix: string, orgId: string) {
     lock: (identity: string): string =>
       tag + ':' + RedisSuffix.locks + ':' + orgId + ':' + identity,
     lockPattern: tag + ':' + RedisSuffix.locks + ':*'
-  })
+  }
 }
 /** Fixed string replies admit genuine SDK strings and byte views while rejecting arbitrary coercion. */
 export function replyString(value: unknown): string {

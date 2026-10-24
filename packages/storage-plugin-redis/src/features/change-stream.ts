@@ -1,7 +1,6 @@
 import { RedisOperation } from '../constants.js'
 import { RedisCommand, RedisText } from '../constants.js'
 import type { IRedisConnection } from '../driver.js'
-import { inspectThenable, observeThenableRejection } from '@migaia/utils/function'
 import { defineFeature, type IStorageFeatureOutput } from '@migaia/storage-host'
 import { asyncDisposeKey, throwIfAborted } from '@migaia/storage-host/authoring/backend'
 import {
@@ -62,7 +61,7 @@ function changes(reply: unknown): readonly IDurableStorageChange[] {
     } catch (error) {
       throw redisError(RedisErrorCode.decodeFailed, error)
     }
-    return Object.freeze({ ...decodeRedisChange(replyString(row[1][1])), cursor: id })
+    return { ...decodeRedisChange(replyString(row[1][1])), cursor: id }
   })
 }
 /** Native retention facts distinguish an initial empty cursor from actually lost retained history. */
@@ -259,7 +258,7 @@ function createRedisDurableApi(
             if (onError) {
               try {
                 const result: unknown = onError(failure)
-                observeThenableRejection(result, inspectThenable(result), port.report)
+                void Promise.resolve(result).catch(port.report)
               } catch (secondary) {
                 port.report(secondary)
               }

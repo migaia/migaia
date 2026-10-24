@@ -40,7 +40,7 @@ export function bunRedisDriver(client: IBunRedisClient): IRedisDriver<IBunRedisC
         },
         exec: async (commands) => {
           const captured = captureCommands(commands, false) as string[][]
-          if (captured.length === 0) return Object.freeze([])
+          if (captured.length === 0) return []
           let started = false,
             sent = false
           try {

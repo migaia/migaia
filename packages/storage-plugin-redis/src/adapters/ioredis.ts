@@ -66,7 +66,7 @@ export function ioredisDriver<M extends 'legacy' | 'resp3'>(
         },
         exec: async (commands) => {
           const captured = captureCommands(commands, true)
-          if (captured.length === 0) return Object.freeze([])
+          if (captured.length === 0) return []
           const multi = owned.multi()
           for (const args of captured)
             multi.callBuffer(args[0] as string, nativeArguments(args.slice(1)))
@@ -80,11 +80,9 @@ export function ioredisDriver<M extends 'legacy' | 'resp3'>(
           const entries = requireExecArray(replies).map((reply): IRedisExecEntry => {
             const pair = requireExecArray(reply),
               error = pair[0]
-            return error instanceof Error
-              ? Object.freeze({ ok: false, error })
-              : Object.freeze({ ok: true, value: pair[1] })
+            return error instanceof Error ? { ok: false, error } : { ok: true, value: pair[1] }
           })
-          return Object.freeze(entries)
+          return entries
         }
       })
     } catch (error) {

@@ -65,7 +65,7 @@ export function nodeRedisDriver<
           },
           exec: async (commands) => {
             const captured = captureCommands(commands, true)
-            if (captured.length === 0) return Object.freeze([])
+            if (captured.length === 0) return []
             // The SDK multi builder omits its mapping on EXEC; use its public raw queue instead.
             const chainId = Symbol(RedisCommand.multi),
               sameConnection = (): boolean => client.isReady && client.socketEpoch === epoch,
