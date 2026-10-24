@@ -91,9 +91,16 @@ describe('global native storage journal', () => {
       })
       expect(body.locked).toBe(false)
       expect(pulls).toBe(0)
-      expect(() => store.sync.set('sync', 'cannot bypass selected journal')).toThrowError(
-        expect.objectContaining({ code: 'ASYNC_STAGE_IN_SYNC_ENTRY' })
-      )
+      /** The original bootstrap stage rejects every public sync writer before its terminal. */
+      for (const write of [
+        () => store.sync.set('sync', 'cannot bypass selected journal'),
+        () => store.sync.remove('text'),
+        () => store.sync.clearValues()
+      ])
+        expect(write).toThrowError(expect.objectContaining({ code: 'ASYNC_STAGE_IN_SYNC_ENTRY' }))
+      expect(await store.get('text')).toBe('three')
+      expect(await store.get('sync')).toBeNull()
+      expect(await logs.get(initialized[0]!)!.lastSeq()).toBe(6)
       const orgId = createOrgId()
       const org = host.org(orgId).backend('memory')
       expect(initialized).toHaveLength(1)
