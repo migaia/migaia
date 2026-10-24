@@ -26,7 +26,7 @@ for (const service of ['MIGAIA_REDIS_URL', 'MIGAIA_REDIS_STACK_URL'] as const)
       let connected = false
       const create = async (
         observe?: (commands: Parameters<IRedisConnection['exec']>[0]) => void,
-        observeCommand?: () => void
+        observeCommand?: (args: readonly (string | Uint8Array)[]) => void
       ) => {
         if (!connected) {
           if (adapter === 'node') await pool.connect()
@@ -40,13 +40,13 @@ for (const service of ['MIGAIA_REDIS_URL', 'MIGAIA_REDIS_STACK_URL'] as const)
               run({
                 ...connection,
                 command: (args) => {
-                  observeCommand?.()
+                  observeCommand?.(args)
                   return connection.command(args)
                 },
                 ...(connection.binaryCommand
                   ? {
                       binaryCommand: (args: readonly (string | Uint8Array)[]) => {
-                        observeCommand?.()
+                        observeCommand?.(args)
                         return connection.binaryCommand!(args)
                       }
                     }
@@ -100,7 +100,11 @@ for (const service of ['MIGAIA_REDIS_URL', 'MIGAIA_REDIS_STACK_URL'] as const)
         if (client.status !== 'end') client.disconnect()
       })
       it('ranks native FLOAT32 fields, filters before KNN, preserves org/TTL and counts committed deletes', async () => {
-        const { host, store, prefix } = await create(),
+        /** Observe commands from the actual borrowed driver without replacing native execution. */
+        const nativeCommands: (readonly (string | Uint8Array)[])[] = []
+        const { host, store, prefix } = await create(undefined, (args) =>
+            nativeCommands.push([...args])
+          ),
           collection = store.use(vector).collection<{ tag: string; number: number }>('items', {
             dimensions: 2,
             metric: 'cosine'
@@ -126,6 +130,13 @@ for (const service of ['MIGAIA_REDIS_URL', 'MIGAIA_REDIS_STACK_URL'] as const)
               .all()
           ).map((hit) => hit.id)
         ).toEqual(['b'])
+        /** Correct rows alone do not prove native ranking; the same call must issue KNN to Search. */
+        const searches = nativeCommands.filter((command) => command[0] === 'FT.SEARCH')
+        expect(searches).toHaveLength(2)
+        expect(searches.every((command) => String(command[2]).includes('KNN'))).toBe(true)
+        expect(
+          searches.every((command) => command.includes('PARAMS') && command.includes('DIALECT'))
+        ).toBe(true)
         expect(
           await collection
             .near([1, 0])
