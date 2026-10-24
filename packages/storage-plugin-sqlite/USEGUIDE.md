@@ -112,6 +112,12 @@ Feature 的 `query` 和 `tx` 链方法保留在实际派生链上。Feature 借�
 原生 Feature 借用同一个冻结 client，工厂只安装一次。显式组织视图不提供任意 SQL
 或数据库维护；事务内调用这些跨组织入口也会拒绝，并保留原事务错误链。
 
+原生日志通过 `@migaia/storage-host/journal` 的 `storageLogStore(host, 'sqlite',
+{ prefix })` 使用。调用方拥有的内存连接在原进程锁中独占该日志 namespace，私有行
+与业务键隔离，业务 clear 不清日志；释放日志后可用同一 prefix 重开。文件连接没有
+资源整个生存期的可靠独占保证，因此此缓存索引组合在读取日志前报
+`UNSUPPORTED_CAPABILITY`。它不影响文件连接的普通原生事务。
+
 ## 维护与错误
 
 从 `/features/maintenance` 导入 sqliteMaintenanceFeature，并放入插件第二参数。

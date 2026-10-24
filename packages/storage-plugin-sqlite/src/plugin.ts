@@ -4,7 +4,8 @@ import {
   type IStorageBackendPlugin,
   type IStorageFeatureRecord,
   type IStorageFeatureStoreCompatibility,
-  type IStoragePluginCore
+  type IStoragePluginCore,
+  type IStorageJournalBackendBinding
 } from '@migaia/storage-host'
 import {
   StorageContractError,
@@ -51,6 +52,8 @@ export function sqliteBackendPlugin<
     let construction: ISqliteConstruction<TValue>
     /** Context redirects reuse the same organization constructor installed below. */
     let ensureOrg: (orgId: string) => void
+    /** The existing physical organization constructor also supplies exact private journal ports. */
+    let organization: (orgId: string) => ISqliteConstruction<TValue>
     return {
       kind: sqliteBackendKind,
       install() {
@@ -79,6 +82,7 @@ export function sqliteBackendPlugin<
           organizations.set(orgId, child)
           return child
         }
+        organization = forOrg
         ensureOrg = (orgId) => {
           forOrg(orgId)
         }
@@ -111,6 +115,13 @@ export function sqliteBackendPlugin<
           captured.driver.prepare('SELECT 1').get()
         })
         return {}
+      },
+      journalBinding: () => {
+        const binding = (orgId: string): IStorageJournalBackendBinding => ({
+          ...(orgId === core.defaultOrgId ? construction : organization(orgId)).journal,
+          forOrg: binding
+        })
+        return binding(core.defaultOrgId)
       },
       capabilityInstaller: (_store: ISqliteStore<TValue>): ICapabilityInstallPort =>
         construction.installer,

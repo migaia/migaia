@@ -5,6 +5,28 @@ const t = (en: string, zh: string): IText => ({ en, zh })
 export const storagePluginSqliteCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
   sqliteBackendPlugin: [
     {
+      title: t('Keep native logs outside business keys', '原生日志独立于业务键'),
+      problem: t(
+        'Clearing application values must preserve the private native log sequence.',
+        '清空应用值需要保留原生私有日志序号。'
+      ),
+      example: `import { createStorageHost } from '@migaia/storage-host'
+import { storageLogStore } from '@migaia/storage-host/journal'
+import { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'
+import { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'
+
+await using connection = nodeSqliteDriver(':memory:')
+await using host = await createStorageHost({ plugins: [sqliteBackendPlugin({ driver: connection })] as const })
+await using history = await storageLogStore(host, 'sqlite', { prefix: 'history' })
+await history.append([{ kind: 'application', payload: { count: 1 } }])
+await host.backend('sqlite').clearAll()
+console.log(await history.lastSeq(), await host.backend('sqlite').keys())`,
+      result: t(
+        'Prints 1 []. The memory connection reserves this private namespace; lifetime-cached file indexes reject before reading log rows.',
+        '输出 1 []。内存连接独占此私有 namespace；文件连接的生存期缓存索引在读取日志前拒绝。'
+      )
+    },
+    {
       title: t('Isolate organizations on one native connection', '同一原生连接隔离组织'),
       problem: t(
         'Organization data must share the existing tables without sharing its logical keys.',

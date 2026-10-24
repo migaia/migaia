@@ -136,6 +136,14 @@ Every managed table starts with `org_id` in its primary key. Native root SQL is
 caller-owned schema access; callers must supply their own organization filters
 for custom SQL tables and must not modify internal tables.
 
+Use `storageLogStore(host, 'sqlite', { prefix })` from
+`@migaia/storage-host/journal` for native logs. A caller-owned memory connection
+reserves that log namespace through the original process lock. Private rows stay
+outside business keys and business clear operations; dispose the log to reopen the
+same prefix. File connections cannot guarantee exclusivity for a cached index's
+entire lifetime, so that combination raises `UNSUPPORTED_CAPABILITY` before
+reading log rows. Ordinary native file transactions remain available.
+
 ## Maintenance
 
 Import `sqliteMaintenanceFeature` only from
