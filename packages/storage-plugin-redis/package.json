@@ -68,6 +68,7 @@
     "@migaia/utils": "workspace:^"
   },
   "devDependencies": {
+    "@migaia/logger": "workspace:^",
     "@types/bun": "1.4.3",
     "ioredis": "6.0.0",
     "redis": "6.3.0"

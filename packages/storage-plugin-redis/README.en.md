@@ -180,3 +180,11 @@ try {
   await pool.close()
 }
 ```
+
+## Commit-only external journal
+
+Host `journal` may borrow the original Logger with only `binlog`, without WAL, undo or atomic log stores. Each organization captures its final draft through the original journalBinding. Only a fully successful native EXEC triggers onCommit, and the operation awaits its original settle. Callback failure before EXEC writes neither data nor log; partial execution or an unknown reply appends no success log, never replays, and seals subsequent writes. External append failures use the host's report path; committed data is not described as rolled back. The existing post-commit logging window remains.
+
+The terminal declares `nativeAtomic:false`; execution isolation does not imply failure rollback. Standard value, byte, record and vector images use the original portable codec with native wire and absolute expiry. Additional PEXPIRETIME capture runs only when journaling is active. Complete before-images for historical vector removal require the genuine binary port; without it, that new journal combination rejects with `UNSUPPORTED_CAPABILITY` before modification, while ordinary historical removal remains supported.
+
+`indexExclusive:false` separately isolates storageLogStore's lifetime-cached index. Strong same-EXEC atomic binlog, undo and WAL intent/marker combinations reject during preparation and await user review. These previously undelivered guarantees are not represented as implemented. The original owner can remove isolation after providing the actual required guarantees; no second journal or transaction platform is added. Native Streams/PubSub/sorted-set/rate-limit APIs retain their behavior without claiming to be standard business-channel journal sources.

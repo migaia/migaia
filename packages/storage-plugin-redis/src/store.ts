@@ -63,7 +63,8 @@ import {
   StorageError,
   StorageErrorCode,
   type IStoragePluginCore,
-  type IStorageOrgBinding
+  type IStorageOrgBinding,
+  type IStorageJournalBackendBinding
 } from '@migaia/storage-host'
 import {
   asyncDisposeKey,
@@ -80,6 +81,7 @@ import {
   type IBackendChangeController
 } from '@migaia/storage-host/authoring/backend'
 import { RedisDraft, validateRedisExec } from './transaction.js'
+import { createRedisJournalBinding } from './journal.js'
 import { createRedisLocks, RedisLockConflict } from './locks.js'
 import {
   createRedisLayout,
@@ -154,6 +156,7 @@ export type IRedisConstruction = {
   readonly controller: IBackendChangeController
   readonly installer: ICapabilityInstallPort
   readonly orgBinding: IStorageOrgBinding
+  readonly journalBinding: IStorageJournalBackendBinding
   detect(): Promise<void>
 }
 
@@ -178,6 +181,14 @@ export function createRedisStore(
     maxLockMs < 1
   )
     throw invalidArgument()
+  /**
+   * Original root and scoped views authenticate their own store before sharing fixed-org journal
+   * facts.
+   */
+  const scopeDrafts = new WeakMap<
+    object,
+    { readonly store: IRedisStore; readonly draft: RedisDraft }
+  >()
   /** Root alone observes every org; explicit default-org views retain a separate original provider. */
   const rootProjection = Symbol('redis-root-projection')
   let subscription: IStorageResource | undefined, poison: Error | undefined
@@ -380,7 +391,8 @@ export function createRedisStore(
      */
     const nativeAttempt = async <R>(
       context: IConcurrencyAttemptContext,
-      run: (draft: RedisDraft) => Promise<R>
+      run: (draft: RedisDraft) => Promise<R>,
+      scopeOwned = false
     ): Promise<IConcurrencyAttempt<R>> => {
       assertWrite()
       if (
@@ -405,16 +417,58 @@ export function createRedisStore(
             context,
             send,
             locks.guard,
-            locks.guardVector
+            locks.guardVector,
+            ports.journal?.active() === true
           )
         let outcome: IConcurrencyAttempt<R> | undefined,
           primary: unknown,
-          failed = false
+          failed = false,
+          ambiguous = false,
+          journalFailure: unknown,
+          journalRegistration: ReturnType<typeof transactionOwner.register> | undefined
+        /** Terminal effects describe actual settlement, never an inferred Redis rollback. */
+        const complete = async (): Promise<void> => {
+          if (draft.terminal.settled) return
+          draft.terminal.settled = true
+          const callbacks =
+            outcome?.status === 'committed'
+              ? draft.terminal.committed
+              : ambiguous
+                ? []
+                : draft.terminal.rolledBack
+          for (const effect of callbacks) observe({ effect }, 'effect')
+          draft.terminal.committed.clear()
+          draft.terminal.rolledBack.clear()
+          try {
+            await draft.journal?.settle?.()
+          } catch (cause) {
+            reportCleanupError(report, cause)
+          }
+        }
         try {
           await locks.acquire()
           observe(concurrencyStages(), 'onLockAcquired', context.attempt, context.lock?.length ?? 0)
           await draft.start()
+          if (draft.journalActive && !scopeOwned) {
+            const scope = createScope(draft)
+            journalRegistration = transactionOwner.register(scope, {
+              createScope: () => createScope(draft),
+              context,
+              onFailure: (failure) => {
+                journalFailure ??= failure
+              },
+              beforeCommit: async (current) => {
+                await draft.journal?.record(current)
+              }
+            })
+            draft.journal = ports.journal!.begin(scope)
+          }
           const value = await run(draft)
+          if (journalRegistration) {
+            journalRegistration.stopAdmission()
+            if (journalFailure !== undefined) throw journalFailure
+            await journalRegistration.runFinalizers()
+          }
           throwIfAborted(context.signal)
           for (;;) {
             await locks.verify()
@@ -463,6 +517,7 @@ export function createRedisStore(
             throwIfAborted(context.signal)
             let replies: Awaited<ReturnType<IRedisConnection['exec']>>
             try {
+              ambiguous = true
               replies = await exec(connection, commands, orgId)
             } catch (error) {
               poison = normalizeRedisError(error)
@@ -475,10 +530,12 @@ export function createRedisStore(
                 poison = normalizeRedisError(error)
                 throw poison
               }
+              ambiguous = false
               if (change) controller.publishExternal(change.change)
               outcome = { status: 'committed', value }
               break
             }
+            ambiguous = false
             core.emit(RedisOperation.onWatchConflict, () => ({
               backendId: core.getBackendId(),
               backend: RedisText.backend,
@@ -517,6 +574,9 @@ export function createRedisStore(
             primary = error
           }
         }
+        journalRegistration?.stopAdmission()
+        await complete()
+        journalRegistration?.close()
         const cleanup: unknown[] = []
         try {
           await send([RedisCommand.unwatch])
@@ -559,6 +619,7 @@ export function createRedisStore(
           store,
           options: ctx ?? {},
           policy,
+          ...(ports.journal === undefined ? {} : { prepare: () => ports.journal!.prepare() }),
           execute: (context, proceed) =>
             operate<I, Awaited<R>>(
               name,
@@ -1259,6 +1320,7 @@ export function createRedisStore(
             )
         }
       }
+      scopeDrafts.set(scope, { store, draft })
       return scope
     }
     /** User callback and finalizers remain owned by the original contract registration. */
@@ -1273,6 +1335,7 @@ export function createRedisStore(
         {
           store,
           options,
+          ...(ports.journal === undefined ? {} : { prepare: () => ports.journal!.prepare() }),
           executeAttempt: (context, proceed) =>
             operate(RedisOperation.transaction, {}, context, undefined, proceed)
         },
@@ -1297,9 +1360,12 @@ export function createRedisStore(
                         failure = error
                       }
                     },
-                    beforeCommit: (current) =>
+                    beforeCommit: async (current) => {
                       observe(transactions().forTransaction(current), 'beforeCommit')
+                      await draft.journal?.record(current)
+                    }
                   })
+                  if (draft.journalActive) draft.journal = ports.journal!.begin(scope)
                   stages = transactions().forTransaction(scope)
                   observe(transactions(), 'beforeTransaction')
                   observe(stages, 'onTransactionStart')
@@ -1318,7 +1384,8 @@ export function createRedisStore(
                   throwIfAborted(context.signal)
                   changed = [...draft.entries.values()].filter((entry) => entry.changed).length
                   return value as Awaited<R>
-                }
+                },
+                true
               )
               if (outcome.status === 'committed') observe(stages, 'afterCommit', changed)
               else observe(stages, 'afterRollback', StorageContractErrorCode.writeConflict)
@@ -1939,12 +2006,23 @@ export function createRedisStore(
       durablePublication?.release()
       vectorPublication?.release()
     }
-    return { store, installer, configureFeatures, releaseFeatures }
+    const journal = createRedisJournalBinding({
+      forOrg: (next) => forOrg(next).journal,
+      assertLive: () => controller.assertLive(),
+      state: (scope) => {
+        const binding = scopeDrafts.get(scope),
+          info = assertTransactionOwner(binding?.store ?? store, scope)
+        if (binding === undefined || binding.draft.layout.orgId !== orgId) throw invalidArgument()
+        return { draft: binding.draft, info }
+      }
+    })
+    return { store, installer, configureFeatures, releaseFeatures, journal }
   }
   const root = forOrg(core.defaultOrgId, true)
   return {
     ...root,
     controller,
+    journalBinding: root.journal,
     orgBinding: {
       backend: (orgId) => forOrg(orgId).store,
       drop: async (orgId) => {
