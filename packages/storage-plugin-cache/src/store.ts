@@ -1,3 +1,4 @@
+import { createBackendChangeController } from '@migaia/storage-host/authoring/change-controller'
 import {
   kv,
   ttl,
@@ -206,7 +207,7 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
       }
       cacheContext.projections.clear()
     }
-  })
+  }, createBackendChangeController)
   cacheContext.root = bind(cacheContext, cacheContext.core.defaultOrgId)
 
   /** Durable consumers start in the original detect window after their earlier backends are ready. */

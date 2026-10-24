@@ -1,3 +1,5 @@
+import { memoryNotificationsFeature } from '../src/features/memory-notifications.js'
+import { memoryChangeFeedFeature } from '../src/features/memory-change-feed.js'
 import { catalog } from './helpers/catalog.js'
 import { describe, expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
@@ -211,7 +213,16 @@ describe('neutral storage installation', () => {
       }
     }))
     await using host = await createStorageHost({
-      plugins: [memoryBackendPlugin({ id: 'left' }, { identity })]
+      plugins: [
+        memoryBackendPlugin(
+          { id: 'left' },
+          {
+            identity,
+            notifications: memoryNotificationsFeature(),
+            changeFeed: memoryChangeFeedFeature()
+          }
+        )
+      ]
     })
     /** This immutable projection contains only the original committed registration. */
     const before = host.api
@@ -219,7 +230,16 @@ describe('neutral storage installation', () => {
     expect(before.left).toBe(host.backend('left').api)
     expect(await before.left.identity()).toBe(host.backend('left'))
     /** A later publication adds its own API without mutating a saved projection. */
-    const expanded = await host.use(memoryBackendPlugin({ id: 'right' }, { identity }))
+    const expanded = await host.use(
+      memoryBackendPlugin(
+        { id: 'right' },
+        {
+          identity,
+          notifications: memoryNotificationsFeature(),
+          changeFeed: memoryChangeFeedFeature()
+        }
+      )
+    )
     expect(Object.keys(before)).toEqual(['left'])
     expect(Object.keys(expanded.api)).toEqual(['left', 'right'])
     expect(expanded.api.left).toBe(before.left)
@@ -233,7 +253,17 @@ describe('neutral storage installation', () => {
       }
     }))
     await expect(
-      expanded.use(memoryBackendPlugin({ id: 'uncommitted' }, { identity }), reject)
+      expanded.use(
+        memoryBackendPlugin(
+          { id: 'uncommitted' },
+          {
+            identity,
+            notifications: memoryNotificationsFeature(),
+            changeFeed: memoryChangeFeedFeature()
+          }
+        ),
+        reject
+      )
     ).rejects.toMatchObject({ code: 'BACKEND_INSTALL_FAILED' })
     expect(Object.keys(expanded.api)).toEqual(['left', 'right'])
   })

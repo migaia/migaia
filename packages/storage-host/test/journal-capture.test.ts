@@ -1,3 +1,4 @@
+import { storageJournalPlugin } from '../src/journal.js'
 import { describe, expect, it } from 'vitest'
 import { counter, ttl, rdf, records } from '@migaia/storage-contract'
 import { lockKey } from '../src/authoring/concurrency.js'
@@ -12,7 +13,9 @@ import { resolveStorageJournalBinding } from '../src/journal/binding.js'
 
 describe('original memory ordered journal capture', () => {
   it('captures native order, TTL and query deletion members without counting net-absent rows', async () => {
-    await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+    await using host = await createStorageHost({
+      plugins: [storageJournalPlugin(), memoryBackendPlugin()]
+    })
     const store = host.backend('memory')
     const binding = resolveStorageJournalBinding(host, 'memory').binding
     await store.putRecord({ old: true }, 'retained')
@@ -64,7 +67,9 @@ describe('original memory ordered journal capture', () => {
   })
 
   it('captures logical RDF mutations and keeps non-portable writes unchanged unless capture is selected', async () => {
-    await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+    await using host = await createStorageHost({
+      plugins: [storageJournalPlugin(), memoryBackendPlugin()]
+    })
     const store = host.backend('memory')
     const binding = resolveStorageJournalBinding(host, 'memory').binding
     const quad = {
@@ -114,7 +119,9 @@ describe('original memory ordered journal capture', () => {
   })
 
   it('stores authentic commit evidence in the same private native draft and isolates user prefixes and orgs', async () => {
-    await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+    await using host = await createStorageHost({
+      plugins: [storageJournalPlugin(), memoryBackendPlugin()]
+    })
     const store = host.backend('memory')
     const binding = resolveStorageJournalBinding(host, 'memory').binding
     const foreign = resolveStorageJournalBinding(host.org(createOrgId()), 'memory').binding

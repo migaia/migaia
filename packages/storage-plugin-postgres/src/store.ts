@@ -1,3 +1,5 @@
+import { createBackendChangeIterator } from '@migaia/storage-host/authoring/change-iterator'
+import { createBackendChangeController } from '@migaia/storage-host/authoring/change-controller'
 import type { IPgQuantizedOptions } from './features/quantized.js'
 import {
   StorageContractError,
@@ -63,7 +65,6 @@ import type {
 import {
   asyncDisposeKey,
   snapshotKeyRange,
-  createBackendChangeIterator,
   createStorageOperationReporter,
   reportCleanupError,
   throwIfAborted,
@@ -1880,7 +1881,7 @@ export async function createPostgresStore<T>(
         releaseOrganizations()
       }
     }
-  })
+  }, createBackendChangeController)
   try {
     if (configuration.server === 'postgres' && configuration.driver.listen === undefined)
       throw new StorageContractError(StorageContractErrorCode.unsupported, {

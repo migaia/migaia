@@ -78,18 +78,21 @@ type IBackendChangeIteratorContext = {
   /** Native async-generator serialization adds no backend queue or retry state. */
   native: AsyncGenerator<IStorageChange, void, unknown>
 }
+export type IBackendChangeIteratorOptions = {
+  readonly orgId: string
+  readonly channel: IStorageChange['channel']
+  readonly key?: string
+  readonly ctx?: IOperationContext
+  readonly execute?: (
+    advance: () => Promise<IteratorResult<IStorageChange>>,
+    context: IOperationContextSnapshot | undefined
+  ) => Promise<IteratorResult<IStorageChange>>
+}
+
+/** Construct a change feed only when its backend explicitly selects this iterator owner. */
 export function createBackendChangeIterator(
   controller: IBackendChangeController,
-  options: {
-    readonly orgId: string
-    readonly channel: IStorageChange['channel']
-    readonly key?: string
-    readonly ctx?: IOperationContext
-    readonly execute?: (
-      advance: () => Promise<IteratorResult<IStorageChange>>,
-      context: IOperationContextSnapshot | undefined
-    ) => Promise<IteratorResult<IStorageChange>>
-  }
+  options: IBackendChangeIteratorOptions
 ): IStorageIterator<IStorageChange> {
   /** Initialize native facts in original construction order before publishing any port. */
   const iteratorState = { controller, options } as IBackendChangeIteratorContext
