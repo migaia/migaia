@@ -89,13 +89,45 @@ const hostExample = (module: string, plugin: string, id: string, options = ''): 
   `import { createStorageHost } from '@migaia/storage-host'
 import { ${plugin} } from '@migaia/storage-web/${module}'
 
-const host = await createStorageHost({ plugins: [${plugin}({${options}})] })
+const host = await createStorageHost({
+  plugins: [${plugin}({
+    ${options.trim()}
+  })]
+})
 try {
   const store = host.backend('${id}')
   await store.set('theme', 'dark')
   console.log(await store.get('theme'))
 } finally {
   await host.dispose()
+}`
+
+/** Text transactions share the selected original WAL, rather than an independent pending cache. */
+const redoExample = (
+  module: string,
+  plugin: string,
+  id: string
+): string => `import { Logger } from '@migaia/logger'
+import { memoryLogStore, wal } from '@migaia/logger/plugins/durable'
+import { createStorageHost } from '@migaia/storage-host'
+import { ${plugin} } from '@migaia/storage-web/${module}'
+
+const logger = new Logger({
+  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 1000 },
+  plugins: [wal({ store: memoryLogStore() })]
+})
+const host = await createStorageHost({
+  plugins: [${plugin}({ redo: true })],
+  journal: { logger, namespace: 'history', redoWal: logger.wal }
+})
+try {
+  await host.backend('${id}').transaction(async (scope) => {
+    await scope.set('theme', 'dark')
+    await scope.set('locale', 'en')
+  })
+} finally {
+  await host.dispose()
+  await logger.shutdown('manual')
 }`
 
 /** Live queries add no host facade and retain the caller's Runtime ownership. */
@@ -125,7 +157,7 @@ try {
 const webStorageFields = (storage: string): Readonly<Record<string, IMemberDoc>> => ({
   namespace: {
     summary: t('Logical namespace owned by this backend.', '该后端拥有的逻辑命名空间。'),
-    default: t('`default`.', '默认 `default`。')
+    default: t('`default`.', '省略时采用 `default`。')
   },
   redo: {
     summary: t(
@@ -143,7 +175,7 @@ const webStorageFields = (storage: string): Readonly<Record<string, IMemberDoc>>
       'Encodes and decodes physical keys without touching foreign namespaces.',
       '编码与解码物理键，跳过其他命名空间。'
     ),
-    default: t('`lengthPrefixedNamespaceCodec`.', '默认 `lengthPrefixedNamespaceCodec`。'),
+    default: t('`lengthPrefixedNamespaceCodec`.', '省略时采用 `lengthPrefixedNamespaceCodec`。'),
     whenToUse: t(
       'Keep the default unless migrating an existing key layout.',
       '默认布局满足需求时保持不变，仅迁移既有键布局时替换。'
@@ -161,7 +193,7 @@ ${hostExample(
       'Borrow the native Storage port; disposal does not erase its data.',
       '借用原生存储端口，释放不清空其数据。'
     ),
-    default: t(`\`globalThis.${storage}\`.`, `默认 \`globalThis.${storage}\`。`)
+    default: t(`\`globalThis.${storage}\`.`, `省略时采用 \`globalThis.${storage}\`。`)
   }
 })
 
@@ -193,7 +225,24 @@ const optionCases = (module: string, plugin: string, id: string): readonly IOpti
       'Reads and writes use the selected native layout until the host closes.',
       '宿主关闭前，读写始终使用所选原生布局。'
     )
-  }
+  },
+  ...(module === 'indexed-db'
+    ? []
+    : [
+        {
+          title: t('Select recoverable text drafts', '选择可恢复的文本事务草稿'),
+          problem: t(
+            'Commit multiple visible text values through one original WAL owner.',
+            '通过同一个原始预写日志拥有者提交多个可见文本值。'
+          ),
+          covers: ['redo'],
+          example: redoExample(module, plugin, id),
+          result: t(
+            'The draft applies only after its complete WAL intent has been retained.',
+            '仅在完整写入意图已由预写日志保存后，才应用事务草稿。'
+          )
+        }
+      ])
 ]
 
 /** Native IndexedDB options remain exact inputs to its one preparation path. */
@@ -202,30 +251,40 @@ const indexedDbFields: Readonly<Record<string, IMemberDoc>> = {
     summary: t(
       'Explicit true only for an injected factory confined to this realm; it retains the original cached path. Without this declaration or native Web Locks, indexExclusive:false selects current native reads per operation without a cross-operation index.',
       '仅为数据宇宙局限当前 realm 的真实私有 factory 显式声明 true，保留原缓存路径；缺少该声明与原生 Web Locks 时，以 indexExclusive:false 在每操作原生事务中现读，不跨操作缓存。'
-    )
+    ),
+    default: t(
+      'Omitted: no private data universe is asserted.',
+      '省略时不声明工厂拥有私有数据域。'
+    ),
+    whenToUse: t(
+      'Use only when the injected factory actually creates an isolated realm-local database universe.',
+      '仅在注入工厂确实创建当前运行环境内的独立数据库域时使用。'
+    ),
+    example: `import { IDBFactory, IDBKeyRange } from 'fake-indexeddb'
+${hostExample('indexed-db', 'indexedDbBackendPlugin', 'indexed-db', 'factory: new IDBFactory(), keyRange: IDBKeyRange, journalFactoryIsPrivate: true')}`
   },
   dbName: {
     summary: t('Database name used by this installation.', '本次安装使用的数据库名称。'),
-    default: t('`storage-web`.', '默认 `storage-web`。')
+    default: t('`storage-web`.', '省略时采用 `storage-web`。')
   },
   kvStoreName: {
     summary: t('Native text object store name.', '原生文本对象存储名称。'),
-    default: t('`kv`.', '默认 `kv`。')
+    default: t('`kv`.', '省略时采用 `kv`。')
   },
   bytesStoreName: {
     summary: t('Native byte object store name.', '原生字节对象存储名称。'),
-    default: t('`bytes`.', '默认 `bytes`。')
+    default: t('`bytes`.', '省略时采用 `bytes`。')
   },
   recordsStoreName: {
     summary: t('Native authoritative record object store name.', '原生权威记录对象存储名称。'),
-    default: t('`records`.', '默认 `records`。')
+    default: t('`records`.', '省略时采用 `records`。')
   },
   cleanupLegacyRecords: {
     summary: t(
       'Delete the old documents store only after migration completes.',
       '仅在迁移完成后删除旧文档存储。'
     ),
-    default: t('`false`.', '默认 `false`。'),
+    default: t('`false`.', '省略时采用 `false`。'),
     example: hostExample(
       'indexed-db',
       'indexedDbBackendPlugin',
@@ -238,7 +297,7 @@ const indexedDbFields: Readonly<Record<string, IMemberDoc>> = {
       'Borrow an IndexedDB factory and retain its matching keyRange constructor.',
       '借用索引数据库工厂，并提供对应的 `keyRange` 构造器。'
     ),
-    default: t('`globalThis.indexedDB`.', '默认 `globalThis.indexedDB`。'),
+    default: t('`globalThis.indexedDB`.', '省略时采用 `globalThis.indexedDB`。'),
     example: hostExample(
       'indexed-db',
       'indexedDbBackendPlugin',
@@ -251,7 +310,7 @@ const indexedDbFields: Readonly<Record<string, IMemberDoc>> = {
       'Native IDBKeyRange implementation belonging to the supplied factory.',
       '与所提供工厂对应的原生键范围实现。'
     ),
-    default: t('`globalThis.IDBKeyRange`.', '默认 `globalThis.IDBKeyRange`。'),
+    default: t('`globalThis.IDBKeyRange`.', '省略时采用 `globalThis.IDBKeyRange`。'),
     example: hostExample(
       'indexed-db',
       'indexedDbBackendPlugin',
@@ -291,14 +350,17 @@ const cookieFields: Readonly<Record<string, IMemberDoc>> = {
   namespaceCodec: webStorageFields('localStorage').namespaceCodec!,
   document: {
     summary: t('Borrow the JS-visible document.cookie port.', '借用脚本可见的 Cookie 文档端口。'),
-    default: t('`globalThis.document`.', '默认 `globalThis.document`。')
+    default: t('`globalThis.document`.', '省略时采用 `globalThis.document`。')
   },
   scope: {
     summary: t(
       'Fixed path/domain/SameSite/Secure/Partitioned attributes; secure is required for none or partitioned.',
       '固定的路径、域名、同站点、安全与分区属性；不限制同站点或启用分区时必须安全传输。'
     ),
-    default: t("`{ path: '/' }`.", "默认 `{ path: '/' }`。")
+    default: t(
+      'Omitted: no explicit scope attributes; browser default path applies.',
+      '省略时不追加显式作用域属性，由浏览器使用默认路径。'
+    )
   }
 }
 
@@ -310,6 +372,34 @@ const backendSymbols: Readonly<Record<string, ISymbolDoc>> = Object.fromEntries(
       {
         role: 'enhancer',
         options,
+        optionDocs: {
+          id: {
+            summary: t(
+              'Exact host registration identity supplied by the application; select this name with host.backend().',
+              '由应用指定的精确宿主注册标识，通过宿主后端方法按该标识获取存储。'
+            ),
+            default: t(
+              `Omitted: use the native registration name ${id}.`,
+              `省略时使用原生注册名称 ${id}。`
+            ),
+            example: hostExample(module, plugin, 'preferences', "id: 'preferences'")
+          },
+          ...(module === 'indexed-db'
+            ? {
+                'owner.label': {
+                  summary: t(
+                    'Caller-selected readable label shown in lock diagnostics, never an authority token.',
+                    '由调用方选择并显示在锁诊断中的可读标签，不表示操作权限或锁身份。'
+                  ),
+                  default: t(
+                    'Omitted: the original browser label remains.',
+                    '省略时保留原浏览器标签。'
+                  ),
+                  example: hostExample(module, plugin, id, "owner: { label: 'editor-tab' }")
+                }
+              }
+            : {})
+        },
         purpose: t(
           `Install the native ${module} backend into storage-host. Preparation finishes before publication; the host owns cleanup.${module === 'indexed-db' ? ' Native ttl covers text, bytes and records within the same transaction. Organization dbName mapping preserves the configured default and adds "/" + orgId otherwise. dropOrg drains and closes the target connection, deletes only that database, and keeps borrowed views reusable.' : ' Native localStorage watch requires its matching Window event source; injected ports alone retain changeFeed:false. Text organization views preserve the configured default namespace and use namespace + "/" + orgId otherwise; dropOrg clears only that target and keeps borrowed unique writes native.'}`,
           `把原生浏览器后端安装到 \`@migaia/storage-host\`，准备完成后才发布，由宿主拥有清理责任。${module === 'indexed-db' ? '原生 ttl 在同一事务支持文本、字节与记录期限。组织 dbName 保留配置的缺省目标，其它组织追加"/" + orgId；dropOrg 排空并关闭目标连接，只删除该数据库，既有借用视图可复用。' : '原生localStorage watch须准入同Window事件源，单独注入端口仍changeFeed:false。文本组织视图保留配置的缺省namespace，其它组织使用namespace + "/" + orgId；dropOrg只清该目标，借用唯一写仍由原生拥有者完成。'}`
@@ -383,6 +473,56 @@ const backendEnhancers: Readonly<Record<string, IEnhancerDoc>> = Object.fromEntr
   ])
 )
 
+/** Full live options and the chain subset describe the same original Resource generation fields. */
+const liveQueryMembers: Readonly<Record<string, IMemberDoc>> = {
+  runtime: {
+    summary: t(
+      'The caller Runtime created by createRuntime().',
+      '调用者通过 `createRuntime()` 创建的运行时。'
+    )
+  },
+  scope: {
+    summary: t('Optional logical change scope.', '可选逻辑变化范围，用于排除已知无关的失效提示。'),
+    default: t('No scope filter.', '默认不按范围过滤。')
+  },
+  matches: {
+    summary: t(
+      'Filter actual changes; throws report and conservatively refresh.',
+      '过滤实际变化，抛错时报告并保守刷新。'
+    ),
+    default: t('No predicate.', '默认无谓词。')
+  },
+  keepPreviousData: {
+    summary: t('Retain the last value while refreshing.', '重新读取进行期间保留最近一次可用结果。'),
+    default: t('`true`.', '省略时采用 `true`。')
+  },
+  equals: {
+    summary: t(
+      'Suppress replacement for equivalent settled results.',
+      '结果等价时抑制可见值替换。'
+    ),
+    default: t('No suppression.', '默认不抑制。')
+  },
+  timeoutMs: {
+    summary: t(
+      'Optional deadline per query generation.',
+      '每一代实际查询操作单独采用的可选毫秒期限。'
+    ),
+    default: t('No deadline.', '默认无限期。')
+  },
+  signal: {
+    summary: t('Cancel the entire live-query lifetime.', '取消整个实时查询生命周期。'),
+    default: t('No external signal.', '默认无外部信号。')
+  },
+  report: {
+    summary: t(
+      'Receive existing Resource diagnostics without changing query results.',
+      '接收已有资源诊断，不改变查询结果。'
+    ),
+    default: t('Use the original diagnostic boundary.', '默认使用原有诊断边界。')
+  }
+}
+
 /** Reference includes only current public browser entries; neutral ownership is explicit. */
 export const storageWebReference: ILibraryReference = {
   modules: {
@@ -410,7 +550,7 @@ export const storageWebReference: ILibraryReference = {
     'features/blobs': {
       summary: t(
         'Select native Blob/File storage in the original IndexedDB transaction.',
-        '在原 IndexedDB 事务中选择原生 Blob/File 存储。'
+        '在原索引数据库事务内读写原生二进制对象，并与记录共用提交和回滚。'
       ),
       example: blobExample
     },
@@ -425,9 +565,25 @@ export const storageWebReference: ILibraryReference = {
   symbols: {
     indexedDbBlobFeature: {
       role: 'enhancer',
+      optionDocs: {
+        storeName: {
+          summary: t(
+            'A nonempty private IndexedDB object-store name declared before the original opener seals.',
+            '原打开器封闭前声明的非空索引数据库对象仓库名称，不能与业务仓库重名。'
+          ),
+          default: t(
+            'Omitted: use __migaia_blobs__.',
+            '省略时使用内置二进制对象仓库名称 __migaia_blobs__。'
+          ),
+          example: blobExample.replace(
+            'indexedDbBlobFeature()',
+            "indexedDbBlobFeature({\n      storeName: 'attachments_blobs'\n    })"
+          )
+        }
+      },
       purpose: t(
-        'Declare a native Blob store before opening and share record commit or rollback.',
-        '开库前声明原生 Blob 仓库，与 records 共用提交或回滚。'
+        'Declare a native Blob store before opening and share record commit or rollback. Active commit journaling rejects raw native Feature requests before client access; ordinary and telemetry-only installations retain this capability.',
+        '打开数据库之前声明二进制对象仓库，根写入和事务请求均复用原记录提交拥有者。启用提交日志时，原生特性请求在获得客户端之前拒绝；普通安装与仅遥测配置保留该能力。'
       ),
       params: {
         options: t(
@@ -522,6 +678,153 @@ export const storageWebReference: ILibraryReference = {
     }
   },
   types: {
+    ILiveQueryOptions: {
+      summary: t(
+        'Full original live-query admission retains the exact backend, caller Runtime and one read callback per generation.',
+        '完整实时查询准入保留精确后端与调用方运行时，每次查询代际只执行一个原读取回调。'
+      ),
+      members: {
+        ...liveQueryMembers,
+        backendId: {
+          summary: t(
+            'The exact earlier installed backend ID supplied by the application.',
+            '由应用提供并已提前安装的精确后端注册标识，不执行缺省后端回退。'
+          )
+        },
+        query: {
+          summary: t(
+            'Read the current result from the captured backend and observe the current generation cancellation signal.',
+            '从已捕获的原后端读取当前结果，并响应当前查询代际的取消信号。'
+          ),
+          params: {
+            context: t(
+              'The original store, generation signal and optional logical scope supplied by the live query owner.',
+              '由实时查询拥有者提供的原存储、本代取消信号及可选逻辑范围。'
+            )
+          },
+          returns: t(
+            'A value or PromiseLike value for this generation; failure settles its error state and stale results never overwrite newer generations.',
+            '返回本代结果或其异步值；失败进入错误状态，迟到结果不能覆盖更新代际。'
+          ),
+          example: liveExample
+        }
+      }
+    },
+    ICookieRemoveContext: {
+      summary: t(
+        'Removal borrows the original operation cancellation and deadline without changing the fixed cookie scope.',
+        '删除操作借用原取消与毫秒期限上下文，不改变安装时捕获的网页存储固定作用域。'
+      ),
+      members: {
+        signal: storageContractReference.types.IOperationContext!.members!.signal!,
+        timeoutMs: storageContractReference.types.IOperationContext!.members!.timeoutMs!
+      }
+    },
+    ICookieWriteContext: {
+      summary: t(
+        'Cookie writes capture original lifecycle fields and native expiry attributes before any assignment.',
+        '网页存储写入在原生赋值之前捕获生命周期控制字段和原生到期属性。'
+      ),
+      members: {
+        signal: storageContractReference.types.IOperationContext!.members!.signal!,
+        timeoutMs: storageContractReference.types.IOperationContext!.members!.timeoutMs!,
+        expires: {
+          summary: t(
+            'Optional valid Date for native Expires; omission does not add an absolute expiry attribute.',
+            '可选有效日期，用于原生绝对到期属性；省略时不追加该属性。'
+          )
+        },
+        maxAge: {
+          summary: t(
+            'Optional safe integer seconds for native Max-Age, taking precedence over Expires; selected redo captures its absolute deadline once.',
+            '可选安全整数秒数，原生优先于绝对到期属性；选中重放模式时只捕获一次绝对期限。'
+          )
+        }
+      }
+    },
+    ISyncCookieStore: {
+      summary: t(
+        'Synchronous operations see only JavaScript-visible cookies in the fixed namespace; hidden cookies remain opaque.',
+        '同步操作只观察固定命名空间内脚本可见的网页条目，隐藏条目仍是不透明数据。'
+      ),
+      example: hostExample('cookies', 'cookieBackendPlugin', 'cookies'),
+      scenarios: [
+        t(
+          'Use an ordinary cookie backend synchronously when its selected pipeline has no asynchronous stage.',
+          '仅在普通网页存储后端所选管线没有异步阶段时，通过同步入口读写。'
+        )
+      ],
+      members: {
+        get: storageContractReference.types.ISyncKeyValueStore!.members!.get!,
+        has: {
+          ...storageContractReference.types.ISyncKeyValueStore!.members!.has!,
+          summary: t(
+            'Report visible presence only; false cannot establish absence of an HttpOnly cookie.',
+            '只报告脚本可见条目是否存在，假值不能证明隐藏条目已经不存在。'
+          )
+        },
+        keys: storageContractReference.types.ISyncKeyValueStore!.members!.keys!,
+        set: {
+          summary: t(
+            'Assign one text value using the captured cookie scope and optional native expiry attributes.',
+            '按照已捕获的固定作用域及可选原生期限，为一个逻辑键写入文本值。'
+          ),
+          params: {
+            key: t('Application-selected logical cookie name.', '由应用选择的逻辑网页存储键名。'),
+            value: t(
+              'String text to encode in the visible cookie.',
+              '要编码到脚本可见条目中的字符串文本。'
+            ),
+            ctx: t(
+              'Optional expiry and synchronous write policy; cancellation is not available on this entry.',
+              '可选到期属性与同步写入策略，此入口不接受取消或异步等待。'
+            )
+          },
+          returns: t(
+            'Returns after native visibility verification; invalid input or a rejected assignment throws before reporting success.',
+            '原生可见性复核完成后返回；输入无效或原生赋值被拒绝时抛错，不报告成功。'
+          ),
+          example: hostExample('cookies', 'cookieBackendPlugin', 'cookies').replace(
+            "await store.set('theme', 'dark')",
+            "store.sync?.set('theme', 'dark', { maxAge: 3600 })"
+          )
+        },
+        remove: {
+          summary: t(
+            'Expire the visible name using the exact configured scope; hidden or differently scoped cookies may remain.',
+            '使用已配置的精确作用域使可见键名到期，隐藏或其它作用域条目仍可能保留。'
+          ),
+          params: {
+            key: t(
+              'Logical cookie name chosen by the application.',
+              '由应用选择的逻辑网页存储键名。'
+            )
+          },
+          returns: t(
+            'The native expiry assignment has run; this is not proof that every same-name hidden cookie was removed.',
+            '原生到期赋值已执行，并不表示所有同名隐藏条目都已删除。'
+          ),
+          example: hostExample('cookies', 'cookieBackendPlugin', 'cookies').replace(
+            "await store.set('theme', 'dark')",
+            "store.sync?.remove('theme')"
+          )
+        },
+        clearValues: {
+          summary: t(
+            'Expire visible names from this namespace and fixed scope without clearing other browser data.',
+            '只使当前命名空间与固定作用域内可见键名到期，不清理其它浏览器数据。'
+          ),
+          returns: t(
+            'All visible selected names have received expiry assignments; opaque hidden entries are not promised removed.',
+            '已为所有选中可见键名执行到期赋值，不承诺删除脚本不可见条目。'
+          ),
+          example: hostExample('cookies', 'cookieBackendPlugin', 'cookies').replace(
+            "await store.set('theme', 'dark')",
+            'store.sync?.clearValues()'
+          )
+        }
+      }
+    },
     IIndexedDbBlobApi: {
       summary: t(
         'Native Blob/File requests borrow the original database lifetime.',
@@ -531,14 +834,17 @@ export const storageWebReference: ILibraryReference = {
         put: {
           summary: t(
             'Write a Blob/File and wait for actual commit.',
-            '写入 Blob/File，并等待实际提交。'
+            '保存原生二进制对象并等待实际提交完成。'
           ),
           params: {
             key: t('String key.', '字符串键。'),
-            value: t('Native Blob or File.', '原生 Blob 或 File。'),
+            value: t('Native Blob or File.', '调用方提供的原生二进制对象或文件。'),
             ctx: t('Optional operation context.', '可选操作上下文。')
           },
-          returns: t('Promise<void>.', 'Promise<void>。'),
+          returns: t(
+            'Promise<void> after the native operation commits.',
+            '原生操作提交完成后返回空值。'
+          ),
           example: blobExample
         },
         get: {
@@ -550,16 +856,25 @@ export const storageWebReference: ILibraryReference = {
             key: t('String key.', '字符串键。'),
             ctx: t('Optional operation context.', '可选操作上下文。')
           },
-          returns: t('Promise<Blob | undefined>.', 'Promise<Blob | undefined>。'),
+          returns: t(
+            'Promise<Blob | undefined>, detached from stored data.',
+            '返回脱离存储的二进制对象副本，缺失时返回空值。'
+          ),
           example: blobExample
         },
         remove: {
-          summary: t('Remove a native Blob row idempotently.', '幂等删除原生 Blob 行。'),
+          summary: t(
+            'Remove a native Blob row idempotently.',
+            '幂等删除对应的原生二进制对象记录。'
+          ),
           params: {
             key: t('String key.', '字符串键。'),
             ctx: t('Optional operation context.', '可选操作上下文。')
           },
-          returns: t('Promise<void>.', 'Promise<void>。'),
+          returns: t(
+            'Promise<void> after the native operation commits.',
+            '原生操作提交完成后返回空值。'
+          ),
           example: blobExample
         }
       }
@@ -573,16 +888,47 @@ export const storageWebReference: ILibraryReference = {
         put: {
           summary: t(
             'Stage a native Blob/File in this transaction.',
-            '在本事务暂存原生 Blob/File。'
+            '在当前事务草稿内保存原生二进制对象。'
+          ),
+          params: {
+            key: t('Application-selected string object key.', '由应用选择的字符串对象存储键。'),
+            value: t(
+              'Native Blob or File supplied by the application.',
+              '调用方提供的原生二进制对象或文件。'
+            )
+          },
+          returns: t(
+            'The native request has staged its value; the outer transaction still owns commit or rollback.',
+            '原生请求已暂存该值，最终提交或回滚仍由外层事务拥有者决定。'
           ),
           example: blobExample
         },
         get: {
-          summary: t('Read this transaction native Blob value.', '读取本事务的原生 Blob 值。'),
+          summary: t(
+            'Read this transaction native Blob value.',
+            '读取当前事务可见的原生二进制对象。'
+          ),
+          params: {
+            key: t('Application-selected string object key.', '由应用选择的字符串对象存储键。')
+          },
+          returns: t(
+            'The value visible in this transaction, or undefined when absent.',
+            '返回当前事务可见的二进制对象，缺失时返回空值。'
+          ),
           example: blobExample
         },
         remove: {
-          summary: t('Remove this transaction native Blob row.', '删除本事务的原生 Blob 行。'),
+          summary: t(
+            'Remove this transaction native Blob row.',
+            '在当前事务中删除指定二进制对象记录。'
+          ),
+          params: {
+            key: t('Application-selected string object key.', '由应用选择的字符串对象存储键。')
+          },
+          returns: t(
+            'The delete request is staged in the original transaction without committing it.',
+            '在原事务中暂存删除请求，不自行提交该事务。'
+          ),
           example: blobExample
         }
       }
@@ -721,7 +1067,10 @@ console.error(error.source, error.code)`,
           ),
           params: {
             namespace: t('The original configured namespace.', '原配置命名空间。'),
-            physicalKey: t('One visible physical storage key.', '一个可见的物理存储键。')
+            physicalKey: t(
+              'A physical key returned by native enumeration or generated by this same namespace codec.',
+              '来自原生枚举或由同一命名空间编码器生成的物理存储键。'
+            )
           },
           returns: t(
             'An IStorageKey, or undefined for a foreign or malformed entry.',
@@ -790,122 +1139,6 @@ console.error(error.source, error.code)`,
           ),
           returns: t('Resolves when released.', '释放完成后 resolve。'),
           example: `await query.dispose()`
-        }
-      }
-    },
-    ILiveQueryState: {
-      summary: t(
-        'Live-query state projected from the authoritative resource result, retaining a previous value during refresh, failure or disposal when available.',
-        '从权威资源结果投影的实时查询状态；有旧值时，在刷新、失败或释放期间保留。'
-      ),
-      members: {
-        status: {
-          summary: t(
-            'Query discriminant selecting initial load, usable value, refresh, failure or disposed state.',
-            '查询判别状态，选择首次加载、可用值、刷新、失败或已释放状态。'
-          ),
-          values: {
-            loading: t(
-              'The initial query is pending; a previous value is optional.',
-              '初始查询尚未完成，旧值可能不存在。'
-            ),
-            ready: t(
-              'A successful result is available and no refresh is in progress.',
-              '已有成功结果，当前没有正在进行的刷新。'
-            ),
-            refreshing: t(
-              'Keep the last successful value while a new query is running.',
-              '新查询运行期间保留上一次成功结果。'
-            ),
-            error: t(
-              'The query failed; inspect the error and any retained prior value.',
-              '查询失败，应检查错误与可能保留的旧值。'
-            ),
-            disposed: t(
-              'The query has stopped permanently, with its final optional value or error.',
-              '查询已永久停止，可能保留最终值或错误。'
-            )
-          }
-        },
-        value: {
-          summary: t(
-            'Last usable result, required for ready and refreshing, and optional for loading, error and disposed states.',
-            '最后可用结果；就绪与刷新时必填，加载、错误和释放状态下可选。'
-          )
-        },
-        error: {
-          summary: t(
-            'Original query failure required in the error branch and optionally retained after disposal.',
-            '错误分支必填的原始查询失败，也可能在释放后保留。'
-          )
-        }
-      }
-    },
-    ILiveQueryStateView: {
-      summary: t(
-        'Read-only, non-disposable view of the computed live-query state.',
-        '计算得到的实时查询状态只读视图，不授予释放内部节点的权限。'
-      ),
-      members: {
-        runtime: {
-          summary: t(
-            'The exact reactive runtime supplied to the query.',
-            '创建查询时提供的同一个响应式运行时。'
-          )
-        },
-        debugName: {
-          summary: t(
-            'Internal computed-node diagnostic name while the query node exists.',
-            '内部计算节点存在期间使用的诊断名称。'
-          )
-        },
-        observed: {
-          summary: t(
-            'Whether a reactive observer reads the node; always false after disposal.',
-            '是否有响应式观察者读取该节点；查询释放后始终为假。'
-          )
-        },
-        value: {
-          summary: t(
-            'Current query state; reading tracks a dependency, and disposal returns the terminal state.',
-            '当前查询状态；读取会记录依赖，释放后返回终态快照。'
-          )
-        },
-        peek: {
-          summary: t(
-            'Read the same query state without tracking a dependency.',
-            '读取相同的查询状态，但不记录响应式依赖。'
-          ),
-          returns: t(
-            'Current state or the disposed terminal snapshot; query failures live in the error branch.',
-            '当前状态或释放后的终态快照；查询失败保留在错误分支中。'
-          ),
-          example: `console.log(query.state.peek().status)`
-        }
-      }
-    },
-    IReactiveConsistency: {
-      summary: t(
-        'Consistency promise of a reactive adapter, shown on `query.consistency`.',
-        '响应式适配器的一致性承诺，显示在 `query.consistency` 上。'
-      ),
-      members: {
-        mode: {
-          summary: t('How changes are detected.', '检测数据变化的具体方式。'),
-          values: {
-            push: t('The store reports every change at once.', '存储会立即报告每一次变化。'),
-            hybrid: t('Change events plus polling as a safety net.', '变化事件加上轮询作为兜底。'),
-            polling: t('Only periodic re-reads.', '只通过定期重新读取发现变化。')
-          }
-        },
-        pollIntervalMs: {
-          summary: t('Polling interval, when polling is used.', '使用轮询时的轮询间隔（毫秒）。')
-        },
-        visibility: {
-          summary: t(
-            'Which writers are seen; see `IStorageReactiveVisibility`.',
-            '能观察到哪些写入方，见 `IStorageReactiveVisibility`。'
-          )
         }
       }
     },
@@ -1019,9 +1252,15 @@ console.error(error.source, error.code)`,
           ),
           params: {
             scope: t('Current original scope.', '当前原作用域。'),
-            orgId: t('The immutable call organization.', '不可变调用组织。')
+            orgId: t(
+              'The immutable organization ID from the original host view.',
+              '来自原宿主固定组织视图的不可变调用组织标识。'
+            )
           },
-          returns: t('The original synchronous IDBTransaction.', '原同步 IDBTransaction。')
+          returns: t(
+            'The original synchronous IDBTransaction.',
+            '返回同一原生同步事务对象，不创建新的事务。'
+          )
         },
         requireObjectStore: {
           summary: t(
@@ -1045,51 +1284,7 @@ console.error(error.source, error.code)`,
         '`query.live()` 使用的调用者运行时及查询代际选项。'
       ),
       example: liveExample,
-      members: {
-        runtime: {
-          summary: t(
-            'The caller Runtime created by createRuntime().',
-            '调用者通过 `createRuntime()` 创建的运行时。'
-          )
-        },
-        scope: {
-          summary: t('Optional logical change scope.', '可选的逻辑变化范围。'),
-          default: t('No scope filter.', '默认不按范围过滤。')
-        },
-        matches: {
-          summary: t(
-            'Filter actual changes; throws report and conservatively refresh.',
-            '过滤实际变化，抛错时报告并保守刷新。'
-          ),
-          default: t('No predicate.', '默认无谓词。')
-        },
-        keepPreviousData: {
-          summary: t('Retain the last value while refreshing.', '刷新时保留上次值。'),
-          default: t('`true`.', '默认 `true`。')
-        },
-        equals: {
-          summary: t(
-            'Suppress replacement for equivalent settled results.',
-            '结果等价时抑制可见值替换。'
-          ),
-          default: t('No suppression.', '默认不抑制。')
-        },
-        timeoutMs: {
-          summary: t('Optional deadline per query generation.', '每代查询的可选期限。'),
-          default: t('No deadline.', '默认无限期。')
-        },
-        signal: {
-          summary: t('Cancel the entire live-query lifetime.', '取消整个实时查询生命周期。'),
-          default: t('No external signal.', '默认无外部信号。')
-        },
-        report: {
-          summary: t(
-            'Receive existing Resource diagnostics without changing query results.',
-            '接收已有资源诊断，不改变查询结果。'
-          ),
-          default: t('Use the original diagnostic boundary.', '默认使用原有诊断边界。')
-        }
-      }
+      members: liveQueryMembers
     },
     IReactiveLiveMethods: {
       summary: t(
@@ -1103,6 +1298,10 @@ console.error(error.source, error.code)`,
             '从当前精确查询终点启动资源支持的实时查询。'
           ),
           params: {
+            this: t(
+              'The original backend query receiver exposing all().',
+              '来自后端查询链且具有全部结果终点的原查询接收者。'
+            ),
             options: t(
               'Runtime and generation options supplied by the caller.',
               '调用者提供的运行时及代际选项。'
@@ -1140,6 +1339,67 @@ console.error(error.source, error.code)`,
         '按所属接纳、后端、索引或实时查询失败场景命名的稳定诊断消息。'
       ),
       values: {
+        cookieValueInvalid: t(
+          'Cookie text writes received a value that is not a string.',
+          '可见网页存储写入收到非字符串值，在原生赋值之前拒绝。'
+        ),
+        cookieMaxAgeInvalid: t(
+          'Cookie Max-Age is not a safe integer number of seconds.',
+          '网页存储的相对秒数不是安全整数，在原生赋值之前拒绝。'
+        ),
+        cookieExpiresInvalid: t(
+          'Cookie Expires is not an authentic valid Date.',
+          '网页存储的绝对期限不是有效日期对象，不能产生到期属性。'
+        ),
+        cookieRedoScopeMismatch: t(
+          'A visible cookie with the same name remains in an unknown scope during redo.',
+          '重放时同名条目仍在未知作用域可见，不能声称目标已经正确删除。'
+        ),
+        cookieRedoWriteInvisible: t(
+          'A cookie assignment was not visible through the active fixed scope.',
+          '原生赋值后在已固定的当前作用域不可见，不能声称写入已经成功。'
+        ),
+        indexedDbJournalFactoryIsolationInvalid: t(
+          'A private-factory declaration is neither true nor omitted.',
+          '私有工厂声明既不是明确真值也没有省略，因此无法选择该原生隔离路径。'
+        ),
+        indexedDbJournalFactoryMustBeInjected: t(
+          'The known shared realm factory cannot be declared a private data universe.',
+          '当前运行环境已知共享工厂不能被声明为私有数据域，须注入真正独立工厂。'
+        ),
+        storageBatchKeysInvalid: t(
+          'Batch keys must be a finite caller-provided array.',
+          '批量键输入必须是调用方提供的数组，实际请求前完成捕获。'
+        ),
+        storageBatchEntriesInvalid: t(
+          'Batch writes require an array of key and value entries.',
+          '批量写入必须提供键值条目数组，实际请求前完成全部输入捕获。'
+        ),
+        storageBatchDuplicateKey: t(
+          'A batch repeats one canonical logical storage-key identity.',
+          '同一批量输入包含规范身份相同的重复键，在任何原生修改前拒绝。'
+        ),
+        indexedDbOwnerInvalid: t(
+          'An owner label must be an object with an optional string label.',
+          '锁拥有者配置必须是可含字符串标签的对象，该标签本身不授予权限。'
+        ),
+        indexedDbSchemaDeclarationInvalid: t(
+          'A Feature attempted to declare an object store after the original opener sealed.',
+          '特性在原打开器已封闭后声明额外对象仓库，不能修改已准备好的原生结构。'
+        ),
+        indexedDbTransactionEndedEarly: t(
+          'The native transaction ended before the backend chose its commit outcome.',
+          '后端作出提交决定之前原生事务已经结束，后续结果不能当作可靠提交。'
+        ),
+        storageValueInvalid: t(
+          'The native text channel received a value that is not a string.',
+          '原生文本通道收到非字符串值，不能按记录或可移植对象隐式转换。'
+        ),
+        storageBytesInvalid: t(
+          'The native binary channel received a value that is not a Uint8Array.',
+          '原生字节通道收到非字节数组视图，不能创建所承诺的分离字节副本。'
+        ),
+
         namespaceCodecEncodeInvalid: t(
           'A namespace encoder returned a non-string physical key.',
           '命名空间编码器返回了非字符串的物理存储键。'
@@ -1358,7 +1618,7 @@ console.error(error.source, error.code)`,
       target: 'IIndexedDbBackendStore',
       summary: t(
         'Add Blob/File requests to the original native transaction.',
-        '为原生事务增加 Blob/File 请求。'
+        '为原生索引数据库事务增加二进制对象请求，最终提交与回滚仍由原事务拥有者决定。'
       ),
       install: blobExample,
       example: blobExample,
