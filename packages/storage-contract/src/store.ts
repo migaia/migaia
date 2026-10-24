@@ -1,7 +1,8 @@
 import type { ITransactionOptions, IWriteConcurrencyOptions } from './concurrency.js'
 import { StorageContractError, StorageContractErrorCode } from './errors.js'
 import {
-  snapshotStorageCapabilitiesDetailed,
+  isStorageCapabilities,
+  snapshotStorageCapabilities,
   type IBackendKind,
   type IStorageCapabilities
 } from './capabilities.js'
@@ -36,63 +37,70 @@ export type IStorageBaseAdmission =
     }
   | { readonly valid: false; readonly cause: unknown }
 
-/** Shared field inspection checks a supplied fixed symbol without creating a fallback. */
-function inspectStorageBase(
+/** Pure resource shape admission with the caller's fixed cleanup identity. */
+function hasStorageBaseShape(
   store: unknown,
   asyncDisposeKey: symbol | undefined
-): IStorageBaseAdmission {
-  try {
-    if (typeof store !== 'object' || store === null || Array.isArray(store))
-      return { valid: false, cause: undefined }
-    /** Each base property is read once before normalization or callable admission. */
-    const candidate = store as Record<PropertyKey, unknown>
-    /** Backend labels select diagnostics, never runtime permissions. */
-    const backend = candidate.backend
-    /** Individual fact fields reuse the existing capability inspector. */
-    const declaredCapabilities = candidate.capabilities
-    /** Cleanup is borrowed and never invoked by admission. */
-    const dispose = candidate.dispose
-    /** The fixed symbol is captured by the caller and never rediscovered later. */
-    const asyncDispose = asyncDisposeKey === undefined ? undefined : candidate[asyncDisposeKey]
-    /** Getter failures remain the exact original cause rather than escaping the guard. */
-    const capabilities = snapshotStorageCapabilitiesDetailed(declaredCapabilities)
-    if (
-      !isBackendKind(backend) ||
-      !capabilities.value ||
-      typeof dispose !== 'function' ||
-      (asyncDisposeKey !== undefined && typeof asyncDispose !== 'function')
-    )
-      return { valid: false, cause: capabilities.cause }
-    return {
-      valid: true,
-      store: store as IStorageBase,
-      backend,
-      capabilities: capabilities.value,
-      dispose: dispose as () => Promise<void>,
-      receiver: store,
-      ...(asyncDispose === undefined ? {} : { asyncDispose: asyncDispose as () => Promise<void> })
-    }
-  } catch (cause) {
-    return { valid: false, cause }
-  }
+): store is IStorageBase {
+  if (typeof store !== 'object' || store === null || Array.isArray(store)) return false
+  /** The provider is borrowed; shape inspection neither clones facts nor invokes cleanup. */
+  const candidate = store as Record<PropertyKey, unknown>
+  return (
+    isBackendKind(candidate.backend) &&
+    isStorageCapabilities(candidate.capabilities) &&
+    typeof candidate.dispose === 'function' &&
+    (asyncDisposeKey === undefined || typeof candidate[asyncDisposeKey] === 'function')
+  )
 }
 
 /**
- * Admits the original resource base without I/O, cleanup or ownership transfer. The outer host may
- * supply its canonical async-dispose key; absent native symbols promise only explicit cleanup.
+ * Checks a specialized resource without requiring KV methods or copying its facts. The supplied
+ * cleanup symbol is authoritative; without a native symbol only explicit disposal is required.
+ */
+export function isStorageBase(
+  store: unknown,
+  options?: { readonly asyncDisposeKey?: typeof Symbol.asyncDispose }
+): store is IStorageBase {
+  /** The outer host may supply its canonical identity; no fallback symbol is allocated here. */
+  const asyncDisposeKey: symbol | undefined = options?.asyncDisposeKey ?? Symbol.asyncDispose
+  return (
+    (asyncDisposeKey === undefined || typeof asyncDisposeKey === 'symbol') &&
+    hasStorageBaseShape(store, asyncDisposeKey)
+  )
+}
+
+/**
+ * Captures exact resource functions and detached scalar facts before host lifecycle admission can
+ * await. Admission borrows the original receiver without taking cleanup ownership.
  */
 export function snapshotStorageBaseDetailed(
   store: unknown,
   options?: { readonly asyncDisposeKey?: typeof Symbol.asyncDispose }
 ): IStorageBaseAdmission {
-  try {
-    /** Capture the outer fixed key or native key once; no fallback symbol is allocated here. */
-    const asyncDisposeKey: symbol | undefined = options?.asyncDisposeKey ?? Symbol.asyncDispose
-    if (asyncDisposeKey !== undefined && typeof asyncDisposeKey !== 'symbol')
-      return { valid: false, cause: undefined }
-    return inspectStorageBase(store, asyncDisposeKey)
-  } catch (cause) {
-    return { valid: false, cause }
+  /** The captured key keeps later cleanup independent of native symbol discovery. */
+  const asyncDisposeKey: symbol | undefined = options?.asyncDisposeKey ?? Symbol.asyncDispose
+  if (
+    (asyncDisposeKey !== undefined && typeof asyncDisposeKey !== 'symbol') ||
+    !hasStorageBaseShape(store, asyncDisposeKey)
+  )
+    return { valid: false, cause: undefined }
+  /** Only the host snapshot detaches facts; the pure shape guard retains no descriptor. */
+  const capabilities = snapshotStorageCapabilities(store.capabilities)!
+  /** This exact method is borrowed together with its original provider receiver. */
+  const dispose = store.dispose
+  /** A fixed symbol may differ from the native key on the original provider. */
+  const asyncDispose =
+    asyncDisposeKey === undefined
+      ? undefined
+      : (store as unknown as Record<symbol, () => Promise<void>>)[asyncDisposeKey]
+  return {
+    valid: true,
+    store,
+    backend: store.backend,
+    capabilities,
+    dispose,
+    receiver: store,
+    ...(asyncDispose === undefined ? {} : { asyncDispose })
   }
 }
 
@@ -214,8 +222,8 @@ type IStoreShapeInspection = {
 
 /**
  * Result of one base-store inspection. Success retains the original store/receiver, captured
- * capabilities, and original dispose function; failure retains the exact reflection/getter cause.
- * These records do not freeze or wrap the provider and do not prove its asynchronous behavior.
+ * capabilities, and original dispose function; failure identifies an ordinary invalid shape. These
+ * records do not freeze or wrap the provider and do not prove its asynchronous behavior.
  */
 export type IKeyValueStoreAdmission =
   | {
@@ -225,7 +233,7 @@ export type IKeyValueStoreAdmission =
       readonly store: IKeyValueStore
       /** Backend label captured during this inspection. */
       readonly backend: IBackendKind
-      /** Independent descriptor captured once, including normalized legacy capability flags. */
+      /** Independent descriptor for deferred host routing, including normalized legacy flags. */
       readonly capabilities: IStorageCapabilities
       /** Original dispose method; its receiver is supplied separately for lifecycle integration. */
       readonly dispose: () => Promise<void>
@@ -233,80 +241,61 @@ export type IKeyValueStoreAdmission =
       readonly receiver: object
     }
   | {
-      /** Failed shape admission, without throwing a reflected provider failure. */
+      /** Failed ordinary shape admission. */
       readonly valid: false
-      /** Exact accessor/reflection failure, or undefined for an ordinary shape mismatch. */
+      /** Undefined for an ordinary shape mismatch. */
       readonly cause: unknown
     }
 
-/** Internal admission owner shared by record extensions; retain reflection and getter failures. */
+/** Required record operations are a fixed shape, independent of any native implementation. */
+const STORAGE_RECORD_METHODS = [
+  'getBytes',
+  'setBytes',
+  'removeBytes',
+  'clearBytes',
+  'getRecord',
+  'putRecord',
+  'deleteRecord',
+  'clearRecords',
+  'iterateRecords',
+  'transaction'
+] as const
+
+/** Pure shape inspection shares record requirements without cloning provider facts. */
 export const inspectStoreShape = (store: unknown, records: boolean): IStoreShapeInspection => {
-  /** Original KV admission shares one base-field owner before inspecting its callable API. */
-  const base = inspectStorageBase(store, Symbol.asyncDispose)
-  if (!base.valid)
+  if (!isStorageBase(store))
     return {
       valid: false,
       backend: undefined,
       capabilities: undefined,
       dispose: undefined,
-      cause: base.cause
+      cause: undefined
     }
-  /** Only KV-specific members remain to be inspected. */
-  const candidate = store as Record<string, unknown>
-  let methods: unknown[]
-  try {
-    methods = STORAGE_KEY_VALUE_BASE_METHODS.map((name) => candidate[name])
-    methods.push(base.dispose)
-    if (records)
-      methods.push(
-        ...[
-          'getBytes',
-          'setBytes',
-          'removeBytes',
-          'clearBytes',
-          'getRecord',
-          'putRecord',
-          'deleteRecord',
-          'clearRecords',
-          'iterateRecords',
-          'transaction'
-        ].map((name) => candidate[name])
-      )
-  } catch (cause) {
-    return {
-      valid: false,
-      backend: undefined,
-      capabilities: undefined,
-      dispose: undefined,
-      cause
-    }
-  }
-  const normalizedBackend = base.backend
-  const capabilities = base.capabilities
-  const validCapabilities =
-    capabilities !== undefined &&
-    (!records ||
-      (capabilities.records &&
-        capabilities.binary &&
-        capabilities.transactions &&
-        capabilities.iteration))
+  /** Public methods are checked without invoking or wrapping them. */
+  const candidate = store as unknown as Record<string, unknown>
+  /** Facts remain borrowed here; only the host snapshot detaches them for deferred admission. */
+  const capabilities = store.capabilities
   return {
     valid:
-      normalizedBackend !== undefined &&
-      validCapabilities &&
-      methods.every((method) => typeof method === 'function'),
-    backend: normalizedBackend,
+      STORAGE_KEY_VALUE_BASE_METHODS.every((name) => typeof candidate[name] === 'function') &&
+      (!records ||
+        (capabilities.records &&
+          capabilities.binary &&
+          capabilities.transactions &&
+          capabilities.iteration &&
+          STORAGE_RECORD_METHODS.every((name) => typeof candidate[name] === 'function'))),
+    backend: store.backend,
     capabilities,
-    dispose: base.dispose,
+    dispose: store.dispose,
     cause: undefined
   }
 }
 
 /**
- * Inspects a provider once before a lifecycle owner accepts it. Required methods must be callable,
+ * Inspects a provider before a lifecycle owner accepts it. Required methods must be callable,
  * backend syntax and capabilities must be valid. No storage or dispose method is invoked. Success
  * returns original store/receiver plus captured facts; failure returns valid false with the
- * original getter/reflection cause when present. The result record is not frozen.
+ * ordinary shape-mismatch data. The result record is not frozen.
  */
 export const snapshotKeyValueStoreDetailed = (store: unknown): IKeyValueStoreAdmission => {
   const inspection = inspectStoreShape(store, false)
@@ -321,7 +310,7 @@ export const snapshotKeyValueStoreDetailed = (store: unknown): IKeyValueStoreAdm
     valid: true,
     store: store as IKeyValueStore,
     backend: inspection.backend,
-    capabilities: inspection.capabilities,
+    capabilities: snapshotStorageCapabilities(inspection.capabilities)!,
     dispose: inspection.dispose,
     receiver: store as object
   }
@@ -329,8 +318,8 @@ export const snapshotKeyValueStoreDetailed = (store: unknown): IKeyValueStoreAdm
 
 /**
  * Returns a new base-store inspection record with the original store, backend, and captured
- * capabilities, or undefined for invalid shapes and throwing accessors. No I/O is performed. The
- * record is not frozen; use snapshotKeyValueStoreDetailed when a failure cause is needed.
+ * capabilities, or undefined for invalid shapes. No I/O is performed. The record is not frozen; use
+ * snapshotKeyValueStoreDetailed when a failure cause is needed.
  */
 export const snapshotKeyValueStore = (
   store: unknown
@@ -351,10 +340,10 @@ export const snapshotKeyValueStore = (
 }
 
 /**
- * Inspects the full record-store shape once without running operations. Requires a valid base
+ * Inspects the full record-store shape without running operations. Requires a valid base
  * store, callable byte/record/iteration/transaction methods, and four corresponding true capability
- * flags. Returns original store plus captured facts, or undefined on mismatch/accessor failure. The
- * returned description and capability records are not frozen.
+ * flags. Returns original store plus captured facts, or undefined on a shape mismatch. The returned
+ * description and capability records are not frozen.
  */
 export const snapshotRecordStore = <T = unknown>(
   store: unknown
@@ -370,14 +359,14 @@ export const snapshotRecordStore = <T = unknown>(
   return {
     store: store as IRecordStore<T>,
     backend: inspection.backend!,
-    capabilities: inspection.capabilities
+    capabilities: snapshotStorageCapabilities(inspection.capabilities)!
   }
 }
 
 /**
  * Tests a complete base key-value shape without running provider operations. Invalid backend
- * syntax, invalid capability descriptors, missing methods, and throwing accessors return false.
- * This proves structural admission, not that promises, persistence, or backend semantics work.
+ * syntax, invalid capability descriptors, and missing methods return false. This proves structural
+ * admission, not that promises, persistence, or backend semantics work.
  */
 export const isKeyValueStore = (store: unknown): store is IKeyValueStore =>
   inspectStoreShape(store, false).valid
@@ -385,8 +374,7 @@ export const isKeyValueStore = (store: unknown): store is IKeyValueStore =>
 /**
  * Returns the same provider as a record store after full shape and capability admission. Use before
  * depending on bytes, records, iteration, or transactions. No operation is invoked. Missing
- * capabilities/methods throw UNSUPPORTED_CAPABILITY rather than silently degrading; an
- * accessor/reflection failure remains the exact cause on StorageContractError.
+ * capabilities/methods throw UNSUPPORTED_CAPABILITY rather than silently degrading.
  */
 export const asRecordStore = <T = unknown>(store: IKeyValueStore): IRecordStore<T> => {
   const inspection = inspectStoreShape(store, true)

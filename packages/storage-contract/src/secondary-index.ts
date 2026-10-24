@@ -112,29 +112,25 @@ const SECONDARY_INDEX_METHODS = [
   'transactionIndexed'
 ] as const
 
-/** Compose canonical record admission without discarding its original reflection/getter failure. */
+/** Adds only native index method checks to the canonical pure record shape. */
 const inspectSecondaryIndexShape = (value: unknown) => {
   /** This module adds only extension checks; base record requirements stay owned by store.ts. */
   const snapshot = inspectStoreShape(value, true)
   if (!snapshot.valid || snapshot.capabilities === undefined) return snapshot
-  try {
-    if (
+  return {
+    ...snapshot,
+    valid:
       snapshot.capabilities.secondaryIndexes === true &&
       SECONDARY_INDEX_METHODS.every(
         (name) => typeof (value as Record<string, unknown>)[name] === 'function'
       )
-    )
-      return snapshot
-    return { ...snapshot, valid: false }
-  } catch (cause) {
-    return { ...snapshot, valid: false, cause }
   }
 }
 
 /**
  * Returns the same record store after base admission, a true secondaryIndexes flag, and checks that
  * all five extension methods are callable. It does not create indexes or invoke operations.
- * Incomplete shapes throw UNSUPPORTED_CAPABILITY; accessor/reflection failure remains on cause.
+ * Incomplete shapes throw UNSUPPORTED_CAPABILITY.
  */
 export const asSecondaryIndexRecordStore = <T = unknown>(
   store: IRecordStore<T>
@@ -148,9 +144,6 @@ export const asSecondaryIndexRecordStore = <T = unknown>(
   return store as ISecondaryIndexRecordStore<T>
 }
 
-/**
- * Same full secondary-index admission as the assertion, returning false for invalid or throwing
- * shapes.
- */
+/** Same pure secondary-index admission as the assertion, returning false for invalid shapes. */
 export const isSecondaryIndexRecordStore = (store: unknown): store is ISecondaryIndexRecordStore =>
   inspectSecondaryIndexShape(store).valid

@@ -1,6 +1,7 @@
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import {
   snapshotStorageBaseDetailed,
+  snapshotStorageCapabilities,
   provideCapabilities,
   StorageStageKind,
   type IStorageBase,
@@ -39,12 +40,11 @@ describe('resource base admission', () => {
     const base = createBase()
     /** Host checks shape after native capabilities are already installed. */
     const provided = provideCapabilities(base, [])
-    Object.freeze(provided)
     /** Capture exact functions before the shape predicate can inspect them. */
     const dispose = base.dispose
     /** The symbolic disposer is captured separately and never invoked. */
     const asyncDispose = base[Symbol.asyncDispose]
-    /** A frozen provider is a valid host subject even though it cannot be provided again. */
+    /** An already-provided base remains the original host subject. */
     const admission = snapshotStorageBaseDetailed(provided)
     expect(admission.valid).toBe(true)
     if (!admission.valid) return
@@ -56,83 +56,27 @@ describe('resource base admission', () => {
     expect(asyncDispose).not.toHaveBeenCalled()
   })
 
-  it('captures fields and the outer fixed disposal key once', () => {
-    /** Outer canonical identity is supplied, never synthesized by storage-contract. */
+  it('captures the supplied outer fixed disposal identity', () => {
+    /** The outer key is authoritative even when it differs from the native resource symbol. */
     const fixedKey: symbol = Symbol('outer-canonical')
-    /** All public base getters are counted before any matcher receives the original object. */
-    const reads = { backend: 0, capabilities: 0, dispose: 0, symbolic: 0, native: 0, key: 0 }
-    /** One ordinary fixture supplies complete declared capability facts. */
-    const fixture = createBase()
-    /** Functions retain their native receiver and are not invoked during inspection. */
-    const dispose = fixture.dispose
-    /** Symbolic cleanup captures the exact supplied function. */
-    const symbolic = fixture[Symbol.asyncDispose]
-    /** Accessor-backed specialized base must remain valid without any key-value methods. */
-    const candidate = {
-      get backend() {
-        reads.backend += 1
-        return fixture.backend
-      },
-      get capabilities() {
-        reads.capabilities += 1
-        return fixture.capabilities
-      },
-      get dispose() {
-        reads.dispose += 1
-        return dispose
-      },
-      get [Symbol.asyncDispose](): never {
-        reads.native += 1
-        throw new Error('native key must not be read')
-      }
-    }
-    Object.defineProperty(candidate, fixedKey, {
-      get() {
-        reads.symbolic += 1
-        return symbolic
-      }
-    })
-    /** The helper captures a getter-backed outer option once and uses only that fixed identity. */
+    /** Ordinary resource functions retain their original receiver and are not invoked here. */
+    const candidate = createBase()
+    /** The supplied symbol selects this exact function for later host cleanup. */
+    const symbolic = vi.fn(() => Promise.resolve())
+    Object.defineProperty(candidate, fixedKey, { value: symbolic })
+    /** Native disposal is deliberately absent; it is not the selected identity. */
+    Reflect.deleteProperty(candidate, Symbol.asyncDispose)
+    /** Host admission borrows functions and detached facts without taking resource ownership. */
     const admission = snapshotStorageBaseDetailed(candidate, {
-      get asyncDisposeKey(): typeof Symbol.asyncDispose {
-        reads.key += 1
-        return fixedKey as typeof Symbol.asyncDispose
-      }
-    })
-    expect(reads).toEqual({
-      backend: 1,
-      capabilities: 1,
-      dispose: 1,
-      symbolic: 1,
-      native: 0,
-      key: 1
+      asyncDisposeKey: fixedKey as typeof Symbol.asyncDispose
     })
     expect(admission.valid).toBe(true)
     if (!admission.valid) return
     expect(Object.is(admission.store, candidate)).toBe(true)
-    expect(admission.dispose).toBe(dispose)
+    expect(admission.receiver).toBe(candidate)
+    expect(admission.dispose).toBe(candidate.dispose)
     expect(admission.asyncDispose).toBe(symbolic)
-  })
-
-  it('preserves reflection failures without throwing or cleaning up', () => {
-    /** Exact source error must remain reachable as failed-admission data. */
-    const original = new Error('backend getter failed')
-    /** Real resource cleanup remains owned by this caller when admission fails. */
-    const base = createBase()
-    Object.defineProperty(base, 'backend', {
-      get() {
-        throw original
-      }
-    })
-    expect(snapshotStorageBaseDetailed(base)).toEqual({ valid: false, cause: original })
-    expect(base.dispose).not.toHaveBeenCalled()
-    expect(
-      snapshotStorageBaseDetailed(base, {
-        get asyncDisposeKey(): never {
-          throw original
-        }
-      })
-    ).toEqual({ valid: false, cause: original })
+    expect(symbolic).not.toHaveBeenCalled()
   })
 
   it.each([null, [], {}, { backend: 'Invalid Name' }, { backend: 'a'.repeat(65) }])(
@@ -142,7 +86,7 @@ describe('resource base admission', () => {
     }
   )
 
-  it('rejects missing fixed disposal and preserves capability getter failures', () => {
+  it('rejects a missing fixed disposal function', () => {
     /** This separate canonical key has not been implemented by the candidate. */
     const fixedKey: symbol = Symbol('missing-canonical')
     /** Native resource methods alone do not prove support for a different outer fixed key. */
@@ -151,14 +95,25 @@ describe('resource base admission', () => {
       snapshotStorageBaseDetailed(base, { asyncDisposeKey: fixedKey as typeof Symbol.asyncDispose })
         .valid
     ).toBe(false)
-    /** Invalid declared facts must preserve the underlying getter failure for the host. */
-    const original = new Error('fact getter failed')
-    Object.defineProperty(base.capabilities, 'syncRead', {
-      get() {
-        throw original
-      }
+  })
+})
+
+describe('captured capability facts', () => {
+  it('normalizes legacy flag omissions in the independent host descriptor', () => {
+    /** Legacy providers have no declared index or change-feed capability. */
+    const capabilities = {
+      syncRead: true,
+      binary: false,
+      records: false,
+      transactions: false,
+      iteration: false,
+      maxValueBytes: undefined,
+      opaqueEntries: false
+    }
+    expect(snapshotStorageCapabilities(capabilities)).toMatchObject({
+      secondaryIndexes: false,
+      changeFeed: false
     })
-    expect(snapshotStorageBaseDetailed(base)).toEqual({ valid: false, cause: original })
   })
 })
 
