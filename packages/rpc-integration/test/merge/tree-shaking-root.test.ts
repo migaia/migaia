@@ -11,8 +11,8 @@ const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../r
  * bytes. The previous pin (2026-10-13, rpc-devtools closure 52e0537d: 210 / 1051638 / 257939) was
  * exceeded by ordinary growth across the bundled packages (rpc-core, rpc-contract, plugin-host,
  * utils, capability, lifecycle, middleware-pipeline, serialize, event-subscriber); no single change
- * caused it. Reviewed and accepted by the user. Caps allow 3% growth so ordinary merges pass without
- * a re-pin; growth past a cap needs review and a new measured baseline.
+ * caused it. Reviewed and accepted by the user. Caps allow 3% growth so ordinary merges pass
+ * without a re-pin; growth past a cap needs review and a new measured baseline.
  */
 const rootCap = {
   moduleCount: 220,
