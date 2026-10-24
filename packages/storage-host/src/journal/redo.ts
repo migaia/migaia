@@ -2,8 +2,7 @@ import {
   StorageContractError,
   StorageContractErrorCode,
   type IBackendKind,
-  type ILockKey,
-  type ITransactionScope
+  type ILockKey
 } from '@migaia/storage-contract'
 import {
   snapshotLogRecords,
@@ -39,7 +38,7 @@ export async function createStorageRedoJournal(options: {
   const binding = access.binding.redo
   const wal = logger.wal
   const binlog = logger.binlog
-  if (binding === undefined || wal === undefined || access.binding.changes === undefined)
+  if (binding === undefined || wal === undefined)
     throw new StorageContractError(StorageContractErrorCode.unsupported)
   const target = Object.freeze({
     namespace: options.namespace,
@@ -108,15 +107,15 @@ export async function createStorageRedoJournal(options: {
         await recover()
         return run()
       }),
-    begin: (scope: Omit<ITransactionScope, 'use'>) => {
+    begin: (scope: object) => {
       const info = binding.transactionInfo(scope)
-      access.binding.changes!(scope)
+      binding.changes(scope)
       return Object.freeze({
         txId: info.id,
-        record: async (current: Omit<ITransactionScope, 'use'>): Promise<void> => {
+        record: async (current: object): Promise<void> => {
           if (binding.transactionInfo(current).id !== info.id)
             throw new StorageContractError(StorageContractErrorCode.invalidArgument)
-          const changes = access.binding.changes!(current)
+          const changes = binding.changes(current)
           if (changes.length === 0) return
           /** Every target and full image is detached before WAL or the first physical assignment. */
           const payload = snapshotLogRecords([

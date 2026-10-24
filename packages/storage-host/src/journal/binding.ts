@@ -28,7 +28,14 @@ export function snapshotStorageJournalBinding(
       if (redo === null || typeof redo !== 'object')
         throw new StorageContractError(StorageContractErrorCode.invalidArgument)
       const captured: Record<string, unknown> = Object.create(null)
-      for (const key of ['transactionInfo', 'protect', 'apply', 'replay', 'seal'] as const) {
+      for (const key of [
+        'transactionInfo',
+        'changes',
+        'protect',
+        'apply',
+        'replay',
+        'seal'
+      ] as const) {
         const method = redo[key]
         if (typeof method !== 'function')
           throw new StorageContractError(StorageContractErrorCode.invalidArgument)

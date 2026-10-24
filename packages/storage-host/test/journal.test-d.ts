@@ -151,11 +151,14 @@ export async function compileUndoSelection(
 export function compileRedoAuthor(
   binding: IStorageJournalRedoBinding,
   port: IStorageJournalExecutionPort,
-  scope: Omit<ITransactionScope, 'use'>
+  scope: object
 ) {
   const id: string = binding.transactionInfo(scope).id
   const protectedValue: Promise<number> = binding.protect(async () => 1)
   const operation: Promise<number> | undefined = port.runRedo?.(async () => 1)
+  const captured: readonly IStorageJournalChange[] = binding.changes(scope)
+  const recorded: Promise<void> | undefined = port.beginRedo?.(scope)?.record(scope)
+  void [captured, recorded]
   // @ts-expect-error Redo grants no native commit or store installation authority.
   void binding.commit
   // @ts-expect-error Redo never gives the original store or shutdown handle to callers.
