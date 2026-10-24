@@ -7,8 +7,9 @@
  * inventory stays one disclosure away; nothing is removed from navigation.
  *
  * Entries are `module:name` (or bare `name` for the root module) in reading order. Libraries with
- * only a handful of public entries need no entry here. `rpc-core`, `rpc-process` and `rpc-threads`
- * keep their dedicated "Primary endpoints" group in the docs route instead.
+ * only a handful of public entries need no entry here. `rpc-host`, `rpc-plugin-process` and
+ * `rpc-plugin-thread` keep their dedicated "Host and transport plugins" group in the docs route
+ * instead.
  */
 export const essentialApis: Readonly<Record<string, readonly string[]>> = {
   capability: [
@@ -38,11 +39,24 @@ export const essentialApis: Readonly<Record<string, readonly string[]>> = {
     'extension:createObserverBinding',
     'extension:createFieldSource'
   ],
-  'rpc-browser': [
-    'createBrowserPeer',
-    'adapters/window:createWindowMessageTransport',
-    'adapters/broadcast-channel:createBroadcastChannelTransport',
-    'adapters/service-worker:createServiceWorkerTransport'
+  'rpc-host': [
+    'createRpcHost',
+    'features:timeoutFeature',
+    'features:retryFeature',
+    'features:typegenFeature'
+  ],
+  'rpc-plugin-process': ['processPlugin', 'isProcessChild'],
+  'rpc-plugin-thread': ['threadPlugin', 'isThreadChild'],
+  'rpc-plugin-coroutines': ['coroutinePlugin'],
+  'rpc-plugin-pool': ['poolPlugin'],
+  'rpc-plugin-browser': [
+    'windowPlugin',
+    'dedicatedWorkerPlugin',
+    'sharedWorkerPlugin',
+    'serviceWorkerPlugin',
+    'broadcastChannelPlugin',
+    'rtcDataChannelPlugin',
+    'webTransportPlugin'
   ],
   'rpc-contract': [
     'createDescriptor',
@@ -55,7 +69,7 @@ export const essentialApis: Readonly<Record<string, readonly string[]>> = {
     'handshake:acceptRpcHandshake',
     'handshake:completeRpcHandshake'
   ],
-  'rpc-devtools': ['createRpcDevtools', 'hub:createRpcDevtoolsHub', 'log:createRpcLogProbe'],
+  'rpc-plugin-devtools': ['devtoolsPlugin', 'hub:createRpcDevtoolsHub', 'log:createRpcLogProbe'],
   serialize: [
     'registry:createSerializeRegistry',
     'plugins:jsonPlugin',

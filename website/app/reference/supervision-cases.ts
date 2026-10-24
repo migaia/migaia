@@ -313,13 +313,13 @@ budget.close()`
         "用监督器代替手写的 `on('exit')` 重启"
       ),
       problem: t(
-        "A child process exits on start because of a config error, and the restart inside its `exit` handler runs hundreds of times per second.\n\nThe usual hand-written loop restarts a child inside `child.on('exit')`: a child that crashes on start is restarted with no delay or limit, and the listener even restarts it during shutdown.\n\nThe process supervisor gives a real child process spaced, bounded restarts and a clear end state. Here a real Node child always exits with code 3 after 200 ms. The Node launcher comes from `@migaia/rpc-process`; it cannot guarantee ending a whole process tree, so `isolation: 'best-effort'` accepts that gap explicitly.",
-        "子进程因为配置错误一启动就退出，`exit` 事件里的重启每秒执行上百次。\n\n常见的手写写法在 `child.on('exit')` 里重新启动子进程：启动就崩溃时会立即重启、没有上限，连关闭途中也会被重新拉起。\n\n进程监督器为真实子进程提供有间隔、有上限的重启和明确的终态。下面的 Node 子进程每次启动 200 毫秒后都以退出码 3 崩溃。Node 启动器来自 `@migaia/rpc-process`；它不能保证结束整个进程树，所以用 `isolation: 'best-effort'` 显式接受这一点。"
+        "A child process exits on start because of a config error, and the restart inside its `exit` handler runs hundreds of times per second.\n\nThe usual hand-written loop restarts a child inside `child.on('exit')`: a child that crashes on start is restarted with no delay or limit, and the listener even restarts it during shutdown.\n\nThe process supervisor gives a real child process spaced, bounded restarts and a clear end state. Here a real Node child always exits with code 3 after 200 ms. The Node launcher comes from `@migaia/rpc-plugin-process`; it cannot guarantee ending a whole process tree, so `isolation: 'best-effort'` accepts that gap explicitly.",
+        "子进程因为配置错误一启动就退出，`exit` 事件里的重启每秒执行上百次。\n\n常见的手写写法在 `child.on('exit')` 里重新启动子进程：启动就崩溃时会立即重启、没有上限，连关闭途中也会被重新拉起。\n\n进程监督器为真实子进程提供有间隔、有上限的重启和明确的终态。下面的 Node 子进程每次启动 200 毫秒后都以退出码 3 崩溃。Node 启动器来自 `@migaia/rpc-plugin-process`；它不能保证结束整个进程树，所以用 `isolation: 'best-effort'` 显式接受这一点。"
       ),
       example: {
         en: `import { createUnitBudget } from '@migaia/supervision'
 import { createProcessSupervisor } from '@migaia/supervision/process'
-import { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'
+import { createNodeProcessLauncher } from '@migaia/rpc-plugin-process/adapters/node-child-process'
 
 const budget = createUnitBudget({ kind: 'process', maxUnits: 1 })
 const indexer = createProcessSupervisor({
@@ -349,7 +349,7 @@ await indexer.dispose()
 budget.close()`,
         zh: `import { createUnitBudget } from '@migaia/supervision'
 import { createProcessSupervisor } from '@migaia/supervision/process'
-import { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'
+import { createNodeProcessLauncher } from '@migaia/rpc-plugin-process/adapters/node-child-process'
 
 const budget = createUnitBudget({ kind: 'process', maxUnits: 1 })
 const indexer = createProcessSupervisor({
@@ -631,7 +631,7 @@ console.log('已结束:', result.terminated, '| 已删除记录:', result.remove
         en: `import { createUnitBudget } from '@migaia/supervision'
 import { createPrewarmPool, createProcessSupervisor } from '@migaia/supervision/process'
 import type { IProcessSpec } from '@migaia/supervision/process'
-import { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'
+import { createNodeProcessLauncher } from '@migaia/rpc-plugin-process/adapters/node-child-process'
 
 const launcher = createNodeProcessLauncher()
 const budget = createUnitBudget({ kind: 'process', maxUnits: 2 })
@@ -655,7 +655,7 @@ budget.close()`,
         zh: `import { createUnitBudget } from '@migaia/supervision'
 import { createPrewarmPool, createProcessSupervisor } from '@migaia/supervision/process'
 import type { IProcessSpec } from '@migaia/supervision/process'
-import { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'
+import { createNodeProcessLauncher } from '@migaia/rpc-plugin-process/adapters/node-child-process'
 
 const launcher = createNodeProcessLauncher()
 const budget = createUnitBudget({ kind: 'process', maxUnits: 2 })

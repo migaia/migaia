@@ -176,8 +176,8 @@ const members: Record<string, IMemberDoc> = {
 const enums: ILibraryReference['enums'] = {
   StoreDevtoolsErrorCode: {
     summary: t(
-      'Stable failure codes under source @migaia/store-devtools; native error types are retained.',
-      '来源为 `@migaia/store-devtools` 的稳定失败码，保留原生错误类型。'
+      'Stable failure codes under source store.devtools; native error types are retained.',
+      '来源为 `store.devtools` 的稳定失败码，保留原生错误类型。'
     ),
     values: {
       sessionDisposed: t(
@@ -549,8 +549,8 @@ const symbols: Record<string, ISymbolDoc> = {
   STORE_DEVTOOLS_SOURCE: {
     role: 'error',
     purpose: t(
-      'Stable @migaia/store-devtools source on package-created native errors. Compare source and StoreDevtoolsErrorCode together; diagnostic callbacks may also propagate original foreign failures.',
-      '本包构造原生错误时附加的稳定来源 `@migaia/store-devtools`，须与错误码共同判断；诊断回调也可能传播原始外部失败。'
+      'Stable store.devtools source on package-created native errors. Compare source and StoreDevtoolsErrorCode together; diagnostic callbacks may also propagate original foreign failures.',
+      '本包构造原生错误时附加的稳定来源 `store.devtools`，须与错误码共同判断；诊断回调也可能传播原始外部失败。'
     ),
     example: `import { STORE_DEVTOOLS_SOURCE, StoreDevtoolsErrorCode } from '@migaia/store-devtools'\nconsole.log(STORE_DEVTOOLS_SOURCE, StoreDevtoolsErrorCode.sessionDisposed)`
   },

@@ -60,11 +60,12 @@ const GUIDE_STARTERS = [
     bodyZh: '选择后端、记录、事务、编解码与 live query。'
   },
   {
-    library: 'rpc-core',
+    library: 'rpc-host',
     titleEn: 'Connect browser runtimes',
     titleZh: '连接浏览器运行时',
-    bodyEn: 'Create endpoints across windows, workers, channels, and transports.',
-    bodyZh: '跨窗口、Worker、Channel 与 Transport 创建 endpoint。'
+    bodyEn:
+      'Create one host with a transport plugin and add features for calls, cancellation, and streams.',
+    bodyZh: '用一个宿主与传输插件连接窗口、Worker 和进程，并按需安装调用功能。'
   },
   {
     library: 'store-light',
@@ -136,12 +137,13 @@ const ARCHITECTURE_FAMILIES = [
     bodyZh: '用统一协议跨窗口、Worker、进程与语言调用函数，并组合有限并发池与诊断工具。',
     libraries: [
       'rpc-contract',
-      'rpc-core',
-      'rpc-browser',
-      'rpc-threads',
-      'rpc-process',
-      'rpc-pool',
-      'rpc-devtools'
+      'rpc-host',
+      'rpc-plugin-browser',
+      'rpc-plugin-thread',
+      'rpc-plugin-process',
+      'rpc-plugin-pool',
+      'rpc-plugin-devtools',
+      'rpc-plugin-coroutines'
     ]
   },
   {

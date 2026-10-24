@@ -247,7 +247,42 @@
               },
               {
                 "type": "paragraph",
-                "text": "Loader、Adapter、Runtime 不从根入口聚合。直接导入 plugin-host、lifecycle 等依赖的示例应直接安装这些包。本包运行时依赖 capability、event-subscriber、lifecycle、plugin-host、rpc-contract、rpc-core、rpc-process、rpc-threads、supervision 与 utils。跨机器发现、浏览器 Worker 接入、UI、持久消息与自动故障转移重试不属于这里的组合保证。"
+                "text": "Loader、Adapter、Runtime 不从根入口聚合，直接导入的依赖应显式安装。本包运行时依赖 capability、event-subscriber、lifecycle、plugin-host、rpc-contract、rpc-host、rpc-plugin-process、rpc-plugin-thread、rpc-plugin-coroutines、supervision 与 utils。跨机器发现、浏览器 Worker 接入、UI、持久消息与自动故障转移重试不属于这里的组合保证。"
+              }
+            ]
+          },
+          {
+            "id": "原普通-host-上的-rpc-plugins",
+            "heading": "原普通 Host 上的 RPC plugins",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "Tray 在既有 plugin-host Host 上安装 `processPlugin`、`threadPlugin` 或 `coroutinePlugin`。plugin 保留真实 definition 的 name 与 expose 列表；Host 的 process/thread/coroutine outlet 继续按实例名定向调用，并沿原 stop/restart/replace 控制释放或替换。"
+              },
+              {
+                "type": "table",
+                "headers": ["载体", "父端来源", "子端来源"],
+                "rows": [
+                  [
+                    "process",
+                    "`processPlugin({ spawn: { entry, supervision, wrap }, name, expose })`",
+                    "`processPlugin({ connectToParent: true, name, expose })`"
+                  ],
+                  [
+                    "thread",
+                    "`threadPlugin({ spawn: { entry, limits, supervisor }, name, expose })`",
+                    "`threadPlugin({ connectToParent: true, name, expose })`"
+                  ],
+                  [
+                    "coroutine",
+                    "`coroutinePlugin({ spawn: task, supervisor, name, expose })`",
+                    "`coroutinePlugin({ connectToParent: connect, name, expose })`，connect 是 task 给出的真实 opaque 连接"
+                  ]
+                ]
+              },
+              {
+                "type": "paragraph",
+                "text": "表中只说明选项层级，可选字段可省略；Tray 从既有 Host 定义与 task 上下文选择它们。协程 connectToParent 是实际 callback token，不是 true。按实例的 request/notify/stream 保持定向，supervisor 生命周期继续由原 owner 管理。"
               }
             ]
           },
@@ -616,7 +651,7 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "所有 Tray 自有边界码的 source 为 TRAY_SOURCE，即 `@migaia/tray`；按 source / code 分支，不匹配 message。可注记的原生错误保持类型、stack 与 identity；冻结或不可安全注记的值经带码 wrapper.cause 保留，完整外包身份不改写。Graph 启动 / 节点 / 释放错误继续属于 capability。"
+                "text": "所有 Tray 自有边界码的 source 为 TRAY_SOURCE，即 `tray`；按 source / code 分支，不匹配 message。可注记的原生错误保持类型、stack 与 identity；冻结或不可安全注记的值经带码 wrapper.cause 保留，完整外包身份不改写。Graph 启动 / 节点 / 释放错误继续属于 capability。"
               },
               {
                 "type": "table",
@@ -1091,7 +1126,42 @@
               },
               {
                 "type": "paragraph",
-                "text": "Loader、Adapter、Runtime 不从根入口聚合。直接导入 plugin-host、lifecycle 等依赖的示例应直接安装这些包。本包运行时依赖 capability、event-subscriber、lifecycle、plugin-host、rpc-contract、rpc-core、rpc-process、rpc-threads、supervision 与 utils。跨机器发现、浏览器 Worker 接入、UI、持久消息与自动故障转移重试不属于这里的组合保证。"
+                "text": "Loader、Adapter、Runtime 不从根入口聚合，直接导入的依赖应显式安装。本包运行时依赖 capability、event-subscriber、lifecycle、plugin-host、rpc-contract、rpc-host、rpc-plugin-process、rpc-plugin-thread、rpc-plugin-coroutines、supervision 与 utils。跨机器发现、浏览器 Worker 接入、UI、持久消息与自动故障转移重试不属于这里的组合保证。"
+              }
+            ]
+          },
+          {
+            "id": "原普通-host-上的-rpc-plugins",
+            "heading": "原普通 Host 上的 RPC plugins",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "Tray 在既有 plugin-host Host 上安装 `processPlugin`、`threadPlugin` 或 `coroutinePlugin`。plugin 保留真实 definition 的 name 与 expose 列表；Host 的 process/thread/coroutine outlet 继续按实例名定向调用，并沿原 stop/restart/replace 控制释放或替换。"
+              },
+              {
+                "type": "table",
+                "headers": ["载体", "父端来源", "子端来源"],
+                "rows": [
+                  [
+                    "process",
+                    "`processPlugin({ spawn: { entry, supervision, wrap }, name, expose })`",
+                    "`processPlugin({ connectToParent: true, name, expose })`"
+                  ],
+                  [
+                    "thread",
+                    "`threadPlugin({ spawn: { entry, limits, supervisor }, name, expose })`",
+                    "`threadPlugin({ connectToParent: true, name, expose })`"
+                  ],
+                  [
+                    "coroutine",
+                    "`coroutinePlugin({ spawn: task, supervisor, name, expose })`",
+                    "`coroutinePlugin({ connectToParent: connect, name, expose })`，connect 是 task 给出的真实 opaque 连接"
+                  ]
+                ]
+              },
+              {
+                "type": "paragraph",
+                "text": "表中只说明选项层级，可选字段可省略；Tray 从既有 Host 定义与 task 上下文选择它们。协程 connectToParent 是实际 callback token，不是 true。按实例的 request/notify/stream 保持定向，supervisor 生命周期继续由原 owner 管理。"
               }
             ]
           },
@@ -1460,7 +1530,7 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "所有 Tray 自有边界码的 source 为 TRAY_SOURCE，即 `@migaia/tray`；按 source / code 分支，不匹配 message。可注记的原生错误保持类型、stack 与 identity；冻结或不可安全注记的值经带码 wrapper.cause 保留，完整外包身份不改写。Graph 启动 / 节点 / 释放错误继续属于 capability。"
+                "text": "所有 Tray 自有边界码的 source 为 TRAY_SOURCE，即 `tray`；按 source / code 分支，不匹配 message。可注记的原生错误保持类型、stack 与 identity；冻结或不可安全注记的值经带码 wrapper.cause 保留，完整外包身份不改写。Graph 启动 / 节点 / 释放错误继续属于 capability。"
               },
               {
                 "type": "table",
@@ -1821,7 +1891,42 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Loader, Adapter and Runtime are not aggregated by the root. Directly imported dependencies such as plugin-host or lifecycle should be installed directly. Runtime dependencies are capability, event-subscriber, lifecycle, plugin-host, rpc-contract, rpc-core, rpc-process, rpc-threads, supervision and utils. Cross-machine discovery, browser Worker integration, UI, durable messages and automatic failover retry are outside these composition guarantees."
+                  "text": "Loader, Adapter and Runtime are not aggregated by the root. Install directly imported dependencies explicitly. Runtime dependencies are capability, event-subscriber, lifecycle, plugin-host, rpc-contract, rpc-host, rpc-plugin-process, rpc-plugin-thread, rpc-plugin-coroutines, supervision, and utils. Cross-machine discovery, browser Worker integration, UI, durable messages, and automatic failover retry are outside these composition guarantees."
+                }
+              ]
+            },
+            {
+              "id": "rpc-plugins-on-the-original-ordinary-host",
+              "heading": "RPC plugins on the original ordinary Host",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Tray installs `processPlugin`, `threadPlugin`, or `coroutinePlugin` on its existing plugin-host Host. The plugin keeps the actual definition name and expose list; the Host's process/thread/coroutine outlet continues to address one named instance and use its original stop/restart/replace controls."
+                },
+                {
+                  "type": "table",
+                  "headers": ["Carrier", "Parent source", "Child source"],
+                  "rows": [
+                    [
+                      "process",
+                      "`processPlugin({ spawn: { entry, supervision, wrap }, name, expose })`",
+                      "`processPlugin({ connectToParent: true, name, expose })`"
+                    ],
+                    [
+                      "thread",
+                      "`threadPlugin({ spawn: { entry, limits, supervisor }, name, expose })`",
+                      "`threadPlugin({ connectToParent: true, name, expose })`"
+                    ],
+                    [
+                      "coroutine",
+                      "`coroutinePlugin({ spawn: task, supervisor, name, expose })`",
+                      "`coroutinePlugin({ connectToParent: connect, name, expose })` with the task's genuine opaque connection"
+                    ]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "The table shows option placement; optional fields may be omitted. Tray selects these from its existing Host definition and task context. Coroutine connectToParent is the actual callback token, not boolean true. Per-instance request/notify/stream remain targeted; Tray retains the original supervisor lifecycle owner."
                 }
               ]
             },
@@ -2253,7 +2358,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "Tray-owned boundary codes use TRAY_SOURCE, `@migaia/tray`. Branch on source/code rather than message. Annotatable native errors preserve type, stack and identity. Frozen or unsafe-to-annotate values remain reachable through a coded wrapper's cause, and complete foreign identities remain with their owner. Graph startup, node and release failures continue to belong to capability."
+                  "text": "Tray-owned boundary codes use TRAY_SOURCE, `tray`. Branch on source/code rather than message. Annotatable native errors preserve type, stack and identity. Frozen or unsafe-to-annotate values remain reachable through a coded wrapper's cause, and complete foreign identities remain with their owner. Graph startup, node and release failures continue to belong to capability."
                 },
                 {
                   "type": "table",
@@ -2773,7 +2878,42 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Loader, Adapter and Runtime are not aggregated by the root. Directly imported dependencies such as plugin-host or lifecycle should be installed directly. Runtime dependencies are capability, event-subscriber, lifecycle, plugin-host, rpc-contract, rpc-core, rpc-process, rpc-threads, supervision and utils. Cross-machine discovery, browser Worker integration, UI, durable messages and automatic failover retry are outside these composition guarantees."
+                  "text": "Loader, Adapter and Runtime are not aggregated by the root. Install directly imported dependencies explicitly. Runtime dependencies are capability, event-subscriber, lifecycle, plugin-host, rpc-contract, rpc-host, rpc-plugin-process, rpc-plugin-thread, rpc-plugin-coroutines, supervision, and utils. Cross-machine discovery, browser Worker integration, UI, durable messages, and automatic failover retry are outside these composition guarantees."
+                }
+              ]
+            },
+            {
+              "id": "rpc-plugins-on-the-original-ordinary-host",
+              "heading": "RPC plugins on the original ordinary Host",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Tray installs `processPlugin`, `threadPlugin`, or `coroutinePlugin` on its existing plugin-host Host. The plugin keeps the actual definition name and expose list; the Host's process/thread/coroutine outlet continues to address one named instance and use its original stop/restart/replace controls."
+                },
+                {
+                  "type": "table",
+                  "headers": ["Carrier", "Parent source", "Child source"],
+                  "rows": [
+                    [
+                      "process",
+                      "`processPlugin({ spawn: { entry, supervision, wrap }, name, expose })`",
+                      "`processPlugin({ connectToParent: true, name, expose })`"
+                    ],
+                    [
+                      "thread",
+                      "`threadPlugin({ spawn: { entry, limits, supervisor }, name, expose })`",
+                      "`threadPlugin({ connectToParent: true, name, expose })`"
+                    ],
+                    [
+                      "coroutine",
+                      "`coroutinePlugin({ spawn: task, supervisor, name, expose })`",
+                      "`coroutinePlugin({ connectToParent: connect, name, expose })` with the task's genuine opaque connection"
+                    ]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "The table shows option placement; optional fields may be omitted. Tray selects these from its existing Host definition and task context. Coroutine connectToParent is the actual callback token, not boolean true. Per-instance request/notify/stream remain targeted; Tray retains the original supervisor lifecycle owner."
                 }
               ]
             },
@@ -3205,7 +3345,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "Tray-owned boundary codes use TRAY_SOURCE, `@migaia/tray`. Branch on source/code rather than message. Annotatable native errors preserve type, stack and identity. Frozen or unsafe-to-annotate values remain reachable through a coded wrapper's cause, and complete foreign identities remain with their owner. Graph startup, node and release failures continue to belong to capability."
+                  "text": "Tray-owned boundary codes use TRAY_SOURCE, `tray`. Branch on source/code rather than message. Annotatable native errors preserve type, stack and identity. Frozen or unsafe-to-annotate values remain reachable through a coded wrapper's cause, and complete foreign identities remain with their owner. Graph startup, node and release failures continue to belong to capability."
                 },
                 {
                   "type": "table",
@@ -4205,7 +4345,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "所有 Tray 自有边界码的 source 为 TRAY_SOURCE，即 `@migaia/tray`；按 source / code 分支，不匹配 message。可注记的原生错误保持类型、stack 与 identity；冻结或不可安全注记的值经带码 wrapper.cause 保留，完整外包身份不改写。Graph 启动 / 节点 / 释放错误继续属于 capability。"
+                  "text": "所有 Tray 自有边界码的 source 为 TRAY_SOURCE，即 `tray`；按 source / code 分支，不匹配 message。可注记的原生错误保持类型、stack 与 identity；冻结或不可安全注记的值经带码 wrapper.cause 保留，完整外包身份不改写。Graph 启动 / 节点 / 释放错误继续属于 capability。"
                 },
                 {
                   "type": "table",
@@ -5025,7 +5165,7 @@
           "name": "ITrayErrorCode",
           "kind": "type",
           "signature": "export type ITrayErrorCode = (typeof TrayErrorCode)[keyof typeof TrayErrorCode];",
-          "declarationLine": 76,
+          "declarationLine": 78,
           "source": "packages/tray/dist/error-code.d.ts",
           "purpose": "Union of `TrayErrorCode` values.",
           "core": "Union of `TrayErrorCode` values.",
@@ -5367,7 +5507,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "所有 Tray 自有边界码的 source 为 TRAY_SOURCE，即 `@migaia/tray`；按 source / code 分支，不匹配 message。可注记的原生错误保持类型、stack 与 identity；冻结或不可安全注记的值经带码 wrapper.cause 保留，完整外包身份不改写。Graph 启动 / 节点 / 释放错误继续属于 capability。"
+                  "text": "所有 Tray 自有边界码的 source 为 TRAY_SOURCE，即 `tray`；按 source / code 分支，不匹配 message。可注记的原生错误保持类型、stack 与 identity；冻结或不可安全注记的值经带码 wrapper.cause 保留，完整外包身份不改写。Graph 启动 / 节点 / 释放错误继续属于 capability。"
                 },
                 {
                   "type": "table",
@@ -7815,11 +7955,11 @@
         {
           "name": "TRAY_SOURCE",
           "kind": "const",
-          "signature": "export declare const TRAY_SOURCE = \"@migaia/tray\";",
+          "signature": "export declare const TRAY_SOURCE = \"tray\";",
           "declarationLine": 3,
           "source": "packages/tray/dist/errors.d.ts",
-          "purpose": "The `source` value (`@migaia/tray`) on Tray-owned boundary errors; complete foreign identities keep their own source and code. Compare source before branching on code.",
-          "core": "The `source` value (`@migaia/tray`) on Tray-owned boundary errors; complete foreign identities keep their own source and code. Compare source before branching on code.",
+          "purpose": "The `source` value (`tray`) on Tray-owned boundary errors; complete foreign identities keep their own source and code. Compare source before branching on code.",
+          "core": "The `source` value (`tray`) on Tray-owned boundary errors; complete foreign identities keep their own source and code. Compare source before branching on code.",
           "advanced": "",
           "parameters": ["This const declaration has no parameters."],
           "parameterDetails": [],
@@ -7831,7 +7971,7 @@
           "composes": [],
           "aliasOf": "TRAY_SOURCE",
           "exportPath": ".",
-          "overloadSignatures": ["export declare const TRAY_SOURCE = \"@migaia/tray\";"],
+          "overloadSignatures": ["export declare const TRAY_SOURCE = \"tray\";"],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
           "whenToUse": "",
@@ -7840,7 +7980,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "The `source` value (`@migaia/tray`) on Tray-owned boundary errors; complete foreign identities keep their own source and code. Compare source before branching on code."
+              "content": "The `source` value (`tray`) on Tray-owned boundary errors; complete foreign identities keep their own source and code. Compare source before branching on code."
             },
             {
               "id": "getting-started",
@@ -7860,7 +8000,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The `source` value (`@migaia/tray`) on Tray-owned boundary errors; complete foreign identities keep their own source and code. Compare source before branching on code."
+              "content": "The `source` value (`tray`) on Tray-owned boundary errors; complete foreign identities keep their own source and code. Compare source before branching on code."
             },
             {
               "id": "advanced-usage",
@@ -7869,7 +8009,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/tray/dist/errors.d.ts:TRAY_SOURCE:export declare const TRAY_SOURCE = \"@migaia/tray\";",
+          "identity": "packages/tray/dist/errors.d.ts:TRAY_SOURCE:export declare const TRAY_SOURCE = \"tray\";",
           "guidance": [
             {
               "id": "错误与迁移",
@@ -7877,7 +8017,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "所有 Tray 自有边界码的 source 为 TRAY_SOURCE，即 `@migaia/tray`；按 source / code 分支，不匹配 message。可注记的原生错误保持类型、stack 与 identity；冻结或不可安全注记的值经带码 wrapper.cause 保留，完整外包身份不改写。Graph 启动 / 节点 / 释放错误继续属于 capability。"
+                  "text": "所有 Tray 自有边界码的 source 为 TRAY_SOURCE，即 `tray`；按 source / code 分支，不匹配 message。可注记的原生错误保持类型、stack 与 identity；冻结或不可安全注记的值经带码 wrapper.cause 保留，完整外包身份不改写。Graph 启动 / 节点 / 释放错误继续属于 capability。"
                 },
                 {
                   "type": "table",
@@ -7986,7 +8126,7 @@
           "name": "TrayErrorCode",
           "kind": "const",
           "signature": "export declare const TrayErrorCode: { /** The mesh has no ready host candidate; await a ready instance before calling again. */ readonly hostUnavailable: 'TRAY_HOST_UNAVAILABLE'; /** The routing policy is absent from registration or declaration; register its branded definition. */ readonly routingUnknown: 'TRAY_ROUTING_UNKNOWN'; /** The mesh requires a non-empty topic string; correct the topic before publishing or subscribing. */ readonly topicInvalid: 'TRAY_TOPIC_INVALID'; /** Routing policy name or pick is invalid; provide a named synchronous policy. */ readonly routingInvalid: 'TRAY_ROUTING_INVALID'; /** Host definition is invalid; provide an admitted host DSL. */ readonly hostInvalid: 'TRAY_HOST_INVALID'; /** Spawn names an unregistered host; register the host before spawning. */ readonly hostUnknown: 'TRAY_HOST_UNKNOWN'; /** Remote host differs from the admission; select the record's host. */ readonly hostMismatch: 'TRAY_HOST_MISMATCH'; /** Expose uses a reserved internal plugin; rename the business plugin. */ readonly reservedName: 'TRAY_RESERVED_NAME'; /** Config or payload is not portable data; remove unsupported values. */ readonly valueNotPortable: 'TRAY_VALUE_NOT_PORTABLE'; /** Spawn reuses an admitted id; choose a free id or remove the admission. */ readonly instanceDuplicate: 'TRAY_INSTANCE_DUPLICATE'; /** Lookup or remote uses an ended admission; obtain a fresh remote. */ readonly instanceUnknown: 'TRAY_INSTANCE_UNKNOWN'; /** Call targets a non-ready instance; await its ready transition. */ readonly instanceNotReady: 'TRAY_INSTANCE_NOT_READY'; /** Install or generation init fails; inspect the preserved cause. */ readonly instanceStartFailed: 'TRAY_INSTANCE_START_FAILED'; /** Dispatcher receives a path outside the exposure; use an exposed Feature method. */ readonly pathNotExposed: 'TRAY_PATH_NOT_EXPOSED'; /** Child init repeats or names another host; init once per generation. */ readonly childStateInvalid: 'TRAY_CHILD_STATE_INVALID'; /** Operation enters a closing registry; create a new Tray. */ readonly disposed: 'TRAY_DISPOSED'; /** Loader shape or artifact descriptor is invalid; repair the loader contract before retrying. */ readonly loaderContractInvalid: 'LOADER_CONTRACT_INVALID'; /** Loader execution failed; inspect the preserved source error before deciding whether to retry. */ readonly loaderExecutionFailed: 'LOADER_EXECUTION_FAILED'; /** Adapter shape or produced plugin is invalid; repair adapter compatibility. */ readonly adapterContractInvalid: 'ADAPTER_CONTRACT_INVALID'; /** Adapter execution failed; inspect the preserved artifact compatibility cause. */ readonly adapterExecutionFailed: 'ADAPTER_EXECUTION_FAILED'; /** Runtime host, name, options, or callback violates the Runtime boundary contract. */ readonly runtimeContractInvalid: 'RUNTIME_CONTRACT_INVALID'; /** Runtime admission was attempted after closing; create a fresh Runtime. */ readonly runtimeDisposed: 'RUNTIME_DISPOSED'; /** Runtime callback failed after exact lease admission; inspect the preserved callback cause. */ readonly runtimeExecutionFailed: 'RUNTIME_EXECUTION_FAILED'; /** Runtime could not acquire the target lease; inspect the retained admission failure or cause. */ readonly runtimeAborted: 'RUNTIME_ABORTED'; /** * An unclassified artifact cleanup failed; existing lifecycle identities remain unchanged. * Inspect cleanupErrors. */ readonly artifactCleanupFailed: 'ARTIFACT_CLEANUP_FAILED'; /** * An entry, managed factory result, or Host claim is invalid; provide a complete definition and * an unclaimed Host. */ readonly invalidEntry: 'TRAY_INVALID_ENTRY'; /** Duplicate key during factory admission; caller must provide unique keys. */ readonly duplicateEntry: 'TRAY_DUPLICATE_ENTRY'; /** Unknown get()/entryState() key; caller must use an admitted key. */ readonly unknownEntry: 'TRAY_UNKNOWN_ENTRY'; /** Entry is not ready or gate failed; caller must await readiness or repair the gate. */ readonly unavailable: 'TRAY_UNAVAILABLE'; /** Readiness getter failed; caller must inspect the preserved cause and fix the source. */ readonly gateReadFailed: 'TRAY_GATE_READ_FAILED'; /** Managed reads detect a mutation made through the escaped concrete Host. */ readonly hostMutationBypass: 'HOST_MUTATION_BYPASS'; };",
-          "declarationLine": 2,
+          "declarationLine": 4,
           "source": "packages/tray/dist/error-code.d.ts",
           "purpose": "Table of the stable error codes of this package; values are the strings on `error.code`.",
           "core": "hostUnavailable: `TRAY_HOST_UNAVAILABLE`: routing found no ready instance; wait for one.\nroutingUnknown: `TRAY_ROUTING_UNKNOWN`: the policy name is not registered or declared.\ntopicInvalid: `TRAY_TOPIC_INVALID`: the topic is not a non-empty string.\nroutingInvalid: `TRAY_ROUTING_INVALID`: bad policy name, or `pick` threw or returned a non-candidate.\nhostInvalid: `TRAY_HOST_INVALID`: the host definition or spawn options are invalid.\nhostUnknown: `TRAY_HOST_UNKNOWN`: `spawn()` names an unregistered host.\nhostMismatch: `TRAY_HOST_MISMATCH`: `instance()` used a different host than the record.\nreservedName: `TRAY_RESERVED_NAME`: `exposes` uses an internal plugin name.\nvalueNotPortable: `TRAY_VALUE_NOT_PORTABLE`: config or payload cannot cross realms.\ninstanceDuplicate: `TRAY_INSTANCE_DUPLICATE`: the id is already used.\ninstanceUnknown: `TRAY_INSTANCE_UNKNOWN`: no such instance, or it was removed.\ninstanceNotReady: `TRAY_INSTANCE_NOT_READY`: the instance is not ready.\ninstanceStartFailed: `TRAY_INSTANCE_START_FAILED`: install or init failed; see `cause`.\npathNotExposed: `TRAY_PATH_NOT_EXPOSED`: the path is outside `exposes`.\nchildStateInvalid: `TRAY_CHILD_STATE_INVALID`: the child was initialised twice or for another host.\ndisposed: `TRAY_DISPOSED`: the registry is closing; create a new one.\nloaderContractInvalid: `LOADER_CONTRACT_INVALID`: the loader or its result is malformed.\nloaderExecutionFailed: `LOADER_EXECUTION_FAILED`: `load()` threw; see `cause`.\nadapterContractInvalid: `ADAPTER_CONTRACT_INVALID`: the adapter or produced plugin is malformed.\nadapterExecutionFailed: `ADAPTER_EXECUTION_FAILED`: `adapt()` threw; see `cause`.\nruntimeContractInvalid: `RUNTIME_CONTRACT_INVALID`: bad host, name, options or callback for the runtime.\nruntimeDisposed: `RUNTIME_DISPOSED`: `run()` after `dispose()`.\nruntimeExecutionFailed: `RUNTIME_EXECUTION_FAILED`: the callback threw; see `cause`.\nruntimeAborted: `RUNTIME_ABORTED`: fallback classification for an unclassified generation-acquisition failure; an existing source/code is preserved. Caller cancellation and deadlines only abort the cooperative signal and do not force callback settlement.\nartifactCleanupFailed: `ARTIFACT_CLEANUP_FAILED`: releasing an artifact failed; see `cleanupErrors`.\ninvalidEntry: `TRAY_INVALID_ENTRY`: an entry or start result breaks the contract.\nduplicateEntry: `TRAY_DUPLICATE_ENTRY`: a key appears twice.\nunknownEntry: `TRAY_UNKNOWN_ENTRY`: the key was not admitted.\nunavailable: `TRAY_UNAVAILABLE`: not ready, gate failed or disposed.\ngateReadFailed: `TRAY_GATE_READ_FAILED`: a readiness getter threw.\nhostMutationBypass: `HOST_MUTATION_BYPASS`: the inner host was changed directly, bypassing the managed host.",
@@ -8329,7 +8469,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "所有 Tray 自有边界码的 source 为 TRAY_SOURCE，即 `@migaia/tray`；按 source / code 分支，不匹配 message。可注记的原生错误保持类型、stack 与 identity；冻结或不可安全注记的值经带码 wrapper.cause 保留，完整外包身份不改写。Graph 启动 / 节点 / 释放错误继续属于 capability。"
+                  "text": "所有 Tray 自有边界码的 source 为 TRAY_SOURCE，即 `tray`；按 source / code 分支，不匹配 message。可注记的原生错误保持类型、stack 与 identity；冻结或不可安全注记的值经带码 wrapper.cause 保留，完整外包身份不改写。Graph 启动 / 节点 / 释放错误继续属于 capability。"
                 },
                 {
                   "type": "table",
@@ -9564,7 +9704,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "所有 Tray 自有边界码的 source 为 TRAY_SOURCE，即 `@migaia/tray`；按 source / code 分支，不匹配 message。可注记的原生错误保持类型、stack 与 identity；冻结或不可安全注记的值经带码 wrapper.cause 保留，完整外包身份不改写。Graph 启动 / 节点 / 释放错误继续属于 capability。"
+                  "text": "所有 Tray 自有边界码的 source 为 TRAY_SOURCE，即 `tray`；按 source / code 分支，不匹配 message。可注记的原生错误保持类型、stack 与 identity；冻结或不可安全注记的值经带码 wrapper.cause 保留，完整外包身份不改写。Graph 启动 / 节点 / 释放错误继续属于 capability。"
                 },
                 {
                   "type": "table",
@@ -10151,7 +10291,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "所有 Tray 自有边界码的 source 为 TRAY_SOURCE，即 `@migaia/tray`；按 source / code 分支，不匹配 message。可注记的原生错误保持类型、stack 与 identity；冻结或不可安全注记的值经带码 wrapper.cause 保留，完整外包身份不改写。Graph 启动 / 节点 / 释放错误继续属于 capability。"
+                  "text": "所有 Tray 自有边界码的 source 为 TRAY_SOURCE，即 `tray`；按 source / code 分支，不匹配 message。可注记的原生错误保持类型、stack 与 identity；冻结或不可安全注记的值经带码 wrapper.cause 保留，完整外包身份不改写。Graph 启动 / 节点 / 释放错误继续属于 capability。"
                 },
                 {
                   "type": "table",
@@ -11345,7 +11485,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "所有 Tray 自有边界码的 source 为 TRAY_SOURCE，即 `@migaia/tray`；按 source / code 分支，不匹配 message。可注记的原生错误保持类型、stack 与 identity；冻结或不可安全注记的值经带码 wrapper.cause 保留，完整外包身份不改写。Graph 启动 / 节点 / 释放错误继续属于 capability。"
+                  "text": "所有 Tray 自有边界码的 source 为 TRAY_SOURCE，即 `tray`；按 source / code 分支，不匹配 message。可注记的原生错误保持类型、stack 与 identity；冻结或不可安全注记的值经带码 wrapper.cause 保留，完整外包身份不改写。Graph 启动 / 节点 / 释放错误继续属于 capability。"
                 },
                 {
                   "type": "table",

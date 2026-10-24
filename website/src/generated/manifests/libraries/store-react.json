@@ -573,7 +573,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "STORE_REACT_SOURCE 为 `'@migaia/store-react'`，本包创建的错误带 source/code；已有外包身份保持实际 owner，底层 reactive 所有权错误也由其 owner 提供。`createStoreReactError(code:IStoreReactErrorCode,message:string,options?)` 返回原生 Error，options 默认 undefined，cause 非 undefined 时转发；`createStoreReactAggregateError(code,errors:readonly unknown[],message)` 返回原生 AggregateError。必填参数如签名所示，两工厂只构造、不自动抛出，附不可写 source/code，保留 stack 与 errors/cause 链。"
+                "text": "STORE_REACT_SOURCE 为 `'store.react'`，本包创建的错误带 source/code；已有外包身份保持实际 owner，底层 reactive 所有权错误也由其 owner 提供。`createStoreReactError(code:IStoreReactErrorCode,message:string,options?)` 返回原生 Error，options 默认 undefined，cause 非 undefined 时转发；`createStoreReactAggregateError(code,errors:readonly unknown[],message)` 返回原生 AggregateError。必填参数如签名所示，两工厂只构造、不自动抛出，附不可写 source/code，保留 stack 与 errors/cause 链。"
               },
               {
                 "type": "table",
@@ -1341,7 +1341,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "STORE_REACT_SOURCE 为 `'@migaia/store-react'`，本包创建的错误带 source/code；已有外包身份保持实际 owner，底层 reactive 所有权错误也由其 owner 提供。`createStoreReactError(code:IStoreReactErrorCode,message:string,options?)` 返回原生 Error，options 默认 undefined，cause 非 undefined 时转发；`createStoreReactAggregateError(code,errors:readonly unknown[],message)` 返回原生 AggregateError。必填参数如签名所示，两工厂只构造、不自动抛出，附不可写 source/code，保留 stack 与 errors/cause 链。"
+                "text": "STORE_REACT_SOURCE 为 `'store.react'`，本包创建的错误带 source/code；已有外包身份保持实际 owner，底层 reactive 所有权错误也由其 owner 提供。`createStoreReactError(code:IStoreReactErrorCode,message:string,options?)` 返回原生 Error，options 默认 undefined，cause 非 undefined 时转发；`createStoreReactAggregateError(code,errors:readonly unknown[],message)` 返回原生 AggregateError。必填参数如签名所示，两工厂只构造、不自动抛出，附不可写 source/code，保留 stack 与 errors/cause 链。"
               },
               {
                 "type": "table",
@@ -2005,7 +2005,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "STORE_REACT_SOURCE is `'@migaia/store-react'`. Errors created here carry source/code; foreign identities and underlying reactive ownership failures retain their actual owner. `createStoreReactError(code:IStoreReactErrorCode,message:string,options?)` returns native Error. options defaults to undefined and forwards cause when it is not undefined. `createStoreReactAggregateError(code,errors:readonly unknown[],message)` returns native AggregateError. Arguments are required as shown, and both factories construct without automatically throwing, attach nonwritable source/code, and preserve stack and errors/cause chains."
+                  "text": "STORE_REACT_SOURCE is `'store.react'`. Errors created here carry source/code; foreign identities and underlying reactive ownership failures retain their actual owner. `createStoreReactError(code:IStoreReactErrorCode,message:string,options?)` returns native Error. options defaults to undefined and forwards cause when it is not undefined. `createStoreReactAggregateError(code,errors:readonly unknown[],message)` returns native AggregateError. Arguments are required as shown, and both factories construct without automatically throwing, attach nonwritable source/code, and preserve stack and errors/cause chains."
                 },
                 {
                   "type": "table",
@@ -2825,7 +2825,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "STORE_REACT_SOURCE is `'@migaia/store-react'`. Errors created here carry source/code; foreign identities and underlying reactive ownership failures retain their actual owner. `createStoreReactError(code:IStoreReactErrorCode,message:string,options?)` returns native Error. options defaults to undefined and forwards cause when it is not undefined. `createStoreReactAggregateError(code,errors:readonly unknown[],message)` returns native AggregateError. Arguments are required as shown, and both factories construct without automatically throwing, attach nonwritable source/code, and preserve stack and errors/cause chains."
+                  "text": "STORE_REACT_SOURCE is `'store.react'`. Errors created here carry source/code; foreign identities and underlying reactive ownership failures retain their actual owner. `createStoreReactError(code:IStoreReactErrorCode,message:string,options?)` returns native Error. options defaults to undefined and forwards cause when it is not undefined. `createStoreReactAggregateError(code,errors:readonly unknown[],message)` returns native AggregateError. Arguments are required as shown, and both factories construct without automatically throwing, attach nonwritable source/code, and preserve stack and errors/cause chains."
                 },
                 {
                   "type": "table",
@@ -3290,7 +3290,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "STORE_REACT_SOURCE 为 `'@migaia/store-react'`，本包创建的错误带 source/code；已有外包身份保持实际 owner，底层 reactive 所有权错误也由其 owner 提供。`createStoreReactError(code:IStoreReactErrorCode,message:string,options?)` 返回原生 Error，options 默认 undefined，cause 非 undefined 时转发；`createStoreReactAggregateError(code,errors:readonly unknown[],message)` 返回原生 AggregateError。必填参数如签名所示，两工厂只构造、不自动抛出，附不可写 source/code，保留 stack 与 errors/cause 链。"
+                  "text": "STORE_REACT_SOURCE 为 `'store.react'`，本包创建的错误带 source/code；已有外包身份保持实际 owner，底层 reactive 所有权错误也由其 owner 提供。`createStoreReactError(code:IStoreReactErrorCode,message:string,options?)` 返回原生 Error，options 默认 undefined，cause 非 undefined 时转发；`createStoreReactAggregateError(code,errors:readonly unknown[],message)` 返回原生 AggregateError。必填参数如签名所示，两工厂只构造、不自动抛出，附不可写 source/code，保留 stack 与 errors/cause 链。"
                 },
                 {
                   "type": "table",
@@ -3471,7 +3471,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "STORE_REACT_SOURCE 为 `'@migaia/store-react'`，本包创建的错误带 source/code；已有外包身份保持实际 owner，底层 reactive 所有权错误也由其 owner 提供。`createStoreReactError(code:IStoreReactErrorCode,message:string,options?)` 返回原生 Error，options 默认 undefined，cause 非 undefined 时转发；`createStoreReactAggregateError(code,errors:readonly unknown[],message)` 返回原生 AggregateError。必填参数如签名所示，两工厂只构造、不自动抛出，附不可写 source/code，保留 stack 与 errors/cause 链。"
+                  "text": "STORE_REACT_SOURCE 为 `'store.react'`，本包创建的错误带 source/code；已有外包身份保持实际 owner，底层 reactive 所有权错误也由其 owner 提供。`createStoreReactError(code:IStoreReactErrorCode,message:string,options?)` 返回原生 Error，options 默认 undefined，cause 非 undefined 时转发；`createStoreReactAggregateError(code,errors:readonly unknown[],message)` 返回原生 AggregateError。必填参数如签名所示，两工厂只构造、不自动抛出，附不可写 source/code，保留 stack 与 errors/cause 链。"
                 },
                 {
                   "type": "table",
@@ -3515,9 +3515,9 @@
               "name": "cause",
               "type": "unknown",
               "optional": true,
-              "description": "STORE_REACT_SOURCE 为 `'@migaia/store-react'`，本包创建的错误带 source/code；已有外包身份保持实际 owner，底层 reactive 所有权错误也由其 owner 提供。`createStoreReactError(code:IStoreReactErrorCode,message:string,options?)` 返回原生 Error，options 默认 undefined，cause 非 undefined 时转发；`createStoreReactAggregateError(code,errors:readonly unknown[],message)` 返回原生 AggregateError。必填参数如签名所示，两工厂只构造、不自动抛出，附不可写 source/code，保留 stack 与 errors/cause 链。",
+              "description": "STORE_REACT_SOURCE 为 `'store.react'`，本包创建的错误带 source/code；已有外包身份保持实际 owner，底层 reactive 所有权错误也由其 owner 提供。`createStoreReactError(code:IStoreReactErrorCode,message:string,options?)` 返回原生 Error，options 默认 undefined，cause 非 undefined 时转发；`createStoreReactAggregateError(code,errors:readonly unknown[],message)` 返回原生 AggregateError。必填参数如签名所示，两工厂只构造、不自动抛出，附不可写 source/code，保留 stack 与 errors/cause 链。",
               "descriptionEn": "",
-              "descriptionZh": "STORE_REACT_SOURCE 为 `'@migaia/store-react'`，本包创建的错误带 source/code；已有外包身份保持实际 owner，底层 reactive 所有权错误也由其 owner 提供。`createStoreReactError(code:IStoreReactErrorCode,message:string,options?)` 返回原生 Error，options 默认 undefined，cause 非 undefined 时转发；`createStoreReactAggregateError(code,errors:readonly unknown[],message)` 返回原生 AggregateError。必填参数如签名所示，两工厂只构造、不自动抛出，附不可写 source/code，保留 stack 与 errors/cause 链。"
+              "descriptionZh": "STORE_REACT_SOURCE 为 `'store.react'`，本包创建的错误带 source/code；已有外包身份保持实际 owner，底层 reactive 所有权错误也由其 owner 提供。`createStoreReactError(code:IStoreReactErrorCode,message:string,options?)` 返回原生 Error，options 默认 undefined，cause 非 undefined 时转发；`createStoreReactAggregateError(code,errors:readonly unknown[],message)` 返回原生 AggregateError。必填参数如签名所示，两工厂只构造、不自动抛出，附不可写 source/code，保留 stack 与 errors/cause 链。"
             }
           ],
           "fragment": "store-react-index--createStoreReactError"
@@ -4587,7 +4587,7 @@
           "name": "IStoreReactErrorCode",
           "kind": "type",
           "signature": "export type IStoreReactErrorCode = (typeof StoreReactErrorCode)[keyof typeof StoreReactErrorCode];",
-          "declarationLine": 69,
+          "declarationLine": 71,
           "source": "packages/store-react/dist/error-code.d.ts",
           "purpose": "Value union of stable StoreReactErrorCode members for typed package failure recognition.",
           "core": "Value union of stable StoreReactErrorCode members for typed package failure recognition.",
@@ -4677,7 +4677,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "STORE_REACT_SOURCE 为 `'@migaia/store-react'`，本包创建的错误带 source/code；已有外包身份保持实际 owner，底层 reactive 所有权错误也由其 owner 提供。`createStoreReactError(code:IStoreReactErrorCode,message:string,options?)` 返回原生 Error，options 默认 undefined，cause 非 undefined 时转发；`createStoreReactAggregateError(code,errors:readonly unknown[],message)` 返回原生 AggregateError。必填参数如签名所示，两工厂只构造、不自动抛出，附不可写 source/code，保留 stack 与 errors/cause 链。"
+                  "text": "STORE_REACT_SOURCE 为 `'store.react'`，本包创建的错误带 source/code；已有外包身份保持实际 owner，底层 reactive 所有权错误也由其 owner 提供。`createStoreReactError(code:IStoreReactErrorCode,message:string,options?)` 返回原生 Error，options 默认 undefined，cause 非 undefined 时转发；`createStoreReactAggregateError(code,errors:readonly unknown[],message)` 返回原生 AggregateError。必填参数如签名所示，两工厂只构造、不自动抛出，附不可写 source/code，保留 stack 与 errors/cause 链。"
                 },
                 {
                   "type": "table",
@@ -5049,7 +5049,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "STORE_REACT_SOURCE 为 `'@migaia/store-react'`，本包创建的错误带 source/code；已有外包身份保持实际 owner，底层 reactive 所有权错误也由其 owner 提供。`createStoreReactError(code:IStoreReactErrorCode,message:string,options?)` 返回原生 Error，options 默认 undefined，cause 非 undefined 时转发；`createStoreReactAggregateError(code,errors:readonly unknown[],message)` 返回原生 AggregateError。必填参数如签名所示，两工厂只构造、不自动抛出，附不可写 source/code，保留 stack 与 errors/cause 链。"
+                  "text": "STORE_REACT_SOURCE 为 `'store.react'`，本包创建的错误带 source/code；已有外包身份保持实际 owner，底层 reactive 所有权错误也由其 owner 提供。`createStoreReactError(code:IStoreReactErrorCode,message:string,options?)` 返回原生 Error，options 默认 undefined，cause 非 undefined 时转发；`createStoreReactAggregateError(code,errors:readonly unknown[],message)` 返回原生 AggregateError。必填参数如签名所示，两工厂只构造、不自动抛出，附不可写 source/code，保留 stack 与 errors/cause 链。"
                 },
                 {
                   "type": "table",
@@ -5324,7 +5324,7 @@
           "signature": "export declare function readStoreFeature(config: IStoreConfigValue, path: IStoreFeaturePath): boolean;",
           "declarationLine": 107,
           "source": "packages/store-react/dist/store-config.d.ts",
-          "purpose": "Synchronously reads a normalized feature path without throwing merely because it is disabled.",
+          "purpose": "Reads a normalized wasm or experimental feature flag synchronously, treating disabled, unknown and empty experimental paths as false.",
           "core": "config: IStoreConfigValue returned by normalizeStoreConfig or useStoreConfig after checking for null.\npath: wasm or experimental.<name>; select a flag explicitly declared by the application Provider configuration.\nBoolean enabled value; unknown or empty experimental names return false.\nfeatures: Normalized explicit WASM boolean and frozen experimental dictionary; only exact true is enabled.\ndefaults: Application defaults with explicit warnAsyncActions boolean; consumers decide whether to apply it to their Stores.\nready: Null when no barrier exists; otherwise {promise, status(), error()}. Status is pending/ready/error, updated in a microtask; error() preserves rejection identity.\nfeatures.wasm: Declares WASM field usage. True requires at least one readiness barrier; otherwise normalization creates a rejecting configuration barrier.\n`false`: no WASM readiness requirement.\nRequire caller-supplied initialization readiness before rendering the subtree.\nDo not require a WASM initialization barrier.\nSet true when the subtree uses WASM fields, and supply its initialization barriers in `ready`. This declaration does not initialize WASM. False, including omission, disables the declaration and requires no WASM barrier; true without a barrier creates rejected readiness.\nfeatures.experimental: Application feature dictionary; only exact true enables an enumerable data-property entry. A sorted frozen null-prototype snapshot excludes accessors.\nEmpty frozen dictionary; every experimental path is disabled.",
           "advanced": "",
           "parameters": ["config: IStoreConfigValue", "path: IStoreFeaturePath"],
@@ -5372,7 +5372,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Synchronously reads a normalized feature path without throwing merely because it is disabled."
+              "content": "Reads a normalized wasm or experimental feature flag synchronously, treating disabled, unknown and empty experimental paths as false."
             },
             {
               "id": "getting-started",
@@ -5559,11 +5559,11 @@
         {
           "name": "STORE_REACT_SOURCE",
           "kind": "const",
-          "signature": "export declare const STORE_REACT_SOURCE = \"@migaia/store-react\";",
+          "signature": "export declare const STORE_REACT_SOURCE = \"store.react\";",
           "declarationLine": 4,
           "source": "packages/store-react/dist/errors.d.ts",
-          "purpose": "Stable @migaia/store-react source identity attached to package-owned errors; inspect source and code together.",
-          "core": "Stable @migaia/store-react source identity attached to package-owned errors; inspect source and code together.",
+          "purpose": "Stable store.react source identity attached to package-owned errors; inspect source and code together.",
+          "core": "Stable store.react source identity attached to package-owned errors; inspect source and code together.",
           "advanced": "",
           "parameters": ["This const declaration has no parameters."],
           "parameterDetails": [],
@@ -5575,9 +5575,7 @@
           "composes": [],
           "aliasOf": "STORE_REACT_SOURCE",
           "exportPath": ".",
-          "overloadSignatures": [
-            "export declare const STORE_REACT_SOURCE = \"@migaia/store-react\";"
-          ],
+          "overloadSignatures": ["export declare const STORE_REACT_SOURCE = \"store.react\";"],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
           "whenToUse": "",
@@ -5586,7 +5584,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Stable @migaia/store-react source identity attached to package-owned errors; inspect source and code together."
+              "content": "Stable store.react source identity attached to package-owned errors; inspect source and code together."
             },
             {
               "id": "getting-started",
@@ -5606,7 +5604,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Stable @migaia/store-react source identity attached to package-owned errors; inspect source and code together."
+              "content": "Stable store.react source identity attached to package-owned errors; inspect source and code together."
             },
             {
               "id": "advanced-usage",
@@ -5615,7 +5613,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-react/dist/errors.d.ts:STORE_REACT_SOURCE:export declare const STORE_REACT_SOURCE = \"@migaia/store-react\";",
+          "identity": "packages/store-react/dist/errors.d.ts:STORE_REACT_SOURCE:export declare const STORE_REACT_SOURCE = \"store.react\";",
           "guidance": [
             {
               "id": "错误与迁移",
@@ -5650,7 +5648,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "STORE_REACT_SOURCE 为 `'@migaia/store-react'`，本包创建的错误带 source/code；已有外包身份保持实际 owner，底层 reactive 所有权错误也由其 owner 提供。`createStoreReactError(code:IStoreReactErrorCode,message:string,options?)` 返回原生 Error，options 默认 undefined，cause 非 undefined 时转发；`createStoreReactAggregateError(code,errors:readonly unknown[],message)` 返回原生 AggregateError。必填参数如签名所示，两工厂只构造、不自动抛出，附不可写 source/code，保留 stack 与 errors/cause 链。"
+                  "text": "STORE_REACT_SOURCE 为 `'store.react'`，本包创建的错误带 source/code；已有外包身份保持实际 owner，底层 reactive 所有权错误也由其 owner 提供。`createStoreReactError(code:IStoreReactErrorCode,message:string,options?)` 返回原生 Error，options 默认 undefined，cause 非 undefined 时转发；`createStoreReactAggregateError(code,errors:readonly unknown[],message)` 返回原生 AggregateError。必填参数如签名所示，两工厂只构造、不自动抛出，附不可写 source/code，保留 stack 与 errors/cause 链。"
                 },
                 {
                   "type": "table",
@@ -5931,7 +5929,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "STORE_REACT_SOURCE 为 `'@migaia/store-react'`，本包创建的错误带 source/code；已有外包身份保持实际 owner，底层 reactive 所有权错误也由其 owner 提供。`createStoreReactError(code:IStoreReactErrorCode,message:string,options?)` 返回原生 Error，options 默认 undefined，cause 非 undefined 时转发；`createStoreReactAggregateError(code,errors:readonly unknown[],message)` 返回原生 AggregateError。必填参数如签名所示，两工厂只构造、不自动抛出，附不可写 source/code，保留 stack 与 errors/cause 链。"
+                  "text": "STORE_REACT_SOURCE 为 `'store.react'`，本包创建的错误带 source/code；已有外包身份保持实际 owner，底层 reactive 所有权错误也由其 owner 提供。`createStoreReactError(code:IStoreReactErrorCode,message:string,options?)` 返回原生 Error，options 默认 undefined，cause 非 undefined 时转发；`createStoreReactAggregateError(code,errors:readonly unknown[],message)` 返回原生 AggregateError。必填参数如签名所示，两工厂只构造、不自动抛出，附不可写 source/code，保留 stack 与 errors/cause 链。"
                 },
                 {
                   "type": "table",
@@ -6220,7 +6218,7 @@
           "name": "StoreReactErrorCode",
           "kind": "const",
           "signature": "export declare const StoreReactErrorCode: { /** * A provider registry is registered with or read after `dispose()`. * * Create a new registry instead of reusing the disposed instance. */ readonly registryDisposed: 'REGISTRY_DISPOSED'; /** * An owned registry value fails to dispose. Unclassified native errors receive this code; * multiple failures expose an `AggregateError`, and existing foreign module identities remain. * * Inspect the original error, its `cause`, or each aggregate entry. Cleanup continues for other * owned values; retrying disposal does not rerun their callbacks. */ readonly registryDisposalFailed: 'REGISTRY_DISPOSAL_FAILED'; /** * A hook is called without `StoreProvider`. * * Wrap the subtree in `StoreProvider` or use a protocol hook that does not require a provider. */ readonly providerRequired: 'PROVIDER_REQUIRED'; /** * An API requires a feature that is not explicitly enabled in the provider configuration. * * Enable that path in the `StoreProvider` `features` configuration. */ readonly featureDisabled: 'FEATURE_DISABLED'; /** * The registry has no store for the requested token. * * Confirm that the store is registered and uses the same token. */ readonly storeMissing: 'STORE_MISSING'; /** * The same token is registered twice. * * Remove duplicate registration or give each provider its own registry. */ readonly storeDuplicate: 'STORE_DUPLICATE'; /** * A provider store belongs to another `Runtime`. * * Use the same `Runtime` for the store and registry. Cross-runtime injection is rejected. */ readonly crossRuntime: 'CROSS_RUNTIME'; /** * Provider or token configuration is invalid, for example a missing debug name or incompatible * `features.wasm` and `ready`. * * Correct the configuration before retrying. This is a permanent configuration error. */ readonly invalidConfig: 'INVALID_CONFIG'; /** * A non-Error readiness rejection is normalized before rendering can continue. Inspect `cause` * for the original reason; Error rejections, including frozen Errors, retain their identity * instead of receiving this code. */ readonly readyRejected: 'READY_REJECTED'; };",
-          "declarationLine": 9,
+          "declarationLine": 11,
           "source": "packages/store-react/dist/error-code.d.ts",
           "purpose": "Stable codes for Registry admission/disposal, Provider requirements, feature gates and readiness failures.",
           "core": "registryDisposed: Registry lookup or mutation after its lifecycle left open.\nregistryDisposalFailed: Owned cleanup failed: a mutable native uncoded error keeps identity and gains this code; frozen or non-Error values remain on cause/errors. Foreign coded errors keep their owner; multiple failures form an ordered native AggregateError.\nproviderRequired: Provider-dependent hook or feature assertion has no Provider configuration.\nfeatureDisabled: Feature assertion targets a flag not explicitly enabled.\nstoreMissing: Required token has no current Registry entry.\nstoreDuplicate: Register attempts to insert an already registered token.\ncrossRuntime: Registered reactive value belongs to another Runtime graph.\ninvalidConfig: Malformed token, ownership, Provider config or readiness declaration.\nreadyRejected: Readiness rejected with a non-Error value; wrapper retains that original value in cause.",
@@ -6392,7 +6390,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "STORE_REACT_SOURCE 为 `'@migaia/store-react'`，本包创建的错误带 source/code；已有外包身份保持实际 owner，底层 reactive 所有权错误也由其 owner 提供。`createStoreReactError(code:IStoreReactErrorCode,message:string,options?)` 返回原生 Error，options 默认 undefined，cause 非 undefined 时转发；`createStoreReactAggregateError(code,errors:readonly unknown[],message)` 返回原生 AggregateError。必填参数如签名所示，两工厂只构造、不自动抛出，附不可写 source/code，保留 stack 与 errors/cause 链。"
+                  "text": "STORE_REACT_SOURCE 为 `'store.react'`，本包创建的错误带 source/code；已有外包身份保持实际 owner，底层 reactive 所有权错误也由其 owner 提供。`createStoreReactError(code:IStoreReactErrorCode,message:string,options?)` 返回原生 Error，options 默认 undefined，cause 非 undefined 时转发；`createStoreReactAggregateError(code,errors:readonly unknown[],message)` 返回原生 AggregateError。必填参数如签名所示，两工厂只构造、不自动抛出，附不可写 source/code，保留 stack 与 errors/cause 链。"
                 },
                 {
                   "type": "table",
@@ -6957,7 +6955,7 @@
           "signature": "export declare function useAtom<T, Args extends readonly unknown[], Result>(atom: IWritableAtom<T, Args, Result>): readonly [T, (...args: Args) => Result];",
           "declarationLine": 23,
           "source": "packages/store-react/dist/useAtom.d.ts",
-          "purpose": "Combines atom value subscription and stable writer without changing Provider routing or source ownership.",
+          "purpose": "Subscribes to a writable atom's value and pairs it with a stable writer, retaining Provider-local routing and the caller's atom ownership.",
           "core": "atom: Stable external IWritableAtom; definitions route through the current Provider when available.\nReadonly [current value, writer] pair; writer preserves Args, Result and synchronous failures.",
           "advanced": "",
           "parameters": ["atom: IWritableAtom<T, Args, Result>"],
@@ -6994,7 +6992,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Combines atom value subscription and stable writer without changing Provider routing or source ownership."
+              "content": "Subscribes to a writable atom's value and pairs it with a stable writer, retaining Provider-local routing and the caller's atom ownership."
             },
             {
               "id": "getting-started",
@@ -7402,7 +7400,7 @@
           "signature": "export declare function useResource<T>(res: Resource<T>): IResourceState<T>;",
           "declarationLine": 36,
           "source": "packages/store-react/dist/useStore.d.ts",
-          "purpose": "Subscribes to a Resource state machine without automatically unwrapping or throwing its pending/error state.",
+          "purpose": "Subscribes to a Resource and exposes its complete current state for explicit rendering, without unwrapping data or throwing pending and error states.",
           "core": "res: Stable Resource<T> from @migaia/resource; its Runtime owns tracking.\nCurrent external IResourceState<T>, including idle, pending, success, error or cancelled.",
           "advanced": "",
           "parameters": ["res: Resource<T>"],
@@ -7439,7 +7437,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Subscribes to a Resource state machine without automatically unwrapping or throwing its pending/error state."
+              "content": "Subscribes to a Resource and exposes its complete current state for explicit rendering, without unwrapping data or throwing pending and error states."
             },
             {
               "id": "getting-started",
@@ -8118,7 +8116,7 @@
           "signature": "export declare function useStoreFeature(path: IStoreFeaturePath): boolean;",
           "declarationLine": 123,
           "source": "packages/store-react/dist/store-config.d.ts",
-          "purpose": "Reads a normalized feature flag in the current context; returns false when no configuration Provider exists.",
+          "purpose": "Reads a feature flag from the current StoreProvider configuration for optional UI behavior, returning false when no Provider supplies configuration.",
           "core": "path: wasm or experimental.<name>; select a flag explicitly declared by the application Provider configuration.\nTrue only for an explicitly enabled feature.",
           "advanced": "",
           "parameters": ["path: IStoreFeaturePath"],
@@ -8156,7 +8154,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Reads a normalized feature flag in the current context; returns false when no configuration Provider exists."
+              "content": "Reads a feature flag from the current StoreProvider configuration for optional UI behavior, returning false when no Provider supplies configuration."
             },
             {
               "id": "getting-started",

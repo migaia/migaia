@@ -363,7 +363,7 @@ export const storeWasmReference: ILibraryReference = {
     STORE_WASM_SOURCE: {
       role: 'constant',
       purpose: t(
-        'Source @migaia/store-wasm for package-owned failures; interpret it with code. Complete foreign identities retain their owner. Registered native WebAssembly CompileError/LinkError/RuntimeError pass through unchanged without this source or a code.',
+        'Source store.wasm for package-owned failures; interpret it with code. Complete foreign identities retain their owner. Registered native WebAssembly CompileError/LinkError/RuntimeError pass through unchanged without this source or a code.',
         '本包拥有的失败所附精确来源标记，应与稳定错误码联合检查；完整外包身份保持原归属，已登记的原生编译、链接及运行时错误原样透传，不附此来源或错误码。'
       ),
       example: `import { STORE_WASM_SOURCE } from '@migaia/store-wasm'

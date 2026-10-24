@@ -375,7 +375,7 @@ const identifyErrorStatics: Readonly<Record<string, IMemberDoc>> = {
       'The matching `IIdentifiedError`, or `undefined`.',
       '匹配的 `IIdentifiedError`，或 `undefined`。'
     ),
-    example: `const timeout = IdentifyError.find(error, { source: '@migaia/utils', code: 'DEADLINE_EXCEEDED' })`
+    example: `const timeout = IdentifyError.find(error, { source: 'foundation.utils', code: 'DEADLINE_EXCEEDED' })`
   },
   match: {
     summary: t(

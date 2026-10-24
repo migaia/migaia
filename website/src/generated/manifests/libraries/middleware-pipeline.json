@@ -683,7 +683,7 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "`MIDDLEWARE_PIPELINE_SOURCE` 的值是 `'@migaia/middleware-pipeline'`。`MiddlewarePipelineErrorCode` 是唯一的公开错误码表："
+                "text": "`MIDDLEWARE_PIPELINE_SOURCE` 的值是 `'middleware.pipeline'`。`MiddlewarePipelineErrorCode` 是唯一的公开错误码表："
               },
               {
                 "type": "table",
@@ -1503,7 +1503,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "`MIDDLEWARE_PIPELINE_SOURCE` is `'@migaia/middleware-pipeline'`. `MiddlewarePipelineErrorCode` is the public error table."
+                  "text": "`MIDDLEWARE_PIPELINE_SOURCE` is `'middleware.pipeline'`. `MiddlewarePipelineErrorCode` is the public error table."
                 },
                 {
                   "type": "table",
@@ -3251,7 +3251,7 @@
           "name": "IMiddlewarePipelineErrorCode",
           "kind": "type",
           "signature": "export type IMiddlewarePipelineErrorCode = (typeof MiddlewarePipelineErrorCode)[keyof typeof MiddlewarePipelineErrorCode];",
-          "declarationLine": 37,
+          "declarationLine": 39,
           "source": "packages/middleware-pipeline/dist/error-code.d.ts",
           "purpose": "Union of `MiddlewarePipelineErrorCode` values.",
           "core": "Union of `MiddlewarePipelineErrorCode` values.",
@@ -3770,11 +3770,11 @@
         {
           "name": "MIDDLEWARE_PIPELINE_SOURCE",
           "kind": "const",
-          "signature": "export declare const MIDDLEWARE_PIPELINE_SOURCE = \"@migaia/middleware-pipeline\";",
-          "declarationLine": 5,
+          "signature": "export declare const MIDDLEWARE_PIPELINE_SOURCE = \"middleware.pipeline\";",
+          "declarationLine": 7,
           "source": "packages/middleware-pipeline/dist/error-code.d.ts",
-          "purpose": "The `source` value on every error created by this package (`@migaia/middleware-pipeline`). Compare it before branching on `error.code`.",
-          "core": "The `source` value on every error created by this package (`@migaia/middleware-pipeline`). Compare it before branching on `error.code`.",
+          "purpose": "The `source` value on every error created by this package (`middleware.pipeline`). Compare it before branching on `error.code`.",
+          "core": "The `source` value on every error created by this package (`middleware.pipeline`). Compare it before branching on `error.code`.",
           "advanced": "",
           "parameters": ["This const declaration has no parameters."],
           "parameterDetails": [],
@@ -3787,7 +3787,7 @@
           "aliasOf": "MIDDLEWARE_PIPELINE_SOURCE",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const MIDDLEWARE_PIPELINE_SOURCE = \"@migaia/middleware-pipeline\";"
+            "export declare const MIDDLEWARE_PIPELINE_SOURCE = \"middleware.pipeline\";"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -3797,7 +3797,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "The `source` value on every error created by this package (`@migaia/middleware-pipeline`). Compare it before branching on `error.code`."
+              "content": "The `source` value on every error created by this package (`middleware.pipeline`). Compare it before branching on `error.code`."
             },
             {
               "id": "getting-started",
@@ -3817,7 +3817,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The `source` value on every error created by this package (`@migaia/middleware-pipeline`). Compare it before branching on `error.code`."
+              "content": "The `source` value on every error created by this package (`middleware.pipeline`). Compare it before branching on `error.code`."
             },
             {
               "id": "advanced-usage",
@@ -3826,7 +3826,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/middleware-pipeline/dist/error-code.d.ts:MIDDLEWARE_PIPELINE_SOURCE:export declare const MIDDLEWARE_PIPELINE_SOURCE = \"@migaia/middleware-pipeline\";",
+          "identity": "packages/middleware-pipeline/dist/error-code.d.ts:MIDDLEWARE_PIPELINE_SOURCE:export declare const MIDDLEWARE_PIPELINE_SOURCE = \"middleware.pipeline\";",
           "guidance": [
             {
               "id": "失败-原始错误与错误码",
@@ -3834,7 +3834,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "`MIDDLEWARE_PIPELINE_SOURCE` 的值是 `'@migaia/middleware-pipeline'`。`MiddlewarePipelineErrorCode` 是唯一的公开错误码表："
+                  "text": "`MIDDLEWARE_PIPELINE_SOURCE` 的值是 `'middleware.pipeline'`。`MiddlewarePipelineErrorCode` 是唯一的公开错误码表："
                 },
                 {
                   "type": "table",
@@ -3885,7 +3885,7 @@
           "name": "MiddlewarePipelineErrorCode",
           "kind": "const",
           "signature": "export declare const MiddlewarePipelineErrorCode: { /** * Reports failure in both the current stage and its started downstream when no error combiner is * supplied. Also identifies unclassified stage, terminal, host, violation callback, or combiner * failures while preserving native identity where possible and retaining original failures. * Inspect both independent failures in `AggregateError.errors`, or supply an error combiner that * retains them through cause/errors when a domain-specific error is required. */ readonly executionFailed: 'EXECUTION_FAILED'; /** * Invalid mode, onViolation or other callback, signal/control shape, signals, or lift target. The * caller must correct the supplied option rather than retrying the same input. */ readonly invalidOption: 'INVALID_OPTION'; /** * A cooperative checkpoint observes cancellation. Unclassified Error reasons gain identity where * attachable; other reasons remain on cause. Started work is awaited, not forcibly interrupted. */ readonly aborted: 'ABORTED'; /** Iterator cleanup failed during cancellation. errors contains abort first, then cleanup failure. */ readonly abortCleanupFailed: 'ABORT_CLEANUP_FAILED'; };",
-          "declarationLine": 11,
+          "declarationLine": 13,
           "source": "packages/middleware-pipeline/dist/error-code.d.ts",
           "purpose": "Every error code of this package. Errors keep their native type (`TypeError`, `AggregateError`, `AbortError`) and carry `source` and `code`.",
           "core": "executionFailed: EXECUTION_FAILED classifies unowned stage, done, host-active and violation callback failures. Writable native errors retain identity; foreign identities stay unchanged, immutable/primitive values remain on cause. Independent async onion failures form AggregateError without a combiner. A late next callback failure after run completion escapes on the caller stack; report there.\ninvalidOption: `INVALID_OPTION`: an invalid mode, callback, signal, control object, signal set or `lift` direction. Fix the input; retrying will fail again.\naborted: ABORTED classifies an unowned cancellation reason. Native Error reasons can retain their exact object and type; primitive/undefined reasons use ordinary Error with cause. Existing foreign source/code remain unchanged; AbortError is not guaranteed.\nabortCleanupFailed: `ABORT_CLEANUP_FAILED`: cancelling the run and its cleanup both failed; inspect `errors` in order.",
@@ -3985,7 +3985,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "`MIDDLEWARE_PIPELINE_SOURCE` 的值是 `'@migaia/middleware-pipeline'`。`MiddlewarePipelineErrorCode` 是唯一的公开错误码表："
+                  "text": "`MIDDLEWARE_PIPELINE_SOURCE` 的值是 `'middleware.pipeline'`。`MiddlewarePipelineErrorCode` 是唯一的公开错误码表："
                 },
                 {
                   "type": "table",

@@ -26,13 +26,17 @@ export const LIBRARY_REFERENCE_DESCRIPTIONS_ZH = {
   'plugin-host': '为库或应用安装和卸载插件，配置共享能力与处理步骤，并在安装失败时回滚。',
   reactive: '让状态变化自动更新派生值和副作用，并为不同使用场景隔离状态。',
   resource: '随输入变化加载异步数据，取消过期请求、重试失败请求并刷新缓存。',
-  'rpc-browser': '在浏览器窗口、iframe、SharedWorker 与可靠有序的 WebRTC 通道之间调用函数。',
+  'rpc-plugin-browser':
+    '为窗口、浏览器 Worker、广播、ServiceWorker、可靠 WebRTC 与 WebTransport 安装对应传输插件。',
   'rpc-contract': '为自定义 RPC 实现校验和编解码消息，让不同对端按同一协议通信。',
-  'rpc-core': '跨运行时调用远程函数，并为调用设置超时、取消和流式结果处理。',
-  'rpc-devtools': '采集、查询和录制 RPC 元数据，并查看多个宿主的时间线与调用统计。',
-  'rpc-pool': '将 RPC 调用分配到线程池或进程池，并用有限队列承接繁忙时的请求。',
-  'rpc-process': '在子进程或本机服务中运行隔离任务，并通过 RPC 调用和管理它们。',
-  'rpc-threads': '把重计算移到 Worker，并通过 RPC 调用、管理和重启线程。',
+  'rpc-host':
+    '用一个 createRpcHost 入口组合传输插件与功能，进行双向调用、直连选择、广播和流式处理。',
+  'rpc-plugin-coroutines': '在同一事件循环中运行协作任务，通过代内连接句柄与宿主双向调用。',
+  'rpc-plugin-devtools': '采集、查询和录制 RPC 元数据，并查看多个宿主的时间线与调用统计。',
+  'rpc-plugin-pool':
+    '把真实传输成员组织成唯一逻辑目标 pool，每次调度一次并返回标量，使用有限队列与原扩缩容。',
+  'rpc-plugin-process': '在子进程或本机服务中运行隔离任务，并通过 RPC 调用和管理它们。',
+  'rpc-plugin-thread': '把重计算移到 Worker，并通过 RPC 调用、管理和重启线程。',
   serialize: '把应用数据编码为可存储或传输的格式，并在读取时解码。',
   'storage-contract': '定义键值、记录、向量、RDF 与对象存储能力、查询和事务契约。',
   'storage-web': '通过宿主插件读写 Web Storage、Cookie 与 IndexedDB，按需启用响应式查询。',
@@ -92,19 +96,21 @@ export const LIBRARY_REFERENCE_DESCRIPTIONS_EN = {
     'Update derived values and effects when state changes and keep state separate across contexts.',
   resource:
     'Load asynchronous data as inputs change, cancel stale requests, retry failures, and refresh cached results.',
-  'rpc-browser':
-    'Call functions across browser windows, iframes, SharedWorkers, and reliable ordered WebRTC channels.',
+  'rpc-plugin-browser':
+    'Install carrier plugins for windows, browser Workers, broadcast, ServiceWorker, reliable WebRTC, and WebTransport.',
   'rpc-contract':
     'Validate, encode, and decode messages for custom RPC implementations so peers can communicate through the same protocol.',
-  'rpc-core':
-    'Call remote functions across runtimes with timeouts, cancellation, and streaming results.',
-  'rpc-devtools':
+  'rpc-host':
+    'Compose one createRpcHost entry with transport plugins and features for bidirectional calls, direct targets, broadcast, and streams.',
+  'rpc-plugin-coroutines':
+    'Run cooperative tasks in one event loop and connect both hosts through a generation-local handle.',
+  'rpc-plugin-devtools':
     'Collect, query, and record RPC metadata and inspect timelines and call statistics across hosts.',
-  'rpc-pool':
-    'Distribute RPC calls across thread or process pools and queue requests within bounded limits when busy.',
-  'rpc-process':
+  'rpc-plugin-pool':
+    'Expose one logical pool target, schedule each operation once, and retain bounded queueing, resize, and drain.',
+  'rpc-plugin-process':
     'Run isolated work in child processes or local services and call and manage them through RPC.',
-  'rpc-threads':
+  'rpc-plugin-thread':
     'Move heavy computation into Workers and call, manage, and restart threads through RPC.',
   serialize: 'Encode application data for storage or transmission and decode it when reading.',
   'storage-contract':

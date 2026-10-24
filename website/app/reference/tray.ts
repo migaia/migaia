@@ -958,8 +958,8 @@ await tray.routing.first(agent).request('node.svc.echo', 'hi')`
     TRAY_SOURCE: {
       role: 'constant',
       purpose: t(
-        'The `source` value (`@migaia/tray`) on Tray-owned boundary errors; complete foreign identities keep their own source and code. Compare source before branching on code.',
-        '归 Tray 所有的边界错误使用此 `source` 值（`@migaia/tray`）；已有完整身份的外包错误保留原来源和错误码。先比对来源，再按错误码分支处理。'
+        'The `source` value (`tray`) on Tray-owned boundary errors; complete foreign identities keep their own source and code. Compare source before branching on code.',
+        '归 Tray 所有的边界错误使用此 `source` 值（`tray`）；已有完整身份的外包错误保留原来源和错误码。先比对来源，再按错误码分支处理。'
       ),
       example: `if (error.source === TRAY_SOURCE && error.code === TrayErrorCode.unavailable) await graph.ready()`
     },

@@ -420,7 +420,7 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "`STORE_SHARED_SOURCE` 是字符串常量 `'@migaia/store-shared'`。`StoreSharedErrorCode` 是下表常量对象，`IStoreSharedErrorCode` 为其值的联合类型。"
+                "text": "`STORE_SHARED_SOURCE` 是字符串常量 `'store.shared'`。`StoreSharedErrorCode` 是下表常量对象，`IStoreSharedErrorCode` 为其值的联合类型。"
               },
               {
                 "type": "table",
@@ -1042,7 +1042,7 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "`STORE_SHARED_SOURCE` 是字符串常量 `'@migaia/store-shared'`。`StoreSharedErrorCode` 是下表常量对象，`IStoreSharedErrorCode` 为其值的联合类型。"
+                "text": "`STORE_SHARED_SOURCE` 是字符串常量 `'store.shared'`。`StoreSharedErrorCode` 是下表常量对象，`IStoreSharedErrorCode` 为其值的联合类型。"
               },
               {
                 "type": "table",
@@ -1617,7 +1617,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "`STORE_SHARED_SOURCE` is the string constant `'@migaia/store-shared'`. `StoreSharedErrorCode` contains the following entries; `IStoreSharedErrorCode` is the union of their values."
+                  "text": "`STORE_SHARED_SOURCE` is the string constant `'store.shared'`. `StoreSharedErrorCode` contains the following entries; `IStoreSharedErrorCode` is the union of their values."
                 },
                 {
                   "type": "table",
@@ -2315,7 +2315,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "`STORE_SHARED_SOURCE` is the string constant `'@migaia/store-shared'`. `StoreSharedErrorCode` contains the following entries; `IStoreSharedErrorCode` is the union of their values."
+                  "text": "`STORE_SHARED_SOURCE` is the string constant `'store.shared'`. `StoreSharedErrorCode` contains the following entries; `IStoreSharedErrorCode` is the union of their values."
                 },
                 {
                   "type": "table",
@@ -2531,7 +2531,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "`STORE_SHARED_SOURCE` 是字符串常量 `'@migaia/store-shared'`。`StoreSharedErrorCode` 是下表常量对象，`IStoreSharedErrorCode` 为其值的联合类型。"
+                  "text": "`STORE_SHARED_SOURCE` 是字符串常量 `'store.shared'`。`StoreSharedErrorCode` 是下表常量对象，`IStoreSharedErrorCode` 为其值的联合类型。"
                 },
                 {
                   "type": "table",
@@ -2697,7 +2697,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "`STORE_SHARED_SOURCE` 是字符串常量 `'@migaia/store-shared'`。`StoreSharedErrorCode` 是下表常量对象，`IStoreSharedErrorCode` 为其值的联合类型。"
+                  "text": "`STORE_SHARED_SOURCE` 是字符串常量 `'store.shared'`。`StoreSharedErrorCode` 是下表常量对象，`IStoreSharedErrorCode` 为其值的联合类型。"
                 },
                 {
                   "type": "table",
@@ -2756,7 +2756,7 @@
           "name": "IStoreSharedErrorCode",
           "kind": "type",
           "signature": "export type IStoreSharedErrorCode = (typeof StoreSharedErrorCode)[keyof typeof StoreSharedErrorCode];",
-          "declarationLine": 71,
+          "declarationLine": 73,
           "source": "packages/store-shared/dist/error-code.d.ts",
           "purpose": "Value union of package shared-state semantic codes, classified together with STORE_SHARED_SOURCE.",
           "core": "Value union of package shared-state semantic codes, classified together with STORE_SHARED_SOURCE.",
@@ -2819,7 +2819,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "`STORE_SHARED_SOURCE` 是字符串常量 `'@migaia/store-shared'`。`StoreSharedErrorCode` 是下表常量对象，`IStoreSharedErrorCode` 为其值的联合类型。"
+                  "text": "`STORE_SHARED_SOURCE` 是字符串常量 `'store.shared'`。`StoreSharedErrorCode` 是下表常量对象，`IStoreSharedErrorCode` 为其值的联合类型。"
                 },
                 {
                   "type": "table",
@@ -3628,11 +3628,11 @@
         {
           "name": "STORE_SHARED_SOURCE",
           "kind": "const",
-          "signature": "export declare const STORE_SHARED_SOURCE = \"@migaia/store-shared\";",
+          "signature": "export declare const STORE_SHARED_SOURCE = \"store.shared\";",
           "declarationLine": 4,
           "source": "packages/store-shared/dist/errors.d.ts",
-          "purpose": "Canonical @migaia/store-shared source used together with StoreSharedErrorCode to classify package-owned shared-memory failures.",
-          "core": "Canonical @migaia/store-shared source used together with StoreSharedErrorCode to classify package-owned shared-memory failures.",
+          "purpose": "Canonical store.shared source used together with StoreSharedErrorCode to classify package-owned shared-memory failures.",
+          "core": "Canonical store.shared source used together with StoreSharedErrorCode to classify package-owned shared-memory failures.",
           "advanced": "",
           "parameters": ["This const declaration has no parameters."],
           "parameterDetails": [],
@@ -3643,9 +3643,7 @@
           "members": [],
           "composes": [],
           "exportPath": ".",
-          "overloadSignatures": [
-            "export declare const STORE_SHARED_SOURCE = \"@migaia/store-shared\";"
-          ],
+          "overloadSignatures": ["export declare const STORE_SHARED_SOURCE = \"store.shared\";"],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
           "whenToUse": "",
@@ -3654,7 +3652,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Canonical @migaia/store-shared source used together with StoreSharedErrorCode to classify package-owned shared-memory failures."
+              "content": "Canonical store.shared source used together with StoreSharedErrorCode to classify package-owned shared-memory failures."
             },
             {
               "id": "getting-started",
@@ -3674,7 +3672,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Canonical @migaia/store-shared source used together with StoreSharedErrorCode to classify package-owned shared-memory failures."
+              "content": "Canonical store.shared source used together with StoreSharedErrorCode to classify package-owned shared-memory failures."
             },
             {
               "id": "advanced-usage",
@@ -3683,7 +3681,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-shared/dist/errors.d.ts:STORE_SHARED_SOURCE:export declare const STORE_SHARED_SOURCE = \"@migaia/store-shared\";",
+          "identity": "packages/store-shared/dist/errors.d.ts:STORE_SHARED_SOURCE:export declare const STORE_SHARED_SOURCE = \"store.shared\";",
           "guidance": [
             {
               "id": "错误身份与处置",
@@ -3691,7 +3689,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "`STORE_SHARED_SOURCE` 是字符串常量 `'@migaia/store-shared'`。`StoreSharedErrorCode` 是下表常量对象，`IStoreSharedErrorCode` 为其值的联合类型。"
+                  "text": "`STORE_SHARED_SOURCE` 是字符串常量 `'store.shared'`。`StoreSharedErrorCode` 是下表常量对象，`IStoreSharedErrorCode` 为其值的联合类型。"
                 },
                 {
                   "type": "table",
@@ -3741,7 +3739,7 @@
           "name": "StoreSharedErrorCode",
           "kind": "const",
           "signature": "export declare const StoreSharedErrorCode: { /** * The public array updater throws before lock acquisition. Unclassified native errors receive * this identity; complete foreign identities remain with their owner and frozen values remain * reachable through cause. Correct the callback; the shared cell remains usable. */ readonly updateFailed: 'UPDATE_FAILED'; /** * A high-level `SharedInt32Array` read, write, synchronization or watch operation runs after * dispose(), or an extension explicitly checks assertActive(). Unchecked low-level cell * primitives do not perform that lifecycle check themselves. * * Create a new array instead of reusing the disposed instance. */ readonly arrayDisposed: 'ARRAY_DISPOSED'; /** * A `SharedInt32Signal` value read/write, peek(), sync() or watch() runs after dispose(). * Metadata and isStale() do not use this active check. * * Create a new signal instead of reusing the disposed instance. */ readonly signalDisposed: 'SIGNAL_DISPOSED'; /** * The supplied `SharedArrayBuffer` cannot hold the required cell layout. * * Allocate a larger buffer. This is a construction input error; do not retry the same buffer. */ readonly bufferTooSmall: 'BUFFER_TOO_SMALL'; /** * A checked `SharedInt32Array` get(), set(), update() or sync(index) receives a noninteger index * or an index outside `[0, length)`. Low-level cell primitives require their caller to validate. * * Correct the index. This is a permanent input error. */ readonly indexOutOfRange: 'INDEX_OUT_OF_RANGE'; /** * A seqlock does not settle because a cell stays unstable or its lock stays held for the * sustained contention window (about 1 s, after spin rounds with backoff), or `update()` keeps * losing the write race for its whole spin limit. * * This can reflect continuing competition, a delayed writer or a writer that abandoned a held * lock; the code alone does not distinguish them. Reduce contention or investigate the writer. If * a writer permanently left the lock odd, replace the buffer rather than forcing it unlocked. */ readonly contentionLimit: 'CONTENTION_LIMIT'; /** * `Atomics.waitAsync` is unavailable in the current environment. * * Poll with `sync()` or use a runtime that supports `waitAsync`. The library does not silently * fall back. */ readonly envUnsupported: 'ENV_UNSUPPORTED'; /** * Construction or write input is invalid, such as a length that is not a non-negative integer or * a value outside the int32 range. * * Correct the input. This is a permanent input error. */ readonly invalidOption: 'INVALID_OPTION'; };",
-          "declarationLine": 10,
+          "declarationLine": 12,
           "source": "packages/store-shared/dist/error-code.d.ts",
           "purpose": "Eight stable package codes for local disposal, memory layout, index/value admission, updater failures, sustained contention and explicit watch capability. Native classes and original causes are retained; complete foreign identities remain with their owner.",
           "core": "arrayDisposed: A validated array operation uses its disposed local wrapper; create another attached wrapper.\nsignalDisposed: Signal value, peek, sync or watch uses a disposed local wrapper.\nbufferTooSmall: An attached buffer cannot hold the current signal or array layout; allocate the correct kind and size.\nindexOutOfRange: A validated array API receives a noninteger or out-of-range index.\ncontentionLimit: A seqlock remains unstable or locked for the sustained contention window, or update exhausts its retry count; a crashed writer may require replacing the buffer.\nenvUnsupported: Explicit watch requires missing Atomics.waitAsync; callers may choose manual sync instead.\nupdateFailed: An updater throws outside the lock. Unclassified extensible native errors receive UPDATE_FAILED in place, preserving identity, class and stack. Frozen or non-Error failures remain on cause; complete foreign source/code identities retain their owner.\ninvalidOption: Length, int32 value, buffer brand, ABI header or array options violate the supported construction/write domain.",
@@ -3877,7 +3875,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "`STORE_SHARED_SOURCE` 是字符串常量 `'@migaia/store-shared'`。`StoreSharedErrorCode` 是下表常量对象，`IStoreSharedErrorCode` 为其值的联合类型。"
+                  "text": "`STORE_SHARED_SOURCE` 是字符串常量 `'store.shared'`。`StoreSharedErrorCode` 是下表常量对象，`IStoreSharedErrorCode` 为其值的联合类型。"
                 },
                 {
                   "type": "table",

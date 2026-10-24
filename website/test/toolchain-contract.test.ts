@@ -12,6 +12,7 @@ import { findGuideJourney } from '../app/guide-journeys.js'
 import { referenceFor } from '../app/reference/index.js'
 import { resolveFieldDoc } from '../app/reference/surface.js'
 import { parseSelectedLibrary, replaceOwnedEntries } from '../scripts/generate/signatures.js'
+import { LIBRARY_INDEX } from '../app/library-descriptions.js'
 
 /** Root directory used for all website-owned contract observations. */
 const websiteRoot = fileURLToPath(new URL('../', import.meta.url))
@@ -54,25 +55,42 @@ function referenceOptionSummary(
   )?.summary[locale]
 }
 
-test('keeps erased storage star exports out of the runtime inventory', () => {
-  const host = generatedApis.find((api) => api.id === 'storage-host:index')
-  const brand = host?.symbols.find(
-    (symbol) => symbol.name === 'storageBackendPluginExtensionsBrand'
-  )
-  assert.ok(brand)
-  assert.equal(brand.kind, 'type')
-  assert.match(brand.signature, /^export type \{/)
-  assert.equal(
-    host?.symbols.find((symbol) => symbol.name === 'memoryBackendPlugin')?.kind,
-    'function'
-  )
-})
-
 test('validates bounded writer selection before generation', () => {
   assert.equal(parseSelectedLibrary([]), null)
   assert.equal(parseSelectedLibrary(['--library', 'plugin-host']), 'plugin-host')
   assert.throws(() => parseSelectedLibrary(['--library']))
   assert.throws(() => parseSelectedLibrary(['--library', 'unknown']))
+  for (const library of [
+    'rpc-host',
+    'rpc-plugin-process',
+    'rpc-plugin-thread',
+    'rpc-plugin-browser',
+    'rpc-plugin-coroutines',
+    'rpc-plugin-pool',
+    'rpc-plugin-devtools'
+  ])
+    assert.equal(parseSelectedLibrary(['--library', library]), library)
+  for (const library of [
+    'rpc-core',
+    'rpc-process',
+    'rpc-threads',
+    'rpc-browser',
+    'rpc-pool',
+    'rpc-devtools'
+  ])
+    assert.throws(() => parseSelectedLibrary(['--library', library]))
+})
+
+test('reads the current workspace declaration behind the generated host API', () => {
+  /** API generation follows the latest bounded workspace build rather than website dependencies. */
+  const symbol = generatedApis
+    .find((api) => api.library === 'rpc-host' && api.module === 'index')
+    ?.symbols.find((candidate) => candidate.name === 'createRpcHost')
+  assert.ok(symbol, 'the generated host API must contain its current public factory')
+  assert.match(symbol.source, /^packages\/rpc-host\/dist\/.+\.d\.ts$/u)
+  /** The generated provenance names a real declaration from that current build. */
+  const declaration = readFileSync(resolve(websiteRoot, '..', symbol.source), 'utf8')
+  assert.match(declaration, /\bcreateRpcHost\b/u)
 })
 
 test('preserves unselected order through shrink, equal, and grow', () => {
@@ -243,10 +261,13 @@ test('generated projections contain no volatile metadata', () => {
             'plugin-host',
             'resource',
             'rpc-contract',
-            'rpc-core',
-            'rpc-process',
-            'rpc-threads',
-            'rpc-browser',
+            'rpc-host',
+            'rpc-plugin-process',
+            'rpc-plugin-thread',
+            'rpc-plugin-browser',
+            'rpc-plugin-coroutines',
+            'rpc-plugin-pool',
+            'rpc-plugin-devtools',
             'logger',
             'storage-web'
           ]
@@ -272,13 +293,11 @@ test('generated projections contain no volatile metadata', () => {
   assert.equal(apiManifest.version, 1)
   assert.equal(routeManifest.version, 1)
   assert.equal(relationshipManifest.version, 1)
-  /**
-   * Five RPC runtime owners replace the former single package, adding exactly four libraries; the
-   * separate rpc-pool package adds one more, rpc-devtools adds the observation contracts, and
-   * micro-hub adds the shared micro-frontend contract and communication library. Storage adds the
-   * host and eight backend plugins, giving 43 documentation owners.
-   */
-  assert.equal(libraryManifest.libraries.length, 43)
+  /** The maintained library universe must survive owner migration without unrelated omissions. */
+  assert.deepEqual(
+    libraryManifest.libraries.map((library: { readonly slug: string }) => library.slug).sort(),
+    LIBRARY_INDEX.map((library) => library.slug).sort()
+  )
   assert.equal(
     libraryManifest.libraries.some((library: { readonly slug: string }) => library.slug === 'docs'),
     false
@@ -493,45 +512,41 @@ test('gives every public configuration field a readable contract', () => {
 })
 
 test('gives every RPC runtime export an explicit bilingual decision guide', () => {
+  /** Every published runtime owner contributes its actual symbols; no invented total masks a gap. */
+  const owners = [
+    'rpc-contract',
+    'rpc-host',
+    'rpc-plugin-process',
+    'rpc-plugin-thread',
+    'rpc-plugin-browser',
+    'rpc-plugin-coroutines',
+    'rpc-plugin-pool',
+    'rpc-plugin-devtools'
+  ]
   const runtimeSymbols = generatedApis
-    .filter((api) =>
-      [
-        'rpc-contract',
-        'rpc-core',
-        'rpc-process',
-        'rpc-threads',
-        'rpc-browser',
-        'rpc-devtools'
-      ].includes(api.library)
-    )
+    .filter((api) => owners.includes(api.library))
     .flatMap((api) =>
       api.symbols
         .filter((symbol) => symbol.kind !== 'type' && symbol.kind !== 'interface')
         .map((symbol) => ({ api, symbol }))
     )
-
-  /**
-   * Adapter extraction moved owner entries into the adapter packages; the adapter SDK then replaced
-   * the low-level adapter exports with defineMessageAdapter / defineByteAdapter and an
-   * internal-advanced entry, and the short-source helpers added isProcessChild / isThreadChild.
-   * Browser Peer adds createBrowserPeer and its package error source/code catalog at the root.
-   * Probe adds 16 runtime exports including current-stage readers and the existing reporter
-   * aliases. The generator excludes the internal-advanced entry, including carrierSizeBytes.
-   * Devtools retains its nine canonical runtime symbols. The contract entry's error-code/source
-   * re-exports are alias-only and are not counted twice.
-   */
-  /**
-   * The coroutine change removes createCoroutineHost while keeping the createCoroutinePlugin
-   * export.
-   */
-  /** The canonical defaultRpcReporter adds one runtime export to the reviewed RPC surface. */
-  /** Removing four Bridge exports and adding one Process binding yields net minus three. */
-  /**
-   * API audits 649eee7e/99b92efe/4c88a2c5 retire eleven runtime entries. The two RuntimeEventName
-   * re-exports are aliases; 5c067227 also projects the wire-error JSON default and
-   * identifyRpcBoundaryFailure as canonical entries: 334 - 13 + 2 = 323.
-   */
-  assert.equal(runtimeSymbols.length, 323)
+  for (const owner of owners)
+    assert.ok(
+      runtimeSymbols.some(({ api }) => api.library === owner),
+      `${owner} has no published runtime API`
+    )
+  for (const retired of [
+    'rpc-core',
+    'rpc-process',
+    'rpc-threads',
+    'rpc-browser',
+    'rpc-pool',
+    'rpc-devtools'
+  ])
+    assert.equal(
+      generatedApis.some((api) => api.library === retired),
+      false
+    )
   for (const { api, symbol } of runtimeSymbols)
     for (const locale of ['en', 'zh'] as const) {
       const guide = findApiGuide(api.library, api.module, symbol.name, locale)
@@ -544,161 +559,47 @@ test('gives every RPC runtime export an explicit bilingual decision guide', () =
     }
 })
 
-test('gives every public adapter a bilingual runnable tutorial', () => {
-  /** Each adapter retains its Core overview section, public API owner and maintained example. */
+test('gives every public transport plugin a bilingual runnable tutorial', () => {
+  /** User examples enter through one host and the exact native carrier plugin roots. */
   const transports = [
-    [
-      'memory-transport',
-      'rpc-core',
-      'adapters/memory',
-      'createMemoryTransportPair',
-      'getting-started'
-    ],
-    [
-      'window-transport',
-      'rpc-browser',
-      'adapters/window',
-      'createWindowMessageTransport',
-      'peers-and-window'
-    ],
-    [
-      'browser-message-port-transport',
-      'rpc-core',
-      'adapters/message-port',
-      'createBrowserMessagePortTransport',
-      null
-    ],
-    [
-      'node-message-port-transport',
-      'rpc-core',
-      'adapters/message-port',
-      'createNodeMessagePortTransport',
-      'transports-and-security'
-    ],
-    ['web-worker-transport', 'rpc-core', 'adapters/web-worker', 'createWebWorkerTransport', null],
-    [
-      'shared-worker-transport',
-      'rpc-browser',
-      'adapters/shared-worker',
-      'createSharedWorkerTransport',
-      'shared-workers'
-    ],
-    [
-      'service-worker-transport',
-      'rpc-browser',
-      'adapters/service-worker',
-      'createServiceWorkerTransport',
-      'broadcast-and-service-workers'
-    ],
-    [
-      'broadcast-channel-transport',
-      'rpc-browser',
-      'adapters/broadcast-channel',
-      'createBroadcastChannelTransport',
-      'broadcast-and-service-workers'
-    ],
-    [
-      'rtc-data-channel-transport',
-      'rpc-browser',
-      'adapters/rtc-data-channel',
-      'createRtcDataChannelTransport',
-      'rtc-data-channels'
-    ],
-    [
-      'web-transport-datagram-transport',
-      'rpc-browser',
-      'adapters/web-transport',
-      'createWebTransportDatagramTransport',
-      'web-transport-datagrams'
-    ]
+    ['rpc-plugin-process', 'processPlugin'],
+    ['rpc-plugin-thread', 'threadPlugin'],
+    ['rpc-plugin-browser', 'windowPlugin'],
+    ['rpc-plugin-browser', 'dedicatedWorkerPlugin'],
+    ['rpc-plugin-browser', 'sharedWorkerPlugin'],
+    ['rpc-plugin-browser', 'serviceWorkerPlugin'],
+    ['rpc-plugin-browser', 'broadcastChannelPlugin'],
+    ['rpc-plugin-browser', 'rtcDataChannelPlugin'],
+    ['rpc-plugin-browser', 'webTransportPlugin'],
+    ['rpc-plugin-coroutines', 'coroutinePlugin']
   ] as const
-
   for (const locale of ['en', 'zh'] as const) {
-    /** Core keeps an overview for all ten APIs, with one complete real Node-port call. */
-    const journey = findGuideJourney('rpc-core', 'transports-and-security', locale)
+    const journey = findGuideJourney('rpc-host', 'transports-and-security', locale)
     assert.ok(journey)
-    /** The request/provider example may use the actual narrower public factory entries. */
-    const nodeSection = journey.document.sections.find(
-      (section) => section.id === 'node-message-port-transport'
-    )
-    assert.ok(nodeSection)
-    /** Real stock RPC must retain host construction, method registration, typed call and cleanup. */
-    const nodeCode = nodeSection.blocks
-      .flatMap((block) => (block.type === 'code' && block.language === 'ts' ? [block.code] : []))
-      .join('\n')
-    assert.match(nodeCode, /new MessageChannel\(/u)
-    assert.match(nodeCode, /createNodeMessagePortTransport/u)
-    assert.match(nodeCode, /from '@migaia\/rpc-core\/client'/u)
-    assert.match(nodeCode, /from '@migaia\/rpc-core\/provider'/u)
-    assert.match(nodeCode, /context\.success\(7\)/u)
-    assert.match(nodeCode, /\.provide\(/u)
-    assert.match(nodeCode, /\.send<number>/u)
-    assert.match(nodeCode, /await client\.dispose\(\)/u)
-    assert.match(nodeCode, /await provider\.dispose\(\)/u)
-    assert.match(nodeCode, /port1\.close\(\)/u)
-    assert.match(nodeCode, /port2\.close\(\)/u)
-
-    for (const [sectionId, owner, module, factory, topic] of transports) {
-      /** Every original section still explains and links the actual public factory. */
-      const section = journey.document.sections.find((candidate) => candidate.id === sectionId)
-      assert.ok(section, `${locale} transport guide misses ${sectionId}`)
-      /** Paragraph/list/table prose contains the canonical API link rather than an invented owner. */
-      const prose = section.blocks
-        .flatMap((block) =>
-          block.type === 'paragraph'
-            ? [block.text]
-            : block.type === 'list'
-              ? block.items
-              : block.type === 'table'
-                ? block.rows.flat()
-                : []
-        )
-        .join('\n')
-      /** The generated public manifest protects actual ownership and symbol existence. */
+    for (const [owner, factory] of transports) {
       const api = generatedApis.find(
         (candidate) =>
           candidate.library === owner &&
-          candidate.module === module &&
+          candidate.module === 'index' &&
           candidate.symbols.some((symbol) => symbol.name === factory && symbol.kind !== 'type')
       )
-      assert.ok(api, `${owner}/${module} does not export ${factory}`)
-      /** Link to the actual API page, including the six Browser-owned adapters. */
-      const apiPath = `/${locale}/docs/${owner}/api/${module}/${factory}`
-      assert.ok(prose.includes(`](${apiPath})`), `${locale} ${sectionId} misses ${apiPath}`)
-      assert.ok(section.blocks.some((block) => block.type === 'table'))
-      /** Each referenced API retains a direct adapter/Endpoint installation and release example. */
-      const apiGuide = findApiGuide(owner, module, factory, locale)
+      assert.ok(api, `${owner} does not export ${factory}`)
+      const apiGuide = findApiGuide(owner, 'index', factory, locale)
       assert.ok(apiGuide?.quickStart, `${locale} ${factory} has no API example`)
       assert.match(apiGuide.quickStart, new RegExp(`\\b${factory}\\b`, 'u'))
-      assert.match(apiGuide.quickStart, /createEndpoint/u)
-      assert.match(apiGuide.quickStart, /\.provide\(/u)
-      assert.match(apiGuide.quickStart, /\.dispose\(\)/u)
-      if (topic === null) continue
-
-      /** Complete business examples live on their actual owner task page, not ten inline scenes. */
-      const ownerJourney = findGuideJourney(owner, topic, locale)
-      assert.ok(ownerJourney, `${locale} ${owner}/${topic} has no business example`)
-      /** Preserve the real host input and public messaging behavior of that task. */
+      assert.match(apiGuide.quickStart, /createRpcHost/u)
+      assert.match(apiGuide.quickStart, /\.request\(|\.notify\(|\.stream\(/u)
+      assert.match(apiGuide.quickStart, /\.close\(\)/u)
+      assert.doesNotMatch(apiGuide.quickStart, /create(?:\w*Peer|\w*Endpoint)\b/u)
+      const ownerJourney = findGuideJourney(owner, 'getting-started', locale)
+      assert.ok(ownerJourney, `${locale} ${owner} has no business example`)
       const ownerCode = ownerJourney.document.sections
-        .flatMap((candidate) => candidate.blocks)
+        .flatMap((section) => section.blocks)
         .flatMap((block) => (block.type === 'code' && block.language === 'ts' ? [block.code] : []))
         .join('\n')
-      assert.ok(ownerCode.trim(), `${locale} ${owner}/${topic} has no TypeScript example`)
-      assert.match(ownerCode, /\.send(?:<|\()|\.request\(|\.subscribe\(/u)
-      if (factory === 'createSharedWorkerTransport') {
-        assert.match(ownerCode, /new SharedWorker\(/u)
-        assert.match(ownerCode, /createBrowserPeer/u)
-      } else if (factory === 'createRtcDataChannelTransport') {
-        assert.match(ownerCode, /new RTCPeerConnection\(/u)
-        assert.match(ownerCode, /createBrowserPeer/u)
-      } else {
-        assert.match(ownerCode, new RegExp(`\\b${factory}\\b`, 'u'))
-      }
-      if (owner !== 'rpc-core' || topic !== 'transports-and-security') {
-        /** An overview link must reach the actual task example instead of stopping at declarations. */
-        const taskPath = `/${locale}/docs/${owner}/${topic}`
-        assert.ok(prose.includes(`](${taskPath})`), `${locale} ${sectionId} misses ${taskPath}`)
-      }
+      assert.match(ownerCode, /createRpcHost/u)
+      assert.match(ownerCode, /\.request\(|\.notify\(|\.stream\(/u)
+      assert.match(ownerCode, /\.close\(\)/u)
     }
   }
 })
@@ -2101,29 +2002,24 @@ test('documents feature admission, readiness, and traceability', () => {
 
 test('documents boundary admission and capability composition', () => {
   const targets = [
-    ['authoring/store', 'snapshotStorageCapabilities', ['value']],
-    ['index', 'isStorageCapabilities', ['value']],
-    ['authoring/store', 'snapshotKeyValueStoreDetailed', ['store']],
-    ['authoring/store', 'snapshotKeyValueStore', ['store']],
-    ['authoring/store', 'snapshotRecordStore', ['store']],
-    ['index', 'isKeyValueStore', ['store']],
-    ['index', 'asRecordStore', ['store']],
-    ['index', 'isRecordStore', ['store']],
-    ['index', 'asSecondaryIndexRecordStore', ['store']],
-    ['index', 'isSecondaryIndexRecordStore', ['store']],
-    ['index', 'asChangeFeedStore', ['store']],
-    ['index', 'isChangeFeedStore', ['store']]
+    ['snapshotStorageCapabilities', ['value']],
+    ['isStorageCapabilities', ['value']],
+    ['snapshotKeyValueStoreDetailed', ['store']],
+    ['snapshotKeyValueStore', ['store']],
+    ['snapshotRecordStore', ['store']],
+    ['isKeyValueStore', ['store']],
+    ['asRecordStore', ['store']],
+    ['isRecordStore', ['store']],
+    ['asSecondaryIndexRecordStore', ['store']],
+    ['isSecondaryIndexRecordStore', ['store']],
+    ['asChangeFeedStore', ['store']],
+    ['isChangeFeedStore', ['store']]
   ] as const
 
-  for (const [moduleName, symbolName, expectedOptions] of targets)
+  for (const [symbolName, expectedOptions] of targets)
     for (const locale of ['en', 'zh'] as const) {
-      /** Runtime guides follow their canonical authoring owner; pure guards stay at contract root. */
-      const libraryName = moduleName === 'index' ? 'storage-contract' : 'storage-host'
-      const guide = findApiGuide(libraryName, moduleName, symbolName, locale)
-      assert.ok(
-        guide,
-        `${libraryName}:${moduleName}#${symbolName} has no ${locale} capability guide`
-      )
+      const guide = findApiGuide('storage-contract', 'index', symbolName, locale)
+      assert.ok(guide, `storage-contract:index#${symbolName} has no ${locale} capability guide`)
       assert.ok(guide.quickStart?.trim())
       assert.ok(guide.scenarios.length >= 3)
       assert.ok(guide.avoidWhen.length >= 3)
@@ -2144,28 +2040,25 @@ test('documents boundary admission and capability composition', () => {
 test('documents keys, operation context, and transactions', () => {
   const targets = [
     [
-      'authoring/context',
       'snapshotOperationContext',
       ['ctx.signal', 'ctx.timeoutMs', 'ctx.pageSize', 'ctx.conflictPolicy']
     ],
-    ['index', 'assertOperationContext', ['ctx']],
-    ['authoring/context', 'snapshotSyncWriteOptions', ['options.conflictPolicy']],
-    ['index', 'assertSyncWriteOptions', ['options']],
-    ['index', 'assertStringStorageKey', ['value', 'backend', 'label']],
-    ['index', 'assertStorageKey', ['value', 'backend', 'label']],
-    ['authoring/key', 'snapshotStorageKey', ['value', 'backend', 'label']],
-    ['authoring/key', 'compareStorageKeys', ['a', 'b']],
-    ['index', 'KEY_DOMAIN_LIMITS', []],
-    ['index', 'assertTransactionCallback', ['run', 'backend']],
-    ['index', 'readTransactionConflictPolicy', ['options.conflictPolicy', 'backend']]
+    ['assertOperationContext', ['ctx']],
+    ['snapshotSyncWriteOptions', ['options.conflictPolicy']],
+    ['assertSyncWriteOptions', ['options']],
+    ['assertStringStorageKey', ['value', 'backend', 'label']],
+    ['assertStorageKey', ['value', 'backend', 'label']],
+    ['snapshotStorageKey', ['value', 'backend', 'label']],
+    ['compareStorageKeys', ['a', 'b']],
+    ['KEY_DOMAIN_LIMITS', []],
+    ['assertTransactionCallback', ['run', 'backend']],
+    ['readTransactionConflictPolicy', ['options.conflictPolicy', 'backend']]
   ] as const
 
-  for (const [moduleName, symbolName, expectedOptions] of targets)
+  for (const [symbolName, expectedOptions] of targets)
     for (const locale of ['en', 'zh'] as const) {
-      /** Runtime guides follow their canonical authoring owner; pure guards stay at contract root. */
-      const libraryName = moduleName === 'index' ? 'storage-contract' : 'storage-host'
-      const guide = findApiGuide(libraryName, moduleName, symbolName, locale)
-      assert.ok(guide, `${libraryName}:${moduleName}#${symbolName} has no ${locale} input guide`)
+      const guide = findApiGuide('storage-contract', 'index', symbolName, locale)
+      assert.ok(guide, `storage-contract:index#${symbolName} has no ${locale} input guide`)
       assert.ok(guide.quickStart?.trim())
       assert.ok(guide.scenarios.length >= 3)
       assert.ok(guide.avoidWhen.length >= 3)
@@ -2185,30 +2078,25 @@ test('documents keys, operation context, and transactions', () => {
 
 test('documents wire identity, policy, and traceability', () => {
   const targets = [
-    ['authoring/codec', 'snapshotCodec', ['codec']],
-    ['index', 'assertCodec', ['codec']],
-    ['authoring/codec', 'fromValueCodec', []],
-    ['entity', 'jsonCodec', []],
-    ['index', 'ConflictPolicy', []],
-    ['authoring/backend', 'intrinsicConstructorName', ['value']],
-    ['index', 'STORAGE_CONTRACT_SOURCE', []],
+    ['snapshotCodec', ['codec']],
+    ['assertCodec', ['codec']],
+    ['collectionsJsonCodec', []],
+    ['COLLECTIONS_JSON_CODEC_NAME', []],
+    ['ConflictPolicy', []],
+    ['StorageContractConflictPolicy', []],
+    ['intrinsicConstructorName', ['value']],
+    ['STORAGE_CONTRACT_SOURCE', []],
     [
-      'index',
       'StorageContractError',
       ['code', 'details.backend', 'details.key', 'details.cause', 'message']
     ],
-    ['index', 'isStorageContractError', ['value']]
+    ['isStorageContractError', ['value']]
   ] as const
 
-  for (const [moduleName, symbolName, expectedOptions] of targets)
+  for (const [symbolName, expectedOptions] of targets)
     for (const locale of ['en', 'zh'] as const) {
-      /** Runtime guides follow their canonical authoring owner; pure guards stay at contract root. */
-      const libraryName = moduleName === 'index' ? 'storage-contract' : 'storage-host'
-      const guide = findApiGuide(libraryName, moduleName, symbolName, locale)
-      assert.ok(
-        guide,
-        `${libraryName}:${moduleName}#${symbolName} has no ${locale} codec/error guide`
-      )
+      const guide = findApiGuide('storage-contract', 'index', symbolName, locale)
+      assert.ok(guide, `storage-contract:index#${symbolName} has no ${locale} codec/error guide`)
       assert.ok(guide.quickStart?.trim())
       assert.ok(guide.scenarios.length >= 3)
       assert.ok(guide.avoidWhen.length >= 3)
@@ -2224,17 +2112,6 @@ test('documents wire identity, policy, and traceability', () => {
         assert.ok(option.example?.trim())
       }
     }
-  const contract = generatedApis.find((entry) => entry.id === 'storage-contract:index')
-  assert.ok(contract)
-  for (const retired of [
-    'collectionsJsonCodec',
-    'COLLECTIONS_JSON_CODEC_NAME',
-    'StorageContractConflictPolicy'
-  ])
-    assert.equal(
-      contract.symbols.some((symbol) => symbol.name === retired),
-      false
-    )
 })
 
 test('documents protocol constants, guards, and text transport', () => {
@@ -2402,49 +2279,14 @@ test('documents JSON configuration and native error identity', () => {
 
 test('documents durability, capability, and every constructor option', () => {
   const targets = [
+    ['memory', 'memoryStorageHost', []],
+    ['local-storage', 'localStorageHost', ['storage']],
+    ['session-storage', 'sessionStorageHost', ['storage']],
+    ['cookies', 'cookiesHost', ['namespace', 'namespaceCodec', 'scope', 'document']],
     [
-      'storage-host',
-      'index',
-      'memoryBackendPlugin',
-      ['namespace', 'concurrency', 'owner', 'features', 'id']
-    ],
-    [
-      'storage-web',
-      'local-storage',
-      'localStorageBackendPlugin',
-      ['features', 'id', 'namespace', 'namespaceCodec', 'storage']
-    ],
-    [
-      'storage-web',
-      'session-storage',
-      'sessionStorageBackendPlugin',
-      ['features', 'id', 'namespace', 'namespaceCodec', 'storage']
-    ],
-    [
-      'storage-web',
-      'cookies',
-      'cookieBackendPlugin',
-      [
-        'features',
-        'id',
-        'namespace',
-        'scope',
-        'namespaceCodec',
-        'scope.path',
-        'scope.domain',
-        'scope.sameSite',
-        'scope.secure',
-        'scope.partitioned',
-        'document'
-      ]
-    ],
-    [
-      'storage-web',
       'indexed-db',
-      'indexedDbBackendPlugin',
+      'indexedDbHost',
       [
-        'features',
-        'id',
         'dbName',
         'kvStoreName',
         'bytesStoreName',
@@ -2456,10 +2298,10 @@ test('documents durability, capability, and every constructor option', () => {
     ]
   ] as const
 
-  for (const [libraryName, moduleName, symbolName, expectedOptions] of targets)
+  for (const [moduleName, symbolName, expectedOptions] of targets)
     for (const locale of ['en', 'zh'] as const) {
-      const guide = findApiGuide(libraryName, moduleName, symbolName, locale)
-      assert.ok(guide, `${libraryName}:${moduleName}#${symbolName} has no ${locale} backend guide`)
+      const guide = findApiGuide('storage-web', moduleName, symbolName, locale)
+      assert.ok(guide, `storage-web:${moduleName}#${symbolName} has no ${locale} backend guide`)
       assert.ok(guide.quickStart?.trim())
       assert.ok(guide.scenarios.length >= 3)
       assert.ok(guide.avoidWhen.length >= 3)
@@ -2479,20 +2321,21 @@ test('documents durability, capability, and every constructor option', () => {
 
 test('documents selection, validation, and migration contracts', () => {
   const targets = [
-    ['entity', 'jsonCodec', []],
-    ['entity', 'binaryCodec', []],
-    ['entity', 'structuredCodec', []],
-    ['entity', 'selectCodec', ['codec', 'capabilities', 'onDiagnostic']],
-    ['entity', 'fromStandardSchema', ['schema']],
-    ['entity', 'passthrough', []]
+    ['serialize', 'jsonCodec', []],
+    ['serialize', 'binaryCodec', []],
+    ['serialize', 'structuredCodec', []],
+    ['serialize', 'selectCodec', ['codec', 'capabilities', 'onDiagnostic']],
+    ['schema', 'fromStandardSchema', ['schema']],
+    ['schema', 'passthrough', []],
+    ['schema', 'runMigrations', ['value', 'fromVersion', 'toVersion', 'migrations', 'signal']]
   ] as const
 
   for (const [moduleName, symbolName, expectedOptions] of targets)
     for (const locale of ['en', 'zh'] as const) {
-      const guide = findApiGuide('storage-host', moduleName, symbolName, locale)
+      const guide = findApiGuide('storage-web', moduleName, symbolName, locale)
       assert.ok(
         guide,
-        `storage-host:${moduleName}#${symbolName} has no ${locale} codec/schema guide`
+        `storage-web:${moduleName}#${symbolName} has no ${locale} codec/schema guide`
       )
       assert.ok(guide.quickStart?.trim())
       assert.ok(guide.scenarios.length >= 3)
@@ -2509,35 +2352,6 @@ test('documents selection, validation, and migration contracts', () => {
         assert.ok(option.example?.trim())
       }
     }
-  const migrations = [
-    ['createMigrationPlan', ['version', 'reset', 'steps']],
-    ['migrateEnvelope', ['observe', 'signal', 'report']],
-    ['migrateEnvelopeSync', ['observe']]
-  ] as const
-  for (const [name, expectedOptions] of migrations) {
-    const reference = referenceFor('storage-host')
-    const guide = reference?.symbols[`authoring/migration:${name}`] ?? reference?.symbols[name]
-    const api = generatedApis.find((entry) => entry.id === 'storage-host:authoring/migration')
-    const symbol = api?.symbols.find((entry) => entry.name === name)
-    assert.ok(guide && api && symbol, `${name} has no migration contract`)
-    assert.deepEqual(
-      symbol.configuration.map((field) => field.name),
-      expectedOptions
-    )
-    for (const locale of ['en', 'zh'] as const) {
-      assert.ok(guide.purpose[locale].trim().length >= 30)
-      assert.ok(guide.returns?.[locale].trim())
-      assert.ok(guide.params && Object.values(guide.params).every((text) => text[locale].trim()))
-      for (const field of symbol.configuration) {
-        const description =
-          referenceOptionSummary(api, symbol, field.name, locale) ??
-          findOptionTranslation(api.library, api.module, name, field.name, locale)
-        assert.ok(description?.trim(), `${name}.${field.name} ${locale}`)
-      }
-    }
-    assert.match(JSON.stringify(guide), /version|plan/)
-    assert.match(JSON.stringify(guide), /migrateEnvelope|createMigrationPlan/)
-  }
 })
 
 test('documents repository composition and every definition option', () => {
@@ -2555,8 +2369,8 @@ test('documents repository composition and every definition option', () => {
   ]
 
   for (const locale of ['en', 'zh'] as const) {
-    const guide = findApiGuide('storage-host', 'entity', 'defineEntity', locale)
-    assert.ok(guide, `storage-host:entity#defineEntity has no ${locale} entity guide`)
+    const guide = findApiGuide('storage-web', 'entity', 'defineEntity', locale)
+    assert.ok(guide, `storage-web:entity#defineEntity has no ${locale} entity guide`)
     assert.ok(guide.quickStart?.includes('.connect('))
     assert.ok(guide.quickStart?.includes('.put('))
     assert.ok(guide.scenarios.length >= 4)
@@ -2584,8 +2398,8 @@ test('documents authority, topology, installation, and lifecycle options', () =>
 
   for (const [symbolName, expectedOptions] of targets)
     for (const locale of ['en', 'zh'] as const) {
-      const guide = findApiGuide('storage-host', 'index', symbolName, locale)
-      assert.ok(guide, `storage-host:index#${symbolName} has no ${locale} Host guide`)
+      const guide = findApiGuide('storage-web', 'host', symbolName, locale)
+      assert.ok(guide, `storage-web:host#${symbolName} has no ${locale} Host guide`)
       assert.ok(guide.quickStart?.trim())
       assert.ok(guide.scenarios.length >= 3)
       assert.ok(guide.avoidWhen.length >= 3)
@@ -2652,50 +2466,23 @@ test('documents public namespace and errors while keeping Host helpers private',
 })
 
 test('documents non-reactive factories and custom reactive adapters', () => {
-  /** Each backend keeps its native options; optional Features declare their exact target kind. */
+  /**
+   * Commit c8d24f68 made custom reactive features store-owned; the definition no longer takes
+   * backendKind.
+   */
   const targets = [
+    ['plugins-memory', 'memoryBackendPlugin', ['id']],
+    ['plugins-local-storage', 'localStorageBackendPlugin', ['storage']],
+    ['plugins-session-storage', 'sessionStorageBackendPlugin', ['storage']],
     [
-      'storage-host',
-      'index',
-      'memoryBackendPlugin',
-      ['namespace', 'concurrency', 'owner', 'features', 'id']
-    ],
-    [
-      'storage-web',
-      'local-storage',
-      'localStorageBackendPlugin',
-      ['features', 'id', 'namespace', 'namespaceCodec', 'storage']
-    ],
-    [
-      'storage-web',
-      'session-storage',
-      'sessionStorageBackendPlugin',
-      ['features', 'id', 'namespace', 'namespaceCodec', 'storage']
-    ],
-    [
-      'storage-web',
-      'cookies',
+      'plugins-cookies',
       'cookieBackendPlugin',
-      [
-        'features',
-        'id',
-        'namespace',
-        'scope',
-        'namespaceCodec',
-        'scope.path',
-        'scope.domain',
-        'scope.sameSite',
-        'scope.secure',
-        'scope.partitioned',
-        'document'
-      ]
+      ['namespace', 'namespaceCodec', 'scope', 'document']
     ],
     [
-      'storage-web',
-      'indexed-db',
+      'plugins-indexed-db',
       'indexedDbBackendPlugin',
       [
-        'features',
         'id',
         'dbName',
         'kvStoreName',
@@ -2706,14 +2493,17 @@ test('documents non-reactive factories and custom reactive adapters', () => {
         'keyRange'
       ]
     ],
-    ['storage-host', 'index', 'defineFeature', []],
-    ['storage-host', 'index', 'definePlugin', []]
+    [
+      'reactive-adapter',
+      'defineReactiveAdapterFeature',
+      ['mode', 'pollIntervalMs', 'visibility', 'subscribe']
+    ]
   ] as const
 
-  for (const [libraryName, moduleName, symbolName, expectedOptions] of targets)
+  for (const [moduleName, symbolName, expectedOptions] of targets)
     for (const locale of ['en', 'zh'] as const) {
-      const guide = findApiGuide(libraryName, moduleName, symbolName, locale)
-      assert.ok(guide, `${libraryName}:${moduleName}#${symbolName} has no ${locale} plugin guide`)
+      const guide = findApiGuide('storage-web', moduleName, symbolName, locale)
+      assert.ok(guide, `storage-web:${moduleName}#${symbolName} has no ${locale} plugin guide`)
       assert.ok(guide.quickStart?.trim())
       assert.ok(guide.scenarios.length >= 3)
       assert.ok(guide.avoidWhen.length >= 3)
@@ -2732,13 +2522,36 @@ test('documents non-reactive factories and custom reactive adapters', () => {
 })
 
 test('documents honest visibility and every factory option', () => {
-  const targets = [['features/reactive', 'reactiveFeature', ['target']]] as const
+  const targets = [
+    ['plugins-reactive-memory', 'memoryReactive', ['id']],
+    ['plugins-reactive-local-storage', 'localStorageReactive', ['storage']],
+    ['plugins-reactive-session-storage', 'sessionStorageReactive', ['storage']],
+    [
+      'plugins-reactive-cookies',
+      'cookiesReactive',
+      ['namespace', 'namespaceCodec', 'scope', 'document']
+    ],
+    [
+      'plugins-reactive-indexed-db',
+      'indexedDbReactive',
+      [
+        'id',
+        'dbName',
+        'kvStoreName',
+        'bytesStoreName',
+        'recordsStoreName',
+        'cleanupLegacyRecords',
+        'factory',
+        'keyRange'
+      ]
+    ]
+  ] as const
 
   for (const [moduleName, symbolName, expectedOptions] of targets)
     for (const locale of ['en', 'zh'] as const) {
       const guide = findApiGuide('storage-web', moduleName, symbolName, locale)
       assert.ok(guide, `storage-web:${moduleName}#${symbolName} has no ${locale} reactive guide`)
-      assert.ok(guide.quickStart?.includes('.live('))
+      assert.ok(guide.quickStart?.includes('liveQuery'))
       assert.ok(guide.scenarios.length >= 3)
       assert.ok(guide.avoidWhen.length >= 3)
       assert.deepEqual(

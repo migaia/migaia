@@ -12,9 +12,9 @@ import { utilsReference } from './utils.js'
 import { resourceReference } from './resource.js'
 import { loggerReference } from './logger.js'
 import { trayReference } from './tray.js'
-import { rpcBrowserReference } from './rpc-browser.js'
-import { rpcThreadsReference } from './rpc-threads.js'
-import { rpcProcessReference } from './rpc-process.js'
+import { rpcBrowserReference } from './rpc-plugin-browser.js'
+import { rpcThreadsReference } from './rpc-plugin-thread.js'
+import { rpcProcessReference } from './rpc-plugin-process.js'
 import { storageWebReference } from './storage-web.js'
 import { storeLightReference } from './store-light.js'
 import { capabilityReference } from './capability.js'
@@ -23,9 +23,10 @@ import { serializeReference } from './serialize.js'
 import { reference as supervisionReference } from './supervision.js'
 import { reference as wasmReference } from './wasm.js'
 import { reference as rpcContractReference } from './rpc-contract.js'
-import { reference as rpcCoreReference } from './rpc-core.js'
-import { rpcDevtoolsReference } from './rpc-devtools.js'
-import { rpcPoolReference } from './rpc-pool.js'
+import { rpcHostReference } from './rpc-host.js'
+import { rpcDevtoolsReference } from './rpc-plugin-devtools.js'
+import { rpcPoolReference } from './rpc-plugin-pool.js'
+import { rpcCoroutinesReference } from './rpc-plugin-coroutines.js'
 import { storageContractReference } from './storage-contract.js'
 import { storageHostReference } from './storage-host.js'
 import { storageContractCases } from './storage-contract-cases.js'
@@ -196,9 +197,9 @@ export const libraryReferences: Readonly<Record<string, ILibraryReference>> = {
   resource: resourceReference,
   logger: loggerReference,
   tray: trayReference,
-  'rpc-browser': rpcBrowserReference,
-  'rpc-threads': rpcThreadsReference,
-  'rpc-process': rpcProcessReference,
+  'rpc-plugin-browser': rpcBrowserReference,
+  'rpc-plugin-thread': rpcThreadsReference,
+  'rpc-plugin-process': rpcProcessReference,
   'storage-web': storageWebReference,
   'store-light': storeLightReference,
   capability: capabilityReference,
@@ -207,9 +208,10 @@ export const libraryReferences: Readonly<Record<string, ILibraryReference>> = {
   supervision: supervisionReference,
   wasm: wasmReference,
   'rpc-contract': rpcContractReference,
-  'rpc-core': rpcCoreReference,
-  'rpc-devtools': rpcDevtoolsReference,
-  'rpc-pool': rpcPoolReference,
+  'rpc-host': rpcHostReference,
+  'rpc-plugin-devtools': rpcDevtoolsReference,
+  'rpc-plugin-pool': rpcPoolReference,
+  'rpc-plugin-coroutines': rpcCoroutinesReference,
   'storage-contract': withStorageExamples('storage-contract', storageContractReference),
   'storage-host': withStorageExamples('storage-host', storageHostReference),
   'storage-plugin-redis': storagePluginRedisReference,

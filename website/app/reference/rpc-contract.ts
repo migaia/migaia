@@ -2370,7 +2370,7 @@ operation(
 operation(
   'rpcBinaryBackingLength',
   'Reads genuine non-shared ArrayBuffer byte length from intrinsic slots rather than a shadowed application property.',
-  '通过内建槽读取真实非共享背板字节数，而非应用遮蔽属性。',
+  '通过内建槽返回真实非共享背板的完整字节数，包含视图以外的背板范围，不读取应用遮蔽的同名属性。',
   {
     backing: t(
       'Original non-shared ArrayBuffer from application data or native sidecars.',
@@ -2610,13 +2610,13 @@ for (const [name, en, zh, extra] of [
   [
     'checkRpcStreamInitialSequence',
     'Checks that the original stream open uses sequence zero without starting or advancing stream state.',
-    '检查原始流打开是否使用零序号，不创建或推进流状态。',
+    '检查实际流打开帧是否使用零序号并返回协议错误或未定义，不创建交换记录，也不推进原所有者的流状态。',
     {}
   ],
   [
     'checkRpcStreamSequence',
     'Checks equality with the owner-held expected sequence; an absent exchange cannot acknowledge cancellation.',
-    '检查与所有者已有预期序号相等；不存在的交换不能确认取消。',
+    '将实际帧序号与原所有者持有的预期序号比较并返回错误或未定义，不存在的交换不能据此确认取消。',
     {
       expected: t(
         'Original owner-held IRpcStreamSequence, or undefined when no exchange exists.',
@@ -2627,13 +2627,13 @@ for (const [name, en, zh, extra] of [
   [
     'checkRpcStreamProgress',
     'Allows a terminal runtime notification to advance beyond discarded items, while rejecting backward sequence movement.',
-    '允许运行终止通知越过已丢弃条目向前推进，但拒绝序号后退。',
+    '检查终止通知的序号进度并返回错误或未定义，允许越过已丢弃条目前进，拒绝后退且不更新流状态。',
     { state: t('Actual owner-held latest IRpcStreamSequence.', '实际所有者持有的最近流序号。') }
   ],
   [
     'checkRpcStreamConsumerCredit',
     'Checks matching consumer sequence and an actual outstanding pull credit before accepting a response.',
-    '接受响应前检查消费方序号匹配并实际持有未完成拉取额度。',
+    '接受响应前核对消费方序号与尚未消耗的拉取额度，返回协议错误或未定义，状态更新仍由原流所有者执行。',
     {
       state: t(
         'Actual consumer-owned sequence and pending credit token.',
@@ -2644,7 +2644,7 @@ for (const [name, en, zh, extra] of [
   [
     'checkRpcStreamProducerCredit',
     'Checks matching producer sequence and absence of an in-flight pull before granting the next item.',
-    '授予下个条目前检查生产方序号匹配且没有进行中的拉取。',
+    '授予下一条目前核对生产方序号及进行中的拉取状态，返回协议错误或未定义，不启动额外生产操作。',
     {
       state: t(
         'Actual producer-owned sequence and busy marker.',

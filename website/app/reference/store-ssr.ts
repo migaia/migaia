@@ -690,8 +690,8 @@ export const storeSsrReference: ILibraryReference = {
     SSRRequestScope: {
       role: 'factory',
       purpose: t(
-        'Creates one fixed-Runtime request registry, equivalent to createSSRRequestScope.',
-        '创建固定运行时的请求注册表，等价于请求作用域工厂。'
+        'Creates a request registry bound to one Runtime for Store and Resource registration, snapshot generation and deterministic cleanup; equivalent to createSSRRequestScope.',
+        '创建绑定单一运行时的请求注册表，统一登记状态与资源、生成快照并在请求结束时清理，行为等价于请求作用域工厂。'
       ),
       options: 'ISSRRequestScopeOptions',
       optionDocs: runtimeMembers,
@@ -729,8 +729,8 @@ export const storeSsrReference: ILibraryReference = {
     assertSSRState: {
       role: 'operation',
       purpose: t(
-        'Validates version-1 envelope and recursive plain JSON data without cloning/freezing.',
-        '校验第一版外层及递归普通可序列化数据，不拷贝也不冻结。'
+        'Validates an unknown value as a version-1 SSR envelope, checking its recursive JSON graph, resource snapshots and traversal limits without copying or freezing it.',
+        '校验未知值是否为第一版 SSR 状态，检查递归 JSON 数据、资源快照及遍历限制，直接验证原值，不拷贝或冻结。'
       ),
       params: {
         value: t(
@@ -829,8 +829,8 @@ export const storeSsrReference: ILibraryReference = {
     readSSRStateFromDocument: {
       role: 'operation',
       purpose: t(
-        'Reads text from an explicitly injected host; never reads global document or checks script metadata.',
-        '读取显式注入宿主的正文，不读取全局文档也不检查脚本元数据。'
+        'Parses and validates SSR state text obtained from an explicitly injected document-like host, without reading the global document or inspecting script metadata.',
+        '从显式注入的文档宿主读取正文并解析、校验 SSR 状态，不隐式访问全局文档，也不依赖脚本标签元数据。'
       ),
       params: {
         elementId: t(
@@ -882,8 +882,8 @@ export const storeSsrReference: ILibraryReference = {
     STORE_SSR_SOURCE: {
       role: 'constant',
       purpose: t(
-        'Source @migaia/store-ssr for package-owned failures; complete foreign source/code identities retain their owner.',
-        '本包拥有的失败所附精确来源标记 `@migaia/store-ssr`，须与错误码联合识别，完整外包错误身份保持原归属。'
+        'Source store.ssr for package-owned failures; complete foreign source/code identities retain their owner.',
+        '本包拥有的失败所附精确来源标记 `store.ssr`，须与错误码联合识别，完整外包错误身份保持原归属。'
       ),
       example: `import { STORE_SSR_SOURCE } from '@migaia/store-ssr'
 console.log(STORE_SSR_SOURCE)`

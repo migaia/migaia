@@ -1049,7 +1049,7 @@ export const storePersistReference: ILibraryReference = {
     STORE_PERSIST_SOURCE: {
       role: 'constant',
       purpose: t(
-        'Stable @migaia/store-persist source attached to package-owned boundary errors; inspect it together with the stable code.',
+        'Stable store.persist source attached to package-owned boundary errors; inspect it together with the stable code.',
         '附加到包拥有边界错误上的稳定来源标记，读取时同时检查稳定错误码。'
       ),
       example: 'console.log(STORE_PERSIST_SOURCE)'

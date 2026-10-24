@@ -61,7 +61,7 @@
               {
                 "type": "list",
                 "items": [
-                  "iframe、Worker、跨标签页：这些是不同的 realm，用 `@migaia/rpc-browser`。",
+                  "iframe、Worker、跨标签页：这些是不同的 realm，用 `@migaia/rpc-plugin-browser`。",
                   "页面内单个应用自己的状态：直接用 `@migaia/store-keyed` 或 `@migaia/store-light`。"
                 ]
               }
@@ -238,7 +238,7 @@
                   ["`@migaia/event-subscriber`", "事件通道与请求 handler 选择"],
                   ["`@migaia/plugin-host`", "能力插件与每个应用的安装、卸载"],
                   ["`@migaia/store-persist`", "持久化防抖、版本与 hydrate 竞态"],
-                  ["`@migaia/rpc-browser`", "iframe / Worker 等跨 realm 通信"]
+                  ["`@migaia/rpc-plugin-browser`", "iframe / Worker 等跨 realm 通信"]
                 ]
               }
             ]
@@ -669,7 +669,7 @@
                 {
                   "type": "list",
                   "items": [
-                    "iframes, Workers, or other browser tabs. These are separate realms; use `@migaia/rpc-browser`.",
+                    "iframes, Workers, or other browser tabs. These are separate realms; use `@migaia/rpc-plugin-browser`.",
                     "State that belongs to a single app on the page. Use `@migaia/store-keyed` or `@migaia/store-light` directly."
                   ]
                 }
@@ -853,7 +853,7 @@
                       "Persistence debouncing, versions and hydrate races"
                     ],
                     [
-                      "`@migaia/rpc-browser`",
+                      "`@migaia/rpc-plugin-browser`",
                       "Cross-realm communication such as iframes and Workers"
                     ]
                   ]
@@ -1336,7 +1336,7 @@
           "source": "packages/micro-hub/dist/hub.d.ts",
           "purpose": "Creates the single hub of the page. Only the shell calls it; child apps call `getMicroHub()`. Every plugin's dependencies are checked first, and the plugins are installed only when all of them are met, so a missing dependency leaves no hub behind.",
           "core": "The `IMicroHub`. Throws `HUB_ALREADY_CREATED` when a hub already exists in this realm, and `PLUGIN_MISSING` when a plugin needs another plugin that is not in `plugins`.\nplugins: Capability plugins to install: any of `events()`, `state()`, `persist()`, `resources()`. Order does not matter; dependencies are checked before anything is installed.\nreport: Receives errors that must not interrupt the current operation: exceptions from listeners and subscription callbacks, and cleanup failures. If it throws, both errors go to the default reporter.\n`globalThis.reportError`, or `console.error` when that is missing.\nSend listener failures of all apps to your error monitoring.",
-          "advanced": "Several Module Federation remotes or Web Component child apps on one page share state, events and requests.\niframes, Workers or other tabs are separate realms: use `@migaia/rpc-browser`.\nState used by only one app: use `@migaia/store-keyed` or `@migaia/store-light` directly.",
+          "advanced": "Several Module Federation remotes or Web Component child apps on one page share state, events and requests.\niframes, Workers or other tabs are separate realms: use `@migaia/rpc-plugin-browser` with `createRpcHost`.\nState used by only one app: use `@migaia/store-keyed` or `@migaia/store-light` directly.",
           "parameters": ["options: ICreateMicroHubOptions"],
           "parameterDetails": [
             {
@@ -1369,7 +1369,7 @@
           ],
           "overloadReturns": ["IMicroHub"],
           "whenToUse": "Several Module Federation remotes or Web Component child apps on one page share state, events and requests.",
-          "notUse": "iframes, Workers or other tabs are separate realms: use `@migaia/rpc-browser`.\nState used by only one app: use `@migaia/store-keyed` or `@migaia/store-light` directly.",
+          "notUse": "iframes, Workers or other tabs are separate realms: use `@migaia/rpc-plugin-browser` with `createRpcHost`.\nState used by only one app: use `@migaia/store-keyed` or `@migaia/store-light` directly.",
           "sections": [
             {
               "id": "introduction",
@@ -1399,7 +1399,7 @@
             {
               "id": "advanced-usage",
               "title": "高阶用法",
-              "content": "Several Module Federation remotes or Web Component child apps on one page share state, events and requests.\niframes, Workers or other tabs are separate realms: use `@migaia/rpc-browser`.\nState used by only one app: use `@migaia/store-keyed` or `@migaia/store-light` directly."
+              "content": "Several Module Federation remotes or Web Component child apps on one page share state, events and requests.\niframes, Workers or other tabs are separate realms: use `@migaia/rpc-plugin-browser` with `createRpcHost`.\nState used by only one app: use `@migaia/store-keyed` or `@migaia/store-light` directly."
             }
           ],
           "declaredConfiguration": [
@@ -3537,7 +3537,7 @@
           "name": "IMicroHubErrorCode",
           "kind": "type",
           "signature": "export type IMicroHubErrorCode = (typeof MicroHubErrorCode)[keyof typeof MicroHubErrorCode];",
-          "declarationLine": 108,
+          "declarationLine": 110,
           "source": "packages/micro-hub/dist/error-code.d.ts",
           "purpose": "The union of every `MicroHubErrorCode` value.",
           "core": "The union of every `MicroHubErrorCode` value.",
@@ -4885,11 +4885,11 @@
         {
           "name": "MICRO_HUB_SOURCE",
           "kind": "const",
-          "signature": "export declare const MICRO_HUB_SOURCE = \"@migaia/micro-hub\";",
+          "signature": "export declare const MICRO_HUB_SOURCE = \"micro-frontend.hub\";",
           "declarationLine": 4,
           "source": "packages/micro-hub/dist/errors.d.ts",
-          "purpose": "The `source` value on every error this package creates (`@migaia/micro-hub`). Compare `error.source` with it to know the error came from this package, then branch on `error.code`.",
-          "core": "The `source` value on every error this package creates (`@migaia/micro-hub`). Compare `error.source` with it to know the error came from this package, then branch on `error.code`.",
+          "purpose": "The `source` value on every error this package creates (`micro-frontend.hub`). Compare `error.source` with it to know the error came from this package, then branch on `error.code`.",
+          "core": "The `source` value on every error this package creates (`micro-frontend.hub`). Compare `error.source` with it to know the error came from this package, then branch on `error.code`.",
           "advanced": "",
           "parameters": ["This const declaration has no parameters."],
           "parameterDetails": [],
@@ -4901,7 +4901,7 @@
           "composes": [],
           "aliasOf": "MICRO_HUB_SOURCE",
           "exportPath": ".",
-          "overloadSignatures": ["export declare const MICRO_HUB_SOURCE = \"@migaia/micro-hub\";"],
+          "overloadSignatures": ["export declare const MICRO_HUB_SOURCE = \"micro-frontend.hub\";"],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
           "whenToUse": "",
@@ -4910,7 +4910,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "The `source` value on every error this package creates (`@migaia/micro-hub`). Compare `error.source` with it to know the error came from this package, then branch on `error.code`."
+              "content": "The `source` value on every error this package creates (`micro-frontend.hub`). Compare `error.source` with it to know the error came from this package, then branch on `error.code`."
             },
             {
               "id": "getting-started",
@@ -4930,7 +4930,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The `source` value on every error this package creates (`@migaia/micro-hub`). Compare `error.source` with it to know the error came from this package, then branch on `error.code`."
+              "content": "The `source` value on every error this package creates (`micro-frontend.hub`). Compare `error.source` with it to know the error came from this package, then branch on `error.code`."
             },
             {
               "id": "advanced-usage",
@@ -4939,7 +4939,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/micro-hub/dist/errors.d.ts:MICRO_HUB_SOURCE:export declare const MICRO_HUB_SOURCE = \"@migaia/micro-hub\";",
+          "identity": "packages/micro-hub/dist/errors.d.ts:MICRO_HUB_SOURCE:export declare const MICRO_HUB_SOURCE = \"micro-frontend.hub\";",
           "guidance": [
             {
               "id": "错误",
@@ -5071,7 +5071,7 @@
           "name": "MicroHubErrorCode",
           "kind": "const",
           "signature": "export declare const MicroHubErrorCode: { /** * `createMicroHub()` is called while a hub already exists in this realm. * * The module is a singleton: only the shell configures it. Child apps call `getMicroHub()`; call * `hub.dispose()` first when a fresh hub is really intended. */ readonly hubAlreadyCreated: 'HUB_ALREADY_CREATED'; /** * `getMicroHub()` is called before the shell created the hub. * * Load order is wrong: create the hub in the shell before any remote mounts, or create it in a * child's standalone development entry. */ readonly hubNotCreated: 'HUB_NOT_CREATED'; /** * `connect(name)` is called while an app with the same name is still connected. * * Prevents double subscriptions after a remount. Disconnect the previous instance first. */ readonly appAlreadyConnected: 'APP_ALREADY_CONNECTED'; /** * A member of an app handle, or of a view obtained from it, is used after `disconnect()` began. * * Connect again to obtain a live handle; disconnected handles are never revived. */ readonly appDisconnected: 'APP_DISCONNECTED'; /** * A contract needs a capability (`events`, `state`, `persist`, `resource`) the hub was created * without, or a capability plugin requires another one that is missing. * * Add the plugin to `createMicroHub({ plugins })`. */ readonly pluginMissing: 'PLUGIN_MISSING'; /** * A contract is used with a major version different from the one already registered under the * same name. * * Two independently deployed apps disagree on the contract shape; deploy matching versions. */ readonly contractVersionMismatch: 'CONTRACT_VERSION_MISMATCH'; /** * `own(contract)` is called while another connected app (or the same app) already owns it. * * Each contract has at most one owner. Wait for the current owner to disconnect. */ readonly contractOwned: 'CONTRACT_OWNED'; /** * A command is called by an app that is neither the owner nor listed in the contract `writers`. * * Add the app to `writers`, or route the change through the owner with a request. */ readonly writeDenied: 'WRITE_DENIED'; /** * An event is emitted by an app that does not own the contract. * * Events belong to the owner; other apps use commands or requests to reach it. */ readonly emitDenied: 'EMIT_DENIED'; /** * A command returned a thenable. Thrown as `TypeError`; no state was written. * * Commands must be synchronous pure functions so a commit is atomic. Do async work first, then * call the command with the result. */ readonly commandAsync: 'COMMAND_ASYNC'; /** * `handle()` or `provide()` is called twice for the same request or resource of one contract. * * Each request or resource has exactly one provider; remove the duplicate registration. */ readonly handlerDuplicated: 'HANDLER_DUPLICATED'; /** * A request is made while the contract has no owner (or no handler for it) and no `waitForOwner` * was given. * * Pass `waitForOwner` when the owner may mount later, or retry after it connects. */ readonly ownerAbsent: 'OWNER_ABSENT'; /** * `waitForOwner` elapsed before the owner registered a handler for the request. * * The owner did not mount in time; surface the failure or retry later. */ readonly ownerTimeout: 'OWNER_TIMEOUT'; /** * The owner disconnected while a request to it was in flight. * * The handler may or may not have completed its side effects; reconcile before retrying. */ readonly ownerGone: 'OWNER_GONE'; /** * An argument or option has an invalid shape: empty or dotted names, a non-positive version, * unknown fields in a command patch, a non-function command. Thrown as `TypeError`. * * Fix the call site; nothing was registered. */ readonly invalidOption: 'INVALID_OPTION'; };",
-          "declarationLine": 8,
+          "declarationLine": 10,
           "source": "packages/micro-hub/dist/error-code.d.ts",
           "purpose": "Every error code this package throws. Errors keep their native type (`Error` or `TypeError`) and carry `source` and `code`; branch on `code`, not on the message.",
           "core": "hubAlreadyCreated: `HUB_ALREADY_CREATED`: `createMicroHub` was called while a hub exists. Child apps use `getMicroHub()`.\nhubNotCreated: `HUB_NOT_CREATED`: no hub exists, or it has been disposed. Create it in the shell first.\nappAlreadyConnected: `APP_ALREADY_CONNECTED`: an app with the same name is still connected. Disconnect the old instance first.\nappDisconnected: `APP_DISCONNECTED`: a handle or view was used after disconnecting. Connect again.\npluginMissing: `PLUGIN_MISSING`: a contract or a plugin needs a capability that is not installed. Add the plugin to `plugins`.\ncontractVersionMismatch: `CONTRACT_VERSION_MISMATCH`: a contract name was used with another major version. Align the deployed versions.\ncontractOwned: `CONTRACT_OWNED`: the contract already has an owner. Wait for it to disconnect or call `release()`.\nwriteDenied: `WRITE_DENIED`: the caller is neither the owner nor in `writers`. Add it to `writers`, or use a request.\nemitDenied: `EMIT_DENIED`: an owner-only member (emit, handle, provide) was called after `release()`. Claim ownership again.\ncommandAsync: `COMMAND_ASYNC`: a command returned a thenable; nothing was written. Finish asynchronous work before calling the command.\nhandlerDuplicated: `HANDLER_DUPLICATED`: `handle` or `provide` was registered twice for one name. Remove the duplicate.\nownerAbsent: `OWNER_ABSENT`: no handler or fetcher is registered. Pass `waitForOwner`, or retry later.\nownerTimeout: `OWNER_TIMEOUT`: waiting for a handler timed out. Report the failure, or retry later.\nownerGone: `OWNER_GONE`: the owner left while a request was in progress; side effects may have happened. Reconcile before retrying.\ninvalidOption: `INVALID_OPTION` (`TypeError`): a name, version, contract member or patch field is invalid. Fix the call.",

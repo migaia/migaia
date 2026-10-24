@@ -248,7 +248,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "1. `get` 登记依赖，`peek` / `preview` 不登记。 React 适配层的快照读取必须用 `peek` 或 `preview`。 2. `set` 只接受可写定义（`atomDef`、`atomDefFactory`、`writableDef` 及其 optics）。对只读派生写入抛 `TypeError`，经过 `override` 间接指向只读定义时也一样。`set` 在一个批次里执行，不会被外层的追踪记成依赖。 3. `override` 必须保持写入方式。 只读定义可以换成任何同值类型的定义；源定义只能换成源定义；可写派生只能换成参数和返回值相同的可写派生。override 链成环抛 `CYCLIC_OVERRIDE`。 4. 对象初值按 store 复制。 复制用 `structuredClone`，值不可克隆（例如含函数）时抛 `INVALID_OPTION`，宿主缺少 `structuredClone` 时抛 `ENV_UNSUPPORTED`。 5. `preview` 不执行未声明安全的工厂。 `atomDefFactory` 的工厂在 `preview` 里会抛 `PREVIEW_UNSAFE`；确认工厂纯、无副作用后改用 `previewSafeAtomDefFactory`。推测出的值在 Runtime 空闲清理（默认微任务）后，若始终没有变成真实节点就丢弃。 6. `dispose()` 的顺序。 先标记为已释放，再取消全部订阅，再按建出的逆序释放节点；单个失败不阻断其余步骤，多个失败合并成 `AggregateError`（`DISPOSAL_FAILED`）。释放后的任何访问抛 `ATOM_STORE_DISPOSED`。 7. 缓存清理和节点释放是两回事。 `splitDef(...).prune(store)`、`familyDef(...).forget()` / `clear()` 只清理定义的缓存，不释放 store 里已建的节点；节点用 `store.release()` 或 `store.dispose()` 释放。`forget` 之后同一个 key 会得到新定义，旧定义的状态与新定义互不相通。 8. family 需要 `WeakRef` 和 `FinalizationRegistry`。 宿主缺少它们时，调用 `familyDef` / `derivedFamilyDef` 就抛 `ENV_UNSUPPORTED`，不会悄悄退化。 9. key 比较用 SameValueZero，和 `Map` / `Set` 一致：`-0` 与 `+0` 是同一个 key，`NaN` 等于自身。 10. 错误身份。 本包产生的错误带 `source === STORE_KEYED_SOURCE`（`@migaia/store-keyed`）和 `StoreKeyedErrorCode` 里的 `code`；其他包已有身份的错误保持原样。按 `source` / `code` 判断，不要比较 message。"
+                "text": "1. `get` 登记依赖，`peek` / `preview` 不登记。 React 适配层的快照读取必须用 `peek` 或 `preview`。 2. `set` 只接受可写定义（`atomDef`、`atomDefFactory`、`writableDef` 及其 optics）。对只读派生写入抛 `TypeError`，经过 `override` 间接指向只读定义时也一样。`set` 在一个批次里执行，不会被外层的追踪记成依赖。 3. `override` 必须保持写入方式。 只读定义可以换成任何同值类型的定义；源定义只能换成源定义；可写派生只能换成参数和返回值相同的可写派生。override 链成环抛 `CYCLIC_OVERRIDE`。 4. 对象初值按 store 复制。 复制用 `structuredClone`，值不可克隆（例如含函数）时抛 `INVALID_OPTION`，宿主缺少 `structuredClone` 时抛 `ENV_UNSUPPORTED`。 5. `preview` 不执行未声明安全的工厂。 `atomDefFactory` 的工厂在 `preview` 里会抛 `PREVIEW_UNSAFE`；确认工厂纯、无副作用后改用 `previewSafeAtomDefFactory`。推测出的值在 Runtime 空闲清理（默认微任务）后，若始终没有变成真实节点就丢弃。 6. `dispose()` 的顺序。 先标记为已释放，再取消全部订阅，再按建出的逆序释放节点；单个失败不阻断其余步骤，多个失败合并成 `AggregateError`（`DISPOSAL_FAILED`）。释放后的任何访问抛 `ATOM_STORE_DISPOSED`。 7. 缓存清理和节点释放是两回事。 `splitDef(...).prune(store)`、`familyDef(...).forget()` / `clear()` 只清理定义的缓存，不释放 store 里已建的节点；节点用 `store.release()` 或 `store.dispose()` 释放。`forget` 之后同一个 key 会得到新定义，旧定义的状态与新定义互不相通。 8. family 需要 `WeakRef` 和 `FinalizationRegistry`。 宿主缺少它们时，调用 `familyDef` / `derivedFamilyDef` 就抛 `ENV_UNSUPPORTED`，不会悄悄退化。 9. key 比较用 SameValueZero，和 `Map` / `Set` 一致：`-0` 与 `+0` 是同一个 key，`NaN` 等于自身。 10. 错误身份。 本包产生的错误带 `source === STORE_KEYED_SOURCE`（`store.keyed`）和 `StoreKeyedErrorCode` 里的 `code`；其他包已有身份的错误保持原样。按 `source` / `code` 判断，不要比较 message。"
               },
               {
                 "type": "paragraph",
@@ -1093,7 +1093,7 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "源文件：`src/errors.ts`、`src/error-code.ts`、`src/error-text.ts`。本包创建的错误带 `source: '@migaia/store-keyed'` 与稳定 `code`；Reactive 或其它已有编码错误保留实际 owner。纯 optic 属性访问失败使用 `OPTIC_ACCESS_FAILED`：可扩展原生错误在原对象附码，保留类型、message、stack；frozen/非 Error 主值经 coded fallback 的 cause 可达。任意值品牌守卫读取失败返回 false。按 source/code 处理（而非 message）。"
+                "text": "源文件：`src/errors.ts`、`src/error-code.ts`、`src/error-text.ts`。本包创建的错误带 `source: 'store.keyed'` 与稳定 `code`；Reactive 或其它已有编码错误保留实际 owner。纯 optic 属性访问失败使用 `OPTIC_ACCESS_FAILED`：可扩展原生错误在原对象附码，保留类型、message、stack；frozen/非 Error 主值经 coded fallback 的 cause 可达。任意值品牌守卫读取失败返回 false。按 source/code 处理（而非 message）。"
               }
             ]
           },
@@ -1108,12 +1108,12 @@
               },
               {
                 "type": "paragraph",
-                "text": "前三者只在返回的运行时类型上不同（`Error`/`RangeError`/`TypeError`），参数形状完全一致：`code`（必填）、`message`（必填）、`options?.cause`（可选，透传进原生 `Error` 构造器的 `{ cause }`）。返回值都经 `attachErrorIdentity`（来自 `@migaia/utils/error`）打上 `source: '@migaia/store-keyed'` 与 `code`，不改动 `stack`/`name`。`createStoreKeyedAggregateError` 额外要求 `errors: unknown[]`（必填，成为 `AggregateError.errors`），不接受 `cause` 选项。"
+                "text": "前三者只在返回的运行时类型上不同（`Error`/`RangeError`/`TypeError`），参数形状完全一致：`code`（必填）、`message`（必填）、`options?.cause`（可选，透传进原生 `Error` 构造器的 `{ cause }`）。返回值都经 `attachErrorIdentity`（来自 `@migaia/utils/error`）打上 `source: 'store.keyed'` 与 `code`，不改动 `stack`/`name`。`createStoreKeyedAggregateError` 额外要求 `errors: unknown[]`（必填，成为 `AggregateError.errors`），不接受 `cause` 选项。"
               },
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const STORE_KEYED_SOURCE = '@migaia/store-keyed'"
+                "code": "const STORE_KEYED_SOURCE = 'store.keyed'"
               },
               {
                 "type": "paragraph",
@@ -1784,7 +1784,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "1. `get` records a dependency; `peek` / `preview` do not. Snapshot reads in React adapters must use `peek` or `preview`. 2. `set` accepts only writable definitions (`atomDef`, `atomDefFactory`, `writableDef` and their optics). Writing a read-only derived definition throws `TypeError`, also when an `override` routes to one indirectly. `set` runs in one batch and is never recorded as a dependency by an outer tracking context. 3. An `override` must keep the write contract. A read-only definition can be replaced by any definition of the same value type; a source definition only by a source definition; a writable derived definition only by one with the same arguments and result. A cycle in the override chain throws `CYCLIC_OVERRIDE`. 4. Object initial values are copied per store. Copying uses `structuredClone`; a value that cannot be cloned (for example one containing functions) throws `INVALID_OPTION`, and a host without `structuredClone` throws `ENV_UNSUPPORTED`. 5. `preview` never runs factories not declared safe. An `atomDefFactory` factory throws `PREVIEW_UNSAFE` inside `preview`; use `previewSafeAtomDefFactory` once you have made sure the factory is pure and side-effect free. Speculative values are dropped after the Runtime's idle cleanup (a microtask by default) if they never became real nodes. 6. The order of `dispose()`. It marks the store disposed, cancels every subscription, then releases nodes in reverse creation order; one failure never stops the remaining steps, and several failures are combined into an `AggregateError` (`DISPOSAL_FAILED`). Any access after disposal throws `ATOM_STORE_DISPOSED`. 7. Clearing caches is not releasing nodes. `splitDef(...).prune(store)` and `familyDef(...).forget()` / `clear()` only clear definition caches and leave nodes already created in a store alone; release those with `store.release()` or `store.dispose()`. After `forget`, the same key gives a new definition whose state is unrelated to the old one. 8. Families need `WeakRef` and `FinalizationRegistry`. Without them, calling `familyDef` / `derivedFamilyDef` throws `ENV_UNSUPPORTED` instead of degrading silently. 9. Keys are compared with SameValueZero, as in `Map` / `Set`: `-0` and `+0` are the same key, and `NaN` equals itself. 10. Error identity. Errors produced by this module carry `source === STORE_KEYED_SOURCE` (`@migaia/store-keyed`) and a `code` from `StoreKeyedErrorCode`; errors from other module that already have an identity keep it. Branch on `source` / `code`, never on the message."
+                  "text": "1. `get` records a dependency; `peek` / `preview` do not. Snapshot reads in React adapters must use `peek` or `preview`. 2. `set` accepts only writable definitions (`atomDef`, `atomDefFactory`, `writableDef` and their optics). Writing a read-only derived definition throws `TypeError`, also when an `override` routes to one indirectly. `set` runs in one batch and is never recorded as a dependency by an outer tracking context. 3. An `override` must keep the write contract. A read-only definition can be replaced by any definition of the same value type; a source definition only by a source definition; a writable derived definition only by one with the same arguments and result. A cycle in the override chain throws `CYCLIC_OVERRIDE`. 4. Object initial values are copied per store. Copying uses `structuredClone`; a value that cannot be cloned (for example one containing functions) throws `INVALID_OPTION`, and a host without `structuredClone` throws `ENV_UNSUPPORTED`. 5. `preview` never runs factories not declared safe. An `atomDefFactory` factory throws `PREVIEW_UNSAFE` inside `preview`; use `previewSafeAtomDefFactory` once you have made sure the factory is pure and side-effect free. Speculative values are dropped after the Runtime's idle cleanup (a microtask by default) if they never became real nodes. 6. The order of `dispose()`. It marks the store disposed, cancels every subscription, then releases nodes in reverse creation order; one failure never stops the remaining steps, and several failures are combined into an `AggregateError` (`DISPOSAL_FAILED`). Any access after disposal throws `ATOM_STORE_DISPOSED`. 7. Clearing caches is not releasing nodes. `splitDef(...).prune(store)` and `familyDef(...).forget()` / `clear()` only clear definition caches and leave nodes already created in a store alone; release those with `store.release()` or `store.dispose()`. After `forget`, the same key gives a new definition whose state is unrelated to the old one. 8. Families need `WeakRef` and `FinalizationRegistry`. Without them, calling `familyDef` / `derivedFamilyDef` throws `ENV_UNSUPPORTED` instead of degrading silently. 9. Keys are compared with SameValueZero, as in `Map` / `Set`: `-0` and `+0` are the same key, and `NaN` equals itself. 10. Error identity. Errors produced by this module carry `source === STORE_KEYED_SOURCE` (`store.keyed`) and a `code` from `StoreKeyedErrorCode`; errors from other module that already have an identity keep it. Branch on `source` / `code`, never on the message."
                 },
                 {
                   "type": "paragraph",
@@ -2648,7 +2648,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "Source: `src/errors.ts`, `src/error-code.ts`, `src/error-text.ts`. Errors created by this module carry `source: '@migaia/store-keyed'` and a stable `code`; errors from Reactive or other module that already have a code keep their real owner. Failures of pure optic property access use `OPTIC_ACCESS_FAILED`: extensible native errors receive the code on the original object, keeping type, message and stack; frozen or non-Error primary values stay reachable through the cause of a coded fallback. Brand guards on arbitrary values return false when reading fails. Branch on source/code, not on the message."
+                  "text": "Source: `src/errors.ts`, `src/error-code.ts`, `src/error-text.ts`. Errors created by this module carry `source: 'store.keyed'` and a stable `code`; errors from Reactive or other module that already have a code keep their real owner. Failures of pure optic property access use `OPTIC_ACCESS_FAILED`: extensible native errors receive the code on the original object, keeping type, message and stack; frozen or non-Error primary values stay reachable through the cause of a coded fallback. Brand guards on arbitrary values return false when reading fails. Branch on source/code, not on the message."
                 }
               ]
             },
@@ -2663,12 +2663,12 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "The first three differ only in the runtime type they return (`Error`/`RangeError`/`TypeError`) and take the same arguments: `code` (required), `message` (required), `options?.cause` (optional, passed to the native `Error` constructor's `{ cause }`). Each result gets `source: '@migaia/store-keyed'` and `code` through `attachErrorIdentity` (from `@migaia/utils/error`), without touching `stack`/`name`. `createStoreKeyedAggregateError` also requires `errors: unknown[]` (which become `AggregateError.errors`) and takes no `cause` option."
+                  "text": "The first three differ only in the runtime type they return (`Error`/`RangeError`/`TypeError`) and take the same arguments: `code` (required), `message` (required), `options?.cause` (optional, passed to the native `Error` constructor's `{ cause }`). Each result gets `source: 'store.keyed'` and `code` through `attachErrorIdentity` (from `@migaia/utils/error`), without touching `stack`/`name`. `createStoreKeyedAggregateError` also requires `errors: unknown[]` (which become `AggregateError.errors`) and takes no `cause` option."
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const STORE_KEYED_SOURCE = '@migaia/store-keyed'"
+                  "code": "const STORE_KEYED_SOURCE = 'store.keyed'"
                 },
                 {
                   "type": "paragraph",
@@ -3413,9 +3413,9 @@
               "name": "cause",
               "type": "unknown",
               "optional": true,
-              "description": "前三者只在返回的运行时类型上不同（`Error`/`RangeError`/`TypeError`），参数形状完全一致：`code`（必填）、`message`（必填）、`options?.cause`（可选，透传进原生 `Error` 构造器的 `{ cause }`）。返回值都经 `attachErrorIdentity`（来自 `@migaia/utils/error`）打上 `source: '@migaia/store-keyed'` 与 `code`，不改动 `stack`/`name`。`createStoreKeyedAggregateError` 额外要求 `errors: unknown[]`（必填，成为 `AggregateError.errors`），不接受 `cause` 选项。",
+              "description": "前三者只在返回的运行时类型上不同（`Error`/`RangeError`/`TypeError`），参数形状完全一致：`code`（必填）、`message`（必填）、`options?.cause`（可选，透传进原生 `Error` 构造器的 `{ cause }`）。返回值都经 `attachErrorIdentity`（来自 `@migaia/utils/error`）打上 `source: 'store.keyed'` 与 `code`，不改动 `stack`/`name`。`createStoreKeyedAggregateError` 额外要求 `errors: unknown[]`（必填，成为 `AggregateError.errors`），不接受 `cause` 选项。",
               "descriptionEn": "",
-              "descriptionZh": "前三者只在返回的运行时类型上不同（`Error`/`RangeError`/`TypeError`），参数形状完全一致：`code`（必填）、`message`（必填）、`options?.cause`（可选，透传进原生 `Error` 构造器的 `{ cause }`）。返回值都经 `attachErrorIdentity`（来自 `@migaia/utils/error`）打上 `source: '@migaia/store-keyed'` 与 `code`，不改动 `stack`/`name`。`createStoreKeyedAggregateError` 额外要求 `errors: unknown[]`（必填，成为 `AggregateError.errors`），不接受 `cause` 选项。"
+              "descriptionZh": "前三者只在返回的运行时类型上不同（`Error`/`RangeError`/`TypeError`），参数形状完全一致：`code`（必填）、`message`（必填）、`options?.cause`（可选，透传进原生 `Error` 构造器的 `{ cause }`）。返回值都经 `attachErrorIdentity`（来自 `@migaia/utils/error`）打上 `source: 'store.keyed'` 与 `code`，不改动 `stack`/`name`。`createStoreKeyedAggregateError` 额外要求 `errors: unknown[]`（必填，成为 `AggregateError.errors`），不接受 `cause` 选项。"
             }
           ],
           "fragment": "store-keyed-index--createStoreKeyedError"
@@ -3531,9 +3531,9 @@
               "name": "cause",
               "type": "unknown",
               "optional": true,
-              "description": "前三者只在返回的运行时类型上不同（`Error`/`RangeError`/`TypeError`），参数形状完全一致：`code`（必填）、`message`（必填）、`options?.cause`（可选，透传进原生 `Error` 构造器的 `{ cause }`）。返回值都经 `attachErrorIdentity`（来自 `@migaia/utils/error`）打上 `source: '@migaia/store-keyed'` 与 `code`，不改动 `stack`/`name`。`createStoreKeyedAggregateError` 额外要求 `errors: unknown[]`（必填，成为 `AggregateError.errors`），不接受 `cause` 选项。",
+              "description": "前三者只在返回的运行时类型上不同（`Error`/`RangeError`/`TypeError`），参数形状完全一致：`code`（必填）、`message`（必填）、`options?.cause`（可选，透传进原生 `Error` 构造器的 `{ cause }`）。返回值都经 `attachErrorIdentity`（来自 `@migaia/utils/error`）打上 `source: 'store.keyed'` 与 `code`，不改动 `stack`/`name`。`createStoreKeyedAggregateError` 额外要求 `errors: unknown[]`（必填，成为 `AggregateError.errors`），不接受 `cause` 选项。",
               "descriptionEn": "",
-              "descriptionZh": "前三者只在返回的运行时类型上不同（`Error`/`RangeError`/`TypeError`），参数形状完全一致：`code`（必填）、`message`（必填）、`options?.cause`（可选，透传进原生 `Error` 构造器的 `{ cause }`）。返回值都经 `attachErrorIdentity`（来自 `@migaia/utils/error`）打上 `source: '@migaia/store-keyed'` 与 `code`，不改动 `stack`/`name`。`createStoreKeyedAggregateError` 额外要求 `errors: unknown[]`（必填，成为 `AggregateError.errors`），不接受 `cause` 选项。"
+              "descriptionZh": "前三者只在返回的运行时类型上不同（`Error`/`RangeError`/`TypeError`），参数形状完全一致：`code`（必填）、`message`（必填）、`options?.cause`（可选，透传进原生 `Error` 构造器的 `{ cause }`）。返回值都经 `attachErrorIdentity`（来自 `@migaia/utils/error`）打上 `source: 'store.keyed'` 与 `code`，不改动 `stack`/`name`。`createStoreKeyedAggregateError` 额外要求 `errors: unknown[]`（必填，成为 `AggregateError.errors`），不接受 `cause` 选项。"
             }
           ],
           "fragment": "store-keyed-index--createStoreKeyedRangeError"
@@ -3649,9 +3649,9 @@
               "name": "cause",
               "type": "unknown",
               "optional": true,
-              "description": "前三者只在返回的运行时类型上不同（`Error`/`RangeError`/`TypeError`），参数形状完全一致：`code`（必填）、`message`（必填）、`options?.cause`（可选，透传进原生 `Error` 构造器的 `{ cause }`）。返回值都经 `attachErrorIdentity`（来自 `@migaia/utils/error`）打上 `source: '@migaia/store-keyed'` 与 `code`，不改动 `stack`/`name`。`createStoreKeyedAggregateError` 额外要求 `errors: unknown[]`（必填，成为 `AggregateError.errors`），不接受 `cause` 选项。",
+              "description": "前三者只在返回的运行时类型上不同（`Error`/`RangeError`/`TypeError`），参数形状完全一致：`code`（必填）、`message`（必填）、`options?.cause`（可选，透传进原生 `Error` 构造器的 `{ cause }`）。返回值都经 `attachErrorIdentity`（来自 `@migaia/utils/error`）打上 `source: 'store.keyed'` 与 `code`，不改动 `stack`/`name`。`createStoreKeyedAggregateError` 额外要求 `errors: unknown[]`（必填，成为 `AggregateError.errors`），不接受 `cause` 选项。",
               "descriptionEn": "",
-              "descriptionZh": "前三者只在返回的运行时类型上不同（`Error`/`RangeError`/`TypeError`），参数形状完全一致：`code`（必填）、`message`（必填）、`options?.cause`（可选，透传进原生 `Error` 构造器的 `{ cause }`）。返回值都经 `attachErrorIdentity`（来自 `@migaia/utils/error`）打上 `source: '@migaia/store-keyed'` 与 `code`，不改动 `stack`/`name`。`createStoreKeyedAggregateError` 额外要求 `errors: unknown[]`（必填，成为 `AggregateError.errors`），不接受 `cause` 选项。"
+              "descriptionZh": "前三者只在返回的运行时类型上不同（`Error`/`RangeError`/`TypeError`），参数形状完全一致：`code`（必填）、`message`（必填）、`options?.cause`（可选，透传进原生 `Error` 构造器的 `{ cause }`）。返回值都经 `attachErrorIdentity`（来自 `@migaia/utils/error`）打上 `source: 'store.keyed'` 与 `code`，不改动 `stack`/`name`。`createStoreKeyedAggregateError` 额外要求 `errors: unknown[]`（必填，成为 `AggregateError.errors`），不接受 `cause` 选项。"
             }
           ],
           "fragment": "store-keyed-index--createStoreKeyedTypeError"
@@ -5399,7 +5399,7 @@
           "name": "IStoreKeyedErrorCode",
           "kind": "type",
           "signature": "export type IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode];",
-          "declarationLine": 77,
+          "declarationLine": 78,
           "source": "packages/store-keyed/dist/error-code.d.ts",
           "purpose": "Value union of StoreKeyedErrorCode for stable package failure classification with STORE_KEYED_SOURCE.",
           "core": "Value union of StoreKeyedErrorCode for stable package failure classification with STORE_KEYED_SOURCE.",
@@ -6082,7 +6082,7 @@
         {
           "name": "STORE_KEYED_SOURCE",
           "kind": "const",
-          "signature": "export declare const STORE_KEYED_SOURCE = \"@migaia/store-keyed\";",
+          "signature": "export declare const STORE_KEYED_SOURCE = \"store.keyed\";",
           "declarationLine": 7,
           "source": "packages/store-keyed/dist/errors.d.ts",
           "purpose": "Canonical @migaia/store-keyed error source string; classify package failures with this source and StoreKeyedErrorCode rather than message prefixes.",
@@ -6093,13 +6093,11 @@
           "returns": "No explicit return annotation is declared for this const.",
           "errors": [],
           "lifecycleConcurrency": "",
-          "examples": ["const STORE_KEYED_SOURCE = '@migaia/store-keyed'"],
+          "examples": ["const STORE_KEYED_SOURCE = 'store.keyed'"],
           "members": [],
           "composes": [],
           "exportPath": ".",
-          "overloadSignatures": [
-            "export declare const STORE_KEYED_SOURCE = \"@migaia/store-keyed\";"
-          ],
+          "overloadSignatures": ["export declare const STORE_KEYED_SOURCE = \"store.keyed\";"],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
           "whenToUse": "",
@@ -6137,7 +6135,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-keyed/dist/errors.d.ts:STORE_KEYED_SOURCE:export declare const STORE_KEYED_SOURCE = \"@migaia/store-keyed\";",
+          "identity": "packages/store-keyed/dist/errors.d.ts:STORE_KEYED_SOURCE:export declare const STORE_KEYED_SOURCE = \"store.keyed\";",
           "guidance": [],
           "usageScore": 12,
           "configuration": [],
@@ -6147,7 +6145,7 @@
           "name": "StoreKeyedErrorCode",
           "kind": "const",
           "signature": "export declare const StoreKeyedErrorCode: { /** * An atom store is used after disposal. * * Create a new store instead of reusing the disposed instance. */ readonly atomStoreDisposed: 'ATOM_STORE_DISPOSED'; /** * Multiple entries fail to clean up while an atom store is disposed. An `AggregateError` exposes * each failure through `errors[]`. * * Treat this as a disposal failure and inspect each cause. */ readonly disposalFailed: 'DISPOSAL_FAILED'; /** * An atom preview cycle is detected within one render or preview stack. * * Check derived dependencies for cycles. */ readonly circularPreview: 'CIRCULAR_PREVIEW'; /** * An atom override chain contains a cycle and cannot resolve its final definition. * * Check whether override targets point back to each other. */ readonly cyclicOverride: 'CYCLIC_OVERRIDE'; /** * An override replaces a writable definition with a read-only target and breaks its write * contract. * * Preserve the read and write semantics across overrides. */ readonly overrideContract: 'OVERRIDE_CONTRACT'; /** * A primitive factory without `previewSafe` is evaluated during preview. * * Mark the factory as `previewSafe` or avoid evaluating it during preview. */ readonly previewUnsafe: 'PREVIEW_UNSAFE'; /** * An atom is accessed from a different `Runtime`, whose dependency graph cannot see the atom. * * Access the atom within its own `Runtime` instead of sharing it across runtimes. */ readonly crossRuntime: 'CROSS_RUNTIME'; /** * The host lacks `WeakRef`/`FinalizationRegistry` for the family cache or `structuredClone` for * independent primitive templates in AtomStore. * * Enable these capabilities in the host sandbox. This is a deployment issue. */ readonly envUnsupported: 'ENV_UNSUPPORTED'; /** * An application accessor or proxy fails while an optic reads or immutably copies its input. * Native mutable errors retain their identity and stack; frozen/non-Error originals stay on * cause. Inspect the application accessor rather than treating this as a missing path or target * key. */ readonly opticAccessFailed: 'OPTIC_ACCESS_FAILED'; /** * Input validation fails for `maxSize`, a non-atom definition, an empty or inaccessible focus * path, duplicate keys, a missing target key, or a thenable initial value. * * Correct the input named in the error message. */ readonly invalidOption: 'INVALID_OPTION'; };",
-          "declarationLine": 10,
+          "declarationLine": 11,
           "source": "packages/store-keyed/dist/error-code.d.ts",
           "purpose": "Stable package semantic codes for scoped stores, previews, overrides, runtime access, optic access, environment capability and input validation. Native errors preserve original runtime classes and causes.",
           "core": "atomStoreDisposed: A state operation uses a disposed AtomStore; create a new store instead.\ndisposalFailed: Several store cleanup entries failed; inspect original errors in the aggregate.\ncircularPreview: Speculative definition evaluation loops back to its active preview stack.\ncyclicOverride: Override routing contains a cycle and cannot resolve a final definition.\noverrideContract: A write or override would break the definition read/write contract.\npreviewUnsafe: An unmaterialized factory is evaluated speculatively without explicit preview safety.\ncrossRuntime: A protocol atom is read or written through a helper bound to a different Runtime.\nenvUnsupported: Host capabilities such as WeakRef, FinalizationRegistry or structuredClone are required but unavailable.\nopticAccessFailed: An accessor or proxy fails during a pure optic read or immutable copy. Existing foreign identities remain unchanged; mutable native errors retain identity and stack, while fallback cause/errors retain the original.\ninvalidOption: Definition, family limit, thenable initial value, optic path or keyed-list input violates its supported contract.",

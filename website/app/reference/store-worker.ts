@@ -1,10 +1,10 @@
 /**
  * Current source, README and USEGUIDE reference (2026-10-18). Unlike the old zero-copy/performance
  * prose, the current worker-contract bridge recursively converts bytes to base64url portable values
- * before RPC and forwards transfer lists separately; this is not an end-to-end zero-copy guarantee.
- * Handler timeoutMs is not a compute execution deadline. Managed pendingCount counts message
- * deliveries, not RPC computations. Serializer encode streams frames instead of merging chunks
- * locally.
+ * before its single createRpcHost + dedicatedWorkerPlugin bridge. Worker calls copy inputs without
+ * detaching their buffers; this is not a zero-copy guarantee. Handler timeoutMs is not a compute
+ * execution deadline. Managed pendingCount counts message deliveries, not RPC computations.
+ * Serializer encode streams frames instead of merging chunks locally.
  */
 import type { ILibraryReference, IMemberDoc, IText } from './contract.js'
 import { resourceReference } from './resource.js'
@@ -20,11 +20,6 @@ const t = (en: string, zh: string): IText => ({ en, zh })
 const computeExample = storeWorkerCases.WorkerAdapter![0]!.example
 /** Actual Worker-side JSON parser paired with a main-side registry plugin. */
 const codecExample = storeWorkerCases.workerPlugin![0]!.example
-/** Public byte policies select input ownership without exposing private chunk helpers. */
-const ownershipExample = `import { WorkerByteOwnership, type IByteOwnership } from '@migaia/store-worker'
-const policy: IByteOwnership = WorkerByteOwnership.copy
-console.log(policy, WorkerByteOwnership.transfer)`
-
 /** Client identity and deadline are external RPC inputs, not generated instance IDs. */
 const clientOptions: Readonly<Record<string, IMemberDoc>> = {
   clientId: {
@@ -146,18 +141,6 @@ const computedOptions: Readonly<Record<string, IMemberDoc>> = {
       '默认响应包共享运行时，隔离请求或实例应显式传入独立运行时。'
     )
   },
-  transfer: {
-    whenToUse: t(
-      'Set it when the caller can give up native buffer ownership after sending an input. Return a synchronous transfer list; aliases can detach even if the request later fails. Omission sends no explicit list.',
-      '调用方发送输入后可以放弃原生缓冲区所有权时设置。同步返回转移列表；即使请求之后失败，别名也可能已分离。省略时不提供显式列表。'
-    ),
-    example: storeWorkerOptionExamples.transfer,
-    summary: t(
-      'Synchronous callback receiving the selected Input and returning readonly native transfer entries for that request; it runs in the Resource fetcher after selectInput. Throws become Resource fetch failures; no Promise result is supported. Transferring may detach caller data and does not guarantee end-to-end zero-copy.',
-      '资源取值器同步选出输入后，将其交给此回调并取得本次原生转移列表；抛错会使资源取值失败，不支持 Promise 结果。转移可能分离调用方数据，不保证全程零拷贝。'
-    ),
-    default: t('undefined: no native transfer entries.', '`undefined`：不提供原生转移条目。')
-  },
   scheduler: {
     summary: t(
       'IScheduler from @migaia/utils/scheduler controls Resource TTL and retry clocks; forwarded unchanged to Resource.',
@@ -169,7 +152,7 @@ const computedOptions: Readonly<Record<string, IMemberDoc>> = {
     )
   }
 }
-/** Serializer ownership describes list selection, not a promised wire optimization. */
+/** Serializer options select format and physical Worker cleanup, while inputs always copy. */
 const pluginOptions: Readonly<Record<string, IMemberDoc>> = {
   worker: {
     summary: t(
@@ -193,22 +176,6 @@ const pluginOptions: Readonly<Record<string, IMemberDoc>> = {
       '解析器销毁是否在端点清理后调用工作线程终止，即使端点清理失败也尝试，终止回调同步且无参数。'
     ),
     default: t('False: cleanup retires only the borrowed endpoint.', '默认假，清理仅结束借用端点。')
-  },
-  ownership: {
-    whenToUse: t(
-      'Use the default copy when callers need the input again. Choose transfer only for a complete, disposable ArrayBuffer-backed view. Partial views and shared buffers fall back to no transfer list; transfer can detach every alias.',
-      '调用方还需要输入时使用默认 copy。仅在视图完整覆盖且可放弃普通 ArrayBuffer 时选 transfer。局部视图和共享缓冲区回退为空转移列表；转移可能分离所有别名。'
-    ),
-    example: storeWorkerOptionExamples.transferPlugin,
-    summary: t(
-      'Input byte transfer-list policy. transfer selects only complete Uint8Array views of ArrayBuffer; partial views and SharedArrayBuffer fall back to an empty list. Native transfer can detach every alias even if work later fails. Current portable encoding still materializes base64url values.',
-      '输入字节的转移列表策略，转移仅选择完整覆盖普通缓冲区的字节视图，局部视图及共享缓冲区回退空列表，原生转移可使所有别名分离且后续失败不恢复，当前可移植编码仍生成文本值。'
-    ),
-    default: t(
-      'copy: selects no transfer list for the input bytes.',
-      '默认复制策略，不为输入字节选择转移列表。'
-    ),
-    values: { enum: 'WorkerByteOwnership' }
   },
   clientId: clientOptions.clientId
 }
@@ -259,7 +226,7 @@ const errorDoc = (aggregate = false) => ({
   purpose: t(
     'Creates native ' +
       (aggregate ? 'AggregateError' : 'Error') +
-      ' with source @migaia/store-worker and selected code, preserving native type, stack and original failure reachability.',
+      ' with source store.worker and selected code, preserving native type, stack and original failure reachability.',
     '创建原生错误并附加本包来源与所选稳定错误码，保留原生类型、堆栈及原始失败可达性。'
   ),
   params: {
@@ -345,16 +312,16 @@ console.log(error)`
 /** Six public semantic errors; stream failures use the canonical RPC error chain. */
 const errors = {
   invalidOption: t(
-    'Malformed options, callbacks, ownership, worker shape or serializer phase; correct caller input.',
-    '选项、回调、所有权、工作线程形状或序列化阶段无效，应修正调用者输入。'
+    'Malformed options, callbacks, worker shape or serializer phase; correct caller input.',
+    '选项、回调、工作线程形状或序列化阶段无效，应修正调用者输入。'
   ),
   adapterDisposed: t(
     'WorkerAdapter request after close/dispose; create another adapter.',
     '工作适配器关闭或销毁后继续请求，应创建新适配器。'
   ),
   requestAborted: t(
-    'Serializer cancellation. Decode/pre-aborted encode can carry SerializeCodecError diagnostics; active encode failure can retain the canonical RPC/AbortError shape. A transfer policy does not prove detachment: pre-cancelled input was never sent, so inspect the actual backing buffer before retrying.',
-    '序列化取消，解码或预先取消编码可带格式诊断，活动编码失败可保留标准请求或原生中止形状；转移策略不证明已经分离，预取消输入尚未发送，重试前应检查实际底层缓冲区。'
+    'Worker serialization was cancelled through its context signal or an explicit stream stop; copied input remains readable.',
+    'Worker 序列化由上下文 signal 或显式流停止取消，调用方输入保持可读取。'
   ),
   invalidRequestChunk: t(
     'Worker handler received a malformed serialization chunk.',
@@ -381,8 +348,8 @@ export const storeWorkerReference: ILibraryReference = {
     },
     'serialize/worker': {
       summary: t(
-        'Move encoding and decoding into a worker so the caller can use a serializer without running its work locally. Import this subpath for serializer integration; the package root provides general worker computation APIs.\n\nStart with `workerPlugin()` to register the worker-backed parser in a serialization registry, and `createSerializeWorkerHandler()` to connect an ordinary parser on the worker side. Encoding streams chunks with a limit on unconsumed chunks, while decoding returns one result; byte transfer settings do not promise end-to-end copying avoidance.',
-        '把编码和解码放到工作线程中执行，让调用方通过序列化接口使用它。此子路径负责序列化集成；根入口提供通用的工作线程计算接口。\n\n从 `workerPlugin()` 把工作线程解析器装入序列化注册表，再用 `createSerializeWorkerHandler()` 在工作线程端接入普通解析器。编码分块传回结果，并限制尚未消费的分块数量，解码返回一个结果；字节转移设置不保证整个传输过程都无需复制。'
+        'Move encoding and decoding into a worker so the caller can use a serializer without running its work locally. Import this subpath for serializer integration; the package root provides general worker computation APIs.\n\nStart with `workerPlugin()` to register the worker-backed parser in a serialization registry, and `createSerializeWorkerHandler()` to connect an ordinary parser on the worker side. Encoding streams chunks with a limit on unconsumed chunks, while decoding returns one result; all Worker calls copy inputs without detaching caller buffers.',
+        '把编码和解码放到工作线程中执行，让调用方通过序列化接口使用它。此子路径负责序列化集成；根入口提供通用的工作线程计算接口。\n\n从 `workerPlugin()` 把工作线程解析器装入序列化注册表，再用 `createSerializeWorkerHandler()` 在工作线程端接入普通解析器。编码分块传回结果，并限制尚未消费的分块数量，解码返回一个结果；所有 Worker 调用复制参数，不 detach 输入。'
       ),
       example: codecExample
     }
@@ -407,8 +374,8 @@ export const storeWorkerReference: ILibraryReference = {
         '返回已启动异步端点初始化的适配器，请求自动等待初始化，重复销毁复用清理 Promise；无效选项或读取失败同步抛 `INVALID_OPTION`，端点初始化失败经请求或销毁观察。'
       ),
       exampleIntro: {
-        en: "Save the whole example as a .ts file and run it with Node 24. new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] }) runs that file again in a native thread and transfers the actual MessagePort. isMainThread selects its role; workerData is the child input. Start port1 before using its EventTarget listeners, then close it and await worker.terminate after endpoint cleanup. This proves the Node path, not browser Worker behavior.\n\nThe Node Worker itself has on/off rather than Web addEventListener; its transferred MessagePort implements IWorkerPort directly. Constructor options default to {}, clientId to 'main' and timeoutMs to undefined, so this installed timeout middleware supplies no deadline. request options default to {}, with signal and transfer undefined. Generics provide typing only. Use finite primitives, arrays and plain records; undefined, ArrayBuffer and Uint8Array have bridge representations, $worker is reserved, and byte transfer does not prove zero-copy.",
-        zh: "把完整示例保存为 `.ts` 文件并用 Node 24 运行；`new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] })` 在原生线程重新执行该文件，并转交真实 `MessagePort`。`isMainThread` 区分分支，`workerData` 是子线程输入；使用事件监听前启动 `port1`，端点清理后关闭端口并等待终止 Worker。这里验证 Node 路径，不代替浏览器 Worker 验证。\n\nNode Worker 自身使用 `on/off`，转交的 `MessagePort` 直接满足 `IWorkerPort`。构造选项默认 `{}`，`clientId` 默认 `'main'`，`timeoutMs` 默认 `undefined`，已安装的超时中间件不设置默认期限；请求选项也默认 `{}`，`signal`、`transfer` 默认 `undefined`。泛型只提供类型标注；载荷使用有限原始值、数组和普通记录，`undefined`、`ArrayBuffer`、`Uint8Array` 有桥接表示，`$worker` 为保留键，字节转移不证明零拷贝。"
+        en: "Save the whole example as a .ts file and run it with Node 24. new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] }) runs that file again in a native thread and transfers the actual MessagePort. isMainThread selects its role; workerData is the child input. Start port1 before using its EventTarget listeners, then close it and await worker.terminate after endpoint cleanup. This proves the Node path, not browser Worker behavior.\n\nThe Node Worker itself has on/off rather than Web addEventListener; its transferred MessagePort implements IWorkerPort directly. Constructor options default to {}, clientId to 'main' and timeoutMs to undefined, so this installed timeout middleware supplies no deadline. request options default to {}, with signal undefined. Inputs are copied without detaching caller buffers. Generics provide typing only. Use finite primitives, arrays and plain records; undefined, ArrayBuffer and Uint8Array have bridge representations, $worker is reserved, and all Worker calls copy inputs without detaching their buffers.",
+        zh: "把完整示例保存为 `.ts` 文件并用 Node 24 运行；`new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] })` 在原生线程重新执行该文件，并转交真实 `MessagePort`。`isMainThread` 区分分支，`workerData` 是子线程输入；使用事件监听前启动 `port1`，端点清理后关闭端口并等待终止 Worker。这里验证 Node 路径，不代替浏览器 Worker 验证。\n\nNode Worker 自身使用 `on/off`，转交的 `MessagePort` 直接满足 `IWorkerPort`。构造选项默认 `{}`，`clientId` 默认 `'main'`，`timeoutMs` 默认 `undefined`，已安装的超时中间件不设置默认期限；请求选项也默认 `{}`，`signal` 默认 `undefined`，输入按复制发送且不会 detach。泛型只提供类型标注；载荷使用有限原始值、数组和普通记录，`undefined`、`ArrayBuffer`、`Uint8Array` 有桥接表示，`$worker` 为保留键，所有 Worker 调用复制参数，不 detach 输入。"
       },
       cases: storeWorkerCases.WorkerAdapter,
       example: computeExample
@@ -476,8 +443,8 @@ export const storeWorkerReference: ILibraryReference = {
         '返回标准 `Resource`，提供状态、刷新、Promise、取消、缓存导出恢复及销毁；请求代次与重试遵循资源包契约。先释放资源，再等待适配器清理，最后终止调用方创建的线程。'
       ),
       exampleIntro: {
-        en: 'Save the whole example as a .ts file and run it with Node 24. new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] }) runs that file again in a native thread and transfers the actual MessagePort. isMainThread selects its role; workerData is the child input. Start port1 before using its EventTarget listeners, then close it and await worker.terminate after endpoint cleanup. This proves the Node path, not browser Worker behavior.\n\nDirectly install @migaia/reactive for createRuntime(); omitted Runtime options use the host adapter and microtask scheduler. runtime.signal uses the shown initial array and default Object.is equality. Pass that same Runtime to workerComputed; otherwise it defaults to defaultRuntime. This example changes autoStart from true to false, but the first state read still starts lazy work. ttl defaults to Infinity; explicit refetch forces a request and fresh passive promise reads reuse cache. Full Resource options below retain their own defaults. transfer defaults to undefined; Resource disposal does not dispose the adapter.',
-        zh: '把完整示例保存为 `.ts` 文件并用 Node 24 运行；`new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] })` 在原生线程重新执行该文件，并转交真实 `MessagePort`。`isMainThread` 区分分支，`workerData` 是子线程输入；使用事件监听前启动 `port1`，端点清理后关闭端口并等待终止 Worker。这里验证 Node 路径，不代替浏览器 Worker 验证。\n\n直接安装 `@migaia/reactive` 来调用 `createRuntime()`，省略选项时使用宿主适配器及微任务调度；`runtime.signal` 接收本例初始数组，默认按 `Object.is` 判断相等。把同一运行时传给 `workerComputed`，否则使用 `defaultRuntime`；本例将 `autoStart` 从默认 `true` 改为 `false`，首次读取 `state` 仍会按需启动。`ttl` 默认 `Infinity`，显式 `refetch` 强制请求，新鲜缓存的被动 `promise` 读取则复用结果；下表完整列出资源选项。`transfer` 默认 `undefined`，释放资源不释放适配器。'
+        en: 'Save the whole example as a .ts file and run it with Node 24. new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] }) runs that file again in a native thread and transfers the actual MessagePort. isMainThread selects its role; workerData is the child input. Start port1 before using its EventTarget listeners, then close it and await worker.terminate after endpoint cleanup. This proves the Node path, not browser Worker behavior.\n\nDirectly install @migaia/reactive for createRuntime(); omitted Runtime options use the host adapter and microtask scheduler. runtime.signal uses the shown initial array and default Object.is equality. Pass that same Runtime to workerComputed; otherwise it defaults to defaultRuntime. This example changes autoStart from true to false, but the first state read still starts lazy work. ttl defaults to Infinity; explicit refetch forces a request and fresh passive promise reads reuse cache. Full Resource options below retain their own defaults. Resource disposal does not dispose the adapter.',
+        zh: '把完整示例保存为 `.ts` 文件并用 Node 24 运行；`new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] })` 在原生线程重新执行该文件，并转交真实 `MessagePort`。`isMainThread` 区分分支，`workerData` 是子线程输入；使用事件监听前启动 `port1`，端点清理后关闭端口并等待终止 Worker。这里验证 Node 路径，不代替浏览器 Worker 验证。\n\n直接安装 `@migaia/reactive` 来调用 `createRuntime()`，省略选项时使用宿主适配器及微任务调度；`runtime.signal` 接收本例初始数组，默认按 `Object.is` 判断相等。把同一运行时传给 `workerComputed`，否则使用 `defaultRuntime`；本例将 `autoStart` 从默认 `true` 改为 `false`，首次读取 `state` 仍会按需启动。`ttl` 默认 `Infinity`，显式 `refetch` 强制请求，新鲜缓存的被动 `promise` 读取则复用结果；下表完整列出资源选项。所有输入按复制发送；释放资源不释放适配器。'
       },
       cases: storeWorkerCases.workerComputed,
       example: storeWorkerCases.workerComputed![0]!.example
@@ -507,8 +474,8 @@ export const storeWorkerReference: ILibraryReference = {
     workerParser: {
       role: 'factory',
       purpose: t(
-        'Creates a main-side ISerializeParser over a borrowed Worker endpoint. Pair with createSerializeWorkerHandler using a compatible worker parser; the name is a local label, not negotiation.',
-        '在借用工作端点上创建主端解析器，须搭配使用兼容解析器的 `createSerializeWorkerHandler`，名称是本地标签而非协商。'
+        'Creates a main-side ISerializeParser over a borrowed Worker endpoint. Inputs follow one copy path without detaching caller buffers. Pair with createSerializeWorkerHandler using a compatible worker parser; the name is a local label, not negotiation.',
+        '在借用工作端点上创建主端解析器，输入统一复制且不 detach 调用方 buffer；须搭配使用兼容解析器的 `createSerializeWorkerHandler`，名称是本地标签而非协商。'
       ),
       options: 'IWorkerPluginOptions',
       returns: t(
@@ -516,8 +483,8 @@ export const storeWorkerReference: ILibraryReference = {
         '返回序列化包解析协议，含名称、接值及上下文返回异步块流的编码、接块及上下文异步返回载荷的解码，以及稳定异步销毁；解析器没有超时选项，取消使用上下文信号；信号透传请求，解码及预先取消编码包装取消诊断并保留原始原因，流错误可能保留原生请求或中止形状。销毁失败活动队列、关闭端点，再按需终止线程，端点失败仍尝试终止，二者失败聚合。'
       ),
       exampleIntro: {
-        en: "Save the whole example as a .ts file and run it with Node 24. new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] }) runs that file again in a native thread and transfers the actual MessagePort. isMainThread selects its role; workerData is the child input. Start port1 before using its EventTarget listeners, then close it and await worker.terminate after endpoint cleanup. This proves the Node path, not browser Worker behavior.\n\nDirectly install @migaia/serialize for these examples. jsonParser(options = {}) is the real native JSON parser: replacer, reviver, space and decoder default to undefined; byte decoding then uses host TextDecoder. Text chunks are ['text', string], byte chunks ['bytes', Uint8Array], and value chunks ['value', unknown]. Main-side context requires a cancellation signal and a diagnostic context string; no parser timeoutMs option exists.\n\nThe worker option is required. Here type defaults to 'worker', ownership to 'copy', terminateOnDispose to false, and clientId to 'main'. TextEncoder creates the eleven JSON bytes; TextDecoder verifies they remain readable. The pre-aborted decode uses a real AbortController and keeps its original reason on cause; it demonstrates cancellation before sending, not preemption. The borrowed MessagePort has no terminate method, so the caller explicitly closes it and terminates the separately owned Worker.",
-        zh: "把完整示例保存为 `.ts` 文件并用 Node 24 运行；`new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] })` 在原生线程重新执行该文件，并转交真实 `MessagePort`。`isMainThread` 区分分支，`workerData` 是子线程输入；使用事件监听前启动 `port1`，端点清理后关闭端口并等待终止 Worker。这里验证 Node 路径，不代替浏览器 Worker 验证。\n\n示例需直接安装 `@migaia/serialize`；`jsonParser(options = {})` 使用真实原生 JSON 编解码，`replacer`、`reviver`、`space`、`decoder` 均默认 `undefined`，字节解码未指定解码器时使用宿主 `TextDecoder`。文本块为 `['text', string]`，字节块为 `['bytes', Uint8Array]`，值块为 `['value', unknown]`；主端上下文必填取消信号与诊断标签，不提供解析器 `timeoutMs` 选项。\n\n`worker` 必填；本例 `type` 默认 `'worker'`，`ownership` 默认 `'copy'`，`terminateOnDispose` 默认 `false`，`clientId` 默认 `'main'`。`TextEncoder` 生成十一字节 JSON，`TextDecoder` 核对原输入仍可读取；真实 `AbortController` 在发送前取消解码，`cause` 保留其原始原因，不表示抢占计算。借用的消息端口没有终止方法，调用方显式关闭端口并终止单独持有的 Worker。"
+        en: "Save the whole example as a .ts file and run it with Node 24. new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] }) runs that file again in a native thread and transfers the actual MessagePort. isMainThread selects its role; workerData is the child input. Start port1 before using its EventTarget listeners, then close it and await worker.terminate after endpoint cleanup. This proves the Node path, not browser Worker behavior.\n\nDirectly install @migaia/serialize for these examples. jsonParser(options = {}) is the real native JSON parser: replacer, reviver, space and decoder default to undefined; byte decoding then uses host TextDecoder. Text chunks are ['text', string], byte chunks ['bytes', Uint8Array], and value chunks ['value', unknown]. Main-side context requires a cancellation signal and a diagnostic context string; no parser timeoutMs option exists.\n\nThe worker option is required. Here type defaults to 'worker', terminateOnDispose to false, and clientId to 'main'. TextEncoder creates the eleven JSON bytes; TextDecoder verifies they remain readable. The pre-aborted decode uses a real AbortController and keeps its original reason on cause; it demonstrates cancellation before sending, not preemption. The borrowed MessagePort has no terminate method, so the caller explicitly closes it and terminates the separately owned Worker.",
+        zh: "把完整示例保存为 `.ts` 文件并用 Node 24 运行；`new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] })` 在原生线程重新执行该文件，并转交真实 `MessagePort`。`isMainThread` 区分分支，`workerData` 是子线程输入；使用事件监听前启动 `port1`，端点清理后关闭端口并等待终止 Worker。这里验证 Node 路径，不代替浏览器 Worker 验证。\n\n示例需直接安装 `@migaia/serialize`；`jsonParser(options = {})` 使用真实原生 JSON 编解码，`replacer`、`reviver`、`space`、`decoder` 均默认 `undefined`，字节解码未指定解码器时使用宿主 `TextDecoder`。文本块为 `['text', string]`，字节块为 `['bytes', Uint8Array]`，值块为 `['value', unknown]`；主端上下文必填取消信号与诊断标签，不提供解析器 `timeoutMs` 选项。\n\n`worker` 必填；本例 `type` 默认 `'worker'`，`terminateOnDispose` 默认 `false`，`clientId` 默认 `'main'`。`TextEncoder` 生成十一字节 JSON，`TextDecoder` 核对原输入仍可读取；真实 `AbortController` 在发送前取消解码，`cause` 保留其原始原因，不表示抢占计算。借用的消息端口没有终止方法，调用方显式关闭端口并终止单独持有的 Worker。"
       },
       cases: storeWorkerCases.workerParser,
       example: storeWorkerCases.workerParser![0]!.example
@@ -534,8 +501,8 @@ export const storeWorkerReference: ILibraryReference = {
         '返回序列化包插件协议，包含本地格式标签及解析器，不额外检测格式、协商或取得线程所有权。'
       ),
       exampleIntro: {
-        en: "Save the whole example as a .ts file and run it with Node 24. new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] }) runs that file again in a native thread and transfers the actual MessagePort. isMainThread selects its role; workerData is the child input. Start port1 before using its EventTarget listeners, then close it and await worker.terminate after endpoint cleanup. This proves the Node path, not browser Worker behavior.\n\nDirectly install @migaia/serialize for these examples. jsonParser(options = {}) is the real native JSON parser: replacer, reviver, space and decoder default to undefined; byte decoding then uses host TextDecoder. Text chunks are ['text', string], byte chunks ['bytes', Uint8Array], and value chunks ['value', unknown]. Main-side context requires a cancellation signal and a diagnostic context string; no parser timeoutMs option exists.\n\ncreateSerializeRegistry requires a non-empty plugin list; the first plugin type is the default for encoding and decoding, and options default to systemScheduler with host TextEncoder/TextDecoder. Per-call context defaults to 'anonymous' and signal to undefined. This example chooses type 'json', overriding workerPlugin's default 'worker'; ownership remains 'copy', terminateOnDispose false, and clientId 'main'. The encoded chunk does not embed the plugin type, so retain a type separately when storing multiple formats. Registry disposal awaits parser disposal, not native Worker termination.",
-        zh: "把完整示例保存为 `.ts` 文件并用 Node 24 运行；`new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] })` 在原生线程重新执行该文件，并转交真实 `MessagePort`。`isMainThread` 区分分支，`workerData` 是子线程输入；使用事件监听前启动 `port1`，端点清理后关闭端口并等待终止 Worker。这里验证 Node 路径，不代替浏览器 Worker 验证。\n\n示例需直接安装 `@migaia/serialize`；`jsonParser(options = {})` 使用真实原生 JSON 编解码，`replacer`、`reviver`、`space`、`decoder` 均默认 `undefined`，字节解码未指定解码器时使用宿主 `TextDecoder`。文本块为 `['text', string]`，字节块为 `['bytes', Uint8Array]`，值块为 `['value', unknown]`；主端上下文必填取消信号与诊断标签，不提供解析器 `timeoutMs` 选项。\n\n`createSerializeRegistry` 必填非空插件列表，首个格式作为编码与解码的默认格式；选项默认使用 `systemScheduler` 和宿主 `TextEncoder`、`TextDecoder`，每次调用的诊断标签默认 `'anonymous'`，信号默认 `undefined`。本例用 `'json'` 覆盖插件默认格式 `'worker'`，其余默认值为 `ownership: 'copy'`、`terminateOnDispose: false`、`clientId: 'main'`；输出块本身不包含格式标签，保存多种格式时需另外保留标签。注册表等待解析器释放，不终止原生 Worker。"
+        en: "Save the whole example as a .ts file and run it with Node 24. new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] }) runs that file again in a native thread and transfers the actual MessagePort. isMainThread selects its role; workerData is the child input. Start port1 before using its EventTarget listeners, then close it and await worker.terminate after endpoint cleanup. This proves the Node path, not browser Worker behavior.\n\nDirectly install @migaia/serialize for these examples. jsonParser(options = {}) is the real native JSON parser: replacer, reviver, space and decoder default to undefined; byte decoding then uses host TextDecoder. Text chunks are ['text', string], byte chunks ['bytes', Uint8Array], and value chunks ['value', unknown]. Main-side context requires a cancellation signal and a diagnostic context string; no parser timeoutMs option exists.\n\ncreateSerializeRegistry requires a non-empty plugin list; the first plugin type is the default for encoding and decoding, and options default to systemScheduler with host TextEncoder/TextDecoder. Per-call context defaults to 'anonymous' and signal to undefined. This example chooses type 'json', overriding workerPlugin's default 'worker'; terminateOnDispose false, and clientId 'main'. The encoded chunk does not embed the plugin type, so retain a type separately when storing multiple formats. Registry disposal awaits parser disposal, not native Worker termination.",
+        zh: "把完整示例保存为 `.ts` 文件并用 Node 24 运行；`new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] })` 在原生线程重新执行该文件，并转交真实 `MessagePort`。`isMainThread` 区分分支，`workerData` 是子线程输入；使用事件监听前启动 `port1`，端点清理后关闭端口并等待终止 Worker。这里验证 Node 路径，不代替浏览器 Worker 验证。\n\n示例需直接安装 `@migaia/serialize`；`jsonParser(options = {})` 使用真实原生 JSON 编解码，`replacer`、`reviver`、`space`、`decoder` 均默认 `undefined`，字节解码未指定解码器时使用宿主 `TextDecoder`。文本块为 `['text', string]`，字节块为 `['bytes', Uint8Array]`，值块为 `['value', unknown]`；主端上下文必填取消信号与诊断标签，不提供解析器 `timeoutMs` 选项。\n\n`createSerializeRegistry` 必填非空插件列表，首个格式作为编码与解码的默认格式；选项默认使用 `systemScheduler` 和宿主 `TextEncoder`、`TextDecoder`，每次调用的诊断标签默认 `'anonymous'`，信号默认 `undefined`。本例用 `'json'` 覆盖插件默认格式 `'worker'`，其余默认值为 `terminateOnDispose: false`、`clientId: 'main'`；输出块本身不包含格式标签，保存多种格式时需另外保留标签。注册表等待解析器释放，不终止原生 Worker。"
       },
       cases: storeWorkerCases.workerPlugin,
       example: storeWorkerCases.workerPlugin![0]!.example
@@ -545,7 +512,7 @@ export const storeWorkerReference: ILibraryReference = {
     STORE_WORKER_SOURCE: {
       role: 'constant',
       purpose: t(
-        'Exact @migaia/store-worker source identity attached to package errors; inspect together with code.',
+        'Exact store.worker source identity attached to package errors; inspect together with code.',
         '附加到本包错误的精确来源身份，应联合稳定错误码检查以定位实际失败分支。'
       ),
       example: `import { STORE_WORKER_SOURCE } from '@migaia/store-worker'
@@ -559,14 +526,6 @@ console.log(STORE_WORKER_SOURCE)`
       ),
       example: `import { StoreWorkerErrorCode } from '@migaia/store-worker'
 console.log(StoreWorkerErrorCode.invalidResponseChunk)`
-    },
-    WorkerByteOwnership: {
-      role: 'constant',
-      purpose: t(
-        'Input byte transfer-list policy constants. Native transfer ownership risks remain even though current portable conversion does not promise zero-copy.',
-        '输入字节转移列表策略常量，当前可移植转换不承诺零拷贝而原生转移所有权风险仍然存在。'
-      ),
-      example: ownershipExample
     },
     WorkerDiagnosticType: {
       role: 'constant',
@@ -609,8 +568,8 @@ console.log(WorkerDiagnosticType.worker)`
               '由工作端计算消费的调用者输入，应避免环及工作外层保留标记键。'
             ),
             options: t(
-              'Optional {signal,transfer}, default empty. Signal is forwarded for cooperative cancellation; transfer is a native list, potentially detaching aliases. Invalid option/getter returns a rejected Promise.',
-              '选项对象默认 `{}`，其中 `signal`、`transfer` 均默认 `undefined`；信号用于协作取消，转移可能分离其他别名视图。非法选项或 getter 失败使返回的 Promise 拒绝。'
+              'Options default to {}; signal defaults to undefined and controls cooperative request cancellation. Inputs are copied without detaching caller buffers.',
+              '选项对象默认 {}，signal 默认 undefined，控制请求的协作式取消；输入按复制发送，不 detach 调用方 buffer。'
             )
           },
           returns: t(
@@ -663,8 +622,8 @@ worker.terminate()`
     },
     IWorkerComputedOptions: {
       summary: t(
-        'Resource IResourceOptions plus Runtime selection and per-fetch transfer callback; known fields are read once before Resource ownership and auto-start.',
-        '资源选项加运行时选择及每次取值转移回调，在资源拥有对象及自动启动前一次读取已知字段。'
+        'Resource IResourceOptions plus Runtime selection; known fields are read once before Resource ownership and auto-start.',
+        '资源选项加运行时选择，在资源拥有对象及自动启动前一次读取已知字段。'
       ),
       example: computeExample,
       optionCases: storeWorkerOptionCases.computed,
@@ -672,7 +631,7 @@ worker.terminate()`
     },
     IWorkerPort: {
       summary: t(
-        'Alias of rpc-core/adapters/web-worker IWebWorkerLikePort; dedicated Worker, MessagePort and compatible listener-based hosts implement this external protocol.',
+        'Alias of the rpc-plugin-browser/adapters/web-worker IWebWorkerLikePort; dedicated Worker, MessagePort and compatible listener-based hosts implement this external protocol.',
         '请求包工作适配器端口协议的别名，专用线程、消息端口及兼容监听宿主实现此外包协议。'
       ),
       example: computeExample,
@@ -701,8 +660,8 @@ worker.terminate()`
     },
     IWorkerPluginOptions: {
       summary: t(
-        'Serializer worker endpoint, format label, byte policy and explicit optional termination ownership.',
-        '序列化工作端点、格式标签、字节策略及显式可选终止所有权。'
+        'Serializer worker endpoint, format label and explicit optional termination ownership.',
+        '序列化工作端点、格式标签及显式可选终止所有权。'
       ),
       example: codecExample,
       optionCases: storeWorkerOptionCases.serializer,
@@ -716,14 +675,6 @@ worker.terminate()`
       members: {},
       example: `import type { IWorkerFailureEvent } from '@migaia/store-worker/serialize/worker'
 const event: IWorkerFailureEvent = 'messageerror'`
-    },
-    IByteOwnership: {
-      summary: t(
-        'Value union copy or transfer from WorkerByteOwnership; policy selection never proves exclusive ownership of a buffer.',
-        '所有权常量中的复制或转移值联合，选择策略不证明缓冲区确由单方独占。'
-      ),
-      members: {},
-      example: ownershipExample
     },
     IWorkerDiagnosticType: {
       summary: t(
@@ -751,19 +702,6 @@ const code: IStoreWorkerErrorCode = StoreWorkerErrorCode.adapterDisposed`
         '与本包来源联合识别的具体失败分支。'
       ),
       values: errors
-    },
-    WorkerByteOwnership: {
-      summary: t('Serializer input byte transfer-list policy.', '序列化输入字节的转移列表策略。'),
-      values: {
-        copy: t(
-          'Select no transfer entries; the original input remains caller-owned.',
-          '不选择转移条目，原始输入仍由调用者拥有。'
-        ),
-        transfer: t(
-          'Select a complete ordinary ArrayBuffer; native send can detach all aliases and failed work does not restore it.',
-          '选择完整普通缓冲区，原生发送可分离所有别名，工作失败不恢复内存。'
-        )
-      }
     },
     WorkerDiagnosticType: {
       summary: t(

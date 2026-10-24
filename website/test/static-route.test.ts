@@ -4,7 +4,9 @@ import { fileURLToPath } from 'node:url'
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { copyFor } from '../app/copy.js'
+import { findGuideJourney, listGuideJourneys } from '../app/guide-journeys.js'
 import { LIBRARY_INDEX } from '../app/library-descriptions.js'
+import { findApiGuide } from '../app/api-guides.js'
 
 const websiteRoot = fileURLToPath(new URL('../', import.meta.url))
 const buildRoot = join(websiteRoot, 'build/client')
@@ -16,7 +18,6 @@ const copySource = readFileSync(join(websiteRoot, 'app/copy.ts'), 'utf8')
 const docsSource = readFileSync(join(websiteRoot, 'app/routes/docs.tsx'), 'utf8')
 const styleSource = readFileSync(join(websiteRoot, 'app/app.css'), 'utf8')
 const guideSource = readFileSync(join(websiteRoot, 'app/guide-journeys.ts'), 'utf8')
-const webRpcGuideSource = readFileSync(join(websiteRoot, 'app/rpc-api-guides.ts'), 'utf8')
 const routeManifest = JSON.parse(
   readFileSync(join(websiteRoot, 'src/generated/manifests/routes.json'), 'utf8')
 ) as {
@@ -176,7 +177,7 @@ test('serves the docs home at the language root and redirects the old index', ()
     assert.match(html, /class="docs-hero-search"/)
     assert.match(html, /class="journey-grid"/)
     assert.match(html, /class="architecture-stack"/)
-    for (const library of ['utils', 'lifecycle', 'rpc-core', 'tray'])
+    for (const library of ['utils', 'lifecycle', 'rpc-host', 'tray'])
       assert.ok(
         html.includes(`href="/${locale}/docs/${library}"`),
         `/${locale} misses ${library} link`
@@ -210,21 +211,25 @@ test('classifies public symbols by developer-facing role', () => {
     docsSource,
     /apiLinks[\s\S]*?filter\(\(link\) => link\.module === candidate\.module\)/
   )
-  for (const middleware of [
-    'abort',
-    'authentication',
-    'chunk',
-    'codec',
-    'connect',
-    'contract',
-    'framer',
-    'hooks',
-    'ping',
-    'protocol',
-    'timeout'
+  assert.match(docsSource, /featurePluginLinks[\s\S]*link\.module\.startsWith\('features\/'\)/)
+  assert.match(docsSource, /featurePluginLinks[\s\S]*link\.name\.endsWith\('Feature'\)/)
+  assert.match(docsSource, /featurePluginLinks\.map/)
+  for (const feature of [
+    'authFeature',
+    'chunkFeature',
+    'retryFeature',
+    'timeoutFeature',
+    'typegenFeature'
   ])
-    assert.match(docsSource, new RegExp(`'${middleware}'`))
-  assert.match(docsSource, /middlewarePluginLinks\.map/)
+    assert.ok(
+      apiManifest.apis.some(
+        (api) =>
+          api.library === 'rpc-host' &&
+          api.module === `features/${feature.replace('Feature', '')}` &&
+          api.symbols.some((symbol) => symbol.name === feature)
+      ),
+      feature
+    )
   assert.doesNotMatch(docsSource, /candidate === api\s*\? apiLinks/)
 })
 
@@ -254,7 +259,7 @@ test('keeps the expanded API navigation visible below the sticky header', () => 
     for (const route of [
       'docs/tray',
       'docs/tray/api/createTray',
-      'docs/rpc-core/getting-started'
+      'docs/rpc-host/getting-started'
     ]) {
       /** Every rendered reading shell has one desktop category sidebar. */
       const html = readFileSync(join(buildRoot, artifactPath(`/${locale}/${route}`)), 'utf8')
@@ -293,42 +298,42 @@ test('presents a purpose, example, option table, related APIs, then collapsed ty
 
 test('documents contract use across host boundaries', () => {
   for (const scenario of [
-    'createWindowMessageTransport',
-    'createWebWorkerTransport',
-    'createBroadcastChannelTransport',
-    'createServiceWorkerTransport'
+    'windowPlugin',
+    'dedicatedWorkerPlugin',
+    'broadcastChannelPlugin',
+    'serviceWorkerPlugin'
   ])
-    assert.match(webRpcGuideSource, new RegExp(scenario))
-  for (const exampleId of [
-    'iframe-transport',
-    'worker-transport',
-    'broadcast-transport',
-    'service-worker-transport'
-  ])
-    assert.match(webRpcGuideSource, new RegExp(`id: '${exampleId}'`))
+    for (const locale of ['zh', 'en'] as const) {
+      const guide = findApiGuide('rpc-plugin-browser', 'index', scenario, locale)
+      assert.ok(guide?.quickStart, `${locale} ${scenario}`)
+      assert.match(guide.quickStart, /createRpcHost/)
+      assert.match(guide.quickStart, /\.request\(|\.notify\(|\.stream\(/)
+      assert.match(guide.quickStart, /\.close\(\)/)
+    }
 })
 
-test('applies real-host examples to every middleware guide', () => {
-  assert.match(webRpcGuideSource, /function middlewareTransportExamples/)
-  assert.match(
-    webRpcGuideSource,
-    /examplesEn: input\.examplesEn \?\? middlewareTransportExamples\(input\.name, input\.code, 'en'\)/
-  )
-  assert.match(
-    webRpcGuideSource,
-    /examplesZh: input\.examplesZh \?\? middlewareTransportExamples\(input\.name, input\.code, 'zh'\)/
-  )
+test('applies real-host examples to every public feature guide', () => {
+  for (const feature of ['auth', 'chunk', 'retry', 'timeout', 'typegen'])
+    for (const locale of ['zh', 'en'] as const) {
+      const guide = findApiGuide('rpc-host', `features/${feature}`, `${feature}Feature`, locale)
+      assert.ok(guide?.quickStart, `${locale} ${feature}`)
+      assert.match(guide.quickStart, /createRpcHost/)
+      assert.match(guide.quickStart, /plugins:/)
+      assert.match(guide.quickStart, /finally/)
+      assert.match(guide.quickStart, /\.close\(\)/)
+    }
 })
 
-test('documents operational liveness decisions', () => {
-  for (const exampleId of [
-    'preflight-liveness',
-    'fanout-liveness',
-    'cancel-liveness',
-    'periodic-liveness'
-  ])
-    assert.match(webRpcGuideSource, new RegExp(`id: '${exampleId}'`))
-  assert.match(webRpcGuideSource, /\.\.\.pingUsageExamples\('zh'\)/)
+test('documents connection readiness and call deadlines through their public owners', () => {
+  for (const locale of ['zh', 'en'] as const) {
+    const transport = findApiGuide('rpc-plugin-process', 'index', 'processPlugin', locale)
+    const timeout = findApiGuide('rpc-host', 'features/timeout', 'timeoutFeature', locale)
+    assert.match(transport?.quickStart ?? '', /connect:.*timeoutMs:/)
+    assert.match(transport?.quickStart ?? '', /await createRpcHost/)
+    assert.match(timeout?.quickStart ?? '', /timeoutFeature/)
+    assert.match(timeout?.quickStart ?? '', /\.request\(/)
+    assert.match(timeout?.quickStart ?? '', /\.close\(\)/)
+  }
 })
 
 test('emits the admitted nested static route set', () => {
@@ -436,11 +441,11 @@ test('preserves export hierarchy in routes and navigation', () => {
 
   /** Current RPC features come from package exports rather than a hard-coded plugin inventory. */
   const webRpcFeatures = nestedApis.filter(
-    (api) => api.library === 'rpc-core' && api.module.startsWith('features/')
+    (api) => api.library === 'rpc-host' && api.module.startsWith('features/')
   )
   assert.ok(webRpcFeatures.length > 0, 'expected RPC feature modules')
   const webRpcFeatureHtml = readFileSync(
-    join(buildRoot, artifactPath(publicModulePath('zh', 'rpc-core', webRpcFeatures[0].module))),
+    join(buildRoot, artifactPath(publicModulePath('zh', 'rpc-host', webRpcFeatures[0].module))),
     'utf8'
   )
   const featureRail = stableLeftRail(webRpcFeatureHtml)
@@ -449,9 +454,9 @@ test('preserves export hierarchy in routes and navigation', () => {
   for (const feature of webRpcFeatures)
     assert.match(
       featureRail,
-      new RegExp(`href="${publicModulePath('zh', 'rpc-core', feature.module)}"`)
+      new RegExp(`href="${publicModulePath('zh', 'rpc-host', feature.module)}"`)
     )
-  assert.doesNotMatch(featureRail, /rpc-core\/features-[^/"]+/)
+  assert.doesNotMatch(featureRail, /rpc-host\/features-[^/"]+/)
 })
 
 test('keeps every module tree stable across all API routes', () => {
@@ -880,13 +885,11 @@ test('render compute, streaming, and ownership boundaries', () => {
       ),
       'utf8'
     )
-  /** The client owns endpoint cleanup while its request accepts cancellation and transfer options. */
+  /** The client owns endpoint cleanup; requests copy bytes and accept cooperative cancellation. */
   const adapter = renderedText(readWorker('index', 'WorkerAdapter'))
   assert.match(adapter, /关闭适配器、等待就绪并关闭端点，不终止借用线程；重复调用返回同一 Promise/)
-  assert.match(
-    adapter,
-    /选项对象默认 \{\}，其中 signal、transfer 均默认 undefined；信号用于协作取消，转移可能分离其他别名视图/
-  )
+  assert.match(adapter, /signal.*undefined/)
+  assert.match(adapter, /复制.*不.*detach|不.*分离/)
   assert.match(
     renderedText(readWorker('index', 'createWorkerHandler')),
     /计算失败转回复，初始化或投递失败可使回调拒绝/
@@ -900,7 +903,7 @@ test('render compute, streaming, and ownership boundaries', () => {
     renderedText(readWorker('serialize/worker', 'workerParser')),
     /接值及上下文返回异步块流的编码/
   )
-  assert.match(readWorker('serialize/worker', 'workerParser'), /--option-ownership"/)
+  assert.doesNotMatch(readWorker('serialize/worker', 'workerParser'), /--option-ownership"/)
   assert.match(
     renderedText(readWorker('serialize/worker', 'workerPlugin')),
     /不额外检测格式、协商或取得线程所有权/
@@ -911,7 +914,7 @@ test('render compute, streaming, and ownership boundaries', () => {
   )
   assert.match(
     renderedText(readWorker('serialize/worker', 'workerParser')),
-    /局部视图及共享缓冲区回退空列表/
+    /复制.*不.*detach|不.*分离/
   )
   assert.match(
     renderedText(readWorker('index', 'createStoreWorkerAggregateError')),
@@ -2317,13 +2320,13 @@ test('gives primary tasks independent bilingual pages', () => {
     ],
     [
       '/zh/docs/store-worker/byte-copy-and-transfer-ownership',
-      '字节复制与交出后的使用',
-      '交出不再使用的一份完整字节'
+      '复制 Worker 字节并保留输入',
+      '统一复制路径与调用者内存'
     ],
     [
       '/en/docs/store-worker/byte-copy-and-transfer-ownership',
-      'Byte copies and transfer ownership',
-      'Hand off a complete byte buffer'
+      'Copy Worker bytes while retaining input',
+      'One copy path and retained caller memory'
     ],
     ['/zh/docs/store-worker/errors-timeouts-and-cleanup', '错误、超时与清理', '保留错误的真实来源'],
     [
@@ -3241,82 +3244,6 @@ test('gives primary tasks independent bilingual pages', () => {
       'String templates and number formatting',
       'Number formatting'
     ],
-    ['/zh/docs/rpc-core', 'RPC Core：把请求、答复和取消交给同一端点', '为什么选它'],
-    [
-      '/en/docs/rpc-core',
-      'RPC Core: keep requests, replies, and cancellation on one endpoint',
-      'Why choose it'
-    ],
-    ['/zh/docs/rpc-core/getting-started', '安装并计算商品小计', '端点返回什么'],
-    [
-      '/en/docs/rpc-core/getting-started',
-      'Install and calculate an item subtotal',
-      'What the endpoint returns'
-    ],
-    ['/zh/docs/rpc-core/endpoint-composition', '选择端点需要的功能', '接已有运行时连接'],
-    [
-      '/en/docs/rpc-core/endpoint-composition',
-      'Select the endpoint features you need',
-      'Connect existing runtime operations'
-    ],
-    [
-      '/zh/docs/rpc-core/providers-and-contracts',
-      '注册服务并检查业务数据',
-      '限制服务同时处理的工作'
-    ],
-    [
-      '/en/docs/rpc-core/providers-and-contracts',
-      'Register providers and check application data',
-      'Limit concurrent provider work'
-    ],
-    ['/zh/docs/rpc-core/extension-authoring', '给 RPC 增加能力与安装工作', '扩展作者的其他入口'],
-    [
-      '/en/docs/rpc-core/extension-authoring',
-      'Extend RPC capabilities and installation',
-      'Other extension tools'
-    ],
-    [
-      '/zh/docs/rpc-core/transports-and-security',
-      '把 RPC 接到实际消息通道',
-      '适配器工具与后续阅读'
-    ],
-    [
-      '/en/docs/rpc-core/transports-and-security',
-      'Connect RPC to physical message channels',
-      'Adapter tools and next steps'
-    ],
-    [
-      '/zh/docs/rpc-core/calls-and-cancellation',
-      '选择调用方式并取消无用等待',
-      '按错误来源选择恢复动作'
-    ],
-    [
-      '/en/docs/rpc-core/calls-and-cancellation',
-      'Choose calls and cancel unused work',
-      'Choose recovery from the error source'
-    ],
-    ['/zh/docs/rpc-core/discovery-and-control', '发现服务并选择一个接收端', '健康检测与关闭通知'],
-    [
-      '/en/docs/rpc-core/discovery-and-control',
-      'Discover a service and select a receiver',
-      'Health checks and close announcements'
-    ],
-    ['/zh/docs/rpc-core/chunking-and-backpressure', '按需读取，并限制帧与发送队列', '限制发送积压'],
-    [
-      '/en/docs/rpc-core/chunking-and-backpressure',
-      'Read on demand and bound frames and queues',
-      'Bound outgoing backlog'
-    ],
-    [
-      '/zh/docs/rpc-core/replay-retry-and-lifecycle',
-      '复用业务键，并由创建者关闭连接',
-      '关闭后创建新的连接'
-    ],
-    [
-      '/en/docs/rpc-core/replay-retry-and-lifecycle',
-      'Reuse business keys and close owned connections',
-      'Create a new connection after closure'
-    ],
     ['/zh/docs/storage-web', '按数据种类保存记录，并明确升级与释放', '为什么选它'],
     [
       '/en/docs/storage-web',
@@ -4068,314 +3995,6 @@ test('gives primary tasks independent bilingual pages', () => {
       '/en/docs/rpc-contract/binary-messages',
       'Preserve binary data and verify integrity',
       'Let the host inspect native wrappers before restore'
-    ],
-    ['/zh/docs/rpc-process', '调用另一个进程中的函数，并明确谁负责关闭它', '为什么选它'],
-    ['/en/docs/rpc-process', 'Call another process and keep its owner explicit', 'Why choose it'],
-    ['/zh/docs/rpc-process/getting-started', '安装并启动价格服务', 'Peer 创建选项'],
-    [
-      '/en/docs/rpc-process/getting-started',
-      'Install and launch a pricing service',
-      'Peer factory options'
-    ],
-    ['/zh/docs/rpc-process/peers-and-sources', '选择进程来源并读取结果', '自定义运行时加载器'],
-    [
-      '/en/docs/rpc-process/peers-and-sources',
-      'Choose a process source and read results',
-      'Custom runtime loaders'
-    ],
-    [
-      '/zh/docs/rpc-process/plugins-and-exposure',
-      '让 Host 管理进程与公开方法',
-      '检查可以保存的部署描述'
-    ],
-    [
-      '/en/docs/rpc-process/plugins-and-exposure',
-      'Let a Host manage processes and exposed methods',
-      'Validate persistable deployment descriptions'
-    ],
-    [
-      '/zh/docs/rpc-process/launchers-and-stdio',
-      '启动原生进程并管理标准流',
-      '选择已支持的宿主能力'
-    ],
-    [
-      '/en/docs/rpc-process/launchers-and-stdio',
-      'Launch a native process and manage stdio',
-      'Choose host capabilities'
-    ],
-    [
-      '/zh/docs/rpc-process/socket-and-message-channels',
-      '连接已有进程与消息端口',
-      '通过真实消息端口交付订单'
-    ],
-    [
-      '/en/docs/rpc-process/socket-and-message-channels',
-      'Connect an existing process or message port',
-      'Deliver an order through real message ports'
-    ],
-    [
-      '/zh/docs/rpc-process/protocol-and-bootstrap',
-      '连接字节流并读取启动信息',
-      '读取自动启动信息与稳定常量'
-    ],
-    [
-      '/en/docs/rpc-process/protocol-and-bootstrap',
-      'Connect byte streams and read launch metadata',
-      'Read launch metadata and stable constants'
-    ],
-    ['/zh/docs/rpc-process/resilience-and-shutdown', '限制连接并按顺序关闭', '采用真实认证连接'],
-    [
-      '/en/docs/rpc-process/resilience-and-shutdown',
-      'Bound connections and close in order',
-      'Adopt actual authenticated connections'
-    ],
-    [
-      '/zh/docs/rpc-process/troubleshooting',
-      '从业务异常和宿主提示定位问题',
-      '先检查可观察的配置差异'
-    ],
-    [
-      '/en/docs/rpc-process/troubleshooting',
-      'Separate business failures from host diagnostics',
-      'Check observable configuration differences first'
-    ],
-    ['/zh/docs/rpc-threads', '把计算移出主线程，并明确谁负责关闭 Worker', '为什么选它'],
-    [
-      '/en/docs/rpc-threads',
-      'Move work off the main thread and keep its Worker owner explicit',
-      'Why choose it'
-    ],
-    ['/zh/docs/rpc-threads/getting-started', '安装并启动价格 Worker', 'Peer 创建选项'],
-    [
-      '/en/docs/rpc-threads/getting-started',
-      'Install and launch a pricing Worker',
-      'Peer factory options'
-    ],
-    [
-      '/zh/docs/rpc-threads/peers-and-sources',
-      '选择 Worker 来源并读取结果',
-      '原生模块加载与子端接入'
-    ],
-    [
-      '/en/docs/rpc-threads/peers-and-sources',
-      'Choose a Worker source and read results',
-      'Native module loading and child setup'
-    ],
-    ['/zh/docs/rpc-threads/plugins-and-hosts', '让 Host 管理 Worker 与公开方法', '重启完成后调用'],
-    [
-      '/en/docs/rpc-threads/plugins-and-hosts',
-      'Let a Host manage Workers and exposed methods',
-      'Calling after restart'
-    ],
-    ['/zh/docs/rpc-threads/native-launchers', '选择真正启动 Worker 的宿主', '选择其他 Worker 宿主'],
-    [
-      '/en/docs/rpc-threads/native-launchers',
-      'Choose the host that launches the Worker',
-      'Choose another Worker host'
-    ],
-    [
-      '/zh/docs/rpc-threads/channels-and-bootstrap',
-      '借用消息端口并读取启动配置',
-      '准备好配置后再通知启动方'
-    ],
-    [
-      '/en/docs/rpc-threads/channels-and-bootstrap',
-      'Borrow message ports and read startup data',
-      'Prepare configuration before acknowledging startup'
-    ],
-    [
-      '/zh/docs/rpc-threads/binary-and-transfer',
-      '复制附件或交出原缓冲区',
-      '把附件缓冲区交给 Worker'
-    ],
-    [
-      '/en/docs/rpc-threads/binary-and-transfer',
-      'Copy an attachment or hand over its buffer',
-      'Hand the attachment buffer to the Worker'
-    ],
-    [
-      '/zh/docs/rpc-threads/troubleshooting',
-      '区分业务异常与 Worker 资源错误',
-      '从现象检查入口和关闭方式'
-    ],
-    [
-      '/en/docs/rpc-threads/troubleshooting',
-      'Separate business errors from Worker resource failures',
-      'Check entry selection and cleanup by symptom'
-    ],
-    ['/zh/docs/rpc-browser', '把浏览器原生载体接成可调用连接', '为什么选它'],
-    ['/en/docs/rpc-browser', 'Connect browser carriers to callable peers', 'Why choose it'],
-    ['/zh/docs/rpc-browser/getting-started', '安装并连接价格 iframe', 'Peer 创建选项'],
-    [
-      '/en/docs/rpc-browser/getting-started',
-      'Install and connect a pricing iframe',
-      'Peer factory options'
-    ],
-    ['/zh/docs/rpc-browser/peers-and-window', '选择来源并接入窗口消息', '物理观察数据'],
-    [
-      '/en/docs/rpc-browser/peers-and-window',
-      'Choose a source and connect window messages',
-      'Physical observation data'
-    ],
-    ['/zh/docs/rpc-browser/shared-workers', '让多个连接共享购物车 Worker', '直接借用已有端口'],
-    [
-      '/en/docs/rpc-browser/shared-workers',
-      'Share a cart Worker across connections',
-      'Borrow a port directly'
-    ],
-    [
-      '/zh/docs/rpc-browser/rtc-data-channels',
-      '在已连通的 RTC 频道上调用订单服务',
-      '直接使用字符串 transport'
-    ],
-    [
-      '/en/docs/rpc-browser/rtc-data-channels',
-      'Call an order service over a connected RTC channel',
-      'Use the string transport directly'
-    ],
-    [
-      '/zh/docs/rpc-browser/broadcast-and-service-workers',
-      '广播变化并与ServiceWorker通信',
-      '需要RPC调用时交给Endpoint'
-    ],
-    [
-      '/en/docs/rpc-browser/broadcast-and-service-workers',
-      'Broadcast changes and communicate with ServiceWorkers',
-      'Use an Endpoint for RPC calls'
-    ],
-    [
-      '/zh/docs/rpc-browser/web-transport-datagrams',
-      '把数据报流接入字节传输',
-      '关闭流并保留数据报限制'
-    ],
-    [
-      '/en/docs/rpc-browser/web-transport-datagrams',
-      'Adapt datagram streams to byte transport',
-      'Close streams and retain datagram limits'
-    ],
-    [
-      '/zh/docs/rpc-browser/troubleshooting',
-      '区分业务异常、解码失败和载体关闭',
-      '先检查连接来源与关闭责任'
-    ],
-    [
-      '/en/docs/rpc-browser/troubleshooting',
-      'Separate business errors, decoding failures, and carrier closure',
-      'Check source selection and cleanup responsibility'
-    ],
-    ['/zh/docs/rpc-devtools', '把 RPC 观察变成可查询的诊断数据', '为什么选它'],
-    ['/en/docs/rpc-devtools', 'Turn RPC observations into queryable diagnostics', 'Why choose it'],
-    ['/zh/docs/rpc-devtools/getting-started', '安装并查看价格 RPC', '创建采集器的全部选项'],
-    [
-      '/en/docs/rpc-devtools/getting-started',
-      'Install and inspect a pricing RPC',
-      'All collector construction options'
-    ],
-    [
-      '/zh/docs/rpc-devtools/collector-and-queries',
-      '筛选事件、统计与捕获内容',
-      '直接 emit 接收什么'
-    ],
-    [
-      '/en/docs/rpc-devtools/collector-and-queries',
-      'Filter events, statistics and captured content',
-      'Inputs consumed by direct emit'
-    ],
-    [
-      '/zh/docs/rpc-devtools/recordings-and-service',
-      '保存一次真实调用并提供远程查询',
-      '从独立服务连接查询订单调用'
-    ],
-    [
-      '/en/docs/rpc-devtools/recordings-and-service',
-      'Record a real call and expose remote queries',
-      'Query the call through a separate service connection'
-    ],
-    [
-      '/zh/docs/rpc-devtools/hub-and-offline',
-      '聚合已有服务并查询离线录制',
-      '在关闭业务连接后读取录制'
-    ],
-    [
-      '/en/docs/rpc-devtools/hub-and-offline',
-      'Aggregate existing services and offline recordings',
-      'Read the recording after business close'
-    ],
-    [
-      '/zh/docs/rpc-devtools/log-ingestion',
-      '把 RPC 慢调用写入真实日志文件',
-      '让日志系统负责输出与收尾'
-    ],
-    [
-      '/en/docs/rpc-devtools/log-ingestion',
-      'Write slow RPC calls to a real log file',
-      'Let the logger own delivery and cleanup'
-    ],
-    ['/zh/docs/rpc-devtools/troubleshooting', '先区分没有捕获与没有事件', '检查保留范围与时间基准'],
-    [
-      '/en/docs/rpc-devtools/troubleshooting',
-      'Distinguish uncaptured content from missing events',
-      'Check retention and time baselines'
-    ],
-    ['/zh/docs/rpc-pool', '为线程与进程调用设置容量和等待上限', '为什么选它'],
-    [
-      '/en/docs/rpc-pool',
-      'Set capacity and waiting limits for Thread and Process calls',
-      'Why choose it'
-    ],
-    ['/zh/docs/rpc-pool/getting-started', '启动处理订单的线程池', '公开类型对应到哪里'],
-    [
-      '/en/docs/rpc-pool/getting-started',
-      'Start an order-processing Thread pool',
-      'Where public types apply'
-    ],
-    [
-      '/zh/docs/rpc-pool/choose-thread-or-process',
-      '把报价任务交给线程或子进程',
-      '两个工厂只有这些配置'
-    ],
-    [
-      '/en/docs/rpc-pool/choose-thread-or-process',
-      'Run pricing work in a thread or child process',
-      'Use the two factories’ actual options'
-    ],
-    ['/zh/docs/rpc-pool/dispatch-and-queue', '忙时让订单等待可用成员', '读取统计时各字段代表什么'],
-    [
-      '/en/docs/rpc-pool/dispatch-and-queue',
-      'Let orders wait for an available member',
-      'What each stats field means'
-    ],
-    [
-      '/zh/docs/rpc-pool/notifications-and-streams',
-      '消费订单流，让通知只等待发送',
-      '结束读取时归还成员'
-    ],
-    [
-      '/en/docs/rpc-pool/notifications-and-streams',
-      'Consume an order stream and wait only for notification send',
-      'Release a member when reading ends'
-    ],
-    ['/zh/docs/rpc-pool/resize-and-idle-members', '调整成员数并回收空闲成员', '空闲回收与按需补齐'],
-    [
-      '/en/docs/rpc-pool/resize-and-idle-members',
-      'Resize and retire idle members',
-      'Idle retirement and refill'
-    ],
-    [
-      '/zh/docs/rpc-pool/cancellation-and-shutdown',
-      '关闭时完成已接受的订单',
-      'close 的等待与错误结果'
-    ],
-    [
-      '/en/docs/rpc-pool/cancellation-and-shutdown',
-      'Finish accepted orders during closure',
-      'Understand close waiting and errors'
-    ],
-    ['/zh/docs/rpc-pool/troubleshooting', '排查池的排队与关闭问题', '启动回滚与清理错误'],
-    [
-      '/en/docs/rpc-pool/troubleshooting',
-      'Diagnose queueing and close problems',
-      'Startup rollback and cleanup errors'
     ]
   ] as const
 
@@ -4623,56 +4242,30 @@ test('gives primary tasks independent bilingual pages', () => {
   assert.match(storageWebText, /indexedDbBackendPlugin\(/)
   assert.match(storageWebText, /query\(\)\.limit\(20\)\.live\(/)
 
-  /** The first RPC task uses the current public client/provider presets for one price call. */
-  const rpcStart = readFileSync(
-    join(buildRoot, artifactPath('/en/docs/rpc-core/getting-started')),
-    'utf8'
+  /** RPC examples use the actual host facade and one installed transport. */
+  const rpcStart = renderedText(
+    readFileSync(join(buildRoot, artifactPath('/en/docs/rpc-host/getting-started')), 'utf8')
   )
-  /** Rendered code and output must agree with the independently executed example. */
-  const rpcStartText = renderedText(rpcStart)
-  assert.match(rpcStartText, /createClientEndpoint/)
-  assert.match(rpcStartText, /createProviderEndpoint/)
-  assert.match(rpcStartText, /createMemoryTransportPair/)
-  assert.match(rpcStartText, /send<number>\('catalog', 'subtotal', 2\)/)
-  assert.match(rpcStartText, /Item subtotal: 25/)
-  assert.match(rpcStartText, /await client\.dispose\(\)/)
-  assert.match(rpcStartText, /await provider\.dispose\(\)/)
-  assert.match(guideSource, /path: 'endpoint-composition'/)
-
-  /**
-   * Task-specific assertions follow each example instead of requiring all scenarios in the start
-   * page.
-   */
-  const rpcTopics = [
-    'endpoint-composition',
-    'extension-authoring',
-    'calls-and-cancellation',
-    'providers-and-contracts',
-    'transports-and-security',
-    'discovery-and-control',
-    'chunking-and-backpressure',
-    'replay-retry-and-lifecycle'
-  ]
+  assert.match(rpcStart, /createRpcHost/)
+  assert.match(rpcStart, /coroutinePlugin/)
+  assert.match(rpcStart, /host\.request\('double', 21\)/)
+  assert.match(rpcStart, /await host\.close\(\)/)
+  const rpcTopics = ['host-and-plugins', 'transports-and-security', 'calls-and-cancellation']
     .map((topic) =>
       renderedText(
-        readFileSync(join(buildRoot, artifactPath(`/en/docs/rpc-core/${topic}`)), 'utf8')
+        readFileSync(join(buildRoot, artifactPath(`/en/docs/rpc-host/${topic}`)), 'utf8')
       )
     )
     .join('\n')
-  assert.match(rpcTopics, /createControlFeature\(outboundCapability, discoveryCapability\)/)
-  assert.match(rpcTopics, /defineFeature\(\(\) => \(\{ currency: 'USD' \}\)\)/)
-  assert.match(rpcTopics, /core\.own\(timer, \(\) => clearInterval\(timer\)\)/)
-  assert.match(rpcTopics, /controller\.abort\('route changed'\)/)
-  assert.match(
+  assert.match(rpcTopics, /createRpcHost/)
+  assert.match(rpcTopics, /source/)
+  assert.match(rpcTopics, /code/)
+  assert.match(rpcTopics, /cause/)
+  assert.match(rpcTopics, /host\.close\(\)/)
+  assert.doesNotMatch(
     rpcTopics,
-    /schemas: \{ subtotal: \{ params: numberSchema, result: numberSchema \} \}/
+    /create(?:ClientEndpoint|ProviderEndpoint|ComposedEndpoint|\w*Peer)\b/
   )
-  assert.match(rpcTopics, /maxGlobal\?: number[\s\S]*?the default is 256/)
-  assert.match(rpcTopics, /exclusive\/multiplexed\/broadcast topology/)
-  assert.match(rpcTopics, /Read a new snapshot rather than retaining internal mutable records/)
-  assert.match(rpcTopics, /maxConcurrentMessages\?: number/)
-  assert.match(rpcTopics, /No per-peer concurrency option exists/)
-  assert.match(rpcTopics, /An old Peer is not revived into a new connection/)
 
   const eventStart = readFileSync(
     join(buildRoot, artifactPath('/en/docs/event-subscriber/getting-started')),
@@ -4809,165 +4402,160 @@ test('teaches aliases while preserving the canonical Channel contract', () => {
   }
 })
 
-test('keeps every maintained RPC continuation resolvable', () => {
+test('keeps every maintained RPC continuation resolvable without retired owner redirects', () => {
   const routes = new Set(routeManifest.entries.map((entry) => entry.path))
-  const topics = [
-    '',
-    'getting-started',
-    'endpoint-composition',
-    'extension-authoring',
-    'calls-and-cancellation',
-    'providers-and-contracts',
-    'transports-and-security',
-    'discovery-and-control',
-    'chunking-and-backpressure',
-    'replay-retry-and-lifecycle'
+  const owners = [
+    'rpc-host',
+    'rpc-plugin-process',
+    'rpc-plugin-thread',
+    'rpc-plugin-browser',
+    'rpc-plugin-coroutines',
+    'rpc-plugin-pool',
+    'rpc-plugin-devtools'
   ]
-
-  for (const locale of ['en', 'zh']) {
-    for (const topic of topics) {
-      const path = `/${locale}/docs/rpc-core${topic ? `/${topic}` : ''}`
-      const html = readFileSync(join(buildRoot, artifactPath(path)), 'utf8')
-      const internalLinks = [
-        ...html.matchAll(/href="(\/(?:en|zh)\/(?:docs|guides|architecture)[^"#?]*)/g)
-      ]
-        .map((match) => match[1])
-        .filter((link): link is string => link !== undefined)
-
-      for (const link of internalLinks) {
-        assert.ok(routes.has(link), `broken maintained RPC link: ${path} -> ${link}`)
-      }
-    }
-  }
-})
-
-test('renders every adapter tutorial in both locales', () => {
-  const factories = [
-    'createMemoryTransportPair',
-    'createWindowMessageTransport',
-    'createBrowserMessagePortTransport',
-    'createNodeMessagePortTransport',
-    'createWebWorkerTransport',
-    'createSharedWorkerTransport',
-    'createServiceWorkerTransport',
-    'createBroadcastChannelTransport',
-    'createRtcDataChannelTransport',
-    'createWebTransportDatagramTransport'
-  ]
-  for (const locale of ['en', 'zh']) {
-    const path = `/${locale}/docs/rpc-core/transports-and-security`
-    const page = readFileSync(join(buildRoot, artifactPath(path)), 'utf8')
-    for (const factory of factories) assert.ok(page.includes(factory), `${path} misses ${factory}`)
-    assert.ok(!page.includes('createMessagePortTransport'))
-  }
-})
-
-test('exposes primary endpoints and every guide from the left rail', () => {
-  for (const locale of ['en', 'zh']) {
-    /** Each factory remains navigable from the actual package that owns its public API. */
-    const factoryOwners = [
-      ['rpc-core', ['createEndpoint', 'createComposedEndpoint']],
-      ['rpc-process', ['createProcessPeer', 'createProcessPlugin']],
-      ['rpc-threads', ['createThreadPeer', 'createThreadPlugin']]
-    ] as const
-    for (const [owner, endpoints] of factoryOwners) {
-      const docsPath = `/${locale}/docs/${owner}`
-      const docsPage = readFileSync(join(buildRoot, artifactPath(docsPath)), 'utf8')
-      for (const endpoint of endpoints)
-        assert.ok(docsPage.includes(`>${endpoint}</a>`), `${docsPath} hides ${endpoint}`)
-    }
-    const corePage = readFileSync(join(buildRoot, artifactPath(`/${locale}/docs/rpc-core`)), 'utf8')
-    assert.ok(corePage.includes(`/${locale}/docs/rpc-core/transports-and-security`))
-    assert.ok(corePage.includes(`/${locale}/docs/rpc-core/endpoint-composition`))
-
-    const guidePath = `/${locale}/docs/rpc-core/transports-and-security`
-    const guidePage = readFileSync(join(buildRoot, artifactPath(guidePath)), 'utf8')
-    for (const anchor of [
-      'window-transport',
-      'web-worker-transport',
-      'shared-worker-transport',
-      'broadcast-channel-transport'
-    ]) {
-      assert.ok(guidePage.includes(`id="${anchor}"`), `${guidePath} misses #${anchor}`)
-      assert.ok(guidePage.includes(`href="#${anchor}"`), `${guidePath} does not link #${anchor}`)
-    }
-    for (const topic of [
-      'getting-started',
-      'endpoint-composition',
-      'extension-authoring',
-      'calls-and-cancellation',
-      'providers-and-contracts',
-      'transports-and-security',
-      'discovery-and-control',
-      'chunking-and-backpressure',
-      'replay-retry-and-lifecycle'
-    ])
-      assert.ok(guidePage.includes(`/${locale}/docs/rpc-core/${topic}`))
-    assert.ok(guidePage.includes('href="#memory-transport"'))
-    assert.ok(guidePage.includes('href="#web-transport-datagram-transport"'))
-  }
-})
-
-test('explains advanced factories and the lower-level call boundary', () => {
-  for (const locale of ['en', 'zh']) {
-    const path = `/${locale}/docs/rpc-core/endpoint-composition`
-    const page = readFileSync(join(buildRoot, artifactPath(path)), 'utf8')
-    for (const factory of [
-      'createClientEndpoint',
-      'createProviderEndpoint',
-      'createFullEndpoint',
-      'createComposedEndpoint'
-    ])
-      assert.ok(page.includes(factory), `${path} misses ${factory}`)
-    /** The lower-level example supplies both endpoints and consumes a typed result. */
-    const text = renderedText(page)
-    for (const contract of [
-      'createMemoryTransportPair',
-      'context.success',
-      'client.send<number>',
-      'client.dispose()',
-      'provider.dispose()'
-    ])
-      assert.ok(text.includes(contract), `${path} misses ${contract}`)
-    assert.ok(text.includes(locale === 'zh' ? '商品单价: 12.5' : 'Item unit price: 12.5'))
-    assert.ok(text.includes('send<T>(targetId, method, data, options?)'))
-    assert.ok(text.includes('request(method, payload?, options?)'))
-    assert.match(text, /createCanonicalChunkFeature/)
-    assert.ok(page.includes(`/${locale}/docs/rpc-core/extension-authoring`))
-  }
-})
-
-test('documents the public Feature boundary and custom middleware', () => {
-  for (const locale of ['en', 'zh']) {
-    const path = `/${locale}/docs/rpc-core/extension-authoring`
-    const page = readFileSync(join(buildRoot, artifactPath(path)), 'utf8')
-    for (const contract of [
-      'IRpcPlugin',
-      'defineFeature',
-      'defineMiddleware',
-      'core.own',
-      'publicKeys'
-    ])
-      assert.ok(page.includes(contract), `${path} misses ${contract}`)
-    assert.ok(page.includes(`/${locale}/docs/rpc-core/endpoint-composition`))
-  }
-})
-
-test('keeps guide topics, primary endpoints, and plugins in one rail', () => {
   for (const locale of ['en', 'zh'] as const) {
-    const path = `/${locale}/docs/rpc-core/extension-authoring`
-    const page = readFileSync(join(buildRoot, artifactPath(path)), 'utf8')
+    for (const owner of owners)
+      for (const { topic } of listGuideJourneys(owner, locale)) {
+        const path = `/${locale}/docs/${owner}${topic === 'index' ? '' : `/${topic}`}`
+        assert.ok(routes.has(path), `missing maintained RPC route: ${path}`)
+        const journey = findGuideJourney(owner, topic, locale)
+        assert.ok(journey)
+        const html = readFileSync(join(buildRoot, artifactPath(path)), 'utf8')
+        assert.ok(renderedText(html).includes(journey.title), `missing task title: ${path}`)
+        assert.match(html, /class="guide-journey-next"/, `missing bounded next action: ${path}`)
+        const links = [
+          ...html.matchAll(/href="(\/(?:en|zh)\/(?:docs|guides|architecture)[^"#?]*)/g)
+        ].map((match) => match[1])
+        for (const link of links)
+          assert.ok(routes.has(link), `broken maintained RPC link: ${path} -> ${link}`)
+      }
+    for (const retired of [
+      'rpc-core',
+      'rpc-process',
+      'rpc-threads',
+      'rpc-browser',
+      'rpc-pool',
+      'rpc-devtools'
+    ]) {
+      assert.equal(
+        [...routes].some(
+          (path) =>
+            path === `/${locale}/docs/${retired}` || path.startsWith(`/${locale}/docs/${retired}/`)
+        ),
+        false
+      )
+      assert.equal(
+        existsSync(join(buildRoot, artifactPath(`/${locale}/docs/${retired}`))),
+        false,
+        `retired RPC owner must not remain as a redirect: ${retired}`
+      )
+    }
+  }
+})
+
+test('renders every transport plugin tutorial in both locales', () => {
+  const factories = [
+    ['rpc-plugin-process', 'processPlugin'],
+    ['rpc-plugin-thread', 'threadPlugin'],
+    ['rpc-plugin-browser', 'windowPlugin'],
+    ['rpc-plugin-browser', 'dedicatedWorkerPlugin'],
+    ['rpc-plugin-browser', 'sharedWorkerPlugin'],
+    ['rpc-plugin-browser', 'serviceWorkerPlugin'],
+    ['rpc-plugin-browser', 'broadcastChannelPlugin'],
+    ['rpc-plugin-browser', 'rtcDataChannelPlugin'],
+    ['rpc-plugin-browser', 'webTransportPlugin'],
+    ['rpc-plugin-coroutines', 'coroutinePlugin']
+  ] as const
+  for (const locale of ['en', 'zh'])
+    for (const [owner, factory] of factories) {
+      const path = `/${locale}/docs/${owner}/api/${factory}`
+      const text = renderedText(readFileSync(join(buildRoot, artifactPath(path)), 'utf8'))
+      for (const contract of [factory, 'createRpcHost', '.close()'])
+        assert.ok(text.includes(contract), `${path} misses ${contract}`)
+      assert.doesNotMatch(
+        text,
+        /create(?:ClientEndpoint|ProviderEndpoint|ComposedEndpoint|\w*Peer)\b/
+      )
+    }
+})
+
+test('exposes the host and plugin roots with their actual guides in the left rail', () => {
+  const roots = [
+    ['rpc-host', 'createRpcHost'],
+    ['rpc-plugin-process', 'processPlugin'],
+    ['rpc-plugin-thread', 'threadPlugin'],
+    ['rpc-plugin-browser', 'dedicatedWorkerPlugin'],
+    ['rpc-plugin-coroutines', 'coroutinePlugin'],
+    ['rpc-plugin-pool', 'poolPlugin'],
+    ['rpc-plugin-devtools', 'devtoolsPlugin']
+  ] as const
+  for (const locale of ['en', 'zh'] as const)
+    for (const [owner, factory] of roots) {
+      const path = `/${locale}/docs/${owner}`
+      const page = readFileSync(join(buildRoot, artifactPath(path)), 'utf8')
+      const rail = stableLeftRail(page)
+      assert.ok(
+        rail.includes(`/${locale}/docs/${owner}/api/${factory}`),
+        `${path} hides ${factory}`
+      )
+      assert.ok(rail.includes(`/${locale}/docs/${owner}/getting-started`))
+      for (const { topic } of listGuideJourneys(owner, locale))
+        if (topic !== 'index') assert.ok(rail.includes(`/${locale}/docs/${owner}/${topic}`))
+    }
+})
+
+test('keeps user construction on the host and explicit plugin composition', () => {
+  for (const locale of ['en', 'zh']) {
+    const path = `/${locale}/docs/rpc-host/host-and-plugins`
+    const text = renderedText(readFileSync(join(buildRoot, artifactPath(path)), 'utf8'))
+    for (const contract of ['createRpcHost', 'plugins:', 'provide:', '.request(', '.close()'])
+      assert.ok(text.includes(contract), `${path} misses ${contract}`)
+    assert.doesNotMatch(
+      text,
+      /create(?:ClientEndpoint|ProviderEndpoint|FullEndpoint|ComposedEndpoint|\w*Peer)\b/
+    )
+  }
+})
+
+test('documents the public feature boundary without exposing private endpoint composition', () => {
+  for (const locale of ['en', 'zh'])
+    for (const feature of [
+      'authFeature',
+      'chunkFeature',
+      'retryFeature',
+      'timeoutFeature',
+      'typegenFeature'
+    ]) {
+      const api = apiManifest.apis.find(
+        (entry) =>
+          entry.library === 'rpc-host' &&
+          entry.symbols.some((symbol) => symbol.name === feature && symbol.kind !== 'type')
+      )
+      assert.ok(api, `missing public feature ${feature}`)
+      const symbol = api.symbols.find((entry) => entry.name === feature)!
+      const path = `${publicModulePath(locale, 'rpc-host', api.module)}/${symbol.routeSlug ?? feature}`
+      const text = renderedText(readFileSync(join(buildRoot, artifactPath(path)), 'utf8'))
+      assert.ok(text.includes(feature))
+      assert.ok(text.includes('createRpcHost'))
+      assert.doesNotMatch(text, /create(?:ComposedEndpoint|OutboundFeature|ProviderFeature)\b/)
+    }
+})
+
+test('keeps guide topics, the host entry, and features in one stable rail', () => {
+  for (const locale of ['en', 'zh'] as const) {
+    const page = readFileSync(
+      join(buildRoot, artifactPath(`/${locale}/docs/rpc-host/host-and-plugins`)),
+      'utf8'
+    )
     const rail = stableLeftRail(page)
-    assert.ok(rail.includes(locale === 'zh' ? '<span>场景指南</span>' : '<span>Guides</span>'))
-    assert.ok(rail.includes(locale === 'zh' ? '常用 Endpoint' : 'Primary endpoints'))
-    assert.ok(rail.includes(locale === 'zh' ? '中间件插件' : 'Middleware plugins'))
-    assert.match(rail, />connect<\/a>/)
-    assert.match(rail, /href="\/(?:en|zh)\/docs\/rpc-core\/api\/[^"]*RpcTransportTopology"/)
+    assert.ok(rail.includes(`/${locale}/docs/rpc-host/api/createRpcHost`))
+    for (const topic of ['host-and-plugins', 'transports-and-security', 'calls-and-cancellation'])
+      assert.ok(rail.includes(`/${locale}/docs/rpc-host/${topic}`))
     assert.equal(
       rail,
       stableLeftRail(
         readFileSync(
-          join(buildRoot, artifactPath(`/${locale}/docs/rpc-core/api/createEndpoint`)),
+          join(buildRoot, artifactPath(`/${locale}/docs/rpc-host/api/createRpcHost`)),
           'utf8'
         )
       )

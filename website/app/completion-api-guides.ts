@@ -165,58 +165,13 @@ await host.dispose()`
 export const completionApiGuides: Readonly<
   Record<string, Readonly<Partial<Record<IGuideLocale, IApiGuide>>>>
 > = {
-  'rpc-core:full:createFullOneWayEndpoint': guide({
-    purposeEn:
-      'Creates an endpoint: the local object that sends RPC messages and handles incoming calls. This full variant includes ordinary calls, local handlers, peer discovery and connection control, and adds sendOneWay for notifications that need no reply. Choose it when both kinds of messages share one connection. The example connects a client and service in memory, calls the service to double 21, then sends a progress notification. A completed sendOneWay only confirms handoff to the message channel. Use an ordinary call when the sender must learn whether the remote handler succeeded.',
-    purposeZh:
-      '创建用于收发远程调用的端点对象。这个完整版本提供普通调用、本地处理函数、对端发现和连接控制，还增加了不等待回复的 sendOneWay 通知。同一连接需要同时发送普通调用和通知时，选择此版本。下面在内存中连接客户端与服务端，先让服务端计算 21 的两倍，再发送进度通知。sendOneWay 完成只表示消息已交给通道；需要知道远端处理是否成功时，应使用普通调用取得结果。',
-    quickStart: `import { connect, createEndpoint } from '@migaia/rpc-core'
-import { createFullOneWayEndpoint } from '@migaia/rpc-core/full'
-import { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'
-
-const [clientTransport, serviceTransport] = createMemoryTransportPair()
-/** The service owns handlers for this side of the memory channel. */
-const service = await createEndpoint({
-  id: 'service', transport: serviceTransport,
-  middlewares: [connect({ transport: serviceTransport })] as const
-})
-service.provide('double', (context) => context.success(Number(context.data) * 2))
-service.provide('note', (context) => { console.log(context.data); return context.success() })
-/** This client keeps ordinary calls and adds one-way sending on the same connection. */
-const client = await createFullOneWayEndpoint({
-  id: 'client', transport: clientTransport,
-  middlewares: [connect({ transport: clientTransport })] as const
-})
-try {
-  console.log(await client.send<number>('service', 'double', 21))
-  await client.sendOneWay('service', 'note', 'calculation completed')
-} finally {
-  await Promise.all([client.dispose(), service.dispose()])
-}`,
-    scenariosEn: [
-      'The ordinary send call prints 42, proving that request and response still work alongside one-way sending.',
-      'A notification reports local progress and does not need a remote return value.'
-    ],
-    scenariosZh: [
-      '普通 send 调用输出 42，说明单向发送与原有的请求回复可以同时使用。',
-      '用通知报告本地进度，不需要远端返回结果。'
-    ],
-    avoidEn: [
-      'Use createFullEndpoint when every operation must wait for a remote response.',
-      'Do not use sendOneWay as evidence that a remote write succeeded; use a call with an explicit result when confirmation matters.'
-    ],
-    avoidZh: [
-      '所有操作都需要等待远端回复时，使用 createFullEndpoint。',
-      '不能用 sendOneWay 完成证明远端写入成功；需要确认时，使用带明确结果的普通调用。'
-    ]
-  }),
-  'rpc-core:transport-kit:identifyRpcBoundaryFailure': guide({
+  'rpc-host:plugin:identifyRpcBoundaryFailure': guide({
     purposeEn:
       'Adds a Core error classification to a failure caught while an adapter sends or receives data. An adapter connects RPC to a host resource such as a message port. Pass the caught value, the Core code describing that operation, and a message for any wrapper that is needed. An Error that accepts the new properties remains the same object, with its native type and stack. If it already has nonempty source and code strings identifying another package and failure, the function returns it unchanged. A non-Error value, or an Error that cannot accept the properties, receives a new Error wrapper whose cause retains the original value. The example checks that classifying a mutable TypeError preserves both its object identity and its type.',
     purposeZh:
       '为适配器发送或接收数据时捕获的失败补上 Core 错误分类。适配器负责把 RPC 接到消息端口等运行环境资源。调用时传入捕获的值、描述本次操作的 Core 错误码，以及需要包装错误时使用的说明。原生 Error 如果允许附加属性，就仍返回原对象，并保留类型和堆栈。若它已经用非空的 source 和 code 字符串标明所属包与失败种类，函数会保留原分类。捕获到非 Error 值，或原错误不允许附加属性时，函数才创建新的 Error，并通过 cause 保留原值。下面检查给 TypeError 分类后，返回的是否仍为同一个对象、是否仍属于 TypeError。',
-    quickStart: `import { RpcCoreErrorCode } from '@migaia/rpc-core'
-import { identifyRpcBoundaryFailure } from '@migaia/rpc-core/transport-kit'
+    quickStart: `import { RpcCoreErrorCode } from '@migaia/rpc-host'
+import { identifyRpcBoundaryFailure } from '@migaia/rpc-host/plugin'
 
 /** A native failure that an adapter would receive from its host. */
 const originalFailure = new TypeError('Port is closed')
@@ -243,12 +198,12 @@ console.log(classifiedFailure instanceof TypeError)`,
       '普通业务代码应处理 RPC 调用失败，不应自行制造适配器传输错误。'
     ]
   }),
-  'rpc-threads:adapters-node:createNodeThreadLauncher': guide({
+  'rpc-plugin-thread:adapters-node:createNodeThreadLauncher': guide({
     purposeEn:
       'Creates a launcher that can start Node Worker threads. Use it when integrating a supervisor: an object that starts a Worker, restarts it after failure and closes it when work ends. Creating the launcher starts no thread. The supervisor later calls launch with the Worker entry and cancellation signal. The launcher reports which operations it can guarantee: termination requests can stop the Worker, and exit observation confirms that the Worker actually stopped. The example prepares a launcher without inherited runtime flags and prints these two guarantees. For ordinary application calls, createThreadPeer prepares the Worker and connection for you.',
     purposeZh:
       '创建能够启动 Node Worker 线程的启动器，供监督器使用。监督器是负责启动 Worker、失败后重启、结束时关闭 Worker 的管理对象。创建启动器不会启动线程；监督器之后调用 launch，才会按入口配置与取消信号创建 Worker。启动器还说明哪些操作有实际保证：可以终止 Worker，也能确认 Worker 是否已经真正退出。下面禁止继承父进程的运行时参数，并输出这两项能力。普通业务只需调用 createThreadPeer，由它准备 Worker 和连接。',
-    quickStart: `import { createNodeThreadLauncher } from '@migaia/rpc-threads/adapters/node'
+    quickStart: `import { createNodeThreadLauncher } from '@migaia/rpc-plugin-thread/adapters/node'
 
 /** Preparation exposes capabilities without starting a Worker. */
 const launcher = createNodeThreadLauncher({ execArgv: [] })
@@ -271,12 +226,12 @@ console.log(launcher.capabilities['exit-observation'])`,
       '不要在浏览器 Worker 中使用 Node 适配器，该宿主应使用网页启动器。'
     ]
   }),
-  'rpc-threads:adapters-node:createNodeThreadChannelFactory': guide({
+  'rpc-plugin-thread:adapters-node:createNodeThreadChannelFactory': guide({
     purposeEn:
       'Prepares a factory that opens RPC message channels for Node Workers already started by your application. The Worker handle is the object returned by its launcher; keep that original object. Pass the same scheduler, which supplies time and timers, as the manager that starts, restarts and closes the Workers. Creating the factory opens no channel. Call open(handle, signal) to open a connection to that Worker and cancel setup through signal if needed. The example only prepares the factory; it starts no Worker.',
     purposeZh:
       '准备一个为现有 Node Worker 打开 RPC 消息通道的工厂。传给工厂的 handle 是启动器返回的 Worker 操作对象，必须保留原对象。scheduler 提供时间和计时器，应与负责启动、重启和关闭 Worker 的管理对象共用。创建工厂不会打开通道；之后调用 open(handle, signal)，才会连接该 Worker，signal 用于取消连接建立。下面只准备工厂，不启动 Worker。',
-    quickStart: `import { createNodeThreadChannelFactory } from '@migaia/rpc-threads/adapters/node'
+    quickStart: `import { createNodeThreadChannelFactory } from '@migaia/rpc-plugin-thread/adapters/node'
 import { systemScheduler } from '@migaia/utils/scheduler'
 
 /** The channel factory shares the supervision owner clock. */
@@ -299,12 +254,12 @@ console.log(typeof channels.open)`,
       '不要复制属性伪造 Worker 句柄，应传入启动器所有者取得的句柄。'
     ]
   }),
-  'rpc-threads:adapters-electron-main:createElectronMainThreadLauncher': guide({
+  'rpc-plugin-thread:adapters-electron-main:createElectronMainThreadLauncher': guide({
     purposeEn:
       'Prepares a launcher for Node worker_threads inside the Electron main process. Use it with a manager that starts, restarts and closes those threads. This adapter reports unsupported for guaranteed termination, confirmation of actual exit, and heap memory limits. Here unsupported means the adapter does not promise those guarantees; a policy that requires them must reject this choice. The example inspects the declaration without starting a Worker. This launcher creates Worker threads when launch is called, rather than Electron utilityProcess instances.',
     purposeZh:
       '准备在 Electron 主进程内使用 Node worker_threads 的启动器，交给负责启动、重启和关闭线程的管理对象。这个适配器把终止保证、确认实际退出、限制堆内存三项能力都声明为 unsupported，表示它不承诺这些操作有保证。应用规则如果要求其中任一保证，就不能选择这个适配器。下面只读取能力声明，不启动 Worker。之后调用 launch 时创建的是 Worker 线程，不是 Electron 的 utilityProcess 工具进程。',
-    quickStart: `import { createElectronMainThreadLauncher } from '@migaia/rpc-threads/adapters/electron-main'
+    quickStart: `import { createElectronMainThreadLauncher } from '@migaia/rpc-plugin-thread/adapters/electron-main'
 
 /** Electron main explicitly advertises its unsupported guarantees. */
 const launcher = createElectronMainThreadLauncher()
@@ -326,12 +281,12 @@ console.log(launcher.capabilities.termination)`,
       '代码运行于 Electron 渲染进程或浏览器页面时，不应使用属于主进程的此适配器。'
     ]
   }),
-  'rpc-threads:adapters-electron-main:createElectronMainThreadChannelFactory': guide({
+  'rpc-plugin-thread:adapters-electron-main:createElectronMainThreadChannelFactory': guide({
     purposeEn:
       'Prepares a factory for opening RPC message channels to Worker threads in the Electron main process. It uses the Node channel implementation. Supply the scheduler that provides time and timers for your Worker manager, so connection setup uses the same clock. Calling open with the original Worker handle and a cancellation signal opens the channel. Merely creating the factory starts no Worker and terminates no Worker. The example prepares open for later use.',
     purposeZh:
       '准备为 Electron 主进程内的 Worker 线程打开 RPC 消息通道的工厂，内部使用 Node 的通道实现。scheduler 是提供时间和计时器的对象，应与 Worker 管理对象共用，让连接建立使用同一个时钟。调用 open 时传入启动器返回的原 Worker 操作对象和取消信号，才会打开通道。创建工厂本身不会启动或终止 Worker。下面准备好 open，供之后连接时使用。',
-    quickStart: `import { createElectronMainThreadChannelFactory } from '@migaia/rpc-threads/adapters/electron-main'
+    quickStart: `import { createElectronMainThreadChannelFactory } from '@migaia/rpc-plugin-thread/adapters/electron-main'
 import { systemScheduler } from '@migaia/utils/scheduler'
 
 /** Preparing the factory does not open or terminate a Worker. */
@@ -354,6 +309,628 @@ console.log(typeof channels.open)`,
       '渲染侧代码应使用浏览器或网页 Worker 接入，不使用此主进程适配器。'
     ]
   }),
+  'rpc-host:index:createRpcIdempotencyStore': guide({
+    purposeEn:
+      'Creates the RPC-owned idempotency/result store used by request keys and outcome lookup. Retention is local to its owner unless the application supplies durable storage and reconciliation.',
+    purposeZh:
+      '创建 RPC owner 的幂等键与结果存储，用于请求键和 outcome 查询；除非应用提供持久化及对账，结果只在当前 owner 内保留。',
+    quickStart:
+      "import { createRpcIdempotencyStore } from '@migaia/rpc-host'\n\nexport function invokeConfiguredBoundary(...args: Parameters<typeof createRpcIdempotencyStore>) {\n  return createRpcIdempotencyStore(...args)\n}",
+    scenariosEn: [
+      'A library adapter must assemble the explicit source, contract or runtime policy named above.',
+      'The application needs to retain the original channel/Host lifecycle while validating inputs at its own integration boundary.'
+    ],
+    scenariosZh: [
+      '库适配器需要装配上述明确的来源、契约或运行时策略。',
+      '应用需要保留原 channel/Host 生命周期，并在自己的集成边界校验输入。'
+    ],
+    avoidEn: [
+      'Prefer the four process/thread Peer or Plugin factories for ordinary application RPC.',
+      'Do not treat this low-level operation as permission to bypass expose, source authentication or cleanup ownership.'
+    ],
+    avoidZh: [
+      '普通业务 RPC 优先使用四个 process/thread Peer 或 Plugin 工厂。',
+      '不要把底层操作当作绕过 expose、source 鉴权或资源清理归属的权限。'
+    ]
+  }),
+  'rpc-host:plugin:createIpcLogFeature': guide({
+    purposeEn:
+      'Creates the IPC log Feature for one connection/session, reporting lifecycle and backlog facts through the existing Host logger without exposing the peer authentication token.',
+    purposeZh:
+      '为一个 connection/session 创建 IPC 日志 Feature，通过既有 Host logger 报告生命周期与 backlog 事实，不暴露对端鉴权 token。',
+    quickStart:
+      "import { createIpcLogFeature } from '@migaia/rpc-host/plugin'\n\nexport function invokeConfiguredBoundary(...args: Parameters<typeof createIpcLogFeature>) {\n  return createIpcLogFeature(...args)\n}",
+    scenariosEn: [
+      'A library adapter must assemble the explicit source, contract or runtime policy named above.',
+      'The application needs to retain the original channel/Host lifecycle while validating inputs at its own integration boundary.'
+    ],
+    scenariosZh: [
+      '库适配器需要装配上述明确的来源、契约或运行时策略。',
+      '应用需要保留原 channel/Host 生命周期，并在自己的集成边界校验输入。'
+    ],
+    avoidEn: [
+      'Prefer the four process/thread Peer or Plugin factories for ordinary application RPC.',
+      'Do not treat this low-level operation as permission to bypass expose, source authentication or cleanup ownership.'
+    ],
+    avoidZh: [
+      '普通业务 RPC 优先使用四个 process/thread Peer 或 Plugin 工厂。',
+      '不要把底层操作当作绕过 expose、source 鉴权或资源清理归属的权限。'
+    ]
+  }),
+  'rpc-host:plugin:createIpcSendQueueFeature': guide({
+    purposeEn:
+      'Creates the connection-owned bounded send gate with separate data and control capacity. Provider replies and stream data retain the data lane instead of being dropped as control traffic.',
+    purposeZh:
+      '创建连接持有的有界发送 gate，分别保留 data 与 control 容量；provider 回复和 stream 数据继续占用 data lane，不会被当成控制流丢弃。',
+    quickStart:
+      "import { createIpcSendQueueFeature } from '@migaia/rpc-host/plugin'\n\nexport function invokeConfiguredBoundary(...args: Parameters<typeof createIpcSendQueueFeature>) {\n  return createIpcSendQueueFeature(...args)\n}",
+    scenariosEn: [
+      'A library adapter must assemble the explicit source, contract or runtime policy named above.',
+      'The application needs to retain the original channel/Host lifecycle while validating inputs at its own integration boundary.'
+    ],
+    scenariosZh: [
+      '库适配器需要装配上述明确的来源、契约或运行时策略。',
+      '应用需要保留原 channel/Host 生命周期，并在自己的集成边界校验输入。'
+    ],
+    avoidEn: [
+      'Prefer the four process/thread Peer or Plugin factories for ordinary application RPC.',
+      'Do not treat this low-level operation as permission to bypass expose, source authentication or cleanup ownership.'
+    ],
+    avoidZh: [
+      '普通业务 RPC 优先使用四个 process/thread Peer 或 Plugin 工厂。',
+      '不要把底层操作当作绕过 expose、source 鉴权或资源清理归属的权限。'
+    ]
+  }),
+  'rpc-host:stream:createCanonicalChunkFeature': guide({
+    purposeEn:
+      'Creates the canonical chunk-reassembly dependency used by outbound and stream Features. It is selected during endpoint composition and released with the original endpoint scope.',
+    purposeZh:
+      '创建 outbound 和 stream Feature 使用的规范分片重组依赖，在 endpoint 组合时选定，并随原 endpoint scope 释放。',
+    quickStart:
+      "import { createCanonicalChunkFeature } from '@migaia/rpc-host/stream'\n\nexport function invokeConfiguredBoundary(...args: Parameters<typeof createCanonicalChunkFeature>) {\n  return createCanonicalChunkFeature(...args)\n}",
+    scenariosEn: [
+      'A library adapter must assemble the explicit source, contract or runtime policy named above.',
+      'The application needs to retain the original channel/Host lifecycle while validating inputs at its own integration boundary.'
+    ],
+    scenariosZh: [
+      '库适配器需要装配上述明确的来源、契约或运行时策略。',
+      '应用需要保留原 channel/Host 生命周期，并在自己的集成边界校验输入。'
+    ],
+    avoidEn: [
+      'Prefer the four process/thread Peer or Plugin factories for ordinary application RPC.',
+      'Do not treat this low-level operation as permission to bypass expose, source authentication or cleanup ownership.'
+    ],
+    avoidZh: [
+      '普通业务 RPC 优先使用四个 process/thread Peer 或 Plugin 工厂。',
+      '不要把底层操作当作绕过 expose、source 鉴权或资源清理归属的权限。'
+    ]
+  }),
+  'rpc-host:stream:createStreamFeature': guide({
+    purposeEn:
+      'Adds the stream owner to existing outbound/provider Features, retaining direction, sequence, credit, cancellation and terminal cleanup in that owner.',
+    purposeZh:
+      '在现有 outbound/provider Feature 上增加 stream owner，由它保留方向、序号、额度、取消和终态清理职责。',
+    quickStart:
+      "import { createStreamFeature } from '@migaia/rpc-host/stream'\n\nexport function invokeConfiguredBoundary(...args: Parameters<typeof createStreamFeature>) {\n  return createStreamFeature(...args)\n}",
+    scenariosEn: [
+      'A library adapter must assemble the explicit source, contract or runtime policy named above.',
+      'The application needs to retain the original channel/Host lifecycle while validating inputs at its own integration boundary.'
+    ],
+    scenariosZh: [
+      '库适配器需要装配上述明确的来源、契约或运行时策略。',
+      '应用需要保留原 channel/Host 生命周期，并在自己的集成边界校验输入。'
+    ],
+    avoidEn: [
+      'Prefer the four process/thread Peer or Plugin factories for ordinary application RPC.',
+      'Do not treat this low-level operation as permission to bypass expose, source authentication or cleanup ownership.'
+    ],
+    avoidZh: [
+      '普通业务 RPC 优先使用四个 process/thread Peer 或 Plugin 工厂。',
+      '不要把底层操作当作绕过 expose、source 鉴权或资源清理归属的权限。'
+    ]
+  }),
+  'rpc-plugin-process:adapters-node-child-process:openProcessStdioChannel': guide({
+    purposeEn:
+      'Opens Node-compatible child stdio after the trusted bootstrap frame and keeps the original streams, cancellation and closed-state observation.',
+    purposeZh:
+      '在可信 bootstrap 帧之后打开 Node 兼容子进程 stdio，并保留原流、取消和关闭状态观察。',
+    quickStart:
+      "import { openProcessStdioChannel } from '@migaia/rpc-plugin-process/adapters/node-child-process'\n\nexport function invokeConfiguredBoundary(...args: Parameters<typeof openProcessStdioChannel>) {\n  return openProcessStdioChannel(...args)\n}",
+    scenariosEn: [
+      'A library adapter must assemble the explicit source, contract or runtime policy named above.',
+      'The application needs to retain the original channel/Host lifecycle while validating inputs at its own integration boundary.'
+    ],
+    scenariosZh: [
+      '库适配器需要装配上述明确的来源、契约或运行时策略。',
+      '应用需要保留原 channel/Host 生命周期，并在自己的集成边界校验输入。'
+    ],
+    avoidEn: [
+      'Prefer the four process/thread Peer or Plugin factories for ordinary application RPC.',
+      'Do not treat this low-level operation as permission to bypass expose, source authentication or cleanup ownership.'
+    ],
+    avoidZh: [
+      '普通业务 RPC 优先使用四个 process/thread Peer 或 Plugin 工厂。',
+      '不要把底层操作当作绕过 expose、source 鉴权或资源清理归属的权限。'
+    ]
+  }),
+  'rpc-host:plugin:createRemoteRetryPort': guide({
+    purposeEn:
+      'Creates the bounded retry strategy port used with the original generation, idempotency key, deadline and dispatch owner; unknown outcome never proves a non-idempotent write can be repeated.',
+    purposeZh:
+      '创建与原 generation、幂等键、deadline 和 dispatch owner 配合的有界重试策略端口；unknown outcome 不证明非幂等写可安全重复。',
+    quickStart:
+      "import { createRemoteRetryPort } from '@migaia/rpc-host/plugin'\n\nexport function invokeConfiguredBoundary(...args: Parameters<typeof createRemoteRetryPort>) {\n  return createRemoteRetryPort(...args)\n}",
+    scenariosEn: [
+      'A library adapter must assemble the explicit source, contract or runtime policy named above.',
+      'The application needs to retain the original channel/Host lifecycle while validating inputs at its own integration boundary.'
+    ],
+    scenariosZh: [
+      '库适配器需要装配上述明确的来源、契约或运行时策略。',
+      '应用需要保留原 channel/Host 生命周期，并在自己的集成边界校验输入。'
+    ],
+    avoidEn: [
+      'Prefer the four process/thread Peer or Plugin factories for ordinary application RPC.',
+      'Do not treat this low-level operation as permission to bypass expose, source authentication or cleanup ownership.'
+    ],
+    avoidZh: [
+      '普通业务 RPC 优先使用四个 process/thread Peer 或 Plugin 工厂。',
+      '不要把底层操作当作绕过 expose、source 鉴权或资源清理归属的权限。'
+    ]
+  }),
+  'rpc-host:plugin:normalizeRemoteContract': guide({
+    purposeEn:
+      'Normalizes an external advanced remote contract before installing its method projection; it rejects invalid keys/modes instead of granting methods not actually provided.',
+    purposeZh:
+      '安装方法投影前规范化外部高级 remote contract；拒绝非法键和 mode，不会授予实际未提供的方法。',
+    quickStart:
+      "import { normalizeRemoteContract } from '@migaia/rpc-host/plugin'\n\nexport function invokeConfiguredBoundary(...args: Parameters<typeof normalizeRemoteContract>) {\n  return normalizeRemoteContract(...args)\n}",
+    scenariosEn: [
+      'A library adapter must assemble the explicit source, contract or runtime policy named above.',
+      'The application needs to retain the original channel/Host lifecycle while validating inputs at its own integration boundary.'
+    ],
+    scenariosZh: [
+      '库适配器需要装配上述明确的来源、契约或运行时策略。',
+      '应用需要保留原 channel/Host 生命周期，并在自己的集成边界校验输入。'
+    ],
+    avoidEn: [
+      'Prefer the four process/thread Peer or Plugin factories for ordinary application RPC.',
+      'Do not treat this low-level operation as permission to bypass expose, source authentication or cleanup ownership.'
+    ],
+    avoidZh: [
+      '普通业务 RPC 优先使用四个 process/thread Peer 或 Plugin 工厂。',
+      '不要把底层操作当作绕过 expose、source 鉴权或资源清理归属的权限。'
+    ]
+  }),
+  'rpc-host:plugin:normalizeRemoteControlShape': guide({
+    purposeEn:
+      'Validates one Host-control payload against the registered control definition, preserving portable values and exact action shape before remote dispatch.',
+    purposeZh:
+      '远端分发前按已登记 control 定义校验 Host-control payload，保留可移植值与明确的动作形态。',
+    quickStart:
+      "import { normalizeRemoteControlShape } from '@migaia/rpc-host/plugin'\n\nexport function invokeConfiguredBoundary(...args: Parameters<typeof normalizeRemoteControlShape>) {\n  return normalizeRemoteControlShape(...args)\n}",
+    scenariosEn: [
+      'A library adapter must assemble the explicit source, contract or runtime policy named above.',
+      'The application needs to retain the original channel/Host lifecycle while validating inputs at its own integration boundary.'
+    ],
+    scenariosZh: [
+      '库适配器需要装配上述明确的来源、契约或运行时策略。',
+      '应用需要保留原 channel/Host 生命周期，并在自己的集成边界校验输入。'
+    ],
+    avoidEn: [
+      'Prefer the four process/thread Peer or Plugin factories for ordinary application RPC.',
+      'Do not treat this low-level operation as permission to bypass expose, source authentication or cleanup ownership.'
+    ],
+    avoidZh: [
+      '普通业务 RPC 优先使用四个 process/thread Peer 或 Plugin 工厂。',
+      '不要把底层操作当作绕过 expose、source 鉴权或资源清理归属的权限。'
+    ]
+  }),
+  'rpc-host:plugin:normalizeRemoteHostCatalog': guide({
+    purposeEn:
+      'Validates the external Host plugin catalog used by the advanced remote facade, retaining explicit plugin/method names and rejecting structural conflicts before publication.',
+    purposeZh:
+      '校验高级 remote 门面使用的外部 Host 插件目录，保留明确的插件和方法名，并在发布前拒绝结构冲突。',
+    quickStart:
+      "import { normalizeRemoteHostCatalog } from '@migaia/rpc-host/plugin'\n\nexport function invokeConfiguredBoundary(...args: Parameters<typeof normalizeRemoteHostCatalog>) {\n  return normalizeRemoteHostCatalog(...args)\n}",
+    scenariosEn: [
+      'A library adapter must assemble the explicit source, contract or runtime policy named above.',
+      'The application needs to retain the original channel/Host lifecycle while validating inputs at its own integration boundary.'
+    ],
+    scenariosZh: [
+      '库适配器需要装配上述明确的来源、契约或运行时策略。',
+      '应用需要保留原 channel/Host 生命周期，并在自己的集成边界校验输入。'
+    ],
+    avoidEn: [
+      'Prefer the four process/thread Peer or Plugin factories for ordinary application RPC.',
+      'Do not treat this low-level operation as permission to bypass expose, source authentication or cleanup ownership.'
+    ],
+    avoidZh: [
+      '普通业务 RPC 优先使用四个 process/thread Peer 或 Plugin 工厂。',
+      '不要把底层操作当作绕过 expose、source 鉴权或资源清理归属的权限。'
+    ]
+  }),
+  'rpc-host:plugin:sameRemoteContract': guide({
+    purposeEn:
+      'Compares two normalized remote contracts by their maintained method and mode semantics for directory compatibility decisions; equality does not authorize a caller.',
+    purposeZh:
+      '按维护中的方法与 mode 语义比较两个规范 remote contract，供目录兼容判断使用；相等不代表调用者获得权限。',
+    quickStart:
+      "import { sameRemoteContract } from '@migaia/rpc-host/plugin'\n\nexport function invokeConfiguredBoundary(...args: Parameters<typeof sameRemoteContract>) {\n  return sameRemoteContract(...args)\n}",
+    scenariosEn: [
+      'A library adapter must assemble the explicit source, contract or runtime policy named above.',
+      'The application needs to retain the original channel/Host lifecycle while validating inputs at its own integration boundary.'
+    ],
+    scenariosZh: [
+      '库适配器需要装配上述明确的来源、契约或运行时策略。',
+      '应用需要保留原 channel/Host 生命周期，并在自己的集成边界校验输入。'
+    ],
+    avoidEn: [
+      'Prefer the four process/thread Peer or Plugin factories for ordinary application RPC.',
+      'Do not treat this low-level operation as permission to bypass expose, source authentication or cleanup ownership.'
+    ],
+    avoidZh: [
+      '普通业务 RPC 优先使用四个 process/thread Peer 或 Plugin 工厂。',
+      '不要把底层操作当作绕过 expose、source 鉴权或资源清理归属的权限。'
+    ]
+  }),
+  'rpc-host:testing:createPeerPair': guide({
+    purposeEn:
+      'Creates two in-memory symmetric Peers with cross-inferred provide types and the real core call/error/order semantics. It is an application test helper, not evidence of native transfer or process isolation.',
+    purposeZh:
+      '创建两个内存内对称 Peer，交叉推导 provide 类型并执行真实 core 调用、错误和顺序语义；这是应用测试 helper，不证明原生 transfer 或进程隔离。',
+    quickStart:
+      "import { createPeerPair } from '@migaia/rpc-host/testing'\n\nconst pair = await createPeerPair({\n  a: { provide: { echo: (value: string) => value } },\n  b: { provide: { double: (value: number) => value * 2 } }\n})\ntry {\n  console.log(await pair.a.request('double', 21))\n  console.log(await pair.b.request('echo', 'ready'))\n} finally {\n  await Promise.all([pair.a.close(), pair.b.close()])\n}",
+    scenariosEn: [
+      'A library adapter must assemble the explicit source, contract or runtime policy named above.',
+      'The application needs to retain the original channel/Host lifecycle while validating inputs at its own integration boundary.'
+    ],
+    scenariosZh: [
+      '库适配器需要装配上述明确的来源、契约或运行时策略。',
+      '应用需要保留原 channel/Host 生命周期，并在自己的集成边界校验输入。'
+    ],
+    avoidEn: [
+      'Prefer the four process/thread Peer or Plugin factories for ordinary application RPC.',
+      'Do not treat this low-level operation as permission to bypass expose, source authentication or cleanup ownership.'
+    ],
+    avoidZh: [
+      '普通业务 RPC 优先使用四个 process/thread Peer 或 Plugin 工厂。',
+      '不要把底层操作当作绕过 expose、source 鉴权或资源清理归属的权限。'
+    ]
+  }),
+  'rpc-plugin-process:adapters-node-child-process:createNodeProcessLauncher': guide({
+    purposeEn:
+      'Creates the node-child-process native unit launcher used by the matching process or thread Peer source. It retains runtime-specific validation, readiness, exit observation and ownership instead of pretending every native handle supports the same controls.',
+    purposeZh:
+      '创建 node-child-process 的执行单元启动器，交给匹配的 process/thread Peer 来源使用。保留该运行时自身的配置校验、就绪、退出观察和所有权；不把不同原生 handle 伪装成具有同一组控制能力。',
+    quickStart:
+      "import { createNodeProcessLauncher } from '@migaia/rpc-plugin-process/adapters/node-child-process'\n\nexport function configureAdapter(options: Parameters<typeof createNodeProcessLauncher>[0]) {\n  return createNodeProcessLauncher(options)\n}",
+    scenariosEn: [
+      'A node-child-process application needs a real adapter for a spawn-owned unit rather than a borrowed message target.',
+      'A custom native source assembles the original launcher, budget, scheduler and channel factory with explicit lifecycle ownership.'
+    ],
+    scenariosZh: [
+      'node-child-process 应用需要为 spawn 拥有的单元配置真实适配器，而不是借用外部消息目标。',
+      '自定义原生来源需要组合原 launcher、budget、scheduler 和 channel factory，并明确资源生命周期归属。'
+    ],
+    avoidEn: [
+      'Use the default runtime Peer or Plugin factory when no custom source assembly is required.',
+      'Do not infer hard termination, complete resource sampling or memory sharing from a platform name; inspect the adapter capability profile.'
+    ],
+    avoidZh: [
+      '不需要自定义来源装配时，应使用默认运行时 Peer 或 Plugin 工厂。',
+      '不要从平台名推断强制终止、完整资源采样或共享内存支持；应读取适配器 capability profile。'
+    ]
+  }),
+  'rpc-host:plugin:createListenerFailureState': guide({
+    purposeEn:
+      'Creates a local bucket for failures thrown by diagnostic reporters, so reporting one listener error cannot recursively lose another error.',
+    purposeZh:
+      '创建本地诊断上报失败桶，防止报告一个监听器错误时递归丢失另一个错误。桶由适配器 owner 持有，在终态报告与清理后释放。',
+    quickStart:
+      "import { createListenerFailureState } from '@migaia/rpc-host/plugin'\n\nconst state = createListenerFailureState()\nconsole.log(state)",
+    scenariosEn: [
+      'A custom adapter owns native event subscriptions and must isolate listener failure.',
+      'Channel shutdown must remove all listeners while retaining original cleanup and reporting errors.'
+    ],
+    scenariosZh: [
+      '自定义适配器持有原生事件订阅，需要隔离监听器失败。',
+      '通道关闭时必须移除全部监听器，并保留原始清理与上报错误。'
+    ],
+    avoidEn: [
+      'Ordinary application RPC code should use the maintained transport or Peer factory.',
+      'Do not swallow the returned or reported errors, or recreate them as unrelated Error objects.'
+    ],
+    avoidZh: [
+      '普通业务 RPC 代码应使用维护中的 transport 或 Peer 工厂。',
+      '不要吞掉返回或上报的错误，也不要把它们重建为无关的 Error 对象。'
+    ]
+  }),
+  'rpc-host:plugin:collectListenerFailure': guide({
+    purposeEn:
+      'Retains one original reporter failure in the existing failure state without reconstructing its native type or cause chain.',
+    purposeZh: '把一个原始上报失败保留到既有 failure state，不重建它的原生类型或 cause 链。',
+    quickStart:
+      "import { collectListenerFailure, createListenerFailureState } from '@migaia/rpc-host/plugin'\n\nconst state = createListenerFailureState()\ncollectListenerFailure(state, new TypeError('listener failed'))\nconsole.log(state)",
+    scenariosEn: [
+      'A custom adapter owns native event subscriptions and must isolate listener failure.',
+      'Channel shutdown must remove all listeners while retaining original cleanup and reporting errors.'
+    ],
+    scenariosZh: [
+      '自定义适配器持有原生事件订阅，需要隔离监听器失败。',
+      '通道关闭时必须移除全部监听器，并保留原始清理与上报错误。'
+    ],
+    avoidEn: [
+      'Ordinary application RPC code should use the maintained transport or Peer factory.',
+      'Do not swallow the returned or reported errors, or recreate them as unrelated Error objects.'
+    ],
+    avoidZh: [
+      '普通业务 RPC 代码应使用维护中的 transport 或 Peer 工厂。',
+      '不要吞掉返回或上报的错误，也不要把它们重建为无关的 Error 对象。'
+    ]
+  }),
+  'rpc-host:plugin:collectListenerCleanupFailures': guide({
+    purposeEn:
+      'Runs the supplied listener removals and collects every original cleanup failure, allowing a transport owner to finish all removals before reporting.',
+    purposeZh:
+      '执行给定的监听器移除操作并收集所有原始清理失败，让 transport owner 完成全部移除后再报告。',
+    quickStart:
+      "import { collectListenerCleanupFailures } from '@migaia/rpc-host/plugin'\n\nconst failures = collectListenerCleanupFailures([() => console.log('listener removed')])\nconsole.log(failures)",
+    scenariosEn: [
+      'A custom adapter owns native event subscriptions and must isolate listener failure.',
+      'Channel shutdown must remove all listeners while retaining original cleanup and reporting errors.'
+    ],
+    scenariosZh: [
+      '自定义适配器持有原生事件订阅，需要隔离监听器失败。',
+      '通道关闭时必须移除全部监听器，并保留原始清理与上报错误。'
+    ],
+    avoidEn: [
+      'Ordinary application RPC code should use the maintained transport or Peer factory.',
+      'Do not swallow the returned or reported errors, or recreate them as unrelated Error objects.'
+    ],
+    avoidZh: [
+      '普通业务 RPC 代码应使用维护中的 transport 或 Peer 工厂。',
+      '不要吞掉返回或上报的错误，也不要把它们重建为无关的 Error 对象。'
+    ]
+  }),
+  'rpc-host:plugin:createListenerFailure': guide({
+    purposeEn:
+      'Projects collected listener failures to the source-owned boundary error while keeping the original errors reachable through cause or aggregation.',
+    purposeZh:
+      '把已收集的监听器失败投影为原 owner 的边界错误，原始错误仍可通过 cause 或聚合成员访问。',
+    quickStart:
+      "import { createListenerFailure } from '@migaia/rpc-host/plugin'\n\nconst failure = createListenerFailure([new TypeError('listener failed')])\nconsole.error(failure)",
+    scenariosEn: [
+      'A custom adapter owns native event subscriptions and must isolate listener failure.',
+      'Channel shutdown must remove all listeners while retaining original cleanup and reporting errors.'
+    ],
+    scenariosZh: [
+      '自定义适配器持有原生事件订阅，需要隔离监听器失败。',
+      '通道关闭时必须移除全部监听器，并保留原始清理与上报错误。'
+    ],
+    avoidEn: [
+      'Ordinary application RPC code should use the maintained transport or Peer factory.',
+      'Do not swallow the returned or reported errors, or recreate them as unrelated Error objects.'
+    ],
+    avoidZh: [
+      '普通业务 RPC 代码应使用维护中的 transport 或 Peer 工厂。',
+      '不要吞掉返回或上报的错误，也不要把它们重建为无关的 Error 对象。'
+    ]
+  }),
+  'rpc-host:plugin:createMessageListenerHub': guide({
+    purposeEn:
+      'Creates the transport-owned listener collection with stable subscribe/dispose behavior; dispatch isolates individual listener failure without copying the RPC state machine.',
+    purposeZh:
+      '创建 transport 持有的监听器集合，保留稳定的订阅与清理行为；分发隔离单个监听器失败，而不复制 RPC 状态机。',
+    quickStart:
+      "import { createMessageListenerHub } from '@migaia/rpc-host/plugin'\n\nconst hub = createMessageListenerHub<{ value: number }>()\nconsole.log(hub)",
+    scenariosEn: [
+      'A custom adapter owns native event subscriptions and must isolate listener failure.',
+      'Channel shutdown must remove all listeners while retaining original cleanup and reporting errors.'
+    ],
+    scenariosZh: [
+      '自定义适配器持有原生事件订阅，需要隔离监听器失败。',
+      '通道关闭时必须移除全部监听器，并保留原始清理与上报错误。'
+    ],
+    avoidEn: [
+      'Ordinary application RPC code should use the maintained transport or Peer factory.',
+      'Do not swallow the returned or reported errors, or recreate them as unrelated Error objects.'
+    ],
+    avoidZh: [
+      '普通业务 RPC 代码应使用维护中的 transport 或 Peer 工厂。',
+      '不要吞掉返回或上报的错误，也不要把它们重建为无关的 Error 对象。'
+    ]
+  }),
+  'rpc-host:plugin:drainListenerFailures': guide({
+    purposeEn:
+      'Reports the completed cleanup failure set at the selected boundary after all cleanup work has been attempted.',
+    purposeZh:
+      '在全部监听器清理操作都已尝试后，向选定边界报告完整失败集合，使原始错误仍可追踪并避免跳过后续清理。',
+    quickStart:
+      "import { drainListenerFailures } from '@migaia/rpc-host/plugin'\n\ndrainListenerFailures([])\nconsole.log('listener failures drained')",
+    scenariosEn: [
+      'A custom adapter owns native event subscriptions and must isolate listener failure.',
+      'Channel shutdown must remove all listeners while retaining original cleanup and reporting errors.'
+    ],
+    scenariosZh: [
+      '自定义适配器持有原生事件订阅，需要隔离监听器失败。',
+      '通道关闭时必须移除全部监听器，并保留原始清理与上报错误。'
+    ],
+    avoidEn: [
+      'Ordinary application RPC code should use the maintained transport or Peer factory.',
+      'Do not swallow the returned or reported errors, or recreate them as unrelated Error objects.'
+    ],
+    avoidZh: [
+      '普通业务 RPC 代码应使用维护中的 transport 或 Peer 工厂。',
+      '不要吞掉返回或上报的错误，也不要把它们重建为无关的 Error 对象。'
+    ]
+  }),
+  'rpc-host:plugin:drainTerminalListenerFailures': guide({
+    purposeEn:
+      'Drains the terminal listener failure set through the original boundary reporter and preserves its synchronous or asynchronous completion semantics.',
+    purposeZh:
+      '通过原始边界上报器排空终态监听器失败集合，保留其同步或异步完成语义。调用方须等待完整结束，不能提前宣告所有资源已释放。',
+    quickStart:
+      "import { drainTerminalListenerFailures } from '@migaia/rpc-host/plugin'\n\nawait drainTerminalListenerFailures([])",
+    scenariosEn: [
+      'A custom adapter owns native event subscriptions and must isolate listener failure.',
+      'Channel shutdown must remove all listeners while retaining original cleanup and reporting errors.'
+    ],
+    scenariosZh: [
+      '自定义适配器持有原生事件订阅，需要隔离监听器失败。',
+      '通道关闭时必须移除全部监听器，并保留原始清理与上报错误。'
+    ],
+    avoidEn: [
+      'Ordinary application RPC code should use the maintained transport or Peer factory.',
+      'Do not swallow the returned or reported errors, or recreate them as unrelated Error objects.'
+    ],
+    avoidZh: [
+      '普通业务 RPC 代码应使用维护中的 transport 或 Peer 工厂。',
+      '不要吞掉返回或上报的错误，也不要把它们重建为无关的 Error 对象。'
+    ]
+  }),
+  'rpc-host:plugin:observeListener': guide({
+    purposeEn:
+      'Invokes one listener and contains synchronous throws and late Promise rejection in the existing report channel, retaining original error identity.',
+    purposeZh:
+      '调用一个监听器，把同步抛错和迟到的 Promise rejection 交给现有 report 通道，保留原始错误身份。',
+    quickStart:
+      "import { observeListener, createListenerFailureState } from '@migaia/rpc-host/plugin'\n\nconst state = createListenerFailureState()\nobserveListener(() => console.log('message delivered'), console.error, state)",
+    scenariosEn: [
+      'A custom adapter owns native event subscriptions and must isolate listener failure.',
+      'Channel shutdown must remove all listeners while retaining original cleanup and reporting errors.'
+    ],
+    scenariosZh: [
+      '自定义适配器持有原生事件订阅，需要隔离监听器失败。',
+      '通道关闭时必须移除全部监听器，并保留原始清理与上报错误。'
+    ],
+    avoidEn: [
+      'Ordinary application RPC code should use the maintained transport or Peer factory.',
+      'Do not swallow the returned or reported errors, or recreate them as unrelated Error objects.'
+    ],
+    avoidZh: [
+      '普通业务 RPC 代码应使用维护中的 transport 或 Peer 工厂。',
+      '不要吞掉返回或上报的错误，也不要把它们重建为无关的 Error 对象。'
+    ]
+  }),
+  'rpc-host:plugin:registerListeners': guide({
+    purposeEn:
+      'Registers the listener set through one transactional boundary; a partial registration failure removes the listeners already installed.',
+    purposeZh:
+      '通过一个事务边界登记监听器集合；中途登记失败会移除已经安装的监听器，并保留原始登记失败与回滚错误，避免留下半安装接收器。',
+    quickStart:
+      "import { registerListeners } from '@migaia/rpc-host/plugin'\n\nconst listener = () => console.log('window resized')\nregisterListeners([{ add: () => window.addEventListener('resize', listener), remove: () => window.removeEventListener('resize', listener) }])",
+    scenariosEn: [
+      'A custom adapter owns native event subscriptions and must isolate listener failure.',
+      'Channel shutdown must remove all listeners while retaining original cleanup and reporting errors.'
+    ],
+    scenariosZh: [
+      '自定义适配器持有原生事件订阅，需要隔离监听器失败。',
+      '通道关闭时必须移除全部监听器，并保留原始清理与上报错误。'
+    ],
+    avoidEn: [
+      'Ordinary application RPC code should use the maintained transport or Peer factory.',
+      'Do not swallow the returned or reported errors, or recreate them as unrelated Error objects.'
+    ],
+    avoidZh: [
+      '普通业务 RPC 代码应使用维护中的 transport 或 Peer 工厂。',
+      '不要吞掉返回或上报的错误，也不要把它们重建为无关的 Error 对象。'
+    ]
+  }),
+  'rpc-host:plugin:releaseListenerRegistration': guide({
+    purposeEn:
+      'Attempts every original listener removal and commits terminal release once, preserving cleanup failures for the owner boundary.',
+    purposeZh: '尝试执行全部原监听器移除，并只提交一次终态释放；清理失败保留给 owner 边界处理。',
+    quickStart:
+      "import { releaseListenerRegistration } from '@migaia/rpc-host/plugin'\n\nreleaseListenerRegistration([() => console.log('listener removed')], () => console.log('registration closed'))",
+    scenariosEn: [
+      'A custom adapter owns native event subscriptions and must isolate listener failure.',
+      'Channel shutdown must remove all listeners while retaining original cleanup and reporting errors.'
+    ],
+    scenariosZh: [
+      '自定义适配器持有原生事件订阅，需要隔离监听器失败。',
+      '通道关闭时必须移除全部监听器，并保留原始清理与上报错误。'
+    ],
+    avoidEn: [
+      'Ordinary application RPC code should use the maintained transport or Peer factory.',
+      'Do not swallow the returned or reported errors, or recreate them as unrelated Error objects.'
+    ],
+    avoidZh: [
+      '普通业务 RPC 代码应使用维护中的 transport 或 Peer 工厂。',
+      '不要吞掉返回或上报的错误，也不要把它们重建为无关的 Error 对象。'
+    ]
+  }),
+  'rpc-host:plugin:reportListenerFailure': guide({
+    purposeEn:
+      'Delivers one original listener failure to the registered reporter set and retains failures thrown by those reporters in the supplied bucket.',
+    purposeZh:
+      '把一个原始监听器失败交给已登记的上报器集合，并把上报器自身失败保留到给定桶中。它不会替换原业务错误或静默吞掉诊断失败。',
+    quickStart:
+      "import { reportListenerFailure, createListenerFailureState } from '@migaia/rpc-host/plugin'\n\nconst state = createListenerFailureState()\nreportListenerFailure(new TypeError('listener failed'), [console.error], state)",
+    scenariosEn: [
+      'A custom adapter owns native event subscriptions and must isolate listener failure.',
+      'Channel shutdown must remove all listeners while retaining original cleanup and reporting errors.'
+    ],
+    scenariosZh: [
+      '自定义适配器持有原生事件订阅，需要隔离监听器失败。',
+      '通道关闭时必须移除全部监听器，并保留原始清理与上报错误。'
+    ],
+    avoidEn: [
+      'Ordinary application RPC code should use the maintained transport or Peer factory.',
+      'Do not swallow the returned or reported errors, or recreate them as unrelated Error objects.'
+    ],
+    avoidZh: [
+      '普通业务 RPC 代码应使用维护中的 transport 或 Peer 工厂。',
+      '不要吞掉返回或上报的错误，也不要把它们重建为无关的 Error 对象。'
+    ]
+  }),
+  'rpc-host:plugin:safeRead': guide({
+    purposeEn:
+      'Reads a possibly hostile property through the source-owned reporting boundary; getter failure is reported instead of escaping unnoticed from message handling.',
+    purposeZh:
+      '通过原 owner 的上报边界读取可能不可信的属性；getter 失败会被报告，不会在消息处理中悄然逸出。',
+    quickStart:
+      "import { safeRead } from '@migaia/rpc-host/plugin'\n\nconst value: unknown = { id: 'remote' }\nconsole.log(safeRead<string>(value, 'id', ({ error }) => {\n  console.error(error)\n  return undefined\n}))",
+    scenariosEn: [
+      'A custom adapter owns native event subscriptions and must isolate listener failure.',
+      'Channel shutdown must remove all listeners while retaining original cleanup and reporting errors.'
+    ],
+    scenariosZh: [
+      '自定义适配器持有原生事件订阅，需要隔离监听器失败。',
+      '通道关闭时必须移除全部监听器，并保留原始清理与上报错误。'
+    ],
+    avoidEn: [
+      'Ordinary application RPC code should use the maintained transport or Peer factory.',
+      'Do not swallow the returned or reported errors, or recreate them as unrelated Error objects.'
+    ],
+    avoidZh: [
+      '普通业务 RPC 代码应使用维护中的 transport 或 Peer 工厂。',
+      '不要吞掉返回或上报的错误，也不要把它们重建为无关的 Error 对象。'
+    ]
+  }),
+  'rpc-host:plugin:safeString': guide({
+    purposeEn:
+      'Converts a value to diagnostic text with an explicit fallback and reporter when conversion fails; it does not replace protocol validation.',
+    purposeZh: '把值转换为诊断文本，转换失败时采用明确 fallback 并报告错误；它不替代协议校验。',
+    quickStart:
+      "import { safeString } from '@migaia/rpc-host/plugin'\n\nconsole.log(safeString({ status: 'ready' }, 'unavailable', ({ error }) => {\n  console.error(error)\n  return undefined\n}))",
+    scenariosEn: [
+      'A custom adapter owns native event subscriptions and must isolate listener failure.',
+      'Channel shutdown must remove all listeners while retaining original cleanup and reporting errors.'
+    ],
+    scenariosZh: [
+      '自定义适配器持有原生事件订阅，需要隔离监听器失败。',
+      '通道关闭时必须移除全部监听器，并保留原始清理与上报错误。'
+    ],
+    avoidEn: [
+      'Ordinary application RPC code should use the maintained transport or Peer factory.',
+      'Do not swallow the returned or reported errors, or recreate them as unrelated Error objects.'
+    ],
+    avoidZh: [
+      '普通业务 RPC 代码应使用维护中的 transport 或 Peer 工厂。',
+      '不要吞掉返回或上报的错误，也不要把它们重建为无关的 Error 对象。'
+    ]
+  }),
+
   'wasm:index:__wbg_init': guide({
     purposeEn:
       'Loads the package’s WebAssembly code and creates the module instance used by its memory-allocation and format-conversion functions. Import this initializer as the default export, using a local name such as init; __wbg_init is its documentation name, not a named export. Await initialization before calling those functions, because they need the loaded module. The example assumes a browser build that includes the package’s .wasm file. It initializes the module, requests one byte of memory, prints the allocated capacity and releases the allocation. Loading or instantiation failures reject initialization. Native WebAssembly errors pass through unchanged.',
@@ -387,1294 +964,6 @@ try {
     ]
   }),
   'utils:scheduler:deferTask': schedulerDeferGuide,
-  'rpc-core:index:createRpcIdempotencyStore': guide({
-    purposeEn:
-      'Creates the RPC-owned idempotency/result store used by request keys and outcome lookup. Retention is local to its owner unless the application supplies durable storage and reconciliation.',
-    purposeZh:
-      '创建 RPC owner 的幂等键与结果存储，用于请求键和 outcome 查询；除非应用提供持久化及对账，结果只在当前 owner 内保留。',
-    quickStart:
-      "import { createRpcIdempotencyStore } from '@migaia/rpc-core'\n\nexport function invokeConfiguredBoundary(...args: Parameters<typeof createRpcIdempotencyStore>) {\n  return createRpcIdempotencyStore(...args)\n}",
-    scenariosEn: [
-      'A library adapter must assemble the explicit source, contract or runtime policy named above.',
-      'The application needs to retain the original channel/Host lifecycle while validating inputs at its own integration boundary.'
-    ],
-    scenariosZh: [
-      '库适配器需要装配上述明确的来源、契约或运行时策略。',
-      '应用需要保留原 channel/Host 生命周期，并在自己的集成边界校验输入。'
-    ],
-    avoidEn: [
-      'Prefer the four process/thread Peer or Plugin factories for ordinary application RPC.',
-      'Do not treat this low-level operation as permission to bypass expose, source authentication or cleanup ownership.'
-    ],
-    avoidZh: [
-      '普通业务 RPC 优先使用四个 process/thread Peer 或 Plugin 工厂。',
-      '不要把底层操作当作绕过 expose、source 鉴权或资源清理归属的权限。'
-    ]
-  }),
-  'rpc-core:features-one-way:createOneWayFeature': guide({
-    purposeEn:
-      'Adds sendOneWay to a composed endpoint over the existing outbound Feature. Completion means physical send completed, not that the remote provider executed successfully.',
-    purposeZh:
-      '在现有 outbound Feature 上为组合 endpoint 增加 sendOneWay；完成只表示物理发送结束，不证明远端 provider 成功执行。',
-    quickStart:
-      "import { createOneWayFeature } from '@migaia/rpc-core/features/one-way'\n\nexport function invokeConfiguredBoundary(...args: Parameters<typeof createOneWayFeature>) {\n  return createOneWayFeature(...args)\n}",
-    scenariosEn: [
-      'A library adapter must assemble the explicit source, contract or runtime policy named above.',
-      'The application needs to retain the original channel/Host lifecycle while validating inputs at its own integration boundary.'
-    ],
-    scenariosZh: [
-      '库适配器需要装配上述明确的来源、契约或运行时策略。',
-      '应用需要保留原 channel/Host 生命周期，并在自己的集成边界校验输入。'
-    ],
-    avoidEn: [
-      'Prefer the four process/thread Peer or Plugin factories for ordinary application RPC.',
-      'Do not treat this low-level operation as permission to bypass expose, source authentication or cleanup ownership.'
-    ],
-    avoidZh: [
-      '普通业务 RPC 优先使用四个 process/thread Peer 或 Plugin 工厂。',
-      '不要把底层操作当作绕过 expose、source 鉴权或资源清理归属的权限。'
-    ]
-  }),
-  'rpc-core:plugins-log:createIpcLogFeature': guide({
-    purposeEn:
-      'Creates the IPC log Feature for one connection/session, reporting lifecycle and backlog facts through the existing Host logger without exposing the peer authentication token.',
-    purposeZh:
-      '为一个 connection/session 创建 IPC 日志 Feature，通过既有 Host logger 报告生命周期与 backlog 事实，不暴露对端鉴权 token。',
-    quickStart:
-      "import { createIpcLogFeature } from '@migaia/rpc-core/plugins/log'\n\nexport function invokeConfiguredBoundary(...args: Parameters<typeof createIpcLogFeature>) {\n  return createIpcLogFeature(...args)\n}",
-    scenariosEn: [
-      'A library adapter must assemble the explicit source, contract or runtime policy named above.',
-      'The application needs to retain the original channel/Host lifecycle while validating inputs at its own integration boundary.'
-    ],
-    scenariosZh: [
-      '库适配器需要装配上述明确的来源、契约或运行时策略。',
-      '应用需要保留原 channel/Host 生命周期，并在自己的集成边界校验输入。'
-    ],
-    avoidEn: [
-      'Prefer the four process/thread Peer or Plugin factories for ordinary application RPC.',
-      'Do not treat this low-level operation as permission to bypass expose, source authentication or cleanup ownership.'
-    ],
-    avoidZh: [
-      '普通业务 RPC 优先使用四个 process/thread Peer 或 Plugin 工厂。',
-      '不要把底层操作当作绕过 expose、source 鉴权或资源清理归属的权限。'
-    ]
-  }),
-  'rpc-core:plugins-send-queue:createIpcSendQueueFeature': guide({
-    purposeEn:
-      'Creates the connection-owned bounded send gate with separate data and control capacity. Provider replies and stream data retain the data lane instead of being dropped as control traffic.',
-    purposeZh:
-      '创建连接持有的有界发送 gate，分别保留 data 与 control 容量；provider 回复和 stream 数据继续占用 data lane，不会被当成控制流丢弃。',
-    quickStart:
-      "import { createIpcSendQueueFeature } from '@migaia/rpc-core/plugins/send-queue'\n\nexport function invokeConfiguredBoundary(...args: Parameters<typeof createIpcSendQueueFeature>) {\n  return createIpcSendQueueFeature(...args)\n}",
-    scenariosEn: [
-      'A library adapter must assemble the explicit source, contract or runtime policy named above.',
-      'The application needs to retain the original channel/Host lifecycle while validating inputs at its own integration boundary.'
-    ],
-    scenariosZh: [
-      '库适配器需要装配上述明确的来源、契约或运行时策略。',
-      '应用需要保留原 channel/Host 生命周期，并在自己的集成边界校验输入。'
-    ],
-    avoidEn: [
-      'Prefer the four process/thread Peer or Plugin factories for ordinary application RPC.',
-      'Do not treat this low-level operation as permission to bypass expose, source authentication or cleanup ownership.'
-    ],
-    avoidZh: [
-      '普通业务 RPC 优先使用四个 process/thread Peer 或 Plugin 工厂。',
-      '不要把底层操作当作绕过 expose、source 鉴权或资源清理归属的权限。'
-    ]
-  }),
-  'rpc-core:plugins-send-queue:createIpcSendQueueTransport': guide({
-    purposeEn:
-      'Attaches the existing send gate to one original physical transport, carrying its negotiated agreement and native ownership without building a second queue or receiver.',
-    purposeZh:
-      '把现有发送 gate 接到一个原物理 transport，携带其协商结果与原生所有权，不创建第二份队列或接收器。',
-    quickStart:
-      "import { createIpcSendQueueTransport } from '@migaia/rpc-core/plugins/send-queue'\n\nexport function invokeConfiguredBoundary(...args: Parameters<typeof createIpcSendQueueTransport>) {\n  return createIpcSendQueueTransport(...args)\n}",
-    scenariosEn: [
-      'A library adapter must assemble the explicit source, contract or runtime policy named above.',
-      'The application needs to retain the original channel/Host lifecycle while validating inputs at its own integration boundary.'
-    ],
-    scenariosZh: [
-      '库适配器需要装配上述明确的来源、契约或运行时策略。',
-      '应用需要保留原 channel/Host 生命周期，并在自己的集成边界校验输入。'
-    ],
-    avoidEn: [
-      'Prefer the four process/thread Peer or Plugin factories for ordinary application RPC.',
-      'Do not treat this low-level operation as permission to bypass expose, source authentication or cleanup ownership.'
-    ],
-    avoidZh: [
-      '普通业务 RPC 优先使用四个 process/thread Peer 或 Plugin 工厂。',
-      '不要把底层操作当作绕过 expose、source 鉴权或资源清理归属的权限。'
-    ]
-  }),
-  'rpc-core:stream:createCanonicalChunkFeature': guide({
-    purposeEn:
-      'Creates the canonical chunk-reassembly dependency used by outbound and stream Features. It is selected during endpoint composition and released with the original endpoint scope.',
-    purposeZh:
-      '创建 outbound 和 stream Feature 使用的规范分片重组依赖，在 endpoint 组合时选定，并随原 endpoint scope 释放。',
-    quickStart:
-      "import { createCanonicalChunkFeature } from '@migaia/rpc-core/stream'\n\nexport function invokeConfiguredBoundary(...args: Parameters<typeof createCanonicalChunkFeature>) {\n  return createCanonicalChunkFeature(...args)\n}",
-    scenariosEn: [
-      'A library adapter must assemble the explicit source, contract or runtime policy named above.',
-      'The application needs to retain the original channel/Host lifecycle while validating inputs at its own integration boundary.'
-    ],
-    scenariosZh: [
-      '库适配器需要装配上述明确的来源、契约或运行时策略。',
-      '应用需要保留原 channel/Host 生命周期，并在自己的集成边界校验输入。'
-    ],
-    avoidEn: [
-      'Prefer the four process/thread Peer or Plugin factories for ordinary application RPC.',
-      'Do not treat this low-level operation as permission to bypass expose, source authentication or cleanup ownership.'
-    ],
-    avoidZh: [
-      '普通业务 RPC 优先使用四个 process/thread Peer 或 Plugin 工厂。',
-      '不要把底层操作当作绕过 expose、source 鉴权或资源清理归属的权限。'
-    ]
-  }),
-  'rpc-core:stream:createStreamFeature': guide({
-    purposeEn:
-      'Adds the stream owner to existing outbound/provider Features, retaining direction, sequence, credit, cancellation and terminal cleanup in that owner.',
-    purposeZh:
-      '在现有 outbound/provider Feature 上增加 stream owner，由它保留方向、序号、额度、取消和终态清理职责。',
-    quickStart:
-      "import { createStreamFeature } from '@migaia/rpc-core/stream'\n\nexport function invokeConfiguredBoundary(...args: Parameters<typeof createStreamFeature>) {\n  return createStreamFeature(...args)\n}",
-    scenariosEn: [
-      'A library adapter must assemble the explicit source, contract or runtime policy named above.',
-      'The application needs to retain the original channel/Host lifecycle while validating inputs at its own integration boundary.'
-    ],
-    scenariosZh: [
-      '库适配器需要装配上述明确的来源、契约或运行时策略。',
-      '应用需要保留原 channel/Host 生命周期，并在自己的集成边界校验输入。'
-    ],
-    avoidEn: [
-      'Prefer the four process/thread Peer or Plugin factories for ordinary application RPC.',
-      'Do not treat this low-level operation as permission to bypass expose, source authentication or cleanup ownership.'
-    ],
-    avoidZh: [
-      '普通业务 RPC 优先使用四个 process/thread Peer 或 Plugin 工厂。',
-      '不要把底层操作当作绕过 expose、source 鉴权或资源清理归属的权限。'
-    ]
-  }),
-  'rpc-process:index:createNativeProcessOffer': guide({
-    purposeEn:
-      'Builds the local native-process version/codec/capability offer; the handshake intersects it with the independent peer and never treats local declarations as remote support.',
-    purposeZh:
-      '构造本端原生进程版本、codec 与能力 offer；握手与独立对端取交集，不把本端声明当作远端支持。',
-    quickStart:
-      "import { createNativeProcessOffer } from '@migaia/rpc-process'\n\nexport function invokeConfiguredBoundary(...args: Parameters<typeof createNativeProcessOffer>) {\n  return createNativeProcessOffer(...args)\n}",
-    scenariosEn: [
-      'A library adapter must assemble the explicit source, contract or runtime policy named above.',
-      'The application needs to retain the original channel/Host lifecycle while validating inputs at its own integration boundary.'
-    ],
-    scenariosZh: [
-      '库适配器需要装配上述明确的来源、契约或运行时策略。',
-      '应用需要保留原 channel/Host 生命周期，并在自己的集成边界校验输入。'
-    ],
-    avoidEn: [
-      'Prefer the four process/thread Peer or Plugin factories for ordinary application RPC.',
-      'Do not treat this low-level operation as permission to bypass expose, source authentication or cleanup ownership.'
-    ],
-    avoidZh: [
-      '普通业务 RPC 优先使用四个 process/thread Peer 或 Plugin 工厂。',
-      '不要把底层操作当作绕过 expose、source 鉴权或资源清理归属的权限。'
-    ]
-  }),
-  'rpc-process:index:createProcessResilience': guide({
-    purposeEn:
-      'Creates the process-specific resilience policy over the existing supervision and generation owners, retaining native health, drain and bounded replacement behavior.',
-    purposeZh:
-      '在原 supervision 和 generation owner 上创建进程恢复策略，保留原生健康检查、drain 与有界替换行为。',
-    quickStart:
-      "import { createProcessResilience } from '@migaia/rpc-process'\n\nexport function invokeConfiguredBoundary(...args: Parameters<typeof createProcessResilience>) {\n  return createProcessResilience(...args)\n}",
-    scenariosEn: [
-      'A library adapter must assemble the explicit source, contract or runtime policy named above.',
-      'The application needs to retain the original channel/Host lifecycle while validating inputs at its own integration boundary.'
-    ],
-    scenariosZh: [
-      '库适配器需要装配上述明确的来源、契约或运行时策略。',
-      '应用需要保留原 channel/Host 生命周期，并在自己的集成边界校验输入。'
-    ],
-    avoidEn: [
-      'Prefer the four process/thread Peer or Plugin factories for ordinary application RPC.',
-      'Do not treat this low-level operation as permission to bypass expose, source authentication or cleanup ownership.'
-    ],
-    avoidZh: [
-      '普通业务 RPC 优先使用四个 process/thread Peer 或 Plugin 工厂。',
-      '不要把底层操作当作绕过 expose、source 鉴权或资源清理归属的权限。'
-    ]
-  }),
-  'rpc-process:index:createProcessTransport': guide({
-    purposeEn:
-      'Negotiates one native byte channel or accepts an explicit message-channel agreement, then exposes the original framed transport, capability result and stable close ownership.',
-    purposeZh:
-      '协商一个原生字节通道，或接纳明确的消息通道协议结果，然后公开原帧 transport、能力交集与稳定的 close 所有权。',
-    quickStart:
-      "import { createProcessTransport } from '@migaia/rpc-process'\n\nexport function invokeConfiguredBoundary(...args: Parameters<typeof createProcessTransport>) {\n  return createProcessTransport(...args)\n}",
-    scenariosEn: [
-      'A library adapter must assemble the explicit source, contract or runtime policy named above.',
-      'The application needs to retain the original channel/Host lifecycle while validating inputs at its own integration boundary.'
-    ],
-    scenariosZh: [
-      '库适配器需要装配上述明确的来源、契约或运行时策略。',
-      '应用需要保留原 channel/Host 生命周期，并在自己的集成边界校验输入。'
-    ],
-    avoidEn: [
-      'Prefer the four process/thread Peer or Plugin factories for ordinary application RPC.',
-      'Do not treat this low-level operation as permission to bypass expose, source authentication or cleanup ownership.'
-    ],
-    avoidZh: [
-      '普通业务 RPC 优先使用四个 process/thread Peer 或 Plugin 工厂。',
-      '不要把底层操作当作绕过 expose、source 鉴权或资源清理归属的权限。'
-    ]
-  }),
-  'rpc-process:index:parseProcessPluginDescriptor': guide({
-    purposeEn:
-      'Validates an external process plugin descriptor before startup, keeping names, source selection and declared options on the maintained closed configuration contract.',
-    purposeZh:
-      '启动前校验外部进程插件描述符，把名称、来源选择和声明选项限制在维护中的封闭配置契约内。',
-    quickStart:
-      "import { parseProcessPluginDescriptor } from '@migaia/rpc-process'\n\nexport function invokeConfiguredBoundary(...args: Parameters<typeof parseProcessPluginDescriptor>) {\n  return parseProcessPluginDescriptor(...args)\n}",
-    scenariosEn: [
-      'A library adapter must assemble the explicit source, contract or runtime policy named above.',
-      'The application needs to retain the original channel/Host lifecycle while validating inputs at its own integration boundary.'
-    ],
-    scenariosZh: [
-      '库适配器需要装配上述明确的来源、契约或运行时策略。',
-      '应用需要保留原 channel/Host 生命周期，并在自己的集成边界校验输入。'
-    ],
-    avoidEn: [
-      'Prefer the four process/thread Peer or Plugin factories for ordinary application RPC.',
-      'Do not treat this low-level operation as permission to bypass expose, source authentication or cleanup ownership.'
-    ],
-    avoidZh: [
-      '普通业务 RPC 优先使用四个 process/thread Peer 或 Plugin 工厂。',
-      '不要把底层操作当作绕过 expose、source 鉴权或资源清理归属的权限。'
-    ]
-  }),
-  'rpc-process:adapters-deno-command:openProcessStdioChannel': guide({
-    purposeEn:
-      'Opens the actual Deno stdin/stdout byte channel used after trusted bootstrap, retaining stream ownership and native close instead of pretending a message port exists.',
-    purposeZh:
-      '在可信 bootstrap 后打开实际 Deno stdin/stdout 字节通道，保留原流所有权和原生 close，不伪造 message port。',
-    quickStart:
-      "import { openProcessStdioChannel } from '@migaia/rpc-process/adapters/deno-command'\n\nexport function invokeConfiguredBoundary(...args: Parameters<typeof openProcessStdioChannel>) {\n  return openProcessStdioChannel(...args)\n}",
-    scenariosEn: [
-      'A library adapter must assemble the explicit source, contract or runtime policy named above.',
-      'The application needs to retain the original channel/Host lifecycle while validating inputs at its own integration boundary.'
-    ],
-    scenariosZh: [
-      '库适配器需要装配上述明确的来源、契约或运行时策略。',
-      '应用需要保留原 channel/Host 生命周期，并在自己的集成边界校验输入。'
-    ],
-    avoidEn: [
-      'Prefer the four process/thread Peer or Plugin factories for ordinary application RPC.',
-      'Do not treat this low-level operation as permission to bypass expose, source authentication or cleanup ownership.'
-    ],
-    avoidZh: [
-      '普通业务 RPC 优先使用四个 process/thread Peer 或 Plugin 工厂。',
-      '不要把底层操作当作绕过 expose、source 鉴权或资源清理归属的权限。'
-    ]
-  }),
-  'rpc-process:adapters-node-child-process:openProcessStdioChannel': guide({
-    purposeEn:
-      'Opens Node-compatible child stdio after the trusted bootstrap frame and keeps the original streams, cancellation and closed-state observation.',
-    purposeZh:
-      '在可信 bootstrap 帧之后打开 Node 兼容子进程 stdio，并保留原流、取消和关闭状态观察。',
-    quickStart:
-      "import { openProcessStdioChannel } from '@migaia/rpc-process/adapters/node-child-process'\n\nexport function invokeConfiguredBoundary(...args: Parameters<typeof openProcessStdioChannel>) {\n  return openProcessStdioChannel(...args)\n}",
-    scenariosEn: [
-      'A library adapter must assemble the explicit source, contract or runtime policy named above.',
-      'The application needs to retain the original channel/Host lifecycle while validating inputs at its own integration boundary.'
-    ],
-    scenariosZh: [
-      '库适配器需要装配上述明确的来源、契约或运行时策略。',
-      '应用需要保留原 channel/Host 生命周期，并在自己的集成边界校验输入。'
-    ],
-    avoidEn: [
-      'Prefer the four process/thread Peer or Plugin factories for ordinary application RPC.',
-      'Do not treat this low-level operation as permission to bypass expose, source authentication or cleanup ownership.'
-    ],
-    avoidZh: [
-      '普通业务 RPC 优先使用四个 process/thread Peer 或 Plugin 工厂。',
-      '不要把底层操作当作绕过 expose、source 鉴权或资源清理归属的权限。'
-    ]
-  }),
-  'rpc-process:adapters-node-socket:dialProcessByteChannel': guide({
-    purposeEn:
-      'Dials one local Unix or loopback TCP byte connection for a borrowed process session. The connection can close locally but never owns the target process.',
-    purposeZh:
-      '连接一个本地 Unix 或 loopback TCP 字节通道，创建借用进程会话；可以关闭本端连接，但不拥有目标进程。',
-    quickStart:
-      "import { dialProcessByteChannel } from '@migaia/rpc-process/adapters/node-socket'\n\nexport function invokeConfiguredBoundary(...args: Parameters<typeof dialProcessByteChannel>) {\n  return dialProcessByteChannel(...args)\n}",
-    scenariosEn: [
-      'A library adapter must assemble the explicit source, contract or runtime policy named above.',
-      'The application needs to retain the original channel/Host lifecycle while validating inputs at its own integration boundary.'
-    ],
-    scenariosZh: [
-      '库适配器需要装配上述明确的来源、契约或运行时策略。',
-      '应用需要保留原 channel/Host 生命周期，并在自己的集成边界校验输入。'
-    ],
-    avoidEn: [
-      'Prefer the four process/thread Peer or Plugin factories for ordinary application RPC.',
-      'Do not treat this low-level operation as permission to bypass expose, source authentication or cleanup ownership.'
-    ],
-    avoidZh: [
-      '普通业务 RPC 优先使用四个 process/thread Peer 或 Plugin 工厂。',
-      '不要把底层操作当作绕过 expose、source 鉴权或资源清理归属的权限。'
-    ]
-  }),
-  'rpc-process:adapters-deno-socket:dialProcessByteChannel': guide({
-    purposeEn:
-      'Dials a real Deno local socket with the maintained native byte framing; permission errors remain observable and are not converted to fake ready state.',
-    purposeZh:
-      '使用维护中的原生字节帧连接实际 Deno 本地 socket；权限错误仍可观察，不会被转换成伪造的 ready 状态。',
-    quickStart:
-      "import { dialProcessByteChannel } from '@migaia/rpc-process/adapters/deno-socket'\n\nexport function invokeConfiguredBoundary(...args: Parameters<typeof dialProcessByteChannel>) {\n  return dialProcessByteChannel(...args)\n}",
-    scenariosEn: [
-      'A library adapter must assemble the explicit source, contract or runtime policy named above.',
-      'The application needs to retain the original channel/Host lifecycle while validating inputs at its own integration boundary.'
-    ],
-    scenariosZh: [
-      '库适配器需要装配上述明确的来源、契约或运行时策略。',
-      '应用需要保留原 channel/Host 生命周期，并在自己的集成边界校验输入。'
-    ],
-    avoidEn: [
-      'Prefer the four process/thread Peer or Plugin factories for ordinary application RPC.',
-      'Do not treat this low-level operation as permission to bypass expose, source authentication or cleanup ownership.'
-    ],
-    avoidZh: [
-      '普通业务 RPC 优先使用四个 process/thread Peer 或 Plugin 工厂。',
-      '不要把底层操作当作绕过 expose、source 鉴权或资源清理归属的权限。'
-    ]
-  }),
-  'rpc-core:remote:createCoroutinePlugin': guide({
-    purposeEn:
-      'Run a supervised task in the same process and verify its returned result. A task is work that stays available until it finishes or receives a stop signal. Run this complete main.ts example in Node.js. The consumer Host supplies task. The handler Host uses the connect value received by that task. Both sides use host.coroutine.',
-    purposeZh:
-      '你将运行同进程受监督的 task，并验证返回值。task 是持续工作到完成或收到停止 signal（信号）的任务。在 Node.js 中运行这个完整的 main.ts 示例。调用端 Host 传入 task。处理端 Host 使用该 task 收到的 connect。两端通过 host.coroutine 调用。',
-    quickStart: `import assert from 'node:assert/strict'
-import { defineHost } from '@migaia/plugin-host'
-import { createCoroutinePlugin } from '@migaia/rpc-core/remote'
-
-const service = createCoroutinePlugin<{ double(value: number): number }>({
-  name: 'math', task: async ({ connect, signal }) => {
-    const parent = createCoroutinePlugin({ name: 'parent', connect, provide: { double: (value: number) => value * 2 } })
-    const child = defineHost<Record<string, never>, never, readonly [typeof parent]>({ host: { execution: { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 5_000 } } })
-    try { await child.use(parent); await new Promise<void>((resolve) => { if (signal.aborted) resolve(); else signal.addEventListener('abort', () => resolve(), { once: true }) }) }
-    finally { await child.dispose() }
-  }
-})
-const host = defineHost<Record<string, never>, never, readonly [typeof service]>({ host: { execution: { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 5_000 } } })
-try { await host.use(service); assert.equal(await host.coroutine!.request('math', 'double', 21), 42) }
-finally { await host.dispose() }`,
-    examplesEn: [
-      {
-        id: 'complete-coroutine-calls',
-        title: 'main.ts: handler and consumer in one process',
-        description:
-          'Run this file in Node.js. The task installs the handler Host. The outer Host consumes request, notify and stream. readNote waits for the saved notification payload. Assertions check the numeric result, notification and streamed items. finally closes both Hosts.',
-        code: `import assert from 'node:assert/strict'
-import { defineHost } from '@migaia/plugin-host'
-import { createCoroutinePlugin } from '@migaia/rpc-core/remote'
-
-/** The task publishes this API to the parent Host. */
-type IServiceApi = {
-  double(value: number): number
-  note(value: string): void
-  readNote(): Promise<string>
-  count(limit: number): AsyncIterableIterator<number>
-}
-/** Both Hosts run in this Node.js main.ts process. */
-const service = createCoroutinePlugin<IServiceApi>({
-  name: 'math',
-  task: async ({ connect, signal }) => {
-    /** Store the first notification so readNote confirms that the handler ran. */
-    let receiveNote: (value: string) => void = () => undefined
-    const receivedNote = new Promise<string>((resolve) => { receiveNote = resolve })
-    /** Child mode joins the connection supplied to this task. */
-    const parent = createCoroutinePlugin({
-      name: 'parent', connect,
-      provide: {
-        double: (value: number) => value * 2,
-        note: (value: string) => receiveNote(value),
-        readNote: () => receivedNote,
-        count: async function* (limit: number) {
-          for (let value = 1; value <= limit; value++) yield value
-        }
-      }
-    })
-    /** The handler Host stays available until the parent stops its task. */
-    const child = defineHost<Record<string, never>, never, readonly [typeof parent]>({ host: { execution: { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 5_000 } } })
-    try {
-      await child.use(parent)
-      await new Promise<void>((resolve) => {
-        if (signal.aborted) resolve()
-        else signal.addEventListener('abort', () => resolve(), { once: true })
-      })
-    } finally { await child.dispose() }
-  }
-})
-/** The consumer Host owns the installed task. */
-const host = defineHost<Record<string, never>, never, readonly [typeof service]>({ host: { execution: { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 5_000 } } })
-try {
-  await host.use(service)
-  assert.equal(await host.coroutine!.request('math', 'double', 21), 42)
-  await host.coroutine!.notify('math', 'note', 'hello')
-  assert.equal(await host.coroutine!.request('math', 'readNote'), 'hello')
-  /** Collect every item before checking the complete stream. */
-  const values: number[] = []
-  for await (const value of host.coroutine!.stream('math', 'count', 3)) values.push(value)
-  assert.deepEqual(values, [1, 2, 3])
-} finally { await host.dispose() }`
-      }
-    ],
-    examplesZh: [
-      {
-        id: 'complete-coroutine-calls',
-        title: 'main.ts：同进程的处理端与调用端',
-        description:
-          '在 Node.js 中运行这个文件。task 安装处理端 Host。外层 Host 调用 request、notify 与 stream（逐项结果）。readNote 等待已保存的通知 payload（输入值）。Assertions 验证数字结果、通知与所有流结果。finally 释放两个 Hosts。',
-        code: `import assert from 'node:assert/strict'
-import { defineHost } from '@migaia/plugin-host'
-import { createCoroutinePlugin } from '@migaia/rpc-core/remote'
-
-/** The task publishes this API to the parent Host. */
-type IServiceApi = {
-  double(value: number): number
-  note(value: string): void
-  readNote(): Promise<string>
-  count(limit: number): AsyncIterableIterator<number>
-}
-/** Both Hosts run in this Node.js main.ts process. */
-const service = createCoroutinePlugin<IServiceApi>({
-  name: 'math',
-  task: async ({ connect, signal }) => {
-    /** Store the first notification so readNote confirms that the handler ran. */
-    let receiveNote: (value: string) => void = () => undefined
-    const receivedNote = new Promise<string>((resolve) => { receiveNote = resolve })
-    /** Child mode joins the connection supplied to this task. */
-    const parent = createCoroutinePlugin({
-      name: 'parent', connect,
-      provide: {
-        double: (value: number) => value * 2,
-        note: (value: string) => receiveNote(value),
-        readNote: () => receivedNote,
-        count: async function* (limit: number) {
-          for (let value = 1; value <= limit; value++) yield value
-        }
-      }
-    })
-    /** The handler Host stays available until the parent stops its task. */
-    const child = defineHost<Record<string, never>, never, readonly [typeof parent]>({ host: { execution: { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 5_000 } } })
-    try {
-      await child.use(parent)
-      await new Promise<void>((resolve) => {
-        if (signal.aborted) resolve()
-        else signal.addEventListener('abort', () => resolve(), { once: true })
-      })
-    } finally { await child.dispose() }
-  }
-})
-/** The consumer Host owns the installed task. */
-const host = defineHost<Record<string, never>, never, readonly [typeof service]>({ host: { execution: { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 5_000 } } })
-try {
-  await host.use(service)
-  assert.equal(await host.coroutine!.request('math', 'double', 21), 42)
-  await host.coroutine!.notify('math', 'note', 'hello')
-  assert.equal(await host.coroutine!.request('math', 'readNote'), 'hello')
-  /** Collect every item before checking the complete stream. */
-  const values: number[] = []
-  for await (const value of host.coroutine!.stream('math', 'count', 3)) values.push(value)
-  assert.deepEqual(values, [1, 2, 3])
-} finally { await host.dispose() }`
-      }
-    ],
-    scenariosEn: [
-      'The application needs supervised work without a Worker or child process.',
-      'The parent needs cooperative stop, restart or replace(name, { task }).'
-    ],
-    scenariosZh: [
-      '应用需要受监督的工作，无需 Worker 或子进程。',
-      '父端需要协作停止、restart 或 replace(name, { task })。'
-    ],
-    avoidEn: [
-      'Pass exactly one of task or connect. A child uses only the connect value received by its task.',
-      'CPU-bound work that blocks the event loop cannot be stopped until it yields.',
-      'A resolved task exits normally. A rejected task crashes. Release its handler Host in finally.',
-      'Next task: cancel an unfinished request in Calls and cancellation (calls-and-cancellation).'
-    ],
-    avoidZh: [
-      'task 与 connect 必须二选一。子端只使用自己的 task 收到的 connect。',
-      'CPU 密集工作阻塞事件循环期间无法停止。',
-      'task resolve 表示正常退出。task reject 表示异常退出。在 finally 中释放处理端 Host。',
-      '下一任务：按“调用与取消”（calls-and-cancellation）取消未完成的 request。'
-    ]
-  }),
-  'rpc-core:remote:createRemoteHost': guide({
-    purposeEn:
-      'Creates the advanced remote Host facade over a supplied original binding, preserving supervision, generation and Host control instead of launching a new unit itself.',
-    purposeZh:
-      '在给定原 binding 上创建高级 remote Host 门面，保留 supervision、generation 与 Host control；门面本身不另行启动执行单元。',
-    quickStart:
-      "import { createRemoteHost } from '@migaia/rpc-core/remote'\n\nexport function invokeConfiguredBoundary(...args: Parameters<typeof createRemoteHost>) {\n  return createRemoteHost(...args)\n}",
-    scenariosEn: [
-      'A library adapter must assemble the explicit source, contract or runtime policy named above.',
-      'The application needs to retain the original channel/Host lifecycle while validating inputs at its own integration boundary.'
-    ],
-    scenariosZh: [
-      '库适配器需要装配上述明确的来源、契约或运行时策略。',
-      '应用需要保留原 channel/Host 生命周期，并在自己的集成边界校验输入。'
-    ],
-    avoidEn: [
-      'Prefer the four process/thread Peer or Plugin factories for ordinary application RPC.',
-      'Do not treat this low-level operation as permission to bypass expose, source authentication or cleanup ownership.'
-    ],
-    avoidZh: [
-      '普通业务 RPC 优先使用四个 process/thread Peer 或 Plugin 工厂。',
-      '不要把底层操作当作绕过 expose、source 鉴权或资源清理归属的权限。'
-    ]
-  }),
-  'rpc-core:remote:createRemotePlugin': guide({
-    purposeEn:
-      'Builds the advanced remote Plugin definition around one supplied binding and contract. Installation, exposed methods and close remain part of the adopting PluginHost.',
-    purposeZh:
-      '围绕一个给定 binding 和 contract 创建高级 remote Plugin 定义；安装、公开方法和 close 都属于采纳它的 PluginHost。',
-    quickStart:
-      "import { createRemotePlugin } from '@migaia/rpc-core/remote'\n\nexport function invokeConfiguredBoundary(...args: Parameters<typeof createRemotePlugin>) {\n  return createRemotePlugin(...args)\n}",
-    scenariosEn: [
-      'A library adapter must assemble the explicit source, contract or runtime policy named above.',
-      'The application needs to retain the original channel/Host lifecycle while validating inputs at its own integration boundary.'
-    ],
-    scenariosZh: [
-      '库适配器需要装配上述明确的来源、契约或运行时策略。',
-      '应用需要保留原 channel/Host 生命周期，并在自己的集成边界校验输入。'
-    ],
-    avoidEn: [
-      'Prefer the four process/thread Peer or Plugin factories for ordinary application RPC.',
-      'Do not treat this low-level operation as permission to bypass expose, source authentication or cleanup ownership.'
-    ],
-    avoidZh: [
-      '普通业务 RPC 优先使用四个 process/thread Peer 或 Plugin 工厂。',
-      '不要把底层操作当作绕过 expose、source 鉴权或资源清理归属的权限。'
-    ]
-  }),
-  'rpc-core:remote:createRemoteRetryPort': guide({
-    purposeEn:
-      'Creates the bounded retry strategy port used with the original generation, idempotency key, deadline and dispatch owner; unknown outcome never proves a non-idempotent write can be repeated.',
-    purposeZh:
-      '创建与原 generation、幂等键、deadline 和 dispatch owner 配合的有界重试策略端口；unknown outcome 不证明非幂等写可安全重复。',
-    quickStart:
-      "import { createRemoteRetryPort } from '@migaia/rpc-core/remote'\n\nexport function invokeConfiguredBoundary(...args: Parameters<typeof createRemoteRetryPort>) {\n  return createRemoteRetryPort(...args)\n}",
-    scenariosEn: [
-      'A library adapter must assemble the explicit source, contract or runtime policy named above.',
-      'The application needs to retain the original channel/Host lifecycle while validating inputs at its own integration boundary.'
-    ],
-    scenariosZh: [
-      '库适配器需要装配上述明确的来源、契约或运行时策略。',
-      '应用需要保留原 channel/Host 生命周期，并在自己的集成边界校验输入。'
-    ],
-    avoidEn: [
-      'Prefer the four process/thread Peer or Plugin factories for ordinary application RPC.',
-      'Do not treat this low-level operation as permission to bypass expose, source authentication or cleanup ownership.'
-    ],
-    avoidZh: [
-      '普通业务 RPC 优先使用四个 process/thread Peer 或 Plugin 工厂。',
-      '不要把底层操作当作绕过 expose、source 鉴权或资源清理归属的权限。'
-    ]
-  }),
-  'rpc-core:remote:normalizeRemoteContract': guide({
-    purposeEn:
-      'Normalizes an external advanced remote contract before installing its method projection; it rejects invalid keys/modes instead of granting methods not actually provided.',
-    purposeZh:
-      '安装方法投影前规范化外部高级 remote contract；拒绝非法键和 mode，不会授予实际未提供的方法。',
-    quickStart:
-      "import { normalizeRemoteContract } from '@migaia/rpc-core/remote'\n\nexport function invokeConfiguredBoundary(...args: Parameters<typeof normalizeRemoteContract>) {\n  return normalizeRemoteContract(...args)\n}",
-    scenariosEn: [
-      'A library adapter must assemble the explicit source, contract or runtime policy named above.',
-      'The application needs to retain the original channel/Host lifecycle while validating inputs at its own integration boundary.'
-    ],
-    scenariosZh: [
-      '库适配器需要装配上述明确的来源、契约或运行时策略。',
-      '应用需要保留原 channel/Host 生命周期，并在自己的集成边界校验输入。'
-    ],
-    avoidEn: [
-      'Prefer the four process/thread Peer or Plugin factories for ordinary application RPC.',
-      'Do not treat this low-level operation as permission to bypass expose, source authentication or cleanup ownership.'
-    ],
-    avoidZh: [
-      '普通业务 RPC 优先使用四个 process/thread Peer 或 Plugin 工厂。',
-      '不要把底层操作当作绕过 expose、source 鉴权或资源清理归属的权限。'
-    ]
-  }),
-  'rpc-core:remote:normalizeRemoteControlShape': guide({
-    purposeEn:
-      'Validates one Host-control payload against the registered control definition, preserving portable values and exact action shape before remote dispatch.',
-    purposeZh:
-      '远端分发前按已登记 control 定义校验 Host-control payload，保留可移植值与明确的动作形态。',
-    quickStart:
-      "import { normalizeRemoteControlShape } from '@migaia/rpc-core/remote'\n\nexport function invokeConfiguredBoundary(...args: Parameters<typeof normalizeRemoteControlShape>) {\n  return normalizeRemoteControlShape(...args)\n}",
-    scenariosEn: [
-      'A library adapter must assemble the explicit source, contract or runtime policy named above.',
-      'The application needs to retain the original channel/Host lifecycle while validating inputs at its own integration boundary.'
-    ],
-    scenariosZh: [
-      '库适配器需要装配上述明确的来源、契约或运行时策略。',
-      '应用需要保留原 channel/Host 生命周期，并在自己的集成边界校验输入。'
-    ],
-    avoidEn: [
-      'Prefer the four process/thread Peer or Plugin factories for ordinary application RPC.',
-      'Do not treat this low-level operation as permission to bypass expose, source authentication or cleanup ownership.'
-    ],
-    avoidZh: [
-      '普通业务 RPC 优先使用四个 process/thread Peer 或 Plugin 工厂。',
-      '不要把底层操作当作绕过 expose、source 鉴权或资源清理归属的权限。'
-    ]
-  }),
-  'rpc-core:remote:normalizeRemoteHostCatalog': guide({
-    purposeEn:
-      'Validates the external Host plugin catalog used by the advanced remote facade, retaining explicit plugin/method names and rejecting structural conflicts before publication.',
-    purposeZh:
-      '校验高级 remote 门面使用的外部 Host 插件目录，保留明确的插件和方法名，并在发布前拒绝结构冲突。',
-    quickStart:
-      "import { normalizeRemoteHostCatalog } from '@migaia/rpc-core/remote'\n\nexport function invokeConfiguredBoundary(...args: Parameters<typeof normalizeRemoteHostCatalog>) {\n  return normalizeRemoteHostCatalog(...args)\n}",
-    scenariosEn: [
-      'A library adapter must assemble the explicit source, contract or runtime policy named above.',
-      'The application needs to retain the original channel/Host lifecycle while validating inputs at its own integration boundary.'
-    ],
-    scenariosZh: [
-      '库适配器需要装配上述明确的来源、契约或运行时策略。',
-      '应用需要保留原 channel/Host 生命周期，并在自己的集成边界校验输入。'
-    ],
-    avoidEn: [
-      'Prefer the four process/thread Peer or Plugin factories for ordinary application RPC.',
-      'Do not treat this low-level operation as permission to bypass expose, source authentication or cleanup ownership.'
-    ],
-    avoidZh: [
-      '普通业务 RPC 优先使用四个 process/thread Peer 或 Plugin 工厂。',
-      '不要把底层操作当作绕过 expose、source 鉴权或资源清理归属的权限。'
-    ]
-  }),
-  'rpc-core:remote:sameRemoteContract': guide({
-    purposeEn:
-      'Compares two normalized remote contracts by their maintained method and mode semantics for directory compatibility decisions; equality does not authorize a caller.',
-    purposeZh:
-      '按维护中的方法与 mode 语义比较两个规范 remote contract，供目录兼容判断使用；相等不代表调用者获得权限。',
-    quickStart:
-      "import { sameRemoteContract } from '@migaia/rpc-core/remote'\n\nexport function invokeConfiguredBoundary(...args: Parameters<typeof sameRemoteContract>) {\n  return sameRemoteContract(...args)\n}",
-    scenariosEn: [
-      'A library adapter must assemble the explicit source, contract or runtime policy named above.',
-      'The application needs to retain the original channel/Host lifecycle while validating inputs at its own integration boundary.'
-    ],
-    scenariosZh: [
-      '库适配器需要装配上述明确的来源、契约或运行时策略。',
-      '应用需要保留原 channel/Host 生命周期，并在自己的集成边界校验输入。'
-    ],
-    avoidEn: [
-      'Prefer the four process/thread Peer or Plugin factories for ordinary application RPC.',
-      'Do not treat this low-level operation as permission to bypass expose, source authentication or cleanup ownership.'
-    ],
-    avoidZh: [
-      '普通业务 RPC 优先使用四个 process/thread Peer 或 Plugin 工厂。',
-      '不要把底层操作当作绕过 expose、source 鉴权或资源清理归属的权限。'
-    ]
-  }),
-  'rpc-core:remote:serveRemoteHost': guide({
-    purposeEn:
-      'Publishes an explicitly exposed local Host through an accepted remote channel while preserving method whitelists and the local Host registration owner.',
-    purposeZh:
-      '通过已采纳 remote channel 发布显式 expose 的本地 Host，保留方法白名单及本地 Host 注册 owner。',
-    quickStart:
-      "import { serveRemoteHost } from '@migaia/rpc-core/remote'\n\nexport function invokeConfiguredBoundary(...args: Parameters<typeof serveRemoteHost>) {\n  return serveRemoteHost(...args)\n}",
-    scenariosEn: [
-      'A library adapter must assemble the explicit source, contract or runtime policy named above.',
-      'The application needs to retain the original channel/Host lifecycle while validating inputs at its own integration boundary.'
-    ],
-    scenariosZh: [
-      '库适配器需要装配上述明确的来源、契约或运行时策略。',
-      '应用需要保留原 channel/Host 生命周期，并在自己的集成边界校验输入。'
-    ],
-    avoidEn: [
-      'Prefer the four process/thread Peer or Plugin factories for ordinary application RPC.',
-      'Do not treat this low-level operation as permission to bypass expose, source authentication or cleanup ownership.'
-    ],
-    avoidZh: [
-      '普通业务 RPC 优先使用四个 process/thread Peer 或 Plugin 工厂。',
-      '不要把底层操作当作绕过 expose、source 鉴权或资源清理归属的权限。'
-    ]
-  }),
-  'rpc-core:remote:serveRemotePlugin': guide({
-    purposeEn:
-      'Publishes the explicitly exposed local Plugin projection through an accepted channel; it transfers calls and results, never executable plugin code.',
-    purposeZh:
-      '通过已采纳 channel 发布显式 expose 的本地 Plugin 投影；只传输调用和结果，不传输可执行插件代码。',
-    quickStart:
-      "import { serveRemotePlugin } from '@migaia/rpc-core/remote'\n\nexport function invokeConfiguredBoundary(...args: Parameters<typeof serveRemotePlugin>) {\n  return serveRemotePlugin(...args)\n}",
-    scenariosEn: [
-      'A library adapter must assemble the explicit source, contract or runtime policy named above.',
-      'The application needs to retain the original channel/Host lifecycle while validating inputs at its own integration boundary.'
-    ],
-    scenariosZh: [
-      '库适配器需要装配上述明确的来源、契约或运行时策略。',
-      '应用需要保留原 channel/Host 生命周期，并在自己的集成边界校验输入。'
-    ],
-    avoidEn: [
-      'Prefer the four process/thread Peer or Plugin factories for ordinary application RPC.',
-      'Do not treat this low-level operation as permission to bypass expose, source authentication or cleanup ownership.'
-    ],
-    avoidZh: [
-      '普通业务 RPC 优先使用四个 process/thread Peer 或 Plugin 工厂。',
-      '不要把底层操作当作绕过 expose、source 鉴权或资源清理归属的权限。'
-    ]
-  }),
-  'rpc-core:testing:createPeerPair': guide({
-    purposeEn:
-      'Creates two in-memory symmetric Peers with cross-inferred provide types and the real core call/error/order semantics. It is an application test helper, not evidence of native transfer or process isolation.',
-    purposeZh:
-      '创建两个内存内对称 Peer，交叉推导 provide 类型并执行真实 core 调用、错误和顺序语义；这是应用测试 helper，不证明原生 transfer 或进程隔离。',
-    quickStart:
-      "import { createPeerPair } from '@migaia/rpc-core/testing'\n\nconst pair = await createPeerPair({\n  a: { provide: { echo: (value: string) => value } },\n  b: { provide: { double: (value: number) => value * 2 } }\n})\ntry {\n  console.log(await pair.a.request('double', 21))\n  console.log(await pair.b.request('echo', 'ready'))\n} finally {\n  await Promise.all([pair.a.close(), pair.b.close()])\n}",
-    scenariosEn: [
-      'A library adapter must assemble the explicit source, contract or runtime policy named above.',
-      'The application needs to retain the original channel/Host lifecycle while validating inputs at its own integration boundary.'
-    ],
-    scenariosZh: [
-      '库适配器需要装配上述明确的来源、契约或运行时策略。',
-      '应用需要保留原 channel/Host 生命周期，并在自己的集成边界校验输入。'
-    ],
-    avoidEn: [
-      'Prefer the four process/thread Peer or Plugin factories for ordinary application RPC.',
-      'Do not treat this low-level operation as permission to bypass expose, source authentication or cleanup ownership.'
-    ],
-    avoidZh: [
-      '普通业务 RPC 优先使用四个 process/thread Peer 或 Plugin 工厂。',
-      '不要把底层操作当作绕过 expose、source 鉴权或资源清理归属的权限。'
-    ]
-  }),
-  'rpc-threads:index:createNodeThreadChannel': guide({
-    purposeEn:
-      'Binds an existing Node MessagePort to the canonical borrowed thread channel with an explicit peer identity and scheduler; only the original launcher observes Worker exit.',
-    purposeZh:
-      '把已有 Node MessagePort 绑定到规范借用线程通道，并声明 peer 身份和 scheduler；只有原 launcher 负责观察 Worker 退出。',
-    quickStart:
-      "import { createNodeThreadChannel } from '@migaia/rpc-threads'\n\nexport function invokeConfiguredBoundary(...args: Parameters<typeof createNodeThreadChannel>) {\n  return createNodeThreadChannel(...args)\n}",
-    scenariosEn: [
-      'A library adapter must assemble the explicit source, contract or runtime policy named above.',
-      'The application needs to retain the original channel/Host lifecycle while validating inputs at its own integration boundary.'
-    ],
-    scenariosZh: [
-      '库适配器需要装配上述明确的来源、契约或运行时策略。',
-      '应用需要保留原 channel/Host 生命周期，并在自己的集成边界校验输入。'
-    ],
-    avoidEn: [
-      'Prefer the four process/thread Peer or Plugin factories for ordinary application RPC.',
-      'Do not treat this low-level operation as permission to bypass expose, source authentication or cleanup ownership.'
-    ],
-    avoidZh: [
-      '普通业务 RPC 优先使用四个 process/thread Peer 或 Plugin 工厂。',
-      '不要把底层操作当作绕过 expose、source 鉴权或资源清理归属的权限。'
-    ]
-  }),
-  'rpc-threads:index:createWebThreadChannel': guide({
-    purposeEn:
-      'Binds an existing EventTarget-style port after bootstrap has finished, retaining borrowed message ownership without claiming Worker termination authority.',
-    purposeZh:
-      '在 bootstrap 完成后绑定已有 EventTarget 风格端口，保留借用消息所有权，不宣称拥有 Worker 终止权限。',
-    quickStart:
-      "import { createWebThreadChannel } from '@migaia/rpc-threads'\n\nexport function invokeConfiguredBoundary(...args: Parameters<typeof createWebThreadChannel>) {\n  return createWebThreadChannel(...args)\n}",
-    scenariosEn: [
-      'A library adapter must assemble the explicit source, contract or runtime policy named above.',
-      'The application needs to retain the original channel/Host lifecycle while validating inputs at its own integration boundary.'
-    ],
-    scenariosZh: [
-      '库适配器需要装配上述明确的来源、契约或运行时策略。',
-      '应用需要保留原 channel/Host 生命周期，并在自己的集成边界校验输入。'
-    ],
-    avoidEn: [
-      'Prefer the four process/thread Peer or Plugin factories for ordinary application RPC.',
-      'Do not treat this low-level operation as permission to bypass expose, source authentication or cleanup ownership.'
-    ],
-    avoidZh: [
-      '普通业务 RPC 优先使用四个 process/thread Peer 或 Plugin 工厂。',
-      '不要把底层操作当作绕过 expose、source 鉴权或资源清理归属的权限。'
-    ]
-  }),
-  'rpc-threads:index:readThreadBootstrap': guide({
-    purposeEn:
-      'Validates a received trusted thread bootstrap value before its identity and parent route are used; extra object fields do not create launcher ownership.',
-    purposeZh:
-      '使用身份和父路由前校验收到的可信线程 bootstrap 值；额外对象字段不能创造 launcher 所有权。',
-    quickStart:
-      "import { readThreadBootstrap } from '@migaia/rpc-threads'\n\nexport function invokeConfiguredBoundary(...args: Parameters<typeof readThreadBootstrap>) {\n  return readThreadBootstrap(...args)\n}",
-    scenariosEn: [
-      'A library adapter must assemble the explicit source, contract or runtime policy named above.',
-      'The application needs to retain the original channel/Host lifecycle while validating inputs at its own integration boundary.'
-    ],
-    scenariosZh: [
-      '库适配器需要装配上述明确的来源、契约或运行时策略。',
-      '应用需要保留原 channel/Host 生命周期，并在自己的集成边界校验输入。'
-    ],
-    avoidEn: [
-      'Prefer the four process/thread Peer or Plugin factories for ordinary application RPC.',
-      'Do not treat this low-level operation as permission to bypass expose, source authentication or cleanup ownership.'
-    ],
-    avoidZh: [
-      '普通业务 RPC 优先使用四个 process/thread Peer 或 Plugin 工厂。',
-      '不要把底层操作当作绕过 expose、source 鉴权或资源清理归属的权限。'
-    ]
-  }),
-  'rpc-threads:index:receiveThreadData': guide({
-    purposeEn:
-      'Receives the maintained thread preparation data and gives it to the existing preparation callback, preserving the channel identity before ordinary message reception starts.',
-    purposeZh:
-      '接收维护中的线程准备数据并交给既有 preparation 回调，在普通消息接收开始前保留通道身份。',
-    quickStart:
-      "import { receiveThreadData } from '@migaia/rpc-threads'\n\nexport function invokeConfiguredBoundary(...args: Parameters<typeof receiveThreadData>) {\n  return receiveThreadData(...args)\n}",
-    scenariosEn: [
-      'A library adapter must assemble the explicit source, contract or runtime policy named above.',
-      'The application needs to retain the original channel/Host lifecycle while validating inputs at its own integration boundary.'
-    ],
-    scenariosZh: [
-      '库适配器需要装配上述明确的来源、契约或运行时策略。',
-      '应用需要保留原 channel/Host 生命周期，并在自己的集成边界校验输入。'
-    ],
-    avoidEn: [
-      'Prefer the four process/thread Peer or Plugin factories for ordinary application RPC.',
-      'Do not treat this low-level operation as permission to bypass expose, source authentication or cleanup ownership.'
-    ],
-    avoidZh: [
-      '普通业务 RPC 优先使用四个 process/thread Peer 或 Plugin 工厂。',
-      '不要把底层操作当作绕过 expose、source 鉴权或资源清理归属的权限。'
-    ]
-  }),
-  'rpc-process:adapters-bun-spawn:createBunProcessLauncher': guide({
-    purposeEn:
-      'Creates the bun-spawn native unit launcher used by the matching process or thread Peer source. It retains runtime-specific validation, readiness, exit observation and ownership instead of pretending every native handle supports the same controls.',
-    purposeZh:
-      '创建 bun-spawn 的执行单元启动器，交给匹配的 process/thread Peer 来源使用。保留该运行时自身的配置校验、就绪、退出观察和所有权；不把不同原生 handle 伪装成具有同一组控制能力。',
-    quickStart:
-      "import { createBunProcessLauncher } from '@migaia/rpc-process/adapters/bun-spawn'\n\nexport function configureAdapter(options: Parameters<typeof createBunProcessLauncher>[0]) {\n  return createBunProcessLauncher(options)\n}",
-    scenariosEn: [
-      'A bun-spawn application needs a real adapter for a spawn-owned unit rather than a borrowed message target.',
-      'A custom native source assembles the original launcher, budget, scheduler and channel factory with explicit lifecycle ownership.'
-    ],
-    scenariosZh: [
-      'bun-spawn 应用需要为 spawn 拥有的单元配置真实适配器，而不是借用外部消息目标。',
-      '自定义原生来源需要组合原 launcher、budget、scheduler 和 channel factory，并明确资源生命周期归属。'
-    ],
-    avoidEn: [
-      'Use the default runtime Peer or Plugin factory when no custom source assembly is required.',
-      'Do not infer hard termination, complete resource sampling or memory sharing from a platform name; inspect the adapter capability profile.'
-    ],
-    avoidZh: [
-      '不需要自定义来源装配时，应使用默认运行时 Peer 或 Plugin 工厂。',
-      '不要从平台名推断强制终止、完整资源采样或共享内存支持；应读取适配器 capability profile。'
-    ]
-  }),
-  'rpc-process:adapters-deno-command:createDenoProcessLauncher': guide({
-    purposeEn:
-      'Creates the deno-command native unit launcher used by the matching process or thread Peer source. It retains runtime-specific validation, readiness, exit observation and ownership instead of pretending every native handle supports the same controls.',
-    purposeZh:
-      '创建 deno-command 的执行单元启动器，交给匹配的 process/thread Peer 来源使用。保留该运行时自身的配置校验、就绪、退出观察和所有权；不把不同原生 handle 伪装成具有同一组控制能力。',
-    quickStart:
-      "import { createDenoProcessLauncher } from '@migaia/rpc-process/adapters/deno-command'\n\nexport function configureAdapter(options: Parameters<typeof createDenoProcessLauncher>[0]) {\n  return createDenoProcessLauncher(options)\n}",
-    scenariosEn: [
-      'A deno-command application needs a real adapter for a spawn-owned unit rather than a borrowed message target.',
-      'A custom native source assembles the original launcher, budget, scheduler and channel factory with explicit lifecycle ownership.'
-    ],
-    scenariosZh: [
-      'deno-command 应用需要为 spawn 拥有的单元配置真实适配器，而不是借用外部消息目标。',
-      '自定义原生来源需要组合原 launcher、budget、scheduler 和 channel factory，并明确资源生命周期归属。'
-    ],
-    avoidEn: [
-      'Use the default runtime Peer or Plugin factory when no custom source assembly is required.',
-      'Do not infer hard termination, complete resource sampling or memory sharing from a platform name; inspect the adapter capability profile.'
-    ],
-    avoidZh: [
-      '不需要自定义来源装配时，应使用默认运行时 Peer 或 Plugin 工厂。',
-      '不要从平台名推断强制终止、完整资源采样或共享内存支持；应读取适配器 capability profile。'
-    ]
-  }),
-  'rpc-process:adapters-electron-utility-process:createElectronUtilityProcessLauncher': guide({
-    purposeEn:
-      'Creates the electron-utility-process native unit launcher used by the matching process or thread Peer source. It retains runtime-specific validation, readiness, exit observation and ownership instead of pretending every native handle supports the same controls.',
-    purposeZh:
-      '创建 electron-utility-process 的执行单元启动器，交给匹配的 process/thread Peer 来源使用。保留该运行时自身的配置校验、就绪、退出观察和所有权；不把不同原生 handle 伪装成具有同一组控制能力。',
-    quickStart:
-      "import { createElectronUtilityProcessLauncher } from '@migaia/rpc-process/adapters/electron-utility-process'\n\nconst adapter = createElectronUtilityProcessLauncher()\nconsole.log(adapter)",
-    scenariosEn: [
-      'A electron-utility-process application needs a real adapter for a spawn-owned unit rather than a borrowed message target.',
-      'A custom native source assembles the original launcher, budget, scheduler and channel factory with explicit lifecycle ownership.'
-    ],
-    scenariosZh: [
-      'electron-utility-process 应用需要为 spawn 拥有的单元配置真实适配器，而不是借用外部消息目标。',
-      '自定义原生来源需要组合原 launcher、budget、scheduler 和 channel factory，并明确资源生命周期归属。'
-    ],
-    avoidEn: [
-      'Use the default runtime Peer or Plugin factory when no custom source assembly is required.',
-      'Do not infer hard termination, complete resource sampling or memory sharing from a platform name; inspect the adapter capability profile.'
-    ],
-    avoidZh: [
-      '不需要自定义来源装配时，应使用默认运行时 Peer 或 Plugin 工厂。',
-      '不要从平台名推断强制终止、完整资源采样或共享内存支持；应读取适配器 capability profile。'
-    ]
-  }),
-  'rpc-process:adapters-node-child-process:createNodeProcessLauncher': guide({
-    purposeEn:
-      'Creates the node-child-process native unit launcher used by the matching process or thread Peer source. It retains runtime-specific validation, readiness, exit observation and ownership instead of pretending every native handle supports the same controls.',
-    purposeZh:
-      '创建 node-child-process 的执行单元启动器，交给匹配的 process/thread Peer 来源使用。保留该运行时自身的配置校验、就绪、退出观察和所有权；不把不同原生 handle 伪装成具有同一组控制能力。',
-    quickStart:
-      "import { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'\n\nexport function configureAdapter(options: Parameters<typeof createNodeProcessLauncher>[0]) {\n  return createNodeProcessLauncher(options)\n}",
-    scenariosEn: [
-      'A node-child-process application needs a real adapter for a spawn-owned unit rather than a borrowed message target.',
-      'A custom native source assembles the original launcher, budget, scheduler and channel factory with explicit lifecycle ownership.'
-    ],
-    scenariosZh: [
-      'node-child-process 应用需要为 spawn 拥有的单元配置真实适配器，而不是借用外部消息目标。',
-      '自定义原生来源需要组合原 launcher、budget、scheduler 和 channel factory，并明确资源生命周期归属。'
-    ],
-    avoidEn: [
-      'Use the default runtime Peer or Plugin factory when no custom source assembly is required.',
-      'Do not infer hard termination, complete resource sampling or memory sharing from a platform name; inspect the adapter capability profile.'
-    ],
-    avoidZh: [
-      '不需要自定义来源装配时，应使用默认运行时 Peer 或 Plugin 工厂。',
-      '不要从平台名推断强制终止、完整资源采样或共享内存支持；应读取适配器 capability profile。'
-    ]
-  }),
-  'rpc-process:adapters-windows-job:createWindowsJobProcessLauncher': guide({
-    purposeEn:
-      'Creates the windows-job native unit launcher used by the matching process or thread Peer source. It retains runtime-specific validation, readiness, exit observation and ownership instead of pretending every native handle supports the same controls.',
-    purposeZh:
-      '创建 windows-job 的执行单元启动器，交给匹配的 process/thread Peer 来源使用。保留该运行时自身的配置校验、就绪、退出观察和所有权；不把不同原生 handle 伪装成具有同一组控制能力。',
-    quickStart:
-      "import { createWindowsJobProcessLauncher } from '@migaia/rpc-process/adapters/windows-job'\n\nconst adapter = createWindowsJobProcessLauncher()\nconsole.log(adapter)",
-    scenariosEn: [
-      'A windows-job application needs a real adapter for a spawn-owned unit rather than a borrowed message target.',
-      'A custom native source assembles the original launcher, budget, scheduler and channel factory with explicit lifecycle ownership.'
-    ],
-    scenariosZh: [
-      'windows-job 应用需要为 spawn 拥有的单元配置真实适配器，而不是借用外部消息目标。',
-      '自定义原生来源需要组合原 launcher、budget、scheduler 和 channel factory，并明确资源生命周期归属。'
-    ],
-    avoidEn: [
-      'Use the default runtime Peer or Plugin factory when no custom source assembly is required.',
-      'Do not infer hard termination, complete resource sampling or memory sharing from a platform name; inspect the adapter capability profile.'
-    ],
-    avoidZh: [
-      '不需要自定义来源装配时，应使用默认运行时 Peer 或 Plugin 工厂。',
-      '不要从平台名推断强制终止、完整资源采样或共享内存支持；应读取适配器 capability profile。'
-    ]
-  }),
-  'rpc-core:transport-kit:createListenerFailureState': guide({
-    purposeEn:
-      'Creates a local bucket for failures thrown by diagnostic reporters, so reporting one listener error cannot recursively lose another error.',
-    purposeZh:
-      '创建本地诊断上报失败桶，防止报告一个监听器错误时递归丢失另一个错误。桶由适配器 owner 持有，在终态报告与清理后释放。',
-    quickStart:
-      "import { createListenerFailureState } from '@migaia/rpc-core/transport-kit'\n\nconst state = createListenerFailureState()\nconsole.log(state)",
-    scenariosEn: [
-      'A custom adapter owns native event subscriptions and must isolate listener failure.',
-      'Channel shutdown must remove all listeners while retaining original cleanup and reporting errors.'
-    ],
-    scenariosZh: [
-      '自定义适配器持有原生事件订阅，需要隔离监听器失败。',
-      '通道关闭时必须移除全部监听器，并保留原始清理与上报错误。'
-    ],
-    avoidEn: [
-      'Ordinary application RPC code should use the maintained transport or Peer factory.',
-      'Do not swallow the returned or reported errors, or recreate them as unrelated Error objects.'
-    ],
-    avoidZh: [
-      '普通业务 RPC 代码应使用维护中的 transport 或 Peer 工厂。',
-      '不要吞掉返回或上报的错误，也不要把它们重建为无关的 Error 对象。'
-    ]
-  }),
-  'rpc-core:transport-kit:collectListenerFailure': guide({
-    purposeEn:
-      'Retains one original reporter failure in the existing failure state without reconstructing its native type or cause chain.',
-    purposeZh: '把一个原始上报失败保留到既有 failure state，不重建它的原生类型或 cause 链。',
-    quickStart:
-      "import { collectListenerFailure, createListenerFailureState } from '@migaia/rpc-core/transport-kit'\n\nconst state = createListenerFailureState()\ncollectListenerFailure(state, new TypeError('listener failed'))\nconsole.log(state)",
-    scenariosEn: [
-      'A custom adapter owns native event subscriptions and must isolate listener failure.',
-      'Channel shutdown must remove all listeners while retaining original cleanup and reporting errors.'
-    ],
-    scenariosZh: [
-      '自定义适配器持有原生事件订阅，需要隔离监听器失败。',
-      '通道关闭时必须移除全部监听器，并保留原始清理与上报错误。'
-    ],
-    avoidEn: [
-      'Ordinary application RPC code should use the maintained transport or Peer factory.',
-      'Do not swallow the returned or reported errors, or recreate them as unrelated Error objects.'
-    ],
-    avoidZh: [
-      '普通业务 RPC 代码应使用维护中的 transport 或 Peer 工厂。',
-      '不要吞掉返回或上报的错误，也不要把它们重建为无关的 Error 对象。'
-    ]
-  }),
-  'rpc-core:transport-kit:collectListenerCleanupFailures': guide({
-    purposeEn:
-      'Runs the supplied listener removals and collects every original cleanup failure, allowing a transport owner to finish all removals before reporting.',
-    purposeZh:
-      '执行给定的监听器移除操作并收集所有原始清理失败，让 transport owner 完成全部移除后再报告。',
-    quickStart:
-      "import { collectListenerCleanupFailures } from '@migaia/rpc-core/transport-kit'\n\nconst failures = collectListenerCleanupFailures([() => console.log('listener removed')])\nconsole.log(failures)",
-    scenariosEn: [
-      'A custom adapter owns native event subscriptions and must isolate listener failure.',
-      'Channel shutdown must remove all listeners while retaining original cleanup and reporting errors.'
-    ],
-    scenariosZh: [
-      '自定义适配器持有原生事件订阅，需要隔离监听器失败。',
-      '通道关闭时必须移除全部监听器，并保留原始清理与上报错误。'
-    ],
-    avoidEn: [
-      'Ordinary application RPC code should use the maintained transport or Peer factory.',
-      'Do not swallow the returned or reported errors, or recreate them as unrelated Error objects.'
-    ],
-    avoidZh: [
-      '普通业务 RPC 代码应使用维护中的 transport 或 Peer 工厂。',
-      '不要吞掉返回或上报的错误，也不要把它们重建为无关的 Error 对象。'
-    ]
-  }),
-  'rpc-core:transport-kit:createListenerFailure': guide({
-    purposeEn:
-      'Projects collected listener failures to the source-owned boundary error while keeping the original errors reachable through cause or aggregation.',
-    purposeZh:
-      '把已收集的监听器失败投影为原 owner 的边界错误，原始错误仍可通过 cause 或聚合成员访问。',
-    quickStart:
-      "import { createListenerFailure } from '@migaia/rpc-core/transport-kit'\n\nconst failure = createListenerFailure([new TypeError('listener failed')])\nconsole.error(failure)",
-    scenariosEn: [
-      'A custom adapter owns native event subscriptions and must isolate listener failure.',
-      'Channel shutdown must remove all listeners while retaining original cleanup and reporting errors.'
-    ],
-    scenariosZh: [
-      '自定义适配器持有原生事件订阅，需要隔离监听器失败。',
-      '通道关闭时必须移除全部监听器，并保留原始清理与上报错误。'
-    ],
-    avoidEn: [
-      'Ordinary application RPC code should use the maintained transport or Peer factory.',
-      'Do not swallow the returned or reported errors, or recreate them as unrelated Error objects.'
-    ],
-    avoidZh: [
-      '普通业务 RPC 代码应使用维护中的 transport 或 Peer 工厂。',
-      '不要吞掉返回或上报的错误，也不要把它们重建为无关的 Error 对象。'
-    ]
-  }),
-  'rpc-core:transport-kit:createMessageListenerHub': guide({
-    purposeEn:
-      'Creates the transport-owned listener collection with stable subscribe/dispose behavior; dispatch isolates individual listener failure without copying the RPC state machine.',
-    purposeZh:
-      '创建 transport 持有的监听器集合，保留稳定的订阅与清理行为；分发隔离单个监听器失败，而不复制 RPC 状态机。',
-    quickStart:
-      "import { createMessageListenerHub } from '@migaia/rpc-core/transport-kit'\n\nconst hub = createMessageListenerHub<{ value: number }>()\nconsole.log(hub)",
-    scenariosEn: [
-      'A custom adapter owns native event subscriptions and must isolate listener failure.',
-      'Channel shutdown must remove all listeners while retaining original cleanup and reporting errors.'
-    ],
-    scenariosZh: [
-      '自定义适配器持有原生事件订阅，需要隔离监听器失败。',
-      '通道关闭时必须移除全部监听器，并保留原始清理与上报错误。'
-    ],
-    avoidEn: [
-      'Ordinary application RPC code should use the maintained transport or Peer factory.',
-      'Do not swallow the returned or reported errors, or recreate them as unrelated Error objects.'
-    ],
-    avoidZh: [
-      '普通业务 RPC 代码应使用维护中的 transport 或 Peer 工厂。',
-      '不要吞掉返回或上报的错误，也不要把它们重建为无关的 Error 对象。'
-    ]
-  }),
-  'rpc-core:transport-kit:drainListenerFailures': guide({
-    purposeEn:
-      'Reports the completed cleanup failure set at the selected boundary after all cleanup work has been attempted.',
-    purposeZh:
-      '在全部监听器清理操作都已尝试后，向选定边界报告完整失败集合，使原始错误仍可追踪并避免跳过后续清理。',
-    quickStart:
-      "import { drainListenerFailures } from '@migaia/rpc-core/transport-kit'\n\ndrainListenerFailures([])\nconsole.log('listener failures drained')",
-    scenariosEn: [
-      'A custom adapter owns native event subscriptions and must isolate listener failure.',
-      'Channel shutdown must remove all listeners while retaining original cleanup and reporting errors.'
-    ],
-    scenariosZh: [
-      '自定义适配器持有原生事件订阅，需要隔离监听器失败。',
-      '通道关闭时必须移除全部监听器，并保留原始清理与上报错误。'
-    ],
-    avoidEn: [
-      'Ordinary application RPC code should use the maintained transport or Peer factory.',
-      'Do not swallow the returned or reported errors, or recreate them as unrelated Error objects.'
-    ],
-    avoidZh: [
-      '普通业务 RPC 代码应使用维护中的 transport 或 Peer 工厂。',
-      '不要吞掉返回或上报的错误，也不要把它们重建为无关的 Error 对象。'
-    ]
-  }),
-  'rpc-core:transport-kit:drainTerminalListenerFailures': guide({
-    purposeEn:
-      'Drains the terminal listener failure set through the original boundary reporter and preserves its synchronous or asynchronous completion semantics.',
-    purposeZh:
-      '通过原始边界上报器排空终态监听器失败集合，保留其同步或异步完成语义。调用方须等待完整结束，不能提前宣告所有资源已释放。',
-    quickStart:
-      "import { drainTerminalListenerFailures } from '@migaia/rpc-core/transport-kit'\n\nawait drainTerminalListenerFailures([])",
-    scenariosEn: [
-      'A custom adapter owns native event subscriptions and must isolate listener failure.',
-      'Channel shutdown must remove all listeners while retaining original cleanup and reporting errors.'
-    ],
-    scenariosZh: [
-      '自定义适配器持有原生事件订阅，需要隔离监听器失败。',
-      '通道关闭时必须移除全部监听器，并保留原始清理与上报错误。'
-    ],
-    avoidEn: [
-      'Ordinary application RPC code should use the maintained transport or Peer factory.',
-      'Do not swallow the returned or reported errors, or recreate them as unrelated Error objects.'
-    ],
-    avoidZh: [
-      '普通业务 RPC 代码应使用维护中的 transport 或 Peer 工厂。',
-      '不要吞掉返回或上报的错误，也不要把它们重建为无关的 Error 对象。'
-    ]
-  }),
-  'rpc-core:transport-kit:observeListener': guide({
-    purposeEn:
-      'Invokes one listener and contains synchronous throws and late Promise rejection in the existing report channel, retaining original error identity.',
-    purposeZh:
-      '调用一个监听器，把同步抛错和迟到的 Promise rejection 交给现有 report 通道，保留原始错误身份。',
-    quickStart:
-      "import { observeListener, createListenerFailureState } from '@migaia/rpc-core/transport-kit'\n\nconst state = createListenerFailureState()\nobserveListener(() => console.log('message delivered'), console.error, state)",
-    scenariosEn: [
-      'A custom adapter owns native event subscriptions and must isolate listener failure.',
-      'Channel shutdown must remove all listeners while retaining original cleanup and reporting errors.'
-    ],
-    scenariosZh: [
-      '自定义适配器持有原生事件订阅，需要隔离监听器失败。',
-      '通道关闭时必须移除全部监听器，并保留原始清理与上报错误。'
-    ],
-    avoidEn: [
-      'Ordinary application RPC code should use the maintained transport or Peer factory.',
-      'Do not swallow the returned or reported errors, or recreate them as unrelated Error objects.'
-    ],
-    avoidZh: [
-      '普通业务 RPC 代码应使用维护中的 transport 或 Peer 工厂。',
-      '不要吞掉返回或上报的错误，也不要把它们重建为无关的 Error 对象。'
-    ]
-  }),
-  'rpc-core:transport-kit:registerListeners': guide({
-    purposeEn:
-      'Registers the listener set through one transactional boundary; a partial registration failure removes the listeners already installed.',
-    purposeZh:
-      '通过一个事务边界登记监听器集合；中途登记失败会移除已经安装的监听器，并保留原始登记失败与回滚错误，避免留下半安装接收器。',
-    quickStart:
-      "import { registerListeners } from '@migaia/rpc-core/transport-kit'\n\nconst listener = () => console.log('window resized')\nregisterListeners([{ add: () => window.addEventListener('resize', listener), remove: () => window.removeEventListener('resize', listener) }])",
-    scenariosEn: [
-      'A custom adapter owns native event subscriptions and must isolate listener failure.',
-      'Channel shutdown must remove all listeners while retaining original cleanup and reporting errors.'
-    ],
-    scenariosZh: [
-      '自定义适配器持有原生事件订阅，需要隔离监听器失败。',
-      '通道关闭时必须移除全部监听器，并保留原始清理与上报错误。'
-    ],
-    avoidEn: [
-      'Ordinary application RPC code should use the maintained transport or Peer factory.',
-      'Do not swallow the returned or reported errors, or recreate them as unrelated Error objects.'
-    ],
-    avoidZh: [
-      '普通业务 RPC 代码应使用维护中的 transport 或 Peer 工厂。',
-      '不要吞掉返回或上报的错误，也不要把它们重建为无关的 Error 对象。'
-    ]
-  }),
-  'rpc-core:transport-kit:releaseListenerRegistration': guide({
-    purposeEn:
-      'Attempts every original listener removal and commits terminal release once, preserving cleanup failures for the owner boundary.',
-    purposeZh: '尝试执行全部原监听器移除，并只提交一次终态释放；清理失败保留给 owner 边界处理。',
-    quickStart:
-      "import { releaseListenerRegistration } from '@migaia/rpc-core/transport-kit'\n\nreleaseListenerRegistration([() => console.log('listener removed')], () => console.log('registration closed'))",
-    scenariosEn: [
-      'A custom adapter owns native event subscriptions and must isolate listener failure.',
-      'Channel shutdown must remove all listeners while retaining original cleanup and reporting errors.'
-    ],
-    scenariosZh: [
-      '自定义适配器持有原生事件订阅，需要隔离监听器失败。',
-      '通道关闭时必须移除全部监听器，并保留原始清理与上报错误。'
-    ],
-    avoidEn: [
-      'Ordinary application RPC code should use the maintained transport or Peer factory.',
-      'Do not swallow the returned or reported errors, or recreate them as unrelated Error objects.'
-    ],
-    avoidZh: [
-      '普通业务 RPC 代码应使用维护中的 transport 或 Peer 工厂。',
-      '不要吞掉返回或上报的错误，也不要把它们重建为无关的 Error 对象。'
-    ]
-  }),
-  'rpc-core:transport-kit:reportListenerFailure': guide({
-    purposeEn:
-      'Delivers one original listener failure to the registered reporter set and retains failures thrown by those reporters in the supplied bucket.',
-    purposeZh:
-      '把一个原始监听器失败交给已登记的上报器集合，并把上报器自身失败保留到给定桶中。它不会替换原业务错误或静默吞掉诊断失败。',
-    quickStart:
-      "import { reportListenerFailure, createListenerFailureState } from '@migaia/rpc-core/transport-kit'\n\nconst state = createListenerFailureState()\nreportListenerFailure(new TypeError('listener failed'), [console.error], state)",
-    scenariosEn: [
-      'A custom adapter owns native event subscriptions and must isolate listener failure.',
-      'Channel shutdown must remove all listeners while retaining original cleanup and reporting errors.'
-    ],
-    scenariosZh: [
-      '自定义适配器持有原生事件订阅，需要隔离监听器失败。',
-      '通道关闭时必须移除全部监听器，并保留原始清理与上报错误。'
-    ],
-    avoidEn: [
-      'Ordinary application RPC code should use the maintained transport or Peer factory.',
-      'Do not swallow the returned or reported errors, or recreate them as unrelated Error objects.'
-    ],
-    avoidZh: [
-      '普通业务 RPC 代码应使用维护中的 transport 或 Peer 工厂。',
-      '不要吞掉返回或上报的错误，也不要把它们重建为无关的 Error 对象。'
-    ]
-  }),
-  'rpc-core:transport-kit:safeRead': guide({
-    purposeEn:
-      'Reads a possibly hostile property through the source-owned reporting boundary; getter failure is reported instead of escaping unnoticed from message handling.',
-    purposeZh:
-      '通过原 owner 的上报边界读取可能不可信的属性；getter 失败会被报告，不会在消息处理中悄然逸出。',
-    quickStart:
-      "import { safeRead } from '@migaia/rpc-core/transport-kit'\n\nconst value: unknown = { id: 'remote' }\nconsole.log(safeRead<string>(value, 'id', ({ error }) => {\n  console.error(error)\n  return undefined\n}))",
-    scenariosEn: [
-      'A custom adapter owns native event subscriptions and must isolate listener failure.',
-      'Channel shutdown must remove all listeners while retaining original cleanup and reporting errors.'
-    ],
-    scenariosZh: [
-      '自定义适配器持有原生事件订阅，需要隔离监听器失败。',
-      '通道关闭时必须移除全部监听器，并保留原始清理与上报错误。'
-    ],
-    avoidEn: [
-      'Ordinary application RPC code should use the maintained transport or Peer factory.',
-      'Do not swallow the returned or reported errors, or recreate them as unrelated Error objects.'
-    ],
-    avoidZh: [
-      '普通业务 RPC 代码应使用维护中的 transport 或 Peer 工厂。',
-      '不要吞掉返回或上报的错误，也不要把它们重建为无关的 Error 对象。'
-    ]
-  }),
-  'rpc-core:transport-kit:safeString': guide({
-    purposeEn:
-      'Converts a value to diagnostic text with an explicit fallback and reporter when conversion fails; it does not replace protocol validation.',
-    purposeZh: '把值转换为诊断文本，转换失败时采用明确 fallback 并报告错误；它不替代协议校验。',
-    quickStart:
-      "import { safeString } from '@migaia/rpc-core/transport-kit'\n\nconsole.log(safeString({ status: 'ready' }, 'unavailable', ({ error }) => {\n  console.error(error)\n  return undefined\n}))",
-    scenariosEn: [
-      'A custom adapter owns native event subscriptions and must isolate listener failure.',
-      'Channel shutdown must remove all listeners while retaining original cleanup and reporting errors.'
-    ],
-    scenariosZh: [
-      '自定义适配器持有原生事件订阅，需要隔离监听器失败。',
-      '通道关闭时必须移除全部监听器，并保留原始清理与上报错误。'
-    ],
-    avoidEn: [
-      'Ordinary application RPC code should use the maintained transport or Peer factory.',
-      'Do not swallow the returned or reported errors, or recreate them as unrelated Error objects.'
-    ],
-    avoidZh: [
-      '普通业务 RPC 代码应使用维护中的 transport 或 Peer 工厂。',
-      '不要吞掉返回或上报的错误，也不要把它们重建为无关的 Error 对象。'
-    ]
-  }),
   'rpc-contract:index:createRpcUnknownFieldWarner': guide({
     purposeEn:
       'Creates a bounded, per-connection unknown-field warning owner so repeated extensions do not flood diagnostics; it does not authorize unknown protocol values.',
@@ -1816,480 +1105,6 @@ try {
     avoidZh: [
       '库能够代应用执行这些线材工作时，应使用 process/thread Peer 工厂。',
       '不要因为使用底层 helper 就绕过 source 准入、鉴权或物理帧上限。'
-    ]
-  }),
-  'rpc-process:index:createProcessPeer': guide({
-    purposeEn:
-      'Creates a symmetric process connection owned by the caller, who closes the Peer. Both sides publish explicit provide/expose methods; the library builds the v2 directory and requires batch reception before business calls are admitted.',
-    purposeZh:
-      '创建对称进程连接，由调用方持有并负责 close 的独立 Peer。两端通过 provide/expose 显式发布方法，由库生成 v2 目录并要求批量帧接收；类型声明不会代替运行时鉴权。',
-    quickStart:
-      "import { randomBytes } from 'node:crypto'\nimport {\n  createProcessPeer,\n  createProcessTransport,\n  type IProcessByteChannel\n} from '@migaia/rpc-process'\nimport { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'\nimport { createUnitBudget } from '@migaia/supervision'\n\ntype IChildApi = { math: { double: (value: number) => number } }\ntype IOptions = Parameters<typeof createProcessPeer<IChildApi>>[0]\ntype ISpawn = Exclude<NonNullable<IOptions['spawn']>, Function>\nconst report = (error: unknown) => console.error(error)\nconst launcher = createNodeProcessLauncher()\nconst token = randomBytes(32).toString('base64url')\nlet handle: Awaited<ReturnType<typeof launcher.launch>>\nconst spawn: ISpawn = {\n  kind: 'spawn',\n  channelKind: 'byte',\n  wire: 'native',\n  token,\n  supervision: {\n    id: 'math-process',\n    isolation: 'best-effort',\n    report,\n    launcher: {\n      ...launcher,\n      launch: async (spec, request) => {\n        handle = await launcher.launch(spec, request)\n        return handle\n      }\n    },\n    budget: createUnitBudget({ kind: 'process', maxUnits: 1 }),\n    spec: {\n      command: process.execPath,\n      args: [fileURLToPath(new URL('./service.js', import.meta.url))],\n      env: { inherit: ['PATH'], set: {} },\n      stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' },\n      bootstrap: { via: 'stdin', payload: new TextEncoder().encode(token) }\n    }\n  },\n  rawChannel: async () => handle.channel!,\n  establish: (raw, prepared) =>\n    createProcessTransport(raw as IProcessByteChannel, {\n      role: 'initiator',\n      offer: prepared.offer!,\n      peerId: handle.runtimeApiIdentity!.instanceId,\n      scheduler: prepared.scheduler,\n      ipc: { ...prepared.session, log: () => undefined },\n      report\n    })\n}\nconst typedRemote = await createProcessPeer<IChildApi>({ spawn, report })\ntry {\n  console.log(await typedRemote.request('math.double', 21))\n} finally {\n  await typedRemote.close()\n}",
-    scenariosEn: [
-      'An application needs typed request, notify and stream calls across a process boundary.',
-      'A spawn-owned unit needs lifecycle control, or a borrowed connect/listen session needs local close without owning the remote unit.'
-    ],
-    scenariosZh: [
-      '应用需要跨进程边界进行有类型的 request、notify 和 stream 调用。',
-      'spawn 单元需要原 owner 的生命周期控制，或借用 connect/listen 连接只需要关闭本端会话。'
-    ],
-    avoidEn: [
-      'In-process functions need no remote boundary; call the function directly.',
-      'Do not assume a display name, type assertion or transport ownership label grants remote permissions.'
-    ],
-    avoidZh: [
-      '同一进程内的普通函数不需要远端边界，直接调用函数即可。',
-      '不要认为显示名称、类型断言或 ownership 标签会授予远端权限。'
-    ],
-    optionsEn: [
-      {
-        name: 'provide',
-        description:
-          'Functions owned by this side; nested objects become method paths in the generated directory.',
-        whenToUse: 'The remote side must invoke explicitly published application methods.'
-      },
-      {
-        name: 'defaultTimeoutMs',
-        description:
-          'Positive default request/stream deadline in milliseconds; defaults to 30000 and remains within the launcher call cap.',
-        whenToUse:
-          'Set one bounded application deadline; per-call timeoutMs:false explicitly disables this default.'
-      }
-    ],
-    optionsZh: [
-      {
-        name: 'provide',
-        description: '本端拥有并公开的函数；嵌套对象在库生成的目录中形成方法路径。',
-        whenToUse: '对端需要调用明确公开的业务方法时使用。'
-      },
-      {
-        name: 'defaultTimeoutMs',
-        description: 'request/stream 的正毫秒默认期限，默认30000，仍受launcher总调用预算限制。',
-        whenToUse: '设置一个有界业务期限；单调用timeoutMs:false显式关闭此默认值。'
-      }
-    ]
-  }),
-  'rpc-process:index:createProcessPlugin': guide({
-    purposeEn:
-      'Launch a process from a PluginHost and verify its returned result. PluginHost installs plugins and releases their connections together. In Node.js, compile the service.ts handler below to service.js beside main.js. Compile the parent main.ts and run main.js with Node.js. host.process selects the connection by name.',
-    purposeZh:
-      '你将从 PluginHost 启动进程，并验证返回值。PluginHost 负责安装 plugins，并统一释放连接。在 Node.js 中，先将下方处理端 service.ts 编译成 main.js 旁的 service.js。将父端 main.ts 编译为 main.js，再用 Node.js 运行。host.process 用连接名称选择目标。',
-    quickStart: `import assert from 'node:assert/strict'
-import { defineHost } from '@migaia/plugin-host'
-import { createProcessPlugin } from '@migaia/rpc-process'
-
-type IServiceApi = { math: { double(value: number): number } }
-const service = createProcessPlugin<IServiceApi, Record<never, never>, 'service'>({
-  name: 'service', spawn: new URL('./service.js', import.meta.url)
-})
-const host = defineHost<Record<string, never>, never, readonly [typeof service]>({ host: { execution: { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 5_000 } } })
-try {
-  await host.use(service)
-  assert.equal(await host.process!.request('service', 'math.double', 21), 42)
-} finally { await host.dispose() }`,
-    examplesEn: [
-      {
-        id: 'service-handler',
-        title: 'Handler: service.ts in the launched process',
-        description:
-          'Compile this file beside the parent main.ts. The parent launches it through spawn. note stores its first payload. readNote waits for that payload before returning it.',
-        code: `import { createProcessPeer } from '@migaia/rpc-process'
-
-/** Store the first notification so readNote can confirm that the handler ran. */
-let receiveNote: (value: string) => void = () => undefined
-const receivedNote = new Promise<string>((resolve) => { receiveNote = resolve })
-/** This entry is launched by main.ts; it automatically connects to the parent. */
-await createProcessPeer({
-  provide: {
-    math: { double: (value: number) => value * 2 },
-    note: (value: string) => receiveNote(value),
-    readNote: () => receivedNote,
-    count: async function* (limit: number) {
-      for (let value = 1; value <= limit; value++) yield value
-    }
-  }
-})`
-      },
-      {
-        id: 'parent-calls',
-        title: 'Consumer: main.ts verifies all three call forms',
-        description:
-          'Run this parent in Node.js with the compiled service.js beside it. request returns a result. notify waits only for sending. readNote confirms that the notification handler ran. stream returns values one at a time. Assertions check every result.',
-        code: `import assert from 'node:assert/strict'
-import { defineHost } from '@migaia/plugin-host'
-import { createProcessPlugin } from '@migaia/rpc-process'
-
-type IServiceApi = {
-  math: { double(value: number): number }
-  note(value: string): void
-  readNote(): Promise<string>
-  count(limit: number): AsyncIterableIterator<number>
-}
-/** main.ts launches the compiled service.ts handler. */
-const service = createProcessPlugin<IServiceApi, Record<never, never>, 'service'>({
-  name: 'service', spawn: new URL('./service.js', import.meta.url)
-})
-/** The parent Host owns its plugin and child process. */
-const host = defineHost<Record<string, never>, never, readonly [typeof service]>({ host: { execution: { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 5_000 } } })
-try {
-  await host.use(service)
-  assert.equal(await host.process!.request('service', 'math.double', 21), 42)
-  await host.process!.notify('service', 'note', 'hello')
-  assert.equal(await host.process!.request('service', 'readNote'), 'hello')
-  /** Collect every streamed value before checking the result. */
-  const values: number[] = []
-  for await (const value of host.process!.stream('service', 'count', 3)) values.push(value)
-  assert.deepEqual(values, [1, 2, 3])
-} finally { await host.dispose() }`
-      }
-    ],
-    examplesZh: [
-      {
-        id: 'service-handler',
-        title: '处理端：启动的进程内运行 service.ts',
-        description:
-          '将这个文件与父端 main.ts 一起编译。父端通过 spawn 启动它。note 保存首次收到的 payload（输入值）。readNote 等待这个值后再返回。',
-        code: `import { createProcessPeer } from '@migaia/rpc-process'
-
-/** Store the first notification so readNote can confirm that the handler ran. */
-let receiveNote: (value: string) => void = () => undefined
-const receivedNote = new Promise<string>((resolve) => { receiveNote = resolve })
-/** This entry is launched by main.ts; it automatically connects to the parent. */
-await createProcessPeer({
-  provide: {
-    math: { double: (value: number) => value * 2 },
-    note: (value: string) => receiveNote(value),
-    readNote: () => receivedNote,
-    count: async function* (limit: number) {
-      for (let value = 1; value <= limit; value++) yield value
-    }
-  }
-})`
-      },
-      {
-        id: 'parent-calls',
-        title: '调用端：main.ts 验证三种调用',
-        description:
-          '在 Node.js 中运行父端，旁边放置已编译的 service.js。request 等待结果。notify 只等待发送。readNote 确认通知处理函数已执行。stream 逐项返回结果。Assertions 验证所有结果。',
-        code: `import assert from 'node:assert/strict'
-import { defineHost } from '@migaia/plugin-host'
-import { createProcessPlugin } from '@migaia/rpc-process'
-
-type IServiceApi = {
-  math: { double(value: number): number }
-  note(value: string): void
-  readNote(): Promise<string>
-  count(limit: number): AsyncIterableIterator<number>
-}
-/** main.ts launches the compiled service.ts handler. */
-const service = createProcessPlugin<IServiceApi, Record<never, never>, 'service'>({
-  name: 'service', spawn: new URL('./service.js', import.meta.url)
-})
-/** The parent Host owns its plugin and child process. */
-const host = defineHost<Record<string, never>, never, readonly [typeof service]>({ host: { execution: { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 5_000 } } })
-try {
-  await host.use(service)
-  assert.equal(await host.process!.request('service', 'math.double', 21), 42)
-  await host.process!.notify('service', 'note', 'hello')
-  assert.equal(await host.process!.request('service', 'readNote'), 'hello')
-  /** Collect every streamed value before checking the result. */
-  const values: number[] = []
-  for await (const value of host.process!.stream('service', 'count', 3)) values.push(value)
-  assert.deepEqual(values, [1, 2, 3])
-} finally { await host.dispose() }`
-      }
-    ],
-    scenariosEn: [
-      'One PluginHost manages several process connections and releases them together.',
-      'A launched unit needs stop, restart or replace through host.process.'
-    ],
-    scenariosZh: [
-      '一个 PluginHost 管理多个进程连接，并统一释放。',
-      '启动的执行单元需要经 host.process 执行 stop、restart 或 replace。'
-    ],
-    avoidEn: [
-      'Use createProcessPeer when the application needs a connection without PluginHost ownership.',
-      'A borrowed connect or listen session cannot stop or restart the remote unit.',
-      'Next task: cancel an unfinished request in Calls and cancellation (calls-and-cancellation).'
-    ],
-    avoidZh: [
-      '应用只需要独立连接时，使用 createProcessPeer。',
-      '借用的 connect 或 listen 会话不能停止或重启远端单元。',
-      '下一任务：按“调用与取消”（calls-and-cancellation）取消未完成的 request。'
-    ],
-    optionsEn: [
-      {
-        name: 'spawn',
-        description:
-          'Use true to rerun the current entry, or pass a string, URL or short spawn object.',
-        whenToUse: 'The Host must launch and own the execution unit.'
-      },
-      {
-        name: 'provide / expose',
-        description:
-          'provide publishes local functions. expose starts empty and publishes only listed Host methods.',
-        whenToUse: 'The child must call explicitly published local methods.'
-      },
-      {
-        name: 'defaultTimeoutMs',
-        description:
-          'Sets the default request and stream waiting limit in milliseconds. The default is 30000.',
-        whenToUse: 'Use timeoutMs on one call to override this default.'
-      }
-    ],
-    optionsZh: [
-      {
-        name: 'spawn',
-        description: '用 true 重跑当前入口，或传入 string、URL、简短的启动配置对象。',
-        whenToUse: 'Host 需要启动并持有执行单元时使用。'
-      },
-      {
-        name: 'provide / expose',
-        description: 'provide 发布本端函数。expose 默认为空，只公开列出的 Host methods（方法）。',
-        whenToUse: '子端需要调用明确公开的本端方法时使用。'
-      },
-      {
-        name: 'defaultTimeoutMs',
-        description: '设置 request 与 stream 的默认等待上限，单位为毫秒。默认值为 30000。',
-        whenToUse: '单次调用通过 timeoutMs 覆盖默认值。'
-      }
-    ]
-  }),
-  'rpc-threads:index:createThreadPeer': guide({
-    purposeEn:
-      'Creates a symmetric Worker connection owned by the caller, who closes the Peer. Both sides publish explicit provide/expose methods; the library builds the v2 directory and requires batch reception before business calls are admitted.',
-    purposeZh:
-      '创建对称Worker连接，由调用方持有并负责 close 的独立 Peer。两端通过 provide/expose 显式发布方法，由库生成 v2 目录并要求批量帧接收；类型声明不会代替运行时鉴权。',
-    quickStart:
-      "import { createThreadPeer } from '@migaia/rpc-threads'\n\ntype IChildApi = { math: { double: (value: number) => number } }\nconst report = (error: unknown) => console.error(error)\nconst spawn = { entry: new URL('./worker.ts', import.meta.url).href, name: 'math-worker' }\nconst typedRemote = await createThreadPeer<IChildApi>({ spawn, report })\ntry {\n  console.log(await typedRemote.request('math.double', 21))\n} finally {\n  await typedRemote.close()\n}",
-    scenariosEn: [
-      'An application needs typed request, notify and stream calls across a Worker boundary.',
-      'A spawn-owned unit needs lifecycle control, or a borrowed connect/listen session needs local close without owning the remote unit.'
-    ],
-    scenariosZh: [
-      '应用需要跨Worker边界进行有类型的 request、notify 和 stream 调用。',
-      'spawn 单元需要原 owner 的生命周期控制，或借用 connect/listen 连接只需要关闭本端会话。'
-    ],
-    avoidEn: [
-      'In-process functions need no remote boundary; call the function directly.',
-      'Do not assume a display name, type assertion or transport ownership label grants remote permissions.'
-    ],
-    avoidZh: [
-      '同一进程内的普通函数不需要远端边界，直接调用函数即可。',
-      '不要认为显示名称、类型断言或 ownership 标签会授予远端权限。'
-    ],
-    optionsEn: [
-      {
-        name: 'provide',
-        description:
-          'Functions owned by this side; nested objects become method paths in the generated directory.',
-        whenToUse: 'The remote side must invoke explicitly published application methods.'
-      },
-      {
-        name: 'defaultTimeoutMs',
-        description:
-          'Positive default request/stream deadline in milliseconds; defaults to 30000 and remains within the launcher call cap.',
-        whenToUse:
-          'Set one bounded application deadline; per-call timeoutMs:false explicitly disables this default.'
-      }
-    ],
-    optionsZh: [
-      {
-        name: 'provide',
-        description: '本端拥有并公开的函数；嵌套对象在库生成的目录中形成方法路径。',
-        whenToUse: '对端需要调用明确公开的业务方法时使用。'
-      },
-      {
-        name: 'defaultTimeoutMs',
-        description: 'request/stream 的正毫秒默认期限，默认30000，仍受launcher总调用预算限制。',
-        whenToUse: '设置一个有界业务期限；单调用timeoutMs:false显式关闭此默认值。'
-      }
-    ]
-  }),
-  'rpc-threads:index:createThreadPlugin': guide({
-    purposeEn:
-      'Launch a Worker from a PluginHost and verify its returned result. PluginHost installs plugins and releases their connections together. In Node.js, compile the worker.ts handler below to worker.js beside main.js. Compile the parent main.ts and run main.js with Node.js. host.thread selects the connection by name.',
-    purposeZh:
-      '你将从 PluginHost 启动Worker，并验证返回值。PluginHost 负责安装 plugins，并统一释放连接。在 Node.js 中，先将下方处理端 worker.ts 编译成 main.js 旁的 worker.js。将父端 main.ts 编译为 main.js，再用 Node.js 运行。host.thread 用连接名称选择目标。',
-    quickStart: `import assert from 'node:assert/strict'
-import { defineHost } from '@migaia/plugin-host'
-import { createThreadPlugin } from '@migaia/rpc-threads'
-
-type IServiceApi = { math: { double(value: number): number } }
-const service = createThreadPlugin<IServiceApi, Record<never, never>, 'service'>({
-  name: 'service', spawn: new URL('./worker.js', import.meta.url)
-})
-const host = defineHost<Record<string, never>, never, readonly [typeof service]>({ host: { execution: { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 5_000 } } })
-try {
-  await host.use(service)
-  assert.equal(await host.thread!.request('service', 'math.double', 21), 42)
-} finally { await host.dispose() }`,
-    examplesEn: [
-      {
-        id: 'worker-handler',
-        title: 'Handler: worker.ts in the launched Worker',
-        description:
-          'Compile this file beside the parent main.ts. The parent launches it through spawn. note stores its first payload. readNote waits for that payload before returning it.',
-        code: `import { createThreadPeer } from '@migaia/rpc-threads'
-
-/** Store the first notification so readNote can confirm that the handler ran. */
-let receiveNote: (value: string) => void = () => undefined
-const receivedNote = new Promise<string>((resolve) => { receiveNote = resolve })
-/** This entry is launched by main.ts; it automatically connects to the parent. */
-await createThreadPeer({
-  provide: {
-    math: { double: (value: number) => value * 2 },
-    note: (value: string) => receiveNote(value),
-    readNote: () => receivedNote,
-    count: async function* (limit: number) {
-      for (let value = 1; value <= limit; value++) yield value
-    }
-  }
-})`
-      },
-      {
-        id: 'parent-calls',
-        title: 'Consumer: main.ts verifies all three call forms',
-        description:
-          'Run this parent in Node.js with the compiled worker.js beside it. request returns a result. notify waits only for sending. readNote confirms that the notification handler ran. stream returns values one at a time. Assertions check every result.',
-        code: `import assert from 'node:assert/strict'
-import { defineHost } from '@migaia/plugin-host'
-import { createThreadPlugin } from '@migaia/rpc-threads'
-
-type IServiceApi = {
-  math: { double(value: number): number }
-  note(value: string): void
-  readNote(): Promise<string>
-  count(limit: number): AsyncIterableIterator<number>
-}
-/** main.ts launches the compiled worker.ts handler. */
-const service = createThreadPlugin<IServiceApi, Record<never, never>, 'service'>({
-  name: 'service', spawn: new URL('./worker.js', import.meta.url)
-})
-/** The parent Host owns its plugin and child Worker. */
-const host = defineHost<Record<string, never>, never, readonly [typeof service]>({ host: { execution: { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 5_000 } } })
-try {
-  await host.use(service)
-  assert.equal(await host.thread!.request('service', 'math.double', 21), 42)
-  await host.thread!.notify('service', 'note', 'hello')
-  assert.equal(await host.thread!.request('service', 'readNote'), 'hello')
-  /** Collect every streamed value before checking the result. */
-  const values: number[] = []
-  for await (const value of host.thread!.stream('service', 'count', 3)) values.push(value)
-  assert.deepEqual(values, [1, 2, 3])
-} finally { await host.dispose() }`
-      }
-    ],
-    examplesZh: [
-      {
-        id: 'worker-handler',
-        title: '处理端：启动的Worker内运行 worker.ts',
-        description:
-          '将这个文件与父端 main.ts 一起编译。父端通过 spawn 启动它。note 保存首次收到的 payload（输入值）。readNote 等待这个值后再返回。',
-        code: `import { createThreadPeer } from '@migaia/rpc-threads'
-
-/** Store the first notification so readNote can confirm that the handler ran. */
-let receiveNote: (value: string) => void = () => undefined
-const receivedNote = new Promise<string>((resolve) => { receiveNote = resolve })
-/** This entry is launched by main.ts; it automatically connects to the parent. */
-await createThreadPeer({
-  provide: {
-    math: { double: (value: number) => value * 2 },
-    note: (value: string) => receiveNote(value),
-    readNote: () => receivedNote,
-    count: async function* (limit: number) {
-      for (let value = 1; value <= limit; value++) yield value
-    }
-  }
-})`
-      },
-      {
-        id: 'parent-calls',
-        title: '调用端：main.ts 验证三种调用',
-        description:
-          '在 Node.js 中运行父端，旁边放置已编译的 worker.js。request 等待结果。notify 只等待发送。readNote 确认通知处理函数已执行。stream 逐项返回结果。Assertions 验证所有结果。',
-        code: `import assert from 'node:assert/strict'
-import { defineHost } from '@migaia/plugin-host'
-import { createThreadPlugin } from '@migaia/rpc-threads'
-
-type IServiceApi = {
-  math: { double(value: number): number }
-  note(value: string): void
-  readNote(): Promise<string>
-  count(limit: number): AsyncIterableIterator<number>
-}
-/** main.ts launches the compiled worker.ts handler. */
-const service = createThreadPlugin<IServiceApi, Record<never, never>, 'service'>({
-  name: 'service', spawn: new URL('./worker.js', import.meta.url)
-})
-/** The parent Host owns its plugin and child Worker. */
-const host = defineHost<Record<string, never>, never, readonly [typeof service]>({ host: { execution: { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 5_000 } } })
-try {
-  await host.use(service)
-  assert.equal(await host.thread!.request('service', 'math.double', 21), 42)
-  await host.thread!.notify('service', 'note', 'hello')
-  assert.equal(await host.thread!.request('service', 'readNote'), 'hello')
-  /** Collect every streamed value before checking the result. */
-  const values: number[] = []
-  for await (const value of host.thread!.stream('service', 'count', 3)) values.push(value)
-  assert.deepEqual(values, [1, 2, 3])
-} finally { await host.dispose() }`
-      }
-    ],
-    scenariosEn: [
-      'One PluginHost manages several Worker connections and releases them together.',
-      'A launched unit needs stop, restart or replace through host.thread.'
-    ],
-    scenariosZh: [
-      '一个 PluginHost 管理多个Worker连接，并统一释放。',
-      '启动的执行单元需要经 host.thread 执行 stop、restart 或 replace。'
-    ],
-    avoidEn: [
-      'Use createThreadPeer when the application needs a connection without PluginHost ownership.',
-      'A borrowed connect or listen session cannot stop or restart the remote unit.',
-      'Next task: cancel an unfinished request in Calls and cancellation (calls-and-cancellation).'
-    ],
-    avoidZh: [
-      '应用只需要独立连接时，使用 createThreadPeer。',
-      '借用的 connect 或 listen 会话不能停止或重启远端单元。',
-      '下一任务：按“调用与取消”（calls-and-cancellation）取消未完成的 request。'
-    ],
-    optionsEn: [
-      {
-        name: 'spawn',
-        description:
-          'Use true to rerun a Node, Bun or Deno entry. Pass an explicit URL in browsers.',
-        whenToUse: 'The Host must launch and own the execution unit.'
-      },
-      {
-        name: 'provide / expose',
-        description:
-          'provide publishes local functions. expose starts empty and publishes only listed Host methods.',
-        whenToUse: 'The child must call explicitly published local methods.'
-      },
-      {
-        name: 'defaultTimeoutMs',
-        description:
-          'Sets the default request and stream waiting limit in milliseconds. The default is 30000.',
-        whenToUse: 'Use timeoutMs on one call to override this default.'
-      }
-    ],
-    optionsZh: [
-      {
-        name: 'spawn',
-        description: '用 true 重跑 Node、Bun 或 Deno 入口。浏览器必须传入显式 URL。',
-        whenToUse: 'Host 需要启动并持有执行单元时使用。'
-      },
-      {
-        name: 'provide / expose',
-        description: 'provide 发布本端函数。expose 默认为空，只公开列出的 Host methods（方法）。',
-        whenToUse: '子端需要调用明确公开的本端方法时使用。'
-      },
-      {
-        name: 'defaultTimeoutMs',
-        description: '设置 request 与 stream 的默认等待上限，单位为毫秒。默认值为 30000。',
-        whenToUse: '单次调用通过 timeoutMs 覆盖默认值。'
-      }
     ]
   }),
   'plugin-host:index:getPluginRuntimeIntegration': guide({

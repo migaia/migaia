@@ -1585,20 +1585,70 @@ isEmptyValue(0) // false`
 const ttlMs = jitter(60_000, 0.2)`
     },
     detectServerRuntime: {
-      role: 'operation',
-      cases: utilsCases.detectServerRuntime,
-      purpose: t(
-        'Identifies the server runtime without importing host APIs, checking Deno before Bun before Node.',
-        '不导入平台宿主接口，按 Deno、Bun、Node 的固定优先级检查全局身份并识别服务端运行时。'
-      ),
-      returns: t(
-        '`deno`, `bun` or `node`; `undefined` in browsers without server globals.',
-        '`deno`、`bun` 或 `node`；没有服务端全局的浏览器返回 `undefined`。'
-      ),
-      example: `import { detectServerRuntime } from '@migaia/utils'
-
-const runtime = detectServerRuntime()`
+      role: 'factory',
+      purpose: {
+        en: 'Reads current host markers with Deno > Bun > Node precedence. Deno needs a nonempty Deno.version.deno; Bun can use its actual global object or process version marker. No server marker returns undefined.',
+        zh: '每次读取当前宿主标记，优先级为 Deno > Bun > Node。Deno 要求非空 Deno.version.deno；Bun 可由真实全局对象或 process 版本标记识别；没有服务端标记返回 undefined。'
+      },
+      returns: {
+        en: 'ServerRuntime | undefined',
+        zh: 'ServerRuntime | undefined'
+      },
+      example:
+        "import { detectServerRuntime } from '@migaia/utils'\n\nconsole.log(detectServerRuntime())\n// Fresh reads only; no I/O, timer, resource creation, or capability grant."
     },
+    detectElectronProcessType: {
+      role: 'factory',
+      purpose: {
+        en: 'Reads the current Electron version and process.type without loading host modules. Historical browser maps to main; renderer and utility retain their names. Outside recognized Electron returns undefined.',
+        zh: '不加载宿主模块，读取当前 Electron 版本与 process.type。历史 browser 映射到 main，renderer 和 utility 保留原名；非已识别 Electron 返回 undefined。'
+      },
+      returns: {
+        en: 'ElectronProcessType | undefined',
+        zh: 'ElectronProcessType | undefined'
+      },
+      example:
+        "import { detectElectronProcessType } from '@migaia/utils'\n\nconsole.log(detectElectronProcessType())\n// Fresh reads only; no I/O, timer, resource creation, or capability grant."
+    },
+    detectGlobalScope: {
+      role: 'factory',
+      purpose: {
+        en: 'Only outside recognized server runtimes, checks the actual globalThis instance relation against Window, DedicatedWorkerGlobalScope, SharedWorkerGlobalScope, then ServiceWorkerGlobalScope. Constructor presence alone is insufficient.',
+        zh: '仅在未识别出服务端运行时时，依次检查 globalThis 与 Window、DedicatedWorkerGlobalScope、SharedWorkerGlobalScope、ServiceWorkerGlobalScope 的真实实例关系；仅有构造器不够。'
+      },
+      returns: {
+        en: 'GlobalScopeKind | undefined',
+        zh: 'GlobalScopeKind | undefined'
+      },
+      example:
+        "import { detectGlobalScope } from '@migaia/utils'\n\nconsole.log(detectGlobalScope())\n// Fresh reads only; no I/O, timer, resource creation, or capability grant."
+    },
+    ServerRuntime: {
+      role: 'constant',
+      purpose: {
+        en: 'Canonical deno, bun, node values used by detectServerRuntime. Classification does not grant a native adapter capability.',
+        zh: 'detectServerRuntime 使用的规范 deno、bun、node 值；分类结果不授予原生 adapter 能力。'
+      },
+      example: "import { ServerRuntime } from '@migaia/utils'\nconsole.log(ServerRuntime)"
+    },
+    ElectronProcessType: {
+      role: 'constant',
+      purpose: {
+        en: 'Normalized main, renderer, utility values. Electron browser is reported as main.',
+        zh: '归一化的 main、renderer、utility 值；Electron browser 报为 main。'
+      },
+      example:
+        "import { ElectronProcessType } from '@migaia/utils'\nconsole.log(ElectronProcessType)"
+    },
+    GlobalScopeKind: {
+      role: 'constant',
+      purpose: {
+        en: 'Canonical window, dedicated-worker, shared-worker, service-worker browser scope values. Detectors use fresh reads without Node or DOM types in their public declarations.',
+        zh: '规范 window、dedicated-worker、shared-worker、service-worker 浏览器作用域值。探测每次重新读取，公开声明不引入 Node 或 DOM 类型。'
+      },
+      example: "import { GlobalScopeKind } from '@migaia/utils'\nconsole.log(GlobalScopeKind)"
+    },
+
     ...utilsFacadeSymbols,
     yieldToHost: {
       ...utilsFacadeSymbols.yieldToHost!,
@@ -2188,8 +2238,8 @@ if (read.threw) report(read.error)`
     UtilsErrorCode: {
       role: 'constant',
       purpose: t(
-        'Table of the stable error codes of this package (`source: "@migaia/utils"`); compare `error.code` with these keys instead of matching messages.',
-        '本包稳定错误码的对照表（`source: "@migaia/utils"`）；用这些键比较 `error.code`，不要匹配错误信息文本。'
+        'Table of the stable error codes of this package (`source: "foundation.utils"`); compare `error.code` with these keys instead of matching messages.',
+        '本包稳定错误码的对照表（`source: "foundation.utils"`）；用这些键比较 `error.code`，不要匹配错误信息文本。'
       ),
       example: `if (error.code === UtilsErrorCode.deadlineExceeded) showRetry()`
     },
@@ -2236,8 +2286,8 @@ if (read.threw) report(read.error)`
         }
       },
       purpose: t(
-        'Abstract base class of every error class of this package; carries `source: "@migaia/utils"` and a stable `code`.',
-        '本包所有错误类的抽象基类，带有 `source: "@migaia/utils"` 和稳定的 `code`，可用 `instanceof` 统一识别。'
+        'Abstract base class of every error class of this package; carries `source: "foundation.utils"` and a stable `code`.',
+        '本包所有错误类的抽象基类，带有 `source: "foundation.utils"` 和稳定的 `code`，可用 `instanceof` 统一识别。'
       ),
       example: `if (error instanceof UtilsError) console.log(error.code)`
     },
@@ -2427,8 +2477,8 @@ rows.map((row) => price(row.amount))`
     formatCurrency: {
       role: 'operation',
       purpose: t(
-        'Formats money in the given currency; rounding policy stays with the caller.',
-        '按指定币种格式化金额；舍入规则由调用方决定。'
+        'Formats a monetary amount using an explicit ISO currency code and locale conventions; callers select any rounding options.',
+        '按显式币种代码与语言区域约定将金额格式化为货币文本，调用方通过选项决定需要的舍入规则。'
       ),
       params: {
         value: t('Amount.', '金额数值。'),
@@ -2444,8 +2494,8 @@ rows.map((row) => price(row.amount))`
     formatInteger: {
       role: 'operation',
       purpose: t(
-        'Formats whole numbers (no fraction digits unless overridden).',
-        '把数值格式化为整数形式（默认不显示小数，可通过选项覆盖）。'
+        'Formats a number or bigint using locale-specific integer notation, with no fractional digits by default and optional overrides for digit formatting.',
+        '按语言区域的整数格式显示数字或 bigint，默认不保留小数位，调用方可通过格式选项覆盖位数设置。'
       ),
       params: { value: t('Number or bigint to format.', '要格式化的数字或 bigint。') },
       returns: t('The formatted text.', '格式化后的文本。'),
@@ -4270,8 +4320,8 @@ const restored = deserializeErrorChain(tree)`
       members: {
         source: {
           summary: t(
-            'Always `@migaia/utils`; confirms the error came from this package.',
-            '固定为 `@migaia/utils`，用来确认错误来源。'
+            'Always `foundation.utils`; confirms the error came from this package.',
+            '固定为 `foundation.utils`，用来确认错误来源。'
           )
         },
         code: {
@@ -4304,8 +4354,8 @@ const restored = deserializeErrorChain(tree)`
         },
         source: {
           summary: t(
-            'Always `@migaia/utils`; confirms the error came from this package.',
-            '固定为 `@migaia/utils`，用来确认错误来源。'
+            'Always `foundation.utils`; confirms the error came from this package.',
+            '固定为 `foundation.utils`，用来确认错误来源。'
           )
         },
         code: {
@@ -4346,8 +4396,8 @@ const restored = deserializeErrorChain(tree)`
         },
         source: {
           summary: t(
-            'Always `@migaia/utils`; confirms the error came from this package.',
-            '固定为 `@migaia/utils`，用来确认错误来源。'
+            'Always `foundation.utils`; confirms the error came from this package.',
+            '固定为 `foundation.utils`，用来确认错误来源。'
           )
         },
         code: {

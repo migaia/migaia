@@ -369,8 +369,8 @@ assertSingleRuntimeCopy()`
     REACTIVE_SOURCE: {
       role: 'error',
       purpose: t(
-        'The `source` value on Reactive-owned errors (`@migaia/reactive`). Existing foreign source/code and non-Error control objects retain their identity. Compare `error.source` with it, then branch on `error.code`.',
-        '响应式包自身错误所带的 `source` 值（`@migaia/reactive`）。已有外部错误身份与非错误控制对象保持不变。先比较 `error.source` 确认错误来自本包，再按 `error.code` 分支处理。'
+        'The `source` value on Reactive-owned errors (`reactive`). Existing foreign source/code and non-Error control objects retain their identity. Compare `error.source` with it, then branch on `error.code`.',
+        '响应式包自身错误所带的 `source` 值（`reactive`）。已有外部错误身份与非错误控制对象保持不变。先比较 `error.source` 确认错误来自本包，再按 `error.code` 分支处理。'
       ),
       example: `if ((error as { source?: string }).source === REACTIVE_SOURCE) handle(error)`
     },
@@ -1298,7 +1298,7 @@ console.log(subscription.disposed) // true`,
       ),
       members: {
         source: {
-          summary: t('Always `@migaia/reactive`.', '固定为 `@migaia/reactive`，用来确认错误来源。')
+          summary: t('Always `reactive`.', '固定为 `reactive`，用来确认错误来源。')
         },
         code: {
           summary: t(

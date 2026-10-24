@@ -518,7 +518,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "本包错误的 source 为 `STORE_INDEXED_SOURCE='@migaia/store-indexed'`。已有外包 source/code 保持实际 owner。未编码 guard/updater 原生错误可附码时保留原对象、类型、message、stack；不可附码或非 Error 值经 cause/errors 保留。不要依赖 message 分支，下面列出稳定诊断供定位："
+                "text": "本包错误的 source 为 `STORE_INDEXED_SOURCE='store.indexed'`。已有外包 source/code 保持实际 owner。未编码 guard/updater 原生错误可附码时保留原对象、类型、message、stack；不可附码或非 Error 值经 cause/errors 保留。不要依赖 message 分支，下面列出稳定诊断供定位："
               },
               {
                 "type": "table",
@@ -1230,7 +1230,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "本包错误的 source 为 `STORE_INDEXED_SOURCE='@migaia/store-indexed'`。已有外包 source/code 保持实际 owner。未编码 guard/updater 原生错误可附码时保留原对象、类型、message、stack；不可附码或非 Error 值经 cause/errors 保留。不要依赖 message 分支，下面列出稳定诊断供定位："
+                "text": "本包错误的 source 为 `STORE_INDEXED_SOURCE='store.indexed'`。已有外包 source/code 保持实际 owner。未编码 guard/updater 原生错误可附码时保留原对象、类型、message、stack；不可附码或非 Error 值经 cause/errors 保留。不要依赖 message 分支，下面列出稳定诊断供定位："
               },
               {
                 "type": "table",
@@ -1870,7 +1870,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Errors owned here use `STORE_INDEXED_SOURCE='@migaia/store-indexed'`. Existing foreign source/code pairs retain their actual owner. An uncoded guard/updater native error keeps its object, type, message, and stack when identity can be attached; otherwise cause/errors retain the original value. Branch on code rather than message. Stable diagnostics remain available for locating a failure:"
+                  "text": "Errors owned here use `STORE_INDEXED_SOURCE='store.indexed'`. Existing foreign source/code pairs retain their actual owner. An uncoded guard/updater native error keeps its object, type, message, and stack when identity can be attached; otherwise cause/errors retain the original value. Branch on code rather than message. Stable diagnostics remain available for locating a failure:"
                 },
                 {
                   "type": "table",
@@ -2662,7 +2662,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Errors owned here use `STORE_INDEXED_SOURCE='@migaia/store-indexed'`. Existing foreign source/code pairs retain their actual owner. An uncoded guard/updater native error keeps its object, type, message, and stack when identity can be attached; otherwise cause/errors retain the original value. Branch on code rather than message. Stable diagnostics remain available for locating a failure:"
+                  "text": "Errors owned here use `STORE_INDEXED_SOURCE='store.indexed'`. Existing foreign source/code pairs retain their actual owner. An uncoded guard/updater native error keeps its object, type, message, and stack when identity can be attached; otherwise cause/errors retain the original value. Branch on code rather than message. Stable diagnostics remain available for locating a failure:"
                 },
                 {
                   "type": "table",
@@ -2872,7 +2872,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "本包错误的 source 为 `STORE_INDEXED_SOURCE='@migaia/store-indexed'`。已有外包 source/code 保持实际 owner。未编码 guard/updater 原生错误可附码时保留原对象、类型、message、stack；不可附码或非 Error 值经 cause/errors 保留。不要依赖 message 分支，下面列出稳定诊断供定位："
+                  "text": "本包错误的 source 为 `STORE_INDEXED_SOURCE='store.indexed'`。已有外包 source/code 保持实际 owner。未编码 guard/updater 原生错误可附码时保留原对象、类型、message、stack；不可附码或非 Error 值经 cause/errors 保留。不要依赖 message 分支，下面列出稳定诊断供定位："
                 },
                 {
                   "type": "table",
@@ -3031,7 +3031,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "本包错误的 source 为 `STORE_INDEXED_SOURCE='@migaia/store-indexed'`。已有外包 source/code 保持实际 owner。未编码 guard/updater 原生错误可附码时保留原对象、类型、message、stack；不可附码或非 Error 值经 cause/errors 保留。不要依赖 message 分支，下面列出稳定诊断供定位："
+                  "text": "本包错误的 source 为 `STORE_INDEXED_SOURCE='store.indexed'`。已有外包 source/code 保持实际 owner。未编码 guard/updater 原生错误可附码时保留原对象、类型、message、stack；不可附码或非 Error 值经 cause/errors 保留。不要依赖 message 分支，下面列出稳定诊断供定位："
                 },
                 {
                   "type": "table",
@@ -3202,7 +3202,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "本包错误的 source 为 `STORE_INDEXED_SOURCE='@migaia/store-indexed'`。已有外包 source/code 保持实际 owner。未编码 guard/updater 原生错误可附码时保留原对象、类型、message、stack；不可附码或非 Error 值经 cause/errors 保留。不要依赖 message 分支，下面列出稳定诊断供定位："
+                  "text": "本包错误的 source 为 `STORE_INDEXED_SOURCE='store.indexed'`。已有外包 source/code 保持实际 owner。未编码 guard/updater 原生错误可附码时保留原对象、类型、message、stack；不可附码或非 Error 值经 cause/errors 保留。不要依赖 message 分支，下面列出稳定诊断供定位："
                 },
                 {
                   "type": "table",
@@ -3338,7 +3338,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "本包错误的 source 为 `STORE_INDEXED_SOURCE='@migaia/store-indexed'`。已有外包 source/code 保持实际 owner。未编码 guard/updater 原生错误可附码时保留原对象、类型、message、stack；不可附码或非 Error 值经 cause/errors 保留。不要依赖 message 分支，下面列出稳定诊断供定位："
+                  "text": "本包错误的 source 为 `STORE_INDEXED_SOURCE='store.indexed'`。已有外包 source/code 保持实际 owner。未编码 guard/updater 原生错误可附码时保留原对象、类型、message、stack；不可附码或非 Error 值经 cause/errors 保留。不要依赖 message 分支，下面列出稳定诊断供定位："
                 },
                 {
                   "type": "table",
@@ -3511,7 +3511,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "本包错误的 source 为 `STORE_INDEXED_SOURCE='@migaia/store-indexed'`。已有外包 source/code 保持实际 owner。未编码 guard/updater 原生错误可附码时保留原对象、类型、message、stack；不可附码或非 Error 值经 cause/errors 保留。不要依赖 message 分支，下面列出稳定诊断供定位："
+                  "text": "本包错误的 source 为 `STORE_INDEXED_SOURCE='store.indexed'`。已有外包 source/code 保持实际 owner。未编码 guard/updater 原生错误可附码时保留原对象、类型、message、stack；不可附码或非 Error 值经 cause/errors 保留。不要依赖 message 分支，下面列出稳定诊断供定位："
                 },
                 {
                   "type": "table",
@@ -3638,7 +3638,7 @@
           "name": "IStoreIndexedErrorCode",
           "kind": "type",
           "signature": "export type IStoreIndexedErrorCode = (typeof StoreIndexedErrorCode)[keyof typeof StoreIndexedErrorCode];",
-          "declarationLine": 41,
+          "declarationLine": 43,
           "source": "packages/store-indexed/dist/error-code.d.ts",
           "purpose": "Value union from StoreIndexedErrorCode, selected when constructing or recognizing this package errors.",
           "core": "Value union from StoreIndexedErrorCode, selected when constructing or recognizing this package errors.",
@@ -3721,7 +3721,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "本包错误的 source 为 `STORE_INDEXED_SOURCE='@migaia/store-indexed'`。已有外包 source/code 保持实际 owner。未编码 guard/updater 原生错误可附码时保留原对象、类型、message、stack；不可附码或非 Error 值经 cause/errors 保留。不要依赖 message 分支，下面列出稳定诊断供定位："
+                  "text": "本包错误的 source 为 `STORE_INDEXED_SOURCE='store.indexed'`。已有外包 source/code 保持实际 owner。未编码 guard/updater 原生错误可附码时保留原对象、类型、message、stack；不可附码或非 Error 值经 cause/errors 保留。不要依赖 message 分支，下面列出稳定诊断供定位："
                 },
                 {
                   "type": "table",
@@ -4064,7 +4064,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "本包错误的 source 为 `STORE_INDEXED_SOURCE='@migaia/store-indexed'`。已有外包 source/code 保持实际 owner。未编码 guard/updater 原生错误可附码时保留原对象、类型、message、stack；不可附码或非 Error 值经 cause/errors 保留。不要依赖 message 分支，下面列出稳定诊断供定位："
+                  "text": "本包错误的 source 为 `STORE_INDEXED_SOURCE='store.indexed'`。已有外包 source/code 保持实际 owner。未编码 guard/updater 原生错误可附码时保留原对象、类型、message、stack；不可附码或非 Error 值经 cause/errors 保留。不要依赖 message 分支，下面列出稳定诊断供定位："
                 },
                 {
                   "type": "table",
@@ -4751,7 +4751,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "本包错误的 source 为 `STORE_INDEXED_SOURCE='@migaia/store-indexed'`。已有外包 source/code 保持实际 owner。未编码 guard/updater 原生错误可附码时保留原对象、类型、message、stack；不可附码或非 Error 值经 cause/errors 保留。不要依赖 message 分支，下面列出稳定诊断供定位："
+                  "text": "本包错误的 source 为 `STORE_INDEXED_SOURCE='store.indexed'`。已有外包 source/code 保持实际 owner。未编码 guard/updater 原生错误可附码时保留原对象、类型、message、stack；不可附码或非 Error 值经 cause/errors 保留。不要依赖 message 分支，下面列出稳定诊断供定位："
                 },
                 {
                   "type": "table",
@@ -5078,11 +5078,11 @@
         {
           "name": "STORE_INDEXED_SOURCE",
           "kind": "const",
-          "signature": "export declare const STORE_INDEXED_SOURCE = \"@migaia/store-indexed\";",
+          "signature": "export declare const STORE_INDEXED_SOURCE = \"store.indexed\";",
           "declarationLine": 4,
           "source": "packages/store-indexed/dist/errors.d.ts",
-          "purpose": "Stable @migaia/store-indexed source stamped on errors created by this package; combine it with the error code to identify an owned failure.",
-          "core": "Stable @migaia/store-indexed source stamped on errors created by this package; combine it with the error code to identify an owned failure.",
+          "purpose": "Stable store.indexed source stamped on errors created by this package; combine it with the error code to identify an owned failure.",
+          "core": "Stable store.indexed source stamped on errors created by this package; combine it with the error code to identify an owned failure.",
           "advanced": "",
           "parameters": ["This const declaration has no parameters."],
           "parameterDetails": [],
@@ -5093,9 +5093,7 @@
           "members": [],
           "composes": [],
           "exportPath": ".",
-          "overloadSignatures": [
-            "export declare const STORE_INDEXED_SOURCE = \"@migaia/store-indexed\";"
-          ],
+          "overloadSignatures": ["export declare const STORE_INDEXED_SOURCE = \"store.indexed\";"],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
           "whenToUse": "",
@@ -5104,7 +5102,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Stable @migaia/store-indexed source stamped on errors created by this package; combine it with the error code to identify an owned failure."
+              "content": "Stable store.indexed source stamped on errors created by this package; combine it with the error code to identify an owned failure."
             },
             {
               "id": "getting-started",
@@ -5124,7 +5122,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Stable @migaia/store-indexed source stamped on errors created by this package; combine it with the error code to identify an owned failure."
+              "content": "Stable store.indexed source stamped on errors created by this package; combine it with the error code to identify an owned failure."
             },
             {
               "id": "advanced-usage",
@@ -5133,7 +5131,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-indexed/dist/errors.d.ts:STORE_INDEXED_SOURCE:export declare const STORE_INDEXED_SOURCE = \"@migaia/store-indexed\";",
+          "identity": "packages/store-indexed/dist/errors.d.ts:STORE_INDEXED_SOURCE:export declare const STORE_INDEXED_SOURCE = \"store.indexed\";",
           "guidance": [
             {
               "id": "操作词表与错误",
@@ -5161,7 +5159,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "本包错误的 source 为 `STORE_INDEXED_SOURCE='@migaia/store-indexed'`。已有外包 source/code 保持实际 owner。未编码 guard/updater 原生错误可附码时保留原对象、类型、message、stack；不可附码或非 Error 值经 cause/errors 保留。不要依赖 message 分支，下面列出稳定诊断供定位："
+                  "text": "本包错误的 source 为 `STORE_INDEXED_SOURCE='store.indexed'`。已有外包 source/code 保持实际 owner。未编码 guard/updater 原生错误可附码时保留原对象、类型、message、stack；不可附码或非 Error 值经 cause/errors 保留。不要依赖 message 分支，下面列出稳定诊断供定位："
                 },
                 {
                   "type": "table",
@@ -5205,7 +5203,7 @@
           "name": "StoreIndexedErrorCode",
           "kind": "const",
           "signature": "export declare const StoreIndexedErrorCode: { /** * Rejects invalid constructor/options/input/iterator, debugName, object key or updater shape. * Correct the named argument; no partial construction or replacement is committed. */ readonly invalidOption: 'INVALID_OPTION'; /** * Rejects reads or writes after collection disposal. Create a new collection instead of reusing * the disposed instance. */ readonly collectionDisposed: 'COLLECTION_DISPOSED'; /** * A synchronous mutation guard or ObservableObject updater fails without an existing module * identity. Mutable native errors retain their object/type/stack; fallback cause/errors retain * the original. The outer mutation is not committed; callback-owned side effects are not rolled * back. */ readonly callbackFailed: 'CALLBACK_FAILED'; /** * Rejects an out-of-range `ObservableArray.set()` index. Check that the index is within `[0, * length)`. Correct the index instead of retrying the same invalid input. */ readonly indexOutOfRange: 'INDEX_OUT_OF_RANGE'; /** * Rejects a noninteger `ObservableArray` index. Correct the index. Array indices must be * integers. */ readonly invalidIndex: 'INVALID_INDEX'; /** * Rejects a tracked collection read from another runtime. Use the same runtime for the collection * and its observing effect or observer. Untracked `peek` reads are exempt. */ readonly crossRuntime: 'CROSS_RUNTIME'; };",
-          "declarationLine": 6,
+          "declarationLine": 8,
           "source": "packages/store-indexed/dist/error-code.d.ts",
           "purpose": "Stable semantic codes distinguishing invalid inputs, disposed collections, callback failures, invalid array indexes and reads across runtime graphs.",
           "core": "invalidOption: Invalid constructor options, input/iterator shape, debugName, object key or updater; fix the supplied value.\ncollectionDisposed: Data access after terminal collection disposal; create a new collection.\ncallbackFailed: An unclassified synchronous mutation guard or updater fails; existing foreign identities stay unchanged, and original values remain reachable. The outer mutation is not committed.\nindexOutOfRange: Array set index falls outside existing nonnegative positions.\ninvalidIndex: Array at or set received a noninteger index.\ncrossRuntime: A tracked value read attempts to connect another Runtime graph.",
@@ -5343,7 +5341,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "本包错误的 source 为 `STORE_INDEXED_SOURCE='@migaia/store-indexed'`。已有外包 source/code 保持实际 owner。未编码 guard/updater 原生错误可附码时保留原对象、类型、message、stack；不可附码或非 Error 值经 cause/errors 保留。不要依赖 message 分支，下面列出稳定诊断供定位："
+                  "text": "本包错误的 source 为 `STORE_INDEXED_SOURCE='store.indexed'`。已有外包 source/code 保持实际 owner。未编码 guard/updater 原生错误可附码时保留原对象、类型、message、stack；不可附码或非 Error 值经 cause/errors 保留。不要依赖 message 分支，下面列出稳定诊断供定位："
                 },
                 {
                   "type": "table",

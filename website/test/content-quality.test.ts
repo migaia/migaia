@@ -450,21 +450,18 @@ test('reactive Effect guide covers imports, handle lifecycle, factory API, and p
   }
 })
 
-test('RPC canonical chunk Feature quick start defines actual dependencies and runtime inputs', () => {
-  const guide = findApiGuide('rpc-core', 'stream', 'createCanonicalChunkFeature', 'zh')
+test('RPC chunk feature quick start uses the host and actual transport plugins', () => {
+  const guide = findApiGuide('rpc-host', 'features/chunk', 'chunkFeature', 'zh')
   assert.ok(guide?.quickStart)
-  assert.match(guide.quickStart, /createCanonicalChunkFeature/)
-  assert.match(guide.quickStart, /createOutboundFeature\(chunks\)/)
-  assert.match(guide.quickStart, /createProviderFeature\(outbound\)/)
-  assert.match(
+  assert.match(guide.quickStart, /chunkFeature/)
+  assert.match(guide.quickStart, /createRpcHost/)
+  assert.match(guide.quickStart, /plugins:/)
+  assert.match(guide.quickStart, /\.request\(|\.stream\(/)
+  assert.match(guide.quickStart, /\.close\(\)/)
+  assert.doesNotMatch(
     guide.quickStart,
-    /const \[clientTransport, serviceTransport\] = createMemoryTransportPair\(\)/
+    /create(?:ComposedEndpoint|CanonicalChunkFeature|OutboundFeature|ProviderFeature)\b/
   )
-  assert.match(
-    guide.quickStart,
-    /return \{ 'first-party-chunk': chunks, 'first-party-outbound': outbound, 'first-party-provider': provider \}/
-  )
-  assert.doesNotMatch(guide.quickStart, /chunk as|\bchunkFeature\b|\.\.\.config/)
 })
 
 test('lifecycle boundedWait explains a complete production shutdown flow', () => {
@@ -601,49 +598,48 @@ test('Logger custom plugin guide covers extension, Host use, async completion, a
   assert.match(source, /usePipeline \/ useAsyncPipeline/)
 })
 
-test('RPC canonical chunk route keeps the complete composition guide', () => {
-  const guide = findApiGuide('rpc-core', 'stream', 'createCanonicalChunkFeature', 'zh')
-  assert.ok(guide?.quickStart)
-  assert.match(guide.purpose, /组合式 endpoint/)
-  assert.match(guide.quickStart, /createMemoryTransportPair/)
-  assert.match(guide.quickStart, /const service = await createComposedEndpoint/)
-  assert.match(guide.quickStart, /service\.provide\('measure'/)
-  assert.match(guide.quickStart, /const client = await createComposedEndpoint/)
-  assert.match(guide.quickStart, /client\.send<number>/)
-  assert.match(guide.quickStart, /Promise\.all\(\[client\.dispose\(\), service\.dispose\(\)\]\)/)
-  assert.equal(
-    guide.options.length,
-    0,
-    'the canonical dependency takes no old chunk-policy options'
-  )
-})
-
-test('every RPC Feature explains actual dependencies, use, and composition cleanup', () => {
-  for (const [module, feature, dependencies] of [
-    ['features/outbound', 'createOutboundFeature', ['chunkCapability']],
-    ['features/provider', 'createProviderFeature', ['outboundCapability']],
-    ['features/discovery', 'createDiscoveryFeature', ['outboundCapability']],
-    ['features/control', 'createControlFeature', ['outboundCapability', 'discoveryCapability']],
-    ['stream', 'createCanonicalChunkFeature', []]
-  ] as const) {
-    const guide = findApiGuide('rpc-core', module, feature, 'zh')
-    assert.ok(guide, feature)
-    assert.ok(guide.purpose.length >= 100, `${feature}: purpose`)
-    assert.ok(guide.scenarios.length >= 2, `${feature}: scenarios`)
-    assert.ok(guide.avoidWhen.length >= 2, `${feature}: avoidWhen`)
-    assert.deepEqual(
-      guide.options.map((option) => option.name),
-      dependencies,
-      `${feature}: exact public dependencies`
+test('RPC chunk route keeps a complete feature installation and cleanup guide', () => {
+  for (const locale of ['zh', 'en'] as const) {
+    const guide = findApiGuide('rpc-host', 'features/chunk', 'chunkFeature', locale)
+    assert.ok(guide?.quickStart)
+    assert.match(guide.quickStart, /createRpcHost/)
+    assert.match(guide.quickStart, /chunkFeature\(\)/)
+    assert.match(guide.quickStart, /finally/)
+    assert.match(guide.quickStart, /\.close\(\)/)
+    assert.equal(
+      guide.options.length,
+      0,
+      'the canonical chunk feature factory takes no old composition dependencies'
     )
-    assert.match(guide.quickStart ?? '', /createComposedEndpoint/)
-    assert.match(guide.quickStart ?? '', /createMemoryTransportPair/)
-    assert.match(guide.quickStart ?? '', /dispose\(\)/)
-    assert.doesNotMatch(guide.quickStart ?? '', /\bchunkFeature\b|\.\.\.config/)
   }
 })
 
-test('every RPC middleware guide installs into a Host and consumes a real capability', () => {
+test('every RPC feature explains its real configuration, installation, and cleanup', () => {
+  for (const [module, feature] of [
+    ['features/auth', 'authFeature'],
+    ['features/chunk', 'chunkFeature'],
+    ['features/retry', 'retryFeature'],
+    ['features/timeout', 'timeoutFeature'],
+    ['features/typegen', 'typegenFeature']
+  ] as const)
+    for (const locale of ['zh', 'en'] as const) {
+      const guide = findApiGuide('rpc-host', module, feature, locale)
+      assert.ok(guide, feature)
+      assert.ok(guide.purpose.length >= 100, `${feature}: purpose`)
+      assert.ok(guide.scenarios.length >= 2, `${feature}: scenarios`)
+      assert.ok(guide.avoidWhen.length >= 2, `${feature}: avoidWhen`)
+      assert.match(guide.quickStart ?? '', /createRpcHost/)
+      assert.match(guide.quickStart ?? '', new RegExp(`\\b${feature}\\b`))
+      assert.match(guide.quickStart ?? '', /plugins:/)
+      assert.match(guide.quickStart ?? '', /\.close\(\)/)
+      assert.doesNotMatch(
+        guide.quickStart ?? '',
+        /create(?:ComposedEndpoint|CanonicalChunkFeature|OutboundFeature|ProviderFeature)\b|\.\.\.config/
+      )
+    }
+})
+
+test('retired endpoint middleware factories have no public host guide', () => {
   for (const middleware of [
     'connect',
     'contract',
@@ -654,30 +650,13 @@ test('every RPC middleware guide installs into a Host and consumes a real capabi
     'abort',
     'hooks',
     'uuid'
-  ]) {
-    const guide = findApiGuide('rpc-core', 'index', middleware, 'zh')
-    assert.ok(guide?.quickStart, middleware)
-    assert.match(guide.purpose, /安装到 Host 后/, `${middleware}: Host effect`)
-    assert.match(guide.quickStart, /createMemoryTransportPair/, `${middleware}: transport`)
-    assert.match(guide.quickStart, /const service = await createEndpoint/, `${middleware}: service`)
-    assert.match(guide.quickStart, /service\.provide\('findProduct'/, `${middleware}: provider`)
-    assert.match(guide.quickStart, /const client = await createEndpoint/, `${middleware}: client`)
-    assert.match(
-      guide.quickStart,
-      /client\.send<\{ id: string; available: boolean \}>/,
-      `${middleware}: operation`
-    )
-    assert.match(
-      guide.quickStart,
-      /client\.dispose\(\), service\.dispose\(\)/,
-      `${middleware}: cleanup`
-    )
-    assert.doesNotMatch(
-      guide.quickStart,
-      /const middleware =|\bsumInput\b|\bsumOutput\b|\breportHookFailure\b/,
-      `${middleware}: unexplained placeholder`
-    )
-  }
+  ])
+    for (const locale of ['zh', 'en'] as const)
+      assert.equal(
+        findApiGuide('rpc-host', 'index', middleware, locale),
+        undefined,
+        `${middleware} must remain private`
+      )
 })
 
 describe('site-wide task guide quality', () => {

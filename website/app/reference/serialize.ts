@@ -2199,8 +2199,8 @@ console.log(createSerializeRangeError(SerializeErrorCode.invalidOption, 'invalid
     SerializeCodecError: {
       role: 'error',
       purpose: t(
-        'Native Error subclass carrying format, phase and stream position for encoding or decoding failures. Constructor details provide code, type, phase, chunkIndex and bytesConsumed; context and cause are optional and source defaults to @migaia/serialize.',
-        '携带格式、阶段与流位置的编解码失败原生错误子类；构造细节提供错误码、格式、阶段、分块位置及已消费字节数，上下文和原因可选，来源默认 `@migaia/serialize`。'
+        'Native Error subclass carrying format, phase and stream position for encoding or decoding failures. Constructor details provide code, type, phase, chunkIndex and bytesConsumed; context and cause are optional and source defaults to serialization.',
+        '携带格式、阶段与流位置的编解码失败原生错误子类；构造细节提供错误码、格式、阶段、分块位置及已消费字节数，上下文和原因可选，来源默认 `serialization`。'
       ),
       params: {
         message: t(
@@ -2208,7 +2208,7 @@ console.log(createSerializeRangeError(SerializeErrorCode.invalidOption, 'invalid
           '调用者提供的诊断消息，由原生错误与其自身堆栈一起保留。'
         ),
         details: t(
-          'Caller-supplied failure location: required semantic code, format type, encode/decode phase, zero-based chunkIndex and bytesConsumed; optional context and cause are omitted by default, while source defaults to @migaia/serialize and may identify a higher-level owner. cause preserves the exact original failure.',
+          'Caller-supplied failure location: required semantic code, format type, encode/decode phase, zero-based chunkIndex and bytesConsumed; optional context and cause are omitted by default, while source defaults to serialization and may identify a higher-level owner. cause preserves the exact original failure.',
           '调用者给出的失败定位，必需语义码、格式、编码或解码阶段、零起始分块位置及已消费字节数；上下文与原因默认省略，来源默认本序列化包且可覆盖为高层拥有者，原因保留精确原始失败。'
         )
       },

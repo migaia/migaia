@@ -338,7 +338,7 @@ export const storeIndexedReference: ILibraryReference = {
     STORE_INDEXED_SOURCE: {
       role: 'constant',
       purpose: t(
-        'Stable @migaia/store-indexed source stamped on errors created by this package; combine it with the error code to identify an owned failure.',
+        'Stable store.indexed source stamped on errors created by this package; combine it with the error code to identify an owned failure.',
         '本包创建错误时附加的稳定来源标记；读取来源与错误码可识别本包拥有的失败。'
       ),
       example: 'console.log(STORE_INDEXED_SOURCE)'

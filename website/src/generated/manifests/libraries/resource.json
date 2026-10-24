@@ -263,7 +263,7 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "`Resource` 自己产生的错误带 `source === RESOURCE_SOURCE`（`@migaia/resource`）和 `ResourceErrorCode` 里的 `code`。已经有完整 `source`/`code` 的外部错误保持原样；没有分类的加载失败在重试结束后附加 `FETCH_FAILED`，原生错误保持原类型，不可修改的错误保留在 `cause` 链上。重试策略本身出错时附加 `INVALID_OPTION`，触发它的加载错误仍可从错误链找到。取消和释放产生的错误是原生 `DOMException`（`name === 'AbortError'`），按 `error.name` 判断即可。"
+                "text": "`Resource` 自己产生的错误带 `source === RESOURCE_SOURCE`（`resource`）和 `ResourceErrorCode` 里的 `code`。已经有完整 `source`/`code` 的外部错误保持原样；没有分类的加载失败在重试结束后附加 `FETCH_FAILED`，原生错误保持原类型，不可修改的错误保留在 `cause` 链上。重试策略本身出错时附加 `INVALID_OPTION`，触发它的加载错误仍可从错误链找到。取消和释放产生的错误是原生 `DOMException`（`name === 'AbortError'`），按 `error.name` 判断即可。"
               }
             ]
           },
@@ -985,7 +985,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "稳定错误码表，9 个码，唯一声明处 `src/error-code.ts`，包自身错误的 `source` 为 `'@migaia/resource'`；已有完整外部身份的错误保留原包身份。 `RESOURCE_SOURCE` 导出这个稳定 source，跨包分类错误时应比较它与 `ResourceErrorCode`，不要复制字符串字面量。"
+                "text": "稳定错误码表，9 个码，唯一声明处 `src/error-code.ts`，包自身错误的 `source` 为 `'resource'`；已有完整外部身份的错误保留原包身份。 `RESOURCE_SOURCE` 导出这个稳定 source，跨包分类错误时应比较它与 `ResourceErrorCode`，不要复制字符串字面量。"
               },
               {
                 "type": "table",
@@ -1137,7 +1137,7 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "`peekState()` 返回当前的 `IResourceState<T>`，不登记依赖、不发起加载，也不检查有效期。和 `peek()` 不同，它返回状态联合本身，而不是取出值或抛出。`reset()` 取消进行中的请求，清除依赖和缓存数据，让同一个实例回到可复用的 `idle`。之前那个 pending Promise 立即以原生 `AbortError` 失败，`source` 为 `@migaia/resource`，`code` 为 `REQUEST_ABORTED`；重置后的请求不会沿用旧的 generation 或 token。"
+                "text": "`peekState()` 返回当前的 `IResourceState<T>`，不登记依赖、不发起加载，也不检查有效期。和 `peek()` 不同，它返回状态联合本身，而不是取出值或抛出。`reset()` 取消进行中的请求，清除依赖和缓存数据，让同一个实例回到可复用的 `idle`。之前那个 pending Promise 立即以原生 `AbortError` 失败，`source` 为 `resource`，`code` 为 `REQUEST_ABORTED`；重置后的请求不会沿用旧的 generation 或 token。"
               },
               {
                 "type": "paragraph",
@@ -1436,7 +1436,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "Errors produced by `Resource` itself carry `source === RESOURCE_SOURCE` (`@migaia/resource`) and a `code` from `ResourceErrorCode`. Foreign errors that already have a full `source`/`code` stay as they are; an unclassified load failure receives `FETCH_FAILED` once retrying ends, native errors keep their type, and immutable errors remain on the `cause` chain. A failing retry policy receives `INVALID_OPTION`, and the load error that triggered it stays reachable on the error chain. Errors produced by cancellation and disposal are native `DOMException`s (`name === 'AbortError'`), so checking `error.name` is enough."
+                  "text": "Errors produced by `Resource` itself carry `source === RESOURCE_SOURCE` (`resource`) and a `code` from `ResourceErrorCode`. Foreign errors that already have a full `source`/`code` stay as they are; an unclassified load failure receives `FETCH_FAILED` once retrying ends, native errors keep their type, and immutable errors remain on the `cause` chain. A failing retry policy receives `INVALID_OPTION`, and the load error that triggered it stays reachable on the error chain. Errors produced by cancellation and disposal are native `DOMException`s (`name === 'AbortError'`), so checking `error.name` is enough."
                 }
               ]
             },
@@ -2135,7 +2135,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "The stable error-code table has 9 codes, declared only in `src/error-code.ts`. The module's own errors use the `source` `'@migaia/resource'`; errors that already carry a full foreign identity keep their original module identity. `RESOURCE_SOURCE` exports this stable source: when classifying errors across module, compare against it and `ResourceErrorCode` instead of copying string literals."
+                  "text": "The stable error-code table has 9 codes, declared only in `src/error-code.ts`. The module's own errors use the `source` `'resource'`; errors that already carry a full foreign identity keep their original module identity. `RESOURCE_SOURCE` exports this stable source: when classifying errors across module, compare against it and `ResourceErrorCode` instead of copying string literals."
                 },
                 {
                   "type": "table",
@@ -2287,7 +2287,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "`peekState()` returns the current `IResourceState<T>` without tracking, loading or TTL revalidation. Unlike `peek()`, it returns the state union rather than taking the value out or throwing. `reset()` cancels any pending generation, clears dependency edges and cached data, and leaves this same instance idle and reusable. The old pending Promise rejects immediately with a native `AbortError`, source `@migaia/resource`, code `REQUEST_ABORTED`; reset never reuses a prior generation or token."
+                  "text": "`peekState()` returns the current `IResourceState<T>` without tracking, loading or TTL revalidation. Unlike `peek()`, it returns the state union rather than taking the value out or throwing. `reset()` cancels any pending generation, clears dependency edges and cached data, and leaves this same instance idle and reusable. The old pending Promise rejects immediately with a native `AbortError`, source `resource`, code `REQUEST_ABORTED`; reset never reuses a prior generation or token."
                 },
                 {
                   "type": "paragraph",
@@ -2810,7 +2810,7 @@
           "declarationLine": 11,
           "source": "packages/resource/dist/errors.d.ts",
           "purpose": "Shape of Resource-owned failures: native errors retain their type with `source` and `code` attached where possible; immutable or primitive failures remain on `cause`. Already classified foreign failures keep their original identity.",
-          "core": "source: Always `@migaia/resource` (`RESOURCE_SOURCE`).\ncode: One of the `ResourceErrorCode` values.",
+          "core": "source: Always `resource` (`RESOURCE_SOURCE`).\ncode: One of the `ResourceErrorCode` values.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -2872,7 +2872,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "source: Always `@migaia/resource` (`RESOURCE_SOURCE`).\ncode: One of the `ResourceErrorCode` values."
+              "content": "source: Always `resource` (`RESOURCE_SOURCE`).\ncode: One of the `ResourceErrorCode` values."
             },
             {
               "id": "advanced-usage",
@@ -2894,7 +2894,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "稳定错误码表，9 个码，唯一声明处 `src/error-code.ts`，包自身错误的 `source` 为 `'@migaia/resource'`；已有完整外部身份的错误保留原包身份。 `RESOURCE_SOURCE` 导出这个稳定 source，跨包分类错误时应比较它与 `ResourceErrorCode`，不要复制字符串字面量。"
+                  "text": "稳定错误码表，9 个码，唯一声明处 `src/error-code.ts`，包自身错误的 `source` 为 `'resource'`；已有完整外部身份的错误保留原包身份。 `RESOURCE_SOURCE` 导出这个稳定 source，跨包分类错误时应比较它与 `ResourceErrorCode`，不要复制字符串字面量。"
                 },
                 {
                   "type": "table",
@@ -2962,7 +2962,7 @@
           "name": "IResourceErrorCode",
           "kind": "type",
           "signature": "export type IResourceErrorCode = (typeof ResourceErrorCode)[keyof typeof ResourceErrorCode];",
-          "declarationLine": 83,
+          "declarationLine": 85,
           "source": "packages/resource/dist/error-code.d.ts",
           "purpose": "Union of the `ResourceErrorCode` values.",
           "core": "Union of the `ResourceErrorCode` values.",
@@ -3032,7 +3032,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "稳定错误码表，9 个码，唯一声明处 `src/error-code.ts`，包自身错误的 `source` 为 `'@migaia/resource'`；已有完整外部身份的错误保留原包身份。 `RESOURCE_SOURCE` 导出这个稳定 source，跨包分类错误时应比较它与 `ResourceErrorCode`，不要复制字符串字面量。"
+                  "text": "稳定错误码表，9 个码，唯一声明处 `src/error-code.ts`，包自身错误的 `source` 为 `'resource'`；已有完整外部身份的错误保留原包身份。 `RESOURCE_SOURCE` 导出这个稳定 source，跨包分类错误时应比较它与 `ResourceErrorCode`，不要复制字符串字面量。"
                 },
                 {
                   "type": "table",
@@ -4501,7 +4501,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "稳定错误码表，9 个码，唯一声明处 `src/error-code.ts`，包自身错误的 `source` 为 `'@migaia/resource'`；已有完整外部身份的错误保留原包身份。 `RESOURCE_SOURCE` 导出这个稳定 source，跨包分类错误时应比较它与 `ResourceErrorCode`，不要复制字符串字面量。"
+                  "text": "稳定错误码表，9 个码，唯一声明处 `src/error-code.ts`，包自身错误的 `source` 为 `'resource'`；已有完整外部身份的错误保留原包身份。 `RESOURCE_SOURCE` 导出这个稳定 source，跨包分类错误时应比较它与 `ResourceErrorCode`，不要复制字符串字面量。"
                 },
                 {
                   "type": "table",
@@ -4591,7 +4591,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "`Resource` 自己产生的错误带 `source === RESOURCE_SOURCE`（`@migaia/resource`）和 `ResourceErrorCode` 里的 `code`。已经有完整 `source`/`code` 的外部错误保持原样；没有分类的加载失败在重试结束后附加 `FETCH_FAILED`，原生错误保持原类型，不可修改的错误保留在 `cause` 链上。重试策略本身出错时附加 `INVALID_OPTION`，触发它的加载错误仍可从错误链找到。取消和释放产生的错误是原生 `DOMException`（`name === 'AbortError'`），按 `error.name` 判断即可。"
+                  "text": "`Resource` 自己产生的错误带 `source === RESOURCE_SOURCE`（`resource`）和 `ResourceErrorCode` 里的 `code`。已经有完整 `source`/`code` 的外部错误保持原样；没有分类的加载失败在重试结束后附加 `FETCH_FAILED`，原生错误保持原类型，不可修改的错误保留在 `cause` 链上。重试策略本身出错时附加 `INVALID_OPTION`，触发它的加载错误仍可从错误链找到。取消和释放产生的错误是原生 `DOMException`（`name === 'AbortError'`），按 `error.name` 判断即可。"
                 }
               ]
             }
@@ -4676,11 +4676,11 @@
         {
           "name": "RESOURCE_SOURCE",
           "kind": "const",
-          "signature": "export declare const RESOURCE_SOURCE = \"@migaia/resource\";",
+          "signature": "export declare const RESOURCE_SOURCE = \"resource\";",
           "declarationLine": 5,
           "source": "packages/resource/dist/errors.d.ts",
-          "purpose": "The `source` value (`@migaia/resource`) attached to Resource-owned failures; existing foreign error identities are preserved; compare `error.source` with it before branching on `error.code`.",
-          "core": "The `source` value (`@migaia/resource`) attached to Resource-owned failures; existing foreign error identities are preserved; compare `error.source` with it before branching on `error.code`.",
+          "purpose": "The `source` value (`resource`) attached to Resource-owned failures; existing foreign error identities are preserved; compare `error.source` with it before branching on `error.code`.",
+          "core": "The `source` value (`resource`) attached to Resource-owned failures; existing foreign error identities are preserved; compare `error.source` with it before branching on `error.code`.",
           "advanced": "",
           "parameters": ["This const declaration has no parameters."],
           "parameterDetails": [],
@@ -4694,7 +4694,7 @@
           "composes": [],
           "aliasOf": "RESOURCE_SOURCE",
           "exportPath": ".",
-          "overloadSignatures": ["export declare const RESOURCE_SOURCE = \"@migaia/resource\";"],
+          "overloadSignatures": ["export declare const RESOURCE_SOURCE = \"resource\";"],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
           "whenToUse": "",
@@ -4703,7 +4703,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "The `source` value (`@migaia/resource`) attached to Resource-owned failures; existing foreign error identities are preserved; compare `error.source` with it before branching on `error.code`."
+              "content": "The `source` value (`resource`) attached to Resource-owned failures; existing foreign error identities are preserved; compare `error.source` with it before branching on `error.code`."
             },
             {
               "id": "getting-started",
@@ -4723,7 +4723,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The `source` value (`@migaia/resource`) attached to Resource-owned failures; existing foreign error identities are preserved; compare `error.source` with it before branching on `error.code`."
+              "content": "The `source` value (`resource`) attached to Resource-owned failures; existing foreign error identities are preserved; compare `error.source` with it before branching on `error.code`."
             },
             {
               "id": "advanced-usage",
@@ -4732,7 +4732,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/resource/dist/errors.d.ts:RESOURCE_SOURCE:export declare const RESOURCE_SOURCE = \"@migaia/resource\";",
+          "identity": "packages/resource/dist/errors.d.ts:RESOURCE_SOURCE:export declare const RESOURCE_SOURCE = \"resource\";",
           "guidance": [
             {
               "id": "错误码",
@@ -4745,7 +4745,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "稳定错误码表，9 个码，唯一声明处 `src/error-code.ts`，包自身错误的 `source` 为 `'@migaia/resource'`；已有完整外部身份的错误保留原包身份。 `RESOURCE_SOURCE` 导出这个稳定 source，跨包分类错误时应比较它与 `ResourceErrorCode`，不要复制字符串字面量。"
+                  "text": "稳定错误码表，9 个码，唯一声明处 `src/error-code.ts`，包自身错误的 `source` 为 `'resource'`；已有完整外部身份的错误保留原包身份。 `RESOURCE_SOURCE` 导出这个稳定 source，跨包分类错误时应比较它与 `ResourceErrorCode`，不要复制字符串字面量。"
                 },
                 {
                   "type": "table",
@@ -4810,7 +4810,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "`Resource` 自己产生的错误带 `source === RESOURCE_SOURCE`（`@migaia/resource`）和 `ResourceErrorCode` 里的 `code`。已经有完整 `source`/`code` 的外部错误保持原样；没有分类的加载失败在重试结束后附加 `FETCH_FAILED`，原生错误保持原类型，不可修改的错误保留在 `cause` 链上。重试策略本身出错时附加 `INVALID_OPTION`，触发它的加载错误仍可从错误链找到。取消和释放产生的错误是原生 `DOMException`（`name === 'AbortError'`），按 `error.name` 判断即可。"
+                  "text": "`Resource` 自己产生的错误带 `source === RESOURCE_SOURCE`（`resource`）和 `ResourceErrorCode` 里的 `code`。已经有完整 `source`/`code` 的外部错误保持原样；没有分类的加载失败在重试结束后附加 `FETCH_FAILED`，原生错误保持原类型，不可修改的错误保留在 `cause` 链上。重试策略本身出错时附加 `INVALID_OPTION`，触发它的加载错误仍可从错误链找到。取消和释放产生的错误是原生 `DOMException`（`name === 'AbortError'`），按 `error.name` 判断即可。"
                 }
               ]
             }
@@ -4823,7 +4823,7 @@
           "name": "ResourceErrorCode",
           "kind": "const",
           "signature": "export declare const ResourceErrorCode: { /** * Rejects operations guarded by `#assertUsable()` after the `Resource` is disposed. This prevents * reading stale state after tracking stops. Repeated `dispose()` remains a no-op, and lifecycle * inspection getters remain available. Use a new `Resource` for further data reads or * operations. */ readonly resourceDisposed: 'RESOURCE_DISPOSED'; /** * Identifies the native AbortError for a stopped request. Resource-initiated cancellation uses * this same error as signal.reason; lifecycle-owned replacement reasons remain on its cause. * Callers usually recognize `error.name === 'AbortError'` and handle cancellation quietly. */ readonly requestAborted: 'REQUEST_ABORTED'; /** * Identifies the `DOMException` in the `cancelled` state when explicit `cancel()` cancels a * pending request. Preserves the native `AbortError` type. Unlike `REQUEST_ABORTED`, which * identifies request rejection, this code identifies explicit cancellation state. */ readonly requestCancelled: 'REQUEST_CANCELLED'; /** * Reports timer or listener cleanup failure after request cancellation converges state. * `REQUEST_CANCELLED` identifies the `AbortError` stored in the cancelled state. This code * separates cleanup failures from state errors. Record the cleanup failure and continue treating * the `Resource` as cancelled. */ readonly cancellationCleanupFailed: 'CANCELLATION_CLEANUP_FAILED'; /** * Reports a missing active or cached Promise when reading `promise` or materializing `pending` or * `idle`. This usually indicates inconsistent intermediate state. Check for internal state * changes that bypass the normal `refetch()` or `invalidate()` paths. */ readonly noActivePromise: 'NO_ACTIVE_PROMISE'; /** * Rejects a version other than 2, negative/nonfinite age or remaining lifetime, or durations that * cannot be rebased into finite local scheduler timestamps. Accessor failures retain their cause. * `remainingTtlMs: null` means unbounded lifetime. Migrate old absolute-time snapshots * explicitly; their sender clock origin cannot be inferred on the receiver. */ readonly invalidSnapshot: 'INVALID_SNAPSHOT'; /** * Rejects construction or operation options such as invalid `ttl`, retry counts, or `retryDelay`. * Validation rejects invalid configuration before it enters the state machine. Correct the * supplied options. Retry policy failures retain the triggering fetch error in their chain. */ readonly invalidOption: 'INVALID_OPTION'; /** * Reports a throwing `.then` getter on a value the `fetcher` throws for Suspense. The probe * cannot determine whether the value is a thenable. `AggregateError.errors` retains both the * original thrown value and getter failure by identity. Enforces `error-codes.md`. Inspect the * hostile getter instead of silently retrying it as an ordinary fetch failure. */ readonly suspenseProbeFailed: 'SUSPENSE_PROBE_FAILED'; /** * A fetcher failure exhausted retry without an existing semantic identity. Mutable native errors * retain type, identity, and stack; immutable errors/non-Error values stay reachable on cause. * Already classified failures retain their originating module. Inspect the request failure * instead of treating it as cancellation or an invalid option. */ readonly fetchFailed: 'FETCH_FAILED'; /** * `createResource()` received a non-function setup, or setup returned something other than a * fetcher function. Registered setup cleanups have already run. Pass a setup callback that * returns `(ctx) => data | Promise<data>`. */ readonly setupInvalid: 'RESOURCE_SETUP_INVALID'; /** * `onDispose()` was called on a setup context after setup returned (for example from an escaped * context inside an async callback). The cleanup is rejected instead of leaking. Register every * cleanup synchronously inside setup. */ readonly setupClosed: 'RESOURCE_SETUP_CLOSED'; };",
-          "declarationLine": 10,
+          "declarationLine": 12,
           "source": "packages/resource/dist/error-code.d.ts",
           "purpose": "Table of the stable error codes of this package. Each key names one failure; the values are the strings found on `error.code`.",
           "core": "resourceDisposed: `RESOURCE_DISPOSED`: a member was used after `dispose()`; create a new resource.\nrequestAborted: `REQUEST_ABORTED`: Resource-initiated cancellation uses the same native AbortError as its signal reason and rejection. Lifecycle replacement can supply a different signal reason, retained on the `cause` of the Resource AbortError.\nrequestCancelled: `REQUEST_CANCELLED`: the `AbortError` stored in the `cancelled` state after `cancel()`.\ncancellationCleanupFailed: `CANCELLATION_CLEANUP_FAILED`: a timer or listener could not be cleaned after cancellation; the resource still counts as cancelled.\nnoActivePromise: `NO_ACTIVE_PROMISE`: no request Promise is available, including a valid `autoStart: false` idle `peek()`; inspect `peekState()` or explicitly start a request.\ninvalidSnapshot: `INVALID_SNAPSHOT`: snapshot version is not `2`, durations are negative/non-finite (only remaining lifetime permits `null`), or rebased local timestamps overflow. Getter failures retain their cause.\ninvalidOption: `INVALID_OPTION`: an option such as `ttl`, `retry` or `retryDelay` is invalid; fix the options.\nfetchFailed: `FETCH_FAILED`: final unclassified fetch failure after retries. Native errors keep identity when writable; immutable errors and primitive values stay reachable through `cause`. Existing foreign source/code is preserved.\nsetupInvalid: `RESOURCE_SETUP_INVALID`: `createResource()` got a non-function setup, or setup returned a non-function; registered cleanups already ran. Return a fetcher from setup.\nsetupClosed: `RESOURCE_SETUP_CLOSED`: `onDispose()` was called after setup returned, for example from an async callback; register cleanups synchronously during setup.\nsuspenseProbeFailed: `SUSPENSE_PROBE_FAILED`: a value thrown by the fetcher has a throwing `then` getter; both errors are kept in `errors`.",
@@ -4993,7 +4993,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "稳定错误码表，9 个码，唯一声明处 `src/error-code.ts`，包自身错误的 `source` 为 `'@migaia/resource'`；已有完整外部身份的错误保留原包身份。 `RESOURCE_SOURCE` 导出这个稳定 source，跨包分类错误时应比较它与 `ResourceErrorCode`，不要复制字符串字面量。"
+                  "text": "稳定错误码表，9 个码，唯一声明处 `src/error-code.ts`，包自身错误的 `source` 为 `'resource'`；已有完整外部身份的错误保留原包身份。 `RESOURCE_SOURCE` 导出这个稳定 source，跨包分类错误时应比较它与 `ResourceErrorCode`，不要复制字符串字面量。"
                 },
                 {
                   "type": "table",
@@ -5058,7 +5058,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "`Resource` 自己产生的错误带 `source === RESOURCE_SOURCE`（`@migaia/resource`）和 `ResourceErrorCode` 里的 `code`。已经有完整 `source`/`code` 的外部错误保持原样；没有分类的加载失败在重试结束后附加 `FETCH_FAILED`，原生错误保持原类型，不可修改的错误保留在 `cause` 链上。重试策略本身出错时附加 `INVALID_OPTION`，触发它的加载错误仍可从错误链找到。取消和释放产生的错误是原生 `DOMException`（`name === 'AbortError'`），按 `error.name` 判断即可。"
+                  "text": "`Resource` 自己产生的错误带 `source === RESOURCE_SOURCE`（`resource`）和 `ResourceErrorCode` 里的 `code`。已经有完整 `source`/`code` 的外部错误保持原样；没有分类的加载失败在重试结束后附加 `FETCH_FAILED`，原生错误保持原类型，不可修改的错误保留在 `cause` 链上。重试策略本身出错时附加 `INVALID_OPTION`，触发它的加载错误仍可从错误链找到。取消和释放产生的错误是原生 `DOMException`（`name === 'AbortError'`），按 `error.name` 判断即可。"
                 }
               ]
             }

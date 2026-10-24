@@ -945,7 +945,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "稳定错误码表，18 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `'@migaia/reactive'`。（迁移背景：原属于本包的 `SCOPE_CLOSED`/`SCOPE_REENTRANT_DISPOSE`/`SCOPE_SYNC_VIOLATION`/`GENERATION_DISPOSED`/`SCOPE_DISPOSAL_FAILED` 五个码已随生命周期原语迁出，归属 `@migaia/lifecycle`，不在本表。）"
+                "text": "稳定错误码表，18 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `'reactive'`。（迁移背景：原属于本包的 `SCOPE_CLOSED`/`SCOPE_REENTRANT_DISPOSE`/`SCOPE_SYNC_VIOLATION`/`GENERATION_DISPOSED`/`SCOPE_DISPOSAL_FAILED` 五个码已随生命周期原语迁出，归属 `@migaia/lifecycle`，不在本表。）"
               },
               {
                 "type": "table",
@@ -2166,7 +2166,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "The stable error code table has 18 codes, declared only in `src/error-code.ts`, and `source` is always `'@migaia/reactive'`. (Background: the five codes `SCOPE_CLOSED` / `SCOPE_REENTRANT_DISPOSE` / `SCOPE_SYNC_VIOLATION` / `GENERATION_DISPOSED` / `SCOPE_DISPOSAL_FAILED` that used to belong here moved out with the lifecycle primitives and now belong to `@migaia/lifecycle`.)"
+                  "text": "The stable error code table has 18 codes, declared only in `src/error-code.ts`, and `source` is always `'reactive'`. (Background: the five codes `SCOPE_CLOSED` / `SCOPE_REENTRANT_DISPOSE` / `SCOPE_SYNC_VIOLATION` / `GENERATION_DISPOSED` / `SCOPE_DISPOSAL_FAILED` that used to belong here moved out with the lifecycle primitives and now belong to `@migaia/lifecycle`.)"
                 },
                 {
                   "type": "table",
@@ -2503,7 +2503,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "稳定错误码表，18 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `'@migaia/reactive'`。（迁移背景：原属于本包的 `SCOPE_CLOSED`/`SCOPE_REENTRANT_DISPOSE`/`SCOPE_SYNC_VIOLATION`/`GENERATION_DISPOSED`/`SCOPE_DISPOSAL_FAILED` 五个码已随生命周期原语迁出，归属 `@migaia/lifecycle`，不在本表。）"
+                  "text": "稳定错误码表，18 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `'reactive'`。（迁移背景：原属于本包的 `SCOPE_CLOSED`/`SCOPE_REENTRANT_DISPOSE`/`SCOPE_SYNC_VIOLATION`/`GENERATION_DISPOSED`/`SCOPE_DISPOSAL_FAILED` 五个码已随生命周期原语迁出，归属 `@migaia/lifecycle`，不在本表。）"
                 },
                 {
                   "type": "table",
@@ -2748,7 +2748,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "稳定错误码表，18 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `'@migaia/reactive'`。（迁移背景：原属于本包的 `SCOPE_CLOSED`/`SCOPE_REENTRANT_DISPOSE`/`SCOPE_SYNC_VIOLATION`/`GENERATION_DISPOSED`/`SCOPE_DISPOSAL_FAILED` 五个码已随生命周期原语迁出，归属 `@migaia/lifecycle`，不在本表。）"
+                  "text": "稳定错误码表，18 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `'reactive'`。（迁移背景：原属于本包的 `SCOPE_CLOSED`/`SCOPE_REENTRANT_DISPOSE`/`SCOPE_SYNC_VIOLATION`/`GENERATION_DISPOSED`/`SCOPE_DISPOSAL_FAILED` 五个码已随生命周期原语迁出，归属 `@migaia/lifecycle`，不在本表。）"
                 },
                 {
                   "type": "table",
@@ -3582,7 +3582,7 @@
           "declarationLine": 8,
           "source": "packages/reactive/dist/errors.d.ts",
           "purpose": "Shape of errors thrown by this package: a native error with `source` and `code`.",
-          "core": "source: Always `@migaia/reactive`.\ncode: One of `ReactiveErrorCode`.",
+          "core": "source: Always `reactive`.\ncode: One of `ReactiveErrorCode`.",
           "advanced": "",
           "parameters": ["This type declaration has no parameters."],
           "parameterDetails": [],
@@ -3646,7 +3646,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "source: Always `@migaia/reactive`.\ncode: One of `ReactiveErrorCode`."
+              "content": "source: Always `reactive`.\ncode: One of `ReactiveErrorCode`."
             },
             {
               "id": "advanced-usage",
@@ -3668,7 +3668,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "稳定错误码表，18 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `'@migaia/reactive'`。（迁移背景：原属于本包的 `SCOPE_CLOSED`/`SCOPE_REENTRANT_DISPOSE`/`SCOPE_SYNC_VIOLATION`/`GENERATION_DISPOSED`/`SCOPE_DISPOSAL_FAILED` 五个码已随生命周期原语迁出，归属 `@migaia/lifecycle`，不在本表。）"
+                  "text": "稳定错误码表，18 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `'reactive'`。（迁移背景：原属于本包的 `SCOPE_CLOSED`/`SCOPE_REENTRANT_DISPOSE`/`SCOPE_SYNC_VIOLATION`/`GENERATION_DISPOSED`/`SCOPE_DISPOSAL_FAILED` 五个码已随生命周期原语迁出，归属 `@migaia/lifecycle`，不在本表。）"
                 },
                 {
                   "type": "table",
@@ -3777,7 +3777,7 @@
           "name": "IReactiveErrorCode",
           "kind": "type",
           "signature": "export type IReactiveErrorCode = (typeof ReactiveErrorCode)[keyof typeof ReactiveErrorCode];",
-          "declarationLine": 163,
+          "declarationLine": 164,
           "source": "packages/reactive/dist/error-code.d.ts",
           "purpose": "Union of every `ReactiveErrorCode` value.",
           "core": "Union of every `ReactiveErrorCode` value.",
@@ -3848,7 +3848,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "稳定错误码表，18 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `'@migaia/reactive'`。（迁移背景：原属于本包的 `SCOPE_CLOSED`/`SCOPE_REENTRANT_DISPOSE`/`SCOPE_SYNC_VIOLATION`/`GENERATION_DISPOSED`/`SCOPE_DISPOSAL_FAILED` 五个码已随生命周期原语迁出，归属 `@migaia/lifecycle`，不在本表。）"
+                  "text": "稳定错误码表，18 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `'reactive'`。（迁移背景：原属于本包的 `SCOPE_CLOSED`/`SCOPE_REENTRANT_DISPOSE`/`SCOPE_SYNC_VIOLATION`/`GENERATION_DISPOSED`/`SCOPE_DISPOSAL_FAILED` 五个码已随生命周期原语迁出，归属 `@migaia/lifecycle`，不在本表。）"
                 },
                 {
                   "type": "table",
@@ -4958,11 +4958,11 @@
         {
           "name": "REACTIVE_SOURCE",
           "kind": "const",
-          "signature": "export declare const REACTIVE_SOURCE = \"@migaia/reactive\";",
+          "signature": "export declare const REACTIVE_SOURCE = \"reactive\";",
           "declarationLine": 2,
           "source": "packages/reactive/dist/errors.d.ts",
-          "purpose": "The `source` value on Reactive-owned errors (`@migaia/reactive`). Existing foreign source/code and non-Error control objects retain their identity. Compare `error.source` with it, then branch on `error.code`.",
-          "core": "The `source` value on Reactive-owned errors (`@migaia/reactive`). Existing foreign source/code and non-Error control objects retain their identity. Compare `error.source` with it, then branch on `error.code`.",
+          "purpose": "The `source` value on Reactive-owned errors (`reactive`). Existing foreign source/code and non-Error control objects retain their identity. Compare `error.source` with it, then branch on `error.code`.",
+          "core": "The `source` value on Reactive-owned errors (`reactive`). Existing foreign source/code and non-Error control objects retain their identity. Compare `error.source` with it, then branch on `error.code`.",
           "advanced": "",
           "parameters": ["This const declaration has no parameters."],
           "parameterDetails": [],
@@ -4976,7 +4976,7 @@
           "composes": [],
           "aliasOf": "REACTIVE_SOURCE",
           "exportPath": ".",
-          "overloadSignatures": ["export declare const REACTIVE_SOURCE = \"@migaia/reactive\";"],
+          "overloadSignatures": ["export declare const REACTIVE_SOURCE = \"reactive\";"],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
           "whenToUse": "",
@@ -4985,7 +4985,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "The `source` value on Reactive-owned errors (`@migaia/reactive`). Existing foreign source/code and non-Error control objects retain their identity. Compare `error.source` with it, then branch on `error.code`."
+              "content": "The `source` value on Reactive-owned errors (`reactive`). Existing foreign source/code and non-Error control objects retain their identity. Compare `error.source` with it, then branch on `error.code`."
             },
             {
               "id": "getting-started",
@@ -5005,7 +5005,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The `source` value on Reactive-owned errors (`@migaia/reactive`). Existing foreign source/code and non-Error control objects retain their identity. Compare `error.source` with it, then branch on `error.code`."
+              "content": "The `source` value on Reactive-owned errors (`reactive`). Existing foreign source/code and non-Error control objects retain their identity. Compare `error.source` with it, then branch on `error.code`."
             },
             {
               "id": "advanced-usage",
@@ -5014,7 +5014,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/reactive/dist/errors.d.ts:REACTIVE_SOURCE:export declare const REACTIVE_SOURCE = \"@migaia/reactive\";",
+          "identity": "packages/reactive/dist/errors.d.ts:REACTIVE_SOURCE:export declare const REACTIVE_SOURCE = \"reactive\";",
           "guidance": [],
           "usageScore": 10,
           "configuration": [],
@@ -5024,7 +5024,7 @@
           "name": "ReactiveErrorCode",
           "kind": "const",
           "signature": "export declare const ReactiveErrorCode: { /** * An unclassified action, batch, untracked, or tracked derivation callback threw. Annotatable * native errors keep identity and stack; immutable and primitive values remain on cause. Existing * module identities are preserved. Handle the callback failure before retrying the operation. */ readonly callbackFailed: 'CALLBACK_FAILED'; /** * Thrown when a read or write operation targets a disposed `Signal`, `Computed`, or custom * source. * * Value access rejects after disposal to prevent reading stale values from disconnected nodes. * Stop using the disposed node and create a replacement instance. */ readonly nodeDisposed: 'NODE_DISPOSED'; /** * Thrown when evaluating a `Computed` directly or indirectly reads its own pending result. * * A cycle cannot produce a determinate value. Further evaluation loops or returns incomplete * stale data. Inspect the dependency graph and remove the cycle. */ readonly circularDependency: 'CIRCULAR_DEPENDENCY'; /** * Thrown when a node from one `Runtime` is read, subscribed, or checked at another runtime's * boundary. * * Each `Runtime` owns an independent dependency graph and ownership table. Cross-graph operations * cannot preserve consistency and can leave stale dependency edges. Ensure the node and its * consumer belong to the same `Runtime`. Do not share nodes across runtimes. */ readonly crossRuntime: 'CROSS_RUNTIME'; /** * Thrown when an object lacks the internal registration supplied by this library's runtime or * node factories. * * The kernel trusts only registered runtimes and nodes. It rejects unregistered objects at the * entry boundary instead of allowing later failures that obscure their source. Use an object from * this library's factories. */ readonly notRuntimeOwned: 'NOT_RUNTIME_OWNED'; /** * Thrown at the second registration when the same node object is assigned to different runtimes. * * A node cannot belong to two dependency graphs without invalidating ownership checks. Create * independent nodes for each `Runtime` instead of reusing an object across runtimes. */ readonly ownershipConflict: 'OWNERSHIP_CONFLICT'; /** * Reports multiple library copies, such as duplicate installations, bundled and CDN copies, or * separate microfrontend bundles. Also thrown when `assertSingleRuntimeCopy()` finds more than * one copy. * * Copies do not share ownership tables or synchronous tracking contexts. Cross-copy reads can * therefore return stale data without detection. Deduplicate dependencies to keep one library * copy in the process. Use `assertSingleRuntimeCopy()` when the deployment must reject multiple * copies. */ readonly copyConflict: 'COPY_CONFLICT'; /** * Thrown when a cross-copy diagnostic brand has an unexpected shape. * * `Object.defineProperty` installs this read-only internal marker. An invalid brand indicates * modification outside the supported path and invalidates ownership checks. Do not modify * internal properties on managed objects. */ readonly brandCorrupted: 'BRAND_CORRUPTED'; /** * Thrown when a new version is requested after the monotonic clock reaches its configured limit. * The production default is `Number.MAX_SAFE_INTEGER`. * * Resetting the counter would collide with versions held by live nodes and cause missed updates. * The clock therefore stops on exhaustion. Dispose all nodes owned by the current `Runtime`, * discard that runtime, and create a new one instead of reusing the graph. */ readonly versionExhausted: 'VERSION_EXHAUSTED'; /** * Thrown when one observer executes more than `maxFlushPasses` times in one flush. The default is * 100. * * This usually indicates an effect writes to its own dependency and triggers itself. The * scheduler clears pending work and ends the flush to prevent a synchronous infinite loop. * Inspect the discarded items in the error message to locate and remove the cycle. */ readonly flushLoop: 'FLUSH_LOOP'; /** * Thrown or reported as an `AggregateError` when multiple observer `tick()` calls fail in a * flush, or multiple observable lifecycle hooks (`onObserved` or `onUnobserved`) fail. * * Inspect each entry in `error.errors`. A single observer failure retains the original error * without this code. */ readonly observerFailed: 'OBSERVER_FAILED'; /** * Tags the aggregate when both the business action and final flush fail in `runBatched()`. If * reading the business error's `cause` fails, all three original failures enter * `AggregateError.errors`. * * A writable business error remains the top-level error, with the flush failure attached through * `cause`. Inspect the top-level error and its `cause` or `errors`. */ readonly actionFlushFailed: 'ACTION_FLUSH_FAILED'; /** * Reserved diagnostic code for unhandled failures in an async scheduling callback or * `reportError()`. * * The default `adapter.reportError` is a no-op, so no default throw or report site uses this * code. The code remains stable for custom `onAsyncError` or `onError` handlers that need * scheduler-failure semantics. */ readonly schedulerFailed: 'SCHEDULER_FAILED'; /** * Thrown when `commitCapture()` receives an invalid or consumed token, a token from another * tracker, or a token whose observer is disposed. * * A capture token can be validated and committed only once. Reevaluate instead of reusing the * token, for example during a Concurrent React render. */ readonly captureInvalid: 'CAPTURE_INVALID'; /** * Thrown when `observe` is called on an `IObserverBinding` that already owns an active observer. * * `observe` is not idempotent. Duplicate calls indicate a repeated state-machine transition. * Ensure the previous observation ends before calling `observe` again. */ readonly bindingDuplicate: 'BINDING_DUPLICATE'; /** * Thrown when an extension binding targets a node with existing graph bookkeeping. Replacing its * sets would orphan live edges. Bind a fresh custom node once; do not rebind a Signal, Computed, * Effect, Resource, or an already bound custom node. */ readonly graphNodeRegistered: 'GRAPH_NODE_REGISTERED'; /** * Thrown when `registerInternals()` registers the same `Runtime` object twice. * * Register internals once during construction. Duplicate registration is a programming error, not * an instruction to replace the existing internals. Check the runtime construction path. */ readonly internalsRegistered: 'INTERNALS_REGISTERED'; /** * Thrown during construction or invocation when an option fails validation. Examples include * `maxFlushPasses`, the maximum version, and a traced action's name. * * Entry validation prevents invalid configuration from entering runtime state. Correct the option * value. */ readonly invalidOption: 'INVALID_OPTION'; };",
-          "declarationLine": 15,
+          "declarationLine": 16,
           "source": "packages/reactive/dist/error-code.d.ts",
           "purpose": "Every error code this package throws or reports. Branch on `error.code === ReactiveErrorCode.x` instead of the message text.",
           "core": "callbackFailed: `CALLBACK_FAILED`: an unclassified callback failure. Writable native errors retain identity; primitive or immutable failures remain on cause, including undefined. Valid external identities and non-Error object control values pass through unchanged, without then probing.\nnodeDisposed: `NODE_DISPOSED`: a disposed signal, computed or source was read or written.\ncircularDependency: `CIRCULAR_DEPENDENCY`: a computed read itself while being computed.\ncrossRuntime: `CROSS_RUNTIME`: a node of one runtime was used by another runtime.\nnotRuntimeOwned: `NOT_RUNTIME_OWNED`: the object is not a runtime (or node) registered by this package.\nownershipConflict: `OWNERSHIP_CONFLICT`: one object was registered to two runtimes.\ncopyConflict: `COPY_CONFLICT`: multiple copies registered at a correctness boundary, or a foreign branded node crossed a local boundary. Cold imports alone need not register.\nbrandCorrupted: `BRAND_CORRUPTED`: the cross-copy diagnostic marker has an unexpected shape.\nversionExhausted: `VERSION_EXHAUSTED`: the version clock reached its upper limit.\nflushLoop: `FLUSH_LOOP`: one effect ran more than `maxFlushPasses` times in one flush.\nobserverFailed: `OBSERVER_FAILED`: several observers or hooks failed in one flush; an `AggregateError` holds them.\nactionFlushFailed: `ACTION_FLUSH_FAILED`: a batch body and its final flush both failed.\nschedulerFailed: `SCHEDULER_FAILED`: reserved code for scheduler strategy failures reported by adapters.\ncaptureInvalid: `CAPTURE_INVALID`: a capture token was already used, belongs elsewhere, or its observer is gone.\nbindingDuplicate: `BINDING_DUPLICATE`: `observe()` was called twice on one binding.\ngraphNodeRegistered: `GRAPH_NODE_REGISTERED`: a source or observer binding targeted an already registered node.\ninternalsRegistered: `INTERNALS_REGISTERED`: internal services were registered twice for one runtime.\ninvalidOption: `INVALID_OPTION`: a runtime option or argument has an invalid value.",
@@ -5258,7 +5258,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "稳定错误码表，18 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `'@migaia/reactive'`。（迁移背景：原属于本包的 `SCOPE_CLOSED`/`SCOPE_REENTRANT_DISPOSE`/`SCOPE_SYNC_VIOLATION`/`GENERATION_DISPOSED`/`SCOPE_DISPOSAL_FAILED` 五个码已随生命周期原语迁出，归属 `@migaia/lifecycle`，不在本表。）"
+                  "text": "稳定错误码表，18 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `'reactive'`。（迁移背景：原属于本包的 `SCOPE_CLOSED`/`SCOPE_REENTRANT_DISPOSE`/`SCOPE_SYNC_VIOLATION`/`GENERATION_DISPOSED`/`SCOPE_DISPOSAL_FAILED` 五个码已随生命周期原语迁出，归属 `@migaia/lifecycle`，不在本表。）"
                 },
                 {
                   "type": "table",
@@ -7617,7 +7617,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "稳定错误码表，18 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `'@migaia/reactive'`。（迁移背景：原属于本包的 `SCOPE_CLOSED`/`SCOPE_REENTRANT_DISPOSE`/`SCOPE_SYNC_VIOLATION`/`GENERATION_DISPOSED`/`SCOPE_DISPOSAL_FAILED` 五个码已随生命周期原语迁出，归属 `@migaia/lifecycle`，不在本表。）"
+                  "text": "稳定错误码表，18 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `'reactive'`。（迁移背景：原属于本包的 `SCOPE_CLOSED`/`SCOPE_REENTRANT_DISPOSE`/`SCOPE_SYNC_VIOLATION`/`GENERATION_DISPOSED`/`SCOPE_DISPOSAL_FAILED` 五个码已随生命周期原语迁出，归属 `@migaia/lifecycle`，不在本表。）"
                 },
                 {
                   "type": "table",
@@ -7857,7 +7857,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "稳定错误码表，18 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `'@migaia/reactive'`。（迁移背景：原属于本包的 `SCOPE_CLOSED`/`SCOPE_REENTRANT_DISPOSE`/`SCOPE_SYNC_VIOLATION`/`GENERATION_DISPOSED`/`SCOPE_DISPOSAL_FAILED` 五个码已随生命周期原语迁出，归属 `@migaia/lifecycle`，不在本表。）"
+                  "text": "稳定错误码表，18 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `'reactive'`。（迁移背景：原属于本包的 `SCOPE_CLOSED`/`SCOPE_REENTRANT_DISPOSE`/`SCOPE_SYNC_VIOLATION`/`GENERATION_DISPOSED`/`SCOPE_DISPOSAL_FAILED` 五个码已随生命周期原语迁出，归属 `@migaia/lifecycle`，不在本表。）"
                 },
                 {
                   "type": "table",

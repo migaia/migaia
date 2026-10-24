@@ -138,8 +138,8 @@ pipeline.run([(value, next) => next(value + 1)], 1, (result) => console.log(resu
     MIDDLEWARE_PIPELINE_SOURCE: {
       role: 'error',
       purpose: t(
-        'The `source` value on every error created by this package (`@migaia/middleware-pipeline`). Compare it before branching on `error.code`.',
-        '本包创建的每个错误上都带有的 `source` 值（`@migaia/middleware-pipeline`）。先比较它确认来源，再按 `error.code` 分支。'
+        'The `source` value on every error created by this package (`middleware.pipeline`). Compare it before branching on `error.code`.',
+        '本包创建的每个错误上都带有的 `source` 值（`middleware.pipeline`）。先比较它确认来源，再按 `error.code` 分支。'
       ),
       example: `if ((error as { source?: string }).source === MIDDLEWARE_PIPELINE_SOURCE) console.error(error)`
     },

@@ -581,8 +581,8 @@ subscribeOnce(channel, (event) => console.log('只执行一次', event.value))`
     EVENT_SUBSCRIBER_SOURCE: {
       role: 'error',
       purpose: t(
-        'The `source` value attached to every error this package throws (`@migaia/event-subscriber`). Compare `error.source` with it to know the error came from this package, then branch on `error.code`.',
-        '本包抛出的每个错误都带有的 `source` 值（`@migaia/event-subscriber`）。比较 `error.source` 是否等于它，即可确认错误来自本包，再按 `error.code` 分支处理。'
+        'The `source` value attached to every error this package throws (`event.subscriber`). Compare `error.source` with it to know the error came from this package, then branch on `error.code`.',
+        '本包抛出的每个错误都带有的 `source` 值（`event.subscriber`）。比较 `error.source` 是否等于它，即可确认错误来自本包，再按 `error.code` 分支处理。'
       ),
       example: `try {
   channel.subscribe(undefined as never)

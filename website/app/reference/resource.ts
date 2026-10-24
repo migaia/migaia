@@ -552,8 +552,8 @@ export const resourceReference: ILibraryReference = {
     RESOURCE_SOURCE: {
       role: 'constant',
       purpose: t(
-        'The `source` value (`@migaia/resource`) attached to Resource-owned failures; existing foreign error identities are preserved; compare `error.source` with it before branching on `error.code`.',
-        '资源自身产生的错误所附加的 `source` 值（`@migaia/resource`）；已有外部错误身份保持不变；先用它比对 `error.source`，再按 `error.code` 分支。'
+        'The `source` value (`resource`) attached to Resource-owned failures; existing foreign error identities are preserved; compare `error.source` with it before branching on `error.code`.',
+        '资源自身产生的错误所附加的 `source` 值（`resource`）；已有外部错误身份保持不变；先用它比对 `error.source`，再按 `error.code` 分支。'
       ),
       example: `if (error.source === RESOURCE_SOURCE && error.code === ResourceErrorCode.resourceDisposed) return`
     },
@@ -996,8 +996,8 @@ const clientUser = new Resource(fetchUser, runtime, { initialSnapshot: snapshot 
       members: {
         source: {
           summary: t(
-            'Always `@migaia/resource` (`RESOURCE_SOURCE`).',
-            '固定为 `@migaia/resource`（即 `RESOURCE_SOURCE`），用于确认错误来自本包。'
+            'Always `resource` (`RESOURCE_SOURCE`).',
+            '固定为 `resource`（即 `RESOURCE_SOURCE`），用于确认错误来自本包。'
           )
         },
         code: {

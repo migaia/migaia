@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
 import { chromium } from 'playwright'
+import { referenceFor } from '../app/reference/index.ts'
 
 const apiManifest = JSON.parse(
   readFileSync(new URL('../src/generated/manifests/apis.json', import.meta.url), 'utf8')
@@ -13,11 +14,22 @@ const libraryIndex = JSON.parse(
 const baseUrl = process.env.MIGAI_PREVIEW_URL ?? 'http://127.0.0.1:4173'
 const executablePath =
   process.env.MIGAI_CHROME_PATH ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+/** The existing prepaint bridge reads this actual storage-web theme archive. */
+const themePhysicalKey = 'sw1:14:migaia-website:theme'
 const a29ActionTimeoutMs = 15_000
 const a29ProgressIntervalMs = 5_000
 
 /** Produces the semantic public path segment for one runtime symbol. */
 function apiSymbolPath(symbol, siblings) {
+  /** Inventory records retain their original identity; route spelling comes from the manifest. */
+  const routeSlug =
+    symbol.routeSlug ??
+    (symbol.library
+      ? apiManifest.apis
+          .find((api) => api.library === symbol.library && api.module === symbol.module)
+          ?.symbols.find((entry) => entry.fragment === symbol.fragment)?.routeSlug
+      : undefined)
+  if (routeSlug) return routeSlug
   const collisions = siblings.filter(
     (candidate) =>
       candidate.name.toLocaleLowerCase('en-US') === symbol.name.toLocaleLowerCase('en-US')
@@ -44,6 +56,62 @@ function isErrorContractSymbol(symbol) {
   )
 }
 
+/** Checks the existing authored boundary prose in the API and visible returned-instance owners. */
+async function assertReferenceBoundaries(article, doc, routeLabel, fragment, overview) {
+  /** Keep InlineText's link labels/library wording and ignore only layout/code delimiters. */
+  const displayedProse = (text) =>
+    text
+      .replace(/\[([^\]\n]+)\]\((\/(?:zh|en)\/docs\/[A-Za-z0-9_./#-]+|#[A-Za-z0-9_-]+)\)/g, '$1')
+      .replace(/(?<!GitHub |[\w.:/-])packages(?![\w.:/-])/gi, 'libraries')
+      .replace(/(?<![\w.:/-])package(?![\w.:/-])/gi, 'library')
+      .replace(/[\s`]+/gu, '')
+  if (overview && doc?.purpose) {
+    /** The actual overview replaces the retired decision panel; retain its full existing guidance. */
+    const purpose = await overview.evaluate((element) => {
+      const content = element.cloneNode(true)
+      content
+        .querySelectorAll('.library-reference-popover,[hidden],[aria-hidden="true"]')
+        .forEach((note) => note.remove())
+      return content.textContent ?? ''
+    })
+    assert.ok(
+      displayedProse(purpose).includes(displayedProse(doc.purpose.zh)),
+      `${routeLabel} missing authored usage boundary`
+    )
+  }
+  /** Preserve every original scenario/avoid entry without copying production ownership filtering. */
+  const expectedScenarios = [...(doc?.scenarios ?? []), ...(doc?.avoid ?? [])]
+  if (expectedScenarios.length === 0) return
+  /** Read the actual visible list union, ignoring only injected notes and explicitly hidden nodes. */
+  const renderedScenarios = await article
+    .locator(`[id="${fragment}--scenarios"] > ul > li, .instance-guide > ul > li`)
+    .evaluateAll((items) =>
+      items
+        .filter(
+          (item) =>
+            item.getClientRects().length > 0 && getComputedStyle(item).visibility !== 'hidden'
+        )
+        .map((item) => {
+          const content = item.cloneNode(true)
+          content
+            .querySelectorAll('.library-reference-popover,[hidden],[aria-hidden="true"]')
+            .forEach((note) => note.remove())
+          return content.textContent ?? ''
+        })
+    )
+  /** Count complete prose occurrences so both missing and repeated boundaries fail. */
+  const displayedScenarios = renderedScenarios.map(displayedProse)
+  for (const scenario of expectedScenarios) {
+    const expected = displayedProse(scenario.zh)
+    assert.ok(expected.length > 0, `${routeLabel} empty authored scenario`)
+    assert.equal(
+      displayedScenarios.reduce((count, text) => count + text.split(expected).length - 1, 0),
+      1,
+      `${routeLabel} scenario must appear once: ${scenario.zh}`
+    )
+  }
+}
+
 /** Declarative claim ledger; each entry names one acceptance claim with an exact oracle. */
 const browserMatrix = [
   'keyboard controls and focus',
@@ -56,7 +124,7 @@ const browserMatrix = [
   '72ch reading line',
   'immutable fragment inventory',
   'derived navigation state',
-  'pre-paint theme and route transition veil'
+  'pre-paint theme and route progress'
 ]
 
 /** Returns a canonical trailing-slash URL for the static preview server. */
@@ -128,6 +196,11 @@ test(
   async () => {
     await withChrome((browser) =>
       withPage(browser, { width: 320, height: 844 }, async (page) => {
+        await page.addInitScript(
+          (key) =>
+            localStorage.setItem(key, JSON.stringify({ version: 1, state: { theme: 'light' } })),
+          themePhysicalKey
+        )
         await visit(page, '/')
         const rootLanguage = page.getByRole('link', { name: 'Switch to Chinese' })
         assert.equal(await rootLanguage.getAttribute('href'), '/zh')
@@ -140,6 +213,7 @@ test(
           await page.locator('a.skip-link').evaluate((link) => document.activeElement === link),
           true
         )
+        await visit(page, '/en/docs/utils/api/promise/deferred')
         const menu = page.getByRole('button', { name: 'Menu' })
         await menu.focus()
         await page.keyboard.press('Space')
@@ -149,27 +223,45 @@ test(
         assert.equal(await page.locator('#mobile-navigation').count(), 0)
         await menu.focus()
         await page.keyboard.press('Enter')
-        const mobileDocs = page.locator('#mobile-navigation').getByRole('link', { name: 'Docs' })
+        const mobileDocs = page
+          .locator('#mobile-navigation')
+          .getByRole('link', { name: 'API reference', exact: true })
         await mobileDocs.focus()
         await page.keyboard.press('Enter')
-        await page.waitForFunction(() => /^\/en\/docs\/?$/.test(window.location.pathname))
+        await page.waitForFunction(() =>
+          /^\/en\/docs\/utils\/api\/?$/.test(window.location.pathname)
+        )
+        await page.locator('#mobile-navigation').waitFor({ state: 'detached' })
         assert.equal(await page.locator('#mobile-navigation').count(), 0)
         await visit(page, '/en/docs/utils')
-        assert.equal(await page.locator('.mobile-toc nav').isVisible(), true)
+        /** The current page outline is a native disclosure, closed until the reader opens it. */
+        const outline = page.locator('details.page-toc')
+        assert.equal(await outline.getAttribute('open'), null)
+        await outline.locator('summary').focus()
+        await page.keyboard.press('Space')
+        assert.equal(await outline.getAttribute('open'), '')
+        assert.equal(await outline.locator('nav').isVisible(), true)
         await visit(page, '/en')
         const search = page.getByRole('button', { name: /search/i })
         await search.focus()
         await page.keyboard.press('Space')
-        await page.getByRole('textbox', { name: /search the library/i }).waitFor()
+        await page
+          .getByRole('textbox', { name: 'Search libraries, APIs, and guides', exact: true })
+          .waitFor()
         await page.keyboard.press('Escape')
-        assert.equal(await page.locator('.search-panel').count(), 0)
+        assert.equal(
+          await page.getByRole('dialog', { name: 'Search libraries, APIs, and guides' }).count(),
+          0
+        )
         const language = page.getByRole('link', { name: 'Switch to Chinese' })
         await language.focus()
         await page.keyboard.press('Enter')
         await page.waitForFunction(() => /^\/zh\/?$/.test(window.location.pathname))
-        const theme = page.getByRole('combobox', { name: /theme|主题/i })
+        const theme = page.getByRole('button', { name: '配色: 浅色', exact: true })
+        assert.equal(await theme.getAttribute('data-choice'), 'light')
         await theme.focus()
-        await theme.selectOption('dark')
+        await page.keyboard.press('Space')
+        await page.waitForFunction(() => document.documentElement.dataset.themeChoice === 'dark')
         assert.equal(await page.locator('html').getAttribute('data-theme'), 'dark')
       })
     )
@@ -187,7 +279,9 @@ test('loads Pagefind only after independent search demand', { timeout: 90_000 },
         false
       )
       await page.getByRole('button', { name: /search/i }).click()
-      await page.getByRole('textbox', { name: /search the library/i }).fill('utils')
+      await page
+        .getByRole('textbox', { name: 'Search libraries, APIs, and guides', exact: true })
+        .fill('utils')
       await page.waitForTimeout(250)
       assert.equal(
         (await resourceNames()).some((name) => /pagefind/i.test(name)),
@@ -252,31 +346,36 @@ test(
 )
 
 test(
-  'restores theme before hydration and keeps the particle veil layout-neutral',
+  'restores theme before hydration and keeps route progress layout-neutral',
   { timeout: 90_000 },
   async () => {
     await withChrome((browser) =>
       withPage(browser, { width: 768, height: 900 }, async (page) => {
-        await page.addInitScript(() => localStorage.setItem('migaia-theme', 'dark'))
-        await page.goto(pageUrl('/en/docs'), { waitUntil: 'domcontentloaded' })
+        await page.addInitScript(
+          (key) =>
+            localStorage.setItem(key, JSON.stringify({ version: 1, state: { theme: 'dark' } })),
+          themePhysicalKey
+        )
+        await page.goto(pageUrl('/en'), { waitUntil: 'domcontentloaded' })
         assert.equal(await page.locator('html').getAttribute('data-theme'), 'dark')
 
-        const transition = page.locator('.route-transition')
-        assert.equal(await transition.getAttribute('data-active'), 'false')
+        const progress = page.locator('.route-progress')
+        assert.equal(await progress.getAttribute('data-active'), 'false')
         const before = await page.evaluate(() => ({
           height: document.documentElement.scrollHeight,
           width: document.documentElement.scrollWidth
         }))
-        await transition.evaluate((element) => element.setAttribute('data-active', 'true'))
+        await progress.evaluate((element) => element.setAttribute('data-active', 'true'))
         assert.equal(
-          await transition.evaluate((element) => getComputedStyle(element).position),
+          await progress.evaluate((element) => getComputedStyle(element).position),
           'fixed'
         )
         assert.equal(
-          await transition.evaluate((element) => getComputedStyle(element).pointerEvents),
+          await progress.evaluate((element) => getComputedStyle(element).pointerEvents),
           'none'
         )
-        assert.equal(await transition.locator('i').count(), 3)
+        assert.equal(await progress.getAttribute('aria-hidden'), 'true')
+        assert.equal(await progress.evaluate((element) => getComputedStyle(element).height), '2px')
         assert.deepEqual(
           await page.evaluate(() => ({
             height: document.documentElement.scrollHeight,
@@ -285,18 +384,18 @@ test(
           before
         )
 
-        await transition.evaluate((element) => element.setAttribute('data-active', 'false'))
+        await progress.evaluate((element) => element.setAttribute('data-active', 'false'))
         await page.route('**/*.data', async (route) => {
           await new Promise((resolve) => setTimeout(resolve, 250))
           await route.continue()
         })
-        await page.getByRole('link', { name: 'Guides' }).click()
+        await page.locator('a.library-item[href="/en/docs/utils"]').click()
         await page.waitForFunction(
-          () => document.querySelector('.route-transition')?.getAttribute('data-active') === 'true'
+          () => document.querySelector('.route-progress')?.getAttribute('data-active') === 'true'
         )
-        await page.waitForURL(/\/en\/guides\/?$/)
+        await page.waitForURL(/\/en\/docs\/utils\/?$/)
         await page.waitForFunction(
-          () => document.querySelector('.route-transition')?.getAttribute('data-active') === 'false'
+          () => document.querySelector('.route-progress')?.getAttribute('data-active') === 'false'
         )
       })
     )
@@ -314,8 +413,8 @@ test(
             await page.addInitScript((value) => {
               document.documentElement.dataset.theme = value
             }, theme)
-            await visit(page, '/en/docs')
-            assert.equal(await page.locator('.library-item').count(), 26)
+            await visit(page, '/en')
+            assert.equal(await page.locator('.library-item').count(), libraryIndex.libraries.length)
             assert.equal(
               await page
                 .locator('.library-item')
@@ -339,10 +438,10 @@ test(
 
 test('completes each primary journey in its own context', { timeout: 120_000 }, async () => {
   const journeys = [
-    ['/en/docs', '/en/docs/utils'],
-    ['/en/guides', '/en/docs/utils'],
-    ['/en/docs', '/en/docs/utils'],
-    ['/en/architecture', '/en/architecture/rpc']
+    ['/en/docs/utils', '/en/docs/utils/api'],
+    ['/en/docs/utils', '/en/docs/utils/getting-started'],
+    ['/en/docs/rpc-host', '/en/docs/rpc-host/host-and-plugins'],
+    ['/en/docs/rpc-host', '/en/docs/rpc-host/transports-and-security']
   ]
   await withChrome(async (browser) => {
     for (const journey of journeys) {
@@ -360,10 +459,17 @@ test('renders empty and unknown search states without errors', { timeout: 90_000
     withPage(browser, { width: 768, height: 900 }, async (page) => {
       await visit(page, '/en')
       await page.getByRole('button', { name: /search/i }).click()
-      const input = page.getByRole('textbox', { name: /search the library/i })
-      await page.getByText(/type to search/i).waitFor()
-      await input.fill('not-a-real-result')
-      await page.getByText(/no matching result/i).waitFor()
+      const input = page.getByRole('textbox', {
+        name: 'Search libraries, APIs, and guides',
+        exact: true
+      })
+      assert.equal(await input.inputValue(), '')
+      await page.getByRole('listbox').waitFor()
+      assert.ok((await page.getByRole('listbox').getByRole('option').count()) > 0)
+      await input.fill('zzunmatchedq7j4vx9k2')
+      await page
+        .getByText('No page matches this query. Try a library or API name.', { exact: true })
+        .waitFor()
       assert.equal(await page.locator('[role="alert"]').count(), 0)
     })
   )
@@ -383,7 +489,7 @@ test('resolves every event-subscriber API detail route', { timeout: 120_000 }, a
       page.on('pageerror', (error) => pageErrors.push(error.message))
       for (const symbol of runtimeSymbols) {
         const modulePath = api.module === 'index' ? '' : `/${api.module}`
-        const path = `/zh/docs/${api.library}${modulePath}/${apiSymbolPath(symbol, api.symbols)}`
+        const path = `/zh/docs/${api.library}/api${modulePath}/${apiSymbolPath(symbol, api.symbols)}`
         await visit(page, path)
         assert.equal(await page.locator('article h1').innerText(), symbol.name)
       }
@@ -417,20 +523,20 @@ test('preserves code when resolving a legacy type fragment', async () => {
 test('canonicalizes root modules without exposing index', async () => {
   await withChrome(async (browser) => {
     await withPage(browser, { width: 1280, height: 900 }, async (page) => {
-      await page.goto(`${baseUrl}/zh/docs/event-subscriber/api/createEventChannel/`)
+      await page.goto(pageUrl('/zh/docs/event-subscriber/api/createEventChannel'))
       assert.match(await page.locator('h1').innerText(), /createEventChannel/)
-      await page.goto(`${baseUrl}/zh/docs/event-subscriber/api/`)
+      await page.goto(pageUrl('/zh/docs/event-subscriber/api'))
       assert.match(await page.locator('main').innerText(), /createEventChannel/)
       assert.equal(await page.locator('a[href*="/event-subscriber/index"]').count(), 0)
     })
   })
 })
 
-test('keeps API anchors in the correct responsive rail', async () => {
+test('keeps API anchors in the correct responsive rail', { timeout: 120_000 }, async () => {
   await withChrome(async (browser) => {
     for (const width of [1280, 768, 320]) {
       await withPage(browser, { width, height: 900 }, async (page) => {
-        await page.goto(`${baseUrl}/zh/docs/event-subscriber/api/createEventHub/`)
+        await page.goto(pageUrl('/zh/docs/event-subscriber/api/createEventHub'))
         const layout = await page.evaluate(() => {
           const article = document.querySelector('.article-column')
           const mobile = document.querySelector('.page-toc')
@@ -457,8 +563,8 @@ test('keeps API anchors in the correct responsive rail', async () => {
     /** Representative API, guide, and package routes expose their title on the first screen. */
     const mobileRoutes = [
       'docs/tray/api/createTray',
-      'docs/rpc-core/api/createEndpoint',
-      'docs/rpc-core/getting-started',
+      'docs/rpc-host/api/createRpcHost',
+      'docs/rpc-host/getting-started',
       'docs/utils'
     ]
     for (const locale of ['zh', 'en']) {
@@ -522,7 +628,7 @@ test('keeps API anchors in the correct responsive rail', async () => {
 test('starts a newly selected API at the page top', async () => {
   await withChrome(async (browser) => {
     await withPage(browser, { width: 1280, height: 900 }, async (page) => {
-      await page.goto(`${baseUrl}/zh/docs/event-subscriber/api/createEventChannel/`)
+      await page.goto(pageUrl('/zh/docs/event-subscriber/api/createEventChannel'))
       await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
       assert.ok((await page.evaluate(() => window.scrollY)) > 0)
 
@@ -540,18 +646,24 @@ test('starts a newly selected API at the page top', async () => {
 test('separates source markers and explains their real use', async () => {
   await withChrome(async (browser) => {
     await withPage(browser, { width: 600, height: 778 }, async (page) => {
-      await page.goto(`${baseUrl}/zh/docs/event-subscriber/api/`)
+      await page.goto(pageUrl('/zh/docs/event-subscriber/api'))
       const contract = page.locator(
         '.error-contracts a[href="/zh/docs/event-subscriber/api/EVENT_SUBSCRIBER_SOURCE"]'
       )
       await contract.waitFor()
-      assert.match(await contract.locator('xpath=..').innerText(), /稳定来源标识/)
+      assert.match(await contract.locator('xpath=..').innerText(), /source.*event\.subscriber/)
 
       await contract.click()
       await page.waitForURL(/\/zh\/docs\/event-subscriber\/api\/EVENT_SUBSCRIBER_SOURCE\/?$/)
       await page.locator('h1', { hasText: 'EVENT_SUBSCRIBER_SOURCE' }).waitFor()
-      assert.match(await page.locator('main').innerText(), /契约识别示例/)
-      assert.match(await page.locator('.code-frame').first().innerText(), /error\.source/)
+      assert.equal(
+        await page.locator('[data-primary-api-example="EVENT_SUBSCRIBER_SOURCE"]').count(),
+        1
+      )
+      assert.match(
+        await page.locator('.code-frame').first().innerText(),
+        /(?:\berror|\(error\s+as\s+\{[^}]*\}\))\.source\s*===\s*EVENT_SUBSCRIBER_SOURCE/
+      )
       assert.doesNotMatch(await page.locator('main').innerText(), /最小可运行示例/)
     })
   })
@@ -560,7 +672,7 @@ test('separates source markers and explains their real use', async () => {
 test('gives long desktop API menus an independent scroll boundary', async () => {
   await withChrome(async (browser) => {
     await withPage(browser, { width: 1280, height: 700 }, async (page) => {
-      await page.goto(`${baseUrl}/zh/docs/rpc/`)
+      await page.goto(pageUrl('/zh/docs/rpc-host/api/plugin'))
       const rail = page.locator('.left-rail')
       const viewport = rail.locator('[data-radix-scroll-area-viewport]')
       await rail.waitFor()
@@ -585,7 +697,7 @@ test('gives long desktop API menus an independent scroll boundary', async () => 
 test('keeps menu order and the selected API visible across routes', async () => {
   await withChrome(async (browser) => {
     await withPage(browser, { width: 1800, height: 900 }, async (page) => {
-      await page.goto(`${baseUrl}/zh/docs/lifecycle/api/createLifecycleUnit/`)
+      await page.goto(pageUrl('/zh/docs/lifecycle/api/createProvisionalScope'))
       const rail = page.locator('.left-rail')
       await rail.waitFor()
       const viewport = rail.locator('[data-radix-scroll-area-viewport]')
@@ -599,7 +711,12 @@ test('keeps menu order and the selected API visible across routes', async () => 
       }))
       assert.ok(before.scrollTop > 0)
 
-      await viewport.locator('a[href="/zh/docs/lifecycle/api/boundedWait"]').click()
+      /** Common APIs and the complete inventory intentionally share destinations. */
+      const essentials = viewport.locator('.left-rail-essentials')
+      assert.equal(await essentials.count(), 1)
+      const nextApi = essentials.locator('a[href="/zh/docs/lifecycle/api/boundedWait"]')
+      assert.equal(await nextApi.count(), 1)
+      await nextApi.click()
       await page.waitForURL(/\/zh\/docs\/lifecycle\/api\/boundedWait\/?$/)
       await page.locator('h1', { hasText: 'boundedWait' }).waitFor()
       const after = await viewport.evaluate((element) => ({
@@ -610,7 +727,7 @@ test('keeps menu order and the selected API visible across routes', async () => 
       assert.deepEqual(after.links, before.links)
       assert.ok(after.scrollTop >= 0)
       assert.equal(
-        await viewport.locator('a.active[href="/zh/docs/lifecycle/api/boundedWait"]').count(),
+        await essentials.locator('a.active[href="/zh/docs/lifecycle/api/boundedWait"]').count(),
         1
       )
     })
@@ -621,11 +738,11 @@ test('closes every Chinese package landing page', { timeout: 180_000 }, async ()
   await withChrome(async (browser) => {
     await withPage(browser, { width: 1280, height: 900 }, async (page) => {
       for (const library of libraryIndex.libraries) {
-        await page.goto(`${baseUrl}/zh/docs/${library.slug}/api/`)
+        await page.goto(pageUrl(`/zh/docs/${library.slug}/api`))
         await page.locator('#api-index').waitFor()
         assert.equal(await page.locator('.module-learning-path').count(), 0)
         assert.equal(
-          await page.locator(`a[href="/zh/docs/${library.slug}"]`).count(),
+          await page.locator(`nav.next-actions a[href="/zh/docs/${library.slug}"]`).count(),
           1,
           `${library.slug} missing task-guide continuation`
         )
@@ -752,10 +869,20 @@ test('closes every configuration field across the site', { timeout: 300_000 }, a
           )
           for (const field of symbol.configuration) {
             const entry = page.locator(
-              `#${symbol.fragment}--option-${field.name.replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^-+|-+$/g, '')}`
+              `[id="${symbol.fragment}--option-${field.name.replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^-+|-+$/g, '')}"]`
             )
             await entry.waitFor()
-            const paragraphs = (await entry.locator(':scope > p').allInnerTexts()).join(' ')
+            /** Values, defaults and usage notes share this behavior cell with its opening summary. */
+            const paragraphs = await entry.locator(':scope > .option-behavior').evaluate((cell) => {
+              /** Keep inline contract values; omit example blocks and injected/hidden content. */
+              const content = cell.cloneNode(true)
+              content
+                .querySelectorAll(
+                  'pre,.code-frame,.library-reference-popover,[hidden],[aria-hidden="true"]'
+                )
+                .forEach((node) => node.remove())
+              return (content.textContent ?? '').replace(/\s+/gu, ' ').trim()
+            })
             assert.ok(
               paragraphs.trim().length >= 20,
               `${api.library}/${api.module}/${symbol.name}.${field.name} has no useful explanation: ${JSON.stringify(paragraphs)}`
@@ -772,11 +899,18 @@ test('closes every configuration field across the site', { timeout: 300_000 }, a
         }
       }
 
-      await page.goto(pageUrl('/zh/docs/rpc/createEndpoint'))
-      const transportGuide = page.locator('[data-parameter-guide="rpc-transport"]')
-      await transportGuide.waitFor()
-      assert.equal(await transportGuide.locator('li a').count(), 10)
-      assert.match(await transportGuide.innerText(), /发送和接收消息/u)
+      await page.goto(pageUrl('/zh/docs/rpc-host/api/createRpcHost'))
+      /** The public host accepts registered plugins, with exactly one transport per host. */
+      const pluginGuide = page.locator('#rpc-host-index--createRpcHost--option-plugins')
+      await pluginGuide.waitFor()
+      assert.match(await pluginGuide.innerText(), /一个传输/u)
+      assert.equal(
+        await pluginGuide
+          .locator('a.type-link[href="/zh/docs/rpc-host/api/plugin/IRpcHostPlugin"]')
+          .count(),
+        1
+      )
+      assert.match(await pluginGuide.locator('pre').first().innerText(), /plugins:/u)
     })
   })
 })
@@ -804,10 +938,20 @@ test('closes every callable API detail page', { timeout: 300_000 }, async () => 
             1,
             `${routeLabel} missing Quick Start code`
           )
-          const decisionGuide = article.locator('.api-decision-guide')
-          assert.equal(await decisionGuide.count(), 1, `${routeLabel} missing decision guide`)
-          for (const list of await decisionGuide.locator('ul').all())
-            assert.ok((await list.locator('li').count()) >= 2, `${routeLabel} shallow scenarios`)
+          /** The reference now owns one purpose/example/contract flow, without duplicate panels. */
+          const primaryExample = article.locator(`[data-primary-api-example="${symbol.name}"]`)
+          assert.equal(await primaryExample.count(), 1, `${routeLabel} missing primary example`)
+          assert.ok((await primaryExample.locator('pre code').innerText()).trim().length > 0)
+          assert.equal(await primaryExample.locator('button.code-copy-button').count(), 1)
+          assert.equal(
+            await article.locator('.api-decision-guide,.api-scenario-examples').count(),
+            0
+          )
+          /** Existing authored boundaries may be displayed beside the returned instance. */
+          const reference = referenceFor(api.library)
+          const doc =
+            reference?.symbols[`${api.module}:${symbol.name}`] ?? reference?.symbols[symbol.name]
+          await assertReferenceBoundaries(article, doc, routeLabel, symbol.fragment)
           assert.equal(forbidden.test(await article.innerText()), false, `${routeLabel} bad prose`)
         }
       }
@@ -836,10 +980,22 @@ test('closes every supporting constant detail page', { timeout: 180_000 }, async
             1,
             `${routeLabel} missing reference example`
           )
+          /** Current overview and maintained scenarios carry the constant's actual use boundaries. */
+          assert.equal(await article.getAttribute('data-api-kind'), 'const')
+          const overview = article.locator('.api-overview')
+          assert.equal(await overview.count(), 1, `${routeLabel} missing use boundaries`)
+          assert.ok((await overview.locator(':scope > p').last().innerText()).trim().length > 0)
+          const reference = referenceFor(api.library)
+          const doc =
+            reference?.symbols[`${api.module}:${symbol.name}`] ?? reference?.symbols[symbol.name]
+          await assertReferenceBoundaries(article, doc, routeLabel, symbol.fragment, overview)
+          const primaryExample = article.locator(`[data-primary-api-example="${symbol.name}"]`)
+          assert.equal(await primaryExample.count(), 1, `${routeLabel} missing primary reference`)
+          assert.equal(await primaryExample.locator('button.code-copy-button').count(), 1)
+          assert.ok((await primaryExample.locator('pre code').innerText()).trim().length > 0)
           assert.equal(
-            await article.locator('.api-decision-guide').count(),
-            1,
-            `${routeLabel} missing use boundaries`
+            await article.locator('.api-decision-guide,.api-scenario-examples').count(),
+            0
           )
           assert.doesNotMatch(
             await article.innerText(),
@@ -862,14 +1018,14 @@ test(
     const modulePath = api.module === 'index' ? '' : `/${api.module}`
     const path =
       symbol.kind === 'type' || symbol.kind === 'interface'
-        ? `/en/docs/${api.library}${modulePath}`
-        : `/en/docs/${api.library}${modulePath}/${apiSymbolPath(symbol, api.symbols)}`
+        ? `/en/docs/${api.library}/api${modulePath}`
+        : `/en/docs/${api.library}/api${modulePath}/${apiSymbolPath(symbol, api.symbols)}`
     await withChrome(async (browser) => {
       for (const width of [320, 768, 1280]) {
         await withPage(browser, { width, height: width === 320 ? 844 : 900 }, async (page) => {
           await page.goto(`${pageUrl(path)}#${symbol.fragment}`, { waitUntil: 'commit' })
-          await page.locator(`#${symbol.fragment}`).waitFor()
-          const target = await page.locator(`#${symbol.fragment}`).evaluate((element) => {
+          await page.locator(`[id="${symbol.fragment}"]`).waitFor()
+          const target = await page.locator(`[id="${symbol.fragment}"]`).evaluate((element) => {
             const rect = element.getBoundingClientRect()
             return { top: rect.top, height: rect.height }
           })
@@ -887,10 +1043,10 @@ test(
 test('keeps each prose recipe within the 72ch line bound', { timeout: 120_000 }, async () => {
   const routes = [
     '/en',
-    '/en/docs',
+    '/en/docs/rpc-host',
     '/en/docs/utils',
     '/en/docs/utils/getting-started',
-    '/en/docs/utils'
+    '/en/docs/rpc-host/getting-started'
   ]
   await withChrome(async (browser) => {
     for (const path of routes) {
@@ -918,7 +1074,8 @@ test('keeps each prose recipe within the 72ch line bound', { timeout: 120_000 },
 
 test(
   'checks every immutable fragment inventory member independently',
-  { timeout: 300_000 },
+  /** Bound the whole inventory separately while each action retains its existing deadline. */
+  { timeout: 600_000 },
   async () => {
     const fragmentInventory = Object.freeze(
       ['en', 'zh'].flatMap((locale) =>
@@ -1010,8 +1167,8 @@ test(
                   const modulePath = route.module === 'index' ? '' : `/${route.module}`
                   const path =
                     member.kind === 'type' || member.kind === 'interface'
-                      ? `/${route.locale}/docs/${route.library}${modulePath}`
-                      : `/${route.locale}/docs/${route.library}${modulePath}/${apiSymbolPath(member, route.members)}`
+                      ? `/${route.locale}/docs/${route.library}/api${modulePath}`
+                      : `/${route.locale}/docs/${route.library}/api${modulePath}/${apiSymbolPath(member, route.members)}`
                   const fragmentUrl = `${pageUrl(path)}#${member.fragment}`
                   await boundedA29Action(
                     'goto fragment',
@@ -1092,7 +1249,7 @@ test(
           const primarySymbol = api.symbols.find(isCallableApiSymbol)
           if (!primarySymbol) continue
           const modulePath = api.module === 'index' ? '' : `/${api.module}`
-          const path = `/${locale}/docs/${api.library}${modulePath}/${apiSymbolPath(primarySymbol, api.symbols)}`
+          const path = `/${locale}/docs/${api.library}/api${modulePath}/${apiSymbolPath(primarySymbol, api.symbols)}`
           const fragment = `${primarySymbol.fragment}--overview`
           await withPage(browser, { width: 768, height: 900 }, async (page) => {
             await page.goto(`${pageUrl(path)}#${fragment}`, { waitUntil: 'commit' })
@@ -1106,7 +1263,7 @@ test(
               assert.match(
                 state.activeTree,
                 new RegExp(
-                  `^/${locale}/docs/${api.library}(?:/[^/]+)?/${apiSymbolPath(primarySymbol, api.symbols)}$`
+                  `^/${locale}/docs/${api.library}/api${modulePath}/${apiSymbolPath(primarySymbol, api.symbols)}$`
                 )
               )
             assert.equal(state.activeAnchor, `#${fragment}`)
@@ -1119,7 +1276,7 @@ test(
   }
 )
 
-test('keeps the ten-target claim ledger closed', () => {
+test('keeps the eleven-target claim ledger closed', () => {
   assert.deepEqual(browserMatrix, [
     'keyboard controls and focus',
     'lazy Pagefind demand',
@@ -1130,6 +1287,7 @@ test('keeps the ten-target claim ledger closed', () => {
     'anchor visibility',
     '72ch reading line',
     'immutable fragment inventory',
-    'derived navigation state'
+    'derived navigation state',
+    'pre-paint theme and route progress'
   ])
 })

@@ -76,7 +76,7 @@ function isGuideNavigationSymbol(api: IApi, symbol: IApiSymbol): boolean {
 function isGuideApiLinkSymbol(slug: string, api: IApi, symbol: IApiSymbol): boolean {
   if (!isGuideNavigationSymbol(api, symbol)) return false
   if (isCallableApiSymbol(symbol)) return true
-  return slug === 'rpc-core' && api.module === 'transport-constants' && symbol.kind === 'const'
+  return slug === 'rpc-host' && api.module === 'plugin' && symbol.kind === 'const'
 }
 
 /**
@@ -336,10 +336,12 @@ function collectReferencedTypeNames(
     for (const base of typing) if (symbol.composes?.includes(base.name)) pending.push(base)
   }
   const linked = new Set(expanded)
+  /** Flattened option fields remain visible type references even when their owner is only linked. */
   for (const symbol of typing)
     if (
       !linked.has(symbol.name) &&
-      typing.some((owner) => expanded.has(owner.name) && names(owner.signature, symbol))
+      (typing.some((owner) => expanded.has(owner.name) && names(owner.signature, symbol)) ||
+        selected.configuration.some((field) => names(field.type, symbol)))
     )
       linked.add(symbol.name)
   return { expanded, linked }

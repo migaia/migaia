@@ -91,11 +91,11 @@ export const microHubApiGuides: Readonly<
       '主应用希望通过 report 选项，把所有应用的监听失败汇总到同一个错误监控。'
     ],
     avoidEn: [
-      'The apps live in iframes, Workers or other tabs; use @migaia/rpc-browser for separate realms.',
+      'The apps live in iframes, Workers or other tabs; use @migaia/rpc-plugin-browser for separate realms.',
       'Only one app uses the state; use @migaia/store-keyed or @migaia/store-light directly.'
     ],
     avoidZh: [
-      '应用位于 iframe、Worker 或其它标签页中：这些是不同的运行环境，请使用 @migaia/rpc-browser。',
+      '应用位于 iframe、Worker 或其它标签页中：这些是不同的运行环境，请使用 @migaia/rpc-plugin-browser。',
       '状态只有一个应用使用：直接使用 @migaia/store-keyed 或 @migaia/store-light。'
     ]
   }),
@@ -311,11 +311,11 @@ throw createMicroHubTypeError(
     ],
     avoidEn: [
       'No contract declares events or requests; skip the plugin to keep the hub smaller.',
-      'Messages must cross iframes or Workers; use @migaia/rpc-browser.'
+      'Messages must cross iframes or Workers; use @migaia/rpc-plugin-browser.'
     ],
     avoidZh: [
       '没有任何契约声明事件或请求：不安装这个插件，让 hub 更精简。',
-      '消息需要跨越 iframe 或 Worker：使用 @migaia/rpc-browser。'
+      '消息需要跨越 iframe 或 Worker：使用 @migaia/rpc-plugin-browser。'
     ]
   }),
   'micro-hub:state:state': guide({

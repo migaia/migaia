@@ -1,0 +1,1861 @@
+{
+  "version": 1,
+  "library": {
+    "slug": "rpc-plugin-coroutines",
+    "description": "Cooperative coroutine transport plugin for RPC hosts.",
+    "version": "0.0.11",
+    "exports": ["."],
+    "readmeLocales": ["zh", "en"],
+    "documentation": {
+      "readme": {
+        "sections": [
+          {
+            "id": "migaia-rpc-plugin-coroutines",
+            "heading": "@migaia/rpc-plugin-coroutines",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "让 `createRpcHost` 在同一事件循环运行受监督的协作任务，通过真实 MessageChannel 交换业务调用。"
+              },
+              {
+                "type": "paragraph",
+                "text": "English · 使用指南"
+              }
+            ]
+          },
+          {
+            "id": "为什么选它",
+            "heading": "为什么选它",
+            "blocks": [
+              {
+                "type": "list",
+                "items": [
+                  "业务使用同一套双向请求、通知、流、期限和错误语义。",
+                  "每代任务获得独立连接句柄；原监督器负责预算、代次、停止、重启和替换。",
+                  "任务直接使用原 `signal` 与 `heartbeat()`，不另建任务调度或重试循环。",
+                  "不启动操作系统进程或 Worker；需要故障隔离时改用进程或线程传输。"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "从这里开始",
+            "heading": "从这里开始",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "bash",
+                "code": "pnpm add @migaia/rpc-host @migaia/rpc-contract @migaia/rpc-plugin-coroutines"
+              },
+              {
+                "type": "paragraph",
+                "text": "宿主需提供原生 MessageChannel。下面在 Node、Bun、Deno 或支持该能力的浏览器中运行同一任务模式："
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst parent = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      spawn: async ({ connect, signal, heartbeat }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        heartbeat()\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    })\n  ]\n})\ntry {\n  console.log(await parent.request('double', 21))\n} finally {\n  await parent.close()\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "输出 `42`。保持任务运行直到 signal 取消；任务函数一旦结算，其本代原生端口会关闭。"
+              }
+            ]
+          },
+          {
+            "id": "来源与生命周期",
+            "heading": "来源与生命周期",
+            "blocks": [
+              {
+                "type": "table",
+                "headers": ["配置 / 能力", "含义"],
+                "rows": [
+                  ["`coroutinePlugin({ spawn: task })`", "创建本 host 拥有的真实协作任务"],
+                  [
+                    "`coroutinePlugin({ connectToParent: context.connect })`",
+                    "子端使用当前任务获得的精确 opaque 句柄"
+                  ],
+                  ["`context.signal`", "原监督停止信号；任务必须协作退出"],
+                  ["`context.heartbeat()`", "向原监督器报告活性，只有配置了相应策略时参与检查"],
+                  [
+                    "`supervisor`",
+                    "可选原 restart、terminalPolicy、startupTimeoutMs、stop、budget、heartbeat 策略"
+                  ],
+                  ["`connect: { timeoutMs }`", "本代 identity 与能力握手共用预算"]
+                ]
+              },
+              {
+                "type": "paragraph",
+                "text": "spawn 与 connectToParent 互斥。这里的 `connectToParent` 不是 true；不得保存到下一代、复制对象或自行伪造。子端不重新解释父端身份，双方沿原消息握手确认各自目录。"
+              },
+              {
+                "type": "paragraph",
+                "text": "任务与调用取消不同：`context.signal` 约束任务寿命，provider 的调用 context.signal 只约束相应调用。协作任务不能强制抢占同步死循环，也不提供独立 CPU、内存或权限隔离。close 沿原 drain/监督清理；忽略 signal 的任务仍受原停止与晚到结算规则约束。"
+              }
+            ]
+          },
+          {
+            "id": "与-host-和-pool-组合",
+            "heading": "与 host 和 pool 组合",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "父子两端均可在 `createRpcHost` 上设置 `provide`、`self` 与公用 feature；单连接 request 返回标量，广播遵循 host 规则。安装 poolPlugin 后，每个私有成员是独立真实任务，对外仅有逻辑目标 pool。"
+              },
+              {
+                "type": "paragraph",
+                "text": "普通 `PluginHost` 可直接安装传输定义。原 coroutine outlet 保留 stop/restart/replace 等控制；替换使用 `{ task: nextTask }`，由原替换事务管理，而非业务代码自行关闭旧代再派发新代。"
+              }
+            ]
+          },
+          {
+            "id": "类型与错误",
+            "heading": "类型与错误",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "公开类型为 `ICoroutinePluginOptions`、`ICoroutineConnect`、`ICoroutineUserTask`、`ICoroutineTaskContext`、`ICoroutineReplaceSpec`、`ICoroutineSupervisorPolicy`，以及错误码类型。类型不暴露句柄内的物理端口。"
+              },
+              {
+                "type": "paragraph",
+                "text": "来源准入失败保留 TypeError，source=`rpc.transport.coroutine`、code=`COROUTINE_SOURCE_INVALID`。调用或监督失败保留其原 owner 身份及 cause，不统一改写为来源错误。以 source/code 判断，聚合清理失败仍可沿 errors/cause 找到原始对象。统一调用语义见 host 文档。"
+              }
+            ]
+          }
+        ]
+      },
+      "guide": {
+        "sections": [
+          {
+            "id": "协作任务-rpc-使用指南",
+            "heading": "协作任务 RPC 使用指南",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "English · 包概览 · 统一调用规则"
+              },
+              {
+                "type": "paragraph",
+                "text": "`coroutinePlugin` 把同一事件循环中的真实协作任务接入 `createRpcHost`。原生 MessageChannel 承载调用，原监督器管理代次、预算、停止和替换。它不提供进程或 Worker 隔离，也不能抢占同步死循环。"
+              }
+            ]
+          },
+          {
+            "id": "父任务与子-host",
+            "heading": "父任务与子 host",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "运行环境须有原生 MessageChannel。父端提供任务函数，子端使用该次任务上下文中的准确 connect 句柄。完整关闭顺序如下："
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst parent = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      connect: { timeoutMs: 1500 },\n      spawn: async ({ connect, signal, heartbeat }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        heartbeat()\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    })\n  ]\n})\ntry {\n  console.log(await parent.request('double', 21))\n} finally {\n  await parent.close()\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "预期输出 `42`。任务不能在构造 child 后立即返回：任务结算会结束本代原生连接。父 host 的 close 进入原 drain/监督停止路径；任务看到 signal 后关闭自己的 child 并退出。"
+              }
+            ]
+          },
+          {
+            "id": "精确连接句柄",
+            "heading": "精确连接句柄",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "`spawn` 与 `connectToParent` 互斥。这里的 `connectToParent` 是 `ICoroutineConnect` opaque 句柄，不是 true。不要把 process/thread 的子端布尔写法套在此处，也不要复制、伪造或跨代复用句柄。该句柄关联原任务的真实端口与报告器；它不是可序列化配置。"
+              },
+              {
+                "type": "paragraph",
+                "text": "任务拿到三个上下文字段：signal、heartbeat、connect。signal 约束整代任务寿命；heartbeat 向原监督策略报告活性；connect 只供本次子 host 连接。heartbeat 不等于业务完成，也不会替任务自动运行循环。"
+              },
+              {
+                "type": "paragraph",
+                "text": "可以明确声明任务类型，保持业务与传输配置分开："
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'\n\nexport const task: ICoroutineUserTask = async ({ connect, signal }) => {\n  const child = await createRpcHost({\n    plugins: [coroutinePlugin({ connectToParent: connect })],\n    provide: { echo: (value: string) => value }\n  })\n  try {\n    if (!signal.aborted)\n      await new Promise<void>((resolve) => {\n        signal.addEventListener('abort', () => resolve(), { once: true })\n      })\n  } finally {\n    await child.close()\n  }\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "应用将 task 交给 `coroutinePlugin({ spawn: task })`，并最终关闭返回的父 host。"
+              }
+            ]
+          },
+          {
+            "id": "取消-流与错误",
+            "heading": "取消、流与错误",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "任务 signal 与 provider 调用的 context.signal 是两个层次。前者终止任务寿命；后者取消该业务调用。长时间异步业务应协作观察调用信号；同步 CPU 循环会阻塞同一事件循环，包括调用期限和监督器的回调。"
+              },
+              {
+                "type": "paragraph",
+                "text": "流沿统一 host API 返回 AsyncIterable。消费者提前退出时显式 return，释放本次原 stream 资源；不会因此停止整代任务。下面消费当前直连 worker 的显式流方法："
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import type { IRpcHost } from '@migaia/rpc-host'\n\nexport async function firstValue(\n  host: IRpcHost<{ worker: { values(end: number): AsyncIterable<number> } }>\n) {\n  const stream = host.peers.worker.values(10)\n  try {\n    return await stream.next()\n  } finally {\n    await stream.return?.()\n  }\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "单个直连对端的 request 返回标量；多对端规则见 host 指南。任务和父 host 都可 provide，双向业务共用同一真实会话。"
+              },
+              {
+                "type": "paragraph",
+                "text": "来源错误保留原生 TypeError，source 为 rpc.transport.coroutine、code 为 COROUTINE_SOURCE_INVALID。业务、握手或监督失败保持各自 source/code/cause，不统一改成来源错误。跨消息边界保留原生错误名称、消息、stack 与完整原因链。"
+              }
+            ]
+          },
+          {
+            "id": "监督与替换",
+            "heading": "监督与替换",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "`supervisor` 只配置原策略的 restart、terminalPolicy、startupTimeoutMs、stop、budget、heartbeat 字段。`connect.timeoutMs` 则约束该代 identity/能力握手；它不是任务停止预算或业务调用 timeoutMs。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'\nimport { retryFeature, timeoutFeature } from '@migaia/rpc-host/features'\n\nexport function taskPlugins(task: ICoroutineUserTask) {\n  return [\n    coroutinePlugin({ spawn: task, supervisor: { startupTimeoutMs: 1500 } }),\n    retryFeature(),\n    timeoutFeature({ ms: 1000 })\n  ]\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "retry 使用原调用策略，不意味着所有非幂等业务都能安全重放。原监督器选择新代；旧代持有的能力不会自动指向新代。任务忽略取消时，原停止、reap 与晚到结算规则仍有效，不能把返回的控制结果当作强制终止同线程代码。"
+              },
+              {
+                "type": "paragraph",
+                "text": "同一传输定义也可安装普通 PluginHost。原 coroutine outlet 保留 stop/restart/replace；replace 的输入是 `{ task: nextTask }`，类型为 ICoroutineReplaceSpec。让原替换事务管理新旧代，不在业务层另写“关旧任务再启动”的流程。"
+              }
+            ]
+          },
+          {
+            "id": "与-pool-和-devtools-组合",
+            "heading": "与 pool 和 devtools 组合",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "安装 `poolPlugin({ size })` 后，每个隐藏成员是独立真实任务。对外只有逻辑目标 pool，每次操作只选一个成员，不向所有任务广播；详见 pool 指南。"
+              },
+              {
+                "type": "paragraph",
+                "text": "安装 `devtoolsPlugin()` 可观察同一原消息/载体路径；host.close 撤回本 host 的观察，但应用仍拥有 collector 的最终 close。协程任务不会自动隔离共享内存，应用仍须控制闭包共享数据和并发副作用。"
+              },
+              {
+                "type": "paragraph",
+                "text": "公开类型包括 ICoroutinePluginOptions、ICoroutineConnect、ICoroutineUserTask、ICoroutineTaskContext、ICoroutineReplaceSpec、ICoroutineSupervisorPolicy。应用通过这些类型描述任务与策略，无需读取端口、注册表或内部构造器。"
+              }
+            ]
+          }
+        ]
+      },
+      "en": {
+        "readme": {
+          "sections": [
+            {
+              "id": "migaia-rpc-plugin-coroutines",
+              "heading": "@migaia/rpc-plugin-coroutines",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Run supervised cooperative tasks in one event loop with `createRpcHost`, using a real MessageChannel for application calls."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "中文 · Guide"
+                }
+              ]
+            },
+            {
+              "id": "why-use-it",
+              "heading": "Why use it",
+              "blocks": [
+                {
+                  "type": "list",
+                  "items": [
+                    "Keep the same bidirectional requests, notifications, streams, deadlines, and error semantics.",
+                    "Each task generation gets an independent connection handle; the original supervisor owns budget, generations, stop, restart, and replacement.",
+                    "Tasks receive the original `signal` and `heartbeat()` without another task scheduler or retry loop.",
+                    "No OS process or Worker is started. Choose process or thread transport when isolation is required."
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "start-here",
+              "heading": "Start here",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "bash",
+                  "code": "pnpm add @migaia/rpc-host @migaia/rpc-contract @migaia/rpc-plugin-coroutines"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "The host runtime must provide native MessageChannel. The same task pattern works on Node, Bun, Deno, and browsers with that capability:"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst parent = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      spawn: async ({ connect, signal, heartbeat }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        heartbeat()\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    })\n  ]\n})\ntry {\n  console.log(await parent.request('double', 21))\n} finally {\n  await parent.close()\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "It prints `42`. Keep the task running until its signal is cancelled: settling the task function closes its generation's native ports."
+                }
+              ]
+            },
+            {
+              "id": "sources-and-lifetime",
+              "heading": "Sources and lifetime",
+              "blocks": [
+                {
+                  "type": "table",
+                  "headers": ["Configuration / capability", "Meaning"],
+                  "rows": [
+                    [
+                      "`coroutinePlugin({ spawn: task })`",
+                      "Starts a real cooperative task owned by this host"
+                    ],
+                    [
+                      "`coroutinePlugin({ connectToParent: context.connect })`",
+                      "Joins from the child using its exact generation-local opaque handle"
+                    ],
+                    [
+                      "`context.signal`",
+                      "Original supervision stop signal; user work must cooperate"
+                    ],
+                    [
+                      "`context.heartbeat()`",
+                      "Reports liveness to the existing supervisor when its policy enables checks"
+                    ],
+                    [
+                      "`supervisor`",
+                      "Optional original restart, terminalPolicy, startupTimeoutMs, stop, budget, and heartbeat policies"
+                    ],
+                    [
+                      "`connect: { timeoutMs }`",
+                      "One budget for this generation's identity/capability handshake"
+                    ]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "spawn and connectToParent are mutually exclusive. Here `connectToParent` is not true. Do not reuse a handle in another generation, copy it, or fabricate one. The child does not reinterpret the parent's identity; both sides confirm their directories through the original handshake."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Task cancellation differs from call cancellation: `context.signal` controls task lifetime, while a provider call context.signal belongs to that call. Cooperative tasks cannot forcibly interrupt synchronous loops and provide no separate CPU, memory, or permission isolation. Close follows existing drain and supervision; tasks ignoring the signal retain the original stop/late-settlement behavior."
+                }
+              ]
+            },
+            {
+              "id": "combine-with-host-and-pool",
+              "heading": "Combine with host and pool",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Both sides can configure `provide`, `self`, and common features on `createRpcHost`. A single connection returns scalar request results; broadcasting follows host rules. With poolPlugin, each private member is an independent real task, exposed only through the logical pool target."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Definitions also install on ordinary `PluginHost`. Its coroutine outlet retains stop/restart/replace controls. Replacement supplies `{ task: nextTask }` to the original transaction rather than implementing another close-and-respawn sequence in application code."
+                }
+              ]
+            },
+            {
+              "id": "types-and-errors",
+              "heading": "Types and errors",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Public types are `ICoroutinePluginOptions`, `ICoroutineConnect`, `ICoroutineUserTask`, `ICoroutineTaskContext`, `ICoroutineReplaceSpec`, and `ICoroutineSupervisorPolicy`, plus the error-code type. The handle does not expose its physical port."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Source admission preserves TypeError with source=`rpc.transport.coroutine`, code=`COROUTINE_SOURCE_INVALID`. Call and supervision failures retain their original owner's identity and cause instead of becoming source errors. Branch on source/code; cleanup aggregates keep original objects reachable through errors/cause. See the host documentation for shared call semantics."
+                }
+              ]
+            }
+          ]
+        },
+        "guide": {
+          "sections": [
+            {
+              "id": "cooperative-task-rpc-guide",
+              "heading": "Cooperative task RPC guide",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "中文 · Overview · Shared call rules"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "coroutinePlugin connects a real cooperative task on the same event loop to createRpcHost. Native MessageChannel carries calls; the original supervisor owns generations, budgets, stopping, and replacement. Tasks have no process or Worker isolation and cannot preempt a synchronous infinite loop."
+                }
+              ]
+            },
+            {
+              "id": "parent-task-and-child-host",
+              "heading": "Parent task and child host",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "The runtime must provide native MessageChannel. The parent supplies a task; the child uses the exact connect handle from that invocation. This example includes both sides' cleanup:"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst parent = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      connect: { timeoutMs: 1500 },\n      spawn: async ({ connect, signal, heartbeat }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        heartbeat()\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    })\n  ]\n})\ntry {\n  console.log(await parent.request('double', 21))\n} finally {\n  await parent.close()\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Expected output is 42. Do not return immediately after constructing the child: task settlement ends that generation's native connection. Parent host.close follows the original drain and supervised stop path. The task observes signal, closes its child, and exits."
+                }
+              ]
+            },
+            {
+              "id": "exact-connection-handle",
+              "heading": "Exact connection handle",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "spawn and connectToParent are mutually exclusive. Here connectToParent is an opaque ICoroutineConnect handle, not true. Do not reuse the process/thread boolean form, copy the handle, fabricate one, or carry it into another generation. It identifies the task's actual port and reporter; it is not serializable configuration."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "The task receives signal, heartbeat, and connect. signal bounds task lifetime. heartbeat reports liveness to the original configured policy. connect belongs only to this child connection. A heartbeat neither completes business work nor runs a task loop for you."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Declare a task independently from its transport configuration:"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'\n\nexport const task: ICoroutineUserTask = async ({ connect, signal }) => {\n  const child = await createRpcHost({\n    plugins: [coroutinePlugin({ connectToParent: connect })],\n    provide: { echo: (value: string) => value }\n  })\n  try {\n    if (!signal.aborted)\n      await new Promise<void>((resolve) => {\n        signal.addEventListener('abort', () => resolve(), { once: true })\n      })\n  } finally {\n    await child.close()\n  }\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Pass task to coroutinePlugin({ spawn: task }) and eventually close the resulting parent host."
+                }
+              ]
+            },
+            {
+              "id": "cancellation-streams-and-errors",
+              "heading": "Cancellation, streams, and errors",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Task signal and a provider call's context.signal have different scopes. The first ends a task generation; the second cancels that call. Long asynchronous work should observe the call signal cooperatively. A synchronous CPU loop blocks the same event loop, including deadline and supervisor callbacks."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Streams use the shared host AsyncIterable API. Consumers that stop early return the stream, releasing its original call resources without stopping the task. This helper consumes an explicit stream method on the current direct worker:"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import type { IRpcHost } from '@migaia/rpc-host'\n\nexport async function firstValue(\n  host: IRpcHost<{ worker: { values(end: number): AsyncIterable<number> } }>\n) {\n  const stream = host.peers.worker.values(10)\n  try {\n    return await stream.next()\n  } finally {\n    await stream.return?.()\n  }\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "A request with one direct peer returns a scalar. See the host guide for multiple peers. Both the task and parent can provide methods over the same real session."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Source admission preserves native TypeError with source rpc.transport.coroutine and code COROUTINE_SOURCE_INVALID. Business, handshake, and supervisor errors keep their owning source/code/cause rather than becoming source errors. The message boundary preserves native names, messages, stacks, and complete cause chains."
+                }
+              ]
+            },
+            {
+              "id": "supervision-and-replacement",
+              "heading": "Supervision and replacement",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "supervisor configures only the original restart, terminalPolicy, startupTimeoutMs, stop, budget, and heartbeat policies. connect.timeoutMs bounds identity/capability negotiation for a generation. It is separate from task stop budgets and per-call timeoutMs."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'\nimport { retryFeature, timeoutFeature } from '@migaia/rpc-host/features'\n\nexport function taskPlugins(task: ICoroutineUserTask) {\n  return [\n    coroutinePlugin({ spawn: task, supervisor: { startupTimeoutMs: 1500 } }),\n    retryFeature(),\n    timeoutFeature({ ms: 1000 })\n  ]\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Retry uses the original call policy; it does not make every non-idempotent operation safe to replay. The supervisor chooses the next generation. Held old-generation capabilities do not retarget automatically. Tasks that ignore cancellation retain original stop, reap, and late-settlement behavior. A control result does not prove forced termination of same-thread code."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "The same transport definition installs in an ordinary PluginHost. Its coroutine outlet retains stop/restart/replace. Replacement takes { task: nextTask }, typed as ICoroutineReplaceSpec. Let the original replacement transaction manage generations instead of writing a separate close-old/start-new sequence."
+                }
+              ]
+            },
+            {
+              "id": "pool-and-devtools",
+              "heading": "Pool and devtools",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "With poolPlugin({ size }), every hidden member is an independent real task. Only the logical pool target is public; each operation selects one member instead of broadcasting to every task. See the pool guide."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Install devtoolsPlugin() to observe the original message/carrier path. host.close removes that host's observation; the application still owns the collector's final close. Tasks share memory, so applications remain responsible for closure state and concurrent side effects."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Public types are ICoroutinePluginOptions, ICoroutineConnect, ICoroutineUserTask, ICoroutineTaskContext, ICoroutineReplaceSpec, and ICoroutineSupervisorPolicy. They describe tasks and policies without exposing ports, registries, or internal constructors."
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  },
+  "apis": [
+    {
+      "id": "rpc-plugin-coroutines:index",
+      "library": "rpc-plugin-coroutines",
+      "module": "index",
+      "exportPath": ".",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/docs/rpc-plugin-coroutines/getting-started",
+      "architecturePath": "/en/docs/rpc-plugin-coroutines",
+      "symbols": [
+        {
+          "name": "coroutinePlugin",
+          "kind": "function",
+          "signature": "export declare function coroutinePlugin(options: ICoroutinePluginOptions): IRpcTransportPlugin;",
+          "declarationLine": 24,
+          "source": "packages/rpc-plugin-coroutines/dist/coroutine-plugin.d.ts",
+          "purpose": "Run a cooperative task on real MessageChannel; original supervision owns generations, budget, stop and replacement. Same-loop tasks provide no process or Worker isolation and cannot preempt synchronous blocking.",
+          "core": "Registered cold transport definition for createRpcHost or ordinary PluginHost. Preserve exact object identity.\nconnect.timeoutMs: Finite positive identity/capability handshake budget shared by the original identity and ACK phases, independent of task and call deadlines.\nOmitted: use the original source/default handshake budget.\nself: Application-owned local name and instanceId for ordinary Host installation; publish only the safe identity fields. Explicit createRpcHost identity takes precedence.\nOmitted: retain the canonical Host identity and generated instanceId.\nprovide: Local methods, descriptors or permitted forwarding entries compiled by the existing provider owner. Explicit createRpcHost providers remain its input.\nOmitted: add no application methods through this plugin option.\nproviderLimits: Original provider admission limits for ordinary Host installation; they do not add another registry or transport queue.\nOmitted: retain the existing provider owner defaults.\nauthentication: Original sign/verify/encrypt configuration used by ordinary Host installation. It protects the accepted connection without granting process or Worker isolation.\nOmitted: add no authentication configuration through this option.\nprobe: One observer or an array of observers forwarded to the same canonical endpoint observation owner.\nOmitted: install no additional probe from this option.\ndefaultTimeoutMs: Default request and stream deadline for ordinary Host installation; it is independent of handshake and cooperative task stop budgets.\nOmitted: retain the original runtime call default.\ncontract: Local remote-method declaration consumed by the existing method compiler, including schemas, call modes and idempotency.\nOmitted: retain the original declaration inference.\nreport: Application error sink for background task, binding and installation failures; existing reporting keeps original error identity and cause chains.\nOmitted: borrow the Host effective reporter.\nkeyFactory: Generate idempotency keys through the original managed task proxy. Parent-handle direct connections do not acquire a second retry owner.\nOmitted: use the original managed proxy key factory.\nretryPort: Dispatch whole invocations through the original managed task proxy retry port, preserving its generation and cancellation ownership.\nOmitted: use the existing managed retry port.\nspawn: Actual task function. Returning settles its generation and closes native ports.\nAbsent in child mode.\nconnectToParent: Exact opaque context.connect issued by this task invocation, not copied or reused.\nAbsent in spawn mode.\nsupervisor: Original restart, terminalPolicy, startupTimeoutMs, stop, budget and heartbeat policy.\nOmitted: original supervisor defaults.\nconnect: Original identity/capability handshake budget, separate from task stop and call timeouts.\nOmitted: original source/default budget.\nname: Application-selected local registration name in an ordinary PluginHost; it distinguishes installed entries and is independent of remote self.name or authentication identity.\nOmitted: coroutine registration name.\nexpose: Explicit method exposure list for an ordinary PluginHost installation; selects which existing methods that entry publishes without creating a local business implementation.\nOmitted: original exposure policy.\nRun a cooperative task on real MessageChannel; original supervision owns generations, budget, stop and replacement. Same-loop tasks provide no process or Worker isolation and cannot preempt synchronous blocking.",
+          "advanced": "The task owns its child host; close drains and signals the original supervised task.\nUse cooperative tasks when native isolation is unnecessary.",
+          "parameters": ["options: ICoroutinePluginOptions"],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "ICoroutinePluginOptions",
+              "optional": false
+            }
+          ],
+          "returns": "IRpcTransportPlugin",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [
+            "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst parent = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      connect: { timeoutMs: 1500 },\n      spawn: async ({ connect, signal, heartbeat }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        heartbeat()\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    })\n  ]\n})\ntry {\n  console.log(await parent.request('double', 21))\n} finally {\n  await parent.close()\n}",
+            "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'\n\nexport const task: ICoroutineUserTask = async ({ connect, signal }) => {\n  const child = await createRpcHost({\n    plugins: [coroutinePlugin({ connectToParent: connect })],\n    provide: { echo: (value: string) => value }\n  })\n  try {\n    if (!signal.aborted)\n      await new Promise<void>((resolve) => {\n        signal.addEventListener('abort', () => resolve(), { once: true })\n      })\n  } finally {\n    await child.close()\n  }\n}",
+            "import { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'\nimport { retryFeature, timeoutFeature } from '@migaia/rpc-host/features'\n\nexport function taskPlugins(task: ICoroutineUserTask) {\n  return [\n    coroutinePlugin({ spawn: task, supervisor: { startupTimeoutMs: 1500 } }),\n    retryFeature(),\n    timeoutFeature({ ms: 1000 })\n  ]\n}",
+            "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'\n\nconst parent = await createRpcHost<{ double(value: number): number }>({\n  plugins: [\n    coroutinePlugin({\n      spawn: async ({ connect, signal, heartbeat }) => {\n        const child = await createRpcHost({\n          plugins: [coroutinePlugin({ connectToParent: connect })],\n          provide: { double: (value: number) => value * 2 }\n        })\n        heartbeat()\n        try {\n          if (!signal.aborted)\n            await new Promise<void>((resolve) => {\n              signal.addEventListener('abort', () => resolve(), { once: true })\n            })\n        } finally {\n          await child.close()\n        }\n      }\n    })\n  ]\n})\ntry {\n  console.log(await parent.request('double', 21))\n} finally {\n  await parent.close()\n}"
+          ],
+          "members": [],
+          "composes": [],
+          "aliasOf": "coroutinePlugin",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare function coroutinePlugin(options: ICoroutinePluginOptions): IRpcTransportPlugin;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "ICoroutinePluginOptions",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["IRpcTransportPlugin"],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Run a cooperative task on real MessageChannel; original supervision owns generations, budget, stop and replacement. Same-loop tasks provide no process or Worker isolation and cannot preempt synchronous blocking."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import coroutinePlugin from @migaia/rpc-plugin-coroutines, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use coroutinePlugin when its function contract and declared inputs match the result you need. Choose a different public symbol when coroutinePlugin does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "Registered cold transport definition for createRpcHost or ordinary PluginHost. Preserve exact object identity.\nconnect.timeoutMs: Finite positive identity/capability handshake budget shared by the original identity and ACK phases, independent of task and call deadlines.\nOmitted: use the original source/default handshake budget.\nself: Application-owned local name and instanceId for ordinary Host installation; publish only the safe identity fields. Explicit createRpcHost identity takes precedence.\nOmitted: retain the canonical Host identity and generated instanceId.\nprovide: Local methods, descriptors or permitted forwarding entries compiled by the existing provider owner. Explicit createRpcHost providers remain its input.\nOmitted: add no application methods through this plugin option.\nproviderLimits: Original provider admission limits for ordinary Host installation; they do not add another registry or transport queue.\nOmitted: retain the existing provider owner defaults.\nauthentication: Original sign/verify/encrypt configuration used by ordinary Host installation. It protects the accepted connection without granting process or Worker isolation.\nOmitted: add no authentication configuration through this option.\nprobe: One observer or an array of observers forwarded to the same canonical endpoint observation owner.\nOmitted: install no additional probe from this option.\ndefaultTimeoutMs: Default request and stream deadline for ordinary Host installation; it is independent of handshake and cooperative task stop budgets.\nOmitted: retain the original runtime call default.\ncontract: Local remote-method declaration consumed by the existing method compiler, including schemas, call modes and idempotency.\nOmitted: retain the original declaration inference.\nreport: Application error sink for background task, binding and installation failures; existing reporting keeps original error identity and cause chains.\nOmitted: borrow the Host effective reporter.\nkeyFactory: Generate idempotency keys through the original managed task proxy. Parent-handle direct connections do not acquire a second retry owner.\nOmitted: use the original managed proxy key factory.\nretryPort: Dispatch whole invocations through the original managed task proxy retry port, preserving its generation and cancellation ownership.\nOmitted: use the existing managed retry port.\nspawn: Actual task function. Returning settles its generation and closes native ports.\nAbsent in child mode.\nconnectToParent: Exact opaque context.connect issued by this task invocation, not copied or reused.\nAbsent in spawn mode.\nsupervisor: Original restart, terminalPolicy, startupTimeoutMs, stop, budget and heartbeat policy.\nOmitted: original supervisor defaults.\nconnect: Original identity/capability handshake budget, separate from task stop and call timeouts.\nOmitted: original source/default budget.\nname: Application-selected local registration name in an ordinary PluginHost; it distinguishes installed entries and is independent of remote self.name or authentication identity.\nOmitted: coroutine registration name.\nexpose: Explicit method exposure list for an ordinary PluginHost installation; selects which existing methods that entry publishes without creating a local business implementation.\nOmitted: original exposure policy.\nRun a cooperative task on real MessageChannel; original supervision owns generations, budget, stop and replacement. Same-loop tasks provide no process or Worker isolation and cannot preempt synchronous blocking."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "The task owns its child host; close drains and signals the original supervised task.\nUse cooperative tasks when native isolation is unnecessary."
+            }
+          ],
+          "declaredConfiguration": [
+            {
+              "name": "spawn",
+              "type": "ICoroutineUserTask",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "supervisor",
+              "type": "ICoroutineSupervisorPolicy",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "connectToParent",
+              "type": "ICoroutineConnect",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "name",
+              "type": "string",
+              "optional": true,
+              "description": "Native local registration name is independent of either endpoint's handshake identity."
+            },
+            {
+              "name": "expose",
+              "type": "readonly string[]",
+              "optional": true,
+              "description": "Ordinary Host provider selection is compiled by the canonical native installation."
+            },
+            {
+              "name": "connect",
+              "type": "IRpcConnectOptions",
+              "optional": true,
+              "description": "The SDK shares this budget between the original identity and ACK preparation phases."
+            },
+            {
+              "name": "connect.timeoutMs",
+              "type": "number",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "self",
+              "type": "IRuntimePeerIdentity",
+              "optional": true,
+              "description": "Optional local identity; omission generates an instance id with the display name peer."
+            },
+            {
+              "name": "provide",
+              "type": "IRuntimePeerProvide",
+              "optional": true,
+              "description": "Explicit nested own-data method groups; defaults to no application methods and rejects * accessors during compilation."
+            },
+            {
+              "name": "providerLimits",
+              "type": "IRpcProviderLimits",
+              "optional": true,
+              "description": "Provider quotas, defaulting to 256 global and 64 per verified peer."
+            },
+            {
+              "name": "authentication",
+              "type": "IRpcAuthenticationConfig",
+              "optional": true,
+              "description": "Existing per-frame credentials enable signed native transfer without a custom endpoint."
+            },
+            {
+              "name": "probe",
+              "type": "IRpcProbe | readonly IRpcProbe[]",
+              "optional": true,
+              "description": "Installs an endpoint-local synchronous observer without changing pipeline selection."
+            },
+            {
+              "name": "defaultTimeoutMs",
+              "type": "number",
+              "optional": true,
+              "description": "Only request/stream inherit this positive default in their original timeout scope."
+            },
+            {
+              "name": "contract",
+              "type": "IRemoteContract",
+              "optional": true,
+              "description": "Explicit advanced schema, modes and idempotency retain their original contract owner."
+            },
+            {
+              "name": "report",
+              "type": "(error: unknown) => void",
+              "optional": true,
+              "description": "Omission reports background failures to console.error through the original owner."
+            },
+            {
+              "name": "keyFactory",
+              "type": "() => string",
+              "optional": true,
+              "description": "Optional idempotency key generator; omission uses the canonical identity generator."
+            },
+            {
+              "name": "retryPort",
+              "type": "IRemoteRetryPort",
+              "optional": true,
+              "description": "Optional whole-invocation retry policy; omission sends once."
+            }
+          ],
+          "identity": "packages/rpc-plugin-coroutines/dist/coroutine-plugin.d.ts:coroutinePlugin:export declare function coroutinePlugin(options: ICoroutinePluginOptions): IRpcTransportPlugin;",
+          "guidance": [
+            {
+              "id": "来源与生命周期",
+              "heading": "来源与生命周期",
+              "blocks": [
+                {
+                  "type": "table",
+                  "headers": ["配置 / 能力", "含义"],
+                  "rows": [
+                    ["`coroutinePlugin({ spawn: task })`", "创建本 host 拥有的真实协作任务"],
+                    [
+                      "`coroutinePlugin({ connectToParent: context.connect })`",
+                      "子端使用当前任务获得的精确 opaque 句柄"
+                    ],
+                    ["`context.signal`", "原监督停止信号；任务必须协作退出"],
+                    ["`context.heartbeat()`", "向原监督器报告活性，只有配置了相应策略时参与检查"],
+                    [
+                      "`supervisor`",
+                      "可选原 restart、terminalPolicy、startupTimeoutMs、stop、budget、heartbeat 策略"
+                    ],
+                    ["`connect: { timeoutMs }`", "本代 identity 与能力握手共用预算"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "spawn 与 connectToParent 互斥。这里的 `connectToParent` 不是 true；不得保存到下一代、复制对象或自行伪造。子端不重新解释父端身份，双方沿原消息握手确认各自目录。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "任务与调用取消不同：`context.signal` 约束任务寿命，provider 的调用 context.signal 只约束相应调用。协作任务不能强制抢占同步死循环，也不提供独立 CPU、内存或权限隔离。close 沿原 drain/监督清理；忽略 signal 的任务仍受原停止与晚到结算规则约束。"
+                }
+              ]
+            }
+          ],
+          "usageScore": 70,
+          "configuration": [
+            {
+              "name": "spawn",
+              "type": "ICoroutineUserTask",
+              "optional": true,
+              "description": "`spawn` 与 `connectToParent` 互斥。这里的 `connectToParent` 是 `ICoroutineConnect` opaque 句柄，不是 true。不要把 process/thread 的子端布尔写法套在此处，也不要复制、伪造或跨代复用句柄。该句柄关联原任务的真实端口与报告器；它不是可序列化配置。",
+              "descriptionEn": "",
+              "descriptionZh": "`spawn` 与 `connectToParent` 互斥。这里的 `connectToParent` 是 `ICoroutineConnect` opaque 句柄，不是 true。不要把 process/thread 的子端布尔写法套在此处，也不要复制、伪造或跨代复用句柄。该句柄关联原任务的真实端口与报告器；它不是可序列化配置。"
+            },
+            {
+              "name": "supervisor",
+              "type": "ICoroutineSupervisorPolicy",
+              "optional": true,
+              "description": "`supervisor` 只配置原策略的 restart、terminalPolicy、startupTimeoutMs、stop、budget、heartbeat 字段。`connect.timeoutMs` 则约束该代 identity/能力握手；它不是任务停止预算或业务调用 timeoutMs。",
+              "descriptionEn": "",
+              "descriptionZh": "`supervisor` 只配置原策略的 restart、terminalPolicy、startupTimeoutMs、stop、budget、heartbeat 字段。`connect.timeoutMs` 则约束该代 identity/能力握手；它不是任务停止预算或业务调用 timeoutMs。"
+            },
+            {
+              "name": "connectToParent",
+              "type": "ICoroutineConnect",
+              "optional": true,
+              "description": "`spawn` 与 `connectToParent` 互斥。这里的 `connectToParent` 是 `ICoroutineConnect` opaque 句柄，不是 true。不要把 process/thread 的子端布尔写法套在此处，也不要复制、伪造或跨代复用句柄。该句柄关联原任务的真实端口与报告器；它不是可序列化配置。",
+              "descriptionEn": "",
+              "descriptionZh": "`spawn` 与 `connectToParent` 互斥。这里的 `connectToParent` 是 `ICoroutineConnect` opaque 句柄，不是 true。不要把 process/thread 的子端布尔写法套在此处，也不要复制、伪造或跨代复用句柄。该句柄关联原任务的真实端口与报告器；它不是可序列化配置。"
+            },
+            {
+              "name": "name",
+              "type": "string",
+              "optional": true,
+              "description": "Native local registration name is independent of either endpoint's handshake identity.",
+              "descriptionEn": "Native local registration name is independent of either endpoint's handshake identity.",
+              "descriptionZh": ""
+            },
+            {
+              "name": "expose",
+              "type": "readonly string[]",
+              "optional": true,
+              "description": "Ordinary Host provider selection is compiled by the canonical native installation.",
+              "descriptionEn": "Ordinary Host provider selection is compiled by the canonical native installation.",
+              "descriptionZh": ""
+            },
+            {
+              "name": "connect",
+              "type": "IRpcConnectOptions",
+              "optional": true,
+              "description": "`supervisor` 只配置原策略的 restart、terminalPolicy、startupTimeoutMs、stop、budget、heartbeat 字段。`connect.timeoutMs` 则约束该代 identity/能力握手；它不是任务停止预算或业务调用 timeoutMs。",
+              "descriptionEn": "The SDK shares this budget between the original identity and ACK preparation phases.",
+              "descriptionZh": "`supervisor` 只配置原策略的 restart、terminalPolicy、startupTimeoutMs、stop、budget、heartbeat 字段。`connect.timeoutMs` 则约束该代 identity/能力握手；它不是任务停止预算或业务调用 timeoutMs。"
+            },
+            {
+              "name": "connect.timeoutMs",
+              "type": "number",
+              "optional": true,
+              "description": "`supervisor` 只配置原策略的 restart、terminalPolicy、startupTimeoutMs、stop、budget、heartbeat 字段。`connect.timeoutMs` 则约束该代 identity/能力握手；它不是任务停止预算或业务调用 timeoutMs。",
+              "descriptionEn": "",
+              "descriptionZh": "`supervisor` 只配置原策略的 restart、terminalPolicy、startupTimeoutMs、stop、budget、heartbeat 字段。`connect.timeoutMs` 则约束该代 identity/能力握手；它不是任务停止预算或业务调用 timeoutMs。"
+            },
+            {
+              "name": "self",
+              "type": "IRuntimePeerIdentity",
+              "optional": true,
+              "description": "Optional local identity; omission generates an instance id with the display name peer.",
+              "descriptionEn": "Optional local identity; omission generates an instance id with the display name peer.",
+              "descriptionZh": ""
+            },
+            {
+              "name": "provide",
+              "type": "IRuntimePeerProvide",
+              "optional": true,
+              "description": "Explicit nested own-data method groups; defaults to no application methods and rejects * accessors during compilation.",
+              "descriptionEn": "Explicit nested own-data method groups; defaults to no application methods and rejects * accessors during compilation.",
+              "descriptionZh": ""
+            },
+            {
+              "name": "providerLimits",
+              "type": "IRpcProviderLimits",
+              "optional": true,
+              "description": "Provider quotas, defaulting to 256 global and 64 per verified peer.",
+              "descriptionEn": "Provider quotas, defaulting to 256 global and 64 per verified peer.",
+              "descriptionZh": ""
+            },
+            {
+              "name": "authentication",
+              "type": "IRpcAuthenticationConfig",
+              "optional": true,
+              "description": "Existing per-frame credentials enable signed native transfer without a custom endpoint.",
+              "descriptionEn": "Existing per-frame credentials enable signed native transfer without a custom endpoint.",
+              "descriptionZh": ""
+            },
+            {
+              "name": "probe",
+              "type": "IRpcProbe | readonly IRpcProbe[]",
+              "optional": true,
+              "description": "Installs an endpoint-local synchronous observer without changing pipeline selection.",
+              "descriptionEn": "Installs an endpoint-local synchronous observer without changing pipeline selection.",
+              "descriptionZh": ""
+            },
+            {
+              "name": "defaultTimeoutMs",
+              "type": "number",
+              "optional": true,
+              "description": "Only request/stream inherit this positive default in their original timeout scope.",
+              "descriptionEn": "Only request/stream inherit this positive default in their original timeout scope.",
+              "descriptionZh": ""
+            },
+            {
+              "name": "contract",
+              "type": "IRemoteContract",
+              "optional": true,
+              "description": "Explicit advanced schema, modes and idempotency retain their original contract owner.",
+              "descriptionEn": "Explicit advanced schema, modes and idempotency retain their original contract owner.",
+              "descriptionZh": ""
+            },
+            {
+              "name": "report",
+              "type": "(error: unknown) => void",
+              "optional": true,
+              "description": "Omission reports background failures to console.error through the original owner.",
+              "descriptionEn": "Omission reports background failures to console.error through the original owner.",
+              "descriptionZh": ""
+            },
+            {
+              "name": "keyFactory",
+              "type": "() => string",
+              "optional": true,
+              "description": "Optional idempotency key generator; omission uses the canonical identity generator.",
+              "descriptionEn": "Optional idempotency key generator; omission uses the canonical identity generator.",
+              "descriptionZh": ""
+            },
+            {
+              "name": "retryPort",
+              "type": "IRemoteRetryPort",
+              "optional": true,
+              "description": "Optional whole-invocation retry policy; omission sends once.",
+              "descriptionEn": "Optional whole-invocation retry policy; omission sends once.",
+              "descriptionZh": ""
+            }
+          ],
+          "fragment": "rpc-plugin-coroutines-index--coroutinePlugin"
+        },
+        {
+          "name": "ICoroutineConnect",
+          "kind": "type",
+          "signature": "export type ICoroutineConnect = Readonly<{ readonly __coroutineConnect: unique symbol; }>;",
+          "declarationLine": 4,
+          "source": "packages/rpc-plugin-coroutines/dist/coroutine-task.d.ts",
+          "purpose": "Generation-local opaque authority issued only by the original task registry. Physical ports and reporter ownership remain hidden.",
+          "core": "Generation-local opaque authority issued only by the original task registry. Physical ports and reporter ownership remain hidden.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "aliasOf": "ICoroutineConnect",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type ICoroutineConnect = Readonly<{ readonly __coroutineConnect: unique symbol; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Generation-local opaque authority issued only by the original task registry. Physical ports and reporter ownership remain hidden."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ICoroutineConnect from @migaia/rpc-plugin-coroutines, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ICoroutineConnect when its type contract and declared inputs match the result you need. Choose a different public symbol when ICoroutineConnect does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "Generation-local opaque authority issued only by the original task registry. Physical ports and reporter ownership remain hidden."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-plugin-coroutines/dist/coroutine-task.d.ts:ICoroutineConnect:export type ICoroutineConnect = Readonly<{ readonly __coroutineConnect: unique symbol; }>;",
+          "guidance": [
+            {
+              "id": "类型与错误",
+              "heading": "类型与错误",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "公开类型为 `ICoroutinePluginOptions`、`ICoroutineConnect`、`ICoroutineUserTask`、`ICoroutineTaskContext`、`ICoroutineReplaceSpec`、`ICoroutineSupervisorPolicy`，以及错误码类型。类型不暴露句柄内的物理端口。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "来源准入失败保留 TypeError，source=`rpc.transport.coroutine`、code=`COROUTINE_SOURCE_INVALID`。调用或监督失败保留其原 owner 身份及 cause，不统一改写为来源错误。以 source/code 判断，聚合清理失败仍可沿 errors/cause 找到原始对象。统一调用语义见 host 文档。"
+                }
+              ]
+            }
+          ],
+          "usageScore": 10,
+          "configuration": [],
+          "fragment": "rpc-plugin-coroutines-index--ICoroutineConnect"
+        },
+        {
+          "name": "ICoroutinePluginOptions",
+          "kind": "type",
+          "signature": "export type ICoroutinePluginOptions = ICoroutineCommonOptions & (Readonly<{ spawn: ICoroutineUserTask; supervisor?: ICoroutineSupervisorPolicy; connectToParent?: never; }> | Readonly<{ connectToParent: ICoroutineConnect; spawn?: never; supervisor?: never; }>);",
+          "declarationLine": 14,
+          "source": "packages/rpc-plugin-coroutines/dist/coroutine-plugin.d.ts",
+          "purpose": "Exactly one task spawn or genuine parent handle plus cold installation configuration.",
+          "core": "connect.timeoutMs: Finite positive identity/capability handshake budget shared by the original identity and ACK phases, independent of task and call deadlines.\nOmitted: use the original source/default handshake budget.\nself: Application-owned local name and instanceId for ordinary Host installation; publish only the safe identity fields. Explicit createRpcHost identity takes precedence.\nOmitted: retain the canonical Host identity and generated instanceId.\nprovide: Local methods, descriptors or permitted forwarding entries compiled by the existing provider owner. Explicit createRpcHost providers remain its input.\nOmitted: add no application methods through this plugin option.\nproviderLimits: Original provider admission limits for ordinary Host installation; they do not add another registry or transport queue.\nOmitted: retain the existing provider owner defaults.\nauthentication: Original sign/verify/encrypt configuration used by ordinary Host installation. It protects the accepted connection without granting process or Worker isolation.\nOmitted: add no authentication configuration through this option.\nprobe: One observer or an array of observers forwarded to the same canonical endpoint observation owner.\nOmitted: install no additional probe from this option.\ndefaultTimeoutMs: Default request and stream deadline for ordinary Host installation; it is independent of handshake and cooperative task stop budgets.\nOmitted: retain the original runtime call default.\ncontract: Local remote-method declaration consumed by the existing method compiler, including schemas, call modes and idempotency.\nOmitted: retain the original declaration inference.\nreport: Application error sink for background task, binding and installation failures; existing reporting keeps original error identity and cause chains.\nOmitted: borrow the Host effective reporter.\nkeyFactory: Generate idempotency keys through the original managed task proxy. Parent-handle direct connections do not acquire a second retry owner.\nOmitted: use the original managed proxy key factory.\nretryPort: Dispatch whole invocations through the original managed task proxy retry port, preserving its generation and cancellation ownership.\nOmitted: use the existing managed retry port.\nspawn: Actual task function. Returning settles its generation and closes native ports.\nAbsent in child mode.\nconnectToParent: Exact opaque context.connect issued by this task invocation, not copied or reused.\nAbsent in spawn mode.\nsupervisor: Original restart, terminalPolicy, startupTimeoutMs, stop, budget and heartbeat policy.\nOmitted: original supervisor defaults.\nconnect: Original identity/capability handshake budget, separate from task stop and call timeouts.\nOmitted: original source/default budget.\nname: Application-selected local registration name in an ordinary PluginHost; it distinguishes installed entries and is independent of remote self.name or authentication identity.\nOmitted: coroutine registration name.\nexpose: Explicit method exposure list for an ordinary PluginHost installation; selects which existing methods that entry publishes without creating a local business implementation.\nOmitted: original exposure policy.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "spawn",
+              "kind": "property",
+              "optional": false,
+              "signature": "spawn: ICoroutineUserTask;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "ICoroutineUserTask"
+            },
+            {
+              "name": "supervisor",
+              "kind": "property",
+              "optional": true,
+              "signature": "supervisor?: ICoroutineSupervisorPolicy;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "ICoroutineSupervisorPolicy"
+            },
+            {
+              "name": "connectToParent",
+              "kind": "property",
+              "optional": true,
+              "signature": "connectToParent?: never;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "never"
+            },
+            {
+              "name": "connectToParent",
+              "kind": "property",
+              "optional": false,
+              "signature": "connectToParent: ICoroutineConnect;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "ICoroutineConnect"
+            },
+            {
+              "name": "spawn",
+              "kind": "property",
+              "optional": true,
+              "signature": "spawn?: never;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "never"
+            },
+            {
+              "name": "supervisor",
+              "kind": "property",
+              "optional": true,
+              "signature": "supervisor?: never;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "never"
+            },
+            {
+              "name": "name",
+              "kind": "property",
+              "optional": true,
+              "signature": "name?: string;",
+              "description": "Native local registration name is independent of either endpoint's handshake identity.",
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "expose",
+              "kind": "property",
+              "optional": true,
+              "signature": "expose?: readonly string[];",
+              "description": "Ordinary Host provider selection is compiled by the canonical native installation.",
+              "parameterDetails": [],
+              "returns": "readonly string[]"
+            },
+            {
+              "name": "connect",
+              "kind": "property",
+              "optional": true,
+              "signature": "connect?: IRpcConnectOptions;",
+              "description": "The SDK shares this budget between the original identity and ACK preparation phases.",
+              "parameterDetails": [],
+              "returns": "IRpcConnectOptions"
+            },
+            {
+              "name": "self",
+              "kind": "property",
+              "optional": true,
+              "signature": "self?: IRuntimePeerIdentity;",
+              "description": "Optional local identity; omission generates an instance id with the display name peer.",
+              "parameterDetails": [],
+              "returns": "IRuntimePeerIdentity"
+            },
+            {
+              "name": "provide",
+              "kind": "property",
+              "optional": true,
+              "signature": "provide?: IRuntimePeerProvide;",
+              "description": "Explicit nested own-data method groups; defaults to no application methods and rejects * accessors during compilation.",
+              "parameterDetails": [],
+              "returns": "IRuntimePeerProvide"
+            },
+            {
+              "name": "providerLimits",
+              "kind": "property",
+              "optional": true,
+              "signature": "providerLimits?: IRpcProviderLimits;",
+              "description": "Provider quotas, defaulting to 256 global and 64 per verified peer.",
+              "parameterDetails": [],
+              "returns": "IRpcProviderLimits"
+            },
+            {
+              "name": "authentication",
+              "kind": "property",
+              "optional": true,
+              "signature": "authentication?: IRpcAuthenticationConfig;",
+              "description": "Existing per-frame credentials enable signed native transfer without a custom endpoint.",
+              "parameterDetails": [],
+              "returns": "IRpcAuthenticationConfig"
+            },
+            {
+              "name": "probe",
+              "kind": "property",
+              "optional": true,
+              "signature": "probe?: IRpcProbe | readonly IRpcProbe[];",
+              "description": "Installs an endpoint-local synchronous observer without changing pipeline selection.",
+              "parameterDetails": [],
+              "returns": "IRpcProbe | readonly IRpcProbe[]"
+            },
+            {
+              "name": "defaultTimeoutMs",
+              "kind": "property",
+              "optional": true,
+              "signature": "defaultTimeoutMs?: number;",
+              "description": "Only request/stream inherit this positive default in their original timeout scope.",
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "contract",
+              "kind": "property",
+              "optional": true,
+              "signature": "contract?: IRemoteContract;",
+              "description": "Explicit advanced schema, modes and idempotency retain their original contract owner.",
+              "parameterDetails": [],
+              "returns": "IRemoteContract"
+            },
+            {
+              "name": "report",
+              "kind": "method",
+              "optional": true,
+              "signature": "report?(error: unknown): void;",
+              "description": "Omission reports background failures to console.error through the original owner.",
+              "parameterDetails": [
+                {
+                  "name": "error",
+                  "type": "unknown",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "keyFactory",
+              "kind": "property",
+              "optional": true,
+              "signature": "keyFactory?: () => string;",
+              "description": "Optional idempotency key generator; omission uses the canonical identity generator.",
+              "parameterDetails": [],
+              "returns": "() => string"
+            },
+            {
+              "name": "retryPort",
+              "kind": "property",
+              "optional": true,
+              "signature": "retryPort?: IRemoteRetryPort;",
+              "description": "Optional whole-invocation retry policy; omission sends once.",
+              "parameterDetails": [],
+              "returns": "IRemoteRetryPort"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "ICoroutinePluginOptions",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type ICoroutinePluginOptions = ICoroutineCommonOptions & (Readonly<{ spawn: ICoroutineUserTask; supervisor?: ICoroutineSupervisorPolicy; connectToParent?: never; }> | Readonly<{ connectToParent: ICoroutineConnect; spawn?: never; supervisor?: never; }>);"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Exactly one task spawn or genuine parent handle plus cold installation configuration."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ICoroutinePluginOptions from @migaia/rpc-plugin-coroutines, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ICoroutinePluginOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when ICoroutinePluginOptions does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "connect.timeoutMs: Finite positive identity/capability handshake budget shared by the original identity and ACK phases, independent of task and call deadlines.\nOmitted: use the original source/default handshake budget.\nself: Application-owned local name and instanceId for ordinary Host installation; publish only the safe identity fields. Explicit createRpcHost identity takes precedence.\nOmitted: retain the canonical Host identity and generated instanceId.\nprovide: Local methods, descriptors or permitted forwarding entries compiled by the existing provider owner. Explicit createRpcHost providers remain its input.\nOmitted: add no application methods through this plugin option.\nproviderLimits: Original provider admission limits for ordinary Host installation; they do not add another registry or transport queue.\nOmitted: retain the existing provider owner defaults.\nauthentication: Original sign/verify/encrypt configuration used by ordinary Host installation. It protects the accepted connection without granting process or Worker isolation.\nOmitted: add no authentication configuration through this option.\nprobe: One observer or an array of observers forwarded to the same canonical endpoint observation owner.\nOmitted: install no additional probe from this option.\ndefaultTimeoutMs: Default request and stream deadline for ordinary Host installation; it is independent of handshake and cooperative task stop budgets.\nOmitted: retain the original runtime call default.\ncontract: Local remote-method declaration consumed by the existing method compiler, including schemas, call modes and idempotency.\nOmitted: retain the original declaration inference.\nreport: Application error sink for background task, binding and installation failures; existing reporting keeps original error identity and cause chains.\nOmitted: borrow the Host effective reporter.\nkeyFactory: Generate idempotency keys through the original managed task proxy. Parent-handle direct connections do not acquire a second retry owner.\nOmitted: use the original managed proxy key factory.\nretryPort: Dispatch whole invocations through the original managed task proxy retry port, preserving its generation and cancellation ownership.\nOmitted: use the existing managed retry port.\nspawn: Actual task function. Returning settles its generation and closes native ports.\nAbsent in child mode.\nconnectToParent: Exact opaque context.connect issued by this task invocation, not copied or reused.\nAbsent in spawn mode.\nsupervisor: Original restart, terminalPolicy, startupTimeoutMs, stop, budget and heartbeat policy.\nOmitted: original supervisor defaults.\nconnect: Original identity/capability handshake budget, separate from task stop and call timeouts.\nOmitted: original source/default budget.\nname: Application-selected local registration name in an ordinary PluginHost; it distinguishes installed entries and is independent of remote self.name or authentication identity.\nOmitted: coroutine registration name.\nexpose: Explicit method exposure list for an ordinary PluginHost installation; selects which existing methods that entry publishes without creating a local business implementation.\nOmitted: original exposure policy."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-plugin-coroutines/dist/coroutine-plugin.d.ts:ICoroutinePluginOptions:export type ICoroutinePluginOptions = ICoroutineCommonOptions & (Readonly<{ spawn: ICoroutineUserTask; supervisor?: ICoroutineSupervisorPolicy; connectToParent?: never; }> | Readonly<{ connectToParent: ICoroutineConnect; spawn?: never; supervisor?: never; }>);",
+          "guidance": [
+            {
+              "id": "类型与错误",
+              "heading": "类型与错误",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "公开类型为 `ICoroutinePluginOptions`、`ICoroutineConnect`、`ICoroutineUserTask`、`ICoroutineTaskContext`、`ICoroutineReplaceSpec`、`ICoroutineSupervisorPolicy`，以及错误码类型。类型不暴露句柄内的物理端口。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "来源准入失败保留 TypeError，source=`rpc.transport.coroutine`、code=`COROUTINE_SOURCE_INVALID`。调用或监督失败保留其原 owner 身份及 cause，不统一改写为来源错误。以 source/code 判断，聚合清理失败仍可沿 errors/cause 找到原始对象。统一调用语义见 host 文档。"
+                }
+              ]
+            }
+          ],
+          "usageScore": 6,
+          "configuration": [],
+          "fragment": "rpc-plugin-coroutines-index--ICoroutinePluginOptions"
+        },
+        {
+          "name": "ICoroutineReplaceSpec",
+          "kind": "type",
+          "signature": "export type ICoroutineReplaceSpec = Readonly<{ task: ICoroutineUserTask; }>;",
+          "declarationLine": 30,
+          "source": "packages/rpc-plugin-coroutines/dist/coroutine-task.d.ts",
+          "purpose": "Replacement input for the original native outlet transaction.",
+          "core": "task: Next actual task function, wrapped through the same token/reporter registry.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "task",
+              "kind": "property",
+              "optional": false,
+              "signature": "task: ICoroutineUserTask;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "ICoroutineUserTask"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "ICoroutineReplaceSpec",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type ICoroutineReplaceSpec = Readonly<{ task: ICoroutineUserTask; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Replacement input for the original native outlet transaction."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ICoroutineReplaceSpec from @migaia/rpc-plugin-coroutines, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ICoroutineReplaceSpec when its type contract and declared inputs match the result you need. Choose a different public symbol when ICoroutineReplaceSpec does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "task: Next actual task function, wrapped through the same token/reporter registry."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-plugin-coroutines/dist/coroutine-task.d.ts:ICoroutineReplaceSpec:export type ICoroutineReplaceSpec = Readonly<{ task: ICoroutineUserTask; }>;",
+          "guidance": [
+            {
+              "id": "类型与错误",
+              "heading": "类型与错误",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "公开类型为 `ICoroutinePluginOptions`、`ICoroutineConnect`、`ICoroutineUserTask`、`ICoroutineTaskContext`、`ICoroutineReplaceSpec`、`ICoroutineSupervisorPolicy`，以及错误码类型。类型不暴露句柄内的物理端口。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "来源准入失败保留 TypeError，source=`rpc.transport.coroutine`、code=`COROUTINE_SOURCE_INVALID`。调用或监督失败保留其原 owner 身份及 cause，不统一改写为来源错误。以 source/code 判断，聚合清理失败仍可沿 errors/cause 找到原始对象。统一调用语义见 host 文档。"
+                }
+              ]
+            }
+          ],
+          "usageScore": 10,
+          "configuration": [],
+          "fragment": "rpc-plugin-coroutines-index--ICoroutineReplaceSpec"
+        },
+        {
+          "name": "ICoroutineSupervisorPolicy",
+          "kind": "type",
+          "signature": "export type ICoroutineSupervisorPolicy = Readonly<Partial<Pick<ICoroutineSupervisorOptions<ICoroutineMessagePort>, 'restart' | 'terminalPolicy' | 'startupTimeoutMs' | 'stop' | 'budget' | 'heartbeat'>>>;",
+          "declarationLine": 24,
+          "source": "packages/rpc-plugin-coroutines/dist/coroutine-binding.d.ts",
+          "purpose": "Partial original supervision configuration; no separate task scheduler or retry state.",
+          "core": "restart: Original restart and replacement decision.\nOmitted: original supervisor default.\nterminalPolicy: Original terminal-failure disposition.\nstartupTimeoutMs: Task startup budget, distinct from call/handshake deadlines.\nstop: Original cooperative stop and reap policy.\nbudget: Original native unit/lease budget.\nheartbeat: Original liveness policy observes task heartbeat calls.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "budget",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly budget?: IUnitBudget<'coroutine'>;",
+              "description": "Shared unit admission budget; its lease remains occupied until actual unit exit.",
+              "parameterDetails": [],
+              "returns": "IUnitBudget<'coroutine'>"
+            },
+            {
+              "name": "heartbeat",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly heartbeat?: { /** Maximum scheduler-time age of the last coroutine heartbeat before a check fails. */ readonly timeoutMs: number; /** Scheduler interval between coroutine heartbeat-age checks. */ readonly intervalMs?: number; /** Consecutive stale heartbeat observations required before invalidating the coroutine. */ readonly failureThreshold?: number; };",
+              "description": "Coroutine heartbeat watchdog; it observes cooperative task progress rather than native process * health.",
+              "parameterDetails": [],
+              "returns": "{ /** Maximum scheduler-time age of the last coroutine heartbeat before a check fails. */ readonly timeoutMs: number; /** Scheduler interval between coroutine heartbeat-age checks. */ readonly intervalMs?: number; /** Consecutive stale heartbeat observations required before invalidating the coroutine. */ readonly failureThreshold?: number; }"
+            },
+            {
+              "name": "startupTimeoutMs",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly startupTimeoutMs?: number;",
+              "description": "Maximum launch and readiness time in scheduler milliseconds; defaults to 10000.",
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "restart",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly restart?: { /** Selects never, on-failure or always restart after exit; defaults to on-failure. */ readonly mode?: RestartMode; /** First automatic restart delay in scheduler milliseconds; defaults to 250. */ readonly initialDelayMs?: number; /** Multiplier for successive restart delays; defaults to 2 and remains bounded by maxDelayMs. */ readonly factor?: number; /** Upper bound on exponential restart delay in milliseconds; defaults to 30000. */ readonly maxDelayMs?: number; /** Maximum restart attempts in the sliding window before the supervisor enters terminal state. */ readonly maxRestarts?: number; /** Sliding scheduler-time window used to count restart attempts; defaults to 60000 milliseconds. */ readonly windowMs?: number; };",
+              "description": "Restart mode and bounded exponential backoff after profile-classified retryable exit.",
+              "parameterDetails": [],
+              "returns": "{ /** Selects never, on-failure or always restart after exit; defaults to on-failure. */ readonly mode?: RestartMode; /** First automatic restart delay in scheduler milliseconds; defaults to 250. */ readonly initialDelayMs?: number; /** Multiplier for successive restart delays; defaults to 2 and remains bounded by maxDelayMs. */ readonly factor?: number; /** Upper bound on exponential restart delay in milliseconds; defaults to 30000. */ readonly maxDelayMs?: number; /** Maximum restart attempts in the sliding window before the supervisor enters terminal state. */ readonly maxRestarts?: number; /** Sliding scheduler-time window used to count restart attempts; defaults to 60000 milliseconds. */ readonly windowMs?: number; }"
+            },
+            {
+              "name": "terminalPolicy",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly terminalPolicy?: { /** * Stays terminal until an explicit restart resets policy; dispose remains permanently * closed. */ readonly mode: 'stay'; } | { /** Reopens admission after the explicit cooldown duration. */ readonly mode: 'cooldown'; /** Scheduler milliseconds to wait before admitting a new generation. */ readonly afterMs: number; };",
+              "description": "Chooses whether terminal policy waits for explicit restart or schedules an automatic cooldown retry.",
+              "parameterDetails": [],
+              "returns": "{ /** * Stays terminal until an explicit restart resets policy; dispose remains permanently * closed. */ readonly mode: 'stay'; } | { /** Reopens admission after the explicit cooldown duration. */ readonly mode: 'cooldown'; /** Scheduler milliseconds to wait before admitting a new generation. */ readonly afterMs: number; }"
+            },
+            {
+              "name": "stop",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly stop?: { /** Optional cancellable drain callback invoked before profile-specific termination. */ readonly beforeTerminate?: (unit: THandle, signal: INativeAbortSignal, remainingMs: () => number) => PromiseLike<void>; /** Maximum application drain time before termination proceeds; defaults to 5000 milliseconds. */ readonly drainTimeoutMs?: number; /** Maximum wait for graceful actual exit before hard termination; defaults to 5000 milliseconds. */ readonly exitTimeoutMs?: number; /** Maximum wait for actual exit after hard termination; defaults to 5000 milliseconds. */ readonly reapTimeoutMs?: number; };",
+              "description": "Ordered shutdown policy for draining application work, requesting exit and finally reaping the unit.",
+              "parameterDetails": [],
+              "returns": "{ /** Optional cancellable drain callback invoked before profile-specific termination. */ readonly beforeTerminate?: (unit: THandle, signal: INativeAbortSignal, remainingMs: () => number) => PromiseLike<void>; /** Maximum application drain time before termination proceeds; defaults to 5000 milliseconds. */ readonly drainTimeoutMs?: number; /** Maximum wait for graceful actual exit before hard termination; defaults to 5000 milliseconds. */ readonly exitTimeoutMs?: number; /** Maximum wait for actual exit after hard termination; defaults to 5000 milliseconds. */ readonly reapTimeoutMs?: number; }"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "ICoroutineSupervisorPolicy",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type ICoroutineSupervisorPolicy = Readonly<Partial<Pick<ICoroutineSupervisorOptions<ICoroutineMessagePort>, 'restart' | 'terminalPolicy' | 'startupTimeoutMs' | 'stop' | 'budget' | 'heartbeat'>>>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Partial original supervision configuration; no separate task scheduler or retry state."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ICoroutineSupervisorPolicy from @migaia/rpc-plugin-coroutines, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ICoroutineSupervisorPolicy when its type contract and declared inputs match the result you need. Choose a different public symbol when ICoroutineSupervisorPolicy does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "restart: Original restart and replacement decision.\nOmitted: original supervisor default.\nterminalPolicy: Original terminal-failure disposition.\nstartupTimeoutMs: Task startup budget, distinct from call/handshake deadlines.\nstop: Original cooperative stop and reap policy.\nbudget: Original native unit/lease budget.\nheartbeat: Original liveness policy observes task heartbeat calls."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-plugin-coroutines/dist/coroutine-binding.d.ts:ICoroutineSupervisorPolicy:export type ICoroutineSupervisorPolicy = Readonly<Partial<Pick<ICoroutineSupervisorOptions<ICoroutineMessagePort>, 'restart' | 'terminalPolicy' | 'startupTimeoutMs' | 'stop' | 'budget' | 'heartbeat'>>>;",
+          "guidance": [
+            {
+              "id": "类型与错误",
+              "heading": "类型与错误",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "公开类型为 `ICoroutinePluginOptions`、`ICoroutineConnect`、`ICoroutineUserTask`、`ICoroutineTaskContext`、`ICoroutineReplaceSpec`、`ICoroutineSupervisorPolicy`，以及错误码类型。类型不暴露句柄内的物理端口。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "来源准入失败保留 TypeError，source=`rpc.transport.coroutine`、code=`COROUTINE_SOURCE_INVALID`。调用或监督失败保留其原 owner 身份及 cause，不统一改写为来源错误。以 source/code 判断，聚合清理失败仍可沿 errors/cause 找到原始对象。统一调用语义见 host 文档。"
+                }
+              ]
+            }
+          ],
+          "usageScore": 6,
+          "configuration": [],
+          "fragment": "rpc-plugin-coroutines-index--ICoroutineSupervisorPolicy"
+        },
+        {
+          "name": "ICoroutineTaskContext",
+          "kind": "type",
+          "signature": "export type ICoroutineTaskContext = Readonly<{ /** Original cooperative task cancellation signal; user work must observe it. */ signal: INativeAbortSignal; /** Report liveness through the existing supervisor heartbeat owner. */ heartbeat(): void; /** Opaque child connection for this exact task generation. */ connect: ICoroutineConnect; }>;",
+          "declarationLine": 8,
+          "source": "packages/rpc-plugin-coroutines/dist/coroutine-task.d.ts",
+          "purpose": "Original per-task lifetime, liveness and source authority.",
+          "core": "signal: Supervised task lifetime signal; cancellation is cooperative.\nconnect: Exact handle for this invocation only; never cross a generation.\nheartbeat: Report liveness to the original configured policy without completing business work.\nVoid; all timing remains supervisor-owned.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "signal",
+              "kind": "property",
+              "optional": false,
+              "signature": "signal: INativeAbortSignal;",
+              "description": "Original cooperative task cancellation signal; user work must observe it.",
+              "parameterDetails": [],
+              "returns": "INativeAbortSignal"
+            },
+            {
+              "name": "heartbeat",
+              "kind": "method",
+              "optional": false,
+              "signature": "heartbeat(): void;",
+              "description": "Report liveness through the existing supervisor heartbeat owner.",
+              "parameterDetails": [],
+              "returns": "void"
+            },
+            {
+              "name": "connect",
+              "kind": "property",
+              "optional": false,
+              "signature": "connect: ICoroutineConnect;",
+              "description": "Opaque child connection for this exact task generation.",
+              "parameterDetails": [],
+              "returns": "ICoroutineConnect"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "ICoroutineTaskContext",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type ICoroutineTaskContext = Readonly<{ /** Original cooperative task cancellation signal; user work must observe it. */ signal: INativeAbortSignal; /** Report liveness through the existing supervisor heartbeat owner. */ heartbeat(): void; /** Opaque child connection for this exact task generation. */ connect: ICoroutineConnect; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Original per-task lifetime, liveness and source authority."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ICoroutineTaskContext from @migaia/rpc-plugin-coroutines, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ICoroutineTaskContext when its type contract and declared inputs match the result you need. Choose a different public symbol when ICoroutineTaskContext does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "signal: Supervised task lifetime signal; cancellation is cooperative.\nconnect: Exact handle for this invocation only; never cross a generation.\nheartbeat: Report liveness to the original configured policy without completing business work.\nVoid; all timing remains supervisor-owned."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-plugin-coroutines/dist/coroutine-task.d.ts:ICoroutineTaskContext:export type ICoroutineTaskContext = Readonly<{ /** Original cooperative task cancellation signal; user work must observe it. */ signal: INativeAbortSignal; /** Report liveness through the existing supervisor heartbeat owner. */ heartbeat(): void; /** Opaque child connection for this exact task generation. */ connect: ICoroutineConnect; }>;",
+          "guidance": [
+            {
+              "id": "类型与错误",
+              "heading": "类型与错误",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "公开类型为 `ICoroutinePluginOptions`、`ICoroutineConnect`、`ICoroutineUserTask`、`ICoroutineTaskContext`、`ICoroutineReplaceSpec`、`ICoroutineSupervisorPolicy`，以及错误码类型。类型不暴露句柄内的物理端口。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "来源准入失败保留 TypeError，source=`rpc.transport.coroutine`、code=`COROUTINE_SOURCE_INVALID`。调用或监督失败保留其原 owner 身份及 cause，不统一改写为来源错误。以 source/code 判断，聚合清理失败仍可沿 errors/cause 找到原始对象。统一调用语义见 host 文档。"
+                }
+              ]
+            }
+          ],
+          "usageScore": 6,
+          "configuration": [],
+          "fragment": "rpc-plugin-coroutines-index--ICoroutineTaskContext"
+        },
+        {
+          "name": "ICoroutineUserTask",
+          "kind": "type",
+          "signature": "export type ICoroutineUserTask = (context: ICoroutineTaskContext) => PromiseLike<unknown> | void;",
+          "declarationLine": 28,
+          "source": "packages/rpc-plugin-coroutines/dist/coroutine-task.d.ts",
+          "purpose": "Function receiving ICoroutineTaskContext and returning void or a thenable. Keep it alive until work or stop completes; use finally for child cleanup.",
+          "core": "Function receiving ICoroutineTaskContext and returning void or a thenable. Keep it alive until work or stop completes; use finally for child cleanup.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [
+            "import { createRpcHost } from '@migaia/rpc-host'\nimport { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'\n\nexport const task: ICoroutineUserTask = async ({ connect, signal }) => {\n  const child = await createRpcHost({\n    plugins: [coroutinePlugin({ connectToParent: connect })],\n    provide: { echo: (value: string) => value }\n  })\n  try {\n    if (!signal.aborted)\n      await new Promise<void>((resolve) => {\n        signal.addEventListener('abort', () => resolve(), { once: true })\n      })\n  } finally {\n    await child.close()\n  }\n}",
+            "import { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'\nimport { retryFeature, timeoutFeature } from '@migaia/rpc-host/features'\n\nexport function taskPlugins(task: ICoroutineUserTask) {\n  return [\n    coroutinePlugin({ spawn: task, supervisor: { startupTimeoutMs: 1500 } }),\n    retryFeature(),\n    timeoutFeature({ ms: 1000 })\n  ]\n}"
+          ],
+          "members": [],
+          "composes": [],
+          "aliasOf": "ICoroutineUserTask",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type ICoroutineUserTask = (context: ICoroutineTaskContext) => PromiseLike<unknown> | void;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Function receiving ICoroutineTaskContext and returning void or a thenable. Keep it alive until work or stop completes; use finally for child cleanup."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ICoroutineUserTask from @migaia/rpc-plugin-coroutines, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ICoroutineUserTask when its type contract and declared inputs match the result you need. Choose a different public symbol when ICoroutineUserTask does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "Function receiving ICoroutineTaskContext and returning void or a thenable. Keep it alive until work or stop completes; use finally for child cleanup."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-plugin-coroutines/dist/coroutine-task.d.ts:ICoroutineUserTask:export type ICoroutineUserTask = (context: ICoroutineTaskContext) => PromiseLike<unknown> | void;",
+          "guidance": [
+            {
+              "id": "类型与错误",
+              "heading": "类型与错误",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "公开类型为 `ICoroutinePluginOptions`、`ICoroutineConnect`、`ICoroutineUserTask`、`ICoroutineTaskContext`、`ICoroutineReplaceSpec`、`ICoroutineSupervisorPolicy`，以及错误码类型。类型不暴露句柄内的物理端口。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "来源准入失败保留 TypeError，source=`rpc.transport.coroutine`、code=`COROUTINE_SOURCE_INVALID`。调用或监督失败保留其原 owner 身份及 cause，不统一改写为来源错误。以 source/code 判断，聚合清理失败仍可沿 errors/cause 找到原始对象。统一调用语义见 host 文档。"
+                }
+              ]
+            }
+          ],
+          "usageScore": 34,
+          "configuration": [],
+          "fragment": "rpc-plugin-coroutines-index--ICoroutineUserTask"
+        },
+        {
+          "name": "IRpcCoroutineErrorCode",
+          "kind": "type",
+          "signature": "export type IRpcCoroutineErrorCode = (typeof RpcCoroutineErrorCode)[keyof typeof RpcCoroutineErrorCode];",
+          "declarationLine": 9,
+          "source": "packages/rpc-plugin-coroutines/dist/error-code.d.ts",
+          "purpose": "Registered coroutine source error-code value union.",
+          "core": "Registered coroutine source error-code value union.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "aliasOf": "IRpcCoroutineErrorCode",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IRpcCoroutineErrorCode = (typeof RpcCoroutineErrorCode)[keyof typeof RpcCoroutineErrorCode];"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Registered coroutine source error-code value union."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcCoroutineErrorCode from @migaia/rpc-plugin-coroutines, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcCoroutineErrorCode when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcCoroutineErrorCode does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "Registered coroutine source error-code value union."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-plugin-coroutines/dist/error-code.d.ts:IRpcCoroutineErrorCode:export type IRpcCoroutineErrorCode = (typeof RpcCoroutineErrorCode)[keyof typeof RpcCoroutineErrorCode];",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-plugin-coroutines-index--IRpcCoroutineErrorCode"
+        },
+        {
+          "name": "RPC_COROUTINE_ERROR_SOURCE",
+          "kind": "const",
+          "signature": "export declare const RPC_COROUTINE_ERROR_SOURCE = \"rpc.transport.coroutine\";",
+          "declarationLine": 2,
+          "source": "packages/rpc-plugin-coroutines/dist/error-code.d.ts",
+          "purpose": "Stable rpc.transport.coroutine source admission domain; business and supervision errors keep their original owners.",
+          "core": "Stable rpc.transport.coroutine source admission domain; business and supervision errors keep their original owners.",
+          "advanced": "",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "aliasOf": "ERROR_SOURCE",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare const RPC_COROUTINE_ERROR_SOURCE = \"rpc.transport.coroutine\";"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Stable rpc.transport.coroutine source admission domain; business and supervision errors keep their original owners."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import RPC_COROUTINE_ERROR_SOURCE from @migaia/rpc-plugin-coroutines, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use RPC_COROUTINE_ERROR_SOURCE when its const contract and declared inputs match the result you need. Choose a different public symbol when RPC_COROUTINE_ERROR_SOURCE does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "Stable rpc.transport.coroutine source admission domain; business and supervision errors keep their original owners."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-plugin-coroutines/dist/error-code.d.ts:RPC_COROUTINE_ERROR_SOURCE:export declare const RPC_COROUTINE_ERROR_SOURCE = \"rpc.transport.coroutine\";",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-plugin-coroutines-index--RPC_COROUTINE_ERROR_SOURCE"
+        },
+        {
+          "name": "RpcCoroutineErrorCode",
+          "kind": "const",
+          "signature": "export declare const RpcCoroutineErrorCode: { /** Supply exactly one callable task or a genuine connection received by that task generation. */ readonly sourceInvalid: 'COROUTINE_SOURCE_INVALID'; };",
+          "declarationLine": 4,
+          "source": "packages/rpc-plugin-coroutines/dist/error-code.d.ts",
+          "purpose": "Registered source admission failure attached to native TypeError without replacing the original instance.",
+          "core": "sourceInvalid: COROUTINE_SOURCE_INVALID: select exactly one callable task or genuine parent handle.",
+          "advanced": "",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "sourceInvalid",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly sourceInvalid: 'COROUTINE_SOURCE_INVALID';",
+              "description": "Supply exactly one callable task or a genuine connection received by that task generation.",
+              "parameterDetails": [],
+              "returns": "'COROUTINE_SOURCE_INVALID'"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "RpcCoroutineErrorCode",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare const RpcCoroutineErrorCode: { /** Supply exactly one callable task or a genuine connection received by that task generation. */ readonly sourceInvalid: 'COROUTINE_SOURCE_INVALID'; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Registered source admission failure attached to native TypeError without replacing the original instance."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import RpcCoroutineErrorCode from @migaia/rpc-plugin-coroutines, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use RpcCoroutineErrorCode when its const contract and declared inputs match the result you need. Choose a different public symbol when RpcCoroutineErrorCode does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "sourceInvalid: COROUTINE_SOURCE_INVALID: select exactly one callable task or genuine parent handle."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-plugin-coroutines/dist/error-code.d.ts:RpcCoroutineErrorCode:export declare const RpcCoroutineErrorCode: { /** Supply exactly one callable task or a genuine connection received by that task generation. */ readonly sourceInvalid: 'COROUTINE_SOURCE_INVALID'; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-plugin-coroutines-index--RpcCoroutineErrorCode"
+        }
+      ],
+      "aliases": []
+    }
+  ]
+}

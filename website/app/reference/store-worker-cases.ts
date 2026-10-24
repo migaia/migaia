@@ -65,20 +65,12 @@ const summary = workerComputed<number[], number>(adapter, () => pagePrices(nextP
   keepAlive: true
 })
 nextPage.value = 3`,
-  transfer: `import { workerComputed } from '@migaia/store-worker'
-
-const bytes = await readUploadBytes(file)
-const checksum = workerComputed<Uint8Array, number>(adapter, () => bytes, {
-  transfer: (input) => [input.buffer]
-})
-showChecksum(await checksum.promise)`,
   copyParser: `import { workerParser } from '@migaia/store-worker/serialize/worker'
 
 const parser = workerParser({
   worker: jsonWorker,
   type: 'json',
   clientId: 'main',
-  ownership: 'copy',
   terminateOnDispose: false
 })
 const bytes = await readUploadBytes(file)
@@ -89,23 +81,24 @@ const value = await parser.decode(['bytes', bytes], {
 renderImportedCart(value)
 await saveOriginalUpload(bytes)
 await parser.dispose?.()`,
-  transferPlugin: `import { createSerializeRegistry } from '@migaia/serialize'
+  ownedPlugin: `import { createSerializeRegistry } from '@migaia/serialize'
 import { workerPlugin } from '@migaia/store-worker/serialize/worker'
 
 const registry = createSerializeRegistry([workerPlugin({
   worker: jsonWorker,
   type: 'json',
   clientId: 'main',
-  ownership: 'transfer',
   terminateOnDispose: true
 })])
 const bytes = await readUploadBytes(file)
-const value = await registry.decode(['bytes', bytes], {
-  signal: importLifetime.signal,
-  context: 'cart-import'
-})
-renderImportedCart(value)
-await registry.dispose()`
+try {
+  await registry.decode(['bytes', bytes], {
+    signal: importLifetime.signal, context: 'cart-import'
+  })
+  await saveOriginalUpload(bytes)
+} finally {
+  await registry.dispose()
+}`
 }
 
 /** Each option case explains one visible application outcome. */
@@ -192,19 +185,6 @@ export const storeWorkerOptionCases: Readonly<Record<string, readonly IOptionCas
       covers: ['keepAlive', 'runtime']
     },
     {
-      title: t('Give disposable upload bytes to the worker', '把不再需要的上传字节交给工作线程'),
-      problem: t(
-        'An upload page needs a checksum and will not use its input buffer again. Select that buffer for native transfer instead of retaining ownership. Every alias may detach when the request is sent, so use this only for disposable input.',
-        '上传页需要校验值，之后不会再使用输入缓冲区。选择该缓冲区进行原生转移，并放弃原有所有权。请求发送时所有别名都可能分离，因此只用于可放弃的输入。'
-      ),
-      example: storeWorkerOptionExamples.transfer,
-      result: t(
-        'The checksum appears on the upload page. The original input buffer is no longer available for another operation after transfer.',
-        '上传页显示校验值，转移后的原始输入缓冲区不能再供其他操作使用。'
-      ),
-      covers: ['transfer']
-    },
-    {
       title: t('Calculate only when the summary panel opens', '摘要面板展开时才计算'),
       problem: t(
         'Most visitors never open the optional cart summary. Starting its worker request on every visit wastes work. Leave it idle and request its Promise only when the panel is opened.',
@@ -222,31 +202,31 @@ export const storeWorkerOptionCases: Readonly<Record<string, readonly IOptionCas
     {
       title: t('Keep an uploaded file for validation and archiving', '保留上传文件供校验与归档'),
       problem: t(
-        'A cart importer decodes an uploaded JSON file and also archives the original bytes. Copy ownership preserves that input. Its JSON worker is shared with other imports, so disposing this parser must release only the borrowed endpoint.',
-        '购物车导入器需要解码JSON文件，还要归档原始字节。复制策略保留这些输入。JSON工作线程还供其他导入使用，因此释放解析器时只能结束借用的端点。'
+        'A cart importer decodes an uploaded JSON file and also archives the original bytes. Worker calls copy parameters without detaching that input. Its JSON worker is shared with other imports, so disposing this parser must release only the borrowed endpoint.',
+        '购物车导入器需要解码JSON文件，还要归档原始字节。Worker 调用复制参数，不 detach 这些输入。JSON工作线程还供其他导入使用，因此释放解析器时只能结束借用的端点。'
       ),
       example: storeWorkerOptionExamples.copyParser,
       result: t(
         'The imported cart is shown and the original upload can still be archived. Parser cleanup leaves the shared worker available.',
         '导入后的购物车正常显示，原始上传仍可归档，解析器清理后共享工作线程继续可用。'
       ),
-      covers: ['worker', 'type', 'clientId', 'ownership', 'terminateOnDispose']
+      covers: ['worker', 'type', 'clientId', 'terminateOnDispose']
     },
     {
       title: t(
-        'Consume a one-off import and retire its worker',
-        '完成一次性导入后关闭专用工作线程'
+        'Decode copied bytes and retire the owned worker',
+        '解码复制的字节并关闭拥有的工作线程'
       ),
       problem: t(
-        'A one-off cart import owns a dedicated JSON worker and does not need the uploaded buffer again. Transfer the complete input view and make registry disposal terminate that worker so the import owns its entire lifetime.',
-        '一次性购物车导入拥有专用JSON工作线程，也不再需要上传缓冲区。转移完整输入视图，并让注册表释放时终止工作线程，导入流程便拥有完整生命周期。'
+        'Decode a copied upload while preserving its original bytes. Finally dispose the registry and request its explicitly configured Worker termination.',
+        '解码复制的上传并保留原始字节。finally 释放注册表并按显式配置请求终止 Worker。'
       ),
-      example: storeWorkerOptionExamples.transferPlugin,
+      example: storeWorkerOptionExamples.ownedPlugin,
       result: t(
-        'The imported cart appears, the consumed input bytes detach, and registry disposal requests termination of the dedicated worker.',
-        '导入后的购物车显示出来，已消耗的输入字节分离，注册表释放时请求终止专用工作线程。'
+        'The decoded result is available, the input remains readable, and registry disposal requests termination of its dedicated Worker.',
+        '解码成功后输入仍可读取，注册表释放会请求终止专用 Worker。'
       ),
-      covers: ['worker', 'type', 'clientId', 'ownership', 'terminateOnDispose']
+      covers: ['worker', 'type', 'clientId', 'terminateOnDispose']
     }
   ]
 }
@@ -298,16 +278,16 @@ export const storeWorkerCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
         zh: '保留 Worker 计算失败的原因链'
       },
       problem: {
-        en: 'A Worker calculation throws a TypeError caused by an earlier RangeError, but the caller needs both failures to diagnose the input.\n\nSending only an error message loses native types, the nested cause and the original stack information across the thread boundary.\n\nWrap the real computation with createWorkerHandler and forward incoming messages to it. RPC returns a remote failure whose cause retains the native TypeError and its RangeError cause; no custom error-message protocol is needed.',
-        zh: 'Worker 中的计算因输入问题抛出 `TypeError`，其原因又是一个 `RangeError`，调用方需要同时看到两层失败。\n\n只回传错误消息，会在线程边界丢失原生类型、嵌套原因和原始堆栈信息。\n\n用 `createWorkerHandler` 包装真实计算，并向它转交收到的消息；RPC 返回远端失败，其原因链保留原生 `TypeError` 与内部 `RangeError`，无需另建错误消息协议。'
+        en: 'A Worker calculation throws a TypeError caused by an earlier RangeError, but the caller needs both failures to diagnose the input.\n\nSending only an error message loses native types, the nested cause and the original stack information across the thread boundary.\n\nWrap the real computation with createWorkerHandler and forward incoming messages to it. RPC preserves the native TypeError as the top-level failure and its RangeError cause; no custom error-message protocol is needed.',
+        zh: 'Worker 中的计算因输入问题抛出 `TypeError`，其原因又是一个 `RangeError`，调用方需要同时看到两层失败。\n\n只回传错误消息，会在线程边界丢失原生类型、嵌套原因和原始堆栈信息。\n\n用 `createWorkerHandler` 包装真实计算，并向它转交收到的消息；RPC 保留顶层原生 `TypeError` 与内部 `RangeError` 原因，无需另建错误消息协议。'
       },
       example: {
-        en: "import {\n  Worker,\n  MessageChannel,\n  workerData,\n  isMainThread,\n  threadId,\n  type MessagePort\n} from 'node:worker_threads'\nimport { WorkerAdapter, createWorkerHandler } from '@migaia/store-worker'\n\nif (!isMainThread) {\n  const port = workerData as MessagePort\n  const root = new RangeError('invalid row')\n  const failure = new TypeError('cannot compute total', { cause: root })\n  const handler = createWorkerHandler(\n    () => {\n      throw failure\n    },\n    (message) => port.postMessage(message)\n  )\n  port.on('message', (message) => void handler(message).catch(console.error))\n} else {\n  const { port1, port2 } = new MessageChannel()\n  const worker = new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] })\n  port1.start()\n  const adapter = new WorkerAdapter(port1)\n  try {\n    const failure = (await adapter.request([1, 2]).catch((error: unknown) => error)) as Error\n    const primary = failure.cause as Error\n    const root = primary.cause as Error\n    console.log('remote:', failure.name, (failure as Error & { code?: string }).code)\n    console.log('primary:', primary instanceof TypeError, primary.message)\n    console.log('cause:', root instanceof RangeError, root.message)\n    console.log('stacks:', Boolean(primary.stack), Boolean(root.stack))\n  } finally {\n    await adapter.dispose()\n    port1.close()\n    await worker.terminate()\n  }\n}",
-        zh: "import {\n  Worker,\n  MessageChannel,\n  workerData,\n  isMainThread,\n  threadId,\n  type MessagePort\n} from 'node:worker_threads'\nimport { WorkerAdapter, createWorkerHandler } from '@migaia/store-worker'\n\nif (!isMainThread) {\n  const port = workerData as MessagePort\n  const root = new RangeError('行数据无效')\n  const failure = new TypeError('无法计算总数', { cause: root })\n  const handler = createWorkerHandler(\n    () => {\n      throw failure\n    },\n    (message) => port.postMessage(message)\n  )\n  port.on('message', (message) => void handler(message).catch(console.error))\n} else {\n  const { port1, port2 } = new MessageChannel()\n  const worker = new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] })\n  port1.start()\n  const adapter = new WorkerAdapter(port1)\n  try {\n    const failure = (await adapter.request([1, 2]).catch((error: unknown) => error)) as Error\n    const primary = failure.cause as Error\n    const root = primary.cause as Error\n    console.log('远端错误：', failure.name, (failure as Error & { code?: string }).code)\n    console.log('原始错误：', primary instanceof TypeError, primary.message)\n    console.log('原因：', root instanceof RangeError, root.message)\n    console.log('堆栈：', Boolean(primary.stack), Boolean(root.stack))\n  } finally {\n    await adapter.dispose()\n    port1.close()\n    await worker.terminate()\n  }\n}"
+        en: "import {\n  Worker,\n  MessageChannel,\n  workerData,\n  isMainThread,\n  threadId,\n  type MessagePort\n} from 'node:worker_threads'\nimport { WorkerAdapter, createWorkerHandler } from '@migaia/store-worker'\n\nif (!isMainThread) {\n  const port = workerData as MessagePort\n  const root = new RangeError('invalid row')\n  const failure = new TypeError('cannot compute total', { cause: root })\n  const handler = createWorkerHandler(\n    () => {\n      throw failure\n    },\n    (message) => port.postMessage(message)\n  )\n  port.on('message', (message) => void handler(message).catch(console.error))\n} else {\n  const { port1, port2 } = new MessageChannel()\n  const worker = new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] })\n  port1.start()\n  const adapter = new WorkerAdapter(port1)\n  try {\n    const failure = (await adapter.request([1, 2]).catch((error: unknown) => error)) as Error\n    const primary = failure\n    const root = primary.cause as Error\n    console.log('remote:', failure.name, (failure as Error & { code?: string }).code)\n    console.log('primary:', primary instanceof TypeError, primary.message)\n    console.log('cause:', root instanceof RangeError, root.message)\n    console.log('stacks:', Boolean(primary.stack), Boolean(root.stack))\n  } finally {\n    await adapter.dispose()\n    port1.close()\n    await worker.terminate()\n  }\n}",
+        zh: "import {\n  Worker,\n  MessageChannel,\n  workerData,\n  isMainThread,\n  threadId,\n  type MessagePort\n} from 'node:worker_threads'\nimport { WorkerAdapter, createWorkerHandler } from '@migaia/store-worker'\n\nif (!isMainThread) {\n  const port = workerData as MessagePort\n  const root = new RangeError('行数据无效')\n  const failure = new TypeError('无法计算总数', { cause: root })\n  const handler = createWorkerHandler(\n    () => {\n      throw failure\n    },\n    (message) => port.postMessage(message)\n  )\n  port.on('message', (message) => void handler(message).catch(console.error))\n} else {\n  const { port1, port2 } = new MessageChannel()\n  const worker = new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] })\n  port1.start()\n  const adapter = new WorkerAdapter(port1)\n  try {\n    const failure = (await adapter.request([1, 2]).catch((error: unknown) => error)) as Error\n    const primary = failure\n    const root = primary.cause as Error\n    console.log('远端错误：', failure.name, (failure as Error & { code?: string }).code)\n    console.log('原始错误：', primary instanceof TypeError, primary.message)\n    console.log('原因：', root instanceof RangeError, root.message)\n    console.log('堆栈：', Boolean(primary.stack), Boolean(root.stack))\n  } finally {\n    await adapter.dispose()\n    port1.close()\n    await worker.terminate()\n  }\n}"
       },
       result: {
-        en: "The output is `remote: RpcRemoteError INTERNAL`, `primary: true cannot compute total`, `cause: true invalid row`, then `stacks: true true`.\n\nThe outer error belongs to RPC Core; the native errors remain below cause rather than becoming the top-level TypeError. The message handler's Promise covers delivery, not compute completion; await the main-side request for the operation result.",
-        zh: '依次输出 `远端错误： RpcRemoteError INTERNAL`、`原始错误： true 无法计算总数`、`原因： true 行数据无效`、`堆栈： true true`。\n\n外层错误属于 RPC Core，原生错误保留在 `cause` 链中，不会把最外层变成 `TypeError`。消息处理器的 Promise 只等待投递，不代表计算完成；操作结果由主端请求等待。'
+        en: "The output is `remote: TypeError UNKNOWN`, `primary: true cannot compute total`, `cause: true invalid row`, then `stacks: true true`.\n\nThe original TypeError remains top-level with its RangeError cause and both original stacks; no synthetic RpcRemoteError wrapper is added. The message handler's Promise covers delivery, not compute completion; await the main-side request for the operation result.",
+        zh: '依次输出 `远端错误： TypeError UNKNOWN`、`原始错误： true 无法计算总数`、`原因： true 行数据无效`、`堆栈： true true`。\n\n原生 TypeError 保留在顶层，RangeError 原因与两层原始堆栈均可读取；不会添加伪造 RpcRemoteError 外壳。消息处理器的 Promise 只等待投递，不代表计算完成；操作结果由主端请求等待。'
       }
     }
   ],
@@ -346,8 +326,8 @@ export const storeWorkerCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
         zh: "import {\n  Worker,\n  MessageChannel,\n  workerData,\n  isMainThread,\n  threadId,\n  type MessagePort\n} from 'node:worker_threads'\nimport { createSerializeRegistry } from '@migaia/serialize'\nimport { jsonParser } from '@migaia/serialize/plugins'\nimport { createSerializeWorkerHandler, workerPlugin } from '@migaia/store-worker/serialize/worker'\n\nif (!isMainThread) {\n  const port = workerData as MessagePort\n  const handler = createSerializeWorkerHandler(jsonParser(), (message, transfer) =>\n    port.postMessage(message, transfer as Parameters<typeof port.postMessage>[1])\n  )\n  port.on('message', (message) => void handler(message).catch(console.error))\n} else {\n  const { port1, port2 } = new MessageChannel()\n  const worker = new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] })\n  port1.start()\n  const registry = createSerializeRegistry([workerPlugin({ worker: port1, type: 'json' })])\n  try {\n    const chunk = await registry.encode({ title: 'report', count: 2 })\n    const value = (await registry.decode(chunk)) as { title: string; count: number }\n    console.log('数据块：', chunk[0])\n    console.log('恢复：', value.title, value.count)\n  } finally {\n    await registry.dispose()\n    port1.close()\n    await worker.terminate()\n  }\n}"
       },
       result: {
-        en: "The output is `chunk: text`, then `restored: report 2`: the Worker-side JSON parser produces a text chunk and restores the original fields.\n\nThe explicit type 'json' replaces the default 'worker'; ownership defaults to 'copy' and terminateOnDispose to false. Registry disposal releases its parser endpoint, while the caller closes the native port and Worker. This is wiring evidence, not a speed measurement.",
-        zh: "依次输出 `数据块： text`、`恢复： report 2`：工作端 JSON 解析器返回文本块，并恢复了原有字段。\n\n显式 `type: 'json'` 覆盖默认 `'worker'`，`ownership` 默认 `'copy'`，`terminateOnDispose` 默认 `false`。注册表释放解析器端点，原生端口与 Worker 仍由调用方关闭；这里证明接线，不作速度结论。"
+        en: "The output is `chunk: text`, then `restored: report 2`: the Worker-side JSON parser produces a text chunk and restores the original fields.\n\nThe explicit type 'json' replaces the default 'worker'; terminateOnDispose defaults to false. Registry disposal releases its parser endpoint, while the caller closes the native port and Worker. This is wiring evidence, not a speed measurement.",
+        zh: "依次输出 `数据块： text`、`恢复： report 2`：工作端 JSON 解析器返回文本块，并恢复了原有字段。\n\n显式 `type: 'json'` 覆盖默认 `'worker'`，`terminateOnDispose` 默认 `false`。注册表释放解析器端点，原生端口与 Worker 仍由调用方关闭；这里证明接线，不作速度结论。"
       }
     }
   ],
@@ -358,16 +338,16 @@ export const storeWorkerCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
         zh: '取消解码时保留输入字节'
       },
       problem: {
-        en: "A byte buffer may be needed for a later retry, while the current decode can become unnecessary before it is sent.\n\nTransferring a shared backing buffer can invalidate all its views; treating every cancellation as proof of detachment also discards input that was never sent.\n\nUse workerParser's default copy policy for the real Worker JSON parser. Decode once, then pass a pre-aborted signal and inspect its failure cause and the original bytes before deciding whether to retry.",
-        zh: '输入字节可能还要留给下一次重试，当前解码却可能在发送前就不再需要。\n\n转移共用的底层缓冲区可能让所有视图失效；把取消一律当成已经分离，也会丢弃根本没有发送的输入。\n\n为真实 Worker JSON 解析器使用 `workerParser` 的默认复制策略，先完成一次解码，再传入预先中止的信号，检查失败原因和原字节后决定是否重试。'
+        en: "A byte buffer may be needed for a later retry, while the current decode can become unnecessary before it is sent.\n\nAll Worker calls copy parameters without detaching caller input. Cancellation and input memory remain separately observable; work already running must cooperate with its signal.\n\nUse workerParser's copying path for the real Worker JSON parser. Decode once, then pass a pre-aborted signal and inspect its failure cause and the original bytes before deciding whether to retry.",
+        zh: '输入字节可能还要留给下一次重试，当前解码却可能在发送前就不再需要。\n\n所有 Worker 调用复制参数，不 detach 输入。取消结果与输入内存分别可观察；已经开始的计算仍需主动处理取消信号。\n\n为真实 Worker JSON 解析器使用 `workerParser` 的复制路径，先完成一次解码，再传入预先中止的信号，检查失败原因和原字节后决定是否重试。'
       },
       example: {
         en: "import {\n  Worker,\n  MessageChannel,\n  workerData,\n  isMainThread,\n  threadId,\n  type MessagePort\n} from 'node:worker_threads'\nimport { jsonParser } from '@migaia/serialize/plugins'\nimport { createSerializeWorkerHandler, workerParser } from '@migaia/store-worker/serialize/worker'\n\nif (!isMainThread) {\n  const port = workerData as MessagePort\n  const handler = createSerializeWorkerHandler(jsonParser(), (message, transfer) =>\n    port.postMessage(message, transfer as Parameters<typeof port.postMessage>[1])\n  )\n  port.on('message', (message) => void handler(message).catch(console.error))\n} else {\n  const { port1, port2 } = new MessageChannel()\n  const worker = new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] })\n  port1.start()\n  const parser = workerParser({ worker: port1 })\n  const bytes = new TextEncoder().encode('{\"count\":2}')\n  try {\n    const context = { signal: new AbortController().signal, context: 'settings' }\n    const value = (await parser.decode(['bytes', bytes], context)) as { count: number }\n    console.log('decoded:', value.count, bytes.byteLength)\n    const controller = new AbortController()\n    const reason = new DOMException('Request no longer needed', 'AbortError')\n    controller.abort(reason)\n    const failure = (await Promise.resolve(\n      parser.decode(['bytes', bytes], {\n        signal: controller.signal,\n        context: 'settings'\n      })\n    ).catch((error: unknown) => error)) as Error & { code?: string }\n    console.log('cancelled:', failure.code, failure.cause === reason)\n    console.log('input:', new TextDecoder().decode(bytes))\n  } finally {\n    await parser.dispose?.()\n    port1.close()\n    await worker.terminate()\n  }\n}",
         zh: "import {\n  Worker,\n  MessageChannel,\n  workerData,\n  isMainThread,\n  threadId,\n  type MessagePort\n} from 'node:worker_threads'\nimport { jsonParser } from '@migaia/serialize/plugins'\nimport { createSerializeWorkerHandler, workerParser } from '@migaia/store-worker/serialize/worker'\n\nif (!isMainThread) {\n  const port = workerData as MessagePort\n  const handler = createSerializeWorkerHandler(jsonParser(), (message, transfer) =>\n    port.postMessage(message, transfer as Parameters<typeof port.postMessage>[1])\n  )\n  port.on('message', (message) => void handler(message).catch(console.error))\n} else {\n  const { port1, port2 } = new MessageChannel()\n  const worker = new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] })\n  port1.start()\n  const parser = workerParser({ worker: port1 })\n  const bytes = new TextEncoder().encode('{\"count\":2}')\n  try {\n    const context = { signal: new AbortController().signal, context: 'settings' }\n    const value = (await parser.decode(['bytes', bytes], context)) as { count: number }\n    console.log('解码：', value.count, bytes.byteLength)\n    const controller = new AbortController()\n    const reason = new DOMException('已不再需要此次请求', 'AbortError')\n    controller.abort(reason)\n    const failure = (await Promise.resolve(\n      parser.decode(['bytes', bytes], {\n        signal: controller.signal,\n        context: 'settings'\n      })\n    ).catch((error: unknown) => error)) as Error & { code?: string }\n    console.log('已取消：', failure.code, failure.cause === reason)\n    console.log('输入：', new TextDecoder().decode(bytes))\n  } finally {\n    await parser.dispose?.()\n    port1.close()\n    await worker.terminate()\n  }\n}"
       },
       result: {
-        en: 'The output is `decoded: 2 11`, `cancelled: REQUEST_ABORTED true`, then `input: {"count":2}`.\n\nCopy is the default ownership policy. This pre-cancelled decode preserves the caller\'s reason as cause and does not send work; it does not prove interruption of an already-running calculation. Transfer and byte detachment also do not establish zero-copy payload delivery.',
-        zh: '依次输出 `解码： 2 11`、`已取消： REQUEST_ABORTED true`、`输入： {"count":2}`。\n\n默认所有权策略为 `\'copy\'`；本次预取消保留调用方的原始原因且不发送工作，不证明已经运行的计算会被抢占中断。显式转移和字节分离同样不代表载荷实现了零拷贝。'
+        en: 'The output is `decoded: 2 11`, `cancelled: REQUEST_ABORTED true`, then `input: {"count":2}`.\n\nThis pre-cancelled decode preserves the caller\'s reason as cause and does not send work; it does not prove interruption of an already-running calculation. ',
+        zh: '依次输出 `解码： 2 11`、`已取消： REQUEST_ABORTED true`、`输入： {"count":2}`。\n\n本次预取消保留调用方的原始原因且不发送工作，不证明已经运行的计算会被抢占中断。'
       }
     }
   ]

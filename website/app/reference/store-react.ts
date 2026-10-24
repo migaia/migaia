@@ -789,8 +789,8 @@ export const storeReactReference: ILibraryReference = {
       'function Count({ signal }: { signal: IReactiveSignal<number> }) { const [count, setCount] = useSignal(signal); return <button onClick={() => setCount(count + 1)}>{count}</button> }'
     ),
     useResource: hook(
-      'Subscribes to a Resource state machine without automatically unwrapping or throwing its pending/error state.',
-      '订阅资源状态机，不自动解包，也不主动抛出其等待或错误状态。',
+      'Subscribes to a Resource and exposes its complete current state for explicit rendering, without unwrapping data or throwing pending and error states.',
+      '订阅资源并取得完整当前状态，供组件显式渲染空闲、等待、成功、错误与取消，不自动解包数据，也不抛出等待或错误状态。',
       {
         res: t(
           'Stable Resource<T> from @migaia/resource; its Runtime owns tracking.',
@@ -884,8 +884,8 @@ export const storeReactReference: ILibraryReference = {
       'function Increment({ atom }: { atom: IWritableAtom<number, readonly [number], void> }) { const set = useSetAtom(atom); return <button onClick={() => set(1)}>1</button> }'
     ),
     useAtom: hook(
-      'Combines atom value subscription and stable writer without changing Provider routing or source ownership.',
-      '组合原子值订阅与稳定写入函数，不改变提供者路由或源所有权。',
+      "Subscribes to a writable atom's value and pairs it with a stable writer, retaining Provider-local routing and the caller's atom ownership.",
+      '订阅可写原子的当前值并配对稳定写入函数，沿用当前提供者或原子自身的读取路径，原子生命周期仍由调用方管理。',
       {
         atom: t(
           'Stable external IWritableAtom; definitions route through the current Provider when available.',
@@ -1023,8 +1023,8 @@ export const storeReactReference: ILibraryReference = {
     readStoreFeature: {
       optionCases: featureOptionCases,
       ...hook(
-        'Synchronously reads a normalized feature path without throwing merely because it is disabled.',
-        '同步读取归一化特性路径，特性处于关闭状态本身不会引发错误。',
+        'Reads a normalized wasm or experimental feature flag synchronously, treating disabled, unknown and empty experimental paths as false.',
+        '同步读取归一化的 wasm 或实验特性开关，关闭特性、未知名称及空实验路径均返回假值，不因未启用而抛错。',
         {
           config: t(
             'IStoreConfigValue returned by normalizeStoreConfig or useStoreConfig after checking for null.',
@@ -1083,8 +1083,8 @@ export const storeReactReference: ILibraryReference = {
       'function Flags() { const config = useStoreConfig(); return <span>{String(config?.features.wasm ?? false)}</span> }'
     ),
     useStoreFeature: hook(
-      'Reads a normalized feature flag in the current context; returns false when no configuration Provider exists.',
-      '读取当前上下文归一化特性开关；没有配置提供者时返回假值。',
+      'Reads a feature flag from the current StoreProvider configuration for optional UI behavior, returning false when no Provider supplies configuration.',
+      '从当前状态提供者配置中读取归一化特性开关，用于选择可选界面行为；缺少配置提供者时返回假值而不抛错。',
       { path },
       t('True only for an explicitly enabled feature.', '仅显式启用特性时返回真值。'),
       "function Charts() { return useStoreFeature('experimental.charts') ? <canvas /> : null }"
@@ -1214,7 +1214,7 @@ showInitializationState(ready)`,
     STORE_REACT_SOURCE: {
       role: 'constant',
       purpose: t(
-        'Stable @migaia/store-react source identity attached to package-owned errors; inspect source and code together.',
+        'Stable store.react source identity attached to package-owned errors; inspect source and code together.',
         '附加到包拥有错误上的稳定来源身份，读取来源与错误码应同时进行。'
       ),
       example: 'console.log(STORE_REACT_SOURCE)'

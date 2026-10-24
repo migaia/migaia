@@ -80,21 +80,6 @@
       "readmeLocales": ["zh", "en"]
     },
     {
-      "slug": "rpc-browser",
-      "description": "RPC browser owner.",
-      "version": "0.0.11",
-      "exports": [
-        ".",
-        "./adapters/broadcast-channel",
-        "./adapters/rtc-data-channel",
-        "./adapters/service-worker",
-        "./adapters/shared-worker",
-        "./adapters/web-transport",
-        "./adapters/window"
-      ],
-      "readmeLocales": ["zh", "en"]
-    },
-    {
       "slug": "rpc-contract",
       "description": "RPC contract owner.",
       "version": "0.0.11",
@@ -111,6 +96,7 @@
         "./framing/v1",
         "./handshake",
         "./portable",
+        "./remote",
         "./runtime",
         "./runtime/lazy",
         "./runtime/metadata",
@@ -122,52 +108,65 @@
       "readmeLocales": ["zh", "en"]
     },
     {
-      "slug": "rpc-core",
-      "description": "RPC core owner.",
+      "slug": "rpc-host",
+      "description": "RPC host with transport and feature plugins.",
       "version": "0.0.11",
       "exports": [
         ".",
-        "./adapter",
         "./adapters/memory",
-        "./adapters/message-port",
-        "./adapters/web-worker",
-        "./client",
-        "./composed",
-        "./features/control",
-        "./features/discovery",
-        "./features/one-way",
-        "./features/outbound",
-        "./features/provider",
-        "./full",
-        "./plugins/flow-control",
-        "./plugins/log",
-        "./plugins/send-queue",
+        "./features",
+        "./features/auth",
+        "./features/chunk",
+        "./features/retry",
+        "./features/timeout",
+        "./features/typegen",
+        "./plugin",
         "./probe",
-        "./provider",
-        "./remote",
         "./stream",
-        "./testing",
-        "./transport-constants",
-        "./transport-kit"
+        "./testing"
       ],
       "readmeLocales": ["zh", "en"]
     },
     {
-      "slug": "rpc-devtools",
+      "slug": "rpc-plugin-browser",
+      "description": "RPC browser owner.",
+      "version": "0.0.11",
+      "exports": [
+        ".",
+        "./adapters/broadcast-channel",
+        "./adapters/message-port",
+        "./adapters/rtc-data-channel",
+        "./adapters/service-worker",
+        "./adapters/shared-worker",
+        "./adapters/web-transport",
+        "./adapters/web-worker",
+        "./adapters/window"
+      ],
+      "readmeLocales": ["zh", "en"]
+    },
+    {
+      "slug": "rpc-plugin-coroutines",
+      "description": "Cooperative coroutine transport plugin for RPC hosts.",
+      "version": "0.0.11",
+      "exports": ["."],
+      "readmeLocales": ["zh", "en"]
+    },
+    {
+      "slug": "rpc-plugin-devtools",
       "description": "RPC probe, service and offline record contracts.",
       "version": "0.0.11",
       "exports": [".", "./contract", "./hub", "./log"],
       "readmeLocales": ["zh", "en"]
     },
     {
-      "slug": "rpc-pool",
-      "description": "Thread and process pools composed from public RPC peers.",
+      "slug": "rpc-plugin-pool",
+      "description": "RPC member scheduling feature plugin.",
       "version": "0.0.11",
       "exports": ["."],
       "readmeLocales": ["zh", "en"]
     },
     {
-      "slug": "rpc-process",
+      "slug": "rpc-plugin-process",
       "description": "RPC process owner.",
       "version": "0.0.11",
       "exports": [
@@ -179,12 +178,16 @@
         "./adapters/electron-utility-process",
         "./adapters/node-child-process",
         "./adapters/node-socket",
-        "./adapters/windows-job"
+        "./adapters/windows-job",
+        "./features",
+        "./features/flow-control",
+        "./features/log",
+        "./features/send-queue"
       ],
       "readmeLocales": ["zh", "en"]
     },
     {
-      "slug": "rpc-threads",
+      "slug": "rpc-plugin-thread",
       "description": "RPC threads owner.",
       "version": "0.0.11",
       "exports": [".", "./adapters/electron-main", "./adapters/node"],

@@ -946,43 +946,38 @@ function LibraryModuleLinks({
   readonly locale: ILocale
   readonly selectedSymbol: IApiSymbol | undefined
 }) {
-  /** Root-exported RPC middleware are plugins even though their public paths omit `middleware/`. */
-  const webRpcMiddlewareNames = new Set([
-    'abort',
-    'authentication',
-    'chunk',
-    'codec',
-    'connect',
-    'contract',
-    'framer',
-    'hooks',
-    'ping',
-    'protocol',
-    'timeout'
-  ])
-  /** Complete middleware-plugin links are separated from general root APIs for reader clarity. */
-  const middlewarePluginLinks =
-    librarySlug === 'rpc-core'
-      ? apiLinks.filter((link) => link.module === 'index' && webRpcMiddlewareNames.has(link.name))
+  /** Shared features remain subordinate to the sole host construction entry. */
+  const featurePluginLinks =
+    librarySlug === 'rpc-host'
+      ? apiLinks.filter(
+          (link) => link.module.startsWith('features/') && link.name.endsWith('Feature')
+        )
       : []
-  /** Primary RPC entry points must not be buried under generated module names. */
+  /** Applications start from one host or the transport/feature definition installed on it. */
   const primaryEntries =
-    librarySlug === 'rpc-core'
-      ? ([
-          ['createEndpoint', 'index', 'createEndpoint'],
-          ['createComposedEndpoint', 'composed', 'createComposedEndpoint']
-        ] as const)
-      : librarySlug === 'rpc-process'
-        ? ([
-            ['createProcessPeer', 'index', 'createProcessPeer'],
-            ['createProcessPlugin', 'index', 'createProcessPlugin']
-          ] as const)
-        : librarySlug === 'rpc-threads'
-          ? ([
-              ['createThreadPeer', 'index', 'createThreadPeer'],
-              ['createThreadPlugin', 'index', 'createThreadPlugin']
-            ] as const)
-          : []
+    librarySlug === 'rpc-host'
+      ? ([['createRpcHost', 'index', 'createRpcHost']] as const)
+      : librarySlug === 'rpc-plugin-process'
+        ? ([['processPlugin', 'index', 'processPlugin']] as const)
+        : librarySlug === 'rpc-plugin-thread'
+          ? ([['threadPlugin', 'index', 'threadPlugin']] as const)
+          : librarySlug === 'rpc-plugin-browser'
+            ? ([
+                ['windowPlugin', 'index', 'windowPlugin'],
+                ['dedicatedWorkerPlugin', 'index', 'dedicatedWorkerPlugin'],
+                ['sharedWorkerPlugin', 'index', 'sharedWorkerPlugin'],
+                ['serviceWorkerPlugin', 'index', 'serviceWorkerPlugin'],
+                ['broadcastChannelPlugin', 'index', 'broadcastChannelPlugin'],
+                ['rtcDataChannelPlugin', 'index', 'rtcDataChannelPlugin'],
+                ['webTransportPlugin', 'index', 'webTransportPlugin']
+              ] as const)
+            : librarySlug === 'rpc-plugin-coroutines'
+              ? ([['coroutinePlugin', 'index', 'coroutinePlugin']] as const)
+              : librarySlug === 'rpc-plugin-pool'
+                ? ([['poolPlugin', 'index', 'poolPlugin']] as const)
+                : librarySlug === 'rpc-plugin-devtools'
+                  ? ([['devtoolsPlugin', 'index', 'devtoolsPlugin']] as const)
+                  : []
   /** Navigation links are the complete lightweight inventory for every public runtime entry. */
   const rootApis = libraryApis.filter(
     (candidate) =>
@@ -1092,7 +1087,7 @@ function LibraryModuleLinks({
       ) : null}
       {primaryEntries.length > 0 ? (
         <div className="left-rail-group left-rail-primary">
-          <span>{locale === 'zh' ? '常用 Endpoint' : 'Primary endpoints'}</span>
+          <span>{locale === 'zh' ? '宿主与插件' : 'Host and plugins'}</span>
           <div className="left-rail-children">
             {primaryEntries.map(([label, moduleName, symbol]) => (
               <Link
@@ -1104,10 +1099,10 @@ function LibraryModuleLinks({
               </Link>
             ))}
           </div>
-          <Link to={guidePath(locale, 'rpc-core', 'endpoint-composition')}>
-            {locale === 'zh' ? '如何选择 Endpoint →' : 'How to choose an Endpoint →'}
+          <Link to={guidePath(locale, 'rpc-host', 'host-and-plugins')}>
+            {locale === 'zh' ? '组合宿主与插件 →' : 'Compose a host and plugins →'}
           </Link>
-          <Link to={guidePath(locale, 'rpc-core', 'transports-and-security')}>
+          <Link to={guidePath(locale, 'rpc-host', 'transports-and-security')}>
             {locale === 'zh' ? 'Transport 选择与完整案例' : 'Transport selection and examples'}
           </Link>
         </div>
@@ -1123,7 +1118,11 @@ function LibraryModuleLinks({
             <div className="left-rail-children">
               {group.links.map((link) => (
                 <Link
-                  className={link.name === selectedSymbol?.name ? 'active' : ''}
+                  className={
+                    link.module === api?.module && link.name === selectedSymbol?.name
+                      ? 'active'
+                      : ''
+                  }
                   data-kind={link.kind}
                   key={link.symbolPath}
                   to={docsModulePath(locale, librarySlug, link.module, link.symbolPath)}
@@ -1149,14 +1148,14 @@ function LibraryModuleLinks({
               </Link>
               <div className="left-rail-children">
                 {apiLinks
-                  .filter(
-                    (link) =>
-                      link.module === candidate.module &&
-                      !(candidate.module === 'index' && webRpcMiddlewareNames.has(link.name))
-                  )
+                  .filter((link) => link.module === candidate.module)
                   .map((link) => (
                     <Link
-                      className={link.name === selectedSymbol?.name ? 'active' : ''}
+                      className={
+                        link.module === api?.module && link.name === selectedSymbol?.name
+                          ? 'active'
+                          : ''
+                      }
                       data-kind={link.kind}
                       key={link.symbolPath}
                       to={docsModulePath(locale, librarySlug, link.module, link.symbolPath)}
@@ -1172,13 +1171,17 @@ function LibraryModuleLinks({
               </div>
             </div>
           ))}
-        {middlewarePluginLinks.length > 0 ? (
+        {featurePluginLinks.length > 0 ? (
           <div className="left-rail-group">
-            <span>{locale === 'zh' ? '中间件插件' : 'Middleware plugins'}</span>
+            <span>{locale === 'zh' ? '功能' : 'Features'}</span>
             <div className="left-rail-children">
-              {middlewarePluginLinks.map((link) => (
+              {featurePluginLinks.map((link) => (
                 <Link
-                  className={link.name === selectedSymbol?.name ? 'active' : ''}
+                  className={
+                    link.module === api?.module && link.name === selectedSymbol?.name
+                      ? 'active'
+                      : ''
+                  }
                   data-kind={link.kind}
                   key={link.symbolPath}
                   to={docsModulePath(locale, librarySlug, link.module, link.symbolPath)}
@@ -1220,7 +1223,11 @@ function LibraryModuleLinks({
                       ) : null}
                       {candidateLinks.map((link) => (
                         <Link
-                          className={link.name === selectedSymbol?.name ? 'active' : ''}
+                          className={
+                            link.module === api?.module && link.name === selectedSymbol?.name
+                              ? 'active'
+                              : ''
+                          }
                           data-kind={link.kind}
                           key={link.symbolPath}
                           to={docsModulePath(locale, librarySlug, link.module, link.symbolPath)}
@@ -3002,7 +3009,7 @@ function freshSentence(text: string | undefined, shown: Set<string>): string | u
   return undefined
 }
 
-/** Public npm specifier of one module, e.g. `@migaia/rpc-core/client`. */
+/** Public npm specifier of one module, e.g. `@migaia/rpc-host/features/timeout`. */
 function publicPackagePath(api: IApi): string {
   return api.exportPath === '.'
     ? `@migaia/${api.library}`
@@ -4774,21 +4781,23 @@ const LIBRARY_ARCHITECTURE_LEDES_ZH = {
   utils:
     '用于多个包共同需要、且不应绑定 Store、DOM 或具体运行时的基础能力，包括取消、并发、错误、集合、对象路径、字节与字符串处理。每个子路径拥有独立契约和错误语义，调用方应按能力导入；它不是无边界的杂物箱。',
   wasm: '用于统一 WebAssembly 模块初始化、实例复用、线性内存分配、JS/WASM 值转换和确定性释放。它把平台加载与内存所有权封装在明确边界内，避免每个消费者重复处理指针、视图失效和清理；没有 WASM 模块时无需使用。',
-  'rpc-core':
-    '用于进程、Worker、Window 或 MessagePort 两端进行类型安全的双向调用。四个 Peer/Plugin 工厂根据真实 provide/expose 自动生成 v2 目录，复用原连接、鉴权、重放窗口、deadline 与 drain owner；业务不用复制手写消息协议。spawn 拥有执行单元，connect/listen 只借用连接，批量帧接收是握手基线，未支持的可选能力显式拒绝。事务与业务回滚仍由调用方负责。',
+  'rpc-host':
+    '当应用需要跨进程、线程或页面调用业务方法时，通过 createRpcHost 建立唯一调用宿主，组合一个传输插件与可选功能。宿主持有身份、provider、直连选择、广播与流；连接、鉴权、原生资源、代际、错误链和关闭复用原所有者。插件作者从 /plugin 使用原始部署工具，应用无需组装底层调用对象。',
+  'rpc-plugin-coroutines':
+    '用于把同一事件循环中的协作任务接入双向调用，coroutinePlugin 运行受监督任务，子端使用该代任务上下文提供的 opaque connect 句柄连接父端。取消由原 signal 协作执行，MessageChannel 只传调用，不提供进程或线程隔离。',
   'rpc-contract':
     '用于独立协议实现或自定义载体需要共享 RPC 数据规则的场景。它提供 envelope 校验、握手协商、帧编码与解析、二进制数据准备和错误链转换，使不同实现按同一套 wire 契约交换数据；平台连接与原生执行资源由适配器持有。',
-  'rpc-process':
-    '用于父子进程或已有进程连接需要双向 RPC 的场景。应用通过 Peer 或 Plugin 共享实际方法，再按平台选择启动器与字节或消息通道；spawn 持有实际执行单元，connect/listen 保留借用连接的边界，关闭和失败清理沿原资源 owner 执行。',
-  'rpc-threads':
-    '用于把业务方法放入 Worker 或线程执行，同时保留双向调用和原生资源生命周期的场景。适配器取得实际线程 handle 与消息端口，Peer 或 Plugin 共享方法，并通过原监督器处理启动、退出、替换和关闭；平台未提供的能力保持明确不可用。',
+  'rpc-plugin-process':
+    '用于把隔离工作交给原生子进程或连接本机服务，将 processPlugin 安装到调用宿主或普通 PluginHost，支持 spawn、connect.target、listen 与显式 connectToParent。双方可提供方法；原生启动、重连、替换与 drain 沿原监督器执行，借用连接与拥有进程的关闭边界保持独立。',
+  'rpc-plugin-thread':
+    '用于将重计算移出当前线程，将 threadPlugin 安装到宿主，通过 Node、Bun 或 Deno 的真实线程双向调用。spawn 拥有线程，子端显式使用 connectToParent；浏览器 Worker 由 browser 插件负责。原预算、代际、消息端口、原生错误与监督保持同一所有者。',
   /** The pool architecture page explains which scheduling and native resources each layer owns. */
-  'rpc-pool':
-    '用于把多个公开线程或进程 Peer 组成有限并发池。池管理客户端调用槽、有限 FIFO、惰性 stream、扩缩容和闲置成员回收；原 Peer 负责原生启动、崩溃恢复与关闭。stats 记录池内派发，失败的业务调用交给调用方处理。',
-  'rpc-browser':
-    '用于 Window、共享 Worker、ServiceWorker、BroadcastChannel、WebTransport 或 RTCDataChannel 两端需要 RPC 的场景。各适配器持有实际浏览器通道及其监听器，保留来源校验、传输能力与关闭边界；Endpoint 和协议工具由 Core、Contract 复用，应用按实际通道选择适配器。',
-  'rpc-devtools':
-    '当应用需要追踪 RPC 失败、调用耗时或跨宿主事件时使用。createRpcDevtools 作为 Probe 接入已有宿主，按有界事件环提供查询、统计、录制、暂停与 service；createRpcDevtoolsHub 聚合已有 service client 和离线录制，对齐时钟并关联 timeline 与 interactions。默认只采集元数据，内容捕获必须显式启用；录制使用版本 1 的 NDJSON，错误链复用 RPC Contract，连接与持久化由调用方管理。'
+  'rpc-plugin-pool':
+    '当并发计算需要多个成员分担而调用方只关心一个服务时，poolPlugin 把真实进程、线程或协程成员交给原有限调度器、FIFO、resize 与 drain。宿主只公布逻辑对端 pool；无目标调用与 send(pool,...) 每次选择一个成员、执行一次并返回标量，成员不进入公开目标集合。',
+  'rpc-plugin-browser':
+    '用于跨浏览器页面与工作线程通信，为 Window、浏览器专用/共享/服务 Worker、BroadcastChannel、可靠 RTCDataChannel 与 WebTransport 选择对应传输插件。createRpcHost 持有调用，插件保留原来源校验、消息或字节能力与借用资源的关闭边界。',
+  'rpc-plugin-devtools':
+    '用于定位实际 RPC 调用及载体传输问题，devtoolsPlugin 安装到既有宿主，并通过同一个 collector 查询、录制与观察原消息和载体元数据。collector 可被多个宿主共享；关闭一个宿主不停止其它宿主。contract、hub 与 log 入口保留原离线编解码、聚合与脱敏所有权。'
 } as const satisfies Readonly<Record<string, string>>
 
 /** Unambiguous public product names that may appear without an npm package path. */
@@ -4801,7 +4810,7 @@ const LIBRARY_REFERENCE_ALIASES = {
   'Storage Host': 'storage-web',
   Tray: 'tray',
   WASM: 'wasm',
-  RPC: 'rpc-core'
+  RPC: 'rpc-host'
 } as const satisfies Readonly<Record<string, string>>
 
 /** Resolves an explicit package reference only when it points outside the current library. */

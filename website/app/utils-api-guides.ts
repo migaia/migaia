@@ -43,6 +43,142 @@ function utilsGuide(input: IUtilsGuideInput): Readonly<Record<IGuideLocale, IApi
 const foundationalUtilsApiGuides: Readonly<
   Record<string, Readonly<Record<IGuideLocale, IApiGuide>>>
 > = {
+  'utils:index:detectServerRuntime': utilsGuide({
+    purposeEn:
+      'Reads current runtime markers on every call and returns deno, bun, node, or undefined. A nonempty Deno.version.deno string wins first, then a non-null Bun object, then a nonempty process.versions.bun string, and finally a nonempty process.versions.node string. It imports no native runtime module.',
+    purposeZh:
+      '每次调用重新读取运行时标记，返回 deno、bun、node 或 undefined。依次识别非空字符串 Deno.version.deno、非 null 的 Bun 对象、非空字符串 process.versions.bun，最后才识别非空字符串 process.versions.node；不会导入原生运行时模块。',
+    quickStart: `import { detectServerRuntime, ServerRuntime } from '@migaia/utils'
+
+/** Read once when choosing this operation's runtime path. */
+const runtime = detectServerRuntime()
+if (runtime === ServerRuntime.deno) console.log('Deno runtime')
+else if (runtime === ServerRuntime.bun) console.log('Bun runtime, including Node compatibility')
+else if (runtime === ServerRuntime.node) console.log('Node runtime')
+else console.log('No recognized server runtime')`,
+    useEn:
+      'A runtime-neutral adapter must choose its native implementation while preserving Deno and Bun precedence over Node compatibility markers.',
+    useZh: '运行时无关的适配器需要选择原生实现，并确保 Deno、Bun 优先于它们兼容的 Node 标记。',
+    avoidEn:
+      'You need a runtime version, an Electron process role, or proof that a native capability is available. The result classifies markers only; undefined does not prove a browser.',
+    avoidZh:
+      '需要运行时版本、Electron 进程角色或原生能力可用性证明时不要使用它；结果只分类标记，undefined 也不能证明当前是浏览器。'
+  }),
+  'utils:index:detectElectronProcessType': utilsGuide({
+    purposeEn:
+      'Returns main, renderer, or utility from the current Electron process markers. process.versions.electron must be present; the native process.type value browser maps to main, while renderer and utility keep their names. Missing Electron identity or any other process.type returns undefined.',
+    purposeZh:
+      '根据当前 Electron 进程标记返回 main、renderer 或 utility。必须存在 process.versions.electron；原生 process.type 的 browser 规范化为 main，renderer 与 utility 保持原名。缺少 Electron 标记或 process.type 为其他值时返回 undefined。',
+    quickStart: `import { detectElectronProcessType, ElectronProcessType } from '@migaia/utils'
+
+/** Electron's native "browser" role is normalized to "main". */
+const role = detectElectronProcessType()
+if (role === ElectronProcessType.main) console.log('Application main process')
+else if (role === ElectronProcessType.renderer) console.log('Renderer process')
+else if (role === ElectronProcessType.utility) console.log('Utility process')
+else console.log('No recognized Electron process role')`,
+    useEn:
+      'An adapter needs a stable Electron role without importing Electron or depending on its historical browser spelling for the main process.',
+    useZh:
+      '适配器需要稳定的 Electron 角色名称，同时不导入 Electron，也不向调用方传播主进程的旧 browser 拼写。',
+    avoidEn:
+      'You need Electron API access, authorization, or general Node/Bun/Deno classification. An ordinary process.type value alone does not establish Electron identity.',
+    avoidZh:
+      '需要调用 Electron API、作权限判断或区分 Node/Bun/Deno 时不要使用它；单独一个 process.type 值不能证明 Electron 身份。'
+  }),
+  'utils:index:detectGlobalScope': utilsGuide({
+    purposeEn:
+      'Returns window, dedicated-worker, shared-worker, service-worker, or undefined for the current global object. Recognized server runtimes return undefined first, including Bun and Deno Workers. Otherwise it checks actual instanceof relations in Window, DedicatedWorkerGlobalScope, SharedWorkerGlobalScope, then ServiceWorkerGlobalScope order; constructor presence alone is insufficient.',
+    purposeZh:
+      '分类当前全局对象，返回 window、dedicated-worker、shared-worker、service-worker 或 undefined。先排除已识别的服务端运行时，包括 Bun、Deno 的 Worker；其余环境依次检查当前对象与 Window、DedicatedWorkerGlobalScope、SharedWorkerGlobalScope、ServiceWorkerGlobalScope 的 instanceof 关系，只有构造器存在并不足以分类。',
+    quickStart: `import { detectGlobalScope, GlobalScopeKind } from '@migaia/utils'
+
+/** Undefined includes server runtimes and unrecognized browser globals. */
+const scope = detectGlobalScope()
+if (scope === GlobalScopeKind.window) console.log('Document global')
+else if (scope === GlobalScopeKind['dedicated-worker']) console.log('Dedicated Worker global')
+else if (scope === GlobalScopeKind['shared-worker']) console.log('Shared Worker global')
+else if (scope === GlobalScopeKind['service-worker']) console.log('Service Worker global')
+else console.log('No recognized browser global scope')`,
+    useEn:
+      'Browser transport code must distinguish the global that owns its native message resources without importing DOM types into a shared utility declaration.',
+    useZh: '浏览器传输需要区分拥有原生消息资源的全局作用域，同时不把 DOM 类型引入共享工具声明。',
+    avoidEn:
+      'You need to classify another object, discover a remote peer, or infer permissions from scope names. This function accepts no object and grants no transport authority.',
+    avoidZh:
+      '需要分类其他对象、发现远端对端或根据作用域推断权限时不要使用它；函数不接收对象，也不授予传输权限。'
+  }),
+  'utils:index:ServerRuntime': utilsGuide({
+    purposeEn:
+      'Names the three server-runtime results: deno is deno, bun is bun, and node is node. The same-named TypeScript type is their key union. These constants do not perform detection; detectServerRuntime applies Deno, Bun, then Node precedence and may return undefined.',
+    purposeZh:
+      '定义三个服务端运行时结果：deno 为 deno、bun 为 bun、node 为 node；同名 TypeScript 类型是这些键的联合。常量本身不执行探测；detectServerRuntime 按 Deno、Bun、Node 优先级分类，也可能返回 undefined。',
+    quickStart: `import { ServerRuntime, detectServerRuntime } from '@migaia/utils'
+
+/** The constants name results; the function reads the current host markers. */
+const current = detectServerRuntime()
+console.log(Object.values(ServerRuntime)) // ['deno', 'bun', 'node']
+console.log(current === ServerRuntime.bun)
+console.log(current ?? 'unrecognized')`,
+    useEn:
+      'Runtime selection and diagnostic output must compare against one shared value domain instead of repeating platform strings across adapters.',
+    useZh: '运行时选择与诊断输出需要使用同一组值，避免各适配器重复书写平台字符串。',
+    avoidEn:
+      'You need to enumerate supported native operations or assert that detection always succeeds. These three values are labels, not a capability catalog or a browser fallback.',
+    avoidZh:
+      '需要列举原生能力或断言探测一定成功时不要使用它；三个值只是标签，不是能力目录，也不定义浏览器回退值。'
+  }),
+  'utils:index:ElectronProcessType': utilsGuide({
+    purposeEn:
+      'Names the normalized Electron roles: main is main, renderer is renderer, and utility is utility. detectElectronProcessType maps Electron browser to main and returns undefined outside a recognized role. The same-named type is the three-key union, not Electron native module declarations.',
+    purposeZh:
+      '定义规范化的 Electron 角色：main 为 main、renderer 为 renderer、utility 为 utility。detectElectronProcessType 把 Electron 的 browser 映射为 main，无法识别角色时返回 undefined；同名类型是三个键的联合，不依赖 Electron 原生模块声明。',
+    quickStart: `import { ElectronProcessType, detectElectronProcessType } from '@migaia/utils'
+
+/** Labels use the public role names, including "main" instead of native "browser". */
+const labels: Record<ElectronProcessType, string> = {
+  main: 'Application main process',
+  renderer: 'Renderer process',
+  utility: 'Utility process'
+}
+/** Read the current process role before selecting a label. */
+const role = detectElectronProcessType()
+console.log(role === undefined ? 'Not a recognized Electron role' : labels[role])
+console.log(ElectronProcessType.main) // 'main'`,
+    useEn:
+      'Role-specific configuration or UI text must use the normalized main/renderer/utility vocabulary returned by the utility guard.',
+    useZh: '按角色选择配置或展示说明时，需要与探测函数返回的 main/renderer/utility 规范词汇一致。',
+    avoidEn:
+      'You need raw process.type values or privileged Electron objects. The constant object does not prove that any Electron process is present.',
+    avoidZh:
+      '需要原生 process.type 值或带权限的 Electron 对象时不要使用它；常量对象不能证明 Electron 进程存在。'
+  }),
+  'utils:index:GlobalScopeKind': utilsGuide({
+    purposeEn:
+      'Names the browser-global results: window, dedicated-worker, shared-worker, and service-worker. Hyphenated keys require bracket access. The same-named type is their key union. detectGlobalScope checks real global instance relations and returns undefined for recognized server runtimes or unmatched scopes.',
+    purposeZh:
+      '定义浏览器全局分类值 window、dedicated-worker、shared-worker、service-worker；带连字符的键用方括号访问，同名类型是这些键的联合。detectGlobalScope 检查真实全局实例关系，在已识别的服务端运行时或未匹配的作用域返回 undefined。',
+    quickStart: `import { GlobalScopeKind, detectGlobalScope } from '@migaia/utils'
+
+/** Worker labels do not create Workers or classify a separate object. */
+const workerKinds = [
+  GlobalScopeKind['dedicated-worker'],
+  GlobalScopeKind['shared-worker'],
+  GlobalScopeKind['service-worker']
+]
+/** Classify this global now, with the server-runtime exclusion intact. */
+const scope = detectGlobalScope()
+console.log(scope === GlobalScopeKind.window)
+console.log(workerKinds.some(kind => kind === scope))`,
+    useEn:
+      'A browser adapter needs shared discriminants for document, dedicated, shared and service-worker resources after actual scope detection.',
+    useZh:
+      '浏览器适配器在实际探测后，需要用共享判别值区分文档、独占 Worker、共享 Worker 与 Service Worker 的资源归属。',
+    avoidEn:
+      'You need a Node/Bun/Deno Worker kind or a capability check. Server Worker environments are deliberately excluded by detectGlobalScope.',
+    avoidZh:
+      '需要 Node/Bun/Deno 的 Worker 类型或能力检查时不要使用它；detectGlobalScope 明确排除服务端 Worker 环境。'
+  }),
   'utils:index:collect': utilsGuide({
     purposeEn:
       'Creates a lazy, ordered, single-pass query pipeline over a borrowed readonly array and caches one result snapshot per query revision.',
@@ -310,7 +446,7 @@ const foundationalUtilsApiGuides: Readonly<
     purposeZh:
       '给现有 native Error 增加稳定 source 与 code field，不替换其 class、message、stack 或 identity。',
     quickStart:
-      "import { attachErrorIdentity } from '@migaia/utils'\n\nthrow attachErrorIdentity(new TypeError('invalid value'), { source: '@migaia/example', code: 'INVALID_VALUE' })",
+      "import { attachErrorIdentity } from '@migaia/utils'\n\nthrow attachErrorIdentity(new TypeError('invalid value'), { source: 'example.validation', code: 'INVALID_VALUE' })",
     useEn:
       'A boundary error must remain instanceof its native type while gaining machine-readable ownership.',
     useZh: 'boundary error 必须保留 native instanceof，同时获得 machine-readable ownership。',
@@ -417,7 +553,7 @@ const foundationalUtilsApiGuides: Readonly<
       'Creates the base coded failure for Utils-owned contracts while preserving an optional original cause.',
     purposeZh: '创建 Utils-owned contract 的基础 coded failure，并保留 optional original cause。',
     quickStart:
-      "import { UtilsError, withTimeout } from '@migaia/utils'\n\n// UtilsError 是抽象基类：不直接 new，用 instanceof 识别本包抛出的语义化错误\ntry {\n  await withTimeout(() => new Promise<never>(() => {}), { timeoutMs: 1 })\n} catch (error) {\n  if (error instanceof UtilsError) console.error(error.source, error.code) // '@migaia/utils' 'DEADLINE_EXCEEDED'\n}",
+      "import { UtilsError, withTimeout } from '@migaia/utils'\n\n// UtilsError 是抽象基类：不直接 new，用 instanceof 识别本包抛出的语义化错误\ntry {\n  await withTimeout(() => new Promise<never>(() => {}), { timeoutMs: 1 })\n} catch (error) {\n  if (error instanceof UtilsError) console.error(error.source, error.code) // 'foundation.utils' 'DEADLINE_EXCEEDED'\n}",
     useEn: 'A shared utility boundary needs a stable machine-readable failure.',
     useZh: 'shared utility boundary 需要稳定 machine-readable failure。',
     avoidEn:
@@ -1235,7 +1371,7 @@ const errorChainSendOption: Readonly<Record<IGuideLocale, IApiOptionGuide>> = {
     optional: true,
     defaultValue: '{}',
     description:
-      'report receives { pointer, field, error } with the exact getter or data failure. Serialization marks the affected output truncated and continues; traversal follows available edges. Without report, the default throws a TypeError with source @migaia/utils, code ERROR_CHAIN_INVALID, pointer, violation, and the original value on cause. Reporter failures propagate.',
+      'report receives { pointer, field, error } with the exact getter or data failure. Serialization marks the affected output truncated and continues; traversal follows available edges. Without report, the default throws a TypeError with source foundation.utils, code ERROR_CHAIN_INVALID, pointer, violation, and the original value on cause. Reporter failures propagate.',
     whenToUse:
       'Provide a real diagnostic sink when a partial result is useful; otherwise let the violation propagate.'
   },
@@ -1245,7 +1381,7 @@ const errorChainSendOption: Readonly<Record<IGuideLocale, IApiOptionGuide>> = {
     optional: true,
     defaultValue: '{}',
     description:
-      'report 接收 getter 或可移植数据读取失败的 { pointer, field, error }，其中 error 保留确切抛出值。报告后序列化把受影响输出标为 truncated 并继续；遍历在报告读取失败后沿可用边继续。未配置 report 时，默认抛出带 source @migaia/utils、code ERROR_CHAIN_INVALID、pointer、violation 的 TypeError，原值保留在 cause。report 自身失败会向调用方传播。',
+      'report 接收 getter 或可移植数据读取失败的 { pointer, field, error }，其中 error 保留确切抛出值。报告后序列化把受影响输出标为 truncated 并继续；遍历在报告读取失败后沿可用边继续。未配置 report 时，默认抛出带 source foundation.utils、code ERROR_CHAIN_INVALID、pointer、violation 的 TypeError，原值保留在 cause。report 自身失败会向调用方传播。',
     whenToUse: '部分结果仍有用途时接入实际诊断出口；否则让校验错误向调用方传播。'
   }
 }

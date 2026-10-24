@@ -1342,8 +1342,8 @@ export const reference: ILibraryReference = {
     SUPERVISION_SOURCE: {
       role: 'error',
       purpose: t(
-        'Stable package source `@migaia/supervision` attached to coded supervisor failures; combine source and code when classifying reports.',
-        '编码监督错误附带的稳定包来源 `@migaia/supervision`；分类上报时同时检查来源和错误码。'
+        'Stable package source `supervision` attached to coded supervisor failures; combine source and code when classifying reports.',
+        '编码监督错误附带的稳定包来源 `supervision`；分类上报时同时检查来源和错误码。'
       ),
       example: 'if (error.source === SUPERVISION_SOURCE) console.log(error.code)'
     },

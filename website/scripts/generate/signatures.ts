@@ -1,7 +1,14 @@
 #!/usr/bin/env bun
 // Extract API signatures from .d.ts files
 
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  unlinkSync,
+  writeFileSync
+} from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { join, relative, resolve } from 'node:path'
 import { format } from 'oxfmt'
@@ -28,15 +35,27 @@ const PACKAGES = [
   'plugin-host',
   'resource',
   'rpc-contract',
-  'rpc-core',
-  'rpc-process',
-  'rpc-threads',
-  'rpc-browser',
-  'rpc-devtools',
+  'rpc-host',
+  'rpc-plugin-process',
+  'rpc-plugin-thread',
+  'rpc-plugin-browser',
+  'rpc-plugin-coroutines',
+  'rpc-plugin-pool',
+  'rpc-plugin-devtools',
   'logger',
   'store-persist',
   'store-wasm',
   'storage-web'
+]
+
+/** These retired documentation owners have no routes, aliases, or successful-generation shards. */
+const RETIRED_RPC_LIBRARIES = [
+  'rpc-core',
+  'rpc-process',
+  'rpc-threads',
+  'rpc-browser',
+  'rpc-pool',
+  'rpc-devtools'
 ]
 
 /** Validates optional direct-entry arguments before any generator path can write projections. */
@@ -442,46 +461,7 @@ const GUIDE_TOPICS: Readonly<Record<string, readonly string[]>> = {
     'runtime-and-forwarding',
     'troubleshooting'
   ],
-  'rpc-pool': [
-    'choose-thread-or-process',
-    'dispatch-and-queue',
-    'notifications-and-streams',
-    'resize-and-idle-members',
-    'cancellation-and-shutdown',
-    'troubleshooting'
-  ],
-  'rpc-devtools': [
-    'collector-and-queries',
-    'recordings-and-service',
-    'hub-and-offline',
-    'log-ingestion',
-    'troubleshooting'
-  ],
-  'rpc-browser': [
-    'peers-and-window',
-    'shared-workers',
-    'rtc-data-channels',
-    'broadcast-and-service-workers',
-    'web-transport-datagrams',
-    'troubleshooting'
-  ],
-  'rpc-threads': [
-    'peers-and-sources',
-    'plugins-and-hosts',
-    'native-launchers',
-    'channels-and-bootstrap',
-    'binary-and-transfer',
-    'troubleshooting'
-  ],
-  'rpc-process': [
-    'peers-and-sources',
-    'plugins-and-exposure',
-    'launchers-and-stdio',
-    'socket-and-message-channels',
-    'protocol-and-bootstrap',
-    'resilience-and-shutdown',
-    'troubleshooting'
-  ],
+  'rpc-host': ['host-and-plugins', 'transports-and-security', 'calls-and-cancellation'],
   'rpc-contract': [
     'descriptors-and-envelopes',
     'portable-values',
@@ -494,16 +474,6 @@ const GUIDE_TOPICS: Readonly<Record<string, readonly string[]>> = {
     'websocket',
     'sse',
     'process'
-  ],
-  'rpc-core': [
-    'endpoint-composition',
-    'extension-authoring',
-    'calls-and-cancellation',
-    'providers-and-contracts',
-    'transports-and-security',
-    'discovery-and-control',
-    'chunking-and-backpressure',
-    'replay-retry-and-lifecycle'
   ],
   'storage-web': [
     'indexeddb-and-transactions',
@@ -2691,12 +2661,8 @@ function buildLibraryEntries() {
           return {}
         }
       })()
-      /** Keeps native cross-package operations installed, outside the adapter-author reference. */
-      const exports = Object.keys(manifest.exports ?? {})
-        .filter(
-          (exportPath) => entry.name !== 'rpc-core' || exportPath !== './adapter/internal-advanced'
-        )
-        .sort()
+      /** Public package metadata includes the supported plugin-author SDK entries. */
+      const exports = Object.keys(manifest.exports ?? {}).sort()
       return {
         slug: entry.name,
         description: typeof manifest.description === 'string' ? manifest.description : null,
@@ -2723,10 +2689,9 @@ function buildLibraryEntries() {
 }
 
 /** Writes content, route, and relationship projections through this canonical generator. */
-async function generateManifests() {
+async function generateManifests(libraries: ReturnType<typeof buildLibraryEntries>) {
   const contentRoot = resolve('src/content')
   const entries = buildContentEntries(contentRoot)
-  const libraries = buildLibraryEntries()
   const manifestDirectory = resolve('src/generated/manifests')
   mkdirSync(manifestDirectory, { recursive: true })
 
@@ -3223,6 +3188,8 @@ function formatGeneratedJson() {
 }
 
 async function generateSignatures() {
+  /** Complete the current workspace API calculation before changing generated projections. */
+  const libraries = buildLibraryEntries()
   const dir = resolve('src/generated/signatures')
   mkdirSync(dir, { recursive: true })
 
@@ -3231,8 +3198,15 @@ async function generateSignatures() {
     writeFileSync(resolve(dir, `${pkg}.json`), `${JSON.stringify(output, null, 2)}\n`)
     console.log(`✓ ${pkg}`)
   }
-  await generateManifests()
+  await generateManifests(libraries)
   formatGeneratedJson()
+  if (selectedLibrary === null)
+    for (const retired of RETIRED_RPC_LIBRARIES)
+      for (const path of [
+        resolve('src/generated/signatures', `${retired}.json`),
+        resolve('src/generated/manifests/libraries', `${retired}.json`)
+      ])
+        if (existsSync(path)) unlinkSync(path)
 }
 
 if (import.meta.main)

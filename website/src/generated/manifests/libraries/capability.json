@@ -578,7 +578,7 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "Host 自有错误的 source 为 CAPABILITY_SOURCE，即 @migaia/capability；Graph 自有错误为 CAPABILITY_GRAPH_SOURCE，即 @migaia/capability/graph。用 (source, code) 区分归属。身份字段通过属性附加，不改写 stack；可附加的原生错误保留类型与实例，需包装时经 cause/errors 保留原对象。私有错误工厂不是公开入口。"
+                "text": "Host 自有错误的 source 为 CAPABILITY_SOURCE，即 capability；Graph 自有错误为 CAPABILITY_GRAPH_SOURCE，即 capability.graph。用 (source, code) 区分归属。身份字段通过属性附加，不改写 stack；可附加的原生错误保留类型与实例，需包装时经 cause/errors 保留原对象。私有错误工厂不是公开入口。"
               },
               {
                 "type": "table",
@@ -1438,7 +1438,7 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "Host 自有错误的 source 为 CAPABILITY_SOURCE，即 @migaia/capability；Graph 自有错误为 CAPABILITY_GRAPH_SOURCE，即 @migaia/capability/graph。用 (source, code) 区分归属。身份字段通过属性附加，不改写 stack；可附加的原生错误保留类型与实例，需包装时经 cause/errors 保留原对象。私有错误工厂不是公开入口。"
+                "text": "Host 自有错误的 source 为 CAPABILITY_SOURCE，即 capability；Graph 自有错误为 CAPABILITY_GRAPH_SOURCE，即 capability.graph。用 (source, code) 区分归属。身份字段通过属性附加，不改写 stack；可附加的原生错误保留类型与实例，需包装时经 cause/errors 保留原对象。私有错误工厂不是公开入口。"
               },
               {
                 "type": "table",
@@ -2170,7 +2170,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "Host-owned errors use CAPABILITY_SOURCE, @migaia/capability. Graph-owned errors use CAPABILITY_GRAPH_SOURCE, @migaia/capability/graph. Branch on (source, code). Identity fields are attached without rewriting stack. Annotatable native errors preserve their type and object identity; wrappers retain originals through cause/errors. Private error factories are not public entry points."
+                  "text": "Host-owned errors use CAPABILITY_SOURCE, capability. Graph-owned errors use CAPABILITY_GRAPH_SOURCE, capability.graph. Branch on (source, code). Identity fields are attached without rewriting stack. Annotatable native errors preserve their type and object identity; wrappers retain originals through cause/errors. Private error factories are not public entry points."
                 },
                 {
                   "type": "table",
@@ -3112,7 +3112,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "Host-owned errors use CAPABILITY_SOURCE, @migaia/capability. Graph-owned errors use CAPABILITY_GRAPH_SOURCE, @migaia/capability/graph. Branch on (source, code). Identity fields are attached without rewriting stack. Annotatable native errors preserve their type and object identity; wrappers retain originals through cause/errors. Private error factories are not public entry points."
+                  "text": "Host-owned errors use CAPABILITY_SOURCE, capability. Graph-owned errors use CAPABILITY_GRAPH_SOURCE, capability.graph. Branch on (source, code). Identity fields are attached without rewriting stack. Annotatable native errors preserve their type and object identity; wrappers retain originals through cause/errors. Private error factories are not public entry points."
                 },
                 {
                   "type": "table",
@@ -3234,11 +3234,11 @@
         {
           "name": "CAPABILITY_SOURCE",
           "kind": "const",
-          "signature": "export declare const CAPABILITY_SOURCE = \"@migaia/capability\";",
+          "signature": "export declare const CAPABILITY_SOURCE = \"capability\";",
           "declarationLine": 2,
           "source": "packages/capability/dist/errors.d.ts",
-          "purpose": "Stable @migaia/capability source attached to native host errors. Compare source and CapabilityErrorCode together to distinguish host failures from dependency graph errors.",
-          "core": "Stable @migaia/capability source attached to native host errors. Compare source and CapabilityErrorCode together to distinguish host failures from dependency graph errors.",
+          "purpose": "Stable capability source attached to native host errors. Compare source and CapabilityErrorCode together to distinguish host failures from dependency graph errors.",
+          "core": "Stable capability source attached to native host errors. Compare source and CapabilityErrorCode together to distinguish host failures from dependency graph errors.",
           "advanced": "",
           "parameters": ["This const declaration has no parameters."],
           "parameterDetails": [],
@@ -3250,9 +3250,7 @@
           "composes": [],
           "aliasOf": "CAPABILITY_SOURCE",
           "exportPath": ".",
-          "overloadSignatures": [
-            "export declare const CAPABILITY_SOURCE = \"@migaia/capability\";"
-          ],
+          "overloadSignatures": ["export declare const CAPABILITY_SOURCE = \"capability\";"],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
           "whenToUse": "",
@@ -3261,7 +3259,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Stable @migaia/capability source attached to native host errors. Compare source and CapabilityErrorCode together to distinguish host failures from dependency graph errors."
+              "content": "Stable capability source attached to native host errors. Compare source and CapabilityErrorCode together to distinguish host failures from dependency graph errors."
             },
             {
               "id": "getting-started",
@@ -3281,7 +3279,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Stable @migaia/capability source attached to native host errors. Compare source and CapabilityErrorCode together to distinguish host failures from dependency graph errors."
+              "content": "Stable capability source attached to native host errors. Compare source and CapabilityErrorCode together to distinguish host failures from dependency graph errors."
             },
             {
               "id": "advanced-usage",
@@ -3290,7 +3288,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/capability/dist/errors.d.ts:CAPABILITY_SOURCE:export declare const CAPABILITY_SOURCE = \"@migaia/capability\";",
+          "identity": "packages/capability/dist/errors.d.ts:CAPABILITY_SOURCE:export declare const CAPABILITY_SOURCE = \"capability\";",
           "guidance": [
             {
               "id": "错误身份与处理",
@@ -3298,7 +3296,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "Host 自有错误的 source 为 CAPABILITY_SOURCE，即 @migaia/capability；Graph 自有错误为 CAPABILITY_GRAPH_SOURCE，即 @migaia/capability/graph。用 (source, code) 区分归属。身份字段通过属性附加，不改写 stack；可附加的原生错误保留类型与实例，需包装时经 cause/errors 保留原对象。私有错误工厂不是公开入口。"
+                  "text": "Host 自有错误的 source 为 CAPABILITY_SOURCE，即 capability；Graph 自有错误为 CAPABILITY_GRAPH_SOURCE，即 capability.graph。用 (source, code) 区分归属。身份字段通过属性附加，不改写 stack；可附加的原生错误保留类型与实例，需包装时经 cause/errors 保留原对象。私有错误工厂不是公开入口。"
                 },
                 {
                   "type": "table",
@@ -3469,9 +3467,9 @@
           "name": "CapabilityErrorCode",
           "kind": "const",
           "signature": "export declare const CapabilityErrorCode: { /** * Thrown when a mutation method such as `register`, `setFlag`, `setFlags`, `enable`, or `disable` * is called after the host is disposed. * * Enforces the terminal host boundary. Read-only diagnostics (`names`, `state`, `handle`, and * `error`) remain available after disposal. Create a new host to enable capabilities again. A * disposed host cannot be revived. */ readonly hostDisposed: 'HOST_DISPOSED'; /** * Thrown or rejected when `register`, `setFlag`, `setFlags`, `enable`, `disable`, or `dispose` * reenters a disposer or reporter while `transitionDepth > 0`. Also rejects repeated `dispose()` * calls before the first disposal completes. * * Enforces the reentrancy boundary. A rollback callback cannot rewrite the flag snapshot during * the surrounding transition. Move mutations outside lifecycle callbacks. */ readonly hostTransitioning: 'HOST_TRANSITIONING'; /** * Thrown when `state`, `handle`, `error`, `enable`, or `disable` references an unregistered * capability. * * Enforces registered-name lookup. Check the name and register the capability first. */ readonly notRegistered: 'NOT_REGISTERED'; /** * Thrown when `register()` receives an existing `name`. Duplicate registration is a programming * error and never silently replaces the existing entry. * * Enforces unique registration names. Use a different name or create a new host. */ readonly alreadyRegistered: 'ALREADY_REGISTERED'; /** * Thrown as a `TypeError` when `register()` receives a name that is not a nonempty string. * * Enforces input validation. Correct `name` before retrying. */ readonly invalidName: 'INVALID_NAME'; /** * Thrown as a `TypeError` when `register()` receives a non-function `activate`. * * Enforces input validation. Provide a callable `activate`. */ readonly invalidActivate: 'INVALID_ACTIVATE'; /** * Thrown as a `TypeError` when the result of `activate()` lacks a callable `dispose`. Rejects * incomplete activation instead of leaving a partially enabled capability. * * Enforces the handle contract. Ensure `activate` returns a handle with `dispose`. */ readonly invalidHandle: 'INVALID_HANDLE'; /** * Reserved for diagnostics or events when the gate denies activation. No current throw site uses * it. `enable()` returns `{ status: 'gated' }` for a denied activation without throwing. * Reserving this code for an `onError` or event channel does not change that behavior. * * Enforces the activation gate. `gated` differs from graph availability `blocked`. Branch on the * return value instead of catching an error. */ readonly gated: 'GATED'; /** * Thrown when an `ownKeys`, `getOwnPropertyDescriptor`, or getter operation fails while * snapshotting `flags`, `definition`, or graph-readiness state/error, for example on a hostile * proxy. Annotatable readiness getter Errors retain their native identity and receive this code. * * The gate fails closed before throwing. `cause` retains the original proxy exception by * identity. Correct the flags or definition object before retrying. */ readonly invalidOption: 'INVALID_OPTION'; };",
-          "declarationLine": 13,
+          "declarationLine": 15,
           "source": "packages/capability/dist/error-code.d.ts",
-          "purpose": "Native host errors tagged with source @migaia/capability; inspect source and code together. Compare these exported values when handling the documented branch.",
+          "purpose": "Native host errors tagged with source capability; inspect source and code together. Compare these exported values when handling the documented branch.",
           "core": "hostDisposed: A mutation reached a disposed host; create another host.\nhostTransitioning: A mutation reentered cleanup or repeated unsettled disposal.\nnotRegistered: The capability name is absent; register it before use.\nalreadyRegistered: Registration repeats an existing capability name.\ninvalidName: Name is not a nonempty string; native TypeError is retained.\ninvalidActivate: The definition has no callable activation factory.\ninvalidHandle: Activation returned a handle without a callable disposer.\ngated: Reserved diagnostic code; current enable returns gated without throwing it.\ninvalidOption: Options or snapshot access failed; inspect the original cause.",
           "advanced": "",
           "parameters": ["This const declaration has no parameters."],
@@ -3577,7 +3575,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Native host errors tagged with source @migaia/capability; inspect source and code together. Compare these exported values when handling the documented branch."
+              "content": "Native host errors tagged with source capability; inspect source and code together. Compare these exported values when handling the documented branch."
             },
             {
               "id": "getting-started",
@@ -3614,7 +3612,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "Host 自有错误的 source 为 CAPABILITY_SOURCE，即 @migaia/capability；Graph 自有错误为 CAPABILITY_GRAPH_SOURCE，即 @migaia/capability/graph。用 (source, code) 区分归属。身份字段通过属性附加，不改写 stack；可附加的原生错误保留类型与实例，需包装时经 cause/errors 保留原对象。私有错误工厂不是公开入口。"
+                  "text": "Host 自有错误的 source 为 CAPABILITY_SOURCE，即 capability；Graph 自有错误为 CAPABILITY_GRAPH_SOURCE，即 capability.graph。用 (source, code) 区分归属。身份字段通过属性附加，不改写 stack；可附加的原生错误保留类型与实例，需包装时经 cause/errors 保留原对象。私有错误工厂不是公开入口。"
                 },
                 {
                   "type": "table",
@@ -4274,7 +4272,7 @@
           "name": "ICapabilityErrorCode",
           "kind": "type",
           "signature": "export type ICapabilityErrorCode = (typeof CapabilityErrorCode)[keyof typeof CapabilityErrorCode];",
-          "declarationLine": 85,
+          "declarationLine": 87,
           "source": "packages/capability/dist/error-code.d.ts",
           "purpose": "Value union of CapabilityErrorCode; classify alongside the package source.",
           "core": "Value union of CapabilityErrorCode; classify alongside the package source.",
@@ -4337,7 +4335,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "Host 自有错误的 source 为 CAPABILITY_SOURCE，即 @migaia/capability；Graph 自有错误为 CAPABILITY_GRAPH_SOURCE，即 @migaia/capability/graph。用 (source, code) 区分归属。身份字段通过属性附加，不改写 stack；可附加的原生错误保留类型与实例，需包装时经 cause/errors 保留原对象。私有错误工厂不是公开入口。"
+                  "text": "Host 自有错误的 source 为 CAPABILITY_SOURCE，即 capability；Graph 自有错误为 CAPABILITY_GRAPH_SOURCE，即 capability.graph。用 (source, code) 区分归属。身份字段通过属性附加，不改写 stack；可附加的原生错误保留类型与实例，需包装时经 cause/errors 保留原对象。私有错误工厂不是公开入口。"
                 },
                 {
                   "type": "table",
@@ -5112,11 +5110,11 @@
         {
           "name": "CAPABILITY_GRAPH_SOURCE",
           "kind": "const",
-          "signature": "export declare const CAPABILITY_GRAPH_SOURCE = \"@migaia/capability/graph\";",
+          "signature": "export declare const CAPABILITY_GRAPH_SOURCE = \"capability.graph\";",
           "declarationLine": 3,
           "source": "packages/capability/dist/graph/errors.d.ts",
-          "purpose": "Stable @migaia/capability/graph source marker attached to graph failures. Compare it with CapabilityGraphErrorCode to distinguish graph errors from capability gate activation outcomes.",
-          "core": "Stable @migaia/capability/graph source marker attached to graph failures. Compare it with CapabilityGraphErrorCode to distinguish graph errors from capability gate activation outcomes.",
+          "purpose": "Stable capability.graph source marker attached to graph failures. Compare it with CapabilityGraphErrorCode to distinguish graph errors from capability gate activation outcomes.",
+          "core": "Stable capability.graph source marker attached to graph failures. Compare it with CapabilityGraphErrorCode to distinguish graph errors from capability gate activation outcomes.",
           "advanced": "",
           "parameters": ["This const declaration has no parameters."],
           "parameterDetails": [],
@@ -5129,7 +5127,7 @@
           "aliasOf": "CAPABILITY_GRAPH_SOURCE",
           "exportPath": "./graph",
           "overloadSignatures": [
-            "export declare const CAPABILITY_GRAPH_SOURCE = \"@migaia/capability/graph\";"
+            "export declare const CAPABILITY_GRAPH_SOURCE = \"capability.graph\";"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -5139,7 +5137,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Stable @migaia/capability/graph source marker attached to graph failures. Compare it with CapabilityGraphErrorCode to distinguish graph errors from capability gate activation outcomes."
+              "content": "Stable capability.graph source marker attached to graph failures. Compare it with CapabilityGraphErrorCode to distinguish graph errors from capability gate activation outcomes."
             },
             {
               "id": "getting-started",
@@ -5159,7 +5157,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Stable @migaia/capability/graph source marker attached to graph failures. Compare it with CapabilityGraphErrorCode to distinguish graph errors from capability gate activation outcomes."
+              "content": "Stable capability.graph source marker attached to graph failures. Compare it with CapabilityGraphErrorCode to distinguish graph errors from capability gate activation outcomes."
             },
             {
               "id": "advanced-usage",
@@ -5168,7 +5166,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/capability/dist/graph/errors.d.ts:CAPABILITY_GRAPH_SOURCE:export declare const CAPABILITY_GRAPH_SOURCE = \"@migaia/capability/graph\";",
+          "identity": "packages/capability/dist/graph/errors.d.ts:CAPABILITY_GRAPH_SOURCE:export declare const CAPABILITY_GRAPH_SOURCE = \"capability.graph\";",
           "guidance": [
             {
               "id": "错误身份与处理",
@@ -5176,7 +5174,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "Host 自有错误的 source 为 CAPABILITY_SOURCE，即 @migaia/capability；Graph 自有错误为 CAPABILITY_GRAPH_SOURCE，即 @migaia/capability/graph。用 (source, code) 区分归属。身份字段通过属性附加，不改写 stack；可附加的原生错误保留类型与实例，需包装时经 cause/errors 保留原对象。私有错误工厂不是公开入口。"
+                  "text": "Host 自有错误的 source 为 CAPABILITY_SOURCE，即 capability；Graph 自有错误为 CAPABILITY_GRAPH_SOURCE，即 capability.graph。用 (source, code) 区分归属。身份字段通过属性附加，不改写 stack；可附加的原生错误保留类型与实例，需包装时经 cause/errors 保留原对象。私有错误工厂不是公开入口。"
                 },
                 {
                   "type": "table",
@@ -5248,7 +5246,7 @@
           "signature": "export declare const CapabilityGraphErrorCode: { /** Graph mutation/query reaches terminal state; create a new graph. */ readonly graphDisposed: 'GRAPH_DISPOSED'; /** Registration is attempted after readiness froze the static registry. */ readonly graphFrozen: 'GRAPH_FROZEN'; /** A node, dependency, or start result fails structural admission. */ readonly invalidNode: 'GRAPH_INVALID_NODE'; /** A second node uses an already registered ID. */ readonly duplicateNode: 'GRAPH_DUPLICATE_NODE'; /** A dependency names a provider absent from the frozen registry. */ readonly unknownProvider: 'GRAPH_UNKNOWN_PROVIDER'; /** A consumer repeats the same provider edge. */ readonly duplicateEdge: 'GRAPH_DUPLICATE_EDGE'; /** The required dependency graph contains a self-loop or cycle. */ readonly dependencyCycle: 'GRAPH_DEPENDENCY_CYCLE'; /** A direct provider lookup is not declared and ready. */ readonly providerUnavailable: 'GRAPH_PROVIDER_UNAVAILABLE'; /** A node start failed and the graph entered failed state. */ readonly startFailed: 'GRAPH_START_FAILED'; /** Release of one or more graph-owned node resources failed. */ readonly disposeFailed: 'GRAPH_DISPOSE_FAILED'; /** Startup or new work is rejected while the graph is quiescing. */ readonly admissionClosed: 'GRAPH_ADMISSION_CLOSED'; /** Diagnostic or direct value query names an absent node; correct the id before retrying. */ readonly unknownNode: 'GRAPH_UNKNOWN_NODE'; /** A lifecycle callback synchronously re-enters the same graph operation. */ readonly reentrantOperation: 'GRAPH_REENTRANT_OPERATION'; /** * Factory options or ctx.own resource descriptors fail admission. Correct the input; ownership * failures retain the lifecycle native error on cause rather than reporting a closed graph. */ readonly invalidOption: 'GRAPH_INVALID_OPTION'; /** A reject-policy mutation targets a node that still has required dependents. */ readonly nodeHasDependents: 'GRAPH_NODE_HAS_DEPENDENTS'; /** * A dynamic-graph mutation waited behind an older mutation longer than `mutationAdmissionMs` and * was rejected without running. The lifecycle queue timeout stays on `cause`. Check for a stuck * predecessor (start that never settles, leaked binding lease) or raise the budget. */ readonly mutationAdmissionTimeout: 'GRAPH_MUTATION_ADMISSION_TIMEOUT'; /** * `resume()` targets a dynamic-graph node that is not suspended. A state conflict, not a bad * option: suspend the node first, or skip the call when the node is already running. */ readonly nodeNotSuspended: 'GRAPH_NODE_NOT_SUSPENDED'; };",
           "declarationLine": 4,
           "source": "packages/capability/dist/graph/error-code.d.ts",
-          "purpose": "Graph-owned stable codes under source @migaia/capability/graph; original causes stay reachable. Compare the documented exported values when handling this branch.",
+          "purpose": "Graph-owned stable codes under source capability.graph; original causes stay reachable. Compare the documented exported values when handling this branch.",
           "core": "graphDisposed: A graph operation reached terminal disposal.\ngraphFrozen: Static registration was attempted after readiness froze it.\ninvalidNode: A node, edge or startup result failed structural admission.\nduplicateNode: A definition repeats an existing node identity.\nunknownProvider: A static required provider is absent from the frozen registry.\nduplicateEdge: A provider edge is repeated or an invalid self edge is supplied.\ndependencyCycle: Required provider edges contain a dependency cycle.\nproviderUnavailable: A direct read or lease cannot access a ready provider.\nstartFailed: Node or batch startup failed; inspect the original cause.\ndisposeFailed: One or more graph-owned resource releases failed.\nadmissionClosed: New work arrived while the graph was quiescing.\nunknownNode: A query or mutation references an absent node identity.\nreentrantOperation: A lifecycle callback synchronously reentered this graph.\ninvalidOption: Factory options or auxiliary ownership descriptors are invalid.\nnodeHasDependents: Reject-policy mutation still has required consumers.\nmutationAdmissionTimeout: A queued mutation exceeded its admission deadline before running.\nnodeNotSuspended: Resume targeted a node that is not suspended.",
           "advanced": "",
           "parameters": ["This const declaration has no parameters."],
@@ -5426,7 +5424,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Graph-owned stable codes under source @migaia/capability/graph; original causes stay reachable. Compare the documented exported values when handling this branch."
+              "content": "Graph-owned stable codes under source capability.graph; original causes stay reachable. Compare the documented exported values when handling this branch."
             },
             {
               "id": "getting-started",
@@ -5463,7 +5461,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "Host 自有错误的 source 为 CAPABILITY_SOURCE，即 @migaia/capability；Graph 自有错误为 CAPABILITY_GRAPH_SOURCE，即 @migaia/capability/graph。用 (source, code) 区分归属。身份字段通过属性附加，不改写 stack；可附加的原生错误保留类型与实例，需包装时经 cause/errors 保留原对象。私有错误工厂不是公开入口。"
+                  "text": "Host 自有错误的 source 为 CAPABILITY_SOURCE，即 capability；Graph 自有错误为 CAPABILITY_GRAPH_SOURCE，即 capability.graph。用 (source, code) 区分归属。身份字段通过属性附加，不改写 stack；可附加的原生错误保留类型与实例，需包装时经 cause/errors 保留原对象。私有错误工厂不是公开入口。"
                 },
                 {
                   "type": "table",

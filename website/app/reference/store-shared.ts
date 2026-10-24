@@ -382,7 +382,7 @@ export const storeSharedReference: ILibraryReference = {
     STORE_SHARED_SOURCE: {
       role: 'error',
       purpose: t(
-        'Canonical @migaia/store-shared source used together with StoreSharedErrorCode to classify package-owned shared-memory failures.',
+        'Canonical store.shared source used together with StoreSharedErrorCode to classify package-owned shared-memory failures.',
         '规范共享存储错误来源，与语义错误码一起分类包拥有的共享内存失败。'
       ),
       example: `import { STORE_SHARED_SOURCE, StoreSharedErrorCode } from '@migaia/store-shared'

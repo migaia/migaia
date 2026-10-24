@@ -253,7 +253,7 @@ const enums: ILibraryReference['enums'] = {
   },
   CapabilityErrorCode: {
     summary: t(
-      'Native host errors tagged with source @migaia/capability; inspect source and code together.',
+      'Native host errors tagged with source capability; inspect source and code together.',
       '宿主原生错误的稳定错误码，分类时必须同时核对来源与错误码。'
     ),
     values: {
@@ -682,8 +682,8 @@ export const capabilityReference: ILibraryReference = {
     CAPABILITY_SOURCE: {
       role: 'error',
       purpose: t(
-        'Stable @migaia/capability source attached to native host errors. Compare source and CapabilityErrorCode together to distinguish host failures from dependency graph errors.',
-        '附着于原生宿主错误的稳定来源 `@migaia/capability`；同时核对来源与 `CapabilityErrorCode`，区分宿主失败与依赖图错误。'
+        'Stable capability source attached to native host errors. Compare source and CapabilityErrorCode together to distinguish host failures from dependency graph errors.',
+        '附着于原生宿主错误的稳定来源 `capability`；同时核对来源与 `CapabilityErrorCode`，区分宿主失败与依赖图错误。'
       ),
       example: `import { CAPABILITY_SOURCE, CapabilityErrorCode } from '@migaia/capability'\nconsole.log(CAPABILITY_SOURCE, CapabilityErrorCode.hostDisposed)`
     },

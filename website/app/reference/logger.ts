@@ -2120,8 +2120,8 @@ console.log(getLoggerRuntimeManager() === previous, lines)`
     LOGGER_SOURCE: {
       role: 'constant',
       purpose: t(
-        'The `source` value (`@migaia/logger`) on every error of this package; compare it with `error.source` before branching on `error.code`.',
-        '本包每个错误上的 `source` 值（`@migaia/logger`）；先与 `error.source` 比对确认来源，再按 `error.code` 分支处理。'
+        'The `source` value (`logging`) on every error of this package; compare it with `error.source` before branching on `error.code`.',
+        '本包每个错误上的 `source` 值（`logging`）；先与 `error.source` 比对确认来源，再按 `error.code` 分支处理。'
       ),
       example: `if (error.source === LOGGER_SOURCE && error.code === LoggerErrorCode.batchOverflow) alertOps()`
     },

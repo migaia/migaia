@@ -496,7 +496,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "channel（事件通道）只分发当前发布的事件，不保存当前值，也不重放历史。registration（订阅登记）是一次订阅及其取消句柄。snapshot（快照）是一次发布开始时固定的目标列表。需要当前值或派生依赖时使用 `@migaia/reactive`；需要前一步结果传给下一步的中间件时使用 `@migaia/middleware-pipeline`；资源释放、队列和背压由 `@migaia/lifecycle` 或 `@migaia/resource` 负责；跨 Worker、窗口或网络的消息由 `@migaia/rpc-core` 负责。"
+                "text": "channel（事件通道）只分发当前发布的事件，不保存当前值，也不重放历史。registration（订阅登记）是一次订阅及其取消句柄。snapshot（快照）是一次发布开始时固定的目标列表。需要当前值或派生依赖时使用 `@migaia/reactive`；需要前一步结果传给下一步的中间件时使用 `@migaia/middleware-pipeline`；资源释放、队列和背压由 `@migaia/lifecycle` 或 `@migaia/resource` 负责；跨 Worker、窗口或网络的消息由 `@migaia/rpc-host` 加传输 plugin 负责。"
               }
             ]
           },
@@ -871,7 +871,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "包级错误的 `source` 为 `EVENT_SUBSCRIBER_SOURCE`，值是 `'@migaia/event-subscriber'`。输入校验保留原生 `TypeError`，发布聚合保留 `AggregateError`。原始失败通过 `errors` 与 `cause` 可达；存在监听器失败时，`cause` 是第一个失败。只有预算耗尽时，`errors` 可以为空。业务代码比较 `EventSubscriberErrorCode` 的成员，不散写码值。`EventSubscriberErrorText` 是内部文案表，不是公开导出，业务代码不能导入；锁定文案时断言实际错误的 `message`。"
+                "text": "包级错误的 `source` 为 `EVENT_SUBSCRIBER_SOURCE`，值是 `'event.subscriber'`。输入校验保留原生 `TypeError`，发布聚合保留 `AggregateError`。原始失败通过 `errors` 与 `cause` 可达；存在监听器失败时，`cause` 是第一个失败。只有预算耗尽时，`errors` 可以为空。业务代码比较 `EventSubscriberErrorCode` 的成员，不散写码值。`EventSubscriberErrorText` 是内部文案表，不是公开导出，业务代码不能导入；锁定文案时断言实际错误的 `message`。"
               },
               {
                 "type": "table",
@@ -1538,7 +1538,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "A channel delivers events as they are published. It stores no current value and replays no history. A registration is one subscription and its cancellation ownership. A snapshot fixes the target list when an invocation starts. Use `@migaia/reactive` for current state or derived dependencies, `@migaia/middleware-pipeline` for a sequence that passes each result to the next step, `@migaia/lifecycle` or `@migaia/resource` for resource ownership, queues and backpressure, and `@migaia/rpc-core` for messages crossing Workers, windows or networks."
+                  "text": "A channel delivers events as they are published. It stores no current value and replays no history. A registration is one subscription and its cancellation ownership. A snapshot fixes the target list when an invocation starts. Use `@migaia/reactive` for current state or derived dependencies, `@migaia/middleware-pipeline` for a sequence that passes each result to the next step, `@migaia/lifecycle` or `@migaia/resource` for resource ownership, queues and backpressure, and `@migaia/rpc-host` + transport plugin for messages crossing Workers, windows or networks."
                 }
               ]
             },
@@ -1919,7 +1919,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "module errors use `EVENT_SUBSCRIBER_SOURCE`, whose value is `'@migaia/event-subscriber'`, as their `source`. Admission preserves native `TypeError`; publication aggregation preserves `AggregateError`. Original failures remain reachable through `errors` and `cause`. With listener failures, `cause` is the first failure. Budget-only failure may have an empty `errors` array. Compare `EventSubscriberErrorCode` members instead of scattering code strings. `EventSubscriberErrorText` is an internal message table, not a public export; application code must not import it. To lock down user-facing text, assert the actual error's `message`."
+                  "text": "module errors use `EVENT_SUBSCRIBER_SOURCE`, whose value is `'event.subscriber'`, as their `source`. Admission preserves native `TypeError`; publication aggregation preserves `AggregateError`. Original failures remain reachable through `errors` and `cause`. With listener failures, `cause` is the first failure. Budget-only failure may have an empty `errors` array. Compare `EventSubscriberErrorCode` members instead of scattering code strings. `EventSubscriberErrorText` is an internal message table, not a public export; application code must not import it. To lock down user-facing text, assert the actual error's `message`."
                 },
                 {
                   "type": "table",
@@ -2597,11 +2597,11 @@
         {
           "name": "EVENT_SUBSCRIBER_SOURCE",
           "kind": "const",
-          "signature": "export declare const EVENT_SUBSCRIBER_SOURCE = \"@migaia/event-subscriber\";",
-          "declarationLine": 2,
+          "signature": "export declare const EVENT_SUBSCRIBER_SOURCE = \"event.subscriber\";",
+          "declarationLine": 4,
           "source": "packages/event-subscriber/dist/error-code.d.ts",
-          "purpose": "The `source` value attached to every error this package throws (`@migaia/event-subscriber`). Compare `error.source` with it to know the error came from this package, then branch on `error.code`.",
-          "core": "The `source` value attached to every error this package throws (`@migaia/event-subscriber`). Compare `error.source` with it to know the error came from this package, then branch on `error.code`.",
+          "purpose": "The `source` value attached to every error this package throws (`event.subscriber`). Compare `error.source` with it to know the error came from this package, then branch on `error.code`.",
+          "core": "The `source` value attached to every error this package throws (`event.subscriber`). Compare `error.source` with it to know the error came from this package, then branch on `error.code`.",
           "advanced": "",
           "parameters": ["This const declaration has no parameters."],
           "parameterDetails": [],
@@ -2614,7 +2614,7 @@
           "aliasOf": "EVENT_SUBSCRIBER_SOURCE",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const EVENT_SUBSCRIBER_SOURCE = \"@migaia/event-subscriber\";"
+            "export declare const EVENT_SUBSCRIBER_SOURCE = \"event.subscriber\";"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -2624,7 +2624,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "The `source` value attached to every error this package throws (`@migaia/event-subscriber`). Compare `error.source` with it to know the error came from this package, then branch on `error.code`."
+              "content": "The `source` value attached to every error this package throws (`event.subscriber`). Compare `error.source` with it to know the error came from this package, then branch on `error.code`."
             },
             {
               "id": "getting-started",
@@ -2644,7 +2644,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "The `source` value attached to every error this package throws (`@migaia/event-subscriber`). Compare `error.source` with it to know the error came from this package, then branch on `error.code`."
+              "content": "The `source` value attached to every error this package throws (`event.subscriber`). Compare `error.source` with it to know the error came from this package, then branch on `error.code`."
             },
             {
               "id": "advanced-usage",
@@ -2653,7 +2653,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/event-subscriber/dist/error-code.d.ts:EVENT_SUBSCRIBER_SOURCE:export declare const EVENT_SUBSCRIBER_SOURCE = \"@migaia/event-subscriber\";",
+          "identity": "packages/event-subscriber/dist/error-code.d.ts:EVENT_SUBSCRIBER_SOURCE:export declare const EVENT_SUBSCRIBER_SOURCE = \"event.subscriber\";",
           "guidance": [
             {
               "id": "错误与诊断",
@@ -2669,7 +2669,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "包级错误的 `source` 为 `EVENT_SUBSCRIBER_SOURCE`，值是 `'@migaia/event-subscriber'`。输入校验保留原生 `TypeError`，发布聚合保留 `AggregateError`。原始失败通过 `errors` 与 `cause` 可达；存在监听器失败时，`cause` 是第一个失败。只有预算耗尽时，`errors` 可以为空。业务代码比较 `EventSubscriberErrorCode` 的成员，不散写码值。`EventSubscriberErrorText` 是内部文案表，不是公开导出，业务代码不能导入；锁定文案时断言实际错误的 `message`。"
+                  "text": "包级错误的 `source` 为 `EVENT_SUBSCRIBER_SOURCE`，值是 `'event.subscriber'`。输入校验保留原生 `TypeError`，发布聚合保留 `AggregateError`。原始失败通过 `errors` 与 `cause` 可达；存在监听器失败时，`cause` 是第一个失败。只有预算耗尽时，`errors` 可以为空。业务代码比较 `EventSubscriberErrorCode` 的成员，不散写码值。`EventSubscriberErrorText` 是内部文案表，不是公开导出，业务代码不能导入；锁定文案时断言实际错误的 `message`。"
                 },
                 {
                   "type": "table",
@@ -3249,7 +3249,7 @@
           "name": "EventSubscriberErrorCode",
           "kind": "const",
           "signature": "export declare const EventSubscriberErrorCode: { /** Invalid listener input; caller must pass a function. Reporter input uses INVALID_REPORTER. */ readonly invalidListener: 'INVALID_LISTENER'; /** Invalid report/terminalReport function; caller must provide a callable reporter or omit it. */ readonly invalidReporter: 'INVALID_REPORTER'; /** Use a valid structural source for subscriber helpers, or a factory channel for invoke helpers. */ readonly invalidChannel: 'INVALID_CHANNEL'; /** * A signal-like value failed structural validation or abort rollback; caller must provide a valid * signal. */ readonly invalidSignal: 'INVALID_SIGNAL'; /** A canonical channel was subscribed with an already-aborted signal under strict admission. */ readonly aborted: 'ABORTED'; /** An object subscriber lacks handle(); caller must implement the typing contract. */ readonly invalidSubscriber: 'INVALID_SUBSCRIBER'; /** A hub key is not string, number, or symbol; caller must use a valid property key. */ readonly invalidEventKey: 'INVALID_EVENT_KEY'; /** Strict task publish found no registration; caller must fix the taskId or registration lifetime. */ readonly taskNotFound: 'TASK_NOT_FOUND'; /** Strict task publish found multiple registrations; caller must make the taskId unique. */ readonly taskNotUnique: 'TASK_NOT_UNIQUE'; /** * A task label is empty or not a string; caller must pass a non-empty string or undefined where * allowed. */ readonly invalidTaskId: 'INVALID_TASK_ID'; /** A public options object or field is malformed; caller must correct the option shape. */ readonly invalidOptions: 'INVALID_OPTIONS'; /** A listener failed or the publish budget left snapshot/queued targets undelivered. */ readonly publishFailed: 'PUBLISH_FAILED'; /** * A public snapshot/live invocation visitor threw or rejected. Native failures are annotated * without replacing their identity; immutable or foreign-coded failures retain cause. Fix or * handle the visitor failure; captured invocations are closed before it leaves the boundary. */ readonly visitorFailed: 'VISITOR_FAILED'; /** A configured value path was missing, blocked, or threw while delivering an event. */ readonly valueProjectionFailed: 'VALUE_PROJECTION_FAILED'; /** * A fire-and-forget listener failure reached terminal diagnostics after report handling failed or * was absent. */ readonly unhandledListenerFailure: 'UNHANDLED_LISTENER_FAILURE'; /** A callable subscription chain was closed; caller must retain a live handle. */ readonly subscriptionClosed: 'SUBSCRIPTION_CLOSED'; /** * Handle descriptor projection failed after registration; the module rolls back the first * registration and preserves the projection failure as the primary cause. */ readonly subscriptionHandleProjectionFailed: 'SUBSCRIPTION_HANDLE_PROJECTION_FAILED'; /** A captured invocation was called after completion or more than once. */ readonly invocationClosed: 'INVOCATION_CLOSED'; /** * Closing a subscription chain ran every disposer and more than one failed. The AggregateError * keeps the original failures in run order on `errors`; a single failure is rethrown unchanged. */ readonly subscriptionDisposeFailed: 'SUBSCRIPTION_DISPOSE_FAILED'; };",
-          "declarationLine": 8,
+          "declarationLine": 10,
           "source": "packages/event-subscriber/dist/error-code.d.ts",
           "purpose": "Every error code this package can throw or report. Errors keep their native type (`TypeError`, `AggregateError`) and carry `source` and `code`; branch on `code` instead of the message.",
           "core": "invalidListener: `INVALID_LISTENER`: a listener is not a function. Reporter validation uses `INVALID_REPORTER`.\ninvalidReporter: `INVALID_REPORTER`: `report` or `terminalReport` is not a function. Pass a function or omit it.\ninvalidChannel: `INVALID_CHANNEL`: an `invoke*` function received an object that is not a channel from `createEventChannel()` (or comes from another package copy).\ninvalidSignal: `INVALID_SIGNAL`: the value passed as signal is not a valid AbortSignal. Pass a real signal.\naborted: `ABORTED`: `subscribeUntil` got an already-aborted signal on a channel with `throwOnAborted: true`.\ninvalidSubscriber: `INVALID_SUBSCRIBER`: the object passed to `subscribeSubscriber` has no callable `handle`.\ninvalidEventKey: `INVALID_EVENT_KEY`: a hub event name is not a string, number or symbol.\ntaskNotFound: `TASK_NOT_FOUND`: `invokeTask` found no registration with that taskId. Check the name or the registration lifetime.\ntaskNotUnique: `TASK_NOT_UNIQUE`: `invokeTask` found several registrations with that taskId; the error has `taskId` and `matchCount`.\ninvalidTaskId: `INVALID_TASK_ID`: a taskId is empty or not a string.\ninvalidOptions: `INVALID_OPTIONS`: an options object or one of its fields is malformed.\npublishFailed: `PUBLISH_FAILED`: listeners failed, or the publish budget left snapshot targets or queued values undelivered. Budget details carry processed calls and remaining call budget.\nvisitorFailed: `VISITOR_FAILED`: a snapshot/live visitor threw or rejected. Native errors keep identity when annotatable; conflicting, immutable or primitive failures, including undefined, remain on cause after invocations close.\nvalueProjectionFailed: `VALUE_PROJECTION_FAILED`: the `valueConfig` path was missing, blocked or threw; reported, the listener still runs.\nunhandledListenerFailure: `UNHANDLED_LISTENER_FAILURE`: a late listener failure reached terminal diagnostics because `report` was missing or failed.\nsubscriptionClosed: `SUBSCRIPTION_CLOSED`: `handle.subscribe(...)` was called on a released handle.\nsubscriptionHandleProjectionFailed: `SUBSCRIPTION_HANDLE_PROJECTION_FAILED`: building the alias methods of a handle failed; the registration is rolled back.\ninvocationClosed: `INVOCATION_CLOSED`: an invocation was called twice or after its visitor finished.\nsubscriptionDisposeFailed: `SUBSCRIPTION_DISPOSE_FAILED`: releasing a chain ran every disposer and more than one failed; the failures are in `errors` in run order.",
@@ -3492,7 +3492,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "包级错误的 `source` 为 `EVENT_SUBSCRIBER_SOURCE`，值是 `'@migaia/event-subscriber'`。输入校验保留原生 `TypeError`，发布聚合保留 `AggregateError`。原始失败通过 `errors` 与 `cause` 可达；存在监听器失败时，`cause` 是第一个失败。只有预算耗尽时，`errors` 可以为空。业务代码比较 `EventSubscriberErrorCode` 的成员，不散写码值。`EventSubscriberErrorText` 是内部文案表，不是公开导出，业务代码不能导入；锁定文案时断言实际错误的 `message`。"
+                  "text": "包级错误的 `source` 为 `EVENT_SUBSCRIBER_SOURCE`，值是 `'event.subscriber'`。输入校验保留原生 `TypeError`，发布聚合保留 `AggregateError`。原始失败通过 `errors` 与 `cause` 可达；存在监听器失败时，`cause` 是第一个失败。只有预算耗尽时，`errors` 可以为空。业务代码比较 `EventSubscriberErrorCode` 的成员，不散写码值。`EventSubscriberErrorText` 是内部文案表，不是公开导出，业务代码不能导入；锁定文案时断言实际错误的 `message`。"
                 },
                 {
                   "type": "table",
@@ -5570,7 +5570,7 @@
           "name": "IEventSubscriberErrorCode",
           "kind": "type",
           "signature": "export type IEventSubscriberErrorCode = (typeof EventSubscriberErrorCode)[keyof typeof EventSubscriberErrorCode];",
-          "declarationLine": 68,
+          "declarationLine": 70,
           "source": "packages/event-subscriber/dist/error-code.d.ts",
           "purpose": "The union of every `EventSubscriberErrorCode` value.",
           "core": "The union of every `EventSubscriberErrorCode` value.",

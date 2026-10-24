@@ -4,14 +4,7 @@
  * error-code.ts, error-text.ts, text.ts and the events, state, persist, resource and web-component
  * entries), README and USEGUIDE on 2026-10-21.
  */
-import type {
-  ICode,
-  IGrantDoc,
-  ILibraryReference,
-  IMemberDoc,
-  IText,
-  ITypeDoc
-} from './contract.js'
+import type { ICode, IGrantDoc, ILibraryReference, IMemberDoc, IText } from './contract.js'
 import { microHubCases } from './micro-hub-cases.js'
 
 /** Builds one bilingual text. */
@@ -392,8 +385,8 @@ createMicroHub({ plugins: [state()] })`
       ],
       avoid: [
         t(
-          'iframes, Workers or other tabs are separate realms: use `@migaia/rpc-browser`.',
-          'iframe、Worker 或其它标签页属于不同的运行环境：请使用 `@migaia/rpc-browser`。'
+          'iframes, Workers or other tabs are separate realms: use `@migaia/rpc-plugin-browser` with `createRpcHost`.',
+          'iframe、Worker 或其它标签页属于不同的运行环境：请使用 `@migaia/rpc-plugin-browser` 搭配 `createRpcHost`。'
         ),
         t(
           'State used by only one app: use `@migaia/store-keyed` or `@migaia/store-light` directly.',
@@ -497,8 +490,8 @@ createMicroHub({ plugins: [state()] })`
     MICRO_HUB_SOURCE: {
       role: 'error',
       purpose: t(
-        'The `source` value on every error this package creates (`@migaia/micro-hub`). Compare `error.source` with it to know the error came from this package, then branch on `error.code`.',
-        '本包创建的每个错误都带有的 `source` 值（`@migaia/micro-hub`）。比较 `error.source` 是否等于它，即可确认错误来自本包，再按 `error.code` 分支处理。'
+        'The `source` value on every error this package creates (`micro-frontend.hub`). Compare `error.source` with it to know the error came from this package, then branch on `error.code`.',
+        '本包创建的每个错误都带有的 `source` 值（`micro-frontend.hub`）。比较 `error.source` 是否等于它，即可确认错误来自本包，再按 `error.code` 分支处理。'
       ),
       example: errorExample
     },

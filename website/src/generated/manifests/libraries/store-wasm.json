@@ -441,7 +441,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "STORE_WASM_SOURCE 为 `'@migaia/store-wasm'`，只标识本包创建的错误；已有外包身份保持原 owner。可附码 native 输入读取失败原位附 INVALID_OPTION，不可附码时用 cause/errors；不要把声明的原生 WASM pass-through 错误强制重包为普通 Error。"
+                "text": "STORE_WASM_SOURCE 为 `'store.wasm'`，只标识本包创建的错误；已有外包身份保持原 owner。可附码 native 输入读取失败原位附 INVALID_OPTION，不可附码时用 cause/errors；不要把声明的原生 WASM pass-through 错误强制重包为普通 Error。"
               },
               {
                 "type": "paragraph",
@@ -1092,7 +1092,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "STORE_WASM_SOURCE 为 `'@migaia/store-wasm'`，只标识本包创建的错误；已有外包身份保持原 owner。可附码 native 输入读取失败原位附 INVALID_OPTION，不可附码时用 cause/errors；不要把声明的原生 WASM pass-through 错误强制重包为普通 Error。"
+                "text": "STORE_WASM_SOURCE 为 `'store.wasm'`，只标识本包创建的错误；已有外包身份保持原 owner。可附码 native 输入读取失败原位附 INVALID_OPTION，不可附码时用 cause/errors；不要把声明的原生 WASM pass-through 错误强制重包为普通 Error。"
               },
               {
                 "type": "paragraph",
@@ -1636,7 +1636,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "STORE_WASM_SOURCE is `'@migaia/store-wasm'`, identifying errors created here rather than rewriting foreign owners. A native input-read failure that can accept identity receives INVALID_OPTION in place; otherwise cause/errors retain it. Do not forcibly replace declared native WASM pass-through errors with ordinary Error wrappers."
+                  "text": "STORE_WASM_SOURCE is `'store.wasm'`, identifying errors created here rather than rewriting foreign owners. A native input-read failure that can accept identity receives INVALID_OPTION in place; otherwise cause/errors retain it. Do not forcibly replace declared native WASM pass-through errors with ordinary Error wrappers."
                 },
                 {
                   "type": "paragraph",
@@ -2347,7 +2347,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "STORE_WASM_SOURCE is `'@migaia/store-wasm'`, identifying errors created here rather than rewriting foreign owners. A native input-read failure that can accept identity receives INVALID_OPTION in place; otherwise cause/errors retain it. Do not forcibly replace declared native WASM pass-through errors with ordinary Error wrappers."
+                  "text": "STORE_WASM_SOURCE is `'store.wasm'`, identifying errors created here rather than rewriting foreign owners. A native input-read failure that can accept identity receives INVALID_OPTION in place; otherwise cause/errors retain it. Do not forcibly replace declared native WASM pass-through errors with ordinary Error wrappers."
                 },
                 {
                   "type": "paragraph",
@@ -2580,7 +2580,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "STORE_WASM_SOURCE 为 `'@migaia/store-wasm'`，只标识本包创建的错误；已有外包身份保持原 owner。可附码 native 输入读取失败原位附 INVALID_OPTION，不可附码时用 cause/errors；不要把声明的原生 WASM pass-through 错误强制重包为普通 Error。"
+                  "text": "STORE_WASM_SOURCE 为 `'store.wasm'`，只标识本包创建的错误；已有外包身份保持原 owner。可附码 native 输入读取失败原位附 INVALID_OPTION，不可附码时用 cause/errors；不要把声明的原生 WASM pass-through 错误强制重包为普通 Error。"
                 },
                 {
                   "type": "paragraph",
@@ -2840,7 +2840,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "STORE_WASM_SOURCE 为 `'@migaia/store-wasm'`，只标识本包创建的错误；已有外包身份保持原 owner。可附码 native 输入读取失败原位附 INVALID_OPTION，不可附码时用 cause/errors；不要把声明的原生 WASM pass-through 错误强制重包为普通 Error。"
+                  "text": "STORE_WASM_SOURCE 为 `'store.wasm'`，只标识本包创建的错误；已有外包身份保持原 owner。可附码 native 输入读取失败原位附 INVALID_OPTION，不可附码时用 cause/errors；不要把声明的原生 WASM pass-through 错误强制重包为普通 Error。"
                 },
                 {
                   "type": "paragraph",
@@ -3042,7 +3042,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "STORE_WASM_SOURCE 为 `'@migaia/store-wasm'`，只标识本包创建的错误；已有外包身份保持原 owner。可附码 native 输入读取失败原位附 INVALID_OPTION，不可附码时用 cause/errors；不要把声明的原生 WASM pass-through 错误强制重包为普通 Error。"
+                  "text": "STORE_WASM_SOURCE 为 `'store.wasm'`，只标识本包创建的错误；已有外包身份保持原 owner。可附码 native 输入读取失败原位附 INVALID_OPTION，不可附码时用 cause/errors；不要把声明的原生 WASM pass-through 错误强制重包为普通 Error。"
                 },
                 {
                   "type": "paragraph",
@@ -3232,7 +3232,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "STORE_WASM_SOURCE 为 `'@migaia/store-wasm'`，只标识本包创建的错误；已有外包身份保持原 owner。可附码 native 输入读取失败原位附 INVALID_OPTION，不可附码时用 cause/errors；不要把声明的原生 WASM pass-through 错误强制重包为普通 Error。"
+                  "text": "STORE_WASM_SOURCE 为 `'store.wasm'`，只标识本包创建的错误；已有外包身份保持原 owner。可附码 native 输入读取失败原位附 INVALID_OPTION，不可附码时用 cause/errors；不要把声明的原生 WASM pass-through 错误强制重包为普通 Error。"
                 },
                 {
                   "type": "paragraph",
@@ -3434,7 +3434,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "STORE_WASM_SOURCE 为 `'@migaia/store-wasm'`，只标识本包创建的错误；已有外包身份保持原 owner。可附码 native 输入读取失败原位附 INVALID_OPTION，不可附码时用 cause/errors；不要把声明的原生 WASM pass-through 错误强制重包为普通 Error。"
+                  "text": "STORE_WASM_SOURCE 为 `'store.wasm'`，只标识本包创建的错误；已有外包身份保持原 owner。可附码 native 输入读取失败原位附 INVALID_OPTION，不可附码时用 cause/errors；不要把声明的原生 WASM pass-through 错误强制重包为普通 Error。"
                 },
                 {
                   "type": "paragraph",
@@ -3608,7 +3608,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "STORE_WASM_SOURCE 为 `'@migaia/store-wasm'`，只标识本包创建的错误；已有外包身份保持原 owner。可附码 native 输入读取失败原位附 INVALID_OPTION，不可附码时用 cause/errors；不要把声明的原生 WASM pass-through 错误强制重包为普通 Error。"
+                  "text": "STORE_WASM_SOURCE 为 `'store.wasm'`，只标识本包创建的错误；已有外包身份保持原 owner。可附码 native 输入读取失败原位附 INVALID_OPTION，不可附码时用 cause/errors；不要把声明的原生 WASM pass-through 错误强制重包为普通 Error。"
                 },
                 {
                   "type": "paragraph",
@@ -3668,7 +3668,7 @@
           "name": "IStoreWasmErrorCode",
           "kind": "type",
           "signature": "export type IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode];",
-          "declarationLine": 54,
+          "declarationLine": 56,
           "source": "packages/store-wasm/dist/error-code.d.ts",
           "purpose": "Value union of the StoreWasmErrorCode runtime table, preserving package failure branches.",
           "core": "Value union of the StoreWasmErrorCode runtime table, preserving package failure branches.",
@@ -3765,7 +3765,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "STORE_WASM_SOURCE 为 `'@migaia/store-wasm'`，只标识本包创建的错误；已有外包身份保持原 owner。可附码 native 输入读取失败原位附 INVALID_OPTION，不可附码时用 cause/errors；不要把声明的原生 WASM pass-through 错误强制重包为普通 Error。"
+                  "text": "STORE_WASM_SOURCE 为 `'store.wasm'`，只标识本包创建的错误；已有外包身份保持原 owner。可附码 native 输入读取失败原位附 INVALID_OPTION，不可附码时用 cause/errors；不要把声明的原生 WASM pass-through 错误强制重包为普通 Error。"
                 },
                 {
                   "type": "paragraph",
@@ -4074,7 +4074,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "STORE_WASM_SOURCE 为 `'@migaia/store-wasm'`，只标识本包创建的错误；已有外包身份保持原 owner。可附码 native 输入读取失败原位附 INVALID_OPTION，不可附码时用 cause/errors；不要把声明的原生 WASM pass-through 错误强制重包为普通 Error。"
+                  "text": "STORE_WASM_SOURCE 为 `'store.wasm'`，只标识本包创建的错误；已有外包身份保持原 owner。可附码 native 输入读取失败原位附 INVALID_OPTION，不可附码时用 cause/errors；不要把声明的原生 WASM pass-through 错误强制重包为普通 Error。"
                 },
                 {
                   "type": "paragraph",
@@ -4133,11 +4133,11 @@
         {
           "name": "STORE_WASM_SOURCE",
           "kind": "const",
-          "signature": "export declare const STORE_WASM_SOURCE = \"@migaia/store-wasm\";",
+          "signature": "export declare const STORE_WASM_SOURCE = \"store.wasm\";",
           "declarationLine": 5,
           "source": "packages/store-wasm/dist/errors.d.ts",
-          "purpose": "Source @migaia/store-wasm for package-owned failures; interpret it with code. Complete foreign identities retain their owner. Registered native WebAssembly CompileError/LinkError/RuntimeError pass through unchanged without this source or a code.",
-          "core": "Source @migaia/store-wasm for package-owned failures; interpret it with code. Complete foreign identities retain their owner. Registered native WebAssembly CompileError/LinkError/RuntimeError pass through unchanged without this source or a code.",
+          "purpose": "Source store.wasm for package-owned failures; interpret it with code. Complete foreign identities retain their owner. Registered native WebAssembly CompileError/LinkError/RuntimeError pass through unchanged without this source or a code.",
+          "core": "Source store.wasm for package-owned failures; interpret it with code. Complete foreign identities retain their owner. Registered native WebAssembly CompileError/LinkError/RuntimeError pass through unchanged without this source or a code.",
           "advanced": "",
           "parameters": ["This const declaration has no parameters."],
           "parameterDetails": [],
@@ -4149,9 +4149,7 @@
           "composes": [],
           "aliasOf": "STORE_WASM_SOURCE",
           "exportPath": ".",
-          "overloadSignatures": [
-            "export declare const STORE_WASM_SOURCE = \"@migaia/store-wasm\";"
-          ],
+          "overloadSignatures": ["export declare const STORE_WASM_SOURCE = \"store.wasm\";"],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
           "whenToUse": "",
@@ -4160,7 +4158,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Source @migaia/store-wasm for package-owned failures; interpret it with code. Complete foreign identities retain their owner. Registered native WebAssembly CompileError/LinkError/RuntimeError pass through unchanged without this source or a code."
+              "content": "Source store.wasm for package-owned failures; interpret it with code. Complete foreign identities retain their owner. Registered native WebAssembly CompileError/LinkError/RuntimeError pass through unchanged without this source or a code."
             },
             {
               "id": "getting-started",
@@ -4180,7 +4178,7 @@
             {
               "id": "core-usage",
               "title": "核心用法",
-              "content": "Source @migaia/store-wasm for package-owned failures; interpret it with code. Complete foreign identities retain their owner. Registered native WebAssembly CompileError/LinkError/RuntimeError pass through unchanged without this source or a code."
+              "content": "Source store.wasm for package-owned failures; interpret it with code. Complete foreign identities retain their owner. Registered native WebAssembly CompileError/LinkError/RuntimeError pass through unchanged without this source or a code."
             },
             {
               "id": "advanced-usage",
@@ -4189,7 +4187,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-wasm/dist/errors.d.ts:STORE_WASM_SOURCE:export declare const STORE_WASM_SOURCE = \"@migaia/store-wasm\";",
+          "identity": "packages/store-wasm/dist/errors.d.ts:STORE_WASM_SOURCE:export declare const STORE_WASM_SOURCE = \"store.wasm\";",
           "guidance": [
             {
               "id": "错误码-构造工厂与稳定诊断",
@@ -4231,7 +4229,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "STORE_WASM_SOURCE 为 `'@migaia/store-wasm'`，只标识本包创建的错误；已有外包身份保持原 owner。可附码 native 输入读取失败原位附 INVALID_OPTION，不可附码时用 cause/errors；不要把声明的原生 WASM pass-through 错误强制重包为普通 Error。"
+                  "text": "STORE_WASM_SOURCE 为 `'store.wasm'`，只标识本包创建的错误；已有外包身份保持原 owner。可附码 native 输入读取失败原位附 INVALID_OPTION，不可附码时用 cause/errors；不要把声明的原生 WASM pass-through 错误强制重包为普通 Error。"
                 },
                 {
                   "type": "paragraph",
@@ -4291,7 +4289,7 @@
           "name": "StoreWasmErrorCode",
           "kind": "const",
           "signature": "export declare const StoreWasmErrorCode: { /** * Rejects synchronous field creation or allocation before `ensureWasm()` finishes, or after * initialization fails. First await `ensureWasm()`, or use the `StoreProvider` `ready` barrier to * finish initialization. */ readonly notInitialized: 'NOT_INITIALIZED'; /** * Rejects scalar/record value access and array data operations after field disposal. Create a new * field instead of reusing it; metadata such as disposed and fixed array length remains * readable. */ readonly fieldDisposed: 'FIELD_DISPOSED'; /** * Reports field initialization cancelled through an AbortSignal. Preserve an unclassified native * reason by identity/class/stack; complete foreign identities remain with their owner, and other * reasons stay reachable through cause. Handle it as cooperative cancellation. */ readonly initAborted: 'INIT_ABORTED'; /** Rejects a `wasm.record` field named `dispose` or `disposed`. Choose a different field name. */ readonly reservedFieldName: 'RESERVED_FIELD_NAME'; /** * Reports no usable allocation id/pointer, failed array alignment, or corrupt stored string * length. Check allocation availability and memory integrity. Invalid requested sizes are * INVALID_OPTION rather than this allocation/memory failure. */ readonly allocationFailed: 'ALLOCATION_FAILED'; /** * Rejects invalid field construction or write arguments, including excessive length, invalid * `granularity`, out-of-range indices or ranges, or inaccessible ArrayLike length/items. Keep the * original read failure reachable. Correct the parameter instead of retrying the same invalid * input. */ readonly invalidOption: 'INVALID_OPTION'; /** * Reports multiple owned-resource cleanup failures during field release or construction rollback. * Inspect `AggregateError.errors`. It preserves all original cleanup failures in execution * order. */ readonly cleanupFailed: 'CLEANUP_FAILED'; /** * Rejects allocation after an arena export used by this module on the shared instance raised * `WebAssembly.RuntimeError` (a trap). A trap can leave the Rust arena borrow held, so every * later export would trap again; the instance is unusable for the rest of the page or process. * `cause` is the original trap. Reload the page or restart the process; retrying cannot succeed. */ readonly instancePoisoned: 'INSTANCE_POISONED'; };",
-          "declarationLine": 5,
+          "declarationLine": 7,
           "source": "packages/store-wasm/dist/error-code.d.ts",
           "purpose": "Stable public construction, lifetime, memory and cleanup failure codes interpreted with source.",
           "core": "notInitialized: Field creation ran before ensureWasm completed; await readiness first.\nfieldDisposed: Disposed field is read or written; create another instance.\ninitAborted: Field context signal was already aborted. Native reason identity, class and stack remain; unclassified extensible errors receive this code in place, complete foreign identities keep their owner, and frozen/non-Error reasons remain on cause.\nreservedFieldName: Record would shadow dispose/disposed lifecycle keys; rename the field.\nallocationFailed: Allocation/pointer handshake, alignment or stored string length is invalid.\ninvalidOption: Invalid size, granularity, write type, string capacity, index or range.\ncleanupFailed: Several cleanup failures or rollback requires an aggregate to retain its primary.\ninstancePoisoned: Earlier WebAssembly.RuntimeError poisoned the shared arena; cause is the first trap. Reload/restart; allocation retries cannot repair it.",
@@ -4461,7 +4459,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "STORE_WASM_SOURCE 为 `'@migaia/store-wasm'`，只标识本包创建的错误；已有外包身份保持原 owner。可附码 native 输入读取失败原位附 INVALID_OPTION，不可附码时用 cause/errors；不要把声明的原生 WASM pass-through 错误强制重包为普通 Error。"
+                  "text": "STORE_WASM_SOURCE 为 `'store.wasm'`，只标识本包创建的错误；已有外包身份保持原 owner。可附码 native 输入读取失败原位附 INVALID_OPTION，不可附码时用 cause/errors；不要把声明的原生 WASM pass-through 错误强制重包为普通 Error。"
                 },
                 {
                   "type": "paragraph",
@@ -4634,7 +4632,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "STORE_WASM_SOURCE 为 `'@migaia/store-wasm'`，只标识本包创建的错误；已有外包身份保持原 owner。可附码 native 输入读取失败原位附 INVALID_OPTION，不可附码时用 cause/errors；不要把声明的原生 WASM pass-through 错误强制重包为普通 Error。"
+                  "text": "STORE_WASM_SOURCE 为 `'store.wasm'`，只标识本包创建的错误；已有外包身份保持原 owner。可附码 native 输入读取失败原位附 INVALID_OPTION，不可附码时用 cause/errors；不要把声明的原生 WASM pass-through 错误强制重包为普通 Error。"
                 },
                 {
                   "type": "paragraph",

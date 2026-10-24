@@ -219,8 +219,8 @@ const enums: ILibraryReference['enums'] = {
   },
   CapabilityGraphErrorCode: {
     summary: t(
-      'Graph-owned stable codes under source @migaia/capability/graph; original causes stay reachable.',
-      '来源为 `@migaia/capability/graph` 的图层稳定错误码，保留原始原因。'
+      'Graph-owned stable codes under source capability.graph; original causes stay reachable.',
+      '来源为 `capability.graph` 的图层稳定错误码，保留原始原因。'
     ),
     values: {
       graphDisposed: t(
@@ -490,7 +490,7 @@ const types: Record<string, ITypeDoc> = {
     members: {
       source: p(
         'Stable @migaia/capability/graph identity used alongside code for classification.',
-        '稳定的 `@migaia/capability/graph` 来源，与错误码共同用于分类。'
+        '稳定的 `capability.graph` 来源，与错误码共同用于分类。'
       ),
       code: {
         ...p(
@@ -549,8 +549,8 @@ export const capabilityGraphReference: ILibraryReference = {
     CAPABILITY_GRAPH_SOURCE: {
       role: 'error',
       purpose: t(
-        'Stable @migaia/capability/graph source marker attached to graph failures. Compare it with CapabilityGraphErrorCode to distinguish graph errors from capability gate activation outcomes.',
-        '附着于图失败的稳定来源 `@migaia/capability/graph`；与 `CapabilityGraphErrorCode` 一起判断，区分图错误与能力闸门的普通激活结果。'
+        'Stable capability.graph source marker attached to graph failures. Compare it with CapabilityGraphErrorCode to distinguish graph errors from capability gate activation outcomes.',
+        '附着于图失败的稳定来源 `capability.graph`；与 `CapabilityGraphErrorCode` 一起判断，区分图错误与能力闸门的普通激活结果。'
       ),
       example: `import { CAPABILITY_GRAPH_SOURCE, CapabilityGraphErrorCode } from '@migaia/capability/graph'\nconsole.log(CAPABILITY_GRAPH_SOURCE, CapabilityGraphErrorCode.startFailed)`
     },

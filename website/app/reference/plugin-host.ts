@@ -731,6 +731,15 @@ await host.dispose()`
 /** Short type doc helper for type-only aliases. */
 const alias = (en: string, zh: string) => ({ summary: t(en, zh), members: {} })
 
+/** The same mode contract is shown on the named type and both Host construction forms. */
+const pipelineModeDoc: IMemberDoc = {
+  summary: t(
+    'Pipeline mode; invalid values throw `INVALID_PIPELINE_MODE`.',
+    '宿主 pipeline 的执行模式；传入非法值时构造会抛 `INVALID_PIPELINE_MODE`。'
+  ),
+  default: t('`sync`.', '`sync`，同步模式。')
+}
+
 /** Reference of `@migaia/plugin-host`. */
 /** Host-owned option fields are reused verbatim on class and functional construction pages. */
 const hostOptionMembers: Readonly<Record<string, IMemberDoc>> = {
@@ -779,6 +788,7 @@ const hostOptionMembers: Readonly<Record<string, IMemberDoc>> = {
     ),
     default: t('`{ mode: "sync" }`.', '`{ mode: "sync" }`，同步模式。')
   },
+  'pipeline.mode': pipelineModeDoc,
   diagnostic: {
     summary: t(
       'Receives notable events that are not errors (`PIPELINE_NEXT_LATE`, `EXTENSION_NON_ENUMERABLE_IGNORED`, rollback failures, queue waits) as `(message, code?, error?)`. Its own failures never affect the host.',
@@ -2010,13 +2020,7 @@ console.log(inspection.ordered.length)`,
     IPipelineConfig: {
       summary: t('Pipeline option of a host.', '宿主的 pipeline 选项，目前只包含执行模式。'),
       members: {
-        mode: {
-          summary: t(
-            'Pipeline mode; invalid values throw `INVALID_PIPELINE_MODE`.',
-            '宿主 pipeline 的执行模式；传入非法值时构造会抛 `INVALID_PIPELINE_MODE`。'
-          ),
-          default: t('`sync`.', '`sync`，同步模式。')
-        }
+        mode: pipelineModeDoc
       }
     },
     IPluginDependency: {
@@ -2520,10 +2524,7 @@ inventory.assertCurrent('transport')`,
       },
       members: {
         source: {
-          summary: t(
-            'Always `@migaia/plugin-host`.',
-            '固定为 `@migaia/plugin-host`，用来确认错误来源。'
-          )
+          summary: t('Always `plugin.host`.', '固定为 `plugin.host`，用来确认错误来源。')
         },
         code: {
           summary: t(
