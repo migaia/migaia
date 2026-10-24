@@ -524,6 +524,10 @@ const domainInventory = Object.freeze([
     source: 'rpc.transport.browser'
   },
   {
+    file: 'packages/rpc-plugin-coroutines/src/error-code.ts',
+    source: 'rpc.transport.coroutine'
+  },
+  {
     file: 'packages/rpc-plugin-pool/src/error-code.ts',
     source: 'rpc.pool'
   },
@@ -605,7 +609,7 @@ test('source domains agreed runtime domain inventory', () => {
       .map(({ source }) => source)
       .filter((source) => !deferredSources.has(source))
       .sort()
-    assert.equal(actual.length, 34, 'SOURCE_DOMAIN_DOMAIN_COUNT')
+    assert.equal(actual.length, 35, 'SOURCE_DOMAIN_DOMAIN_COUNT')
     assert.deepEqual(
       actual,
       domainInventory.map(({ source }) => source).sort(),
