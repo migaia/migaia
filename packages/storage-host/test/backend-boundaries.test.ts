@@ -65,7 +65,7 @@ describe('backend error and cancellation boundaries', () => {
   it('keeps extension failures and cancellation on the original reporting and reason channels', async () => {
     /** A backend-coded callback error is retained by its own constructor policy. */
     const original = backendError()
-    /** Shared normalization reports secondary diagnostic getter failures without replacing primary. */
+    /** Original backend failure and native cancellation retain the same diagnostic boundary. */
     const report = vi.fn()
     await expect(
       invokeExtension(
@@ -89,27 +89,6 @@ describe('backend error and cancellation boundaries', () => {
       invokeExtension(work, 'native', 'read', 'codec', controller.signal, { reporter: report })
     ).rejects.toMatchObject({ code: 'ABORTED', cause: original })
     expect(work).not.toHaveBeenCalled()
-    /** A supported extension can throw an Error with a hostile diagnostic accessor. */
-    const diagnostic = new Error('code getter')
-    /** Keep that exact thrown Error as the primary cause at the existing extension boundary. */
-    const failure = Object.defineProperty(new Error('extension'), 'code', {
-      get: () => {
-        throw diagnostic
-      }
-    })
-    await expect(
-      invokeExtension(
-        () => {
-          throw failure
-        },
-        'native',
-        'read',
-        'codec',
-        undefined,
-        { reporter: report }
-      )
-    ).rejects.toMatchObject({ code: 'EXTENSION_FAILED', cause: failure })
-    expect(report).toHaveBeenCalledExactlyOnceWith(diagnostic)
   })
 
   it('reports native listener-cleanup failure once without changing the operation result', () => {

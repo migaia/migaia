@@ -5,9 +5,9 @@ import {
   isStorageContractError
 } from '@migaia/storage-contract'
 import { raceWithAbort, UtilsAbortError } from '@migaia/utils/promise'
-import { UtilsErrorCode, tryReadProperty } from '@migaia/utils/error'
+import { UtilsErrorCode } from '@migaia/utils/error'
 
-import { reportCleanupError, type IStorageOperationRuntime } from './operation-reporter.js'
+import type { IStorageOperationRuntime } from './operation-reporter.js'
 import type { IBackendKind } from '@migaia/storage-contract'
 import { StorageError, StorageErrorCode, type IExtensionStage } from '../errors.js'
 import { throwIfAborted } from './operation.js'
@@ -24,8 +24,7 @@ export const invokeExtension = async <T>(
 ): Promise<T> => {
   try {
     if (!signal) return await Promise.resolve().then(fn)
-    // Preserve storage's hostile-signal boundary: a throwing `aborted` getter is invalid input,
-    // not an extension failure. `raceWithAbort` cannot classify that package-specific contract.
+    // Already-cancelled operations stop before the supported extension callback starts.
     throwIfAborted(signal)
     const result = Promise.resolve().then(fn)
     return await raceWithAbort(() => result, {
@@ -39,16 +38,15 @@ export const invokeExtension = async <T>(
         backend,
         cause: error.cause
       })
-    if (error && typeof error === 'object') {
-      /** Preserve the primary failure if its diagnostic property cannot be inspected. */
-      const code = tryReadProperty(error as { readonly code?: unknown }, 'code')
-      if (code.threw) reportCleanupError(runtime.reporter, code.error)
-      else if (code.value === UtilsErrorCode.invalidArgument)
-        throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
-          backend,
-          cause: error
-        })
-    }
+    if (
+      error &&
+      typeof error === 'object' &&
+      (error as { readonly code?: unknown }).code === UtilsErrorCode.invalidArgument
+    )
+      throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
+        backend,
+        cause: error
+      })
     if (error instanceof StorageError) {
       if (error.operation !== undefined && error.extensionStage !== undefined) throw error
       /** Attach operation context with the original owner and keep its exact failure on cause. */
