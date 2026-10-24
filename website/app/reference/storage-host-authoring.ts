@@ -14,6 +14,10 @@ export const storageHostInputExamples = {
 const iteratorExample =
   "import { memoryNotificationsFeature } from '@migaia/storage-host/features/memory-notifications'\nimport {\n  createStorageHost,\n  defineFeature,\n  memoryBackendKind,\n  memoryBackendPlugin,\n} from '@migaia/storage-host'\nimport { createBackendChangeIterator } from '@migaia/storage-host/authoring/change-iterator'\n\nconst changes = defineFeature(memoryBackendKind, ({ featureExpose }) => ({\n  capabilities: [],\n  chain: {},\n  api: {\n    store: {\n      async changes() {\n        return createBackendChangeIterator(featureExpose.getChangeController()!, {\n          orgId: this.orgId,\n          channel: 'value',\n          key: 'status',\n          ctx: { timeoutMs: 1_000 },\n          execute: (advance) => advance(),\n        })\n      },\n    },\n    transaction: {},\n  },\n}))\nawait using host = await createStorageHost({\n  plugins: [\n    memoryBackendPlugin(undefined, {\n      notifications: memoryNotificationsFeature(),\n      changes,\n    }),\n  ],\n})\nawait using stream = await host.api.memory.changes()\nconst next = stream.next()\nawait host.backend('memory').set('status', 'ready')\nconsole.log((await next).value?.kind)"
 
+/** Query-only authors borrow a real cursor and leave optional keyset code outside this boundary. */
+const queryWithoutKeysetExample =
+  "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { createRecordQueryWithoutKeyset } from '@migaia/storage-host/authoring/query'\nimport {\n  StorageContractError,\n  StorageContractErrorCode,\n  type IRecordQuerySource,\n} from '@migaia/storage-contract'\n\ntype IOrder = { id: number; status: string }\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })\nconst store = host.backend('memory')\nawait store.putRecord({ id: 1, status: 'paid' }, 1)\nawait store.putRecord({ id: 2, status: 'pending' }, 2)\nconst source: IRecordQuerySource = {\n  pushdown: { source: 'application-orders', operators: [], operations: [] },\n  execute: ({ ctx }) => store.iterateRecords(undefined, ctx),\n}\nconst query = createRecordQueryWithoutKeyset<IOrder>(source, {}, () => {\n  throw new StorageContractError(StorageContractErrorCode.invalidArgument)\n})\nconsole.log(await query.where({ status: 'paid' }).select('id').all())\ntry {\n  await query.page(1)\n} catch (error) {\n  if (!(error instanceof StorageContractError)) throw error\n  console.log(error.source, error.code)\n}"
+
 /** Iterator author options are captured once before subscribing to the original controller. */
 export const storageHostChangeIteratorOptions = {
   orgId: {
@@ -81,6 +85,40 @@ export const storageHostChangeIteratorOptions = {
 
 /** Pure authoring operations retain their existing backend owner and error family. */
 export const storageHostAuthoringSymbols: Readonly<Record<string, ISymbolDoc>> = {
+  createRecordQueryWithoutKeyset: {
+    role: 'factory',
+    purpose: t(
+      'Construct the canonical record query without retaining the keyset runtime. Basic where, select and all continue to use the original source and iterator cleanup. page and after invoke the supplied missingKeyset callback; an explicitly selected Feature may instead inject the full createRecordQuery creator. The existing createRecordQuery entry retains its original full behavior.',
+      '构造不保留游标分页运行时的规范记录查询；基础 where、select 与 all 继续使用原始来源及迭代器清理。page 与 after 调用提供的 missingKeyset 回调；显式选择的特性可改为注入完整 createRecordQuery 工厂。既有 createRecordQuery 入口保持原完整行为。'
+    ),
+    params: {
+      source: t(
+        'Original native query source, support declaration and operation-owned cursor.',
+        '原生查询来源、能力声明及操作所拥有的游标。'
+      ),
+      methods: t(
+        'Optional Feature methods captured once and retained by each query branch.',
+        '可选特性方法，单次捕获后由每个查询分支保留。'
+      ),
+      missingKeyset: t(
+        'Optional callback reporting the owning package’s registered missing-assembly error when page or after is requested.',
+        '可选回调，在请求 page 或 after 时报告所属包已注册的缺装配错误。'
+      )
+    },
+    returns: t(
+      'A record query using the same source lifetime; construction performs no native reads.',
+      '返回复用原来源生命周期的记录查询，构造时不执行原生读取。'
+    ),
+    example: queryWithoutKeysetExample,
+    exampleIntro: t(
+      'Borrow memory’s actual record cursor and reject optional keyset calls through a coded callback.',
+      '借用内存后端真实记录游标，并通过带语义码的回调拒绝可选游标分页调用。'
+    ),
+    exampleResult: t(
+      'The ordinary query returns the paid order ID; page reports the caller-selected coded error.',
+      '普通查询返回已支付订单编号；分页调用报告调用方选定的带码错误。'
+    )
+  },
   assertKeyRange: {
     role: 'operation',
     purpose: t(
