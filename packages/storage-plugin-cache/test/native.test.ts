@@ -13,6 +13,7 @@ import { redisChangeStreamFeature } from '@migaia/storage-plugin-redis/features/
 import { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'
 import { pgDriver } from '@migaia/storage-plugin-postgres/pg'
 import { cachePlugin } from '../src/index.js'
+import type { IStorageChange } from '@migaia/storage-contract'
 
 /** Required service fixtures are injected by the repository's sole native-service launcher. */
 const redisUrl = process.env.MIGAIA_REDIS_URL,
@@ -37,6 +38,7 @@ describe('native borrowed cache tiers', () => {
       plugins: [
         memoryBackendPlugin({ id: 'memory' }),
         sqliteBackendPlugin({ id: 'sqlite', driver: nodeSqliteDriver(':memory:') }),
+        sqliteBackendPlugin({ id: 'tail', driver: nodeSqliteDriver(':memory:') }),
         redisBackendPlugin({ id: 'redis', driver: nodeRedisDriver(pool), prefix }),
         postgresBackendPlugin({ id: 'postgres', driver: pgDriver(pg), prefix })
       ]
@@ -77,6 +79,39 @@ describe('native borrowed cache tiers', () => {
           ['y', 'batch:y']
         ])
       )
+      const configured = await host.use(
+        cachePlugin({
+          id: 'back',
+          prefix: 'own-back:',
+          writeBackIntervalMs: 10000,
+          tiers: [
+            { backend: 'memory', ttlMs: 10000 },
+            { backend: 'redis', ttlMs: 10000 },
+            { backend: 'sqlite', ttlMs: 10000, write: 'back' },
+            { backend: 'tail', ttlMs: 10000 }
+          ]
+        })
+      )
+      await configured.detect()
+      const back = configured.backend('back')
+      const notifications: IStorageChange[] = []
+      const off = host.backend('redis').subscribeChanges((change) => {
+        notifications.push(change)
+      })
+      await back.set('self-notification', 'preserved-pending')
+      await until(async () =>
+        notifications.some(
+          (change) =>
+            change.channel === 'value' && change.keys?.includes('own-back:self-notification')
+        )
+      )
+      await new Promise((resolve) => setTimeout(resolve, 10))
+      await back.flush()
+      expect(await host.backend('sqlite').get('own-back:self-notification')).toContain(
+        'preserved-pending'
+      )
+      off()
+      await back.clearAll()
       const org = host.org(crypto.randomUUID()).backend('cache')
       await org.set('answer', 'isolated')
       expect(await cache.get('answer')).toBeNull()
