@@ -72,10 +72,7 @@ export function prepareStorageJournalConfiguration(
     'report' | 'onBinlogAppendError' | 'beforeRecover' | 'afterRecover' | 'onRecoverError'
   >
 ) {
-  if (
-    options.telemetry ||
-    (options.logger.wal !== undefined && options.logger.binlog === undefined)
-  )
+  if (options.telemetry)
     return Promise.reject(new StorageContractError(StorageContractErrorCode.unsupported))
   if (options.logger.binlog === undefined && options.logger.undo === undefined)
     return Promise.resolve(undefined)
