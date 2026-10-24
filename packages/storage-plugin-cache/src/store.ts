@@ -68,6 +68,7 @@ type IProjection = {
   pending(): boolean
   erase(key: string, prefix: boolean, upto?: number, strict?: boolean): Promise<number>
   propagation(change: IStorageChange, upto: number): Promise<void>
+  reset(index: number): Promise<void>
 }
 
 /** A prepared write carries the original entry and the exact sampled per-tier deadlines. */
@@ -171,6 +172,7 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
   /** Physical keys are scoped by the cache prefix while organization routing remains host-owned. */
   const physical = (key: string): string => {
     assertStringStorageKey(key, CacheText.backend)
+    if (key === CacheText.cursor) throw invalidArgument()
     return configuration.prefix + key
   }
   /** Each timer tick flushes the current coalesced table once, never retries a dropped write. */
@@ -797,7 +799,11 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
           let keys: string[]
           try {
             keys = (await apiAt(0).keys())
-              .filter((key) => key.startsWith(configuration.prefix))
+              .filter(
+                (key) =>
+                  key.startsWith(configuration.prefix) &&
+                  key !== configuration.prefix + CacheText.cursor
+              )
               .map((key) => key.slice(configuration.prefix.length))
           } catch (error) {
             tierError(0, CacheOperation.keys, error)
@@ -1309,6 +1315,10 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
       flush,
       pending: () => pending.size > 0,
       erase,
+      reset: async (index: number) => {
+        await erase('', true, index, true)
+        resetFeeds.add(index)
+      },
       propagation: async (change: IStorageChange, upto: number) => {
         if (change.channel !== CacheText.value && change.channel !== CacheText.all) return
         if (!change.keys) await erase('', true, upto, true)
@@ -1334,40 +1344,40 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
     })
   }
   const root = bind(core.defaultOrgId)
-  /** Ephemeral native feeds remain host-level and route their explicit organization facts. */
-  for (const index of feeds)
-    if (configuration.propagate && index > 0) {
-      const tier = tiers[index]!
-      if (!tier.borrowed.has(durableChangeFeed)) {
-        if (typeof tier.native.subscribeChanges !== 'function')
-          missingCapability(index, CacheText.changeFeed)
-        subscriptions.push(
-          tier.native.subscribeChanges((change) => {
-            const orgId = change.orgId ?? core.defaultOrgId
-            const release = controller.beginMutation()
-            return bind(orgId)
-              .propagation(change, index)
-              .catch((error) => {
-                report(error)
-              })
-              .finally(release)
-          })
-        )
-      }
-    }
   /** Durable consumers start in the original detect window after their earlier backends are ready. */
   core.registerDetect(async (signal) => {
     if (signal.aborted) return
+    /** Ephemeral native feeds remain host-level and route their explicit organization facts. */
+    for (const index of feeds)
+      if (configuration.propagate && index > 0) {
+        const tier = tiers[index]!
+        if (!tier.borrowed.has(durableChangeFeed)) {
+          if (typeof tier.native.subscribeChanges !== 'function')
+            missingCapability(index, CacheText.changeFeed)
+          subscriptions.push(
+            tier.native.subscribeChanges((change) => {
+              const orgId = change.orgId ?? core.defaultOrgId
+              const release = controller.beginMutation()
+              return bind(orgId)
+                .propagation(change, index)
+                .catch((error) => {
+                  report(error)
+                })
+                .finally(release)
+            })
+          )
+        }
+      }
     for (const index of feeds)
       if (configuration.propagate && index > 0 && tiers[index]!.borrowed.has(durableChangeFeed)) {
         const source = tiers[index]!.borrowed.use(durableChangeFeed),
           upper = tiers[index - 1]!.borrowed.use(kv)
         let current: Awaited<ReturnType<typeof source.tailChanges>> | undefined,
-          needsReset = false
+          needsReset = false,
+          restarting: Promise<void> | undefined
         const reset = async (): Promise<void> => {
           untrustedFeeds.add(index)
-          for (const projection of projections.values())
-            await projection.erase('', true, index, true)
+          for (const projection of projections.values()) await projection.reset(index)
         }
         const after = await upper.get(configuration.prefix + CacheText.cursor)
         if (after === null) await reset()
@@ -1389,16 +1399,36 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
             release()
           }
         }
+        /** Only native cursor expiry restarts from now; disconnects never create a retry timer. */
+        const onError = (error: unknown): void => {
+          needsReset = true
+          report(error)
+          if (
+            IdentifyError.identityOf(error)?.code !==
+              StorageContractErrorCode.changeCursorExpired ||
+            controller.closingSignal.aborted ||
+            restarting
+          )
+            return
+          const release = controller.beginMutation()
+          restarting = (async () => {
+            await reset()
+            await current?.[asyncDisposeKey]()
+            if (!controller.closingSignal.aborted) await start(CacheText.now)
+          })()
+            .catch(report)
+            .finally(() => {
+              restarting = undefined
+              release()
+            })
+        }
         const start = async (from: string) => {
           try {
             current = await source.tailChanges(
               {
                 from,
                 onChange,
-                onError: (error) => {
-                  needsReset = true
-                  report(error)
-                }
+                onError
               },
               { signal: controller.closingSignal }
             )
@@ -1412,17 +1442,17 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
               {
                 from: CacheText.now,
                 onChange,
-                onError: (error) => {
-                  needsReset = true
-                  report(error)
-                }
+                onError
               },
               { signal: controller.closingSignal }
             )
           }
         }
         await start(after ?? CacheText.now)
-        subscriptions.push(() => current?.dispose())
+        subscriptions.push(async () => {
+          await restarting
+          await current?.dispose()
+        })
       }
   })
   return {

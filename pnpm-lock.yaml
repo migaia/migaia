@@ -806,6 +806,25 @@ importers:
       '@migaia/utils':
         specifier: workspace:^
         version: link:../utils
+    devDependencies:
+      '@migaia/storage-plugin-postgres':
+        specifier: workspace:^
+        version: link:../storage-plugin-postgres
+      '@migaia/storage-plugin-redis':
+        specifier: workspace:^
+        version: link:../storage-plugin-redis
+      '@migaia/storage-plugin-sqlite':
+        specifier: workspace:^
+        version: link:../storage-plugin-sqlite
+      '@types/pg':
+        specifier: 8.23.1
+        version: 8.23.1
+      pg:
+        specifier: 8.23.1
+        version: 8.23.1
+      redis:
+        specifier: 6.3.0
+        version: 6.3.0
 
   packages/storage-plugin-object:
     dependencies:

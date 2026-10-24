@@ -31,6 +31,14 @@
     "@migaia/storage-contract": "workspace:^",
     "@migaia/utils": "workspace:^"
   },
+  "devDependencies": {
+    "@migaia/storage-plugin-postgres": "workspace:^",
+    "@migaia/storage-plugin-redis": "workspace:^",
+    "@migaia/storage-plugin-sqlite": "workspace:^",
+    "@types/pg": "8.23.1",
+    "pg": "8.23.1",
+    "redis": "6.3.0"
+  },
   "peerDependencies": {
     "@migaia/storage-host": "workspace:^"
   },
