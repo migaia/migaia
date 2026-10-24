@@ -180,3 +180,15 @@ try {
   await pool.close()
 }
 ```
+
+## 提交后外置日志
+
+宿主 `journal` 可借用仅安装 `binlog` 的原 Logger，且不配置 WAL、undo 或 atomic log stores。每个组织经原 journalBinding 捕获最终 draft；只有原生 EXEC 所有项成功才触发原 onCommit，操作等待原 settle 完成。回调在 EXEC 前失败不写业务或日志；部分执行或回复未知不追加成功日志、不重放，并封闭后续写入。外置 append 失败沿原宿主报告，已经提交的数据不改为失败回滚，仍存在既定提交后日志窗口。
+
+该终端如实声明 `nativeAtomic:false`，不把 Redis 执行隔离冒充失败回滚。标准值、字节、记录和向量的 image 使用原便携 codec，保留实际 wire 与绝对期限；仅日志启用时额外读取原生 PEXPIRETIME。历史向量删除的完整 before image 需要原二进制端口；缺少时该新增日志组合在修改前 `UNSUPPORTED_CAPABILITY`，普通历史删除不受影响。
+
+`storageLogStore` 的资源期缓存索引由 `indexExclusive:false` 单独隔离；同 EXEC 强原子 binlog、undo 与 WAL intent/marker 组合在准备阶段拒绝，等待用户复核。原本未交付的这些强保证不被伪装实现。后续可由原拥有者提供真实所需保证后撤销隔离；本包没有第二日志或事务平台。原生 Streams/PubSub/sorted-set/rate-limit API 保持原调用行为，不冒充标准业务通道的 journal 来源。
+
+`host.dropOrg(orgId)` 也通过原 WATCH/draft/EXEC 删除该组织既定 Streams、有序集合及限流物理键；重启后未选择这些 Feature 仍生效。只匹配原 layout 的合法字符串名称，保留其它组织与调用方非托管键。PubSub 无持久业务值；共享可靠变更历史保留原 retention/cursor，不按组织改写。普通 `clearAll()` 保留原标准通道范围。删除成本包含原生 SCAN 实际候选。
+
+普通宿主遥测通过 `journal: { logger, namespace, telemetry: true }` 显式启用，并使用原 Logger level 插件。根读写记录规范逻辑键与实际 pipeline 载荷。公开事务跨原有重试只记录一个完成终点；事务 scope 与私有 journal 操作不重复记录。logger 仍为借用，原有 pipeline/hook 次数保持。

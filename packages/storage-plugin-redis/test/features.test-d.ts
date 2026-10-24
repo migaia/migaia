@@ -1,5 +1,15 @@
 import { createStorageHost, memoryBackendKind, type IStorageFeature } from '@migaia/storage-host'
-import { durableChangeFeed, vector } from '@migaia/storage-contract'
+import {
+  durableChangeFeed,
+  vector,
+  kv,
+  records,
+  ttl,
+  counter,
+  isKeyValueStore,
+  isRecordStore,
+  asRecordStore
+} from '@migaia/storage-contract'
 import { redisBackendPlugin, type IRedisDriver } from '../src/index.js'
 import { redisStreamsFeature } from '../src/features/streams.js'
 import { redisPubSubFeature } from '../src/features/pubsub.js'
@@ -77,3 +87,34 @@ void wrongVector
 void wrong
 // @ts-expect-error Backend IDs remain the exact three registered literals.
 host.backend('other')
+
+/** Default identity and original guarded/builder projections remain exact without selected Features. */
+const defaultHost = await createStorageHost({ plugins: [redisBackendPlugin({ driver })] as const })
+const defaults = defaultHost.backend('redis')
+// @ts-expect-error Default identity must not widen to arbitrary strings.
+defaultHost.backend('other')
+for (const key of ['one', 'two', 'three'] as const) {
+  await defaults.use(kv).getMany([key, key])
+  await defaults.use(records).query<{ count: number }>().where({ count: 1 }).all()
+  const changes = defaults.use(records).query<{ count: number }>().watch()
+  await changes.dispose()
+  await defaults.use(ttl).expire({ channel: 'record', key }, 1000)
+  await defaults.use(counter).increment(key)
+  await defaults
+    .tx()
+    .lock({ channel: 'text', key })
+    .run(async (scope) => {
+      await scope.use(kv).setMany([{ key, value: 'value' }])
+      await scope.use(records).query<{ count: number }>().all()
+      await scope.use(ttl).persist({ channel: 'text', key })
+      await scope.use(counter).increment(key)
+    })
+  if (isKeyValueStore(defaults) && isRecordStore(defaults)) {
+    const record = asRecordStore<{ count: number }>(defaults)
+    await record.getRecord(key)
+  }
+}
+// @ts-expect-error The original unlocked builder has no terminal.
+defaults.tx().run(() => undefined)
+// @ts-expect-error TTL targets retain the canonical channel-specific shape.
+defaults.use(ttl).expire({ channel: 'vector', key: 'wrong' }, 1000)

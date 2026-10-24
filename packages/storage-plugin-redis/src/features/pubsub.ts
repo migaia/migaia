@@ -7,7 +7,7 @@ import { inspectThenable, observeThenableRejection } from '@migaia/utils/functio
 import { redisBackendKind } from '../plugin.js'
 import { readNativeFeaturePort } from '../native-feature.js'
 import { featureName, featureInteger, featureBytes, readFeatureBytes } from '../feature-input.js'
-import { replyInteger } from '../layout.js'
+import { RedisSuffix, replyInteger } from '../layout.js'
 import { invalidArgument } from '../errors.js'
 /** Messages are best-effort native Pub/Sub payloads, with no replay or expiry-delivery guarantee. */
 export type IRedisPubSubApi = {
@@ -52,7 +52,7 @@ export function redisPubSubFeature() {
                 replyInteger(
                   await connection.command([
                     RedisCommand.publish,
-                    layout.tag + ':pubsub:' + layout.encode(featureName(actual.name)),
+                    layout.feature(RedisSuffix.pubsub, featureName(actual.name)),
                     actual.payload
                   ])
                 ),
@@ -73,7 +73,7 @@ export function redisPubSubFeature() {
               ctx,
               async (input, layout) => {
                 const resource = await port.driver.subscribe(
-                  layout.tag + ':pubsub:' + layout.encode(featureName(input.name)),
+                  layout.feature(RedisSuffix.pubsub, featureName(input.name)),
                   (wire) => {
                     try {
                       const result: unknown = listener(readFeatureBytes(wire))

@@ -133,6 +133,40 @@ for (const url of [process.env.MIGAIA_REDIS_URL, process.env.MIGAIA_VALKEY_URL])
         await Promise.all([host.dispose(), other.dispose()])
       }
     })
+    it('keeps a fail-policy related WATCH conflict distinct from lock rejection', async () => {
+      if (!pool.isOpen) await pool.connect()
+      const prefix = crypto.randomUUID(),
+        org = createOrgId(),
+        native = nodeRedisDriver(pool)
+      const first = await createStorageHost({
+          org,
+          plugins: [redisBackendPlugin({ driver: native, prefix })] as const
+        }),
+        second = await createStorageHost({
+          org,
+          plugins: [redisBackendPlugin({ driver: native, prefix })] as const
+        })
+      try {
+        const a = first.backend('redis'),
+          b = second.backend('redis')
+        await a.putRecord({ count: 1 }, 'conflict')
+        await expect(
+          a.transaction(
+            async (scope) => {
+              await scope.getRecord('conflict')
+              await b.putRecord({ count: 2 }, 'conflict')
+              await scope.putRecord({ count: 3 }, 'conflict')
+            },
+            { concurrency: ConcurrencyPolicy.fail() }
+          )
+        ).rejects.toMatchObject({ code: 'WRITE_CONFLICT' })
+        expect(await a.getRecord('conflict')).toEqual({ count: 2 })
+      } finally {
+        await first.backend('redis').clearAll()
+        await first.dispose()
+        await second.dispose()
+      }
+    })
     it('drains an executed but unconfirmed reply, seals further writes and preserves reads', async () => {
       const original = nodeRedisDriver(pool),
         prefix = crypto.randomUUID(),

@@ -9,7 +9,12 @@ import {
   type IStorageKey,
   type ILockKey
 } from '@migaia/storage-contract'
+import {
+  createStorageOperationReporter,
+  reportCleanupError
+} from '@migaia/storage-host/authoring/backend'
 import { planChannelWrite } from '@migaia/storage-host/authoring/backend'
+import type { IStorageJournalAttempt } from '@migaia/storage-host'
 import type { IRedisConnection, IRedisExecEntry } from './driver.js'
 import { redisError, invalidArgument } from './errors.js'
 import { RedisErrorCode } from './error-code.js'
@@ -32,6 +37,8 @@ export type IRedisDraftEntry = {
   readonly encoded: string
   readonly physical: string
   readonly original: string | undefined
+  /** Journal capture retains the native absolute deadline only when this attempt requests images. */
+  readonly originalExpiry?: number
   value: string | undefined
   changed: boolean
   expiry: 'keep' | 'persist' | number
@@ -41,6 +48,8 @@ export type IRedisHashEntry = {
   readonly physical: string
   readonly lock: Extract<ILockKey, { channel: 'vector' }>
   readonly original: ReadonlyMap<string, Uint8Array>
+  /** The original absolute HASH deadline survives later draft TTL edits. */
+  readonly originalDeadline: number
   /** Org cleanup observes identity, not vector content; binary Search is not required. */
   readonly identityOnly?: true
   fields: ReadonlyMap<string, Uint8Array>
@@ -109,6 +118,16 @@ export class RedisDraft {
   readonly revisions = new Map<string, number>()
   /** Native HASH state belongs to this same transaction draft, never another attempt. */
   readonly hashes = new Map<string, IRedisHashEntry>()
+  /** Historical native Feature keys are deleted by this original WATCH/EXEC plan. */
+  readonly nativeRemovals = new Set<string>()
+  /** Original native settlement alone delivers these finite commit/zero-write callbacks. */
+  readonly terminal = {
+    committed: new Set<() => void>(),
+    rolledBack: new Set<() => void>(),
+    settled: false
+  }
+  /** One captured host journal attempt remains attached to this exact native draft. */
+  journal?: IStorageJournalAttempt
   /** Read ranges retain their original revision field without a parallel query engine. */
   readonly ranges = new Set<'text' | 'record'>()
   /** Native fixed-command observation wraps the same connection, never another lease. */
@@ -125,7 +144,8 @@ export class RedisDraft {
     context: IConcurrencyAttemptContext,
     send: (args: readonly string[]) => Promise<unknown>,
     guard: (channel: IRedisChannel, key: IStorageKey) => Promise<void>,
-    readonly guardVector: (key: Extract<ILockKey, { channel: 'vector' }>) => Promise<void>
+    readonly guardVector: (key: Extract<ILockKey, { channel: 'vector' }>) => Promise<void>,
+    readonly journalActive = false
   ) {
     this.connection = connection
     this.layout = layout
@@ -152,6 +172,9 @@ export class RedisDraft {
         encoded: this.layout.encode(key),
         physical,
         original: value,
+        ...(this.journalActive
+          ? { originalExpiry: replyInteger(await this.send([RedisCommand.pexpiretime, physical])) }
+          : {}),
         value,
         changed: false,
         expiry: 'keep'
@@ -193,6 +216,13 @@ export class RedisDraft {
           encoded: this.layout.encode(key),
           physical: physical[index]!,
           original: value,
+          ...(this.journalActive
+            ? {
+                originalExpiry: replyInteger(
+                  await this.send([RedisCommand.pexpiretime, physical[index]!])
+                )
+              }
+            : {}),
           value,
           changed: false,
           expiry: 'keep'
@@ -306,6 +336,7 @@ export class RedisDraft {
       physical,
       lock,
       original: fields,
+      originalDeadline: deadline < 0 ? 0 : deadline,
       fields,
       deadline: deadline < 0 ? 0 : deadline,
       changed: false
@@ -385,10 +416,21 @@ export class RedisDraft {
           throw redisError(RedisErrorCode.decodeFailed, metadata)
         const key = { channel: 'vector', collection, id } as const
         await this.guardVector(key)
+        if (this.journalActive) {
+          if (!this.connection.binaryCommand)
+            throw new StorageContractError(StorageContractErrorCode.unsupported, {
+              backend: RedisText.backend
+            })
+          const entry = await this.hash(physical, key)
+          entry.fields = new Map()
+          entry.changed = true
+          continue
+        }
         this.hashes.set(physical, {
           physical,
           lock: key,
           original: metadata,
+          originalDeadline: 0,
           identityOnly: true,
           fields: new Map(),
           deadline: 0,
@@ -396,6 +438,42 @@ export class RedisDraft {
         })
       }
     } while (cursor !== '0')
+  }
+  /** Only known native business layouts participate; shared history and caller-native keys survive. */
+  async clearNativeOrg(): Promise<void> {
+    for (const channel of [RedisSuffix.streams, RedisSuffix.sorted, RedisSuffix.rate]) {
+      let cursor = '0'
+      do {
+        const reply = await this.send([
+          RedisCommand.scan,
+          cursor,
+          RedisCommand.match,
+          this.layout.tag + ':' + channel + ':*',
+          RedisCommand.count,
+          '256'
+        ])
+        if (!Array.isArray(reply) || reply.length !== 2 || !Array.isArray(reply[1]))
+          throw redisError(RedisErrorCode.decodeFailed, reply)
+        cursor = replyOptionalString(reply[0])!
+        if (cursor === undefined) throw redisError(RedisErrorCode.decodeFailed, reply)
+        for (const raw of reply[1]) {
+          const physical = replyOptionalString(raw)
+          if (physical === undefined) throw redisError(RedisErrorCode.decodeFailed, raw)
+          if (!this.layout.owns(physical)) continue
+          let name: IStorageKey
+          try {
+            name = this.layout.decode(physical.slice(physical.lastIndexOf(':') + 1))
+          } catch (cause) {
+            reportCleanupError(createStorageOperationReporter(), cause)
+            continue
+          }
+          if (typeof name !== 'string' || this.layout.feature(channel, name) !== physical) continue
+          await this.send([RedisCommand.watch, physical])
+          if (replyInteger(await this.send([RedisCommand.exists, physical])) !== 0)
+            this.nativeRemovals.add(physical)
+        }
+      } while (cursor !== '0')
+    }
   }
   /** Range reads depend on the real native ordered index before enumeration starts. */
   async watchRange(channel: 'text' | 'record'): Promise<void> {
@@ -422,6 +500,12 @@ export class RedisDraft {
         replyOptionalString(await this.send([RedisCommand.get, entry.physical])) !== entry.original
       )
         return false
+      if (
+        this.journalActive &&
+        replyInteger(await this.send([RedisCommand.pexpiretime, entry.physical])) !==
+          entry.originalExpiry
+      )
+        return false
     }
     for (const entry of this.hashes.values()) {
       await this.send([RedisCommand.watch, entry.physical])
@@ -431,6 +515,14 @@ export class RedisDraft {
             await this.connection.binaryCommand!([RedisCommand.hgetall, entry.physical])
           )
       if (!sameHash(current, entry.original)) return false
+      if (this.journalActive) {
+        const deadline = replyInteger(await this.send([RedisCommand.pexpiretime, entry.physical]))
+        if ((deadline < 0 ? 0 : deadline) !== entry.originalDeadline) return false
+      }
+    }
+    for (const physical of this.nativeRemovals) {
+      await this.send([RedisCommand.watch, physical])
+      if (replyInteger(await this.send([RedisCommand.exists, physical])) === 0) return false
     }
     for (const channel of this.ranges)
       await this.send([RedisCommand.watch, this.layout.index(channel)])
@@ -438,7 +530,10 @@ export class RedisDraft {
   }
   /** Fixed commands retain indexes, values and revisions in one atomic native execution. */
   commands(): IRedisCommand[] {
-    const commands: IRedisCommand[] = []
+    const commands: IRedisCommand[] = [...this.nativeRemovals].map((physical) => [
+      RedisCommand.del,
+      physical
+    ])
     for (const entry of this.entries.values()) {
       if (!entry.changed) continue
       if (

@@ -176,6 +176,8 @@ for (const service of ['MIGAIA_REDIS_URL', 'MIGAIA_REDIS_STACK_URL'] as const)
         const hits = await collection.near([1, 0]).topK(1).withVector().all()
         expect(hits[0]?.vector).toEqual([1, 0])
         expect(await collection.search([1, 0], { k: 0 })).toEqual([])
+        expect((await collection.near([1, 0]).where({}).topK(1).all())[0]?.id).toBe('a')
+        expect(await collection.deleteWhere({})).toBe(1)
       }, 30000)
       it('preserves long IDs and keeps oversized scalar conditions outside native TAG comparisons', async () => {
         let commands = 0
