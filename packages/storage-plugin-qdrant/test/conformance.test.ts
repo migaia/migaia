@@ -124,8 +124,7 @@ describe('real native vector backend', () => {
           multivector
             ? [
                 [x, 0],
-                [0, 1],
-                [0, 0]
+                [0, 1]
               ]
             : [x, 0]
         try {
@@ -140,8 +139,8 @@ describe('real native vector backend', () => {
           })
           if (multivector) {
             const before = fixture.calls.length
-            await expect(
-              store.api.qdrantRescore.updateVectors('points', [
+            expect(
+              await store.api.qdrantRescore.updateVectors('points', [
                 {
                   id: 'a',
                   vector: [
@@ -150,7 +149,7 @@ describe('real native vector backend', () => {
                   ]
                 }
               ])
-            ).rejects.toMatchObject({ code: 'QDRANT_REQUEST_FAILED', cause: { status: 422 } })
+            ).toMatchObject({ status: 'completed' })
             expect(fixture.calls.slice(before)).toEqual(['updateVectors'])
           }
           const operation = await store.api.qdrantRescore.updateVectors('points', [
@@ -173,8 +172,7 @@ describe('real native vector backend', () => {
           const queryVector = multivector
             ? [
                 [1, 0],
-                [0, 1],
-                [0, 0]
+                [0, 1]
               ]
             : [1, 0]
           const queryRow = multivector ? (queryVector[0] as number[]) : queryVector
@@ -237,8 +235,7 @@ describe('real native vector backend', () => {
               query: multivector
                 ? [
                     [1, 0],
-                    [0, 1],
-                    [0, 0]
+                    [0, 1]
                   ]
                 : [1, 0],
               topN: 1

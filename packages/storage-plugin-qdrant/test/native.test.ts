@@ -6,6 +6,132 @@ import { qdrantClientHttp } from '../src/client.js'
 /** The original shared launcher supplies the actual native-service address. */
 const url = process.env.MIGAIA_QDRANT_URL
 describe('native Qdrant protocol adapters', () => {
+  it.skipIf(!url).each(['fetch', 'sdk'] as const)(
+    '%s encodes two-row integer multivectors for native upsert, update and query',
+    async (transport) => {
+      /** Each adapter keeps its original client and transport configuration. */
+      const http =
+        transport === 'fetch' ? fetchHttp(url!) : qdrantClientHttp(new QdrantClient({ url: url! }))
+      /** Only this fixture owns and removes this fresh native collection. */
+      const name = 'multivector_' + crypto.randomUUID().replaceAll('-', '')
+      await http.createCollection(name, {
+        vectors: {
+          multi: { size: 2, distance: 'Dot', multivector_config: { comparator: 'max_sim' } }
+        },
+        sparse_vectors: { sparse: {} }
+      })
+      try {
+        await http.upsert(name, {
+          points: [
+            {
+              id: 1,
+              vector: {
+                multi: [
+                  [0, 0],
+                  [0, 1]
+                ]
+              },
+              payload: {
+                matrix: [
+                  [1, 2],
+                  [3, 4]
+                ]
+              }
+            },
+            {
+              id: 2,
+              vector: {
+                multi: [
+                  [1, 2],
+                  [3, 4]
+                ]
+              }
+            }
+          ],
+          wait: true
+        })
+        expect(
+          await http.retrieve(name, { ids: [1, 2], with_vector: true, with_payload: true })
+        ).toMatchObject([
+          {
+            id: 1,
+            vector: {
+              multi: [
+                [0, 0],
+                [0, 1]
+              ]
+            },
+            payload: {
+              matrix: [
+                [1, 2],
+                [3, 4]
+              ]
+            }
+          },
+          {
+            id: 2,
+            vector: {
+              multi: [
+                [1, 2],
+                [3, 4]
+              ]
+            }
+          }
+        ])
+        await http.updateVectors(name, {
+          points: [
+            {
+              id: 1,
+              vector: {
+                multi: [
+                  [1, 0],
+                  [0, 1]
+                ],
+                sparse: { indices: [1], values: [1] }
+              }
+            },
+            {
+              id: 2,
+              vector: {
+                multi: [
+                  [2, 0],
+                  [0, 2]
+                ]
+              }
+            }
+          ],
+          wait: true
+        })
+        expect(
+          (await http.retrieve(name, { ids: [1], with_vector: true }))[0]!.vector
+        ).toMatchObject({
+          multi: [
+            [1, 0],
+            [0, 1]
+          ],
+          sparse: { indices: [1], values: [1] }
+        })
+        expect(
+          (
+            await http.query(name, {
+              query: [
+                [1, 0],
+                [0, 1]
+              ],
+              using: 'multi',
+              params: { exact: true },
+              limit: 2
+            })
+          ).points
+        ).toMatchObject([
+          { id: 2, score: 4 },
+          { id: 1, score: 2 }
+        ])
+      } finally {
+        await http.deleteCollection(name)
+      }
+    }
+  )
   it.skipIf(!url)(
     'executes the complete finite port against the real engine and preserves native source vectors',
     async () => {

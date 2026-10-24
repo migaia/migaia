@@ -176,6 +176,14 @@ export const QdrantManagedVectorName = {
   source: 'migaia_source',
   rescore: 'migaia_rescore'
 } as const
+/** Native vector-bearing fields select numeric wire encoding; user data remains ordinary JSON. */
+export const QdrantWireField = {
+  vector: 'vector',
+  vectors: 'vectors',
+  query: 'query',
+  payload: 'payload',
+  filter: 'filter'
+} as const
 /** Reserved fields and stable point/configuration names belong only to this backend. */
 export const QdrantText = {
   backend: 'qdrant',

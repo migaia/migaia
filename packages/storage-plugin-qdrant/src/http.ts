@@ -6,6 +6,7 @@ import { QdrantErrorText } from './error-text.js'
 import { capture, invalidArgument, normalizeQdrantError, qdrantError } from './errors.js'
 import { nativeResult } from './protocol.js'
 import { nativeHttp } from './native.js'
+import { qdrantWireValue } from './wire.js'
 import type { IQdrantHttp, IQdrantOperationName } from './types.js'
 /** Runtime fetch is the only native transport loaded by this explicit HTTP entry. */
 export function fetchHttp(url: string, apiKey?: string): IQdrantHttp {
@@ -34,7 +35,7 @@ export function fetchHttp(url: string, apiKey?: string): IQdrantHttp {
           ...(body === undefined ? {} : { 'Content-Type': QdrantText.json }),
           ...(apiKey === undefined ? {} : { [QdrantText.apiKey]: apiKey })
         },
-        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+        ...(body === undefined ? {} : { body: JSON.stringify(qdrantWireValue(body)) }),
         signal: ctx?.signal as AbortSignal | undefined,
         redirect: 'manual'
       })

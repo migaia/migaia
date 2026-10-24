@@ -3,6 +3,7 @@ import type { IOperationContext } from '@migaia/storage-contract'
 import { throwIfAborted } from '@migaia/storage-host/authoring/backend'
 import { nativeHttp } from './native.js'
 import { nativeResult } from './protocol.js'
+import { qdrantWireValue } from './wire.js'
 import { capture, normalizeQdrantError } from './errors.js'
 import { QdrantRoute } from './constants.js'
 import { QdrantErrorCode } from './error-code.js'
@@ -49,7 +50,7 @@ export function qdrantClientHttp(client: QdrantClient): IQdrantHttp {
     try {
       if (Object.hasOwn(writes, operation)) {
         const route = QdrantRoute[operation],
-          parameters = args[route.collection ? 1 : 0] ?? {},
+          parameters = qdrantWireValue(args[route.collection ? 1 : 0] ?? {}),
           body = {
             ...(route.collection ? { collection_name: args[0] } : {}),
             ...(parameters as object)
@@ -61,7 +62,14 @@ export function qdrantClientHttp(client: QdrantClient): IQdrantHttp {
         return nativeResult(operation, response.data.result)
       }
       const method = Reflect.get(reads, operation) as (...args: unknown[]) => Promise<unknown>
-      return nativeResult(operation, await Reflect.apply(method, client, args))
+      return nativeResult(
+        operation,
+        await Reflect.apply(
+          method,
+          client,
+          args.map((arg) => qdrantWireValue(arg))
+        )
+      )
     } catch (cause) {
       throw normalizeQdrantError(cause)
     }
