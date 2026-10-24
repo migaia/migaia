@@ -206,7 +206,7 @@ export type { ITransactionInfo } from './transaction.js'
 export { defineConcurrencyPolicy, ConcurrencyPolicy } from './concurrency.js'
 export type { IConcurrencyConflict, ILockHolding } from './concurrency.js'
 
-export { lockKey } from './concurrency.js'
+export { lockKey, assertLockKey } from './concurrency.js'
 
 export { prefixStorageOrgKey, unprefixStorageOrgKey } from './org.js'
 
@@ -309,7 +309,12 @@ export type { ITransactionCapabilityView, IWithTransactionQueryMethods } from '.
 
 export { snapshotStorageKeyPrefix } from './key-order.js'
 export type { IStorageKeyPrefix } from './key-order.js'
-export { ttl, snapshotStorageTtlTarget, assertStorageTtlDuration } from './capabilities/ttl.js'
+export {
+  ttl,
+  assertStorageTtlTarget,
+  snapshotStorageTtlTarget,
+  assertStorageTtlDuration
+} from './capabilities/ttl.js'
 export type { ITtlTarget, ITtlApi, ITransactionTtlApi } from './capabilities/ttl.js'
 export { counter, snapshotStorageCounterIncrement } from './capabilities/counter.js'
 export type {
@@ -321,6 +326,9 @@ export {
   RdfTermType,
   RdfDatatype,
   term,
+  assertStorageRdfTerm,
+  assertStorageRdfPattern,
+  assertStorageRdfQuad,
   snapshotStorageRdfTerm,
   snapshotStorageRdfPattern,
   snapshotStorageRdfQuad,

@@ -18,6 +18,7 @@ import {
   provideCapabilities,
   defineStorageCapability,
   snapshotStorageTtlTarget,
+  assertStorageTtlTarget,
   assertStorageTtlDuration,
   snapshotStorageCounterIncrement,
   lockKey,
@@ -164,9 +165,11 @@ describe('standard scalar capability contracts', () => {
   it('captures the original physical TTL target and permits every finite nonnegative duration', () => {
     const date = new Date(3)
     const captured = snapshotStorageTtlTarget({ channel: 'record', key: ['x', date] }, 'memory')
+    const target = { channel: 'record' as const, key: ['x', date] }
+    expect(() => assertStorageTtlTarget(target, 'memory')).not.toThrow()
+    expect(target.key[1]).toBe(date)
     date.setTime(9)
     expect(captured).toEqual({ channel: 'record', key: ['x', new Date(3)] })
-    expect(Object.isFrozen(captured)).toBe(true)
     expect(snapshotStorageTtlTarget(lockKey.vector('catalog', 'one'), 'memory')).toEqual({
       channel: 'vector',
       collection: 'catalog',

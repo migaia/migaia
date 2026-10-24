@@ -1,5 +1,10 @@
 import type { IOperationContext } from '../context.js'
-import { snapshotLockKey, type ILockKey, type IWriteConcurrencyOptions } from '../concurrency.js'
+import {
+  assertLockKey,
+  snapshotLockKey,
+  type ILockKey,
+  type IWriteConcurrencyOptions
+} from '../concurrency.js'
 import type { IBackendKind } from '../capabilities.js'
 import { StorageContractError, StorageContractErrorCode } from '../errors.js'
 import { StorageContractErrorText } from '../error-text.js'
@@ -28,20 +33,26 @@ export type ITransactionTtlApi = {
   persist(target: ITtlTarget): Promise<boolean>
 }
 
-/** Captures the original lock owner's channel and logical-key snapshot before native work. */
-export function snapshotStorageTtlTarget(
-  target: ITtlTarget,
+/** Validate TTL's lock-domain subset without copying keys inside synchronous native terminals. */
+export function assertStorageTtlTarget(
+  target: unknown,
   backend: IBackendKind | undefined
-): ITtlTarget {
-  /** RDF has no TTL target even when untyped callers supply a structurally valid lock. */
-  const captured = snapshotLockKey(target, backend)
-  if (captured.channel === 'rdf')
+): asserts target is ITtlTarget {
+  assertLockKey(target, backend)
+  if (target.channel === 'rdf')
     throw new StorageContractError(
       StorageContractErrorCode.invalidArgument,
       { backend },
       StorageContractErrorText.lockArgument
     )
-  return captured
+}
+/** Capture the original lock target only when middleware or native admission can await. */
+export function snapshotStorageTtlTarget(
+  target: ITtlTarget,
+  backend: IBackendKind | undefined
+): ITtlTarget {
+  assertStorageTtlTarget(target, backend)
+  return snapshotLockKey(target, backend) as ITtlTarget
 }
 /** Finite nonnegative durations include fractional milliseconds and immediate expiry at zero. */
 export function assertStorageTtlDuration(ms: number, backend: IBackendKind | undefined): void {

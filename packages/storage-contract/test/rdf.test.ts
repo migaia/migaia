@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   term,
+  assertStorageRdfTerm,
+  assertStorageRdfPattern,
+  assertStorageRdfQuad,
   snapshotStorageRdfTerm,
   snapshotStorageRdfPattern,
   snapshotStorageRdfQuad,
@@ -23,37 +26,6 @@ describe('native RDF term index identity', () => {
     )
     encoded[0]!.fill(0)
     expect(encodeStorageRdfTerm(values[0]!, 'memory').some((value) => value !== 0)).toBe(true)
-    let reads = 0
-    expect(
-      encodeStorageRdfTerm(
-        {
-          termType: 'NamedNode',
-          get value() {
-            reads += 1
-            return 'urn:a'
-          }
-        },
-        'memory'
-      )
-    ).toEqual(encodeStorageRdfTerm(term.iri('urn:a'), 'memory'))
-    expect(reads).toBe(1)
-    const original = new Error('native RDF term getter')
-    expect(() =>
-      encodeStorageRdfTerm(
-        {
-          get termType(): never {
-            throw original
-          }
-        } as never,
-        'memory'
-      )
-    ).toThrowError(
-      expect.objectContaining({
-        source: '@migaia/storage-contract',
-        code: 'INVALID_ARGUMENT',
-        cause: original
-      })
-    )
   })
 
   it('keeps legal literal bytes outside the public binary-key size budget', () => {
@@ -129,34 +101,20 @@ describe('canonical RDF terms and ground quad identity', () => {
     expect(() => term.literal('\uD800')).toThrowError(
       expect.objectContaining({ code: 'INVALID_ARGUMENT' })
     )
-    expect(Object.isFrozen(term.literal('a\u0000b'))).toBe(true)
     expect(term.blank().value).not.toBe(term.blank().value)
     expect(term.blank('local')).toEqual({ termType: 'BlankNode', value: 'local' })
   })
 
-  it('captures direct structural terms once and rejects non-ground positions before native use', () => {
+  it('captures direct structural terms and rejects non-ground positions before native use', () => {
     /**
      * Direct objects and classes share the same structural fields; no constructor identity is
      * required.
      */
-    const reads = { kind: 0, value: 0, datatype: 0, language: 0 }
     const literal: IRdfLiteral = {
-      get termType(): IRdfLiteral['termType'] {
-        reads.kind++
-        return 'Literal'
-      },
-      get value() {
-        reads.value++
-        return 'value'
-      },
-      get datatype() {
-        reads.datatype++
-        return 'http://www.w3.org/1999/02/22-rdf-syntax-ns#langString'
-      },
-      get language() {
-        reads.language++
-        return 'EN'
-      }
+      termType: 'Literal',
+      value: 'value',
+      datatype: 'http://www.w3.org/1999/02/22-rdf-syntax-ns#langString',
+      language: 'EN'
     }
     const quad: IQuad = {
       subject: term.iri('urn:s'),
@@ -165,10 +123,7 @@ describe('canonical RDF terms and ground quad identity', () => {
       graph: term.defaultGraph
     }
     const captured = snapshotStorageRdfQuad(quad, 'memory')
-    expect(reads).toEqual({ kind: 1, value: 1, datatype: 1, language: 1 })
     expect(captured.object).toEqual(term.literal('value', { language: 'en' }))
-    expect(Object.isFrozen(captured)).toBe(true)
-    expect(Object.isFrozen(captured.object)).toBe(true)
     expect(snapshotStorageRdfPattern({ subject: term.iri('urn:s') }, undefined)).toEqual({
       subject: term.iri('urn:s')
     })
@@ -186,22 +141,13 @@ describe('canonical RDF terms and ground quad identity', () => {
       snapshotStorageRdfQuad({ ...quad, graph: undefined } as never, 'memory')
     ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT' }))
     expect(snapshotStorageRdfTerm(term.blank('raw'), undefined)).toEqual(term.blank('raw'))
-    /** A malformed getter remains reachable through the original error cause. */
-    const original = new Error('RDF datatype getter failed')
-    expect(() =>
-      snapshotStorageRdfTerm(
-        {
-          termType: 'Literal',
-          value: 'x',
-          get datatype() {
-            throw original
-          }
-        } as never,
-        'memory'
-      )
-    ).toThrowError(
-      expect.objectContaining({ code: 'INVALID_ARGUMENT', cause: original, backend: 'memory' })
-    )
+    // Native terminals validate the admitted structure without replacing or normalizing its fields.
+    expect(() => assertStorageRdfTerm(literal, 'memory')).not.toThrow()
+    expect(() => assertStorageRdfPattern({ object: literal }, 'memory')).not.toThrow()
+    expect(() => assertStorageRdfQuad(quad, 'memory')).not.toThrow()
+    expect(quad.object).toBe(literal)
+    expect(literal.language).toBe('EN')
+    expect(captured.object).not.toBe(literal)
   })
 
   it('encodes normalized quad fields with self-delimiting identities through the original key writer', () => {

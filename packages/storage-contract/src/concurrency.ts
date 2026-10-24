@@ -13,8 +13,13 @@ import { systemScheduler } from '@migaia/utils/scheduler'
 import { snapshotOperationContext } from './operation-context.js'
 import { readTransactionConcurrency, resolveConcurrencyPolicy } from './transaction.js'
 import type { IStorageBase } from './store.js'
-import { snapshotStorageKey, assertStringStorageKey } from './key.js'
-import { snapshotStorageRdfQuad, encodeRdfQuadSnapshot, type IQuad } from './capabilities/rdf.js'
+import { snapshotStorageKey, assertStorageKey, assertStringStorageKey } from './key.js'
+import {
+  snapshotStorageRdfQuad,
+  assertStorageRdfQuad,
+  encodeRdfQuadSnapshot,
+  type IQuad
+} from './capabilities/rdf.js'
 import {
   encodeOrderedStorageKey,
   snapshotStorageKeyPrefix,
@@ -318,6 +323,34 @@ function invalidLockArgument(
     StorageContractErrorText.lockArgument
   )
 }
+/** Validate the canonical lock channels without allocating a detached lock or logical key. */
+export function assertLockKey(
+  value: unknown,
+  backend: IBackendKind | undefined
+): asserts value is ILockKey {
+  if (typeof value !== 'object' || value === null || Array.isArray(value))
+    throw invalidLockArgument(backend)
+  /** Channel discrimination reads only fields belonging to that supported physical domain. */
+  const key = value as ILockKey
+  switch (key.channel) {
+    case LockChannel.text:
+    case LockChannel.record:
+      assertStorageKey(key.key, backend)
+      return
+    case LockChannel.bytes:
+      assertStringStorageKey(key.key, backend)
+      return
+    case LockChannel.vector:
+      assertStringStorageKey(key.collection, backend)
+      assertStringStorageKey(key.id, backend)
+      return
+    case LockChannel.rdf:
+      assertStorageRdfQuad(key.quad, backend)
+      return
+    default:
+      throw invalidLockArgument(backend)
+  }
+}
 /** Capture text identity before queued lock admission can observe caller key changes. */
 function parseTextLock(
   value: Extract<ILockKey, { channel: 'text' }>,
@@ -326,11 +359,7 @@ function parseTextLock(
   return { channel: LockChannel.text, key: snapshotStorageKey(value.key, backend) }
 }
 /** Bytes retain the existing string-only key domain without allocating another key image. */
-function parseBytesLock(
-  value: Extract<ILockKey, { channel: 'bytes' }>,
-  backend: IBackendKind | undefined
-): ILockKey {
-  assertStringStorageKey(value.key, backend)
+function parseBytesLock(value: Extract<ILockKey, { channel: 'bytes' }>): ILockKey {
   return { channel: LockChannel.bytes, key: value.key }
 }
 /** Capture mutable record key components before the real lock queue yields. */
@@ -341,12 +370,7 @@ function parseRecordLock(
   return { channel: LockChannel.record, key: snapshotStorageKey(value.key, backend) }
 }
 /** Vector point identity consists only of its collection/id strings. */
-function parseVectorLock(
-  value: Extract<ILockKey, { channel: 'vector' }>,
-  backend: IBackendKind | undefined
-): ILockKey {
-  assertStringStorageKey(value.collection, backend)
-  assertStringStorageKey(value.id, backend)
+function parseVectorLock(value: Extract<ILockKey, { channel: 'vector' }>): ILockKey {
   return { channel: LockChannel.vector, collection: value.collection, id: value.id }
 }
 /** Ground quad fields span queued lock admission and share the canonical RDF capture owner. */
@@ -358,19 +382,18 @@ function parseRdfLock(
 }
 /** Dispatch the supported channel once; each channel owns exactly its actual input fields. */
 export function snapshotLockKey(value: unknown, backend: IBackendKind | undefined): ILockKey {
-  if (typeof value !== 'object' || value === null || Array.isArray(value))
-    throw invalidLockArgument(backend)
-  /** Public channel discrimination never probes fields belonging to another channel. */
-  const key = value as ILockKey
+  assertLockKey(value, backend)
+  /** Only the snapshot boundary detaches mutable keys or ground term objects for queued use. */
+  const key = value
   switch (key.channel) {
     case LockChannel.text:
       return parseTextLock(key, backend)
     case LockChannel.bytes:
-      return parseBytesLock(key, backend)
+      return parseBytesLock(key)
     case LockChannel.record:
       return parseRecordLock(key, backend)
     case LockChannel.vector:
-      return parseVectorLock(key, backend)
+      return parseVectorLock(key)
     case LockChannel.rdf:
       return parseRdfLock(key, backend)
     default:

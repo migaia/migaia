@@ -127,14 +127,12 @@ const RDF_GRANDFATHERED = /* @__PURE__ */ new Set([
   'zh-min-nan',
   'zh-xiang'
 ])
-/** DefaultGraph has one immutable value and no generated blank-node identity. */
-const DEFAULT_GRAPH: IRdfDefaultGraph = /* @__PURE__ */ Object.freeze({
-  termType: RdfTermType.defaultGraph
-})
+/** DefaultGraph has one canonical value and no generated blank-node identity. */
+const DEFAULT_GRAPH: IRdfDefaultGraph = { termType: RdfTermType.defaultGraph }
 /** Generated raw labels are unique only within this term factory's runtime. */
 let blankSequence = 0
 
-/** RDF input errors retain the original getter failure without changing its identity or stack. */
+/** RDF admission uses the existing argument error and canonical diagnostic text. */
 function invalidRdf(backend: IBackendKind | undefined, cause?: unknown): StorageContractError {
   return new StorageContractError(
     StorageContractErrorCode.invalidArgument,
@@ -149,10 +147,14 @@ function assertRdfString(
 ): asserts value is string {
   if (typeof value !== 'string' || /[\uD800-\uDFFF]/u.test(value)) throw invalidRdf(backend)
 }
-/** Absolute IRI spelling is validated and retained without case folding, escaping or normalization. */
-function rdfIri(value: unknown, backend: IBackendKind | undefined): IRdfNamedNode {
+/** Absolute IRI admission preserves spelling without URL normalization or allocation. */
+function assertRdfIri(value: unknown, backend: IBackendKind | undefined): asserts value is string {
   if (typeof value !== 'string' || !RDF_IRI.test(value)) throw invalidRdf(backend)
-  return Object.freeze({ termType: RdfTermType.namedNode, value })
+}
+/** Absolute IRI factories allocate only their public result after canonical admission. */
+function rdfIri(value: unknown, backend: IBackendKind | undefined): IRdfNamedNode {
+  assertRdfIri(value, backend)
+  return { termType: RdfTermType.namedNode, value }
 }
 /** Lowercases well-formed BCP47 tags while preserving their original, non-registry spelling. */
 function rdfLanguage(value: unknown, backend: IBackendKind | undefined): string {
@@ -163,110 +165,145 @@ function rdfLanguage(value: unknown, backend: IBackendKind | undefined): string 
   if (!RDF_LANGUAGE.test(language)) throw invalidRdf(backend)
   return language
 }
-/** Creates an admitted literal with its mandatory datatype and consistent optional language. */
-function rdfLiteral(
+/** Literal validation is shared by structural terms and factories without allocating a term. */
+function assertRdfLiteral(
   value: unknown,
   datatype: unknown,
   language: unknown,
   backend: IBackendKind | undefined
-): IRdfLiteral {
+): void {
   assertRdfString(value, backend)
-  /** Datatypes remain exact absolute IRI strings, just like named-node terms. */
-  const type = rdfIri(datatype, backend).value
+  assertRdfIri(datatype, backend)
   if (language === undefined) {
-    if (type === RdfDatatype.langString) throw invalidRdf(backend)
-    return Object.freeze({ termType: RdfTermType.literal, value, datatype: type })
+    if (datatype === RdfDatatype.langString) throw invalidRdf(backend)
+  } else {
+    if (datatype !== RdfDatatype.langString) throw invalidRdf(backend)
+    rdfLanguage(language, backend)
   }
-  if (type !== RdfDatatype.langString) throw invalidRdf(backend)
-  return Object.freeze({
+}
+/** Creates a literal result after the same canonical structural validation used by native authors. */
+function rdfLiteral(
+  value: string,
+  datatype: string,
+  language: string | undefined,
+  backend: IBackendKind | undefined
+): IRdfLiteral {
+  assertRdfLiteral(value, datatype, language, backend)
+  return {
     termType: RdfTermType.literal,
     value,
-    datatype: type,
-    language: rdfLanguage(language, backend)
-  })
+    datatype,
+    ...(language === undefined ? {} : { language: language.toLowerCase() })
+  }
 }
-/** Snapshots direct structural terms for the shared raw/parser and ground-position validators. */
+/** Validate raw RDF structure without copying terms or normalizing caller-owned fields. */
+export function assertStorageRdfTerm(
+  value: unknown,
+  backend: IBackendKind | undefined
+): asserts value is IRdfTerm {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) throw invalidRdf(backend)
+  /** The supported tag determines exactly which lexical fields have meaning. */
+  const candidate = value as IRdfTerm
+  switch (candidate.termType) {
+    case RdfTermType.defaultGraph:
+      return
+    case RdfTermType.namedNode:
+      assertRdfIri(candidate.value, backend)
+      return
+    case RdfTermType.blankNode:
+      assertRdfString(candidate.value, backend)
+      if (candidate.value.length === 0) throw invalidRdf(backend)
+      return
+    case RdfTermType.literal:
+      assertRdfLiteral(candidate.value, candidate.datatype, candidate.language, backend)
+      return
+    default:
+      throw invalidRdf(backend)
+  }
+}
+/** Copy only admitted structural fields when the result must survive asynchronous caller mutation. */
+function copyRdfTerm(value: IRdfTerm): IRdfTerm {
+  switch (value.termType) {
+    case RdfTermType.defaultGraph:
+      return DEFAULT_GRAPH
+    case RdfTermType.literal:
+      return {
+        termType: value.termType,
+        value: value.value,
+        datatype: value.datatype,
+        ...(value.language === undefined ? {} : { language: value.language.toLowerCase() })
+      }
+    default:
+      return { termType: value.termType, value: value.value }
+  }
+}
+/** Snapshots direct structural terms only when a deferred consumer needs an independent value. */
 export function snapshotStorageRdfTerm(
   value: IRdfTerm,
   backend: IBackendKind | undefined
 ): IRdfTerm {
-  try {
-    if (typeof value !== 'object' || value === null || Array.isArray(value))
-      throw invalidRdf(backend)
-    /** Tag is captured first; irrelevant term fields are never reflected. */
-    const kind = value.termType
-    if (kind === RdfTermType.defaultGraph) return DEFAULT_GRAPH
-    /** Every non-default term carries exactly one captured lexical value. */
-    const lexical = (value as IRdfBindingTerm).value
-    if (kind === RdfTermType.namedNode) return rdfIri(lexical, backend)
-    if (kind === RdfTermType.blankNode) {
-      assertRdfString(lexical, backend)
-      if (lexical.length === 0) throw invalidRdf(backend)
-      return Object.freeze({ termType: kind, value: lexical })
-    }
-    if (kind === RdfTermType.literal) {
-      /** Both annotation fields are captured once before their consistency is checked. */
-      const datatype = (value as IRdfLiteral).datatype
-      /** Language omission remains distinct from an invalid empty annotation. */
-      const language = (value as IRdfLiteral).language
-      return rdfLiteral(lexical, datatype, language, backend)
-    }
-    throw invalidRdf(backend)
-  } catch (cause) {
-    if (cause instanceof StorageContractError) throw cause
-    throw invalidRdf(backend, cause)
-  }
+  assertStorageRdfTerm(value, backend)
+  return copyRdfTerm(value)
 }
-/** Standard ground positions reject blank nodes and literal/default-graph misuse before I/O. */
-function rdfPosition(
-  value: IRdfTerm,
+/** Ground positions add only positional rules to the one raw-term validator. */
+function assertRdfPosition(
+  value: unknown,
   position: keyof IQuad,
   backend: IBackendKind | undefined
-): IRdfTerm {
-  /** Snapshot validation is shared with raw terms; ground narrowing owns only position rules. */
-  const captured = snapshotStorageRdfTerm(value, backend)
+): void {
+  assertStorageRdfTerm(value, backend)
   if (
-    captured.termType === RdfTermType.namedNode ||
-    (position === RdfQuadPosition.object && captured.termType === RdfTermType.literal) ||
-    (position === RdfQuadPosition.graph && captured.termType === RdfTermType.defaultGraph)
+    value.termType === RdfTermType.namedNode ||
+    (position === RdfQuadPosition.object && value.termType === RdfTermType.literal) ||
+    (position === RdfQuadPosition.graph && value.termType === RdfTermType.defaultGraph)
   )
-    return captured
+    return
   throw invalidRdf(backend)
 }
-/** Captures a partial ground pattern; omitted graph deliberately continues to match every graph. */
+/** Validate a partial ground pattern without allocating replacement terms or an input image. */
+export function assertStorageRdfPattern(
+  pattern: unknown,
+  backend: IBackendKind | undefined
+): asserts pattern is Partial<IQuad> {
+  if (typeof pattern !== 'object' || pattern === null || Array.isArray(pattern))
+    throw invalidRdf(backend)
+  for (const position of Object.values(RdfQuadPosition)) {
+    /** Missing fields remain omitted; a partial pattern never invents a default graph. */
+    const value = (pattern as Partial<IQuad>)[position]
+    if (value !== undefined) assertRdfPosition(value, position, backend)
+  }
+}
+/** A complete quad uses the same positional rules plus all four mandatory positions. */
+export function assertStorageRdfQuad(
+  quad: unknown,
+  backend: IBackendKind | undefined
+): asserts quad is IQuad {
+  assertStorageRdfPattern(quad, backend)
+  if (!quad.subject || !quad.predicate || !quad.object || !quad.graph) throw invalidRdf(backend)
+}
+/** Copy admitted positions once; completeness and raw-term admission belong to the pure guards. */
+function copyRdfPattern(pattern: Partial<IQuad>): Partial<IQuad> {
+  /** Only supplied positions enter the independent result. */
+  const result: Partial<Record<keyof IQuad, IRdfTerm>> = {}
+  for (const position of Object.values(RdfQuadPosition)) {
+    /** Each term is copied after canonical validation, without another guard traversal. */
+    const value = pattern[position]
+    if (value !== undefined) result[position] = copyRdfTerm(value)
+  }
+  return result as Partial<IQuad>
+}
+/** Capture a partial pattern before a deferred query can observe later caller mutation. */
 export function snapshotStorageRdfPattern(
   pattern: Partial<IQuad>,
   backend: IBackendKind | undefined
 ): Readonly<Partial<IQuad>> {
-  try {
-    if (typeof pattern !== 'object' || pattern === null || Array.isArray(pattern))
-      throw invalidRdf(backend)
-    /**
-     * Each supplied position is read once and validated in canonical subject/predicate/object/graph
-     * order.
-     */
-    const result: Partial<Record<keyof IQuad, IRdfTerm>> = {}
-    for (const position of Object.values(RdfQuadPosition)) {
-      /** A missing field remains omitted; no default graph is inserted into a pattern. */
-      const value = pattern[position]
-      if (value !== undefined) result[position] = rdfPosition(value, position, backend)
-    }
-    return Object.freeze(result) as Readonly<Partial<IQuad>>
-  } catch (cause) {
-    if (cause instanceof StorageContractError) throw cause
-    throw invalidRdf(backend, cause)
-  }
+  assertStorageRdfPattern(pattern, backend)
+  return copyRdfPattern(pattern)
 }
-/** Captures all four mandatory ground positions, never retaining caller term objects or getters. */
+/** Capture all ground positions before a queued write or lock can observe caller mutation. */
 export function snapshotStorageRdfQuad(quad: IQuad, backend: IBackendKind | undefined): IQuad {
-  /**
-   * The partial validator owns reflection and positional checks for both complete and partial
-   * input.
-   */
-  const result = snapshotStorageRdfPattern(quad, backend)
-  if (!result.subject || !result.predicate || !result.object || !result.graph)
-    throw invalidRdf(backend)
-  return result as IQuad
+  assertStorageRdfQuad(quad, backend)
+  return copyRdfPattern(quad) as IQuad
 }
 /** Projects an already captured term into self-delimiting components for the original key writer. */
 function rdfTermKey(value: IRdfTerm): IStorageKey {
@@ -286,7 +323,7 @@ export function encodeStorageRdfTerm(
 ): Uint8Array {
   return encodeOrderedStorageKey(rdfTermKey(snapshotStorageRdfTerm(value, backend)), backend)
 }
-/** Internal lock/native authors encode a validated frozen quad without a second input traversal. */
+/** Internal lock/native authors encode a validated quad without a second input traversal. */
 export function encodeRdfQuadSnapshot(quad: IQuad): Uint8Array {
   return encodeOrderedStorageKey(
     [
@@ -323,31 +360,26 @@ export const term = /* @__PURE__ */ Object.freeze({
       | { readonly language?: string; readonly datatype?: never }
       | { readonly language?: never; readonly datatype?: string }
   ): IRdfLiteral {
-    try {
-      if (
-        options !== undefined &&
-        (typeof options !== 'object' || options === null || Array.isArray(options))
-      )
-        throw invalidRdf(undefined)
-      /** Options are captured once before their mutually exclusive annotations are validated. */
-      const language = options?.language
-      /** Datatype omission is filled only by this public factory, never by raw structural admission. */
-      const datatype = options?.datatype
-      if (language !== undefined && datatype !== undefined) throw invalidRdf(undefined)
-      return rdfLiteral(
-        value,
-        datatype === undefined
-          ? language === undefined
-            ? RdfDatatype.string
-            : RdfDatatype.langString
-          : datatype,
-        language,
-        undefined
-      )
-    } catch (cause) {
-      if (cause instanceof StorageContractError) throw cause
-      throw invalidRdf(undefined, cause)
-    }
+    if (
+      options !== undefined &&
+      (typeof options !== 'object' || options === null || Array.isArray(options))
+    )
+      throw invalidRdf(undefined)
+    /** Options are captured once before their mutually exclusive annotations are validated. */
+    const language = options?.language
+    /** Datatype omission is filled only by this public factory, never by raw structural admission. */
+    const datatype = options?.datatype
+    if (language !== undefined && datatype !== undefined) throw invalidRdf(undefined)
+    return rdfLiteral(
+      value,
+      datatype === undefined
+        ? language === undefined
+          ? RdfDatatype.string
+          : RdfDatatype.langString
+        : datatype,
+      language,
+      undefined
+    )
   },
   defaultGraph: DEFAULT_GRAPH
 })
@@ -374,7 +406,7 @@ function invalidOrgGraph(cause?: unknown): StorageContractError {
 
 /**
  * Maps a logical default or named graph to a real named graph in the exact organization. The
- * original RDF position validator captures getters once; percent encoding preserves IRI spelling.
+ * canonical RDF position validator preserves IRI spelling before percent encoding.
  */
 export function prefixStorageOrgGraph(
   orgId: string,
@@ -394,14 +426,14 @@ export function prefixStorageOrgGraph(
 }
 
 /**
- * Accepts only this organization's canonical physical graph. Returned terms reuse the shared frozen
+ * Accepts only this organization's canonical physical graph. Returned terms reuse the shared
  * factories; malformed percent encoding retains its original native error as cause.
  */
 export function unprefixStorageOrgGraph(
   orgId: string,
   graph: IRdfNamedNode
 ): IRdfNamedNode | IRdfDefaultGraph {
-  /** No graph getter runs until the requested organization has passed canonical UUID admission. */
+  /** Canonical UUID admission precedes graph validation and envelope decoding. */
   const prefix = getStorageOrgGraphPrefix(orgId)
   /** Capturing a graph position admits its IRI once and then narrows the physical named identity. */
   const captured = snapshotStorageRdfPattern({ graph }, undefined).graph

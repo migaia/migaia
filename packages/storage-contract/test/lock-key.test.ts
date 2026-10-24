@@ -1,6 +1,7 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import {
   lockKey,
+  assertLockKey,
   compareStorageKeys,
   snapshotConcurrencyLockHoldings,
   snapshotConcurrencyLockKeys,
@@ -36,6 +37,9 @@ describe('canonical lock identities', () => {
       graph: term.defaultGraph
     }
     const vector = lockKey.vector('catalog', 'one')
+    const rdfInput = { channel: 'rdf', quad }
+    expect(() => assertLockKey(rdfInput, 'memory')).not.toThrow()
+    expect(rdfInput.quad).toBe(quad)
     const rdf = lockKey.rdf(quad)
     expectTypeOf(vector.collection).toEqualTypeOf<string>()
     expectTypeOf(rdf.quad).toEqualTypeOf<import('../src/index.js').IQuad>()
