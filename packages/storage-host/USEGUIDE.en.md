@@ -73,11 +73,28 @@ Strings, bytes and records have channel-conflict rules for the same logical key.
 
 ## Use an entity repository
 
+`/entity` provides definition, connection and basic reads/writes. Optional operations require explicit subpath units. Missing units throw `ENTITY_FEATURE_REQUIRED` with `source: @migaia/storage-host` and name the required import.
+
+```ts
+import { defineEntity } from '@migaia/storage-host/entity'
+const users = defineEntity<{ id: string; name: string }>({ name: 'users', key: 'id' }).connect(
+  store
+)
+await users.put({ id: 'u1', name: 'Ada' })
+console.log(await users.get('u1'))
+```
+
+Select only required units in `features`: `entityQueryFeature()` from `/entity/query` adds query/list/stream; `entityIndexesFeature()` from `/entity/indexes` adds index declaration/planning; `entityUniqueFeature()` from `/entity/unique` adds unique commit checks; `entityMigrationFeature()` from `/entity/migration` adds version plans and persisted migration; `entityKeysetFeature()` from `/entity/keyset` admits page/after. Index, unique and persisted migration paths reuse query operations, so also declare query for those paths. Units never enable another unit implicitly.
+
+The unique unit captures its own constraint projections without enabling index planning. Unique write checks alone do not require the indexes unit.
+
 `defineEntity<T>()({...})` declares an object's primary key and indexes. `connect(store)` attaches it to a backend. This example writes first, then queries through the same definition.
 
 ```ts doc-test=run
 import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
 import { defineEntity } from '@migaia/storage-host/entity'
+import { entityQueryFeature } from '@migaia/storage-host/entity/query'
+import { entityIndexesFeature } from '@migaia/storage-host/entity/indexes'
 
 type IOrder = { id: string; state: string; total: number }
 const host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
@@ -85,6 +102,7 @@ try {
   const orders = defineEntity<IOrder>()({
     name: 'orders',
     key: 'id',
+    features: [entityQueryFeature(), entityIndexesFeature()],
     indexes: { byState: { path: 'state' } }
   }).connect(host.backend('memory'))
   await orders.put({ id: 'o1', state: 'paid', total: 20 })

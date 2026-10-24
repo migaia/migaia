@@ -1,3 +1,8 @@
+import { entityQueryFeature } from '../../src/entity/query-feature.js'
+import { entityUniqueFeature } from '../../src/entity/unique-feature.js'
+import { entityMigrationFeature } from '../../src/entity/migration-feature.js'
+import { entityIndexesFeature } from '../../src/entity/indexes-feature.js'
+import { entityKeysetFeature } from '../../src/entity/keyset.js'
 import { expect, it } from 'vitest'
 import { defineEntity } from '../../src/entity.js'
 import { memoryBackend } from '../helpers/memory.js'
@@ -7,6 +12,13 @@ type IRow = { id: string; group: string; score: number }
 
 it('retains default ordering and its finite bound after skip and projection', async () => {
   const definition = defineEntity<IRow>()({
+    features: [
+      entityQueryFeature(),
+      entityUniqueFeature(),
+      entityMigrationFeature(),
+      entityIndexesFeature(),
+      entityKeysetFeature()
+    ],
     name: 'query-state',
     key: 'id',
     defaultOrderBy: (left, right) => right.score - left.score
@@ -23,7 +35,17 @@ it('retains default ordering and its finite bound after skip and projection', as
 })
 
 it('preserves entity controls after selector and distinct branches', async () => {
-  const definition = defineEntity<IRow>()({ name: 'query-branches', key: 'id' })
+  const definition = defineEntity<IRow>()({
+    features: [
+      entityQueryFeature(),
+      entityUniqueFeature(),
+      entityMigrationFeature(),
+      entityIndexesFeature(),
+      entityKeysetFeature()
+    ],
+    name: 'query-branches',
+    key: 'id'
+  })
   const repo = definition.connect(await memoryBackend())
   await repo.put({ id: 'a', group: 'one', score: 2 })
   await repo.put({ id: 'b', group: 'one', score: 1 })
@@ -51,6 +73,13 @@ it('preserves entity controls after selector and distinct branches', async () =>
 
 it('rejects duplicate and late source selection before opening any native iterator', async () => {
   const definition = defineEntity<IRow>()({
+    features: [
+      entityQueryFeature(),
+      entityUniqueFeature(),
+      entityMigrationFeature(),
+      entityIndexesFeature(),
+      entityKeysetFeature()
+    ],
     name: 'query-source-state',
     key: 'id',
     indexes: { byGroup: { path: 'group' } }
@@ -75,6 +104,13 @@ it('keeps the last page bounds after default comparison and does no work for a z
   const store = await memoryBackend()
   let comparisons = 0
   const repo = defineEntity<IRow>()({
+    features: [
+      entityQueryFeature(),
+      entityUniqueFeature(),
+      entityMigrationFeature(),
+      entityIndexesFeature(),
+      entityKeysetFeature()
+    ],
     name: 'query-page',
     key: 'id',
     defaultOrderBy: (left, right) => {
@@ -103,7 +139,17 @@ it('keeps the last page bounds after default comparison and does no work for a z
 
 it('keeps selector failures at the original entity extension boundary', async () => {
   const store = await memoryBackend()
-  const repo = defineEntity<IRow>()({ name: 'query-selector', key: 'id' }).connect(store)
+  const repo = defineEntity<IRow>()({
+    features: [
+      entityQueryFeature(),
+      entityUniqueFeature(),
+      entityMigrationFeature(),
+      entityIndexesFeature(),
+      entityKeysetFeature()
+    ],
+    name: 'query-selector',
+    key: 'id'
+  }).connect(store)
   await repo.put({ id: 'a', score: 1, group: 'one' })
   const primary = new RangeError('entity selector failure')
   const failure = await repo

@@ -128,6 +128,8 @@ Paths beginning `/authoring/...` below are prefixed with `@migaia/storage-host`.
 
 See [storage-contract](../storage-contract/README.en.md#entries-and-dependency-direction) for full paths and dependencies. The old contract root no longer exports these runtime tools.
 
+Entity assembly changes: `/entity` provides basic reads/writes. Previously automatic query, indexes, unique checks, migration and keyset now require their own `/entity/*` units in `features`. Import only the units used by the application; missing units throw `ENTITY_FEATURE_REQUIRED`. See [entity setup](./USEGUIDE.en.md#use-an-entity-repository).
+
 ## Assemble optional capabilities explicitly
 
 The base host does not import journal runtime, notification controllers or change iterators. Previously journal options loaded logging automatically and memory enabled notifications and watch by default. Applications now select these capabilities so basic reads and writes do not include unused code.

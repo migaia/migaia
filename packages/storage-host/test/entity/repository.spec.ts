@@ -1,3 +1,8 @@
+import { entityQueryFeature } from '../../src/entity/query-feature.js'
+import { entityUniqueFeature } from '../../src/entity/unique-feature.js'
+import { entityMigrationFeature } from '../../src/entity/migration-feature.js'
+import { entityIndexesFeature } from '../../src/entity/indexes-feature.js'
+import { entityKeysetFeature } from '../../src/entity/keyset.js'
 import { describe, expect, it } from 'vitest'
 import { walkErrorCauses } from '@migaia/utils/error'
 import { defineEntity } from '../../src/entity.js'
@@ -13,7 +18,17 @@ import {
 
 type IUser = { id: string; name: string; email: string }
 
-const users = defineEntity<IUser>({ name: 'users', key: 'id' })
+const users = defineEntity<IUser>({
+  features: [
+    entityQueryFeature(),
+    entityUniqueFeature(),
+    entityMigrationFeature(),
+    entityIndexesFeature(),
+    entityKeysetFeature()
+  ],
+  name: 'users',
+  key: 'id'
+})
 
 it('stream limit zero performs no backend read or yield', async () => {
   const store = await memoryBackend()
@@ -50,6 +65,13 @@ it('projects explicit selectors and indexed list through the shared query route'
   let selectorCalls = 0
   const diagnostics: string[] = []
   const entity = defineEntity<IIndexedUser>()({
+    features: [
+      entityQueryFeature(),
+      entityUniqueFeature(),
+      entityMigrationFeature(),
+      entityIndexesFeature(),
+      entityKeysetFeature()
+    ],
     name: 'indexed-list-users',
     key: 'id',
     onDiagnostic: (message) => diagnostics.push(message),
@@ -112,6 +134,13 @@ it('projects explicit selectors and indexed list through the shared query route'
 it('fallback batch does not execute secondary-index selectors', async () => {
   let selectorCalls = 0
   const entity = defineEntity<IUser>()({
+    features: [
+      entityQueryFeature(),
+      entityUniqueFeature(),
+      entityMigrationFeature(),
+      entityIndexesFeature(),
+      entityKeysetFeature()
+    ],
     name: 'fallback-batch-users',
     key: 'id',
     indexes: {
@@ -132,6 +161,13 @@ it('fallback batch does not execute secondary-index selectors', async () => {
 
 it('find APIs share fallback range, ordering, direction, and limit semantics', async () => {
   const repository = defineEntity<IUser>()({
+    features: [
+      entityQueryFeature(),
+      entityUniqueFeature(),
+      entityMigrationFeature(),
+      entityIndexesFeature(),
+      entityKeysetFeature()
+    ],
     name: 'indexed-fallback-users',
     key: 'id',
     indexes: { email: { path: 'email' } }
@@ -167,6 +203,13 @@ it('find APIs share fallback range, ordering, direction, and limit semantics', a
 
 it('indexed comparator ordering ties by index and id before direction and limit', async () => {
   const entity = defineEntity<IUser>()({
+    features: [
+      entityQueryFeature(),
+      entityUniqueFeature(),
+      entityMigrationFeature(),
+      entityIndexesFeature(),
+      entityKeysetFeature()
+    ],
     name: 'indexed-comparator-users',
     key: 'id',
     defaultOrderBy: () => 0,
@@ -298,7 +341,17 @@ for (const { label, create } of backends) {
 
     it('list/stream 不会读到其他 entity 的记录', async () => {
       const store = await create()
-      const posts = defineEntity<{ id: string; title: string }>({ name: 'posts', key: 'id' })
+      const posts = defineEntity<{ id: string; title: string }>({
+        features: [
+          entityQueryFeature(),
+          entityUniqueFeature(),
+          entityMigrationFeature(),
+          entityIndexesFeature(),
+          entityKeysetFeature()
+        ],
+        name: 'posts',
+        key: 'id'
+      })
       const userRepo = users.connect(store)
       const postRepo = posts.connect(store)
       await userRepo.put({ id: 'shared-id', name: 'Ada', email: 'a@b.c' })
@@ -315,6 +368,13 @@ describe('KV-only scan diagnostics', () => {
   it('结构化后端上 list/stream 不触发 diagnostic', async () => {
     const diagnosed: string[] = []
     const diagnosedEntity = defineEntity<IUser>({
+      features: [
+        entityQueryFeature(),
+        entityUniqueFeature(),
+        entityMigrationFeature(),
+        entityIndexesFeature(),
+        entityKeysetFeature()
+      ],
       name: 'users-diag-structured',
       key: 'id',
       onDiagnostic: (message) => diagnosed.push(message)
@@ -328,9 +388,17 @@ describe('KV-only scan diagnostics', () => {
 
 describe('查询排序与无效记录策略', () => {
   it('comparator 异常统一为 EXTENSION_FAILED', async () => {
-    const repo = defineEntity<{ id: string }>({ name: 'order-error', key: 'id' }).connect(
-      await memoryBackend()
-    )
+    const repo = defineEntity<{ id: string }>({
+      features: [
+        entityQueryFeature(),
+        entityUniqueFeature(),
+        entityMigrationFeature(),
+        entityIndexesFeature(),
+        entityKeysetFeature()
+      ],
+      name: 'order-error',
+      key: 'id'
+    }).connect(await memoryBackend())
     await repo.put({ id: 'a' })
     await repo.put({ id: 'b' })
     const comparator = () => {
@@ -349,9 +417,17 @@ describe('查询排序与无效记录策略', () => {
   })
 
   it('comparator 返回非 number 时不静默强制转换', async () => {
-    const repo = defineEntity<{ id: string }>({ name: 'invalid-comparator', key: 'id' }).connect(
-      await memoryBackend()
-    )
+    const repo = defineEntity<{ id: string }>({
+      features: [
+        entityQueryFeature(),
+        entityUniqueFeature(),
+        entityMigrationFeature(),
+        entityIndexesFeature(),
+        entityKeysetFeature()
+      ],
+      name: 'invalid-comparator',
+      key: 'id'
+    }).connect(await memoryBackend())
     await repo.put({ id: 'a' })
     await repo.put({ id: 'b' })
     await expect(repo.list({ orderBy: () => 'invalid' as never, limit: 2 })).rejects.toMatchObject({
@@ -367,9 +443,17 @@ describe('查询排序与无效记录策略', () => {
   })
 
   it('list/stream 不把显式 null orderBy 静默当成默认排序', async () => {
-    const repo = defineEntity<{ id: string }>({ name: 'null-order-by', key: 'id' }).connect(
-      await memoryBackend()
-    )
+    const repo = defineEntity<{ id: string }>({
+      features: [
+        entityQueryFeature(),
+        entityUniqueFeature(),
+        entityMigrationFeature(),
+        entityIndexesFeature(),
+        entityKeysetFeature()
+      ],
+      name: 'null-order-by',
+      key: 'id'
+    }).connect(await memoryBackend())
     await expect(repo.list({ orderBy: null as never })).rejects.toMatchObject({
       code: 'INVALID_CONFIG'
     })
@@ -381,9 +465,17 @@ describe('查询排序与无效记录策略', () => {
   })
 
   it('list/stream 拒绝 null、数组和 primitive range', async () => {
-    const repo = defineEntity<{ id: string }>({ name: 'invalid-range', key: 'id' }).connect(
-      await memoryBackend()
-    )
+    const repo = defineEntity<{ id: string }>({
+      features: [
+        entityQueryFeature(),
+        entityUniqueFeature(),
+        entityMigrationFeature(),
+        entityIndexesFeature(),
+        entityKeysetFeature()
+      ],
+      name: 'invalid-range',
+      key: 'id'
+    }).connect(await memoryBackend())
     for (const range of [null, [], 'range', 1]) {
       await expect(repo.list({ range: range as never })).rejects.toMatchObject({
         code: 'INVALID_ARGUMENT'
@@ -397,9 +489,17 @@ describe('查询排序与无效记录策略', () => {
   })
 
   it('list/stream 拒绝非 boolean range open flags', async () => {
-    const repo = defineEntity<{ id: string }>({ name: 'invalid-range-flags', key: 'id' }).connect(
-      await memoryBackend()
-    )
+    const repo = defineEntity<{ id: string }>({
+      features: [
+        entityQueryFeature(),
+        entityUniqueFeature(),
+        entityMigrationFeature(),
+        entityIndexesFeature(),
+        entityKeysetFeature()
+      ],
+      name: 'invalid-range-flags',
+      key: 'id'
+    }).connect(await memoryBackend())
     for (const range of [{ lowerOpen: 'yes' }, { upperOpen: 1 }]) {
       await expect(repo.list({ range: range as never })).rejects.toMatchObject({
         code: 'INVALID_ARGUMENT'
@@ -413,9 +513,17 @@ describe('查询排序与无效记录策略', () => {
   })
 
   it('list/stream 拒绝 null、数组和 primitive options', async () => {
-    const repo = defineEntity<{ id: string }>({ name: 'invalid-list-options', key: 'id' }).connect(
-      await memoryBackend()
-    )
+    const repo = defineEntity<{ id: string }>({
+      features: [
+        entityQueryFeature(),
+        entityUniqueFeature(),
+        entityMigrationFeature(),
+        entityIndexesFeature(),
+        entityKeysetFeature()
+      ],
+      name: 'invalid-list-options',
+      key: 'id'
+    }).connect(await memoryBackend())
     for (const options of [null, [], 'options', 1]) {
       await expect(repo.list(options as never)).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
       await expect(
@@ -427,9 +535,17 @@ describe('查询排序与无效记录策略', () => {
   })
 
   it('list/stream/migrate 在没有坏记录时也拒绝非法 onInvalid', async () => {
-    const repo = defineEntity<{ id: string }>({ name: 'invalid-on-invalid', key: 'id' }).connect(
-      await memoryBackend()
-    )
+    const repo = defineEntity<{ id: string }>({
+      features: [
+        entityQueryFeature(),
+        entityUniqueFeature(),
+        entityMigrationFeature(),
+        entityIndexesFeature(),
+        entityKeysetFeature()
+      ],
+      name: 'invalid-on-invalid',
+      key: 'id'
+    }).connect(await memoryBackend())
     for (const onInvalid of [null, [], 'invalid', 1]) {
       await expect(repo.list({ onInvalid: onInvalid as never })).rejects.toMatchObject({
         code: 'INVALID_CONFIG'
@@ -445,6 +561,13 @@ describe('查询排序与无效记录策略', () => {
 
   it('list 支持单次 orderBy 覆盖默认顺序并在排序后 limit', async () => {
     const entity = defineEntity<IUser>({
+      features: [
+        entityQueryFeature(),
+        entityUniqueFeature(),
+        entityMigrationFeature(),
+        entityIndexesFeature(),
+        entityKeysetFeature()
+      ],
       name: 'ordered-users',
       key: 'id',
       defaultOrderBy: (left, right) => right.name.localeCompare(left.name)
@@ -465,6 +588,13 @@ describe('查询排序与无效记录策略', () => {
 
   it('onInvalid throw 策略让坏记录终止查询', async () => {
     const entity = defineEntity<{ id: string; n: number }>({
+      features: [
+        entityQueryFeature(),
+        entityUniqueFeature(),
+        entityMigrationFeature(),
+        entityIndexesFeature(),
+        entityKeysetFeature()
+      ],
       name: 'strict-users',
       key: 'id',
       schema: {
@@ -499,6 +629,13 @@ describe('查询排序与无效记录策略', () => {
 describe('自定义 schema（normalize/encode/decode 全链路）', () => {
   it('schema 扩展 raw throw 统一为 EXTENSION_FAILED', async () => {
     const entity = defineEntity<{ id: string }>({
+      features: [
+        entityQueryFeature(),
+        entityUniqueFeature(),
+        entityMigrationFeature(),
+        entityIndexesFeature(),
+        entityKeysetFeature()
+      ],
       name: 'schema-extension-error',
       key: 'id',
       schema: {
@@ -531,6 +668,13 @@ describe('自定义 schema（normalize/encode/decode 全链路）', () => {
 
   it('schema 主动抛 StorageError 时保留 code 并补齐扩展上下文', async () => {
     const entity = defineEntity<{ id: string }>({
+      features: [
+        entityQueryFeature(),
+        entityUniqueFeature(),
+        entityMigrationFeature(),
+        entityIndexesFeature(),
+        entityKeysetFeature()
+      ],
       name: 'schema-storage-error-context',
       key: 'id',
       schema: {
@@ -554,6 +698,13 @@ describe('自定义 schema（normalize/encode/decode 全链路）', () => {
 
   it('读取可关闭 validate，并拒绝畸形 envelope', async () => {
     const unchecked = defineEntity<{ id: string }>({
+      features: [
+        entityQueryFeature(),
+        entityUniqueFeature(),
+        entityMigrationFeature(),
+        entityIndexesFeature(),
+        entityKeysetFeature()
+      ],
       name: 'unchecked-read',
       key: 'id',
       validateOnRead: false,
@@ -579,6 +730,13 @@ describe('自定义 schema（normalize/encode/decode 全链路）', () => {
   type IDomainUser = { id: string; createdAt: Date }
 
   const withSchema = defineEntity<IDomainUser, IRawUser>({
+    features: [
+      entityQueryFeature(),
+      entityUniqueFeature(),
+      entityMigrationFeature(),
+      entityIndexesFeature(),
+      entityKeysetFeature()
+    ],
     name: 'users-schema',
     key: 'id',
     schema: {
@@ -621,6 +779,13 @@ describe('自定义 schema（normalize/encode/decode 全链路）', () => {
 describe('结构化后端上的自定义 repository codec', () => {
   it('codec raw throw 统一为 EXTENSION_FAILED', async () => {
     const entity = defineEntity<{ id: string }>({
+      features: [
+        entityQueryFeature(),
+        entityUniqueFeature(),
+        entityMigrationFeature(),
+        entityIndexesFeature(),
+        entityKeysetFeature()
+      ],
       name: 'codec-extension-error',
       key: 'id',
       codec: {
@@ -643,6 +808,13 @@ describe('结构化后端上的自定义 repository codec', () => {
     let encodeCount = 0
     let decodeCount = 0
     const entity = defineEntity<{ id: string; value: number }>({
+      features: [
+        entityQueryFeature(),
+        entityUniqueFeature(),
+        entityMigrationFeature(),
+        entityIndexesFeature(),
+        entityKeysetFeature()
+      ],
       name: 'structured-codec-users',
       key: 'id',
       codec: {
@@ -677,8 +849,28 @@ describe('结构化后端上的自定义 repository codec', () => {
 describe('list 显式 range', () => {
   it('结构化后端上 list 支持显式 range，且不会逃逸到其他 entity', async () => {
     const store = await memoryBackend()
-    const posts = defineEntity<{ id: string; title: string }>({ name: 'posts-range', key: 'id' })
-    const rangedUsers = defineEntity<IUser>({ name: 'users-range', key: 'id' })
+    const posts = defineEntity<{ id: string; title: string }>({
+      features: [
+        entityQueryFeature(),
+        entityUniqueFeature(),
+        entityMigrationFeature(),
+        entityIndexesFeature(),
+        entityKeysetFeature()
+      ],
+      name: 'posts-range',
+      key: 'id'
+    })
+    const rangedUsers = defineEntity<IUser>({
+      features: [
+        entityQueryFeature(),
+        entityUniqueFeature(),
+        entityMigrationFeature(),
+        entityIndexesFeature(),
+        entityKeysetFeature()
+      ],
+      name: 'users-range',
+      key: 'id'
+    })
     const userRepo = rangedUsers.connect(store)
     const postRepo = posts.connect(store)
     await userRepo.put({ id: 'a', name: 'Ada', email: 'a@b.c' })
@@ -696,6 +888,13 @@ describe('版本迁移', () => {
     const store = await memoryBackend()
     await store.putRecord({ version: 2, state: { id: 'u1', name: 'Ada' } }, ['future-users', 'u1'])
     const repo = defineEntity<{ id: string; name: string }>({
+      features: [
+        entityQueryFeature(),
+        entityUniqueFeature(),
+        entityMigrationFeature(),
+        entityIndexesFeature(),
+        entityKeysetFeature()
+      ],
       name: 'future-users',
       key: 'id'
     }).connect(store)
@@ -710,6 +909,13 @@ describe('版本迁移', () => {
     const store = await memoryBackend()
     await store.putRecord({ version: 1, state: { id: 'u1' } }, ['unsafe-envelope-version', 'u1'])
     const repo = defineEntity<{ id: string }>({
+      features: [
+        entityQueryFeature(),
+        entityUniqueFeature(),
+        entityMigrationFeature(),
+        entityIndexesFeature(),
+        entityKeysetFeature()
+      ],
       name: 'unsafe-envelope-version',
       key: 'id',
       codec: {
@@ -724,9 +930,26 @@ describe('版本迁移', () => {
 
   it('显式 migrate 才持久化新版本并返回统计', async () => {
     const store = await memoryBackend()
-    const v1 = defineEntity<{ id: string; name: string }>({ name: 'explicit-migrate', key: 'id' })
+    const v1 = defineEntity<{ id: string; name: string }>({
+      features: [
+        entityQueryFeature(),
+        entityUniqueFeature(),
+        entityMigrationFeature(),
+        entityIndexesFeature(),
+        entityKeysetFeature()
+      ],
+      name: 'explicit-migrate',
+      key: 'id'
+    })
     await v1.connect(store).put({ id: 'u1', name: 'Ada' })
     const v2 = defineEntity<{ id: string; displayName: string }>({
+      features: [
+        entityQueryFeature(),
+        entityUniqueFeature(),
+        entityMigrationFeature(),
+        entityIndexesFeature(),
+        entityKeysetFeature()
+      ],
       name: 'explicit-migrate',
       key: 'id',
       version: 2,
@@ -748,18 +971,34 @@ describe('版本迁移', () => {
   })
 
   it('migrate 不把显式 null batchSize 静默当成默认值', async () => {
-    const repo = defineEntity<{ id: string }>({ name: 'null-batch-size', key: 'id' }).connect(
-      await memoryBackend()
-    )
+    const repo = defineEntity<{ id: string }>({
+      features: [
+        entityQueryFeature(),
+        entityUniqueFeature(),
+        entityMigrationFeature(),
+        entityIndexesFeature(),
+        entityKeysetFeature()
+      ],
+      name: 'null-batch-size',
+      key: 'id'
+    }).connect(await memoryBackend())
     await expect(repo.migrate({ batchSize: null as never })).rejects.toMatchObject({
       code: 'INVALID_CONFIG'
     })
   })
 
   it('migrate 拒绝超出 safe integer 的 batchSize', async () => {
-    const repo = defineEntity<{ id: string }>({ name: 'unsafe-batch-size', key: 'id' }).connect(
-      await memoryBackend()
-    )
+    const repo = defineEntity<{ id: string }>({
+      features: [
+        entityQueryFeature(),
+        entityUniqueFeature(),
+        entityMigrationFeature(),
+        entityIndexesFeature(),
+        entityKeysetFeature()
+      ],
+      name: 'unsafe-batch-size',
+      key: 'id'
+    }).connect(await memoryBackend())
     await expect(repo.migrate({ batchSize: Number.MAX_SAFE_INTEGER + 1 })).rejects.toMatchObject({
       code: 'INVALID_CONFIG'
     })
@@ -767,6 +1006,13 @@ describe('版本迁移', () => {
 
   it('migrate 拒绝 null、数组和 primitive options', async () => {
     const repo = defineEntity<{ id: string }>({
+      features: [
+        entityQueryFeature(),
+        entityUniqueFeature(),
+        entityMigrationFeature(),
+        entityIndexesFeature(),
+        entityKeysetFeature()
+      ],
       name: 'invalid-migrate-options',
       key: 'id'
     }).connect(await memoryBackend())
@@ -779,6 +1025,13 @@ describe('版本迁移', () => {
   it('migrate 统计被跳过的坏记录', async () => {
     const store = await memoryBackend()
     const entity = defineEntity<{ id: string; value: number }>({
+      features: [
+        entityQueryFeature(),
+        entityUniqueFeature(),
+        entityMigrationFeature(),
+        entityIndexesFeature(),
+        entityKeysetFeature()
+      ],
       name: 'explicit-migrate-invalid',
       key: 'id',
       schema: {
@@ -809,6 +1062,13 @@ describe('版本迁移', () => {
   it('migrate 在 optimistic transaction 冲突时统计整批 conflicted', async () => {
     const source = await memoryBackend()
     const v1 = defineEntity<{ id: string; name: string }>({
+      features: [
+        entityQueryFeature(),
+        entityUniqueFeature(),
+        entityMigrationFeature(),
+        entityIndexesFeature(),
+        entityKeysetFeature()
+      ],
       name: 'explicit-migrate-conflict',
       key: 'id'
     })
@@ -822,6 +1082,13 @@ describe('版本迁移', () => {
       }
     }
     const v2 = defineEntity<{ id: string; displayName: string }>({
+      features: [
+        entityQueryFeature(),
+        entityUniqueFeature(),
+        entityMigrationFeature(),
+        entityIndexesFeature(),
+        entityKeysetFeature()
+      ],
       name: 'explicit-migrate-conflict',
       key: 'id',
       version: 2,
@@ -839,7 +1106,17 @@ describe('版本迁移', () => {
 
   it('migrate 归一化 backend transaction 的裸异常', async () => {
     const source = await memoryBackend()
-    await defineEntity<{ id: string; name: string }>({ name: 'raw-migrate-error', key: 'id' })
+    await defineEntity<{ id: string; name: string }>({
+      features: [
+        entityQueryFeature(),
+        entityUniqueFeature(),
+        entityMigrationFeature(),
+        entityIndexesFeature(),
+        entityKeysetFeature()
+      ],
+      name: 'raw-migrate-error',
+      key: 'id'
+    })
       .connect(source)
       .put({ id: 'u1', name: 'Ada' })
     const failingStore = {
@@ -849,6 +1126,13 @@ describe('版本迁移', () => {
       }
     }
     const entity = defineEntity<{ id: string; displayName: string }>({
+      features: [
+        entityQueryFeature(),
+        entityUniqueFeature(),
+        entityMigrationFeature(),
+        entityIndexesFeature(),
+        entityKeysetFeature()
+      ],
       name: 'raw-migrate-error',
       key: 'id',
       version: 2,
@@ -862,7 +1146,17 @@ describe('版本迁移', () => {
 
   it('migrate 批冲突后逐条重试，避免整批跳过', async () => {
     const source = await memoryBackend()
-    const v1 = defineEntity<{ id: string; name: string }>({ name: 'retry-migrate', key: 'id' })
+    const v1 = defineEntity<{ id: string; name: string }>({
+      features: [
+        entityQueryFeature(),
+        entityUniqueFeature(),
+        entityMigrationFeature(),
+        entityIndexesFeature(),
+        entityKeysetFeature()
+      ],
+      name: 'retry-migrate',
+      key: 'id'
+    })
     await v1.connect(source).put({ id: 'u1', name: 'Ada' })
     let calls = 0
     const originalTransaction = source.transaction
@@ -880,6 +1174,13 @@ describe('版本迁移', () => {
       return originalTransaction(run, ctx)
     }
     const v2 = defineEntity<{ id: string; displayName: string }>({
+      features: [
+        entityQueryFeature(),
+        entityUniqueFeature(),
+        entityMigrationFeature(),
+        entityIndexesFeature(),
+        entityKeysetFeature()
+      ],
       name: 'retry-migrate',
       key: 'id',
       version: 2,
@@ -894,7 +1195,17 @@ describe('版本迁移', () => {
 
   it('migrate 冲突重试发现并发方已迁移时不虚报 migrated', async () => {
     const source = await memoryBackend()
-    const v1 = defineEntity<{ id: string; name: string }>({ name: 'retry-current', key: 'id' })
+    const v1 = defineEntity<{ id: string; name: string }>({
+      features: [
+        entityQueryFeature(),
+        entityUniqueFeature(),
+        entityMigrationFeature(),
+        entityIndexesFeature(),
+        entityKeysetFeature()
+      ],
+      name: 'retry-current',
+      key: 'id'
+    })
     await v1.connect(source).put({ id: 'u1', name: 'Ada' })
     let first = true
     const originalTransaction = source.transaction
@@ -920,6 +1231,13 @@ describe('版本迁移', () => {
       return originalTransaction(run, ctx)
     }
     const v2 = defineEntity<{ id: string; displayName: string }>({
+      features: [
+        entityQueryFeature(),
+        entityUniqueFeature(),
+        entityMigrationFeature(),
+        entityIndexesFeature(),
+        entityKeysetFeature()
+      ],
       name: 'retry-current',
       key: 'id',
       version: 2,
@@ -936,6 +1254,13 @@ describe('版本迁移', () => {
     const diagnosed: string[] = []
     const inner = await memoryBackend()
     const v1 = defineEntity<{ id: string; name: string }>({
+      features: [
+        entityQueryFeature(),
+        entityUniqueFeature(),
+        entityMigrationFeature(),
+        entityIndexesFeature(),
+        entityKeysetFeature()
+      ],
       name: 'people2',
       key: 'id',
       version: 1
@@ -953,6 +1278,13 @@ describe('版本迁移', () => {
     }
 
     const v2 = defineEntity<{ id: string; displayName: string }>({
+      features: [
+        entityQueryFeature(),
+        entityUniqueFeature(),
+        entityMigrationFeature(),
+        entityIndexesFeature(),
+        entityKeysetFeature()
+      ],
       name: 'people2',
       key: 'id',
       version: 2,
@@ -969,6 +1301,13 @@ describe('版本迁移', () => {
     const diagnosed: string[] = []
     const inner = await memoryBackend()
     const v1 = defineEntity<{ id: string; name: string }>({
+      features: [
+        entityQueryFeature(),
+        entityUniqueFeature(),
+        entityMigrationFeature(),
+        entityIndexesFeature(),
+        entityKeysetFeature()
+      ],
       name: 'people3',
       key: 'id',
       version: 1
@@ -984,6 +1323,13 @@ describe('版本迁移', () => {
     }
 
     const v2 = defineEntity<{ id: string; displayName: string }>({
+      features: [
+        entityQueryFeature(),
+        entityUniqueFeature(),
+        entityMigrationFeature(),
+        entityIndexesFeature(),
+        entityKeysetFeature()
+      ],
       name: 'people3',
       key: 'id',
       version: 2,
@@ -998,6 +1344,13 @@ describe('版本迁移', () => {
   it('batch 作用域内 get 读到旧版本记录时触发迁移，但事务内不写回（writeBackTarget 为 undefined）', async () => {
     const store = await memoryBackend()
     const v1 = defineEntity<{ id: string; name: string }>({
+      features: [
+        entityQueryFeature(),
+        entityUniqueFeature(),
+        entityMigrationFeature(),
+        entityIndexesFeature(),
+        entityKeysetFeature()
+      ],
       name: 'people4',
       key: 'id',
       version: 1
@@ -1005,6 +1358,13 @@ describe('版本迁移', () => {
     await v1.connect(store).put({ id: 'u1', name: 'Ada' })
 
     const v2 = defineEntity<{ id: string; displayName: string }>({
+      features: [
+        entityQueryFeature(),
+        entityUniqueFeature(),
+        entityMigrationFeature(),
+        entityIndexesFeature(),
+        entityKeysetFeature()
+      ],
       name: 'people4',
       key: 'id',
       version: 2,
@@ -1047,6 +1407,13 @@ describe('batch', () => {
 
   it('batch put 使用 normalize 后的主键', async () => {
     const batchEntity = defineEntity<{ id: string; createdAt: Date }>({
+      features: [
+        entityQueryFeature(),
+        entityUniqueFeature(),
+        entityMigrationFeature(),
+        entityIndexesFeature(),
+        entityKeysetFeature()
+      ],
       name: 'batch-normalized',
       key: 'id',
       schema: {
@@ -1100,6 +1467,13 @@ describe('batch', () => {
 describe('entity key and invalid-record boundaries', () => {
   it('accepts supported key domains and rejects invalid keys', async () => {
     const entity = defineEntity<{ id: IStorageKey; value: string }>({
+      features: [
+        entityQueryFeature(),
+        entityUniqueFeature(),
+        entityMigrationFeature(),
+        entityIndexesFeature(),
+        entityKeysetFeature()
+      ],
       name: 'key-domains',
       key: 'id'
     })
@@ -1125,6 +1499,13 @@ describe('entity key and invalid-record boundaries', () => {
     // scope.get/scope.remove 曾经跳过这一步，让同一个非法输入在 batch 里被误分类成
     // TRANSACTION_FAILED（暗示"可重试"）而不是 INVALID_KEY（永久性、重试无意义）。
     const repo = defineEntity<{ id: IStorageKey; value: string }>({
+      features: [
+        entityQueryFeature(),
+        entityUniqueFeature(),
+        entityMigrationFeature(),
+        entityIndexesFeature(),
+        entityKeysetFeature()
+      ],
       name: 'batch-key-guard',
       key: 'id'
     }).connect(await memoryBackend())
@@ -1139,18 +1520,34 @@ describe('entity key and invalid-record boundaries', () => {
   })
 
   it('rejects invalid list limits before reading', async () => {
-    const repo = defineEntity<{ id: string }>({ name: 'limit-guard', key: 'id' }).connect(
-      await memoryBackend()
-    )
+    const repo = defineEntity<{ id: string }>({
+      features: [
+        entityQueryFeature(),
+        entityUniqueFeature(),
+        entityMigrationFeature(),
+        entityIndexesFeature(),
+        entityKeysetFeature()
+      ],
+      name: 'limit-guard',
+      key: 'id'
+    }).connect(await memoryBackend())
     for (const limit of [-1, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1])
       await expect(repo.list({ limit })).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
     await expect(repo.list({ limit: 0 })).resolves.toEqual([])
   })
 
   it('list 与 stream apply the same range and invalid-record policy', async () => {
-    const repo = defineEntity<{ id: string }>({ name: 'list-options', key: 'id' }).connect(
-      await memoryBackend()
-    )
+    const repo = defineEntity<{ id: string }>({
+      features: [
+        entityQueryFeature(),
+        entityUniqueFeature(),
+        entityMigrationFeature(),
+        entityIndexesFeature(),
+        entityKeysetFeature()
+      ],
+      name: 'list-options',
+      key: 'id'
+    }).connect(await memoryBackend())
     await repo.put({ id: 'a' })
     const options = { range: { lower: 'a', upper: 'z' }, limit: 1, onInvalid: 'throw' as const }
     await expect(repo.list(options)).resolves.toEqual([{ id: 'a' }])
@@ -1162,6 +1559,13 @@ describe('entity key and invalid-record boundaries', () => {
   it('onInvalid.stage 区分 decode 与 validate', async () => {
     const store = await memoryBackend()
     const decodeEntity = defineEntity<{ id: string; n: number }>({
+      features: [
+        entityQueryFeature(),
+        entityUniqueFeature(),
+        entityMigrationFeature(),
+        entityIndexesFeature(),
+        entityKeysetFeature()
+      ],
       name: 'stage-users',
       key: 'id',
       codec: {
@@ -1191,6 +1595,13 @@ describe('entity key and invalid-record boundaries', () => {
   it('rejects an invalid onInvalid policy or handler result', async () => {
     const store = await memoryBackend()
     const entity = defineEntity<{ id: string; n: number }>({
+      features: [
+        entityQueryFeature(),
+        entityUniqueFeature(),
+        entityMigrationFeature(),
+        entityIndexesFeature(),
+        entityKeysetFeature()
+      ],
       name: 'invalid-policy-users',
       key: 'id',
       codec: {
@@ -1217,6 +1628,13 @@ describe('entity key and invalid-record boundaries', () => {
   it('onInvalid.stage 区分 migration failure', async () => {
     const store = await memoryBackend()
     const entity = defineEntity<{ id: string; n: number }>({
+      features: [
+        entityQueryFeature(),
+        entityUniqueFeature(),
+        entityMigrationFeature(),
+        entityIndexesFeature(),
+        entityKeysetFeature()
+      ],
       name: 'migration-stage-users',
       key: 'id',
       version: 2,

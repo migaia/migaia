@@ -15,7 +15,7 @@ it('keeps base reads and writes usable while rejecting missing optional assembli
   await store.set('key', 'value')
   expect(await store.get('key')).toBe('value')
   expect(store.capabilities.changeFeed).toBe(false)
-  expect(() => store.watch()).toThrowError(
+  expect(() => store.watch('all')).toThrowError(
     expect.objectContaining({
       source: STORAGE_HOST_SOURCE,
       code: StorageErrorCode.changeIteratorNotAssembled
@@ -44,7 +44,7 @@ it('selects notification and iterator roots independently in the original backen
   release()
   expect(changes).toHaveLength(1)
   expect(store.capabilities.changeFeed).toBe(false)
-  expect(() => store.watch()).toThrowError(
+  expect(() => store.watch('all')).toThrowError(
     expect.objectContaining({ code: StorageErrorCode.changeIteratorNotAssembled })
   )
 })

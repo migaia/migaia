@@ -38,3 +38,6 @@ export const STORAGE_CHAIN_FAMILIES = Object.freeze({
   vector: true,
   rdf: true
 })
+
+/** Stable native plugin identity for explicit journal runtime installation and duplicate detection. */
+export const STORAGE_JOURNAL_PLUGIN_ID = 'storage-journal'

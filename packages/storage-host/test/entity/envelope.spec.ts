@@ -1,3 +1,8 @@
+import { entityQueryFeature } from '../../src/entity/query-feature.js'
+import { entityUniqueFeature } from '../../src/entity/unique-feature.js'
+import { entityMigrationFeature } from '../../src/entity/migration-feature.js'
+import { entityIndexesFeature } from '../../src/entity/indexes-feature.js'
+import { entityKeysetFeature } from '../../src/entity/keyset.js'
 import { describe, expect, it } from 'vitest'
 import type { IKeyValueStore } from '@migaia/storage-contract'
 import {
@@ -114,6 +119,13 @@ describe('entity envelopes through the shared plan owner', () => {
       await using host = await createStorageHost({ plugins: [fixture.plugin] })
       const store = fixture.getStore()
       const plain = defineEntity<{ id: string; email: string }>({
+        features: [
+          entityQueryFeature(),
+          entityUniqueFeature(),
+          entityMigrationFeature(),
+          entityIndexesFeature(),
+          entityKeysetFeature()
+        ],
         name: 'plain-raw',
         key: 'id'
       }).connect(store)
@@ -121,6 +133,13 @@ describe('entity envelopes through the shared plan owner', () => {
       const before = await store.keys()
       let validations = 0
       const unique = defineEntity<{ id: string; email: string }>()({
+        features: [
+          entityQueryFeature(),
+          entityUniqueFeature(),
+          entityMigrationFeature(),
+          entityIndexesFeature(),
+          entityKeysetFeature()
+        ],
         name: 'unique-raw',
         key: 'id',
         indexes: { email: { path: 'email', unique: true } },
@@ -147,9 +166,17 @@ describe('entity envelopes through the shared plan owner', () => {
   it('rejects ambiguous query methods when one host sharing the same raw store has no selected methods', async () => {
     const firstRaw = rawPlugin(undefined, true)
     const first = await createStorageHost({ plugins: [firstRaw.plugin] })
-    const repo = defineEntity<{ id: string }>({ name: 'shared-query', key: 'id' }).connect(
-      firstRaw.getStore()
-    )
+    const repo = defineEntity<{ id: string }>({
+      features: [
+        entityQueryFeature(),
+        entityUniqueFeature(),
+        entityMigrationFeature(),
+        entityIndexesFeature(),
+        entityKeysetFeature()
+      ],
+      name: 'shared-query',
+      key: 'id'
+    }).connect(firstRaw.getStore())
     expect(repo.query()).toHaveProperty('mark')
     await using second = await createStorageHost({
       plugins: [rawPlugin(firstRaw.getStore()).plugin]
@@ -182,7 +209,17 @@ describe('entity envelopes through the shared plan owner', () => {
       }
     })
     expect(second.backend('raw')).toBe(store)
-    const repo = defineEntity<{ id: string }>({ name: 'shared', key: 'id' }).connect(store)
+    const repo = defineEntity<{ id: string }>({
+      features: [
+        entityQueryFeature(),
+        entityUniqueFeature(),
+        entityMigrationFeature(),
+        entityIndexesFeature(),
+        entityKeysetFeature()
+      ],
+      name: 'shared',
+      key: 'id'
+    }).connect(store)
     await repo.put({ id: 'a' })
     expect(await repo.get('a')).toEqual({ id: 'a' })
     expect(seen).toEqual(['first', 'second'])
@@ -224,6 +261,13 @@ describe('entity envelopes through the shared plan owner', () => {
       JSON.stringify({ version: 1, state: { id: 'a', count: 1 } })
     )
     const repo = defineEntity<{ id: string; count: number }>({
+      features: [
+        entityQueryFeature(),
+        entityUniqueFeature(),
+        entityMigrationFeature(),
+        entityIndexesFeature(),
+        entityKeysetFeature()
+      ],
       name: 'archives',
       key: 'id',
       version: 2,
@@ -243,9 +287,18 @@ describe('entity envelopes through the shared plan owner', () => {
     await using host = await createStorageHost({ plugins: [raw.plugin] })
     const store = raw.getStore()
     expect(host.backend('raw')).toBe(store)
-    const repo = defineEntity<{ id: string }>({ name: 'invalid', key: 'id', version: 2 }).connect(
-      store
-    )
+    const repo = defineEntity<{ id: string }>({
+      features: [
+        entityQueryFeature(),
+        entityUniqueFeature(),
+        entityMigrationFeature(),
+        entityIndexesFeature(),
+        entityKeysetFeature()
+      ],
+      name: 'invalid',
+      key: 'id',
+      version: 2
+    }).connect(store)
     await store.set(
       composeFlatKey('invalid', 'old'),
       JSON.stringify({ __v: 2, data: { id: 'old' } })
@@ -265,6 +318,13 @@ describe('entity envelopes through the shared plan owner', () => {
       cause: { source: '@migaia/storage-contract', code: 'VERSION_UNSUPPORTED' }
     })
     const invalidWrite = defineEntity<{ id: string }, null>({
+      features: [
+        entityQueryFeature(),
+        entityUniqueFeature(),
+        entityMigrationFeature(),
+        entityIndexesFeature(),
+        entityKeysetFeature()
+      ],
       name: 'null-state',
       key: 'id',
       schema: {
@@ -288,6 +348,13 @@ describe('entity envelopes through the shared plan owner', () => {
     expect(host.backend('raw')).toBe(store)
     const original = new Error('actual migration failure')
     const repo = defineEntity<{ id: string }>({
+      features: [
+        entityQueryFeature(),
+        entityUniqueFeature(),
+        entityMigrationFeature(),
+        entityIndexesFeature(),
+        entityKeysetFeature()
+      ],
       name: 'broken',
       key: 'id',
       version: 2,

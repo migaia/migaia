@@ -1,6 +1,7 @@
 import { definePlugin } from '../contracts.js'
 import type { IStoragePluginCore } from '../types.js'
 import * as runtime from './runtime.js'
+import { STORAGE_JOURNAL_PLUGIN_ID } from '../state-constants.js'
 
 /** The selected native plugin owns journal code admission in the existing host lifecycle. */
 class StorageJournalPluginAssembly {
@@ -18,7 +19,7 @@ class StorageJournalPluginAssembly {
 }
 /** Explicitly include and install journal runtime and private log stores for this host. */
 export function storageJournalPlugin() {
-  return definePlugin('storage-journal', (core) => {
+  return definePlugin(STORAGE_JOURNAL_PLUGIN_ID, (core) => {
     /** The named assembly owns the only runtime installation callback. */
     const assembly = new StorageJournalPluginAssembly(core)
     return { install: () => assembly.install() }

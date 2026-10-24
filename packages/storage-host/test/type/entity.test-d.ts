@@ -1,3 +1,7 @@
+import type { IMemoryBackendWithChangeFeed } from '../helpers/memory.js'
+import type { IStorageBorrowedBackend } from '../../src/types.js'
+import { memoryNotificationsFeature } from '../../src/features/memory-notifications.js'
+import { memoryChangeFeedFeature } from '../../src/features/memory-change-feed.js'
 import { expectTypeOf } from 'vitest'
 import { defineEntity } from '../../src/entity.js'
 import { memoryBackend } from '../helpers/memory.js'
@@ -92,9 +96,18 @@ defineEntity<IUser>({
 defineEntity<IUser>({ name: 'bad', key: 'missing' })
 
 /** Certified borrowed views retain their exact data channels without taking root ownership. */
-const memoryHost = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })
+const memoryHost = await createStorageHost({
+  plugins: [
+    memoryBackendPlugin(undefined, {
+      notifications: memoryNotificationsFeature(),
+      changeFeed: memoryChangeFeedFeature()
+    })
+  ] as const
+})
 const memoryOrg = memoryHost.org('00000000-0000-0000-0000-000000000001')
-const orgRepository = users.connect(memoryOrg.backend('memory'))
+const orgRepository = users.connect(
+  memoryOrg.backend('memory') as IStorageBorrowedBackend<IMemoryBackendWithChangeFeed>
+)
 expectTypeOf(orgRepository.get).returns.toEqualTypeOf<Promise<IUser | undefined>>()
 
 /** A base-only plugin carries no key-value channel for entity connection. */
