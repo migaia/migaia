@@ -480,6 +480,15 @@ describe('borrowed multi-tier cache', () => {
         })
       ).toEqual({ answer: 42 })
       expect(loads).toBe(1)
+      expect(
+        await cache.getOrLoadEntry('source-info', async () => 'loaded', { meta: { source: true } })
+      ).toMatchObject({
+        value: 'loaded',
+        tier: undefined,
+        stale: false,
+        negative: false,
+        meta: { source: true }
+      })
       expect(await cache.get('object')).toBeNull()
       await cache.set('text', 'hello')
       expect(await cache.get('text')).toBe('hello')

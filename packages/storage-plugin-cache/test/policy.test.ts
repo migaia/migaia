@@ -542,7 +542,7 @@ describe('cache policy composition', () => {
         undefined,
         undefined
       ])
-      expect(reports.length).toBeGreaterThan(0)
+      expect(reports).toHaveLength(3)
     } finally {
       await host.dispose()
     }
