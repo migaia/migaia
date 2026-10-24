@@ -69,12 +69,23 @@ type IProjection = {
   propagation(change: IStorageChange, upto: number): Promise<void>
 }
 
-/** Pending entries retain a single coalesced value and selected target tiers. */
+/** A prepared write carries the original entry and the exact sampled per-tier deadlines. */
+type IWriteItem = {
+  key: string
+  entry: ICacheEntry
+  policy: ICachePolicy
+  upto?: number
+  expires?: readonly (number | undefined)[]
+  indexed?: boolean
+}
+
+/** Coalesced back facts remain readable while their original native write is pending. */
 type IPending = {
   entry: ICacheEntry
   policy: ICachePolicy
   tiers: Set<number>
   expires: readonly (number | undefined)[]
+  writing?: Promise<void>
 }
 
 /** Compose installed native storage without owning or reconfiguring any borrowed backend. */
@@ -514,7 +525,9 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
       const execute = async (): Promise<ICacheEntryInfo<ICodecValue>> => {
         let entry: ICacheEntry | undefined,
           value: ICodecValue | undefined,
-          locked = false
+          locked = false,
+          expires: readonly (number | undefined)[] | undefined,
+          lockedHit: ICacheFound | undefined
         if (lockIndex !== undefined) {
           const borrowed = route(tiers[lockIndex]!.borrowed),
             native = borrowed as IStorageBorrowedBackend & ICacheNative
@@ -532,29 +545,50 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
                 () => tx.remove(physical(key))
               )
               if (cached && !cached.info.stale)
-                return { entry: cached.entry, value: cached.info.value, hit: true }
+                return {
+                  entry: cached.entry,
+                  value: cached.info.value,
+                  cached,
+                  expires: plan(cached.entry, policy)
+                }
               const value = await callLoader(load),
                 entry = await encodeEntry(configuration, value, policy)
+              const expires = entry ? plan(entry, policy) : undefined
               if (entry && !row.superseded) {
-                const raw = await stored(lockIndex, entry),
-                  maximum = configuration.tiers[lockIndex]!.maxEntryBytes
-                if (maximum === undefined || new TextEncoder().encode(raw).byteLength <= maximum) {
-                  await tx.set(physical(key), raw)
-                  const ms = deadline(lockIndex, entry, policy)
+                if (!(await indexTags(key, entry, policy, expires!)))
+                  return { entry: undefined, value, cached: undefined, expires }
+                const maximum = configuration.tiers[lockIndex]!.maxEntryBytes
+                if (
+                  maximum === undefined ||
+                  new TextEncoder().encode(JSON.stringify(entry)).byteLength <= maximum
+                ) {
+                  await tx.set(physical(key), await stored(lockIndex, entry))
+                  const ms = remaining(expires!, lockIndex)
                   if (ms !== undefined) await tx.use(ttl).expire(lockKey.text(physical(key)), ms)
                 } else counts.skipped[lockIndex]!++
               }
-              return { entry, value, hit: false }
+              return { entry, value, cached: undefined, expires }
             })
           entry = result.entry
           value = result.value
           locked = true
+          expires = result.expires
+          lockedHit = result.cached
         } else {
           value = await callLoader(load)
           entry = await encodeEntry(configuration, value, policy)
         }
         if (entry && !row.superseded)
-          await write(key, entry, policy, tiers.length, locked ? lockIndex : undefined)
+          await write(
+            key,
+            entry,
+            policy,
+            lockedHit ? lockIndex : tiers.length,
+            locked ? lockIndex : undefined,
+            expires,
+            locked
+          )
+        if (lockedHit) return lockedHit.info
         return Object.freeze({
           value,
           tier: undefined,
@@ -633,17 +667,29 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
       core.emit(CacheHook.invalidate, () => ({ ...identity, tiers: upto, prefix }))
       return removed
     }
-    /** Pending facts are removed before sending; failures are reported and permanently dropped. */
+    /** The same coalesced facts remain readable until their native write settles or is replaced. */
     const flush = async (): Promise<void> => {
       const items = [...pending]
-      pending.clear()
-      for (const [key, item] of items)
-        for (const index of [...item.tiers].reverse())
-          if (!(await writeOne(index, key, item.entry, item.policy, item.expires))) {
-            counts.writeBackDropped++
-            core.emit(CacheHook.writeBackDropped, () => ({ ...identity, tier: index, count: 1 }))
+      for (const [key, item] of items) {
+        item.writing ??= (async () => {
+          try {
+            for (const index of [...item.tiers].reverse())
+              if (!(await writeOne(index, key, item.entry, item.policy, item.expires))) {
+                counts.writeBackDropped++
+                core.emit(CacheHook.writeBackDropped, () => ({
+                  ...identity,
+                  tier: index,
+                  count: 1
+                }))
+              }
+          } finally {
+            if (pending.get(key) === item) pending.delete(key)
           }
+        })()
+        await item.writing
+      }
     }
+
     const defaults = (): ICachePolicy => snapshotCachePolicy(configuration)
     /** Flat KV never exposes codec entries through text APIs. */
     const get = async (key: string): Promise<string | null> => {
@@ -886,14 +932,12 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
       }
     }
     /** All selected entries share one native batch per through tier, with per-key back coalescing. */
-    const writeBatch = async (
-      items: readonly { key: string; entry: ICacheEntry; policy: ICachePolicy; upto?: number }[],
-      skip?: number
-    ): Promise<void> => {
+    const writeBatch = async (items: readonly IWriteItem[], skip?: number): Promise<void> => {
       const accepted: ((typeof items)[number] & { expires: readonly (number | undefined)[] })[] = []
       for (const item of items) {
-        const expires = plan(item.entry, item.policy)
+        const expires = item.expires ?? plan(item.entry, item.policy)
         if (
+          item.indexed ||
           item.upto !== undefined ||
           (await indexTags(item.key, item.entry, item.policy, expires))
         )
@@ -1063,15 +1107,14 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
               values: ReadonlyMap<string, T | undefined>,
               selected: readonly string[]
             ) => {
-              const items: { key: string; entry: ICacheEntry; policy: ICachePolicy }[] = []
+              const items: IWriteItem[] = []
               for (const key of selected) {
                 const entry = await encodeEntry(configuration, values.get(key), policy)
                 if (entry && !rows.get(key)!.superseded) items.push({ key, entry, policy })
               }
               return items
             }
-            let values: ReadonlyMap<string, T | undefined>,
-              items: { key: string; entry: ICacheEntry; policy: ICachePolicy }[]
+            let values: ReadonlyMap<string, T | undefined>, items: IWriteItem[]
             if (lockIndex !== undefined) {
               const native = route(tiers[lockIndex]!.borrowed) as IStorageBorrowedBackend &
                 ICacheNative
@@ -1084,16 +1127,17 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
                   ConcurrencyPolicy.wait({ timeoutMs: configuration.stampedeLock!.timeoutMs })
                 )
                 .run(async (tx) => {
-                  const existing = new Map<string, T | undefined>(),
+                  const existing = new Map<string, ICacheFound>(),
                     absent: string[] = []
                   for (const key of fresh) {
                     const hit = await decode(
                       lockIndex,
                       key,
                       await tx.get(physical(key)),
-                      policy.staleAfterMs
+                      policy.staleAfterMs,
+                      () => tx.remove(physical(key))
                     )
-                    if (hit && !hit.info.stale) existing.set(key, hit.info.value as T | undefined)
+                    if (hit && !hit.info.stale) existing.set(key, hit)
                     else absent.push(key)
                   }
                   const loaded = absent.length
@@ -1102,17 +1146,37 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
                   const combined = new Map(
                     fresh.map((key) => [
                       key,
-                      existing.has(key) ? existing.get(key) : loaded.get(key)
+                      existing.has(key)
+                        ? (existing.get(key)!.info.value as T | undefined)
+                        : loaded.get(key)
                     ])
                   )
-                  const entries = await prepare(combined, fresh)
+                  const entries = await prepare(loaded, absent)
+                  const accepted: IWriteItem[] = []
                   for (const item of entries) {
+                    const expires = plan(item.entry, item.policy)
+                    if (
+                      !(await indexTags(item.key, item.entry, item.policy, expires)) ||
+                      rows.get(item.key)!.superseded
+                    )
+                      continue
+                    accepted.push({ ...item, expires, indexed: true })
+                    const maximum = configuration.tiers[lockIndex]!.maxEntryBytes
+                    if (
+                      maximum !== undefined &&
+                      new TextEncoder().encode(JSON.stringify(item.entry)).byteLength > maximum
+                    ) {
+                      counts.skipped[lockIndex]!++
+                      continue
+                    }
                     await tx.set(physical(item.key), await stored(lockIndex, item.entry))
-                    const ms = deadline(lockIndex, item.entry, item.policy)
+                    const ms = remaining(expires, lockIndex)
                     if (ms !== undefined)
                       await tx.use(ttl).expire(lockKey.text(physical(item.key)), ms)
                   }
-                  return { combined, entries }
+                  for (const [key, hit] of existing)
+                    accepted.push({ key, entry: hit.entry, policy, upto: lockIndex })
+                  return { combined, entries: accepted }
                 })
               values = result.combined
               items = result.entries
