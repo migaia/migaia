@@ -166,7 +166,8 @@ export async function observePgRange(
 export function markPgChanged(
   state: IPgState,
   channel: IPgMutationChannel,
-  key: IStorageKey
+  key: IStorageKey,
+  after?: ISqlRow
 ): void {
   let changed = state.changed.get(channel)
   if (!changed) {
@@ -174,6 +175,7 @@ export function markPgChanged(
     state.changed.set(channel, changed)
   }
   changed.set(pgKey(key).hex, snapshotStorageKey(key, PgNames.backend))
+  state.journal?.stage(channel, key, after)
 }
 /** Expiry cleanup is a real write in the same native transaction, leaving the original tombstone. */
 export async function prunePg(
@@ -288,7 +290,7 @@ export async function writePg(
     raw as ISqlValue,
     ...(ttlMs === undefined ? [] : [ttlMs])
   ]
-  await state.client.query(
+  const written = await state.client.query(
     'INSERT INTO ' +
       tables[channel] +
       ' (org_id,key,value' +
@@ -299,11 +301,14 @@ export async function writePg(
       (channel === 'metadata'
         ? ''
         : ',expires_at=' +
-          (ttlMs === undefined ? tables[channel] + '.expires_at' : 'excluded.expires_at')),
+          (ttlMs === undefined ? tables[channel] + '.expires_at' : 'excluded.expires_at')) +
+      (state.journal === undefined
+        ? ''
+        : ' RETURNING key,value' + (channel === 'metadata' ? '' : ',expires_at::text AS deadline')),
     values,
     state.ctx
   )
-  markPgChanged(state, channel, key)
+  markPgChanged(state, channel, key, written.rows[0])
 }
 /** Deleting an absent key is a no-op; actual deletions preserve their revision identity. */
 export async function removePg(
@@ -649,12 +654,13 @@ export async function setManyPg(
     )
   ).rows
   if (conflicting.length !== 0) throw postgresError(PostgresErrorCode.duplicateKey)
-  await state.client.query(
+  const written = await state.client.query(
     'INSERT INTO ' +
       tables.text +
       " (org_id,key,value,expires_at) SELECT $1,input.key,input.value,CASE WHEN input.duration IS NULL THEN NULL ELSE clock.now+input.duration*interval '1 millisecond' END FROM unnest($2::text[],$3::text[],$4::float8[]) AS input(key,value,duration) CROSS JOIN (SELECT clock_timestamp() AS now) AS clock ON CONFLICT(org_id,key) DO UPDATE SET value=excluded.value,expires_at=coalesce(excluded.expires_at," +
       tables.text +
-      '.expires_at)',
+      '.expires_at)' +
+      (state.journal === undefined ? '' : ' RETURNING key,value,expires_at::text AS deadline'),
     [
       state.orgId,
       { arrayType: 'text', values: entries.map((entry) => entry.identity) },
@@ -663,7 +669,11 @@ export async function setManyPg(
     ],
     state.ctx
   )
-  for (const entry of entries) markPgChanged(state, 'text', entry.key)
+  const after =
+    state.journal === undefined
+      ? undefined
+      : new Map(written.rows.map((row) => [String(row.key), row]))
+  for (const entry of entries) markPgChanged(state, 'text', entry.key, after?.get(entry.identity))
 }
 /** Native ANY deletion returns actual distinct physical removals, including expired rows. */
 export async function removeManyPg(

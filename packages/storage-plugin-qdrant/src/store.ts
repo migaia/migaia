@@ -12,7 +12,8 @@ import {
   snapshotStorageVector,
   snapshotStorageVectorUpsert,
   snapshotStorageVectorSearch,
-  snapshotStorageBatchKeys,
+  snapshotStorageVectorIds,
+  snapshotStorageDeleteCountMode,
   assertStringStorageKey,
   snapshotStorageTtlTarget,
   assertStorageTtlDuration,
@@ -91,12 +92,9 @@ function unsupported(): never {
     backend: QdrantText.backend
   })
 }
-/** The canonical key batch owner validates and detaches public string IDs. */
+/** Shared capture owns admission; native deletion and recommendation retain first-occurrence IDs. */
 function idsOf(ids: readonly string[]): string[] {
-  return snapshotStorageBatchKeys(ids, QdrantText.backend).flatMap((fact, index) => {
-    assertStringStorageKey(fact.key, QdrantText.backend)
-    return fact.firstIndex === index ? [fact.key] : []
-  })
+  return [...new Set(snapshotStorageVectorIds(ids, QdrantText.backend))]
 }
 /** One native operation record is not a count, including acknowledged asynchronous writes. */
 function operationResult(result: Schemas['UpdateResult']): IQdrantUpdateResult {
@@ -807,14 +805,9 @@ export function createQdrantBackend(
           deleteWhere: (where, ctx) => {
             const condition = snapshotStorageWhere(where),
               options = capture(() => ({
-                count: ctx?.count ?? DeleteCountMode.precount,
+                count: snapshotStorageDeleteCountMode(ctx?.count ?? undefined, QdrantText.backend),
                 policy: ctx?.concurrency
               }))
-            if (
-              options.count !== DeleteCountMode.precount &&
-              options.count !== DeleteCountMode.scroll
-            )
-              throw invalidArgument()
             if (
               options.count === DeleteCountMode.precount &&
               nativeCondition(condition) === undefined

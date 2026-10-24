@@ -600,7 +600,7 @@ async function readUser(executor: ISqlExecutor, id: number) {
 
 ## 原事务能力投影
 
-`useTransactionCapability(scope, token)` 从真实 scope 的原 transaction owner 找到同一 store，再读取唯一 provider 表。它供后端原方法工厂的 `use: (token) => useTransactionCapability(scope, token)` 使用；不修改 scope，因此公开类型注解的完整 frozen scope 不需要私有 symbol 或 cast。纯 use 不调用 forTransaction、不执行 I/O；同视图、同实现重复 use 返回同一冻结投影，视图失效时清空缓存。
+`useTransactionCapability(scope, token)` 从真实 scope 的原 transaction owner 找到同一 store，再读取唯一 provider 表。它供后端原方法工厂的 `use: (token) => useTransactionCapability(scope, token)` 使用；不修改 scope，因此公开类型注解的完整 frozen scope 不需要私有 symbol 或 cast。真实仅文本事务也可沿同一 helper 投影其原 kv；不要求虚构 bytes/records 方法，也不授予未声明令牌。纯 use 不调用 forTransaction、不执行 I/O；同视图、同实现重复 use 返回同一冻结投影，视图失效时清空缓存。
 
 当前标准事务投影覆盖 kv 与 records。kv 提供完整 get/set/remove/has/getMany/setMany/removeMany/removeByPrefix，保留单个真实 native batch；没有根 keys/clear、普通操作 ctx 或独立策略。records 提供真实共用 query 与 removeByPrefix；query 的 all 不接受普通 ctx。`IWithTransactionQueryMethods<TScope,TAugmentMethods,TRdfAugmentMethods = {}>` 分别将记录与 RDF 纯方法投影到对应事务能力；第三泛型缺省为空，旧两参数调用只增强 records，query 与 rdf 组不互授方法，不增加根操作上下文、不改原生 scope 成员；规范 builder 类型复用此纯 helper 增强回调 scope。每个数据方法都进入原 runTransactionOperation，将新的完整操作视图交给 forTransaction；保存 query 的 all 也先进入同一 owner，严格计划失败、mapper 与真实 iterator 清理保持原首错和排空。关闭后的保存数据方法与 query 终点在 I/O 前拒绝原后端 TRANSACTION_FAILED。
 
@@ -748,3 +748,5 @@ snapshotStorageOrgKeyPrefix(orgId, prefix, backend) 返回独立的原生半开�
 共享套件同时观察原生入口同步抛出的输入错误与异步拒绝，仍要求同一语义码；接受非法输入或返回其它码仍失败。观察适配不改变后端错误时序，也不包装原错误对象。
 
 `snapshotStorageVectorIds(ids, backend?, rejectDuplicates = false)` 捕获并冻结稠密字符串 ID 批次，默认保序保重复；推荐输入可选拒绝重复，不施加存储键大小限制。`snapshotStorageDeleteCountMode(value, backend?)` 将省略值归为 `DeleteCountMode.precount`，只接受 `precount`/`scroll`；非法输入沿原 `INVALID_ARGUMENT` 边界。两者不做原生 I/O，也不改变引擎实际删除计数策略。
+
+并发循环在 prepare、execute 或 executeAttempt 路径中，把原生选项字段与 symbol 扩展的一次捕获值转发到同一冻结上下文及锁键推导。调用方 getter 不会重读，后续原生 attempt 保留这些字段。没有准备阶段的原准入顺序不变。

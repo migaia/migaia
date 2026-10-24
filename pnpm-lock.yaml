@@ -792,6 +792,21 @@ importers:
         specifier: workspace:^
         version: link:../utils
 
+  packages/storage-plugin-cache:
+    dependencies:
+      '@migaia/serialize':
+        specifier: workspace:^
+        version: link:../serialize
+      '@migaia/storage-contract':
+        specifier: workspace:^
+        version: link:../storage-contract
+      '@migaia/storage-host':
+        specifier: workspace:^
+        version: link:../storage-host
+      '@migaia/utils':
+        specifier: workspace:^
+        version: link:../utils
+
   packages/storage-plugin-object:
     dependencies:
       '@migaia/lifecycle':
@@ -894,6 +909,9 @@ importers:
         specifier: workspace:^
         version: link:../utils
     devDependencies:
+      '@migaia/logger':
+        specifier: workspace:^
+        version: link:../logger
       '@types/bun':
         specifier: 1.4.3
         version: 1.4.3
@@ -953,6 +971,9 @@ importers:
         specifier: workspace:^
         version: link:../utils
     devDependencies:
+      '@migaia/logger':
+        specifier: workspace:^
+        version: link:../logger
       '@migaia/store-light':
         specifier: workspace:^
         version: link:../store-light

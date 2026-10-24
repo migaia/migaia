@@ -2,10 +2,7 @@ import type { ILibraryReference, IText } from './contract.js'
 import { storagePluginRedisCases } from './storage-plugin-redis-cases.js'
 /** Each adapter remains a separate entry; the neutral root imports no SDK. */
 const t = (en: string, zh: string): IText => ({ en, zh })
-/**
- * This inventory describes the delivered driver boundary without claiming backend Feature
- * completion.
- */
+/** This inventory records the delivered native entries and their actual capability boundaries. */
 export const storagePluginRedisReference: ILibraryReference = {
   modules: {
     'features/search': {
@@ -111,8 +108,8 @@ export const storagePluginRedisReference: ILibraryReference = {
     redisBackendPlugin: {
       role: 'factory',
       purpose: t(
-        'Install native KV, bytes, records, TTL, counters and WATCH transactions.',
-        '安装原生 KV、字节、记录、TTL、counter 与 WATCH 事务。'
+        'Install native storage and WATCH transactions; commit-only external binlog uses the original host journal.',
+        '安装原生存储及 WATCH 事务；提交后外置 binlog 使用原宿主 journal。'
       ),
       cases: storagePluginRedisCases.redisBackendPlugin
     },

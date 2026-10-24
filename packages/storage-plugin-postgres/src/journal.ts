@@ -5,7 +5,8 @@ import {
   snapshotStorageKeyPrefix,
   type IStorageKey,
   type ITransactionScope,
-  type ITransactionInfo
+  type ITransactionInfo,
+  type ISqlRow
 } from '@migaia/storage-contract'
 import type {
   IStorageJournalNamespace,
@@ -58,9 +59,10 @@ export type IPgJournalVectorPort = {
   ): Promise<ReadonlyMap<string, IStorageJournalImage>>
   write(state: IPgState, collection: string, id: string, image: IStorageJournalImage): Promise<void>
 }
-/** The original attempt stores first images and its final physical changes, never history. */
+/** The original attempt retains actual native mutation order until its real terminal. */
 export type IPgJournalCapture = {
   capture(channel: IPgMutationChannel, keys: readonly IStorageKey[]): Promise<void>
+  stage(channel: IPgMutationChannel, key: IStorageKey, after?: ISqlRow): void
   finalize(): Promise<void>
   changes(): readonly IStorageJournalChange[]
 }
@@ -69,9 +71,35 @@ export function encodePgJournalImage(wire: IPgJournalWire): IStorageJournalImage
   return Object.freeze({
     present: true,
     value: encodePgRecord({
-      ...wire,
-      value: wire.value instanceof Uint8Array ? bytesToBase64(wire.value) : wire.value
+      version: wire.version,
+      channel: wire.channel,
+      value: wire.value instanceof Uint8Array ? bytesToBase64(wire.value) : wire.value,
+      ...(wire.channel === 'vector' ? { payload: wire.payload, projection: wire.projection } : {}),
+      expiresAt: wire.expiresAt
     })
+  })
+}
+/** Existing native reads and RETURNING rows share one exact image encoder and field admission. */
+function journalRowImage(channel: IPgMutationChannel, row: ISqlRow): IStorageJournalImage {
+  if (
+    !(typeof row.value === 'string' || row.value instanceof Uint8Array) ||
+    (channel !== 'metadata' && row.deadline !== null && typeof row.deadline !== 'string') ||
+    (channel === 'vector' &&
+      (!(row.payload === null || typeof row.payload === 'string') ||
+        !(row.projection === null || typeof row.projection === 'string')))
+  )
+    throw postgresError(PostgresErrorCode.decodeFailed)
+  return encodePgJournalImage({
+    version: 1,
+    channel,
+    value: row.value,
+    expiresAt: channel === 'metadata' ? null : (row.deadline as string | null),
+    ...(channel === 'vector'
+      ? {
+          payload: row.payload as string | null,
+          projection: row.projection as string | null
+        }
+      : {})
   })
 }
 /** Persisted image admission verifies the same native channel before restoration changes data. */
@@ -191,21 +219,8 @@ export function createPgJournalImages(
     ).rows
     for (const row of rows) {
       const key = channel === 'record' ? pgKey(pgRecordKey(row.key)).hex : row.key
-      if (
-        typeof key !== 'string' ||
-        !(typeof row.value === 'string' || row.value instanceof Uint8Array) ||
-        (channel !== 'metadata' && row.deadline !== null && typeof row.deadline !== 'string')
-      )
-        throw postgresError(PostgresErrorCode.decodeFailed)
-      result.set(
-        key,
-        encodePgJournalImage({
-          version: 1,
-          channel,
-          value: row.value,
-          expiresAt: channel === 'metadata' ? null : (row.deadline as string | null)
-        })
-      )
+      if (typeof key !== 'string') throw postgresError(PostgresErrorCode.decodeFailed)
+      result.set(key, journalRowImage(channel, row))
     }
     return result
   }
@@ -216,6 +231,17 @@ export function createPgJournalImages(
         string,
         { target: IStorageJournalTarget; image: IStorageJournalImage }
       >()
+      /**
+       * Raw after rows come from the actual mutation, so concurrent accepted writes cannot
+       * overwrite them.
+       */
+      const stages: {
+        channel: IPgMutationChannel
+        key: IStorageKey
+        target: IStorageJournalTarget
+        before: IStorageJournalImage
+        after: IStorageJournalImage
+      }[] = []
       let changes: readonly IStorageJournalChange[] = []
       return {
         capture: async (channel, keys) => {
@@ -227,6 +253,15 @@ export function createPgJournalImages(
               image: images.get(pgKey(key).hex)!
             })
         },
+        stage: (channel, key, row) => {
+          const id = channel + ':' + pgKey(key).hex
+          const previous = before.get(id)
+          if (previous === undefined) throw postgresError(PostgresErrorCode.decodeFailed)
+          const after =
+            row === undefined ? { present: false as const } : journalRowImage(channel, row)
+          stages.push({ channel, key, target: previous.target, before: previous.image, after })
+          before.set(id, { target: previous.target, image: after })
+        },
         finalize: async () => {
           const final: IStorageJournalChange[] = []
           /** This attempt alone prepares changed revision rows before persisting complete mirrors. */
@@ -236,23 +271,17 @@ export function createPgJournalImages(
           await preparePgRevisionRows(state, tables, identities)
           /** Native births come from those same rows and remain unchanged at actual COMMIT. */
           const revisions = await readPgRevisionRows(state, tables, identities)
-          for (const [channel, changed] of state.changed) {
-            const images = await read(state, channel, [...changed.values()])
-            for (const [id, key] of changed) {
-              const initial = before.get(channel + ':' + id)
-              if (initial === undefined) throw postgresError(PostgresErrorCode.decodeFailed)
-              final.push({
-                target: initial.target,
-                before: initial.image,
-                after: images.get(id)!,
-                afterRevision: {
-                  birth: revisions.get(pgIdentity(channel, key))!.birth!,
-                  version: String(
-                    (state.baseline.get(pgIdentity(channel, key))?.version ?? 0n) + 1n
-                  )
-                }
-              })
-            }
+          for (const stage of stages) {
+            const id = pgIdentity(stage.channel, stage.key)
+            final.push({
+              target: stage.target,
+              before: stage.before,
+              after: stage.after,
+              afterRevision: {
+                birth: revisions.get(id)!.birth!,
+                version: String((state.baseline.get(id)?.version ?? 0n) + 1n)
+              }
+            })
           }
           changes = Object.freeze(final)
         },
@@ -284,6 +313,7 @@ export function createPgJournalImages(
       await observePgRevision(state, tables, channel, key)
       await state.guardKeys([pgLockKey(channel, key)])
       const nativeKey = channel === 'record' ? pgKey(key).bytes : pgKey(key).hex
+      let after: ISqlRow | undefined
       if (wire === undefined) {
         const removed = await state.client.query(
           'DELETE FROM ' + tables[channel] + ' WHERE org_id=$1 AND key=$2',
@@ -292,19 +322,28 @@ export function createPgJournalImages(
         )
         if (removed.rowCount === 0) return
       } else
-        await state.client.query(
-          'INSERT INTO ' +
-            tables[channel] +
-            ' (org_id,key,value' +
-            (channel === 'metadata' ? '' : ',expires_at') +
-            ') VALUES($1,$2,$3' +
-            (channel === 'metadata' ? '' : ',$4::timestamptz') +
-            ') ON CONFLICT(org_id,key) DO UPDATE SET value=excluded.value' +
-            (channel === 'metadata' ? '' : ',expires_at=excluded.expires_at'),
-          [state.orgId, nativeKey, wire.value, ...(channel === 'metadata' ? [] : [wire.expiresAt])],
-          state.ctx
-        )
-      markPgChanged(state, channel, key)
+        after = (
+          await state.client.query(
+            'INSERT INTO ' +
+              tables[channel] +
+              ' (org_id,key,value' +
+              (channel === 'metadata' ? '' : ',expires_at') +
+              ') VALUES($1,$2,$3' +
+              (channel === 'metadata' ? '' : ',$4::timestamptz') +
+              ') ON CONFLICT(org_id,key) DO UPDATE SET value=excluded.value' +
+              (channel === 'metadata' ? '' : ',expires_at=excluded.expires_at') +
+              ' RETURNING key,value' +
+              (channel === 'metadata' ? '' : ',expires_at::text AS deadline'),
+            [
+              state.orgId,
+              nativeKey,
+              wire.value,
+              ...(channel === 'metadata' ? [] : [wire.expiresAt])
+            ],
+            state.ctx
+          )
+        ).rows[0]
+      markPgChanged(state, channel, key, after)
     }
   }
 }

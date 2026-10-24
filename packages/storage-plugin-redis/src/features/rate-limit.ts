@@ -5,7 +5,7 @@ import type { IOperationContext } from '@migaia/storage-contract'
 import { redisBackendKind } from '../plugin.js'
 import { readNativeFeaturePort } from '../native-feature.js'
 import { featureName, featureInteger } from '../feature-input.js'
-import { replyInteger } from '../layout.js'
+import { RedisSuffix, replyInteger } from '../layout.js'
 import { redisError } from '../errors.js'
 import { RedisErrorCode } from '../error-code.js'
 /** Fixed windows use only Redis's clock and reject without increasing an exhausted counter. */
@@ -60,7 +60,7 @@ export function redisRateLimitFeature(options: IRedisRateLimitOptions) {
                     RedisCommand.eval,
                     rateScript,
                     '1',
-                    layout.tag + ':rate:' + layout.encode(featureName(actual.name)),
+                    layout.feature(RedisSuffix.rate, featureName(actual.name)),
                     String(limit),
                     String(featureInteger(actual.cost)),
                     String(windowMs)

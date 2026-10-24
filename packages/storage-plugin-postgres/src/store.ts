@@ -307,7 +307,7 @@ export async function createPostgresStore<T>(
           const input = prepare()
           if (empty?.when(input)) return empty.value
           return runtime.execution.run(
-            { operation, input, ctx: state.ctx, scope: current },
+            { operation, input, ctx: state.ctx, scope: current, internal: true },
             (actual) => {
               throwIfAborted(state.ctx?.signal)
               return observed(
@@ -471,7 +471,8 @@ export async function createPostgresStore<T>(
                   operation: PgOperation.next,
                   input: { range: captured },
                   ctx: engine.stateFor(current).ctx,
-                  scope: current
+                  scope: current,
+                  internal: true
                 },
                 () => advance(engine.stateFor(current))
               ),
@@ -589,11 +590,12 @@ export async function createPostgresStore<T>(
             (persist ? 'NULL' : "clock_timestamp()+($3::float8*interval '1 millisecond')") +
             ' WHERE org_id=$1 AND key=$2' +
             (persist ? ' AND expires_at IS NOT NULL' : '') +
-            ' RETURNING key',
+            ' RETURNING key' +
+            (state.journal === undefined ? '' : ',value,expires_at::text AS deadline'),
           [runtime.orgId, encoded, ...(persist ? [] : [ms!])],
           state.ctx
         )
-        if (result.rowCount !== 0) markPgChanged(state, channel, key)
+        if (result.rowCount !== 0) markPgChanged(state, channel, key, result.rows[0])
         return result.rowCount !== 0
       }
       /** Complete original views are built for the user, every accepted operation and commit checks. */

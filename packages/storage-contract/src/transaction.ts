@@ -882,9 +882,9 @@ function liveTransactionCapability(
   if (!state || state.closed || state.firstFailure) throw invalidTransaction()
   return { state, binding: readTransactionImplementation(state.owner.store, capability) }
 }
-/** Executes one projected data method inside the original operation owner with a fresh full view. */
+/** Executes one projected method with the original owner's exact authenticated operation view. */
 function runTransactionCapabilityMethod(
-  scope: ITransactionScope<unknown>,
+  scope: object,
   capability: IAnyStorageCapability,
   method: string,
   args: readonly unknown[]
@@ -893,7 +893,7 @@ function runTransactionCapabilityMethod(
     /** Re-read publication authority rather than retaining an installation after Feature release. */
     const { binding } = liveTransactionCapability(operationScope, capability)
     /** Only the current operation view reaches backend binding; old views are never reused. */
-    const api = binding.forTransaction(operationScope)
+    const api = Reflect.apply(binding.forTransaction, binding, [operationScope])
     if (typeof api !== 'object' || api === null) throw invalidTransaction()
     /** Borrow one actual native method and preserve its API receiver and returned value. */
     const execute = (api as Record<string, unknown>)[method]
@@ -1116,7 +1116,7 @@ function transactionRdfQuery(scope: object, query: IRdfQuery<undefined>): IRdfQu
  * its authentic backend source supplies the existing iterator/complete-terminal ownership.
  */
 export function useTransactionCapability<
-  TScope extends ITransactionScope<unknown>,
+  TScope extends { use: (...args: never[]) => unknown },
   TCap extends IAnyStorageCapability & Parameters<TScope['use']>[0]
 >(
   scope: TScope,
@@ -1151,7 +1151,7 @@ export function useTransactionCapability<
       const { state, binding } = liveTransactionCapability(scope, capability)
       try {
         /** The backend's pure query constructor must use its real scope, never a root API. */
-        const bound = binding.forTransaction(scope)
+        const bound = Reflect.apply(binding.forTransaction, binding, [scope])
         if (typeof bound !== 'object' || bound === null) throw invalidTransaction()
         /** One borrowed constructor keeps the actual shared chain and its source receiver intact. */
         const query = (bound as Record<string, unknown>).query
@@ -1172,7 +1172,7 @@ export function useTransactionCapability<
       const { state, binding } = liveTransactionCapability(scope, capability)
       try {
         /** The backend supplies its real ground query source and original iterator registration. */
-        const bound = binding.forTransaction(scope)
+        const bound = Reflect.apply(binding.forTransaction, binding, [scope])
         if (typeof bound !== 'object' || bound === null) throw invalidTransaction()
         /** One native match lookup preserves receiver and canonical pattern capture. */
         const match = (bound as Record<string, unknown>).match
