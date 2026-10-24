@@ -1,11 +1,69 @@
-import type { ICaseDoc, IText } from './contract.js'
+import type { ICaseDoc, ICode, IText } from './contract.js'
 
 /** Localized task explanation for the public logger entries. */
 const t = (en: string, zh: string): IText => ({ en, zh })
 
 /** Native authors can prepare committed facts without allocating another resource owner. */
-export const loggerIndexExample =
-  "import { snapshotLogRecords, prepareLogAppend, snapshotLogStoreState, createLogStoreIndex } from '@migaia/logger/plugins/durable'\n\nconst state = snapshotLogStoreState({ lastSeq: 0, time: 0, floor: 1 }, [])\nconst index = createLogStoreIndex(state)\nconst batch = prepareLogAppend(\n  snapshotLogRecords([{ kind: 'order.created', payload: { id: 'o1' } }]),\n  index\n)\nconsole.log(index.lastSeq, batch[0]?.seq) // 0 1: preparation is not a commit.\n"
+export const loggerIndexExample: ICode = t(
+  `import {
+  snapshotLogRecords, prepareLogAppend, snapshotLogStoreState, createLogStoreIndex
+} from '@migaia/logger/plugins/durable'
+
+const state = snapshotLogStoreState({ lastSeq: 0, time: 0, floor: 1 }, [])
+const index = createLogStoreIndex(state)
+const batch = prepareLogAppend(
+  snapshotLogRecords([{ kind: 'order.created', payload: { id: 'o1' } }]),
+  index
+)
+console.log(index.lastSeq, batch[0]?.seq) // Preparation is not a commit.`,
+  `import {
+  snapshotLogRecords, prepareLogAppend, snapshotLogStoreState, createLogStoreIndex
+} from '@migaia/logger/plugins/durable'
+
+const state = snapshotLogStoreState({ lastSeq: 0, time: 0, floor: 1 }, [])
+const index = createLogStoreIndex(state)
+const batch = prepareLogAppend(
+  snapshotLogRecords([{ kind: 'order.created', payload: { id: 'o1' } }]),
+  index
+)
+console.log(index.lastSeq, batch[0]?.seq) // 准备批次不等于提交。`
+)
+
+/** A real resource example exercises committed data and one-way intent states. */
+export const loggerStoreExample = `import { memoryLogStore, LogRecordState } from '@migaia/logger/plugins/durable'
+
+await using store = memoryLogStore()
+const off = store.onAppend(notice => console.log(notice.lastSeq, notice.count))
+const sequences = await store.append([{ kind: 'order.created', payload: { id: 'o1' } }])
+const seq = sequences[0]!
+console.log((await store.read(seq, 10))[0]?.kind)
+await store.setState(seq, LogRecordState.done)
+console.log(await store.states(LogRecordState.pending))
+await store.truncate(seq + 1)
+console.log(await store.lastSeq())
+off()`
+
+/** A second data index follows real committed resource changes; it owns no persistence or cleanup. */
+export const loggerCommittedIndexExample = `import {
+  memoryLogStore, createLogStoreIndex, snapshotLogRecords, LogRecordState
+} from '@migaia/logger/plugins/durable'
+
+await using store = memoryLogStore()
+const index = createLogStoreIndex()
+await store.append(snapshotLogRecords([{ kind: 'order.created', payload: { id: 'o1' } }]))
+const committed = await store.read(1, 10)
+index.applyAppend(committed)
+console.log(index.read(1, 10)[0]?.kind, index.pending())
+console.log(index.lastSeq, index.time >= 0, index.floor)
+if (index.checkState(1, LogRecordState.done)) {
+  await store.setState(1, LogRecordState.done)
+  index.applyState(1, LogRecordState.done)
+}
+if (index.checkTruncate(2)) {
+  await store.truncate(2)
+  index.applyTruncate(2)
+}
+console.log(index.read(1, 10), index.pending(), index.lastSeq, index.floor)`
 
 /** Complete examples use in-memory sinks and the public host capability port. */
 export const loggerCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
@@ -33,7 +91,7 @@ export const loggerCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
         'Keep asynchronous persistence in its native transaction while reusing the original committed index.',
         '异步持久化仍由原生事务拥有，同时复用原已提交索引。'
       ),
-      example: t(loggerIndexExample, loggerIndexExample),
+      example: loggerIndexExample,
       result: t(
         'Prints 0 1. Preparation leaves the index unchanged; apply the exact batch only after commit, and leave rollback unapplied.',
         '输出 0 1。准备不修改索引；仅真实 commit 后应用原批次，rollback 不应用。'
@@ -51,8 +109,8 @@ export const loggerCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
         '使用持久日志资源而不改变普通输出端。每个插件借用独立 store；已接纳工作结束后由创建者关闭。'
       ),
       example: t(
-        "import { memoryLogStore } from '@migaia/logger/plugins/durable'\nimport type { ILogStore } from '@migaia/logger/plugins/durable'\n\nconst delegate = memoryLogStore()\n// A custom implementation must preserve this single owner's atomic commit and notices.\nconst custom: ILogStore = {\n  append: records => delegate.append(records),\n  read: (fromSeq, limit) => delegate.read(fromSeq, limit),\n  lastSeq: () => delegate.lastSeq(),\n  onAppend: listener => delegate.onAppend(listener),\n  truncate: beforeSeq => delegate.truncate(beforeSeq),\n  setState: (seq, state) => delegate.setState(seq, state),\n  states: filter => delegate.states(filter),\n  dispose: () => delegate.dispose(),\n  [Symbol.asyncDispose]: () => delegate[Symbol.asyncDispose]()\n}\nawait custom.append([{ kind: 'custom', payload: null }])\nawait custom.dispose()",
-        "import { memoryLogStore } from '@migaia/logger/plugins/durable'\nimport type { ILogStore } from '@migaia/logger/plugins/durable'\n\nconst delegate = memoryLogStore()\n// A custom implementation must preserve this single owner's atomic commit and notices.\nconst custom: ILogStore = {\n  append: records => delegate.append(records),\n  read: (fromSeq, limit) => delegate.read(fromSeq, limit),\n  lastSeq: () => delegate.lastSeq(),\n  onAppend: listener => delegate.onAppend(listener),\n  truncate: beforeSeq => delegate.truncate(beforeSeq),\n  setState: (seq, state) => delegate.setState(seq, state),\n  states: filter => delegate.states(filter),\n  dispose: () => delegate.dispose(),\n  [Symbol.asyncDispose]: () => delegate[Symbol.asyncDispose]()\n}\nawait custom.append([{ kind: 'custom', payload: null }])\nawait custom.dispose()"
+        "import { memoryLogStore } from '@migaia/logger/plugins/durable'\nimport type { ILogStore } from '@migaia/logger/plugins/durable'\n\nconst delegate = memoryLogStore()\nconst custom: ILogStore = {\n  append: records => delegate.append(records),\n  read: (fromSeq, limit) => delegate.read(fromSeq, limit),\n  lastSeq: () => delegate.lastSeq(),\n  onAppend: listener => delegate.onAppend(listener),\n  truncate: beforeSeq => delegate.truncate(beforeSeq),\n  setState: (seq, state) => delegate.setState(seq, state),\n  states: filter => delegate.states(filter),\n  dispose: () => delegate.dispose(),\n  [Symbol.asyncDispose]: () => delegate[Symbol.asyncDispose]()\n}\nawait custom.append([{ kind: 'custom', payload: null }])\nawait custom.dispose()",
+        "import { memoryLogStore } from '@migaia/logger/plugins/durable'\nimport type { ILogStore } from '@migaia/logger/plugins/durable'\n\nconst delegate = memoryLogStore()\nconst custom: ILogStore = {\n  append: records => delegate.append(records),\n  read: (fromSeq, limit) => delegate.read(fromSeq, limit),\n  lastSeq: () => delegate.lastSeq(),\n  onAppend: listener => delegate.onAppend(listener),\n  truncate: beforeSeq => delegate.truncate(beforeSeq),\n  setState: (seq, state) => delegate.setState(seq, state),\n  states: filter => delegate.states(filter),\n  dispose: () => delegate.dispose(),\n  [Symbol.asyncDispose]: () => delegate[Symbol.asyncDispose]()\n}\nawait custom.append([{ kind: 'custom', payload: null }])\nawait custom.dispose()"
       ),
       result: t(
         'Records retain their JSON values. Initialization and whenIdle are explicit; shutdown completion alone does not prove all I/O ended. File stores use actual builtin SQLite, and external native transaction atomicity belongs to its original owner.',
