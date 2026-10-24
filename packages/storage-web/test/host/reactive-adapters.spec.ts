@@ -3,7 +3,7 @@ import { createReactiveServiceFixture } from '../helpers/reactive-service.js'
 
 /** Original source and Resource lifecycle behavior uses actual installed stores and controllers. */
 describe('reactive source adapters', () => {
-  it('seals a hostile thenable source without awaiting it and releases active queries once', async () => {
+  it('seals an asynchronous source and releases active queries once', async () => {
     const { store, controller, service } = await createReactiveServiceFixture({
       id: 'source-fixture',
       attach: false
@@ -12,22 +12,15 @@ describe('reactive source adapters', () => {
     let stopped = 0
     let observedSignal: { readonly aborted: boolean } | undefined
     const adapter = service.registerAdapter({
-      backendId: 'hostile',
+      backendId: 'late-source',
       store,
       controller,
       consistency: { mode: 'push', visibility: 'instance' },
       subscribe: ({ signal }) => {
         observedSignal = signal
-        const hostile = Object.create(null) as PromiseLike<unknown>
-        const thenKey = ['t', 'h', 'e', 'n'].join('')
-        Object.defineProperty(hostile, thenKey, {
-          value: (resolve: (value: () => void) => void) => {
-            resolve(() => {
-              stopped += 1
-            })
-          }
+        return Promise.resolve(() => {
+          stopped += 1
         })
-        return hostile
       },
       report: (error) => reports.push(error)
     })

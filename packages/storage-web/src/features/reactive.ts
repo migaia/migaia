@@ -3,6 +3,7 @@ import {
   memoryBackendKind,
   type IStorageBackendKind,
   type IStorageFeature,
+  type IStorageFeatureExpose,
   type IStorageFeatureOutput,
   type IStorageFeatureTarget
 } from '@migaia/storage-host'
@@ -10,7 +11,12 @@ import {
   createStorageOperationReporter,
   reportCleanupError
 } from '@migaia/storage-host/authoring/backend'
-import type { IQueryResultOf, IQueryShape, IStorageResource } from '@migaia/storage-contract'
+import type {
+  IOperationContext,
+  IQueryResultOf,
+  IQueryShape,
+  IStorageResource
+} from '@migaia/storage-contract'
 import {
   cookieBackendKind,
   indexedDbBackendKind,
@@ -25,7 +31,7 @@ import type {
 } from '../host/types.js'
 import { StorageReactiveVisibility } from '../host/state-constants.js'
 import { StorageErrorText } from '../error-text.js'
-import { createStorageTypeError, StorageError, StorageErrorCode } from '../types/errors.js'
+import { StorageError, StorageErrorCode } from '../types/errors.js'
 
 export type { ILiveQuery, ILiveQueryOptions } from '../host/types.js'
 
@@ -41,6 +47,11 @@ export type IChainLiveQueryOptions<TResult> = Pick<
   | 'signal'
   | 'report'
 >
+
+/** Executable query terminals accept the existing operation signal while the shape stays type-only. */
+type IReactiveLiveQueryTerminal<TResult> = {
+  all(context: Pick<IOperationContext, 'signal'>): Promise<TResult>
+}
 
 /** Only an existing all terminal can become live, retaining its exact result type. */
 export type IReactiveLiveMethods = {
@@ -104,146 +115,151 @@ const nativeConsistency = (
       }
 }
 
-/** Capture borrowed live options once before source admission or Resource allocation. */
-const snapshotLiveOptions = <T>(options: IChainLiveQueryOptions<T>): IChainLiveQueryOptions<T> => {
+/** Validate live-query options synchronously before source admission or Resource allocation. */
+const validateLiveOptions = <T>(options: IChainLiveQueryOptions<T>): void => {
   if (options === null || (typeof options !== 'object' && typeof options !== 'function'))
     throw new StorageError(
       StorageErrorCode.reactiveFeatureInvalid,
       {},
       StorageErrorText.reactiveFeatureInvalid
     )
-  /** Retain original values while keeping accessor failures inside the Web error boundary. */
-  let captured: IChainLiveQueryOptions<T>
-  /** Borrowed signal method access belongs to the same option-accessor failure boundary. */
-  let signalValid: boolean
-  try {
-    captured = {
-      runtime: options.runtime,
-      scope: options.scope,
-      matches: options.matches,
-      keepPreviousData: options.keepPreviousData,
-      equals: options.equals,
-      timeoutMs: options.timeoutMs,
-      signal: options.signal,
-      report: options.report
-    }
-    signalValid =
-      captured.signal === undefined ||
-      (typeof captured.signal === 'object' &&
-        captured.signal !== null &&
-        typeof captured.signal.addEventListener === 'function' &&
-        typeof captured.signal.removeEventListener === 'function')
-  } catch (cause) {
-    throw createStorageTypeError(
-      StorageErrorCode.reactiveFeatureInvalid,
-      StorageErrorText.reactiveFeatureInvalid,
-      cause
-    )
-  }
+  /** The borrowed signal must provide the existing native subscription surface. */
+  const signalValid =
+    options.signal === undefined ||
+    (typeof options.signal === 'object' &&
+      options.signal !== null &&
+      typeof options.signal.addEventListener === 'function' &&
+      typeof options.signal.removeEventListener === 'function')
   if (
-    typeof captured.runtime !== 'object' ||
-    captured.runtime === null ||
-    (captured.scope !== undefined && typeof captured.scope !== 'string') ||
-    (captured.matches !== undefined && typeof captured.matches !== 'function') ||
-    (captured.keepPreviousData !== undefined && typeof captured.keepPreviousData !== 'boolean') ||
-    (captured.equals !== undefined && typeof captured.equals !== 'function') ||
-    (captured.timeoutMs !== undefined &&
-      (typeof captured.timeoutMs !== 'number' ||
-        !Number.isFinite(captured.timeoutMs) ||
-        captured.timeoutMs < 0)) ||
+    typeof options.runtime !== 'object' ||
+    options.runtime === null ||
+    (options.scope !== undefined && typeof options.scope !== 'string') ||
+    (options.matches !== undefined && typeof options.matches !== 'function') ||
+    (options.keepPreviousData !== undefined && typeof options.keepPreviousData !== 'boolean') ||
+    (options.equals !== undefined && typeof options.equals !== 'function') ||
+    (options.timeoutMs !== undefined &&
+      (typeof options.timeoutMs !== 'number' ||
+        !Number.isFinite(options.timeoutMs) ||
+        options.timeoutMs < 0)) ||
     !signalValid ||
-    (captured.report !== undefined && typeof captured.report !== 'function')
+    (options.report !== undefined && typeof options.report !== 'function')
   )
     throw new StorageError(
       StorageErrorCode.reactiveFeatureInvalid,
       {},
       StorageErrorText.reactiveFeatureInvalid
     )
-  return captured
 }
 
+/** One Feature installation owns its service, selected adapter and stable abort listener. */
+type IReactiveFeatureContext = {
+  /** Original registration controls when store, client and lifecycle access is allowed. */
+  readonly featureExpose: IStorageFeatureExpose<IStorageBackendKind>
+  /** Original scheduler drives Resource requests without a new scheduling owner. */
+  readonly scheduler: ReturnType<IStorageFeatureExpose<IStorageBackendKind>['getScheduler']>
+  /** Original registration signal starts the same service cleanup before LIFO disposal. */
+  readonly signal: ReturnType<IStorageFeatureExpose<IStorageBackendKind>['getLifecycle']>['signal']
+  /** Service owns adapters and their Resource query lifetimes for this one Feature. */
+  readonly service: ReturnType<typeof createStorageReactiveService>
+  /** Original operation reporter handles asynchronous cleanup failures. */
+  readonly reporter: ReturnType<typeof createStorageOperationReporter>
+  /** The exact callback identity is shared by native registration and removal. */
+  stop: () => void
+  /** Adapter selection is lazy and reused by every live query on this installation. */
+  adapter: IStorageReactiveAdapter | undefined
+}
 /** Own one original reactive service per installed Feature and attach its source on first live. */
 export const reactiveFeature = <const T extends IStorageFeatureTarget>(
   target: T
 ): IStorageFeature<T, IReactiveFeatureOutput> =>
-  defineFeature(target, ({ featureExpose }) => {
-    /** Timing and closure belong to the original registration, captured before source access. */
-    const scheduler = featureExpose.getScheduler()
-    const signal = featureExpose.getLifecycle().signal
-    const service = createStorageReactiveService(scheduler)
-    const reporter = createStorageOperationReporter()
-    /** Lifecycle notification starts the same cleanup before the original LIFO releases resources. */
-    const stop = (): void => {
-      void service.dispose().catch((error) => reportCleanupError(reporter, error))
+  defineFeature(target, ({ featureExpose }) => createReactiveFeature(featureExpose))
+
+/** Attach the Feature's service to its original lifecycle before publishing terminal methods. */
+function createReactiveFeature(
+  featureExpose: IStorageFeatureExpose<IStorageBackendKind>
+): IReactiveFeatureOutput {
+  /** Constructor admission selects these original ports before any source can subscribe. */
+  const scheduler = featureExpose.getScheduler()
+  const signal = featureExpose.getLifecycle().signal
+  const service = createStorageReactiveService(scheduler)
+  const reporter = createStorageOperationReporter()
+  /** No callback runs until the one stable listener is attached below. */
+  const context = { featureExpose, scheduler, signal, service, reporter } as IReactiveFeatureContext
+  context.stop = () => stopReactiveFeature(context)
+  try {
+    featureExpose.onDispose(async () => {
+      signal.removeEventListener('abort', context.stop)
+      await service.dispose()
+    })
+    signal.addEventListener('abort', context.stop, { once: true })
+    if (signal.aborted) context.stop()
+  } catch (error) {
+    context.stop()
+    throw error
+  }
+  /**
+   * Fluent methods configure original query nodes; Resource requests invoke their existing all
+   * terminal.
+   */
+  const methods: IReactiveLiveMethods = {
+    live<TQuery extends IQueryShape>(
+      this: TQuery,
+      options: IChainLiveQueryOptions<IQueryResultOf<TQuery>>
+    ) {
+      return createReactiveLiveQuery(context, this, options)
     }
+  }
+  return {
+    capabilities: [] as const,
+    chain: { query: methods, vector: methods, rdf: methods },
+    api: { store: {}, transaction: {} }
+  }
+}
+
+/** Start idempotent service cleanup without replacing the registration's failure outcome. */
+function stopReactiveFeature(context: IReactiveFeatureContext): void {
+  void context.service.dispose().catch((error) => reportCleanupError(context.reporter, error))
+}
+
+/** Admit one original query and lazily bind its actual native consistency/source adapter. */
+function createReactiveLiveQuery<TQuery extends IQueryShape>(
+  context: IReactiveFeatureContext,
+  query: TQuery,
+  options: IChainLiveQueryOptions<IQueryResultOf<TQuery>>
+): ILiveQuery<IQueryResultOf<TQuery>> & IStorageResource {
+  /** The expose window is checked even after this installation selected its adapter. */
+  const store = context.featureExpose.getStore()
+  const backendId = context.featureExpose.getBackendId()
+  validateLiveOptions(options)
+  if (typeof query.all !== 'function')
+    throw new StorageError(
+      StorageErrorCode.reactiveFeatureInvalid,
+      {},
+      StorageErrorText.reactiveFeatureInvalid
+    )
+  if (context.adapter === undefined) {
     try {
-      featureExpose.onDispose(async () => {
-        signal.removeEventListener('abort', stop)
-        await service.dispose()
+      const controller = context.featureExpose.getChangeController()
+      context.adapter = context.service.registerAdapter({
+        backendId,
+        store,
+        controller,
+        consistency: nativeConsistency(context.featureExpose.getKind(), controller !== undefined),
+        subscribe: undefined,
+        report: (error) => reportCleanupError(context.reporter, error)
       })
-      signal.addEventListener('abort', stop, { once: true })
-      if (signal.aborted) stop()
+      context.adapter.startSource()
     } catch (error) {
-      stop()
+      context.stop()
       throw error
     }
-    /** The original service owns its sole adapter; no host-wide reactive registry is introduced. */
-    let adapter: IStorageReactiveAdapter | undefined
-    /** Shared methods remain configuration-only until the caller invokes this live terminal. */
-    const methods: IReactiveLiveMethods = {
-      live<TQuery extends IQueryShape>(
-        this: TQuery,
-        options: IChainLiveQueryOptions<IQueryResultOf<TQuery>>
-      ) {
-        /** Admission still checks the original expose window even after the source was attached. */
-        const store = featureExpose.getStore()
-        const backendId = featureExpose.getBackendId()
-        const captured = snapshotLiveOptions(options)
-        /** Capture the existing terminal with its original receiver; never create a query facade. */
-        let terminal: TQuery['all']
-        try {
-          terminal = this.all
-        } catch (cause) {
-          throw createStorageTypeError(
-            StorageErrorCode.reactiveFeatureInvalid,
-            StorageErrorText.reactiveFeatureInvalid,
-            cause
-          )
-        }
-        if (typeof terminal !== 'function')
-          throw new StorageError(
-            StorageErrorCode.reactiveFeatureInvalid,
-            {},
-            StorageErrorText.reactiveFeatureInvalid
-          )
-        if (adapter === undefined) {
-          try {
-            const controller = featureExpose.getChangeController()
-            adapter = service.registerAdapter({
-              backendId,
-              store,
-              controller,
-              consistency: nativeConsistency(featureExpose.getKind(), controller !== undefined),
-              subscribe: undefined,
-              report: (error) => reportCleanupError(reporter, error)
-            })
-            adapter.startSource()
-          } catch (error) {
-            stop()
-            throw error
-          }
-        }
-        return service.createQuery<IQueryResultOf<TQuery>>({
-          ...captured,
-          backendId,
-          scheduler,
-          query: ({ signal }) => Reflect.apply(terminal, this, [{ signal }])
-        })
-      }
-    }
-    return {
-      capabilities: [] as const,
-      chain: { query: methods, vector: methods, rdf: methods },
-      api: { store: {}, transaction: {} }
-    }
+  }
+  /** This query's options must remain stable while Resource generations await native IO. */
+  return context.service.createQuery<IQueryResultOf<TQuery>>({
+    ...options,
+    backendId,
+    scheduler: context.scheduler,
+    query: ({ signal }) =>
+      (query as unknown as IReactiveLiveQueryTerminal<IQueryResultOf<TQuery>>).all({ signal })
   })
+}

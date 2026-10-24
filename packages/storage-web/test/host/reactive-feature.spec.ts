@@ -54,7 +54,7 @@ describe('reactive Feature', () => {
     }
   })
 
-  it('snapshots every admitted option once and preserves equal settled identity', async () => {
+  it('preserves equal settled identity across invalidation', async () => {
     const host = await createStorageHost({
       plugins: [memoryBackendPlugin(undefined, { reactive: reactiveFeature(memoryBackendKind) })]
     })
@@ -63,58 +63,23 @@ describe('reactive Feature', () => {
     const terminal = vi.fn((value: { value: string }) => value)
     const chain = store.use(records).query<{ value: string }>().select(terminal)
     const runtime = createRuntime()
-    const reads: Record<string, number> = {}
-    /** Borrowed getters must be consumed once before creating the Resource. */
-    const read = <T>(name: string, value: T): T => {
-      reads[name] = (reads[name] ?? 0) + 1
-      return value
-    }
     const query = chain.live({
-      get runtime() {
-        return read('runtime', runtime)
-      },
-      get scope() {
-        return read('scope', 'options-scope')
-      },
-      get matches() {
-        return read('matches', () => true)
-      },
-      get keepPreviousData() {
-        return read('keepPreviousData', true)
-      },
-      get equals() {
-        return read('equals', () => true)
-      },
-      get timeoutMs() {
-        return read('timeoutMs', undefined)
-      },
-      get signal() {
-        return read('signal', undefined)
-      },
-      get report() {
-        return read('report', undefined)
-      }
+      runtime,
+      scope: 'options-scope',
+      matches: () => true,
+      keepPreviousData: true,
+      equals: () => true
     })
     await query.ready
     const first = query.state.value.value
     await store.putRecord({ value: 'changed' }, 'record')
     await vi.waitFor(() => expect(terminal).toHaveBeenCalledTimes(2))
     expect(query.state.value.value).toBe(first)
-    expect(reads).toEqual({
-      runtime: 1,
-      scope: 1,
-      matches: 1,
-      keepPreviousData: 1,
-      equals: 1,
-      timeoutMs: 1,
-      signal: 1,
-      report: 1
-    })
     await query.dispose()
     await host.dispose()
   })
 
-  it('preserves the option getter cause before any source subscription', async () => {
+  it('rejects invalid live options before any source subscription', async () => {
     const host = await createStorageHost({
       plugins: [memoryBackendPlugin(undefined, { reactive: reactiveFeature(memoryBackendKind) })]
     })
@@ -125,35 +90,6 @@ describe('reactive Feature', () => {
         .query()
         .live(null as never)
     ).toThrow(expect.objectContaining({ code: 'REACTIVE_FEATURE_INVALID' }))
-    const cause = new Error('live runtime getter failed')
-    expect(() =>
-      host
-        .backend('memory')
-        .use(records)
-        .query()
-        .live({
-          get runtime(): ReturnType<typeof createRuntime> {
-            throw cause
-          }
-        })
-    ).toThrow(expect.objectContaining({ code: 'REACTIVE_FEATURE_INVALID', cause }))
-    const signalCause = new Error('live signal listener getter failed')
-    expect(() =>
-      host
-        .backend('memory')
-        .use(records)
-        .query()
-        .live({
-          runtime: createRuntime(),
-          signal: {
-            aborted: false,
-            get addEventListener(): AbortSignal['addEventListener'] {
-              throw signalCause
-            },
-            removeEventListener: () => {}
-          }
-        })
-    ).toThrow(expect.objectContaining({ code: 'REACTIVE_FEATURE_INVALID', cause: signalCause }))
     await host.dispose()
   })
 
