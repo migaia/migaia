@@ -223,6 +223,53 @@ describe('root-owned strict lock provenance tool', () => {
     expect(authorized.get('ansis')?.version).toBe('4.3.1')
   })
 
+  it('authorizes optional snapshot edges without accepting missing or substituted origins', () => {
+    /** The same packed graph is resolved by pnpm with its edge in the optional group. */
+    const optionalLockfile = replaceUnique(
+      validLockfile,
+      "    dependencies:\n      '@migaia/utils': file:../storage-v2-lock-pack/migaia-utils-0.0.2.tgz",
+      "    optionalDependencies:\n      '@migaia/utils': file:../storage-v2-lock-pack/migaia-utils-0.0.2.tgz"
+    )
+    expect(
+      [
+        ...authorizeStorageV2LockProvenance(optionalLockfile, consumerDirectory, artifacts).keys()
+      ].sort()
+    ).toEqual(['@migaia/storage-web', '@migaia/utils'])
+    expect(() =>
+      authorizeStorageV2LockProvenance(
+        replaceUnique(
+          optionalLockfile,
+          "    optionalDependencies:\n      '@migaia/utils': file:../storage-v2-lock-pack/migaia-utils-0.0.2.tgz",
+          '    optionalDependencies: {}'
+        ),
+        consumerDirectory,
+        artifacts
+      )
+    ).toThrow('@migaia/storage-web resolved dependency edges mismatch')
+    expect(() =>
+      authorizeStorageV2LockProvenance(
+        replaceUnique(
+          optionalLockfile,
+          "'@migaia/utils': file:../storage-v2-lock-pack/migaia-utils-0.0.2.tgz",
+          "'@migaia/utils': file:../forged/utils.tgz"
+        ),
+        consumerDirectory,
+        artifacts
+      )
+    ).toThrow('@migaia/storage-web resolved dependency edges mismatch')
+    expect(() =>
+      authorizeStorageV2LockProvenance(
+        replaceUnique(
+          optionalLockfile,
+          '    optionalDependencies:',
+          "    dependencies:\n      '@migaia/utils': file:../forged/utils.tgz\n    optionalDependencies:"
+        ),
+        consumerDirectory,
+        artifacts
+      )
+    ).toThrow('contains conflicting dependency edge')
+  })
+
   it('keeps the default importer profile exact and rejects duplicated explicit roots', () => {
     expect(() =>
       authorizeStorageV2LockProvenance(peerLockfile, consumerDirectory, peerArtifacts)

@@ -303,23 +303,27 @@ export function parseStorageV2PnpmLockfile(lockfile) {
     /** Snapshot row rejects unknown groups and non-map dependencies. */
     const snapshot = requireMap(snapshotValue, `snapshots.${identity}`)
     requireClosedKeys(snapshot, snapshotRowKeys, `snapshots.${identity}`)
-    if (snapshot.has('optionalDependencies'))
-      requireStringMap(
+    /** Resolved optional peers are runtime edges and use the same exact authorization below. */
+    const dependencies = snapshot.has('dependencies')
+      ? requireStringMap(snapshot.get('dependencies'), `snapshots.${identity}.dependencies`)
+      : new Map()
+    if (snapshot.has('optionalDependencies')) {
+      for (const [name, locator] of requireStringMap(
         snapshot.get('optionalDependencies'),
         `snapshots.${identity}.optionalDependencies`
-      )
+      )) {
+        if (dependencies.has(name) && dependencies.get(name) !== locator)
+          throw new Error(`snapshots.${identity} contains conflicting dependency edge: ${name}`)
+        dependencies.set(name, locator)
+      }
+    }
     if (snapshot.has('transitivePeerDependencies')) {
       /** Transitive peer names are metadata and cannot become hidden graph edges. */
       const peers = snapshot.get('transitivePeerDependencies')
       if (!Array.isArray(peers) || peers.some((value) => typeof value !== 'string'))
         throw new Error(`snapshots.${identity}.transitivePeerDependencies must be a string array`)
     }
-    snapshots.set(
-      identity,
-      snapshot.has('dependencies')
-        ? requireStringMap(snapshot.get('dependencies'), `snapshots.${identity}.dependencies`)
-        : new Map()
-    )
+    snapshots.set(identity, dependencies)
   }
   return { importers, overrides, packages, snapshots }
 }
