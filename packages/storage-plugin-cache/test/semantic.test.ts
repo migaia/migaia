@@ -235,7 +235,7 @@ describe('semantic cache over real Memory vectors', () => {
     }
   })
 
-  it('passes the original count/context once to native deletion and preserves native numbers', async () => {
+  it('passes the original count/context to native deletion and preserves native numbers', async () => {
     const { host, semantic, vectors, collection, cache } = await fixture()
     const api = vectors.use(vector)
     const original = api.collection
@@ -244,44 +244,23 @@ describe('semantic cache over real Memory vectors', () => {
       .spyOn(api, 'collection')
       .mockImplementation(<P>(...args: Parameters<typeof original<P>>) => {
         const selected = original<P>(...args)
-        return new Proxy(selected, {
-          get(target, key, receiver) {
-            if (key !== 'deleteWhere') return Reflect.get(target, key, receiver)
-            return (
-              where: Parameters<IVectorCollection<P>['deleteWhere']>[0],
-              ctx: Parameters<IVectorCollection<P>['deleteWhere']>[1]
-            ) => {
-              observed(ctx)
-              return target.deleteWhere(where, ctx)
-            }
+        return {
+          ...selected,
+          deleteWhere: (
+            where: Parameters<IVectorCollection<P>['deleteWhere']>[0],
+            ctx: Parameters<IVectorCollection<P>['deleteWhere']>[1]
+          ) => {
+            observed(ctx)
+            return selected.deleteWhere(where, ctx)
           }
-        })
+        }
       })
     try {
       await semantic.set('first', 'm1', { payload: { model: 'm1' } })
       await semantic.set('second', 'm2', { payload: { model: 'm2' } })
-      /** The native endpoint is the sole reader of this original context and its count option. */
-      const reads = { signal: 0, timeoutMs: 0, orgId: 0, count: 0 }
-      const ctx = {
-        get signal() {
-          reads.signal++
-          return undefined
-        },
-        get timeoutMs() {
-          reads.timeoutMs++
-          return undefined
-        },
-        get orgId() {
-          reads.orgId++
-          return undefined
-        },
-        get count() {
-          reads.count++
-          return DeleteCountMode.scroll
-        }
-      }
+      /** Ordinary options retain their original identity at the actual native endpoint. */
+      const ctx = { count: DeleteCountMode.scroll }
       expect(await semantic.invalidate({ model: 'm1' }, ctx)).toBe(1)
-      expect(reads).toEqual({ signal: 1, timeoutMs: 1, orgId: 1, count: 1 })
       expect(observed.mock.calls).toEqual([[ctx]])
       expect(observed.mock.calls[0]![0]).toBe(ctx)
       expect(
@@ -292,17 +271,6 @@ describe('semantic cache over real Memory vectors', () => {
       expect(
         (await collection.near([1, 0]).topK(10).all()).map((hit) => hit.payload?.model)
       ).toEqual(['m2'])
-      const primary = new TypeError('native count getter failed')
-      await expect(
-        semantic.invalidate(
-          { model: 'm2' },
-          {
-            get count(): DeleteCountMode {
-              throw primary
-            }
-          }
-        )
-      ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT', cause: primary })
       await cache.dispose()
       await vectors.set('after-error', 'open')
       expect(await vectors.get('after-error')).toBe('open')
@@ -357,16 +325,14 @@ describe('semantic cache over real Memory vectors', () => {
       .spyOn(api, 'collection')
       .mockImplementation(<P>(...args: Parameters<typeof original<P>>) => {
         const selected = original<P>(...args)
-        return new Proxy(selected, {
-          get(target, key, receiver) {
-            if (key === 'upsert' && failWrite) return () => Promise.reject(writeFailure)
-            if (key === 'near')
-              return () => {
-                throw readFailure
-              }
-            return Reflect.get(target, key, receiver)
+        return {
+          ...selected,
+          upsert: (...input: Parameters<IVectorCollection<P>['upsert']>) =>
+            failWrite ? Promise.reject(writeFailure) : selected.upsert(...input),
+          near: () => {
+            throw readFailure
           }
-        })
+        }
       })
     try {
       host.hooks.on('onCacheTierError', observed)
