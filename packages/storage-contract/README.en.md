@@ -168,10 +168,11 @@ Admission reads relevant properties once. Detailed results retain exact reflecti
 
 ### Capability descriptors
 
-`IStorageCapabilities` has nine read-only fields. snapshotStorageCapabilities(value) takes unknown, reads once and returns a new description, not the original object. It is not guaranteed to be frozen. Invalid types or failing accessors return undefined rather than throwing. `isStorageCapabilities(value)` tests whether snapshot admission succeeds; it does not write normalized fields back to the input.
+`IStorageCapabilities` has nine original read-only fields and optional `batch`. snapshotStorageCapabilities(value) takes unknown, reads once and returns a new description, not the original object. It is not guaranteed to be frozen. Invalid types or failing accessors return undefined rather than throwing. `isStorageCapabilities(value)` tests whether snapshot admission succeeds; it does not write normalized fields back to the input.
 
 | Field              | Meaning, default and range                                                                                                                       |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `batch`            | Optional boolean; true declares complete KV batch writes and counted prefix removal. Omission means unsupported.                                 |
 | `syncRead`         | Required boolean: synchronous reads are available.                                                                                               |
 | `binary`           | Required boolean: a byte channel is available.                                                                                                   |
 | `records`          | Required boolean: structured records are available.                                                                                              |
@@ -725,7 +726,7 @@ Text changes use `ITextWatchApi.watch(key,ctx?)` and `ITextChangeFeedApi.subscri
 
 ## Conformance suite
 
-Backend tests import `runConformance` and `IConformanceHarness` from `@migaia/storage-contract/conformance`. Pass the existing runner's describe/it/expect, an independent create factory, the complete token list and Boolean features. Each fixture checks all ten standard tokens against actual has in both directions, then exercises the declared KV, sync, bytes, records, indexes, iteration, transactions and post-commit notifications. Pure vector and SQL subjects need no KV facade.
+Backend tests import `runConformance` and `IConformanceHarness` from `@migaia/storage-contract/conformance`. Pass the existing runner's describe/it/expect and optional `skip: it.skip` to report undeclared batch cases as not applicable, an independent create factory, the complete token list and Boolean features. Each fixture checks all ten standard tokens against actual has in both directions, then exercises the declared KV, sync, bytes, records, indexes, iteration, transactions and post-commit notifications. Pure vector and SQL subjects need no KV facade.
 
 Each case creates and finally disposes its original store; body and cleanup failures remain reachable. Notification cases use only the consumer runner's case timeout. opaqueEntries and approximate maxValueBytes are declaration checks, not proof about hidden keys or exact quotas. The production subpath imports no Vitest, Web, host or driver.
 
@@ -774,3 +775,5 @@ A thrown or rejected scorer produces `RERANK_FAILED` with the original error as 
 Native authors supply the already captured near vector, similarTo ID or recommend ID sets through `IVectorQuerySource.origin`. A source opting into native refinement declares `native: true`; its Feature derives the same bounded query with `refineStorageVectorQuery(query, k => ({ native: capturedOptions, topN }))`. Only that branch adds the opaque `native` fact to the original execution input. Conditions, original k, context, source and resource ownership remain unchanged. Features validate their own options; the common core validates topN and retains the read-only chain. Native results remain eligible for portable `rerank`.
 
 The optional source author hook `beginOperation()` borrows only the provider's existing work lease and returns its original release. Construction, explain, pre-I/O rejection and old non-reranked paths acquire no lease. A new reranked terminal releases after the scorer and original cleanup actually settle; a stream accepts only its first real next, without retaining native liveness for later buffered reads. The hook is captured once and exposes no source, store or close authority, with no additional lifecycle owner.
+
+`IStorageCapabilities.batch` declares the complete KV batch write and counted prefix-removal group. Omission means unsupported; shared conformance reports that group as not applicable when it is not declared.

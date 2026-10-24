@@ -829,6 +829,7 @@ export async function createPostgresStore<T>(
       const base = {
         backend: PgNames.backend,
         capabilities: {
+          batch: true,
           syncRead: false,
           binary: true,
           records: true,

@@ -58,6 +58,7 @@ import {
 } from './construction.js'
 
 const CAPABILITIES: IStorageCapabilities = Object.freeze({
+  batch: false,
   syncRead: true,
   binary: false,
   records: false,
@@ -756,7 +757,7 @@ export const cookiesHost = (
   const store: ISyncCapableStore<ICookieStore> & ITextRedoStore = {
     backend: StorageBackend.cookie,
     capabilities: redoEnabled
-      ? Object.freeze({ ...CAPABILITIES, transactions: true })
+      ? Object.freeze({ ...CAPABILITIES, batch: true, transactions: true })
       : CAPABILITIES,
     sync,
     transaction: redo.transaction,

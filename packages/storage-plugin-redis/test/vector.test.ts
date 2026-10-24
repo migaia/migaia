@@ -367,6 +367,7 @@ for (const service of ['MIGAIA_REDIS_URL', 'MIGAIA_REDIS_STACK_URL'] as const)
           create: async () => (await create()).store,
           capabilities: [kv, records, counter, durableChangeFeed, vector, ttl],
           features: {
+            batch: true,
             syncRead: false,
             binary: true,
             records: true,

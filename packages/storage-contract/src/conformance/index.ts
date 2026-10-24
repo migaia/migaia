@@ -51,6 +51,6 @@ export function runConformance<TStore extends IStorageStore<never>>(
       )
     }
     if (features.changeFeed) feedConformance(check, harness)
-    standardConformance(check, harness, subject.capabilities)
+    standardConformance(check, harness, subject.capabilities, features.batch === true)
   })
 }

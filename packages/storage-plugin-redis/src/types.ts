@@ -26,6 +26,7 @@ export type IRedisCapabilities = typeof kv | typeof records | typeof ttl | typeo
 export type IRedisTransactionScope = ITransactionScope<unknown, IRedisCapabilities>
 /** Native facts describe the implemented Redis mapping, independently of optional server modules. */
 export const redisCapabilities = Object.freeze({
+  batch: true,
   syncRead: false,
   binary: true,
   records: true,

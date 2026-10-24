@@ -68,6 +68,7 @@ function rows<T>(values: readonly T[]): IStorageIterator<T> {
 
 /** The original capability snapshot is explicit even for a pure non-KV subject. */
 const noFeatures: IStorageCapabilities = {
+  batch: true,
   syncRead: false,
   binary: false,
   records: false,
@@ -476,6 +477,29 @@ describe('public consumer-owned conformance', () => {
     for (const item of selected) await item.run()
     expect(created).toHaveLength(selected.length)
     for (const item of created) expect(item.dispose).toHaveBeenCalled()
+  })
+
+  it('reports undeclared native batches as not applicable without creating a fixture', () => {
+    /** Unselected batch cases must never enter an unsupported backend. */
+    const create = vi.fn(() => {
+      /** The public fixture is available only if a selected case actually runs. */
+      const item = fixture()
+      return provideCapabilities(item.base, [implement(kv, item.api)])
+    })
+    /** The runner records the missing optional capability instead of a failing case. */
+    const skip = vi.fn()
+    /** Other declared KV cases remain registered normally. */
+    const register = vi.fn()
+    runConformance(
+      { describe: (_name, run) => void run(), it: register, skip, expect },
+      { name: 'scalar KV', create, capabilities: [kv], features: { ...noFeatures, batch: false } }
+    )
+    expect(skip).toHaveBeenCalledOnce()
+    expect(skip.mock.calls[0]?.[0]).toContain('not applicable: batch not declared')
+    expect(
+      register.mock.calls.some(([name]) => String(name).startsWith('kv · ordered batches'))
+    ).toBe(false)
+    expect(create).not.toHaveBeenCalled()
   })
 
   it('preserves the original body and cleanup failures', async () => {

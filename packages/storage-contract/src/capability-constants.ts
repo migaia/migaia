@@ -29,7 +29,7 @@ export const STORAGE_KEY_VALUE_BASE_METHODS = [
   'clearAll'
 ] as const
 
-/** A published standard KV capability promises the complete native batch surface too. */
+/** Published KV methods keep one callable shape; capabilities.batch declares native batch support. */
 export const STORAGE_KEY_VALUE_METHODS = [
   ...STORAGE_KEY_VALUE_BASE_METHODS,
   ...STORAGE_BATCH_METHODS

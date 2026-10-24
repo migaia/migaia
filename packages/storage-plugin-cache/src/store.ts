@@ -892,6 +892,7 @@ export function createCacheStore(configuration: ICacheConfiguration, core: IStor
       > = {
       backend: CacheText.backend,
       capabilities: Object.freeze({
+        batch: tiers.length === 1,
         syncRead: false,
         binary: false,
         records: false,

@@ -72,6 +72,7 @@ runConformance(
     name: 'native SQLite standard capabilities',
     capabilities: [kv, records, sql, ttl, counter],
     features: {
+      batch: true,
       syncRead: true,
       binary: true,
       records: true,

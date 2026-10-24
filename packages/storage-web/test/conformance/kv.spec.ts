@@ -23,9 +23,10 @@ import { fakeWebStorage } from '../../src/testing/fake-web-storage.js'
 import { fakeCookieDocument } from '../../src/testing/fake-cookie-document.js'
 
 /** The same runner supplies assertions; the canonical suite owns every fresh case fixture. */
-const harness: IConformanceHarness = { describe, expect, it }
+const harness: IConformanceHarness = { describe, expect, it, skip: it.skip }
 /** Each declared field is independently compared with the backend's actual immutable facts. */
 const textFeatures: IStorageCapabilities = {
+  batch: false,
   syncRead: true,
   binary: false,
   records: false,
@@ -65,6 +66,7 @@ runConformance(harness, {
   features: {
     ...textFeatures,
     syncRead: false,
+    batch: true,
     binary: true,
     records: true,
     transactions: true,
@@ -111,6 +113,7 @@ runConformance(harness, {
   capabilities: [kv, records, ttl, counter, vector, rdf, blob],
   features: {
     ...textFeatures,
+    batch: true,
     binary: true,
     records: true,
     transactions: true,

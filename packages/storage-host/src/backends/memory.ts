@@ -1311,6 +1311,7 @@ function createMemoryNamespace<T>(
   const base: IMemoryBase<T> = {
     backend: STORAGE_MEMORY_BACKEND,
     capabilities: Object.freeze({
+      batch: true,
       syncRead: true,
       binary: true,
       records: true,

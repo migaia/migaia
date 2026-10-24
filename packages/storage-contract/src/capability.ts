@@ -75,7 +75,10 @@ export type IStorageStore<TCaps extends IAnyStorageCapability = never> = IStorag
   has(capability: IAnyStorageCapability): boolean
 }
 
-/** The existing KV contract remains the single declaration of its callable API and sync channel. */
+/**
+ * The existing KV contract owns its callable API and sync channel; capabilities.batch declares
+ * batch support.
+ */
 export type IKeyValueApi = Omit<
   IKeyValueStore,
   'backend' | 'capabilities' | 'dispose' | typeof Symbol.asyncDispose

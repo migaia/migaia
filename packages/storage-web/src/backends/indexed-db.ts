@@ -205,6 +205,7 @@ const recordQueryPushdown = {
 } as const
 
 const CAPABILITIES: IStorageCapabilities = Object.freeze({
+  batch: true,
   syncRead: false,
   binary: true,
   records: true,

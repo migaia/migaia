@@ -40,6 +40,8 @@ export type IConformanceAsyncMatchers = {
 export type IConformanceHarness = {
   describe(name: string, run: () => void | PromiseLike<void>): void
   it(name: string, run: () => void | PromiseLike<void>): void
+  /** Report an undeclared optional capability as not applicable in runners that support skips. */
+  skip?(name: string, run: () => void | PromiseLike<void>): void
   expect(actual: unknown): IConformanceMatchers & {
     readonly resolves: IConformanceAsyncMatchers
     readonly rejects: IConformanceAsyncMatchers

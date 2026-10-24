@@ -9,6 +9,7 @@ runConformance(harness, {
   name: 'native memory complete conformance',
   capabilities: [kv, records, ttl, counter, vector, rdf, blob],
   features: {
+    batch: true,
     syncRead: true,
     binary: true,
     records: true,

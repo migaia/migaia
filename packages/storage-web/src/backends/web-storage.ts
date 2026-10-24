@@ -58,6 +58,7 @@ import {
 } from './construction.js'
 
 const CAPABILITIES: IStorageCapabilities = Object.freeze({
+  batch: false,
   syncRead: true,
   binary: false,
   records: false,
@@ -237,7 +238,8 @@ export const createWebStorageBackend = (
   const capabilities = Object.freeze({
     ...CAPABILITIES,
     changeFeed: releaseNativeEvents !== undefined,
-    transactions: redoEnabled
+    transactions: redoEnabled,
+    batch: redoEnabled
   })
 
   const assertLive = (): void => {

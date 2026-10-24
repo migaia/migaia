@@ -17,10 +17,16 @@ import { conformanceApi, conformanceCleanup, invocation } from './harness.js'
 export function standardConformance(
   check: IConformanceCase,
   harness: IConformanceHarness,
-  capabilities: readonly IAnyStorageCapability[]
+  capabilities: readonly IAnyStorageCapability[],
+  batch: boolean
 ): void {
   const expect = harness.expect
-  if (capabilities.includes(kv)) {
+  if (capabilities.includes(kv) && !batch)
+    harness.skip?.(
+      'kv · ordered batches, canonical duplicates and prefix removal (not applicable: batch not declared)',
+      () => undefined
+    )
+  if (capabilities.includes(kv) && batch) {
     check('kv · ordered batches, canonical duplicates and prefix removal', async (store) => {
       const api = conformanceApi(store, kv)
       await api.setMany([

@@ -2871,6 +2871,7 @@ export function createSqliteStore<TValue>(
   const base: ISqliteNativeStore<TValue> = {
     backend: SqliteNames.backend,
     capabilities: Object.freeze({
+      batch: true,
       syncRead: true,
       binary: true,
       records: true,

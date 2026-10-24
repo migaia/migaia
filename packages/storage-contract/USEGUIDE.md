@@ -295,10 +295,11 @@ metadata 供可恢复维护迁移使用，与 values、bytes、records 独立，
 
 ### 能力描述符
 
-`IStorageCapabilities` 的九个字段均只读。snapshotStorageCapabilities(value) 接收 unknown，只读取一次并返回新说明对象；不是原引用，也不保证 Object.freeze。字段访问失败或类型非法返回 undefined，不抛错。`isStorageCapabilities(value)` 等价于该快照函数成功与否的布尔判断，不会把规范化字段写回原对象。
+`IStorageCapabilities` 的九个原字段及可选 `batch` 均只读。snapshotStorageCapabilities(value) 接收 unknown，只读取一次并返回新说明对象；不是原引用，也不保证 Object.freeze。字段访问失败或类型非法返回 undefined，不抛错。`isStorageCapabilities(value)` 等价于该快照函数成功与否的布尔判断，不会把规范化字段写回原对象。
 
 | 字段               | 含义、默认与范围                                                                                         |
 | ------------------ | -------------------------------------------------------------------------------------------------------- |
+| `batch`            | 可选 boolean；true 声明完整 KV 批量写与计数前缀删除，省略表示不支持。                                    |
 | `syncRead`         | 必填 boolean，是否有同步读取能力。                                                                       |
 | `binary`           | 必填 boolean，是否有字节通道。                                                                           |
 | `records`          | 必填 boolean，是否有结构化记录通道。                                                                     |
@@ -852,7 +853,7 @@ RDF 的客户端 `follow`/`inverse` 现在沿同一 reader 逐前驱调用原 `s
 
 ## 一致性套件
 
-后端测试从 `@migaia/storage-contract/conformance` 导入 `runConformance` 与 `IConformanceHarness`，传入现有 runner 的 describe/it/expect、独立 create 工厂、完整 token 清单及布尔 features。套件核对十个标准 token 的实际 has 与清单双向一致，再执行所声明的 KV、同步、字节、记录、索引、迭代、事务与提交后通知行为；纯 vector 或 SQL subject 无需伪造 KV。
+后端测试从 `@migaia/storage-contract/conformance` 导入 `runConformance` 与 `IConformanceHarness`，传入现有 runner 的 describe/it/expect，可选 `skip: it.skip` 将未声明的批量用例报告为不适用，再传入独立 create 工厂、完整 token 清单及布尔 features。套件核对十个标准 token 的实际 has 与清单双向一致，再执行所声明的 KV、同步、字节、记录、索引、迭代、事务与提交后通知行为；纯 vector 或 SQL subject 无需伪造 KV。
 
 每个 case 单独创建并在 finally 释放原 store。主体和清理失败都可追踪。通知仅沿消费者 runner 的 case 超时，不增加统一通知时限；opaqueEntries 与近似 maxValueBytes 只检查声明，不能当作隐藏键或精确配额的证明。生产子路径没有 Vitest、Web、host 或 driver 依赖。
 

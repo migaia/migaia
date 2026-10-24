@@ -6,6 +6,8 @@ export type IBackendKind = string
 
 /** Provider capability facts, independent of any browser or database implementation. */
 export type IStorageCapabilities = {
+  /** Whether native KV batch writes and counted prefix removal are supported. Omission means false. */
+  readonly batch?: boolean
   /** Whether a synchronous key-value channel is available. */
   readonly syncRead: boolean
   /** Whether the provider supports the byte channel. */
@@ -47,6 +49,11 @@ const inspectStorageCapabilities = (value: unknown): IStorageCapabilitiesInspect
   let opaqueEntries: unknown
   let secondaryIndexes: unknown
   let changeFeed: unknown
+  /**
+   * Optional explicit support controls shared batch conformance without inferring from method
+   * shape.
+   */
+  let batch: unknown
   try {
     if (typeof value !== 'object' || value === null || Array.isArray(value))
       return { value: undefined, cause: undefined }
@@ -59,6 +66,7 @@ const inspectStorageCapabilities = (value: unknown): IStorageCapabilitiesInspect
     opaqueEntries = candidate.opaqueEntries
     secondaryIndexes = candidate.secondaryIndexes
     changeFeed = candidate.changeFeed
+    batch = candidate.batch
   } catch (cause) {
     return { value: undefined, cause }
   }
@@ -68,6 +76,7 @@ const inspectStorageCapabilities = (value: unknown): IStorageCapabilitiesInspect
     ) ||
     (secondaryIndexes !== undefined && typeof secondaryIndexes !== 'boolean') ||
     (changeFeed !== undefined && typeof changeFeed !== 'boolean') ||
+    (batch !== undefined && typeof batch !== 'boolean') ||
     (maxValueBytes !== undefined &&
       (typeof maxValueBytes !== 'number' ||
         !Number.isSafeInteger(maxValueBytes) ||
@@ -84,7 +93,8 @@ const inspectStorageCapabilities = (value: unknown): IStorageCapabilitiesInspect
       maxValueBytes: maxValueBytes as number | undefined,
       opaqueEntries: opaqueEntries as boolean,
       secondaryIndexes: secondaryIndexes === undefined ? false : (secondaryIndexes as boolean),
-      changeFeed: changeFeed === undefined ? false : (changeFeed as boolean)
+      changeFeed: changeFeed === undefined ? false : (changeFeed as boolean),
+      ...(batch === undefined ? {} : { batch: batch as boolean })
     },
     cause: undefined
   }

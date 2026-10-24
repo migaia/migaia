@@ -31,6 +31,7 @@ for (const adapter of ['pg', 'postgres-js'] as const)
         ...(adapter === 'pg' ? [durableChangeFeed] : [])
       ],
       features: {
+        batch: true,
         syncRead: false,
         binary: true,
         records: true,

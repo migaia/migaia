@@ -295,10 +295,11 @@ Admission reads relevant properties once. Detailed results retain exact reflecti
 
 ### Capability descriptors
 
-`IStorageCapabilities` has nine read-only fields. snapshotStorageCapabilities(value) takes unknown, reads once and returns a new description, not the original object. It is not guaranteed to be frozen. Invalid types or failing accessors return undefined rather than throwing. `isStorageCapabilities(value)` tests whether snapshot admission succeeds; it does not write normalized fields back to the input.
+`IStorageCapabilities` has nine original read-only fields and optional `batch`. snapshotStorageCapabilities(value) takes unknown, reads once and returns a new description, not the original object. It is not guaranteed to be frozen. Invalid types or failing accessors return undefined rather than throwing. `isStorageCapabilities(value)` tests whether snapshot admission succeeds; it does not write normalized fields back to the input.
 
 | Field              | Meaning, default and range                                                                                                                       |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `batch`            | Optional boolean; true declares complete KV batch writes and counted prefix removal. Omission means unsupported.                                 |
 | `syncRead`         | Required boolean: synchronous reads are available.                                                                                               |
 | `binary`           | Required boolean: a byte channel is available.                                                                                                   |
 | `records`          | Required boolean: structured records are available.                                                                                              |
@@ -852,7 +853,7 @@ Text changes use `ITextWatchApi.watch(key,ctx?)` and `ITextChangeFeedApi.subscri
 
 ## Conformance suite
 
-Backend tests import `runConformance` and `IConformanceHarness` from `@migaia/storage-contract/conformance`. Pass the existing runner's describe/it/expect, an independent create factory, the complete token list and Boolean features. Each fixture checks all ten standard tokens against actual has in both directions, then exercises the declared KV, sync, bytes, records, indexes, iteration, transactions and post-commit notifications. Pure vector and SQL subjects need no KV facade.
+Backend tests import `runConformance` and `IConformanceHarness` from `@migaia/storage-contract/conformance`. Pass the existing runner's describe/it/expect and optional `skip: it.skip` to report undeclared batch cases as not applicable, an independent create factory, the complete token list and Boolean features. Each fixture checks all ten standard tokens against actual has in both directions, then exercises the declared KV, sync, bytes, records, indexes, iteration, transactions and post-commit notifications. Pure vector and SQL subjects need no KV facade.
 
 Each case creates and finally disposes its original store; body and cleanup failures remain reachable. Notification cases use only the consumer runner's case timeout. opaqueEntries and approximate maxValueBytes are declaration checks, not proof about hidden keys or exact quotas. The production subpath imports no Vitest, Web, host or driver.
 
