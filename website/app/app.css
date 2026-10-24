@@ -3263,6 +3263,10 @@ a.library-item:is(:hover, :focus-visible) strong {
 }
 
 @media (max-width: 639px) {
+  .header-actions {
+    gap: var(--space-1);
+  }
+
   h1 {
     font-size: var(--text-2xl);
   }
