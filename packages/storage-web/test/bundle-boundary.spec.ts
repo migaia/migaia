@@ -89,10 +89,10 @@ const browserPackedRoots = ['@migaia/storage-host', '@migaia/storage-web'] as co
 const browserBaselineCommit = '4af04a168f09a4c852fbd94e7f8f6c2d3f335a03'
 /** The original ratio remains an optimization goal rather than a blocking assertion. */
 const browserBundleOptimizationTarget = 1.15
-/** Raw accepted measurements define exact hard ratios without rounded limits or extra headroom. */
+/** User-approved ceilings retain exactly 2% headroom above the explicit base measurement. */
 const browserBundleHardCeiling = {
-  minified: { current: 696281, baseline: 551293 },
-  gzip: { current: 171662, baseline: 132349 }
+  minified: { current: 672521, baseline: 551293 },
+  gzip: { current: 162890, baseline: 132349 }
 } as const
 /** Selected backend plus one entity where/select/all query, with owning cleanup. */
 const browserQueryEntry = [
@@ -112,120 +112,6 @@ const browserQueryEntry = [
   '  } finally { await host.dispose() }',
   '}'
 ].join('\n')
-
-/** The diagnostic variant declares every optional unit while keeping the same query workload. */
-const browserFullQueryEntry = [
-  "import { createStorageHost } from '@migaia/storage-host'",
-  "import { storageJournalPlugin } from '@migaia/storage-host/journal'",
-  "import { defineEntity } from '@migaia/storage-host/entity'",
-  ...['query', 'unique', 'migration', 'indexes', 'keyset'].map(
-    (name) =>
-      `import { entity${name[0]!.toUpperCase()}${name.slice(1)}Feature } from '@migaia/storage-host/entity/${name}'`
-  ),
-  "import { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'",
-  ...['ttl', 'batch', 'journal', 'notifications', 'change-feed', 'indexes', 'keyset'].map(
-    (name) => {
-      /** Public factory spelling follows the explicitly selected IndexedDB Feature entry. */
-      const suffix =
-        name === 'ttl'
-          ? 'Ttl'
-          : name === 'change-feed'
-            ? 'ChangeFeed'
-            : name[0]!.toUpperCase() + name.slice(1)
-      return `import { indexedDb${suffix}Feature } from '@migaia/storage-web/features/indexed-db-${name}'`
-    }
-  ),
-  '/** Read the same active user names with every optional unit explicitly installed.',
-  ' * @param {import("@migaia/storage-web/indexed-db").IIndexedDbOptions} options Native ports/layout.',
-  ' * @param {import("@migaia/storage-host").IStorageJournalOptions["logger"]} logger Borrowed application logger.',
-  ' * @returns {Promise<{name:string}[]>} Names after native query completion.',
-  ' */',
-  'export async function loadActiveUsersWithFeatures(options, logger) {',
-  '  const host = await createStorageHost({',
-  '    plugins: [storageJournalPlugin(), indexedDbBackendPlugin(options, {',
-  '      ttl: indexedDbTtlFeature(), batch: indexedDbBatchFeature(), journal: indexedDbJournalFeature(),',
-  '      notifications: indexedDbNotificationsFeature(), changeFeed: indexedDbChangeFeedFeature(), indexes: indexedDbIndexesFeature(), keyset: indexedDbKeysetFeature()',
-  '    })],',
-  "    journal: { logger, namespace: 'browser-bundle-full' }",
-  '  })',
-  '  try {',
-  "    const users = defineEntity({ name: 'users', key: 'id', features: [",
-  '      entityQueryFeature(), entityUniqueFeature(), entityMigrationFeature(), entityIndexesFeature(), entityKeysetFeature()',
-  "    ] }).connect(host.backend('indexed-db'))",
-  "    return await users.query().where({ active: true }).select('name').all()",
-  '  } finally { await host.dispose() }',
-  '}'
-].join('\n')
-
-/** Diagnose full assembly through the same packed resolver, bundler and emitted-chunk counter. */
-async function measureFullBrowserAssembly(smokeDirectory: string): Promise<void> {
-  /** The optional logger and its unchanged external dependency exist only in this consumer. */
-  const ansisRoot = realpathSync(resolve(repositoryRoot, 'packages/logger/node_modules/ansis'))
-  /** Native manifest identity is preserved when packing the already-installed logger dependency. */
-  const ansisManifest = readJson(join(ansisRoot, 'package.json'))
-  /** Extra artifacts cannot affect the original base consumer's dependency closure. */
-  const artifacts = packReleaseArtifacts(join(smokeDirectory, 'full-artifacts'), repositoryRoot, [
-    ...packedPackages,
-    packageDefinition('logger', '@migaia/logger'),
-    {
-      directory: 'ansis',
-      name: 'ansis',
-      version: String(ansisManifest.version),
-      sourceDirectory: ansisRoot
-    }
-  ])
-  /** The full variant has its own ordinary install and complete optional peer closure. */
-  const consumer = join(smokeDirectory, 'full-consumer')
-  /** Logger remains an explicitly installed application root, never an implicit base dependency. */
-  const roots = [...browserPackedRoots, '@migaia/logger']
-  installPackedConsumer(
-    consumer,
-    artifacts,
-    configuredPnpmStoreDirectory,
-    artifactFor(artifacts, '@migaia/storage-web'),
-    roots
-  )
-  /** Attribution uses the same strict provenance path as the original base fixture. */
-  const installed = inspectInstalledPackageRoots(consumer, artifacts, undefined, roots)
-  writeFileSync(join(consumer, 'bundle-entry.js'), browserFullQueryEntry, 'utf8')
-  /** Actual native output is diagnostic only; no new size or module-count gate is introduced. */
-  const outputs: IRetainedBrowserChunk[] = []
-  await build({
-    ...packedBrowserBuild(consumer),
-    plugins: [
-      {
-        name: 'storage-browser-full-assembly-attribution',
-        generateBundle(_options, bundle) {
-          for (const output of Object.values(bundle)) {
-            if (output.type !== 'chunk') continue
-            outputs.push({
-              fileName: output.fileName,
-              code: output.code,
-              map: output.map,
-              modules: output.modules
-            })
-          }
-        }
-      }
-    ]
-  })
-  writeRenderedBrowserModules(
-    'storage-browser-full-rendered-modules.json',
-    outputs,
-    consumer,
-    installed
-  )
-  /** Count every emitted JavaScript chunk, including explicitly selected optional runtime chunks. */
-  const diagnostic = {
-    currentBytes: browserBundleBytes(join(consumer, 'bundle')),
-    entry: browserFullQueryEntry
-  }
-  writeFileSync(
-    join(repositoryRoot, 'node_modules/.cache/storage-browser-full-measurement.json'),
-    JSON.stringify(diagnostic, null, 2) + '\n'
-  )
-  console.info('browser-bundle-full-diagnostic', diagnostic)
-}
 
 /** The candidate and fixed-main baseline use the original bundler configuration. */
 const packedBrowserBuild = (root: string, write = true, fileName = 'consumer.js') => ({
@@ -322,7 +208,7 @@ async function measureMainBrowserBaseline(smokeDirectory: string) {
         '  const host = await createStorageHost({ plugins: [indexedDbBackendPlugin(options)] })',
         '  try {',
         "    const store = host.backend('indexed-db')",
-        "    const users = defineEntity({ name: 'users', key: 'id' }).connect(store)",
+        "    const users = defineEntity({ name: 'users', key: 'id', features: [entityQueryFeature()] }).connect(store)",
         '    return (await users.list()).filter((user) => user.active === true).map((user) => ({ name: user.name }))',
         '  } finally { await host.dispose() }',
         '}'
@@ -703,7 +589,6 @@ describe('browser bundle boundary', () => {
           )
       )
       expect(forbidden).toEqual([])
-      await measureFullBrowserAssembly(smokeDirectory)
     } finally {
       rmSync(smokeDirectory, { recursive: true, force: true })
     }
