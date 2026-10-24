@@ -1,3 +1,6 @@
+import { entityQueryFeature } from '../src/entity/query-feature.js'
+import { entityUniqueFeature } from '../src/entity/unique-feature.js'
+import { entityIndexesFeature } from '../src/entity/indexes-feature.js'
 import { memoryNotificationsFeature } from '../src/features/memory-notifications.js'
 import { memoryChangeFeedFeature } from '../src/features/memory-change-feed.js'
 import { describe, expect, it } from 'vitest'
@@ -290,6 +293,7 @@ describe('immutable storage organizations', () => {
     const users = defineEntity<{ id: string; email: string }>()({
       name: 'users',
       key: 'id',
+      features: [entityQueryFeature(), entityUniqueFeature(), entityIndexesFeature()],
       indexes: { email: { path: 'email', unique: true } }
     })
     const first = createOrgId()
