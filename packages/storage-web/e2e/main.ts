@@ -16,11 +16,8 @@ import { localStorageBackendPlugin } from '../src/local-storage.js'
 import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
 import { defineEntity } from '@migaia/storage-host/entity'
 import { fromStandardSchema } from '@migaia/storage-host/entity'
-import {
-  assertVersionedEnvelope,
-  createMigrationPlan,
-  migrateEnvelope
-} from '@migaia/storage-contract'
+import { assertVersionedEnvelope } from '@migaia/storage-contract'
+import { createMigrationPlan, migrateEnvelope } from '@migaia/storage-host/authoring/migration'
 import { jsonCodec, selectCodec } from '@migaia/storage-host/entity'
 import type { IRecordIndexHandle, IStorageChange } from '@migaia/storage-contract'
 import { fromIdbRequest, idbTransactionCommit } from '../src/utils/idb-request'

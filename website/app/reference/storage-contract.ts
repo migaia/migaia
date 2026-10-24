@@ -3645,169 +3645,19 @@ console.log(api === store.use(kv)) // true`
     assertVersionedEnvelope: {
       role: 'operation',
       purpose: t(
-        'Validate a plain archive with own safe version and non-null state fields, reading each once without copying state.',
-        '校验普通存档的自有安全版本与非空状态，每字段读取一次，不复制状态。'
+        'Validate a plain archive with own safe version and non-null state fields, retaining the original envelope and caller-owned state.',
+        '校验普通存档的自有安全版本与非空状态，保留原 envelope 与调用方状态引用。'
       ),
       params: {
         value: t('Known envelope or unknown archive input.', '已知 envelope 或未知存档输入。')
       },
       returns: t(
-        'A fresh envelope retaining state identity and known state type; invalid input throws ENVELOPE_INVALID.',
-        '返回新 envelope，保留状态引用与已知类型；无效输入抛 ENVELOPE_INVALID。'
+        'The original envelope retaining state identity and known state type; invalid input throws ENVELOPE_INVALID.',
+        '返回原 envelope，保留状态引用与已知类型；无效输入抛 ENVELOPE_INVALID。'
       ),
       example: `const state = { name: 'Ada' }
 const archive = assertVersionedEnvelope({ version: 1, state })
 console.log(archive.state === state) // true`
-    },
-    createMigrationPlan: {
-      role: 'operation',
-      optionDocs: {
-        version: {
-          summary: t(
-            'Application’s current nonnegative safe integer archive version.',
-            '应用定义的当前存档版本，必须为非负安全整数。'
-          ),
-          example:
-            "import { createMigrationPlan, migrateEnvelopeSync } from '@migaia/storage-contract'\nconst plan = createMigrationPlan({\n  version: 1, steps: { 1: previous => ({ previous }) }\n})\nconsole.log(migrateEnvelopeSync(plan, { version: 0, state: 'old' }))"
-        },
-        reset: {
-          summary: t(
-            'Exclusive reset-plan callback returning one fresh state for any supported older archive; do not combine with steps.',
-            '重置计划专用回调，为受支持旧存档返回一次新状态，与逐步迁移配置互斥。'
-          ),
-          whenToUse: t(
-            'Discard old state instead of applying individual version transitions.',
-            '需要舍弃旧状态而不逐个执行版本转换时使用。'
-          ),
-          example:
-            "import { createMigrationPlan, migrateEnvelopeSync } from '@migaia/storage-contract'\nconst plan = createMigrationPlan({ version: 1, reset: () => ({ settings: {} }) })\nconsole.log(migrateEnvelopeSync(plan, { version: 0, state: 'old' }))",
-          returns: t(
-            'One replacement state, or a Promise used through migrateEnvelope.',
-            '一个替换状态，或通过异步迁移入口使用的承诺。'
-          )
-        },
-        steps: {
-          summary: t(
-            'Own canonical target-version keys mapped to conversion callbacks; the suffix through version must be continuous.',
-            '以自有规范目标版本为键的转换回调表，直到当前版本的后缀必须连续。'
-          ),
-          default: t(
-            'No steps supports only an archive already at the current version.',
-            '没有步骤时只支持已经处于当前版本的存档。'
-          ),
-          example:
-            "import { createMigrationPlan, migrateEnvelopeSync } from '@migaia/storage-contract'\nconst plan = createMigrationPlan({\n  version: 1, steps: { 1: previous => ({ previous }) }\n})\nconsole.log(migrateEnvelopeSync(plan, { version: 0, state: 'old' }))"
-        }
-      },
-      purpose: t(
-        'Snapshot and freeze canonical continuous version steps, or a constant-space reset callback.',
-        '快照并冻结规范连续版本步骤，或常数空间的重置回调。'
-      ),
-      params: {
-        options: t(
-          'Current nonnegative safe version plus optional steps, or an exclusive reset callback.',
-          '当前非负安全版本，加可选 steps 或互斥的 reset 回调。'
-        )
-      },
-      returns: t(
-        'An immutable plan; gaps throw MIGRATION_GAP and malformed options throw INVALID_ARGUMENT.',
-        '返回不可变计划；断档抛 MIGRATION_GAP，配置形态错误抛 INVALID_ARGUMENT。'
-      ),
-      example: `const plan = createMigrationPlan({ version: 2, steps: { 2: value => ({ previous: value }) } })
-console.log(plan.baseVersion, Object.isFrozen(plan.steps)) // 1 true`
-    },
-    migrateEnvelopeSync: {
-      role: 'operation',
-      optionDocs: {
-        observe: {
-          summary: t(
-            'Optional beforeStep/afterStep observations share each actual conversion context; their results never veto migration.',
-            '可选的步骤前后观察共用实际转换上下文，其返回结果不会否决迁移。'
-          ),
-          default: t('No migration step observations.', '省略时不发送迁移步骤观察。'),
-          example: storageContractCases.migrationSyncOptions![0]!.example
-        }
-      },
-      purpose: t(
-        'Run synchronous steps in target-version order. Refuse newer archives and preserve original errors as cause.',
-        '按目标版本顺序执行同步步骤；拒绝未来存档，将原始错误保留在 cause。'
-      ),
-      params: {
-        plan: t(
-          'Immutable plan from createMigrationPlan.',
-          'createMigrationPlan 创建的不可变计划。'
-        ),
-        envelope: t('Validated version/state archive.', '已校验的版本/状态存档。'),
-        options: t(
-          'Optional observation-only beforeStep, afterStep and synchronous report callbacks.',
-          '可选的只观察 beforeStep、afterStep 与同步 report 回调。'
-        )
-      },
-      returns: t(
-        'Current state reference or migration result. Thenables fail with MIGRATION_FAILED; observer promises are not awaited.',
-        '返回当前状态引用或迁移结果；thenable 导致 MIGRATION_FAILED，观察 Promise 不等待。'
-      ),
-      example: `const plan = createMigrationPlan({ version: 1, steps: { 1: value => ({ previous: value }) } })
-console.log(migrateEnvelopeSync(plan, { version: 0, state: 'old' })) // { previous: 'old' }`
-    },
-    migrateEnvelope: {
-      role: 'operation',
-      optionDocs: {
-        observe: {
-          summary: t(
-            'Optional beforeStep/afterStep observations share each actual conversion context; their results never veto migration.',
-            '可选的步骤前后观察共用实际转换上下文，其返回结果不会否决迁移。'
-          ),
-          default: t('No migration step observations.', '省略时不发送迁移步骤观察。'),
-          example: storageContractCases.migrationAsyncOptions![0]!.example
-        },
-        signal: {
-          summary: t(
-            'Borrow the caller’s cancellation signal for waiting and per-step checks, including the unchanged-version path.',
-            '借用调用方取消信号进行等待与逐步检查，同版直接返回前也检查取消。'
-          ),
-          default: t('No external cancellation signal.', '省略时没有外部取消信号。'),
-          example: storageContractCases.migrationAsyncOptions![0]!.example
-        },
-        report: {
-          summary: t(
-            'Original utility reporter receives late rejections and cleanup/reporter context without changing the migration result.',
-            '原工具报告函数接收迟到拒绝及清理或报告阶段上下文，不改变迁移结果。'
-          ),
-          default: t('Use the original host rethrow reporter.', '省略时使用原宿主重抛报告器。'),
-          whenToUse: t(
-            'Observe failures that arrive after a cancelled migration has already settled.',
-            '需要观察已取消迁移结算后到达的迟到失败时使用。'
-          ),
-          example: storageContractCases.migrationAsyncOptions![0]!.example,
-          params: {
-            error: t('Original asynchronous failure.', '原异步失败值。'),
-            context: t('Original utility operation and failure phase.', '原工具操作名与失败阶段。')
-          },
-          returns: t('No result; reporting stays observation-only.', '无返回结果，报告只作观察。')
-        }
-      },
-      purpose: t(
-        'Run asynchronous migrations with shared cancellation and late-rejection reporting, including cancellation before unchanged-version returns.',
-        '借用共享取消与迟到拒绝报告执行异步迁移，同版返回前仍检查取消。'
-      ),
-      params: {
-        plan: t('Immutable migration plan.', '不可变迁移计划。'),
-        envelope: t(
-          'Validated archive; user state mutations are not rolled back.',
-          '已校验存档；用户对状态的修改不会回滚。'
-        ),
-        options: t(
-          'Optional signal, utils reporter and observation-only step callbacks.',
-          '可选 signal、utils reporter 和只观察的步骤回调。'
-        )
-      },
-      returns: t(
-        'Promise for current or migrated state; cancellation rejects ABORTED with the signal reason as cause.',
-        '返回当前或升级后状态的 Promise；取消以 ABORTED 拒绝，cause 为信号原因。'
-      ),
-      example: `const plan = createMigrationPlan({ version: 1, steps: { 1: async value => ({ previous: value }) } })
-console.log(await migrateEnvelope(plan, { version: 0, state: 'old' })) // { previous: 'old' }`
     },
     asRecordStore: {
       role: 'operation',
@@ -9722,7 +9572,7 @@ console.log(candidate.name, candidate.output)`
         }
       ],
       example:
-        "import { createMigrationPlan, migrateEnvelope } from '@migaia/storage-contract'\nconst plan = createMigrationPlan({ version: 1, steps: { 1: old => ({ previous: old }) } })\nconsole.log(await migrateEnvelope(plan, { version: 0, state: 'draft' }))"
+        "import { createMigrationPlan, migrateEnvelope } from '@migaia/storage-host/authoring/migration'\nconst plan = createMigrationPlan({ version: 1, steps: { 1: old => ({ previous: old }) } })\nconsole.log(await migrateEnvelope(plan, { version: 0, state: 'draft' }))"
     },
     IMigrationStepObserver: {
       summary: t(

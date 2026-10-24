@@ -146,12 +146,10 @@ export {
 
 export {
   assertVersionedEnvelope,
-  createMigrationPlan,
-  migrateEnvelopeSync,
-  migrateEnvelope,
   type IVersionedEnvelope,
   type IMigrationStepContext,
   type IMigrationStep,
+  type ISyncMigrationCheck,
   type IMigrationReset,
   type ISyncMigrationSteps,
   type IMigrationPlan,

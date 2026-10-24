@@ -12,7 +12,6 @@ import {
 import { defaultJsonCodec } from '../storage/codec.js'
 import {
   assertVersionedEnvelope,
-  migrateEnvelopeSync,
   StorageStageKind,
   assertTransactionOwner,
   runTransactionOperation,
@@ -24,6 +23,7 @@ import {
   type IMigrationReset,
   type ISyncMigrationSteps
 } from '@migaia/storage-contract'
+import { migrateEnvelopeSync } from '@migaia/storage-host/authoring/migration'
 import { asyncDisposeKey } from '@migaia/plugin-host'
 import { inspectThenable, observeThenableRejection } from '@migaia/utils/function'
 import { isUint8Array } from '@migaia/utils/bytes'

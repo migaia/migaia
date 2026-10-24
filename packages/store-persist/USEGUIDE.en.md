@@ -418,7 +418,7 @@ clearFamily(storage, namespace) requires both arguments and returns `Promise<num
 
 ### Loading, migration, and local edits
 
-Attachment creates one frozen plan before subscribing. Hydration uses storage-contract assertVersionedEnvelope and migrateEnvelopeSync. Matching versions preserve state. Reachable older archives run contiguous steps or one reset; future archives fail with VERSION_UNSUPPORTED. Contract hydration errors pass through unchanged and close writes. Upgrading/restoring alone never writes back; application changes and flush retain existing scheduling.
+Attachment creates one migration plan before subscribing. Hydration uses storage-contract assertVersionedEnvelope and storage-host/authoring/migration migrateEnvelopeSync. Matching versions preserve state. Reachable older archives run contiguous steps or one reset; future archives fail with VERSION_UNSUPPORTED. Contract hydration errors pass through unchanged and close writes. Upgrading/restoring alone never writes back; application changes and flush retain existing scheduling.
 
 Default merging handles plain objects with Object.prototype or null prototypes. It shallowly compares each current field against construction-time startup state using Object.is: locally changed fields win, untouched fields accept the archive, and unarchived current fields remain. It is not deep conflict resolution; mutation inside a retained nested reference is not recursively compared. Retry uses that same startup baseline. Arrays, Maps, Sets, and other non-plain shapes accept the persisted shape wholesale; a custom merge owns its application rules.
 

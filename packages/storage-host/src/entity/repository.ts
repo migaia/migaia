@@ -15,7 +15,6 @@ import { repositoryMigrationKey } from '../core/record-layout.js'
 import {
   StorageContractError,
   assertVersionedEnvelope,
-  migrateEnvelope,
   type IVersionedEnvelope,
   type IMigrationPlan,
   StorageContractErrorCode,
@@ -54,6 +53,7 @@ import {
   type IKeyRange,
   type ISecondaryIndexRecordStore
 } from '@migaia/storage-contract'
+import { migrateEnvelope } from '../authoring/migration.js'
 import { isStorageErrorFamily } from '../core/error-family.js'
 import {
   StorageError,

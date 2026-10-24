@@ -20,6 +20,7 @@ export default defineConfig({
         journal: 'src/journal.ts',
         'authoring/backend': 'src/authoring/backend.ts',
         'authoring/codec': 'src/authoring/codec.ts',
+        'authoring/migration': 'src/authoring/migration.ts',
         'authoring/vector': 'src/authoring/vector.ts',
         'vector/mmr': 'src/vector/mmr.ts'
       },

@@ -438,15 +438,11 @@ pnpm run test
 
 ## Versioned envelopes and chained migrations
 
-`assertVersionedEnvelope` validates own `version` and non-null `state` properties on a plain object. It reads each property once and retains the state reference. A plan snapshots and freezes a continuous version range at creation. These converters own no connections, perform no storage writes, and do not dispose borrowed resources.
+`assertVersionedEnvelope` validates own `version` and non-null `state` properties on a plain object. It retains the original envelope and state references. The host authoring/migration entry captures a continuous callback range before asynchronous execution. These converters own no connections, perform no storage writes, and do not dispose borrowed resources.
 
 ```ts
-import {
-  assertVersionedEnvelope,
-  createMigrationPlan,
-  migrateEnvelopeSync,
-  StorageContractError
-} from '@migaia/storage-contract'
+import { assertVersionedEnvelope, StorageContractError } from '@migaia/storage-contract'
+import { createMigrationPlan, migrateEnvelopeSync } from '@migaia/storage-host/authoring/migration'
 
 try {
   createMigrationPlan({ version: 3, steps: { 1: (value) => value, 3: (value) => value } })

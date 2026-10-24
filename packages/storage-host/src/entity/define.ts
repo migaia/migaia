@@ -3,7 +3,8 @@ import { passthrough } from '../schema/passthrough.js'
 import { createRepository } from './repository.js'
 import type { IEntityConnectStore } from './types.js'
 import type { ISchemaAdapter } from '../entity.js'
-import { createMigrationPlan, type IMigrationStep } from '@migaia/storage-contract'
+import { type IMigrationStep } from '@migaia/storage-contract'
+import { createMigrationPlan } from '../authoring/migration.js'
 import type {
   IEntityDefinition,
   IEntityIndex,

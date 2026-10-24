@@ -4,11 +4,11 @@ import { StorePersistErrorText } from '../error-text.js'
 import { snapshotOwnDescriptors } from '@migaia/utils/object'
 import { observeThenableRejection } from '@migaia/utils/function'
 import {
-  createMigrationPlan,
   type IMigrationPlan,
   type IMigrationStep,
   type IMigrationReset
 } from '@migaia/storage-contract'
+import { createMigrationPlan } from '@migaia/storage-host/authoring/migration'
 
 /** Binds observations without allowing a public observer's accessor or callback to veto work. */
 export function bindPersistStages<

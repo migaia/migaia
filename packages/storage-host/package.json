@@ -42,6 +42,10 @@
       "types": "./dist/authoring/backend.d.ts",
       "default": "./dist/authoring/backend.js"
     },
+    "./authoring/migration": {
+      "types": "./dist/authoring/migration.d.ts",
+      "default": "./dist/authoring/migration.js"
+    },
     "./authoring/codec": {
       "types": "./dist/authoring/codec.d.ts",
       "default": "./dist/authoring/codec.js"

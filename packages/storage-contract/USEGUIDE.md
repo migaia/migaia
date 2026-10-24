@@ -438,15 +438,11 @@ pnpm run test
 
 ## 版本 envelope 与链式升级
 
-`assertVersionedEnvelope` 校验普通对象上的自有 `version` 与非空 `state`，只读取每个属性一次，并保留 state 引用。计划在创建时快照并冻结连续的版本步骤。纯转换器不持有连接，不写存储，也不负责释放调用方资源。
+`assertVersionedEnvelope` 校验普通对象上的自有 `version` 与非空 `state`，保留原 envelope 与 state 引用。host 的 authoring/migration 入口在创建时捕获连续版本步骤，执行跨异步步骤的转换。纯转换器不持有连接，不写存储，也不负责释放调用方资源。
 
 ```ts
-import {
-  assertVersionedEnvelope,
-  createMigrationPlan,
-  migrateEnvelopeSync,
-  StorageContractError
-} from '@migaia/storage-contract'
+import { assertVersionedEnvelope, StorageContractError } from '@migaia/storage-contract'
+import { createMigrationPlan, migrateEnvelopeSync } from '@migaia/storage-host/authoring/migration'
 
 try {
   createMigrationPlan({ version: 3, steps: { 1: (value) => value, 3: (value) => value } })

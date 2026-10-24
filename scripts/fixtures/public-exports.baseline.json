@@ -1061,7 +1061,6 @@
         "compileStorageQueryCondition",
         "compileStorageWhere",
         "counter",
-        "createMigrationPlan",
         "createRdfQuery",
         "createRecordQuery",
         "createSparqlTag",
@@ -1098,8 +1097,6 @@
         "isStorageContractError",
         "kv",
         "lockKey",
-        "migrateEnvelope",
-        "migrateEnvelopeSync",
         "nextTransactionIterator",
         "orderStorageKeysByBytes",
         "prefixStorageOrgGraph",
@@ -1810,6 +1807,7 @@
         "withAbort"
       ],
       "./authoring/codec": ["fromValueCodec"],
+      "./authoring/migration": ["createMigrationPlan", "migrateEnvelope", "migrateEnvelopeSync"],
       "./authoring/vector": [
         "recommendStorageVector"
       ],

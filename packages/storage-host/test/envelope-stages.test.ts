@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
+import { assertVersionedEnvelope } from '@migaia/storage-contract'
 import {
-  assertVersionedEnvelope,
   createMigrationPlan,
   migrateEnvelope,
   migrateEnvelopeSync
-} from '@migaia/storage-contract'
+} from '../src/authoring/migration.js'
 import {
   createStorageHost,
   definePlugin,

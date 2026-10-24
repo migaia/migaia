@@ -33,6 +33,13 @@ const t = (en: string, zh: string): IText => ({ en, zh })
 /** Neutral host and authoring entry, with no browser or native driver import. */
 export const storageHostReference: ILibraryReference = {
   modules: {
+    'authoring/migration': {
+      summary: t(
+        'Execute contiguous envelope recovery with the original cancellation and observation ports.',
+        '复用原取消与观察端口执行连续版本存档恢复。'
+      ),
+      example: storageContractCases.createMigrationPlan![0]!.example
+    },
     'authoring/codec': {
       summary: t(
         'Adapt serialize codecs for asynchronous storage conversion without a second value format.',
@@ -96,6 +103,154 @@ console.log(host.extensions.label('draft'))`
     }
   },
   symbols: {
+    createMigrationPlan: {
+      role: 'operation',
+      optionDocs: {
+        version: {
+          summary: t(
+            'Application’s current nonnegative safe integer archive version.',
+            '应用定义的当前存档版本，必须为非负安全整数。'
+          ),
+          example:
+            "import { createMigrationPlan, migrateEnvelopeSync } from '@migaia/storage-host/authoring/migration'\nconst plan = createMigrationPlan({\n  version: 1, steps: { 1: previous => ({ previous }) }\n})\nconsole.log(migrateEnvelopeSync(plan, { version: 0, state: 'old' }))"
+        },
+        reset: {
+          summary: t(
+            'Exclusive reset-plan callback returning one fresh state for any supported older archive; do not combine with steps.',
+            '重置计划专用回调，为受支持旧存档返回一次新状态，与逐步迁移配置互斥。'
+          ),
+          whenToUse: t(
+            'Discard old state instead of applying individual version transitions.',
+            '需要舍弃旧状态而不逐个执行版本转换时使用。'
+          ),
+          example:
+            "import { createMigrationPlan, migrateEnvelopeSync } from '@migaia/storage-host/authoring/migration'\nconst plan = createMigrationPlan({ version: 1, reset: () => ({ settings: {} }) })\nconsole.log(migrateEnvelopeSync(plan, { version: 0, state: 'old' }))",
+          returns: t(
+            'One replacement state, or a Promise used through migrateEnvelope.',
+            '一个替换状态，或通过异步迁移入口使用的承诺。'
+          )
+        },
+        steps: {
+          summary: t(
+            'Own canonical target-version keys mapped to conversion callbacks; the suffix through version must be continuous.',
+            '以自有规范目标版本为键的转换回调表，直到当前版本的后缀必须连续。'
+          ),
+          default: t(
+            'No steps supports only an archive already at the current version.',
+            '没有步骤时只支持已经处于当前版本的存档。'
+          ),
+          example:
+            "import { createMigrationPlan, migrateEnvelopeSync } from '@migaia/storage-host/authoring/migration'\nconst plan = createMigrationPlan({\n  version: 1, steps: { 1: previous => ({ previous }) }\n})\nconsole.log(migrateEnvelopeSync(plan, { version: 0, state: 'old' }))"
+        }
+      },
+      purpose: t(
+        'Capture canonical continuous version steps before asynchronous execution, or a constant-space reset callback.',
+        '在异步执行前捕获规范连续版本步骤，或常数空间的重置回调。'
+      ),
+      params: {
+        options: t(
+          'Current nonnegative safe version plus optional steps, or an exclusive reset callback.',
+          '当前非负安全版本，加可选 steps 或互斥的 reset 回调。'
+        )
+      },
+      returns: t(
+        'A reusable plan; gaps throw MIGRATION_GAP and malformed options throw INVALID_ARGUMENT.',
+        '返回可复用计划；断档抛 MIGRATION_GAP，配置形态错误抛 INVALID_ARGUMENT。'
+      ),
+      example: `const plan = createMigrationPlan({ version: 2, steps: { 2: value => ({ previous: value }) } })
+console.log(plan.baseVersion, Object.keys(plan.steps)) // 1 ['2']`
+    },
+    migrateEnvelopeSync: {
+      role: 'operation',
+      optionDocs: {
+        observe: {
+          summary: t(
+            'Optional beforeStep/afterStep observations share each actual conversion context; their results never veto migration.',
+            '可选的步骤前后观察共用实际转换上下文，其返回结果不会否决迁移。'
+          ),
+          default: t('No migration step observations.', '省略时不发送迁移步骤观察。'),
+          example: storageContractCases.migrationSyncOptions![0]!.example
+        }
+      },
+      purpose: t(
+        'Run synchronous steps in target-version order. Refuse newer archives and preserve original errors as cause.',
+        '按目标版本顺序执行同步步骤；拒绝未来存档，将原始错误保留在 cause。'
+      ),
+      params: {
+        plan: t('Plan from createMigrationPlan.', 'createMigrationPlan 创建的计划。'),
+        envelope: t('Validated version/state archive.', '已校验的版本/状态存档。'),
+        options: t(
+          'Optional observation-only beforeStep, afterStep and synchronous report callbacks.',
+          '可选的只观察 beforeStep、afterStep 与同步 report 回调。'
+        )
+      },
+      returns: t(
+        'Current state reference or migration result. Thenables fail with MIGRATION_FAILED; observer promises are not awaited.',
+        '返回当前状态引用或迁移结果；thenable 导致 MIGRATION_FAILED，观察 Promise 不等待。'
+      ),
+      example: `const plan = createMigrationPlan({ version: 1, steps: { 1: value => ({ previous: value }) } })
+console.log(migrateEnvelopeSync(plan, { version: 0, state: 'old' })) // { previous: 'old' }`
+    },
+    migrateEnvelope: {
+      role: 'operation',
+      optionDocs: {
+        observe: {
+          summary: t(
+            'Optional beforeStep/afterStep observations share each actual conversion context; their results never veto migration.',
+            '可选的步骤前后观察共用实际转换上下文，其返回结果不会否决迁移。'
+          ),
+          default: t('No migration step observations.', '省略时不发送迁移步骤观察。'),
+          example: storageContractCases.migrationAsyncOptions![0]!.example
+        },
+        signal: {
+          summary: t(
+            'Borrow the caller’s cancellation signal for waiting and per-step checks, including the unchanged-version path.',
+            '借用调用方取消信号进行等待与逐步检查，同版直接返回前也检查取消。'
+          ),
+          default: t('No external cancellation signal.', '省略时没有外部取消信号。'),
+          example: storageContractCases.migrationAsyncOptions![0]!.example
+        },
+        report: {
+          summary: t(
+            'Original utility reporter receives late rejections and cleanup/reporter context without changing the migration result.',
+            '原工具报告函数接收迟到拒绝及清理或报告阶段上下文，不改变迁移结果。'
+          ),
+          default: t('Use the original host rethrow reporter.', '省略时使用原宿主重抛报告器。'),
+          whenToUse: t(
+            'Observe failures that arrive after a cancelled migration has already settled.',
+            '需要观察已取消迁移结算后到达的迟到失败时使用。'
+          ),
+          example: storageContractCases.migrationAsyncOptions![0]!.example,
+          params: {
+            error: t('Original asynchronous failure.', '原异步失败值。'),
+            context: t('Original utility operation and failure phase.', '原工具操作名与失败阶段。')
+          },
+          returns: t('No result; reporting stays observation-only.', '无返回结果，报告只作观察。')
+        }
+      },
+      purpose: t(
+        'Run asynchronous migrations with shared cancellation and late-rejection reporting, including cancellation before unchanged-version returns.',
+        '借用共享取消与迟到拒绝报告执行异步迁移，同版返回前仍检查取消。'
+      ),
+      params: {
+        plan: t('Reusable migration plan.', '可复用迁移计划。'),
+        envelope: t(
+          'Validated archive; user state mutations are not rolled back.',
+          '已校验存档；用户对状态的修改不会回滚。'
+        ),
+        options: t(
+          'Optional signal, utils reporter and observation-only step callbacks.',
+          '可选 signal、utils reporter 和只观察的步骤回调。'
+        )
+      },
+      returns: t(
+        'Promise for current or migrated state; cancellation rejects ABORTED with the signal reason as cause.',
+        '返回当前或升级后状态的 Promise；取消以 ABORTED 拒绝，cause 为信号原因。'
+      ),
+      example: `const plan = createMigrationPlan({ version: 1, steps: { 1: async value => ({ previous: value }) } })
+console.log(await migrateEnvelope(plan, { version: 0, state: 'old' })) // { previous: 'old' }`
+    },
+
     fromValueCodec: {
       role: 'operation',
       purpose: t(

@@ -458,7 +458,7 @@ export const storageContractCases: Readonly<Record<string, readonly ICaseDoc[]>>
         '迁移观察不能否决状态转换，取消与迟到错误沿借用的工具接点处理。'
       ),
       example:
-        "import { createMigrationPlan, migrateEnvelope } from '@migaia/storage-contract'\nconst plan = createMigrationPlan({\n  version: 1, steps: { 1: value => ({ previous: value }) }\n})\nconst controller = new AbortController()\nconst state = await migrateEnvelope(plan, { version: 0, state: 'old' }, {\n  signal: controller.signal,\n  observe: { afterStep: context => console.info(context.toVersion) },\n  report: (error, context) => console.error(context.phase, error)\n})\nconsole.log(state)",
+        "import { createMigrationPlan, migrateEnvelope } from '@migaia/storage-host/authoring/migration'\nconst plan = createMigrationPlan({\n  version: 1, steps: { 1: value => ({ previous: value }) }\n})\nconst controller = new AbortController()\nconst state = await migrateEnvelope(plan, { version: 0, state: 'old' }, {\n  signal: controller.signal,\n  observe: { afterStep: context => console.info(context.toVersion) },\n  report: (error, context) => console.error(context.phase, error)\n})\nconsole.log(state)",
       result: t(
         'Prints the completed step and converted state. The signal can cancel waiting; user mutations are not rolled back.',
         '输出完成的步骤与转换状态；信号可取消等待，用户已做的修改不会回滚。'
@@ -473,7 +473,7 @@ export const storageContractCases: Readonly<Record<string, readonly ICaseDoc[]>>
         '同步读取器需要步骤通知，同时保持源转换失败可见。'
       ),
       example:
-        "import { createMigrationPlan, migrateEnvelopeSync } from '@migaia/storage-contract'\nconst plan = createMigrationPlan({\n  version: 1, steps: { 1: value => ({ previous: value }) }\n})\nconst state = migrateEnvelopeSync(plan, { version: 0, state: 'old' }, {\n  observe: { afterStep: context => console.info(context.toVersion) }\n})\nconsole.log(state)",
+        "import { createMigrationPlan, migrateEnvelopeSync } from '@migaia/storage-host/authoring/migration'\nconst plan = createMigrationPlan({\n  version: 1, steps: { 1: value => ({ previous: value }) }\n})\nconst state = migrateEnvelopeSync(plan, { version: 0, state: 'old' }, {\n  observe: { afterStep: context => console.info(context.toVersion) }\n})\nconsole.log(state)",
       result: t(
         'Runs the synchronous step once; notification results are not awaited and cannot replace its conversion result.',
         '同步步骤运行一次，通知结果不会被等待，也不能替换转换结果。'
@@ -1414,50 +1414,8 @@ console.log(first !== second, Object.isFrozen(first), Object.isFrozen(descriptor
         '持久化读取器必须在创建时拒绝不完整计划，避免旧代码处理未来存档，并保留转换原错身份。'
       ),
       example: t(
-        `import { createMigrationPlan, migrateEnvelopeSync, StorageContractError } from '@migaia/storage-contract'
-try {
-  createMigrationPlan({ version: 3, steps: { 1: value => value, 3: value => value } })
-} catch (error) {
-  if (!(error instanceof StorageContractError)) throw error
-  console.log(error.code) // MIGRATION_GAP
-}
-const plan = createMigrationPlan({ version: 1, reset: () => ({}) })
-try {
-  migrateEnvelopeSync(plan, { version: 2, state: {} })
-} catch (error) {
-  if (!(error instanceof StorageContractError)) throw error
-  console.log(error.code) // VERSION_UNSUPPORTED
-}
-const originalError = new Error('upgrade failed')
-const failing = createMigrationPlan({ version: 1, steps: { 1: () => { throw originalError } } })
-try {
-  migrateEnvelopeSync(failing, { version: 0, state: {} })
-} catch (error) {
-  if (!(error instanceof StorageContractError)) throw error
-  console.log(error.code, error.cause === originalError) // MIGRATION_FAILED true
-}`,
-        `import { createMigrationPlan, migrateEnvelopeSync, StorageContractError } from '@migaia/storage-contract'
-try {
-  createMigrationPlan({ version: 3, steps: { 1: value => value, 3: value => value } })
-} catch (error) {
-  if (!(error instanceof StorageContractError)) throw error
-  console.log(error.code) // MIGRATION_GAP
-}
-const plan = createMigrationPlan({ version: 1, reset: () => ({}) })
-try {
-  migrateEnvelopeSync(plan, { version: 2, state: {} })
-} catch (error) {
-  if (!(error instanceof StorageContractError)) throw error
-  console.log(error.code) // VERSION_UNSUPPORTED
-}
-const originalError = new Error('upgrade failed')
-const failing = createMigrationPlan({ version: 1, steps: { 1: () => { throw originalError } } })
-try {
-  migrateEnvelopeSync(failing, { version: 0, state: {} })
-} catch (error) {
-  if (!(error instanceof StorageContractError)) throw error
-  console.log(error.code, error.cause === originalError) // MIGRATION_FAILED true
-}`
+        "import { StorageContractError } from '@migaia/storage-contract'\nimport { createMigrationPlan, migrateEnvelopeSync } from '@migaia/storage-host/authoring/migration'\ntry {\n  createMigrationPlan({ version: 3, steps: { 1: value => value, 3: value => value } })\n} catch (error) {\n  if (!(error instanceof StorageContractError)) throw error\n  console.log(error.code) // MIGRATION_GAP\n}\nconst plan = createMigrationPlan({ version: 1, reset: () => ({}) })\ntry {\n  migrateEnvelopeSync(plan, { version: 2, state: {} })\n} catch (error) {\n  if (!(error instanceof StorageContractError)) throw error\n  console.log(error.code) // VERSION_UNSUPPORTED\n}\nconst originalError = new Error('upgrade failed')\nconst failing = createMigrationPlan({ version: 1, steps: { 1: () => { throw originalError } } })\ntry {\n  migrateEnvelopeSync(failing, { version: 0, state: {} })\n} catch (error) {\n  if (!(error instanceof StorageContractError)) throw error\n  console.log(error.code, error.cause === originalError) // MIGRATION_FAILED true\n}",
+        "import { StorageContractError } from '@migaia/storage-contract'\nimport { createMigrationPlan, migrateEnvelopeSync } from '@migaia/storage-host/authoring/migration'\ntry {\n  createMigrationPlan({ version: 3, steps: { 1: value => value, 3: value => value } })\n} catch (error) {\n  if (!(error instanceof StorageContractError)) throw error\n  console.log(error.code) // MIGRATION_GAP\n}\nconst plan = createMigrationPlan({ version: 1, reset: () => ({}) })\ntry {\n  migrateEnvelopeSync(plan, { version: 2, state: {} })\n} catch (error) {\n  if (!(error instanceof StorageContractError)) throw error\n  console.log(error.code) // VERSION_UNSUPPORTED\n}\nconst originalError = new Error('upgrade failed')\nconst failing = createMigrationPlan({ version: 1, steps: { 1: () => { throw originalError } } })\ntry {\n  migrateEnvelopeSync(failing, { version: 0, state: {} })\n} catch (error) {\n  if (!(error instanceof StorageContractError)) throw error\n  console.log(error.code, error.cause === originalError) // MIGRATION_FAILED true\n}"
       ),
       result: t(
         'The complete example prints MIGRATION_GAP, VERSION_UNSUPPORTED and MIGRATION_FAILED true. No storage writes occur; current-version state identity is preserved.',
