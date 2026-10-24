@@ -1,0 +1,10 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": [],
+    "lib": ["ES2024", "DOM", "DOM.Iterable", "ESNext.Disposable"]
+  },
+  "files": ["type-cost.ts"],
+  "include": []
+}
