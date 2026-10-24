@@ -1,7 +1,7 @@
 import { describe, expect, it, onTestFinished } from 'vitest'
 import { Store, quad as nativeQuad, namedNode, literal, defaultGraph } from 'oxigraph'
 import { createStorageHost, memoryBackendPlugin, defineFeature } from '@migaia/storage-host'
-import { rdf, sparql, term, type IQuad } from '@migaia/storage-contract'
+import { rdf, sparql, term, type IQuad, type IRdfApi } from '@migaia/storage-contract'
 import { runConformance } from '@migaia/storage-contract/conformance'
 import { sparqlBackendPlugin, sparqlBackendKind } from '../src/index.js'
 import { oxigraphEndpoint } from '../src/oxigraph.js'
@@ -49,6 +49,27 @@ function normalized(quads: readonly IQuad[]): string[] {
   return native.dump({ format: 'application/n-quads' }).trim().split('\n').sort()
 }
 
+/**
+ * Ground membership, canonical duplicate identity and query writes share one portable business
+ * path.
+ */
+async function groundApplication(api: IRdfApi, input: readonly IQuad[]) {
+  await api.add([...input, ...input])
+  const initial = normalized(await api.match({}).all()),
+    selected = normalized(
+      await api
+        .match({})
+        .where((quad) => quad.object.value.includes('o'))
+        .all()
+    ),
+    replacement: IQuad = { ...input[0]!, object: term.literal('replacement') },
+    replaced = await api.match({ graph: term.defaultGraph }).replace(input[0]!, replacement),
+    deleted = await api.match({ graph: input[1]!.graph }).delete(),
+    remaining = normalized(await api.match({}).all())
+  await api.delete([replacement, replacement])
+  return { initial, selected, replaced, deleted, remaining, empty: await api.match({}).all() }
+}
+
 describe('native ground RDF reference behavior', () => {
   it('matches memory N-Quads and client filtering without changing language, datatype or safe literals', async () => {
     await using memory = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })
@@ -75,16 +96,17 @@ describe('native ground RDF reference behavior', () => {
       ],
       expected = memory.backend('memory').use(rdf),
       actual = native.backend('sparql').use(rdf)
-    await expected.add(input)
-    await actual.add(input)
-    expect(normalized(await actual.match({}).all())).toEqual(
-      normalized(await expected.match({}).all())
+    const reference = await groundApplication(expected, input),
+      result = await groundApplication(actual, input)
+    expect(result).toEqual(reference)
+    expect(result.initial).toEqual(normalized(input))
+    expect(result.initial).toHaveLength(3)
+    expect(result.replaced).toBe(1)
+    expect(result.deleted).toBe(2)
+    expect(result.remaining).toEqual(
+      normalized([{ ...input[0]!, object: term.literal('replacement') }])
     )
-    const selected = (quad: IQuad) => quad.object.value.includes('o')
-    expect(normalized(await actual.match({}).where(selected).all())).toEqual(
-      normalized(await expected.match({}).where(selected).all())
-    )
-    expect(normalized(await actual.match({}).all())).toEqual(normalized(input))
+    expect(result.empty).toEqual([])
   })
 
   it('lends the original endpoint to an exact-kind Feature for its native graph update', async () => {

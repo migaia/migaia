@@ -1,3 +1,4 @@
+import { postgresBackendPlugin, type IPgDriver } from '@migaia/storage-plugin-postgres'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import { createClientPool } from 'redis'
 import {
@@ -383,4 +384,42 @@ it('rejects native Features on a memory backend', async () => {
     if (error instanceof AggregateError) chain.push(...error.errors)
   }
   expect(codes).toContain('BACKEND_KIND_MISMATCH')
+})
+
+/**
+ * A type-erased wrong Feature fails at the real PostgreSQL installation boundary before any native
+ * access.
+ */
+it('rejects a Redis Stream Feature on PostgreSQL before driver access', async () => {
+  let nativeCalls = 0
+  const driver: IPgDriver = {
+    async query() {
+      nativeCalls++
+      return { rows: [], rowCount: 0 }
+    },
+    async connect() {
+      nativeCalls++
+      throw new Error('Wrong Feature must be rejected before PostgreSQL acquisition')
+    }
+  }
+  const failure = await createStorageHost({
+    plugins: [
+      postgresBackendPlugin({ driver }, { streams: redisStreamsFeature() as never })
+    ] as const
+  }).then(
+    () => undefined,
+    (error) => error as unknown
+  )
+  expect(failure).toMatchObject({ code: 'BACKEND_INSTALL_FAILED' })
+  const chain: unknown[] = [failure],
+    codes: unknown[] = []
+  for (let index = 0; index < chain.length && index < 16; index++) {
+    const error = chain[index]
+    if (!(error instanceof Error)) continue
+    codes.push(Reflect.get(error, 'code'))
+    if (error.cause !== undefined) chain.push(error.cause)
+    if (error instanceof AggregateError) chain.push(...error.errors)
+  }
+  expect(codes).toContain('BACKEND_KIND_MISMATCH')
+  expect(nativeCalls).toBe(0)
 })
